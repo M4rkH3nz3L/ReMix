@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Remix",
+    "slug": "remix",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/images/icon.png",
+    "scheme": "remix",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0c0d12",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "A Remix a hangfelvételhez (voiceover) használja a mikrofont."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "A Remix a kész videókat a Fotókba menti."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "A Remix a galériából importál videókat és képeket a szerkesztéshez."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A Remix a videó-felvételhez használja a kamerát.",
+          "microphonePermission": "A Remix a videó-felvételhez használja a mikrofont."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

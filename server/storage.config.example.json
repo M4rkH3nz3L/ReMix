@@ -1,0 +1,22 @@
+[
+  {
+    "id": "nas",
+    "type": "webdav",
+    "label": "Otthoni NAS",
+    "baseUrl": "http://192.168.1.10:5005",
+    "path": "/videok",
+    "username": "felhasznalo",
+    "password": "jelszo"
+  },
+  {
+    "id": "felho",
+    "type": "s3",
+    "label": "S3 / MinIO / R2",
+    "bucket": "media",
+    "prefix": "nyersanyag/",
+    "region": "auto",
+    "endpoint": "http://127.0.0.1:9000",
+    "accessKeyId": "ACCESS_KEY",
+    "secretAccessKey": "SECRET_KEY"
+  }
+]

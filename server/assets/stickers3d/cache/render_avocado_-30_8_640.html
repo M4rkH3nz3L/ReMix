@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{
+  "three":"file:///Users/macbook/Herd/vided/server/node_modules/three/build/three.module.js",
+  "three/addons/":"file:///Users/macbook/Herd/vided/server/node_modules/three/examples/jsm/"
+}}</script>
+<style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+window.addEventListener('error', (e) => { document.title = 'error:' + e.message; });
+
+const SIZE = 640;
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(SIZE, SIZE);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+// semleges stúdió-környezet a PBR-anyagokhoz (nincs külön HDRI-fájl)
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 100);
+
+// a three FileLoader-e fetch()-et használ, ami file://-n tiltott — az XHR-re
+// viszont érvényes a --allow-file-access-from-files, azzal olvassuk a glb-t
+const xhr = new XMLHttpRequest();
+xhr.open('GET', 'file:///Users/macbook/Herd/vided/server/assets/stickers3d/Avocado.glb');
+xhr.responseType = 'arraybuffer';
+xhr.onerror = () => { document.title = 'error:xhr'; };
+xhr.onload = () => new GLTFLoader().parse(xhr.response, '', (gltf) => {
+  const obj = gltf.scene;
+  // a kért nézet: a MODELL forog (a kamera fixen néz)
+  obj.rotation.y = -30 * Math.PI / 180;
+  obj.rotation.x = 8 * Math.PI / 180;
+  scene.add(obj);
+  // keretezés a forgatás UTÁNI befoglaló doboz alapján
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const dist = sphere.radius / Math.sin((camera.fov / 2) * Math.PI / 180) * 1.12;
+  camera.position.set(center.x, center.y, center.z + dist);
+  camera.lookAt(center);
+  renderer.render(scene, camera);
+  window.__png = renderer.domElement.toDataURL('image/png');
+  document.title = 'done';
+}, (err) => {
+  document.title = 'error:' + ((err && err.message) || 'betöltés');
+});
+xhr.send();
+</script></body></html>

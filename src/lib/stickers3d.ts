@@ -35,18 +35,18 @@ export async function listStickers3d(): Promise<Sticker3DEntry[] | null> {
 
 /** a sticker PNG letöltése helyi fájlba (weben a távoli URL megy vissza) */
 export const STICKER_MATERIALS = [
-  { id: 'original', label: 'Eredeti' },
-  { id: 'chrome', label: '🪞 Króm' },
-  { id: 'gold', label: '🥇 Arany' },
-  { id: 'glass', label: '🧊 Üveg' },
-  { id: 'matte', label: '⬜ Matt' },
+  { id: 'original', label: 'lib.stickers3d.material.original' },
+  { id: 'chrome', label: 'lib.stickers3d.material.chrome' },
+  { id: 'gold', label: 'lib.stickers3d.material.gold' },
+  { id: 'glass', label: 'lib.stickers3d.material.glass' },
+  { id: 'matte', label: 'lib.stickers3d.material.matte' },
 ] as const;
 
 export const STICKER_ENVIRONMENTS = [
-  { id: 'studio', label: '💡 Studio' },
-  { id: 'sunset', label: '🌅 Sunset' },
-  { id: 'night', label: '🌌 Night' },
-  { id: 'neon', label: '🟣 Neon' },
+  { id: 'studio', label: 'lib.stickers3d.environment.studio' },
+  { id: 'sunset', label: 'lib.stickers3d.environment.sunset' },
+  { id: 'night', label: 'lib.stickers3d.environment.night' },
+  { id: 'neon', label: 'lib.stickers3d.environment.neon' },
 ] as const;
 
 export async function downloadSticker3d(

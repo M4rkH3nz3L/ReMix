@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
 
@@ -37,7 +38,7 @@ export async function captureFrame(
     kind: 'image',
     uri: target.uri,
     provider: 'local',
-    name: 'Képkocka',
+    name: tr('lib.captureFrame.assetName'),
   };
   const image: ImageClip = {
     kind: 'image',

@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import { makeId } from '@/lib/id';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type {
@@ -76,7 +78,7 @@ function musicClip(
     id: makeId('clip'),
     uri: a.uri,
     assetId: a.id,
-    label: a.name ?? 'Zene',
+    label: a.name ?? tr('lib.demoData.labelMusic'),
     volume: 0.7,
     fadeIn: 0.5,
     fadeOut: 1,
@@ -109,12 +111,12 @@ export function buildDemoProjects(media: {
 
   // 0) Hangsávok — réteges hang hullámformákkal (látványterv-demó) ---------
   {
-    const aV = asset('video', 'Színes gradiens', media.szines);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    const aVo = asset('audio', 'Beszéd (voiceover)', media.voice);
+    const aV = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    const aVo = asset('audio', tr('lib.demoData.assetVoiceover'), media.voice);
     const aW = asset('audio', 'Whoosh', media.whoosh);
     const aC = asset('audio', 'Click', media.click);
-    let p = createEmptyProject('🎧 Demó — Hangsávok', '9:16');
+    let p = createEmptyProject(tr('lib.demoData.projectAudioTracks'), '9:16');
     const dur = 8;
     p = fill(p, {
       video: [
@@ -135,7 +137,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.3,
           duration: 3,
-          text: '🎧 Réteges hang',
+          text: tr('lib.demoData.textLayeredAudio'),
           stylePreset: 'outline',
           fontSize: 6,
           position: { x: 0.5, y: 0.15 },
@@ -143,7 +145,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 3.6,
           duration: 4,
-          text: 'zene + voiceover + SFX egyszerre',
+          text: tr('lib.demoData.textMusicVoiceoverSfx'),
           fontSize: 4.5,
           position: { x: 0.5, y: 0.85 },
         }),
@@ -183,9 +185,9 @@ export function buildDemoProjects(media: {
 
   // 1) Kulcskockás mozgás + blur-háttér ------------------------------------
   {
-    const aV = asset('video', 'Színes gradiens', media.szines);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('✨ Demó — Kulcskockás mozgás', '9:16');
+    const aV = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.projectKeyframeMotion'), '9:16');
     const dur = Math.min(8, media.szines.duration);
     p = fill(p, {
       video: [
@@ -225,7 +227,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 2.8,
           duration: 4.4,
-          text: 'Kulcskockás zoom + blur háttér',
+          text: tr('lib.demoData.textKeyframeZoomBlur'),
           fontSize: 4.5,
           position: { x: 0.5, y: 0.78 },
         }),
@@ -237,10 +239,10 @@ export function buildDemoProjects(media: {
 
   // 2) Maszk + green screen -------------------------------------------------
   {
-    const aF = asset('video', 'Fraktál-zoom', media.fraktal);
-    const aZ = asset('video', 'Green screen', media.zold);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('🎭 Demó — Maszk és green screen', '9:16');
+    const aF = asset('video', tr('lib.demoData.assetFractalZoom'), media.fraktal);
+    const aZ = asset('video', tr('lib.demoData.assetGreenScreen'), media.zold);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.projectMaskGreenScreen'), '9:16');
     const d1 = Math.min(4, media.fraktal.duration);
     const d2 = Math.min(5, media.zold.duration);
     p = fill(p, {
@@ -262,14 +264,14 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.4,
           duration: d1 - 0.6,
-          text: 'Lágy szélű maszk',
+          text: tr('lib.demoData.textSoftEdgeMask'),
           stylePreset: 'outline',
           position: { x: 0.5, y: 0.14 },
         }),
         textClip({
           start: d1 + 0.5,
           duration: d2 - 1,
-          text: 'Green screen ✂️',
+          text: tr('lib.demoData.textGreenScreen'),
           position: { x: 0.5, y: 0.16 },
         }),
       ],
@@ -289,10 +291,10 @@ export function buildDemoProjects(media: {
 
   // 3) Beat-vágás -----------------------------------------------------------
   {
-    const aF = asset('video', 'Fraktál-zoom', media.fraktal);
-    const aS = asset('video', 'Színes gradiens', media.szines);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('🎵 Demó — Beat-vágás', '9:16');
+    const aF = asset('video', tr('lib.demoData.assetFractalZoom'), media.fraktal);
+    const aS = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.projectBeatCut'), '9:16');
     // pörgős jump-cutok: fél másodperces darabok a forrás különböző pontjairól
     const trims = [0, 2.5, 5, 1.2, 3.8, 6.2, 0.6, 4.4];
     const cuts: Clip[] = trims.map((trimIn, i) =>
@@ -321,7 +323,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.2,
           duration: 3.6,
-          text: 'Vágás a zene ütemére',
+          text: tr('lib.demoData.textCutToTheBeat'),
           animation: 'karaoke',
           stylePreset: 'outline',
           position: { x: 0.5, y: 0.2 },
@@ -330,7 +332,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 4.4,
           duration: 2.8,
-          text: '🎵 Auto Beat Edit',
+          text: tr('lib.demoData.textAutoBeatEdit'),
           position: { x: 0.5, y: 0.78 },
           fontSize: 5,
         }),
@@ -344,9 +346,9 @@ export function buildDemoProjects(media: {
 
   // 4) Beszéd + felirat + Voice Studio -------------------------------------
   {
-    const aB = asset('video', 'Beszédes klip', media.beszed);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('🎙️ Demó — Felirat és Voice Studio', '9:16');
+    const aB = asset('video', tr('lib.demoData.assetSpeechClip'), media.beszed);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.projectCaptionsVoiceStudio'), '9:16');
     const dur = Math.min(7.6, media.beszed.duration);
     p = fill(p, {
       video: [
@@ -356,7 +358,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.3,
           duration: 2.6,
-          text: '✨ Enhance Voice + auto-felirat',
+          text: tr('lib.demoData.textEnhanceVoiceAutoCaption'),
           stylePreset: 'outline',
           fontSize: 4.5,
           position: { x: 0.5, y: 0.12 },
@@ -366,21 +368,21 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.1,
           duration: 2.3,
-          text: 'Ez itt a Remix alkalmazás tesztje',
+          text: tr('lib.demoData.captionRemixTest'),
           fontSize: 5,
           position: { x: 0.5, y: 0.78 },
         }),
         textClip({
           start: 2.5,
           duration: 3,
-          text: 'az automatikus felirat a beszédből készül',
+          text: tr('lib.demoData.captionAutoFromSpeech'),
           fontSize: 5,
           position: { x: 0.5, y: 0.78 },
         }),
         textClip({
           start: 5.6,
           duration: 1.9,
-          text: 'próbáld ki te is! 🚀',
+          text: tr('lib.demoData.captionTryItToo'),
           fontSize: 5,
           position: { x: 0.5, y: 0.78 },
         }),
@@ -393,11 +395,11 @@ export function buildDemoProjects(media: {
 
   // 5) Minden egyben (mini-showreel) ---------------------------------------
   {
-    const aS = asset('video', 'Színes gradiens', media.szines);
-    const aF = asset('video', 'Fraktál-zoom', media.fraktal);
-    const aZ = asset('video', 'Green screen', media.zold);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('🚀 Demó — Minden egyben', '9:16');
+    const aS = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aF = asset('video', tr('lib.demoData.assetFractalZoom'), media.fraktal);
+    const aZ = asset('video', tr('lib.demoData.assetGreenScreen'), media.zold);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.projectAllInOne'), '9:16');
     p = fill(p, {
       video: [
         videoClip(aS, {
@@ -448,7 +450,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 5.2,
           duration: 2.4,
-          text: 'Készítsd el a sajátod! 📱',
+          text: tr('lib.demoData.textMakeYourOwn'),
           fontSize: 5,
           position: { x: 0.5, y: 0.8 },
         }),
@@ -469,10 +471,10 @@ export function buildDemoProjects(media: {
 
   // 6) 3D tér, mozgás-elmosás és részecskék (3D V2 + speed ramp v2) --------
   {
-    const aS = asset('video', 'Színes gradiens', media.szines);
-    const aF = asset('video', 'Fraktál-zoom', media.fraktal);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
-    let p = createEmptyProject('🧊 Demó — 3D tér & mozgás', '9:16');
+    const aS = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aF = asset('video', tr('lib.demoData.assetFractalZoom'), media.fraktal);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
+    let p = createEmptyProject(tr('lib.demoData.project3dSpaceMotion'), '9:16');
     p = fill(p, {
       video: [
         // 3D döntés + neon világítás — a klip „lapként” fordul a térben
@@ -535,7 +537,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: 0.3,
           duration: 2.1,
-          text: '3D döntés + fény',
+          text: tr('lib.demoData.text3dTiltLight'),
           stylePreset: 'outline',
           fontSize: 6.5,
           position: { x: 0.5, y: 0.16 },
@@ -543,21 +545,21 @@ export function buildDemoProjects(media: {
         textClip({
           start: 2.8,
           duration: 1.1,
-          text: '⚡ gyorsítás — mozgás-elmosással',
+          text: tr('lib.demoData.textSpeedUpMotionBlur'),
           fontSize: 4.5,
           position: { x: 0.5, y: 0.85 },
         }),
         textClip({
           start: 4.2,
           duration: 1.8,
-          text: '🐢 lassítás — interpolált kockákkal',
+          text: tr('lib.demoData.textSlowDownInterpolated'),
           fontSize: 4.5,
           position: { x: 0.5, y: 0.85 },
         }),
         textClip({
           start: 6.5,
           duration: 1.9,
-          text: 'freeform maszk',
+          text: tr('lib.demoData.textFreeformMask'),
           stylePreset: 'neon',
           fontSize: 6,
           position: { x: 0.5, y: 0.83 },
@@ -572,12 +574,12 @@ export function buildDemoProjects(media: {
 
   // 7) Márka-intro/outro + Sound Design (a vágásokra hangolt SFX) ----------
   {
-    const aB = asset('video', 'Beszéd', media.beszed);
-    const aS = asset('video', 'Színes gradiens', media.szines);
-    const aM = asset('audio', 'Lo-fi demó', media.zene);
+    const aB = asset('video', tr('lib.demoData.assetSpeech'), media.beszed);
+    const aS = asset('video', tr('lib.demoData.assetColorGradient'), media.szines);
+    const aM = asset('audio', tr('lib.demoData.assetLofiDemo'), media.zene);
     const aW = asset('audio', 'Whoosh', media.whoosh);
     const aC = asset('audio', 'Click', media.click);
-    let p = createEmptyProject('🎬 Demó — Márka intro/outro', '9:16');
+    let p = createEmptyProject(tr('lib.demoData.projectBrandIntroOutro'), '9:16');
     const accent = '#ff2d55';
     const introDur = 1.6;
     const bodyEnd = introDur + 6.4;
@@ -656,7 +658,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: bodyEnd + 0.15,
           duration: outroDur - 0.15,
-          text: 'Kövess be 🔔',
+          text: tr('lib.demoData.textFollowMe'),
           fontSize: 10,
           stylePreset: 'plain',
           position: { x: 0.5, y: 0.44 },
@@ -664,7 +666,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: bodyEnd + 0.55,
           duration: outroDur - 0.55,
-          text: 'Több ilyen videóért',
+          text: tr('lib.demoData.textForMoreVideos'),
           fontSize: 5,
           animation: 'fade',
           stylePreset: 'plain',
@@ -676,7 +678,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: introDur + 0.3,
           duration: 1.6,
-          text: 'Három vágás, három hang',
+          text: tr('lib.demoData.captionThreeCutsThreeSounds'),
           fontSize: 5.5,
           animation: 'karaoke',
           emphasis: [0],
@@ -685,7 +687,7 @@ export function buildDemoProjects(media: {
         textClip({
           start: introDur + 2.1,
           duration: 1.5,
-          text: 'a whoosh a vágásra esik',
+          text: tr('lib.demoData.captionWhooshOnCut'),
           fontSize: 5.5,
           animation: 'karaoke',
           emphasis: [1],
@@ -701,7 +703,7 @@ export function buildDemoProjects(media: {
           volume: 0.62,
           fadeIn: 0,
           fadeOut: 0.12,
-          label: 'Whoosh — vágás',
+          label: tr('lib.demoData.sfxWhooshCut'),
         }),
         musicClip(aC, {
           start: bodyEnd,
@@ -709,7 +711,7 @@ export function buildDemoProjects(media: {
           volume: 0.5,
           fadeIn: 0,
           fadeOut: 0.1,
-          label: 'Click — outro',
+          label: tr('lib.demoData.sfxClickOutro'),
         }),
       ],
     });

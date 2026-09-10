@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
@@ -63,9 +64,8 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
  */
 const serverLibraryProvider: StorageProvider = {
   id: 'server-library',
-  label: 'Szerver-tár',
-  description:
-    'A worker server/library mappája — másolj bele videót/képet/zenét, és itt megjelenik.',
+  label: 'lib.storageProviders.serverLibrary.label',
+  description: 'lib.storageProviders.serverLibrary.description',
 
   async isAvailable() {
     try {
@@ -79,7 +79,7 @@ const serverLibraryProvider: StorageProvider = {
   async list() {
     const res = await fetchWithTimeout(`${renderServerUrl()}/library`, 5000);
     if (!res.ok) {
-      throw new Error('A médiatár nem érhető el.');
+      throw new Error(tr('lib.storageProviders.libraryUnavailable'));
     }
     const body = await res.json();
     return body.entries as StorageEntry[];
@@ -118,7 +118,9 @@ function remoteSourceProvider(source: {
   return {
     id: `remote-${source.id}`,
     label: source.label,
-    description: `Távoli forrás a workeren keresztül (${source.type}).`,
+    description: tr('lib.storageProviders.remoteSource.description', {
+      type: source.type,
+    }),
 
     async isAvailable() {
       try {
@@ -136,7 +138,7 @@ function remoteSourceProvider(source: {
       );
       const body = await res.json();
       if (!res.ok) {
-        throw new Error(body.error ?? 'A forrás nem érhető el.');
+        throw new Error(body.error ?? tr('lib.storageProviders.sourceUnavailable'));
       }
       return body.entries as StorageEntry[];
     },

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
@@ -43,6 +44,7 @@ export function AiActivity({
    * azért indul mindig 0-ról, mert a hívó `key`-t ad a lépés nevéből — új
    * lépésnél a komponens újramountolódik, és az állapot magától nullázódik.
    */
+  const { t } = useTranslation();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -62,11 +64,9 @@ export function AiActivity({
             {busyLabel}
           </Text>
           <Text style={styles.sub}>
-            {elapsed} mp
-            {elapsed >= 12
-              ? ' · a helyben futó modell lassabb lehet, még dolgozik'
-              : ''}
-            {elapsed >= 45 ? ' · ha 90 mp-nél tovább tart, magától leáll' : ''}
+            {t('editor.aiActivity.elapsedSeconds', { count: elapsed })}
+            {elapsed >= 12 ? t('editor.aiActivity.slowLocalModel') : ''}
+            {elapsed >= 45 ? t('editor.aiActivity.autoStopHint') : ''}
           </Text>
         </View>
       </View>
@@ -91,7 +91,7 @@ export function AiActivity({
         <Text style={styles.label} numberOfLines={4}>
           {result.text}
         </Text>
-        <Text style={styles.sub}>Koppints az elrejtéshez</Text>
+        <Text style={styles.sub}>{t('editor.aiActivity.tapToHide')}</Text>
       </View>
     </Pressable>
   );

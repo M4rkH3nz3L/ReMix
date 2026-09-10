@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
@@ -37,9 +38,9 @@ const RESOLUTIONS = [
 ] as const;
 const FPS_OPTIONS = [24, 30, 60] as const;
 const QUALITIES = [
-  { id: 'low', label: 'Takarékos' },
-  { id: 'medium', label: 'Normál' },
-  { id: 'high', label: 'Magas' },
+  { id: 'low' },
+  { id: 'medium' },
+  { id: 'high' },
 ] as const;
 
 /** hozzávetőleges bitráta (Mbps) felbontás + minőség szerint, 30 fps-re */
@@ -47,6 +48,7 @@ const BASE_MBPS: Record<number, number> = { 480: 2.2, 720: 4.5, 1080: 8, 2160: 2
 const QUALITY_MULT = { low: 0.55, medium: 1, high: 1.5 } as const;
 
 export function ExportPanel() {
+  const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const isPro = useEntitlement((s) => s.isPro());
   const mockDowngrade = useEntitlement((s) => s.mockDowngrade);
@@ -71,14 +73,14 @@ export function ExportPanel() {
     if (headlineStatus) {
       return;
     }
-    setHeadlineStatus('Címek írása…');
+    setHeadlineStatus(t('panels.export.writingHeadlines'));
     try {
       const transcript = await getTimelineTranscript(project).catch(() => null);
       const lines = (transcript ?? []).slice(0, 12).map((l) => l.text);
       const summary = `${project.name}\n${lines.join('\n')}`.slice(0, 800);
       const list = await fetchThumbHeadlines(summary);
       if (!list) {
-        Alert.alert('AI-címek', 'A címjavaslat nem érhető el — fut a worker + AI?');
+        Alert.alert(t('panels.export.aiHeadlinesTitle'), t('panels.export.headlinesUnavailable'));
         return;
       }
       setHeadlines(list);
@@ -93,11 +95,11 @@ export function ExportPanel() {
     try {
       let final = thumb;
       if (selectedHeadline) {
-        setThumbStatus('Cím ráégetése…');
+        setThumbStatus(t('panels.export.burningHeadline'));
         const composed = await composeThumbnail(thumb, selectedHeadline);
         setThumbStatus(null);
         if (!composed) {
-          Alert.alert('Thumbnail Studio', 'A cím ráégetése nem sikerült.');
+          Alert.alert('Thumbnail Studio', t('panels.export.headlineBurnFailed'));
           return;
         }
         final = composed;
@@ -105,7 +107,7 @@ export function ExportPanel() {
       await saveAndShareThumbnail(final, project.name);
     } catch {
       setThumbStatus(null);
-      Alert.alert('Thumbnail Studio', 'A mentés nem sikerült.');
+      Alert.alert('Thumbnail Studio', t('panels.export.saveFailed'));
     }
   };
 
@@ -119,13 +121,13 @@ export function ExportPanel() {
     if (renderStatus) {
       return; // már fut
     }
-    setRenderStatus('Folyamatban…');
-    withCancellableProgress('Export az eszközön', (report, signal) =>
+    setRenderStatus(t('common.processing'));
+    withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
       renderAndShareMp4(project, report, { resolution, fps, quality }, { mode: 'local', signal })
     )
       .catch((err: Error) => {
         if (!isRenderCancelledError(err)) {
-          Alert.alert('Export az eszközön', err.message);
+          Alert.alert(t('panels.export.exportOnDevice'), err.message);
         }
       })
       .finally(() => setRenderStatus(null));
@@ -136,22 +138,22 @@ export function ExportPanel() {
     if (renderStatus) {
       return; // már fut
     }
-    setRenderStatus('Folyamatban…');
+    setRenderStatus(t('common.processing'));
     void guardPro(
       () =>
-        withCancellableProgress('Felhő HD render', (report, signal) =>
+        withCancellableProgress(t('panels.export.cloudHdRender'), (report, signal) =>
           renderAndShareMp4(project, report, { resolution, fps, quality }, { mode: 'cloud', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
-          Alert.alert('Felhő-render', err.message);
+          Alert.alert(t('panels.export.cloudRenderTitle'), err.message);
         }
       }
     ).finally(() => setRenderStatus(null));
   };
 
   const guard = (fn: () => Promise<void>) => () => {
-    fn().catch(() => Alert.alert('Hiba', 'A megosztás nem sikerült.'));
+    fn().catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
   };
 
   // 📲 Posztolás egy platformra: render → Fotókba mentés → a platform megnyitása.
@@ -160,15 +162,15 @@ export function ExportPanel() {
     if (renderStatus) {
       return;
     }
-    setRenderStatus('Folyamatban…');
+    setRenderStatus(t('common.processing'));
     void guardPro(
       () =>
-        withCancellableProgress(`Posztolás — ${target}`, (report, signal) =>
+        withCancellableProgress(t('panels.export.postTo', { target }), (report, signal) =>
           renderAndPost(project, target, report, { resolution, fps, quality }, { mode: 'auto', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
-          Alert.alert('Posztolás', err.message);
+          Alert.alert(t('panels.export.postingTitle'), err.message);
         }
       }
     ).finally(() => setRenderStatus(null));
@@ -178,10 +180,10 @@ export function ExportPanel() {
     shareCaptionsSrt(project)
       .then((had) => {
         if (!had) {
-          Alert.alert('Nincs felirat', 'A szövegsáv üres — előbb adj hozzá feliratokat.');
+          Alert.alert(t('panels.export.noCaptionsTitle'), t('panels.export.noCaptionsMessage'));
         }
       })
-      .catch(() => Alert.alert('Hiba', 'A megosztás nem sikerült.'));
+      .catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
   };
 
   return (
@@ -189,20 +191,20 @@ export function ExportPanel() {
       {isPro ? (
         <Pressable style={styles.proActive} onLongPress={mockDowngrade}>
           <Ionicons name="sparkles" size={15} color={palette.accent} />
-          <Text style={styles.proActiveText}>Remix Pro aktív — felhő + AI feloldva</Text>
+          <Text style={styles.proActiveText}>{t('panels.export.proActive')}</Text>
         </Pressable>
       ) : (
         <Pressable style={styles.proBanner} onPress={() => openPaywall()}>
           <Ionicons name="rocket-outline" size={16} color={palette.text} />
           <Text style={styles.proBannerText}>
-            Remix Pro: AI-eszközök + felhő-HD render a szervereinken
+            {t('panels.export.proBanner')}
           </Text>
           <Ionicons name="chevron-forward" size={16} color={palette.textDim} />
         </Pressable>
       )}
 
-      <PanelSection title="Videó (MP4)">
-        <Text style={styles.settingLabel}>Felbontás</Text>
+      <PanelSection title={t('panels.export.videoSection')}>
+        <Text style={styles.settingLabel}>{t('panels.export.resolution')}</Text>
         <View style={styles.row}>
           {RESOLUTIONS.map((r) => (
             <Chip
@@ -213,7 +215,7 @@ export function ExportPanel() {
             />
           ))}
         </View>
-        <Text style={styles.settingLabel}>Képfrissítés</Text>
+        <Text style={styles.settingLabel}>{t('panels.export.frameRate')}</Text>
         <View style={styles.row}>
           {FPS_OPTIONS.map((f) => (
             <Chip
@@ -224,12 +226,12 @@ export function ExportPanel() {
             />
           ))}
         </View>
-        <Text style={styles.settingLabel}>Minőség</Text>
+        <Text style={styles.settingLabel}>{t('panels.export.quality')}</Text>
         <View style={styles.row}>
           {QUALITIES.map((q) => (
             <Chip
               key={q.id}
-              label={q.label}
+              label={t('panels.export.quality_' + q.id)}
               active={quality === q.id}
               onPress={() => setQuality(q.id)}
             />
@@ -240,7 +242,7 @@ export function ExportPanel() {
         </Text>
         <PrimaryButton
           icon="phone-portrait-outline"
-          label={renderStatus ?? 'Export az eszközön · ingyen'}
+          label={renderStatus ?? t('panels.export.exportOnDeviceFree')}
           onPress={exportLocal}
         />
         <Pressable
@@ -249,30 +251,27 @@ export function ExportPanel() {
           onPress={exportCloud}
         >
           <Ionicons name="cloud-upload-outline" size={16} color={palette.accent} />
-          <Text style={styles.cloudText}>Felhő HD render</Text>
+          <Text style={styles.cloudText}>{t('panels.export.cloudHdRender')}</Text>
           <View style={styles.proTag}>
             <Text style={styles.proTagText}>PRO</Text>
           </View>
         </Pressable>
         <Text style={styles.note}>
-          Az <Text style={styles.strong}>eszközön-render</Text> a telefonodon készül,
-          szerver nélkül, ingyen — szűrők, áttűnések, feliratok és szöveganimációk
-          beégetve. A <Text style={styles.strong}>felhő-HD render (Pro)</Text> a mi
-          szervereinken fut: nagyobb felbontás, gyorsabb, a telefon nem melegszik.
+          {t('panels.export.videoNoteA')}<Text style={styles.strong}>{t('panels.export.videoNoteBoldLocal')}</Text>{t('panels.export.videoNoteB')}<Text style={styles.strong}>{t('panels.export.videoNoteBoldCloud')}</Text>{t('panels.export.videoNoteC')}
           {!isNativeRenderAvailable()
-            ? ' (Ebben a futtatásban — Expo Go — az eszközön-render még nem elérhető; natív buildben aktiválódik.)'
+            ? t('panels.export.videoNoteExpoGo')
             : ''}
         </Text>
       </PanelSection>
 
-      <PanelSection title="📲 Posztolás közösségi platformra">
+      <PanelSection title={t('panels.export.postSection')}>
         <View style={styles.postRow}>
           {(
             [
               { target: 'tiktok', icon: 'logo-tiktok', color: palette.text, label: 'TikTok' },
               { target: 'reels', icon: 'logo-instagram', color: '#e1306c', label: 'Reels' },
               { target: 'youtube', icon: 'logo-youtube', color: '#ff0033', label: 'YouTube' },
-              { target: 'other', icon: 'share-social-outline', color: palette.textDim, label: 'Egyéb' },
+              { target: 'other', icon: 'share-social-outline', color: palette.textDim, label: t('panels.export.otherPlatform') },
             ] as const
           ).map((p) => (
             <Pressable
@@ -287,31 +286,26 @@ export function ExportPanel() {
           ))}
         </View>
         <Text style={styles.note}>
-          A videó lerenderelődik és a **Fotókba** kerül, majd megnyílik a platform:
-          a TikTok/YouTube a megosztó-lapról (válaszd ki az appot), a Reels iOS-en
-          közvetlenül a szerkesztőbe. A feliratot és a hangot a platform appjában
-          adod hozzá, egy koppintással posztolsz. *(A teljesen automatikus, appból
-          induló feltöltéshez a platformok hivatalos API-ja + saját fejlesztői
-          kulcsaid kellenének — az külön réteg, szólj, ha bekötjük.)*
+          {t('panels.export.postNote')}
         </Text>
       </PanelSection>
 
       <PanelSection title="Thumbnail Studio">
         <PrimaryButton
           icon="images-outline"
-          label={thumbStatus ?? 'Borítókép-javaslatok'}
+          label={thumbStatus ?? t('panels.export.thumbSuggestions')}
           onPress={() => {
             if (thumbStatus) {
               return;
             }
             setThumbs(null);
-            setThumbStatus('Legjobb kockák keresése…');
+            setThumbStatus(t('panels.export.findingBestFrames'));
             suggestThumbnails(project)
               .then((result) => {
                 if (!result) {
                   Alert.alert(
                     'Thumbnail Studio',
-                    'Nincs videóklip, vagy a worker nem érhető el.'
+                    t('panels.export.noVideoClip')
                   );
                   return;
                 }
@@ -331,13 +325,13 @@ export function ExportPanel() {
                   }}
                 >
                   <Image source={{ uri: thumb.uri }} style={styles.thumb} contentFit="cover" />
-                  <Text style={styles.thumbMeta}>{thumb.t.toFixed(0)} mp</Text>
+                  <Text style={styles.thumbMeta}>{t('panels.export.seconds', { seconds: thumb.t.toFixed(0) })}</Text>
                 </Pressable>
               ))}
             </View>
             <View style={styles.headlineRow}>
               <Chip
-                label={headlineStatus ?? '🎬 AI-címjavaslatok'}
+                label={headlineStatus ?? t('panels.export.aiHeadlineChip')}
                 active={false}
                 onPress={() => {
                   void loadHeadlines();
@@ -357,51 +351,47 @@ export function ExportPanel() {
           </>
         ) : null}
         <Text style={styles.note}>
-          A legjobb kockák a videóból — az arcot mutató kockák előnyt kapnak.
-          Válassz AI-címet, és koppints egy kockára: a felirat ráég a borítóra,
-          ami a Fotókba mentődik és megosztható. Cím nélkül a nyers kocka megy.
+          {t('panels.export.thumbNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Feliratok">
+      <PanelSection title={t('panels.export.captionsSection')}>
         <PrimaryButton
           icon="chatbox-ellipses-outline"
-          label="Feliratok megosztása (SRT)"
+          label={t('panels.export.shareCaptionsSrt')}
           onPress={exportSrt}
         />
         <Text style={styles.note}>
-          A szövegsáv időzített feliratai szabvány SubRip formátumban — TikTok,
-          YouTube és bármely lejátszó fogadja.
+          {t('panels.export.captionsNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Interaktív metaadat">
+      <PanelSection title={t('panels.export.interactiveSection')}>
         <PrimaryButton
           icon="code-download-outline"
-          label="Hotspot-JSON megosztása"
+          label={t('panels.export.shareHotspotJson')}
           onPress={guard(() => shareInteractiveMetadata(project))}
         />
         <Text style={styles.note}>
-          Az interaktív elemek nem kerülnek bele a videóba — ezt a JSON-t a lejátszó
-          overlay-ként értelmezi a kész MP4 fölött.
+          {t('panels.export.interactiveNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Projektfájl">
+      <PanelSection title={t('panels.export.projectFileSection')}>
         <PrimaryButton
           icon="document-outline"
-          label=".remix projektfájl megosztása"
+          label={t('panels.export.shareRemixFile')}
           onPress={guard(() => shareVidedFile(project))}
         />
         <PrimaryButton
           icon="archive-outline"
-          label={collectStatus ?? 'Collect — csomag a médiával (zip)'}
+          label={collectStatus ?? t('panels.export.collectZip')}
           onPress={() => {
             if (collectStatus) {
               return; // már fut
             }
-            setCollectStatus('Folyamatban…');
-            withProgress('Collect — csomagolás', (report) =>
+            setCollectStatus(t('common.processing'));
+            withProgress(t('panels.export.collectPackaging'), (report) =>
               collectAndShareProject(project, report)
             )
               .catch((err: Error) => Alert.alert('Collect', err.message))
@@ -409,10 +399,7 @@ export function ExportPanel() {
           }}
         />
         <Text style={styles.note}>
-          A .vided fájl a projekt + asset-referenciák (média nélkül) — a főképernyő
-          import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect
-          a workeren csomagol mindent egyetlen zip-be (project.vided + media/) —
-          átadáshoz, archiváláshoz.
+          {t('panels.export.projectFileNote')}
         </Text>
       </PanelSection>
     </View>

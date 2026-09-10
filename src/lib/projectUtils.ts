@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
@@ -14,14 +16,14 @@ import type {
 } from '@/types/project';
 
 const CANONICAL_TRACKS: { type: TrackType; name: string }[] = [
-  { type: 'video', name: 'Videó' },
+  { type: 'video', name: 'lib.projectUtils.trackVideo' },
   { type: 'pip', name: 'PiP' },
   { type: 'adjust', name: 'Grade' },
-  { type: 'text', name: 'Szöveg' },
-  { type: 'captions', name: 'Felirat' },
-  { type: 'overlay', name: 'Matrica' },
-  { type: 'interactive', name: 'Interaktív' },
-  { type: 'music', name: 'Zene' },
+  { type: 'text', name: 'lib.projectUtils.trackText' },
+  { type: 'captions', name: 'lib.projectUtils.trackCaptions' },
+  { type: 'overlay', name: 'lib.projectUtils.trackOverlay' },
+  { type: 'interactive', name: 'lib.projectUtils.trackInteractive' },
+  { type: 'music', name: 'lib.projectUtils.trackMusic' },
   { type: 'voiceover', name: 'Voiceover' },
   { type: 'sfx', name: 'SFX' },
 ];
@@ -35,7 +37,7 @@ export function createEmptyProject(name: string, aspectRatio: AspectRatio): Proj
     tracks: CANONICAL_TRACKS.map((t) => ({
       id: makeId('trk'),
       type: t.type,
-      name: t.name,
+      name: tr(t.name),
       clips: [],
     })),
     assets: [],
@@ -55,7 +57,7 @@ function ensureCanonicalTracks(project: Project): Project {
   const missing = CANONICAL_TRACKS.filter((t) => !have.has(t.type)).map((t) => ({
     id: makeId('trk'),
     type: t.type,
-    name: t.name,
+    name: tr(t.name),
     clips: [] as Clip[],
   }));
   return { ...project, tracks: [...project.tracks, ...missing], schemaVersion: 5 };
@@ -147,7 +149,7 @@ function migrateToV3(project: Project): Project {
     tracks: CANONICAL_TRACKS.map((t) => ({
       id: byType.get(t.type)?.id ?? makeId('trk'),
       type: t.type,
-      name: t.name,
+      name: tr(t.name),
       clips: clipsFor(t.type),
     })),
     schemaVersion: 3,

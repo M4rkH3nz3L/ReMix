@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { buildDemoProjects } from '@/lib/demoData';
@@ -60,7 +61,7 @@ async function resolveLibraryFile(id: string): Promise<DemoMedia | null> {
 export async function createDemoProjects(
   onProgress?: (u: ProgressUpdate) => void
 ): Promise<number> {
-  onProgress?.({ phase: 'Demó-média letöltése', ratio: 0.1 });
+  onProgress?.({ phase: tr('lib.demoProjects.phaseDownloadMedia'), ratio: 0.1 });
   const [szines, fraktal, zold, beszed, zene, voice, whoosh, click] =
     await Promise.all([
       resolveLibraryFile('demo-szines.mp4'),
@@ -73,12 +74,10 @@ export async function createDemoProjects(
       resolveLibraryFile('sfx-click.m4a'),
     ]);
   if (!szines || !fraktal || !zold || !beszed || !zene || !voice || !whoosh || !click) {
-    throw new Error(
-      'A demó-média nem érhető el — fut a worker? (cd server && npm start)'
-    );
+    throw new Error(tr('lib.demoProjects.mediaUnavailable'));
   }
 
-  onProgress?.({ phase: 'Projektek összeállítása', ratio: 0.7 });
+  onProgress?.({ phase: tr('lib.demoProjects.phaseAssembleProjects'), ratio: 0.7 });
   const existing = new Set((await listProjects()).map((m) => m.name));
   const demos = buildDemoProjects({
     szines,

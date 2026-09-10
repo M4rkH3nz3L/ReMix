@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import { findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type {
   AspectRatio,
@@ -259,38 +261,50 @@ function addClips(project: Project, trackType: TrackType, clips: Clip[]): Projec
 export function describeCommand(cmd: EditorCommand): string {
   switch (cmd.type) {
     case 'ADD_CLIP':
-      return `${cmd.clip.kind} klip hozzáadva (${cmd.trackType} sáv)`;
+      return tr('lib.commands.addClip', { kind: cmd.clip.kind, trackType: cmd.trackType });
     case 'ADD_CLIPS':
-      return `${cmd.clips.length} klip hozzáadva (${cmd.trackType} sáv)`;
+      return tr('lib.commands.addClips', { count: cmd.clips.length, trackType: cmd.trackType });
     case 'UPDATE_CLIP':
-      return `klip módosítva: ${Object.keys(cmd.patch).join(', ')}`;
+      return tr('lib.commands.updateClip', { keys: Object.keys(cmd.patch).join(', ') });
     case 'REMOVE_CLIP':
-      return 'klip törölve';
+      return tr('lib.commands.removeClip');
     case 'SPLIT_CLIP':
-      return `klip kettévágva ${cmd.time.toFixed(2)} mp-nél`;
+      return tr('lib.commands.splitClip', { time: cmd.time.toFixed(2) });
     case 'SET_ASPECT':
-      return `képarány: ${cmd.aspectRatio}`;
+      return tr('lib.commands.setAspect', { aspectRatio: cmd.aspectRatio });
     case 'RENAME_PROJECT':
-      return `projekt átnevezve: ${cmd.name}`;
+      return tr('lib.commands.renameProject', { name: cmd.name });
     case 'SET_PARTICLES':
       return cmd.particles
-        ? `részecskék: ${cmd.particles.preset}${cmd.particles.beatSync ? ' (beat-sync)' : ''}`
-        : 'részecskék kikapcsolva';
+        ? tr('lib.commands.setParticles', {
+            preset: cmd.particles.preset,
+            beatSync: cmd.particles.beatSync ? tr('lib.commands.beatSyncSuffix') : '',
+          })
+        : tr('lib.commands.particlesOff');
     case 'ADD_ASSET':
-      return `asset regisztrálva: ${cmd.asset.name ?? cmd.asset.kind}`;
+      return tr('lib.commands.addAsset', { name: cmd.asset.name ?? cmd.asset.kind });
     case 'REPLACE_TRACK_CLIPS':
-      return `${cmd.trackType} sáv újraépítve (${cmd.clips.length} klip)`;
+      return tr('lib.commands.replaceTrackClips', {
+        trackType: cmd.trackType,
+        count: cmd.clips.length,
+      });
     case 'SET_MARKERS':
-      return `jelölők (${cmd.markers.length})`;
+      return tr('lib.commands.setMarkers', { count: cmd.markers.length });
     case 'UPSERT_IMAGE_DOC':
-      return cmd.label ?? `kép-dokumentum: ${cmd.doc.name} (${cmd.doc.layers.length} réteg)`;
-    case 'REMOVE_IMAGE_DOC':
-      return 'kép-dokumentum törölve';
-    case 'REPLACE_TRACKS':
       return (
-        cmd.label ?? `${cmd.tracks.length} sáv újraépítve`
+        cmd.label ??
+        tr('lib.commands.upsertImageDoc', {
+          name: cmd.doc.name,
+          count: cmd.doc.layers.length,
+        })
       );
+    case 'REMOVE_IMAGE_DOC':
+      return tr('lib.commands.removeImageDoc');
+    case 'REPLACE_TRACKS':
+      return cmd.label ?? tr('lib.commands.replaceTracks', { count: cmd.tracks.length });
     case 'RELINK_URI':
-      return `média újracsatolva: ${cmd.newUri.split('/').pop() ?? cmd.newUri}`;
+      return tr('lib.commands.relinkUri', {
+        file: cmd.newUri.split('/').pop() ?? cmd.newUri,
+      });
   }
 }

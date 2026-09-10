@@ -11,10 +11,10 @@ import { mediaFormData, uploadFetch } from '@/lib/upload';
  */
 
 export const SKY_PRESETS = [
-  { id: 'sunset', label: '🌅 Naplemente' },
-  { id: 'storm', label: '⛈️ Vihar' },
-  { id: 'night', label: '🌌 Éjszaka' },
-  { id: 'cinematic', label: '🎬 Filmes' },
+  { id: 'sunset', label: 'lib.sky.sunset' },
+  { id: 'storm', label: 'lib.sky.storm' },
+  { id: 'night', label: 'lib.sky.night' },
+  { id: 'cinematic', label: 'lib.sky.cinematic' },
 ] as const;
 
 export type SkyPreset = (typeof SKY_PRESETS)[number]['id'];

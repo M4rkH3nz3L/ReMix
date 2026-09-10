@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import type { TranscriptLine } from '@/lib/transcripts';
 import type { SearchHit } from '@/lib/visionIndex';
 
@@ -41,7 +43,7 @@ export function searchTranscript(
       time: line.start,
       uri: '',
       description: line.text,
-      labels: ['átirat'],
+      labels: [tr('lib.transcriptSearch.label')],
       // teljes token-egyezés = 1; részleges arányosan (min. 1 token kell)
       score: Math.round((matched / tokens.length) * 100) / 100,
       source: 'transcript',

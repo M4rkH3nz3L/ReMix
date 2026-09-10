@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   FlatList,
@@ -17,10 +18,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { aspectRatios, palette } from '@/constants/editor';
 import { gridColumns } from '@/constants/layout';
-import { createProjectFromTemplate, templates } from '@/constants/templates';
+import {
+  createProjectFromTemplate,
+  templateDescriptionKey,
+  templateNameKey,
+  templates,
+} from '@/constants/templates';
 import type { VideoTemplate } from '@/constants/templates';
 import { useLayout } from '@/hooks/useLayout';
 import { withProgress } from '@/store/progressStore';
@@ -82,6 +89,8 @@ export default function ProjectsScreen() {
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [demoBusy, setDemoBusy] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const { t } = useTranslation();
   const L = useLayout();
   // a kártya kívánt szélességéből számolt rács — iPaden 3–4 oszlop is lehet,
   // a korábbi fix „640px → 2 oszlop" helyett (lásd @/constants/layout)
@@ -94,7 +103,7 @@ export default function ProjectsScreen() {
   useFocusEffect(refresh);
 
   const create = async () => {
-    const project = createEmptyProject(name.trim() || 'Új videó', aspect);
+    const project = createEmptyProject(name.trim() || t('home.newVideoDefault'), aspect);
     await saveProject(project);
     setCreating(false);
     setName('');
@@ -105,14 +114,14 @@ export default function ProjectsScreen() {
     const project = createProjectFromTemplate(template);
     saveProject(project)
       .then(() => router.push(`/editor/${project.id}`))
-      .catch(() => Alert.alert('Hiba', 'A projekt létrehozása nem sikerült.'));
+      .catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
   };
 
   const confirmDelete = (meta: ProjectMeta) => {
-    Alert.alert('Projekt törlése', `Biztosan törlöd: „${meta.name}"?`, [
-      { text: 'Mégse', style: 'cancel' },
+    Alert.alert(t('home.deleteTitle'), t('home.deleteMessage', { name: meta.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Törlés',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           deleteProject(meta.id).then(refresh).catch(() => {});
@@ -130,12 +139,12 @@ export default function ProjectsScreen() {
         return saveProject({
           ...p,
           id: makeId('prj'),
-          name: `${p.name} (másolat)`,
+          name: `${p.name}${t('home.copySuffix')}`,
           createdAt: new Date().toISOString(),
         });
       })
       .then(refresh)
-      .catch(() => Alert.alert('Hiba', 'A duplikálás nem sikerült.'));
+      .catch(() => Alert.alert(t('common.error'), t('home.duplicateFailed')));
   };
 
   const startRename = (meta: ProjectMeta) => {
@@ -153,15 +162,15 @@ export default function ProjectsScreen() {
     loadProject(meta.id)
       .then((p) => (p ? saveProject({ ...p, name: nextName }) : undefined))
       .then(refresh)
-      .catch(() => Alert.alert('Hiba', 'Az átnevezés nem sikerült.'));
+      .catch(() => Alert.alert(t('common.error'), t('home.renameFailed')));
   };
 
   const projectMenu = (meta: ProjectMeta) => {
     Alert.alert(meta.name, undefined, [
-      { text: 'Átnevezés', onPress: () => startRename(meta) },
-      { text: 'Duplikálás', onPress: () => duplicate(meta) },
-      { text: 'Törlés', style: 'destructive', onPress: () => confirmDelete(meta) },
-      { text: 'Mégse', style: 'cancel' },
+      { text: t('common.rename'), onPress: () => startRename(meta) },
+      { text: t('common.duplicate'), onPress: () => duplicate(meta) },
+      { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(meta) },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -177,30 +186,31 @@ export default function ProjectsScreen() {
               refresh();
               router.push(`/editor/${p.id}`);
             })
-            .catch(() => Alert.alert('Import', 'A projekt mentése nem sikerült.'));
+            .catch(() => Alert.alert(t('common.import'), t('home.saveFailed')));
         };
         if (result.missing.length === 0) {
           if (result.relinked > 0) {
             Alert.alert(
-              'Import kész',
-              `${result.relinked} médiafájl tartalom-egyezés alapján automatikusan újracsatolva.`
+              t('home.importDoneTitle'),
+              t('home.importRelinked', { count: result.relinked })
             );
           }
           finish(result.project);
           return;
         }
         Alert.alert(
-          'Hiányzó média',
-          `${result.missing.length} médiafájl nincs meg ezen az eszközön` +
+          t('home.missingMediaTitle'),
+          t('home.missingMediaCount', { count: result.missing.length }) +
             (result.relinked > 0
-              ? ` (${result.relinked} másikat tartalom-egyezés alapján már újracsatoltunk)`
+              ? ' ' + t('home.missingMediaRelinkedNote', { count: result.relinked })
               : '') +
-            '. Újracsatolod őket most?',
+            '. ' +
+            t('home.missingMediaAsk'),
           [
-            { text: 'Mégse', style: 'cancel' },
-            { text: 'Később', onPress: () => finish(result.project) },
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.later'), onPress: () => finish(result.project) },
             {
-              text: 'Újracsatolás',
+              text: t('home.relink'),
               onPress: () => {
                 relinkInteractive(result.project, result.missing).then(finish);
               },
@@ -208,7 +218,7 @@ export default function ProjectsScreen() {
           ]
         );
       })
-      .catch((err: Error) => Alert.alert('Import', err.message));
+      .catch((err: Error) => Alert.alert(t('common.import'), err.message));
   };
 
   return (
@@ -218,25 +228,33 @@ export default function ProjectsScreen() {
           <Ionicons name="shuffle" size={20} color="#fff" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Remix</Text>
+          <Text style={styles.title}>{t('home.appName')}</Text>
         </View>
+        <Pressable
+          onPress={() => setLangOpen(true)}
+          hitSlop={8}
+          style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('language.title')}
+        >
+          <Ionicons name="language-outline" size={20} color={palette.textDim} />
+          <Text style={styles.importLabel}>{t('language.title')}</Text>
+        </Pressable>
         <Pressable
           onPress={() => {
             if (demoBusy) {
               return;
             }
             setDemoBusy(true);
-            withProgress('Demó projektek', (report) => createDemoProjects(report))
+            withProgress(t('home.demoProgressLabel'), (report) => createDemoProjects(report))
               .then((n) => {
                 refresh();
                 Alert.alert(
-                  'Demó-projektek',
-                  n > 0
-                    ? `${n} bemutató-projekt létrehozva — nyisd meg őket lejátszásra, és próbáld ki a renderelést is!`
-                    : 'A demó-projektek már léteznek.'
+                  t('home.demoTitle'),
+                  n > 0 ? t('home.demoCreated', { count: n }) : t('home.demoExist')
                 );
               })
-              .catch((err: Error) => Alert.alert('Demó-projektek', err.message))
+              .catch((err: Error) => Alert.alert(t('home.demoTitle'), err.message))
               .finally(() => setDemoBusy(false));
           }}
           hitSlop={8}
@@ -247,16 +265,16 @@ export default function ProjectsScreen() {
             size={20}
             color={palette.textDim}
           />
-          <Text style={styles.importLabel}>{demoBusy ? 'Demók…' : 'Demók'}</Text>
+          <Text style={styles.importLabel}>{demoBusy ? t('home.demosLoading') : t('home.demos')}</Text>
         </Pressable>
         <Pressable onPress={importVided} hitSlop={8} style={styles.importButton}>
           <Ionicons name="download-outline" size={20} color={palette.textDim} />
-          <Text style={styles.importLabel}>Import</Text>
+          <Text style={styles.importLabel}>{t('common.import')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.ctaWrap}>
-        <PrimaryButton icon="add" label="Új projekt" onPress={() => setCreating(true)} />
+        <PrimaryButton icon="add" label={t('home.newProject')} onPress={() => setCreating(true)} />
       </View>
 
       <FlatList
@@ -269,8 +287,10 @@ export default function ProjectsScreen() {
         ListHeaderComponent={
           projects.length > 0 ? (
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionLabel}>Utolsó projektek</Text>
-              <Text style={styles.sectionHint}>{projects.length} projekt</Text>
+              <Text style={styles.sectionLabel}>{t('home.recentProjects')}</Text>
+              <Text style={styles.sectionHint}>
+                {t('home.projectCount', { count: projects.length })}
+              </Text>
             </View>
           ) : null
         }
@@ -278,15 +298,17 @@ export default function ProjectsScreen() {
           <View style={styles.empty}>
             <Ionicons name="film-outline" size={44} color={palette.border} />
             <Text style={styles.emptyText}>
-              Még nincs projekted.{'\n'}Hozd létre az elsőt a fenti gombbal!
+              {t('home.emptyTitle')}
+              {'\n'}
+              {t('home.emptyHint')}
             </Text>
           </View>
         }
         ListFooterComponent={
           <View style={styles.templatesBlock}>
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionLabel}>Sablonok</Text>
-              <Text style={styles.sectionHint}>Összes</Text>
+              <Text style={styles.sectionLabel}>{t('home.templates')}</Text>
+              <Text style={styles.sectionHint}>{t('common.all')}</Text>
             </View>
             <ScrollView
               horizontal
@@ -304,15 +326,15 @@ export default function ProjectsScreen() {
                   >
                     {template.trending ? (
                       <View style={styles.trendBadge}>
-                        <Text style={styles.trendBadgeText}>🔥 TREND</Text>
+                        <Text style={styles.trendBadgeText}>{t('home.trend')}</Text>
                       </View>
                     ) : null}
                     <Text style={styles.templateEmoji}>{template.emoji}</Text>
                     <Text style={styles.templateName} numberOfLines={1}>
-                      {template.name}
+                      {t(templateNameKey(template.id))}
                     </Text>
                     <Text style={styles.templateDesc} numberOfLines={2}>
-                      {template.description}
+                      {t(templateDescriptionKey(template.id))}
                     </Text>
                     <Text style={styles.templateMeta}>{template.aspectRatio}</Text>
                   </Pressable>
@@ -332,7 +354,8 @@ export default function ProjectsScreen() {
                 {item.name}
               </Text>
               <Text style={styles.cardMeta}>
-                {item.aspectRatio} · {formatTime(item.duration)} · {item.clipCount} klip
+                {item.aspectRatio} · {formatTime(item.duration)} ·{' '}
+                {t('home.clipCount', { count: item.clipCount })}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
@@ -343,20 +366,16 @@ export default function ProjectsScreen() {
       <View style={styles.tabBar}>
         {(
           [
-            { icon: 'albums', label: 'Projektek', active: true, onPress: () => {} },
+            { icon: 'albums', label: t('home.tabProjects'), active: true, onPress: () => {} },
             {
               icon: 'grid-outline',
-              label: 'Sablonok',
+              label: t('home.tabTemplates'),
               onPress: () => setCreating(true),
             },
             {
               icon: 'sparkles-outline',
-              label: 'AI Tools',
-              onPress: () =>
-                Alert.alert(
-                  'AI Tools',
-                  'Az AI-eszközök a szerkesztőben érhetők el (AI gomb): Auto Edit, Smart Search, vágó-eszközök.'
-                ),
+              label: t('home.tabAiTools'),
+              onPress: () => Alert.alert(t('home.aiToolsTitle'), t('home.aiToolsMessage')),
             },
           ] as const
         ).map((tab) => (
@@ -385,11 +404,11 @@ export default function ProjectsScreen() {
         >
           <View style={styles.modalCard}>
             <View style={styles.modalGrabber} />
-            <Text style={styles.modalTitle}>Új projekt</Text>
+            <Text style={styles.modalTitle}>{t('home.newProject')}</Text>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="Projekt neve"
+              placeholder={t('home.projectNamePlaceholder')}
               placeholderTextColor={palette.textDim}
               style={styles.input}
               autoFocus
@@ -398,7 +417,7 @@ export default function ProjectsScreen() {
               {aspectRatios.map((option) => (
                 <Chip
                   key={option.id}
-                  label={option.label}
+                  label={t(option.label)}
                   active={aspect === option.id}
                   onPress={() => setAspect(option.id)}
                 />
@@ -406,13 +425,13 @@ export default function ProjectsScreen() {
             </View>
             <PrimaryButton
               icon="checkmark"
-              label="Létrehozás"
+              label={t('common.create')}
               onPress={() => {
-                create().catch(() => Alert.alert('Hiba', 'A projekt létrehozása nem sikerült.'));
+                create().catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
               }}
             />
             <Pressable onPress={() => setCreating(false)} style={styles.cancel}>
-              <Text style={styles.cancelText}>Mégse</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -425,22 +444,23 @@ export default function ProjectsScreen() {
         >
           <View style={styles.modalCard}>
             <View style={styles.modalGrabber} />
-            <Text style={styles.modalTitle}>Projekt átnevezése</Text>
+            <Text style={styles.modalTitle}>{t('home.renameTitle')}</Text>
             <TextInput
               value={renameValue}
               onChangeText={setRenameValue}
-              placeholder="Projekt neve"
+              placeholder={t('home.projectNamePlaceholder')}
               placeholderTextColor={palette.textDim}
               style={styles.input}
               autoFocus
             />
-            <PrimaryButton icon="checkmark" label="Mentés" onPress={saveRename} />
+            <PrimaryButton icon="checkmark" label={t('common.save')} onPress={saveRename} />
             <Pressable onPress={() => setRenaming(null)} style={styles.cancel}>
-              <Text style={styles.cancelText}>Mégse</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <LanguageSwitcher visible={langOpen} onClose={() => setLangOpen(false)} />
     </SafeAreaView>
   );
 }

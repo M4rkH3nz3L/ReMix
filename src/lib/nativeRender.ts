@@ -1,5 +1,6 @@
 import { requireOptionalNativeModule } from 'expo';
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 
 import type { RenderSettings } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -44,10 +45,7 @@ export function isNativeRenderAvailable(): boolean {
 /** Az eszközön-render nem elérhető ezen a buildon (pl. Expo Go). */
 export class LocalRenderUnavailableError extends Error {
   constructor() {
-    super(
-      'Az eszközön-render ehhez a buildhez nem érhető el (Expo Go). Használd a ' +
-        'felhő-rendert (Pro), vagy készíts natív buildet (npx expo run:ios).'
-    );
+    super(tr('lib.nativeRender.unavailable'));
     this.name = 'LocalRenderUnavailableError';
   }
 }

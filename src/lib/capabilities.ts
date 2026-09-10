@@ -12,6 +12,8 @@
  * (`@/lib/nativeRender`) olvassa; a `pro` mezőt a paywall-gate.
  */
 
+import { t as tr } from 'i18next';
+
 export type Where = 'local' | 'cloud';
 
 export type CapabilityId =
@@ -41,22 +43,22 @@ interface CapabilityMeta {
 }
 
 export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
-  localRender: { where: 'local', pro: false, label: 'Export az eszközön' },
+  localRender: { where: 'local', pro: false, label: 'lib.capabilities.label.localRender' },
 
-  cloudRender: { where: 'cloud', pro: true, label: 'Felhő HD/4K render' },
-  autoCaption: { where: 'cloud', pro: true, label: 'Automatikus felirat' },
-  urlImport: { where: 'cloud', pro: true, label: 'Import linkből (YouTube/TikTok)' },
-  autoEdit: { where: 'cloud', pro: true, label: 'AI Auto-Edit' },
-  bgRemove: { where: 'cloud', pro: true, label: 'Háttér-eltávolítás' },
-  depth3d: { where: 'cloud', pro: true, label: '3D / mélység' },
-  faceTools: { where: 'cloud', pro: true, label: 'Arc-eszközök' },
-  reframe: { where: 'cloud', pro: true, label: 'AI újrakeretezés' },
-  upscale: { where: 'cloud', pro: true, label: 'Felskálázás' },
-  skyReplace: { where: 'cloud', pro: true, label: 'Ég-csere' },
-  colorAi: { where: 'cloud', pro: true, label: 'AI szín' },
-  tts: { where: 'cloud', pro: true, label: 'Szöveg → beszéd' },
+  cloudRender: { where: 'cloud', pro: true, label: 'lib.capabilities.label.cloudRender' },
+  autoCaption: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoCaption' },
+  urlImport: { where: 'cloud', pro: true, label: 'lib.capabilities.label.urlImport' },
+  autoEdit: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoEdit' },
+  bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
+  depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
+  faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },
+  reframe: { where: 'cloud', pro: true, label: 'lib.capabilities.label.reframe' },
+  upscale: { where: 'cloud', pro: true, label: 'lib.capabilities.label.upscale' },
+  skyReplace: { where: 'cloud', pro: true, label: 'lib.capabilities.label.skyReplace' },
+  colorAi: { where: 'cloud', pro: true, label: 'lib.capabilities.label.colorAi' },
+  tts: { where: 'cloud', pro: true, label: 'lib.capabilities.label.tts' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
-  soundLibrary: { where: 'cloud', pro: false, label: 'Hang-könyvtár' },
+  soundLibrary: { where: 'cloud', pro: false, label: 'lib.capabilities.label.soundLibrary' },
 };
 
 export function capabilityWhere(cap: CapabilityId): Where {
@@ -68,12 +70,12 @@ export function capabilityRequiresPro(cap: CapabilityId): boolean {
 }
 
 export function capabilityLabel(cap: CapabilityId): string {
-  return CAPABILITIES[cap].label;
+  return tr(CAPABILITIES[cap].label);
 }
 
 /** A Pro-only képességek listája — a paywall „mit kapsz" felsorolásához. */
 export function proCapabilities(): CapabilityMeta['label'][] {
   return Object.values(CAPABILITIES)
     .filter((c) => c.pro)
-    .map((c) => c.label);
+    .map((c) => tr(c.label));
 }

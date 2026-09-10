@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
 import { palette, textColors } from '@/constants/editor';
@@ -6,40 +7,41 @@ import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip } from '@/types/project';
 
-const GRADIENTS: { label: string; from: string; to: string }[] = [
-  { label: 'Lila–pink', from: '#7c5cff', to: '#ff5ca8' },
-  { label: 'Kék–türkiz', from: '#4d9dff', to: '#5cffd0' },
-  { label: 'Naplemente', from: '#ff6b4a', to: '#ffb85c' },
+const GRADIENTS: { id: string; from: string; to: string }[] = [
+  { id: 'purplePink', from: '#7c5cff', to: '#ff5ca8' },
+  { id: 'blueTurquoise', from: '#4d9dff', to: '#5cffd0' },
+  { id: 'sunset', from: '#ff6b4a', to: '#ffb85c' },
 ];
 
 /** Forma-szerkesztő (Creative Canvas): kitöltés, gradiens, keret, lekerekítés. */
 const GLOW_PRESETS = [
-  { label: '🩵 Cián', color: '#00e5ff' },
-  { label: '💗 Pink', color: '#ff2d95' },
-  { label: '🤍 Fehér', color: '#ffffff' },
-  { label: '💛 Arany', color: '#ffd166' },
+  { id: 'cyan', emoji: '🩵', color: '#00e5ff' },
+  { id: 'pink', emoji: '💗', color: '#ff2d95' },
+  { id: 'white', emoji: '🤍', color: '#ffffff' },
+  { id: 'gold', emoji: '💛', color: '#ffd166' },
 ];
 
 const OUTLINE_PRESETS = [
-  { label: '🤍 Fehér', color: '#ffffff' },
-  { label: '🖤 Fekete', color: '#0b0b18' },
-  { label: '💗 Pink', color: '#ff2d95' },
+  { id: 'white', emoji: '🤍', color: '#ffffff' },
+  { id: 'black', emoji: '🖤', color: '#0b0b18' },
+  { id: 'pink', emoji: '💗', color: '#ff2d95' },
 ];
 
 export function ShapePanel({ clip }: { clip: ShapeClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const snapGrid = useEditorStore((s) => s.snapGrid);
   const setSnapGrid = useEditorStore((s) => s.setSnapGrid);
 
   return (
     <View>
-      <PanelSection title="Forma">
+      <PanelSection title={t('panels.shape.shapeTitle')}>
         <View style={styles.row}>
           {(
             [
-              { id: 'rectangle', label: 'Téglalap' },
-              { id: 'ellipse', label: 'Ellipszis' },
-              { id: 'line', label: 'Vonal' },
+              { id: 'rectangle', label: t('panels.shape.shapeRectangle') },
+              { id: 'ellipse', label: t('panels.shape.shapeEllipse') },
+              { id: 'line', label: t('panels.shape.shapeLine') },
             ] as const
           ).map((s) => (
             <Chip
@@ -53,14 +55,13 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
       </PanelSection>
 
       {clip.imageUri ? (
-        <PanelSection title="Kép">
+        <PanelSection title={t('panels.shape.imageTitle')}>
           <Text style={styles.note}>
-            Kép-kitöltésű réteg (logó/watermark) — a méret, lekerekítés, keret és
-            átlátszóság lent állítható; a képarányt a kép tartja (contain).
+            {t('panels.shape.imageNote')}
           </Text>
         </PanelSection>
       ) : (
-        <PanelSection title="Kitöltés">
+        <PanelSection title={t('panels.shape.fillTitle')}>
           <View style={styles.row}>
             {textColors.map((color) => (
               <ColorDot
@@ -76,8 +77,8 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           <View style={styles.row}>
             {GRADIENTS.map((g) => (
               <Chip
-                key={g.label}
-                label={g.label}
+                key={g.id}
+                label={t('panels.shape.gradient_' + g.id)}
                 active={clip.fillGradient?.from === g.from}
                 onPress={() =>
                   updateClip(clip.id, { fillGradient: { from: g.from, to: g.to } })
@@ -86,7 +87,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
             ))}
             {clip.fillGradient ? (
               <Chip
-                label="✕ Sima szín"
+                label={t('panels.shape.plainColor')}
                 active={false}
                 onPress={() => updateClip(clip.id, { fillGradient: undefined })}
               />
@@ -95,20 +96,20 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         </PanelSection>
       )}
 
-      <PanelSection title="Blend">
+      <PanelSection title={t('panels.shape.blendTitle')}>
         <View style={styles.row}>
           {(
             [
-              { id: undefined, label: 'Normál' },
-              { id: 'multiply', label: 'Szorzás' },
+              { id: undefined, label: t('panels.shape.blendNormal') },
+              { id: 'multiply', label: t('panels.shape.blendMultiply') },
               { id: 'screen', label: 'Screen' },
               { id: 'overlay', label: 'Overlay' },
-              { id: 'lighten', label: 'Világosít' },
-              { id: 'difference', label: 'Különbség' },
+              { id: 'lighten', label: t('panels.shape.blendLighten') },
+              { id: 'difference', label: t('panels.shape.blendDifference') },
             ] as const
           ).map((m) => (
             <Chip
-              key={m.label}
+              key={String(m.id)}
               label={m.label}
               active={clip.blendMode === m.id}
               onPress={() => updateClip(clip.id, { blendMode: m.id })}
@@ -116,19 +117,19 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           ))}
         </View>
         <Text style={styles.note}>
-          A réteg az alatta lévő videóval keveredik — előnézetben és renderben is.
+          {t('panels.shape.blendNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Méret és stílus">
+      <PanelSection title={t('panels.shape.sizeStyleTitle')}>
         <Stepper
-          label="Szélesség"
+          label={t('panels.shape.width')}
           value={`${Math.round(clip.w * 100)}%`}
           onDec={() => updateClip(clip.id, { w: clamp(clip.w - 0.05, 0.05, 1) })}
           onInc={() => updateClip(clip.id, { w: clamp(clip.w + 0.05, 0.05, 1) })}
         />
         <Stepper
-          label="Magasság"
+          label={t('panels.shape.height')}
           value={`${Math.round(clip.h * 100)}%`}
           onDec={() =>
             updateClip(clip.id, { h: clamp(clip.h - 0.05, 0.004, 1) })
@@ -137,7 +138,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         />
         {clip.shape === 'rectangle' ? (
           <Stepper
-            label="Lekerekítés"
+            label={t('panels.shape.cornerRadius')}
             value={`${Math.round((clip.cornerRadius ?? 0) * 100)}%`}
             onDec={() =>
               updateClip(clip.id, {
@@ -152,7 +153,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           />
         ) : null}
         <Stepper
-          label="Keret"
+          label={t('panels.shape.border')}
           value={`${(clip.borderWidth ?? 0).toFixed(1)}`}
           onDec={() =>
             updateClip(clip.id, {
@@ -168,7 +169,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           }
         />
         <Stepper
-          label="Átlátszóság"
+          label={t('panels.shape.opacity')}
           value={`${Math.round((clip.opacity ?? 1) * 100)}%`}
           onDec={() =>
             updateClip(clip.id, { opacity: clamp((clip.opacity ?? 1) - 0.1, 0.1, 1) })
@@ -179,21 +180,19 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         />
         <View style={styles.row}>
           <Chip
-            label={clip.shadow ? '🌒 Árnyék be' : '🌒 Árnyék'}
+            label={clip.shadow ? t('panels.shape.shadowOn') : t('panels.shape.shadow')}
             active={clip.shadow === true}
             onPress={() => updateClip(clip.id, { shadow: !clip.shadow })}
           />
         </View>
         <Text style={styles.note}>
-          A formát a vásznon húzással pozicionálhatod — a renderelt videóba
-          pontosan így ég be. Az árnyék a renderben a forma sziluettjét követi
-          (nyílon és csillagon is).
+          {t('panels.shape.sizeStyleNote')}
         </Text>
       </PanelSection>
-      <PanelSection title="📐 Igazítás">
+      <PanelSection title={t('panels.shape.alignTitle')}>
         <View style={styles.row}>
           {[
-            { v: 0, label: 'Rács ki' },
+            { v: 0, label: t('panels.shape.gridOff') },
             { v: 6, label: '6×6' },
             { v: 12, label: '12×12' },
           ].map((g) => (
@@ -206,24 +205,22 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           ))}
         </View>
         <Text style={styles.note}>
-          Húzáskor a réteg a vászon közép- és harmadvonalaira, a safe-zone
-          határokra, a TÖBBI RÉTEG középvonalára és a köztük lévő egyenlő
-          térközre is ráugrik — a rács ehhez még egy egyenletes osztást ad.
+          {t('panels.shape.alignNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="✨ Ragyogás és kontúr">
-        <Text style={styles.subLabel}>Ragyogás</Text>
+      <PanelSection title={t('panels.shape.glowOutlineTitle')}>
+        <Text style={styles.subLabel}>{t('panels.shape.glowLabel')}</Text>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('panels.shape.glowNone')}
             active={!clip.glow}
             onPress={() => updateClip(clip.id, { glow: undefined })}
           />
           {GLOW_PRESETS.map((g) => (
             <Chip
-              key={g.label}
-              label={g.label}
+              key={g.id}
+              label={g.emoji + ' ' + t('panels.shape.glowColor_' + g.id)}
               active={clip.glow?.color === g.color}
               onPress={() => updateClip(clip.id, { glow: { color: g.color, size: 2 } })}
             />
@@ -231,7 +228,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         </View>
         {clip.glow ? (
           <Stepper
-            label="Ragyogás mérete"
+            label={t('panels.shape.glowSize')}
             value={`${clip.glow.size.toFixed(1)}%`}
             onDec={() =>
               updateClip(clip.id, {
@@ -245,17 +242,17 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
             }
           />
         ) : null}
-        <Text style={styles.subLabel}>Kontúr</Text>
+        <Text style={styles.subLabel}>{t('panels.shape.outlineLabel')}</Text>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('panels.shape.outlineNone')}
             active={!clip.outline}
             onPress={() => updateClip(clip.id, { outline: undefined })}
           />
           {OUTLINE_PRESETS.map((o) => (
             <Chip
-              key={o.label}
-              label={o.label}
+              key={o.id}
+              label={o.emoji + ' ' + t('panels.shape.outlineColor_' + o.id)}
               active={clip.outline?.color === o.color}
               onPress={() => updateClip(clip.id, { outline: { color: o.color, width: 0.4 } })}
             />
@@ -263,7 +260,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         </View>
         {clip.outline ? (
           <Stepper
-            label="Kontúr vastagsága"
+            label={t('panels.shape.outlineWidth')}
             value={`${clip.outline.width.toFixed(2)}%`}
             onDec={() =>
               updateClip(clip.id, {
@@ -278,9 +275,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           />
         ) : null}
         <Text style={styles.note}>
-          Mindkettő a forma SZILUETTJÉT követi, ezért a nyílon, a csillagon és a
-          kép-kitöltésű logón is működik — ott, ahol a sima keret nem. A
-          renderben látszik pontosan; az előnézet közelít.
+          {t('panels.shape.glowOutlineNote')}
         </Text>
       </PanelSection>
     </View>

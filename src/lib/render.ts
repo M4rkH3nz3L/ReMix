@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import * as Sharing from 'expo-sharing';
 import { Linking, Platform } from 'react-native';
 
@@ -86,7 +87,7 @@ export interface RenderOptions {
 /** A felhasználó megszakította a műveletet. */
 export class RenderCancelledError extends Error {
   constructor() {
-    super('A művelet megszakítva.');
+    super(tr('lib.render.cancelled'));
     this.name = 'RenderCancelledError';
   }
 }
@@ -112,7 +113,7 @@ export async function renderMp4(
   opts?: RenderOptions
 ): Promise<File> {
   if (Platform.OS === 'web') {
-    throw new Error('Az MP4-render a natív appból érhető el (iOS/Android).');
+    throw new Error(tr('lib.render.mp4NativeOnly'));
   }
   const mode = opts?.mode ?? 'auto';
   const effective = settings ?? DEFAULT_SETTINGS;
@@ -123,9 +124,9 @@ export async function renderMp4(
     isNativeRenderAvailable() &&
     canRenderLocally(project, effective);
   if (canLocal) {
-    onProgress?.({ phase: 'Renderelés az eszközön', ratio: 0 });
+    onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: 0 });
     return renderLocal(project, effective, (p) =>
-      onProgress?.({ phase: 'Renderelés az eszközön', ratio: p })
+      onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p })
     );
   }
   if (mode === 'local') {
@@ -147,18 +148,19 @@ async function renderCloud(
   const base = ensureCloud('cloudRender');
   // A három fázis EGY 0–1 skálára vetítve, hogy a sáv sose ugorjon vissza.
   // A súlyok a fázisok tipikus időarányai (a render viszi az idő nagy részét).
+  const PHASE_UPLOAD = tr('lib.render.phaseUpload');
+  const PHASE_RENDER = tr('lib.render.phaseRender');
+  const PHASE_DOWNLOAD = tr('lib.render.phaseDownload');
   const stages = weightedStages([
-    ['Feltöltés', 0.25],
-    ['Renderelés', 0.65],
-    ['Letöltés', 0.1],
+    [PHASE_UPLOAD, 0.25],
+    [PHASE_RENDER, 0.65],
+    [PHASE_DOWNLOAD, 0.1],
   ]);
 
   try {
     await fetchWithTimeout(`${base}/health`, 3000);
   } catch {
-    throw new Error(
-      `A render worker nem érhető el (${base}) — indítsd el: cd server && npm start`
-    );
+    throw new Error(tr('lib.render.workerUnreachable', { base }));
   }
 
   const form = new FormData();
@@ -169,11 +171,11 @@ async function renderCloud(
     uriMap[uri] = field;
     form.append(field, new File(uri) as unknown as Blob, fileName(uri));
     onProgress?.({
-      phase: 'Feltöltés',
-      ratio: stages.ratioFor('Feltöltés', (i + 1) / Math.max(1, uris.length)),
+      phase: PHASE_UPLOAD,
+      ratio: stages.ratioFor(PHASE_UPLOAD, (i + 1) / Math.max(1, uris.length)),
       current: i + 1,
       total: uris.length,
-      unit: 'fájl',
+      unit: tr('lib.render.unitFile'),
     });
   });
   form.append('project', JSON.stringify(project));
@@ -185,11 +187,11 @@ async function renderCloud(
   const submit = await uploadFetch(`${base}/render`, { method: 'POST', body: form });
   const submitBody = await submit.json();
   if (!submit.ok) {
-    throw new Error(submitBody.error ?? 'A render indítása nem sikerült.');
+    throw new Error(submitBody.error ?? tr('lib.render.renderStartFailed'));
   }
   const { id } = submitBody;
 
-  onProgress?.({ phase: 'Renderelés', ratio: stages.ratioFor('Renderelés', 0) });
+  onProgress?.({ phase: PHASE_RENDER, ratio: stages.ratioFor(PHASE_RENDER, 0) });
   for (let i = 0; i < MAX_POLLS; i++) {
     if (signal?.aborted) {
       throw new RenderCancelledError();
@@ -198,7 +200,7 @@ async function renderCloud(
     const res = await fetchWithTimeout(`${base}/render/${id}`, 5000);
     const status = await res.json();
     if (status.state === 'done') {
-      onProgress?.({ phase: 'Letöltés', ratio: stages.ratioFor('Letöltés', 0) });
+      onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
       const safeName = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'video';
       const target = new File(Paths.cache, `${safeName}.mp4`);
       try {
@@ -211,17 +213,17 @@ async function renderCloud(
       return await File.downloadFileAsync(`${base}/render/${id}/file`, target);
     }
     if (status.state === 'error') {
-      throw new Error(status.error ?? 'Render hiba.');
+      throw new Error(status.error ?? tr('lib.render.renderError'));
     }
     // a worker az ffmpeg tényleges előrehaladását adja (0-1)
     if (typeof status.progress === 'number' && status.progress > 0) {
       onProgress?.({
-        phase: 'Renderelés',
-        ratio: stages.ratioFor('Renderelés', status.progress),
+        phase: PHASE_RENDER,
+        ratio: stages.ratioFor(PHASE_RENDER, status.progress),
       });
     }
   }
-  throw new Error('A render túl sokáig tartott — próbáld újra.');
+  throw new Error(tr('lib.render.renderTimeout'));
 }
 
 export interface LibraryTrack {
@@ -238,7 +240,7 @@ export async function fetchSoundLibrary(): Promise<LibraryTrack[]> {
   const base = cloudBaseUrl();
   const res = await fetchWithTimeout(`${base}/music`, 5000);
   if (!res.ok) {
-    throw new Error('A hang-könyvtár nem érhető el.');
+    throw new Error(tr('lib.render.soundLibraryUnreachable'));
   }
   const body = await res.json();
   return body.tracks as LibraryTrack[];
@@ -272,7 +274,7 @@ export async function transcribeToSrt(
   granularity: 'caption' | 'word' = 'caption'
 ): Promise<string> {
   if (Platform.OS === 'web') {
-    throw new Error('Az automatikus felirat a natív appból érhető el (iOS/Android).');
+    throw new Error(tr('lib.render.autoCaptionNativeOnly'));
   }
   const base = ensureCloud('autoCaption');
   let health: { captions?: boolean };
@@ -280,14 +282,10 @@ export async function transcribeToSrt(
     const res = await fetchWithTimeout(`${base}/health`, 3000);
     health = await res.json();
   } catch {
-    throw new Error(
-      `A render worker nem érhető el (${base}) — indítsd el: cd server && npm start`
-    );
+    throw new Error(tr('lib.render.workerUnreachable', { base }));
   }
   if (!health.captions) {
-    throw new Error(
-      'A workeren nincs Whisper-modell — lásd server/models (ggml-base.bin).'
-    );
+    throw new Error(tr('lib.render.noWhisperModel'));
   }
   const form = new FormData();
   form.append('media', new File(uri) as unknown as Blob, fileName(uri));
@@ -295,7 +293,7 @@ export async function transcribeToSrt(
   const res = await uploadFetch(`${base}/captions`, { method: 'POST', body: form });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error ?? 'A beszédfelismerés nem sikerült.');
+    throw new Error(body.error ?? tr('lib.render.transcriptionFailed'));
   }
   return body.srt as string;
 }
@@ -311,23 +309,24 @@ export async function collectAndShareProject(
   onProgress?: (update: ProgressUpdate) => void
 ): Promise<void> {
   if (Platform.OS === 'web') {
-    throw new Error('A Collect a natív appból érhető el (iOS/Android).');
+    throw new Error(tr('lib.render.collectNativeOnly'));
   }
   const base = cloudBaseUrl();
   try {
     await fetchWithTimeout(`${base}/health`, 3000);
   } catch {
-    throw new Error(
-      `A render worker nem érhető el (${base}) — indítsd el: cd server && npm start`
-    );
+    throw new Error(tr('lib.render.workerUnreachable', { base }));
   }
 
+  const PHASE_UPLOAD = tr('lib.render.phaseUpload');
+  const PHASE_PACKAGING = tr('lib.render.phasePackaging');
+  const PHASE_DOWNLOAD = tr('lib.render.phaseDownload');
   const stages = weightedStages([
-    ['Feltöltés', 0.3],
-    ['Csomagolás', 0.6],
-    ['Letöltés', 0.1],
+    [PHASE_UPLOAD, 0.3],
+    [PHASE_PACKAGING, 0.6],
+    [PHASE_DOWNLOAD, 0.1],
   ]);
-  onProgress?.({ phase: 'Feltöltés', ratio: 0 });
+  onProgress?.({ phase: PHASE_UPLOAD, ratio: 0 });
   // md5+méret identitás az archívumba — a kicsomagolt project.vided
   // tartalom szerint is újracsatolható marad
   const stamped = await withFingerprints(project);
@@ -346,16 +345,16 @@ export async function collectAndShareProject(
   const submit = await uploadFetch(`${base}/collect`, { method: 'POST', body: form });
   const submitBody = await submit.json();
   if (!submit.ok) {
-    throw new Error(submitBody.error ?? 'A csomagolás indítása nem sikerült.');
+    throw new Error(submitBody.error ?? tr('lib.render.packagingStartFailed'));
   }
 
-  onProgress?.({ phase: 'Csomagolás', ratio: stages.ratioFor('Csomagolás', 0) });
+  onProgress?.({ phase: PHASE_PACKAGING, ratio: stages.ratioFor(PHASE_PACKAGING, 0) });
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     const res = await fetchWithTimeout(`${base}/render/${submitBody.id}`, 5000);
     const status = await res.json();
     if (status.state === 'done') {
-      onProgress?.({ phase: 'Letöltés', ratio: stages.ratioFor('Letöltés', 0) });
+      onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
       const safe = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'projekt';
       const target = new File(Paths.cache, `${safe}.remix.zip`);
       try {
@@ -369,7 +368,7 @@ export async function collectAndShareProject(
         `${base}/render/${submitBody.id}/file`,
         target
       );
-      onProgress?.({ phase: 'Megosztás', ratio: 1 });
+      onProgress?.({ phase: tr('lib.render.phaseShare'), ratio: 1 });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(file.uri, {
           mimeType: 'application/zip',
@@ -379,10 +378,10 @@ export async function collectAndShareProject(
       return;
     }
     if (status.state === 'error') {
-      throw new Error(status.error ?? 'Csomagolás-hiba.');
+      throw new Error(status.error ?? tr('lib.render.packagingError'));
     }
   }
-  throw new Error('A csomagolás túl sokáig tartott — próbáld újra.');
+  throw new Error(tr('lib.render.packagingTimeout'));
 }
 
 /**
@@ -403,7 +402,7 @@ export async function renderAndShareMp4(
       const MediaLibrary = await import('expo-media-library');
       const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (permission.granted) {
-        onProgress?.({ phase: 'Mentés a Fotókba', ratio: 1 });
+        onProgress?.({ phase: tr('lib.render.phaseSavingToPhotos'), ratio: 1 });
         await MediaLibrary.saveToLibraryAsync(file.uri);
         savedToPhotos = true;
       }
@@ -413,7 +412,9 @@ export async function renderAndShareMp4(
   }
 
   onProgress?.({
-    phase: savedToPhotos ? 'A Fotókba mentve ✓ — megosztás' : 'Megosztás',
+    phase: savedToPhotos
+      ? tr('lib.render.phaseSavedToPhotosShare')
+      : tr('lib.render.phaseShare'),
     ratio: 1,
   });
   if (await Sharing.isAvailableAsync()) {
@@ -454,7 +455,7 @@ export async function renderAndPost(
       const MediaLibrary = await import('expo-media-library');
       const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (permission.granted) {
-        onProgress?.({ phase: 'Mentés a Fotókba', ratio: 1 });
+        onProgress?.({ phase: tr('lib.render.phaseSavingToPhotos'), ratio: 1 });
         const asset = await MediaLibrary.createAssetAsync(file.uri);
         assetId = asset?.id ?? null;
       }
@@ -468,7 +469,7 @@ export async function renderAndPost(
     const igUrl = `instagram://library?LocalIdentifier=${encodeURIComponent(assetId)}`;
     try {
       if (await Linking.canOpenURL(igUrl)) {
-        onProgress?.({ phase: 'Megnyitás az Instagramban (Reels)', ratio: 1 });
+        onProgress?.({ phase: tr('lib.render.phaseOpeningInstagramReels'), ratio: 1 });
         await Linking.openURL(igUrl);
         return;
       }
@@ -481,10 +482,10 @@ export async function renderAndPost(
   onProgress?.({
     phase:
       target === 'tiktok'
-        ? 'Válaszd a TikTok appot a listából'
+        ? tr('lib.render.phaseChooseTikTok')
         : target === 'youtube'
-          ? 'Válaszd a YouTube appot (Short)'
-          : 'Megosztás',
+          ? tr('lib.render.phaseChooseYouTube')
+          : tr('lib.render.phaseShare'),
     ratio: 1,
   });
   if (await Sharing.isAvailableAsync()) {

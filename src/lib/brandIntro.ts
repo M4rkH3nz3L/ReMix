@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import type { BrandKit } from '@/lib/brandKit';
 import type { Clip, ShapeClip, TextClip, TrackType } from '@/types/project';
 
@@ -23,9 +24,9 @@ export const INTRO_TEMPLATES: {
   hint: string;
   duration: number;
 }[] = [
-  { id: 'logoPop', label: '⚡ Logó-pop', hint: 'rövid, logó középen', duration: 1.2 },
-  { id: 'titleCard', label: '🎬 Címkártya', hint: 'cím + alcím', duration: 2 },
-  { id: 'flashCut', label: '💥 Villanás', hint: 'nagyon rövid felvillanás', duration: 0.7 },
+  { id: 'logoPop', label: 'lib.intro.logoPop', hint: 'rövid, logó középen', duration: 1.2 },
+  { id: 'titleCard', label: 'lib.intro.titleCard', hint: 'cím + alcím', duration: 2 },
+  { id: 'flashCut', label: 'lib.intro.flashCut', hint: 'nagyon rövid felvillanás', duration: 0.7 },
 ];
 
 export const OUTRO_TEMPLATES: {
@@ -34,9 +35,9 @@ export const OUTRO_TEMPLATES: {
   hint: string;
   duration: number;
 }[] = [
-  { id: 'subscribe', label: '🔔 Kövess be', hint: 'CTA + logó', duration: 2.4 },
-  { id: 'logoEnd', label: '🏁 Logó-zárás', hint: 'csak a márka', duration: 1.6 },
-  { id: 'nextUp', label: '➡️ Következő', hint: 'átvezetés a következő videóra', duration: 2.4 },
+  { id: 'subscribe', label: 'lib.outro.subscribe', hint: 'CTA + logó', duration: 2.4 },
+  { id: 'logoEnd', label: 'lib.outro.logoEnd', hint: 'csak a márka', duration: 1.6 },
+  { id: 'nextUp', label: 'lib.outro.nextUp', hint: 'átvezetés a következő videóra', duration: 2.4 },
 ];
 
 const DEFAULT_ACCENT = '#ff2d55';
@@ -176,7 +177,7 @@ export function buildIntroClips(
     }
     captions.push(
       textClip(c, d, ctx.title, { y: logo ? 0.5 : 0.44, fontSize: 10 }),
-      textClip(c, d, 'Nézd végig 👇', {
+      textClip(c, d, tr('lib.brandIntro.watchThrough'), {
         y: logo ? 0.66 : 0.6,
         fontSize: 5.5,
         delay: 0.5,
@@ -208,8 +209,8 @@ export function buildOutroClips(
       overlay.push(logo);
     }
     captions.push(
-      textClip(ctx, d, 'Kövess be 🔔', { y: logo ? 0.54 : 0.44, fontSize: 10 }),
-      textClip(ctx, d, 'Több ilyen videóért', {
+      textClip(ctx, d, tr('lib.brandIntro.subscribeCta'), { y: logo ? 0.54 : 0.44, fontSize: 10 }),
+      textClip(ctx, d, tr('lib.brandIntro.moreLikeThis'), {
         y: logo ? 0.68 : 0.58,
         fontSize: 5,
         delay: 0.4,
@@ -225,8 +226,8 @@ export function buildOutroClips(
     }
   } else {
     captions.push(
-      textClip(ctx, d, 'Következő videó ➡️', { y: 0.42, fontSize: 8.5 }),
-      textClip(ctx, d, 'Koppints a profilra', {
+      textClip(ctx, d, tr('lib.brandIntro.nextVideo'), { y: 0.42, fontSize: 8.5 }),
+      textClip(ctx, d, tr('lib.brandIntro.tapProfile'), {
         y: 0.56,
         fontSize: 5,
         delay: 0.4,

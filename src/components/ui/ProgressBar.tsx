@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { accentGradient, palette } from '@/constants/editor';
@@ -25,6 +26,7 @@ export function ProgressBar({
   /** szűk helyre: csak a sáv + egy sor */
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const L = useLayout();
   const fill = useRef(new Animated.Value(0)).current;
   const sweep = useRef(new Animated.Value(0)).current;
@@ -125,7 +127,7 @@ export function ProgressBar({
           style={[styles.phase, { fontSize: L.font(11) }]}
           numberOfLines={1}
         >
-          {snapshot.phase || 'Dolgozom…'}
+          {snapshot.phase || t('progressBar.working')}
         </Text>
         {right ? (
           <Text style={[styles.meta, { fontSize: L.font(11) }]}>{right}</Text>
@@ -134,7 +136,7 @@ export function ProgressBar({
 
       {eta ? (
         <Text style={[styles.eta, { fontSize: L.font(10) }]}>
-          {eta === 'mindjárt kész' ? 'mindjárt kész' : `${eta} van hátra`}
+          {eta === t('lib.progress.etaAlmostDone') ? t('progressBar.almostDone') : t('progressBar.etaRemaining', { eta })}
         </Text>
       ) : null}
     </View>

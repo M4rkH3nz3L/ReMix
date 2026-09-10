@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { makeId } from '@/lib/id';
@@ -53,7 +54,7 @@ export async function generateTts(
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error ?? 'A hang generálása nem sikerült.');
+    throw new Error(body.error ?? tr('lib.tts.generateFailed'));
   }
   const dir = new Directory(Paths.document, 'media');
   try {

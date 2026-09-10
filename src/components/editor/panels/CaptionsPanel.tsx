@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
@@ -38,6 +39,7 @@ const FALLBACK_CAPTION = 2.5;
  * (auto-caption) eredményét is.
  */
 export function CaptionsPanel() {
+  const { t } = useTranslation();
   const [raw, setRaw] = useState('');
   const [preset, setPreset] = useState<TextStylePreset>('bubble');
   const [aiStatus, setAiStatus] = useState<string | null>(null);
@@ -58,22 +60,22 @@ export function CaptionsPanel() {
       (c): c is TextClip => c.kind === 'text'
     );
     if (!state.project || !track || captions.length === 0) {
-      Alert.alert('Szó-időzítés', 'Nincs felirat a sávon.');
+      Alert.alert(t('panels.captions.wordTiming'), t('panels.captions.noCaptionsOnTrack'));
       return;
     }
-    setWordStatus('Szó-átirat…');
+    setWordStatus(t('panels.captions.wordTranscriptStatus'));
     try {
-      const cuesByUri = await withProgress('Szó-időzítés', (report) =>
+      const cuesByUri = await withProgress(t('panels.captions.wordTiming'), (report) =>
         getProjectWordCues(state.project!, report)
       );
       if (cuesByUri.size === 0) {
         Alert.alert(
-          'Szó-időzítés',
-          'Nem érhető el szó-szintű átirat — fut a worker (Whisper)?'
+          t('panels.captions.wordTiming'),
+          t('panels.captions.noWordTranscript')
         );
         return;
       }
-      setWordStatus('Igazítás…');
+      setWordStatus(t('panels.captions.aligningStatus'));
       let aligned = 0;
       let skipped = 0;
       const clips = track.clips.map((c) => {
@@ -107,9 +109,8 @@ export function CaptionsPanel() {
       setWordStatus(null);
       if (aligned === 0) {
         Alert.alert(
-          'Szó-időzítés',
-          'Egy feliratot sem sikerült megbízhatóan igazítani — maradt az ' +
-            'egyenletes elosztás. (A felirat szövege nagyon eltérhet az elhangzottaktól.)'
+          t('panels.captions.wordTiming'),
+          t('panels.captions.wordTimingNoneAligned')
         );
         return;
       }
@@ -118,11 +119,10 @@ export function CaptionsPanel() {
         'ai'
       );
       Alert.alert(
-        'Szó-időzítés kész',
-        `${aligned} felirat kapott valódi szó-időzítést` +
-          (skipped > 0 ? ` (${skipped} maradt egyenletesen)` : '') +
-          '.\n\nA karaoke-kiemelés mostantól a tényleges kimondáshoz igazodik — ' +
-          'előnézetben és a renderelt videóban is.'
+        t('panels.captions.wordTimingDoneTitle'),
+        t('panels.captions.wordTimingDoneBody', { count: aligned }) +
+          (skipped > 0 ? t('panels.captions.wordTimingSkippedSuffix', { count: skipped }) : '') +
+          t('panels.captions.wordTimingDoneTail')
       );
     } finally {
       setWordStatus(null);
@@ -149,7 +149,12 @@ export function CaptionsPanel() {
     const items = captions.slice(0, 60);
 
     for (let i = 0; i < items.length; i += 4) {
-      setLayoutStatus(`Arcok keresése… (${Math.min(i + 4, items.length)}/${items.length})`);
+      setLayoutStatus(
+        t('panels.captions.searchingFaces', {
+          current: Math.min(i + 4, items.length),
+          total: items.length,
+        })
+      );
       await Promise.all(
         items.slice(i, i + 4).map(async (c) => {
           const mid = c.start + c.duration / 2;
@@ -183,10 +188,10 @@ export function CaptionsPanel() {
       (c): c is TextClip => c.kind === 'text'
     );
     if (!track || captions.length < 2) {
-      Alert.alert('Beszélő-színek', 'Legalább két felirat kell hozzá.');
+      Alert.alert(t('panels.captions.speakerColors'), t('panels.captions.speakerColorsNeedTwo'));
       return;
     }
-    setLayoutStatus('Elemzés…');
+    setLayoutStatus(t('panels.captions.analyzingStatus'));
     const samples = await sampleFaces(captions);
     setLayoutStatus(null);
     const speakers = assignSpeakers(
@@ -199,8 +204,8 @@ export function CaptionsPanel() {
     const count = new Set(speakers.values()).size;
     if (count < 2) {
       Alert.alert(
-        'Beszélő-színek',
-        'Egyetlen beszélőt találtam — több kamera/nézőpont kell a szétválasztáshoz.'
+        t('panels.captions.speakerColors'),
+        t('panels.captions.speakerColorsSingle')
       );
       return;
     }
@@ -210,8 +215,8 @@ export function CaptionsPanel() {
     });
     state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'ai');
     Alert.alert(
-      'Beszélő-színek kész',
-      `${count} beszélő, mindegyik saját színnel. A szín a Szöveg panelen bármikor átírható.`
+      t('panels.captions.speakerColorsDoneTitle'),
+      t('panels.captions.speakerColorsDoneBody', { count })
     );
   };
 
@@ -223,10 +228,10 @@ export function CaptionsPanel() {
       (c): c is TextClip => c.kind === 'text'
     );
     if (!track || captions.length === 0) {
-      Alert.alert('Okos pozíció', 'Nincs felirat a sávon.');
+      Alert.alert(t('panels.captions.smartPosition'), t('panels.captions.noCaptionsOnTrack'));
       return;
     }
-    setLayoutStatus('Elemzés…');
+    setLayoutStatus(t('panels.captions.analyzingStatus'));
     const samples = await sampleFaces(captions);
     setLayoutStatus(null);
     let moved = 0;
@@ -245,17 +250,17 @@ export function CaptionsPanel() {
     });
     if (moved === 0) {
       Alert.alert(
-        'Okos pozíció',
+        t('panels.captions.smartPosition'),
         samples.size === 0
-          ? 'Nem érhető el az arc-detektor — fut a worker?'
-          : 'Egyik felirat sem takart arcot — minden marad a helyén.'
+          ? t('panels.captions.smartPositionNoDetector')
+          : t('panels.captions.smartPositionNoOverlap')
       );
       return;
     }
     state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'ai');
     Alert.alert(
-      'Okos pozíció kész',
-      `${moved} felirat került arrébb, hogy ne takarja az arcot. Visszavonható egy lépésben.`
+      t('panels.captions.smartPositionDoneTitle'),
+      t('panels.captions.smartPositionDoneBody', { count: moved })
     );
   };
 
@@ -266,17 +271,17 @@ export function CaptionsPanel() {
     const track = state.project?.tracks.find((t) => t.type === 'captions');
     const captions = (track?.clips ?? []).filter((c) => c.kind === 'text');
     if (!track || captions.length === 0) {
-      Alert.alert('Caption Studio', 'Nincs felirat a sávon — előbb készíts feliratokat.');
+      Alert.alert('Caption Studio', t('panels.captions.captionStudioNoCaptions'));
       return;
     }
-    setStudioStatus('Elemzés…');
+    setStudioStatus(t('panels.captions.analyzingStatus'));
     const segments = captions.map((c) => ({ id: c.id, text: (c as TextClip).text }));
     const ai = await fetchCaptionSuggestions(segments);
     const suggestions = ai ?? heuristicSuggestions(segments);
     setStudioStatus(null);
     const { clips, changed } = applyCaptionSuggestions(track.clips, suggestions);
     if (changed === 0) {
-      Alert.alert('Caption Studio', 'Nem találtam kiemelésre érdemes szót.');
+      Alert.alert('Caption Studio', t('panels.captions.captionStudioNoWords'));
       return;
     }
     state.dispatch(
@@ -284,9 +289,12 @@ export function CaptionsPanel() {
       'ai'
     );
     Alert.alert(
-      'Caption Studio kész',
-      `${changed} felirat kapott kiemelést${ai ? ' (AI)' : ' (heurisztika — worker nélkül)'}. ` +
-        'A kiemelt szavak nagyobbak és színesek — előnézetben és a renderelt videóban is.'
+      t('panels.captions.captionStudioDoneTitle'),
+      t('panels.captions.captionStudioDoneBody', { count: changed }) +
+        (ai
+          ? t('panels.captions.captionStudioSourceAi')
+          : t('panels.captions.captionStudioSourceHeuristic')) +
+        t('panels.captions.captionStudioDoneTail')
     );
   };
 
@@ -326,7 +334,7 @@ export function CaptionsPanel() {
       return;
     }
     if (cues.length === 0) {
-      Alert.alert('Nem sikerült', 'A fájlban nem találtam értelmezhető SRT-feliratot.');
+      Alert.alert(t('panels.captions.srtImportFailedTitle'), t('panels.captions.srtImportNoCues'));
       return;
     }
     insertClips(cues.map((cue) => captionClip(cue.text, cue.start, cue.end - cue.start)));
@@ -346,30 +354,30 @@ export function CaptionsPanel() {
       (c): c is VideoClip => c.kind === 'video'
     );
     if (videoClips.length === 0) {
-      Alert.alert('Nincs videó', 'Az AI-felirathoz előbb adj hozzá videót hanggal.');
+      Alert.alert(t('panels.captions.noVideoTitle'), t('panels.captions.noVideoBody'));
       return;
     }
     // azonos forrásfájl (pl. kettévágott klip) csak egyszer megy át a Whisperen
     const srtByUri = new Map<string, ReturnType<typeof parseSrt>>();
     const uniqueUris = [...new Set(videoClips.map((c) => c.uri))];
     // valódi darabszám-progressz: hányadik videót ismeri fel épp (ETA-val)
-    await withProgress('AI-felirat', async (report) => {
+    await withProgress(t('panels.captions.aiCaption'), async (report) => {
       for (let i = 0; i < uniqueUris.length; i++) {
         report({
-          phase: 'Beszédfelismerés',
+          phase: t('panels.captions.phaseSpeechRecognition'),
           current: i,
           total: uniqueUris.length,
-          unit: 'videó',
+          unit: t('panels.captions.unitVideo'),
         });
         srtByUri.set(uniqueUris[i], parseSrt(await transcribeToSrt(uniqueUris[i])));
         report({
-          phase: 'Beszédfelismerés',
+          phase: t('panels.captions.phaseSpeechRecognition'),
           current: i + 1,
           total: uniqueUris.length,
-          unit: 'videó',
+          unit: t('panels.captions.unitVideo'),
         });
       }
-      report({ phase: 'Feliratok elhelyezése', ratio: 1 });
+      report({ phase: t('panels.captions.phasePlacingCaptions'), ratio: 1 });
     });
 
     const timelineCues = mapCuesToTimeline(videoClips, srtByUri);
@@ -377,7 +385,7 @@ export function CaptionsPanel() {
       captionClip(cue.text, cue.start, cue.end - cue.start)
     );
     if (clips.length === 0) {
-      Alert.alert('Nincs beszéd', 'A videókban nem találtam felismerhető beszédet.');
+      Alert.alert(t('panels.captions.noSpeechTitle'), t('panels.captions.noSpeechBody'));
       return;
     }
     insertClips(clips);
@@ -405,36 +413,35 @@ export function CaptionsPanel() {
 
   return (
     <View>
-      <PanelSection title="Automatikus felirat (AI)">
+      <PanelSection title={t('panels.captions.autoCaptionSectionTitle')}>
         <PrimaryButton
           icon="sparkles-outline"
-          label={aiStatus ?? 'Felirat a beszédből (Whisper)'}
+          label={aiStatus ?? t('panels.captions.captionFromSpeech')}
           onPress={() => {
             if (aiStatus) {
               return; // már fut
             }
-            setAiStatus('Indítás…');
+            setAiStatus(t('panels.captions.startingStatus'));
             autoCaptions()
               .catch((err: Error) => {
                 if (isProRequiredError(err)) {
                   usePaywall.getState().open(err.capability);
                 } else {
-                  Alert.alert('AI-felirat', err.message);
+                  Alert.alert(t('panels.captions.aiCaption'), err.message);
                 }
               })
               .finally(() => setAiStatus(null));
           }}
         />
         <Text style={styles.note}>
-          A videóid hangja a render workeren (Whisper) átírásra kerül, és időzített,
-          stílusozott feliratsáv lesz belőle. Vágás és sebesség figyelembe véve.
+          {t('panels.captions.autoCaptionNote')}
         </Text>
       </PanelSection>
 
       <PanelSection title="✨ Caption Studio">
         <PrimaryButton
           icon="flash-outline"
-          label={studioStatus ?? 'Kiemelések + emoji (AI)'}
+          label={studioStatus ?? t('panels.captions.highlightsEmoji')}
           onPress={() => {
             if (studioStatus) {
               return;
@@ -444,7 +451,7 @@ export function CaptionsPanel() {
         />
         <View style={styles.row}>
           <Chip
-            label={layoutStatus ?? '🗣️ Beszélő-színek'}
+            label={layoutStatus ?? t('panels.captions.speakerColorsChip')}
             active={false}
             onPress={() => {
               if (!layoutStatus) {
@@ -453,7 +460,7 @@ export function CaptionsPanel() {
             }}
           />
           <Chip
-            label={wordStatus ?? '🎤 Szó-időzítés'}
+            label={wordStatus ?? t('panels.captions.wordTimingChip')}
             active={false}
             onPress={() => {
               if (!wordStatus) {
@@ -462,7 +469,7 @@ export function CaptionsPanel() {
             }}
           />
           <Chip
-            label={layoutStatus ?? '📐 Okos pozíció'}
+            label={layoutStatus ?? t('panels.captions.smartPositionChip')}
             active={false}
             onPress={() => {
               if (!layoutStatus) {
@@ -472,26 +479,19 @@ export function CaptionsPanel() {
           />
         </View>
         <Text style={styles.note}>
-          A fontos szavak kiemelést kapnak (nagyobb, színes — karaoke-val
-          kombinálva is), és ahol illik, emoji kerül a felirat végére. AI nélkül
-          konzervatív heurisztika megy. Egy lépésben visszavonható.
+          {t('panels.captions.captionStudioNote')}
         </Text>
         <Text style={styles.note}>
-          A beszélő-színek a kamera-váltás és az arc helye alapján csoportosítják
-          a sorokat, és mindegyik beszélő saját színt kap. Az okos pozíció
-          megnézi, takarja-e a felirat az arcot, és ha igen, az arc másik
-          oldalára viszi. A szó-időzítés a beszédfelismerés szó-szintű
-          átiratához igazítja a karaoke-kiemelést, hogy a szó pont akkor
-          gyulladjon fel, amikor elhangzik.
+          {t('panels.captions.captionStudioNote2')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Stílus">
+      <PanelSection title={t('panels.captions.styleSectionTitle')}>
         <View style={styles.row}>
           {textStylePresets.map((option) => (
             <Chip
               key={option.id}
-              label={option.label}
+              label={t('panels.captions.preset_' + option.id)}
               active={preset === option.id}
               onPress={() => setPreset(option.id)}
             />
@@ -499,43 +499,41 @@ export function CaptionsPanel() {
         </View>
       </PanelSection>
 
-      <PanelSection title="Kézi feliratok — soronként egy">
+      <PanelSection title={t('panels.captions.manualSectionTitle')}>
         <TextInput
           value={raw}
           onChangeText={setRaw}
           multiline
           style={styles.input}
-          placeholder={'Ez a hook, ami megfog\nEz a második mondat\nKövess a többiért!'}
+          placeholder={t('panels.captions.manualPlaceholder')}
           placeholderTextColor={palette.textDim}
         />
         <PrimaryButton
           icon="chatbox-ellipses-outline"
           label={
             lines.length > 0
-              ? `${lines.length} felirat hozzáadása a lejátszófejtől`
-              : 'Írj legalább egy sort'
+              ? t('panels.captions.addCaptionsFromPlayhead', { count: lines.length })
+              : t('panels.captions.writeAtLeastOneLine')
           }
           onPress={addCaptions}
         />
       </PanelSection>
 
-      <PanelSection title="SRT-import">
+      <PanelSection title={t('panels.captions.srtSectionTitle')}>
         <PrimaryButton
           icon="document-text-outline"
-          label="SRT-felirat importálása"
+          label={t('panels.captions.importSrtButton')}
           onPress={() => {
-            importSrt().catch(() => Alert.alert('Hiba', 'Az SRT-import nem sikerült.'));
+            importSrt().catch(() => Alert.alert(t('common.error'), t('panels.captions.srtImportError')));
           }}
         />
         <Text style={styles.note}>
-          Whisper / YouTube / CapCut által generált .srt fájlból kész, időzített
-          feliratsáv lesz — a kiválasztott stílussal.
+          {t('panels.captions.srtNote')}
         </Text>
       </PanelSection>
 
       <Text style={styles.note}>
-        A beírt sorok a lejátszófejtől a videó végéig egyenletesen oszlanak el, utána
-        egyenként igazíthatod őket az idővonalon.
+        {t('panels.captions.footerNote')}
       </Text>
     </View>
   );

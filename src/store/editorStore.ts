@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import { create } from 'zustand';
 
 import { MAX_ZOOM, MIN_ZOOM } from '@/constants/editor';
@@ -301,7 +302,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().dispatch({
       type: 'REPLACE_TRACKS',
       tracks,
-      label: `kötegelt szerkesztés (${multiSelectIds.length + 1} klip)`,
+      label: tr('store.editor.batchEdit', { count: multiSelectIds.length + 1 }),
     });
   },
 
@@ -398,7 +399,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return 0;
     }
     get().dispatch(
-      { type: 'REPLACE_TRACKS', tracks, label: `stílus beillesztve (${changed} klip)` },
+      { type: 'REPLACE_TRACKS', tracks, label: tr('store.editor.pasteStyle', { count: changed }) },
       'user'
     );
     return changed;
@@ -442,7 +443,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const ok = get().dispatch({
       type: 'REPLACE_TRACKS',
       tracks: plan.tracks,
-      label: `ripple-törlés (${clipIds.length} klip, ${plan.moved} csúszott)`,
+      label: tr('store.editor.rippleDelete', { count: clipIds.length, moved: plan.moved }),
     });
     if (ok) {
       set({ selectedClipId: null, multiSelectIds: [], multiSelectMode: false, activePanel: null });
@@ -462,7 +463,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return get().dispatch({
       type: 'REPLACE_TRACKS',
       tracks: plan.tracks,
-      label: `ripple-hossz (${plan.moved} klip csúszott)`,
+      label: tr('store.editor.rippleLength', { count: plan.moved }),
     });
   },
 

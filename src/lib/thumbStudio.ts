@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { uploadFetch } from '@/lib/upload';
@@ -160,7 +161,7 @@ export async function saveAndShareThumbnail(
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(target.uri, {
       mimeType: 'image/jpeg',
-      dialogTitle: `${projectName} — borítókép`,
+      dialogTitle: tr('lib.thumbStudio.shareDialogTitle', { projectName }),
     });
   }
 }

@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
 import { palette, textColors } from '@/constants/editor';
@@ -7,11 +8,11 @@ import { useEditorStore } from '@/store/editorStore';
 import type { BlendMode, ImageClip, PipFrame, VideoClip } from '@/types/project';
 
 /** lekerekítés-presetek (a rövidebb él arányában) */
-const RADII: { label: string; value: number }[] = [
-  { label: 'Szögletes', value: 0 },
-  { label: 'Lekerekített', value: 0.12 },
-  { label: 'Nagyon kerek', value: 0.28 },
-  { label: '🔵 Kör', value: 0.5 },
+const RADII: { id: string; value: number }[] = [
+  { id: 'square', value: 0 },
+  { id: 'rounded', value: 0.12 },
+  { id: 'veryRound', value: 0.28 },
+  { id: 'circle', value: 0.5 },
 ];
 
 /** keverési módok a fő videóval (light-leak/overlay/dupla-expozíció) */
@@ -28,6 +29,7 @@ const BLENDS: { label: string; value: BlendMode }[] = [
  * renderben `geq` alfával, az előnézetben natív borderRadius-szal — WYSIWYG.
  */
 export function PipPanel({ clip }: { clip: VideoClip | ImageClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const frame = clip.pipFrame ?? {};
   const radius = frame.radius ?? 0;
@@ -40,26 +42,23 @@ export function PipPanel({ clip }: { clip: VideoClip | ImageClip }) {
 
   return (
     <View>
-      <PanelSection title="Sarok-lekerekítés">
+      <PanelSection title={t('panels.pip.cornerRoundingTitle')}>
         <View style={styles.row}>
           {RADII.map((r) => (
             <Chip
-              key={r.label}
-              label={r.label}
+              key={r.id}
+              label={t('panels.pip.radius_' + r.id)}
               active={Math.abs(radius - r.value) < 0.02}
               onPress={() => patch({ radius: r.value })}
             />
           ))}
         </View>
-        <Text style={styles.note}>
-          A „🔵 Kör” nagyjából négyzetes PiP-en ad teljes kört — állítsd a PiP
-          méretét közel négyzetesre a webcam-buborékhoz.
-        </Text>
+        <Text style={styles.note}>{t('panels.pip.cornerRoundingNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="Keret">
+      <PanelSection title={t('panels.pip.borderTitle')}>
         <Stepper
-          label="Vastagság"
+          label={t('panels.pip.thickness')}
           value={`${Math.round(borderWidth * 1000) / 10}%`}
           onDec={() => patch({ borderWidth: clamp(borderWidth - 0.004, 0, 0.03) })}
           onInc={() => patch({ borderWidth: clamp(borderWidth + 0.004, 0, 0.03) })}
@@ -76,10 +75,10 @@ export function PipPanel({ clip }: { clip: VideoClip | ImageClip }) {
         </View>
       </PanelSection>
 
-      <PanelSection title="Keverés a fő videóval (blend)">
+      <PanelSection title={t('panels.pip.blendTitle')}>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!frame.blendMode}
             onPress={() => patch({ blendMode: undefined })}
           />
@@ -92,28 +91,20 @@ export function PipPanel({ clip }: { clip: VideoClip | ImageClip }) {
             />
           ))}
         </View>
-        <Text style={styles.note}>
-          A PiP a fő videóval keveredik (nem takarja): ☀️ Screen = világos rész
-          átüt (light-leak, tűzijáték, fény-overlay), 🌑 Multiply = sötét rész
-          átüt, Overlay/Lighten = kontraszt/dupla-expozíció. Előnézetben és
-          renderben is beég.
-        </Text>
+        <Text style={styles.note}>{t('panels.pip.blendNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="Árnyék">
+      <PanelSection title={t('panels.pip.shadowTitle')}>
         <View style={styles.row}>
-          <Chip label="Nincs" active={!shadow} onPress={() => patch({ shadow: false })} />
-          <Chip label="🌒 Vetett árnyék" active={shadow} onPress={() => patch({ shadow: true })} />
+          <Chip label={t('common.none')} active={!shadow} onPress={() => patch({ shadow: false })} />
+          <Chip label={t('panels.pip.dropShadow')} active={shadow} onPress={() => patch({ shadow: true })} />
         </View>
-        <Text style={styles.note}>
-          Lágy vetett árnyék a buborék mögé — az előnézetben és a renderelt
-          videóban is (jobbra-le eltolva, elmosva).
-        </Text>
+        <Text style={styles.note}>{t('panels.pip.shadowNote')}</Text>
       </PanelSection>
 
       {clip.pipFrame ? (
         <Chip
-          label="Alaphelyzet"
+          label={t('common.reset')}
           active={false}
           onPress={() => updateClip(clip.id, { pipFrame: undefined })}
         />

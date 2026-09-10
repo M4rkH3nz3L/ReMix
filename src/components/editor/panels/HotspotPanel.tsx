@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -12,6 +13,7 @@ import type { HotspotAction, InteractiveClip } from '@/types/project';
  * húzható-méretezhető.
  */
 export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
 
   const setAction = (action: HotspotAction) => updateClip(clip.id, { action });
@@ -27,8 +29,12 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
     } else {
       setAction({
         type: 'quiz',
-        question: 'Mi a kérdés?',
-        answers: ['Válasz A', 'Válasz B', 'Válasz C'],
+        question: t('panels.hotspot.defaultQuestion'),
+        answers: [
+          t('panels.hotspot.defaultAnswerA'),
+          t('panels.hotspot.defaultAnswerB'),
+          t('panels.hotspot.defaultAnswerC'),
+        ],
         correctIndex: 0,
       });
     }
@@ -36,32 +42,32 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
 
   return (
     <View>
-      <PanelSection title="Felirat">
+      <PanelSection title={t('panels.hotspot.labelSection')}>
         <TextInput
           value={clip.label}
           onChangeText={(label) => updateClip(clip.id, { label })}
           style={styles.input}
-          placeholder="Pl. Vásárolj most"
+          placeholder={t('panels.hotspot.labelPlaceholder')}
           placeholderTextColor={palette.textDim}
         />
         <Stepper
-          label="Időtartam"
-          value={`${clip.duration.toFixed(1)} mp`}
+          label={t('panels.hotspot.duration')}
+          value={t('panels.hotspot.seconds', { value: clip.duration.toFixed(1) })}
           onDec={() => updateClip(clip.id, { duration: clamp(clip.duration - 0.5, 0.5, 600) })}
           onInc={() => updateClip(clip.id, { duration: clamp(clip.duration + 0.5, 0.5, 600) })}
         />
       </PanelSection>
 
-      <PanelSection title="Művelet">
+      <PanelSection title={t('panels.hotspot.actionSection')}>
         <View style={styles.row}>
           <Chip label="URL" active={clip.action.type === 'url'} onPress={() => switchType('url')} />
           <Chip
-            label="Ugrás"
+            label={t('panels.hotspot.actionSeek')}
             active={clip.action.type === 'seek'}
             onPress={() => switchType('seek')}
           />
           <Chip
-            label="Kvíz"
+            label={t('panels.hotspot.actionQuiz')}
             active={clip.action.type === 'quiz'}
             onPress={() => switchType('quiz')}
           />
@@ -82,8 +88,8 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
 
         {clip.action.type === 'seek' ? (
           <Stepper
-            label={`Ugrás ide: ${formatTime(clip.action.toTime)}`}
-            value={`${clip.action.toTime.toFixed(1)} mp`}
+            label={t('panels.hotspot.seekTo', { time: formatTime(clip.action.toTime) })}
+            value={t('panels.hotspot.seconds', { value: clip.action.toTime.toFixed(1) })}
             onDec={() =>
               setAction({
                 type: 'seek',
@@ -116,7 +122,7 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
                 setAction({ ...clip.action, question })
               }
               style={styles.input}
-              placeholder="Kérdés"
+              placeholder={t('panels.hotspot.questionPlaceholder')}
               placeholderTextColor={palette.textDim}
             />
             {clip.action.answers.map((answer, index) => (
@@ -140,7 +146,7 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
                     setAction({ ...clip.action, answers });
                   }}
                   style={[styles.input, { flex: 1 }]}
-                  placeholder={`Válasz ${index + 1}`}
+                  placeholder={t('panels.hotspot.answerPlaceholder', { index: index + 1 })}
                   placeholderTextColor={palette.textDim}
                 />
               </View>

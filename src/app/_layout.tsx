@@ -9,6 +9,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PaywallSheet } from '@/components/PaywallSheet';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { palette } from '@/constants/editor';
+// 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
+import { hydrateLanguage } from '@/i18n';
 import { useEntitlement } from '@/store/entitlementStore';
 
 export default function RootLayout() {
@@ -16,6 +18,8 @@ export default function RootLayout() {
   const hydrateEntitlement = useEntitlement((s) => s.hydrate);
   useEffect(() => {
     void hydrateEntitlement();
+    // 🌍 mentett nyelvválasztás betöltése (a felismert eszköz-nyelv fölé)
+    void hydrateLanguage();
   }, [hydrateEntitlement]);
 
   // választható betűtípusok betöltése (a family-nevek egyeznek a renderrel)

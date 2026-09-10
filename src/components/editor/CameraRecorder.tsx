@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { filters, palette } from '@/constants/editor';
@@ -23,6 +24,7 @@ const SPEEDS = [0.5, 1, 2, 3] as const;
  * a választott szűrővel és sebességgel.
  */
 export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const [camPerm, requestCam] = useCameraPermissions();
   const [micPerm, requestMic] = useMicrophonePermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -176,7 +178,7 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
         ) : (
           <View style={styles.permWrap}>
             <Ionicons name="videocam-outline" size={48} color={palette.textDim} />
-            <Text style={styles.permText}>A felvételhez kamera- és mikrofon-engedély kell.</Text>
+            <Text style={styles.permText}>{t('editor.cameraRecorder.permissionNeeded')}</Text>
             <Pressable
               style={styles.permBtn}
               onPress={() => {
@@ -184,7 +186,7 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
                 requestMic();
               }}
             >
-              <Text style={styles.permBtnText}>Engedélyezés</Text>
+              <Text style={styles.permBtnText}>{t('editor.cameraRecorder.grantPermission')}</Text>
             </Pressable>
           </View>
         )}
@@ -288,7 +290,7 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
                     ) : null}
                   </View>
                   <Text style={styles.filterLabel} numberOfLines={1}>
-                    {f.label}
+                    {t(f.label)}
                   </Text>
                 </Pressable>
               ))}
@@ -302,7 +304,9 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
               <View style={recording ? styles.shutterStop : styles.shutterInner} />
             </Pressable>
             <Text style={styles.hint}>
-              {recording ? 'Koppints a leállításhoz' : 'Koppints a felvételhez (max 60 mp)'}
+              {recording
+                ? t('editor.cameraRecorder.tapToStop')
+                : t('editor.cameraRecorder.tapToRecord')}
             </Text>
           </View>
         ) : null}

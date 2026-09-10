@@ -1,5 +1,6 @@
 import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AiActivity } from '@/components/editor/AiActivity';
@@ -54,12 +55,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
 import type { VideoClip } from '@/types/project';
 
-const QUICK_ACTIONS = [
-  'Rövidítsd 30 mp alá',
-  'Adj hozzá címet és záró CTA-t',
-  'Igazítsd a feliratokat az alsó harmadba',
-  'Tedd egységessé a feliratok stílusát',
-];
+const QUICK_ACTIONS = ['shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
 /**
  * AI-asszisztens (full-plan F3): utasítás → a worker Claude-dal parancslistát
@@ -67,6 +63,7 @@ const QUICK_ACTIONS = [
  * undo-val. Az AI sosem írja közvetlenül a projektet.
  */
 export function AssistantPanel() {
+  const { t } = useTranslation();
   const [instruction, setInstruction] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [reply, setReply] = useState<{ message: string; commands: AiCommand[] } | null>(
@@ -78,7 +75,7 @@ export function AssistantPanel() {
   const [outro, setOutro] = useState<OutroTemplate | null>(null);
   // worker-diagnosztika: mit hív a kliens, és eléri-e (a „nem érhető el”
   // hibák oka azonnal látszik: rossz URL vs. nem futó worker vs. hálózat)
-  const [workerDiag, setWorkerDiag] = useState<string>('worker: ellenőrzés…');
+  const [workerDiag, setWorkerDiag] = useState<string>(t('panels.assistant.workerChecking'));
 
   useEffect(() => {
     let alive = true;
@@ -101,10 +98,10 @@ export function AssistantPanel() {
       if (firstVideo && firstVideo.kind === 'video') {
         try {
           fileInfo = new File(firstVideo.uri).exists
-            ? ' · médiafájl ✓'
-            : ' · MÉDIAFÁJL HIÁNYZIK ✗ (relink kell)';
+            ? t('panels.assistant.mediaOk')
+            : t('panels.assistant.mediaMissing');
         } catch {
-          fileInfo = ' · médiafájl nem ellenőrizhető';
+          fileInfo = t('panels.assistant.mediaUncheckable');
         }
       }
     }
@@ -114,13 +111,25 @@ export function AssistantPanel() {
       .then((res) => {
         if (alive) {
           setWorkerDiag(
-            `worker: ${base} · ${res.ok ? 'elérhető ✓' : `HTTP ${res.status} ✗`}${fileInfo}`
+            t('panels.assistant.workerStatus', {
+              base,
+              status: res.ok
+                ? t('panels.assistant.workerReachable')
+                : t('panels.assistant.workerHttpError', { status: res.status }),
+              fileInfo,
+            })
           );
         }
       })
       .catch(() => {
         if (alive) {
-          setWorkerDiag(`worker: ${base} · NEM elérhető ✗${fileInfo}`);
+          setWorkerDiag(
+            t('panels.assistant.workerStatus', {
+              base,
+              status: t('panels.assistant.workerUnreachable'),
+              fileInfo,
+            })
+          );
         }
       })
       .finally(() => clearTimeout(timer));
@@ -141,7 +150,13 @@ export function AssistantPanel() {
           .then((r) => {
             if (alive) {
               setWorkerDiag(
-                (prev) => `${prev}\nfeltöltés-próba: ${r.ok ? 'OK ✓' : `HTTP ${r.status} ✗`}`
+                (prev) =>
+                  `${prev}\n` +
+                  t('panels.assistant.uploadProbe', {
+                    result: r.ok
+                      ? t('panels.assistant.uploadProbeOk')
+                      : t('panels.assistant.uploadProbeHttpError', { status: r.status }),
+                  })
               );
             }
           })
@@ -149,7 +164,9 @@ export function AssistantPanel() {
             console.warn('feltöltés-próba hiba:', (e as Error).message);
             if (alive) {
               setWorkerDiag(
-                (prev) => `${prev}\nfeltöltés-próba HIBA: ${(e as Error).message}`
+                (prev) =>
+                  `${prev}\n` +
+                  t('panels.assistant.uploadProbeError', { message: (e as Error).message })
               );
             }
           });
@@ -158,6 +175,8 @@ export function AssistantPanel() {
     return () => {
       alive = false;
     };
+    // csak mount-kor futó worker-diagnosztika; a `t` stabil referencia (i18next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 🎬 Look-csomag: kamera + átmenetek + lighting egy koppintásra, egy undóban
@@ -168,21 +187,20 @@ export function AssistantPanel() {
     }
     const plan = buildMotionPackPlan(state.project, pack);
     if (!plan) {
-      Alert.alert('Look-csomag', 'Nincs videó/kép klip a projektben.');
+      Alert.alert(t('panels.assistant.lookPackTitle'), t('panels.assistant.lookPackNoClip'));
       return;
     }
     Alert.alert(
-      `${MOTION_PACKS[pack].label} look`,
-      `${plan.touched} klip kap összehangolt kameramozgást, átmenetet és ` +
-        `világítást${
-          plan.skippedCamera > 0
-            ? ` (${plan.skippedCamera} kulcskockás klip mozgása megmarad)`
-            : ''
-        }.\n\nEgy lépésben visszavonható.`,
+      t('panels.assistant.lookPackHeader', { pack: MOTION_PACKS[pack].label }),
+      t('panels.assistant.lookPackBody', { count: plan.touched }) +
+        (plan.skippedCamera > 0
+          ? t('panels.assistant.lookPackSkipped', { count: plan.skippedCamera })
+          : '') +
+        t('panels.assistant.lookPackUndo'),
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Alkalmazás',
+          text: t('panels.assistant.applyAction'),
           onPress: () => {
             const ok = useEditorStore
               .getState()
@@ -192,8 +210,11 @@ export function AssistantPanel() {
               );
             setApplied(
               ok
-                ? `${MOTION_PACKS[pack].label} look alkalmazva ${plan.touched} klipre.`
-                : 'Nem sikerült alkalmazni.'
+                ? t('panels.assistant.lookPackApplied', {
+                    pack: MOTION_PACKS[pack].label,
+                    count: plan.touched,
+                  })
+                : t('panels.assistant.applyFailed')
             );
           },
         },
@@ -210,7 +231,7 @@ export function AssistantPanel() {
     if (!state.project || hookStatus) {
       return;
     }
-    setHookStatus('Hookok írása…');
+    setHookStatus(t('panels.assistant.hookWriting'));
     try {
       const transcript = await getTimelineTranscript(state.project).catch(() => null);
       const lines = (transcript ?? []).slice(0, 12).map((l) => l.text);
@@ -218,8 +239,8 @@ export function AssistantPanel() {
       const list = await fetchHooks(summary);
       if (!list) {
         Alert.alert(
-          'Hook Generator',
-          'A hook-javaslat nem érhető el — fut a worker és az AI? (a /health mutatja)'
+          t('panels.assistant.hookGeneratorTitle'),
+          t('panels.assistant.hookUnavailable')
         );
         return;
       }
@@ -249,7 +270,9 @@ export function AssistantPanel() {
       { type: 'REPLACE_TRACK_CLIPS', trackType: 'text', clips },
       'ai'
     );
-    setApplied(ok ? `Hook beállítva: „${hook.text}"` : 'Nem sikerült alkalmazni.');
+    setApplied(
+      ok ? t('panels.assistant.hookApplied', { text: hook.text }) : t('panels.assistant.applyFailed')
+    );
   };
 
   // 🛍️ Product showcase: a legjobb pillanatokból 10 mp-es termékvideó
@@ -266,47 +289,50 @@ export function AssistantPanel() {
       .filter((c): c is VideoClip => c.kind === 'video')
       .sort((a, b) => a.start - b.start)[0];
     if (!source) {
-      Alert.alert('Termékvideó', 'Kell hozzá legalább egy videóklip.');
+      Alert.alert(t('panels.assistant.productAdTitle'), t('panels.assistant.productAdNeedsClip'));
       return;
     }
-    setProductStatus('Legjobb pillanatok keresése…');
+    setProductStatus(t('panels.assistant.productFindingMoments'));
     try {
       const scenes = (await detectScenes(source.uri)) ?? [];
       const times = [0.5, ...scenes.map((s) => s + 0.4)].slice(0, 16);
       const shots = await fetchShotScores(source.uri, times);
       if (!shots || shots.length === 0) {
         Alert.alert(
-          'Termékvideó',
-          'A kocka-pontozás nem érhető el — fut a worker? (cd server && npm start)'
+          t('panels.assistant.productAdTitle'),
+          t('panels.assistant.productScoringUnavailable')
         );
         return;
       }
-      setProductStatus('Cím írása…');
+      setProductStatus(t('panels.assistant.productWritingHeadline'));
       const headlines = await fetchThumbHeadlines(
-        `${state.project.name} — termékbemutató videó`
+        t('panels.assistant.productHeadlinePrompt', { name: state.project.name })
       );
       const plan = buildProductAdPlan(source, shots, {
         targetSeconds: 10,
         headline: headlines?.[0],
-        cta: 'Nézd meg most',
+        cta: t('panels.assistant.productCta'),
         makeId: () => makeId('clip'),
       });
       if (!plan) {
-        Alert.alert('Termékvideó', 'Nem sikerült elég használható pillanatot találni.');
+        Alert.alert(t('panels.assistant.productAdTitle'), t('panels.assistant.productNotEnoughMoments'));
         return;
       }
       setProductStatus(null);
       Alert.alert(
-        '🛍️ Termékvideó',
-        `${plan.shots} legjobb pillanat · ${plan.totalSeconds} mp · Product look ` +
-          `(orbit-kamera, lágy áttűnés, studio fény)` +
-          `${plan.captions.length > 0 ? `\n\nCím: „${plan.captions[0].text}"` : ''}` +
-          '\n\nA videósáv újraépül, a feliratok a Felirat sávra kerülnek — ' +
-          'mindkét lépés visszavonható.',
+        t('panels.assistant.productAdEmojiTitle'),
+        t('panels.assistant.productAdBody', {
+          shots: plan.shots,
+          seconds: plan.totalSeconds,
+        }) +
+          (plan.captions.length > 0
+            ? t('panels.assistant.productAdCaption', { text: plan.captions[0].text })
+            : '') +
+          t('panels.assistant.productAdUndo'),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Készítés',
+            text: t('panels.assistant.createAction'),
             onPress: () => {
               const s = useEditorStore.getState();
               const ok = s.dispatch(
@@ -321,8 +347,11 @@ export function AssistantPanel() {
               }
               setApplied(
                 ok
-                  ? `Termékvideó kész: ${plan.shots} vágás, ${plan.totalSeconds} mp.`
-                  : 'Nem sikerült alkalmazni.'
+                  ? t('panels.assistant.productAdDone', {
+                      shots: plan.shots,
+                      seconds: plan.totalSeconds,
+                    })
+                  : t('panels.assistant.applyFailed')
               );
             },
           },
@@ -342,14 +371,14 @@ export function AssistantPanel() {
     const kit = deriveBrandKit(project, new Date().toISOString());
     if (!kit) {
       Alert.alert(
-        'Brand Kit',
-        'Ebből a projektből nem olvasható ki stílus — kell hozzá felirat vagy logó-vízjel.'
+        t('panels.assistant.brandKitTitle'),
+        t('panels.assistant.brandKitNoStyle')
       );
       return;
     }
     await saveBrandKit(kit);
     setBrandKit(kit);
-    Alert.alert('Brand Kit mentve', describeBrandKit(kit));
+    Alert.alert(t('panels.assistant.brandKitSaved'), describeBrandKit(kit));
   };
 
   // 🎨 Brand Kit: a mentett márka alkalmazása a nyitott projektre
@@ -361,7 +390,7 @@ export function AssistantPanel() {
     }
     const kit = brandKit ?? (await loadBrandKit());
     if (!kit) {
-      Alert.alert('Brand Kit', 'Még nincs mentett márka — előbb mentsd el egy projektből.');
+      Alert.alert(t('panels.assistant.brandKitTitle'), t('panels.assistant.brandKitNoSaved'));
       return;
     }
     let captionCount = 0;
@@ -397,7 +426,7 @@ export function AssistantPanel() {
               kind: 'image',
               uri: kit.watermark.imageUri,
               provider: 'local',
-              name: 'Vízjel',
+              name: t('panels.assistant.watermarkName'),
             },
           },
           'user'
@@ -405,17 +434,19 @@ export function AssistantPanel() {
       }
     }
     if (captionCount === 0 && !watermarkAdded) {
-      Alert.alert('Brand Kit', 'Nincs mit alkalmazni — a projekt már a márkádat viseli.');
+      Alert.alert(t('panels.assistant.brandKitTitle'), t('panels.assistant.brandNothingToApply'));
       return;
     }
     Alert.alert(
-      'Márka alkalmazva',
+      t('panels.assistant.brandApplied'),
       [
-        captionCount > 0 ? `${captionCount} felirat átstílusozva` : null,
-        watermarkAdded ? 'vízjel hozzáadva' : null,
+        captionCount > 0
+          ? t('panels.assistant.brandCaptionsRestyled', { count: captionCount })
+          : null,
+        watermarkAdded ? t('panels.assistant.brandWatermarkAdded') : null,
       ]
         .filter(Boolean)
-        .join(' · ') + '. Lépésenként visszavonható.'
+        .join(' · ') + t('panels.assistant.brandUndoStepwise')
     );
   };
 
@@ -424,7 +455,7 @@ export function AssistantPanel() {
     if (!state.project || status) {
       return;
     }
-    setStatus('Gondolkodik…');
+    setStatus(t('panels.assistant.thinking'));
     setReply(null);
     setApplied(null);
     try {
@@ -436,20 +467,20 @@ export function AssistantPanel() {
       );
       // szemantikus réteg: a videók beszéde idővonal-időben (best-effort,
       // fájlonként cache-elve — worker/Whisper nélkül kimarad)
-      const transcript = await withProgress('Átirat (AI-kontextus)', (report) =>
+      const transcript = await withProgress(t('panels.assistant.progressTranscript'), (report) =>
         getTimelineTranscript(state.project!, report)
       ).catch(() => null);
       if (transcript && transcript.length > 0) {
         context.transcript = transcript;
       }
-      setStatus('Gondolkodik…');
+      setStatus(t('panels.assistant.thinking'));
       const answer = await askAssistant(context, text);
       setReply(answer);
       setAiResult({
         ok: true,
         text: answer.commands.length > 0
-          ? `Kész: ${answer.commands.length} javasolt művelet — nézd meg lent a „Javaslat" dobozban.`
-          : 'Kész — az asszisztens válaszolt, de nem javasolt műveletet.',
+          ? t('panels.assistant.replyReady', { count: answer.commands.length })
+          : t('panels.assistant.replyNoCommands'),
       });
     } catch (err) {
       // a hiba MOSTANTÓL a panel tetején, feltűnően jelenik meg
@@ -472,7 +503,7 @@ export function AssistantPanel() {
     if (!state.project || cutStatus) {
       return;
     }
-    setCutStatus('Csend-elemzés…');
+    setCutStatus(t('panels.assistant.silenceAnalysis'));
     try {
       const uris = [
         ...new Set(
@@ -484,12 +515,12 @@ export function AssistantPanel() {
         ),
       ];
       if (uris.length === 0) {
-        Alert.alert('Holtidő-vágás', 'Nincs videóklip a projektben.');
+        Alert.alert(t('panels.assistant.deadAirTitle'), t('panels.assistant.noVideoClip'));
         return;
       }
       const silencesByUri = new Map<string, SilenceRange[]>();
       for (let i = 0; i < uris.length; i++) {
-        setCutStatus(`Csend-elemzés… (${i + 1}/${uris.length})`);
+        setCutStatus(t('panels.assistant.silenceAnalysisProgress', { current: i + 1, total: uris.length }));
         const silences = await detectSilence(uris[i]);
         if (silences) {
           silencesByUri.set(uris[i], silences);
@@ -497,30 +528,28 @@ export function AssistantPanel() {
       }
       if (silencesByUri.size === 0) {
         Alert.alert(
-          'Holtidő-vágás',
+          t('panels.assistant.deadAirTitle'),
           Platform.OS === 'web'
-            ? 'A csend-elemzés a webes előnézetben nem elérhető (natív fájl-feltöltés ' +
-              'kell hozzá) — próbáld a szimulátorban vagy a telefonon.'
-            : `A csend-elemzés nem érhető el.\n\nCél: ${renderServerUrl()}/silence\n` +
-              'Nézd meg a panel alján a „worker:” sort — ha ✓, akkor a fájl-feltöltés ' +
-              'akadt el (szólj, és megnézzük a worker-naplót).'
+            ? t('panels.assistant.silenceWebUnavailable')
+            : t('panels.assistant.silenceUnavailable', { url: `${renderServerUrl()}/silence` })
         );
         return;
       }
       const plan = buildCutPlan(state.project, silencesByUri);
       if (!plan) {
-        Alert.alert('Holtidő-vágás', 'Nem találtam kivágható holtidőt. 🎉');
+        Alert.alert(t('panels.assistant.deadAirTitle'), t('panels.assistant.noDeadAir'));
         return;
       }
       Alert.alert(
-        'Holtidő kivágása',
-        `${plan.cuts} vágás, összesen −${plan.removedSeconds.toFixed(1)} mp.\n\n` +
-          'A videósáv hézag nélkül újraépül; a többi sáv időzítése nem mozdul. ' +
-          'A művelet visszavonható.',
+        t('panels.assistant.deadAirRemoveTitle'),
+        t('panels.assistant.deadAirBody', {
+          cuts: plan.cuts,
+          seconds: plan.removedSeconds.toFixed(1),
+        }),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Alkalmazás',
+            text: t('panels.assistant.applyAction'),
             onPress: () => {
               const ok = useEditorStore
                 .getState()
@@ -530,8 +559,11 @@ export function AssistantPanel() {
                 );
               setApplied(
                 ok
-                  ? `Holtidő kivágva: ${plan.cuts} vágás, −${plan.removedSeconds.toFixed(1)} mp.`
-                  : 'Nem sikerült alkalmazni.'
+                  ? t('panels.assistant.deadAirDone', {
+                      cuts: plan.cuts,
+                      seconds: plan.removedSeconds.toFixed(1),
+                    })
+                  : t('panels.assistant.applyFailed')
               );
             },
           },
@@ -554,7 +586,7 @@ export function AssistantPanel() {
     if (!state.project || sceneStatus) {
       return;
     }
-    setSceneStatus('Jelenet-elemzés…');
+    setSceneStatus(t('panels.assistant.sceneAnalysis'));
     try {
       const uris = [
         ...new Set(
@@ -566,12 +598,12 @@ export function AssistantPanel() {
         ),
       ];
       if (uris.length === 0) {
-        Alert.alert('Jelenetvágás', 'Nincs videóklip a projektben.');
+        Alert.alert(t('panels.assistant.sceneCutTitle'), t('panels.assistant.noVideoClip'));
         return;
       }
       const scenesByUri = new Map<string, number[]>();
       for (let i = 0; i < uris.length; i++) {
-        setSceneStatus(`Jelenet-elemzés… (${i + 1}/${uris.length})`);
+        setSceneStatus(t('panels.assistant.sceneAnalysisProgress', { current: i + 1, total: uris.length }));
         const scenes = await detectScenes(uris[i]);
         if (scenes) {
           scenesByUri.set(uris[i], scenes);
@@ -579,25 +611,23 @@ export function AssistantPanel() {
       }
       if (scenesByUri.size === 0) {
         Alert.alert(
-          'Jelenetvágás',
-          'A jelenet-elemzés nem érhető el — fut a worker? (cd server && npm start)'
+          t('panels.assistant.sceneCutTitle'),
+          t('panels.assistant.sceneAnalysisUnavailable')
         );
         return;
       }
       const plan = buildSceneSplitPlan(state.project, scenesByUri);
       if (!plan) {
-        Alert.alert('Jelenetvágás', 'Nem találtam jelenetváltást a klipekben.');
+        Alert.alert(t('panels.assistant.sceneCutTitle'), t('panels.assistant.noSceneChange'));
         return;
       }
       Alert.alert(
-        'Vágás a jelenetváltásoknál',
-        `${plan.splits} jelenetváltást találtam.\n\n` +
-          'A klipek a határokon felvágódnak (semmi nem törlődik és nem mozdul el), ' +
-          'utána a darabok egyenként szerkeszthetők. A művelet visszavonható.',
+        t('panels.assistant.sceneCutHeader'),
+        t('panels.assistant.sceneCutBody', { count: plan.splits }),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Felvágás',
+            text: t('panels.assistant.splitAction'),
             onPress: () => {
               const ok = useEditorStore
                 .getState()
@@ -607,8 +637,8 @@ export function AssistantPanel() {
                 );
               setApplied(
                 ok
-                  ? `Jelenetvágás kész: ${plan.splits} vágás.`
-                  : 'Nem sikerült alkalmazni.'
+                  ? t('panels.assistant.sceneCutDone', { count: plan.splits })
+                  : t('panels.assistant.applyFailed')
               );
             },
           },
@@ -633,14 +663,14 @@ export function AssistantPanel() {
       return;
     }
     setAutoResult(null);
-    setAutoStatus('Jelek gyűjtése…');
+    setAutoStatus(t('panels.assistant.gatheringSignals'));
     try {
-      const result = await withProgress('Auto Edit', (report) =>
+      const result = await withProgress(t('panels.assistant.autoEditTitle'), (report) =>
         runAutoEditFlow(state.project!, targetSeconds, report)
       );
       setAutoResult(result);
     } catch (err) {
-      Alert.alert('Auto Edit', (err as Error).message);
+      Alert.alert(t('panels.assistant.autoEditTitle'), (err as Error).message);
     } finally {
       setAutoStatus(null);
     }
@@ -676,7 +706,7 @@ export function AssistantPanel() {
       }))
       .filter((r) => r.end - r.start > 0.05);
     if (ranges.length === 0) {
-      Alert.alert('Előnézet', 'Ehhez a változathoz nincs lejátszható sáv.');
+      Alert.alert(t('panels.assistant.previewTitle'), t('panels.assistant.previewNoTrack'));
       return;
     }
     state.setVariantPreview(ranges);
@@ -693,19 +723,21 @@ export function AssistantPanel() {
     stopVariantPreview();
     const compiled = compileVariant(state.project, variant, projectDuration(state.project));
     if (!compiled) {
-      Alert.alert('Auto Edit', 'Ez a változat nem alkalmazható erre a projektre.');
+      Alert.alert(t('panels.assistant.autoEditTitle'), t('panels.assistant.variantNotApplicable'));
       return;
     }
     Alert.alert(
       variant.title,
-      `${compiled.totalSeconds.toFixed(1)} mp · ${compiled.cuts} vágás · ` +
-        `${compiled.captionClips.length} felirat\n\n${variant.rationale}\n\n` +
-        'A videósáv újraépül és a feliratok a Felirat sávra kerülnek — mindkét ' +
-        'lépés visszavonható.',
+      t('panels.assistant.variantBody', {
+        seconds: compiled.totalSeconds.toFixed(1),
+        cuts: compiled.cuts,
+        captions: compiled.captionClips.length,
+        rationale: variant.rationale,
+      }),
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Alkalmazás',
+          text: t('panels.assistant.applyAction'),
           onPress: () => {
             const s = useEditorStore.getState();
             const ok = s.dispatch(
@@ -721,9 +753,13 @@ export function AssistantPanel() {
             setAutoResult(null);
             setApplied(
               ok
-                ? `${variant.title} alkalmazva: ${compiled.totalSeconds.toFixed(1)} mp, ` +
-                    `${compiled.cuts} vágás, ${compiled.captionClips.length} felirat.`
-                : 'Nem sikerült alkalmazni.'
+                ? t('panels.assistant.variantApplied', {
+                    title: variant.title,
+                    seconds: compiled.totalSeconds.toFixed(1),
+                    cuts: compiled.cuts,
+                    captions: compiled.captionClips.length,
+                  })
+                : t('panels.assistant.applyFailed')
             );
           },
         },
@@ -748,7 +784,7 @@ export function AssistantPanel() {
       return;
     }
     if (!intro && !outro) {
-      Alert.alert('Intro / Outro', 'Válassz legalább egy sablont.');
+      Alert.alert(t('panels.assistant.introOutroTitle'), t('panels.assistant.introOutroPickTemplate'));
       return;
     }
     const kit = brandKit ?? (await loadBrandKit());
@@ -763,31 +799,29 @@ export function AssistantPanel() {
       }
     );
     if (!plan) {
-      Alert.alert('Intro / Outro', 'Nem sikerült felépíteni a sablont.');
+      Alert.alert(t('panels.assistant.introOutroTitle'), t('panels.assistant.introOutroBuildFailed'));
       return;
     }
     Alert.alert(
-      'Intro / Outro',
-      `${plan.summary} kerül a videóra.` +
+      t('panels.assistant.introOutroTitle'),
+      t('panels.assistant.introOutroBody', { summary: plan.summary }) +
         (plan.duration > 0
-          ? `\n\nAz intro miatt minden sáv ${plan.duration.toFixed(1)} mp-cel ` +
-            'csúszik — a zene és a feliratok szinkronban maradnak.'
+          ? t('panels.assistant.introOutroShift', { duration: plan.duration.toFixed(1) })
           : '') +
         (kit?.watermark
-          ? '\n\nA mentett logó is bekerül.'
-          : '\n\nNincs mentett logó — szöveges változat készül. Logóért ments ' +
-            'egy márkát vízjellel.') +
-        '\n\nVisszavonható egy lépésben.',
+          ? t('panels.assistant.introOutroLogoIncluded')
+          : t('panels.assistant.introOutroNoLogo')) +
+        t('panels.assistant.introOutroUndo'),
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Beszúrás',
+          text: t('panels.assistant.insertAction'),
           onPress: () => {
             useEditorStore.getState().dispatch(
               {
                 type: 'REPLACE_TRACKS',
                 tracks: plan.tracks,
-                label: `intro/outro: ${plan.summary}`,
+                label: t('panels.assistant.introOutroUndoLabel', { summary: plan.summary }),
               },
               'user'
             );
@@ -814,11 +848,11 @@ export function AssistantPanel() {
       .flatMap((t) => t.clips)
       .sort((a, b) => a.start - b.start);
     if (videoClips.length === 0) {
-      Alert.alert('Sound Design', 'Előbb tegyél videót az idővonalra.');
+      Alert.alert(t('panels.assistant.soundDesignTitle'), t('panels.assistant.soundDesignNeedsVideo'));
       return;
     }
 
-    setSfxStatus('Elemzés…');
+    setSfxStatus(t('panels.assistant.analyzing'));
     try {
       // vágópontok: minden klip-kezdet az első után
       const cuts = videoClips.slice(1).map((c) => c.start);
@@ -837,7 +871,7 @@ export function AssistantPanel() {
         .filter((c) => c.kind === 'audio')
         .sort((a, b) => a.start - b.start)[0];
       if (musicClip && musicClip.kind === 'audio') {
-        setSfxStatus('Beat-elemzés…');
+        setSfxStatus(t('panels.assistant.beatAnalysis'));
         const grid = await detectBeats(musicClip.uri);
         if (grid && grid.bpm > 0) {
           beats = timelineBeats(musicClip, grid.beats);
@@ -855,14 +889,14 @@ export function AssistantPanel() {
       );
       if (plan.length === 0) {
         Alert.alert(
-          'Sound Design',
-          'Nem találtam hangosítható pontot — több vágás vagy zene kell hozzá.'
+          t('panels.assistant.soundDesignTitle'),
+          t('panels.assistant.soundDesignNoPoints')
         );
         return;
       }
 
       // a szükséges SFX-fájlok letöltése (mindegyik csak egyszer)
-      setSfxStatus('Hangok letöltése…');
+      setSfxStatus(t('panels.assistant.downloadingSounds'));
       const library = await fetchSoundLibrary();
       const uriById = new Map<SfxId, { uri: string; name: string }>();
       for (const id of usedSfxIds(plan)) {
@@ -878,7 +912,7 @@ export function AssistantPanel() {
       }
       setSfxStatus(null);
       if (uriById.size === 0) {
-        Alert.alert('Sound Design', 'A hangkönyvtár nem érhető el — fut a worker?');
+        Alert.alert(t('panels.assistant.soundDesignTitle'), t('panels.assistant.soundLibraryUnavailable'));
         return;
       }
 
@@ -891,16 +925,19 @@ export function AssistantPanel() {
       const lines = Object.entries(summary).map(([r, n]) => `· ${n}× ${r}`);
 
       Alert.alert(
-        'Sound Design',
-        `${usable.length} hangeffekt kerül az SFX sávra:\n${lines.join('\n')}\n\n` +
+        t('panels.assistant.soundDesignTitle'),
+        t('panels.assistant.soundDesignBody', {
+          count: usable.length,
+          lines: lines.join('\n'),
+        }) +
           (beats.length > 0
-            ? 'A vágások az ütemhez igazodva kapnak hangot.'
-            : 'Zene nélkül csak a vágásokra kerül hang — zenével pontosabb.') +
-          '\n\nA meglévő SFX-klipek megmaradnak. Visszavonható egy lépésben.',
+            ? t('panels.assistant.soundDesignWithBeats')
+            : t('panels.assistant.soundDesignNoBeats')) +
+          t('panels.assistant.soundDesignKeepUndo'),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Alkalmazás',
+            text: t('panels.assistant.applyAction'),
             onPress: () => {
               const newClips = usable.map((p: SfxPlacement) => {
                 const entry = uriById.get(p.sfxId)!;
@@ -941,7 +978,7 @@ export function AssistantPanel() {
     if (!state.project || fxStatus) {
       return;
     }
-    setFxStatus('Beat-elemzés…');
+    setFxStatus(t('panels.assistant.beatAnalysis'));
     try {
       const musicClip = state.project.tracks
         .filter((t) => t.type === 'music')
@@ -949,12 +986,12 @@ export function AssistantPanel() {
         .filter((c) => c.kind === 'audio')
         .sort((a, b) => a.start - b.start)[0];
       if (!musicClip || musicClip.kind !== 'audio') {
-        Alert.alert('Beat FX', 'Adj előbb zenét a Zene sávra.');
+        Alert.alert(t('panels.assistant.beatFxTitle'), t('panels.assistant.addMusicFirst'));
         return;
       }
       const grid = await detectBeats(musicClip.uri);
       if (!grid || grid.bpm === 0 || grid.beats.length < 4) {
-        Alert.alert('Beat FX', 'Nem érhető el beat-rács — fut a worker, van ütem a zenében?');
+        Alert.alert(t('panels.assistant.beatFxTitle'), t('panels.assistant.noBeatGrid'));
         return;
       }
       if (kind === 'pulse') {
@@ -964,21 +1001,22 @@ export function AssistantPanel() {
         const plan = buildBeatPulsePlan(state.project, times);
         if (!plan) {
           Alert.alert(
-            'Beat-pulzus',
-            'Nincs pulzálható klip — a kulcskockás/animált klipeken nem fut.'
+            t('panels.assistant.beatPulseTitle'),
+            t('panels.assistant.beatPulseNoClip')
           );
           return;
         }
         Alert.alert(
-          'Beat-pulzus',
-          `${plan.pulses} zoom-pulzus ${grid.bpm} BPM-re` +
-            `${plan.skipped > 0 ? ` (${plan.skipped} kulcskockás klip kihagyva)` : ''}.\n\n` +
-            'A videó minden ütemre finoman ránagyít, majd visszaáll — előnézetben ' +
-            'és renderben is. Visszavonható.',
+          t('panels.assistant.beatPulseTitle'),
+          t('panels.assistant.beatPulseBody', { pulses: plan.pulses, bpm: grid.bpm }) +
+            (plan.skipped > 0
+              ? t('panels.assistant.beatPulseSkipped', { count: plan.skipped })
+              : '') +
+            t('panels.assistant.beatPulseUndo'),
           [
-            { text: 'Mégse', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Alkalmazás',
+              text: t('panels.assistant.applyAction'),
               onPress: () => {
                 const ok = useEditorStore
                   .getState()
@@ -986,7 +1024,11 @@ export function AssistantPanel() {
                     { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
                     'ai'
                   );
-                setApplied(ok ? `Beat-pulzus kész: ${plan.pulses} ütem.` : 'Nem sikerült.');
+                setApplied(
+                  ok
+                    ? t('panels.assistant.beatPulseDone', { count: plan.pulses })
+                    : t('panels.assistant.failedShort')
+                );
               },
             },
           ]
@@ -995,18 +1037,16 @@ export function AssistantPanel() {
         const times = timelineBeats(musicClip, grid.downbeats);
         const plan = buildBeatFlashPlan(state.project, times, () => makeId('clip'));
         if (!plan) {
-          Alert.alert('Beat-flash', 'Nem esik downbeat a videó hosszába.');
+          Alert.alert(t('panels.assistant.beatFlashTitle'), t('panels.assistant.beatFlashNoDownbeat'));
           return;
         }
         Alert.alert(
-          'Beat-flash',
-          `${plan.flashes} villanás a 4-es ütemekre (${grid.bpm} BPM).\n\n` +
-            'Rövid fehér flash-réteg kerül az overlay-sávra minden downbeatnél. ' +
-            'Visszavonható.',
+          t('panels.assistant.beatFlashTitle'),
+          t('panels.assistant.beatFlashBody', { flashes: plan.flashes, bpm: grid.bpm }),
           [
-            { text: 'Mégse', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Alkalmazás',
+              text: t('panels.assistant.applyAction'),
               onPress: () => {
                 const ok = useEditorStore
                   .getState()
@@ -1014,7 +1054,11 @@ export function AssistantPanel() {
                     { type: 'REPLACE_TRACK_CLIPS', trackType: 'overlay', clips: plan.clips },
                     'ai'
                   );
-                setApplied(ok ? `Beat-flash kész: ${plan.flashes} villanás.` : 'Nem sikerült.');
+                setApplied(
+                  ok
+                    ? t('panels.assistant.beatFlashDone', { count: plan.flashes })
+                    : t('panels.assistant.failedShort')
+                );
               },
             },
           ]
@@ -1035,7 +1079,7 @@ export function AssistantPanel() {
     if (!state.project || beatStatus) {
       return;
     }
-    setBeatStatus('Beat-elemzés…');
+    setBeatStatus(t('panels.assistant.beatAnalysis'));
     try {
       const musicClip = state.project.tracks
         .filter((t) => t.type === 'music')
@@ -1043,19 +1087,19 @@ export function AssistantPanel() {
         .filter((c) => c.kind === 'audio')
         .sort((a, b) => a.start - b.start)[0];
       if (!musicClip || musicClip.kind !== 'audio') {
-        Alert.alert('Beat-vágás', 'Adj előbb zenét a Zene sávra.');
+        Alert.alert(t('panels.assistant.beatCutTitle'), t('panels.assistant.addMusicFirst'));
         return;
       }
       const grid = await detectBeats(musicClip.uri);
       if (!grid) {
         Alert.alert(
-          'Beat-vágás',
-          'A beat-elemzés nem érhető el — fut a worker? (cd server && npm start)'
+          t('panels.assistant.beatCutTitle'),
+          t('panels.assistant.beatAnalysisUnavailable')
         );
         return;
       }
       if (grid.bpm === 0 || grid.beats.length < 4) {
-        Alert.alert('Beat-vágás', 'Nem találtam kivehető ütemet a zenében.');
+        Alert.alert(t('panels.assistant.beatCutTitle'), t('panels.assistant.noBeatInMusic'));
         return;
       }
       // 135 BPM felett a minden-beat vágás már villódzás — ott a downbeat vág
@@ -1063,19 +1107,20 @@ export function AssistantPanel() {
       const times = timelineBeats(musicClip, useDownbeats ? grid.downbeats : grid.beats);
       const plan = buildBeatSplitPlan(state.project, times);
       if (!plan) {
-        Alert.alert('Beat-vágás', 'Nem esik ütem a videóklipek belsejébe.');
+        Alert.alert(t('panels.assistant.beatCutTitle'), t('panels.assistant.noBeatInsideClips'));
         return;
       }
       Alert.alert(
-        'Vágás a zene ütemére',
-        `${grid.bpm} BPM${useDownbeats ? ' (4-es ütemenként vágva)' : ''} — ` +
-          `${plan.splits} vágás.\n\n` +
-          'A klipek az ütemeken felvágódnak (semmi nem törlődik és nem mozdul el), ' +
-          'utána a darabok egyenként cserélhetők/törölhetők. A művelet visszavonható.',
+        t('panels.assistant.beatCutHeader'),
+        t('panels.assistant.beatCutBody', {
+          bpm: grid.bpm,
+          downbeatNote: useDownbeats ? t('panels.assistant.beatCutDownbeatNote') : '',
+          splits: plan.splits,
+        }),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Felvágás',
+            text: t('panels.assistant.splitAction'),
             onPress: () => {
               const ok = useEditorStore
                 .getState()
@@ -1085,8 +1130,8 @@ export function AssistantPanel() {
                 );
               setApplied(
                 ok
-                  ? `Beat-vágás kész: ${plan.splits} vágás ${grid.bpm} BPM-re.`
-                  : 'Nem sikerült alkalmazni.'
+                  ? t('panels.assistant.beatCutDone', { splits: plan.splits, bpm: grid.bpm })
+                  : t('panels.assistant.applyFailed')
               );
             },
           },
@@ -1108,28 +1153,26 @@ export function AssistantPanel() {
     if (!state.project || reframeStatus) {
       return;
     }
-    setReframeStatus('Téma-elemzés…');
+    setReframeStatus(t('panels.assistant.subjectAnalysis'));
     try {
       const canvasAspect = aspectValue(state.project.aspectRatio);
-      const plan = await withProgress('Smart Reframe', (report) =>
+      const plan = await withProgress(t('panels.assistant.reframeTitle'), (report) =>
         buildSmartReframe(state.project!, canvasAspect, report)
       );
       if (!plan) {
         Alert.alert(
-          'Smart Reframe',
-          'Nincs teendő: minden klip aránya egyezik a vászonnal, vagy a worker nem érhető el.'
+          t('panels.assistant.reframeTitle'),
+          t('panels.assistant.reframeNothing')
         );
         return;
       }
       Alert.alert(
-        'Smart Reframe',
-        `${plan.changed} klip okos-kitöltést kap: a videó kitölti a vásznat, és a ` +
-          'kivágás követi a témát (mozgás-alapú elemzés).\n\nA korábbi ' +
-          'zoom/pozíció ezeken a klipeken felülíródik. A művelet visszavonható.',
+        t('panels.assistant.reframeTitle'),
+        t('panels.assistant.reframeBody', { count: plan.changed }),
         [
-          { text: 'Mégse', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Alkalmazás',
+            text: t('panels.assistant.applyAction'),
             onPress: () => {
               const ok = useEditorStore
                 .getState()
@@ -1139,8 +1182,8 @@ export function AssistantPanel() {
                 );
               setApplied(
                 ok
-                  ? `Smart Reframe kész: ${plan.changed} klip téma-követő kitöltéssel.`
-                  : 'Nem sikerült alkalmazni.'
+                  ? t('panels.assistant.reframeDone', { count: plan.changed })
+                  : t('panels.assistant.applyFailed')
               );
             },
           },
@@ -1183,25 +1226,24 @@ export function AssistantPanel() {
       return;
     }
     setSearchHits(null);
-    setSearchStatus('Keresés…');
+    setSearchStatus(t('panels.assistant.searching'));
     try {
       // 📝 átirat-találatok a vision-találatokkal EGY listában (P0‑8)
       const transcript =
         (await getTimelineTranscript(state.project).catch(() => null)) ?? [];
       const transcriptHits = searchTranscript(transcript, query);
-      const index = await withProgress('Vizuális index', (report) =>
+      const index = await withProgress(t('panels.assistant.progressVisualIndex'), (report) =>
         indexProjectVision(state.project!, report)
       );
       let visionHits: SearchHit[] = [];
       if (index.length > 0) {
-        setSearchStatus('Pontozás…');
+        setSearchStatus(t('panels.assistant.scoring'));
         visionHits = await searchVision(query, index);
       }
       if (index.length === 0 && transcriptHits.length === 0) {
         Alert.alert(
-          'Smart Search',
-          'Se vizuális index, se átirat — fut a worker és megvan a vision-modell? ' +
-            '(ollama pull qwen2.5vl:7b)'
+          t('panels.assistant.smartSearchTitle'),
+          t('panels.assistant.searchNoIndex')
         );
         return;
       }
@@ -1227,8 +1269,8 @@ export function AssistantPanel() {
     setInstruction('');
     setApplied(
       ok > 0
-        ? `${ok} művelet alkalmazva — a visszavonás gombbal bármikor visszavonható.`
-        : 'Nem volt alkalmazható művelet.'
+        ? t('panels.assistant.commandsApplied', { count: ok })
+        : t('panels.assistant.noApplicableCommand')
     );
   };
 
@@ -1236,32 +1278,32 @@ export function AssistantPanel() {
   // determinisztikus eszközök és AI-promptok vegyesen, egy koppintásra
   const commandBar: { label: string; run: () => void }[] = [
     {
-      label: '✂️ Csend ki',
+      label: t('panels.assistant.cmdSilenceOut'),
       run: () => {
-        cutDeadAir().catch((err: Error) => Alert.alert('Holtidő-vágás', err.message));
+        cutDeadAir().catch((err: Error) => Alert.alert(t('panels.assistant.deadAirTitle'), err.message));
       },
     },
     {
-      label: '🎵 Beat-vágás',
+      label: t('panels.assistant.cmdBeatCut'),
       run: () => {
-        splitOnBeats().catch((err: Error) => Alert.alert('Beat-vágás', err.message));
+        splitOnBeats().catch((err: Error) => Alert.alert(t('panels.assistant.beatCutTitle'), err.message));
       },
     },
     {
-      label: '🎯 Reframe',
+      label: t('panels.assistant.cmdReframe'),
       run: () => {
-        smartReframe().catch((err: Error) => Alert.alert('Smart Reframe', err.message));
+        smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
       },
     },
     {
-      label: '⚡ 30 mp-es short',
+      label: t('panels.assistant.cmdShort30'),
       run: () => {
         setTargetSeconds(30);
-        startAutoEdit().catch((err: Error) => Alert.alert('Auto Edit', err.message));
+        startAutoEdit().catch((err: Error) => Alert.alert(t('panels.assistant.autoEditTitle'), err.message));
       },
     },
-    { label: '💬 Feliratozz', run: () => send('Feliratozd a beszédet a felirat-sávra') },
-    { label: '🔥 Címet a hookra', run: () => send('Adj ütős címet a videó elejére') },
+    { label: t('panels.assistant.cmdCaption'), run: () => send(t('panels.assistant.promptCaption')) },
+    { label: t('panels.assistant.cmdTitleHook'), run: () => send(t('panels.assistant.promptTitleHook')) },
   ];
 
   return (
@@ -1272,7 +1314,7 @@ export function AssistantPanel() {
         result={aiResult}
         onDismiss={() => setAiResult(null)}
       />
-      <PanelSection title="Parancsok">
+      <PanelSection title={t('panels.assistant.sectionCommands')}>
         <View style={styles.row}>
           {commandBar.map((cmd) => (
             <Chip key={cmd.label} label={cmd.label} active={false} onPress={cmd.run} />
@@ -1280,12 +1322,12 @@ export function AssistantPanel() {
         </View>
       </PanelSection>
 
-      <PanelSection title="Auto Edit — 3 változat">
+      <PanelSection title={t('panels.assistant.sectionAutoEdit')}>
         <View style={styles.row}>
           {[15, 30, 60].map((sec) => (
             <Chip
               key={sec}
-              label={`${sec} mp`}
+              label={t('panels.assistant.seconds', { count: sec })}
               active={targetSeconds === sec}
               onPress={() => setTargetSeconds(sec)}
             />
@@ -1293,7 +1335,7 @@ export function AssistantPanel() {
         </View>
         <PrimaryButton
           icon="flash-outline"
-          label={autoStatus ?? `Auto Edit indítása (${targetSeconds} mp-es short)`}
+          label={autoStatus ?? t('panels.assistant.autoEditStart', { seconds: targetSeconds })}
           onPress={() => {
             startAutoEdit().catch((err: Error) => Alert.alert('Auto Edit', err.message));
           }}
@@ -1311,17 +1353,24 @@ export function AssistantPanel() {
               >
                 <Text style={styles.variantTitle}>{variant.title}</Text>
                 <Text style={styles.variantMeta}>
-                  {variant.keep
-                    .reduce((s, k) => s + Math.max(0, k.end - k.start), 0)
-                    .toFixed(1)}{' '}
-                  mp · {variant.keep.length} szegmens · {variant.captions.length} felirat
+                  {t('panels.assistant.variantMeta', {
+                    seconds: variant.keep
+                      .reduce((s, k) => s + Math.max(0, k.end - k.start), 0)
+                      .toFixed(1),
+                    segments: variant.keep.length,
+                    captions: variant.captions.length,
+                  })}
                 </Text>
                 <Text style={styles.variantRationale} numberOfLines={2}>
                   {variant.rationale}
                 </Text>
                 <View style={styles.variantActions}>
                   <Chip
-                    label={previewingId === variant.id ? '⏹ Előnézet leállítása' : '▶ Előnézet'}
+                    label={
+                      previewingId === variant.id
+                        ? t('panels.assistant.previewStop')
+                        : t('panels.assistant.previewPlay')
+                    }
                     active={previewingId === variant.id}
                     onPress={() => previewVariant(variant)}
                   />
@@ -1330,30 +1379,27 @@ export function AssistantPanel() {
             ))}
             <Text style={styles.note}>
               {autoResult.source === 'ai'
-                ? 'AI-tervezett változatok — ▶ előnézet alkalmazás nélkül, koppintás a kártyán = alkalmazás (visszavonható).'
-                : 'Heurisztikus változatok (AI nélkül) — ▶ előnézet alkalmazás nélkül, koppintás = alkalmazás.'}
+                ? t('panels.assistant.variantsAiNote')
+                : t('panels.assistant.variantsHeuristicNote')}
             </Text>
           </>
         ) : (
-          <Text style={styles.note}>
-            A jelekből (jelenetek + átirat + csend + beat) 3 kész vágás készül:
-            🔥 Viral · 🎬 Cinematic · ⚡ Fast-paced.
-          </Text>
+          <Text style={styles.note}>{t('panels.assistant.autoEditIntro')}</Text>
         )}
       </PanelSection>
 
-      <PanelSection title="Mit csináljak?">
+      <PanelSection title={t('panels.assistant.sectionWhatToDo')}>
         <TextInput
           value={instruction}
           onChangeText={setInstruction}
           multiline
           style={styles.input}
-          placeholder={'Pl. "Vágd ki az üres részeket és feliratozd a hookot"'}
+          placeholder={t('panels.assistant.instructionPlaceholder')}
           placeholderTextColor={palette.textDim}
         />
         <PrimaryButton
           icon="sparkles-outline"
-          label={status ?? 'Küldés az asszisztensnek'}
+          label={status ?? t('panels.assistant.sendToAssistant')}
           onPress={() => {
             if (instruction.trim()) {
               send(instruction.trim());
@@ -1361,30 +1407,38 @@ export function AssistantPanel() {
           }}
         />
         <View style={styles.row}>
-          {QUICK_ACTIONS.map((action) => (
-            <Chip key={action} label={action} active={false} onPress={() => send(action)} />
-          ))}
+          {QUICK_ACTIONS.map((action) => {
+            const actionLabel = t(`panels.assistant.quickAction_${action}`);
+            return (
+              <Chip
+                key={action}
+                label={actionLabel}
+                active={false}
+                onPress={() => send(actionLabel)}
+              />
+            );
+          })}
         </View>
       </PanelSection>
 
-      <PanelSection title="Smart Search — keresés a videóban">
+      <PanelSection title={t('panels.assistant.sectionSmartSearch')}>
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.input}
-          placeholder={'Pl. "ahol az autó látszik" vagy "nevető ember"'}
+          placeholder={t('panels.assistant.searchPlaceholder')}
           placeholderTextColor={palette.textDim}
         />
         <PrimaryButton
           icon="search-outline"
-          label={searchStatus ?? 'Keresés a képi tartalomban'}
+          label={searchStatus ?? t('panels.assistant.searchInVisual')}
           onPress={() => {
             runSearch().catch((err: Error) => Alert.alert('Smart Search', err.message));
           }}
         />
         {searchHits !== null ? (
           searchHits.length === 0 ? (
-            <Text style={styles.note}>Nincs találat — próbáld más szavakkal.</Text>
+            <Text style={styles.note}>{t('panels.assistant.searchNoResults')}</Text>
           ) : (
             searchHits.map((hit, i) => (
               <Pressable
@@ -1403,17 +1457,14 @@ export function AssistantPanel() {
             ))
           )
         ) : (
-          <Text style={styles.note}>
-            A jelenetek képi tartalma a gépen futó vision-modellel indexelődik
-            (fájlonként egyszer), a találatra koppintva a lejátszófej odaugrik.
-          </Text>
+          <Text style={styles.note}>{t('panels.assistant.smartSearchIntro')}</Text>
         )}
       </PanelSection>
 
-      <PanelSection title="🪝 Hook Generator (erősebb nyitás)">
+      <PanelSection title={t('panels.assistant.sectionHookGenerator')}>
         <PrimaryButton
           icon="flash-outline"
-          label={hookStatus ?? '🪝 Adj 6 erősebb openinget'}
+          label={hookStatus ?? t('panels.assistant.hookGenerateBtn')}
           onPress={() => {
             generateHooks().catch((err: Error) =>
               Alert.alert('Hook Generator', err.message)
@@ -1428,18 +1479,14 @@ export function AssistantPanel() {
           >
             <Text style={styles.variantTitle}>{hook.text}</Text>
             <Text style={styles.variantMeta}>
-              {hook.style} · {hook.text.length} karakter
+              {t('panels.assistant.hookMeta', { style: hook.style, count: hook.text.length })}
             </Text>
           </Pressable>
         ))}
-        <Text style={styles.note}>
-          Az első 2 másodperc dönti el, végignézik-e. Az AI a videó témájából ír
-          hatféle stílusú nyitómondatot — koppints egyre, és cím-klipként a
-          videó elejére kerül (a korábbi hookot lecseréli, visszavonható).
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.hookNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="🎬 Look-csomagok (motion-presetek)">
+      <PanelSection title={t('panels.assistant.sectionLookPacks')}>
         <View style={styles.packRow}>
           {(Object.keys(MOTION_PACKS) as MotionPack[]).map((pack) => (
             <Chip
@@ -1450,142 +1497,127 @@ export function AssistantPanel() {
             />
           ))}
         </View>
-        <Text style={styles.note}>
-          Egy koppintásos stílus a teljes videóra: kameramozgás + 3D átmenetek +
-          hangulat-világítás összehangolva. A már kulcskockázott klipek mozgása
-          megmarad. Egy lépésben visszavonható.
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.lookPacksNote')}</Text>
         <PrimaryButton
           icon="pricetag-outline"
-          label={productStatus ?? '🛍️ Termékvideó készítése (10 mp)'}
+          label={productStatus ?? t('panels.assistant.makeProductAdBtn')}
           onPress={() => {
             makeProductAd().catch((err: Error) =>
-              Alert.alert('Termékvideó', err.message)
+              Alert.alert(t('panels.assistant.productAdTitle'), err.message)
             );
           }}
         />
-        <Text style={styles.note}>
-          Az AI kiválogatja a legjobban kinéző pillanatokat (élesség, kontraszt,
-          arc), Product-lookba rendezi őket, és címet + záró felhívást is ír.
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.productAdNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="🎨 Márka (Brand Kit)">
+      <PanelSection title={t('panels.assistant.sectionBrandKit')}>
         <PrimaryButton
           icon="bookmark-outline"
-          label="Stílus mentése ebből a projektből"
+          label={t('panels.assistant.brandSaveStyle')}
           onPress={() => {
             void learnBrand();
           }}
         />
         <PrimaryButton
           icon="color-wand-outline"
-          label="Márka alkalmazása erre a projektre"
+          label={t('panels.assistant.brandApplyBtn')}
           onPress={() => {
             void applyBrand();
           }}
         />
         <Text style={styles.note}>
           {brandKit
-            ? `Mentett márka: ${describeBrandKit(brandKit)}`
-            : 'Még nincs mentett márka — állítsd be egy projektben a felirat-stílust ' +
-              '(és opcionálisan egy logó-vízjelet), majd mentsd el innen.'}
+            ? t('panels.assistant.brandSavedInfo', { info: describeBrandKit(brandKit) })
+            : t('panels.assistant.brandNoSavedHint')}
         </Text>
 
-        <Text style={styles.subLabel}>🎬 Intro</Text>
+        <Text style={styles.subLabel}>{t('panels.assistant.introLabel')}</Text>
         <View style={styles.row}>
-          {INTRO_TEMPLATES.map((t) => (
+          {INTRO_TEMPLATES.map((tpl) => (
             <Chip
-              key={t.id}
-              label={t.label}
-              active={intro === t.id}
-              onPress={() => setIntro(intro === t.id ? null : t.id)}
+              key={tpl.id}
+              label={t(tpl.label)}
+              active={intro === tpl.id}
+              onPress={() => setIntro(intro === tpl.id ? null : tpl.id)}
             />
           ))}
         </View>
-        <Text style={styles.subLabel}>🏁 Outro</Text>
+        <Text style={styles.subLabel}>{t('panels.assistant.outroLabel')}</Text>
         <View style={styles.row}>
-          {OUTRO_TEMPLATES.map((t) => (
+          {OUTRO_TEMPLATES.map((tpl) => (
             <Chip
-              key={t.id}
-              label={t.label}
-              active={outro === t.id}
-              onPress={() => setOutro(outro === t.id ? null : t.id)}
+              key={tpl.id}
+              label={t(tpl.label)}
+              active={outro === tpl.id}
+              onPress={() => setOutro(outro === tpl.id ? null : tpl.id)}
             />
           ))}
         </View>
         <PrimaryButton
           icon="albums-outline"
-          label="Intro / outro beszúrása"
+          label={t('panels.assistant.insertIntroOutroBtn')}
           onPress={() => {
             applyBrandSegments().catch((err: Error) =>
-              Alert.alert('Intro / Outro', err.message)
+              Alert.alert(t('panels.assistant.introOutroTitle'), err.message)
             );
           }}
         />
-        <Text style={styles.note}>
-          A sablonok a mentett márkaszínt, logót és felirat-stílust használják.
-          Az intro az elejére kerül és mindent eltol (a zene is vele csúszik),
-          az outro a videó végére. Logó nélkül szöveges változat készül.
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.introOutroNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="Vágó-eszközök">
+      <PanelSection title={t('panels.assistant.sectionCutTools')}>
         <PrimaryButton
           icon="cut-outline"
-          label={cutStatus ?? 'Holtidő kivágása (csend-vágás)'}
+          label={cutStatus ?? t('panels.assistant.cutDeadAirBtn')}
           onPress={() => {
-            cutDeadAir().catch((err: Error) => Alert.alert('Holtidő-vágás', err.message));
+            cutDeadAir().catch((err: Error) => Alert.alert(t('panels.assistant.deadAirTitle'), err.message));
           }}
         />
         <PrimaryButton
           icon="film-outline"
-          label={sceneStatus ?? 'Vágás a jelenetváltásoknál'}
+          label={sceneStatus ?? t('panels.assistant.splitScenesBtn')}
           onPress={() => {
-            splitAtScenes().catch((err: Error) => Alert.alert('Jelenetvágás', err.message));
+            splitAtScenes().catch((err: Error) => Alert.alert(t('panels.assistant.sceneCutTitle'), err.message));
           }}
         />
         <PrimaryButton
           icon="musical-notes-outline"
-          label={beatStatus ?? 'Vágás a zene ütemére (Beat Sync)'}
+          label={beatStatus ?? t('panels.assistant.splitBeatsBtn')}
           onPress={() => {
-            splitOnBeats().catch((err: Error) => Alert.alert('Beat-vágás', err.message));
+            splitOnBeats().catch((err: Error) => Alert.alert(t('panels.assistant.beatCutTitle'), err.message));
           }}
         />
         <PrimaryButton
           icon="pulse-outline"
-          label={fxStatus ?? 'Beat-pulzus (zoom az ütemre)'}
+          label={fxStatus ?? t('panels.assistant.beatPulseBtn')}
           onPress={() => {
-            applyBeatFx('pulse').catch((err: Error) => Alert.alert('Beat FX', err.message));
+            applyBeatFx('pulse').catch((err: Error) => Alert.alert(t('panels.assistant.beatFxTitle'), err.message));
           }}
         />
         <PrimaryButton
           icon="flash-outline"
-          label={fxStatus ?? 'Beat-flash (villanás a 4-esekre)'}
+          label={fxStatus ?? t('panels.assistant.beatFlashBtn')}
           onPress={() => {
-            applyBeatFx('flash').catch((err: Error) => Alert.alert('Beat FX', err.message));
+            applyBeatFx('flash').catch((err: Error) => Alert.alert(t('panels.assistant.beatFxTitle'), err.message));
           }}
         />
         <PrimaryButton
           icon="crop-outline"
-          label={reframeStatus ?? 'Smart Reframe (téma-követő kitöltés)'}
+          label={reframeStatus ?? t('panels.assistant.smartReframeBtn')}
           onPress={() => {
-            smartReframe().catch((err: Error) => Alert.alert('Smart Reframe', err.message));
+            smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
           }}
         />
-        <Text style={styles.note}>
-          FFmpeg-alapú csend-, jelenet- és beat-elemzés a workeren — AI-kulcs
-          nélkül is működik.
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.cutToolsNote')}</Text>
       </PanelSection>
 
-      <PanelSection title="🔊 Sound Design AI">
+      <PanelSection title={t('panels.assistant.sectionSoundDesign')}>
         <View style={styles.row}>
           {(
             [
-              { id: 'subtle', label: 'Finom' },
-              { id: 'normal', label: 'Normál' },
-              { id: 'punchy', label: 'Ütős' },
+              { id: 'subtle', label: t('panels.assistant.intensitySubtle') },
+              { id: 'normal', label: t('panels.assistant.intensityNormal') },
+              { id: 'punchy', label: t('panels.assistant.intensityPunchy') },
             ] as const
           ).map((opt) => (
             <Chip
@@ -1598,41 +1630,33 @@ export function AssistantPanel() {
         </View>
         <PrimaryButton
           icon="volume-high-outline"
-          label={sfxStatus ?? 'Hangosítsd be a vágásokat'}
+          label={sfxStatus ?? t('panels.assistant.soundDesignBtn')}
           onPress={() => {
             runSoundDesign().catch((err: Error) =>
-              Alert.alert('Sound Design', err.message)
+              Alert.alert(t('panels.assistant.soundDesignTitle'), err.message)
             );
           }}
         />
-        <Text style={styles.note}>
-          Whoosh a vágásokra, bassdrop az ütem-elsőkre, egy riser a legerősebb
-          váltás elé, pop a feliratok megjelenésére — mind a worker generált
-          hangkönyvtárából, az SFX sávra. Zenével pontosabb, de anélkül is megy.
-        </Text>
+        <Text style={styles.note}>{t('panels.assistant.soundDesignNote')}</Text>
       </PanelSection>
 
       {reply ? (
-        <PanelSection title="Javaslat">
+        <PanelSection title={t('panels.assistant.sectionSuggestion')}>
           <Text style={styles.message}>{reply.message}</Text>
           {reply.commands.length > 0 ? (
             <PrimaryButton
               icon="checkmark"
-              label={`${reply.commands.length} művelet alkalmazása`}
+              label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
               onPress={apply}
             />
           ) : null}
-          <Chip label="Elvetés" active={false} onPress={() => setReply(null)} />
+          <Chip label={t('panels.assistant.discard')} active={false} onPress={() => setReply(null)} />
         </PanelSection>
       ) : null}
 
       {applied ? <Text style={styles.note}>{applied}</Text> : null}
 
-      <Text style={styles.note}>
-        Az asszisztens a worker AI-motorjával dolgozik (Claude, vagy dev-ben a
-        gépen futó lokális modell) — a műveletei jóváhagyás után futnak le, és
-        visszavonhatók.
-      </Text>
+      <Text style={styles.note}>{t('panels.assistant.assistantFooter')}</Text>
       <Text style={styles.note}>{workerDiag}</Text>
     </View>
   );

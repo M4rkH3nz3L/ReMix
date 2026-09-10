@@ -10,6 +10,8 @@
  * felhasználó tudja: elakadt, nem ő rontott el valamit.
  */
 
+import { t as tr } from 'i18next';
+
 /** alapértelmezett várakozás: a lokális modell bemelegedve 3–8 mp, de az első
  *  hívás modell-betöltéssel jár, ezért bőkezű a keret */
 export const AI_TIMEOUT_MS = 90_000;
@@ -18,11 +20,7 @@ export const AI_PROBE_TIMEOUT_MS = 4_000;
 
 export class AiTimeoutError extends Error {
   constructor(seconds: number) {
-    super(
-      `Az AI ${seconds} másodperc alatt nem válaszolt. Ha a lokális modell fut, ` +
-        'lehet, hogy még tölt vagy túlterhelt — próbáld újra, vagy állíts be ' +
-        'ANTHROPIC_API_KEY-t a workeren.'
-    );
+    super(tr('lib.aiFetch.timeout', { seconds }));
     this.name = 'AiTimeoutError';
   }
 }

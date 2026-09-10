@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import { AI_PROBE_TIMEOUT_MS, aiFetch, aiPostJson } from '@/lib/aiFetch';
 import { renderServerUrl } from '@/lib/render';
 
@@ -19,21 +21,16 @@ export async function askAssistant(
     const res = await aiFetch(`${base}/health`, {}, AI_PROBE_TIMEOUT_MS);
     health = await res.json();
   } catch {
-    throw new Error(
-      `A worker nem érhető el (${base}) — indítsd el: cd server && npm start`
-    );
+    throw new Error(tr('lib.ai.workerUnreachable', { base }));
   }
   if (!health.ai) {
-    throw new Error(
-      'A workeren nincs AI: állíts be ANTHROPIC_API_KEY-t, vagy indítsd el a ' +
-        'lokális Ollamát (ollama serve).'
-    );
+    throw new Error(tr('lib.ai.workerNoAi'));
   }
   // időkorláttal: a lokális modell beragadhat, és időkorlát nélkül az app
   // örökké várna (a felhasználó azt látja, hogy „nem történik semmi")
   return aiPostJson<AssistantReply>(
     `${base}/ai/assist`,
     { context, instruction },
-    'Az AI-asszisztens hívása nem sikerült.'
+    tr('lib.ai.assistCallFailed')
   );
 }

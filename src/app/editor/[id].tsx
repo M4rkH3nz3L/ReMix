@@ -3,6 +3,7 @@ import { setAudioModeAsync } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -33,16 +34,17 @@ const AUTOSAVE_MS = 800;
 
 /** A bal oldali eszköz-rail elemei (medium/expanded elrendezésben). */
 const RAIL_ITEMS = [
-  { icon: 'sparkles-outline', label: 'AI', panel: 'assistant' },
-  { icon: 'server-outline', label: 'Média', panel: 'library' },
-  { icon: 'musical-notes-outline', label: 'Audio', panel: 'audio' },
-  { icon: 'chatbox-ellipses-outline', label: 'Felirat', panel: 'captions' },
-  { icon: 'reader-outline', label: 'Átirat', panel: 'transcript' },
-  { icon: 'happy-outline', label: 'Elemek', panel: 'sticker' },
-  { icon: 'share-outline', label: 'Export', panel: 'export' },
+  { icon: 'sparkles-outline', panel: 'assistant' },
+  { icon: 'server-outline', panel: 'library' },
+  { icon: 'musical-notes-outline', panel: 'audio' },
+  { icon: 'chatbox-ellipses-outline', panel: 'captions' },
+  { icon: 'reader-outline', panel: 'transcript' },
+  { icon: 'happy-outline', panel: 'sticker' },
+  { icon: 'share-outline', panel: 'export' },
 ] as const;
 
 export default function EditorScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const project = useEditorStore((s) => s.project);
   const dirty = useEditorStore((s) => s.dirty);
@@ -199,9 +201,9 @@ export default function EditorScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.missing}>
-          <Text style={styles.missingText}>A projekt nem található.</Text>
+          <Text style={styles.missingText}>{t('editorScreen.projectNotFound')}</Text>
           <Pressable onPress={goBack}>
-            <Text style={styles.missingLink}>Vissza</Text>
+            <Text style={styles.missingLink}>{t('common.back')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -251,8 +253,8 @@ export default function EditorScreen() {
         <Ionicons name="alert-circle-outline" size={16} color={palette.danger} />
         <Text style={styles.missingBannerText}>
           {relinking
-            ? 'Újracsatolás…'
-            : `${missingMedia.length} médiafájl hiányzik — koppints az újracsatoláshoz`}
+            ? t('editorScreen.relinking')
+            : t('editorScreen.missingMedia', { count: missingMedia.length })}
         </Text>
       </Pressable>
     ) : null;
@@ -266,6 +268,7 @@ export default function EditorScreen() {
     >
       {RAIL_ITEMS.map((item) => {
         const active = activePanel === item.panel;
+        const label = t('editorScreen.rail_' + item.panel);
         return (
           <Pressable
             key={item.panel}
@@ -275,7 +278,7 @@ export default function EditorScreen() {
               active ? styles.railItemActive : null,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={item.label}
+            accessibilityLabel={label}
             onPress={() =>
               useEditorStore.getState().setPanel(active ? null : item.panel)
             }
@@ -292,7 +295,7 @@ export default function EditorScreen() {
                 active ? styles.railLabelActive : null,
               ]}
             >
-              {item.label}
+              {label}
             </Text>
           </Pressable>
         );

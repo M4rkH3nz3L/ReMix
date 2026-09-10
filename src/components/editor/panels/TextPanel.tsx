@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip, ColorDot, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
@@ -13,6 +14,7 @@ import { useEditorStore } from '@/store/editorStore';
 import type { TextClip } from '@/types/project';
 
 export function TextPanel({ clip }: { clip: TextClip }) {
+  const { t: tr } = useTranslation();
   const [trackStatus, setTrackStatus] = useState<string | null>(null);
   // 🎯 téma-kijelölő: a panel bezárul, a következő vászon-koppintás adja a pontot
   const [pickHint, setPickHint] = useState<string | null>(null);
@@ -29,11 +31,11 @@ export function TextPanel({ clip }: { clip: TextClip }) {
     }
     const video = activeVisualClip(state.project, state.playhead);
     if (!video || video.kind !== 'video') {
-      Alert.alert('Követés', 'Állítsd a lejátszófejet egy videóklipre.');
+      Alert.alert(tr('panels.text.trackTitle'), tr('panels.text.trackPlayheadOnVideo'));
       return;
     }
     if (state.playhead < clip.start || state.playhead >= clip.start + clip.duration) {
-      Alert.alert('Követés', 'Állítsd a lejátszófejet a szövegklip alá.');
+      Alert.alert(tr('panels.text.trackTitle'), tr('panels.text.trackPlayheadUnderText'));
       return;
     }
     // a szakasz: a playheadtől a szöveg és a videó közös végéig (max 15 mp)
@@ -44,11 +46,11 @@ export function TextPanel({ clip }: { clip: TextClip }) {
     );
     const durationTimeline = endTimeline - state.playhead;
     if (durationTimeline < 0.5) {
-      Alert.alert('Követés', 'Túl rövid szakasz — húzd hosszabbra a szöveget.');
+      Alert.alert(tr('panels.text.trackTitle'), tr('panels.text.trackTooShort'));
       return;
     }
     const ar = aspectValue(state.project.aspectRatio);
-    setTrackStatus('Követés…');
+    setTrackStatus(tr('panels.text.trackingStatus'));
     try {
       const points = await trackSubject(video.uri, {
         startSec: sourceTimeAt(video, state.playhead),
@@ -60,8 +62,8 @@ export function TextPanel({ clip }: { clip: TextClip }) {
       });
       if (!points) {
         Alert.alert(
-          'Követés',
-          'A követés nem sikerült — fut a worker? (cd server && npm start)'
+          tr('panels.text.trackTitle'),
+          tr('panels.text.trackFailed')
         );
         return;
       }
@@ -74,14 +76,13 @@ export function TextPanel({ clip }: { clip: TextClip }) {
       state.updateClip(clip.id, { keyframes: kf });
       setTrackStatus(null);
       Alert.alert(
-        'Követés kész',
-        `${kf.x.length} kulcskocka ${(points[points.length - 1].t / video.speed).toFixed(1)} mp-en — ` +
-          'a szöveg követi a pontot' +
-          (kf.scale
-            ? ', és a témával együtt nő/csökken (🧊 3D követés)'
-            : '') +
-          '. Húzással az egész pálya áthelyezhető, ' +
-          'a törléshez koppints a „Követés törlése” gombra.'
+        tr('panels.text.trackDoneTitle'),
+        tr('panels.text.trackDoneIntro', {
+          count: kf.x.length,
+          seconds: (points[points.length - 1].t / video.speed).toFixed(1),
+        }) +
+          (kf.scale ? tr('panels.text.trackDoneScale') : '') +
+          tr('panels.text.trackDoneOutro')
       );
     } finally {
       setTrackStatus(null);
@@ -95,10 +96,10 @@ export function TextPanel({ clip }: { clip: TextClip }) {
     }
     const video = activeVisualClip(state.project, state.playhead);
     if (!video || video.kind !== 'video') {
-      Alert.alert('Arc-követés', 'Állítsd a lejátszófejet egy videóklipre.');
+      Alert.alert(tr('panels.text.faceTrackTitle'), tr('panels.text.trackPlayheadOnVideo'));
       return;
     }
-    setTrackStatus('Arc keresése…');
+    setTrackStatus(tr('panels.text.faceSearchingStatus'));
     try {
       const ar = aspectValue(state.project.aspectRatio);
       const faces = await fetchFaces(video.uri, {
@@ -109,11 +110,10 @@ export function TextPanel({ clip }: { clip: TextClip }) {
       const face = faces ? pickPrimaryFace(faces) : null;
       if (!face) {
         Alert.alert(
-          'Arc-követés',
+          tr('panels.text.faceTrackTitle'),
           faces === null
-            ? 'Az arc-detektor nem érhető el — fut a worker?'
-            : 'Nem találtam arcot ezen a képkockán — próbáld másik pillanatból, ' +
-              'vagy használd a „Pont követése” gombot.'
+            ? tr('panels.text.faceDetectorUnavailable')
+            : tr('panels.text.faceNotFound')
         );
         return;
       }
@@ -148,41 +148,35 @@ export function TextPanel({ clip }: { clip: TextClip }) {
 
   return (
     <View>
-      <PanelSection title="Szöveg">
+      <PanelSection title={tr('panels.text.sectionText')}>
         <TextInput
           value={clip.text}
           onChangeText={(text) => updateClip(clip.id, { text })}
           multiline
           style={styles.input}
-          placeholder="Írd ide a szöveget…"
+          placeholder={tr('panels.text.textPlaceholder')}
           placeholderTextColor={palette.textDim}
         />
       </PanelSection>
 
-      <PanelSection title="🎞️ Sablonok (egy koppintásra kész look)">
+      <PanelSection title={tr('panels.text.sectionTemplates')}>
         <View style={styles.row}>
           {TEXT_TEMPLATES.map((t) => (
-            <Chip key={t.id} label={t.label} active={false} onPress={() => applyTemplate(t)} />
+            <Chip key={t.id} label={tr(t.label)} active={false} onPress={() => applyTemplate(t)} />
           ))}
         </View>
       </PanelSection>
 
       {/* tabos elrendezés a látványterv szerint (Stílus / Animáció / Extra) */}
       <View style={styles.tabRow}>
-        {(
-          [
-            { id: 'style', label: 'Stílus' },
-            { id: 'anim', label: 'Animáció' },
-            { id: 'extra', label: 'Extra' },
-          ] as const
-        ).map((t) => (
+        {(['style', 'anim', 'extra'] as const).map((id) => (
           <Pressable
-            key={t.id}
-            onPress={() => setTab(t.id)}
-            style={[styles.tabItem, tab === t.id ? styles.tabItemActive : null]}
+            key={id}
+            onPress={() => setTab(id)}
+            style={[styles.tabItem, tab === id ? styles.tabItemActive : null]}
           >
-            <Text style={[styles.tabText, tab === t.id ? styles.tabTextActive : null]}>
-              {t.label}
+            <Text style={[styles.tabText, tab === id ? styles.tabTextActive : null]}>
+              {tr('panels.text.tab_' + id)}
             </Text>
           </Pressable>
         ))}
@@ -190,12 +184,12 @@ export function TextPanel({ clip }: { clip: TextClip }) {
 
       {tab === 'style' ? (
         <>
-          <PanelSection title="Stíluspreset">
+          <PanelSection title={tr('panels.text.sectionStylePreset')}>
             <View style={styles.row}>
               {textStylePresets.map((preset) => (
                 <Chip
                   key={preset.id}
-                  label={preset.label}
+                  label={tr(preset.label)}
                   active={(clip.stylePreset ?? 'plain') === preset.id}
                   onPress={() => updateClip(clip.id, { stylePreset: preset.id })}
                 />
@@ -203,7 +197,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
-          <PanelSection title="Betűtípus">
+          <PanelSection title={tr('panels.text.sectionFont')}>
             <View style={styles.row}>
               {fontOptions.map((f) => {
                 const active = (clip.fontFamily ?? undefined) === f.family;
@@ -228,7 +222,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
-          <PanelSection title="Szín">
+          <PanelSection title={tr('panels.text.sectionColor')}>
             <View style={styles.row}>
               {textColors.map((color) => (
                 <ColorDot
@@ -241,10 +235,10 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
-          <PanelSection title="Háttér">
+          <PanelSection title={tr('panels.text.sectionBackground')}>
             <View style={styles.row}>
               <Chip
-                label="Nincs"
+                label={tr('common.none')}
                 active={clip.backgroundColor === null}
                 onPress={() => updateClip(clip.id, { backgroundColor: null })}
               />
@@ -259,32 +253,25 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
-          <PanelSection title="🧊 3D szöveg">
+          <PanelSection title={tr('panels.text.section3d')}>
             <View style={styles.row}>
               <Chip
-                label="Ki"
+                label={tr('common.off')}
                 active={!clip.text3d}
                 onPress={() => updateClip(clip.id, { text3d: undefined })}
               />
-              {(
-                [
-                  { id: 'chrome', label: 'Chrome' },
-                  { id: 'gold', label: 'Arany' },
-                  { id: 'neon', label: 'Neon 3D' },
-                  { id: 'plastic', label: 'Plasztik' },
-                ] as const
-              ).map((m) => (
+              {(['chrome', 'gold', 'neon', 'plastic'] as const).map((material) => (
                 <Chip
-                  key={m.id}
-                  label={m.label}
-                  active={clip.text3d?.material === m.id}
+                  key={material}
+                  label={tr('panels.text.material_' + material)}
+                  active={clip.text3d?.material === material}
                   onPress={() =>
                     updateClip(clip.id, {
                       text3d: {
                         depth: clip.text3d?.depth ?? 0.5,
                         tiltX: clip.text3d?.tiltX ?? 10,
                         tiltY: clip.text3d?.tiltY ?? -12,
-                        material: m.id,
+                        material,
                       },
                     })
                   }
@@ -294,7 +281,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             {clip.text3d ? (
               <>
                 <Stepper
-                  label="Mélység"
+                  label={tr('panels.text.depth')}
                   value={`${Math.round(clip.text3d.depth * 100)}%`}
                   onDec={() =>
                     updateClip(clip.id, {
@@ -308,7 +295,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
                   }
                 />
                 <Stepper
-                  label="Dőlés ↕"
+                  label={tr('panels.text.tiltVertical')}
                   value={`${clip.text3d.tiltX}°`}
                   onDec={() =>
                     updateClip(clip.id, {
@@ -322,7 +309,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
                   }
                 />
                 <Stepper
-                  label="Dőlés ↔"
+                  label={tr('panels.text.tiltHorizontal')}
                   value={`${clip.text3d.tiltY}°`}
                   onDec={() =>
                     updateClip(clip.id, {
@@ -335,17 +322,14 @@ export function TextPanel({ clip }: { clip: TextClip }) {
                     })
                   }
                 />
-                <Text style={styles.note}>
-                  Az előnézet közelítés — a valódi extrúzió és anyag (chrome/arany
-                  gradiens) a renderben ég be. A Neon 3D a Szín-ből dolgozik.
-                </Text>
+                <Text style={styles.note}>{tr('panels.text.note3d')}</Text>
               </>
             ) : null}
           </PanelSection>
 
-          <PanelSection title="Méret">
+          <PanelSection title={tr('panels.text.sectionSize')}>
             <Stepper
-              label="Méret"
+              label={tr('panels.text.sizeLabel')}
               value={`${clip.fontSize}%`}
               onDec={() =>
                 updateClip(clip.id, { fontSize: clamp(clip.fontSize - 1, 3, 20) })
@@ -356,7 +340,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             />
             <View style={styles.row}>
               <Chip
-                label="Félkövér"
+                label={tr('panels.text.bold')}
                 active={clip.fontWeight === 'bold'}
                 onPress={() =>
                   updateClip(clip.id, {
@@ -370,12 +354,12 @@ export function TextPanel({ clip }: { clip: TextClip }) {
       ) : null}
 
       {tab === 'anim' ? (
-        <PanelSection title="Animáció">
+        <PanelSection title={tr('panels.text.sectionAnimation')}>
           <View style={styles.row}>
             {textAnimations.map((anim) => (
               <Chip
                 key={anim.id}
-                label={anim.label}
+                label={tr(anim.label)}
                 active={clip.animation === anim.id}
                 onPress={() => updateClip(clip.id, { animation: anim.id })}
               />
@@ -386,18 +370,18 @@ export function TextPanel({ clip }: { clip: TextClip }) {
 
       {tab === 'extra' ? (
         <>
-          <PanelSection title="Igazítás">
+          <PanelSection title={tr('panels.text.sectionAlign')}>
             <View style={styles.row}>
               {(
                 [
-                  { label: '⇤ Bal', x: 0.22 },
-                  { label: 'Közép', x: 0.5 },
-                  { label: 'Jobb ⇥', x: 0.78 },
+                  { id: 'left', x: 0.22 },
+                  { id: 'centerX', x: 0.5 },
+                  { id: 'right', x: 0.78 },
                 ] as const
               ).map((a) => (
                 <Chip
-                  key={a.label}
-                  label={a.label}
+                  key={a.id}
+                  label={tr('panels.text.align_' + a.id)}
                   active={Math.abs(clip.position.x - a.x) < 0.03}
                   onPress={() =>
                     updateClip(clip.id, { position: { ...clip.position, x: a.x } })
@@ -408,14 +392,14 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             <View style={styles.row}>
               {(
                 [
-                  { label: '⇡ Fent', y: 0.16 },
-                  { label: 'Közép', y: 0.5 },
-                  { label: 'Lent ⇣', y: 0.8 },
+                  { id: 'top', y: 0.16 },
+                  { id: 'centerY', y: 0.5 },
+                  { id: 'bottom', y: 0.8 },
                 ] as const
               ).map((a) => (
                 <Chip
-                  key={a.label}
-                  label={a.label}
+                  key={a.id}
+                  label={tr('panels.text.align_' + a.id)}
                   active={Math.abs(clip.position.y - a.y) < 0.03}
                   onPress={() =>
                     updateClip(clip.id, { position: { ...clip.position, y: a.y } })
@@ -425,54 +409,50 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
-          <PanelSection title="🎯 Követés (3D)">
+          <PanelSection title={tr('panels.text.sectionTracking')}>
             <PrimaryButton
               icon="locate-outline"
-              label={trackStatus ?? 'Pont követése innen (playhead)'}
+              label={trackStatus ?? tr('panels.text.trackFromPlayhead')}
               onPress={() => {
-                startTracking().catch((err: Error) => Alert.alert('Követés', err.message));
+                startTracking().catch((err: Error) =>
+                  Alert.alert(tr('panels.text.trackTitle'), err.message)
+                );
               }}
             />
             <PrimaryButton
               icon="locate"
-              label={pickHint ?? '🎯 Pont kijelölése a képen'}
+              label={pickHint ?? tr('panels.text.pickPoint')}
               onPress={() => {
-                setPickHint('Koppints a követendő pontra a képen…');
+                setPickHint(tr('panels.text.pickPointHint'));
                 useEditorStore.getState().setPanel(null);
                 useEditorStore.getState().setPickTarget((point) => {
                   setPickHint(null);
                   useEditorStore.getState().setPanel('text');
                   startTracking(point).catch((err: Error) =>
-                    Alert.alert('Követés', err.message)
+                    Alert.alert(tr('panels.text.trackTitle'), err.message)
                   );
                 });
               }}
             />
             <PrimaryButton
               icon="happy-outline"
-              label={trackStatus ?? '🙂 Arc követése (auto-keresés)'}
+              label={trackStatus ?? tr('panels.text.trackFace')}
               onPress={() => {
-                trackFace().catch((err: Error) => Alert.alert('Arc-követés', err.message));
+                trackFace().catch((err: Error) =>
+                  Alert.alert(tr('panels.text.faceTrackTitle'), err.message)
+                );
               }}
             />
             {clip.keyframes ? (
               <Chip
-                label="Követés törlése"
+                label={tr('panels.text.clearTracking')}
                 active={false}
                 onPress={() =>
                   useEditorStore.getState().updateClip(clip.id, { keyframes: undefined })
                 }
               />
             ) : null}
-            <Text style={styles.note}>
-              🎯 Pont kijelölése: koppints a képen arra, amit követni akarsz — a
-              panel visszanyílik, és a követés onnan indul. Vagy helyezd a
-              szöveget a témára, állítsd a lejátszófejet a kezdőpontra, és indítsd — a szöveg átveszi
-              a pont mozgását, és ha a téma közeledik/távolodik, a mérete is együtt
-              változik (előnézetben és renderben is). Az 🙂 arc-követésnél nem kell
-              céloznod: az AI megkeresi az arcot a képen, és onnan indítja a
-              követést. 3D szöveggel kombinálva a cím „a jelenetben ül”.
-            </Text>
+            <Text style={styles.note}>{tr('panels.text.noteTracking')}</Text>
           </PanelSection>
         </>
       ) : null}

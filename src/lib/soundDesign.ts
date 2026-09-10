@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 /**
  * 🔊 Sound Design AI v1 — pure réteg: hova kerüljön SFX az idővonalon.
  * A worker meglévő SFX-könyvtárára (whoosh/riser/bassdrop/…) épít, és a
@@ -136,7 +138,7 @@ export function planSoundDesign(
       start: hero.t - riserLength,
       duration: riserLength,
       volume: gain * 0.8,
-      reason: 'felvezetés a legerősebb vágás elé',
+      reason: tr('lib.soundDesign.leadIn'),
     });
   }
 
@@ -151,7 +153,7 @@ export function planSoundDesign(
         start: cut.t,
         duration: NATIVE_DURATION['sfx-bassdrop'],
         volume: gain,
-        reason: 'ütem-elsőre eső vágás',
+        reason: tr('lib.soundDesign.beatCut'),
       });
       if (ok) {
         continue;
@@ -164,7 +166,7 @@ export function planSoundDesign(
       start: Math.max(0, cut.t - lead),
       duration: NATIVE_DURATION['sfx-whoosh'],
       volume: gain * 0.75,
-      reason: 'vágás',
+      reason: tr('lib.soundDesign.cut'),
     });
   }
 
@@ -178,7 +180,7 @@ export function planSoundDesign(
       start: accent,
       duration: NATIVE_DURATION['sfx-pop'],
       volume: gain * 0.55,
-      reason: 'felirat/matrica megjelenése',
+      reason: tr('lib.soundDesign.elementAppear'),
     });
   }
 

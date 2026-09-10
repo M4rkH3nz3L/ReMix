@@ -25,7 +25,7 @@ export interface TextTemplate {
 export const TEXT_TEMPLATES: TextTemplate[] = [
   {
     id: 'title-bold',
-    label: '📢 Címkártya',
+    label: 'textTemplates.title-bold',
     fields: {
       fontFamily: 'Anton',
       fontSize: 11,
@@ -38,7 +38,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'cinematic',
-    label: '🎬 Mozis',
+    label: 'textTemplates.cinematic',
     fields: {
       fontFamily: 'BebasNeue',
       fontSize: 8,
@@ -51,7 +51,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'lower-third',
-    label: '🟪 Alsó-harmad',
+    label: 'textTemplates.lower-third',
     fields: {
       fontFamily: 'Poppins',
       fontSize: 5,
@@ -65,7 +65,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'subtitle-box',
-    label: '💬 Feliratdoboz',
+    label: 'textTemplates.subtitle-box',
     fields: {
       fontSize: 5,
       fontWeight: 'normal',
@@ -78,7 +78,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'neon',
-    label: '✨ Neon',
+    label: 'textTemplates.neon',
     fields: {
       fontFamily: 'Bungee',
       fontSize: 8,
@@ -91,7 +91,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'chrome-3d',
-    label: '🪞 Króm 3D',
+    label: 'textTemplates.chrome-3d',
     fields: {
       fontFamily: 'Anton',
       fontSize: 12,
@@ -104,7 +104,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'gold-3d',
-    label: '🥇 Arany 3D',
+    label: 'textTemplates.gold-3d',
     fields: {
       fontFamily: 'BebasNeue',
       fontSize: 12,
@@ -117,7 +117,7 @@ export const TEXT_TEMPLATES: TextTemplate[] = [
   },
   {
     id: 'bubble',
-    label: '🎈 Buborék',
+    label: 'textTemplates.bubble',
     fields: {
       fontFamily: 'Pacifico',
       fontSize: 8,

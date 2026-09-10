@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -21,11 +22,11 @@ import type { Sticker3DEntry } from '@/lib/stickers3d';
 import { useEditorStore } from '@/store/editorStore';
 import type { ParticlesPreset } from '@/types/project';
 
-const PARTICLE_PRESETS: { id: ParticlesPreset; label: string }[] = [
-  { id: 'confetti', label: '🎉 Konfetti' },
-  { id: 'sparkle', label: '✨ Szikrák' },
-  { id: 'snow', label: '❄️ Hó' },
-  { id: 'embers', label: '🔥 Parázs' },
+const PARTICLE_PRESETS: { id: ParticlesPreset }[] = [
+  { id: 'confetti' },
+  { id: 'sparkle' },
+  { id: 'snow' },
+  { id: 'embers' },
 ];
 
 const STICKERS = [
@@ -36,6 +37,7 @@ const STICKERS = [
 
 /** Matrica = nagy emoji-szövegklip; húzással pozicionálható, animálható. */
 export function StickerPanel() {
+  const { t } = useTranslation();
   const addClip = useEditorStore((s) => s.addClip);
   const setPanel = useEditorStore((s) => s.setPanel);
   const dispatch = useEditorStore((s) => s.dispatch);
@@ -69,7 +71,7 @@ export function StickerPanel() {
     const uri = await downloadSticker3d(entry, { material, environment });
     setBusy3d(null);
     if (!uri) {
-      Alert.alert('3D objektum', 'A letöltés nem sikerült — fut a worker?');
+      Alert.alert(t('panels.sticker.object3dTitle'), t('panels.sticker.object3dDownloadFailed'));
       return;
     }
     const { playhead, selectClip } = useEditorStore.getState();
@@ -114,7 +116,7 @@ export function StickerPanel() {
     }
     const video = activeVisualClip(state.project, state.playhead);
     if (!video || video.kind !== 'video') {
-      Alert.alert('Arc-matrica', 'Állítsd a lejátszófejet egy videóklipre.');
+      Alert.alert(t('panels.sticker.faceStickerTitle'), t('panels.sticker.faceStickerNeedVideo'));
       return;
     }
     setFaceBusy(emoji);
@@ -128,10 +130,10 @@ export function StickerPanel() {
       const face = faces ? pickPrimaryFace(faces) : null;
       if (!face) {
         Alert.alert(
-          'Arc-matrica',
+          t('panels.sticker.faceStickerTitle'),
           faces === null
-            ? 'Az arc-detektor nem érhető el — fut a worker?'
-            : 'Nem találtam arcot ezen a képkockán.'
+            ? t('panels.sticker.faceDetectorUnavailable')
+            : t('panels.sticker.faceNotFound')
         );
         return;
       }
@@ -154,9 +156,8 @@ export function StickerPanel() {
       });
       state.selectClip(id);
       Alert.alert(
-        'Arc-matrica kész',
-        'A matrica az arcra került. A Szöveg panel „🙂 Arc követése" gombjával ' +
-          'rá is ültetheted a mozgásra (a méretét is követi).'
+        t('panels.sticker.faceStickerDoneTitle'),
+        t('panels.sticker.faceStickerDoneBody')
       );
     } finally {
       setFaceBusy(null);
@@ -248,7 +249,7 @@ export function StickerPanel() {
         kind: 'image',
         uri: picked.uri,
         provider: 'local',
-        name: 'Logó',
+        name: t('panels.sticker.logoName'),
       }
     );
     selectClip(id);
@@ -257,57 +258,56 @@ export function StickerPanel() {
 
   return (
     <View>
-      <PanelSection title="Formák">
+      <PanelSection title={t('panels.sticker.shapesTitle')}>
         <View style={styles.shapeRow}>
           <Pressable style={styles.shapeCell} onPress={() => addShape('rectangle')}>
             <View style={styles.shapeRect} />
-            <Text style={styles.shapeLabel}>Téglalap</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeRectangle')}</Text>
           </Pressable>
           <Pressable style={styles.shapeCell} onPress={() => addShape('ellipse')}>
             <View style={styles.shapeEllipse} />
-            <Text style={styles.shapeLabel}>Ellipszis</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeEllipse')}</Text>
           </Pressable>
           <Pressable style={styles.shapeCell} onPress={() => addShape('line')}>
             <View style={styles.shapeLine} />
-            <Text style={styles.shapeLabel}>Vonal</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeLine')}</Text>
           </Pressable>
           <Pressable style={styles.shapeCell} onPress={() => addShape('arrow')}>
             <Text style={styles.shapeGlyph}>➜</Text>
-            <Text style={styles.shapeLabel}>Nyíl</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeArrow')}</Text>
           </Pressable>
           <Pressable style={styles.shapeCell} onPress={() => addShape('star')}>
             <Text style={styles.shapeGlyph}>★</Text>
-            <Text style={styles.shapeLabel}>Csillag</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeStar')}</Text>
           </Pressable>
           <Pressable
             style={styles.shapeCell}
             onPress={() => {
               addLogo().catch(() =>
-                Alert.alert('Logó', 'A kép betöltése nem sikerült.')
+                Alert.alert(t('panels.sticker.logoName'), t('panels.sticker.logoLoadFailed'))
               );
             }}
           >
             <Ionicons name="image-outline" size={26} color={palette.textDim} />
-            <Text style={styles.shapeLabel}>Logó / kép</Text>
+            <Text style={styles.shapeLabel}>{t('panels.sticker.shapeLogo')}</Text>
           </Pressable>
         </View>
         <Text style={styles.note}>
-          A logó/kép overlay-rétegként kerül a videóra (PNG/JPG/SVG) — húzható,
-          méretezhető, lekerekíthető, watermarknak is jó.
+          {t('panels.sticker.shapesNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="✨ Részecskék (render)">
+      <PanelSection title={t('panels.sticker.particlesTitle')}>
         <View style={styles.shapeRow3d}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!particles}
             onPress={() => dispatch({ type: 'SET_PARTICLES', particles: null }, 'user')}
           />
           {PARTICLE_PRESETS.map((preset) => (
             <Chip
               key={preset.id}
-              label={preset.label}
+              label={t('panels.sticker.particle_' + preset.id)}
               active={particles?.preset === preset.id}
               onPress={() =>
                 dispatch(
@@ -328,7 +328,7 @@ export function StickerPanel() {
         {particles ? (
           <View style={styles.shapeRow3d}>
             <Chip
-              label={particles.beatSync ? '🥁 Beat-sync be' : '🥁 Beat-sync ki'}
+              label={particles.beatSync ? t('panels.sticker.beatSyncOn') : t('panels.sticker.beatSyncOff')}
               active={particles.beatSync}
               onPress={() =>
                 dispatch(
@@ -343,13 +343,11 @@ export function StickerPanel() {
           </View>
         ) : null}
         <Text style={styles.note}>
-          A részecske-réteg (konfetti, szikrák, hó, parázs) a renderelt MP4-be
-          ég be, a feliratok alá — beat-syncnél a burstök a zene ütemeire esnek.
-          Az előnézet nem mutatja.
+          {t('panels.sticker.particlesNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="✏️ Rajzolás a vászonra">
+      <PanelSection title={t('panels.sticker.drawTitle')}>
         <View style={styles.chipRow}>
           {BRUSH_STYLES.map((b) => (
             <Chip
@@ -373,7 +371,7 @@ export function StickerPanel() {
         </View>
         {drawBrush ? (
           <>
-            <Text style={styles.subLabel}>Szín</Text>
+            <Text style={styles.subLabel}>{t('panels.sticker.color')}</Text>
             <View style={styles.chipRow}>
               {BRUSH_COLORS.map((c) => (
                 <Pressable
@@ -388,7 +386,7 @@ export function StickerPanel() {
               ))}
             </View>
             <Stepper
-              label="Vastagság"
+              label={t('panels.sticker.thickness')}
               value={`${drawBrush.width.toFixed(1)}%`}
               onDec={() =>
                 setDrawBrush({
@@ -404,22 +402,19 @@ export function StickerPanel() {
               }
             />
             <Chip
-              label="✓ Rajzolás vége"
+              label={t('panels.sticker.drawEnd')}
               active={false}
               onPress={() => setDrawBrush(null)}
             />
           </>
         ) : null}
         <Text style={styles.note}>
-          Válassz ecsetet, és húzd az ujjad a videón — minden vonal külön
-          réteg-klip lesz: húzható, méretezhető, időzíthető, és a renderelt
-          MP4-be is beég. A szövegkiemelő áttetsző és szorzás módban keveredik
-          (mint a valódi filctoll), a neon ragyogást kap.
+          {t('panels.sticker.drawNote')}
         </Text>
       </PanelSection>
 
       {stickers3d ? (
-        <PanelSection title="🧊 3D objektumok">
+        <PanelSection title={t('panels.sticker.objects3dTitle')}>
           <View style={styles.shapeRow3d}>
             {stickers3d.map((entry) => (
               <Pressable
@@ -444,7 +439,7 @@ export function StickerPanel() {
               </Pressable>
             ))}
           </View>
-          <Text style={styles.subLabel}>Anyag</Text>
+          <Text style={styles.subLabel}>{t('panels.sticker.material')}</Text>
           <View style={styles.chipRow}>
             {STICKER_MATERIALS.map((m) => (
               <Chip
@@ -455,7 +450,7 @@ export function StickerPanel() {
               />
             ))}
           </View>
-          <Text style={styles.subLabel}>Környezet (fény)</Text>
+          <Text style={styles.subLabel}>{t('panels.sticker.environment')}</Text>
           <View style={styles.chipRow}>
             {STICKER_ENVIRONMENTS.map((e) => (
               <Chip
@@ -467,15 +462,12 @@ export function StickerPanel() {
             ))}
           </View>
           <Text style={styles.note}>
-            Valódi 3D modellek (CC0 csomag) — a worker rendereli őket PBR
-            anyaggal és környezeti fénnyel. Az előnézet-csempék is a kiválasztott
-            anyagot mutatják; a vásznon húzhatók/méretezhetők, és a Szöveg panel
-            követésével rá is ültethetők a videó egy pontjára.
+            {t('panels.sticker.objects3dNote')}
           </Text>
         </PanelSection>
       ) : null}
 
-      <PanelSection title="🙂 Arc-matrica (az arcra helyezve)">
+      <PanelSection title={t('panels.sticker.faceStickerSectionTitle')}>
         <View style={styles.shapeRow3d}>
           {['😎', '🤯', '👑', '🔥', '💀', '🥸'].map((emoji) => (
             <Pressable
@@ -490,13 +482,11 @@ export function StickerPanel() {
           ))}
         </View>
         <Text style={styles.note}>
-          Az AI megkeresi az arcot a képkockán, és a matricát fölé teszi — az
-          arc méretéhez igazítva. A Szöveg panel arc-követés gombjával a
-          mozgásra is ráültethető.
+          {t('panels.sticker.faceStickerNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Koppints egy matricára">
+      <PanelSection title={t('panels.sticker.tapStickerTitle')}>
         <View style={styles.grid}>
           {STICKERS.map((emoji) => (
             <Pressable key={emoji} style={styles.cell} onPress={() => addSticker(emoji)}>
@@ -505,8 +495,7 @@ export function StickerPanel() {
           ))}
         </View>
         <Text style={styles.note}>
-          A matrica a lejátszófejnél kerül a szövegsávra — húzással pozicionálhatod,
-          a Szöveg panelen animálhatod.
+          {t('panels.sticker.tapStickerNote')}
         </Text>
       </PanelSection>
     </View>

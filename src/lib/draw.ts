@@ -117,9 +117,9 @@ export function toBoxSpace(points: Point[], bounds: DrawBounds): Point[] {
 
 /** ecset-stílusok: szín-alapérték, vastagság, átlátszóság, ragyogás */
 export const BRUSH_STYLES = [
-  { id: 'marker', label: '🖊️ Filctoll', width: 0.9, opacity: 1, glow: false },
-  { id: 'highlighter', label: '🖍️ Szövegkiemelő', width: 2.6, opacity: 0.42, glow: false },
-  { id: 'neon', label: '💡 Neon', width: 0.8, opacity: 1, glow: true },
+  { id: 'marker', label: 'lib.draw.brush.marker', width: 0.9, opacity: 1, glow: false },
+  { id: 'highlighter', label: 'lib.draw.brush.highlighter', width: 2.6, opacity: 0.42, glow: false },
+  { id: 'neon', label: 'lib.draw.brush.neon', width: 0.8, opacity: 1, glow: true },
 ] as const;
 
 export type BrushStyle = (typeof BRUSH_STYLES)[number]['id'];

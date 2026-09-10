@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
@@ -42,6 +43,7 @@ const trackIcons: Record<TrackType, keyof typeof Ionicons.glyphMap> = {
  * léptetünk (scroll offset ↔ playhead). Kétujjas csippentés = zoom.
  */
 export function Timeline() {
+  const { t } = useTranslation();
   const L = useLayout();
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
@@ -67,23 +69,22 @@ export function Timeline() {
     const solo = soloTracks.includes(type);
     const locked = lockedTracks.includes(type);
     Alert.alert(
-      trackLabels[type],
-      'A némítás és a solo CSAK az előnézetre hat — az exportált videó nem ' +
-        'változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.',
+      t(trackLabels[type]),
+      t('editor.timeline.trackMenuMessage'),
       [
         {
-          text: muted ? '🔊 Némítás vissza' : '🔇 Némítás',
+          text: muted ? t('editor.timeline.unmute') : t('editor.timeline.mute'),
           onPress: () => toggleTrackFlag(type, 'mute'),
         },
         {
-          text: solo ? '⭐ Solo ki' : '⭐ Csak ez szóljon (solo)',
+          text: solo ? t('editor.timeline.soloOff') : t('editor.timeline.soloOn'),
           onPress: () => toggleTrackFlag(type, 'solo'),
         },
         {
-          text: locked ? '🔓 Zárolás fel' : '🔒 Zárolás (véletlen mozdítás ellen)',
+          text: locked ? t('editor.timeline.unlock') : t('editor.timeline.lock'),
           onPress: () => toggleTrackFlag(type, 'lock'),
         },
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
@@ -205,7 +206,7 @@ export function Timeline() {
                   style={[styles.headerText, { color: trackColors[type], fontSize: L.font(10) }]}
                   numberOfLines={1}
                 >
-                  {trackLabels[type]}
+                  {t(trackLabels[type])}
                 </Text>
                 <View style={styles.headerBtns}>
                   {AUDIBLE_TRACKS.includes(type) ? (
@@ -364,7 +365,7 @@ export function Timeline() {
                   style={[styles.trackLabelChip, { borderColor: trackColors[type] }]}
                 >
                   <Text style={[styles.trackLabelText, { color: trackColors[type], fontSize: L.font(8) }]}>
-                    {trackLabels[type]}
+                    {t(trackLabels[type])}
                   </Text>
                   {mutedTracks.includes(type) ? (
                     <Ionicons name="volume-mute" size={9} color={palette.accent2} />

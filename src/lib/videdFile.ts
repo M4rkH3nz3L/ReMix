@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { t as tr } from 'i18next';
 import { Alert, Platform } from 'react-native';
 
 import { fingerprintFile, withFingerprints } from '@/lib/fingerprint';
@@ -56,12 +57,12 @@ function parseVided(text: string): Project {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error('A fájl nem érvényes JSON.');
+    throw new Error(tr('lib.videdFile.invalidJson'));
   }
   const wrapper = parsed as Partial<VidedFileV1>;
   const raw = (wrapper?.format === VIDED_FORMAT ? wrapper.project : parsed) as Project;
   if (!raw || !Array.isArray(raw.tracks) || typeof raw.name !== 'string') {
-    throw new Error('A fájl nem érvényes Remix-projekt.');
+    throw new Error(tr('lib.videdFile.invalidProject'));
   }
   return migrateProject(raw);
 }
@@ -221,7 +222,7 @@ export async function autoRelink(
  */
 export async function pickAndParseVided(): Promise<ImportResult | null> {
   if (Platform.OS === 'web') {
-    throw new Error('A projekt-import a natív appból érhető el (iOS/Android).');
+    throw new Error(tr('lib.videdFile.importNativeOnly'));
   }
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
@@ -255,11 +256,11 @@ export async function pickRelinkPairs(missing: MissingMedia[]): Promise<RelinkPa
   for (const item of missing) {
     const choice = await new Promise<'pick' | 'skip'>((resolve) => {
       Alert.alert(
-        'Média újracsatolása',
-        `Hiányzik: ${item.label}\nVálaszd ki a fájlt a következő lépésben.`,
+        tr('lib.videdFile.relinkTitle'),
+        tr('lib.videdFile.relinkMessage', { label: item.label }),
         [
-          { text: 'Kihagyás', style: 'cancel', onPress: () => resolve('skip') },
-          { text: 'Kiválasztás', onPress: () => resolve('pick') },
+          { text: tr('lib.videdFile.skip'), style: 'cancel', onPress: () => resolve('skip') },
+          { text: tr('lib.videdFile.select'), onPress: () => resolve('pick') },
         ],
         { cancelable: false }
       );

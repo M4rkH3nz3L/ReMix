@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { accentGradient, palette } from '@/constants/editor';
 import { capabilityLabel, proCapabilities } from '@/lib/capabilities';
@@ -16,13 +17,10 @@ import { usePaywall } from '@/store/paywallStore';
  */
 
 /** amit a Pro NEM zár el — hangsúlyozza, hogy az alap ingyen marad */
-const FREE_PERKS = [
-  'Teljes szerkesztő: vágás, rétegek, szöveg, effektek',
-  'In-app kamera + kreatív szűrők',
-  'Export az eszközön (vízjel nélkül is — a te géped rendereli)',
-];
+const FREE_PERKS = ['editor', 'camera', 'export'];
 
 export function PaywallSheet() {
+  const { t } = useTranslation();
   const visible = usePaywall((s) => s.visible);
   const capability = usePaywall((s) => s.capability);
   const close = usePaywall((s) => s.close);
@@ -52,17 +50,17 @@ export function PaywallSheet() {
               <Ionicons name="sparkles" size={14} color={palette.text} />
               <Text style={styles.badgeText}>REMIX PRO</Text>
             </View>
-            <Text style={styles.heroTitle}>Told a felhőbe a nehéz munkát</Text>
+            <Text style={styles.heroTitle}>{t('paywallSheet.heroTitle')}</Text>
             <Text style={styles.heroSub}>
               {trigger
-                ? `A(z) „${trigger}" a Remix Pro része.`
-                : 'AI-eszközök és felhő-HD render — a mi szervereinken.'}
+                ? t('paywallSheet.heroSubTrigger', { trigger })
+                : t('paywallSheet.heroSub')}
             </Text>
           </LinearGradient>
 
           <ScrollView style={styles.body} contentContainerStyle={{ gap: 14, paddingBottom: 8 }}>
             <View>
-              <Text style={styles.groupTitle}>PRO — FELHŐ-WORKEREK</Text>
+              <Text style={styles.groupTitle}>{t('paywallSheet.groupPro')}</Text>
               <View style={{ gap: 7 }}>
                 {perks.map((p) => (
                   <View key={p} style={styles.row}>
@@ -74,12 +72,14 @@ export function PaywallSheet() {
             </View>
 
             <View>
-              <Text style={styles.groupTitle}>MINDIG INGYEN — AZ ESZKÖZÖDÖN</Text>
+              <Text style={styles.groupTitle}>{t('paywallSheet.groupFree')}</Text>
               <View style={{ gap: 7 }}>
                 {FREE_PERKS.map((p) => (
                   <View key={p} style={styles.row}>
                     <Ionicons name="checkmark-circle" size={16} color={palette.textDim} />
-                    <Text style={[styles.rowText, { color: palette.textDim }]}>{p}</Text>
+                    <Text style={[styles.rowText, { color: palette.textDim }]}>
+                      {t('paywallSheet.freePerk_' + p)}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -95,16 +95,13 @@ export function PaywallSheet() {
                 style={styles.cta}
               >
                 <Ionicons name="rocket" size={16} color={palette.text} />
-                <Text style={styles.ctaText}>Pro aktiválása</Text>
+                <Text style={styles.ctaText}>{t('paywallSheet.activatePro')}</Text>
               </LinearGradient>
             </Pressable>
             <Pressable onPress={close} style={styles.dismiss}>
-              <Text style={styles.dismissText}>Most nem</Text>
+              <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
             </Pressable>
-            <Text style={styles.legal}>
-              A vásárlás most fejlesztői teszt-mód (azonnali Pro). Éles buildben az
-              App Store / Play előfizetés lép a helyére.
-            </Text>
+            <Text style={styles.legal}>{t('paywallSheet.legal')}</Text>
           </View>
         </View>
       </View>

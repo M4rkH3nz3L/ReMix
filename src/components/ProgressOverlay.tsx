@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -21,6 +22,7 @@ const TICK_MS = 500;
  * nézelődhet a projektben — a lényeg, hogy sose legyen néma várakozás.
  */
 export function ProgressOverlay() {
+  const { t } = useTranslation();
   const tasks = useProgressStore((s) => s.tasks);
   const tick = useProgressStore((s) => s.tick);
   const L = useLayout();
@@ -66,7 +68,7 @@ export function ProgressOverlay() {
                 hitSlop={12}
                 style={styles.cancel}
                 accessibilityRole="button"
-                accessibilityLabel="Megszakítás"
+                accessibilityLabel={t('progressOverlay.cancelTask')}
               >
                 <Ionicons name="close" size={16} color={palette.textDim} />
               </Pressable>

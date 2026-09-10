@@ -6,6 +6,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
@@ -25,6 +26,7 @@ import type { AudioClip } from '@/types/project';
  * keverése (hangerő, fade in/out).
  */
 export function AudioPanel({ clip }: { clip: AudioClip | null }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const addClip = useEditorStore((s) => s.addClip);
 
@@ -64,10 +66,10 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
     setTtsBusy(true);
     generateTts(text, ttsVoice)
       .then(({ uri, duration }) => {
-        addAudioClip(uri, 'AI-hang', duration, 'local', 'voiceover');
+        addAudioClip(uri, t('panels.audio.aiVoiceLabel'), duration, 'local', 'voiceover');
         setTtsText('');
       })
-      .catch((err: Error) => Alert.alert('AI-hang', err.message))
+      .catch((err: Error) => Alert.alert(t('panels.audio.aiVoiceLabel'), err.message))
       .finally(() => setTtsBusy(false));
   };
 
@@ -119,7 +121,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
           track.kind === 'sfx' ? 'sfx' : 'music'
         )
       )
-      .catch(() => Alert.alert('Hiba', 'A hang letöltése nem sikerült.'))
+      .catch(() => Alert.alert(t('common.error'), t('panels.audio.downloadFailed')))
       .finally(() => setBusyTrack(null));
   };
 
@@ -144,7 +146,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             start: recordStartPlayhead.current,
             duration: seconds,
             uri,
-            label: 'Voiceover',
+            label: t('panels.audio.voiceoverLabel'),
             volume: 1,
             fadeIn: 0,
             fadeOut: 0,
@@ -155,7 +157,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             kind: 'audio',
             uri,
             provider: 'local',
-            name: 'Voiceover',
+            name: t('panels.audio.voiceoverLabel'),
             duration: seconds,
           }
         );
@@ -164,7 +166,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
     }
     const permission = await AudioModule.requestRecordingPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Nincs mikrofon-engedély', 'A voiceoverhez engedélyezd a mikrofont.');
+      Alert.alert(t('panels.audio.micPermissionTitle'), t('panels.audio.micPermissionMessage'));
       return;
     }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -175,13 +177,12 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
 
   return (
     <View>
-      <PanelSection title="Hang-könyvtár">
+      <PanelSection title={t('panels.audio.libraryTitle')}>
         {library === null && !libraryError ? (
-          <Text style={styles.note}>Könyvtár betöltése…</Text>
+          <Text style={styles.note}>{t('panels.audio.libraryLoading')}</Text>
         ) : libraryError ? (
           <Text style={styles.note}>
-            A hang-könyvtárhoz indítsd el a workert (cd server && npm start). Saját
-            zenéidet a server/music mappába teheted.
+            {t('panels.audio.libraryError')}
           </Text>
         ) : (
           <View style={styles.trackList}>
@@ -193,60 +194,58 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
               >
                 <Text style={styles.trackIcon}>{track.kind === 'music' ? '🎵' : '💥'}</Text>
                 <Text style={styles.trackName} numberOfLines={1}>
-                  {busyTrack === track.id ? 'Letöltés…' : track.name}
+                  {busyTrack === track.id ? t('panels.audio.downloading') : track.name}
                 </Text>
-                <Text style={styles.trackDuration}>{track.duration.toFixed(1)} mp</Text>
+                <Text style={styles.trackDuration}>{t('panels.audio.seconds', { value: track.duration.toFixed(1) })}</Text>
               </Pressable>
             ))}
             <Text style={styles.note}>
-              Koppints a hozzáadáshoz — a lejátszófejnél kerül a hang-sávra. Saját
-              zenék: server/music mappa.
+              {t('panels.audio.libraryHint')}
             </Text>
           </View>
         )}
       </PanelSection>
 
-      <PanelSection title="Saját fájl">
+      <PanelSection title={t('panels.audio.ownFileTitle')}>
         <PrimaryButton
           icon="folder-open-outline"
-          label="Zene importálása fájlból"
+          label={t('panels.audio.importMusic')}
           onPress={() => {
-            importOwn().catch(() => Alert.alert('Hiba', 'Az import nem sikerült.'));
+            importOwn().catch(() => Alert.alert(t('common.error'), t('panels.audio.importFailed')));
           }}
         />
       </PanelSection>
 
-      <PanelSection title="Voiceover">
+      <PanelSection title={t('panels.audio.voiceoverTitle')}>
         <PrimaryButton
           icon={recorderState.isRecording ? 'stop' : 'mic'}
           label={
             recorderState.isRecording
-              ? `Felvétel leállítása (${formatTime(recorderState.durationMillis / 1000)})`
-              : 'Felvétel indítása a lejátszófejtől'
+              ? t('panels.audio.stopRecording', { time: formatTime(recorderState.durationMillis / 1000) })
+              : t('panels.audio.startRecording')
           }
           onPress={() => {
             toggleRecord().catch(() => {
-              Alert.alert('Hiba', 'A felvétel nem indult el.');
+              Alert.alert(t('common.error'), t('panels.audio.recordFailed'));
             });
           }}
         />
         <Text style={styles.note}>
-          A felvétel a lejátszófej pozíciójától kerül a hang-sávra.
+          {t('panels.audio.voiceoverHint')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="🗣️ AI-hang (szöveg → beszéd)">
+      <PanelSection title={t('panels.audio.ttsTitle')}>
         {ttsAvailable === false ? (
           <Text style={styles.note}>
-            A dev-worker nem érhető el (macOS). Indítsd: cd server && npm start — utána a
-            beírt szövegből hang készül, felvétel nélkül.
+            {t('panels.audio.ttsUnavailable')}
           </Text>
         ) : (
           <>
             <TextInput
               value={ttsText}
               onChangeText={setTtsText}
-              placeholder="Írd be a szöveget, amit felolvassak…"
+              placeholder={t('panels.audio.ttsPlaceholder')}
               placeholderTextColor={palette.textDim}
               style={styles.ttsInput}
               multiline
@@ -266,36 +265,35 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             {ttsBusy ? (
               <View style={styles.ttsBusy}>
                 <ActivityIndicator color={palette.accent} />
-                <Text style={styles.note}>Hang készül…</Text>
+                <Text style={styles.note}>{t('panels.audio.ttsGenerating')}</Text>
               </View>
             ) : (
-              <PrimaryButton icon="sparkles" label="Hang generálása" onPress={generateVoice} />
+              <PrimaryButton icon="sparkles" label={t('panels.audio.generateVoice')} onPress={generateVoice} />
             )}
             <Text style={styles.note}>
-              A hang a lejátszófejnél kerül a voiceover-sávra — utána a Voice Studio
-              (✨ Enhance) is ráhúzható.
+              {t('panels.audio.ttsHint')}
             </Text>
           </>
         )}
       </PanelSection>
 
       {clip ? (
-        <PanelSection title={`Keverés — ${clip.label}`}>
+        <PanelSection title={t('panels.audio.mixTitle', { label: clip.label })}>
           <Stepper
-            label="Hangerő"
+            label={t('panels.audio.volume')}
             value={`${Math.round(clip.volume * 100)}%`}
             onDec={() => updateClip(clip.id, { volume: clamp(clip.volume - 0.1, 0, 1) })}
             onInc={() => updateClip(clip.id, { volume: clamp(clip.volume + 0.1, 0, 1) })}
           />
           <Stepper
             label="Fade in"
-            value={`${clip.fadeIn.toFixed(1)} mp`}
+            value={t('panels.audio.seconds', { value: clip.fadeIn.toFixed(1) })}
             onDec={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn - 0.5, 0, 10) })}
             onInc={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn + 0.5, 0, 10) })}
           />
           <Stepper
             label="Fade out"
-            value={`${clip.fadeOut.toFixed(1)} mp`}
+            value={t('panels.audio.seconds', { value: clip.fadeOut.toFixed(1) })}
             onDec={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut - 0.5, 0, 10) })}
             onInc={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut + 0.5, 0, 10) })}
           />
@@ -303,19 +301,19 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             {clip.source === 'voiceover' ? (
               <>
                 <Chip
-                  label="✨ Enhance Voice"
+                  label={t('panels.audio.enhanceVoice')}
                   active={clip.voiceEnhance === true}
                   onPress={() => updateClip(clip.id, { voiceEnhance: !clip.voiceEnhance })}
                 />
                 <Chip
-                  label="🔇 Visszhang le"
+                  label={t('panels.audio.deReverb')}
                   active={clip.deReverb === true}
                   onPress={() => updateClip(clip.id, { deReverb: !clip.deReverb })}
                 />
               </>
             ) : (
               <Chip
-                label="🎚️ Halkítás beszéd alatt"
+                label={t('panels.audio.autoDuck')}
                 active={clip.autoDuck === true}
                 onPress={() => updateClip(clip.id, { autoDuck: !clip.autoDuck })}
               />
@@ -323,7 +321,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
           </View>
           <View style={styles.chipRow}>
             <Chip
-              label="◆ Hangerő-kulcskocka (playhead)"
+              label={t('panels.audio.volumeKeyframe')}
               active={false}
               onPress={() => {
                 const state = useEditorStore.getState();
@@ -339,7 +337,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             />
             {clip.keyframes?.volume?.length ? (
               <Chip
-                label={`Automáció törlése (${clip.keyframes.volume.length})`}
+                label={t('panels.audio.clearAutomation', { count: clip.keyframes.volume.length })}
                 active={false}
                 onPress={() =>
                   updateClip(clip.id, {
@@ -350,16 +348,12 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             ) : null}
           </View>
           <Text style={styles.note}>
-            A Voice Studio (zajszűrés + kompresszor + loudness) és a ducking a
-            renderelt MP4-ben érvényesül. Hangerő-automáció: állítsd a hangerőt,
-            állj a playheaddel a kívánt pontra, és üsd le a ◆-t — a hangerő a
-            kulcskockák közt átúszik (előnézetben és renderben is).
+            {t('panels.audio.mixHint')}
           </Text>
         </PanelSection>
       ) : (
         <Text style={styles.note}>
-          Jelölj ki egy hangklipet az idővonalon a keveréshez, vagy adj hozzá zenét a
-          „Zene” gombbal.
+          {t('panels.audio.emptyHint')}
         </Text>
       )}
     </View>

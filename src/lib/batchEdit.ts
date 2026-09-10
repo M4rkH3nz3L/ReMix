@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import type { Clip } from '@/types/project';
 
 /**
@@ -164,18 +166,18 @@ export function styleTransferPatch(
 export function describeStyle(style: Partial<Clip>): string {
   const s = style as Record<string, unknown>;
   const parts: string[] = [];
-  if (s.filterId && s.filterId !== 'none') parts.push(`szűrő: ${String(s.filterId)}`);
-  if (s.lighting) parts.push(`fény: ${String(s.lighting)}`);
-  if (s.adjust) parts.push('képjavítás');
-  if (s.mask) parts.push('maszk');
-  if (s.chromaKey) parts.push('green screen');
-  if (s.transitionOut) parts.push('áttűnés');
-  if (s.stylePreset) parts.push(`stílus: ${String(s.stylePreset)}`);
-  if (s.animation && s.animation !== 'none') parts.push(`animáció: ${String(s.animation)}`);
-  if (s.color) parts.push(`szín: ${String(s.color)}`);
-  if (s.motionBlur) parts.push('mozgás-elmosás');
-  if (typeof s.volume === 'number') parts.push(`hangerő: ${Math.round(s.volume * 100)}%`);
-  return parts.length > 0 ? parts.join(' · ') : 'alap megjelenés';
+  if (s.filterId && s.filterId !== 'none') parts.push(tr('lib.batchEdit.filter', { value: String(s.filterId) }));
+  if (s.lighting) parts.push(tr('lib.batchEdit.lighting', { value: String(s.lighting) }));
+  if (s.adjust) parts.push(tr('lib.batchEdit.enhance'));
+  if (s.mask) parts.push(tr('lib.batchEdit.mask'));
+  if (s.chromaKey) parts.push(tr('lib.batchEdit.greenScreen'));
+  if (s.transitionOut) parts.push(tr('lib.batchEdit.transition'));
+  if (s.stylePreset) parts.push(tr('lib.batchEdit.style', { value: String(s.stylePreset) }));
+  if (s.animation && s.animation !== 'none') parts.push(tr('lib.batchEdit.animation', { value: String(s.animation) }));
+  if (s.color) parts.push(tr('lib.batchEdit.color', { value: String(s.color) }));
+  if (s.motionBlur) parts.push(tr('lib.batchEdit.motionBlur'));
+  if (typeof s.volume === 'number') parts.push(tr('lib.batchEdit.volume', { value: Math.round(s.volume * 100) }));
+  return parts.length > 0 ? parts.join(' · ') : tr('lib.batchEdit.basicLook');
 }
 
 /**

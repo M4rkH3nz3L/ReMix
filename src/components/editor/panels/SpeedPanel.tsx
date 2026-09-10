@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -13,6 +14,7 @@ import { useEditorStore } from '@/store/editorStore';
 import type { VideoClip } from '@/types/project';
 
 export function SpeedPanel({ clip }: { clip: VideoClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   // 🌀 mozgás-elmosás erő a rampnál (0 = ki); a darabok ezt öröklik
   const [rampBlur, setRampBlur] = useState(0.6);
@@ -36,25 +38,23 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
       rampBlur
     );
     if (!plan) {
-      Alert.alert('Speed ramp', 'Ehhez a kliphez nem alkalmazható (túl rövid?).');
+      Alert.alert('Speed ramp', t('panels.speed.rampNotApplicable'));
       return;
     }
     const kfWarning = clip.keyframes
-      ? '\n\nA klip kulcskockás mozgása a ramppal lekerül.'
+      ? '\n\n' + t('panels.speed.rampKeyframeWarning')
       : '';
     Alert.alert(
-      `Speed ramp — ${source.label}`,
-      `A klip ${plan.pieces} változó sebességű darabra oszlik; a hossza és a ` +
-        `többi sáv időzítése nem változik. A művelet visszavonható.` +
+      t('panels.speed.rampTitle', { label: source.label }),
+      t('panels.speed.rampBody', { pieces: plan.pieces }) +
         (rampBlur > 0
-          ? '\n\nMozgás-elmosás bekapcsolva: a gyors darabok elmosódnak, a ' +
-            'lassúak interpolált köztes kockákat kapnak (csak a renderben).'
+          ? '\n\n' + t('panels.speed.rampBlurNote')
           : '') +
         kfWarning,
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Alkalmazás',
+          text: t('common.apply'),
           onPress: () => {
             state.dispatch(
               { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
@@ -79,7 +79,7 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
 
   return (
     <View>
-      <PanelSection title="Sebesség">
+      <PanelSection title={t('panels.speed.speedTitle')}>
         <View style={styles.row}>
           {speedPresets.map((preset) => (
             <Chip
@@ -91,28 +91,28 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
           ))}
         </View>
         <Stepper
-          label="Finomhangolás"
+          label={t('panels.speed.fineTune')}
           value={`${clip.speed.toFixed(2)}×`}
           onDec={() => setSpeed(Math.round((clip.speed - 0.1) * 100) / 100)}
           onInc={() => setSpeed(Math.round((clip.speed + 0.1) * 100) / 100)}
         />
       </PanelSection>
 
-      <PanelSection title="🚀 Speed ramp">
+      <PanelSection title={t('panels.speed.rampSectionTitle')}>
         <View style={styles.row}>
           {SPEED_RAMP_PRESETS.map((preset) => (
             <Chip
               key={preset.id}
-              label={preset.label}
+              label={t('panels.speed.rampPreset_' + preset.id)}
               active={false}
               onPress={() => applyRamp(preset)}
             />
           ))}
         </View>
-        <Text style={styles.subLabel}>Egyéni görbe</Text>
+        <Text style={styles.subLabel}>{t('panels.speed.customCurve')}</Text>
         <View style={styles.row}>
           <Chip
-            label={customCurve ? '✎ Szerkesztő be' : '✎ Saját görbe rajzolása'}
+            label={customCurve ? t('panels.speed.editorOn') : t('panels.speed.drawOwnCurve')}
             active={Boolean(customCurve)}
             onPress={() =>
               setCustomCurve(customCurve ? null : [1.6, 1.2, 0.5, 0.5, 1.2, 1.6])
@@ -123,54 +123,48 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
           <>
             <CurveEditor curve={customCurve} onChange={setCustomCurve} />
             <Chip
-              label="Egyéni görbe alkalmazása"
+              label={t('panels.speed.applyCustomCurve')}
               active={false}
-              onPress={() => applyRamp({ label: 'egyéni görbe', curve: customCurve })}
+              onPress={() => applyRamp({ label: t('panels.speed.customCurveLabel'), curve: customCurve })}
             />
             <Text style={styles.note}>
-              Húzd az oszlopokat: minden oszlop egy egyenlő forrás-szakasz
-              sebessége. A skála logaritmikus, a vonal az 1× — fölötte
-              gyorsítás, alatta lassítás. A klip idővonal-hossza akkor sem
-              változik, ha a görbét átrajzolod.
+              {t('panels.speed.curveNote')}
             </Text>
           </>
         ) : null}
 
-        <Text style={styles.subLabel}>🌀 Mozgás-elmosás</Text>
+        <Text style={styles.subLabel}>{t('panels.speed.motionBlur')}</Text>
         <View style={styles.row}>
           {[
-            { v: 0, label: 'Ki' },
-            { v: 0.35, label: 'Finom' },
-            { v: 0.6, label: 'Közepes' },
-            { v: 1, label: 'Erős' },
+            { v: 0, id: 'off' },
+            { v: 0.35, id: 'subtle' },
+            { v: 0.6, id: 'medium' },
+            { v: 1, id: 'strong' },
           ].map((opt) => (
             <Chip
-              key={opt.label}
-              label={opt.label}
+              key={opt.id}
+              label={t('panels.speed.blur_' + opt.id)}
               active={rampBlur === opt.v}
               onPress={() => setRampBlur(opt.v)}
             />
           ))}
         </View>
         <Text style={styles.note}>
-          A sebesség a klipen belül változik a görbe szerint (pl. Hero: lassítás
-          a közepén) — a klip hossza nem változik, és a darabok utána egyenként
-          is finomhangolhatók. Előnézetben és renderben is él; a mozgás-elmosás
-          csak az exportált videóban látszik.
+          {t('panels.speed.rampNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="🌀 Mozgás-elmosás (ezen a klipen)">
+      <PanelSection title={t('panels.speed.clipMotionBlurTitle')}>
         <View style={styles.row}>
           {[
-            { v: 0, label: 'Ki' },
-            { v: 0.35, label: 'Finom' },
-            { v: 0.6, label: 'Közepes' },
-            { v: 1, label: 'Erős' },
+            { v: 0, id: 'off' },
+            { v: 0.35, id: 'subtle' },
+            { v: 0.6, id: 'medium' },
+            { v: 1, id: 'strong' },
           ].map((opt) => (
             <Chip
-              key={opt.label}
-              label={opt.label}
+              key={opt.id}
+              label={t('panels.speed.blur_' + opt.id)}
               active={(clip.motionBlur ?? 0) === opt.v}
               onPress={() => updateClip(clip.id, { motionBlur: opt.v || undefined })}
             />
@@ -178,16 +172,16 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         </View>
         <Text style={styles.note}>
           {clip.speed > 1.05
-            ? 'Gyorsításnál a kihagyott képkockákat mossa össze — a mozgás folyamatos lesz, nem darabos.'
+            ? t('panels.speed.clipMotionBlurSpeedUp')
             : clip.speed < 0.95
-              ? 'Lassításnál köztes képkockákat számol (mozgás-interpoláció), így a lassítás sima marad. Lassabb render.'
-              : 'Akkor hat, ha a klip gyorsítva vagy lassítva van.'}
+              ? t('panels.speed.clipMotionBlurSlowDown')
+              : t('panels.speed.clipMotionBlurNeutral')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Hangerő">
+      <PanelSection title={t('panels.speed.volumeTitle')}>
         <Stepper
-          label="Klip hangja"
+          label={t('panels.speed.clipAudio')}
           value={`${Math.round(clip.volume * 100)}%`}
           onDec={() => updateClip(clip.id, { volume: clamp(clip.volume - 0.1, 0, 1) })}
           onInc={() => updateClip(clip.id, { volume: clamp(clip.volume + 0.1, 0, 1) })}
@@ -195,12 +189,12 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         {clip.volume > 0 ? (
           <View style={styles.row}>
             <Chip
-              label="✨ Enhance Voice"
+              label={t('panels.speed.enhanceVoice')}
               active={clip.voiceEnhance === true}
               onPress={() => updateClip(clip.id, { voiceEnhance: !clip.voiceEnhance })}
             />
             <Chip
-              label="🔇 Visszhang le"
+              label={t('panels.speed.deReverb')}
               active={clip.deReverb === true}
               onPress={() => updateClip(clip.id, { deReverb: !clip.deReverb })}
             />
@@ -208,23 +202,23 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         ) : null}
         <View style={styles.row}>
           <Chip
-            label="◆ Hangerő-kulcskocka (playhead)"
+            label={t('panels.speed.volumeKeyframe')}
             active={false}
             onPress={() => {
               const state = useEditorStore.getState();
-              const t = clamp(state.playhead - clip.start, 0, clip.duration);
+              const localTime = clamp(state.playhead - clip.start, 0, clip.duration);
               const k = clip.keyframes ?? {};
               updateClip(clip.id, {
                 keyframes: {
                   ...k,
-                  volume: setChannelKeyframe(k.volume, t, clip.volume, 'linear'),
+                  volume: setChannelKeyframe(k.volume, localTime, clip.volume, 'linear'),
                 },
               });
             }}
           />
           {clip.keyframes?.volume?.length ? (
             <Chip
-              label={`Automáció törlése (${clip.keyframes.volume.length})`}
+              label={t('panels.speed.clearAutomation', { count: clip.keyframes.volume.length })}
               active={false}
               onPress={() =>
                 updateClip(clip.id, {
@@ -236,14 +230,11 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         </View>
         {clip.voiceEnhance || clip.deReverb ? (
           <Text style={styles.note}>
-            🎙️ A javított hang az ELŐNÉZETBEN is hallható (a worker ugyanazzal a
-            lánccal dolgozza fel, mint a render). Az első lejátszáskor pár
-            másodpercig még a nyers hang szól, amíg elkészül.
+            {t('panels.speed.enhancedAudioNote')}
           </Text>
         ) : null}
         <Text style={styles.note}>
-          Hangerő-automáció: állítsd a hangerőt, állj a playheaddel a kívánt
-          pontra, és üsd le a ◆-t — a hangerő a kulcskockák közt átúszik.
+          {t('panels.speed.volumeAutomationNote')}
         </Text>
       </PanelSection>
     </View>

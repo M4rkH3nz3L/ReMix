@@ -1,4 +1,5 @@
 import { AI_PROBE_TIMEOUT_MS, aiFetch } from '@/lib/aiFetch';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import {
@@ -45,10 +46,10 @@ async function gatherSignals(
   const scenesByUri = new Map<string, number[]>();
   for (let i = 0; i < uris.length; i++) {
     onProgress?.({
-      phase: 'Klipek elemzése',
+      phase: tr('lib.autoeditClient.phaseAnalyzeClips'),
       current: i + 1,
       total: uris.length,
-      unit: 'klip',
+      unit: tr('lib.autoeditClient.unitClip'),
     });
     const [silences, scenes] = await Promise.all([
       detectSilence(uris[i]),
@@ -73,7 +74,7 @@ async function gatherSignals(
     .filter((c) => c.kind === 'audio')
     .sort((a, b) => a.start - b.start)[0];
   if (musicClip && musicClip.kind === 'audio') {
-    onProgress?.({ phase: 'Beat-elemzés' });
+    onProgress?.({ phase: tr('lib.autoeditClient.phaseBeatAnalysis') });
     const grid = await detectBeats(musicClip.uri);
     if (grid && grid.beats.length > 0) {
       beats = timelineBeats(musicClip, grid.beats);
@@ -83,7 +84,7 @@ async function gatherSignals(
 
   // 🏆 best-shot: a jelenet-kezdetek utáni fél másodperc reprezentatív kockái
   // (forrás-időben), fájlonként pontozva, majd idővonal-időre képezve
-  onProgress?.({ phase: 'Kockák pontozása' });
+  onProgress?.({ phase: tr('lib.autoeditClient.phaseScoreFrames') });
   const shotScores: { t: number; score: number; faces: number }[] = [];
   for (const uri of uris) {
     const sceneTimes = [0.5, ...(scenesByUri.get(uri) ?? []).map((s) => s + 0.5)];
@@ -135,7 +136,7 @@ function validVariants(body: unknown): AutoEditVariant[] | null {
     )
     .map((v) => ({
       id: v.id === 'viral' || v.id === 'cinematic' || v.id === 'fast' ? v.id : 'fast',
-      title: typeof v.title === 'string' && v.title ? v.title.slice(0, 60) : 'Változat',
+      title: typeof v.title === 'string' && v.title ? v.title.slice(0, 60) : tr('lib.autoeditClient.variantFallbackTitle'),
       rationale: typeof v.rationale === 'string' ? v.rationale.slice(0, 200) : '',
       keep: v.keep,
       captions: Array.isArray(v.captions)
@@ -166,7 +167,7 @@ export async function runAutoEditFlow(
         await aiFetch(`${base}/health`, {}, AI_PROBE_TIMEOUT_MS)
       ).json()) as { ai?: boolean };
       if (health.ai) {
-        onProgress?.({ phase: 'AI vágás-tervezés' });
+        onProgress?.({ phase: tr('lib.autoeditClient.phaseAiCutPlanning') });
         const res = await aiFetch(`${base}/ai/autoedit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -192,6 +193,6 @@ export async function runAutoEditFlow(
     }
   }
 
-  onProgress?.({ phase: 'Vágás-tervezés' });
+  onProgress?.({ phase: tr('lib.autoeditClient.phaseCutPlanning') });
   return { variants: heuristicVariants(signals), source: 'heuristic' };
 }

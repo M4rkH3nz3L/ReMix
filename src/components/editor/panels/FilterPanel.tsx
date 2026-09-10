@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -23,16 +24,15 @@ import type { ClipAdjust, ClipMask, ImageClip, LightingPreset, VideoClip } from 
 
 const ADJUSTS: {
   key: keyof ClipAdjust;
-  label: string;
   step: number;
   min: number;
   max: number;
 }[] = [
-  { key: 'brightness', label: 'Fényerő', step: 0.05, min: -0.3, max: 0.3 },
-  { key: 'contrast', label: 'Kontraszt', step: 0.05, min: -0.4, max: 0.4 },
-  { key: 'saturation', label: 'Szaturáció', step: 0.1, min: -1, max: 1 },
-  { key: 'temperature', label: 'Hőmérséklet', step: 0.05, min: -0.3, max: 0.3 },
-  { key: 'vignette', label: 'Vignetta', step: 0.1, min: 0, max: 1 },
+  { key: 'brightness', step: 0.05, min: -0.3, max: 0.3 },
+  { key: 'contrast', step: 0.05, min: -0.4, max: 0.4 },
+  { key: 'saturation', step: 0.1, min: -1, max: 1 },
+  { key: 'temperature', step: 0.05, min: -0.3, max: 0.3 },
+  { key: 'vignette', step: 0.1, min: 0, max: 1 },
 ];
 
 const LIGHTING_PRESETS: { id: LightingPreset; label: string }[] = [
@@ -43,11 +43,11 @@ const LIGHTING_PRESETS: { id: LightingPreset; label: string }[] = [
 ];
 
 /** freeform maszk-alakzatok: szabályos sokszögek + gyémánt (vászon-arányra igazítva) */
-const POLY_SHAPES: { id: string; label: string; sides: number; rotate: number }[] = [
-  { id: 'diamond', label: '◆ Gyémánt', sides: 4, rotate: 0 },
-  { id: 'penta', label: '⬟ Ötszög', sides: 5, rotate: 0 },
-  { id: 'hexa', label: '⬢ Hatszög', sides: 6, rotate: 0.5 },
-  { id: 'octa', label: '⯃ Nyolcszög', sides: 8, rotate: 0.5 },
+const POLY_SHAPES: { id: string; sides: number; rotate: number }[] = [
+  { id: 'diamond', sides: 4, rotate: 0 },
+  { id: 'penta', sides: 5, rotate: 0 },
+  { id: 'hexa', sides: 6, rotate: 0.5 },
+  { id: 'octa', sides: 8, rotate: 0.5 },
 ];
 
 function polygonPointsFor(sides: number, rotate: number): { x: number; y: number }[] {
@@ -70,6 +70,7 @@ const DEFAULT_MASK: ClipMask = {
 };
 
 export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const maskEdit = useEditorStore((s) => s.maskEdit);
   const setMaskEdit = useEditorStore((s) => s.setMaskEdit);
@@ -89,8 +90,8 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     setDepthBusy(false);
     if (!result) {
       Alert.alert(
-        '2.5D mélység',
-        'A mélység-motor nem érhető el (worker + mélység-modell kell hozzá).'
+        t('panels.filter.depthTitle'),
+        t('panels.filter.depthUnavailable')
       );
       return;
     }
@@ -130,14 +131,14 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
       );
       const found = frames.filter((f): f is NonNullable<typeof f> => Boolean(f));
       if (found.length === 0) {
-        Alert.alert('Arc-elmosás', 'Az arc-detektor nem érhető el — fut a worker?');
+        Alert.alert(t('panels.filter.faceBlurTitle'), t('panels.filter.faceDetectorUnavailable'));
         return;
       }
       const region = faceUnionRegion(found);
       if (!region) {
         Alert.alert(
-          'Arc-elmosás',
-          'Nem találtam arcot a klipben — próbáld másik klippel, vagy használd a Maszkot.'
+          t('panels.filter.faceBlurTitle'),
+          t('panels.filter.faceNotFound')
         );
         return;
       }
@@ -160,7 +161,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     const uri = await replaceSky(clip.uri, preset);
     setSkyBusy(null);
     if (!uri) {
-      Alert.alert('Égbolt-csere', 'Nem érhető el (worker + mélység-modell kell hozzá).');
+      Alert.alert(t('panels.filter.skyTitle'), t('panels.filter.skyUnavailable'));
       return;
     }
     updateClip(clip.id, { uri });
@@ -180,8 +181,8 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     setSelectBusy(false);
     if (!result) {
       Alert.alert(
-        'AI Select',
-        'A kijelölés nem érhető el (worker + kivágás-modell kell hozzá).'
+        t('panels.filter.aiSelectTitle'),
+        t('panels.filter.aiSelectUnavailable')
       );
       return;
     }
@@ -192,7 +193,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const upscaleClip = async (scale: 2 | 4) => {
     if (clip.kind !== 'image' || upscaleBusy) {
       if (clip.kind !== 'image') {
-        Alert.alert('Felnagyítás', 'Ez a funkció képekre való (a videó-upscale GPU-t kér).');
+        Alert.alert(t('panels.filter.upscaleTitle'), t('panels.filter.upscaleImagesOnly'));
       }
       return;
     }
@@ -201,16 +202,15 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     setUpscaleBusy(false);
     if (!result) {
       Alert.alert(
-        'Felnagyítás',
-        'A felnagyítás nem érhető el (worker + szuper-felbontás modell kell hozzá).'
+        t('panels.filter.upscaleTitle'),
+        t('panels.filter.upscaleUnavailable')
       );
       return;
     }
     updateClip(clip.id, { uri: result.uri });
     Alert.alert(
-      'Felnagyítás kész',
-      `A kép ${result.width}×${result.height} pixelre nagyítva (szuper-felbontás). ` +
-        'A klip minden beállítása megmaradt — visszavonható.'
+      t('panels.filter.upscaleDoneTitle'),
+      t('panels.filter.upscaleDoneBody', { width: result.width, height: result.height })
     );
   };
   // 🖼️ a szűrő-kártyák fotó-előnézete: a klip egy reprezentatív kockája,
@@ -251,12 +251,12 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     const stats = await fetchColorStats(clip.uri, sourceMidSec(clip));
     setColorBusy(null);
     if (!stats) {
-      Alert.alert('Auto Color', 'A szín-elemzés nem érhető el — fut a worker?');
+      Alert.alert(t('panels.filter.autoColorTitle'), t('panels.filter.colorAnalysisUnavailable'));
       return;
     }
     const adjust = statsToAutoAdjust(stats);
     if (Object.keys(adjust).length === 0) {
-      Alert.alert('Auto Color', 'A kép már kiegyensúlyozott — nincs mit javítani.');
+      Alert.alert(t('panels.filter.autoColorTitle'), t('panels.filter.autoColorBalanced'));
       return;
     }
     updateClip(clip.id, { adjust: { ...clip.adjust, ...adjust } });
@@ -276,7 +276,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
       )
       .sort((a, b) => b.start - a.start)[0] as VideoClip | ImageClip | undefined;
     if (!prev) {
-      Alert.alert('Szín-igazítás', 'Nincs előző klip az idővonalon, amihez igazíthatnék.');
+      Alert.alert(t('panels.filter.matchColorTitle'), t('panels.filter.matchColorNoPrev'));
       return;
     }
     setColorBusy('match');
@@ -286,12 +286,12 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     ]);
     setColorBusy(null);
     if (!target || !reference) {
-      Alert.alert('Szín-igazítás', 'A szín-elemzés nem érhető el — fut a worker?');
+      Alert.alert(t('panels.filter.matchColorTitle'), t('panels.filter.colorAnalysisUnavailable'));
       return;
     }
     const adjust = statsToMatchAdjust(target, reference);
     if (Object.keys(adjust).length === 0) {
-      Alert.alert('Szín-igazítás', 'A két klip színvilága már összhangban van.');
+      Alert.alert(t('panels.filter.matchColorTitle'), t('panels.filter.matchColorAligned'));
       return;
     }
     updateClip(clip.id, { adjust: { ...clip.adjust, ...adjust } });
@@ -308,8 +308,8 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     setCutoutBusy(false);
     if (!result) {
       Alert.alert(
-        'AI kivágás',
-        'A kivágás-motor nem érhető el (worker + u2net modell kell hozzá).'
+        t('panels.filter.aiCutoutTitle'),
+        t('panels.filter.aiCutoutUnavailable')
       );
       return;
     }
@@ -342,15 +342,14 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         kind: 'image',
         uri: result.uri,
         provider: 'local',
-        name: 'AI kivágás',
+        name: t('panels.filter.aiCutoutTitle'),
       }
     );
     state.selectClip(id);
     state.setPanel('shape');
     Alert.alert(
-      'AI kivágás kész',
-      'A téma külön rétegként került a vászonra — az eredeti fotót törölheted ' +
-        'vagy kicserélheted, a kivágás alá bármilyen háttér tehető.'
+      t('panels.filter.aiCutoutDoneTitle'),
+      t('panels.filter.aiCutoutDoneBody')
     );
   };
 
@@ -367,8 +366,8 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     setFocusBusy(false);
     if (!result) {
       Alert.alert(
-        'Mélység-fókusz',
-        'A mélység-motor nem érhető el (worker + mélység-modell kell hozzá).'
+        t('panels.filter.depthFocusTitle'),
+        t('panels.filter.depthUnavailable')
       );
       return;
     }
@@ -379,7 +378,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
 
   return (
     <View>
-      <PanelSection title="Szűrők">
+      <PanelSection title={t('panels.filter.sectionFilters')}>
         <View style={styles.grid}>
           {filters.map((filter) => (
             <Pressable
@@ -431,14 +430,14 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
                 ]}
                 numberOfLines={1}
               >
-                {filter.label}
+                {t(filter.label)}
               </Text>
             </Pressable>
           ))}
         </View>
         {clip.filterId !== 'none' ? (
           <Stepper
-            label="Erősség"
+            label={t('panels.filter.strength')}
             value={`${Math.round(intensity * 100)}%`}
             onDec={() =>
               updateClip(clip.id, { filterIntensity: clamp(intensity - 0.1, 0.1, 1) })
@@ -449,29 +448,28 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           />
         ) : null}
         <Text style={styles.note}>
-          Az előnézet közelítés — a végleges színkorrekció (LUT) a szerveroldali renderben
-          érvényesül.
+          {t('panels.filter.noteFilters')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Képjavítás">
+      <PanelSection title={t('panels.filter.sectionEnhance')}>
         <View style={styles.row}>
           <Chip
-            label={colorBusy === 'auto' ? '🎨 Elemzés…' : '🎨 Auto Color'}
+            label={colorBusy === 'auto' ? t('panels.filter.chipAnalyzingColor') : t('panels.filter.chipAutoColor')}
             active={false}
             onPress={() => {
               void autoColor();
             }}
           />
           <Chip
-            label={colorBusy === 'match' ? '🎯 Elemzés…' : '🎯 Illesztés az előzőhöz'}
+            label={colorBusy === 'match' ? t('panels.filter.chipAnalyzingMatch') : t('panels.filter.chipMatchPrev')}
             active={false}
             onPress={() => {
               void matchColor();
             }}
           />
         </View>
-        {ADJUSTS.map(({ key, label, step, min, max }) => {
+        {ADJUSTS.map(({ key, step, min, max }) => {
           const value = clip.adjust?.[key] ?? 0;
           const set = (v: number) =>
             updateClip(clip.id, {
@@ -480,7 +478,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           return (
             <Stepper
               key={key}
-              label={label}
+              label={t('panels.filter.adjust_' + key)}
               value={`${value > 0 ? '+' : ''}${Math.round(value * 100)}`}
               onDec={() => set(value - step)}
               onInc={() => set(value + step)}
@@ -489,7 +487,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         })}
         {clip.adjust ? (
           <Chip
-            label="Alaphelyzet"
+            label={t('common.reset')}
             active={false}
             onPress={() => updateClip(clip.id, { adjust: undefined })}
           />
@@ -497,19 +495,19 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         {clip.kind === 'image' ? (
           <View style={styles.row}>
             <Chip
-              label="🎯 Mindenre"
+              label={t('panels.filter.chipSelectAll')}
               active={!clip.selective}
               onPress={() => updateClip(clip.id, { selective: undefined })}
             />
             <Chip
-              label={selectBusy ? '🎯 Kijelölés…' : '🎯 Csak a témára'}
+              label={selectBusy ? t('panels.filter.chipSelecting') : t('panels.filter.chipSubjectOnly')}
               active={clip.selective?.target === 'subject'}
               onPress={() => {
                 void applySelective('subject');
               }}
             />
             <Chip
-              label={selectBusy ? '🎯 Kijelölés…' : '🎯 Csak a háttérre'}
+              label={selectBusy ? t('panels.filter.chipSelecting') : t('panels.filter.chipBackgroundOnly')}
               active={clip.selective?.target === 'background'}
               onPress={() => {
                 void applySelective('background');
@@ -518,36 +516,34 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           </View>
         ) : null}
         <Text style={styles.note}>
-          Az előnézet közelítés — a pontos fényerő/kontraszt/szaturáció/vignetta a
-          renderben érvényesül (videón és képen közös motor).
+          {t('panels.filter.noteEnhance')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Háttér-kitöltés">
+      <PanelSection title={t('panels.filter.sectionBackgroundFill')}>
         <View style={styles.row}>
           <Chip
-            label="Fekete"
+            label={t('panels.filter.chipBlack')}
             active={(clip.backgroundFill ?? 'black') === 'black'}
             onPress={() => updateClip(clip.id, { backgroundFill: 'black' })}
           />
           <Chip
-            label="Elmosott"
+            label={t('panels.filter.chipBlurred')}
             active={clip.backgroundFill === 'blur'}
             onPress={() => updateClip(clip.id, { backgroundFill: 'blur' })}
           />
         </View>
         <Text style={styles.note}>
-          Ha a klip aránya nem egyezik a vászonnal, a sávok feketék vagy a klip
-          elmosott, kitöltő változatával telnek meg (a valódi blur a renderben).
+          {t('panels.filter.noteBackgroundFill')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Animálás (Animate Photo)">
+      <PanelSection title={t('panels.filter.sectionAnimate')}>
         <View style={styles.row}>
           {PHOTO_ANIM_PRESETS.map((preset) => (
             <Chip
               key={preset.id}
-              label={preset.label}
+              label={t(preset.label)}
               active={false}
               onPress={() =>
                 updateClip(clip.id, {
@@ -558,27 +554,26 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           ))}
           {clip.keyframes ? (
             <Chip
-              label="✕ Nincs"
+              label={t('panels.filter.chipNoneX')}
               active={false}
               onPress={() => updateClip(clip.id, { keyframes: undefined })}
             />
           ) : null}
         </View>
         <Text style={styles.note}>
-          Egy koppintás → kész kameramozgás (kulcskockákkal — a Pontos igazítás
-          panelen tovább finomítható; előnézetben és renderben is él).
+          {t('panels.filter.noteAnimate')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="🙈 Arc-elmosás (adatvédelem)">
+      <PanelSection title={t('panels.filter.sectionFaceBlur')}>
         <View style={styles.row}>
           <Chip
             label={
               faceBusy
-                ? '🙈 Arc keresése…'
+                ? t('panels.filter.chipFaceSearching')
                 : clip.faceBlur
-                  ? '🙈 Elmosás be ✓'
-                  : '🙈 Arc elmosása'
+                  ? t('panels.filter.chipFaceBlurOn')
+                  : t('panels.filter.chipFaceBlur')
             }
             active={Boolean(clip.faceBlur)}
             onPress={() => {
@@ -587,7 +582,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           />
           {clip.faceBlur ? (
             <Chip
-              label={clip.faceBlur.pixelate ? '🔲 Mozaik' : '🌫️ Lágy'}
+              label={clip.faceBlur.pixelate ? t('panels.filter.chipMosaic') : t('panels.filter.chipSoft')}
               active={clip.faceBlur.pixelate === true}
               onPress={() =>
                 updateClip(clip.id, {
@@ -599,7 +594,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         </View>
         {clip.faceBlur ? (
           <Stepper
-            label="Erősség"
+            label={t('panels.filter.strength')}
             value={`${Math.round((clip.faceBlur.strength ?? 1) * 100)}%`}
             onDec={() =>
               updateClip(clip.id, {
@@ -620,19 +615,17 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           />
         ) : null}
         <Text style={styles.note}>
-          Az AI megkeresi az arcokat több képkockán, és a befoglaló területet
-          elmossa (a fejmozgást is lefedve) — lágy blur vagy mozaik. A renderben
-          ég be, az előnézet jelöléssel mutatja.
+          {t('panels.filter.noteFaceBlur')}
         </Text>
       </PanelSection>
 
       {clip.kind === 'image' ? (
-        <PanelSection title="🌅 Égbolt-csere">
+        <PanelSection title={t('panels.filter.sectionSky')}>
           <View style={styles.row}>
             {SKY_PRESETS.map((preset) => (
               <Chip
                 key={preset.id}
-                label={skyBusy === preset.id ? '⏳…' : preset.label}
+                label={skyBusy === preset.id ? '⏳…' : t(preset.label)}
                 active={false}
                 onPress={() => {
                   void applySky(preset.id);
@@ -641,16 +634,15 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             ))}
           </View>
           <Text style={styles.note}>
-            Az AI mélység-térképből ismeri fel az eget, és lecseréli — a téma és
-            az előtér marad. Az eredmény a klip új forrása lesz (visszavonható).
+            {t('panels.filter.noteSky')}
           </Text>
         </PanelSection>
       ) : null}
 
-      <PanelSection title="💡 Fény (lighting)">
+      <PanelSection title={t('panels.filter.sectionLighting')}>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!clip.lighting}
             onPress={() => updateClip(clip.id, { lighting: undefined })}
           />
@@ -664,15 +656,13 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           ))}
         </View>
         <Text style={styles.note}>
-          Hangulat-világítás egy koppintásra — a renderben valódi split-tone
-          color grade ég be (árnyék/középtónus/csúcsfény külön színnel), az
-          előnézet tinttel közelít. A képjavítással kombinálható.
+          {t('panels.filter.noteLighting')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="🧊 3D tér (döntés + kamera)">
+      <PanelSection title={t('panels.filter.section3d')}>
         <Stepper
-          label="Döntés ↕"
+          label={t('panels.filter.tiltVertical')}
           value={`${clip.tilt3d?.rotX ?? 0}°`}
           onDec={() =>
             updateClip(clip.id, {
@@ -692,7 +682,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           }
         />
         <Stepper
-          label="Döntés ↔"
+          label={t('panels.filter.tiltHorizontal')}
           value={`${clip.tilt3d?.rotY ?? 0}°`}
           onDec={() =>
             updateClip(clip.id, {
@@ -715,7 +705,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           {CAMERA_PRESETS.map((preset) => (
             <Chip
               key={preset.id}
-              label={preset.label}
+              label={t(preset.label)}
               active={false}
               onPress={() => {
                 const move = buildCameraMove(preset.id, clip.duration);
@@ -728,7 +718,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           ))}
           {clip.tilt3d ? (
             <Chip
-              label="✕ Döntés ki"
+              label={t('panels.filter.chipTiltOff')}
               active={false}
               onPress={() => updateClip(clip.id, { tilt3d: undefined })}
             />
@@ -739,10 +729,10 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             <Chip
               label={
                 depthBusy
-                  ? '🏔️ Mélység számítása…'
+                  ? t('panels.filter.chipDepthComputing')
                   : clip.depthParallax
-                    ? '🏔️ 2.5D mélység ✓'
-                    : '🏔️ 2.5D mélység'
+                    ? t('panels.filter.chipDepthOn')
+                    : t('panels.filter.chipDepth')
               }
               active={Boolean(clip.depthParallax)}
               onPress={() => {
@@ -750,42 +740,42 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }}
             />
             <Chip
-              label={focusBusy ? '⏳…' : '🌫️ Portré-blur'}
+              label={focusBusy ? '⏳…' : t('panels.filter.chipPortraitBlur')}
               active={clip.depthFocus?.mode === 'portrait'}
               onPress={() => {
                 void setDepthFocus('portrait');
               }}
             />
             <Chip
-              label="🎬 Fókusz hátra"
+              label={t('panels.filter.chipFocusBack')}
               active={clip.depthFocus?.mode === 'toFar'}
               onPress={() => {
                 void setDepthFocus('toFar');
               }}
             />
             <Chip
-              label="🎬 Fókusz előre"
+              label={t('panels.filter.chipFocusFront')}
               active={clip.depthFocus?.mode === 'toNear'}
               onPress={() => {
                 void setDepthFocus('toNear');
               }}
             />
             <Chip
-              label={cutoutBusy ? '🪄 Kivágás…' : '🪄 Téma kivágása'}
+              label={cutoutBusy ? t('panels.filter.chipCuttingOut') : t('panels.filter.chipExtractSubject')}
               active={false}
               onPress={() => {
                 void extractSubject();
               }}
             />
             <Chip
-              label={upscaleBusy ? '🔍 Nagyítás…' : '🔍 Felnagyítás 2×'}
+              label={upscaleBusy ? t('panels.filter.chipUpscaling') : t('panels.filter.chipUpscale2x')}
               active={false}
               onPress={() => {
                 void upscaleClip(2);
               }}
             />
             <Chip
-              label={upscaleBusy ? '🔍 Nagyítás…' : '🔍 4×'}
+              label={upscaleBusy ? t('panels.filter.chipUpscaling') : '🔍 4×'}
               active={false}
               onPress={() => {
                 void upscaleClip(4);
@@ -794,35 +784,26 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           </View>
         ) : null}
         <Text style={styles.note}>
-          A klip térben megdől (a renderben valódi perspektíva-warp), a
-          kamera-presetek kulcskockákat írnak — a döntés és a mozgás utána
-          szabadon finomítható. A maszkkal a döntés nem kombinálódik. Fotón a
-          2.5D mélység AI-mélységbecsléssel rétegekre bontja a képet, és a
-          kameramozgás mélység-parallaxisszal kel életre a renderelt videóban
-          (az előnézet a lapos fotót mozgatja). A 🌫️ portré-blur a távoli
-          tartalmat mossa el (az előnézetben is), a 🎬 fókusz-húzás pedig a
-          renderben úsztatja át az élességet a téma és a háttér között. A 🪄
-          téma-kivágás a fotó alanyát külön, átlátszó hátterű rétegként teszi a
-          vászonra — alá bármilyen új háttér kerülhet.
+          {t('panels.filter.note3d')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Maszk">
+      <PanelSection title={t('panels.filter.sectionMask')}>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!clip.mask}
             onPress={() => updateClip(clip.id, { mask: undefined })}
           />
           <Chip
-            label="Ellipszis"
+            label={t('panels.filter.chipEllipse')}
             active={clip.mask?.shape === 'ellipse'}
             onPress={() =>
               updateClip(clip.id, { mask: { ...DEFAULT_MASK, ...clip.mask, shape: 'ellipse' } })
             }
           />
           <Chip
-            label="Téglalap"
+            label={t('panels.filter.chipRectangle')}
             active={clip.mask?.shape === 'rectangle'}
             onPress={() =>
               updateClip(clip.id, { mask: { ...DEFAULT_MASK, ...clip.mask, shape: 'rectangle' } })
@@ -834,7 +815,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           {POLY_SHAPES.map((poly) => (
             <Chip
               key={poly.id}
-              label={poly.label}
+              label={t('panels.filter.poly_' + poly.id)}
               active={
                 clip.mask?.shape === 'polygon' &&
                 clip.mask.points?.length === poly.sides
@@ -853,7 +834,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           ))}
           {clip.mask ? (
             <Chip
-              label="Invert"
+              label={t('panels.filter.chipInvert')}
               active={clip.mask.invert === true}
               onPress={() =>
                 updateClip(clip.id, { mask: { ...clip.mask!, invert: !clip.mask!.invert } })
@@ -864,17 +845,15 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         {clip.mask ? (
           <>
             <Chip
-              label={maskEdit ? '✓ Fogantyúk bekapcsolva' : '✋ Igazítás a vásznon'}
+              label={maskEdit ? t('panels.filter.chipHandlesOn') : t('panels.filter.chipAdjustOnCanvas')}
               active={maskEdit}
               onPress={() => setMaskEdit(!maskEdit)}
             />
             <Text style={styles.note}>
-              Bekapcsolva a maszk kerete és fogantyúi megjelennek az előnézeten:
-              a keretet húzva mozgatod, a sarkát húzva méretezed. Poligonnál
-              minden csúcs külön is húzható.
+              {t('panels.filter.noteMaskEdit')}
             </Text>
             <Stepper
-              label="Szélesség"
+              label={t('panels.filter.width')}
               value={`${Math.round(clip.mask.w * 100)}%`}
               onDec={() =>
                 updateClip(clip.id, { mask: { ...clip.mask!, w: clamp(clip.mask!.w - 0.05, 0.1, 1) } })
@@ -884,7 +863,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
             <Stepper
-              label="Magasság"
+              label={t('panels.filter.height')}
               value={`${Math.round(clip.mask.h * 100)}%`}
               onDec={() =>
                 updateClip(clip.id, { mask: { ...clip.mask!, h: clamp(clip.mask!.h - 0.05, 0.1, 1) } })
@@ -894,7 +873,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
             <Stepper
-              label="Vízszintes pozíció"
+              label={t('panels.filter.horizontalPosition')}
               value={`${Math.round(clip.mask.x * 100)}%`}
               onDec={() =>
                 updateClip(clip.id, { mask: { ...clip.mask!, x: clamp(clip.mask!.x - 0.05, 0, 1) } })
@@ -904,7 +883,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
             <Stepper
-              label="Függőleges pozíció"
+              label={t('panels.filter.verticalPosition')}
               value={`${Math.round(clip.mask.y * 100)}%`}
               onDec={() =>
                 updateClip(clip.id, { mask: { ...clip.mask!, y: clamp(clip.mask!.y - 0.05, 0, 1) } })
@@ -914,7 +893,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
             <Stepper
-              label="Lágy szél"
+              label={t('panels.filter.feather')}
               value={`${Math.round((clip.mask.feather ?? 0.05) * 100)}%`}
               onDec={() =>
                 updateClip(clip.id, {
@@ -930,20 +909,19 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           </>
         ) : null}
         <Text style={styles.note}>
-          Az előnézet a maszk körvonalát és a takart terület sötétítését mutatja —
-          a valódi lágy szélű kivágás a renderben készül.
+          {t('panels.filter.noteMask')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Green screen (chroma)">
+      <PanelSection title={t('panels.filter.sectionGreenScreen')}>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!clip.chromaKey}
             onPress={() => updateClip(clip.id, { chromaKey: undefined })}
           />
           <Chip
-            label="🟩 Zöld"
+            label={t('panels.filter.chipGreen')}
             active={clip.chromaKey?.color === '#00ff00'}
             onPress={() =>
               updateClip(clip.id, {
@@ -952,7 +930,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             }
           />
           <Chip
-            label="🟦 Kék"
+            label={t('panels.filter.chipBlue')}
             active={clip.chromaKey?.color === '#0000ff'}
             onPress={() =>
               updateClip(clip.id, {
@@ -963,7 +941,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         </View>
         {clip.chromaKey ? (
           <Stepper
-            label="Tűrés"
+            label={t('panels.filter.tolerance')}
             value={`${Math.round(clip.chromaKey.similarity * 100)}%`}
             onDec={() =>
               updateClip(clip.id, {
@@ -984,8 +962,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
           />
         ) : null}
         <Text style={styles.note}>
-          A kulcs-szín a renderben válik átlátszóvá (a háttér-kitöltéssel
-          kombinálható: fekete vagy elmosott háttér kerül mögé).
+          {t('panels.filter.noteGreenScreen')}
         </Text>
       </PanelSection>
     </View>

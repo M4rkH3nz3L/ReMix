@@ -15,23 +15,25 @@ export interface GradeMeta {
   tint: { color: string; opacity: number }[];
 }
 
+// 🌍 A `label` i18n-kulcs — az AdjustPanel `t(panels.adjust.grade_<id>)`-ként
+// jeleníti meg (a kulcsok az emojival együtt tartalmazzák a nevet).
 export const GRADES: GradeMeta[] = [
-  { id: 'none', label: 'Nincs', tint: [] },
+  { id: 'none', label: 'panels.adjust.grade_none', tint: [] },
   {
     id: 'teal-orange',
-    label: '🎬 Teal & Orange',
+    label: 'panels.adjust.grade_teal-orange',
     tint: [
       { color: '#0f6b6b', opacity: 0.12 },
       { color: '#ff8c42', opacity: 0.1 },
     ],
   },
-  { id: 'moody', label: '🌧️ Moody', tint: [{ color: '#0d1b2a', opacity: 0.24 }] },
-  { id: 'vintage', label: '📽️ Vintage', tint: [{ color: '#d8c9a0', opacity: 0.2 }] },
-  { id: 'noir', label: '⚫ Noir', tint: [{ color: '#808080', opacity: 0.5 }] },
-  { id: 'warm-film', label: '☀️ Warm Film', tint: [{ color: '#ff9d4d', opacity: 0.16 }] },
-  { id: 'cold', label: '❄️ Cold', tint: [{ color: '#4d9dff', opacity: 0.16 }] },
-  { id: 'vibrant', label: '🌈 Vibrant', tint: [{ color: '#ff2ea6', opacity: 0.07 }] },
-  { id: 'dreamy', label: '💗 Dreamy', tint: [{ color: '#ffd6e8', opacity: 0.16 }] },
+  { id: 'moody', label: 'panels.adjust.grade_moody', tint: [{ color: '#0d1b2a', opacity: 0.24 }] },
+  { id: 'vintage', label: 'panels.adjust.grade_vintage', tint: [{ color: '#d8c9a0', opacity: 0.2 }] },
+  { id: 'noir', label: 'panels.adjust.grade_noir', tint: [{ color: '#808080', opacity: 0.5 }] },
+  { id: 'warm-film', label: 'panels.adjust.grade_warm-film', tint: [{ color: '#ff9d4d', opacity: 0.16 }] },
+  { id: 'cold', label: 'panels.adjust.grade_cold', tint: [{ color: '#4d9dff', opacity: 0.16 }] },
+  { id: 'vibrant', label: 'panels.adjust.grade_vibrant', tint: [{ color: '#ff2ea6', opacity: 0.07 }] },
+  { id: 'dreamy', label: 'panels.adjust.grade_dreamy', tint: [{ color: '#ffd6e8', opacity: 0.16 }] },
 ];
 
 /** id → tint-rétegek (előnézeti közelítés); ismeretlen/none → üres. */

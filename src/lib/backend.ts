@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { t as tr } from 'i18next';
 
 import {
   capabilityLabel,
@@ -63,7 +64,7 @@ export function cloudBaseUrl(): string {
 export class ProRequiredError extends Error {
   readonly capability: CapabilityId;
   constructor(cap: CapabilityId) {
-    super(`A(z) „${capabilityLabel(cap)}" funkció Remix Pro-előfizetést igényel.`);
+    super(tr('lib.backend.proRequired', { label: capabilityLabel(cap) }));
     this.name = 'ProRequiredError';
     this.capability = cap;
   }

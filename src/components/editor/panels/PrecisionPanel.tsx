@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -31,15 +32,16 @@ function snap(value: number, mode: StepMode): number {
     : Math.round(value * 100) / 100;
 }
 
-const EASINGS: { id: KeyframeEasing; label: string }[] = [
-  { id: 'easeInOut', label: 'Lágy' },
-  { id: 'linear', label: 'Lineáris' },
-  { id: 'easeIn', label: 'Felpörgő' },
-  { id: 'easeOut', label: 'Lassuló' },
+const EASINGS: { id: KeyframeEasing }[] = [
+  { id: 'easeInOut' },
+  { id: 'linear' },
+  { id: 'easeIn' },
+  { id: 'easeOut' },
 ];
 
 /** Pro eszköz: kezdet/hossz tizedmásodperces igazítása + lejátszófej-műveletek. */
 export function PrecisionPanel({ clip }: { clip: Clip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
   const playhead = useEditorStore((s) => s.playhead);
@@ -72,27 +74,27 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
 
   return (
     <View>
-      <PanelSection title="Időzítés">
+      <PanelSection title={t('panels.precision.timingTitle')}>
         <View style={styles.row}>
           <Chip
-            label="0,1 mp"
+            label={t('panels.precision.stepSec')}
             active={stepMode === 'sec'}
             onPress={() => setStepMode('sec')}
           />
           <Chip
-            label={`1 képkocka (${EDIT_FPS} fps)`}
+            label={t('panels.precision.stepFrame', { fps: EDIT_FPS })}
             active={stepMode === 'frame'}
             onPress={() => setStepMode('frame')}
           />
         </View>
         <Stepper
-          label="Kezdet"
+          label={t('panels.precision.start')}
           value={formatTime(clip.start)}
           onDec={() => setStart(clip.start - step)}
           onInc={() => setStart(clip.start + step)}
         />
         <Stepper
-          label="Hossz"
+          label={t('panels.precision.length')}
           value={formatTime(clip.duration)}
           onDec={() => setDuration(clip.duration - step)}
           onInc={() => setDuration(clip.duration + step)}
@@ -100,33 +102,42 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
         <Text style={styles.range}>
           {formatTime(clip.start)} → {formatTime(clip.start + clip.duration)}
           {stepMode === 'frame'
-            ? `  ·  ${Math.round(clip.start * EDIT_FPS)}. kocka, ${Math.round(
-                clip.duration * EDIT_FPS
-              )} kocka hosszú`
+            ? t('panels.precision.frameInfo', {
+                startFrame: Math.round(clip.start * EDIT_FPS),
+                frameCount: Math.round(clip.duration * EDIT_FPS),
+              })
             : ''}
         </Text>
       </PanelSection>
 
-      <PanelSection title="Igazítás">
+      <PanelSection title={t('panels.precision.alignTitle')}>
         <View style={styles.row}>
           <Chip
-            label={stepMode === 'frame' ? '◀ 1 kocka' : '◀ 0,1 mp'}
+            label={
+              stepMode === 'frame'
+                ? t('panels.precision.nudgeBackFrame')
+                : t('panels.precision.nudgeBackSec')
+            }
             active={false}
             onPress={() => nudgePlayhead(-1)}
           />
           <Chip
-            label={stepMode === 'frame' ? '1 kocka ▶' : '0,1 mp ▶'}
+            label={
+              stepMode === 'frame'
+                ? t('panels.precision.nudgeFwdFrame')
+                : t('panels.precision.nudgeFwdSec')
+            }
             active={false}
             onPress={() => nudgePlayhead(1)}
           />
-          <Chip label="Kezdet a lejátszófejhez" active={false} onPress={alignToPlayhead} />
+          <Chip label={t('panels.precision.startToPlayhead')} active={false} onPress={alignToPlayhead} />
           <Chip
-            label="Lejátszófej a klip elejére"
+            label={t('panels.precision.playheadToClipStart')}
             active={false}
             onPress={() => setPlayhead(clip.start)}
           />
           <Chip
-            label="Lejátszófej a klip végére"
+            label={t('panels.precision.playheadToClipEnd')}
             active={false}
             onPress={() => setPlayhead(clip.start + clip.duration)}
           />
@@ -134,7 +145,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
       </PanelSection>
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
-        <PanelSection title="Kulcskockák — zoom/pan">
+        <PanelSection title={t('panels.precision.keyframesTitle')}>
           {(() => {
             const tInClip = clamp(playhead - clip.start, 0, clip.duration);
             const times = keyframeTimes(clip.keyframes);
@@ -154,13 +165,17 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
               <>
                 <View style={styles.row}>
                   <Chip
-                    label={onKeyframe ? '◆ Kulcskocka frissítése' : '◆ Kulcskocka itt'}
+                    label={
+                      onKeyframe
+                        ? t('panels.precision.keyframeUpdate')
+                        : t('panels.precision.keyframeHere')
+                    }
                     active={onKeyframe}
                     onPress={addAtPlayhead}
                   />
                   {onKeyframe ? (
                     <Chip
-                      label="✕ Törlés itt"
+                      label={t('panels.precision.keyframeDeleteHere')}
                       active={false}
                       onPress={() =>
                         updateClip(clip.id, {
@@ -171,7 +186,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
                   ) : null}
                   {times.length > 0 ? (
                     <Chip
-                      label="Összes törlése"
+                      label={t('panels.precision.keyframeDeleteAll')}
                       active={false}
                       onPress={() => updateClip(clip.id, { keyframes: undefined })}
                     />
@@ -181,7 +196,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
                   {EASINGS.map((e) => (
                     <Chip
                       key={e.id}
-                      label={e.label}
+                      label={t('panels.precision.easing_' + e.id)}
                       active={easing === e.id}
                       onPress={() => setEasing(e.id)}
                     />
@@ -200,9 +215,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
                   </View>
                 ) : null}
                 <Text style={styles.range}>
-                  Állítsd be a zoomot/pozíciót a vásznon, majd „◆ Kulcskocka itt” — a
-                  klip a kulcskockák közt animálva mozog (az easing az új kulcskockára
-                  vonatkozik). Kulcskockás klipen a csippentés/húzás is kulcskockát ír.
+                  {t('panels.precision.keyframeHint')}
                 </Text>
               </>
             );
@@ -211,9 +224,9 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
       ) : null}
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
-        <PanelSection title="Megjelenés">
+        <PanelSection title={t('panels.precision.appearanceTitle')}>
           <Stepper
-            label="Forgatás"
+            label={t('panels.precision.rotation')}
             value={`${clip.transform?.rotation ?? 0}°`}
             onDec={() =>
               updateClip(clip.id, {
@@ -233,7 +246,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
             }
           />
           <Stepper
-            label="Átlátszóság"
+            label={t('panels.precision.opacity')}
             value={`${Math.round((clip.opacity ?? 1) * 100)}%`}
             onDec={() =>
               updateClip(clip.id, { opacity: clamp((clip.opacity ?? 1) - 0.1, 0.1, 1) })

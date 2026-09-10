@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import { makeId } from '@/lib/id';
 import type { TranscriptLine } from '@/lib/transcripts';
 import type { Clip, ImageClip, Project, TextClip, VideoClip } from '@/types/project';
@@ -366,25 +368,25 @@ export function heuristicVariants(signals: AutoEditSignals): AutoEditVariant[] {
   return [
     {
       id: 'viral',
-      title: '🔥 Viral',
-      rationale: 'Hook az elejére, a legerősebb részek középre, zárás a végéről.',
+      title: tr('lib.autoedit.viralTitle'),
+      rationale: tr('lib.autoedit.viralRationale'),
       keep: viral,
       captions: captionsFor(viral),
     },
     {
       id: 'cinematic',
-      title: '🎬 Cinematic',
+      title: tr('lib.autoedit.cinematicTitle'),
       rationale:
         (signals.shotScores?.length ?? 0) > 0
-          ? 'A vizuálisan legszebb jelenetekből egy-egy szelet, egyenletes tempóban.'
-          : 'Minden jelenetből egy szelet, egyenletes tempóban.',
+          ? tr('lib.autoedit.cinematicRationaleBestShot')
+          : tr('lib.autoedit.cinematicRationale'),
       keep: cinematic,
       captions: captionsFor(cinematic),
     },
     {
       id: 'fast',
-      title: '⚡ Fast-paced',
-      rationale: 'Csak a beszéd, csend nélkül, a cél-hosszra vágva.',
+      title: tr('lib.autoedit.fastTitle'),
+      rationale: tr('lib.autoedit.fastRationale'),
       keep: fast,
       captions: captionsFor(fast),
     },

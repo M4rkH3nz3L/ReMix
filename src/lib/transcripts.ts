@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { transcribeToSrt } from '@/lib/render';
@@ -50,10 +51,10 @@ export async function getProjectWordCues(
       continue;
     }
     onProgress?.({
-      phase: 'Szó-szintű átirat',
+      phase: tr('lib.transcripts.wordLevelTranscriptPhase'),
       current: i + 1,
       total: uris.length,
-      unit: 'videó',
+      unit: tr('lib.transcripts.videoUnit'),
     });
     try {
       const cues = parseSrt(await transcribeToSrt(uri, 'word'));
@@ -107,10 +108,10 @@ export async function getTimelineTranscript(
       continue;
     }
     onProgress?.({
-      phase: 'Átirat készítése',
+      phase: tr('lib.transcripts.transcribePhase'),
       current: i + 1,
       total: uniqueUris.length,
-      unit: 'videó',
+      unit: tr('lib.transcripts.videoUnit'),
     });
     try {
       const cues = parseSrt(await transcribeToSrt(uri));

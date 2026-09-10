@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
@@ -33,6 +34,7 @@ const TEXT_COLORS = ['#ffffff', '#ffd166', '#ff2d95', '#00e5ff', '#0b0b18'];
  * kerül képklipként, de a dokumentum megmarad, így bármikor újraszerkeszthető.
  */
 export function ImageDocPanel() {
+  const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const docs = project?.imageDocs;
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -52,11 +54,11 @@ export function ImageDocPanel() {
       return;
     }
     const next = createImageDoc(
-      `Kép ${(docs?.length ?? 0) + 1}`,
+      t('panels.imageDoc.docName', { index: (docs?.length ?? 0) + 1 }),
       project.aspectRatio,
       () => makeId('lyr')
     );
-    commit(next, 'új kép-dokumentum');
+    commit(next, t('panels.imageDoc.undoNewDoc'));
     setActiveId(next.id);
     setSelectedLayer(null);
   };
@@ -79,7 +81,7 @@ export function ImageDocPanel() {
           h: 0.45,
           fit: 'cover',
         };
-        commit(addLayer(doc, l), 'fotó-réteg');
+        commit(addLayer(doc, l), t('panels.imageDoc.undoPhotoLayer'));
         setSelectedLayer(l.id);
       });
       return;
@@ -90,7 +92,7 @@ export function ImageDocPanel() {
         ? {
             kind: 'text',
             id,
-            text: 'Új szöveg',
+            text: t('panels.imageDoc.newTextLayerContent'),
             color: '#ffffff',
             backgroundColor: null,
             fontSize: 8,
@@ -110,7 +112,7 @@ export function ImageDocPanel() {
               fill: '#ff2d95',
               cornerRadius: 0.15,
             };
-    commit(addLayer(doc, l), `${kind}-réteg`);
+    commit(addLayer(doc, l), t('panels.imageDoc.undoAddLayer', { kind }));
     setSelectedLayer(id);
   };
 
@@ -125,8 +127,8 @@ export function ImageDocPanel() {
       const uri = await renderImageDoc(doc);
       if (!uri) {
         Alert.alert(
-          'Kép-dokumentum',
-          'A kirajzolás nem sikerült — fut a worker? (cd server && npm start)'
+          t('panels.imageDoc.renderFailTitle'),
+          t('panels.imageDoc.renderFailMessage')
         );
         return;
       }
@@ -144,11 +146,10 @@ export function ImageDocPanel() {
         { id: makeId('ast'), kind: 'image', uri, provider: 'local', name: doc.name }
       );
       // a friss PNG útja a dokumentumra is felkerül (cache + későbbi frissítés)
-      commit({ ...doc, renderedUri: uri }, 'kép beillesztve');
+      commit({ ...doc, renderedUri: uri }, t('panels.imageDoc.undoImageInserted'));
       Alert.alert(
-        'Kész',
-        `A(z) „${doc.name}" a videósáv végére került képklipként. A réteg-fa ` +
-          'megmaradt: bármikor átszerkesztheted, és újra beillesztheted.'
+        t('common.done'),
+        t('panels.imageDoc.insertedMessage', { name: doc.name })
       );
     } finally {
       setBusy(false);
@@ -161,7 +162,7 @@ export function ImageDocPanel() {
 
   return (
     <View>
-      <PanelSection title="🎨 Kép-dokumentum (rétegek)">
+      <PanelSection title={t('panels.imageDoc.sectionDoc')}>
         <View style={styles.row}>
           {(docs ?? []).map((d) => (
             <Chip
@@ -174,21 +175,16 @@ export function ImageDocPanel() {
               }}
             />
           ))}
-          <Chip label="+ Új dokumentum" active={false} onPress={createDoc} />
+          <Chip label={t('panels.imageDoc.newDocChip')} active={false} onPress={createDoc} />
         </View>
         {!doc ? (
-          <Text style={styles.note}>
-            A kép-dokumentum RÉTEG-FA, nem kész bitmap: háttér, fotó, forma és
-            szöveg egymás fölött, bármikor átrendezhetően. A kirajzolt kép
-            képklipként kerül az idővonalra, de a rétegek megmaradnak — később
-            is átszerkeszthető, nem kell újrakezdeni.
-          </Text>
+          <Text style={styles.note}>{t('panels.imageDoc.emptyNote')}</Text>
         ) : null}
       </PanelSection>
 
       {doc ? (
         <>
-          <PanelSection title="Rétegek (fölül van elöl)">
+          <PanelSection title={t('panels.imageDoc.sectionLayers')}>
             {[...doc.layers].reverse().map((l) => (
               <Pressable
                 key={l.id}
@@ -204,7 +200,7 @@ export function ImageDocPanel() {
                 </Text>
                 <Pressable
                   hitSlop={8}
-                  onPress={() => commit(toggleLayerHidden(doc, l.id), 'réteg láthatóság')}
+                  onPress={() => commit(toggleLayerHidden(doc, l.id), t('panels.imageDoc.undoLayerVisibility'))}
                 >
                   <Ionicons
                     name={l.hidden ? 'eye-off-outline' : 'eye-outline'}
@@ -214,20 +210,20 @@ export function ImageDocPanel() {
                 </Pressable>
                 <Pressable
                   hitSlop={8}
-                  onPress={() => commit(reorderLayer(doc, l.id, 1), 'réteg előrébb')}
+                  onPress={() => commit(reorderLayer(doc, l.id, 1), t('panels.imageDoc.undoLayerForward'))}
                 >
                   <Ionicons name="chevron-up" size={16} color={palette.textDim} />
                 </Pressable>
                 <Pressable
                   hitSlop={8}
-                  onPress={() => commit(reorderLayer(doc, l.id, -1), 'réteg hátrébb')}
+                  onPress={() => commit(reorderLayer(doc, l.id, -1), t('panels.imageDoc.undoLayerBackward'))}
                 >
                   <Ionicons name="chevron-down" size={16} color={palette.textDim} />
                 </Pressable>
                 <Pressable
                   hitSlop={8}
                   onPress={() =>
-                    commit(duplicateLayer(doc, l.id, () => makeId('lyr')), 'réteg duplikálva')
+                    commit(duplicateLayer(doc, l.id, () => makeId('lyr')), t('panels.imageDoc.undoLayerDuplicated'))
                   }
                 >
                   <Ionicons name="copy-outline" size={15} color={palette.textDim} />
@@ -235,7 +231,7 @@ export function ImageDocPanel() {
                 <Pressable
                   hitSlop={8}
                   onPress={() => {
-                    commit(removeLayer(doc, l.id), 'réteg törölve');
+                    commit(removeLayer(doc, l.id), t('panels.imageDoc.undoLayerRemoved'));
                     setSelectedLayer(null);
                   }}
                 >
@@ -244,15 +240,15 @@ export function ImageDocPanel() {
               </Pressable>
             ))}
             <View style={styles.row}>
-              <Chip label="🅰️ Szöveg" active={false} onPress={() => add('text')} />
-              <Chip label="⬛ Forma" active={false} onPress={() => add('shape')} />
-              <Chip label="🖼️ Fotó" active={false} onPress={() => add('photo')} />
-              <Chip label="🎨 Háttér" active={false} onPress={() => add('fill')} />
+              <Chip label={t('panels.imageDoc.addText')} active={false} onPress={() => add('text')} />
+              <Chip label={t('panels.imageDoc.addShape')} active={false} onPress={() => add('shape')} />
+              <Chip label={t('panels.imageDoc.addPhoto')} active={false} onPress={() => add('photo')} />
+              <Chip label={t('panels.imageDoc.addFill')} active={false} onPress={() => add('fill')} />
             </View>
           </PanelSection>
 
           {layer ? (
-            <PanelSection title={`Kijelölt: ${layerLabel(layer)}`}>
+            <PanelSection title={t('panels.imageDoc.sectionSelected', { name: layerLabel(layer) })}>
               {layer.kind === 'text' ? (
                 <>
                   <View style={styles.row}>
@@ -269,7 +265,7 @@ export function ImageDocPanel() {
                     ))}
                   </View>
                   <Stepper
-                    label="Betűméret"
+                    label={t('panels.imageDoc.fontSize')}
                     value={`${layer.fontSize.toFixed(1)}%`}
                     onDec={() =>
                       commit(
@@ -286,21 +282,18 @@ export function ImageDocPanel() {
                       )
                     }
                   />
-                  <Text style={styles.note}>
-                    A szöveg tartalmát a vásznon dupla koppintással írod át,
-                    miután beillesztetted — a dokumentumban a stílus állítható.
-                  </Text>
+                  <Text style={styles.note}>{t('panels.imageDoc.textEditNote')}</Text>
                 </>
               ) : null}
               {layer.kind === 'photo' ? (
                 <View style={styles.row}>
                   <Chip
-                    label="Kitöltés (vág)"
+                    label={t('panels.imageDoc.fitCover')}
                     active={layer.fit !== 'contain'}
                     onPress={() => commit(updateLayer(doc, layer.id, { fit: 'cover' } as never))}
                   />
                   <Chip
-                    label="Belefér"
+                    label={t('panels.imageDoc.fitContain')}
                     active={layer.fit === 'contain'}
                     onPress={() => commit(updateLayer(doc, layer.id, { fit: 'contain' } as never))}
                   />
@@ -322,7 +315,7 @@ export function ImageDocPanel() {
                 </View>
               ) : null}
               <Stepper
-                label="Átlátszóság"
+                label={t('panels.imageDoc.opacity')}
                 value={`${Math.round((layer.opacity ?? 1) * 100)}%`}
                 onDec={() =>
                   commit(
@@ -342,19 +335,15 @@ export function ImageDocPanel() {
             </PanelSection>
           ) : null}
 
-          <PanelSection title="Beillesztés">
+          <PanelSection title={t('panels.imageDoc.sectionInsert')}>
             <PrimaryButton
               icon="image-outline"
-              label={busy ? 'Kirajzolás…' : '🖼️ Kép az idővonalra'}
+              label={busy ? t('panels.imageDoc.rendering') : t('panels.imageDoc.insertButton')}
               onPress={() => {
                 void insertToTimeline();
               }}
             />
-            <Text style={styles.note}>
-              A rétegeket ugyanaz a motor rajzolja, mint az idővonal formáit és
-              feliratait — amit itt beállítasz, pontosan úgy néz ki a videóban
-              is. Minden réteg-művelet visszavonható.
-            </Text>
+            <Text style={styles.note}>{t('panels.imageDoc.insertNote')}</Text>
           </PanelSection>
         </>
       ) : null}

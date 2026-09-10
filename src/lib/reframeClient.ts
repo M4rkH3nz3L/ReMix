@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import {
@@ -81,10 +82,10 @@ export async function buildSmartReframe(
     }
     i++;
     onProgress?.({
-      phase: 'Téma-elemzés',
+      phase: tr('lib.reframeClient.phaseSubjectAnalysis'),
       current: i,
       total: videoClips.length,
-      unit: 'klip',
+      unit: tr('lib.reframeClient.unitClip'),
     });
     const win = sourceWindow(clip);
     const reply = await analyzeClipReframe(clip.uri, win.startSec, win.durationSec);

@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import { create } from 'zustand';
 
 import { makeId } from '@/lib/id';
@@ -39,7 +40,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     const id = makeId('task');
     const tracker = new ProgressTracker();
     trackers.set(id, tracker);
-    tracker.report({ phase: 'Indítás…' });
+    tracker.report({ phase: tr('store.progress.starting') });
     set({
       tasks: [...get().tasks, { id, label, snapshot: tracker.snapshot(), cancel }],
     });

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
@@ -27,24 +28,8 @@ import {
   useEditorStore,
 } from '@/store/editorStore';
 
-const panelTitles: Record<string, string> = {
-  text: 'Szöveg',
-  filter: 'Szűrők',
-  speed: 'Sebesség és hangerő',
-  audio: 'Hang',
-  hotspot: 'Interaktív elem',
-  captions: 'Gyors felirat',
-  sticker: 'Matrica',
-  transition: 'Áttűnés',
-  precision: 'Pontos igazítás',
-  assistant: 'AI-asszisztens',
-  library: 'Médiatár',
-  transcript: 'Átirat-vágó',
-  shape: 'Forma',
-  adjust: 'Grade-réteg',
-  pip: 'PiP-keret',
-  export: 'Exportálás',
-};
+// A panelcímek fordítása a render-helyen történik (nyelvváltásra reagál):
+// t('editor.panelHost.title_' + activePanel)
 
 /**
  * Az aktív szerkesztő-panel.
@@ -60,6 +45,7 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
   const setPanel = useEditorStore((s) => s.setPanel);
   const selected = useEditorStore(selectSelectedClip);
   const L = useLayout();
+  const { t } = useTranslation();
 
   if (!activePanel || !visible) {
     return null;
@@ -148,14 +134,14 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
       {docked ? null : <View style={styles.grabber} />}
       <View style={[styles.header, { paddingHorizontal: L.spacing.lg }]}>
         <Text style={[styles.title, { fontSize: L.font(13) }]}>
-          {panelTitles[activePanel]}
+          {t('editor.panelHost.title_' + activePanel)}
         </Text>
         <Pressable
           onPress={() => setPanel(null)}
           hitSlop={12}
           style={styles.closeButton}
           accessibilityRole="button"
-          accessibilityLabel="Panel bezárása"
+          accessibilityLabel={t('editor.panelHost.closePanel')}
         >
           <Ionicons
             name={docked ? 'close' : 'chevron-down'}

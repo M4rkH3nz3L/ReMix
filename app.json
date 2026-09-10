@@ -59,7 +59,8 @@
           "cameraPermission": "A Remix a videó-felvételhez használja a kamerát.",
           "microphonePermission": "A Remix a videó-felvételhez használja a mikrofont."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

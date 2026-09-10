@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
@@ -9,32 +10,33 @@ import type { ImageClip, TransitionOut, VideoClip } from '@/types/project';
 const STEP = 0.25;
 const MAX_FADE = 2;
 
-const TRANSITIONS: { id: TransitionOut['type']; label: string }[] = [
+const TRANSITIONS: { id: TransitionOut['type'] }[] = [
   // 🧊 3D-jellegű
-  { id: 'zoom', label: '🔍 Zoom-through' },
-  { id: 'spin', label: '🌀 Pörgés' },
-  { id: 'flip', label: '↕️ Billenés' },
-  { id: 'cube', label: '🧊 Kocka' },
-  { id: 'circle', label: '⭕ Kör' },
-  { id: 'dissolve', label: '✨ Feloldás' },
+  { id: 'zoom' },
+  { id: 'spin' },
+  { id: 'flip' },
+  { id: 'cube' },
+  { id: 'circle' },
+  { id: 'dissolve' },
   // 2D — wipe / csúszás
-  { id: 'wipeLeft', label: '⬅️ Wipe balra' },
-  { id: 'wipeRight', label: '➡️ Wipe jobbra' },
-  { id: 'wipeUp', label: '⬆️ Wipe fel' },
-  { id: 'wipeDown', label: '⬇️ Wipe le' },
-  { id: 'slideLeft', label: '⏪ Csúszás balra' },
-  { id: 'slideRight', label: '⏩ Csúszás jobbra' },
+  { id: 'wipeLeft' },
+  { id: 'wipeRight' },
+  { id: 'wipeUp' },
+  { id: 'wipeDown' },
+  { id: 'slideLeft' },
+  { id: 'slideRight' },
   // 2D — stílus
-  { id: 'pixelize', label: '👾 Pixel (glitch)' },
-  { id: 'blur', label: '🌫️ Elmosás' },
-  { id: 'radial', label: '🕐 Radiális' },
-  { id: 'fadeBlack', label: '🎬 Feketén át' },
-  { id: 'fadeWhite', label: '⚪ Fehéren át' },
+  { id: 'pixelize' },
+  { id: 'blur' },
+  { id: 'radial' },
+  { id: 'fadeBlack' },
+  { id: 'fadeWhite' },
 ];
 
 /** Áttűnés feketéből/feketébe a klip szélein — az egymás utáni klipek
  * kimenő+bejövő fade-je együtt adja a vágásponti átúszást. */
 export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
+  const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
 
   const fadeIn = clip.fadeInSec ?? 0;
@@ -43,45 +45,44 @@ export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
 
   return (
     <View>
-      <PanelSection title="Áttűnés">
+      <PanelSection title={t('panels.transition.fadeSectionTitle')}>
         <Stepper
-          label="Bejövő (fade in)"
-          value={fadeIn > 0 ? `${fadeIn.toFixed(2)} mp` : 'nincs'}
+          label={t('panels.transition.fadeIn')}
+          value={fadeIn > 0 ? t('panels.transition.seconds', { value: fadeIn.toFixed(2) }) : t('panels.transition.noneValue')}
           onDec={() => updateClip(clip.id, { fadeInSec: clamp(fadeIn - STEP, 0, MAX_FADE) })}
           onInc={() =>
             updateClip(clip.id, { fadeInSec: clamp(fadeIn + STEP, 0, Math.min(MAX_FADE, half)) })
           }
         />
         <Stepper
-          label="Kimenő (fade out)"
-          value={fadeOut > 0 ? `${fadeOut.toFixed(2)} mp` : 'nincs'}
+          label={t('panels.transition.fadeOut')}
+          value={fadeOut > 0 ? t('panels.transition.seconds', { value: fadeOut.toFixed(2) }) : t('panels.transition.noneValue')}
           onDec={() => updateClip(clip.id, { fadeOutSec: clamp(fadeOut - STEP, 0, MAX_FADE) })}
           onInc={() =>
             updateClip(clip.id, { fadeOutSec: clamp(fadeOut + STEP, 0, Math.min(MAX_FADE, half)) })
           }
         />
         <Text style={styles.note}>
-          Ha az előző klip kimenő és a következő bejövő áttűnést is kap, a vágás
-          lágy átúszásként hat.
+          {t('panels.transition.fadeNote')}
         </Text>
       </PanelSection>
 
-      <PanelSection title="🎬 Átmenet a következő klipre">
+      <PanelSection title={t('panels.transition.nextClipSectionTitle')}>
         <View style={styles.row}>
           <Chip
-            label="Nincs"
+            label={t('common.none')}
             active={!clip.transitionOut}
             onPress={() => updateClip(clip.id, { transitionOut: undefined })}
           />
-          {TRANSITIONS.map((t) => (
+          {TRANSITIONS.map((tr) => (
             <Chip
-              key={t.id}
-              label={t.label}
-              active={clip.transitionOut?.type === t.id}
+              key={tr.id}
+              label={t('panels.transition.type_' + tr.id)}
+              active={clip.transitionOut?.type === tr.id}
               onPress={() =>
                 updateClip(clip.id, {
                   transitionOut: {
-                    type: t.id,
+                    type: tr.id,
                     duration: clip.transitionOut?.duration ?? 0.5,
                   },
                 })
@@ -91,8 +92,8 @@ export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
         </View>
         {clip.transitionOut ? (
           <Stepper
-            label="Hossz"
-            value={`${clip.transitionOut.duration.toFixed(2)} mp`}
+            label={t('panels.transition.length')}
+            value={t('panels.transition.seconds', { value: clip.transitionOut.duration.toFixed(2) })}
             onDec={() =>
               updateClip(clip.id, {
                 transitionOut: {
@@ -112,9 +113,7 @@ export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
           />
         ) : null}
         <Text style={styles.note}>
-          Az átmenet a klip végén indul és a következő klipbe visz át — a
-          renderelt MP4-ben ég be (az előnézet vágásként mutatja), az időzítés
-          nem csúszik el.
+          {t('panels.transition.nextClipNote')}
         </Text>
       </PanelSection>
     </View>

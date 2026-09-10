@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import type { AspectRatio, ImageDoc, ImageLayer } from '@/types/project';
 
 /**
@@ -22,7 +24,14 @@ export function createImageDoc(
     name,
     aspectRatio,
     // induláskor egy sötét háttér, hogy a vászon ne legyen áttetsző-üres
-    layers: [{ kind: 'fill', id: makeId(), name: 'Háttér', fill: '#12121a' }],
+    layers: [
+      {
+        kind: 'fill',
+        id: makeId(),
+        name: tr('lib.imageDoc.defaultBackgroundName'),
+        fill: '#12121a',
+      },
+    ],
   };
 }
 
@@ -107,17 +116,19 @@ export function layerLabel(layer: ImageLayer): string {
   }
   switch (layer.kind) {
     case 'fill':
-      return layer.fillGradient ? 'Gradiens háttér' : 'Színes háttér';
+      return layer.fillGradient
+        ? tr('lib.imageDoc.layerLabelGradientBackground')
+        : tr('lib.imageDoc.layerLabelColorBackground');
     case 'photo':
-      return 'Fotó';
+      return tr('lib.imageDoc.layerLabelPhoto');
     case 'text':
-      return layer.text.trim().slice(0, 24) || 'Szöveg';
+      return layer.text.trim().slice(0, 24) || tr('lib.imageDoc.layerLabelText');
     case 'shape':
       return layer.imageUri
-        ? 'Logó / kép'
+        ? tr('lib.imageDoc.layerLabelLogoImage')
         : layer.shape === 'path'
-          ? 'Rajz'
-          : `Forma (${layer.shape})`;
+          ? tr('lib.imageDoc.layerLabelDrawing')
+          : tr('lib.imageDoc.layerLabelShape', { shape: layer.shape });
   }
 }
 

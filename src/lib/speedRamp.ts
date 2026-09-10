@@ -23,11 +23,11 @@ export const SPEED_RAMP_PRESETS: {
   label: string;
   curve: number[];
 }[] = [
-  { id: 'hero', label: '🦸 Hero', curve: [1.6, 1.2, 0.45, 0.45, 1.2, 1.6] },
-  { id: 'bullet', label: '🔫 Bullet time', curve: [1.5, 1.5, 0.25, 0.25, 1.5, 1.5] },
-  { id: 'montage', label: '🎞️ Montázs', curve: [0.65, 0.85, 1.1, 1.5, 2.1] },
-  { id: 'flashIn', label: '⚡ Berántás', curve: [3, 1.7, 0.95, 0.8, 0.8] },
-  { id: 'easeOut', label: '🐢 Lassú zárás', curve: [1.8, 1.3, 0.95, 0.65, 0.5] },
+  { id: 'hero', label: 'lib.speedRamp.presetHero', curve: [1.6, 1.2, 0.45, 0.45, 1.2, 1.6] },
+  { id: 'bullet', label: 'lib.speedRamp.presetBullet', curve: [1.5, 1.5, 0.25, 0.25, 1.5, 1.5] },
+  { id: 'montage', label: 'lib.speedRamp.presetMontage', curve: [0.65, 0.85, 1.1, 1.5, 2.1] },
+  { id: 'flashIn', label: 'lib.speedRamp.presetFlashIn', curve: [3, 1.7, 0.95, 0.8, 0.8] },
+  { id: 'easeOut', label: 'lib.speedRamp.presetEaseOut', curve: [1.8, 1.3, 0.95, 0.65, 0.5] },
 ];
 
 /**

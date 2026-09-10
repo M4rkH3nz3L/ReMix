@@ -15,12 +15,12 @@ export type PhotoAnimPreset =
   | 'floating';
 
 export const PHOTO_ANIM_PRESETS: { id: PhotoAnimPreset; label: string }[] = [
-  { id: 'kenburns', label: 'Ken Burns' },
-  { id: 'zoomIn', label: 'Zoom be' },
-  { id: 'zoomOut', label: 'Zoom ki' },
-  { id: 'panLeft', label: 'Pan ←' },
-  { id: 'panRight', label: 'Pan →' },
-  { id: 'floating', label: 'Lebegés' },
+  { id: 'kenburns', label: 'lib.photoAnim.kenburns' },
+  { id: 'zoomIn', label: 'lib.photoAnim.zoomIn' },
+  { id: 'zoomOut', label: 'lib.photoAnim.zoomOut' },
+  { id: 'panLeft', label: 'lib.photoAnim.panLeft' },
+  { id: 'panRight', label: 'lib.photoAnim.panRight' },
+  { id: 'floating', label: 'lib.photoAnim.floating' },
 ];
 
 /** preset → kulcskockák a klip hosszára (mp) */

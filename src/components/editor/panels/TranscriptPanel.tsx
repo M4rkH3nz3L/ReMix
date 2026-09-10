@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PanelSection, PrimaryButton } from '@/components/ui/controls';
@@ -24,6 +25,7 @@ const MAX_WORDS = 800;
  * A szó-szintű átirat fájlonként cache-elt, a worker Whisperje készíti.
  */
 export function TranscriptPanel() {
+  const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
@@ -38,17 +40,17 @@ export function TranscriptPanel() {
     if (!state.project || status) {
       return;
     }
-    setStatus('Szó-szintű átirat…');
+    setStatus(t('panels.transcript.wordLevelStatus'));
     try {
-      const cues = await withProgress('Szó-szintű átirat', (report) =>
+      const cues = await withProgress(t('panels.transcript.wordLevelProgress'), (report) =>
         getProjectWordCues(state.project!, report)
       );
       setCuesByUri(cues);
       if (cues.size === 0) {
         setApplied(
           Platform.OS === 'web'
-            ? 'Az átirat a natív appból érhető el (iOS/Android).'
-            : 'Nincs átírható beszéd — fut a worker? (cd server && npm start)'
+            ? t('panels.transcript.webOnly')
+            : t('panels.transcript.noSpeech')
         );
       }
     } finally {
@@ -83,18 +85,20 @@ export function TranscriptPanel() {
     const ranges = selectedWordRanges(words, selected);
     const plan = buildRangeCutPlan(state.project, ranges);
     if (!plan) {
-      Alert.alert('Szöveg-vágás', 'A kijelölt szavak nem vághatók ki (túl rövid darabok).');
+      Alert.alert(t('panels.transcript.textCutTitle'), t('panels.transcript.textCutTooShort'));
       return;
     }
     const seconds = selectedSeconds(words, selected);
     Alert.alert(
-      'Kijelölt szavak törlése',
-      `${selected.size} szó (−${seconds.toFixed(1)} mp) kivágása a videóból.\n\n` +
-        'A videósáv hézag nélkül újraépül (ripple). A művelet visszavonható.',
+      t('panels.transcript.deleteSelectedTitle'),
+      t('panels.transcript.deleteSelectedMessage', {
+        count: selected.size,
+        seconds: seconds.toFixed(1),
+      }),
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Törlés',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             const ok = useEditorStore
@@ -106,8 +110,11 @@ export function TranscriptPanel() {
             setSelected(new Set());
             setApplied(
               ok
-                ? `${plan.cuts} vágás, −${plan.removedSeconds.toFixed(1)} mp — visszavonható.`
-                : 'Nem sikerült alkalmazni.'
+                ? t('panels.transcript.cutResult', {
+                    cuts: plan.cuts,
+                    seconds: plan.removedSeconds.toFixed(1),
+                  })
+                : t('panels.transcript.applyFailed')
             );
           },
         },
@@ -118,19 +125,19 @@ export function TranscriptPanel() {
   return (
     <View>
       {words.length === 0 ? (
-        <PanelSection title="Átirat">
+        <PanelSection title={t('panels.transcript.title')}>
           <PrimaryButton
             icon="mic-outline"
-            label={status ?? 'Átirat készítése a beszédből'}
+            label={status ?? t('panels.transcript.createFromSpeech')}
             onPress={() => {
-              load().catch((err: Error) => Alert.alert('Átirat', err.message));
+              load().catch((err: Error) => Alert.alert(t('panels.transcript.title'), err.message));
             }}
           />
           {applied ? <Text style={styles.note}>{applied}</Text> : null}
         </PanelSection>
       ) : (
         <>
-          <PanelSection title="Szerkesztés szövegből">
+          <PanelSection title={t('panels.transcript.editFromText')}>
             <View style={styles.words}>
               {shown.map((w, i) => {
                 const isSelected = selected.has(i);
@@ -156,38 +163,35 @@ export function TranscriptPanel() {
             </View>
             {words.length > MAX_WORDS ? (
               <Text style={styles.note}>
-                Csak az első {MAX_WORDS} szó látszik ({words.length}-ból).
+                {t('panels.transcript.truncated', { max: MAX_WORDS, total: words.length })}
               </Text>
             ) : null}
           </PanelSection>
 
           <PrimaryButton
             icon="remove-circle-outline"
-            label="Töltelékszavak kijelölése (ööö, umm…)"
+            label={t('panels.transcript.selectFillers')}
             onPress={() => {
               const fillers = findFillerWords(words);
               if (fillers.length === 0) {
-                setApplied('Nem találtam töltelékszót. 🎉');
+                setApplied(t('panels.transcript.noFillers'));
                 return;
               }
               setSelected(new Set(fillers));
               setApplied(
-                `${fillers.length} töltelékszó kijelölve — nézd át, aztán töröld.`
+                t('panels.transcript.fillersSelected', { count: fillers.length })
               );
             }}
           />
           {selected.size > 0 ? (
             <PrimaryButton
               icon="cut-outline"
-              label={`${selected.size} szó törlése a videóból`}
+              label={t('panels.transcript.deleteWordsButton', { count: selected.size })}
               onPress={removeSelected}
             />
           ) : null}
           {applied ? <Text style={styles.note}>{applied}</Text> : null}
-          <Text style={styles.note}>
-            Koppints a szavakra a kijelöléshez (a lejátszófej odaugrik) — a törlés
-            ripple-vágásként fut le, és visszavonható.
-          </Text>
+          <Text style={styles.note}>{t('panels.transcript.tapHint')}</Text>
         </>
       )}
     </View>

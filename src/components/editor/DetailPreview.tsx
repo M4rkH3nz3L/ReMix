@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
@@ -23,6 +24,7 @@ import { withProgress } from '@/store/progressStore';
  * végleges minőség — így az iteráció gyors marad.
  */
 export function DetailPreview() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<string | null>(null);
   const [uri, setUri] = useState<string | null>(null);
   const [range, setRange] = useState<{ from: number; to: number } | null>(null);
@@ -44,22 +46,22 @@ export function DetailPreview() {
     }
     const total = projectDuration(state.project);
     if (total <= 0) {
-      Alert.alert('Részlet-előnézet', 'Előbb tegyél tartalmat az idővonalra.');
+      Alert.alert(t('editor.detailPreview.title'), t('editor.detailPreview.emptyTimeline'));
       return;
     }
     const win = windowAround(state.playhead, total);
     const slice = buildPreviewWindow(state.project, win.from, win.to);
     if (!slice) {
       Alert.alert(
-        'Részlet-előnézet',
-        'Ezen a szakaszon nincs renderelni való — állítsd a lejátszófejet tartalomra.'
+        t('editor.detailPreview.title'),
+        t('editor.detailPreview.nothingToRender')
       );
       return;
     }
-    setStatus('Előkészítés…');
+    setStatus(t('editor.detailPreview.preparing'));
     setRange(win);
     try {
-      const file = await withProgress('Részlet-előnézet', (report) =>
+      const file = await withProgress(t('editor.detailPreview.title'), (report) =>
         renderMp4(
           slice,
           (u) => {
@@ -71,7 +73,7 @@ export function DetailPreview() {
       );
       setUri(file.uri);
     } catch (err) {
-      Alert.alert('Részlet-előnézet', (err as Error).message);
+      Alert.alert(t('editor.detailPreview.title'), (err as Error).message);
     } finally {
       setStatus(null);
     }
@@ -108,7 +110,7 @@ export function DetailPreview() {
         <View style={styles.backdrop}>
           <View style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.title}>🎬 Részlet-előnézet</Text>
+              <Text style={styles.title}>{t('editor.detailPreview.titleWithIcon')}</Text>
               <Pressable onPress={close} hitSlop={8}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
@@ -118,14 +120,13 @@ export function DetailPreview() {
             ) : null}
             <Text style={styles.note}>
               {range
-                ? `${formatTime(range.from)} – ${formatTime(range.to)} · valódi render 480p-ben`
+                ? t('editor.detailPreview.rangeNote', {
+                    from: formatTime(range.from),
+                    to: formatTime(range.to),
+                  })
                 : ''}
             </Text>
-            <Text style={styles.note}>
-              Itt látszanak azok a hatások, amiket az élő előnézet nem tud
-              mutatni: részecskék, mozgás-elmosás, égcsere, 3D matricák és
-              szöveg, arc-elmosás, átmenetek.
-            </Text>
+            <Text style={styles.note}>{t('editor.detailPreview.effectsNote')}</Text>
           </View>
         </View>
       </Modal>

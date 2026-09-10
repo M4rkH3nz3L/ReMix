@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DetailPreview } from '@/components/editor/DetailPreview';
@@ -14,6 +15,7 @@ import type { Marker } from '@/types/project';
 const EMPTY_MARKERS: Marker[] = [];
 
 export function TransportBar() {
+  const { t } = useTranslation();
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const loop = useEditorStore((s) => s.loop);
@@ -40,10 +42,10 @@ export function TransportBar() {
       return;
     }
     if (nearMarker) {
-      Alert.alert('Jelölő', `„${nearMarker.label}" törlése?`, [
-        { text: 'Mégse', style: 'cancel' },
+      Alert.alert(t('editor.transportBar.markerTitle'), t('editor.transportBar.deleteMarkerConfirm', { label: nearMarker.label }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Törlés',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () =>
             state.dispatch({
@@ -54,7 +56,7 @@ export function TransportBar() {
       ]);
       return;
     }
-    const defaultLabel = `Jelölő ${markers.length + 1}`;
+    const defaultLabel = t('editor.transportBar.defaultMarkerLabel', { number: markers.length + 1 });
     const add = (label?: string) =>
       state.dispatch({
         type: 'SET_MARKERS',
@@ -69,12 +71,11 @@ export function TransportBar() {
       return;
     }
     Alert.prompt(
-      'Új jelölő',
-      `A lejátszófejnél (${formatTime(playhead)}). A jelölők a vonalzón látszanak, ` +
-        'a klip-húzás rájuk snappel, és a projekttel mentődnek.',
+      t('editor.transportBar.newMarkerTitle'),
+      t('editor.transportBar.newMarkerMessage', { time: formatTime(playhead) }),
       [
-        { text: 'Mégse', style: 'cancel' },
-        { text: 'Hozzáadás', onPress: (label?: string) => add(label) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.add'), onPress: (label?: string) => add(label) },
       ],
       'plain-text',
       defaultLabel

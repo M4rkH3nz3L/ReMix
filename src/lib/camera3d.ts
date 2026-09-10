@@ -10,11 +10,11 @@ import type { ClipKeyframes, Tilt3D } from '@/types/project';
 export type CameraPreset = 'pushIn' | 'pushOut' | 'dramaticZoom' | 'orbit' | 'hero';
 
 export const CAMERA_PRESETS: { id: CameraPreset; label: string }[] = [
-  { id: 'pushIn', label: '🎥 Push in' },
-  { id: 'pushOut', label: '🎥 Push out' },
-  { id: 'dramaticZoom', label: '⚡ Drámai zoom' },
-  { id: 'orbit', label: '🔄 Orbit' },
-  { id: 'hero', label: '🦸 Hero' },
+  { id: 'pushIn', label: 'lib.cameraPreset.pushIn' },
+  { id: 'pushOut', label: 'lib.cameraPreset.pushOut' },
+  { id: 'dramaticZoom', label: 'lib.cameraPreset.dramaticZoom' },
+  { id: 'orbit', label: 'lib.cameraPreset.orbit' },
+  { id: 'hero', label: 'lib.cameraPreset.hero' },
 ];
 
 export interface CameraMove {

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Linking,
   Modal,
@@ -32,6 +33,7 @@ export default function PlayerScreen() {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setPlaying = useEditorStore((s) => s.setPlaying);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
+  const { t } = useTranslation();
 
   const [quiz, setQuiz] = useState<InteractiveClip | null>(null);
   const [answered, setAnswered] = useState<number | null>(null);
@@ -161,11 +163,11 @@ export default function PlayerScreen() {
                   <>
                     <Text style={styles.quizResult}>
                       {quiz.action.correctIndex === answered
-                        ? 'Helyes válasz! 🎉'
-                        : 'Nem talált — nézd meg a helyes választ!'}
+                        ? t('playerScreen.quizCorrect')
+                        : t('playerScreen.quizWrong')}
                     </Text>
                     <Pressable onPress={closeQuiz} style={styles.quizContinue}>
-                      <Text style={styles.quizContinueText}>Tovább</Text>
+                      <Text style={styles.quizContinueText}>{t('playerScreen.quizContinue')}</Text>
                     </Pressable>
                   </>
                 ) : null}

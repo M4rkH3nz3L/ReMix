@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { uploadFetch } from '@/lib/upload';
@@ -67,10 +68,10 @@ export async function indexProjectVision(
   const entriesByUri = new Map<string, VisionEntry[]>();
   for (let i = 0; i < uris.length; i++) {
     onProgress?.({
-      phase: 'Vizuális index',
+      phase: tr('lib.visionSearch.phaseVisualIndex'),
       current: i + 1,
       total: uris.length,
-      unit: 'videó',
+      unit: tr('lib.visionSearch.unitVideo'),
     });
     const uri = uris[i];
     const clip = videoClips.find((c) => c.uri === uri)!;

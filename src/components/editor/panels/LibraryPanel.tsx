@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PanelSection } from '@/components/ui/controls';
@@ -51,6 +52,7 @@ function loadingStates(providers: StorageProvider[]): Record<string, ProviderSta
 }
 
 export function LibraryPanel() {
+  const { t } = useTranslation();
   const addClip = useEditorStore((s) => s.addClip);
   // a beépített providerekkel indulunk; a távoli források betöltés után jönnek
   const [providers, setProviders] = useState<StorageProvider[]>(storageProviders);
@@ -74,7 +76,7 @@ export function LibraryPanel() {
     setImportBusy(kind);
     setImportErr(null);
     const atSec = kind === 'image' ? parseFloat(imgSec) || 1 : undefined;
-    withProgress(`Import linkből — ${kind}`, (report) =>
+    withProgress(t('panels.library.importFromLinkProgress', { kind }), (report) =>
       importYouTubeMedia(u, kind, atSec, report)
     )
       .then((m) => {
@@ -90,7 +92,7 @@ export function LibraryPanel() {
           kind: m.kind,
           uri: m.uri,
           provider: 'local' as const,
-          name: `URL ${kind}`,
+          name: t('panels.library.urlAssetName', { kind }),
           duration: m.duration || undefined,
           width: m.width,
           height: m.height,
@@ -104,7 +106,7 @@ export function LibraryPanel() {
               start: playhead,
               duration: m.duration || 10,
               uri: m.uri,
-              label: 'URL hang',
+              label: t('panels.library.urlAudioLabel'),
               volume: 1,
               fadeIn: 0,
               fadeOut: 0,
@@ -151,7 +153,7 @@ export function LibraryPanel() {
         if (isProRequiredError(e)) {
           usePaywall.getState().open(e.capability);
         } else {
-          setImportErr(e.message || 'Az import nem sikerült.');
+          setImportErr(e.message || t('panels.library.importFailed'));
         }
       })
       .finally(() => setImportBusy(null));
@@ -279,7 +281,7 @@ export function LibraryPanel() {
       .catch(() => {
         setStates((prev) => ({
           ...prev,
-          [provider.id]: { state: 'error', message: 'A letöltés nem sikerült.' },
+          [provider.id]: { state: 'error', message: t('panels.library.downloadFailed') },
         }));
       })
       .finally(() => setBusyId(null));
@@ -291,11 +293,11 @@ export function LibraryPanel() {
 
   return (
     <View style={{ gap: 4 }}>
-      <PanelSection title="🔗 Import linkből (YouTube, TikTok…)">
+      <PanelSection title={t('panels.library.importSectionTitle')}>
         <TextInput
           value={url}
           onChangeText={setUrl}
-          placeholder="YouTube / TikTok videó URL…"
+          placeholder={t('panels.library.urlPlaceholder')}
           placeholderTextColor={palette.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -304,9 +306,9 @@ export function LibraryPanel() {
         <View style={styles.importRow}>
           {(
             [
-              { kind: 'video', icon: 'videocam-outline', label: 'Videó' },
-              { kind: 'audio', icon: 'musical-notes-outline', label: 'Hang' },
-              { kind: 'image', icon: 'image-outline', label: 'Kép' },
+              { kind: 'video', icon: 'videocam-outline' },
+              { kind: 'audio', icon: 'musical-notes-outline' },
+              { kind: 'image', icon: 'image-outline' },
             ] as const
           ).map((b) => (
             <Pressable
@@ -320,12 +322,12 @@ export function LibraryPanel() {
               ) : (
                 <Ionicons name={b.icon} size={16} color={palette.accent} />
               )}
-              <Text style={styles.importBtnText}>{b.label}</Text>
+              <Text style={styles.importBtnText}>{t('panels.library.importKind_' + b.kind)}</Text>
             </Pressable>
           ))}
         </View>
         <View style={styles.importRow}>
-          <Text style={styles.note}>Kép ideje (mp):</Text>
+          <Text style={styles.note}>{t('panels.library.imageTimeLabel')}</Text>
           <TextInput
             value={imgSec}
             onChangeText={setImgSec}
@@ -336,16 +338,13 @@ export function LibraryPanel() {
           />
         </View>
         {importErr ? <Text style={styles.errText}>{importErr}</Text> : null}
-        <Text style={styles.note}>
-          A teljes videó, csak a hang (zene-sávra), vagy egy képkocka tölthető le
-          — a workeren (yt-dlp). Csak jogtiszta/saját tartalommal használd.
-        </Text>
+        <Text style={styles.note}>{t('panels.library.importHint')}</Text>
       </PanelSection>
 
       <TextInput
         value={filter}
         onChangeText={setFilter}
-        placeholder="🔎 Keresés a Tárban (fájlnév)…"
+        placeholder={t('panels.library.searchPlaceholder')}
         placeholderTextColor={palette.textDim}
         style={styles.search}
       />
@@ -360,9 +359,7 @@ export function LibraryPanel() {
             {st.state === 'loading' ? (
               <ActivityIndicator color={palette.accent} />
             ) : st.state === 'offline' ? (
-              <Text style={styles.note}>
-                A worker nem érhető el — indítsd el: cd server && npm start
-              </Text>
+              <Text style={styles.note}>{t('panels.library.workerOffline')}</Text>
             ) : st.state === 'error' ? (
               <Text style={styles.note}>{st.message}</Text>
             ) : visible.length === 0 ? (
@@ -404,7 +401,7 @@ export function LibraryPanel() {
       })}
       <Pressable onPress={load} style={styles.refresh}>
         <Ionicons name="refresh-outline" size={14} color={palette.textDim} />
-        <Text style={styles.refreshText}>Frissítés</Text>
+        <Text style={styles.refreshText}>{t('panels.library.refresh')}</Text>
       </Pressable>
     </View>
   );

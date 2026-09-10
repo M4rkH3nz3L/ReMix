@@ -16,6 +16,7 @@
  * simítja, hogy ne ugráljon. Ha még nincs elég adat, inkább NEM mutat ETA-t,
  * mint hogy hazudjon egyet.
  */
+import { t as tr } from 'i18next';
 
 export interface ProgressUpdate {
   /** mit csinál épp — a felhasználónak mutatott fázisnév */
@@ -172,18 +173,20 @@ export function formatEta(sec: number | null): string | null {
   }
   const s = Math.round(sec);
   if (s < 5) {
-    return 'mindjárt kész';
+    return tr('lib.progress.etaAlmostDone');
   }
   if (s < 60) {
-    return `~${s} mp`;
+    return tr('lib.progress.etaSeconds', { seconds: s });
   }
   const m = Math.floor(s / 60);
   const rest = s % 60;
   if (m < 60) {
-    return rest > 0 ? `~${m} p ${rest} mp` : `~${m} p`;
+    return rest > 0
+      ? tr('lib.progress.etaMinutesSeconds', { minutes: m, seconds: rest })
+      : tr('lib.progress.etaMinutes', { minutes: m });
   }
   const h = Math.floor(m / 60);
-  return `~${h} ó ${m % 60} p`;
+  return tr('lib.progress.etaHoursMinutes', { hours: h, minutes: m % 60 });
 }
 
 /** „3/8 klip" alakú darabszám-jelzés (ha van). */

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { memo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -11,6 +12,7 @@ import { maxVideoDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, TrackType } from '@/types/project';
+import type { TFunction } from 'i18next';
 
 interface Props {
   clip: Clip;
@@ -23,26 +25,28 @@ interface Props {
   multiSelected?: boolean;
 }
 
-function clipLabel(clip: Clip): string {
+function clipLabel(clip: Clip, t: TFunction): string {
   switch (clip.kind) {
     case 'video':
-      return clip.speed !== 1 ? `Videó ${clip.speed}×` : 'Videó';
+      return clip.speed !== 1
+        ? t('editor.timelineClip.videoSpeed', { speed: clip.speed })
+        : t('editor.timelineClip.video');
     case 'image':
-      return 'Kép';
+      return t('editor.timelineClip.image');
     case 'text':
-      return clip.text || 'Szöveg';
+      return clip.text || t('editor.timelineClip.text');
     case 'audio':
-      return clip.label || 'Hang';
+      return clip.label || t('editor.timelineClip.audio');
     case 'interactive':
-      return clip.label || 'Hotspot';
+      return clip.label || t('editor.timelineClip.hotspot');
     case 'shape':
       return clip.shape === 'ellipse'
-        ? 'Ellipszis'
+        ? t('editor.timelineClip.ellipse')
         : clip.shape === 'line'
-          ? 'Vonal'
-          : 'Téglalap';
+          ? t('editor.timelineClip.line')
+          : t('editor.timelineClip.rectangle');
     case 'adjust':
-      return 'Grade';
+      return t('editor.timelineClip.grade');
   }
 }
 
@@ -63,6 +67,7 @@ function TimelineClipInner({
   selected,
   multiSelected,
 }: Props) {
+  const { t } = useTranslation();
   const selectClip = useEditorStore((s) => s.selectClip);
   const toggleMultiSelect = useEditorStore((s) => s.toggleMultiSelect);
   const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
@@ -281,7 +286,7 @@ function TimelineClipInner({
             clip.kind === 'audio' ? styles.labelAudio : null,
           ]}
         >
-          {clipLabel(clip)}
+          {clipLabel(clip, t)}
         </Text>
         {selected ? (
           <>

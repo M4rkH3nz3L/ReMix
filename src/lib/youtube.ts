@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
 import { makeId } from '@/lib/id';
@@ -48,7 +49,7 @@ export async function importYouTubeMedia(
   const base = ensureCloud('urlImport');
   // a szerver-oldali kinyerés hossza nem mérhető előre (yt-dlp), ezért ez a
   // fázis határozatlan — de a felhasználó legalább látja, MI történik épp
-  onProgress?.({ phase: 'Kinyerés a forrásból' });
+  onProgress?.({ phase: tr('lib.youtube.phaseExtract') });
   const res = await fetch(`${base}/youtube`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -56,7 +57,7 @@ export async function importYouTubeMedia(
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error ?? 'Az import nem sikerült.');
+    throw new Error(body.error ?? tr('lib.youtube.importFailed'));
   }
   const ext = (body.name as string).split('.').pop() || 'mp4';
   const dir = new Directory(Paths.document, 'media');
@@ -66,9 +67,9 @@ export async function importYouTubeMedia(
     /* már létezik */
   }
   const target = new File(dir, `yt_${makeId('m')}.${ext}`);
-  onProgress?.({ phase: 'Letöltés az eszközre' });
+  onProgress?.({ phase: tr('lib.youtube.phaseDownload') });
   await File.downloadFileAsync(`${base}/youtube/${body.id}/${body.name}`, target);
-  onProgress?.({ phase: 'Kész', ratio: 1 });
+  onProgress?.({ phase: tr('lib.youtube.phaseDone'), ratio: 1 });
   return {
     uri: target.uri,
     kind: body.kind,

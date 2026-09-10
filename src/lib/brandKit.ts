@@ -1,3 +1,5 @@
+import { t as tr } from 'i18next';
+
 import type {
   Clip,
   Project,
@@ -174,13 +176,18 @@ export function buildWatermarkClip(
 export function describeBrandKit(kit: BrandKit): string {
   const parts: string[] = [];
   if (kit.caption) {
-    parts.push(`felirat: ${kit.caption.stylePreset}/${kit.caption.animation}`);
+    parts.push(
+      tr('lib.brandKit.captionSummary', {
+        preset: kit.caption.stylePreset,
+        animation: kit.caption.animation,
+      })
+    );
   }
   if (kit.watermark) {
-    parts.push('vízjel ✓');
+    parts.push(tr('lib.brandKit.watermarkSummary'));
   }
   if (kit.accentColor) {
-    parts.push(`szín: ${kit.accentColor}`);
+    parts.push(tr('lib.brandKit.colorSummary', { color: kit.accentColor }));
   }
   return parts.join(' · ');
 }

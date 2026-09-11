@@ -142,6 +142,8 @@ interface EditorState {
    * Az AI is ezt használja (actor: 'ai'). false = érvénytelen/no-op.
    */
   dispatch: (command: EditorCommand, actor?: EventActor) => boolean;
+  /** több command EGY undo-lépésként (pl. teljes AI-köteg → egy visszavonás, #57) */
+  applyBatch: (commands: EditorCommand[], actor?: EventActor) => number;
   addClip: (trackType: TrackType, clip: Clip, asset?: Asset) => void;
   updateClip: (clipId: string, patch: Partial<Clip>) => void;
   removeClip: (clipId: string) => void;
@@ -314,6 +316,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       events: [...events.slice(-EVENT_LIMIT + 1), event],
     });
     return true;
+  },
+
+  applyBatch: (commands, actor = 'ai') => {
+    const { project, past, events } = get();
+    if (!project) {
+      return 0;
+    }
+    let cur = project;
+    const batchEvents: ProjectEvent[] = [];
+    for (const command of commands) {
+      const next = applyCommand(cur, command);
+      if (next !== null) {
+        cur = next;
+        batchEvents.push({ id: makeId('evt'), at: new Date().toISOString(), actor, command });
+      }
+    }
+    if (batchEvents.length === 0) {
+      return 0;
+    }
+    // EGYETLEN pre-batch pillanatkép a history-ba → egy undo visszavonja az egészet
+    set({
+      project: cur,
+      past: [...past.slice(-HISTORY_LIMIT + 1), project],
+      future: [],
+      dirty: true,
+      events: [...events, ...batchEvents].slice(-EVENT_LIMIT),
+    });
+    return batchEvents.length;
   },
 
   addClip: (trackType, clip, asset) => {

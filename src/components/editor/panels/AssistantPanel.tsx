@@ -1294,13 +1294,8 @@ export function AssistantPanel() {
     }
     // proveniencia (#34): az AI-hozzáadott elemek megkapják az AI indoklását
     const commands = toEditorCommands(reply.commands, reply.message);
-    const state = useEditorStore.getState();
-    let ok = 0;
-    for (const command of commands) {
-      if (state.dispatch(command, 'ai')) {
-        ok += 1;
-      }
-    }
+    // #57 smart undo: a teljes AI-köteg EGY undo-lépés (nem parancsonként külön)
+    const ok = useEditorStore.getState().applyBatch(commands, 'ai');
     setReply(null);
     setInstruction('');
     setApplied(

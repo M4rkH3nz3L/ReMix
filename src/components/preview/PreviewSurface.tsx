@@ -81,6 +81,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
+  const focusMode = useEditorStore((s) => s.focusMode);
   const selectClip = useEditorStore((s) => s.selectClip);
   const updateClip = useEditorStore((s) => s.updateClip);
   const drawBrush = useEditorStore((s) => s.drawBrush);
@@ -698,6 +699,23 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           {/* 🎬 átmenet-előnézet: a klip-átmenet ablakában a következő klip beúszik
               (kereszttűnés/csúszás közelítés — a pontos xfade a renderben) */}
           <TransitionLayer box={box} />
+
+          {/* 🎯 fókusz mód (#27): diszkrét overlay szerkesztésekor a base média
+              elhalványul, hogy a szerkesztett elem kiemelkedjen (a scrim a média
+              fölött, de az overlay-k ALATT van) */}
+          {(() => {
+            const selTrack =
+              project && selectedClipId ? findClip(project, selectedClipId)?.track.type : undefined;
+            const overlayTracks = ['text', 'captions', 'overlay', 'interactive', 'pip'];
+            const dimBase =
+              mode === 'edit' && focusMode && !!selTrack && overlayTracks.includes(selTrack);
+            return dimBase ? (
+              <View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: 0.5 }]}
+              />
+            ) : null;
+          })()}
 
           {textClips.map((clip) => (
             <TextOverlay

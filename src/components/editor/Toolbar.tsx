@@ -5,6 +5,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
+import { SelectionInfo } from '@/components/editor/SelectionInfo';
 import { ToolButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { captureFrame } from '@/lib/captureFrame';
@@ -187,7 +188,9 @@ export function Toolbar() {
       duration: 3,
       label: 'Hotspot',
       rect: { x: 0.35, y: 0.4, w: 0.3, h: 0.2 },
-      action: { type: 'url', url: 'https://' },
+      // üres URL: a panel placeholderje (https://…) vezeti a felhasználót, és a
+      // validáció addig üres/érvénytelen linknek jelzi, míg valódi címet nem ad meg
+      action: { type: 'url', url: '' },
     });
     setPanel('hotspot');
   };
@@ -340,6 +343,8 @@ export function Toolbar() {
 
   return (
     <View style={styles.container}>
+      {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
+      <SelectionInfo />
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {selected ? (
           <>
@@ -485,6 +490,8 @@ export function Toolbar() {
                         const s = useEditorStore.getState();
                         s.addClip('video', result.clip, result.asset);
                         s.selectClip(result.clip.id);
+                        // frissen elkapott kockát rögtön a Kép Stúdióban nyitjuk
+                        s.openImageStudio(result.clip.id);
                       })
                       .catch(() =>
                         Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureFailed'))

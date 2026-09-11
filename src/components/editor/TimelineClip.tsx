@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
@@ -73,7 +73,12 @@ function TimelineClipInner({
   const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   // 🔒 zárolt sávon a klip nem mozgatható/trimmelhető/kijelölhető
   const locked = useEditorStore((s) => s.lockedTracks.includes(trackType));
+  const toggleTrackFlag = useEditorStore((s) => s.toggleTrackFlag);
   const updateClip = useEditorStore((s) => s.updateClip);
+  // 🎯 fókusz mód: ha van kijelölés és ez NEM az, halványabb (kiemeli az aktívat)
+  const focusMode = useEditorStore((s) => s.focusMode);
+  const hasSelection = useEditorStore((s) => s.selectedClipId != null);
+  const dimmed = focusMode && hasSelection && !selected && !multiSelected;
 
   const moveDX = useSharedValue(0);
   const leftDelta = useSharedValue(0);
@@ -177,6 +182,15 @@ function TimelineClipInner({
   // kijelölésre (a köteg ilyenkor elévül — lásd selectClip a store-ban)
   const handleTap = () => {
     if (locked) {
+      // néma no-op helyett: elmondjuk, MIÉRT nem történik semmi + feloldás egy koppintással
+      Alert.alert(
+        t('editor.timelineClip.lockedTitle'),
+        t('editor.timelineClip.lockedBody', { track: t('editor.track.' + trackType) }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('editor.timeline.unlock'), onPress: () => toggleTrackFlag(trackType, 'lock') },
+        ]
+      );
       return;
     }
     if (multiSelectMode) {
@@ -256,8 +270,8 @@ function TimelineClipInner({
                 ? palette.accent
                 : `${color}aa`,
             borderWidth: selected || multiSelected ? 2 : 1,
-            // a zárolt sáv klipjei halványabbak — látszik, miért nem reagálnak
-            opacity: locked ? 0.55 : 1,
+            // zárolt sáv halványabb; fókusz módban a nem-kijelöltek elhalványulnak
+            opacity: locked ? 0.55 : dimmed ? 0.3 : 1,
           },
           clip.kind === 'text' ? styles.clipPill : null,
           animatedStyle,

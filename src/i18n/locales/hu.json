@@ -34,6 +34,68 @@
     "title": "Nyelv",
     "subtitle": "Válaszd ki az alkalmazás nyelvét"
   },
+  "auth": {
+    "signInTitle": "Üdv újra",
+    "signInSubtitle": "Jelentkezz be a projektjeidhez.",
+    "signUpTitle": "Fiók létrehozása",
+    "signUpSubtitle": "Regisztrálj, hogy projekteket készíthess.",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "te@pelda.hu",
+    "passwordLabel": "Jelszó",
+    "passwordPlaceholder": "A jelszavad",
+    "passwordHint": "Legalább 6 karakter.",
+    "nameLabel": "Teljes név",
+    "namePlaceholder": "Kiss Anna",
+    "nameHint": "Legalább két szó és 2 nagybetű.",
+    "phoneLabel": "Telefonszám",
+    "phonePlaceholder": "+36 20 123 4567",
+    "phoneInvalid": "Adj meg érvényes telefonszámot (7–15 számjegy).",
+    "birthdayLabel": "Születési dátum",
+    "birthdayPlaceholder": "ÉÉÉÉ-HH-NN",
+    "birthdayInvalid": "Adj meg érvényes dátumot (ÉÉÉÉ-HH-NN), min. 13 év.",
+    "locationLabel": "Lokáció",
+    "countryPlaceholder": "Ország",
+    "cityPlaceholder": "Város",
+    "signInAction": "Bejelentkezés",
+    "signUpAction": "Regisztráció",
+    "noAccount": "Nincs még fiókod?",
+    "haveAccount": "Van már fiókod?",
+    "checkEmailTitle": "Nézd meg az e-mailed",
+    "checkEmailBody": "Megerősítő linket küldtünk ide: {{email}}. Erősítsd meg, majd jelentkezz be.",
+    "backToSignIn": "Vissza a bejelentkezéshez",
+    "notConfigured": "A bejelentkezés-backend nincs beállítva (Supabase). Állítsd be az EXPO_PUBLIC_SUPABASE_URL és _ANON_KEY értékeket.",
+    "account": "Fiók",
+    "signedInAs": "Bejelentkezve: {{email}}",
+    "signOut": "Kijelentkezés",
+    "signOutConfirm": "Ki szeretnél jelentkezni?"
+  },
+  "profile": {
+    "title": "Profil",
+    "personalSection": "Személyes adatok",
+    "aiSection": "AI-modellek",
+    "aiSectionHint": "Saját modellek: adj meg endpointot, modell-azonosítót és API-kulcsot. Az alapértelmezettet használják az AI-funkciók.",
+    "accountSection": "Fiók",
+    "savedTitle": "Mentve",
+    "profileSaved": "Az adataid frissültek.",
+    "noModels": "Még nincs modell. Adj hozzá egyet a saját AI-hoz.",
+    "addModel": "Modell hozzáadása",
+    "editModel": "Modell szerkesztése",
+    "newModel": "Új modell",
+    "labelLabel": "Név",
+    "labelPlaceholder": "pl. Saját GPT-4o",
+    "providerLabel": "Szolgáltató",
+    "modelLabel": "Modell",
+    "modelPlaceholder": "Modell-azonosító",
+    "baseUrlLabel": "API-végpont",
+    "baseUrlPlaceholder": "https://…",
+    "baseUrlHint": "Hagyd üresen a szolgáltató alapértelmezett címéhez.",
+    "apiKeyLabel": "API-kulcs",
+    "apiKeyPlaceholder": "Az API-kulcsod",
+    "apiKeyOptional": "Opcionális (pl. lokális Ollama)",
+    "apiKeyHint": "A fiókodban tárolva (Supabase), csak te olvashatod.",
+    "defaultBadge": "ALAP",
+    "deleteModelConfirm": "Törlöd ezt a modell-beállítást?"
+  },
   "home": {
     "appName": "Remix",
     "newProject": "Új projekt",
@@ -54,6 +116,16 @@
     "tabTemplates": "Sablonok",
     "tabAiTools": "AI eszközök",
     "projectNamePlaceholder": "Projekt neve",
+    "titleLabel": "Cím",
+    "aspectLabel": "Képarány",
+    "seoSectionTitle": "SEO — a felfedezéshez",
+    "seoSectionHint": "A TikTok/Reels felirathoz és a YouTube kereséshez — mindet meg kell adni.",
+    "descriptionLabel": "Leírás",
+    "descriptionPlaceholder": "Miről szól a videó? Kulcsszavakkal…",
+    "hashtagsLabel": "Hashtagek",
+    "hashtagsPlaceholder": "#reels #recept (szóköz vagy vessző)",
+    "keywordsLabel": "Kulcsszavak",
+    "keywordsPlaceholder": "kulcsszavak vesszővel elválasztva",
     "renameTitle": "Projekt átnevezése",
     "deleteTitle": "Projekt törlése",
     "deleteMessage": "Biztosan törlöd: „{{name}}”?",
@@ -75,9 +147,7 @@
     "demoTitle": "Demó-projektek",
     "demoCreated_one": "{{count}} bemutató-projekt létrehozva — nyisd meg lejátszásra, és próbáld ki a renderelést is!",
     "demoCreated_other": "{{count}} bemutató-projekt létrehozva — nyisd meg őket lejátszásra, és próbáld ki a renderelést is!",
-    "demoExist": "A demó-projektek már léteznek.",
-    "aiToolsTitle": "AI eszközök",
-    "aiToolsMessage": "Az AI-eszközök a szerkesztőben érhetők el (AI gomb): Auto Edit, Smart Search, vágó-eszközök."
+    "demoExist": "A demó-projektek már léteznek."
   },
   "templates": {
     "hook-cta": {
@@ -139,6 +209,13 @@
       "tapToStop": "Koppints a leállításhoz",
       "tapToRecord": "Koppints a felvételhez (max 60 mp)"
     },
+    "preview": {
+      "safeZones": "Biztonságos zóna"
+    },
+    "selection": {
+      "notVisible": "Ezen a képkockán nem látható — koppints az odaugráshoz.",
+      "focusMode": "Fókusz mód — a többi klip halványítása"
+    },
     "detailPreview": {
       "title": "Részlet-előnézet",
       "titleWithIcon": "🎬 Részlet-előnézet",
@@ -174,9 +251,15 @@
       "soloOn": "⭐ Csak ez szóljon (solo)",
       "soloOff": "⭐ Solo ki",
       "lock": "🔒 Zárolás (véletlen mozdítás ellen)",
-      "unlock": "🔓 Zárolás fel"
+      "unlock": "🔓 Zárolás fel",
+      "gapRemove": "{{seconds}}s hézag — koppints a törléshez",
+      "collapse": "🔽 Sáv összecsukása",
+      "expand": "🔼 Sáv kinyitása",
+      "minimap": "Idővonal-minimap"
     },
     "timelineClip": {
+      "lockedTitle": "Zárolt sáv",
+      "lockedBody": "A(z) {{track}} sáv zárolva. Oldd fel a szerkesztéshez.",
       "videoSpeed": "Videó {{speed}}×",
       "video": "Videó",
       "image": "Kép",
@@ -340,6 +423,9 @@
       "grade_dreamy": "💗 Dreamy"
     },
     "assistant": {
+      "modelSection": "Modell",
+      "modelAuto": "Auto",
+      "modelHint": "Adj hozzá AI-modelleket a profilodban, majd válassz itt egyet.",
       "quickAction_shorten30": "Rövidítsd 30 mp alá",
       "quickAction_addTitleCta": "Adj hozzá címet és záró CTA-t",
       "quickAction_captionsLowerThird": "Igazítsd a feliratokat az alsó harmadba",
@@ -591,7 +677,8 @@
       "clearAutomation_one": "Automáció törlése ({{count}})",
       "clearAutomation_other": "Automáció törlése ({{count}})",
       "mixHint": "A Voice Studio (zajszűrés + kompresszor + loudness) és a ducking a renderelt MP4-ben érvényesül. Hangerő-automáció: állítsd a hangerőt, állj a playheaddel a kívánt pontra, és üsd le a ◆-t — a hangerő a kulcskockák közt átúszik (előnézetben és renderben is).",
-      "emptyHint": "Jelölj ki egy hangklipet az idővonalon a keveréshez, vagy adj hozzá zenét a „Zene” gombbal."
+      "emptyHint": "Jelölj ki egy hangklipet az idővonalon a keveréshez, vagy adj hozzá zenét a „Zene” gombbal.",
+      "openHangStudio": "Hang Stúdió megnyitása"
     },
     "captions": {
       "wordTiming": "Szó-időzítés",
@@ -814,7 +901,10 @@
       "aiCutoutTitle": "AI kivágás",
       "aiCutoutUnavailable": "A kivágás-motor nem érhető el (worker + u2net modell kell hozzá).",
       "aiCutoutDoneTitle": "AI kivágás kész",
-      "aiCutoutDoneBody": "A téma külön rétegként került a vászonra — az eredeti fotót törölheted vagy kicserélheted, a kivágás alá bármilyen háttér tehető."
+      "aiCutoutDoneBody": "A téma külön rétegként került a vászonra — az eredeti fotót törölheted vagy kicserélheted, a kivágás alá bármilyen háttér tehető.",
+      "sectionImageStudio": "Kép Stúdió",
+      "openImageStudio": "Kép Stúdió megnyitása",
+      "imageStudioHint": "Vágás, forgatás, tükrözés, rajz és korrekció — mind az eszközödön, feltöltés nélkül."
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",
@@ -828,6 +918,7 @@
       "actionSection": "Művelet",
       "actionSeek": "Ugrás",
       "actionQuiz": "Kvíz",
+      "urlInvalid": "Adj meg egy teljes linket (https://…).",
       "seekTo": "Ugrás ide: {{time}}",
       "questionPlaceholder": "Kérdés",
       "answerPlaceholder": "Válasz {{index}}"
@@ -878,7 +969,7 @@
       "importKind_audio": "Hang",
       "importKind_image": "Kép",
       "imageTimeLabel": "Kép ideje (mp):",
-      "importHint": "A teljes videó, csak a hang (zene-sávra), vagy egy képkocka tölthető le — a workeren (yt-dlp). Csak jogtiszta/saját tartalommal használd.",
+      "importHint": "YouTube-videó és -hang az ESZKÖZÖN, ingyen tölthető le (standard minőség, előfizetés nélkül). A HD, a más oldalak (TikTok…) és a képkocka a felhő-workeren keresztül megy (Pro). Csak jogtiszta/saját tartalommal használd.",
       "searchPlaceholder": "🔎 Keresés a Tárban (fájlnév)…",
       "workerOffline": "A worker nem érhető el — indítsd el: cd server && npm start",
       "refresh": "Frissítés"
@@ -1173,12 +1264,17 @@
     "freePerk_export": "Export az eszközön (vízjel nélkül is — a te géped rendereli)",
     "activatePro": "Pro aktiválása",
     "notNow": "Most nem",
+    "comingSoonTitle": "Hamarosan",
+    "comingSoonBody": "Az alkalmazáson belüli vásárlás még nem elérhető — a Pro egy későbbi frissítésben lesz megvásárolható.",
     "legal": "A vásárlás most fejlesztői teszt-mód (azonnali Pro). Éles buildben az App Store / Play előfizetés lép a helyére."
   },
   "playerScreen": {
     "quizCorrect": "Helyes válasz! 🎉",
     "quizWrong": "Nem talált — nézd meg a helyes választ!",
-    "quizContinue": "Tovább"
+    "quizContinue": "Tovább",
+    "linkTitle": "Link",
+    "linkInvalid": "Ehhez a hotspothoz még nincs érvényes link.",
+    "linkFailed": "A link nem nyitható meg."
   },
   "progressBar": {
     "working": "Dolgozom…",
@@ -1524,10 +1620,45 @@
       "rippleDelete_one": "ripple-törlés ({{count}} klip, {{moved}} csúszott)",
       "rippleDelete_other": "ripple-törlés ({{count}} klip, {{moved}} csúszott)",
       "rippleLength_one": "ripple-hossz ({{count}} klip csúszott)",
-      "rippleLength_other": "ripple-hossz ({{count}} klip csúszott)"
+      "rippleLength_other": "ripple-hossz ({{count}} klip csúszott)",
+      "closeGap": "hézag bezárása"
     },
     "progress": {
       "starting": "Indítás…"
     }
+  },
+  "imageStudio": {
+    "title": "Kép Stúdió",
+    "bakeFailed": "A művelet nem sikerült — próbáld újra.",
+    "tools": {
+      "transform": "Átalakítás",
+      "crop": "Vágás",
+      "adjust": "Korrekció",
+      "draw": "Rajz"
+    },
+    "rotateLeft": "Balra",
+    "rotateRight": "Jobbra",
+    "flipH": "Tükör V",
+    "flipV": "Tükör F",
+    "crop": {
+      "free": "Szabad",
+      "straighten": "Kiegyenesítés"
+    },
+    "adjust": {
+      "brightness": "Fényerő",
+      "contrast": "Kontraszt",
+      "saturation": "Szaturáció",
+      "temperature": "Melegség"
+    }
+  },
+  "hangStudio": {
+    "title": "Hang Stúdió",
+    "volume": "Hangerő",
+    "fadeIn": "Beúsztatás",
+    "fadeOut": "Kiúsztatás",
+    "enhance": "Hangjavítás",
+    "deReverb": "Visszhang-csökkentés",
+    "autoDuck": "Auto-halkítás beszéd alatt",
+    "enhanceHint": "A javítások a végső renderben, az eszközön érvényesülnek (az előnézet közelítés)."
   }
 }

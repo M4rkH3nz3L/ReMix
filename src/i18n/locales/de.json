@@ -34,6 +34,68 @@
     "title": "Sprache",
     "subtitle": "App-Sprache wählen"
   },
+  "auth": {
+    "signInTitle": "Willkommen zurück",
+    "signInSubtitle": "Melde dich an, um auf deine Projekte zuzugreifen.",
+    "signUpTitle": "Konto erstellen",
+    "signUpSubtitle": "Registriere dich, um Projekte zu erstellen.",
+    "emailLabel": "E-Mail",
+    "emailPlaceholder": "du@beispiel.com",
+    "passwordLabel": "Passwort",
+    "passwordPlaceholder": "Dein Passwort",
+    "passwordHint": "Mindestens 6 Zeichen.",
+    "nameLabel": "Vollständiger Name",
+    "namePlaceholder": "Max Mustermann",
+    "nameHint": "Mindestens zwei Wörter und 2 Großbuchstaben.",
+    "phoneLabel": "Telefonnummer",
+    "phonePlaceholder": "+49 151 12345678",
+    "phoneInvalid": "Gib eine gültige Telefonnummer ein (7–15 Ziffern).",
+    "birthdayLabel": "Geburtsdatum",
+    "birthdayPlaceholder": "JJJJ-MM-TT",
+    "birthdayInvalid": "Gib ein gültiges Datum ein (JJJJ-MM-TT), mind. 13 Jahre.",
+    "locationLabel": "Standort",
+    "countryPlaceholder": "Land",
+    "cityPlaceholder": "Stadt",
+    "signInAction": "Anmelden",
+    "signUpAction": "Registrieren",
+    "noAccount": "Noch kein Konto?",
+    "haveAccount": "Bereits ein Konto?",
+    "checkEmailTitle": "Prüfe deine E-Mails",
+    "checkEmailBody": "Wir haben einen Bestätigungslink an {{email}} gesendet. Bestätige ihn und melde dich dann an.",
+    "backToSignIn": "Zurück zur Anmeldung",
+    "notConfigured": "Anmelde-Backend ist nicht konfiguriert (Supabase). Setze EXPO_PUBLIC_SUPABASE_URL und _ANON_KEY.",
+    "account": "Konto",
+    "signedInAs": "Angemeldet als {{email}}",
+    "signOut": "Abmelden",
+    "signOutConfirm": "Möchtest du dich abmelden?"
+  },
+  "profile": {
+    "title": "Profil",
+    "personalSection": "Persönliche Daten",
+    "aiSection": "KI-Modelle",
+    "aiSectionHint": "Eigene Modelle: Endpunkt, Modell-ID und API-Schlüssel festlegen. Das Standardmodell nutzen die KI-Funktionen.",
+    "accountSection": "Konto",
+    "savedTitle": "Gespeichert",
+    "profileSaved": "Deine Daten wurden aktualisiert.",
+    "noModels": "Noch keine Modelle. Füge eines hinzu, um deine eigene KI zu nutzen.",
+    "addModel": "Modell hinzufügen",
+    "editModel": "Modell bearbeiten",
+    "newModel": "Neues Modell",
+    "labelLabel": "Name",
+    "labelPlaceholder": "z. B. Mein GPT-4o",
+    "providerLabel": "Anbieter",
+    "modelLabel": "Modell",
+    "modelPlaceholder": "Modell-ID",
+    "baseUrlLabel": "API-Endpunkt",
+    "baseUrlPlaceholder": "https://…",
+    "baseUrlHint": "Leer lassen, um den Standard-Endpunkt des Anbieters zu verwenden.",
+    "apiKeyLabel": "API-Schlüssel",
+    "apiKeyPlaceholder": "Dein API-Schlüssel",
+    "apiKeyOptional": "Optional (z. B. lokales Ollama)",
+    "apiKeyHint": "In deinem Konto gespeichert (Supabase), nur für dich lesbar.",
+    "defaultBadge": "STANDARD",
+    "deleteModelConfirm": "Diese Modellkonfiguration löschen?"
+  },
   "home": {
     "appName": "Remix",
     "newProject": "Neues Projekt",
@@ -54,6 +116,16 @@
     "tabTemplates": "Vorlagen",
     "tabAiTools": "KI-Tools",
     "projectNamePlaceholder": "Projektname",
+    "titleLabel": "Titel",
+    "aspectLabel": "Seitenverhältnis",
+    "seoSectionTitle": "SEO — für die Auffindbarkeit",
+    "seoSectionHint": "Für die TikTok/Reels-Beschriftung und die YouTube-Suche — alle Pflicht.",
+    "descriptionLabel": "Beschreibung",
+    "descriptionPlaceholder": "Worum geht's im Video? Mit Schlüsselwörtern…",
+    "hashtagsLabel": "Hashtags",
+    "hashtagsPlaceholder": "#reels #rezept (Leerzeichen oder Komma)",
+    "keywordsLabel": "Schlüsselwörter",
+    "keywordsPlaceholder": "Schlüsselwörter durch Kommas getrennt",
     "renameTitle": "Projekt umbenennen",
     "deleteTitle": "Projekt löschen",
     "deleteMessage": "„{{name}}“ wirklich löschen?",
@@ -75,9 +147,7 @@
     "demoTitle": "Demo-Projekte",
     "demoCreated_one": "{{count}} Demo-Projekt erstellt — öffne es zum Abspielen und probiere auch das Rendern aus!",
     "demoCreated_other": "{{count}} Demo-Projekte erstellt — öffne sie zum Abspielen und probiere auch das Rendern aus!",
-    "demoExist": "Die Demo-Projekte existieren bereits.",
-    "aiToolsTitle": "KI-Tools",
-    "aiToolsMessage": "Die KI-Tools sind im Editor verfügbar (KI-Schaltfläche): Auto Edit, Smart Search, Schnittwerkzeuge."
+    "demoExist": "Die Demo-Projekte existieren bereits."
   },
   "templates": {
     "hook-cta": {
@@ -139,6 +209,13 @@
       "tapToStop": "Tippen zum Stoppen",
       "tapToRecord": "Tippen zum Aufnehmen (max. 60 s)"
     },
+    "preview": {
+      "safeZones": "Sichere Zonen"
+    },
+    "selection": {
+      "notVisible": "In diesem Frame nicht sichtbar — zum Springen tippen.",
+      "focusMode": "Fokus-Modus — andere Clips abdunkeln"
+    },
     "detailPreview": {
       "title": "Detailvorschau",
       "titleWithIcon": "🎬 Detailvorschau",
@@ -174,9 +251,15 @@
       "soloOn": "⭐ Nur diese (Solo)",
       "soloOff": "⭐ Solo aus",
       "lock": "🔒 Sperren (gegen versehentliches Verschieben)",
-      "unlock": "🔓 Entsperren"
+      "unlock": "🔓 Entsperren",
+      "gapRemove": "{{seconds}}s Lücke — zum Entfernen tippen",
+      "collapse": "🔽 Spur einklappen",
+      "expand": "🔼 Spur ausklappen",
+      "minimap": "Zeitleisten-Minimap"
     },
     "timelineClip": {
+      "lockedTitle": "Ebene gesperrt",
+      "lockedBody": "Die Spur {{track}} ist gesperrt. Zum Bearbeiten entsperren.",
       "videoSpeed": "Video {{speed}}×",
       "video": "Video",
       "image": "Bild",
@@ -340,6 +423,9 @@
       "grade_dreamy": "💗 Dreamy"
     },
     "assistant": {
+      "modelSection": "Modell",
+      "modelAuto": "Auto",
+      "modelHint": "Füge KI-Modelle in deinem Profil hinzu und wähle hier eines aus.",
       "quickAction_shorten30": "Auf unter 30 s kürzen",
       "quickAction_addTitleCta": "Titel und Abschluss-CTA hinzufügen",
       "quickAction_captionsLowerThird": "Untertitel ins untere Drittel setzen",
@@ -591,7 +677,8 @@
       "clearAutomation_one": "Automation löschen ({{count}})",
       "clearAutomation_other": "Automation löschen ({{count}})",
       "mixHint": "Voice Studio (Rauschunterdrückung + Kompressor + Loudness) und Ducking wirken im gerenderten MP4. Lautstärke-Automation: stelle die Lautstärke ein, setze den Playhead an den gewünschten Punkt und drücke ◆ — die Lautstärke blendet zwischen den Keyframes über (in Vorschau und Render).",
-      "emptyHint": "Wähle einen Audioclip auf der Timeline zum Mischen aus oder füge Musik mit dem „Musik”-Button hinzu."
+      "emptyHint": "Wähle einen Audioclip auf der Timeline zum Mischen aus oder füge Musik mit dem „Musik”-Button hinzu.",
+      "openHangStudio": "Sound-Studio öffnen"
     },
     "captions": {
       "wordTiming": "Wort-Timing",
@@ -814,7 +901,10 @@
       "aiCutoutTitle": "KI-Freistellung",
       "aiCutoutUnavailable": "Die Freistell-Engine ist nicht verfügbar (benötigt Worker + u2net-Modell).",
       "aiCutoutDoneTitle": "KI-Freistellung fertig",
-      "aiCutoutDoneBody": "Das Motiv wurde als separate Ebene auf die Leinwand gelegt — du kannst das Originalfoto löschen oder ersetzen, und unter die Freistellung kann jeder Hintergrund."
+      "aiCutoutDoneBody": "Das Motiv wurde als separate Ebene auf die Leinwand gelegt — du kannst das Originalfoto löschen oder ersetzen, und unter die Freistellung kann jeder Hintergrund.",
+      "sectionImageStudio": "Bild-Studio",
+      "openImageStudio": "Bild-Studio öffnen",
+      "imageStudioHint": "Zuschneiden, drehen, spiegeln, zeichnen und anpassen — alles auf deinem Gerät, ohne Upload."
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",
@@ -828,6 +918,7 @@
       "actionSection": "Aktion",
       "actionSeek": "Sprung",
       "actionQuiz": "Quiz",
+      "urlInvalid": "Gib einen vollständigen Link ein (https://…).",
       "seekTo": "Springe zu: {{time}}",
       "questionPlaceholder": "Frage",
       "answerPlaceholder": "Antwort {{index}}"
@@ -878,7 +969,7 @@
       "importKind_audio": "Audio",
       "importKind_image": "Bild",
       "imageTimeLabel": "Bildzeit (s):",
-      "importHint": "Du kannst das ganze Video, nur den Ton (auf die Musikspur) oder ein einzelnes Bild herunterladen — über den Worker (yt-dlp). Nutze nur rechtefreie oder eigene Inhalte.",
+      "importHint": "YouTube-Video und -Ton werden AUF DEM GERÄT kostenlos heruntergeladen (Standardqualität, ohne Abo). HD, andere Seiten (TikTok…) und Einzelbilder laufen über den Cloud-Worker (Pro). Nutze nur rechtefreie oder eigene Inhalte.",
       "searchPlaceholder": "🔎 In der Bibliothek suchen (Dateiname)…",
       "workerOffline": "Worker nicht erreichbar — starte ihn: cd server && npm start",
       "refresh": "Aktualisieren"
@@ -1173,12 +1264,17 @@
     "freePerk_export": "Export auf dem Gerät (auch ohne Wasserzeichen — dein Gerät rendert es)",
     "activatePro": "Pro aktivieren",
     "notNow": "Jetzt nicht",
+    "comingSoonTitle": "Bald verfügbar",
+    "comingSoonBody": "In-App-Käufe sind noch nicht verfügbar — Pro wird in einem künftigen Update kaufbar sein.",
     "legal": "Käufe laufen aktuell im Entwickler-Testmodus (sofortiges Pro). In Produktions-Builds tritt ein App Store / Play-Abo an dessen Stelle."
   },
   "playerScreen": {
     "quizCorrect": "Richtige Antwort! 🎉",
     "quizWrong": "Daneben — schau dir die richtige Antwort an!",
-    "quizContinue": "Weiter"
+    "quizContinue": "Weiter",
+    "linkTitle": "Link",
+    "linkInvalid": "Dieser Hotspot hat noch keinen gültigen Link.",
+    "linkFailed": "Der Link konnte nicht geöffnet werden."
   },
   "progressBar": {
     "working": "Arbeite…",
@@ -1524,10 +1620,45 @@
       "rippleDelete_one": "Ripple-Löschen ({{count}} Clip, {{moved}} verschoben)",
       "rippleDelete_other": "Ripple-Löschen ({{count}} Clips, {{moved}} verschoben)",
       "rippleLength_one": "Ripple-Länge ({{count}} Clip verschoben)",
-      "rippleLength_other": "Ripple-Länge ({{count}} Clips verschoben)"
+      "rippleLength_other": "Ripple-Länge ({{count}} Clips verschoben)",
+      "closeGap": "Lücke schließen"
     },
     "progress": {
       "starting": "Wird gestartet…"
     }
+  },
+  "imageStudio": {
+    "title": "Bild-Studio",
+    "bakeFailed": "Der Vorgang ist fehlgeschlagen — bitte versuche es erneut.",
+    "tools": {
+      "transform": "Transformieren",
+      "crop": "Zuschneiden",
+      "adjust": "Anpassen",
+      "draw": "Zeichnen"
+    },
+    "rotateLeft": "Links drehen",
+    "rotateRight": "Rechts drehen",
+    "flipH": "H spiegeln",
+    "flipV": "V spiegeln",
+    "crop": {
+      "free": "Frei",
+      "straighten": "Begradigen"
+    },
+    "adjust": {
+      "brightness": "Helligkeit",
+      "contrast": "Kontrast",
+      "saturation": "Sättigung",
+      "temperature": "Wärme"
+    }
+  },
+  "hangStudio": {
+    "title": "Sound-Studio",
+    "volume": "Lautstärke",
+    "fadeIn": "Einblenden",
+    "fadeOut": "Ausblenden",
+    "enhance": "Stimme verbessern",
+    "deReverb": "Raumhall reduzieren",
+    "autoDuck": "Auto-Absenkung unter Sprache",
+    "enhanceHint": "Die Verbesserungen werden beim finalen Rendern auf dem Gerät angewendet (die Vorschau nähert sie an)."
   }
 }

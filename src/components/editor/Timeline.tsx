@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 
 import { TimelineClip } from '@/components/editor/TimelineClip';
+import { TimelineMinimap } from '@/components/editor/TimelineMinimap';
 import {
   BASE_PX_PER_SEC,
   palette,
@@ -39,6 +40,25 @@ const trackIcons: Record<TrackType, keyof typeof Ionicons.glyphMap> = {
 };
 
 /**
+ * A video-sáv klipek közti (és vezető) hézagai — CSAK a fő videósávon jelent ez
+ * fekete képkockát az exportban (overlay/text/audio sávon a hézag szándékos).
+ */
+function videoTrackGaps(
+  clips: { id: string; start: number; duration: number }[]
+): { start: number; end: number; nextId: string }[] {
+  const sorted = [...clips].sort((a, b) => a.start - b.start);
+  const gaps: { start: number; end: number; nextId: string }[] = [];
+  let cursor = 0;
+  for (const c of sorted) {
+    if (c.start - cursor > 0.2) {
+      gaps.push({ start: cursor, end: c.start, nextId: c.id });
+    }
+    cursor = Math.max(cursor, c.start + c.duration);
+  }
+  return gaps;
+}
+
+/**
  * CapCut-mintájú idővonal: a lejátszófej középen áll, a tartalom görgetésével
  * léptetünk (scroll offset ↔ playhead). Kétujjas csippentés = zoom.
  */
@@ -58,7 +78,9 @@ export function Timeline() {
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
   const lockedTracks = useEditorStore((s) => s.lockedTracks);
+  const collapsedTracks = useEditorStore((s) => s.collapsedTracks);
   const toggleTrackFlag = useEditorStore((s) => s.toggleTrackFlag);
+  const closeGapBefore = useEditorStore((s) => s.closeGapBefore);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -68,6 +90,7 @@ export function Timeline() {
     const muted = mutedTracks.includes(type);
     const solo = soloTracks.includes(type);
     const locked = lockedTracks.includes(type);
+    const collapsed = collapsedTracks.includes(type);
     Alert.alert(
       t(trackLabels[type]),
       t('editor.timeline.trackMenuMessage'),
@@ -83,6 +106,10 @@ export function Timeline() {
         {
           text: locked ? t('editor.timeline.unlock') : t('editor.timeline.lock'),
           onPress: () => toggleTrackFlag(type, 'lock'),
+        },
+        {
+          text: collapsed ? t('editor.timeline.expand') : t('editor.timeline.collapse'),
+          onPress: () => toggleTrackFlag(type, 'collapse'),
         },
         { text: t('common.cancel'), style: 'cancel' },
       ]
@@ -181,7 +208,10 @@ export function Timeline() {
   });
 
   // nagyobb kijelzőn vastagabb sávok — könnyebb célozni és olvasni
-  const th = (t: TrackType) => Math.round(trackHeights[t] * L.editor.trackScale);
+  // 🔽 összecsukott sáv: vékony „lane" marad (a klip-terület elrejtve)
+  const COLLAPSED_H = 18;
+  const th = (t: TrackType) =>
+    collapsedTracks.includes(t) ? COLLAPSED_H : Math.round(trackHeights[t] * L.editor.trackScale);
 
   const totalTracksHeight = visibleTracks.reduce((sum, t) => sum + th(t), 0);
 
@@ -191,8 +221,11 @@ export function Timeline() {
   const showHeaders = L.editor.trackHeaderWidth > 0;
 
   return (
-    <GestureDetector gesture={pinch}>
-      <View style={styles.outerRow}>
+    <View>
+      {/* 🗺️ minimap: a teljes projekt + a jelenlegi nézet (viewport) */}
+      <TimelineMinimap viewportW={viewportW} pps={pps} />
+      <GestureDetector gesture={pinch}>
+        <View style={styles.outerRow}>
         {showHeaders ? (
           <View style={[styles.headerCol, { width: L.editor.trackHeaderWidth }]}>
             <View style={{ height: RULER_HEIGHT }} />
@@ -332,17 +365,42 @@ export function Timeline() {
                     },
                   ]}
                 >
-                  {track?.clips.map((clip) => (
-                    <TimelineClip
-                      key={clip.id}
-                      clip={clip}
-                      trackType={type}
-                      pps={pps}
-                      height={th(type)}
-                      selected={clip.id === selectedClipId}
-                      multiSelected={multiSelectIds.includes(clip.id)}
-                    />
-                  ))}
+                  {track && !collapsedTracks.includes(type)
+                    ? track.clips.map((clip) => (
+                        <TimelineClip
+                          key={clip.id}
+                          clip={clip}
+                          trackType={type}
+                          pps={pps}
+                          height={th(type)}
+                          selected={clip.id === selectedClipId}
+                          multiSelected={multiSelectIds.includes(clip.id)}
+                        />
+                      ))
+                    : null}
+                  {/* ⚠️ hézag-jelző a fő videósávon: koppintásra bezárul (visszavonható) */}
+                  {type === 'video' && track && !collapsedTracks.includes(type)
+                    ? videoTrackGaps(track.clips).map((g, i) => (
+                        <Pressable
+                          key={`gap-${i}`}
+                          hitSlop={6}
+                          onPress={() => closeGapBefore(g.nextId)}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('editor.timeline.gapRemove', {
+                            seconds: (g.end - g.start).toFixed(1),
+                          })}
+                          style={[
+                            styles.gap,
+                            { left: g.start * pps, width: (g.end - g.start) * pps, height: th(type) },
+                          ]}
+                        >
+                          <Ionicons name="warning" size={11} color={palette.danger} />
+                          {(g.end - g.start) * pps > 46 ? (
+                            <Text style={styles.gapText}>{(g.end - g.start).toFixed(1)}s</Text>
+                          ) : null}
+                        </Pressable>
+                      ))
+                    : null}
                 </View>
               );
             })}
@@ -376,6 +434,9 @@ export function Timeline() {
                   {lockedTracks.includes(type) ? (
                     <Ionicons name="lock-closed" size={9} color={palette.accent2} />
                   ) : null}
+                  {collapsedTracks.includes(type) ? (
+                    <Ionicons name="chevron-expand" size={9} color={palette.textDim} />
+                  ) : null}
                 </Pressable>
               </View>
             ))}
@@ -392,7 +453,8 @@ export function Timeline() {
         />
         </View>
       </View>
-    </GestureDetector>
+      </GestureDetector>
+    </View>
   );
 }
 
@@ -451,6 +513,24 @@ const styles = StyleSheet.create({
   trackRow: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: palette.border,
+  },
+  gap: {
+    position: 'absolute',
+    top: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: '#ff5c7222',
+    borderWidth: 1,
+    borderColor: '#ff5c7266',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+  },
+  gapText: {
+    color: palette.danger,
+    fontSize: 9,
+    fontWeight: '700',
   },
   markerFlag: {
     position: 'absolute',

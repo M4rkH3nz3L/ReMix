@@ -76,6 +76,8 @@ interface EditorState {
   mutedTracks: TrackType[];
   soloTracks: TrackType[];
   lockedTracks: TrackType[];
+  /** 🔽 összecsukott sávok (session-szintű; a klip-terület elrejtve, thin lane marad) */
+  collapsedTracks: TrackType[];
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -89,6 +91,10 @@ interface EditorState {
   drawBrush: { color: string; width: number; style: BrushStyle; glow: boolean } | null;
   /** 📐 vászon-rács osztása a snaphez (0 = nincs rács); session-szintű */
   snapGrid: number;
+  /** 🛡️ safe-zone overlay az előnézeten (TikTok/Reels/YT UI-zónák); session-szintű */
+  showSafeZones: boolean;
+  /** 🎯 fókusz mód: kijelöléskor a TÖBBI idővonal-klip elhalványul; session-szintű */
+  focusMode: boolean;
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
   maskEdit: boolean;
   /**
@@ -138,16 +144,20 @@ interface EditorState {
   toggleMultiSelect: (clipId: string) => void;
   copyStyle: () => boolean;
   pasteStyle: () => number;
-  toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock') => void;
+  toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse') => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
+  toggleSafeZones: () => void;
+  toggleFocusMode: () => void;
   setMaskEdit: (on: boolean) => void;
   setVideoVoiceActive: (on: boolean) => void;
   /** ripple-törlés: a klipek eltűnnek és a lyuk bezárul (false = nem futott) */
   rippleDelete: (clipIds: string[]) => boolean;
   /** ripple-hossz: a klip új hosszt kap, a mögötte lévők csúsznak */
   rippleResize: (clipId: string, nextDuration: number) => boolean;
+  /** a klip ELŐTTI hézag bezárása: a klip és a sávon utána lévők balra csúsznak (false = nincs hézag) */
+  closeGapBefore: (clipId: string) => boolean;
   /** hallható-e a sáv az ELŐNÉZETBEN (solo felülírja a némítást) */
   isTrackAudible: (type: TrackType) => boolean;
   setMultiSelectMode: (on: boolean) => void;
@@ -161,6 +171,14 @@ interface EditorState {
   setPickTarget: (fn: ((point: { x: number; y: number }) => void) | null) => void;
   setZoom: (zoom: number) => void;
   setPanel: (panel: PanelId) => void;
+  /** 🖼️ Kép Stúdió (teljes képernyős, on-device képszerkesztő) cél-klipje */
+  imageStudioClipId: string | null;
+  openImageStudio: (clipId: string) => void;
+  closeImageStudio: () => void;
+  /** 🎧 Hang Stúdió (teljes képernyős, on-device audio-szerkesztő) cél-klipje */
+  audioStudioClipId: string | null;
+  openAudioStudio: (clipId: string) => void;
+  closeAudioStudio: () => void;
   undo: () => void;
   redo: () => void;
   markSaved: () => void;
@@ -181,11 +199,14 @@ const SESSION_RESET = {
   drawBrush: null,
   rippleMode: false,
   snapGrid: 0,
+  showSafeZones: false,
+  focusMode: false,
   maskEdit: false,
   videoVoiceActive: false,
   mutedTracks: [] as TrackType[],
   soloTracks: [] as TrackType[],
   lockedTracks: [] as TrackType[],
+  collapsedTracks: [] as TrackType[],
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -201,6 +222,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loop: false,
   zoom: 1,
   activePanel: null,
+  imageStudioClipId: null,
+  audioStudioClipId: null,
   past: [],
   future: [],
   dirty: false,
@@ -406,7 +429,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   toggleTrackFlag: (type, flag) => {
-    const key = flag === 'mute' ? 'mutedTracks' : flag === 'solo' ? 'soloTracks' : 'lockedTracks';
+    const key =
+      flag === 'mute'
+        ? 'mutedTracks'
+        : flag === 'solo'
+          ? 'soloTracks'
+          : flag === 'collapse'
+            ? 'collapsedTracks'
+            : 'lockedTracks';
     const list = get()[key];
     const next = list.includes(type) ? list.filter((t) => t !== type) : [...list, type];
     // zároláskor a sávon lévő kijelölés elévül (különben zárolt klipet
@@ -426,6 +456,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setDrawBrush: (brush) => set({ drawBrush: brush }),
 
   setSnapGrid: (grid) => set({ snapGrid: grid }),
+  toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),
+  toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
 
   setMaskEdit: (on) => set({ maskEdit: on }),
 
@@ -464,6 +496,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       type: 'REPLACE_TRACKS',
       tracks: plan.tracks,
       label: tr('store.editor.rippleLength', { count: plan.moved }),
+    });
+  },
+
+  closeGapBefore: (clipId) => {
+    const { project } = get();
+    if (!project) {
+      return false;
+    }
+    const track = project.tracks.find((tk) => tk.clips.some((c) => c.id === clipId));
+    const target = track?.clips.find((c) => c.id === clipId);
+    if (!track || !target) {
+      return false;
+    }
+    // az előző (target előtt végződő) klip vége ezen a sávon, vagy 0 (vezető hézag)
+    const prevEnd = track.clips
+      .filter((c) => c.id !== clipId && c.start + c.duration <= target.start + 0.001)
+      .reduce((max, c) => Math.max(max, c.start + c.duration), 0);
+    const gap = target.start - prevEnd;
+    if (gap <= 0.01) {
+      return false;
+    }
+    // a target és a sávon utána lévők balra csúsznak a hézag méretével (csak ez a sáv változik)
+    const clips = track.clips.map((c) =>
+      c.start >= target.start - 0.001
+        ? { ...c, start: Math.max(0, Math.round((c.start - gap) * 1000) / 1000) }
+        : c
+    );
+    return get().dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks: [{ trackType: track.type, clips }],
+      label: tr('store.editor.closeGap'),
     });
   },
 
@@ -536,6 +599,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       multiSelectMode: false,
     });
   },
+
+  openImageStudio: (clipId) => set({ imageStudioClipId: clipId }),
+  closeImageStudio: () => set({ imageStudioClipId: null }),
+
+  openAudioStudio: (clipId) => set({ audioStudioClipId: clipId }),
+  closeAudioStudio: () => set({ audioStudioClipId: null }),
 
   markSaved: () => set({ dirty: false }),
 }));

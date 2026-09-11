@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Polyline } from 'react-native-svg';
 import Animated, {
@@ -13,6 +15,7 @@ import Animated, {
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { MaskOverlay } from '@/components/preview/MaskOverlay';
 import { PipLayer } from '@/components/preview/PipLayer';
+import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
@@ -25,6 +28,7 @@ import {
   setChannelKeyframe,
   shiftPositionKeyframes,
 } from '@/lib/keyframes';
+import { adjustTintLayers } from '@/lib/adjustPreview';
 import { pathBounds, polylinePoints, simplifyPath, toBoxSpace } from '@/lib/draw';
 import { makeId } from '@/lib/id';
 import { ensureProxy, getProxyUriSync } from '@/lib/proxy';
@@ -41,7 +45,6 @@ import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type {
   CanvasTransform,
-  ClipAdjust,
   ImageClip,
   InteractiveClip,
   ShapeClip,
@@ -59,34 +62,7 @@ const LIGHTING_TINTS: Record<string, { color: string; opacity: number }> = {
   cyberpunk: { color: '#1ad1c4', opacity: 0.14 },
 };
 
-/**
- * Képjavítás-közelítés: a ClipAdjust értékekből féligátlátszó tint-rétegek
- * (fényerő/hőmérséklet/deszaturáció). Ugyanez fut a per-klip adjustra és a
- * grade-réteg (adjust-sáv) teljes-vászon overlay-ére — a pontos eq/colorbalance/
- * vignette a renderben ég be.
- */
-function adjustTintLayers(adjust: ClipAdjust): { color: string; opacity: number }[] {
-  const layers: { color: string; opacity: number }[] = [];
-  const b = adjust.brightness ?? 0;
-  if (b !== 0) {
-    layers.push({
-      color: b > 0 ? '#ffffff' : '#000000',
-      opacity: Math.min(0.5, Math.abs(b) * 1.4),
-    });
-  }
-  const t = adjust.temperature ?? 0;
-  if (t !== 0) {
-    layers.push({
-      color: t > 0 ? '#ff9d4d' : '#4d9dff',
-      opacity: Math.min(0.4, Math.abs(t) * 1.1),
-    });
-  }
-  const s = adjust.saturation ?? 0;
-  if (s < 0) {
-    layers.push({ color: '#808080', opacity: Math.min(0.6, -s * 0.55) });
-  }
-  return layers;
-}
+// adjustTintLayers → @/lib/adjustPreview (megosztva a Kép Stúdió Korrekcióval)
 
 interface Props {
   mode: 'edit' | 'play';
@@ -98,7 +74,10 @@ interface Props {
  * A videólejátszó a rAF-órához szinkronizál (forráscsere, seek, drift-korrekció).
  */
 export function PreviewSurface({ mode, onHotspotPress }: Props) {
+  const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  const showSafeZones = useEditorStore((s) => s.showSafeZones);
+  const toggleSafeZones = useEditorStore((s) => s.toggleSafeZones);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
@@ -855,8 +834,31 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               />
             </Svg>
           ) : null}
+
+          {/* 🛡️ safe-zone overlay — csak szerkesztésben, kapcsolóra (pointerEvents none) */}
+          {mode === 'edit' && showSafeZones ? (
+            <SafeZoneOverlay width={boxW} height={boxH} aspect={project.aspectRatio} />
+          ) : null}
           </View>
         </GestureDetector>
+      ) : null}
+
+      {/* safe-zone kapcsoló (bal felső sarok, csak szerkesztésben) */}
+      {mode === 'edit' && project ? (
+        <Pressable
+          onPress={toggleSafeZones}
+          hitSlop={8}
+          style={[styles.safeToggle, showSafeZones ? styles.safeToggleOn : null]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: showSafeZones }}
+          accessibilityLabel={t('editor.preview.safeZones')}
+        >
+          <Ionicons
+            name="scan-outline"
+            size={16}
+            color={showSafeZones ? palette.accent : palette.textDim}
+          />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -872,6 +874,23 @@ const styles = StyleSheet.create({
   canvas: {
     backgroundColor: '#05060a',
     overflow: 'hidden',
+  },
+  safeToggle: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  safeToggleOn: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
   },
   canvasSelected: {
     borderWidth: 1,

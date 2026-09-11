@@ -34,6 +34,68 @@
     "title": "Language",
     "subtitle": "Choose the app language"
   },
+  "auth": {
+    "signInTitle": "Welcome back",
+    "signInSubtitle": "Sign in to access your projects.",
+    "signUpTitle": "Create account",
+    "signUpSubtitle": "Sign up to start creating projects.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Your password",
+    "passwordHint": "At least 6 characters.",
+    "nameLabel": "Full name",
+    "namePlaceholder": "Jane Doe",
+    "nameHint": "At least two words and 2 uppercase letters.",
+    "phoneLabel": "Phone number",
+    "phonePlaceholder": "+1 555 123 4567",
+    "phoneInvalid": "Enter a valid phone number (7–15 digits).",
+    "birthdayLabel": "Date of birth",
+    "birthdayPlaceholder": "YYYY-MM-DD",
+    "birthdayInvalid": "Enter a valid date (YYYY-MM-DD), 13+ years old.",
+    "locationLabel": "Location",
+    "countryPlaceholder": "Country",
+    "cityPlaceholder": "City",
+    "signInAction": "Sign in",
+    "signUpAction": "Sign up",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "checkEmailTitle": "Check your email",
+    "checkEmailBody": "We sent a confirmation link to {{email}}. Confirm it, then sign in.",
+    "backToSignIn": "Back to sign in",
+    "notConfigured": "Sign-in backend is not configured (Supabase). Set EXPO_PUBLIC_SUPABASE_URL and _ANON_KEY.",
+    "account": "Account",
+    "signedInAs": "Signed in as {{email}}",
+    "signOut": "Sign out",
+    "signOutConfirm": "Do you want to sign out?"
+  },
+  "profile": {
+    "title": "Profile",
+    "personalSection": "Personal details",
+    "aiSection": "AI models",
+    "aiSectionHint": "Bring your own models: set an endpoint, model id and API key. The default one is used by the AI features.",
+    "accountSection": "Account",
+    "savedTitle": "Saved",
+    "profileSaved": "Your details have been updated.",
+    "noModels": "No models yet. Add one to use your own AI.",
+    "addModel": "Add model",
+    "editModel": "Edit model",
+    "newModel": "New model",
+    "labelLabel": "Name",
+    "labelPlaceholder": "e.g. My GPT-4o",
+    "providerLabel": "Provider",
+    "modelLabel": "Model",
+    "modelPlaceholder": "Model id",
+    "baseUrlLabel": "API endpoint",
+    "baseUrlPlaceholder": "https://…",
+    "baseUrlHint": "Leave empty to use the provider's default endpoint.",
+    "apiKeyLabel": "API key",
+    "apiKeyPlaceholder": "Your API key",
+    "apiKeyOptional": "Optional (e.g. local Ollama)",
+    "apiKeyHint": "Stored in your account (Supabase), readable only by you.",
+    "defaultBadge": "DEFAULT",
+    "deleteModelConfirm": "Delete this model configuration?"
+  },
   "home": {
     "appName": "Remix",
     "newProject": "New project",
@@ -54,6 +116,16 @@
     "tabTemplates": "Templates",
     "tabAiTools": "AI Tools",
     "projectNamePlaceholder": "Project name",
+    "titleLabel": "Title",
+    "aspectLabel": "Aspect ratio",
+    "seoSectionTitle": "SEO — for discovery",
+    "seoSectionHint": "For the TikTok/Reels caption and YouTube search — all required.",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What's the video about? With keywords…",
+    "hashtagsLabel": "Hashtags",
+    "hashtagsPlaceholder": "#reels #recipe (space or comma)",
+    "keywordsLabel": "Keywords",
+    "keywordsPlaceholder": "keywords separated by commas",
     "renameTitle": "Rename project",
     "deleteTitle": "Delete project",
     "deleteMessage": "Delete “{{name}}”?",
@@ -75,9 +147,7 @@
     "demoTitle": "Demo projects",
     "demoCreated_one": "{{count}} demo project created — open it to play, and try rendering too!",
     "demoCreated_other": "{{count}} demo projects created — open them to play, and try rendering too!",
-    "demoExist": "The demo projects already exist.",
-    "aiToolsTitle": "AI Tools",
-    "aiToolsMessage": "The AI tools are available in the editor (AI button): Auto Edit, Smart Search, cutting tools."
+    "demoExist": "The demo projects already exist."
   },
   "templates": {
     "hook-cta": {
@@ -139,6 +209,13 @@
       "tapToStop": "Tap to stop",
       "tapToRecord": "Tap to record (max 60 s)"
     },
+    "preview": {
+      "safeZones": "Safe zones"
+    },
+    "selection": {
+      "notVisible": "Not visible at this frame — tap to jump there.",
+      "focusMode": "Focus mode — dim other clips"
+    },
     "detailPreview": {
       "title": "Detail preview",
       "titleWithIcon": "🎬 Detail preview",
@@ -174,9 +251,15 @@
       "soloOn": "⭐ Only this (solo)",
       "soloOff": "⭐ Solo off",
       "lock": "🔒 Lock (against accidental moves)",
-      "unlock": "🔓 Unlock"
+      "unlock": "🔓 Unlock",
+      "gapRemove": "{{seconds}}s gap — tap to remove",
+      "collapse": "🔽 Collapse track",
+      "expand": "🔼 Expand track",
+      "minimap": "Timeline minimap"
     },
     "timelineClip": {
+      "lockedTitle": "Layer locked",
+      "lockedBody": "The {{track}} track is locked. Unlock it to edit.",
       "videoSpeed": "Video {{speed}}×",
       "video": "Video",
       "image": "Image",
@@ -340,6 +423,9 @@
       "grade_dreamy": "💗 Dreamy"
     },
     "assistant": {
+      "modelSection": "Model",
+      "modelAuto": "Auto",
+      "modelHint": "Add AI models in your profile, then pick one here.",
       "quickAction_shorten30": "Trim under 30 s",
       "quickAction_addTitleCta": "Add a title and closing CTA",
       "quickAction_captionsLowerThird": "Move captions to the lower third",
@@ -591,7 +677,8 @@
       "clearAutomation_one": "Clear automation ({{count}})",
       "clearAutomation_other": "Clear automation ({{count}})",
       "mixHint": "Voice Studio (noise reduction + compressor + loudness) and ducking take effect in the rendered MP4. Volume automation: set the volume, move the playhead to the desired point, and hit ◆ — the volume crosses over between keyframes (in preview and render alike).",
-      "emptyHint": "Select an audio clip on the timeline to mix, or add music with the „Music” button."
+      "emptyHint": "Select an audio clip on the timeline to mix, or add music with the „Music” button.",
+      "openHangStudio": "Open Sound Studio"
     },
     "captions": {
       "wordTiming": "Word timing",
@@ -814,7 +901,10 @@
       "aiCutoutTitle": "AI cutout",
       "aiCutoutUnavailable": "The cutout engine isn't available (needs a worker + u2net model).",
       "aiCutoutDoneTitle": "AI cutout done",
-      "aiCutoutDoneBody": "The subject was placed on the canvas as a separate layer — you can delete or replace the original photo, and any background can go beneath the cutout."
+      "aiCutoutDoneBody": "The subject was placed on the canvas as a separate layer — you can delete or replace the original photo, and any background can go beneath the cutout.",
+      "sectionImageStudio": "Image Studio",
+      "openImageStudio": "Open Image Studio",
+      "imageStudioHint": "Crop, rotate, flip, draw and adjust — all on your device, no upload."
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",
@@ -828,6 +918,7 @@
       "actionSection": "Action",
       "actionSeek": "Jump",
       "actionQuiz": "Quiz",
+      "urlInvalid": "Enter a full link (https://…).",
       "seekTo": "Jump to: {{time}}",
       "questionPlaceholder": "Question",
       "answerPlaceholder": "Answer {{index}}"
@@ -878,7 +969,7 @@
       "importKind_audio": "Audio",
       "importKind_image": "Image",
       "imageTimeLabel": "Image time (s):",
-      "importHint": "You can download the full video, audio only (to the music track), or a single frame — via the worker (yt-dlp). Use only with copyright-clear or your own content.",
+      "importHint": "YouTube video and audio download ON-DEVICE for free (standard quality, no subscription). HD, other sites (TikTok…) and single frames go via the cloud worker (Pro). Use only with copyright-clear or your own content.",
       "searchPlaceholder": "🔎 Search the Library (file name)…",
       "workerOffline": "Worker not reachable — start it: cd server && npm start",
       "refresh": "Refresh"
@@ -1173,12 +1264,17 @@
     "freePerk_export": "Export on device (even without watermark — your device renders it)",
     "activatePro": "Activate Pro",
     "notNow": "Not now",
+    "comingSoonTitle": "Coming soon",
+    "comingSoonBody": "In-app purchases aren't available yet — Pro will be purchasable in a future update.",
     "legal": "Purchases are currently in developer test mode (instant Pro). In production builds an App Store / Play subscription takes its place."
   },
   "playerScreen": {
     "quizCorrect": "Correct answer! 🎉",
     "quizWrong": "Wrong — check out the correct answer!",
-    "quizContinue": "Continue"
+    "quizContinue": "Continue",
+    "linkTitle": "Link",
+    "linkInvalid": "This hotspot has no valid link yet.",
+    "linkFailed": "Couldn't open the link."
   },
   "progressBar": {
     "working": "Working…",
@@ -1524,10 +1620,45 @@
       "rippleDelete_one": "ripple delete ({{count}} clip, {{moved}} shifted)",
       "rippleDelete_other": "ripple delete ({{count}} clips, {{moved}} shifted)",
       "rippleLength_one": "ripple length ({{count}} clip shifted)",
-      "rippleLength_other": "ripple length ({{count}} clips shifted)"
+      "rippleLength_other": "ripple length ({{count}} clips shifted)",
+      "closeGap": "close gap"
     },
     "progress": {
       "starting": "Starting…"
     }
+  },
+  "imageStudio": {
+    "title": "Image Studio",
+    "bakeFailed": "The operation failed — please try again.",
+    "tools": {
+      "transform": "Transform",
+      "crop": "Crop",
+      "adjust": "Adjust",
+      "draw": "Draw"
+    },
+    "rotateLeft": "Rotate left",
+    "rotateRight": "Rotate right",
+    "flipH": "Flip H",
+    "flipV": "Flip V",
+    "crop": {
+      "free": "Free",
+      "straighten": "Straighten"
+    },
+    "adjust": {
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturation": "Saturation",
+      "temperature": "Warmth"
+    }
+  },
+  "hangStudio": {
+    "title": "Sound Studio",
+    "volume": "Volume",
+    "fadeIn": "Fade in",
+    "fadeOut": "Fade out",
+    "enhance": "Voice enhance",
+    "deReverb": "Reduce room echo",
+    "autoDuck": "Auto-duck under voice",
+    "enhanceHint": "Enhancements are applied on-device in the final render (the preview approximates them)."
   }
 }

@@ -214,7 +214,8 @@
     },
     "selection": {
       "notVisible": "Ezen a képkockán nem látható — koppints az odaugráshoz.",
-      "focusMode": "Fókusz mód — a többi klip halványítása"
+      "focusMode": "Fókusz mód — a többi klip halványítása",
+      "aiAdded": "A ReMix AI adta hozzá"
     },
     "detailPreview": {
       "title": "Részlet-előnézet",

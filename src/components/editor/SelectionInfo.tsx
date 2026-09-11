@@ -122,6 +122,16 @@ export function SelectionInfo() {
           <Ionicons name="play-skip-forward-outline" size={13} color={palette.danger} />
         </Pressable>
       ) : null}
+
+      {/* 🤖 proveniencia (#34): „miért van ez itt?" — az AI adta hozzá, ezzel az indoklással */}
+      {clip.aiReason ? (
+        <View style={styles.aiNote}>
+          <Ionicons name="sparkles" size={12} color={palette.accent} />
+          <Text style={styles.aiNoteText} numberOfLines={3}>
+            {t('editor.selection.aiAdded')} — {clip.aiReason}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -159,6 +169,23 @@ const styles = StyleSheet.create({
     color: palette.danger,
     fontSize: 11,
     fontWeight: '600',
+  },
+  aiNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: palette.accentSoft,
+    borderWidth: 1,
+    borderColor: palette.accent,
+  },
+  aiNoteText: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 11,
+    lineHeight: 15,
   },
   type: {
     color: palette.text,

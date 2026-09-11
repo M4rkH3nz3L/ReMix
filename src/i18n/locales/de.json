@@ -214,7 +214,8 @@
     },
     "selection": {
       "notVisible": "In diesem Frame nicht sichtbar — zum Springen tippen.",
-      "focusMode": "Fokus-Modus — andere Clips abdunkeln"
+      "focusMode": "Fokus-Modus — andere Clips abdunkeln",
+      "aiAdded": "Von ReMix AI hinzugefügt"
     },
     "detailPreview": {
       "title": "Detailvorschau",

@@ -214,7 +214,8 @@
     },
     "selection": {
       "notVisible": "Not visible at this frame — tap to jump there.",
-      "focusMode": "Focus mode — dim other clips"
+      "focusMode": "Focus mode — dim other clips",
+      "aiAdded": "Added by ReMix AI"
     },
     "detailPreview": {
       "title": "Detail preview",

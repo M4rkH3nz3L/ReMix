@@ -1292,7 +1292,8 @@ export function AssistantPanel() {
     if (!reply) {
       return;
     }
-    const commands = toEditorCommands(reply.commands);
+    // proveniencia (#34): az AI-hozzáadott elemek megkapják az AI indoklását
+    const commands = toEditorCommands(reply.commands, reply.message);
     const state = useEditorStore.getState();
     let ok = 0;
     for (const command of commands) {

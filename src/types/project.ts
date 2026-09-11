@@ -187,6 +187,8 @@ export interface ClipBase {
   start: number;
   /** hossz az idővonalon (mp) */
   duration: number;
+  /** 🤖 ha az AI hozta létre: a művelet indoklása („miért van ez itt?" — #34) */
+  aiReason?: string;
 }
 
 /**

@@ -151,7 +151,7 @@ const PATCHABLE_FIELDS = new Set([
  * AI-parancsok → validált EditorCommand-ok. Az ismeretlen mezők kiszűrődnek,
  * az új szövegklipek teljes klipekké egészülnek ki.
  */
-export function toEditorCommands(commands: AiCommand[]): EditorCommand[] {
+export function toEditorCommands(commands: AiCommand[], aiReason?: string): EditorCommand[] {
   const result: EditorCommand[] = [];
   for (const cmd of commands) {
     switch (cmd.type) {
@@ -197,6 +197,8 @@ export function toEditorCommands(commands: AiCommand[]): EditorCommand[] {
           },
           animation: c.animation ?? 'pop',
           stylePreset: c.stylePreset ?? (cmd.trackType === 'captions' ? 'bubble' : 'outline'),
+          // 🤖 proveniencia (#34): az AI által hozzáadott elem indoklása
+          ...(aiReason ? { aiReason } : {}),
         }));
         result.push({ type: 'ADD_CLIPS', trackType: cmd.trackType, clips });
         break;

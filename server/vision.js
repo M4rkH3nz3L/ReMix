@@ -81,8 +81,11 @@ async function labelImage(imageFile) {
         {
           role: 'user',
           content:
-            'Írd le röviden MAGYARUL, mi látható a képen, és adj 5-10 magyar ' +
-            'címkét (tárgyak, személyek, helyszín, hangulat, tevékenység).',
+            'Írd le röviden MAGYARUL, mi látható a képen. Az "objects" mezőbe ' +
+            'sorolj fel KONKRÉT látható TÁRGYAKAT a fő jellemzőjükkel — szín/típus, ' +
+            'pl. "piros autó", "fehér kutya", "faasztal" (ne általánosságokat). A ' +
+            '"labels" mezőbe adj 6-12 magyar címkét: személyek, helyszín, ' +
+            'tevékenység, hangulat.',
           images: [image],
         },
       ],
@@ -91,6 +94,8 @@ async function labelImage(imageFile) {
         properties: {
           description: { type: 'string' },
           labels: { type: 'array', items: { type: 'string' } },
+          // konkrét látható tárgyak (objektum-kereséshez, Phase 2.3)
+          objects: { type: 'array', items: { type: 'string' } },
         },
         required: ['description', 'labels'],
       },
@@ -102,11 +107,22 @@ async function labelImage(imageFile) {
   }
   const reply = await res.json();
   const parsed = JSON.parse(reply.message?.content ?? '{}');
+  const clean = (arr) =>
+    Array.isArray(arr) ? arr.map((l) => String(l).slice(0, 40)).filter(Boolean) : [];
+  // az objektum-címkék a labels ELÉ kerülnek (kereséskor ezek a legjellemzőbbek),
+  // egyedire szűrve (kis-nagybetű-független), majd korlátozva
+  const merged = [];
+  const seen = new Set();
+  for (const l of [...clean(parsed.objects), ...clean(parsed.labels)]) {
+    const key = l.toLowerCase();
+    if (l && !seen.has(key)) {
+      seen.add(key);
+      merged.push(l);
+    }
+  }
   return {
     description: String(parsed.description ?? '').slice(0, 300),
-    labels: Array.isArray(parsed.labels)
-      ? parsed.labels.slice(0, 12).map((l) => String(l).slice(0, 40))
-      : [],
+    labels: merged.slice(0, 16),
   };
 }
 

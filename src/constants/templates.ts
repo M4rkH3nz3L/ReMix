@@ -119,7 +119,15 @@ export const templates: VideoTemplate[] = [
 /** Projekt a sablonból — a szövegsáv előre fel van töltve, a videó a creatoré.
  *  A név + felirat-placeholderek az aktuális nyelven égnek be (i18n, egyszeri). */
 export function createProjectFromTemplate(template: VideoTemplate): Project {
-  const project = createEmptyProject(t(templateNameKey(template.id)), template.aspectRatio);
+  const name = t(templateNameKey(template.id));
+  // a sablon már ad kiindulási SEO-t (cím + leírás), így a sablonból induló
+  // projekt sem marad meta nélkül — a hashtagek/kulcsszavak a creatorra várnak
+  const project = createEmptyProject(name, template.aspectRatio, {
+    title: name,
+    description: t(templateDescriptionKey(template.id)),
+    hashtags: [],
+    keywords: [],
+  });
   const textClips: TextClip[] = template.texts.map((tx, i) => ({
     kind: 'text',
     id: makeId('clip'),

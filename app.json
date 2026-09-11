@@ -60,7 +60,8 @@
           "microphonePermission": "A Remix a videó-felvételhez használja a mikrofont."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "react-native-audio-api"
     ],
     "experiments": {
       "typedRoutes": true,

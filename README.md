@@ -1,4 +1,4 @@
-# vided — interaktív videószerkesztő (React Native / Expo)
+# ReMix — interaktív videószerkesztő (React Native / Expo)
 
 Mobil-first, érintőképernyőre tervezett videószerkesztő, amelyben a vágás mellett
 **interaktív elemek** (kattintható hotspotok, elágazó ugrások, kvízek) is
@@ -193,9 +193,9 @@ A worker `/music` végpontja hang-könyvtárat szolgál ki az app Zene paneljén
 Koppintásra a hang letöltődik az eszközre és a lejátszófejnél kerül a
 hang-sávra (weben letöltés helyett streamel).
 
-### .vided projektfájl és Collect Project
+### .ReMix projektfájl és Collect Project
 
-- **`.vided` export** (Export panel): a projekt + asset-referenciák, nyers média
+- **`.ReMix` export** (Export panel): a projekt + asset-referenciák, nyers média
   nélkül — verziózott, átadható fájl. Exportkor minden asset **md5+méret
   ujjlenyomatot** kap (file identity). **Import** a főképernyő Import-gombjával:
   validálás + séma-migráció, majd **automatikus relink** — a hiányzó médiát az
@@ -203,7 +203,7 @@ hang-sávra (weben letöltés helyett streamel).
   ami így nem talál párt, arra tételenként kézi választót ajánl (a kihagyottak
   üres klipként maradnak).
 - **Collect Project** (Export panel): a worker `/collect` végpontja a projektet
-  + minden médiafájlt egyetlen zip-be csomagol (`project.vided` + `media/`,
+  + minden médiafájlt egyetlen zip-be csomagol (`project.ReMix` + `media/`,
   a projekt uri-jai relatív útra átírva) — átadáshoz, archiváláshoz.
 
 ### AI-hang (TTS)

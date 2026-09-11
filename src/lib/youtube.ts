@@ -1,9 +1,11 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { t as tr } from 'i18next';
+import { Platform } from 'react-native';
 
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
 import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
+import { importYouTubeLocal } from '@/lib/youtubeLocal';
 
 /**
  * URL-import kliens (YouTube stb.): a felhő-worker yt-dlp-alapú végpontja.
@@ -46,6 +48,23 @@ export async function importYouTubeMedia(
   atSec?: number,
   onProgress?: (update: ProgressUpdate) => void
 ): Promise<YtImport> {
+  // 1) 🆓 INGYENES on-device út (YouTube, videó/hang): nincs worker, nincs Pro —
+  //    amit a készülék maga meg tud csinálni, az a felhasználónak ingyen jár.
+  //    Best-effort: ha eszközön nem oldható meg (HD, más oldal, képkocka, vagy a
+  //    YouTube nem ad direkt streamet), null-t ad → a fizetős worker-útra esünk.
+  if (Platform.OS !== 'web') {
+    try {
+      const local = await importYouTubeLocal(url, kind, onProgress);
+      if (local) {
+        return local;
+      }
+    } catch {
+      // best-effort — bármi hiba esetén megy tovább a worker-fallback
+    }
+  }
+
+  // 2) 💳 FIZETŐS worker-út (HD, más oldalak, képkocka): yt-dlp + ffmpeg a
+  //    workeren → Pro-kapu (ensureCloud dob, ha nincs előfizetés).
   const base = ensureCloud('urlImport');
   // a szerver-oldali kinyerés hossza nem mérhető előre (yt-dlp), ezért ez a
   // fázis határozatlan — de a felhasználó legalább látja, MI történik épp

@@ -137,13 +137,21 @@ export function PrimaryButton({
   label,
   onPress,
   icon,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
   icon?: IoniconName;
+  disabled?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.primaryPressable}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      style={[styles.primaryPressable, disabled ? styles.primaryDisabled : null]}
+    >
       <LinearGradient
         colors={[...accentGradient]}
         start={{ x: 0, y: 0 }}
@@ -252,6 +260,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+  },
+  primaryDisabled: {
+    opacity: 0.4,
   },
   primaryButton: {
     flexDirection: 'row',

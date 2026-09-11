@@ -1,15 +1,13 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { uploadFetch } from '@/lib/upload';
-import { renderServerUrl } from '@/lib/render';
-
 /**
- * Hang-hullámforma az idővonalhoz (full-plan F2 waveform-szelet). A csúcsokat
- * a worker /waveform végpontja számolja FFmpeg-gel; az eredmény lemezre
- * cache-elődik (fájlnév+méret kulccsal), így egy hangfájl csak egyszer megy
- * fel. Ha a worker nem fut, csendben null jön vissza — az idővonal címkével
- * működik tovább.
+ * Hang-hullámforma az idővonalhoz ÉS a Hang Stúdióhoz. A csúcsokat AZ ESZKÖZÖN
+ * számoljuk (worker nélkül): a `react-native-audio-api` natívan dekódolja a
+ * hangot (8 kHz-en, ennyi bőven elég a görbéhez), weben a WebAudio. Az eredmény
+ * lemezre cache-elődik (fájlnév+méret kulccsal), így egy fájlt csak egyszer
+ * dekódolunk. Hiba esetén csendben null — a UI címkével/sávval működik tovább.
  */
 
 export interface WaveformData {
@@ -31,28 +29,55 @@ function hashKey(input: string): string {
   return h.toString(36);
 }
 
-async function fetchFromWorker(uri: string): Promise<WaveformData | null> {
-  const base = renderServerUrl();
+/** csúcsok kinyerése egy dekódolt csatornából (közös a natív + web úthoz) */
+function peaksFromChannel(
+  channel: Float32Array,
+  sampleRate: number,
+  duration: number,
+  pps: number
+): WaveformData | null {
+  const samplesPerPeak = Math.max(1, Math.floor(sampleRate / pps));
+  const peaks: number[] = [];
+  for (let i = 0; i + samplesPerPeak <= channel.length; i += samplesPerPeak) {
+    let max = 0;
+    // ritkított mintavétel a csúcson belül — gyors, a burkológörbe megmarad
+    for (let j = i; j < i + samplesPerPeak; j += 4) {
+      const v = Math.abs(channel[j]);
+      if (v > max) {
+        max = v;
+      }
+    }
+    peaks.push(Math.round(max * 100) / 100);
+  }
+  return peaks.length > 0 ? { duration, peaksPerSecond: pps, peaks } : null;
+}
+
+/**
+ * A natív dekóder állapota. A `react-native-audio-api` NATÍV modul: Expo Go-ban
+ * (és rá nem buildelt dev-kliensben) NINCS jelen, és MÁR AZ IMPORTKOR dob
+ * (modul-szintű install-ellenőrzés) — a lusta import() ezt csak elhalasztja, de
+ * minden hívásnál újra megtörténne (hibaspam). Ezért: Expo Go-ban meg se
+ * próbáljuk, és az első hiány után végleg lemondunk róla (csendes visszaesés a
+ * sima sávra). Valódi (natív) buildben a modul jelen van → valódi hullámforma.
+ */
+let nativeDecoder: 'unknown' | 'ok' | 'missing' = 'unknown';
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+/** ESZKÖZÖN (natív) dekódolás → csúcsok, worker nélkül (react-native-audio-api). */
+async function computeNativeWaveform(uri: string): Promise<WaveformData | null> {
+  if (nativeDecoder === 'missing' || isExpoGo) {
+    return null; // nincs natív modul — nincs import-kísérlet, nincs hibalog
+  }
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
-    await fetch(`${base}/health`, { signal: controller.signal });
-    clearTimeout(timer);
+    const { decodeAudioData } = await import('react-native-audio-api');
+    // alacsony mintavétel: a görbéhez elég, gyors és kevés memória
+    const audio = await decodeAudioData(uri, 8000);
+    nativeDecoder = 'ok';
+    return peaksFromChannel(audio.getChannelData(0), audio.sampleRate, audio.duration, 20);
   } catch {
-    return null; // worker nem fut — nincs hullámforma, nincs hiba
-  }
-  const name = uri.split('/').pop() ?? 'audio';
-  const form = new FormData();
-  form.append('media', new File(uri) as unknown as Blob, name);
-  const res = await uploadFetch(`${base}/waveform`, { method: 'POST', body: form });
-  if (!res.ok) {
+    nativeDecoder = 'missing'; // többé ne próbálkozzunk (nincs spam)
     return null;
   }
-  const body = (await res.json()) as WaveformData;
-  if (!Array.isArray(body.peaks) || body.peaks.length === 0) {
-    return null;
-  }
-  return body;
 }
 
 /** weben a csúcsokat a WebAudio számolja — a worker/feltöltés kihagyható */
@@ -121,7 +146,7 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
       cacheFile = null;
     }
     try {
-      const data = await fetchFromWorker(uri);
+      const data = await computeNativeWaveform(uri);
       if (data && cacheFile) {
         try {
           cacheFile.write(JSON.stringify(data));

@@ -10,6 +10,7 @@ import type {
   Clip,
   ImageClip,
   Project,
+  ProjectSeo,
   Track,
   TrackType,
   VideoClip,
@@ -28,12 +29,19 @@ const CANONICAL_TRACKS: { type: TrackType; name: string }[] = [
   { type: 'sfx', name: 'SFX' },
 ];
 
-export function createEmptyProject(name: string, aspectRatio: AspectRatio): Project {
+export function createEmptyProject(
+  name: string,
+  aspectRatio: AspectRatio,
+  seo?: ProjectSeo
+): Project {
   const now = new Date().toISOString();
   return {
     id: makeId('prj'),
     name,
     aspectRatio,
+    // a SEO-meta a létrehozáskor kötelező (Új projekt űrlap); demo/import útján
+    // hiányozhat — ezért opcionális a mezőn, és csak akkor kerül be, ha van
+    ...(seo ? { seo } : {}),
     tracks: CANONICAL_TRACKS.map((t) => ({
       id: makeId('trk'),
       type: t.type,
@@ -45,6 +53,31 @@ export function createEmptyProject(name: string, aspectRatio: AspectRatio): Proj
     updatedAt: now,
     schemaVersion: 5,
   };
+}
+
+/** közös: trimmelt, üres- és duplikátum-mentes tokenlista (kis/nagybetű-érzéketlen). */
+function dedupeTokens(parts: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of parts) {
+    const value = raw.trim();
+    const key = value.toLowerCase();
+    if (value && !seen.has(key)) {
+      seen.add(key);
+      out.push(value);
+    }
+  }
+  return out;
+}
+
+/** „#viral, fun  travel" → ['viral','fun','travel'] — `#` nélkül, szó/vessző mentén. */
+export function parseHashtags(input: string): string[] {
+  return dedupeTokens(input.replace(/#/g, ' ').split(/[\s,]+/));
+}
+
+/** „főzés, gyors recept" → ['főzés','gyors recept'] — vesszős lista (szóköz megengedett). */
+export function parseKeywords(input: string): string[] {
+  return dedupeTokens(input.split(','));
 }
 
 /**

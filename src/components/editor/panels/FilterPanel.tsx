@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
+import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { aspectValue, filters, palette } from '@/constants/editor';
 import { requestCutout } from '@/lib/bgremove';
 import { CAMERA_PRESETS, buildCameraMove } from '@/lib/camera3d';
@@ -378,6 +378,18 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
 
   return (
     <View>
+      {clip.kind === 'image' ? (
+        <PanelSection title={t('panels.filter.sectionImageStudio')}>
+          <PrimaryButton
+            icon="brush-outline"
+            label={t('panels.filter.openImageStudio')}
+            onPress={() => useEditorStore.getState().openImageStudio(clip.id)}
+          />
+          <Text style={{ color: palette.textDim, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+            {t('panels.filter.imageStudioHint')}
+          </Text>
+        </PanelSection>
+      ) : null}
       <PanelSection title={t('panels.filter.sectionFilters')}>
         <View style={styles.grid}>
           {filters.map((filter) => (

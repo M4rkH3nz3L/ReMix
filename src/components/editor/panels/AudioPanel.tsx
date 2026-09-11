@@ -279,6 +279,11 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
 
       {clip ? (
         <PanelSection title={t('panels.audio.mixTitle', { label: clip.label })}>
+          <PrimaryButton
+            icon="options-outline"
+            label={t('panels.audio.openHangStudio')}
+            onPress={() => useEditorStore.getState().openAudioStudio(clip.id)}
+          />
           <Stepper
             label={t('panels.audio.volume')}
             value={`${Math.round(clip.volume * 100)}%`}

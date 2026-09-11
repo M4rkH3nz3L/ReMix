@@ -666,10 +666,30 @@ export interface ImageDoc {
   renderedUri?: string;
 }
 
+/**
+ * 🔎 SEO / közzétételi meta — a felfedezéshez: a TikTok/Reels felirat + hashtag
+ * és a YouTube cím/leírás/kulcsszavak. A projekt LÉTREHOZÁSAKOR kötelezően
+ * kitöltött (lásd az „Új projekt” űrlapot a főképernyőn); a social `FeedPost`
+ * (title/description/hashtags) egy-az-egyben erre képződik le. A hashtagek és a
+ * kulcsszavak `#` nélkül, trimmelve, duplikátum-mentesen tárolódnak.
+ */
+export interface ProjectSeo {
+  /** közzétételi cím (kulcsszavas; a `name`-től eltérhet) */
+  title: string;
+  /** leírás/felirat kulcsszavakkal */
+  description: string;
+  /** hashtagek `#` nélkül */
+  hashtags: string[];
+  /** kulcsszavak (YouTube-tagek) */
+  keywords: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
   aspectRatio: AspectRatio;
+  /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
+  seo?: ProjectSeo;
   tracks: Track[];
   /** a projekt által hivatkozott médiafájlok */
   assets: Asset[];

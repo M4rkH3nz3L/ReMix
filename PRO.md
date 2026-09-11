@@ -12,6 +12,18 @@
 
 ---
 
+## Haladás (élő)
+
+- ✅ **Phase 0** — per-user előfizetés (Supabase `subscriptions` + szinkron + RLS).
+- ✅ **1.1** AI Story Engine · ✅ **1.2** AI Pacing · ✅ **1.3** filler + dadogás/
+  ismétlés · ✅ **1.5** felvétel-minőség (homály/expozíció).
+- ⏳ **1.4** Speaker diarization — DÖNTÉSRE VÁR (hang-ML modell választása; a
+  Caption Studio-ban már van kamera/arc-alapú beszélő-heurisztika).
+- ⏳ **1.6** Emotion (opcionális, később).
+- ▶️ Következő: **Phase 2** (Semantic select → parancs) vagy 1.4 (modelldöntés után).
+
+---
+
 ## 0. Döntések (rögzítve)
 
 ### 0.1 Kapuzási elv — **szigorú on-device = ingyen**

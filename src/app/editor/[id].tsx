@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HangStudio } from '@/components/editor/HangStudio';
+import { ImageStudio } from '@/components/editor/ImageStudio';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
@@ -28,7 +30,7 @@ import { loadEvents, loadProject, saveEvents, saveProject } from '@/lib/storage'
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
 import { indexProjectVision } from '@/lib/visionSearch';
-import { selectPanelVisible, useEditorStore } from '@/store/editorStore';
+import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
 
 const AUTOSAVE_MS = 800;
 
@@ -45,7 +47,7 @@ const RAIL_ITEMS = [
 
 export default function EditorScreen() {
   const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, panel } = useLocalSearchParams<{ id: string; panel?: string }>();
   const project = useEditorStore((s) => s.project);
   const dirty = useEditorStore((s) => s.dirty);
   const panelVisible = useEditorStore(selectPanelVisible);
@@ -56,6 +58,30 @@ export default function EditorScreen() {
   const L = useLayout();
 
   usePlaybackClock();
+
+  // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
+  // füléből: ?panel=assistant) — a projekt betöltése után EGYSZER nyitjuk meg
+  const panelOpenedRef = useRef(false);
+  useEffect(() => {
+    if (panelOpenedRef.current || !panel || project?.id !== id) {
+      return;
+    }
+    // csak a kijelölés nélkül is nyitható (standalone) paneleket engedjük paramból
+    const openable = new Set<PanelId>([
+      'assistant',
+      'export',
+      'captions',
+      'audio',
+      'library',
+      'transcript',
+      'sticker',
+      'imagedoc',
+    ]);
+    if (openable.has(panel as PanelId)) {
+      useEditorStore.getState().setPanel(panel as PanelId);
+      panelOpenedRef.current = true;
+    }
+  }, [panel, project?.id, id]);
 
   // projekt betöltése (ha nem ez van a store-ban)
   useEffect(() => {
@@ -395,6 +421,8 @@ export default function EditorScreen() {
         {body}
         <AudioLayer />
       </KeyboardAvoidingView>
+      <ImageStudio />
+      <HangStudio />
     </SafeAreaView>
   );
 }

@@ -189,7 +189,11 @@ export function ExportPanel() {
   return (
     <View style={{ gap: 12 }}>
       {isPro ? (
-        <Pressable style={styles.proActive} onLongPress={mockDowngrade}>
+        // a hosszú-nyomásos Free-re-váltás CSAK dev-buildben (rejtett teszt-gesztus)
+        <Pressable
+          style={styles.proActive}
+          onLongPress={__DEV__ ? mockDowngrade : undefined}
+        >
           <Ionicons name="sparkles" size={15} color={palette.accent} />
           <Text style={styles.proActiveText}>{t('panels.export.proActive')}</Text>
         </Pressable>

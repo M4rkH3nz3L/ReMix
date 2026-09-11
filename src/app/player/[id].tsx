@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   Linking,
   Modal,
   Pressable,
@@ -18,6 +19,7 @@ import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { projectDuration } from '@/lib/projectUtils';
 import { loadProject } from '@/lib/storage';
+import { isValidActionUrl } from '@/lib/url';
 import { useEditorStore } from '@/store/editorStore';
 import { formatTime } from '@/lib/time';
 import type { InteractiveClip } from '@/types/project';
@@ -69,9 +71,18 @@ export default function PlayerScreen() {
 
   const onHotspotPress = (clip: InteractiveClip) => {
     switch (clip.action.type) {
-      case 'url':
-        Linking.openURL(clip.action.url).catch(() => {});
+      case 'url': {
+        const url = clip.action.url.trim();
+        // üres/érvénytelen link: néma bukás helyett rövid visszajelzés
+        if (!isValidActionUrl(url)) {
+          Alert.alert(t('playerScreen.linkTitle'), t('playerScreen.linkInvalid'));
+          break;
+        }
+        Linking.openURL(url).catch(() =>
+          Alert.alert(t('playerScreen.linkTitle'), t('playerScreen.linkFailed'))
+        );
         break;
+      }
       case 'seek':
         setPlayhead(clip.action.toTime);
         setPlaying(true);

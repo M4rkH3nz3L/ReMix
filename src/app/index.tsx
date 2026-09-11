@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -33,7 +33,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { withProgress } from '@/store/progressStore';
 import { createDemoProjects } from '@/lib/demoProjects';
 import { makeId } from '@/lib/id';
-import { createEmptyProject } from '@/lib/projectUtils';
+import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { formatTime } from '@/lib/time';
@@ -85,6 +85,10 @@ export default function ProjectsScreen() {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
+  // 🔎 SEO-meta — a projekt létrehozásakor kötelező (a cím = a projekt neve fent)
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoHashtags, setSeoHashtags] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState('');
   const [aspect, setAspect] = useState<AspectRatio>('9:16');
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -92,6 +96,8 @@ export default function ProjectsScreen() {
   const [langOpen, setLangOpen] = useState(false);
   const { t } = useTranslation();
   const L = useLayout();
+  // a lista-referencia a fülsáv „ugrás" műveleteihez (tetejére / sablonokhoz)
+  const listRef = useRef<FlatList<ProjectMeta>>(null);
   // a kártya kívánt szélességéből számolt rács — iPaden 3–4 oszlop is lehet,
   // a korábbi fix „640px → 2 oszlop" helyett (lásd @/constants/layout)
   const columns = gridColumns(L.width, 340, 4);
@@ -102,11 +108,34 @@ export default function ProjectsScreen() {
 
   useFocusEffect(refresh);
 
+  const resetCreateForm = () => {
+    setName('');
+    setSeoDescription('');
+    setSeoHashtags('');
+    setSeoKeywords('');
+  };
+
+  // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve
+  const seoReady =
+    name.trim().length > 0 &&
+    seoDescription.trim().length > 0 &&
+    parseHashtags(seoHashtags).length > 0 &&
+    parseKeywords(seoKeywords).length > 0;
+
   const create = async () => {
-    const project = createEmptyProject(name.trim() || t('home.newVideoDefault'), aspect);
+    const title = name.trim();
+    const description = seoDescription.trim();
+    const hashtags = parseHashtags(seoHashtags);
+    const keywords = parseKeywords(seoKeywords);
+    // védőkorlát: a gomb tiltva van, míg mind ki nincs töltve
+    if (!title || !description || hashtags.length === 0 || keywords.length === 0) {
+      return;
+    }
+    // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
+    const project = createEmptyProject(title, aspect, { title, description, hashtags, keywords });
     await saveProject(project);
     setCreating(false);
-    setName('');
+    resetCreateForm();
     router.push(`/editor/${project.id}`);
   };
 
@@ -221,6 +250,17 @@ export default function ProjectsScreen() {
       .catch((err: Error) => Alert.alert(t('common.import'), err.message));
   };
 
+  // 🤖 „AI eszközök": az AI a szerkesztőben él → a legutóbbi projektet nyitjuk
+  // meg egyből az AI-panellel; ha még nincs projekt, előbb létrehozunk egyet
+  const openAiTools = () => {
+    const recent = projects[0];
+    if (recent) {
+      router.push(`/editor/${recent.id}?panel=assistant`);
+    } else {
+      setCreating(true);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -239,6 +279,16 @@ export default function ProjectsScreen() {
         >
           <Ionicons name="language-outline" size={20} color={palette.textDim} />
           <Text style={styles.importLabel}>{t('language.title')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/profile')}
+          hitSlop={8}
+          style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('auth.account')}
+        >
+          <Ionicons name="person-circle-outline" size={20} color={palette.textDim} />
+          <Text style={styles.importLabel}>{t('auth.account')}</Text>
         </Pressable>
         <Pressable
           onPress={() => {
@@ -278,6 +328,7 @@ export default function ProjectsScreen() {
       </View>
 
       <FlatList
+        ref={listRef}
         data={projects}
         key={columns}
         numColumns={columns}
@@ -366,16 +417,23 @@ export default function ProjectsScreen() {
       <View style={styles.tabBar}>
         {(
           [
-            { icon: 'albums', label: t('home.tabProjects'), active: true, onPress: () => {} },
+            {
+              icon: 'albums',
+              label: t('home.tabProjects'),
+              active: true,
+              // aktív fül újra-koppintása → a lista tetejére (iOS-minta)
+              onPress: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+            },
             {
               icon: 'grid-outline',
               label: t('home.tabTemplates'),
-              onPress: () => setCreating(true),
+              // a sablonok a lista alján (karusszel) → odagörgetünk, nem create-modal
+              onPress: () => listRef.current?.scrollToEnd({ animated: true }),
             },
             {
               icon: 'sparkles-outline',
               label: t('home.tabAiTools'),
-              onPress: () => Alert.alert(t('home.aiToolsTitle'), t('home.aiToolsMessage')),
+              onPress: openAiTools,
             },
           ] as const
         ).map((tab) => (
@@ -405,32 +463,81 @@ export default function ProjectsScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalGrabber} />
             <Text style={styles.modalTitle}>{t('home.newProject')}</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder={t('home.projectNamePlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-              autoFocus
-            />
-            <View style={styles.aspectRow}>
-              {aspectRatios.map((option) => (
-                <Chip
-                  key={option.id}
-                  label={t(option.label)}
-                  active={aspect === option.id}
-                  onPress={() => setAspect(option.id)}
-                />
-              ))}
-            </View>
+            <ScrollView
+              style={{ maxHeight: Math.round(L.height * 0.5) }}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.fieldLabel}>{t('home.titleLabel')}</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t('home.projectNamePlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+                autoFocus
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.seoSectionTitle')}</Text>
+              <Text style={styles.seoHint}>{t('home.seoSectionHint')}</Text>
+
+              <Text style={styles.fieldLabel}>{t('home.descriptionLabel')}</Text>
+              <TextInput
+                value={seoDescription}
+                onChangeText={setSeoDescription}
+                placeholder={t('home.descriptionPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={[styles.input, styles.inputMultiline]}
+                multiline
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.hashtagsLabel')}</Text>
+              <TextInput
+                value={seoHashtags}
+                onChangeText={setSeoHashtags}
+                placeholder={t('home.hashtagsPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.keywordsLabel')}</Text>
+              <TextInput
+                value={seoKeywords}
+                onChangeText={setSeoKeywords}
+                placeholder={t('home.keywordsPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.aspectLabel')}</Text>
+              <View style={styles.aspectRow}>
+                {aspectRatios.map((option) => (
+                  <Chip
+                    key={option.id}
+                    label={t(option.label)}
+                    active={aspect === option.id}
+                    onPress={() => setAspect(option.id)}
+                  />
+                ))}
+              </View>
+            </ScrollView>
             <PrimaryButton
               icon="checkmark"
               label={t('common.create')}
+              disabled={!seoReady}
               onPress={() => {
                 create().catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
               }}
             />
-            <Pressable onPress={() => setCreating(false)} style={styles.cancel}>
+            <Pressable
+              onPress={() => {
+                setCreating(false);
+                resetCreateForm();
+              }}
+              style={styles.cancel}
+            >
               <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </View>
@@ -736,6 +843,26 @@ const styles = StyleSheet.create({
     color: palette.text,
     padding: 12,
     fontSize: 15,
+  },
+  inputMultiline: {
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  modalScrollContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  fieldLabel: {
+    color: palette.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  seoHint: {
+    color: palette.textDim,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: -4,
   },
   aspectRow: {
     flexDirection: 'row',

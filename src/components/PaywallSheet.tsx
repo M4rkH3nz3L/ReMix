@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { accentGradient, palette } from '@/constants/editor';
@@ -30,9 +30,14 @@ export function PaywallSheet() {
   const trigger = capability ? capabilityLabel(capability) : null;
 
   const onUpgrade = () => {
-    // TODO(IAP): éles vásárlás — RevenueCat/StoreKit a natív buildben
-    mockUpgrade();
-    close();
+    // DEV: azonnali Pro a teszteléshez. Éles buildben NINCS valódi IAP-réteg
+    // (TODO(IAP): RevenueCat/StoreKit) → nem osztunk ingyen Prót, csak jelezzük.
+    if (__DEV__) {
+      mockUpgrade();
+      close();
+      return;
+    }
+    Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
   };
 
   return (
@@ -95,7 +100,10 @@ export function PaywallSheet() {
                 style={styles.cta}
               >
                 <Ionicons name="rocket" size={16} color={palette.text} />
-                <Text style={styles.ctaText}>{t('paywallSheet.activatePro')}</Text>
+                <Text style={styles.ctaText}>
+                  {t('paywallSheet.activatePro')}
+                  {__DEV__ ? ' (DEV)' : ''}
+                </Text>
               </LinearGradient>
             </Pressable>
             <Pressable onPress={close} style={styles.dismiss}>

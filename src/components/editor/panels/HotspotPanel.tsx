@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { clamp, formatTime } from '@/lib/time';
+import { isValidActionUrl } from '@/lib/url';
 import { useEditorStore } from '@/store/editorStore';
 import type { HotspotAction, InteractiveClip } from '@/types/project';
 
@@ -23,7 +24,7 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
       return;
     }
     if (type === 'url') {
-      setAction({ type: 'url', url: 'https://' });
+      setAction({ type: 'url', url: '' });
     } else if (type === 'seek') {
       setAction({ type: 'seek', toTime: 0 });
     } else {
@@ -74,16 +75,26 @@ export function HotspotPanel({ clip }: { clip: InteractiveClip }) {
         </View>
 
         {clip.action.type === 'url' ? (
-          <TextInput
-            value={clip.action.url}
-            onChangeText={(url) => setAction({ type: 'url', url })}
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            placeholder="https://…"
-            placeholderTextColor={palette.textDim}
-          />
+          <>
+            <TextInput
+              value={clip.action.url}
+              onChangeText={(url) => setAction({ type: 'url', url })}
+              style={[
+                styles.input,
+                clip.action.url.length > 0 && !isValidActionUrl(clip.action.url)
+                  ? styles.inputError
+                  : null,
+              ]}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              placeholder="https://…"
+              placeholderTextColor={palette.textDim}
+            />
+            {!isValidActionUrl(clip.action.url) ? (
+              <Text style={styles.urlWarning}>{t('panels.hotspot.urlInvalid')}</Text>
+            ) : null}
+          </>
         ) : null}
 
         {clip.action.type === 'seek' ? (
@@ -167,6 +178,14 @@ const styles = StyleSheet.create({
     color: palette.text,
     padding: 10,
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: palette.danger,
+  },
+  urlWarning: {
+    color: palette.danger,
+    fontSize: 12,
+    marginTop: 4,
   },
   row: {
     flexDirection: 'row',

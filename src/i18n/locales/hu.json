@@ -217,6 +217,9 @@
       "focusMode": "Fókusz mód — a többi klip halványítása",
       "aiAdded": "A ReMix AI adta hozzá"
     },
+    "pacing": {
+      "slow": "lassú"
+    },
     "story": {
       "empty": "Nincs fejezet — koppints a +-ra a történet feltérképezéséhez",
       "addChapter": "Fejezet a lejátszófejnél",

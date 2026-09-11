@@ -217,6 +217,9 @@
       "focusMode": "Fokus-Modus — andere Clips abdunkeln",
       "aiAdded": "Von ReMix AI hinzugefügt"
     },
+    "pacing": {
+      "slow": "langsam"
+    },
     "story": {
       "empty": "Keine Kapitel — tippe auf +, um deine Story zu gliedern",
       "addChapter": "Kapitel am Abspielkopf hinzufügen",

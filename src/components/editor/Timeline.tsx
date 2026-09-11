@@ -5,6 +5,7 @@ import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 
+import { PacingLane } from '@/components/editor/PacingLane';
 import { StoryLane } from '@/components/editor/StoryLane';
 import { TimelineClip } from '@/components/editor/TimelineClip';
 import { TimelineMinimap } from '@/components/editor/TimelineMinimap';
@@ -235,6 +236,8 @@ export function Timeline() {
       <StoryLane />
       {/* 🗺️ minimap: a teljes projekt + a jelenlegi nézet (viewport) */}
       <TimelineMinimap viewportW={viewportW} pps={pps} />
+      {/* 📈 pacing: vágás-ritmus / energia + „lassú szakasz" jelölés */}
+      <PacingLane />
       <GestureDetector gesture={pinch}>
         <View style={styles.outerRow}>
         {showHeaders ? (

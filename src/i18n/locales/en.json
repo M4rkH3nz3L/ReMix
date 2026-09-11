@@ -217,6 +217,9 @@
       "focusMode": "Focus mode — dim other clips",
       "aiAdded": "Added by ReMix AI"
     },
+    "pacing": {
+      "slow": "slow"
+    },
     "story": {
       "empty": "No chapters — tap + to map your story",
       "addChapter": "Add chapter at playhead",

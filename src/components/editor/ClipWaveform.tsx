@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { palette } from '@/constants/editor';
 import { getWaveform, resamplePeaks } from '@/lib/waveform';
 import type { WaveformData } from '@/lib/waveform';
 import { clamp } from '@/lib/time';
 import type { AudioClip } from '@/types/project';
+
+/** full-scale (0 dBFS) közeli csúcs = torzulás/clipping — a csúcsok abszolút [0,1] értékek */
+const CLIP_THRESHOLD = 0.99;
 
 interface Props {
   clip: AudioClip;
@@ -50,6 +54,8 @@ export function ClipWaveform({ clip, widthPx, heightPx, color }: Props) {
   const norm = bars.map((p) =>
     mx - mn > 0.02 ? 0.3 + 0.7 * ((p - mn) / (mx - mn)) : 0.6
   );
+  // ⚠️ clipping: a NYERS (full-scale) csúcs 0 dBFS közelében — torzulhat a hang
+  const clipping = bars.map((p) => p >= CLIP_THRESHOLD);
   // a hullám a klip TELJES magasságát használja — markáns, telt megjelenés
   const maxBar = heightPx - 4;
 
@@ -63,7 +69,8 @@ export function ClipWaveform({ clip, widthPx, heightPx, color }: Props) {
             marginRight: 1,
             borderRadius: 1.5,
             height: Math.max(3, p * maxBar),
-            backgroundColor: color,
+            // a torzuló (clipping) sávok pirosak — azonnal látszik, hol esik szét a hang
+            backgroundColor: clipping[i] ? palette.danger : color,
           }}
         />
       ))}

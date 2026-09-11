@@ -1468,6 +1468,8 @@
       "setMarkers_other": "jelölők ({{count}})",
       "setChapters_one": "fejezetek ({{count}})",
       "setChapters_other": "fejezetek ({{count}})",
+      "setLinks_one": "linkek ({{count}})",
+      "setLinks_other": "linkek ({{count}})",
       "upsertImageDoc_one": "kép-dokumentum: {{name}} ({{count}} réteg)",
       "upsertImageDoc_other": "kép-dokumentum: {{name}} ({{count}} réteg)",
       "removeImageDoc": "kép-dokumentum törölve",

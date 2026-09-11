@@ -719,6 +719,8 @@ export interface Project {
   /** 🔀 remix-forrás: miből készült ez a projekt (duplikálás/remix). A lineage-
    *  lánc a szülő-hivatkozások (remixOf.projectId) mentén bejárható. */
   remixOf?: { projectId: string; name: string };
+  /** 🔗 link-csoportok: az egy csoportban lévő klipek együtt mozognak (persisztált) */
+  links?: string[][];
   /**
    * 🎨 Kép-dokumentumok (Creative Canvas): a projekthez tartozó réteg-fák.
    * A vászonra kirasterizált PNG-jük képklipként kerül az idővonalra, de a

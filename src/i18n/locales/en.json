@@ -1468,6 +1468,8 @@
       "setMarkers_other": "markers ({{count}})",
       "setChapters_one": "chapters ({{count}})",
       "setChapters_other": "chapters ({{count}})",
+      "setLinks_one": "links ({{count}})",
+      "setLinks_other": "links ({{count}})",
       "upsertImageDoc_one": "image document: {{name}} ({{count}} layer)",
       "upsertImageDoc_other": "image document: {{name}} ({{count}} layers)",
       "removeImageDoc": "image document deleted",

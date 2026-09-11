@@ -40,10 +40,10 @@ export function Toolbar() {
   const rippleMode = useEditorStore((s) => s.rippleMode);
   const setRippleMode = useEditorStore((s) => s.setRippleMode);
   // 🔗 link-csoportok: linkelt klipek együtt mozognak
-  const linkGroups = useEditorStore((s) => s.linkGroups);
+  const projectLinks = useEditorStore((s) => s.project?.links);
   const linkSelected = useEditorStore((s) => s.linkSelected);
   const unlinkClip = useEditorStore((s) => s.unlinkClip);
-  const isLinked = !!selected && linkGroups.some((g) => g.includes(selected.id));
+  const isLinked = !!selected && !!projectLinks?.some((g) => g.includes(selected.id));
   const canPasteStyle = Boolean(
     styleClipboard && selected && styleClipboard.kind === selected.kind
   );

@@ -1468,6 +1468,8 @@
       "setMarkers_other": "Marker ({{count}})",
       "setChapters_one": "Kapitel ({{count}})",
       "setChapters_other": "Kapitel ({{count}})",
+      "setLinks_one": "Verknüpfungen ({{count}})",
+      "setLinks_other": "Verknüpfungen ({{count}})",
       "upsertImageDoc_one": "Bilddokument: {{name}} ({{count}} Ebene)",
       "upsertImageDoc_other": "Bilddokument: {{name}} ({{count}} Ebenen)",
       "removeImageDoc": "Bilddokument gelöscht",

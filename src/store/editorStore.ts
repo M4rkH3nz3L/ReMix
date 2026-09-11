@@ -83,8 +83,6 @@ interface EditorState {
   collapsedTracks: TrackType[];
   /** 📏 sáv-magasság szorzó (session-szintű; hiányzó = 1×) — precíz munkához nagyítható */
   trackHeightScale: Partial<Record<TrackType, number>>;
-  /** 🔗 link-csoportok (session-szintű): az egy csoportban lévő klipek együtt mozognak */
-  linkGroups: string[][];
   /** ✂️ AI/heurisztika által javasolt vágáspontok (mp) — szaggatottan, NEM alkalmazva */
   suggestedCuts: number[];
   /**
@@ -251,7 +249,6 @@ const SESSION_RESET = {
   lockedTracks: [] as TrackType[],
   collapsedTracks: [] as TrackType[],
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
-  linkGroups: [] as string[][],
   suggestedCuts: [] as number[],
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
@@ -576,27 +573,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().nudgeClipsBy([selectedClipId, ...multiSelectIds], deltaSec);
   },
 
-  linkGroupOf: (clipId) => get().linkGroups.find((g) => g.includes(clipId)) ?? null,
+  linkGroupOf: (clipId) => (get().project?.links ?? []).find((g) => g.includes(clipId)) ?? null,
 
   linkSelected: () => {
-    const { selectedClipId, multiSelectIds, linkGroups } = get();
-    if (!selectedClipId || multiSelectIds.length === 0) {
+    const { project, selectedClipId, multiSelectIds } = get();
+    if (!project || !selectedClipId || multiSelectIds.length === 0) {
       return; // legalább 2 klip kell a linkeléshez
     }
     // az új csoport + a beleérő MEGLÉVŐ csoportok összeolvasztása
     const merged = new Set<string>([selectedClipId, ...multiSelectIds]);
-    const rest = linkGroups.filter((g) => {
+    const rest = (project.links ?? []).filter((g) => {
       if (g.some((id) => merged.has(id))) {
         g.forEach((id) => merged.add(id));
         return false;
       }
       return true;
     });
-    set({ linkGroups: [...rest, [...merged]] });
+    get().dispatch({ type: 'SET_LINKS', links: [...rest, [...merged]] });
   },
 
-  unlinkClip: (clipId) =>
-    set((s) => ({ linkGroups: s.linkGroups.filter((g) => !g.includes(clipId)) })),
+  unlinkClip: (clipId) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    get().dispatch({
+      type: 'SET_LINKS',
+      links: (project.links ?? []).filter((g) => !g.includes(clipId)),
+    });
+  },
 
   addChapterAt: (kind) => {
     const { project, playhead } = get();

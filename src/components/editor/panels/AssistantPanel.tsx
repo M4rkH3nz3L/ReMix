@@ -15,7 +15,7 @@ import {
   listTaskAssignments,
   setTaskAssignment,
 } from '@/lib/aiProviders';
-import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
+import { buildAiContext, describeAiCommand, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import {
   applyBrandCaptions,
@@ -1701,11 +1701,23 @@ export function AssistantPanel() {
         <PanelSection title={t('panels.assistant.sectionSuggestion')}>
           <Text style={styles.message}>{reply.message}</Text>
           {reply.commands.length > 0 ? (
-            <PrimaryButton
-              icon="checkmark"
-              label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
-              onPress={apply}
-            />
+            <>
+              {/* 🤖 AI action preview (#35): tételesen, mi fog változni — alkalmazás ELŐTT */}
+              <Text style={styles.changeHeader}>
+                {t('panels.assistant.changesHeader', { count: reply.commands.length })}
+              </Text>
+              {reply.commands.map((c, i) => (
+                <Text key={i} style={styles.changeItem}>
+                  {'•  '}
+                  {describeAiCommand(c, t)}
+                </Text>
+              ))}
+              <PrimaryButton
+                icon="checkmark"
+                label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
+                onPress={apply}
+              />
+            </>
           ) : null}
           <Chip label={t('panels.assistant.discard')} active={false} onPress={() => setReply(null)} />
         </PanelSection>
@@ -1781,6 +1793,19 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 13,
     lineHeight: 19,
+  },
+  changeHeader: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 8,
+  },
+  changeItem: {
+    color: palette.text,
+    fontSize: 12,
+    lineHeight: 18,
   },
   subLabel: {
     color: palette.textDim,

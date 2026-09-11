@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import { describeCommand } from '@/lib/commands';
 import type { EditorCommand, ProjectEvent } from '@/lib/commands';
 import { makeId } from '@/lib/id';
@@ -42,6 +44,29 @@ export interface AiCommand {
 export interface AssistantReply {
   message: string;
   commands: AiCommand[];
+}
+
+/**
+ * 🤖 Egy AI-parancs emberi nyelvű leírása — az „AI action preview"-hez (#35):
+ * a felhasználó az ALKALMAZÁS ELŐTT tételesen látja, mi fog változni.
+ */
+export function describeAiCommand(cmd: AiCommand, t: TFunction): string {
+  switch (cmd.type) {
+    case 'UPDATE_CLIP':
+      return t('panels.assistant.cmdUpdateClip');
+    case 'REMOVE_CLIP':
+      return t('panels.assistant.cmdRemoveClip');
+    case 'SPLIT_CLIP':
+      return t('panels.assistant.cmdSplitClip', { time: (cmd.time ?? 0).toFixed(1) });
+    case 'ADD_TEXT_CLIPS':
+      return t('panels.assistant.cmdAddText', { count: cmd.clips?.length ?? 0 });
+    case 'SET_ASPECT':
+      return t('panels.assistant.cmdSetAspect', { aspect: cmd.aspectRatio ?? '' });
+    case 'RENAME_PROJECT':
+      return t('panels.assistant.cmdRename', { name: cmd.name ?? '' });
+    default:
+      return cmd.type;
+  }
 }
 
 function clipBrief(clip: Clip): Record<string, unknown> {

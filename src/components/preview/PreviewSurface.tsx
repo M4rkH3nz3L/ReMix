@@ -84,6 +84,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const focusMode = useEditorStore((s) => s.focusMode);
   const comparingOriginal = useEditorStore((s) => s.comparingOriginal);
   const setComparingOriginal = useEditorStore((s) => s.setComparingOriginal);
+  const compareSplit = useEditorStore((s) => s.compareSplit);
+  const setCompareSplit = useEditorStore((s) => s.setCompareSplit);
   const selectClip = useEditorStore((s) => s.selectClip);
   const updateClip = useEditorStore((s) => s.updateClip);
   const drawBrush = useEditorStore((s) => s.drawBrush);
@@ -149,6 +151,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const gestureScale = useSharedValue(1);
   const gestureDX = useSharedValue(0);
   const gestureDY = useSharedValue(0);
+  const splitStartX = useSharedValue(0);
 
   const player = useVideoPlayer(null);
   const loadedUriRef = useRef<string | null>(null);
@@ -253,6 +256,13 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     boxW = boxH * ar;
   }
   const box = { w: boxW, h: boxH };
+  // 🅱️ before/after slider: a look-rétegek CSAK az elválasztótól jobbra fedjenek
+  // (bal fél = nyers forrás). Slider nélkül teljes vászon. Nem-vizuális módban null.
+  const sliderX = compareSplit != null ? Math.round(compareSplit * boxW) : 0;
+  const lookGeom =
+    compareSplit != null
+      ? ({ position: 'absolute', top: 0, bottom: 0, left: sliderX, right: 0 } as const)
+      : StyleSheet.absoluteFill;
 
   // minden szöveg-jellegű réteg: címek + feliratok + matricák
   const textClips = project
@@ -391,6 +401,16 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       blendMode: brush.style === 'highlighter' ? 'multiply' : undefined,
     });
   };
+
+  // 🅱️ before/after slider elválasztójának húzása (a fogantyún, nem a vásznon)
+  const dividerPan = Gesture.Pan()
+    .onBegin(() => {
+      splitStartX.value = sliderX;
+    })
+    .onUpdate((e) => {
+      const frac = Math.min(1, Math.max(0, (splitStartX.value + e.translationX) / Math.max(boxW, 1)));
+      runOnJS(setCompareSplit)(frac);
+    });
 
   const drawPan = Gesture.Pan()
     .enabled(Boolean(drawBrush))
@@ -624,7 +644,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             <View
               pointerEvents="none"
               style={[
-                StyleSheet.absoluteFill,
+                lookGeom,
                 { backgroundColor: filter.overlay, opacity: filter.opacity * filterIntensity },
               ]}
             />
@@ -668,7 +688,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               <View
                 pointerEvents="none"
                 style={[
-                  StyleSheet.absoluteFill,
+                  lookGeom,
                   { backgroundColor: tint.color, opacity: tint.opacity },
                 ]}
               />
@@ -687,7 +707,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
                 key={i}
                 pointerEvents="none"
                 style={[
-                  StyleSheet.absoluteFill,
+                  lookGeom,
                   { backgroundColor: l.color, opacity: l.opacity },
                 ]}
               />
@@ -794,7 +814,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
                 key={`${clip.id}-${i}`}
                 pointerEvents="none"
                 style={[
-                  StyleSheet.absoluteFill,
+                  lookGeom,
                   { backgroundColor: l.color, opacity: l.opacity * eff },
                 ]}
               />
@@ -862,6 +882,24 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           {mode === 'edit' && showSafeZones ? (
             <SafeZoneOverlay width={boxW} height={boxH} aspect={project.aspectRatio} />
           ) : null}
+
+          {/* 🅱️ before/after slider: elválasztó vonal + húzható fogantyú + oldal-címkék */}
+          {mode === 'edit' && compareSplit != null ? (
+            <>
+              <View pointerEvents="none" style={[styles.splitLine, { left: sliderX }]} />
+              <View pointerEvents="none" style={[styles.splitBadge, styles.splitBadgeLeft]}>
+                <Text style={styles.splitBadgeText}>{t('editor.preview.original')}</Text>
+              </View>
+              <View pointerEvents="none" style={[styles.splitBadge, styles.splitBadgeRight]}>
+                <Text style={styles.splitBadgeText}>{t('editor.preview.edited')}</Text>
+              </View>
+              <GestureDetector gesture={dividerPan}>
+                <View style={[styles.splitHandle, { left: sliderX - 14 }]}>
+                  <Ionicons name="code-outline" size={16} color="#fff" />
+                </View>
+              </GestureDetector>
+            </>
+          ) : null}
           </View>
         </GestureDetector>
       ) : null}
@@ -898,6 +936,24 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             name="git-compare-outline"
             size={16}
             color={comparingOriginal ? palette.accent : palette.textDim}
+          />
+        </Pressable>
+      ) : null}
+
+      {/* 🅱️ before/after SLIDER kapcsoló (eredeti | szerkesztett, húzható elválasztóval) */}
+      {mode === 'edit' && project ? (
+        <Pressable
+          onPress={() => setCompareSplit(compareSplit == null ? 0.5 : null)}
+          hitSlop={8}
+          style={[styles.sliderToggle, compareSplit != null ? styles.compareBtnOn : null]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: compareSplit != null }}
+          accessibilityLabel={t('editor.preview.compareSlider')}
+        >
+          <Ionicons
+            name="contrast-outline"
+            size={16}
+            color={compareSplit != null ? palette.accent : palette.textDim}
           />
         </Pressable>
       ) : null}
@@ -973,6 +1029,62 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+  },
+  sliderToggle: {
+    position: 'absolute',
+    top: 44,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  splitLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    marginLeft: -1,
+    backgroundColor: '#fff',
+    opacity: 0.9,
+  },
+  splitHandle: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.accent,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  splitBadge: {
+    position: 'absolute',
+    top: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  splitBadgeLeft: {
+    left: 8,
+  },
+  splitBadgeRight: {
+    right: 8,
+  },
+  splitBadgeText: {
+    color: palette.text,
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   canvasSelected: {
     borderWidth: 1,

@@ -104,6 +104,8 @@ interface EditorState {
   focusMode: boolean;
   /** 🅱️ before/after: nyomva tartva az előnézet a NYERS forrást mutatja (look nélkül) */
   comparingOriginal: boolean;
+  /** 🅱️ before/after SLIDER: null = ki; 0–1 = elválasztó helye (bal=eredeti, jobb=szerkesztett) */
+  compareSplit: number | null;
   /** 🔎 az idővonal fölötti insight-sáv aktív nézete (story / minimap / pacing) */
   insightLane: InsightLane;
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
@@ -188,6 +190,7 @@ interface EditorState {
   toggleSafeZones: () => void;
   toggleFocusMode: () => void;
   setComparingOriginal: (on: boolean) => void;
+  setCompareSplit: (v: number | null) => void;
   setInsightLane: (lane: InsightLane) => void;
   setMaskEdit: (on: boolean) => void;
   setVideoVoiceActive: (on: boolean) => void;
@@ -241,6 +244,7 @@ const SESSION_RESET = {
   showSafeZones: false,
   focusMode: false,
   comparingOriginal: false,
+  compareSplit: null as number | null,
   insightLane: 'story' as InsightLane,
   maskEdit: false,
   videoVoiceActive: false,
@@ -667,6 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   setComparingOriginal: (on) => set({ comparingOriginal: on }),
+  setCompareSplit: (v) => set({ compareSplit: v }),
   setInsightLane: (lane) => set({ insightLane: lane }),
 
   setMaskEdit: (on) => set({ maskEdit: on }),

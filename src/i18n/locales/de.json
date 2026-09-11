@@ -212,7 +212,9 @@
     "preview": {
       "safeZones": "Sichere Zonen",
       "compareOriginal": "Halten für Vergleich mit Original",
-      "original": "Original"
+      "original": "Original",
+      "edited": "Bearbeitet",
+      "compareSlider": "Vorher/Nachher-Regler"
     },
     "selection": {
       "notVisible": "In diesem Frame nicht sichtbar — zum Springen tippen.",

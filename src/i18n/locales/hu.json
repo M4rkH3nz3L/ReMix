@@ -212,7 +212,9 @@
     "preview": {
       "safeZones": "Biztonságos zóna",
       "compareOriginal": "Tartsd nyomva az eredetihez",
-      "original": "Eredeti"
+      "original": "Eredeti",
+      "edited": "Szerkesztett",
+      "compareSlider": "Előtte/utána csúszka"
     },
     "selection": {
       "notVisible": "Ezen a képkockán nem látható — koppints az odaugráshoz.",

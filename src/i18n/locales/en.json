@@ -293,6 +293,8 @@
       "multiSelectTitle": "Select multiple",
       "multiSelectMessage": "Tap more clips — style settings (filter, light, transition, text style, volume) apply to all at once. Only clips of the same kind can be batched.",
       "split": "Split",
+      "link": "Link",
+      "unlink": "Unlink",
       "ripple": "Ripple",
       "rippleModeOnTitle": "Ripple mode on",
       "rippleModeOnMessage": "Deleting and length changes leave no gap: clips behind slide on EVERY track, so captions, music and SFX stay in sync with the picture. Locked tracks are skipped.",

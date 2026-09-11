@@ -39,6 +39,11 @@ export function Toolbar() {
   // beilleszteni csak azonos fajtájú klipre lehet (a stílus-mezők kind-függők)
   const rippleMode = useEditorStore((s) => s.rippleMode);
   const setRippleMode = useEditorStore((s) => s.setRippleMode);
+  // 🔗 link-csoportok: linkelt klipek együtt mozognak
+  const linkGroups = useEditorStore((s) => s.linkGroups);
+  const linkSelected = useEditorStore((s) => s.linkSelected);
+  const unlinkClip = useEditorStore((s) => s.unlinkClip);
+  const isLinked = !!selected && linkGroups.some((g) => g.includes(selected.id));
   const canPasteStyle = Boolean(
     styleClipboard && selected && styleClipboard.kind === selected.kind
   );
@@ -364,6 +369,16 @@ export function Toolbar() {
                 }
               }}
             />
+            {multiSelectMode && multiSelectIds.length >= 1 ? (
+              <ToolButton icon="link" label={t('editor.toolbar.link')} onPress={linkSelected} />
+            ) : null}
+            {isLinked ? (
+              <ToolButton
+                icon="unlink"
+                label={t('editor.toolbar.unlink')}
+                onPress={() => selected && unlinkClip(selected.id)}
+              />
+            ) : null}
             {multiSelectIds.length === 0 ? (
               <ToolButton icon="cut-outline" label={t('editor.toolbar.split')} onPress={split} />
             ) : null}

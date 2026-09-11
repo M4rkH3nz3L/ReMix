@@ -293,6 +293,8 @@
       "multiSelectTitle": "Mehrere auswählen",
       "multiSelectMessage": "Tippe weitere Clips an — Stil-Einstellungen (Filter, Licht, Übergang, Textstil, Lautstärke) gelten für alle gleichzeitig. Nur Clips gleicher Art lassen sich bündeln.",
       "split": "Teilen",
+      "link": "Verknüpfen",
+      "unlink": "Trennen",
       "ripple": "Ripple",
       "rippleModeOnTitle": "Ripple-Modus an",
       "rippleModeOnMessage": "Löschen und Längenänderungen hinterlassen keine Lücke: Clips dahinter rücken auf JEDER Spur nach, so bleiben Untertitel, Musik und SFX synchron zum Bild. Gesperrte Spuren werden übersprungen.",

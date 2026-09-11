@@ -80,6 +80,8 @@ interface EditorState {
   collapsedTracks: TrackType[];
   /** 📏 sáv-magasság szorzó (session-szintű; hiányzó = 1×) — precíz munkához nagyítható */
   trackHeightScale: Partial<Record<TrackType, number>>;
+  /** 🔗 link-csoportok (session-szintű): az egy csoportban lévő klipek együtt mozognak */
+  linkGroups: string[][];
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -151,6 +153,14 @@ interface EditorState {
   cycleTrackHeight: (type: TrackType) => void;
   /** a TÖBB-kijelölt klipek együttes eltolása az idővonalon (csoport-mozgatás) */
   nudgeSelectedBy: (deltaSec: number) => void;
+  /** megadott klipek együttes eltolása (csoport-clamppal) — link/selection közös magja */
+  nudgeClipsBy: (ids: string[], deltaSec: number) => void;
+  /** a klip link-csoportja (együtt mozgó klipek), vagy null */
+  linkGroupOf: (clipId: string) => string[] | null;
+  /** a jelenlegi több-kijelölés linkelése egy csoporttá (min. 2 klip) */
+  linkSelected: () => void;
+  /** a klipet tartalmazó link-csoport feloldása */
+  unlinkClip: (clipId: string) => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
@@ -214,6 +224,7 @@ const SESSION_RESET = {
   lockedTracks: [] as TrackType[],
   collapsedTracks: [] as TrackType[],
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
+  linkGroups: [] as string[][],
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -466,13 +477,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({ trackHeightScale: { ...s.trackHeightScale, [type]: next } }));
   },
 
-  nudgeSelectedBy: (deltaSec) => {
-    const { project, selectedClipId, multiSelectIds } = get();
-    if (!project || !selectedClipId || multiSelectIds.length === 0) {
+  nudgeClipsBy: (idList, deltaSec) => {
+    const { project } = get();
+    if (!project || idList.length === 0) {
       return;
     }
-    const ids = new Set([selectedClipId, ...multiSelectIds]);
-    // csoport-clamp: a legkorábbi kijelölt se csússzon 0 alá (a relatív rend marad)
+    const ids = new Set(idList);
+    // csoport-clamp: a legkorábbi klip se csússzon 0 alá (a relatív rend marad)
     let minStart = Infinity;
     for (const tk of project.tracks) {
       for (const c of tk.clips) {
@@ -500,6 +511,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }));
     get().dispatch({ type: 'REPLACE_TRACKS', tracks, label: tr('store.editor.groupMove') });
   },
+
+  nudgeSelectedBy: (deltaSec) => {
+    const { selectedClipId, multiSelectIds } = get();
+    if (!selectedClipId || multiSelectIds.length === 0) {
+      return;
+    }
+    get().nudgeClipsBy([selectedClipId, ...multiSelectIds], deltaSec);
+  },
+
+  linkGroupOf: (clipId) => get().linkGroups.find((g) => g.includes(clipId)) ?? null,
+
+  linkSelected: () => {
+    const { selectedClipId, multiSelectIds, linkGroups } = get();
+    if (!selectedClipId || multiSelectIds.length === 0) {
+      return; // legalább 2 klip kell a linkeléshez
+    }
+    // az új csoport + a beleérő MEGLÉVŐ csoportok összeolvasztása
+    const merged = new Set<string>([selectedClipId, ...multiSelectIds]);
+    const rest = linkGroups.filter((g) => {
+      if (g.some((id) => merged.has(id))) {
+        g.forEach((id) => merged.add(id));
+        return false;
+      }
+      return true;
+    });
+    set({ linkGroups: [...rest, [...merged]] });
+  },
+
+  unlinkClip: (clipId) =>
+    set((s) => ({ linkGroups: s.linkGroups.filter((g) => !g.includes(clipId)) })),
 
   setRippleMode: (on) => set({ rippleMode: on }),
 

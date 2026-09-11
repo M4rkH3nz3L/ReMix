@@ -133,8 +133,14 @@ function TimelineClipInner({
       }
     }
     moveDX.value = 0;
-    // csoport-mozgatás (#58): ha ez a klip a több-kijelölés része, együtt mozog a csoport
     const st = useEditorStore.getState();
+    // 🔗 linkelt klipek (#59): a link-csoport együtt mozog (kijelölés nélkül is)
+    const link = st.linkGroupOf(clip.id);
+    if (link) {
+      st.nudgeClipsBy(link, proposed - clip.start);
+      return;
+    }
+    // csoport-mozgatás (#58): ha ez a klip a több-kijelölés része, együtt mozog a csoport
     if (
       st.multiSelectIds.length > 0 &&
       (clip.id === st.selectedClipId || st.multiSelectIds.includes(clip.id))

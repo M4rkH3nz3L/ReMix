@@ -293,6 +293,8 @@
       "multiSelectTitle": "Több kijelölése",
       "multiSelectMessage": "Koppints a további klipekre — a stílus-beállítások (szűrő, fény, áttűnés, szöveg-stílus, hangerő) mindre egyszerre mennek. Csak azonos fajtájú klip vehető a kötegbe.",
       "split": "Vágás",
+      "link": "Összekapcsol",
+      "unlink": "Szétkapcsol",
       "ripple": "Ripple",
       "rippleModeOnTitle": "Ripple mód be",
       "rippleModeOnMessage": "A törlés és a hossz-változás nem hagy lyukat: a mögötte lévő klipek MINDEN sávon csúsznak, így a felirat, a zene és az SFX szinkronban marad a képpel. A zárolt sávok kimaradnak.",

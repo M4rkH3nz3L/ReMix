@@ -1622,7 +1622,8 @@
       "rippleDelete_other": "ripple delete ({{count}} clips, {{moved}} shifted)",
       "rippleLength_one": "ripple length ({{count}} clip shifted)",
       "rippleLength_other": "ripple length ({{count}} clips shifted)",
-      "closeGap": "close gap"
+      "closeGap": "close gap",
+      "groupMove": "group move"
     },
     "progress": {
       "starting": "Starting…"

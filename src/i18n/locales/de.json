@@ -1622,7 +1622,8 @@
       "rippleDelete_other": "Ripple-Löschen ({{count}} Clips, {{moved}} verschoben)",
       "rippleLength_one": "Ripple-Länge ({{count}} Clip verschoben)",
       "rippleLength_other": "Ripple-Länge ({{count}} Clips verschoben)",
-      "closeGap": "Lücke schließen"
+      "closeGap": "Lücke schließen",
+      "groupMove": "Gruppe verschoben"
     },
     "progress": {
       "starting": "Wird gestartet…"

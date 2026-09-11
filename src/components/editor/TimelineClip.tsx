@@ -133,6 +133,15 @@ function TimelineClipInner({
       }
     }
     moveDX.value = 0;
+    // csoport-mozgatás (#58): ha ez a klip a több-kijelölés része, együtt mozog a csoport
+    const st = useEditorStore.getState();
+    if (
+      st.multiSelectIds.length > 0 &&
+      (clip.id === st.selectedClipId || st.multiSelectIds.includes(clip.id))
+    ) {
+      st.nudgeSelectedBy(proposed - clip.start);
+      return;
+    }
     updateClip(clip.id, { start: proposed });
   };
 

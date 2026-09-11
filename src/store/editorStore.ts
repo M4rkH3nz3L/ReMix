@@ -149,6 +149,8 @@ interface EditorState {
   toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse') => void;
   /** sáv-magasság léptetése: 1× → 1.6× → 2.4× → 1× */
   cycleTrackHeight: (type: TrackType) => void;
+  /** a TÖBB-kijelölt klipek együttes eltolása az idővonalon (csoport-mozgatás) */
+  nudgeSelectedBy: (deltaSec: number) => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
@@ -462,6 +464,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const idx = steps.indexOf(cur);
     const next = steps[(idx + 1) % steps.length] ?? 1;
     set((s) => ({ trackHeightScale: { ...s.trackHeightScale, [type]: next } }));
+  },
+
+  nudgeSelectedBy: (deltaSec) => {
+    const { project, selectedClipId, multiSelectIds } = get();
+    if (!project || !selectedClipId || multiSelectIds.length === 0) {
+      return;
+    }
+    const ids = new Set([selectedClipId, ...multiSelectIds]);
+    // csoport-clamp: a legkorábbi kijelölt se csússzon 0 alá (a relatív rend marad)
+    let minStart = Infinity;
+    for (const tk of project.tracks) {
+      for (const c of tk.clips) {
+        if (ids.has(c.id)) {
+          minStart = Math.min(minStart, c.start);
+        }
+      }
+    }
+    if (!Number.isFinite(minStart)) {
+      return;
+    }
+    const delta = Math.max(deltaSec, -minStart);
+    if (Math.abs(delta) < 0.001) {
+      return;
+    }
+    const tracks = project.tracks
+      .filter((tk) => tk.clips.some((c) => ids.has(c.id)))
+      .map((tk) => ({
+        trackType: tk.type,
+        clips: tk.clips.map((c) =>
+          ids.has(c.id)
+            ? { ...c, start: Math.max(0, Math.round((c.start + delta) * 1000) / 1000) }
+            : c
+        ),
+      }));
+    get().dispatch({ type: 'REPLACE_TRACKS', tracks, label: tr('store.editor.groupMove') });
   },
 
   setRippleMode: (on) => set({ rippleMode: on }),

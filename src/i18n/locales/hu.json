@@ -1622,7 +1622,8 @@
       "rippleDelete_other": "ripple-törlés ({{count}} klip, {{moved}} csúszott)",
       "rippleLength_one": "ripple-hossz ({{count}} klip csúszott)",
       "rippleLength_other": "ripple-hossz ({{count}} klip csúszott)",
-      "closeGap": "hézag bezárása"
+      "closeGap": "hézag bezárása",
+      "groupMove": "csoport mozgatása"
     },
     "progress": {
       "starting": "Indítás…"

@@ -48,7 +48,7 @@ import type { SilenceRange } from '@/lib/cutlist';
 import { MOTION_PACKS, buildMotionPackPlan } from '@/lib/motionPacks';
 import { buildProductAdPlan } from '@/lib/productAd';
 import type { MotionPack } from '@/lib/motionPacks';
-import { projectDuration } from '@/lib/projectUtils';
+import { clipsAt, projectDuration } from '@/lib/projectUtils';
 import { buildSmartReframe } from '@/lib/reframeClient';
 import { downloadTrack, fetchSoundLibrary, renderServerUrl } from '@/lib/render';
 import { formatTime } from '@/lib/time';
@@ -1322,6 +1322,37 @@ export function AssistantPanel() {
     }
   };
 
+  /**
+   * 🔎 Semantic select (Phase 2.1): a keresési találatok idejeit a videóklipekre
+   * képezi, és MIND kijelöli (multi-select) — „válaszd ki az összes ilyen
+   * snittet". Onnan a köteg-műveletek (stílus, törlés…) mennek. Kliens-oldali.
+   */
+  const selectSearchMatches = () => {
+    const state = useEditorStore.getState();
+    const vt = state.project?.tracks.find((tk) => tk.type === 'video');
+    if (!vt || !searchHits || searchHits.length === 0) {
+      return;
+    }
+    const byId = new Map<string, VideoClip>();
+    for (const hit of searchHits) {
+      for (const c of clipsAt<VideoClip>(vt, hit.time)) {
+        if (c.kind === 'video') {
+          byId.set(c.id, c);
+        }
+      }
+    }
+    const clips = [...byId.values()].sort((a, b) => a.start - b.start);
+    if (clips.length === 0) {
+      Alert.alert(t('panels.assistant.smartSearchTitle'), t('panels.assistant.selectMatchesNone'));
+      return;
+    }
+    state.selectClips(clips.map((c) => c.id));
+    Alert.alert(
+      t('panels.assistant.smartSearchTitle'),
+      t('panels.assistant.selectMatchesDone', { count: clips.length })
+    );
+  };
+
   const apply = () => {
     if (!reply) {
       return;
@@ -1527,7 +1558,13 @@ export function AssistantPanel() {
           searchHits.length === 0 ? (
             <Text style={styles.note}>{t('panels.assistant.searchNoResults')}</Text>
           ) : (
-            searchHits.map((hit, i) => (
+            <>
+            <PrimaryButton
+              icon="checkbox-outline"
+              label={t('panels.assistant.selectMatchesBtn', { count: searchHits.length })}
+              onPress={selectSearchMatches}
+            />
+            {searchHits.map((hit, i) => (
               <Pressable
                 key={`${hit.time.toFixed(1)}-${i}`}
                 style={styles.variantCard}
@@ -1541,7 +1578,8 @@ export function AssistantPanel() {
                   {hit.description || hit.labels.join(', ')}
                 </Text>
               </Pressable>
-            ))
+            ))}
+            </>
           )
         ) : (
           <Text style={styles.note}>{t('panels.assistant.smartSearchIntro')}</Text>

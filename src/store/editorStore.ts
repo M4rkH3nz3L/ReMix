@@ -160,6 +160,9 @@ interface EditorState {
   splitClipAt: (clipId: string, time: number) => boolean;
   selectClip: (clipId: string | null) => void;
   toggleMultiSelect: (clipId: string) => void;
+  /** 🔎 több klip együttes kijelölése (pl. AI smart-select találatokból); az első
+   *  lesz az elsődleges, a többi (azonos fajtájú) a köteg */
+  selectClips: (ids: string[]) => void;
   copyStyle: () => boolean;
   pasteStyle: () => number;
   toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse') => void;
@@ -457,6 +460,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       multiSelectIds: multiSelectIds.includes(clipId)
         ? multiSelectIds.filter((id) => id !== clipId)
         : [...multiSelectIds, clipId],
+    });
+  },
+
+  selectClips: (ids) => {
+    const { project } = get();
+    if (!project || ids.length === 0) {
+      return;
+    }
+    // csak létező klipek; az első az elsődleges, a köteg csak azonos fajtájú
+    const clips = ids
+      .map((id) => findClip(project, id)?.clip)
+      .filter((c): c is Clip => !!c);
+    if (clips.length === 0) {
+      return;
+    }
+    const primary = clips[0];
+    const rest = clips.slice(1).filter((c) => c.kind === primary.kind).map((c) => c.id);
+    set({
+      selectedClipId: primary.id,
+      multiSelectIds: rest,
+      multiSelectMode: rest.length > 0,
     });
   },
 

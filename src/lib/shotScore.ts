@@ -14,6 +14,8 @@ export interface ShotScore {
   /** forrás-mp */
   t: number;
   score: number;
+  /** átlag-fényerő 0–1 (expozíció-elemzéshez); régi worker válaszban hiányozhat */
+  luma?: number;
   faces: number;
 }
 

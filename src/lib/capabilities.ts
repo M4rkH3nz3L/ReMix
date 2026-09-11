@@ -26,6 +26,7 @@ export type CapabilityId =
   | 'autoEdit' // AI Auto-Edit / cutplan / hook-ok
   | 'storyAnalyze' // AI story-struktúra (Hook→Context→Value→CTA felismerés)
   | 'pacingAnalyze' // AI tempó-elemzés (beszéd/csend/vágás-jelek → lassú szakaszok)
+  | 'qualityScan' // felvétel-minőség ellenőrzés (homályos / alul-túlexponált kockák)
   | 'bgRemove' // háttér-eltávolítás
   | 'depth3d' // mélység / 3D / parallax
   | 'faceTools' // arc-követés / retusálás
@@ -58,6 +59,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   autoEdit: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoEdit' },
   storyAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.storyAnalyze' },
   pacingAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pacingAnalyze' },
+  qualityScan: { where: 'cloud', pro: true, label: 'lib.capabilities.label.qualityScan' },
   bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
   faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },

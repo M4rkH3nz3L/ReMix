@@ -52,12 +52,14 @@ import { projectDuration } from '@/lib/projectUtils';
 import { buildSmartReframe } from '@/lib/reframeClient';
 import { downloadTrack, fetchSoundLibrary, renderServerUrl } from '@/lib/render';
 import { formatTime } from '@/lib/time';
+import { analyzeQuality } from '@/lib/qualityClient';
 import { fetchShotScores } from '@/lib/shotScore';
 import { fetchThumbHeadlines } from '@/lib/thumbStudio';
 import { mergeSearchHits, searchTranscript } from '@/lib/transcriptSearch';
 import { indexProjectVision, searchVision } from '@/lib/visionSearch';
 import type { SearchHit } from '@/lib/visionIndex';
 import { useEditorStore } from '@/store/editorStore';
+import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { VideoClip } from '@/types/project';
 
@@ -606,6 +608,38 @@ export function AssistantPanel() {
       );
     } finally {
       setCutStatus(null);
+    }
+  };
+
+  const [footageStatus, setFootageStatus] = useState<string | null>(null);
+
+  /**
+   * 🔍 Footage check (Phase 1.5): a klipek reprezentatív kockái alapján jelöli a
+   * homályos / alul-túlexponált felvételeket (worker /shotscore) — nem módosít,
+   * csak összefoglalót ad. Pro (guardPro → nem-Pro esetén paywall).
+   */
+  const footageCheck = async () => {
+    if (footageStatus) {
+      return;
+    }
+    const project = useEditorStore.getState().project;
+    if (!project) {
+      return;
+    }
+    setFootageStatus(t('panels.assistant.footageChecking'));
+    try {
+      await guardPro(
+        async () => {
+          const report = await analyzeQuality(project);
+          Alert.alert(
+            t('panels.assistant.footageTitle'),
+            report ? report.summary : t('panels.assistant.footageUnavailable')
+          );
+        },
+        (e) => Alert.alert(t('panels.assistant.footageTitle'), e.message)
+      );
+    } finally {
+      setFootageStatus(null);
     }
   };
 
@@ -1659,6 +1693,13 @@ export function AssistantPanel() {
           label={reframeStatus ?? t('panels.assistant.smartReframeBtn')}
           onPress={() => {
             smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
+          }}
+        />
+        <PrimaryButton
+          icon="search-outline"
+          label={footageStatus ?? t('panels.assistant.footageCheckBtn')}
+          onPress={() => {
+            footageCheck().catch((err: Error) => Alert.alert(t('panels.assistant.footageTitle'), err.message));
           }}
         />
         <Text style={styles.note}>{t('panels.assistant.cutToolsNote')}</Text>

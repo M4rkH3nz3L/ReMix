@@ -86,7 +86,11 @@ function scoreFrame(frames, offset, W, H) {
   // a középszürkétől távoli (túl sötét/kiégett) kockák büntetése
   const brightnessPenalty = Math.abs(mean - 118) / 118;
   void n;
-  return Math.round((sharpness * 1.5 + contrast - brightnessPenalty * 40) * 10) / 10;
+  return {
+    score: Math.round((sharpness * 1.5 + contrast - brightnessPenalty * 40) * 10) / 10,
+    // átlag-fényerő 0–1 (expozíció-elemzéshez): a szürke átlag normalizálva
+    luma: Math.round((mean / 255) * 1000) / 1000,
+  };
 }
 
 /** pontozott jelöltekből a legjobbak, időbeli szétszórással — pure */
@@ -153,7 +157,7 @@ async function pickThumbnails(file, opts) {
   }
   const scored = [];
   for (let i = 0; i < total; i++) {
-    scored.push({ t: i + 0.5, score: scoreFrame(frames, i * frameSize, TH_W, H) });
+    scored.push({ t: i + 0.5, score: scoreFrame(frames, i * frameSize, TH_W, H).score });
   }
   // két kör: az alap-pontszám legjobbjain (szűkebb pool) fut az arc-detektor,
   // és a bónusszal frissített pontszámból jön a végső válogatás
@@ -286,11 +290,12 @@ async function scoreShots(file, times) {
     if (!gray || gray.length < TH_W * H) {
       continue;
     }
-    const base = scoreFrame(gray, 0, TH_W, H);
+    const frame = scoreFrame(gray, 0, TH_W, H);
     const fb = await faceBonusFor(file, t, width, height);
     out.push({
       t,
-      score: Math.round((base + fb.bonus) * 10) / 10,
+      score: Math.round((frame.score + fb.bonus) * 10) / 10,
+      luma: frame.luma,
       faces: fb.faces,
     });
   }

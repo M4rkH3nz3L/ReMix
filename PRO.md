@@ -20,7 +20,9 @@
 - ⏳ **1.4** Speaker diarization — DÖNTÉSRE VÁR (hang-ML modell választása; a
   Caption Studio-ban már van kamera/arc-alapú beszélő-heurisztika).
 - ⏳ **1.6** Emotion (opcionális, később).
-- ▶️ Következő: **Phase 2** (Semantic select → parancs) vagy 1.4 (modelldöntés után).
+- ✅ **Phase 2** — 2.1 semantic select (találatok → multi-select) · 2.2 találat-
+  kiemelés az idővonalon · 2.3 objektum-címkék a vision-indexben.
+- ▶️ Következő: **Phase 3** (EDIT — AI copilot mélyítés) vagy 1.4 (modelldöntés után).
 
 ---
 

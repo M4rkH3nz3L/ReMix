@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
+import { aiConfigForTask } from '@/lib/aiProviders';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import type { Project, VideoClip } from '@/types/project';
@@ -66,10 +67,11 @@ export async function suggestThumbnails(
 /** 🎬 AI-címjavaslatok a borítóra (lokális AI vagy Claude a workeren) */
 export async function fetchThumbHeadlines(summary: string): Promise<string[] | null> {
   try {
+    const aiConfig = await aiConfigForTask('thumbHeadlines');
     const res = await uploadFetch(`${renderServerUrl()}/ai/thumbheadlines`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary }),
+      body: JSON.stringify({ summary, aiConfig }),
     });
     if (!res.ok) {
       return null;

@@ -9,6 +9,12 @@ import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { aspectValue, palette } from '@/constants/editor';
 import { uploadFetch } from '@/lib/upload';
 import { askAssistant } from '@/lib/ai';
+import {
+  type AiProvider,
+  listAiProviders,
+  listTaskAssignments,
+  setTaskAssignment,
+} from '@/lib/aiProviders';
 import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import {
@@ -76,6 +82,35 @@ export function AssistantPanel() {
   // worker-diagnosztika: mit hív a kliens, és eléri-e (a „nem érhető el”
   // hibák oka azonnal látszik: rossz URL vs. nem futó worker vs. hálózat)
   const [workerDiag, setWorkerDiag] = useState<string>(t('panels.assistant.workerChecking'));
+  // 🤖 melyik AI-modell oldja meg a feladatot (a profilban felvett modellek közül);
+  // null = Auto (az alapértelmezett modell, majd a worker env-AI-ja)
+  const [aiModels, setAiModels] = useState<AiProvider[]>([]);
+  const [assistantModel, setAssistantModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([listAiProviders(), listTaskAssignments()])
+      .then(([list, tasks]) => {
+        if (alive) {
+          setAiModels(list);
+          setAssistantModel(tasks.assistant ?? null);
+        }
+      })
+      .catch(() => {
+        // nincs backend/bejelentkezés → nincs modellválasztó, marad az Auto
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // modellválasztás a feladathoz — optimista, és perzisztálva (user_ai_task_providers)
+  const pickAssistantModel = (id: string | null) => {
+    setAssistantModel(id);
+    setTaskAssignment('assistant', id).catch(() => {
+      // best-effort; a következő betöltés úgyis a szerver-állapotot mutatja
+    });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -1314,6 +1349,28 @@ export function AssistantPanel() {
         result={aiResult}
         onDismiss={() => setAiResult(null)}
       />
+      <PanelSection title={t('panels.assistant.modelSection')}>
+        {aiModels.length === 0 ? (
+          <Text style={styles.modelHint}>{t('panels.assistant.modelHint')}</Text>
+        ) : (
+          <View style={styles.row}>
+            <Chip
+              label={t('panels.assistant.modelAuto')}
+              active={!assistantModel}
+              onPress={() => pickAssistantModel(null)}
+            />
+            {aiModels.map((m) => (
+              <Chip
+                key={m.id}
+                label={m.label}
+                active={assistantModel === m.id}
+                onPress={() => pickAssistantModel(m.id)}
+              />
+            ))}
+          </View>
+        )}
+      </PanelSection>
+
       <PanelSection title={t('panels.assistant.sectionCommands')}>
         <View style={styles.row}>
           {commandBar.map((cmd) => (
@@ -1712,6 +1769,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 4,
+  },
+  modelHint: {
+    color: palette.textDim,
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 4,
   },
   message: {

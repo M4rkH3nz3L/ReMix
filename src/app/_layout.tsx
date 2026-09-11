@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -11,16 +11,22 @@ import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
+import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 
 export default function RootLayout() {
   // 💳 Free/Pro szint betöltése a tárolóból (a felhő-funkciók kapuja)
   const hydrateEntitlement = useEntitlement((s) => s.hydrate);
+  // 🔐 session betöltése — amíg nem kész, nem tudjuk, be van-e jelentkezve a user
+  const hydrateAuth = useAuth((s) => s.hydrate);
+  const authHydrated = useAuth((s) => s.hydrated);
+  const authed = useAuth((s) => s.session != null);
   useEffect(() => {
+    void hydrateAuth();
     void hydrateEntitlement();
     // 🌍 mentett nyelvválasztás betöltése (a felismert eszköz-nyelv fölé)
     void hydrateLanguage();
-  }, [hydrateEntitlement]);
+  }, [hydrateAuth, hydrateEntitlement]);
 
   // választható betűtípusok betöltése (a family-nevek egyeznek a renderrel)
   useFonts({
@@ -54,12 +60,31 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.bg }}>
       <StatusBar style="light" />
       <ErrorBoundary>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: palette.bg },
-          }}
-        />
+        {authHydrated ? (
+          // 🔐 útvonal-kapuzás: bejelentkezve a projektek/szerkesztő, egyébként
+          // csak az auth-képernyő elérhető (Expo Router `Stack.Protected`)
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: palette.bg },
+            }}
+          >
+            <Stack.Protected guard={authed}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="editor/[id]" />
+              <Stack.Screen name="player/[id]" />
+            </Stack.Protected>
+            <Stack.Protected guard={!authed}>
+              <Stack.Screen name="auth" />
+            </Stack.Protected>
+          </Stack>
+        ) : (
+          // amíg a session töltődik: rövid loading, hogy ne villanjon fel az auth-képernyő
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color={palette.accent} />
+          </View>
+        )}
         <PaywallSheet />
         {/* futó hosszú műveletek: mit csinál · hol tart · mennyi van hátra */}
         <ProgressOverlay />

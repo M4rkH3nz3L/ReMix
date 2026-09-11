@@ -1,4 +1,5 @@
 import { aiFetch } from '@/lib/aiFetch';
+import { aiConfigForTask } from '@/lib/aiProviders';
 import type { HookSuggestion } from '@/lib/hooks';
 import { renderServerUrl } from '@/lib/render';
 
@@ -8,11 +9,12 @@ import { renderServerUrl } from '@/lib/render';
  */
 export async function fetchHooks(summary: string): Promise<HookSuggestion[] | null> {
   try {
+    const aiConfig = await aiConfigForTask('hooks');
     // időkorláttal — enélkül a beragadt lokális modell örökre elnyelné a hívást
     const res = await aiFetch(`${renderServerUrl()}/ai/hooks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary }),
+      body: JSON.stringify({ summary, aiConfig }),
     });
     if (!res.ok) {
       return null;

@@ -12,7 +12,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 
-const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHookGenerator, runThumbHeadlines } = require('./ai');
+const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHookGenerator, runThumbHeadlines, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
@@ -267,12 +267,12 @@ app.post('/upscale', upload.any(), (req, res) => {
 
 // 🪝 Hook Generator (P2): téma → 6 különböző stílusú nyitómondat
 app.post('/ai/hooks', express.json({ limit: '256kb' }), (req, res) => {
-  const { summary } = req.body ?? {};
+  const { summary, aiConfig } = req.body ?? {};
   if (!summary || typeof summary !== 'string') {
     res.status(400).json({ error: 'Hiányzó összefoglaló.' });
     return;
   }
-  runHookGenerator(summary.slice(0, 2000))
+  runHookGenerator(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('Hook hiba:', err.message);
@@ -282,12 +282,12 @@ app.post('/ai/hooks', express.json({ limit: '256kb' }), (req, res) => {
 
 // 🎬 Thumbnail headline-javaslatok (CC V2): téma-összefoglaló → 3 rövid cím
 app.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), (req, res) => {
-  const { summary } = req.body ?? {};
+  const { summary, aiConfig } = req.body ?? {};
   if (!summary || typeof summary !== 'string') {
     res.status(400).json({ error: 'Hiányzó összefoglaló.' });
     return;
   }
-  runThumbHeadlines(summary.slice(0, 2000))
+  runThumbHeadlines(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('ThumbHeadline hiba:', err.message);
@@ -322,12 +322,12 @@ app.post('/thumbnails/compose', upload.any(), (req, res) => {
 
 // ✨ Caption Studio (P1): kiemelt szavak + emoji a felirat-szegmensekhez
 app.post('/ai/captionstudio', express.json({ limit: '1mb' }), (req, res) => {
-  const { segments } = req.body ?? {};
+  const { segments, aiConfig } = req.body ?? {};
   if (!Array.isArray(segments) || segments.length === 0) {
     res.status(400).json({ error: 'Hiányzó szegmensek.' });
     return;
   }
-  runCaptionStudio(segments.slice(0, 60))
+  runCaptionStudio(segments.slice(0, 60), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('CaptionStudio hiba:', err.message);
@@ -585,12 +585,12 @@ app.get('/depth/:id/:name', (req, res) => {
 
 // AI-asszisztens: kontextus + utasítás → validált parancslista
 app.post('/ai/assist', express.json({ limit: '2mb' }), (req, res) => {
-  const { context, instruction } = req.body ?? {};
+  const { context, instruction, aiConfig } = req.body ?? {};
   if (!instruction || typeof instruction !== 'string') {
     res.status(400).json({ error: 'Hiányzó utasítás.' });
     return;
   }
-  runAssistant(context ?? {}, instruction)
+  runAssistant(context ?? {}, instruction, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('AI hiba:', err.message);
@@ -601,12 +601,12 @@ app.post('/ai/assist', express.json({ limit: '2mb' }), (req, res) => {
 // AI Edit Engine (P0-1): elemzett jelek → 3 vágás-változat (keep-sávok +
 // felirat-javaslatok) — a kliens fordítja commandokká és kér jóváhagyást.
 app.post('/ai/autoedit', express.json({ limit: '2mb' }), (req, res) => {
-  const { context } = req.body ?? {};
+  const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
     return;
   }
-  runAutoEdit(context)
+  runAutoEdit(context, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('AutoEdit hiba:', err.message);

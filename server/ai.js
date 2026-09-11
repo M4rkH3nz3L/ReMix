@@ -134,10 +134,11 @@ async function aiAvailable() {
   return (await aiProvider()) !== null;
 }
 
-async function runAnthropic(system, userContent, schema) {
-  const client = new Anthropic();
+async function runAnthropic(system, userContent, schema, cfg) {
+  // BYOK: a felhasználó kulcsa/modellje, ha küldött; különben az env-alapértelmezés
+  const client = cfg && cfg.apiKey ? new Anthropic({ apiKey: cfg.apiKey }) : new Anthropic();
   const response = await client.messages.parse({
-    model: MODEL,
+    model: (cfg && cfg.model) || MODEL,
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     system,
@@ -191,8 +192,89 @@ async function runLocal(system, userContent, schema) {
   return parsed.data;
 }
 
-/** provider-független strukturált hívás — minden AI-funkció ezen megy át */
-async function runStructured(system, userContent, schema) {
+/**
+ * A klienstől érkező BYOK-config ellenőrzése. Csak akkor fogadjuk el, ha van
+ * modell; a nem-anthropic providerekhez base_url is kell (oda megy a hívás).
+ * Érvénytelen → null → a worker a saját (env) AI-jára esik vissza.
+ *
+ * ⚠️ A base_url a felhasználótól jön → a worker oda POST-ol (BYOK: saját kulcs,
+ *    saját végpont). Prod-ban érdemes a providereket allowlistázni (SSRF).
+ */
+function sanitizeAiConfig(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const provider = ['openai', 'anthropic', 'ollama', 'custom'].includes(raw.provider)
+    ? raw.provider
+    : 'custom';
+  const model = typeof raw.model === 'string' ? raw.model.trim() : '';
+  const baseUrl = typeof raw.baseUrl === 'string' ? raw.baseUrl.trim() : '';
+  const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey.trim() : '';
+  if (!model) {
+    return null;
+  }
+  if (provider !== 'anthropic' && !baseUrl) {
+    return null;
+  }
+  return { provider, model, baseUrl, apiKey };
+}
+
+/**
+ * OpenAI-kompatibilis strukturált hívás (OpenAI / Ollama /v1 / bármely
+ * kompatibilis végpont). A JSON-sémát a system-be tesszük, `json_object`
+ * módban kérünk, majd zod-dal validálunk — ez a legszélesebb körben támogatott.
+ */
+async function runOpenAICompatible(system, userContent, schema, cfg) {
+  const base = cfg.baseUrl.replace(/\/+$/, '');
+  const sys =
+    `${system}\n\nVÁLASZ: kizárólag EGYETLEN JSON-objektum, ami megfelel ennek a ` +
+    `JSON-sémának (más szöveg, magyarázat vagy kódblokk NÉLKÜL):\n${JSON.stringify(z.toJSONSchema(schema))}`;
+  const headers = { 'content-type': 'application/json' };
+  if (cfg.apiKey) {
+    headers.authorization = `Bearer ${cfg.apiKey}`;
+  }
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: userContent },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`AI hiba (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content ?? '';
+  let obj;
+  try {
+    obj = JSON.parse(content);
+  } catch {
+    throw new Error('Az AI válasza nem volt érvényes JSON.');
+  }
+  const parsed = schema.safeParse(obj);
+  if (!parsed.success) {
+    throw new Error('Az AI válasza nem felelt meg a sémának.');
+  }
+  return parsed.data;
+}
+
+/**
+ * Provider-független strukturált hívás — minden AI-funkció ezen megy át.
+ * @param aiConfig opcionális BYOK-config (sanitizeAiConfig kimenete); ha van,
+ *   a felhasználó saját modellje megy, különben a worker env-providere.
+ */
+async function runStructured(system, userContent, schema, aiConfig) {
+  if (aiConfig) {
+    return aiConfig.provider === 'anthropic'
+      ? runAnthropic(system, userContent, schema, aiConfig)
+      : runOpenAICompatible(system, userContent, schema, aiConfig);
+  }
   const provider = await aiProvider();
   if (provider === 'anthropic') {
     return runAnthropic(system, userContent, schema);
@@ -201,8 +283,8 @@ async function runStructured(system, userContent, schema) {
     return runLocal(system, userContent, schema);
   }
   throw new Error(
-    `Nincs elérhető AI: állíts be ANTHROPIC_API_KEY-t, vagy indítsd el az Ollamát ` +
-      `(ollama serve + ollama pull ${LOCAL_MODEL}).`
+    `Nincs elérhető AI: állíts be ANTHROPIC_API_KEY-t, indítsd el az Ollamát ` +
+      `(ollama serve + ollama pull ${LOCAL_MODEL}), vagy állíts be saját AI-modellt a profilodban.`
   );
 }
 
@@ -211,11 +293,12 @@ async function runStructured(system, userContent, schema) {
  * @param instruction a felhasználó utasítása
  * @returns {Promise<{message: string, commands: object[]}>}
  */
-async function runAssistant(context, instruction) {
+async function runAssistant(context, instruction, aiConfig) {
   return runStructured(
     SYSTEM,
     `PROJEKT-KONTEXTUS:\n${JSON.stringify(context, null, 1)}\n\nUTASÍTÁS: ${instruction}`,
-    ReplySchema
+    ReplySchema,
+    aiConfig
   );
 }
 
@@ -272,11 +355,12 @@ kontextus: transcript [{0.5-2.5 "Ez a legjobb tipp"}, {3-5 "amit valaha kaptam"}
  * @param context buildAutoEditContext kimenete (jelek + cél-hossz)
  * @returns {Promise<{variants: object[]}>}
  */
-async function runAutoEdit(context) {
+async function runAutoEdit(context, aiConfig) {
   return runStructured(
     AUTOEDIT_SYSTEM,
     `JELEK:\n${JSON.stringify(context, null, 1)}\n\nKészítsd el a 3 változatot.`,
-    AutoEditReplySchema
+    AutoEditReplySchema,
+    aiConfig
   );
 }
 
@@ -318,11 +402,12 @@ bemenet: [{"id":"c3","text":"Ez volt életem legjobb döntése"}]
  * @param segments [{id, text}] felirat-szegmensek
  * @returns {Promise<{segments: [{id, emphasis, emoji}]}>}
  */
-async function runCaptionStudio(segments) {
+async function runCaptionStudio(segments, aiConfig) {
   return runStructured(
     CAPTION_STUDIO_SYSTEM,
     `SZEGMENSEK:\n${JSON.stringify(segments, null, 1)}`,
-    CaptionStudioReplySchema
+    CaptionStudioReplySchema,
+    aiConfig
   );
 }
 
@@ -351,8 +436,8 @@ bemenet: "5 tipp a gyorsabb vágáshoz kezdőknek"
  * @param summary rövid téma-összefoglaló (projektnév + átirat-részlet)
  * @returns {Promise<{headlines: string[]}>}
  */
-async function runThumbHeadlines(summary) {
-  return runStructured(THUMB_SYSTEM, `TÉMA/ÁTIRAT:\n${summary}`, ThumbHeadlineSchema);
+async function runThumbHeadlines(summary, aiConfig) {
+  return runStructured(THUMB_SYSTEM, `TÉMA/ÁTIRAT:\n${summary}`, ThumbHeadlineSchema, aiConfig);
 }
 
 // --- 🪝 Hook Generator (P2): erősebb nyitómondatok ------------------------
@@ -394,8 +479,8 @@ téma: "vágás-tippek kezdőknek, gyorsbillentyűk"
  * @param summary a videó témája (projektnév + átirat-részlet)
  * @returns {Promise<{hooks: {text: string, style: string}[]}>}
  */
-async function runHookGenerator(summary) {
-  return runStructured(HOOK_SYSTEM, `A VIDEÓ TÉMÁJA:\n${summary}`, HookReplySchema);
+async function runHookGenerator(summary, aiConfig) {
+  return runStructured(HOOK_SYSTEM, `A VIDEÓ TÉMÁJA:\n${summary}`, HookReplySchema, aiConfig);
 }
 
 module.exports = {
@@ -404,6 +489,7 @@ module.exports = {
   runCaptionStudio,
   runHookGenerator,
   runThumbHeadlines,
+  sanitizeAiConfig,
   aiAvailable,
   aiProvider,
   LOCAL_MODEL,

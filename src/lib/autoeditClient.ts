@@ -13,6 +13,7 @@ import type { AutoEditSignals, AutoEditVariant } from '@/lib/autoedit';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { detectScenes, detectSilence } from '@/lib/cutlist';
 import { projectDuration } from '@/lib/projectUtils';
+import { aiConfigForTask } from '@/lib/aiProviders';
 import { ensureCloud } from '@/lib/backend';
 import type { ProgressUpdate } from '@/lib/progress';
 import { fetchShotScores } from '@/lib/shotScore';
@@ -163,15 +164,17 @@ export async function runAutoEditFlow(
   if (Platform.OS !== 'web') {
     try {
       const base = ensureCloud('autoEdit');
+      // a felhasználó saját modellje (BYOK), ha van — ekkor az env-AI nem kell
+      const aiConfig = await aiConfigForTask('autoEdit');
       const health = (await (
         await aiFetch(`${base}/health`, {}, AI_PROBE_TIMEOUT_MS)
       ).json()) as { ai?: boolean };
-      if (health.ai) {
+      if (health.ai || aiConfig) {
         onProgress?.({ phase: tr('lib.autoeditClient.phaseAiCutPlanning') });
         const res = await aiFetch(`${base}/ai/autoedit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ context: buildAutoEditContext(signals) }),
+          body: JSON.stringify({ context: buildAutoEditContext(signals), aiConfig }),
         });
         if (res.ok) {
           const variants = validVariants(await res.json());

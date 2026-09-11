@@ -1,4 +1,5 @@
 import { aiFetch } from '@/lib/aiFetch';
+import { aiConfigForTask } from '@/lib/aiProviders';
 import type { CaptionSuggestion } from '@/lib/captionStudio';
 import { ensureCloud } from '@/lib/backend';
 
@@ -11,10 +12,11 @@ export async function fetchCaptionSuggestions(
   segments: { id: string; text: string }[]
 ): Promise<CaptionSuggestion[] | null> {
   try {
+    const aiConfig = await aiConfigForTask('captionStudio');
     const res = await aiFetch(`${ensureCloud('autoCaption')}/ai/captionstudio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segments }),
+      body: JSON.stringify({ segments, aiConfig }),
     });
     if (!res.ok) {
       return null;

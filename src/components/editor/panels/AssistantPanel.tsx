@@ -1295,6 +1295,7 @@ export function AssistantPanel() {
       return;
     }
     setSearchHits(null);
+    state.setSearchMatchTimes([]); // korábbi kiemelés törlése
     setSearchStatus(t('panels.assistant.searching'));
     try {
       // 📝 átirat-találatok a vision-találatokkal EGY listában (P0‑8)
@@ -1316,7 +1317,10 @@ export function AssistantPanel() {
         );
         return;
       }
-      setSearchHits(mergeSearchHits(visionHits, transcriptHits));
+      const merged = mergeSearchHits(visionHits, transcriptHits);
+      setSearchHits(merged);
+      // 🔎 találatok kiemelése az idővonalon (Phase 2.2)
+      state.setSearchMatchTimes(merged.map((h) => h.time));
     } finally {
       setSearchStatus(null);
     }

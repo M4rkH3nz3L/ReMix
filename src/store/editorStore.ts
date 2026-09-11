@@ -88,6 +88,8 @@ interface EditorState {
   suggestedCuts: number[];
   /** 📈 AI tempó-elemzés eredménye (lassú szakaszok + összefoglaló); null = nincs */
   pacingInsight: PacingInsight | null;
+  /** 🔎 Smart Search találat-időpontok (idővonal-mp) — az idővonalon kiemelve */
+  searchMatchTimes: number[];
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -192,6 +194,8 @@ interface EditorState {
   clearSuggestedCuts: () => void;
   /** 📈 AI tempó-elemzés eredményének beállítása/törlése (null = törlés) */
   setPacingInsight: (insight: PacingInsight | null) => void;
+  /** 🔎 Smart Search találat-időpontok beállítása (üres = kiemelés törlése) */
+  setSearchMatchTimes: (times: number[]) => void;
   /** a javasolt vágások alkalmazása (a lefedő videóklipek splitelése), majd elvetés */
   applySuggestedCuts: () => void;
   setRippleMode: (on: boolean) => void;
@@ -265,6 +269,7 @@ const SESSION_RESET = {
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
   suggestedCuts: [] as number[],
   pacingInsight: null as PacingInsight | null,
+  searchMatchTimes: [] as number[],
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -699,6 +704,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearSuggestedCuts: () => set({ suggestedCuts: [] }),
 
   setPacingInsight: (insight) => set({ pacingInsight: insight }),
+
+  setSearchMatchTimes: (times) =>
+    set({ searchMatchTimes: [...times].sort((a, b) => a - b) }),
 
   applySuggestedCuts: () => {
     const times = [...get().suggestedCuts].sort((a, b) => a - b);

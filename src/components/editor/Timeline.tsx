@@ -86,6 +86,7 @@ export function Timeline() {
   const cycleTrackHeight = useEditorStore((s) => s.cycleTrackHeight);
   const closeGapBefore = useEditorStore((s) => s.closeGapBefore);
   const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
+  const searchMatchTimes = useEditorStore((s) => s.searchMatchTimes);
   const insightLane = useEditorStore((s) => s.insightLane);
   const setInsightLane = useEditorStore((s) => s.setInsightLane);
 
@@ -453,6 +454,17 @@ export function Timeline() {
                 ]}
               />
             ))}
+            {/* 🔎 Smart Search találatok (Phase 2.2): teljes-magas kiemelő vonal */}
+            {searchMatchTimes.map((mt, i) => (
+              <View
+                key={`match-${i}`}
+                pointerEvents="none"
+                style={[
+                  styles.searchMatch,
+                  { left: mt * pps, height: RULER_HEIGHT + totalTracksHeight },
+                ]}
+              />
+            ))}
           </View>
         </ScrollView>
 
@@ -588,6 +600,14 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderStyle: 'dashed',
     borderColor: palette.accent,
+  },
+  searchMatch: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    marginLeft: -1,
+    backgroundColor: palette.accent2,
+    opacity: 0.75,
   },
   insightTabs: {
     flexDirection: 'row',

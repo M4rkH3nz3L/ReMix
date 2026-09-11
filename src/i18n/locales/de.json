@@ -224,10 +224,12 @@
     "insight": {
       "story": "Story",
       "map": "Karte",
-      "pacing": "Tempo"
+      "pacing": "Tempo",
+      "mapEmpty": "Noch keine Clips — hier erscheint die Timeline-Karte"
     },
     "pacing": {
       "slow": "langsam",
+      "empty": "Noch keine Clips — hier erscheint das Tempo",
       "suggestCuts": "{{count}} Schnitte vorschlagen",
       "applyCuts": "{{count}} Schnitte anwenden",
       "clearCuts": "Vorschläge verwerfen"

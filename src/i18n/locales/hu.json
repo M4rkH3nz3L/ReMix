@@ -224,10 +224,12 @@
     "insight": {
       "story": "Sztori",
       "map": "Térkép",
-      "pacing": "Tempó"
+      "pacing": "Tempó",
+      "mapEmpty": "Még nincs klip — itt jelenik meg az idővonal-térkép"
     },
     "pacing": {
       "slow": "lassú",
+      "empty": "Még nincs klip — itt jelenik meg a tempó",
       "suggestCuts": "{{count}} vágás javaslása",
       "applyCuts": "{{count}} vágás alkalmazása",
       "clearCuts": "Javaslatok elvetése"

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { GestureResponderEvent, Pressable, StyleSheet, View } from 'react-native';
+import { GestureResponderEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette, trackColors } from '@/constants/editor';
 import { projectDuration } from '@/lib/projectUtils';
@@ -11,8 +11,10 @@ import { useEditorStore } from '@/store/editorStore';
  * 🗺️ Idővonal-minimap (#42/43): a TELJES projekt kicsinyített térképe + a
  * jelenlegi nézet (viewport) kiemelése — „hol vagyok a projektben?".
  *
- * Csak akkor jelenik meg, ha a tartalom szélesebb a látható idővonalnál (tehát
- * van mit navigálni). Koppintásra a lejátszófej odaugrik; a középre rögzített
+ * Mindig látszik (kiválasztott fül soha ne legyen üres → nem tűnik hibának):
+ * tartalom hiányában halvány súgó, egyébként a kicsinyített térkép. A viewport-
+ * téglalap csak akkor jelenik meg, ha a tartalom túllóg a látható idővonalon
+ * (van mit navigálni). Koppintásra a lejátszófej odaugrik; a középre rögzített
  * playhead miatt a meglévő auto-scroll effekt igazítja a nagy idővonalat.
  */
 export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: number }) {
@@ -26,15 +28,13 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
     return null;
   }
   const totalDur = Math.max(projectDuration(project), 0.001);
-  // csak akkor van értelme, ha a tartalom túllóg a látható idővonalon
+  // a viewport-téglalapnak csak akkor van értelme, ha a tartalom túllóg
   const overflows = viewportW > 0 && totalDur * pps > viewportW + 4;
-  if (!overflows) {
-    return null;
-  }
 
   const secToX = mapW > 0 ? mapW / totalDur : 0;
   const videoClips = project.tracks.find((tk) => tk.type === 'video')?.clips ?? [];
   const markers = project.markers ?? [];
+  const hasContent = videoClips.length > 0 || markers.length > 0;
 
   // viewport (a látható ablak) — a playheadre centrálva (középre rögzített fej)
   const windowSec = viewportW / pps;
@@ -56,7 +56,11 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
       accessibilityRole="adjustable"
       accessibilityLabel={t('editor.timeline.minimap')}
     >
-      {mapW > 0 ? (
+      {!hasContent ? (
+        <Text style={styles.hint} pointerEvents="none">
+          {t('editor.insight.mapEmpty')}
+        </Text>
+      ) : mapW > 0 ? (
         <>
           {/* videó-klipek mint tartalom-sűrűség */}
           {videoClips.map((c) => (
@@ -80,8 +84,10 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
               style={{ position: 'absolute', left: m.time * secToX - 0.5, top: 0, bottom: 0, width: 1, backgroundColor: palette.accent2 }}
             />
           ))}
-          {/* viewport-téglalap */}
-          <View style={[styles.viewport, { left: vpLeft, width: vpW }]} pointerEvents="none" />
+          {/* viewport-téglalap — csak túllógásnál (különben a teljes sáv, felesleges) */}
+          {overflows ? (
+            <View style={[styles.viewport, { left: vpLeft, width: vpW }]} pointerEvents="none" />
+          ) : null}
           {/* playhead */}
           <View style={[styles.playhead, { left: playhead * secToX - 0.5 }]} pointerEvents="none" />
         </>
@@ -116,5 +122,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 1,
     backgroundColor: palette.text,
+  },
+  hint: {
+    color: palette.textDim,
+    fontSize: 10,
+    paddingHorizontal: 8,
+    lineHeight: 24,
   },
 });

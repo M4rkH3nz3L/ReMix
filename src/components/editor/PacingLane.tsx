@@ -34,9 +34,6 @@ export function PacingLane() {
   const videoClips = (project.tracks.find((tk) => tk.type === 'video')?.clips ?? []).filter(
     (c): c is VideoClip => c.kind === 'video'
   );
-  if (videoClips.length < 2) {
-    return null; // egyetlen klipnél nincs érdemi ritmus-információ
-  }
   const totalDur = Math.max(projectDuration(project), 0.001);
   const secToX = laneW > 0 ? laneW / totalDur : 0;
 
@@ -52,8 +49,10 @@ export function PacingLane() {
   return (
     <View style={styles.wrap}>
       <View style={styles.lane} onLayout={(e) => setLaneW(e.nativeEvent.layout.width)}>
-        {laneW > 0
-          ? videoClips.map((c) => {
+        {videoClips.length === 0 ? (
+          <Text style={styles.hint}>{t('editor.pacing.empty')}</Text>
+        ) : laneW > 0 ? (
+          videoClips.map((c) => {
               const e = energyOf(c.duration);
               const slow = c.duration > SLOW_SEC;
               const w = Math.max(2, c.duration * secToX);
@@ -81,7 +80,7 @@ export function PacingLane() {
                 </Pressable>
               );
             })
-          : null}
+        ) : null}
       </View>
 
       {hasSuggestions ? (
@@ -170,5 +169,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  hint: {
+    color: palette.textDim,
+    fontSize: 10,
+    paddingHorizontal: 8,
+    lineHeight: 22,
   },
 });

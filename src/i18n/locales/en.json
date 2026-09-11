@@ -224,10 +224,12 @@
     "insight": {
       "story": "Story",
       "map": "Map",
-      "pacing": "Pacing"
+      "pacing": "Pacing",
+      "mapEmpty": "No clips yet — the timeline map appears here"
     },
     "pacing": {
       "slow": "slow",
+      "empty": "No clips yet — pacing appears here",
       "suggestCuts": "Suggest {{count}} cuts",
       "applyCuts": "Apply {{count}} cuts",
       "clearCuts": "Clear suggestions"

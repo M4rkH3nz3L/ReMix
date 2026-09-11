@@ -24,6 +24,7 @@ export type CapabilityId =
   | 'autoCaption' // Whisper: beszéd → felirat
   | 'urlImport' // import linkből (YouTube / TikTok / …)
   | 'autoEdit' // AI Auto-Edit / cutplan / hook-ok
+  | 'storyAnalyze' // AI story-struktúra (Hook→Context→Value→CTA felismerés)
   | 'bgRemove' // háttér-eltávolítás
   | 'depth3d' // mélység / 3D / parallax
   | 'faceTools' // arc-követés / retusálás
@@ -54,6 +55,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   autoCaption: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoCaption' },
   urlImport: { where: 'cloud', pro: true, label: 'lib.capabilities.label.urlImport' },
   autoEdit: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoEdit' },
+  storyAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.storyAnalyze' },
   bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
   faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },

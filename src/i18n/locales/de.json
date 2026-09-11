@@ -235,8 +235,11 @@
       "clearCuts": "Vorschläge verwerfen"
     },
     "story": {
-      "empty": "Keine Kapitel — tippe auf +, um deine Story zu gliedern",
+      "empty": "Keine Kapitel — tippe auf + oder ✨, um deine Story zu gliedern",
       "addChapter": "Kapitel am Abspielkopf hinzufügen",
+      "aiDetect": "Story mit KI erkennen",
+      "aiTitle": "KI-Story",
+      "aiEmpty": "Konnte keine Story-Struktur erkennen — füge Sprache oder Kapitel manuell hinzu.",
       "menuMessage": "Kapiteltyp ändern oder entfernen.",
       "changeType": "Typ ändern",
       "kind_hook": "Hook",
@@ -1439,6 +1442,7 @@
         "autoCaption": "Automatische Untertitel",
         "urlImport": "Import per Link (YouTube/TikTok)",
         "autoEdit": "KI-Auto-Edit",
+        "storyAnalyze": "KI-Story-Struktur",
         "bgRemove": "Hintergrund entfernen",
         "depth3d": "3D / Tiefe",
         "faceTools": "Gesichts-Tools",

@@ -489,11 +489,65 @@ async function runHookGenerator(summary, aiConfig) {
   return runStructured(HOOK_SYSTEM, `A VIDEÓ TÉMÁJA:\n${summary}`, HookReplySchema, aiConfig);
 }
 
+// --- 🎬 Story Engine (Phase 1.1): dramaturgia-térkép a beszédből -------------
+
+const StoryReplySchema = z.object({
+  chapters: z
+    .array(
+      z.object({
+        start: z.number().describe('a fejezet kezdete az idővonalon (mp), 0-tól'),
+        kind: z
+          .enum(['hook', 'context', 'value', 'cta', 'other'])
+          .describe('a szakasz dramaturgiai szerepe'),
+      })
+    )
+    .describe('3–6 fejezet időrendben, az elsőnek 0 közelében kell kezdődnie'),
+});
+
+const STORY_SYSTEM = `A "vided" AI Story Engine-je vagy: egy short-form (TikTok/
+Reels/Shorts) videó dramaturgiai TÉRKÉPÉT ismered fel a beszéd-átiratból és a
+hosszból. A kimenet fejezetek listája — mindegyik egy idővonal-kezdettel (mp) és
+egy szereppel:
+- "hook": a figyelemfelkeltő nyitás (az első pillanatok, ami megállítja a görgetést)
+- "context": felvezetés / háttér / a probléma vagy helyzet bemutatása
+- "value": a lényeg — a magyarázat, a tartalom, a fizetség (a videó „húsa")
+- "cta": lezárás / felszólítás (kövess, próbáld ki, kommentelj) a végén
+- "other": ha egyik sem illik
+
+Szabályok:
+- 3–6 fejezet, IDŐRENDBEN növekvő "start"-tal; az első fejezet 0 körül kezdődjön.
+- Ne szabdald túl: egy fejezet több mondatot foghat át. A vágás-pontokat a
+  jelentés VÁLTÁSÁHOZ igazítsd (a transcript sorai mutatják a tartalmat + időt).
+- A "start" mindig 0 és a videó hossza közé essen (mp).
+- A klasszikus ív: hook (eleje) → context → value → cta (vége). Nem kötelező
+  mind a négy, de a sorrend ez legyen.
+- Ha nincs érdemi átirat, ossz időarányosan: hook az elején, value középen,
+  cta a vége felé.
+- A választ CSAK a séma szerinti JSON-ban add.
+
+Példa (18 mp, transcript: [{0-3 "Sose csináld ezt vágásnál"}, {3-11 "mindig a
+beszéd köré vágj, ne a zenéhez"}, {12-17 "próbáld ki és írd meg, működött-e"}])
+→ {"chapters":[{"start":0,"kind":"hook"},{"start":3,"kind":"value"},{"start":12,"kind":"cta"}]}`;
+
+/**
+ * @param context { duration:number, transcript:[{start,end,text}] }
+ * @returns {Promise<{chapters: {start:number, kind:string}[]}>}
+ */
+async function runStoryEngine(context, aiConfig) {
+  return runStructured(
+    STORY_SYSTEM,
+    `A VIDEÓ JELEI:\n${JSON.stringify(context, null, 1)}\n\nAdd meg a fejezeteket.`,
+    StoryReplySchema,
+    aiConfig
+  );
+}
+
 module.exports = {
   runAssistant,
   runAutoEdit,
   runCaptionStudio,
   runHookGenerator,
+  runStoryEngine,
   runThumbHeadlines,
   sanitizeAiConfig,
   aiAvailable,

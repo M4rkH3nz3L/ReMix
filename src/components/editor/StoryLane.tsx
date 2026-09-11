@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { projectDuration } from '@/lib/projectUtils';
+import { runStoryFlow } from '@/lib/storyClient';
 import { useEditorStore } from '@/store/editorStore';
+import { guardPro } from '@/store/paywallStore';
 import type { ChapterKind } from '@/types/project';
 
 /** fejezet-fajta → szín (short-form dramaturgia színkódja) */
@@ -33,11 +35,33 @@ export function StoryLane() {
   const addChapterAt = useEditorStore((s) => s.addChapterAt);
   const cycleChapterKind = useEditorStore((s) => s.cycleChapterKind);
   const removeChapter = useEditorStore((s) => s.removeChapter);
+  const applyAiChapters = useEditorStore((s) => s.applyAiChapters);
   const [laneW, setLaneW] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   if (!project) {
     return null;
   }
+
+  // 🎬 AI Story Engine (Phase 1.1): dramaturgia felismerése a beszédből (Pro)
+  const runAi = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    await guardPro(
+      async () => {
+        const detected = await runStoryFlow(project);
+        if (detected && detected.length > 0) {
+          applyAiChapters(detected);
+        } else {
+          Alert.alert(t('editor.story.aiTitle'), t('editor.story.aiEmpty'));
+        }
+      },
+      (e) => Alert.alert(t('editor.story.aiTitle'), e.message)
+    );
+    setBusy(false);
+  };
   const totalDur = Math.max(projectDuration(project), 0.001);
   const chapters = [...(project.chapters ?? [])].sort((a, b) => a.start - b.start);
   const secToX = laneW > 0 ? laneW / totalDur : 0;
@@ -82,6 +106,20 @@ export function StoryLane() {
           <Text style={styles.hint}>{t('editor.story.empty')}</Text>
         ) : null}
       </View>
+      <Pressable
+        onPress={runAi}
+        disabled={busy}
+        hitSlop={6}
+        style={[styles.aiBtn, busy ? styles.aiBtnBusy : null]}
+        accessibilityRole="button"
+        accessibilityLabel={t('editor.story.aiDetect')}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={palette.accent2} />
+        ) : (
+          <Ionicons name="sparkles" size={13} color={palette.accent2} />
+        )}
+      </Pressable>
       <Pressable
         onPress={() => addChapterAt(chapters.length === 0 ? 'hook' : 'other')}
         hitSlop={6}
@@ -144,5 +182,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.accent,
     backgroundColor: palette.accentSoft,
+  },
+  aiBtn: {
+    width: 26,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.accent2,
+    backgroundColor: '#7c5cff22',
+  },
+  aiBtnBusy: {
+    opacity: 0.7,
   },
 });

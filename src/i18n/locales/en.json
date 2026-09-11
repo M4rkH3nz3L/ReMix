@@ -235,8 +235,11 @@
       "clearCuts": "Clear suggestions"
     },
     "story": {
-      "empty": "No chapters — tap + to map your story",
+      "empty": "No chapters — tap + or ✨ to map your story",
       "addChapter": "Add chapter at playhead",
+      "aiDetect": "Detect story with AI",
+      "aiTitle": "AI Story",
+      "aiEmpty": "Couldn't detect a story structure — add speech or chapters manually.",
       "menuMessage": "Change the chapter type or remove it.",
       "changeType": "Change type",
       "kind_hook": "Hook",
@@ -1439,6 +1442,7 @@
         "autoCaption": "Automatic captions",
         "urlImport": "Import from link (YouTube/TikTok)",
         "autoEdit": "AI Auto-Edit",
+        "storyAnalyze": "AI story structure",
         "bgRemove": "Background removal",
         "depth3d": "3D / depth",
         "faceTools": "Face tools",

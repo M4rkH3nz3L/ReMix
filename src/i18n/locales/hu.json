@@ -235,8 +235,11 @@
       "clearCuts": "Javaslatok elvetése"
     },
     "story": {
-      "empty": "Nincs fejezet — koppints a +-ra a történet feltérképezéséhez",
+      "empty": "Nincs fejezet — koppints a +-ra vagy a ✨-ra a történet feltérképezéséhez",
       "addChapter": "Fejezet a lejátszófejnél",
+      "aiDetect": "Történet felismerése AI-val",
+      "aiTitle": "AI történet",
+      "aiEmpty": "Nem sikerült történet-struktúrát felismerni — adj hozzá beszédet vagy fejezetet kézzel.",
       "menuMessage": "Változtasd a fejezet típusát, vagy töröld.",
       "changeType": "Típus váltása",
       "kind_hook": "Hook",
@@ -1439,6 +1442,7 @@
         "autoCaption": "Automatikus felirat",
         "urlImport": "Import linkből (YouTube/TikTok)",
         "autoEdit": "AI Auto-Edit",
+        "storyAnalyze": "AI story-struktúra",
         "bgRemove": "Háttér-eltávolítás",
         "depth3d": "3D / mélység",
         "faceTools": "Arc-eszközök",

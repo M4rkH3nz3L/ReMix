@@ -178,6 +178,8 @@ interface EditorState {
   cycleChapterKind: (id: string) => void;
   /** fejezet törlése */
   removeChapter: (id: string) => void;
+  /** 🎬 AI-felismert story-fejezetek alkalmazása (a meglévőket lecseréli, egy undo-lépés) */
+  applyAiChapters: (chapters: { start: number; kind: ChapterKind }[]) => void;
   /** ✂️ javasolt vágáspontok beállítása (szaggatott jelölés, nem alkalmazva) */
   setSuggestedCuts: (times: number[]) => void;
   /** a javaslatok elvetése */
@@ -642,6 +644,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       type: 'SET_CHAPTERS',
       chapters: (project.chapters ?? []).filter((c) => c.id !== id),
     });
+  },
+
+  applyAiChapters: (input) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    // időrend + közeli dedup, majd id-hozzárendelés — a régi fejezeteket cseréli
+    const sorted = [...input].sort((a, b) => a.start - b.start);
+    const chapters: Chapter[] = [];
+    for (const c of sorted) {
+      if (!chapters.some((d) => Math.abs(d.start - c.start) < 0.05)) {
+        chapters.push({ id: makeId('chp'), start: Math.max(0, c.start), kind: c.kind });
+      }
+    }
+    // provenance: az esemény-naplóban 'ai'-ként jelenik meg (mint az AI-parancsok)
+    get().dispatch({ type: 'SET_CHAPTERS', chapters }, 'ai');
   },
 
   setSuggestedCuts: (times) =>

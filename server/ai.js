@@ -34,6 +34,25 @@ const PatchSchema = z
     fadeOutSec: z.number().describe('kiúszás feketébe (mp, 0-2)'),
     opacity: z.number().describe('0.1-1'),
     trimIn: z.number().describe('forrásfájlon belüli kezdőpont (mp)'),
+    // 🎬 kimenő átmenet a KÖVETKEZŐ klipre (az első klipre tedd)
+    transitionOut: z.object({
+      type: z.enum([
+        'zoom', 'spin', 'flip', 'cube', 'circle', 'dissolve', 'wipeLeft', 'wipeRight',
+        'wipeUp', 'wipeDown', 'slideLeft', 'slideRight', 'pixelize', 'blur',
+        'fadeBlack', 'fadeWhite', 'radial',
+      ]),
+      duration: z.number().describe('mp, 0.2-1.5'),
+    }),
+    // 🎨 szín-korrekció (a klip saját grade-je)
+    adjust: z
+      .object({
+        brightness: z.number().describe('-0.3–0.3'),
+        contrast: z.number().describe('-0.4–0.4'),
+        saturation: z.number().describe('-1–1 (−1 = fekete-fehér)'),
+        temperature: z.number().describe('-0.3–0.3 (meleg↔hideg)'),
+        vignette: z.number().describe('0–1'),
+      })
+      .partial(),
   })
   .partial();
 
@@ -99,12 +118,18 @@ Szabályok:
 - A message mindig magyar, tömör, és a felhasználónak szól.
 - ADD_TEXT_CLIPS-nél adj egy rövid magyar "reason" mezőt (1 tömör mondat: miért
   kell ez a felirat/cím) — ez lesz a klip „miért van itt?" indoklása.
+- ÁTMENET két klip közé: az ELSŐ klipre tedd az UPDATE_CLIP patch.transitionOut-ot
+  ({type, duration}); a duration 0.2–1.5 mp.
+- SZÍN/hangulat: UPDATE_CLIP patch.adjust ({brightness/contrast/saturation/
+  temperature/vignette}) — csak a valóban kért mezőket add meg, a tartományon belül.
 
 Példák (utasítás → commands):
 - "Nevezd át a projektet Vlogra" → [{"type":"RENAME_PROJECT","name":"Vlog"}]
 - "Legyen négyzetes a videó" → [{"type":"SET_ASPECT","aspectRatio":"1:1"}]
 - "Vágd ketté a c12 klipet 3 mp-nél" → [{"type":"SPLIT_CLIP","clipId":"c12","time":3}]
-- "Halkítsd le a c3-at" → [{"type":"UPDATE_CLIP","clipId":"c3","patch":{"volume":0.3}}]`;
+- "Halkítsd le a c3-at" → [{"type":"UPDATE_CLIP","clipId":"c3","patch":{"volume":0.3}}]
+- "Tegyél feloldó átmenetet a c1 után" → [{"type":"UPDATE_CLIP","clipId":"c1","patch":{"transitionOut":{"type":"dissolve","duration":0.5}}}]
+- "Legyen a c2 melegebb és kontrasztosabb" → [{"type":"UPDATE_CLIP","clipId":"c2","patch":{"adjust":{"temperature":0.15,"contrast":0.15}}}]`;
 
 /** a lokális runtime elérhetősége — rövid cache-sel, hogy a /health gyors legyen */
 let localProbe = { at: 0, ok: false };

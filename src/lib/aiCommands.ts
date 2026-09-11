@@ -147,6 +147,8 @@ const PATCHABLE_FIELDS = new Set([
   'fadeOutSec',
   'opacity',
   'trimIn',
+  'transitionOut',
+  'adjust',
 ]);
 
 /**

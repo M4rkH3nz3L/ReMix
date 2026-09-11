@@ -255,7 +255,8 @@
       "gapRemove": "{{seconds}}s Lücke — zum Entfernen tippen",
       "collapse": "🔽 Spur einklappen",
       "expand": "🔼 Spur ausklappen",
-      "minimap": "Zeitleisten-Minimap"
+      "minimap": "Zeitleisten-Minimap",
+      "height": "📏 Höhe (wechseln)"
     },
     "timelineClip": {
       "lockedTitle": "Ebene gesperrt",

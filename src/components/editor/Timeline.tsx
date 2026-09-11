@@ -79,7 +79,9 @@ export function Timeline() {
   const soloTracks = useEditorStore((s) => s.soloTracks);
   const lockedTracks = useEditorStore((s) => s.lockedTracks);
   const collapsedTracks = useEditorStore((s) => s.collapsedTracks);
+  const trackHeightScale = useEditorStore((s) => s.trackHeightScale);
   const toggleTrackFlag = useEditorStore((s) => s.toggleTrackFlag);
+  const cycleTrackHeight = useEditorStore((s) => s.cycleTrackHeight);
   const closeGapBefore = useEditorStore((s) => s.closeGapBefore);
 
   /**
@@ -110,6 +112,10 @@ export function Timeline() {
         {
           text: collapsed ? t('editor.timeline.expand') : t('editor.timeline.collapse'),
           onPress: () => toggleTrackFlag(type, 'collapse'),
+        },
+        {
+          text: t('editor.timeline.height'),
+          onPress: () => cycleTrackHeight(type),
         },
         { text: t('common.cancel'), style: 'cancel' },
       ]
@@ -211,7 +217,9 @@ export function Timeline() {
   // 🔽 összecsukott sáv: vékony „lane" marad (a klip-terület elrejtve)
   const COLLAPSED_H = 18;
   const th = (t: TrackType) =>
-    collapsedTracks.includes(t) ? COLLAPSED_H : Math.round(trackHeights[t] * L.editor.trackScale);
+    collapsedTracks.includes(t)
+      ? COLLAPSED_H
+      : Math.round(trackHeights[t] * L.editor.trackScale * (trackHeightScale[t] ?? 1));
 
   const totalTracksHeight = visibleTracks.reduce((sum, t) => sum + th(t), 0);
 

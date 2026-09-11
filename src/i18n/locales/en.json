@@ -255,7 +255,8 @@
       "gapRemove": "{{seconds}}s gap — tap to remove",
       "collapse": "🔽 Collapse track",
       "expand": "🔼 Expand track",
-      "minimap": "Timeline minimap"
+      "minimap": "Timeline minimap",
+      "height": "📏 Height (cycle)"
     },
     "timelineClip": {
       "lockedTitle": "Layer locked",

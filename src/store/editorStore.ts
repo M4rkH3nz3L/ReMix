@@ -78,6 +78,8 @@ interface EditorState {
   lockedTracks: TrackType[];
   /** 🔽 összecsukott sávok (session-szintű; a klip-terület elrejtve, thin lane marad) */
   collapsedTracks: TrackType[];
+  /** 📏 sáv-magasság szorzó (session-szintű; hiányzó = 1×) — precíz munkához nagyítható */
+  trackHeightScale: Partial<Record<TrackType, number>>;
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -145,6 +147,8 @@ interface EditorState {
   copyStyle: () => boolean;
   pasteStyle: () => number;
   toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse') => void;
+  /** sáv-magasság léptetése: 1× → 1.6× → 2.4× → 1× */
+  cycleTrackHeight: (type: TrackType) => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
@@ -207,6 +211,7 @@ const SESSION_RESET = {
   soloTracks: [] as TrackType[],
   lockedTracks: [] as TrackType[],
   collapsedTracks: [] as TrackType[],
+  trackHeightScale: {} as Partial<Record<TrackType, number>>,
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -449,6 +454,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }
     set({ [key]: next } as never);
+  },
+
+  cycleTrackHeight: (type) => {
+    const steps = [1, 1.6, 2.4];
+    const cur = get().trackHeightScale[type] ?? 1;
+    const idx = steps.indexOf(cur);
+    const next = steps[(idx + 1) % steps.length] ?? 1;
+    set((s) => ({ trackHeightScale: { ...s.trackHeightScale, [type]: next } }));
   },
 
   setRippleMode: (on) => set({ rippleMode: on }),

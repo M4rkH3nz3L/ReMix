@@ -255,7 +255,8 @@
       "gapRemove": "{{seconds}}s hézag — koppints a törléshez",
       "collapse": "🔽 Sáv összecsukása",
       "expand": "🔼 Sáv kinyitása",
-      "minimap": "Idővonal-minimap"
+      "minimap": "Idővonal-minimap",
+      "height": "📏 Magasság (léptet)"
     },
     "timelineClip": {
       "lockedTitle": "Zárolt sáv",

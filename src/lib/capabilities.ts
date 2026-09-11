@@ -34,13 +34,18 @@ export type CapabilityId =
   | 'tts' // szöveg → beszéd / Voice Studio
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
-interface CapabilityMeta {
-  where: Where;
-  /** Pro-előfizetést igényel? */
-  pro: boolean;
-  /** felhasználónak mutatott név (upsell / paywall) */
-  label: string;
-}
+/**
+ * A `where`/`pro` kombináció TÍPUS-SZINTEN kódolja a szigorú üzleti szabályt:
+ * ami az ESZKÖZÖN fut (`where: 'local'`), az KÖTELEZŐEN ingyenes (`pro: false`)
+ * — on-device funkciót soha nem kapuzunk Pro mögé. Felhő-funkció (`'cloud'`)
+ * lehet Pro, vagy — ritkán, szándékosan — ingyenes (pl. `soundLibrary`).
+ *
+ * Következmény: egy `{ where: 'local', pro: true }` sor FORDÍTÁSI HIBÁT ad, így
+ * a szabály minden `tsc --noEmit` futásnál automatikusan auditálva van.
+ */
+type CapabilityMeta =
+  | { where: 'local'; pro: false; label: string }
+  | { where: 'cloud'; pro: boolean; label: string };
 
 export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   localRender: { where: 'local', pro: false, label: 'lib.capabilities.label.localRender' },

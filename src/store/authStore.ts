@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { SignUpProfile } from '@/lib/accountValidation';
 import { registerCurrentDevice } from '@/lib/deviceInfo';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
+import { useEntitlement } from '@/store/entitlementStore';
 
 /**
  * 🔐 Auth-store — a bejelentkezett felhasználó EGYETLEN forrása.
@@ -73,6 +74,8 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       const { data } = await supabase.auth.getSession();
       set({ session: data.session, user: data.session?.user ?? null });
+      // 💳 Pro-szint szinkronja a bejelentkezett userhez (offline-cache + Supabase)
+      void useEntitlement.getState().syncFromUser(data.session?.user?.id ?? null);
       // már bejelentkezett user: aktuális eszköz frissítése (last_seen + adatok)
       if (data.session?.user) {
         void registerCurrentDevice(data.session.user.id);
@@ -85,6 +88,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       subscribed = true;
       supabase.auth.onAuthStateChange((_event, session) => {
         set({ session, user: session?.user ?? null });
+        // 💳 minden auth-váltásnál újraszinkron: login → user szintje, logout → Free
+        void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
       });
     }
     set({ hydrated: true });

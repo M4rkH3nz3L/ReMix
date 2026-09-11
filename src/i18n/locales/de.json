@@ -232,7 +232,13 @@
       "empty": "Noch keine Clips — hier erscheint das Tempo",
       "suggestCuts": "{{count}} Schnitte vorschlagen",
       "applyCuts": "{{count}} Schnitte anwenden",
-      "clearCuts": "Vorschläge verwerfen"
+      "clearCuts": "Vorschläge verwerfen",
+      "aiDetect": "Tempo mit KI analysieren",
+      "aiTitle": "KI-Tempo",
+      "aiEmpty": "Tempo konnte nicht analysiert werden — braucht Sprache oder einen laufenden Worker.",
+      "aiGood": "Das Tempo wirkt gleichmäßig — keine langsamen Abschnitte gefunden.",
+      "aiSlowOne": "Das Tempo wird um {{from}}–{{to}} langsamer.",
+      "aiSlowMany": "{{count}} langsame Abschnitte — der längste ist {{from}}–{{to}}."
     },
     "story": {
       "empty": "Keine Kapitel — tippe auf + oder ✨, um deine Story zu gliedern",
@@ -1443,6 +1449,7 @@
         "urlImport": "Import per Link (YouTube/TikTok)",
         "autoEdit": "KI-Auto-Edit",
         "storyAnalyze": "KI-Story-Struktur",
+        "pacingAnalyze": "KI-Tempo-Analyse",
         "bgRemove": "Hintergrund entfernen",
         "depth3d": "3D / Tiefe",
         "faceTools": "Gesichts-Tools",

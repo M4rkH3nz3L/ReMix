@@ -232,7 +232,13 @@
       "empty": "No clips yet — pacing appears here",
       "suggestCuts": "Suggest {{count}} cuts",
       "applyCuts": "Apply {{count}} cuts",
-      "clearCuts": "Clear suggestions"
+      "clearCuts": "Clear suggestions",
+      "aiDetect": "Analyze pacing with AI",
+      "aiTitle": "AI Pacing",
+      "aiEmpty": "Couldn't analyze pacing — needs speech or a running worker.",
+      "aiGood": "Pacing looks even — no slow sections found.",
+      "aiSlowOne": "Pacing slows down around {{from}}–{{to}}.",
+      "aiSlowMany": "{{count}} slow sections — the longest is {{from}}–{{to}}."
     },
     "story": {
       "empty": "No chapters — tap + or ✨ to map your story",
@@ -1443,6 +1449,7 @@
         "urlImport": "Import from link (YouTube/TikTok)",
         "autoEdit": "AI Auto-Edit",
         "storyAnalyze": "AI story structure",
+        "pacingAnalyze": "AI pacing analysis",
         "bgRemove": "Background removal",
         "depth3d": "3D / depth",
         "faceTools": "Face tools",

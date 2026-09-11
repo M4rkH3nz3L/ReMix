@@ -232,7 +232,13 @@
       "empty": "Még nincs klip — itt jelenik meg a tempó",
       "suggestCuts": "{{count}} vágás javaslása",
       "applyCuts": "{{count}} vágás alkalmazása",
-      "clearCuts": "Javaslatok elvetése"
+      "clearCuts": "Javaslatok elvetése",
+      "aiDetect": "Tempó elemzése AI-val",
+      "aiTitle": "AI tempó",
+      "aiEmpty": "Nem sikerült elemezni a tempót — beszéd vagy futó worker kell hozzá.",
+      "aiGood": "A tempó egyenletes — nincs lassú szakasz.",
+      "aiSlowOne": "A tempó lelassul {{from}}–{{to}} között.",
+      "aiSlowMany": "{{count}} lassú szakasz — a leghosszabb: {{from}}–{{to}}."
     },
     "story": {
       "empty": "Nincs fejezet — koppints a +-ra vagy a ✨-ra a történet feltérképezéséhez",
@@ -1443,6 +1449,7 @@
         "urlImport": "Import linkből (YouTube/TikTok)",
         "autoEdit": "AI Auto-Edit",
         "storyAnalyze": "AI story-struktúra",
+        "pacingAnalyze": "AI tempó-elemzés",
         "bgRemove": "Háttér-eltávolítás",
         "depth3d": "3D / mélység",
         "faceTools": "Arc-eszközök",

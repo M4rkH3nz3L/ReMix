@@ -15,6 +15,7 @@ import { findClip, projectDuration } from '@/lib/projectUtils';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
+import type { PacingInsight } from '@/lib/pacingClient';
 import type { Asset, Chapter, ChapterKind, Clip, Project, TrackType } from '@/types/project';
 
 /** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
@@ -85,6 +86,8 @@ interface EditorState {
   trackHeightScale: Partial<Record<TrackType, number>>;
   /** ✂️ AI/heurisztika által javasolt vágáspontok (mp) — szaggatottan, NEM alkalmazva */
   suggestedCuts: number[];
+  /** 📈 AI tempó-elemzés eredménye (lassú szakaszok + összefoglaló); null = nincs */
+  pacingInsight: PacingInsight | null;
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -184,6 +187,8 @@ interface EditorState {
   setSuggestedCuts: (times: number[]) => void;
   /** a javaslatok elvetése */
   clearSuggestedCuts: () => void;
+  /** 📈 AI tempó-elemzés eredményének beállítása/törlése (null = törlés) */
+  setPacingInsight: (insight: PacingInsight | null) => void;
   /** a javasolt vágások alkalmazása (a lefedő videóklipek splitelése), majd elvetés */
   applySuggestedCuts: () => void;
   setRippleMode: (on: boolean) => void;
@@ -256,6 +261,7 @@ const SESSION_RESET = {
   collapsedTracks: [] as TrackType[],
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
   suggestedCuts: [] as number[],
+  pacingInsight: null as PacingInsight | null,
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -667,6 +673,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ suggestedCuts: [...new Set(times.map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b) }),
 
   clearSuggestedCuts: () => set({ suggestedCuts: [] }),
+
+  setPacingInsight: (insight) => set({ pacingInsight: insight }),
 
   applySuggestedCuts: () => {
     const times = [...get().suggestedCuts].sort((a, b) => a - b);

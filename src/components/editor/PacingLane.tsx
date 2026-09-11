@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { analyzePacing } from '@/lib/pacingClient';
 import { projectDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
+import { guardPro } from '@/store/paywallStore';
 import type { VideoClip } from '@/types/project';
 
 /** ennél hosszabb, vágatlan videóklip „lassú" szakasznak számít (short-form). */
@@ -26,11 +28,34 @@ export function PacingLane() {
   const setSuggestedCuts = useEditorStore((s) => s.setSuggestedCuts);
   const applySuggestedCuts = useEditorStore((s) => s.applySuggestedCuts);
   const clearSuggestedCuts = useEditorStore((s) => s.clearSuggestedCuts);
+  const pacingInsight = useEditorStore((s) => s.pacingInsight);
+  const setPacingInsight = useEditorStore((s) => s.setPacingInsight);
   const [laneW, setLaneW] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   if (!project) {
     return null;
   }
+
+  // 📈 AI Pacing (Phase 1.2): valós worker-jelekből tempó-elemzés (Pro)
+  const runAi = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    await guardPro(
+      async () => {
+        const insight = await analyzePacing(project);
+        setPacingInsight(insight);
+        Alert.alert(
+          t('editor.pacing.aiTitle'),
+          insight ? insight.summary : t('editor.pacing.aiEmpty')
+        );
+      },
+      (e) => Alert.alert(t('editor.pacing.aiTitle'), e.message)
+    );
+    setBusy(false);
+  };
   const videoClips = (project.tracks.find((tk) => tk.type === 'video')?.clips ?? []).filter(
     (c): c is VideoClip => c.kind === 'video'
   );
@@ -81,7 +106,34 @@ export function PacingLane() {
               );
             })
         ) : null}
+        {/* 📈 AI: lassú (alacsony energiájú) szakaszok kiemelése */}
+        {laneW > 0
+          ? pacingInsight?.slow.map((r, i) => (
+              <View
+                key={`slow-${i}`}
+                pointerEvents="none"
+                style={[
+                  styles.slowBand,
+                  { left: r.start * secToX, width: Math.max(2, (r.end - r.start) * secToX) },
+                ]}
+              />
+            ))
+          : null}
       </View>
+
+      <Pressable
+        onPress={runAi}
+        disabled={busy}
+        hitSlop={6}
+        style={[styles.actionBtn, styles.aiBtn]}
+        accessibilityLabel={t('editor.pacing.aiDetect')}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={palette.accent2} />
+        ) : (
+          <Ionicons name="sparkles" size={13} color={palette.accent2} />
+        )}
+      </Pressable>
 
       {hasSuggestions ? (
         <>
@@ -146,6 +198,18 @@ const styles = StyleSheet.create({
   applyBtn: {
     borderColor: palette.ok,
     backgroundColor: '#2ecc8f22',
+  },
+  aiBtn: {
+    borderColor: palette.accent2,
+    backgroundColor: '#7c5cff22',
+  },
+  slowBand: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#ff3b3b22',
+    borderLeftWidth: 1,
+    borderLeftColor: palette.danger,
   },
   slot: {
     position: 'absolute',

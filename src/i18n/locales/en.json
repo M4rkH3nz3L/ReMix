@@ -217,6 +217,17 @@
       "focusMode": "Focus mode — dim other clips",
       "aiAdded": "Added by ReMix AI"
     },
+    "story": {
+      "empty": "No chapters — tap + to map your story",
+      "addChapter": "Add chapter at playhead",
+      "menuMessage": "Change the chapter type or remove it.",
+      "changeType": "Change type",
+      "kind_hook": "Hook",
+      "kind_context": "Context",
+      "kind_value": "Value",
+      "kind_cta": "CTA",
+      "kind_other": "Section"
+    },
     "history": {
       "title": "Edit history",
       "empty": "No edits yet.",
@@ -1441,6 +1452,8 @@
       "replaceTrackClips_other": "{{trackType}} track rebuilt ({{count}} clips)",
       "setMarkers_one": "markers ({{count}})",
       "setMarkers_other": "markers ({{count}})",
+      "setChapters_one": "chapters ({{count}})",
+      "setChapters_other": "chapters ({{count}})",
       "upsertImageDoc_one": "image document: {{name}} ({{count}} layer)",
       "upsertImageDoc_other": "image document: {{name}} ({{count}} layers)",
       "removeImageDoc": "image document deleted",

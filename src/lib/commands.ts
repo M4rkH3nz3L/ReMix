@@ -4,6 +4,7 @@ import { findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils'
 import type {
   AspectRatio,
   Asset,
+  Chapter,
   Clip,
   ImageDoc,
   Marker,
@@ -45,6 +46,7 @@ export type EditorCommand =
   | { type: 'SET_PARTICLES'; particles: ParticlesConfig | null }
   /** 🔖 a marker-lista cseréje (hozzáadás/törlés/átnevezés egy lépésben) */
   | { type: 'SET_MARKERS'; markers: Marker[] }
+  | { type: 'SET_CHAPTERS'; chapters: Chapter[] }
   /**
    * 🎨 Kép-dokumentum beírása (létrehozás ÉS módosítás). A réteg-műveletek
    * pure függvények (imageDoc.ts), az eredményt EZ a parancs teszi be — így a
@@ -205,6 +207,15 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, markers: next.length > 0 ? next : undefined };
     }
 
+    case 'SET_CHAPTERS': {
+      const next = [...cmd.chapters].sort((a, b) => a.start - b.start);
+      const prev = project.chapters ?? [];
+      if (JSON.stringify(prev) === JSON.stringify(next)) {
+        return null;
+      }
+      return { ...project, chapters: next.length > 0 ? next : undefined };
+    }
+
     case 'REPLACE_TRACKS': {
       const byType = new Map(cmd.tracks.map((t) => [t.trackType, t.clips]));
       if (byType.size === 0) {
@@ -290,6 +301,8 @@ export function describeCommand(cmd: EditorCommand): string {
       });
     case 'SET_MARKERS':
       return tr('lib.commands.setMarkers', { count: cmd.markers.length });
+    case 'SET_CHAPTERS':
+      return tr('lib.commands.setChapters', { count: cmd.chapters.length });
     case 'UPSERT_IMAGE_DOC':
       return (
         cmd.label ??

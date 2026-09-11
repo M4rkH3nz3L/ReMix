@@ -15,7 +15,7 @@ import { findClip, projectDuration } from '@/lib/projectUtils';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
-import type { Asset, Clip, Project, TrackType } from '@/types/project';
+import type { Asset, Chapter, ChapterKind, Clip, Project, TrackType } from '@/types/project';
 
 export type PanelId =
   | 'text'
@@ -161,6 +161,12 @@ interface EditorState {
   linkSelected: () => void;
   /** a klipet tartalmazó link-csoport feloldása */
   unlinkClip: (clipId: string) => void;
+  /** 🎬 story-fejezet hozzáadása a lejátszófejnél (adott fajtával) */
+  addChapterAt: (kind: ChapterKind) => void;
+  /** fejezet fajtájának léptetése: hook → context → value → cta → other → hook */
+  cycleChapterKind: (id: string) => void;
+  /** fejezet törlése */
+  removeChapter: (id: string) => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
@@ -541,6 +547,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   unlinkClip: (clipId) =>
     set((s) => ({ linkGroups: s.linkGroups.filter((g) => !g.includes(clipId)) })),
+
+  addChapterAt: (kind) => {
+    const { project, playhead } = get();
+    if (!project) {
+      return;
+    }
+    const start = Math.max(0, Math.round(playhead * 100) / 100);
+    // ugyanannál a startnál ne legyen két fejezet — a meglévőt felülírjuk
+    const chapters: Chapter[] = [
+      ...(project.chapters ?? []).filter((c) => Math.abs(c.start - start) > 0.05),
+      { id: makeId('chp'), start, kind },
+    ];
+    get().dispatch({ type: 'SET_CHAPTERS', chapters });
+  },
+
+  cycleChapterKind: (id) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    const order: ChapterKind[] = ['hook', 'context', 'value', 'cta', 'other'];
+    const chapters = (project.chapters ?? []).map((c) =>
+      c.id === id ? { ...c, kind: order[(order.indexOf(c.kind) + 1) % order.length] } : c
+    );
+    get().dispatch({ type: 'SET_CHAPTERS', chapters });
+  },
+
+  removeChapter: (id) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    get().dispatch({
+      type: 'SET_CHAPTERS',
+      chapters: (project.chapters ?? []).filter((c) => c.id !== id),
+    });
+  },
 
   setRippleMode: (on) => set({ rippleMode: on }),
 

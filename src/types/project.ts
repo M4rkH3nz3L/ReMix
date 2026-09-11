@@ -596,6 +596,21 @@ export interface Marker {
   label: string;
 }
 
+/** 🎬 Story-fejezet fajtája (short-form dramaturgia): Hook→Context→Value→CTA. */
+export type ChapterKind = 'hook' | 'context' | 'value' | 'cta' | 'other';
+
+/**
+ * 🎬 Story-struktúra fejezet: a `start`-tól a KÖVETKEZŐ fejezet startjáig (ill.
+ * a projekt végéig) tart. A ReMix a videó „térképét" adja — a user nem csak
+ * klipeket lát, hanem a videója történetét (Hook / Context / Value / CTA).
+ */
+export interface Chapter {
+  id: string;
+  /** kezdet az idővonalon (mp) */
+  start: number;
+  kind: ChapterKind;
+}
+
 /**
  * 🎨 KÉP-DOKUMENTUM (Creative Canvas V1) — a kép RÉTEG-FA, nem bitmap.
  *
@@ -699,6 +714,8 @@ export interface Project {
   particles?: ParticlesConfig;
   /** 🔖 szerkezeti jelölők az idővonalon */
   markers?: Marker[];
+  /** 🎬 story-struktúra fejezetek (Hook/Context/Value/CTA) — a videó „térképe" */
+  chapters?: Chapter[];
   /**
    * 🎨 Kép-dokumentumok (Creative Canvas): a projekthez tartozó réteg-fák.
    * A vászonra kirasterizált PNG-jük képklipként kerül az idővonalra, de a

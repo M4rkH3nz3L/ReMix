@@ -217,6 +217,17 @@
       "focusMode": "Fókusz mód — a többi klip halványítása",
       "aiAdded": "A ReMix AI adta hozzá"
     },
+    "story": {
+      "empty": "Nincs fejezet — koppints a +-ra a történet feltérképezéséhez",
+      "addChapter": "Fejezet a lejátszófejnél",
+      "menuMessage": "Változtasd a fejezet típusát, vagy töröld.",
+      "changeType": "Típus váltása",
+      "kind_hook": "Hook",
+      "kind_context": "Kontextus",
+      "kind_value": "Érték",
+      "kind_cta": "CTA",
+      "kind_other": "Szakasz"
+    },
     "history": {
       "title": "Szerkesztési előzmények",
       "empty": "Még nincs szerkesztés.",
@@ -1441,6 +1452,8 @@
       "replaceTrackClips_other": "{{trackType}} sáv újraépítve ({{count}} klip)",
       "setMarkers_one": "jelölők ({{count}})",
       "setMarkers_other": "jelölők ({{count}})",
+      "setChapters_one": "fejezetek ({{count}})",
+      "setChapters_other": "fejezetek ({{count}})",
       "upsertImageDoc_one": "kép-dokumentum: {{name}} ({{count}} réteg)",
       "upsertImageDoc_other": "kép-dokumentum: {{name}} ({{count}} réteg)",
       "removeImageDoc": "kép-dokumentum törölve",

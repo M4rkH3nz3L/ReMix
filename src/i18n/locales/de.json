@@ -217,6 +217,17 @@
       "focusMode": "Fokus-Modus — andere Clips abdunkeln",
       "aiAdded": "Von ReMix AI hinzugefügt"
     },
+    "story": {
+      "empty": "Keine Kapitel — tippe auf +, um deine Story zu gliedern",
+      "addChapter": "Kapitel am Abspielkopf hinzufügen",
+      "menuMessage": "Kapiteltyp ändern oder entfernen.",
+      "changeType": "Typ ändern",
+      "kind_hook": "Hook",
+      "kind_context": "Kontext",
+      "kind_value": "Value",
+      "kind_cta": "CTA",
+      "kind_other": "Abschnitt"
+    },
     "history": {
       "title": "Bearbeitungsverlauf",
       "empty": "Noch keine Bearbeitungen.",
@@ -1441,6 +1452,8 @@
       "replaceTrackClips_other": "{{trackType}}-Spur neu aufgebaut ({{count}} Clips)",
       "setMarkers_one": "Marker ({{count}})",
       "setMarkers_other": "Marker ({{count}})",
+      "setChapters_one": "Kapitel ({{count}})",
+      "setChapters_other": "Kapitel ({{count}})",
       "upsertImageDoc_one": "Bilddokument: {{name}} ({{count}} Ebene)",
       "upsertImageDoc_other": "Bilddokument: {{name}} ({{count}} Ebenen)",
       "removeImageDoc": "Bilddokument gelöscht",

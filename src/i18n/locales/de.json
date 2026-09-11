@@ -219,6 +219,11 @@
       "focusMode": "Fokus-Modus — andere Clips abdunkeln",
       "aiAdded": "Von ReMix AI hinzugefügt"
     },
+    "insight": {
+      "story": "Story",
+      "map": "Karte",
+      "pacing": "Tempo"
+    },
     "pacing": {
       "slow": "langsam",
       "suggestCuts": "{{count}} Schnitte vorschlagen",

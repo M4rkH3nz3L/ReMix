@@ -219,6 +219,11 @@
       "focusMode": "Focus mode — dim other clips",
       "aiAdded": "Added by ReMix AI"
     },
+    "insight": {
+      "story": "Story",
+      "map": "Map",
+      "pacing": "Pacing"
+    },
     "pacing": {
       "slow": "slow",
       "suggestCuts": "Suggest {{count}} cuts",

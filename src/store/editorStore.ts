@@ -17,6 +17,9 @@ import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
 import type { Asset, Chapter, ChapterKind, Clip, Project, TrackType } from '@/types/project';
 
+/** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
+export type InsightLane = 'story' | 'map' | 'pacing';
+
 export type PanelId =
   | 'text'
   | 'filter'
@@ -103,6 +106,8 @@ interface EditorState {
   focusMode: boolean;
   /** 🅱️ before/after: nyomva tartva az előnézet a NYERS forrást mutatja (look nélkül) */
   comparingOriginal: boolean;
+  /** 🔎 az idővonal fölötti insight-sáv aktív nézete (story / minimap / pacing) */
+  insightLane: InsightLane;
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
   maskEdit: boolean;
   /**
@@ -185,6 +190,7 @@ interface EditorState {
   toggleSafeZones: () => void;
   toggleFocusMode: () => void;
   setComparingOriginal: (on: boolean) => void;
+  setInsightLane: (lane: InsightLane) => void;
   setMaskEdit: (on: boolean) => void;
   setVideoVoiceActive: (on: boolean) => void;
   /** ripple-törlés: a klipek eltűnnek és a lyuk bezárul (false = nem futott) */
@@ -237,6 +243,7 @@ const SESSION_RESET = {
   showSafeZones: false,
   focusMode: false,
   comparingOriginal: false,
+  insightLane: 'story' as InsightLane,
   maskEdit: false,
   videoVoiceActive: false,
   mutedTracks: [] as TrackType[],
@@ -655,6 +662,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   setComparingOriginal: (on) => set({ comparingOriginal: on }),
+  setInsightLane: (lane) => set({ insightLane: lane }),
 
   setMaskEdit: (on) => set({ maskEdit: on }),
 

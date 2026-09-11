@@ -219,6 +219,11 @@
       "focusMode": "Fókusz mód — a többi klip halványítása",
       "aiAdded": "A ReMix AI adta hozzá"
     },
+    "insight": {
+      "story": "Sztori",
+      "map": "Térkép",
+      "pacing": "Tempó"
+    },
     "pacing": {
       "slow": "lassú",
       "suggestCuts": "{{count}} vágás javaslása",

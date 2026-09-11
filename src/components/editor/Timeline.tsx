@@ -86,6 +86,8 @@ export function Timeline() {
   const cycleTrackHeight = useEditorStore((s) => s.cycleTrackHeight);
   const closeGapBefore = useEditorStore((s) => s.closeGapBefore);
   const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
+  const insightLane = useEditorStore((s) => s.insightLane);
+  const setInsightLane = useEditorStore((s) => s.setInsightLane);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -233,12 +235,33 @@ export function Timeline() {
 
   return (
     <View>
-      {/* 🎬 story-struktúra: a videó „térképe" (Hook→Context→Value→CTA) */}
-      <StoryLane />
-      {/* 🗺️ minimap: a teljes projekt + a jelenlegi nézet (viewport) */}
-      <TimelineMinimap viewportW={viewportW} pps={pps} />
-      {/* 📈 pacing: vágás-ritmus / energia + „lassú szakasz" jelölés */}
-      <PacingLane />
+      {/* 🔎 insight-sáv: egyszerre EGY nézet (story / minimap / pacing) — kevés chrome */}
+      <View style={styles.insightTabs}>
+        {(['story', 'map', 'pacing'] as const).map((k) => (
+          <Pressable
+            key={k}
+            onPress={() => setInsightLane(k)}
+            hitSlop={4}
+            style={[styles.insightTab, insightLane === k ? styles.insightTabActive : null]}
+          >
+            <Text
+              style={[
+                styles.insightTabText,
+                insightLane === k ? styles.insightTabTextActive : null,
+              ]}
+            >
+              {t('editor.insight.' + k)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {insightLane === 'story' ? (
+        <StoryLane />
+      ) : insightLane === 'map' ? (
+        <TimelineMinimap viewportW={viewportW} pps={pps} />
+      ) : (
+        <PacingLane />
+      )}
       <GestureDetector gesture={pinch}>
         <View style={styles.outerRow}>
         {showHeaders ? (
@@ -565,6 +588,34 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderStyle: 'dashed',
     borderColor: palette.accent,
+  },
+  insightTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    marginHorizontal: 8,
+    marginBottom: 3,
+  },
+  insightTab: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+  },
+  insightTabActive: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  insightTabText: {
+    color: palette.textDim,
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  insightTabTextActive: {
+    color: palette.accent,
   },
   markerFlag: {
     position: 'absolute',

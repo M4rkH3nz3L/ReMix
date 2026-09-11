@@ -7,7 +7,7 @@ import { palette } from '@/constants/editor';
 import { buildRangeCutPlan } from '@/lib/cutplan';
 import type { SrtCue } from '@/lib/srt';
 import {
-  findFillerWords,
+  findFillerAndRepeats,
   selectedSeconds,
   selectedWordRanges,
   timelineWords,
@@ -172,7 +172,7 @@ export function TranscriptPanel() {
             icon="remove-circle-outline"
             label={t('panels.transcript.selectFillers')}
             onPress={() => {
-              const fillers = findFillerWords(words);
+              const fillers = findFillerAndRepeats(words);
               if (fillers.length === 0) {
                 setApplied(t('panels.transcript.noFillers'));
                 return;

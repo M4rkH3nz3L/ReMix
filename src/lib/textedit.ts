@@ -137,3 +137,41 @@ export function findFillerWords(words: WordItem[]): number[] {
   }
   return out;
 }
+
+/** szoros időköz, ameddig két azonos szó valódi dadogásnak/hamis kezdésnek számít (mp) */
+const REPEAT_MAX_GAP = 0.6;
+
+/**
+ * Azonnali szó-ismétlések (dadogás / hamis kezdés): „a a a", „és és", „the the".
+ * A KORÁBBI előfordulás(oka)t jelöli, az utolsót meghagyja. Csak UGYANABBAN a
+ * klipben, SZOROS időközön belül — így a mondathatáron átnyúló, szándékos
+ * ismétlést (pl. „nagyon nagyon jó" külön mondatban) nem bántja. On-device,
+ * konzervatív; a felhasználó a törlés előtt átnézi (mint a töltelékeknél).
+ */
+export function findRepeatedWords(words: WordItem[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < words.length; i++) {
+    const prev = normalizeWord(words[i - 1].text);
+    const cur = normalizeWord(words[i].text);
+    if (!cur || prev !== cur) {
+      continue;
+    }
+    if (words[i].clipId !== words[i - 1].clipId) {
+      continue;
+    }
+    if (words[i].start - words[i - 1].end > REPEAT_MAX_GAP) {
+      continue;
+    }
+    out.push(i - 1); // a korábbit dobjuk, az utolsó (tisztább) kimondás marad
+  }
+  return out;
+}
+
+/**
+ * Töltelék- ÉS ismételt szavak egyesített, rendezett indexei — a „töltelékek
+ * kijelölése" művelet ezt használja (egy kattintás, review után törlés).
+ */
+export function findFillerAndRepeats(words: WordItem[]): number[] {
+  const set = new Set<number>([...findFillerWords(words), ...findRepeatedWords(words)]);
+  return [...set].sort((a, b) => a - b);
+}

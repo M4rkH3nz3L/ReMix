@@ -248,7 +248,7 @@ Remix (mobil videószerkesztő — Expo / expo-router)
 │       │
 │       ├─ 📄 Átirat-vágó  (*transcript*)
 │       │   ├─ Átirat készítése a beszédből / Szerkesztés szövegből
-│       │   ├─ Töltelékszavak kijelölése (ööö, umm…)
+│       │   ├─ Töltelék- és ismételt szavak kijelölése (ööö, umm, dadogás…)
 │       │   ├─ Szavakra koppintás = kijelölés (a playhead odaugrik)
 │       │   └─ N szó törlése a videóból  (ripple-vágás, visszavonható)
 │       │

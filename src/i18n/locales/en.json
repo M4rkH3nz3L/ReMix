@@ -218,7 +218,10 @@
       "aiAdded": "Added by ReMix AI"
     },
     "pacing": {
-      "slow": "slow"
+      "slow": "slow",
+      "suggestCuts": "Suggest {{count}} cuts",
+      "applyCuts": "Apply {{count}} cuts",
+      "clearCuts": "Clear suggestions"
     },
     "story": {
       "empty": "No chapters — tap + to map your story",

@@ -218,7 +218,10 @@
       "aiAdded": "Von ReMix AI hinzugefügt"
     },
     "pacing": {
-      "slow": "langsam"
+      "slow": "langsam",
+      "suggestCuts": "{{count}} Schnitte vorschlagen",
+      "applyCuts": "{{count}} Schnitte anwenden",
+      "clearCuts": "Vorschläge verwerfen"
     },
     "story": {
       "empty": "Keine Kapitel — tippe auf +, um deine Story zu gliedern",

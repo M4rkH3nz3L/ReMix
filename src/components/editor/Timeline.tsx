@@ -85,6 +85,7 @@ export function Timeline() {
   const toggleTrackFlag = useEditorStore((s) => s.toggleTrackFlag);
   const cycleTrackHeight = useEditorStore((s) => s.cycleTrackHeight);
   const closeGapBefore = useEditorStore((s) => s.closeGapBefore);
+  const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -418,6 +419,17 @@ export function Timeline() {
                 </View>
               );
             })}
+            {/* ✂️ javasolt vágások (#36): szaggatott, teljes-magas, nem-destruktív */}
+            {suggestedCuts.map((cutT, i) => (
+              <View
+                key={`cut-${i}`}
+                pointerEvents="none"
+                style={[
+                  styles.suggestedCut,
+                  { left: cutT * pps, height: RULER_HEIGHT + totalTracksHeight },
+                ]}
+              />
+            ))}
           </View>
         </ScrollView>
 
@@ -545,6 +557,14 @@ const styles = StyleSheet.create({
     color: palette.danger,
     fontSize: 9,
     fontWeight: '700',
+  },
+  suggestedCut: {
+    position: 'absolute',
+    top: 0,
+    width: 0,
+    borderLeftWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: palette.accent,
   },
   markerFlag: {
     position: 'absolute',

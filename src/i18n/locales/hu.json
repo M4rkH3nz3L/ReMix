@@ -218,7 +218,10 @@
       "aiAdded": "A ReMix AI adta hozzá"
     },
     "pacing": {
-      "slow": "lassú"
+      "slow": "lassú",
+      "suggestCuts": "{{count}} vágás javaslása",
+      "applyCuts": "{{count}} vágás alkalmazása",
+      "clearCuts": "Javaslatok elvetése"
     },
     "story": {
       "empty": "Nincs fejezet — koppints a +-ra a történet feltérképezéséhez",

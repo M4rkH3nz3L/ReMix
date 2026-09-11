@@ -82,6 +82,8 @@ interface EditorState {
   trackHeightScale: Partial<Record<TrackType, number>>;
   /** 🔗 link-csoportok (session-szintű): az egy csoportban lévő klipek együtt mozognak */
   linkGroups: string[][];
+  /** ✂️ AI/heurisztika által javasolt vágáspontok (mp) — szaggatottan, NEM alkalmazva */
+  suggestedCuts: number[];
   /**
    * ⏭️ Ripple mód: a törlés és a hossz-változás nem hagy lyukat — a mögötte
    * lévő klipek MINDEN (nem zárolt) sávon csúsznak, hogy a felirat/zene/SFX
@@ -167,6 +169,12 @@ interface EditorState {
   cycleChapterKind: (id: string) => void;
   /** fejezet törlése */
   removeChapter: (id: string) => void;
+  /** ✂️ javasolt vágáspontok beállítása (szaggatott jelölés, nem alkalmazva) */
+  setSuggestedCuts: (times: number[]) => void;
+  /** a javaslatok elvetése */
+  clearSuggestedCuts: () => void;
+  /** a javasolt vágások alkalmazása (a lefedő videóklipek splitelése), majd elvetés */
+  applySuggestedCuts: () => void;
   setRippleMode: (on: boolean) => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
@@ -231,6 +239,7 @@ const SESSION_RESET = {
   collapsedTracks: [] as TrackType[],
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
   linkGroups: [] as string[][],
+  suggestedCuts: [] as number[],
   beatTimes: [] as number[],
   downbeatTimes: [] as number[],
   variantPreview: null,
@@ -583,6 +592,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       type: 'SET_CHAPTERS',
       chapters: (project.chapters ?? []).filter((c) => c.id !== id),
     });
+  },
+
+  setSuggestedCuts: (times) =>
+    set({ suggestedCuts: [...new Set(times.map((t) => Math.round(t * 100) / 100))].sort((a, b) => a - b) }),
+
+  clearSuggestedCuts: () => set({ suggestedCuts: [] }),
+
+  applySuggestedCuts: () => {
+    const times = [...get().suggestedCuts].sort((a, b) => a - b);
+    for (const t of times) {
+      // minden vágásnál újraolvassuk a projektet (a split megváltoztatja a klipeket)
+      const project = get().project;
+      const videoTrack = project?.tracks.find((tk) => tk.type === 'video');
+      const clip = videoTrack?.clips.find((c) => c.start + 0.05 < t && t < c.start + c.duration - 0.05);
+      if (clip) {
+        get().splitClipAt(clip.id, t);
+      }
+    }
+    set({ suggestedCuts: [] });
   },
 
   setRippleMode: (on) => set({ rippleMode: on }),

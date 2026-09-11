@@ -217,6 +217,11 @@
       "focusMode": "Fókusz mód — a többi klip halványítása",
       "aiAdded": "A ReMix AI adta hozzá"
     },
+    "history": {
+      "title": "Szerkesztési előzmények",
+      "empty": "Még nincs szerkesztés.",
+      "current": "most"
+    },
     "detailPreview": {
       "title": "Részlet-előnézet",
       "titleWithIcon": "🎬 Részlet-előnézet",

@@ -217,6 +217,11 @@
       "focusMode": "Fokus-Modus — andere Clips abdunkeln",
       "aiAdded": "Von ReMix AI hinzugefügt"
     },
+    "history": {
+      "title": "Bearbeitungsverlauf",
+      "empty": "Noch keine Bearbeitungen.",
+      "current": "jetzt"
+    },
     "detailPreview": {
       "title": "Detailvorschau",
       "titleWithIcon": "🎬 Detailvorschau",

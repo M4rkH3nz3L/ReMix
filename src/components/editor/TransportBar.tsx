@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DetailPreview } from '@/components/editor/DetailPreview';
+import { HistoryModal } from '@/components/editor/HistoryModal';
 import { accentGradient, palette } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
@@ -16,6 +18,7 @@ const EMPTY_MARKERS: Marker[] = [];
 
 export function TransportBar() {
   const { t } = useTranslation();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const loop = useEditorStore((s) => s.loop);
@@ -105,6 +108,16 @@ export function TransportBar() {
           color={canRedo ? palette.text : palette.border}
         />
       </Pressable>
+      {/* 🕓 szerkesztési előzmények (#38): mi történt, mit csinált az AI */}
+      <Pressable
+        onPress={() => setHistoryOpen(true)}
+        hitSlop={6}
+        style={styles.side}
+        accessibilityRole="button"
+        accessibilityLabel={t('editor.history.title')}
+      >
+        <Ionicons name="time-outline" size={18} color={palette.textDim} />
+      </Pressable>
 
       <View style={styles.center}>
         <Pressable onPress={() => setPlayhead(0)} hitSlop={6}>
@@ -151,6 +164,7 @@ export function TransportBar() {
           color={loop ? palette.accent : palette.textDim}
         />
       </Pressable>
+      <HistoryModal visible={historyOpen} onClose={() => setHistoryOpen(false)} />
     </View>
   );
 }

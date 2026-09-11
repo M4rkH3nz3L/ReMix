@@ -217,6 +217,11 @@
       "focusMode": "Focus mode — dim other clips",
       "aiAdded": "Added by ReMix AI"
     },
+    "history": {
+      "title": "Edit history",
+      "empty": "No edits yet.",
+      "current": "now"
+    },
     "detailPreview": {
       "title": "Detail preview",
       "titleWithIcon": "🎬 Detail preview",

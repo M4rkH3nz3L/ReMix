@@ -62,6 +62,10 @@ const CommandSchema = z.discriminatedUnion('type', [
     type: z.literal('ADD_TEXT_CLIPS'),
     trackType: z.enum(['text', 'captions', 'overlay']).describe('text=cím, captions=felirat, overlay=matrica'),
     clips: z.array(NewTextClipSchema),
+    reason: z
+      .string()
+      .optional()
+      .describe('rövid magyar indok (miért kell ez a felirat/cím) — a „miért van itt?" jelzéshez'),
   }),
   z.object({ type: z.literal('SET_ASPECT'), aspectRatio: z.enum(['16:9', '9:16', '1:1']) }),
   z.object({ type: z.literal('RENAME_PROJECT'), name: z.string() }),
@@ -93,6 +97,8 @@ Szabályok:
 - A message CSAK azt írhatja le, amit a commands lista TÉNYLEGESEN tartalmaz —
   ha a commands üres, ne állítsd, hogy elvégeztél bármit.
 - A message mindig magyar, tömör, és a felhasználónak szól.
+- ADD_TEXT_CLIPS-nél adj egy rövid magyar "reason" mezőt (1 tömör mondat: miért
+  kell ez a felirat/cím) — ez lesz a klip „miért van itt?" indoklása.
 
 Példák (utasítás → commands):
 - "Nevezd át a projektet Vlogra" → [{"type":"RENAME_PROJECT","name":"Vlog"}]

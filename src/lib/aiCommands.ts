@@ -39,6 +39,8 @@ export interface AiCommand {
   }[];
   aspectRatio?: Project['aspectRatio'];
   name?: string;
+  /** 🤖 rövid indok (miért kell ez a művelet) — a „miért van itt?" jelzéshez (#34) */
+  reason?: string;
 }
 
 export interface AssistantReply {
@@ -181,6 +183,8 @@ export function toEditorCommands(commands: AiCommand[], aiReason?: string): Edit
         if (!cmd.trackType || !cmd.clips || cmd.clips.length === 0) {
           break;
         }
+        // a parancs saját indoka elsőbbséget élvez, különben az AI válaszüzenete
+        const clipReason = cmd.reason ?? aiReason;
         const clips: TextClip[] = cmd.clips.map((c) => ({
           kind: 'text',
           id: makeId('clip'),
@@ -197,8 +201,8 @@ export function toEditorCommands(commands: AiCommand[], aiReason?: string): Edit
           },
           animation: c.animation ?? 'pop',
           stylePreset: c.stylePreset ?? (cmd.trackType === 'captions' ? 'bubble' : 'outline'),
-          // 🤖 proveniencia (#34): az AI által hozzáadott elem indoklása
-          ...(aiReason ? { aiReason } : {}),
+          // 🤖 proveniencia (#34)
+          ...(clipReason ? { aiReason: clipReason } : {}),
         }));
         result.push({ type: 'ADD_CLIPS', trackType: cmd.trackType, clips });
         break;

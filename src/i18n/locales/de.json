@@ -210,7 +210,9 @@
       "tapToRecord": "Tippen zum Aufnehmen (max. 60 s)"
     },
     "preview": {
-      "safeZones": "Sichere Zonen"
+      "safeZones": "Sichere Zonen",
+      "compareOriginal": "Halten für Vergleich mit Original",
+      "original": "Original"
     },
     "selection": {
       "notVisible": "In diesem Frame nicht sichtbar — zum Springen tippen.",

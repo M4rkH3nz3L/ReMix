@@ -210,7 +210,9 @@
       "tapToRecord": "Koppints a felvételhez (max 60 mp)"
     },
     "preview": {
-      "safeZones": "Biztonságos zóna"
+      "safeZones": "Biztonságos zóna",
+      "compareOriginal": "Tartsd nyomva az eredetihez",
+      "original": "Eredeti"
     },
     "selection": {
       "notVisible": "Ezen a képkockán nem látható — koppints az odaugráshoz.",

@@ -101,6 +101,8 @@ interface EditorState {
   showSafeZones: boolean;
   /** 🎯 fókusz mód: kijelöléskor a TÖBBI idővonal-klip elhalványul; session-szintű */
   focusMode: boolean;
+  /** 🅱️ before/after: nyomva tartva az előnézet a NYERS forrást mutatja (look nélkül) */
+  comparingOriginal: boolean;
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
   maskEdit: boolean;
   /**
@@ -182,6 +184,7 @@ interface EditorState {
   setSnapGrid: (grid: number) => void;
   toggleSafeZones: () => void;
   toggleFocusMode: () => void;
+  setComparingOriginal: (on: boolean) => void;
   setMaskEdit: (on: boolean) => void;
   setVideoVoiceActive: (on: boolean) => void;
   /** ripple-törlés: a klipek eltűnnek és a lyuk bezárul (false = nem futott) */
@@ -233,6 +236,7 @@ const SESSION_RESET = {
   snapGrid: 0,
   showSafeZones: false,
   focusMode: false,
+  comparingOriginal: false,
   maskEdit: false,
   videoVoiceActive: false,
   mutedTracks: [] as TrackType[],
@@ -650,6 +654,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSnapGrid: (grid) => set({ snapGrid: grid }),
   toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
+  setComparingOriginal: (on) => set({ comparingOriginal: on }),
 
   setMaskEdit: (on) => set({ maskEdit: on }),
 

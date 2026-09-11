@@ -210,7 +210,9 @@
       "tapToRecord": "Tap to record (max 60 s)"
     },
     "preview": {
-      "safeZones": "Safe zones"
+      "safeZones": "Safe zones",
+      "compareOriginal": "Hold to compare with original",
+      "original": "Original"
     },
     "selection": {
       "notVisible": "Not visible at this frame — tap to jump there.",

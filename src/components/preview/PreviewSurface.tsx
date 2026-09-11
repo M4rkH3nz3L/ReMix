@@ -82,6 +82,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const focusMode = useEditorStore((s) => s.focusMode);
+  const comparingOriginal = useEditorStore((s) => s.comparingOriginal);
+  const setComparingOriginal = useEditorStore((s) => s.setComparingOriginal);
   const selectClip = useEditorStore((s) => s.selectClip);
   const updateClip = useEditorStore((s) => s.updateClip);
   const drawBrush = useEditorStore((s) => s.drawBrush);
@@ -618,7 +620,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             );
           })()}
 
-          {filter && filter.overlay ? (
+          {!comparingOriginal && filter && filter.overlay ? (
             <View
               pointerEvents="none"
               style={[
@@ -657,6 +659,9 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
 
           {/* 💡 lighting-közelítés: hangulat-tint (a split-tone a renderben) */}
           {(() => {
+            if (comparingOriginal) {
+              return null;
+            }
             const lighting = (videoClip ?? imageClip)?.lighting;
             const tint = lighting ? LIGHTING_TINTS[lighting] : null;
             return tint ? (
@@ -674,7 +679,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               szaturáció rétegekkel — a pontos korrekció a renderben készül */}
           {(() => {
             const adjust = (videoClip ?? imageClip)?.adjust;
-            if (!adjust) {
+            if (!adjust || comparingOriginal) {
               return null;
             }
             return adjustTintLayers(adjust).map((l, i) => (
@@ -776,7 +781,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           {/* 🎨 grade-réteg-közelítés: az adjust-sáv aktív klipjei a TELJES
               kompozitot tintelik — előbb a filmes preset (grade), majd a kézi
               adjust (a valódi eq/colorbalance/vignette a renderben) */}
-          {adjustClips.flatMap((clip) => {
+          {!comparingOriginal && adjustClips.flatMap((clip) => {
             // effektív erősség: strength × fade-burkológörbe (a klip elején/végén)
             const tLocal = playhead - clip.start;
             const inR = clip.fadeInSec ? clamp(tLocal / clip.fadeInSec, 0, 1) : 1;
@@ -878,6 +883,30 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           />
         </Pressable>
       ) : null}
+
+      {/* 🅱️ before/after: nyomva tartva a NYERS forrás látszik (look nélkül) */}
+      {mode === 'edit' && project ? (
+        <Pressable
+          onPressIn={() => setComparingOriginal(true)}
+          onPressOut={() => setComparingOriginal(false)}
+          hitSlop={8}
+          style={[styles.compareBtn, comparingOriginal ? styles.compareBtnOn : null]}
+          accessibilityRole="button"
+          accessibilityLabel={t('editor.preview.compareOriginal')}
+        >
+          <Ionicons
+            name="git-compare-outline"
+            size={16}
+            color={comparingOriginal ? palette.accent : palette.textDim}
+          />
+        </Pressable>
+      ) : null}
+
+      {comparingOriginal ? (
+        <View pointerEvents="none" style={styles.originalBadge}>
+          <Text style={styles.originalBadgeText}>{t('editor.preview.original')}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -909,6 +938,41 @@ const styles = StyleSheet.create({
   safeToggleOn: {
     borderColor: palette.accent,
     backgroundColor: palette.accentSoft,
+  },
+  compareBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  compareBtnOn: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  originalBadge: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1,
+    borderColor: palette.accent,
+  },
+  originalBadgeText: {
+    color: palette.text,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   canvasSelected: {
     borderWidth: 1,

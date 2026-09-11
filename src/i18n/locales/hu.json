@@ -473,6 +473,8 @@
       "modelSection": "Modell",
       "modelAuto": "Auto",
       "modelHint": "Adj hozzá AI-modelleket a profilodban, majd válassz itt egyet.",
+      "quickAction_makeEngaging": "✨ Tedd ütősebbé",
+      "quickActionText_makeEngaging": "Tedd ütősebbé ezt a rövid videót a rendelkezésre álló eszközökkel: rövidítsd vagy vágd a túl hosszú, vontatott klipeket; tegyél rövid, ütős feliratokat a fontos mondatokra (alsó harmad); adj finom átmeneteket (pl. dissolve) a vágásokhoz; ahol fakó a kép, élénkítsd a színt (kontraszt/szaturáció). Röviden indokolj minden lépést.",
       "quickAction_shorten30": "Rövidítsd 30 mp alá",
       "quickAction_addTitleCta": "Adj hozzá címet és záró CTA-t",
       "quickAction_captionsLowerThird": "Igazítsd a feliratokat az alsó harmadba",

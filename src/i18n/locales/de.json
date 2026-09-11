@@ -473,6 +473,8 @@
       "modelSection": "Modell",
       "modelAuto": "Auto",
       "modelHint": "Füge KI-Modelle in deinem Profil hinzu und wähle hier eines aus.",
+      "quickAction_makeEngaging": "✨ Mach es packender",
+      "quickActionText_makeEngaging": "Mach dieses kurze Video packender mit den verfügbaren Werkzeugen: kürze oder schneide zu lange, zähe Clips; setze kurze, prägnante Untertitel auf die Kernsätze (unteres Drittel); füge dezente Übergänge (z. B. Dissolve) zwischen den Schnitten ein; wo das Bild flau wirkt, verstärke die Farbe (Kontrast/Sättigung). Begründe jeden Schritt kurz.",
       "quickAction_shorten30": "Auf unter 30 s kürzen",
       "quickAction_addTitleCta": "Titel und Abschluss-CTA hinzufügen",
       "quickAction_captionsLowerThird": "Untertitel ins untere Drittel setzen",

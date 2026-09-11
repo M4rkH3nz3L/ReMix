@@ -63,7 +63,7 @@ import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { VideoClip } from '@/types/project';
 
-const QUICK_ACTIONS = ['shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
+const QUICK_ACTIONS = ['makeEngaging', 'shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
 /**
  * AI-asszisztens (full-plan F3): utasítás → a worker Claude-dal parancslistát
@@ -1531,12 +1531,17 @@ export function AssistantPanel() {
         <View style={styles.row}>
           {QUICK_ACTIONS.map((action) => {
             const actionLabel = t(`panels.assistant.quickAction_${action}`);
+            // egyes műveletek a labelnél GAZDAGABB utasítást küldenek (pl. „tedd
+            // ütősebbé" → több-lépéses terv); ha nincs ilyen kulcs, a label megy
+            const instructionText = t(`panels.assistant.quickActionText_${action}`, {
+              defaultValue: actionLabel,
+            });
             return (
               <Chip
                 key={action}
                 label={actionLabel}
                 active={false}
-                onPress={() => send(actionLabel)}
+                onPress={() => send(instructionText)}
               />
             );
           })}

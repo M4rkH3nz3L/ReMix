@@ -473,6 +473,8 @@
       "modelSection": "Model",
       "modelAuto": "Auto",
       "modelHint": "Add AI models in your profile, then pick one here.",
+      "quickAction_makeEngaging": "✨ Make it engaging",
+      "quickActionText_makeEngaging": "Make this short video more engaging using the available tools: trim or cut overly long, dragging clips; add short punchy captions on the key sentences (lower third); add subtle transitions (e.g. dissolve) between cuts; where the image looks flat, boost the color (contrast/saturation). Briefly justify each step.",
       "quickAction_shorten30": "Trim under 30 s",
       "quickAction_addTitleCta": "Add a title and closing CTA",
       "quickAction_captionsLowerThird": "Move captions to the lower third",

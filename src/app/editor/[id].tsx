@@ -241,10 +241,23 @@ export default function EditorScreen() {
       <Pressable onPress={goBack} hitSlop={8}>
         <Ionicons name="chevron-back" size={22} color={palette.text} />
       </Pressable>
-      <Text style={styles.headerTitle} numberOfLines={1}>
-        {project?.name ?? '…'}
-        {dirty ? ' •' : ''}
-      </Text>
+      <View style={styles.headerTitleWrap}>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {project?.name ?? '…'}
+          {dirty ? ' •' : ''}
+        </Text>
+        {project?.remixOf ? (
+          <Pressable
+            onPress={() => router.push(`/editor/${project.remixOf!.projectId}`)}
+            hitSlop={4}
+            accessibilityRole="button"
+          >
+            <Text style={styles.remixOf} numberOfLines={1}>
+              🔀 {t('editorScreen.remixedFrom', { name: project.remixOf.name })}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.headerActions}>
         <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
           <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
@@ -439,11 +452,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 10,
   },
-  headerTitle: {
+  headerTitleWrap: {
     flex: 1,
+  },
+  headerTitle: {
     color: palette.text,
     fontSize: 15,
     fontWeight: '700',
+  },
+  remixOf: {
+    color: palette.accent,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
   },
   headerActions: {
     flexDirection: 'row',

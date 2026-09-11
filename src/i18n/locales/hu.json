@@ -406,6 +406,7 @@
     }
   },
   "editorScreen": {
+    "remixedFrom": "Remixelve innen: {{name}}",
     "projectNotFound": "A projekt nem található.",
     "relinking": "Újracsatolás…",
     "missingMedia_one": "{{count}} médiafájl hiányzik — koppints az újracsatoláshoz",

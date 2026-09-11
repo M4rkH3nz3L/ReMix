@@ -406,6 +406,7 @@
     }
   },
   "editorScreen": {
+    "remixedFrom": "Remix von {{name}}",
     "projectNotFound": "Projekt nicht gefunden.",
     "relinking": "Neu verknüpfen…",
     "missingMedia_one": "{{count}} Mediendatei fehlt — tippe zum Neuverknüpfen",

@@ -406,6 +406,7 @@
     }
   },
   "editorScreen": {
+    "remixedFrom": "Remixed from {{name}}",
     "projectNotFound": "Project not found.",
     "relinking": "Relinking…",
     "missingMedia_one": "{{count}} media file missing — tap to relink",

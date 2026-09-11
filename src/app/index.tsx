@@ -170,6 +170,8 @@ export default function ProjectsScreen() {
           id: makeId('prj'),
           name: `${p.name}${t('home.copySuffix')}`,
           createdAt: new Date().toISOString(),
+          // 🔀 remix-lineage: az új projekt az eredetiből készült
+          remixOf: { projectId: p.id, name: p.name },
         });
       })
       .then(refresh)

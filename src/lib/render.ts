@@ -62,11 +62,26 @@ function mediaUris(project: Project): string[] {
 }
 
 /** Export-beállítások (látványterv szerint) — a worker rendere olvassa. */
+/** videó-kodek: h264 = univerzális; hevc = modern eszköz+felhő; av1/prores = felhő */
+export type RenderCodec = 'h264' | 'hevc' | 'av1' | 'prores';
+
 export interface RenderSettings {
-  /** a rövidebb oldal pixelben: 480 / 720 / 1080 / 2160 */
+  /** a rövidebb oldal pixelben: 480 / 720 / 1080 / 2160 / 4320 (8K) */
   resolution: number;
   fps: number;
   quality: 'low' | 'medium' | 'high';
+  /** cél-kodek (alap: h264); av1/prores + 8K csak felhő-renderrel */
+  codec?: RenderCodec;
+}
+
+/**
+ * Igaz, ha a beállítás CSAK felhő-renderrel teljesíthető: az eszköz-render
+ * H.264/HEVC-t és max 4K-t tud, az AV1/ProRes és a 8K a felhő-worker dolga.
+ * (A tényleges kodek-támogatás a felhő-render backendjétől függ — a kliens a
+ * `settings.codec`-et továbbítja, a worker azt honorálja, amit tud.)
+ */
+export function settingsNeedCloud(s: RenderSettings): boolean {
+  return s.codec === 'av1' || s.codec === 'prores' || s.resolution > 2160;
 }
 
 /**
@@ -99,7 +114,7 @@ export function isRenderCancelledError(e: unknown): boolean {
   );
 }
 
-const DEFAULT_SETTINGS: RenderSettings = { resolution: 1080, fps: 30, quality: 'high' };
+const DEFAULT_SETTINGS: RenderSettings = { resolution: 1080, fps: 30, quality: 'high', codec: 'h264' };
 
 /**
  * Render-orchesztrátor: eldönti, hogy ESZKÖZÖN (ingyen) vagy FELHŐBEN (Pro)
@@ -117,10 +132,13 @@ export async function renderMp4(
   }
   const mode = opts?.mode ?? 'auto';
   const effective = settings ?? DEFAULT_SETTINGS;
+  // av1/prores + 8K csak felhőben megy → az eszköz-utat kizárjuk
+  const needCloud = settingsNeedCloud(effective);
 
   // ESZKÖZÖN: ingyen, szerver nélkül — ha a build támogatja és van mit renderelni
   const canLocal =
     (mode === 'local' || mode === 'auto') &&
+    !needCloud &&
     isNativeRenderAvailable() &&
     canRenderLocally(project, effective);
   if (canLocal) {
@@ -130,8 +148,9 @@ export async function renderMp4(
     );
   }
   if (mode === 'local') {
-    // kifejezetten eszközön kérték, de nincs natív modul (pl. Expo Go)
-    throw new LocalRenderUnavailableError();
+    // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,
+    // vagy nincs natív modul (pl. Expo Go)
+    throw needCloud ? new Error(tr('lib.render.codecNeedsCloud')) : new LocalRenderUnavailableError();
   }
 
   // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)

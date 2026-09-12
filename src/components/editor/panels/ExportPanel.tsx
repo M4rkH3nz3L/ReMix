@@ -35,6 +35,7 @@ const RESOLUTIONS = [
   { label: '720p', value: 720 },
   { label: '1080p', value: 1080 },
   { label: '4K', value: 2160 },
+  { label: '8K', value: 4320 },
 ] as const;
 const FPS_OPTIONS = [24, 30, 60] as const;
 const QUALITIES = [
@@ -42,9 +43,16 @@ const QUALITIES = [
   { id: 'medium' },
   { id: 'high' },
 ] as const;
+/** kodekek (a nevek fixek); az AV1/ProRes csak felhő-render (Pro) */
+const CODECS = [
+  { id: 'h264', label: 'H.264' },
+  { id: 'hevc', label: 'HEVC' },
+  { id: 'av1', label: 'AV1' },
+  { id: 'prores', label: 'ProRes' },
+] as const;
 
 /** hozzávetőleges bitráta (Mbps) felbontás + minőség szerint, 30 fps-re */
-const BASE_MBPS: Record<number, number> = { 480: 2.2, 720: 4.5, 1080: 8, 2160: 28 };
+const BASE_MBPS: Record<number, number> = { 480: 2.2, 720: 4.5, 1080: 8, 2160: 28, 4320: 90 };
 const QUALITY_MULT = { low: 0.55, medium: 1, high: 1.5 } as const;
 
 export function ExportPanel() {
@@ -58,6 +66,7 @@ export function ExportPanel() {
   const [resolution, setResolution] = useState<number>(1080);
   const [fps, setFps] = useState<number>(30);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
+  const [codec, setCodec] = useState<'h264' | 'hevc' | 'av1' | 'prores'>('h264');
   const [thumbStatus, setThumbStatus] = useState<string | null>(null);
   const [thumbs, setThumbs] = useState<ThumbCandidate[] | null>(null);
   const [headlines, setHeadlines] = useState<string[] | null>(null);
@@ -123,7 +132,7 @@ export function ExportPanel() {
     }
     setRenderStatus(t('common.processing'));
     withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
-      renderAndShareMp4(project, report, { resolution, fps, quality }, { mode: 'local', signal })
+      renderAndShareMp4(project, report, { resolution, fps, quality, codec }, { mode: 'local', signal })
     )
       .catch((err: Error) => {
         if (!isRenderCancelledError(err)) {
@@ -142,7 +151,7 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withCancellableProgress(t('panels.export.cloudHdRender'), (report, signal) =>
-          renderAndShareMp4(project, report, { resolution, fps, quality }, { mode: 'cloud', signal })
+          renderAndShareMp4(project, report, { resolution, fps, quality, codec }, { mode: 'cloud', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
@@ -166,7 +175,7 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withCancellableProgress(t('panels.export.postTo', { target }), (report, signal) =>
-          renderAndPost(project, target, report, { resolution, fps, quality }, { mode: 'auto', signal })
+          renderAndPost(project, target, report, { resolution, fps, quality, codec }, { mode: 'auto', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
@@ -241,9 +250,22 @@ export function ExportPanel() {
             />
           ))}
         </View>
+        <Text style={styles.settingLabel}>{t('panels.export.codec')}</Text>
+        <View style={styles.row}>
+          {CODECS.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.label}
+              active={codec === c.id}
+              onPress={() => setCodec(c.id)}
+            />
+          ))}
+        </View>
         <Text style={styles.estimate}>
-          H.264 · {fps} fps · ~{estimatedMb < 1 ? '<1' : Math.round(estimatedMb)} MB
+          {CODECS.find((c) => c.id === codec)?.label ?? 'H.264'} · {fps} fps · ~
+          {estimatedMb < 1 ? '<1' : Math.round(estimatedMb)} MB
         </Text>
+        <Text style={styles.note}>{t('panels.export.codecCloudNote')}</Text>
         <PrimaryButton
           icon="phone-portrait-outline"
           label={renderStatus ?? t('panels.export.exportOnDeviceFree')}

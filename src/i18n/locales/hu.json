@@ -1595,7 +1595,8 @@
         "skyReplace": "Ég-csere",
         "colorAi": "AI szín",
         "tts": "Szöveg → beszéd",
-        "soundLibrary": "Hang-könyvtár"
+        "soundLibrary": "Hang-könyvtár",
+        "collab": "Projekt-kollaboráció"
       }
     },
     "captureFrame": {
@@ -1862,5 +1863,50 @@
     "deReverb": "Visszhang-csökkentés",
     "autoDuck": "Auto-halkítás beszéd alatt",
     "enhanceHint": "A javítások a végső renderben, az eszközön érvényesülnek (az előnézet közelítés)."
+  },
+  "collab": {
+    "title": "Kollaboráció",
+    "share": "Kollaboráció…",
+    "sharedWithMe": "Velem megosztva",
+    "members_one": "{{count}} tag",
+    "members_other": "{{count}} tag",
+    "role": {
+      "owner": "Tulaj",
+      "editor": "Szerkesztő",
+      "viewer": "Néző"
+    },
+    "youAre": "Te: {{role}}",
+    "you": "(te)",
+    "invite": {
+      "title": "Meghívás",
+      "placeholder": "E-mail-cím",
+      "cta": "Meghívó küldése",
+      "badEmail": "Adj meg egy érvényes e-mail-címet.",
+      "added": "{{email}} hozzáadva a projekthez.",
+      "pending": "Meghívó elküldve: {{email}} — regisztrációkor csatlakozik.",
+      "self": "Magadat nem hívhatod meg."
+    },
+    "remove": {
+      "title": "Tag eltávolítása",
+      "msg": "Eltávolítod {{name}} tagot a projektből?",
+      "confirm": "Eltávolítás"
+    },
+    "leave": {
+      "title": "Kilépés a projektből",
+      "msg": "Elveszíted a hozzáférést ehhez a megosztott projekthez.",
+      "confirm": "Kilépés",
+      "cta": "Kilépés a projektből"
+    },
+    "open": {
+      "cta": "Megnyitás szerkesztőben",
+      "failed": "A megosztott projekt letöltése nem sikerült."
+    },
+    "enable": {
+      "title": "Kollaboráció bekapcsolása",
+      "hint": "Mentsd a projektet a felhőbe, hogy tagokat hívhass meg szerepkörökkel.",
+      "cta": "Megosztás bekapcsolása"
+    },
+    "noAccess": "Nincs hozzáférésed ehhez a projekthez.",
+    "viewerBanner": "Néző — csak olvasható. A módosításaid nem menthetők a felhőbe."
   }
 }

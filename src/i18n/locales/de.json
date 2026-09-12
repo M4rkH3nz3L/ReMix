@@ -1595,7 +1595,8 @@
         "skyReplace": "Himmel ersetzen",
         "colorAi": "KI-Farbe",
         "tts": "Text zu Sprache",
-        "soundLibrary": "Sound-Bibliothek"
+        "soundLibrary": "Sound-Bibliothek",
+        "collab": "Projekt-Zusammenarbeit"
       }
     },
     "captureFrame": {
@@ -1862,5 +1863,50 @@
     "deReverb": "Raumhall reduzieren",
     "autoDuck": "Auto-Absenkung unter Sprache",
     "enhanceHint": "Die Verbesserungen werden beim finalen Rendern auf dem Gerät angewendet (die Vorschau nähert sie an)."
+  },
+  "collab": {
+    "title": "Zusammenarbeit",
+    "share": "Zusammenarbeit…",
+    "sharedWithMe": "Mit mir geteilt",
+    "members_one": "{{count}} Mitglied",
+    "members_other": "{{count}} Mitglieder",
+    "role": {
+      "owner": "Eigentümer",
+      "editor": "Bearbeiter",
+      "viewer": "Betrachter"
+    },
+    "youAre": "Du: {{role}}",
+    "you": "(du)",
+    "invite": {
+      "title": "Einladen",
+      "placeholder": "E-Mail-Adresse",
+      "cta": "Einladung senden",
+      "badEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
+      "added": "{{email}} wurde zum Projekt hinzugefügt.",
+      "pending": "Einladung an {{email}} gesendet — tritt bei der Registrierung bei.",
+      "self": "Du kannst dich nicht selbst einladen."
+    },
+    "remove": {
+      "title": "Mitglied entfernen",
+      "msg": "{{name}} aus dem Projekt entfernen?",
+      "confirm": "Entfernen"
+    },
+    "leave": {
+      "title": "Projekt verlassen",
+      "msg": "Du verlierst den Zugriff auf dieses geteilte Projekt.",
+      "confirm": "Verlassen",
+      "cta": "Projekt verlassen"
+    },
+    "open": {
+      "cta": "Im Editor öffnen",
+      "failed": "Das geteilte Projekt konnte nicht geladen werden."
+    },
+    "enable": {
+      "title": "Zusammenarbeit aktivieren",
+      "hint": "Speichere das Projekt in der Cloud, um Mitglieder mit Rollen einzuladen.",
+      "cta": "Teilen aktivieren"
+    },
+    "noAccess": "Du hast keinen Zugriff auf dieses Projekt.",
+    "viewerBanner": "Betrachter — schreibgeschützt. Deine Änderungen werden nicht in der Cloud gespeichert."
   }
 }

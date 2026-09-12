@@ -26,6 +26,7 @@ import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
+import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
 import { loadEvents, loadProject, saveEvents, saveProject } from '@/lib/storage';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
@@ -57,9 +58,17 @@ export default function EditorScreen() {
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
+  const [collab, setCollab] = useState<{ ownerId: string; role: CollabRole } | null>(null);
   const L = useLayout();
 
   usePlaybackClock();
+
+  // 👥 megosztott projekt-e + a szerepem (a fejléc-jelzéshez / Studio-linkhez)
+  useEffect(() => {
+    if (project?.id === id) {
+      myMembership(id).then(setCollab).catch(() => {});
+    }
+  }, [project?.id, id]);
 
   // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
   // füléből: ?panel=assistant) — a projekt betöltése után EGYSZER nyitjuk meg
@@ -261,6 +270,20 @@ export default function EditorScreen() {
         ) : null}
       </View>
       <View style={styles.headerActions}>
+        <Pressable
+          onPress={() =>
+            router.push(`/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`)
+          }
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('collab.title')}
+        >
+          <Ionicons
+            name={collab ? 'people' : 'people-outline'}
+            size={22}
+            color={collab ? palette.accent : palette.textDim}
+          />
+        </Pressable>
         <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
           <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
         </Pressable>
@@ -297,6 +320,18 @@ export default function EditorScreen() {
             ? t('editorScreen.relinking')
             : t('editorScreen.missingMedia', { count: missingMedia.length })}
         </Text>
+      </Pressable>
+    ) : null;
+
+  // 👁️ néző szerep → csak olvasható (a felhő-mentést az RLS úgyis blokkolja)
+  const collabBanner =
+    collab?.role === 'viewer' ? (
+      <Pressable
+        style={styles.collabBanner}
+        onPress={() => router.push(`/collab/${id}?owner=${collab.ownerId}`)}
+      >
+        <Ionicons name="eye-outline" size={16} color={palette.textDim} />
+        <Text style={styles.collabBannerText}>{t('collab.viewerBanner')}</Text>
       </Pressable>
     ) : null;
 
@@ -362,6 +397,7 @@ export default function EditorScreen() {
       <>
         {header}
         {missingBanner}
+        {collabBanner}
         <View style={styles.expandedBand}>
           {rail}
           <View style={styles.expandedCenter}>
@@ -388,6 +424,7 @@ export default function EditorScreen() {
         <View style={styles.landscapeSide}>
           {header}
           {missingBanner}
+        {collabBanner}
           <TransportBar />
           <View style={styles.landscapeSideBody}>
             {panelVisible ? <PanelHost /> : <Timeline />}
@@ -401,6 +438,7 @@ export default function EditorScreen() {
       <>
         {header}
         {missingBanner}
+        {collabBanner}
         <View style={styles.expandedBand}>
           {rail}
           <View style={styles.expandedCenter}>
@@ -418,6 +456,7 @@ export default function EditorScreen() {
       <>
         {header}
         {missingBanner}
+        {collabBanner}
         <PreviewSurface mode="edit" />
         <TransportBar />
         {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
@@ -567,6 +606,25 @@ const styles = StyleSheet.create({
   missingBannerText: {
     flex: 1,
     color: palette.danger,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  collabBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  collabBannerText: {
+    flex: 1,
+    color: palette.textDim,
     fontSize: 12,
     fontWeight: '600',
   },

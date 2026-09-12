@@ -32,6 +32,7 @@ import {
 import type { VideoTemplate } from '@/constants/templates';
 import { useLayout } from '@/hooks/useLayout';
 import { withProgress } from '@/store/progressStore';
+import { listSharedWithMe, type SharedProject } from '@/lib/collab';
 import { createDemoProjects } from '@/lib/demoProjects';
 import { makeId } from '@/lib/id';
 import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
@@ -95,6 +96,7 @@ export default function ProjectsScreen() {
   const [renameValue, setRenameValue] = useState('');
   const [demoBusy, setDemoBusy] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [shared, setShared] = useState<SharedProject[]>([]);
   const { t } = useTranslation();
   const L = useLayout();
   // a lista-referencia a fülsáv „ugrás" műveleteihez (tetejére / sablonokhoz)
@@ -105,6 +107,8 @@ export default function ProjectsScreen() {
 
   const refresh = useCallback(() => {
     listProjects().then(setProjects).catch(() => {});
+    // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
+    listSharedWithMe().then(setShared).catch(() => {});
   }, []);
 
   useFocusEffect(refresh);
@@ -201,6 +205,7 @@ export default function ProjectsScreen() {
     Alert.alert(meta.name, undefined, [
       { text: t('common.rename'), onPress: () => startRename(meta) },
       { text: t('common.duplicate'), onPress: () => duplicate(meta) },
+      { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },
       { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(meta) },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
@@ -340,14 +345,45 @@ export default function ProjectsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, { padding: L.spacing.lg }]}
         ListHeaderComponent={
-          projects.length > 0 ? (
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionLabel}>{t('home.recentProjects')}</Text>
-              <Text style={styles.sectionHint}>
-                {t('home.projectCount', { count: projects.length })}
-              </Text>
-            </View>
-          ) : null
+          <>
+            {shared.length > 0 ? (
+              <View style={styles.sharedBlock}>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionLabel}>{t('collab.sharedWithMe')}</Text>
+                  <Text style={styles.sectionHint}>
+                    {t('home.projectCount', { count: shared.length })}
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.templatesRow}
+                >
+                  {shared.map((s) => (
+                    <Pressable
+                      key={`${s.ownerId}:${s.projectId}`}
+                      style={styles.sharedCard}
+                      onPress={() => router.push(`/collab/${s.projectId}?owner=${s.ownerId}`)}
+                    >
+                      <Ionicons name="people" size={18} color={palette.accent} />
+                      <Text style={styles.sharedName} numberOfLines={2}>
+                        {s.projectName ?? s.projectId}
+                      </Text>
+                      <Text style={styles.sharedRole}>{t(`collab.role.${s.role}`)}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+            {projects.length > 0 ? (
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionLabel}>{t('home.recentProjects')}</Text>
+                <Text style={styles.sectionHint}>
+                  {t('home.projectCount', { count: projects.length })}
+                </Text>
+              </View>
+            ) : null}
+          </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -691,6 +727,27 @@ const styles = StyleSheet.create({
   },
   templatesBlock: {
     paddingTop: 10,
+  },
+  sharedBlock: {
+    paddingBottom: 6,
+    marginBottom: 6,
+  },
+  sharedCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 12,
+    gap: 6,
+    width: 150,
+  },
+  sharedName: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  sharedRole: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   sectionLabel: {
     color: palette.textDim,

@@ -113,6 +113,7 @@ export default function RootLayout() {
               <Stack.Screen name="profile" />
               <Stack.Screen name="editor/[id]" />
               <Stack.Screen name="player/[id]" />
+              <Stack.Screen name="collab/[id]" />
             </Stack.Protected>
             <Stack.Protected guard={!authed}>
               <Stack.Screen name="auth" />

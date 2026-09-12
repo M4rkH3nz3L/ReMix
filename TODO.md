@@ -22,11 +22,12 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **BYOK SSRF-védelem** — a worker a felhasználó `baseUrl`-jére POST-ol
   (`server/ai.js` `runOpenAICompatible`, lásd a kód SSRF-megjegyzését). Prod-ban
   **provider-allowlist** (csak ismert AI-hosztok), vagy belső-IP tiltás.
-- [ ] **`/notify` jogosultság** — a worker `POST /notify` service_role-lal ír
-  (megkerüli az RLS-t), ma hitelesítés NÉLKÜL (dev). Prod-ban a hívó Supabase
-  JWT-jét verifikálni kell + eldönteni **ki kinek küldhet** (collab: csak közös
-  projekt tagjainak), különben bárki bárkinek spam-elhet. A worker általános
-  JWT-tételéhez kötve (lásd fentebb).
+- [ ] **`/notify` + `/invite` jogosultság** — a worker `POST /notify` és
+  `POST /invite` service_role-lal ír (megkerüli az RLS-t), ma hitelesítés NÉLKÜL
+  (dev). Prod-ban a hívó Supabase JWT-jét verifikálni kell + eldönteni **ki kinek
+  küldhet / ki hívhat meg** (invite: csak a projekt TULAJA). Enélkül bárki
+  bármelyik projektbe felvehet tagot / spam-elhet. A worker általános JWT-
+  tételéhez kötve (lásd fentebb). Az `user_id_by_email` RPC már service_role-only.
 - [ ] **Dev-override kizárása prodból** — az `entitlementStore.mockUpgrade()`
   (dev Pro-kapcsoló) NE legyen elérhető prod buildben; a Pro KIZÁRÓLAG a
   Supabase `subscriptions`-ből jöjjön (Phase 0 kész — a mock-gombokat `__DEV__`
@@ -71,8 +72,18 @@ Nagyobb, döntést/infrát igénylő funkciók (nem élesítés-blokkolók):
 - [ ] **Média-fájl felhő-sync** — a cloud-sync (Phase 5.1) ma a projekt-TERVET
   (JSON) menti; a médiafájlokat is fel kell tölteni (Supabase Storage) + URI-
   átírás, hogy más eszközön is működjön a visszaállítás. Invazív (média-modell).
-- [ ] **Collaboration** (Phase 5.3) — presence (kurzor/kijelölés), timeline-
-  komment, clip-lock, review-mode. Realtime-infra (Supabase Realtime) + cloud-sync.
+- [x] **Collaboration — tagok + szerepkörök** (KÉSZ) — projekt megosztása,
+  tagok meghívása e-mailen (tulaj/szerkesztő/néző), Studio-felület (taglista +
+  szerepváltás + eltávolítás + kilépés), „Megosztva velem" a főképernyőn, editor
+  szerep-banner. RLS kényszeríti a szerep-alapú írást (néző nem push-olhat),
+  realtime taglista, meghívó-értesítés + pending-invite konverzió signupkor.
+- [ ] **Collaboration — élő együtt-szerkesztés** (Phase 5.3, következő) — presence
+  (kurzor/kijelölés), timeline-komment, clip-lock, review-mode, valamint a
+  megosztott projekt MÉDIA-fájljainak szinkronja (ma csak a projekt-JSON megy a
+  felhőbe → a más eszközön megnyitott megosztott projekt médiája hiányozhat, lásd
+  „Média-fájl felhő-sync"). A jelenlegi modell: last-write-wins megosztott
+  dokumentum (nem valós idejű CRDT). Az editor mély read-only lezárása nézőknek
+  (ma: RLS blokk + banner; a lokális szerkesztést nem tiltjuk).
 - [ ] **Cloud media-library** (Phase 5.4) — mappák/tagek/kereshető könyvtár;
   metaadat on-device ingyen, cloud-tárolt média Pro.
 - [ ] **Kereszt-user Remix Graph** (Phase 5.5, felhő) — a helyi származási lánc
@@ -121,4 +132,7 @@ B-roll helykereső) · Phase 5 (helyi verziózás · cloud-sync alap · Remix Gr
 Free/on-device (színes markerek · timeline-régiók · állítható snapping) ·
 Értesítés-rendszer (realtime + deep-link + self-insert; csengő+badge+lista;
 expo-notifications helyi push + koppintás-navigáció; worker `POST /notify`
-service_role-lal cross-user + Expo Push — deven end-to-end tesztelve).
+service_role-lal cross-user + Expo Push — deven end-to-end tesztelve) ·
+Kollaboráció (tagok + szerepkörök: tulaj/szerkesztő/néző; meghívás e-mailen a
+worker `/invite`-ján; Studio-felület; RLS szerep-alapú írással; realtime taglista;
+pending-invite konverzió signupkor — RLS/invite deven end-to-end tesztelve).

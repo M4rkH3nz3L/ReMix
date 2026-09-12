@@ -28,6 +28,7 @@ export type CapabilityId =
   | 'pacingAnalyze' // AI tempó-elemzés (beszéd/csend/vágás-jelek → lassú szakaszok)
   | 'qualityScan' // felvétel-minőség ellenőrzés (homályos / alul-túlexponált kockák)
   | 'cloudSync' // projekt felhő-mentés/visszaállítás (cloud-tárhely)
+  | 'collab' // projekt-kollaboráció: tagok meghívása + szerepkörök (megosztott felhő-projekt)
   | 'bgRemove' // háttér-eltávolítás
   | 'depth3d' // mélység / 3D / parallax
   | 'faceTools' // arc-követés / retusálás
@@ -62,6 +63,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   pacingAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pacingAnalyze' },
   qualityScan: { where: 'cloud', pro: true, label: 'lib.capabilities.label.qualityScan' },
   cloudSync: { where: 'cloud', pro: true, label: 'lib.capabilities.label.cloudSync' },
+  collab: { where: 'cloud', pro: true, label: 'lib.capabilities.label.collab' },
   bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
   faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },

@@ -34,7 +34,7 @@ const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
-const { notifyAvailable, sendNotification } = require('./notify');
+const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
 
 const WHISPER_MODEL =
   process.env.WHISPER_MODEL || path.join(__dirname, 'models', 'ggml-base.bin');
@@ -307,6 +307,23 @@ app.post('/notify', express.json({ limit: '64kb' }), (req, res) => {
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('Notify hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
+});
+
+// 👥 Meghívás egy projektbe (service_role): e-mail → tag hozzáadás VAGY pending
+// invite + „meghívtak" értesítés. A névfeloldás (auth.users e-mail) miatt kell a
+// worker (a kliens az RLS-en nem lát más e-mailt). ⚠️ PROD: JWT + „ki hívhat meg"
+// jogosultság (csak a tulaj) mögé — lásd TODO.md Biztonság.
+app.post('/invite', express.json({ limit: '32kb' }), (req, res) => {
+  if (!notifyAvailable()) {
+    res.status(503).json({ error: 'invite nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    return;
+  }
+  inviteMember(req.body ?? {})
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('Invite hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
 });

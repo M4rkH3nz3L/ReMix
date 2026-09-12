@@ -96,4 +96,80 @@ async function sendNotification(input) {
   return { id: inserted.id, push };
 }
 
-module.exports = { notifyAvailable, sendNotification };
+/**
+ * 👥 Meghívás egy projektbe (service_role). Az e-mailt user_id-ra oldja:
+ *   • LÉTEZŐ user → project_members sor (upsert) + „meghívtak" értesítés
+ *   • MÉG NEM létező → project_invites (pending); a signup-trigger konvertálja
+ * `input`: { ownerId, projectId, projectName?, email, role, invitedBy? }
+ * A `role` csak 'editor' | 'viewer' lehet (a tulaj implicit).
+ */
+async function inviteMember(input) {
+  const sb = adminClient();
+  if (!sb) {
+    throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY nincs beállítva a workeren.');
+  }
+  const ownerId = String(input?.ownerId || '').trim();
+  const projectId = String(input?.projectId || '').trim();
+  const email = String(input?.email || '').trim().toLowerCase();
+  const role = input?.role === 'editor' ? 'editor' : 'viewer';
+  const projectName = input?.projectName ? String(input.projectName).slice(0, 200) : null;
+  const invitedBy = input?.invitedBy ? String(input.invitedBy) : null;
+  if (!ownerId || !projectId || !email) {
+    throw new Error('ownerId, projectId és email kötelező.');
+  }
+
+  const { data: uid, error: lookupErr } = await sb.rpc('user_id_by_email', { p_email: email });
+  if (lookupErr) {
+    throw new Error(lookupErr.message);
+  }
+
+  if (uid) {
+    if (uid === ownerId) {
+      return { status: 'self' }; // a tulaj magát nem hívhatja meg
+    }
+    const { data: prof } = await sb.from('profiles').select('full_name').eq('id', uid).maybeSingle();
+    const { error: memErr } = await sb.from('project_members').upsert(
+      {
+        owner_id: ownerId,
+        project_id: projectId,
+        member_id: uid,
+        role,
+        project_name: projectName,
+        email,
+        display_name: prof?.full_name || null,
+        invited_by: invitedBy,
+      },
+      { onConflict: 'owner_id,project_id,member_id' }
+    );
+    if (memErr) {
+      throw new Error(memErr.message);
+    }
+    await sendNotification({
+      userId: uid,
+      type: 'invite',
+      title: 'Meghívtak egy projektbe',
+      body: `${projectName || 'Projekt'} — ${role}`,
+      route: `/collab/${projectId}?owner=${ownerId}`,
+      data: { ownerId, projectId, role },
+    }).catch(() => {});
+    return { status: 'added', memberId: uid };
+  }
+
+  const { error: invErr } = await sb.from('project_invites').upsert(
+    {
+      owner_id: ownerId,
+      project_id: projectId,
+      project_name: projectName,
+      email,
+      role,
+      invited_by: invitedBy,
+    },
+    { onConflict: 'owner_id,project_id,email' }
+  );
+  if (invErr) {
+    throw new Error(invErr.message);
+  }
+  return { status: 'pending', email };
+}
+
+module.exports = { notifyAvailable, sendNotification, inviteMember };

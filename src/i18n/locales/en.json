@@ -1595,7 +1595,8 @@
         "skyReplace": "Sky replacement",
         "colorAi": "AI color",
         "tts": "Text to speech",
-        "soundLibrary": "Sound library"
+        "soundLibrary": "Sound library",
+        "collab": "Project collaboration"
       }
     },
     "captureFrame": {
@@ -1862,5 +1863,50 @@
     "deReverb": "Reduce room echo",
     "autoDuck": "Auto-duck under voice",
     "enhanceHint": "Enhancements are applied on-device in the final render (the preview approximates them)."
+  },
+  "collab": {
+    "title": "Collaboration",
+    "share": "Collaboration…",
+    "sharedWithMe": "Shared with me",
+    "members_one": "{{count}} member",
+    "members_other": "{{count}} members",
+    "role": {
+      "owner": "Owner",
+      "editor": "Editor",
+      "viewer": "Viewer"
+    },
+    "youAre": "You: {{role}}",
+    "you": "(you)",
+    "invite": {
+      "title": "Invite",
+      "placeholder": "Email address",
+      "cta": "Send invite",
+      "badEmail": "Please enter a valid email address.",
+      "added": "{{email}} was added to the project.",
+      "pending": "Invitation sent to {{email}} — they'll join when they sign up.",
+      "self": "You can't invite yourself."
+    },
+    "remove": {
+      "title": "Remove member",
+      "msg": "Remove {{name}} from the project?",
+      "confirm": "Remove"
+    },
+    "leave": {
+      "title": "Leave project",
+      "msg": "You'll lose access to this shared project.",
+      "confirm": "Leave",
+      "cta": "Leave project"
+    },
+    "open": {
+      "cta": "Open in editor",
+      "failed": "Couldn't download the shared project."
+    },
+    "enable": {
+      "title": "Enable collaboration",
+      "hint": "Save the project to the cloud so you can invite members with roles.",
+      "cta": "Enable sharing"
+    },
+    "noAccess": "You don't have access to this project.",
+    "viewerBanner": "Viewer — read-only. Your changes won't be saved to the cloud."
   }
 }

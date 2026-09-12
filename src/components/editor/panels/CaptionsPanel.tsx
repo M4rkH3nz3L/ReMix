@@ -230,6 +230,47 @@ export function CaptionsPanel() {
     );
   };
 
+  /**
+   * 🗣️ Beszélő-címkék (diarization, heurisztikus): ugyanaz a csoportosítás, mint
+   * a beszélő-színeknél (forrásklip + arc-pozíció), de a felirat SZÖVEGÉBE tesz
+   * „[Beszélő N] " előtagot. A szöveg amúgy is renderelődik → paritás-mentes;
+   * re-run-nál a régi előtag lecserélődik.
+   */
+  const runSpeakerLabels = async () => {
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tk) => tk.type === 'captions');
+    const captions = (track?.clips ?? []).filter((c): c is TextClip => c.kind === 'text');
+    if (!track || captions.length < 2) {
+      Alert.alert(t('panels.captions.speakerLabels'), t('panels.captions.speakerColorsNeedTwo'));
+      return;
+    }
+    setLayoutStatus(t('panels.captions.analyzingStatus'));
+    const samples = await sampleFaces(captions);
+    setLayoutStatus(null);
+    const speakers = assignSpeakers(
+      captions.map((c) => ({
+        id: c.id,
+        sourceKey: samples.get(c.id)?.sourceKey ?? 'nincs',
+        faceX: samples.get(c.id)?.face?.x,
+      }))
+    );
+    const count = new Set(speakers.values()).size;
+    if (count < 2) {
+      Alert.alert(t('panels.captions.speakerLabels'), t('panels.captions.speakerColorsSingle'));
+      return;
+    }
+    const clips = track.clips.map((c) => {
+      const idx = speakers.get(c.id);
+      if (c.kind !== 'text' || idx == null) {
+        return c;
+      }
+      const bare = c.text.replace(/^\[[^\]]+\]\s+/, ''); // korábbi címke levágása
+      return { ...c, text: `[${t('panels.captions.speakerName', { n: idx + 1 })}] ${bare}` };
+    });
+    state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'ai');
+    Alert.alert(t('panels.captions.speakerLabels'), t('panels.captions.speakerLabelsDone', { count }));
+  };
+
   /** 📐 okos pozíció: a felirat kikerüli az arcot (fölé/alá ugrik) */
   const runSmartPosition = async () => {
     const state = useEditorStore.getState();
@@ -534,6 +575,15 @@ export function CaptionsPanel() {
             onPress={() => {
               if (!layoutStatus) {
                 void runSmartPosition();
+              }
+            }}
+          />
+          <Chip
+            label={layoutStatus ?? t('panels.captions.speakerLabelsChip')}
+            active={false}
+            onPress={() => {
+              if (!layoutStatus) {
+                void runSpeakerLabels();
               }
             }}
           />

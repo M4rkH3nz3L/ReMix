@@ -22,6 +22,11 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **BYOK SSRF-védelem** — a worker a felhasználó `baseUrl`-jére POST-ol
   (`server/ai.js` `runOpenAICompatible`, lásd a kód SSRF-megjegyzését). Prod-ban
   **provider-allowlist** (csak ismert AI-hosztok), vagy belső-IP tiltás.
+- [ ] **`/notify` jogosultság** — a worker `POST /notify` service_role-lal ír
+  (megkerüli az RLS-t), ma hitelesítés NÉLKÜL (dev). Prod-ban a hívó Supabase
+  JWT-jét verifikálni kell + eldönteni **ki kinek küldhet** (collab: csak közös
+  projekt tagjainak), különben bárki bárkinek spam-elhet. A worker általános
+  JWT-tételéhez kötve (lásd fentebb).
 - [ ] **Dev-override kizárása prodból** — az `entitlementStore.mockUpgrade()`
   (dev Pro-kapcsoló) NE legyen elérhető prod buildben; a Pro KIZÁRÓLAG a
   Supabase `subscriptions`-ből jöjjön (Phase 0 kész — a mock-gombokat `__DEV__`
@@ -38,19 +43,14 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **Natív render build (EAS)** — a helyi export natív modult igényel
   (`isNativeRenderAvailable`; Expo Go-ban `LocalRenderUnavailableError`). Kell
   EAS dev/prod build a device-render-hez.
-- [ ] **Push-értesítések (expo-notifications)** — a realtime+deeplink alap KÉSZ
-  (`notifications` tábla + realtime + `NotificationBell` + `route`-nav). A push-hoz
-  kell: `npx expo install expo-notifications`, EAS **projectId** (`app.json`
-  `extra.eas.projectId`), natív build (Expo Go nem küld push-t iOS-en), a device
-  Expo-push-token mentése (`user_devices.push_token` **oszlop kész**), és a worker
-  küldje az Expo Push API-ra. A deep-link már működik: a `route` mezőre navigál a
-  `NotificationBell` (kliens) — a push-payloadba is ugyanez a `route` kerül.
-- [ ] **Kereszt-user `/notify` (worker, service_role)** — a self-insert (saját
-  értesítés) KÉSZ (RLS `insert_own`, kliens `createNotification`). MÁS usernek
-  küldeni (collab: komment/meghívó/mention) **service_role**-t igényel, ami
-  megkerüli az RLS-t → worker `POST /notify` (JWT-verifikáció mögött, lásd
-  Biztonság) írja a `notifications` sorba + trigger push-t. Ez a **team-working**
-  alap-csatornája.
+- [ ] **Remote push (háttérben is szól)** — a HELYI push + a teljes bekötés KÉSZ
+  (`expo-notifications` telepítve + plugin; engedélykérés + handler; realtime-
+  érkezés → rendszer-notification; koppintás → `route` deep-link; worker Expo
+  Push API-küldés `notify.js`-ben). A HÁTTÉR-push-hoz már csak: EAS **projectId**
+  (`app.json` `extra.eas.projectId`) + fizikai eszközön futó **dev/prod build**
+  (Expo Go iOS-en nem ad remote tokent) — ekkor a `registerForPush` menti a
+  `user_devices.push_token`-t, és a worker push-a kézbesül. Deven a realtime→helyi
+  notification már MŰKÖDIK, projectId nélkül is.
 - [ ] **Titkok / env** — prod env-ek: worker `ANTHROPIC_API_KEY` (vagy lokál AI),
   Supabase kulcsok, `EXPO_PUBLIC_*`. A `.env` gitignore-olt (OK) — prod titkok a
   CI/EAS secret-store-ból.
@@ -119,4 +119,6 @@ objektum-index) · Phase 3 (engaging · parancs-whitelist · rough-cut→shorts)
 Phase 4 (social variants · feliratfordítás · dub · export-codecek · zene-illesztés ·
 B-roll helykereső) · Phase 5 (helyi verziózás · cloud-sync alap · Remix Graph) ·
 Free/on-device (színes markerek · timeline-régiók · állítható snapping) ·
-Értesítés-rendszer alap (realtime + deep-link + self-insert; csengő+badge+lista).
+Értesítés-rendszer (realtime + deep-link + self-insert; csengő+badge+lista;
+expo-notifications helyi push + koppintás-navigáció; worker `POST /notify`
+service_role-lal cross-user + Expo Push — deven end-to-end tesztelve).

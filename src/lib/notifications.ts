@@ -1,3 +1,4 @@
+import { cloudBaseUrl } from '@/lib/backend';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -124,6 +125,35 @@ export async function createNotification(input: {
     data: input.data ?? null,
   });
   return !error;
+}
+
+/**
+ * Értesítés küldése MÁS usernek (collab: komment/meghívó/mention) — a worker
+ * `POST /notify`-ján át, mert cross-user íráshoz service_role kell (az RLS csak
+ * a sajátot engedi). A worker beszúrja a sort (realtime kézbesíti) + Expo push-t
+ * küld a cél-user push_token-jeire. Best-effort (nem dob). SAJÁT értesítéshez a
+ * `createNotification` (közvetlen self-insert) is elég.
+ */
+export async function sendNotification(
+  userId: string,
+  input: {
+    type?: NotificationType;
+    title: string;
+    body?: string;
+    route?: string;
+    data?: Record<string, unknown>;
+  }
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${cloudBaseUrl()}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...input }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** A jelenlegi user id-ja (a realtime feliratkozáshoz), vagy null. */

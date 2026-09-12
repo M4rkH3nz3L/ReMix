@@ -61,7 +61,13 @@
         }
       ],
       "expo-localization",
-      "react-native-audio-api"
+      "react-native-audio-api",
+      [
+        "expo-notifications",
+        {
+          "color": "#0c0d12"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

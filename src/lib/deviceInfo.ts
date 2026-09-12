@@ -169,3 +169,25 @@ export async function registerCurrentDevice(userId: string): Promise<void> {
     // best-effort telemetria; a bejelentkezést nem blokkolja
   }
 }
+
+/**
+ * Az Expo push-token elmentése a jelenlegi eszköz sorára (`user_devices.push_token`).
+ * A (user_id, fingerprint) kulcson upsert-el, így ugyanahhoz az eszközhöz köti,
+ * amit a `registerCurrentDevice` írt. Best-effort. A workert (POST /notify) ez
+ * táplálja a remote-push kézbesítéshez.
+ */
+export async function saveCurrentDevicePushToken(userId: string, token: string): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+  try {
+    const fingerprint = await getInstallId();
+    await supabase
+      .from('user_devices')
+      .update({ push_token: token, last_seen: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('fingerprint', fingerprint);
+  } catch {
+    // best-effort; a push nélkül is megy a realtime + in-app csengő
+  }
+}

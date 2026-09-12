@@ -1,5 +1,5 @@
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
@@ -11,9 +11,23 @@ import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
+import {
+  addNotificationResponseListener,
+  getInitialNotificationRoute,
+  registerForPush,
+} from '@/lib/pushNotifications';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useNotifications } from '@/store/notificationStore';
+
+/** Deep-link cél megnyitása egy notification koppintásából (best-effort). */
+function openNotificationRoute(route: string) {
+  try {
+    router.push(route as Parameters<typeof router.push>[0]);
+  } catch {
+    // ismeretlen/rossz útvonal → csendben elnyeljük
+  }
+}
 
 export default function RootLayout() {
   // 💳 Free/Pro szint betöltése a tárolóból (a felhő-funkciók kapuja)
@@ -34,6 +48,24 @@ export default function RootLayout() {
   useEffect(() => {
     void useNotifications.getState().syncForUser(userId);
   }, [userId]);
+
+  // 📲 push: bejelentkezve engedélyt kérünk + (ha lehet) push-tokent mentünk
+  useEffect(() => {
+    if (userId) {
+      void registerForPush(userId);
+    }
+  }, [userId]);
+
+  // 📲 notification-koppintás → deep-link (előtér/háttér + hideg indítás)
+  useEffect(() => {
+    const unsub = addNotificationResponseListener(openNotificationRoute);
+    void getInitialNotificationRoute().then((route) => {
+      if (route) {
+        openNotificationRoute(route);
+      }
+    });
+    return unsub;
+  }, []);
 
   // választható betűtípusok betöltése (a family-nevek egyeznek a renderrel)
   useFonts({

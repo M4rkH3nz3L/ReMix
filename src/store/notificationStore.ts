@@ -7,6 +7,7 @@ import {
   subscribeNotifications,
   type AppNotification,
 } from '@/lib/notifications';
+import { presentLocal } from '@/lib/pushNotifications';
 
 /**
  * 🔔 Értesítés-store — a lista + olvasatlan-szám EGYETLEN forrása, REALTIME
@@ -51,13 +52,19 @@ export const useNotifications = create<NotificationState>((set, get) => ({
     }
     // realtime: új értesítés → a lista elejére, olvasatlan-szám nő
     unsub = subscribeNotifications(userId, (n) => {
+      let isNew = false;
       set((s) => {
         if (s.items.some((x) => x.id === n.id)) {
           return s; // duplikátum-védelem
         }
+        isNew = true;
         const items = [n, ...s.items];
         return { items, unread: countUnread(items) };
       });
+      // futó app mellett is „push-élmény": rendszer-notification a deep-linkkel
+      if (isNew) {
+        void presentLocal({ id: n.id, title: n.title, body: n.body, route: n.route, data: n.data });
+      }
     });
   },
 

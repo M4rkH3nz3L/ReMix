@@ -34,6 +34,7 @@ const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
+const { notifyAvailable, sendNotification } = require('./notify');
 
 const WHISPER_MODEL =
   process.env.WHISPER_MODEL || path.join(__dirname, 'models', 'ggml-base.bin');
@@ -94,6 +95,7 @@ app.get('/health', async (_req, res) => {
     upscale: upscaleAvailable(),
     tts: ttsAvailable(),
     youtube: ytAvailable(),
+    notify: notifyAvailable(),
     render: queueEnabled() && s3Enabled() ? 'cloud+local' : 'local',
     cloudRenderMinSec: parseInt(process.env.CLOUD_RENDER_MIN_SEC || '15', 10),
   });
@@ -290,6 +292,23 @@ app.post('/ai/probe', express.json({ limit: '64kb' }), (req, res) => {
   probeProvider(cfg)
     .then((ok) => res.json({ ok }))
     .catch(() => res.json({ ok: false }));
+});
+
+// 🔔 Értesítés-küldés (service_role): SELF + CROSS-USER (team-working). Beszúr a
+// notifications-be (realtime kézbesíti) + best-effort Expo push a push_tokenekre.
+// ⚠️ PROD: JWT-verifikáció + hívó-jogosultság (ki kinek küldhet) mögé kell tenni,
+//    lásd TODO.md „Biztonság" (a worker ma nem hitelesít).
+app.post('/notify', express.json({ limit: '64kb' }), (req, res) => {
+  if (!notifyAvailable()) {
+    res.status(503).json({ error: 'notify nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    return;
+  }
+  sendNotification(req.body ?? {})
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('Notify hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
 });
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek

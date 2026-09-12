@@ -641,7 +641,42 @@ async function runTranslateCaptions(segments, lang, aiConfig) {
   );
 }
 
+// --- 🟢 Provider-health próba: elérhető-e a modell végpontja ----------------
+
+/**
+ * Gyors reachability-próba egy BYOK-providerhez: GET {baseUrl}/models (OpenAI-
+ * kompatibilis + Ollama + Anthropic mind ad modell-listát). 2xx = elérhető.
+ * Rövid időkorlát; hálózati hiba / időtúllépés = nem elérhető.
+ */
+async function probeProvider(cfg) {
+  const isAnthropic = cfg.provider === 'anthropic';
+  const base = (cfg.baseUrl || (isAnthropic ? 'https://api.anthropic.com/v1' : '')).replace(/\/+$/, '');
+  if (!base) {
+    return false;
+  }
+  const headers = {};
+  if (isAnthropic) {
+    if (cfg.apiKey) {
+      headers['x-api-key'] = cfg.apiKey;
+    }
+    headers['anthropic-version'] = '2023-06-01';
+  } else if (cfg.apiKey) {
+    headers.authorization = `Bearer ${cfg.apiKey}`;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(`${base}/models`, { headers, signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 module.exports = {
+  probeProvider,
   runAssistant,
   runAutoEdit,
   runCaptionStudio,

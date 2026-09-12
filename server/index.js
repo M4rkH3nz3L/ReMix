@@ -12,7 +12,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 
-const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
+const { aiAvailable, aiProvider, probeProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
@@ -278,6 +278,18 @@ app.post('/ai/hooks', express.json({ limit: '256kb' }), (req, res) => {
       console.error('Hook hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
+});
+
+// 🟢 Provider-health: elérhető-e a modell végpontja (a karakter-picker bogyójához)
+app.post('/ai/probe', express.json({ limit: '64kb' }), (req, res) => {
+  const cfg = sanitizeAiConfig(req.body?.aiConfig);
+  if (!cfg) {
+    res.json({ ok: false });
+    return;
+  }
+  probeProvider(cfg)
+    .then((ok) => res.json({ ok }))
+    .catch(() => res.json({ ok: false }));
 });
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek

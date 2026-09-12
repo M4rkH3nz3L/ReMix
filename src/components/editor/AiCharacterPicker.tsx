@@ -5,6 +5,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { palette } from '@/constants/editor';
+import { probeProvider } from '@/lib/aiHealth';
 import {
   listAiProviders,
   listTaskAssignments,
@@ -12,6 +13,8 @@ import {
   type AiProvider,
   type AiTask,
 } from '@/lib/aiProviders';
+
+type Health = 'checking' | 'ok' | 'down';
 
 /**
  * 🧑‍🎨💬 Karakter-választó egy AI-feladathoz — a chip-lista helyett a felhasználó
@@ -25,6 +28,7 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
   const [models, setModels] = useState<AiProvider[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [intro, setIntro] = useState<{ provider: AiProvider; shown: number } | null>(null);
+  const [health, setHealth] = useState<Record<string, Health>>({});
 
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pop = useRef(new Animated.Value(0)).current;
@@ -72,6 +76,21 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
         if (active && (active.avatar || active.personaName)) {
           playIntro(active);
         }
+        // 🟢 health-próba providerenként (a worker /ai/probe-on át)
+        setHealth(Object.fromEntries(list.map((m) => [m.id, 'checking' as Health])));
+        for (const m of list) {
+          probeProvider(m)
+            .then((ok) => {
+              if (alive) {
+                setHealth((h) => ({ ...h, [m.id]: ok ? 'ok' : 'down' }));
+              }
+            })
+            .catch(() => {
+              if (alive) {
+                setHealth((h) => ({ ...h, [m.id]: 'down' }));
+              }
+            });
+        }
       })
       .catch(() => {});
     return () => {
@@ -82,6 +101,10 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
   }, [task]);
 
   const choose = (id: string | null) => {
+    // elérhetetlen modellt nem lehet kijelölni
+    if (id && health[id] === 'down') {
+      return;
+    }
     setSelected(id);
     setTaskAssignment(task, id).catch(() => {});
     const p = id ? models.find((x) => x.id === id) : null;
@@ -118,10 +141,25 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
         {/* karakterek */}
         {models.map((m) => {
           const on = selected === m.id;
+          const hs = health[m.id] ?? 'checking';
+          const down = hs === 'down';
           return (
-            <Pressable key={m.id} style={styles.tile} onPress={() => choose(m.id)}>
-              <View style={[styles.avatarWrap, on ? styles.avatarActive : null]}>
-                <AvatarSvg config={m.avatar} size={48} />
+            <Pressable
+              key={m.id}
+              style={[styles.tile, down ? styles.tileDown : null]}
+              disabled={down}
+              onPress={() => choose(m.id)}
+            >
+              <View style={styles.avatarBox}>
+                <View style={[styles.avatarWrap, on ? styles.avatarActive : null]}>
+                  <AvatarSvg config={m.avatar} size={48} />
+                </View>
+                <View
+                  style={[
+                    styles.dot,
+                    hs === 'ok' ? styles.dotOk : hs === 'down' ? styles.dotDown : styles.dotChecking,
+                  ]}
+                />
               </View>
               <Text style={[styles.tileName, on ? styles.tileNameActive : null]} numberOfLines={1}>
                 {m.personaName || m.label}
@@ -161,6 +199,21 @@ const styles = StyleSheet.create({
   wrap: { gap: 10, marginBottom: 6 },
   row: { gap: 12, paddingVertical: 2, paddingRight: 8 },
   tile: { alignItems: 'center', width: 60, gap: 4 },
+  tileDown: { opacity: 0.45 },
+  avatarBox: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center' },
+  dot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: palette.surface,
+  },
+  dotOk: { backgroundColor: palette.ok },
+  dotDown: { backgroundColor: palette.danger },
+  dotChecking: { backgroundColor: palette.textDim },
   avatarWrap: {
     width: 54,
     height: 54,

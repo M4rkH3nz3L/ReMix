@@ -226,9 +226,18 @@ Supabase sorból jön; kijelentkezés után az eszköz visszaáll `free`-re.
 
 > A „pótoljuk a hiányzó funkciókat" része, de a szigorú elv miatt **ingyen**.
 > Külön priorizálható, nem az előfizetéshez kötött.
+>
+> ⚠️ **PARITÁS-FIGYELMEZTETÉS (fontos!):** a ReMix **preview↔render paritásra**
+> épül — ami a KIMENETET érinti, azt a kliens-előnézetben ÉS a `server/render.js`
+> kifejezés-építőben IS meg kell csinálni. Ezért az alábbiak zöme NEM tiszta
+> „on-device kliens" munka: dupla (preview + render) implementáció kell, a render-
+> oldal itt futásidőben nem verifikálható. Pl. a `keyframes.ts` SZÁNDÉKOSAN
+> zárja ki a rotáció/opacity keyframe-et (a render per-frame-alfa korlátja).
+> **Kimenet-független, editor-only (biztonságos) tételek:** ✅ színes markerek
+> (kész) · timeline-régiók · snapping-küszöb. Ezek paritás-mentesek.
 
-- Keyframe: **rotáció + opacity** csatorna (ma csak scale/x/y/volume) + **graph
-  editor** (bezier-görbe UI).
+- Keyframe: **rotáció + opacity** csatorna (⚠️ render-kizárt jelenleg) + **graph
+  editor** (bezier-görbe UI). *(dupla impl. kell)*
 - Szín: **görbék / RGB-görbék / HSL / color wheels / scope-ok** (histogram,
   waveform, vectorscope, RGB parade), **LUT-import** (ma csak preset).
 - Speed: **freeze frame + reverse**.

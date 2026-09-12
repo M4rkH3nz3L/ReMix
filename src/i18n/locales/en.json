@@ -238,6 +238,13 @@
       "normal": "Snap",
       "strong": "Snap+"
     },
+    "remixGraph": {
+      "title": "Remix lineage",
+      "empty": "This project has no remix ancestry.",
+      "current": "you are here",
+      "open": "Open",
+      "unavailable": "unavailable"
+    },
     "pacing": {
       "slow": "slow",
       "empty": "No clips yet — pacing appears here",

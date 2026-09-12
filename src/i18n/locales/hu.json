@@ -238,6 +238,13 @@
       "normal": "Illesztés",
       "strong": "Illesztés+"
     },
+    "remixGraph": {
+      "title": "Remix-származás",
+      "empty": "Ennek a projektnek nincs remix-előzménye.",
+      "current": "itt vagy",
+      "open": "Megnyitás",
+      "unavailable": "nem elérhető"
+    },
     "pacing": {
       "slow": "lassú",
       "empty": "Még nincs klip — itt jelenik meg a tempó",

@@ -238,6 +238,13 @@
       "normal": "Snap",
       "strong": "Snap+"
     },
+    "remixGraph": {
+      "title": "Remix-Herkunft",
+      "empty": "Dieses Projekt hat keine Remix-Herkunft.",
+      "current": "du bist hier",
+      "open": "Öffnen",
+      "unavailable": "nicht verfügbar"
+    },
     "pacing": {
       "slow": "langsam",
       "empty": "Noch keine Clips — hier erscheint das Tempo",

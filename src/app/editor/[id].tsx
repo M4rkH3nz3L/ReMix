@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HangStudio } from '@/components/editor/HangStudio';
 import { ImageStudio } from '@/components/editor/ImageStudio';
 import { PanelHost } from '@/components/editor/PanelHost';
+import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
@@ -55,6 +56,7 @@ export default function EditorScreen() {
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
+  const [lineageOpen, setLineageOpen] = useState(false);
   const L = useLayout();
 
   usePlaybackClock();
@@ -248,7 +250,7 @@ export default function EditorScreen() {
         </Text>
         {project?.remixOf ? (
           <Pressable
-            onPress={() => router.push(`/editor/${project.remixOf!.projectId}`)}
+            onPress={() => setLineageOpen(true)}
             hitSlop={4}
             accessibilityRole="button"
           >
@@ -436,6 +438,11 @@ export default function EditorScreen() {
       </KeyboardAvoidingView>
       <ImageStudio />
       <HangStudio />
+      <RemixGraphModal
+        visible={lineageOpen}
+        onClose={() => setLineageOpen(false)}
+        project={project}
+      />
     </SafeAreaView>
   );
 }

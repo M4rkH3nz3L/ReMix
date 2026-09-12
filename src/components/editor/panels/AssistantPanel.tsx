@@ -52,6 +52,7 @@ import { clipsAt, projectDuration } from '@/lib/projectUtils';
 import { buildSmartReframe } from '@/lib/reframeClient';
 import { downloadTrack, fetchSoundLibrary, renderServerUrl } from '@/lib/render';
 import { formatTime } from '@/lib/time';
+import { findBrollSpots } from '@/lib/brollClient';
 import { findHighlights } from '@/lib/highlightsClient';
 import type { Highlight } from '@/lib/highlightsClient';
 import { analyzeQuality } from '@/lib/qualityClient';
@@ -623,6 +624,46 @@ export function AssistantPanel() {
   };
 
   const [footageStatus, setFootageStatus] = useState<string | null>(null);
+  const [brollStatus, setBrollStatus] = useState<string | null>(null);
+
+  /**
+   * 🎞️ B-roll-helyek (saját médiából): a beszéd-szünetek (csend) azok a pontok,
+   * ahol a legjobb SAJÁT B-roll felvétellel takarni. Nem módosít — összefoglaló.
+   */
+  const findBroll = async () => {
+    if (brollStatus) {
+      return;
+    }
+    const project = useEditorStore.getState().project;
+    if (!project) {
+      return;
+    }
+    setBrollStatus(t('panels.assistant.brollChecking'));
+    try {
+      await guardPro(
+        async () => {
+          const spots = await withProgress(t('panels.assistant.brollTitle'), () =>
+            findBrollSpots(project)
+          );
+          if (!spots || spots.length === 0) {
+            Alert.alert(t('panels.assistant.brollTitle'), t('panels.assistant.brollNone'));
+            return;
+          }
+          const list = spots
+            .slice(0, 8)
+            .map((s) => `• ${formatTime(s.start)}–${formatTime(s.end)}`)
+            .join('\n');
+          Alert.alert(
+            t('panels.assistant.brollTitle'),
+            `${t('panels.assistant.brollFound', { count: spots.length })}\n${list}`
+          );
+        },
+        (e) => Alert.alert(t('panels.assistant.brollTitle'), e.message)
+      );
+    } finally {
+      setBrollStatus(null);
+    }
+  };
 
   /**
    * 🔍 Footage check (Phase 1.5): a klipek reprezentatív kockái alapján jelöli a
@@ -1353,6 +1394,7 @@ export function AssistantPanel() {
     searchStatus ??
     highlightStatus ??
     footageStatus ??
+    brollStatus ??
     null;
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null);
@@ -1840,6 +1882,13 @@ export function AssistantPanel() {
           label={footageStatus ?? t('panels.assistant.footageCheckBtn')}
           onPress={() => {
             footageCheck().catch((err: Error) => Alert.alert(t('panels.assistant.footageTitle'), err.message));
+          }}
+        />
+        <PrimaryButton
+          icon="images-outline"
+          label={brollStatus ?? t('panels.assistant.brollBtn')}
+          onPress={() => {
+            findBroll().catch((err: Error) => Alert.alert(t('panels.assistant.brollTitle'), err.message));
           }}
         />
         <Text style={styles.note}>{t('panels.assistant.cutToolsNote')}</Text>

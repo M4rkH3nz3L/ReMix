@@ -19,7 +19,8 @@ import type { LibraryTrack } from '@/lib/render';
 import { fetchTtsVoices, generateTts, type TtsVoice } from '@/lib/tts';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip } from '@/types/project';
+import { guardPro } from '@/store/paywallStore';
+import type { AudioClip, TextClip } from '@/types/project';
 
 /**
  * Hang-panel: voiceover-felvétel közvetlenül az appból + a kijelölt hangklip
@@ -71,6 +72,42 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
       })
       .catch((err: Error) => Alert.alert(t('panels.audio.aiVoiceLabel'), err.message))
       .finally(() => setTtsBusy(false));
+  };
+
+  /**
+   * 🎙️ Dub feliratokból (Phase 4.3): a felirat-sáv szövegéből (ami a 4.2-vel
+   * akár lefordított is lehet) AI-narrációt generál a kiválasztott hanggal, és a
+   * beszéd kezdetéhez időzítve a voiceover-sávra teszi. EGY narrációs sáv (nem
+   * per-szegmens lip-sync); az eredeti hang halkítása a mixerből. Pro (TTS).
+   */
+  const runDub = async () => {
+    if (ttsBusy) {
+      return;
+    }
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tk) => tk.type === 'captions');
+    const caps = (track?.clips ?? [])
+      .filter((c): c is TextClip => c.kind === 'text')
+      .sort((a, b) => a.start - b.start);
+    if (caps.length === 0) {
+      Alert.alert(t('panels.audio.dubTitle'), t('panels.audio.dubNoCaptions'));
+      return;
+    }
+    const text = caps.map((c) => c.text).join(' ').trim().slice(0, 4000);
+    setTtsBusy(true);
+    try {
+      await guardPro(
+        async () => {
+          const { uri, duration } = await generateTts(text, ttsVoice);
+          state.setPlayhead(Math.max(0, caps[0].start));
+          addAudioClip(uri, t('panels.audio.dubLabel'), duration, 'local', 'voiceover');
+          Alert.alert(t('panels.audio.dubTitle'), t('panels.audio.dubDone'));
+        },
+        (e) => Alert.alert(t('panels.audio.dubTitle'), e.message)
+      );
+    } finally {
+      setTtsBusy(false);
+    }
   };
 
   const addAudioClip = (
@@ -268,10 +305,22 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
                 <Text style={styles.note}>{t('panels.audio.ttsGenerating')}</Text>
               </View>
             ) : (
-              <PrimaryButton icon="sparkles" label={t('panels.audio.generateVoice')} onPress={generateVoice} />
+              <>
+                <PrimaryButton icon="sparkles" label={t('panels.audio.generateVoice')} onPress={generateVoice} />
+                <PrimaryButton
+                  icon="language-outline"
+                  label={t('panels.audio.dubBtn')}
+                  onPress={() => {
+                    runDub().catch((err: Error) => Alert.alert(t('panels.audio.dubTitle'), err.message));
+                  }}
+                />
+              </>
             )}
             <Text style={styles.note}>
               {t('panels.audio.ttsHint')}
+            </Text>
+            <Text style={styles.note}>
+              {t('panels.audio.dubNote')}
             </Text>
           </>
         )}

@@ -147,7 +147,32 @@
     "apiKeyOptional": "Optional (z. B. lokales Ollama)",
     "apiKeyHint": "In deinem Konto gespeichert (Supabase), nur für dich lesbar.",
     "defaultBadge": "STANDARD",
-    "deleteModelConfirm": "Diese Modellkonfiguration löschen?"
+    "deleteModelConfirm": "Diese Modellkonfiguration löschen?",
+    "subscriptionSection": "Pro-Abo",
+    "subActive": "Aktiv",
+    "subStatusLabel": "Status",
+    "subUntilLabel": "Gültig bis",
+    "subSourceLabel": "Quelle",
+    "subUpdatedLabel": "Aktualisiert",
+    "subForever": "Kein Ablauf",
+    "subDaysLeft_one": "noch {{count}} Tag",
+    "subDaysLeft_other": "noch {{count}} Tage",
+    "subNone": "Kein aktives Abo",
+    "subNoneHint": "Schalte Cloud-Rendering, KI-Tools und Zusammenarbeit mit Remix Pro frei.",
+    "subscribeCta": "Pro abonnieren",
+    "subStatus": {
+      "active": "Aktiv",
+      "trialing": "Testphase",
+      "past_due": "Überfällig",
+      "canceled": "Gekündigt",
+      "expired": "Abgelaufen"
+    },
+    "subSource": {
+      "manual": "Manuell",
+      "revenuecat": "App Store / Play",
+      "stripe": "Karte",
+      "promo": "Promo"
+    }
   },
   "home": {
     "appName": "Remix",

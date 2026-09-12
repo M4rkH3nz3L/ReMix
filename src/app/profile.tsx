@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -43,8 +43,12 @@ import { AI_CAPABILITIES, generatePersona, personaLabel } from '@/lib/aiPersona'
 import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
+import { billingClientAvailable, restorePurchases } from '@/lib/billing';
 import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
+import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
 import { useAuth } from '@/store/authStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { usePaywall } from '@/store/paywallStore';
 
 const PROVIDER_KINDS: AiProviderKind[] = ['openai', 'anthropic', 'ollama', 'custom'];
 const PROVIDER_LABEL: Record<AiProviderKind, string> = {
@@ -92,7 +96,17 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const configured = useAuth((s) => s.configured);
   const email = useAuth((s) => s.user?.email ?? '');
+  const userId = useAuth((s) => s.user?.id ?? null);
   const signOut = useAuth((s) => s.signOut);
+  // 💳 Pro-állapot reaktívan (aktiválás után azonnal frissül a szekció)
+  const isPro = useEntitlement((s) => s.isPro());
+  const proUntil = useEntitlement((s) => s.proUntil);
+  const [sub, setSub] = useState<SubscriptionDetails | null>(null);
+  // a dátum-kijelzéseket effektben számoljuk (a render TISZTA marad — react-hooks/purity)
+  const [proMeta, setProMeta] = useState<{ untilText: string; updatedText: string | null }>({
+    untilText: '',
+    updatedText: null,
+  });
 
   // configured=false esetén nincs mit tölteni → azonnal false (nem villog a spinner)
   const [loading, setLoading] = useState(configured);
@@ -134,6 +148,31 @@ export default function ProfileScreen() {
 
   useFocusEffect(refresh);
 
+  // 💳 az előfizetés részletei (minden adat) — betöltés + a Pro-állapot
+  // változásakor (pl. aktiválás/visszaállítás után) újratöltés
+  // az előfizetés részletei + a dátum-kijelzések. A setState a .then callbackben
+  // fut (nem az effekt szinkron testében — react-hooks/set-state-in-effect), és a
+  // Date-hívások is ott (nem renderben — react-hooks/purity).
+  useEffect(() => {
+    const uid = userId;
+    Promise.resolve(uid ? fetchSubscriptionDetails(uid) : null)
+      .then((d) => {
+        setSub(d);
+        let untilText = '';
+        if (uid) {
+          if (proUntil) {
+            const days = Math.max(0, Math.ceil((Date.parse(proUntil) - Date.now()) / 86400000));
+            untilText = `${new Date(proUntil).toLocaleDateString()} · ${t('profile.subDaysLeft', { count: days })}`;
+          } else {
+            untilText = t('profile.subForever');
+          }
+        }
+        const updatedText = d?.updatedAt ? new Date(d.updatedAt).toLocaleDateString() : null;
+        setProMeta({ untilText, updatedText });
+      })
+      .catch(() => {});
+  }, [userId, isPro, proUntil, t]);
+
   // — személyes adatok —
   const setField = (key: keyof AccountProfile, value: string) =>
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -162,6 +201,28 @@ export default function ProfileScreen() {
       setSavingProfile(false);
     }
   };
+
+  // 💳 előfizetés — feliratkozás (paywall) + korábbi vásárlás visszaállítása
+  const onSubscribe = () => usePaywall.getState().open();
+  const onRestore = () => {
+    restorePurchases()
+      .then((ok) =>
+        Alert.alert(
+          t('paywallSheet.restoreTitle'),
+          ok ? t('paywallSheet.restoreOk') : t('paywallSheet.restoreNone')
+        )
+      )
+      .catch((e: unknown) =>
+        Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e))
+      );
+  };
+
+  const subRow = (label: string, value: string) => (
+    <View style={styles.subRow}>
+      <Text style={styles.subRowLabel}>{label}</Text>
+      <Text style={styles.subRowValue}>{value}</Text>
+    </View>
+  );
 
   // — AI-modellek —
   const openNew = () => {
@@ -372,6 +433,67 @@ export default function ProfileScreen() {
                 />
               )}
             </View>
+          </View>
+
+          {/* — Pro előfizetés — */}
+          <Text style={styles.sectionTitle}>{t('profile.subscriptionSection')}</Text>
+          <View style={styles.card}>
+            {isPro ? (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={styles.proBadge}>
+                    <Ionicons name="sparkles" size={13} color={palette.accent} />
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                  <Text style={styles.subActive}>{t('profile.subActive')}</Text>
+                </View>
+                {subRow(
+                  t('profile.subStatusLabel'),
+                  t(`profile.subStatus.${sub?.status ?? 'active'}`, {
+                    defaultValue: sub?.status ?? 'active',
+                  })
+                )}
+                {subRow(t('profile.subUntilLabel'), proMeta.untilText)}
+                {subRow(
+                  t('profile.subSourceLabel'),
+                  t(`profile.subSource.${sub?.source ?? 'manual'}`, {
+                    defaultValue: sub?.source ?? 'manual',
+                  })
+                )}
+                {proMeta.updatedText
+                  ? subRow(t('profile.subUpdatedLabel'), proMeta.updatedText)
+                  : null}
+                {billingClientAvailable() ? (
+                  <Pressable onPress={onRestore} style={styles.subRestore}>
+                    <Ionicons name="refresh" size={15} color={palette.textDim} />
+                    <Text style={styles.subRestoreText}>{t('paywallSheet.restore')}</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={styles.freeBadge}>
+                    <Text style={styles.freeBadgeText}>FREE</Text>
+                  </View>
+                  <Text style={styles.subFreeTitle}>{t('profile.subNone')}</Text>
+                </View>
+                <Text style={styles.subFreeHint}>{t('profile.subNoneHint')}</Text>
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  <PrimaryButton
+                    icon="rocket"
+                    label={t('profile.subscribeCta')}
+                    onPress={onSubscribe}
+                  />
+                  {billingClientAvailable() ? (
+                    <Pressable onPress={onRestore} style={styles.subRestore}>
+                      <Ionicons name="refresh" size={15} color={palette.textDim} />
+                      <Text style={styles.subRestoreText}>{t('paywallSheet.restore')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </>
+            )}
           </View>
 
           {/* — AI-modellek — */}
@@ -689,6 +811,41 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
+  subHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: palette.accentSoft,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  proBadgeText: { color: palette.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  freeBadge: {
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  freeBadgeText: { color: palette.textDim, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  subActive: { color: palette.ok, fontSize: 14, fontWeight: '700' },
+  subFreeTitle: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  subFreeHint: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
+  subRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+  },
+  subRowLabel: { color: palette.textDim, fontSize: 13 },
+  subRowValue: { color: palette.text, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  subRestore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  subRestoreText: { color: palette.textDim, fontSize: 14, fontWeight: '600' },
   input: {
     backgroundColor: palette.surfaceHigh,
     borderRadius: 10,

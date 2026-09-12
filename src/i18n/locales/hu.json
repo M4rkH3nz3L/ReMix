@@ -147,7 +147,32 @@
     "apiKeyOptional": "Opcionális (pl. lokális Ollama)",
     "apiKeyHint": "A fiókodban tárolva (Supabase), csak te olvashatod.",
     "defaultBadge": "ALAP",
-    "deleteModelConfirm": "Törlöd ezt a modell-beállítást?"
+    "deleteModelConfirm": "Törlöd ezt a modell-beállítást?",
+    "subscriptionSection": "Pro előfizetés",
+    "subActive": "Aktív",
+    "subStatusLabel": "Állapot",
+    "subUntilLabel": "Érvényes eddig",
+    "subSourceLabel": "Forrás",
+    "subUpdatedLabel": "Frissítve",
+    "subForever": "Nincs lejárat",
+    "subDaysLeft_one": "{{count}} nap van hátra",
+    "subDaysLeft_other": "{{count}} nap van hátra",
+    "subNone": "Nincs aktív előfizetés",
+    "subNoneHint": "Oldd fel a felhő-renderelést, az AI-eszközöket és a kollaborációt a Remix Pro-val.",
+    "subscribeCta": "Előfizetés a Pro-ra",
+    "subStatus": {
+      "active": "Aktív",
+      "trialing": "Próbaidő",
+      "past_due": "Lejárt fizetés",
+      "canceled": "Lemondva",
+      "expired": "Lejárt"
+    },
+    "subSource": {
+      "manual": "Manuális",
+      "revenuecat": "App Store / Play",
+      "stripe": "Kártya",
+      "promo": "Promó"
+    }
   },
   "home": {
     "appName": "Remix",

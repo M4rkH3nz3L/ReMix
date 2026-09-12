@@ -147,7 +147,32 @@
     "apiKeyOptional": "Optional (e.g. local Ollama)",
     "apiKeyHint": "Stored in your account (Supabase), readable only by you.",
     "defaultBadge": "DEFAULT",
-    "deleteModelConfirm": "Delete this model configuration?"
+    "deleteModelConfirm": "Delete this model configuration?",
+    "subscriptionSection": "Pro subscription",
+    "subActive": "Active",
+    "subStatusLabel": "Status",
+    "subUntilLabel": "Valid until",
+    "subSourceLabel": "Source",
+    "subUpdatedLabel": "Updated",
+    "subForever": "No expiry",
+    "subDaysLeft_one": "{{count}} day left",
+    "subDaysLeft_other": "{{count}} days left",
+    "subNone": "No active subscription",
+    "subNoneHint": "Unlock cloud rendering, AI tools and collaboration with Remix Pro.",
+    "subscribeCta": "Subscribe to Pro",
+    "subStatus": {
+      "active": "Active",
+      "trialing": "Trial",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "expired": "Expired"
+    },
+    "subSource": {
+      "manual": "Manual",
+      "revenuecat": "App Store / Play",
+      "stripe": "Card",
+      "promo": "Promo"
+    }
   },
   "home": {
     "appName": "Remix",

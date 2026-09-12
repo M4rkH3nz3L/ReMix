@@ -567,10 +567,54 @@ async function runStoryEngine(context, aiConfig) {
   );
 }
 
+// --- 🎯 Highlights: long-form → több önálló short-jelölt (Phase 3.3) ---------
+
+const HighlightsReplySchema = z.object({
+  highlights: z
+    .array(
+      z.object({
+        start: z.number().describe('a short kezdete az idővonalon (mp)'),
+        end: z.number().describe('a short vége (mp)'),
+        title: z.string().describe('rövid, ütős magyar cím a short-nak (max ~40 karakter)'),
+        reason: z.string().describe('1 mondat: miért jó ez önálló short-nak'),
+      })
+    )
+    .describe('2–4 nem-átfedő short-jelölt időrendben'),
+});
+
+const HIGHLIGHTS_SYSTEM = `Hosszú videóból ÖNÁLLÓ short-jelölteket választasz ki
+(long-form → shorts). A beszéd-átirat és a hossz alapján adj 2–4 NEM ÁTFEDŐ
+időablakot.
+
+Szabályok:
+- Mindegyik ablak 12–45 mp, és ÖNMAGÁBAN is érthető — erős pillanattal/hookkal
+  kezdődjön, és legyen kerek vége (ne vágj mondat közepén; a transcript sorai
+  mutatják a mondathatárokat).
+- Az ablakok időrendben, ÁTFEDÉS NÉLKÜL; a start/end az idővonal másodperceiben,
+  0 és a videó hossza között.
+- Válaszd a legütősebb, önállóan is megálló részeket (tipp, poén, tanulság,
+  fordulat) — ne csak az elejét.
+- Minden ablakhoz rövid, ütős magyar cím + 1 mondatos indok.
+- A választ CSAK a séma szerinti JSON-ban add.`;
+
+/**
+ * @param context { duration:number, transcript:[{start,end,text}] }
+ * @returns {Promise<{highlights: {start,end,title,reason}[]}>}
+ */
+async function runHighlights(context, aiConfig) {
+  return runStructured(
+    HIGHLIGHTS_SYSTEM,
+    `A VIDEÓ JELEI:\n${JSON.stringify(context, null, 1)}\n\nAdd meg a short-jelölteket.`,
+    HighlightsReplySchema,
+    aiConfig
+  );
+}
+
 module.exports = {
   runAssistant,
   runAutoEdit,
   runCaptionStudio,
+  runHighlights,
   runHookGenerator,
   runStoryEngine,
   runThumbHeadlines,

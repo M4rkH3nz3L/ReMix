@@ -12,7 +12,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 
-const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHookGenerator, runStoryEngine, runThumbHeadlines, sanitizeAiConfig } = require('./ai');
+const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
@@ -276,6 +276,21 @@ app.post('/ai/hooks', express.json({ limit: '256kb' }), (req, res) => {
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('Hook hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
+// 🎯 Highlights (Phase 3.3): long-form → több önálló short-jelölt (idő-ablak)
+app.post('/ai/highlights', express.json({ limit: '512kb' }), (req, res) => {
+  const { context, aiConfig } = req.body ?? {};
+  if (!context || typeof context !== 'object') {
+    res.status(400).json({ error: 'Hiányzó kontextus.' });
+    return;
+  }
+  runHighlights(context, sanitizeAiConfig(aiConfig))
+    .then((reply) => res.json(reply))
+    .catch((err) => {
+      console.error('Highlights hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
 });

@@ -52,6 +52,8 @@ import { clipsAt, projectDuration } from '@/lib/projectUtils';
 import { buildSmartReframe } from '@/lib/reframeClient';
 import { downloadTrack, fetchSoundLibrary, renderServerUrl } from '@/lib/render';
 import { formatTime } from '@/lib/time';
+import { findHighlights } from '@/lib/highlightsClient';
+import type { Highlight } from '@/lib/highlightsClient';
 import { analyzeQuality } from '@/lib/qualityClient';
 import { fetchShotScores } from '@/lib/shotScore';
 import { fetchThumbHeadlines } from '@/lib/thumbStudio';
@@ -745,6 +747,42 @@ export function AssistantPanel() {
     }
   };
 
+  const [highlightStatus, setHighlightStatus] = useState<string | null>(null);
+  const [highlights, setHighlights] = useState<Highlight[] | null>(null);
+
+  /**
+   * 🎯 AI Rough Cut → shorts (Phase 3.3): a hosszú anyagból önálló short-jelöltek
+   * (highlight-ablakok). Nem módosít — tap = a lejátszófej a highlight elejére.
+   */
+  const findShorts = async () => {
+    if (highlightStatus) {
+      return;
+    }
+    const project = useEditorStore.getState().project;
+    if (!project) {
+      return;
+    }
+    setHighlights(null);
+    setHighlightStatus(t('panels.assistant.findShortsChecking'));
+    try {
+      await guardPro(
+        async () => {
+          const found = await withProgress(t('panels.assistant.shortsTitle'), () =>
+            findHighlights(project)
+          );
+          if (found && found.length > 0) {
+            setHighlights(found);
+          } else {
+            Alert.alert(t('panels.assistant.shortsTitle'), t('panels.assistant.shortsNone'));
+          }
+        },
+        (e) => Alert.alert(t('panels.assistant.shortsTitle'), e.message)
+      );
+    } finally {
+      setHighlightStatus(null);
+    }
+  };
+
   const [previewingId, setPreviewingId] = useState<string | null>(null);
 
   const stopVariantPreview = () => {
@@ -1284,6 +1322,8 @@ export function AssistantPanel() {
     sfxStatus ??
     reframeStatus ??
     searchStatus ??
+    highlightStatus ??
+    footageStatus ??
     null;
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null);
@@ -1508,6 +1548,30 @@ export function AssistantPanel() {
         ) : (
           <Text style={styles.note}>{t('panels.assistant.autoEditIntro')}</Text>
         )}
+
+        {/* 🎯 long-form → shorts: önálló highlight-jelöltek (Phase 3.3) */}
+        <PrimaryButton
+          icon="albums-outline"
+          label={highlightStatus ?? t('panels.assistant.findShortsBtn')}
+          onPress={() => {
+            findShorts().catch((err: Error) => Alert.alert(t('panels.assistant.shortsTitle'), err.message));
+          }}
+        />
+        {highlights?.map((h, i) => (
+          <Pressable
+            key={`hl-${i}-${h.start.toFixed(1)}`}
+            style={styles.variantCard}
+            onPress={() => useEditorStore.getState().setPlayhead(h.start)}
+          >
+            <Text style={styles.variantTitle}>{h.title || t('panels.assistant.shortsTitle')}</Text>
+            <Text style={styles.variantMeta}>
+              ▶ {formatTime(h.start)}–{formatTime(h.end)} · {(h.end - h.start).toFixed(0)}s
+            </Text>
+            <Text style={styles.variantRationale} numberOfLines={2}>
+              {h.reason}
+            </Text>
+          </Pressable>
+        ))}
       </PanelSection>
 
       <PanelSection title={t('panels.assistant.sectionWhatToDo')}>

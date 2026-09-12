@@ -259,6 +259,15 @@
       "empty": "Noch keine Bearbeitungen.",
       "current": "jetzt"
     },
+    "versions": {
+      "title": "Versionen",
+      "save": "Version speichern",
+      "defaultName": "Version {{n}}",
+      "empty": "Keine gespeicherten Versionen — tippe auf „Version speichern“, um den aktuellen Stand festzuhalten.",
+      "restore": "Wiederherstellen",
+      "restoreTitle": "Version wiederherstellen",
+      "restoreConfirm": "„{{name}}“ wiederherstellen? Der aktuelle Stand bleibt als ein Undo-Schritt erhalten."
+    },
     "detailPreview": {
       "title": "Detailvorschau",
       "titleWithIcon": "🎬 Detailvorschau",

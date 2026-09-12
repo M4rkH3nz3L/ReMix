@@ -148,6 +148,8 @@ interface EditorState {
   events: ProjectEvent[];
 
   loadProject: (project: Project, events?: ProjectEvent[]) => void;
+  /** 🕓 egy mentett verzió visszaállítása (teljes projekt-csere, undo-zható) */
+  restoreProject: (snapshot: Project) => void;
   closeProject: () => void;
   /**
    * Minden szerkesztő-művelet ezen megy át: validál, history-t és eventet ír.
@@ -306,6 +308,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       events: events ?? [],
       ...SESSION_RESET,
     }),
+
+  restoreProject: (snapshot) => {
+    const { project, past } = get();
+    if (!project) {
+      return;
+    }
+    // a jelenlegi állapot a history-ba kerül → a visszaállítás egy undóval visszavonható
+    set({
+      project: snapshot,
+      past: [...past.slice(-HISTORY_LIMIT + 1), project],
+      future: [],
+      dirty: true,
+      selectedClipId: null,
+      multiSelectIds: [],
+      multiSelectMode: false,
+      playhead: 0,
+      isPlaying: false,
+    });
+  },
 
   closeProject: () =>
     set({

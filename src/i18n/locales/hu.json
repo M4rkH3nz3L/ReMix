@@ -259,6 +259,15 @@
       "empty": "Még nincs szerkesztés.",
       "current": "most"
     },
+    "versions": {
+      "title": "Verziók",
+      "save": "Verzió mentése",
+      "defaultName": "{{n}}. verzió",
+      "empty": "Nincs mentett verzió — koppints a „Verzió mentése” gombra a jelenlegi állapot rögzítéséhez.",
+      "restore": "Visszaállítás",
+      "restoreTitle": "Verzió visszaállítása",
+      "restoreConfirm": "Visszaállítod ezt: „{{name}}”? A jelenlegi állapot egy undo-lépésként megmarad."
+    },
     "detailPreview": {
       "title": "Részlet-előnézet",
       "titleWithIcon": "🎬 Részlet-előnézet",

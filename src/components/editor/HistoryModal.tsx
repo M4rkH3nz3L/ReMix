@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { describeCommand } from '@/lib/commands';
 import type { EventActor } from '@/lib/commands';
+import { makeId } from '@/lib/id';
+import { loadVersions, saveVersions, type ProjectVersion } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -36,13 +38,89 @@ function shortTime(iso: string): string {
 export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const events = useEditorStore((s) => s.events);
+  const projectId = useEditorStore((s) => s.project?.id);
+  const restore = useEditorStore((s) => s.restoreProject);
   const data = [...events].reverse(); // legújabb elöl
+  const [versions, setVersions] = useState<ProjectVersion[]>([]);
+
+  // 🕓 a mentett verziók betöltése a modal megnyitásakor (async → nem sync setState)
+  useEffect(() => {
+    if (visible && projectId) {
+      loadVersions(projectId).then(setVersions).catch(() => setVersions([]));
+    }
+  }, [visible, projectId]);
+
+  const saveCurrentVersion = () => {
+    const p = useEditorStore.getState().project;
+    if (!p) {
+      return;
+    }
+    const v: ProjectVersion = {
+      id: makeId('ver'),
+      name: t('editor.versions.defaultName', { n: versions.length + 1 }),
+      at: new Date().toISOString(),
+      project: p,
+    };
+    const next = [...versions, v];
+    setVersions(next);
+    saveVersions(p.id, next).catch(() => {});
+  };
+
+  const restoreVersion = (v: ProjectVersion) => {
+    Alert.alert(t('editor.versions.restoreTitle'), t('editor.versions.restoreConfirm', { name: v.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('editor.versions.restore'),
+        onPress: () => {
+          restore(v.project);
+          onClose();
+        },
+      },
+    ]);
+  };
+
+  const deleteVersion = (v: ProjectVersion) => {
+    const next = versions.filter((x) => x.id !== v.id);
+    setVersions(next);
+    if (projectId) {
+      saveVersions(projectId, next).catch(() => {});
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={() => {}}>
           <View style={styles.grabber} />
+
+          {/* 🕓 Verziók (Phase 5.2): névvel mentett pillanatképek + visszaállítás */}
+          <View style={styles.versionHead}>
+            <Text style={styles.title}>{t('editor.versions.title')}</Text>
+            <Pressable style={styles.saveBtn} onPress={saveCurrentVersion} hitSlop={6}>
+              <Ionicons name="bookmark-outline" size={14} color={palette.accent} />
+              <Text style={styles.saveBtnText}>{t('editor.versions.save')}</Text>
+            </Pressable>
+          </View>
+          {versions.length === 0 ? (
+            <Text style={styles.empty}>{t('editor.versions.empty')}</Text>
+          ) : (
+            [...versions].reverse().map((v) => (
+              <View style={styles.row} key={v.id}>
+                <Ionicons name="time-outline" size={15} color={palette.textDim} />
+                <Text style={styles.label} numberOfLines={1}>
+                  {v.name}
+                </Text>
+                <Text style={styles.time}>{shortTime(v.at)}</Text>
+                <Pressable onPress={() => restoreVersion(v)} hitSlop={8}>
+                  <Text style={styles.action}>{t('editor.versions.restore')}</Text>
+                </Pressable>
+                <Pressable onPress={() => deleteVersion(v)} hitSlop={8}>
+                  <Ionicons name="trash-outline" size={14} color={palette.danger} />
+                </Pressable>
+              </View>
+            ))
+          )}
+
           <Text style={styles.title}>{t('editor.history.title')}</Text>
           {data.length === 0 ? (
             <Text style={styles.empty}>{t('editor.history.empty')}</Text>
@@ -133,5 +211,31 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     fontVariant: ['tabular-nums'],
+  },
+  versionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  saveBtnText: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  action: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

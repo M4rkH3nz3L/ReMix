@@ -259,6 +259,15 @@
       "empty": "No edits yet.",
       "current": "now"
     },
+    "versions": {
+      "title": "Versions",
+      "save": "Save version",
+      "defaultName": "Version {{n}}",
+      "empty": "No saved versions — tap Save version to snapshot the current state.",
+      "restore": "Restore",
+      "restoreTitle": "Restore version",
+      "restoreConfirm": "Restore \"{{name}}\"? The current state stays as one undo step."
+    },
     "detailPreview": {
       "title": "Detail preview",
       "titleWithIcon": "🎬 Detail preview",

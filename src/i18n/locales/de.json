@@ -912,7 +912,16 @@
       "shareRemixFile": ".remix-Projektdatei teilen",
       "collectZip": "Collect — Paket mit Medien (zip)",
       "collectPackaging": "Collect — Verpacken",
-      "projectFileNote": "Die .vided-Datei ist das Projekt + Asset-Referenzen (ohne Medien) — stell sie mit der Import-Taste auf dem Startbildschirm wieder her, fehlende Medien werden neu verknüpft. Collect packt auf dem Worker alles in ein einziges Zip (project.vided + media/) — zur Übergabe und Archivierung."
+      "projectFileNote": "Die .vided-Datei ist das Projekt + Asset-Referenzen (ohne Medien) — stell sie mit der Import-Taste auf dem Startbildschirm wieder her, fehlende Medien werden neu verknüpft. Collect packt auf dem Worker alles in ein einziges Zip (project.vided + media/) — zur Übergabe und Archivierung.",
+      "cloudTitle": "Cloud-Backup",
+      "cloudBackupBtn": "☁️ In die Cloud sichern",
+      "cloudRestoreBtn": "☁️ Aus der Cloud wiederherstellen",
+      "cloudBackingUp": "Sichern…",
+      "cloudRestoring": "Wiederherstellen…",
+      "cloudBackupDone": "Projekt in der Cloud gesichert (der Plan; Medien bleiben vorerst lokal).",
+      "cloudRestoreDone": "Cloud-Version wiederhergestellt — der vorherige Stand bleibt als ein Undo-Schritt.",
+      "cloudRestoreNone": "Noch kein Cloud-Backup für dieses Projekt.",
+      "cloudSyncNote": "Sichert den Projektplan (JSON) in deinem Konto — auf jedem Gerät wiederherstellbar. Medien-Cloud-Sync ist ein separater, späterer Schritt."
     },
     "filter": {
       "sectionFilters": "Filter",
@@ -1508,6 +1517,7 @@
         "storyAnalyze": "KI-Story-Struktur",
         "pacingAnalyze": "KI-Tempo-Analyse",
         "qualityScan": "Material-Qualitätscheck",
+        "cloudSync": "Cloud-Projekt-Backup",
         "bgRemove": "Hintergrund entfernen",
         "depth3d": "3D / Tiefe",
         "faceTools": "Gesichts-Tools",

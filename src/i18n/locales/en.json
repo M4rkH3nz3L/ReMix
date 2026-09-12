@@ -912,7 +912,16 @@
       "shareRemixFile": "Share .remix project file",
       "collectZip": "Collect — package with media (zip)",
       "collectPackaging": "Collect — packaging",
-      "projectFileNote": "The .vided file is the project + asset references (without media) — restore it with the home screen's import button, reattaching any missing media. Collect packages everything into a single zip on the worker (project.vided + media/) — for handoff and archiving."
+      "projectFileNote": "The .vided file is the project + asset references (without media) — restore it with the home screen's import button, reattaching any missing media. Collect packages everything into a single zip on the worker (project.vided + media/) — for handoff and archiving.",
+      "cloudTitle": "Cloud backup",
+      "cloudBackupBtn": "☁️ Back up to cloud",
+      "cloudRestoreBtn": "☁️ Restore from cloud",
+      "cloudBackingUp": "Backing up…",
+      "cloudRestoring": "Restoring…",
+      "cloudBackupDone": "Project backed up to the cloud (the plan; media stays local for now).",
+      "cloudRestoreDone": "Cloud version restored — the previous state stays as one undo step.",
+      "cloudRestoreNone": "No cloud backup for this project yet.",
+      "cloudSyncNote": "Backs up the project plan (JSON) to your account — restore it on any device. Media-file cloud sync is a separate, later step."
     },
     "filter": {
       "sectionFilters": "Filters",
@@ -1508,6 +1517,7 @@
         "storyAnalyze": "AI story structure",
         "pacingAnalyze": "AI pacing analysis",
         "qualityScan": "Footage quality check",
+        "cloudSync": "Cloud project backup",
         "bgRemove": "Background removal",
         "depth3d": "3D / depth",
         "faceTools": "Face tools",

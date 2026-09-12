@@ -912,7 +912,16 @@
       "shareRemixFile": ".remix projektfájl megosztása",
       "collectZip": "Collect — csomag a médiával (zip)",
       "collectPackaging": "Collect — csomagolás",
-      "projectFileNote": "A .vided fájl a projekt + asset-referenciák (média nélkül) — a főképernyő import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect a workeren csomagol mindent egyetlen zip-be (project.vided + media/) — átadáshoz, archiváláshoz."
+      "projectFileNote": "A .vided fájl a projekt + asset-referenciák (média nélkül) — a főképernyő import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect a workeren csomagol mindent egyetlen zip-be (project.vided + media/) — átadáshoz, archiváláshoz.",
+      "cloudTitle": "Felhő-mentés",
+      "cloudBackupBtn": "☁️ Mentés a felhőbe",
+      "cloudRestoreBtn": "☁️ Visszaállítás a felhőből",
+      "cloudBackingUp": "Mentés…",
+      "cloudRestoring": "Visszaállítás…",
+      "cloudBackupDone": "A projekt (terv) elmentve a felhőbe — a média egyelőre helyben marad.",
+      "cloudRestoreDone": "Felhő-verzió visszaállítva — az előző állapot egy undo-lépésként megmarad.",
+      "cloudRestoreNone": "Ehhez a projekthez még nincs felhő-mentés.",
+      "cloudSyncNote": "A projekt-tervet (JSON) a fiókodba menti — bármely eszközön visszaállítható. A médiafájlok felhő-szinkronja külön, későbbi lépés."
     },
     "filter": {
       "sectionFilters": "Szűrők",
@@ -1508,6 +1517,7 @@
         "storyAnalyze": "AI story-struktúra",
         "pacingAnalyze": "AI tempó-elemzés",
         "qualityScan": "Felvétel-minőség ellenőrzés",
+        "cloudSync": "Projekt felhő-mentés",
         "bgRemove": "Háttér-eltávolítás",
         "depth3d": "3D / mélység",
         "faceTools": "Arc-eszközök",

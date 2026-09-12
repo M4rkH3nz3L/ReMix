@@ -29,6 +29,7 @@ import {
 import type { PostTarget } from '@/lib/render';
 import { shareVidedFile } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
+import { pullProject, pushProject } from '@/lib/cloudSync';
 
 const RESOLUTIONS = [
   { label: '480p', value: 480 },
@@ -58,11 +59,13 @@ const QUALITY_MULT = { low: 0.55, medium: 1, high: 1.5 } as const;
 export function ExportPanel() {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  const restoreProject = useEditorStore((s) => s.restoreProject);
   const isPro = useEntitlement((s) => s.isPro());
   const mockDowngrade = useEntitlement((s) => s.mockDowngrade);
   const openPaywall = usePaywall((s) => s.open);
   const [renderStatus, setRenderStatus] = useState<string | null>(null);
   const [collectStatus, setCollectStatus] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<string | null>(null);
   const [resolution, setResolution] = useState<number>(1080);
   const [fps, setFps] = useState<number>(30);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
@@ -193,6 +196,49 @@ export function ExportPanel() {
         }
       })
       .catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
+  };
+
+  // ☁️ projekt-terv felhő-mentése (Pro; a médiafájlok külön, későbbi lépés)
+  const cloudBackup = async () => {
+    if (cloudStatus) {
+      return;
+    }
+    setCloudStatus(t('panels.export.cloudBackingUp'));
+    try {
+      await guardPro(
+        async () => {
+          await pushProject(project);
+          Alert.alert(t('panels.export.cloudTitle'), t('panels.export.cloudBackupDone'));
+        },
+        (e) => Alert.alert(t('panels.export.cloudTitle'), e.message)
+      );
+    } finally {
+      setCloudStatus(null);
+    }
+  };
+
+  // ☁️ a felhő-mentett terv visszaállítása (undo-zható; a helyi restoreProject-en át)
+  const cloudRestore = async () => {
+    if (cloudStatus) {
+      return;
+    }
+    setCloudStatus(t('panels.export.cloudRestoring'));
+    try {
+      await guardPro(
+        async () => {
+          const cloud = await pullProject(project.id);
+          if (!cloud) {
+            Alert.alert(t('panels.export.cloudTitle'), t('panels.export.cloudRestoreNone'));
+            return;
+          }
+          restoreProject(cloud);
+          Alert.alert(t('panels.export.cloudTitle'), t('panels.export.cloudRestoreDone'));
+        },
+        (e) => Alert.alert(t('panels.export.cloudTitle'), e.message)
+      );
+    } finally {
+      setCloudStatus(null);
+    }
   };
 
   return (
@@ -424,9 +470,24 @@ export function ExportPanel() {
               .finally(() => setCollectStatus(null));
           }}
         />
+        <PrimaryButton
+          icon="cloud-upload-outline"
+          label={cloudStatus ?? t('panels.export.cloudBackupBtn')}
+          onPress={() => {
+            cloudBackup().catch((err: Error) => Alert.alert(t('panels.export.cloudTitle'), err.message));
+          }}
+        />
+        <PrimaryButton
+          icon="cloud-download-outline"
+          label={t('panels.export.cloudRestoreBtn')}
+          onPress={() => {
+            cloudRestore().catch((err: Error) => Alert.alert(t('panels.export.cloudTitle'), err.message));
+          }}
+        />
         <Text style={styles.note}>
           {t('panels.export.projectFileNote')}
         </Text>
+        <Text style={styles.note}>{t('panels.export.cloudSyncNote')}</Text>
       </PanelSection>
     </View>
   );

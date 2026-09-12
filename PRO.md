@@ -233,8 +233,8 @@ Supabase sorból jön; kijelentkezés után az eszköz visszaáll `free`-re.
 > „on-device kliens" munka: dupla (preview + render) implementáció kell, a render-
 > oldal itt futásidőben nem verifikálható. Pl. a `keyframes.ts` SZÁNDÉKOSAN
 > zárja ki a rotáció/opacity keyframe-et (a render per-frame-alfa korlátja).
-> **Kimenet-független, editor-only (biztonságos) tételek:** ✅ színes markerek
-> (kész) · timeline-régiók · snapping-küszöb. Ezek paritás-mentesek.
+> **Kimenet-független, editor-only (biztonságos) tételek:** ✅ színes markerek ·
+> ✅ timeline-régiók · snapping-küszöb (hátra). Ezek paritás-mentesek.
 
 - Keyframe: **rotáció + opacity** csatorna (⚠️ render-kizárt jelenleg) + **graph
   editor** (bezier-görbe UI). *(dupla impl. kell)*

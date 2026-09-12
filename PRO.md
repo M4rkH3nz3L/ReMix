@@ -27,7 +27,12 @@
 - ⏳ **Phase 4** — ✅ 4.1 social variants · ✅ 4.2 feliratfordítás · ✅ 4.6 export-
   codecek (HEVC/AV1/ProRes + 8K). Hátra: 4.3 dubbing (Pro+), 4.4 AI zene/B-roll,
   4.5 A/B (Pro+).
-- ▶️ Következő: Phase 4 maradék (Pro+) / **Phase 5** (Cloud) / 1.4 (modelldöntés után).
+- ⏳ **Phase 5** — ✅ 5.2 (helyi): verzió-pillanatképek + visszaállítás (on-device,
+  ingyen). Hátra (felhő-tárhely kell): 5.1 projekt-sync, 5.3 collab, 5.4 media-
+  library, 5.5 remix-graph; + 5.2 felhő-verziótörténet.
+- ⛔ **Blokkolt/döntés:** 4.4 AI zene/B-roll (nincs library-metaadat/B-roll forrás),
+  4.5 A/B (Pro+, fedésben hooks/auto-edittel), 1.4 diarization (modelldöntés).
+- ▶️ Következő: Phase 5 felhő-rész (sync) — nagyobb, döntést igényel.
 
 ---
 

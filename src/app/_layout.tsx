@@ -13,6 +13,7 @@ import { palette } from '@/constants/editor';
 import { hydrateLanguage } from '@/i18n';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
+import { useNotifications } from '@/store/notificationStore';
 
 export default function RootLayout() {
   // 💳 Free/Pro szint betöltése a tárolóból (a felhő-funkciók kapuja)
@@ -21,12 +22,18 @@ export default function RootLayout() {
   const hydrateAuth = useAuth((s) => s.hydrate);
   const authHydrated = useAuth((s) => s.hydrated);
   const authed = useAuth((s) => s.session != null);
+  const userId = useAuth((s) => s.user?.id ?? null);
   useEffect(() => {
     void hydrateAuth();
     void hydrateEntitlement();
     // 🌍 mentett nyelvválasztás betöltése (a felismert eszköz-nyelv fölé)
     void hydrateLanguage();
   }, [hydrateAuth, hydrateEntitlement]);
+
+  // 🔔 értesítések: login → betöltés + realtime feliratkozás; logout → ürítés
+  useEffect(() => {
+    void useNotifications.getState().syncForUser(userId);
+  }, [userId]);
 
   // választható betűtípusok betöltése (a family-nevek egyeznek a renderrel)
   useFonts({

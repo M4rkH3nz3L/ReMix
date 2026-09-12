@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { aspectRatios, palette } from '@/constants/editor';
 import { gridColumns } from '@/constants/layout';
@@ -272,6 +273,7 @@ export default function ProjectsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{t('home.appName')}</Text>
         </View>
+        <NotificationBell />
         <Pressable
           onPress={() => setLangOpen(true)}
           hitSlop={8}

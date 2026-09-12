@@ -31,6 +31,11 @@
     "hide": "Tap to hide",
     "hello": "Hi, I'm {{name}} — happy to help!"
   },
+  "notifications": {
+    "title": "Notifications",
+    "markAll": "Mark all read",
+    "empty": "No notifications yet."
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",

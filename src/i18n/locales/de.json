@@ -31,6 +31,11 @@
     "hide": "Tippen zum Ausblenden",
     "hello": "Hi, ich bin {{name}} — helfe dir gern!"
   },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "markAll": "Alle als gelesen",
+    "empty": "Noch keine Benachrichtigungen."
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",

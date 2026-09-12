@@ -30,7 +30,7 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 ### Infra
 - [ ] **Supabase PROD instance** — ma LOKÁLIS dev fut (+100 port, API 54421). Kell:
   hosztolt Supabase projekt, a migrációk alkalmazva (`supabase/migrations/`:
-  profiles/devices/ai_providers/ai_task_providers/**subscriptions**/**cloud_projects**),
+  profiles/devices/ai_providers/ai_task_providers/**subscriptions**/**cloud_projects**/**notifications**),
   és a prod `EXPO_PUBLIC_SUPABASE_URL` / `_ANON_KEY`.
 - [ ] **Cloud worker hosztolás** — `EXPO_PUBLIC_CLOUD_URL` a hosztolt render/AI-
   workerre (ma dev-fallback a Metró gépére). ffmpeg + Whisper + (opcionális)
@@ -38,6 +38,19 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **Natív render build (EAS)** — a helyi export natív modult igényel
   (`isNativeRenderAvailable`; Expo Go-ban `LocalRenderUnavailableError`). Kell
   EAS dev/prod build a device-render-hez.
+- [ ] **Push-értesítések (expo-notifications)** — a realtime+deeplink alap KÉSZ
+  (`notifications` tábla + realtime + `NotificationBell` + `route`-nav). A push-hoz
+  kell: `npx expo install expo-notifications`, EAS **projectId** (`app.json`
+  `extra.eas.projectId`), natív build (Expo Go nem küld push-t iOS-en), a device
+  Expo-push-token mentése (`user_devices.push_token` **oszlop kész**), és a worker
+  küldje az Expo Push API-ra. A deep-link már működik: a `route` mezőre navigál a
+  `NotificationBell` (kliens) — a push-payloadba is ugyanez a `route` kerül.
+- [ ] **Kereszt-user `/notify` (worker, service_role)** — a self-insert (saját
+  értesítés) KÉSZ (RLS `insert_own`, kliens `createNotification`). MÁS usernek
+  küldeni (collab: komment/meghívó/mention) **service_role**-t igényel, ami
+  megkerüli az RLS-t → worker `POST /notify` (JWT-verifikáció mögött, lásd
+  Biztonság) írja a `notifications` sorba + trigger push-t. Ez a **team-working**
+  alap-csatornája.
 - [ ] **Titkok / env** — prod env-ek: worker `ANTHROPIC_API_KEY` (vagy lokál AI),
   Supabase kulcsok, `EXPO_PUBLIC_*`. A `.env` gitignore-olt (OK) — prod titkok a
   CI/EAS secret-store-ból.
@@ -105,4 +118,5 @@ minőség · diarization-címkék) · Phase 2 (semantic select · találat-kieme
 objektum-index) · Phase 3 (engaging · parancs-whitelist · rough-cut→shorts) ·
 Phase 4 (social variants · feliratfordítás · dub · export-codecek · zene-illesztés ·
 B-roll helykereső) · Phase 5 (helyi verziózás · cloud-sync alap · Remix Graph) ·
-Free/on-device (színes markerek · timeline-régiók · állítható snapping).
+Free/on-device (színes markerek · timeline-régiók · állítható snapping) ·
+Értesítés-rendszer alap (realtime + deep-link + self-insert; csengő+badge+lista).

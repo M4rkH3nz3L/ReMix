@@ -30,8 +30,10 @@ import {
   templates,
 } from '@/constants/templates';
 import type { VideoTemplate } from '@/constants/templates';
+import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { useLayout } from '@/hooks/useLayout';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
+import { publishPost } from '@/lib/feed';
 import { makeId } from '@/lib/id';
 import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
@@ -198,8 +200,23 @@ export default function ProjectsScreen() {
       .catch(() => Alert.alert(t('common.error'), t('home.renameFailed')));
   };
 
+  const shareToFeed = (meta: ProjectMeta) => {
+    loadProject(meta.id)
+      .then((p) => (p ? publishPost(p) : undefined))
+      .then((post) => {
+        if (post) {
+          Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
+            { text: t('common.ok') },
+            { text: t('nav.feed'), onPress: () => router.push('/feed') },
+          ]);
+        }
+      })
+      .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+  };
+
   const projectMenu = (meta: ProjectMeta) => {
     Alert.alert(meta.name, undefined, [
+      { text: t('feed.shareToFeed'), onPress: () => shareToFeed(meta) },
       { text: t('common.rename'), onPress: () => startRename(meta) },
       { text: t('common.duplicate'), onPress: () => duplicate(meta) },
       { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },
@@ -323,7 +340,7 @@ export default function ProjectsScreen() {
         numColumns={columns}
         columnWrapperStyle={columns > 1 ? styles.listColumns : undefined}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.list, { padding: L.spacing.lg }]}
+        contentContainerStyle={[styles.list, { padding: L.spacing.lg, paddingBottom: BOTTOM_NAV_HEIGHT + 32 }]}
         ListHeaderComponent={
           <>
             {shared.length > 0 ? (
@@ -588,6 +605,7 @@ export default function ProjectsScreen() {
         </KeyboardAvoidingView>
       </Modal>
       <LanguageSwitcher visible={langOpen} onClose={() => setLangOpen(false)} />
+      <BottomNav active="studio" />
     </SafeAreaView>
   );
 }

@@ -2033,5 +2033,34 @@
     "priceLabel": "Ár (kredit)",
     "creditsHint": "A kredit a piactér fizetőeszköze. Az éles appban App Store / Play-en veszed; itt (dev) azonnal jóváíródik.",
     "devGrant": "dev"
+  },
+  "nav": {
+    "feed": "Feed",
+    "studio": "Stúdió",
+    "channel": "Csatorna"
+  },
+  "feed": {
+    "title": "Feed",
+    "forYou": "Neked",
+    "following": "Követett",
+    "empty": "Még nincs videó — oszd meg te az elsőt!",
+    "emptyFollowing": "Még senkit sem követsz.",
+    "createCta": "Videó készítése",
+    "notRemixable": "Ez a videó nem remixelhető.",
+    "followed": "Mostantól követed: {{name}}",
+    "remixOf": "Remix tőle: @{{name}}",
+    "remixPrompt": "Megnyitod új projektként remixeléshez?",
+    "remix": "Remix",
+    "shareToFeed": "Megosztás a feedbe",
+    "sharedOk": "A videód felkerült a feedre."
+  },
+  "channel": {
+    "posts": "Posztok",
+    "followers": "Követők",
+    "following": "Követett",
+    "follow": "Követés",
+    "following2": "Követve",
+    "editProfile": "Profil szerkesztése",
+    "noPosts": "Még nincs poszt."
   }
 }

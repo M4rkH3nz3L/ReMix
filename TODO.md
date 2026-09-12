@@ -111,6 +111,30 @@ kredit-top-up dev+RevenueCat consumable). Go-live:
 
 ---
 
+## 📱 SOCIAL / CSATORNA + FEED (TikTok-szerű)
+
+Az alap **KÉSZ** és szerver-backendes (Supabase): a poszt a Project egy nézete
+(`project_snapshot` → REMIX a Studióban). Táblák: `posts` + `post_likes` +
+`post_saves` + `follows` (+ számláló-triggerek, `record_post_view` RPC,
+`channel_stats` RPC, remix/follow → értesítés, RLS, realtime). Kliens `lib/feed.ts`
++ `/feed` (függőleges lapozó, like/save/remix/follow) + `/channel/[id]` (posztok +
+követők) + alsó nav (Feed/Studio/Csatorna) + „megosztás a feedbe" a projekt-menüből.
+Deven end-to-end tesztelt (publikálás/engagement-számlálók/RLS/remix/follow/stats).
+
+- [ ] **Média-feltöltés (a valódi lejátszáshoz)** — ma a poszt metaadat +
+  `project_snapshot` (a SAJÁT projekt lokálisan lejátszható/remixelhető, a
+  `video_url`/`poster_url` üres → a más eszközről jött poszt borító/placeholder).
+  Kell: a render + borító feltöltése Supabase Storage-ba (a „Média-fájl felhő-sync"
+  tétellel közös), majd inline autoplay (`expo-video`) a feedben.
+- [ ] **Kommentek** — `post_comments` tábla + UI (a `src/types/social.ts` már
+  modellezi: nested reply, mention, pin). Ma a komment-szám placeholder.
+- [ ] **For-You ranking** — ma „legújabb"; később engagement/hasonlóság-alapú
+  rangsor (SOCIAL.md M11).
+- [ ] **Moderáció / report** — a `moderation_status` mező kész; kell jelentés-flow
+  + admin-eszköz + tartalom-szabályzat (a skálázáshoz).
+- [ ] **Chat / DM, letiltás, említések, közösségek** — a `devs/SOCIAL.md` teljes
+  víziója (Identity/Social/Chat/Notifications/AI-layer).
+
 ## 📋 FUNKCIÓ-BACKLOG (roadmap-maradék — a PRO.md-ből)
 
 Nagyobb, döntést/infrát igénylő funkciók (nem élesítés-blokkolók):

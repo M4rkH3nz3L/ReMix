@@ -2033,5 +2033,34 @@
     "priceLabel": "Price (credits)",
     "creditsHint": "Credits are the shop currency. In the live app you buy them via the App Store / Play; here (dev) they are granted instantly.",
     "devGrant": "dev"
+  },
+  "nav": {
+    "feed": "Feed",
+    "studio": "Studio",
+    "channel": "Channel"
+  },
+  "feed": {
+    "title": "Feed",
+    "forYou": "For You",
+    "following": "Following",
+    "empty": "No videos yet — share the first one!",
+    "emptyFollowing": "You're not following anyone yet.",
+    "createCta": "Create a video",
+    "notRemixable": "This video isn't remixable.",
+    "followed": "You now follow {{name}}",
+    "remixOf": "Remix of @{{name}}",
+    "remixPrompt": "Open this as a new project to remix?",
+    "remix": "Remix",
+    "shareToFeed": "Share to feed",
+    "sharedOk": "Your video is live on the feed."
+  },
+  "channel": {
+    "posts": "Posts",
+    "followers": "Followers",
+    "following": "Following",
+    "follow": "Follow",
+    "following2": "Following",
+    "editProfile": "Edit profile",
+    "noPosts": "No posts yet."
   }
 }

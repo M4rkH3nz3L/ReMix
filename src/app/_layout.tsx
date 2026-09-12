@@ -122,6 +122,8 @@ export default function RootLayout() {
               <Stack.Screen name="player/[id]" />
               <Stack.Screen name="collab/[id]" />
               <Stack.Screen name="shop" />
+              <Stack.Screen name="feed" />
+              <Stack.Screen name="channel/[id]" />
             </Stack.Protected>
             <Stack.Protected guard={!authed}>
               <Stack.Screen name="auth" />

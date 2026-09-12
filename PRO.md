@@ -30,13 +30,13 @@
   4.5 A/B (Pro+).
 - ⏳ **Phase 5** — ✅ 5.2 (helyi) verzió-snapshot+restore · ✅ **5.1 (alap)**
   cloud-sync: projekt-terv (JSON) felhő-mentés/visszaállítás (Pro, RLS own,
-  `cloud_projects` tábla). Hátra: 5.1 média-fájl Storage-sync, 5.3 collab,
-  5.4 media-library, 5.5 remix-graph.
+  `cloud_projects` tábla) · ✅ **5.5 (helyi)** Remix Graph (származási lánc).
+  Hátra: média-fájl Storage-sync, 5.3 collab, 5.4 media-library.
 - ✅ **4.4:** zene — egységes track-metaadat (BPM+energia) + videóhoz-illesztés;
   B-roll — saját-média helykereső (csend-alapú „hova tegyél B-rollt").
-- ⛔ **Marad döntésre:** 4.5 A/B (Pro+, fedésben hooks/auto-edittel), Phase 6
-  billing (RevenueCat — store-termék + eszköz-teszt kell), 1.6 emotion.
-- ▶️ Következő: Phase 5 felhő-rész (sync) — nagyobb, döntést igényel.
+- ⛔ **Marad döntésre/infra:** média-fájl Storage-sync, collab, valódi hang-ML
+  diarization, 4.5 A/B, Phase 6 billing (store-termék + eszköz-teszt), 1.6 emotion,
+  render-coupled finomságok (freeze/reverse, szín-scope-ok…) — futásidejű teszttel.
 
 ---
 

@@ -17,8 +17,9 @@
 - ✅ **Phase 0** — per-user előfizetés (Supabase `subscriptions` + szinkron + RLS).
 - ✅ **1.1** AI Story Engine · ✅ **1.2** AI Pacing · ✅ **1.3** filler + dadogás/
   ismétlés · ✅ **1.5** felvétel-minőség (homály/expozíció).
-- ⏳ **1.4** Speaker diarization — DÖNTÉSRE VÁR (hang-ML modell választása; a
-  Caption Studio-ban már van kamera/arc-alapú beszélő-heurisztika).
+- ✅ **1.4 (heurisztikus)** Speaker diarization — beszélő-CÍMKÉK a feliratokon
+  (a meglévő kamera/arc-alapú assignSpeakers-re; „[Beszélő N]" előtag). A valódi
+  hang-ML (pyannote) külön, nagy worker-lift maradna.
 - ⏳ **1.6** Emotion (opcionális, később).
 - ✅ **Phase 2** — 2.1 semantic select (találatok → multi-select) · 2.2 találat-
   kiemelés az idővonalon · 2.3 objektum-címkék a vision-indexben.
@@ -31,10 +32,10 @@
   cloud-sync: projekt-terv (JSON) felhő-mentés/visszaállítás (Pro, RLS own,
   `cloud_projects` tábla). Hátra: 5.1 média-fájl Storage-sync, 5.3 collab,
   5.4 media-library, 5.5 remix-graph.
-- ✅ **4.4 (zene):** egységes track-metaadat (worker: BPM+energia) + videóhoz-
-  illesztő rangsor a könyvtárban. (B-roll még blokkolt: nincs tartalom-forrás.)
-- ⛔ **Blokkolt/döntés:** 4.4 B-roll (nincs forrás), 4.5 A/B (Pro+, fedésben
-  hooks/auto-edittel), 1.4 diarization (modelldöntés).
+- ✅ **4.4:** zene — egységes track-metaadat (BPM+energia) + videóhoz-illesztés;
+  B-roll — saját-média helykereső (csend-alapú „hova tegyél B-rollt").
+- ⛔ **Marad döntésre:** 4.5 A/B (Pro+, fedésben hooks/auto-edittel), Phase 6
+  billing (RevenueCat — store-termék + eszköz-teszt kell), 1.6 emotion.
 - ▶️ Következő: Phase 5 felhő-rész (sync) — nagyobb, döntést igényel.
 
 ---

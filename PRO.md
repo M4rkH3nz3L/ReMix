@@ -24,7 +24,10 @@
   kiemelés az idővonalon · 2.3 objektum-címkék a vision-indexben.
 - ✅ **Phase 3** — 3.1 „tedd ütősebbé" összetett javaslat · 3.2 parancs-whitelist
   (átmenet + szín) · 3.3 rough-cut → shorts (highlight-jelöltek).
-- ▶️ Következő: **Phase 4** (PUBLISH — AI social & lokalizáció) vagy 1.4 (modelldöntés után).
+- ⏳ **Phase 4** — ✅ 4.1 social variants · ✅ 4.2 feliratfordítás · ✅ 4.6 export-
+  codecek (HEVC/AV1/ProRes + 8K). Hátra: 4.3 dubbing (Pro+), 4.4 AI zene/B-roll,
+  4.5 A/B (Pro+).
+- ▶️ Következő: Phase 4 maradék (Pro+) / **Phase 5** (Cloud) / 1.4 (modelldöntés után).
 
 ---
 

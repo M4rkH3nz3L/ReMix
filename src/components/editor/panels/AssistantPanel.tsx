@@ -10,6 +10,7 @@ import { aspectValue, palette } from '@/constants/editor';
 import { uploadFetch } from '@/lib/upload';
 import { askAssistant } from '@/lib/ai';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
+import { AssistantPersona } from '@/components/editor/AssistantPersona';
 import { buildAiContext, describeAiCommand, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import {
@@ -1492,6 +1493,7 @@ export function AssistantPanel() {
         onDismiss={() => setAiResult(null)}
       />
       <PanelSection title={t('panels.assistant.modelSection')}>
+        <AssistantPersona task="assistant" />
         <AiProviderPicker task="assistant" />
         <Text style={styles.modelHint}>{t('panels.assistant.modelHint')}</Text>
       </PanelSection>

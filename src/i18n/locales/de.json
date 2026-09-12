@@ -26,6 +26,11 @@
     "accessory": "Accessoire",
     "randomize": "Überrasch mich"
   },
+  "assistantPersona": {
+    "tapToMeet": "Tippen zum Vorstellen 👋",
+    "hide": "Tippen zum Ausblenden",
+    "hello": "Hi, ich bin {{name}} — helfe dir gern!"
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",

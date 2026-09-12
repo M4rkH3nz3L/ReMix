@@ -26,6 +26,11 @@
     "accessory": "Accessory",
     "randomize": "Surprise me"
   },
+  "assistantPersona": {
+    "tapToMeet": "Tap to say hi 👋",
+    "hide": "Tap to hide",
+    "hello": "Hi, I'm {{name}} — happy to help!"
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",

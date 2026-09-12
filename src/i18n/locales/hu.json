@@ -26,6 +26,11 @@
     "accessory": "Kiegészítő",
     "randomize": "Lepj meg"
   },
+  "assistantPersona": {
+    "tapToMeet": "Koppints, hogy bemutatkozzon 👋",
+    "hide": "Koppints az elrejtéshez",
+    "hello": "Szia, {{name}} vagyok — szívesen segítek!"
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",

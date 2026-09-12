@@ -232,6 +232,12 @@
       "menuMessage": "Színezd át a régiót, vagy töröld.",
       "recolor": "Átszínezés"
     },
+    "snap": {
+      "label": "Illesztés erőssége",
+      "off": "Illesztés ki",
+      "normal": "Illesztés",
+      "strong": "Illesztés+"
+    },
     "pacing": {
       "slow": "lassú",
       "empty": "Még nincs klip — itt jelenik meg a tempó",

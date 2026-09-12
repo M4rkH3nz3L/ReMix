@@ -232,6 +232,12 @@
       "menuMessage": "Region umfärben oder entfernen.",
       "recolor": "Umfärben"
     },
+    "snap": {
+      "label": "Snap-Stärke",
+      "off": "Snap aus",
+      "normal": "Snap",
+      "strong": "Snap+"
+    },
     "pacing": {
       "slow": "langsam",
       "empty": "Noch keine Clips — hier erscheint das Tempo",

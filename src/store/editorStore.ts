@@ -21,6 +21,11 @@ import type { Asset, Chapter, ChapterKind, Clip, Project, TimelineRegion, TrackT
 /** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
 export type InsightLane = 'story' | 'map' | 'pacing';
 
+/** 🧲 idővonal-illesztés erőssége: ki / normál / erős (a küszöböt skálázza) */
+export type SnapStrength = 'off' | 'normal' | 'strong';
+/** erősség → SNAP_PX szorzó (0 = nincs illesztés) */
+export const SNAP_FACTOR: Record<SnapStrength, number> = { off: 0, normal: 1, strong: 2 };
+
 /** 🏷️ timeline-régió színek — új régió ciklikusan kap, az átszínezés ezen lépked */
 const REGION_COLORS = ['#7c5cff', '#4a9eff', '#2ecc8f', '#ffb454', '#ff5ca8', '#ff6b6b'];
 
@@ -106,6 +111,8 @@ interface EditorState {
   drawBrush: { color: string; width: number; style: BrushStyle; glow: boolean } | null;
   /** 📐 vászon-rács osztása a snaphez (0 = nincs rács); session-szintű */
   snapGrid: number;
+  /** 🧲 idővonal-illesztés erőssége (klip-él → beat/marker/playhead); session-szintű */
+  snapStrength: SnapStrength;
   /** 🛡️ safe-zone overlay az előnézeten (TikTok/Reels/YT UI-zónák); session-szintű */
   showSafeZones: boolean;
   /** 🎯 fókusz mód: kijelöléskor a TÖBBI idővonal-klip elhalványul; session-szintű */
@@ -213,6 +220,8 @@ interface EditorState {
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
   toggleSafeZones: () => void;
+  /** 🧲 illesztés-erősség léptetése: normál → erős → ki → normál */
+  cycleSnapStrength: () => void;
   toggleFocusMode: () => void;
   setComparingOriginal: (on: boolean) => void;
   setCompareSplit: (v: number | null) => void;
@@ -266,6 +275,7 @@ const SESSION_RESET = {
   drawBrush: null,
   rippleMode: false,
   snapGrid: 0,
+  snapStrength: 'normal' as SnapStrength,
   showSafeZones: false,
   focusMode: false,
   comparingOriginal: false,
@@ -810,6 +820,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setSnapGrid: (grid) => set({ snapGrid: grid }),
   toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),
+
+  cycleSnapStrength: () =>
+    set((s) => ({
+      snapStrength:
+        s.snapStrength === 'normal' ? 'strong' : s.snapStrength === 'strong' ? 'off' : 'normal',
+    })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   setComparingOriginal: (on) => set({ comparingOriginal: on }),
   setCompareSplit: (v) => set({ compareSplit: v }),

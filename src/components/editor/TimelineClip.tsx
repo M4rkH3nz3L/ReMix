@@ -10,7 +10,7 @@ import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { MIN_CLIP_DURATION, SNAP_PX, palette, trackColors } from '@/constants/editor';
 import { maxVideoDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
-import { useEditorStore } from '@/store/editorStore';
+import { SNAP_FACTOR, useEditorStore } from '@/store/editorStore';
 import type { Clip, TrackType } from '@/types/project';
 import type { TFunction } from 'i18next';
 
@@ -94,6 +94,8 @@ function TimelineClipInner({
    * A legközelebbi rácspont, ha SNAP_PX-en belül van: a zene beatjei (P0‑2)
    * ÉS a 🔖 szerkezeti jelölők — így a klip a refrénhez/CTA-hoz is igazítható.
    */
+  // 🧲 az illesztési küszöb az erősség-beállítás szerint (0 = kikapcsolt snap)
+  const snapPx = () => SNAP_PX * SNAP_FACTOR[useEditorStore.getState().snapStrength];
   const nearestBeat = (t: number): number | null => {
     const state = useEditorStore.getState();
     const targets = [
@@ -101,7 +103,7 @@ function TimelineClipInner({
       ...(state.project?.markers ?? []).map((m) => m.time),
     ];
     let best: number | null = null;
-    let bestDist = SNAP_PX / pps;
+    let bestDist = snapPx() / pps;
     for (const b of targets) {
       const d = Math.abs(b - t);
       if (d < bestDist) {
@@ -118,7 +120,7 @@ function TimelineClipInner({
     let snapped = false;
     const snapTargets = [0, playhead, Math.max(0, playhead - clip.duration)];
     for (const target of snapTargets) {
-      if (Math.abs((proposed - target) * pps) < SNAP_PX) {
+      if (Math.abs((proposed - target) * pps) < snapPx()) {
         proposed = target;
         snapped = true;
         selectionHaptic();
@@ -179,7 +181,7 @@ function TimelineClipInner({
     const beat = nearestBeat(clip.start + duration);
     if (beat !== null) {
       const snappedDur = clamp(beat - clip.start, MIN_CLIP_DURATION, max);
-      if (Math.abs(snappedDur - duration) * pps < SNAP_PX) {
+      if (Math.abs(snappedDur - duration) * pps < snapPx()) {
         duration = snappedDur;
         selectionHaptic();
       }

@@ -92,6 +92,8 @@ export function Timeline() {
   const addRegion = useEditorStore((s) => s.addRegion);
   const removeRegion = useEditorStore((s) => s.removeRegion);
   const recolorRegion = useEditorStore((s) => s.recolorRegion);
+  const snapStrength = useEditorStore((s) => s.snapStrength);
+  const cycleSnapStrength = useEditorStore((s) => s.cycleSnapStrength);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -258,6 +260,22 @@ export function Timeline() {
             </Text>
           </Pressable>
         ))}
+        {/* 🧲 illesztés-erősség: normál → erős → ki */}
+        <Pressable
+          onPress={cycleSnapStrength}
+          hitSlop={4}
+          style={styles.snapBtn}
+          accessibilityLabel={t('editor.snap.label')}
+        >
+          <Ionicons
+            name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
+            size={12}
+            color={snapStrength === 'off' ? palette.textDim : palette.accent2}
+          />
+          <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
+            {t('editor.snap.' + snapStrength)}
+          </Text>
+        </Pressable>
         {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
         <Pressable
           onPress={addRegion}
@@ -682,11 +700,22 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
-  regionAddBtn: {
+  snapBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     marginLeft: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  regionAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,

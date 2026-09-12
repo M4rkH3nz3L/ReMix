@@ -16,10 +16,13 @@ import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
 import type { PacingInsight } from '@/lib/pacingClient';
-import type { Asset, Chapter, ChapterKind, Clip, Project, TrackType } from '@/types/project';
+import type { Asset, Chapter, ChapterKind, Clip, Project, TimelineRegion, TrackType } from '@/types/project';
 
 /** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
 export type InsightLane = 'story' | 'map' | 'pacing';
+
+/** 🏷️ timeline-régió színek — új régió ciklikusan kap, az átszínezés ezen lépked */
+const REGION_COLORS = ['#7c5cff', '#4a9eff', '#2ecc8f', '#ffb454', '#ff5ca8', '#ff6b6b'];
 
 export type PanelId =
   | 'text'
@@ -190,6 +193,12 @@ interface EditorState {
   removeChapter: (id: string) => void;
   /** 🎬 AI-felismert story-fejezetek alkalmazása (a meglévőket lecseréli, egy undo-lépés) */
   applyAiChapters: (chapters: { start: number; kind: ChapterKind }[]) => void;
+  /** 🏷️ timeline-régió a kijelölt klip tartományából (vagy alap-hossz a playheadnél) */
+  addRegion: () => void;
+  /** régió törlése */
+  removeRegion: (id: string) => void;
+  /** régió átszínezése a következő palettaszínre */
+  recolorRegion: (id: string) => void;
   /** ✂️ javasolt vágáspontok beállítása (szaggatott jelölés, nem alkalmazva) */
   setSuggestedCuts: (times: number[]) => void;
   /** a javaslatok elvetése */
@@ -699,6 +708,58 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().dispatch({
       type: 'SET_CHAPTERS',
       chapters: (project.chapters ?? []).filter((c) => c.id !== id),
+    });
+  },
+
+  addRegion: () => {
+    const { project, selectedClipId, playhead } = get();
+    if (!project) {
+      return;
+    }
+    // a kijelölt klip tartománya, vagy alap 3 mp-es sáv a lejátszófejnél
+    let start = Math.max(0, playhead);
+    let end = start + 3;
+    if (selectedClipId) {
+      const c = findClip(project, selectedClipId)?.clip;
+      if (c) {
+        start = c.start;
+        end = c.start + c.duration;
+      }
+    }
+    const regions = project.regions ?? [];
+    const region: TimelineRegion = {
+      id: makeId('rgn'),
+      start: Math.round(start * 100) / 100,
+      end: Math.round(end * 100) / 100,
+      label: tr('store.editor.regionDefault', { n: regions.length + 1 }),
+      color: REGION_COLORS[regions.length % REGION_COLORS.length],
+    };
+    get().dispatch({ type: 'SET_REGIONS', regions: [...regions, region] });
+  },
+
+  removeRegion: (id) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    get().dispatch({
+      type: 'SET_REGIONS',
+      regions: (project.regions ?? []).filter((r) => r.id !== id),
+    });
+  },
+
+  recolorRegion: (id) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    get().dispatch({
+      type: 'SET_REGIONS',
+      regions: (project.regions ?? []).map((r) =>
+        r.id === id
+          ? { ...r, color: REGION_COLORS[(REGION_COLORS.indexOf(r.color) + 1) % REGION_COLORS.length] }
+          : r
+      ),
     });
   },
 

@@ -10,6 +10,7 @@ import type {
   Marker,
   ParticlesConfig,
   Project,
+  TimelineRegion,
   TrackType,
 } from '@/types/project';
 
@@ -47,6 +48,7 @@ export type EditorCommand =
   /** 🔖 a marker-lista cseréje (hozzáadás/törlés/átnevezés egy lépésben) */
   | { type: 'SET_MARKERS'; markers: Marker[] }
   | { type: 'SET_CHAPTERS'; chapters: Chapter[] }
+  | { type: 'SET_REGIONS'; regions: TimelineRegion[] }
   | { type: 'SET_LINKS'; links: string[][] }
   /**
    * 🎨 Kép-dokumentum beírása (létrehozás ÉS módosítás). A réteg-műveletek
@@ -217,6 +219,15 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, chapters: next.length > 0 ? next : undefined };
     }
 
+    case 'SET_REGIONS': {
+      const next = [...cmd.regions].sort((a, b) => a.start - b.start);
+      const prev = project.regions ?? [];
+      if (JSON.stringify(prev) === JSON.stringify(next)) {
+        return null;
+      }
+      return { ...project, regions: next.length > 0 ? next : undefined };
+    }
+
     case 'SET_LINKS': {
       // csak a 2+ elemű csoportok érdekesek; rendezve az összehasonlításhoz
       const next = cmd.links.filter((g) => g.length > 1).map((g) => [...g].sort());
@@ -314,6 +325,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setMarkers', { count: cmd.markers.length });
     case 'SET_CHAPTERS':
       return tr('lib.commands.setChapters', { count: cmd.chapters.length });
+    case 'SET_REGIONS':
+      return tr('lib.commands.setRegions', { count: cmd.regions.length });
     case 'SET_LINKS':
       return tr('lib.commands.setLinks', { count: cmd.links.filter((g) => g.length > 1).length });
     case 'UPSERT_IMAGE_DOC':

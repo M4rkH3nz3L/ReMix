@@ -599,6 +599,20 @@ export interface Marker {
   color?: string;
 }
 
+/**
+ * 🏷️ Timeline-régió: névvel + színnel jelölt idő-tartomány az idővonalon
+ * (szervezés/navigáció — pl. „Intró", „B-roll blokk"). CSAK szerkesztő-oldali,
+ * NEM renderelődik → tetszőlegesen színezhető paritás-gond nélkül.
+ */
+export interface TimelineRegion {
+  id: string;
+  /** idővonal-mp */
+  start: number;
+  end: number;
+  label: string;
+  color: string;
+}
+
 /** 🎬 Story-fejezet fajtája (short-form dramaturgia): Hook→Context→Value→CTA. */
 export type ChapterKind = 'hook' | 'context' | 'value' | 'cta' | 'other';
 
@@ -717,6 +731,8 @@ export interface Project {
   particles?: ParticlesConfig;
   /** 🔖 szerkezeti jelölők az idővonalon */
   markers?: Marker[];
+  /** 🏷️ névvel jelölt idő-tartományok (szervezés/navigáció; nem renderelődik) */
+  regions?: TimelineRegion[];
   /** 🎬 story-struktúra fejezetek (Hook/Context/Value/CTA) — a videó „térképe" */
   chapters?: Chapter[];
   /** 🔀 remix-forrás: miből készült ez a projekt (duplikálás/remix). A lineage-

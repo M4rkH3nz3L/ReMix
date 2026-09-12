@@ -227,6 +227,11 @@
       "pacing": "Pacing",
       "mapEmpty": "No clips yet — the timeline map appears here"
     },
+    "regions": {
+      "add": "Region",
+      "menuMessage": "Recolor the region or remove it.",
+      "recolor": "Recolor"
+    },
     "pacing": {
       "slow": "slow",
       "empty": "No clips yet — pacing appears here",
@@ -1530,6 +1535,8 @@
       "setMarkers_other": "markers ({{count}})",
       "setChapters_one": "chapters ({{count}})",
       "setChapters_other": "chapters ({{count}})",
+      "setRegions_one": "regions ({{count}})",
+      "setRegions_other": "regions ({{count}})",
       "setLinks_one": "links ({{count}})",
       "setLinks_other": "links ({{count}})",
       "upsertImageDoc_one": "image document: {{name}} ({{count}} layer)",
@@ -1721,6 +1728,7 @@
   },
   "store": {
     "editor": {
+      "regionDefault": "Region {{n}}",
       "batchEdit_one": "batch edit ({{count}} clip)",
       "batchEdit_other": "batch edit ({{count}} clips)",
       "pasteStyle_one": "style pasted ({{count}} clip)",

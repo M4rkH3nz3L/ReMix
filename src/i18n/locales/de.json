@@ -227,6 +227,11 @@
       "pacing": "Tempo",
       "mapEmpty": "Noch keine Clips — hier erscheint die Timeline-Karte"
     },
+    "regions": {
+      "add": "Region",
+      "menuMessage": "Region umfärben oder entfernen.",
+      "recolor": "Umfärben"
+    },
     "pacing": {
       "slow": "langsam",
       "empty": "Noch keine Clips — hier erscheint das Tempo",
@@ -1530,6 +1535,8 @@
       "setMarkers_other": "Marker ({{count}})",
       "setChapters_one": "Kapitel ({{count}})",
       "setChapters_other": "Kapitel ({{count}})",
+      "setRegions_one": "Regionen ({{count}})",
+      "setRegions_other": "Regionen ({{count}})",
       "setLinks_one": "Verknüpfungen ({{count}})",
       "setLinks_other": "Verknüpfungen ({{count}})",
       "upsertImageDoc_one": "Bilddokument: {{name}} ({{count}} Ebene)",
@@ -1721,6 +1728,7 @@
   },
   "store": {
     "editor": {
+      "regionDefault": "Region {{n}}",
       "batchEdit_one": "Stapelbearbeitung ({{count}} Clip)",
       "batchEdit_other": "Stapelbearbeitung ({{count}} Clips)",
       "pasteStyle_one": "Stil eingefügt ({{count}} Clip)",

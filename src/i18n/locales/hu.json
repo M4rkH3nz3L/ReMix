@@ -227,6 +227,11 @@
       "pacing": "Tempó",
       "mapEmpty": "Még nincs klip — itt jelenik meg az idővonal-térkép"
     },
+    "regions": {
+      "add": "Régió",
+      "menuMessage": "Színezd át a régiót, vagy töröld.",
+      "recolor": "Átszínezés"
+    },
     "pacing": {
       "slow": "lassú",
       "empty": "Még nincs klip — itt jelenik meg a tempó",
@@ -1530,6 +1535,8 @@
       "setMarkers_other": "jelölők ({{count}})",
       "setChapters_one": "fejezetek ({{count}})",
       "setChapters_other": "fejezetek ({{count}})",
+      "setRegions_one": "régiók ({{count}})",
+      "setRegions_other": "régiók ({{count}})",
       "setLinks_one": "linkek ({{count}})",
       "setLinks_other": "linkek ({{count}})",
       "upsertImageDoc_one": "kép-dokumentum: {{name}} ({{count}} réteg)",
@@ -1721,6 +1728,7 @@
   },
   "store": {
     "editor": {
+      "regionDefault": "{{n}}. régió",
       "batchEdit_one": "kötegelt szerkesztés ({{count}} klip)",
       "batchEdit_other": "kötegelt szerkesztés ({{count}} klip)",
       "pasteStyle_one": "stílus beillesztve ({{count}} klip)",

@@ -89,6 +89,9 @@ export function Timeline() {
   const searchMatchTimes = useEditorStore((s) => s.searchMatchTimes);
   const insightLane = useEditorStore((s) => s.insightLane);
   const setInsightLane = useEditorStore((s) => s.setInsightLane);
+  const addRegion = useEditorStore((s) => s.addRegion);
+  const removeRegion = useEditorStore((s) => s.removeRegion);
+  const recolorRegion = useEditorStore((s) => s.recolorRegion);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -255,6 +258,16 @@ export function Timeline() {
             </Text>
           </Pressable>
         ))}
+        {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
+        <Pressable
+          onPress={addRegion}
+          hitSlop={4}
+          style={styles.regionAddBtn}
+          accessibilityLabel={t('editor.regions.add')}
+        >
+          <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
+          <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
+        </Pressable>
       </View>
       {insightLane === 'story' ? (
         <StoryLane />
@@ -374,6 +387,43 @@ export function Timeline() {
               ))}
               {downbeatTimes.map((t) => (
                 <View key={`d${t}`} style={[styles.downbeatDot, { left: t * pps - 2 }]} />
+              ))}
+              {/* 🏷️ régiók: halvány, teljes-magas sáv (a klipek mögött, nem fog gesztust) */}
+              {(project.regions ?? []).map((r) => (
+                <View
+                  key={`rb-${r.id}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.regionBand,
+                    {
+                      left: r.start * pps,
+                      width: Math.max(2, (r.end - r.start) * pps),
+                      height: RULER_HEIGHT + totalTracksHeight,
+                      backgroundColor: `${r.color}1f`,
+                      borderColor: r.color,
+                    },
+                  ]}
+                />
+              ))}
+              {/* régió-címkék a tetején: tap = ugrás, hosszú-nyomás = átszínez/törlés */}
+              {(project.regions ?? []).map((r) => (
+                <Pressable
+                  key={`rl-${r.id}`}
+                  hitSlop={6}
+                  onPress={() => useEditorStore.getState().setPlayhead(r.start)}
+                  onLongPress={() =>
+                    Alert.alert(r.label, t('editor.regions.menuMessage'), [
+                      { text: t('editor.regions.recolor'), onPress: () => recolorRegion(r.id) },
+                      { text: t('common.delete'), style: 'destructive', onPress: () => removeRegion(r.id) },
+                      { text: t('common.cancel'), style: 'cancel' },
+                    ])
+                  }
+                  style={[styles.regionLabel, { left: r.start * pps, borderColor: r.color, backgroundColor: `${r.color}33` }]}
+                >
+                  <Text style={styles.regionLabelText} numberOfLines={1}>
+                    {r.label}
+                  </Text>
+                </Pressable>
               ))}
               {/* 🔖 szerkezeti jelölők: zászló + felirat, koppintásra odaugrik */}
               {(project.markers ?? []).map((m) => (
@@ -611,6 +661,42 @@ const styles = StyleSheet.create({
     marginLeft: -1,
     backgroundColor: palette.accent2,
     opacity: 0.75,
+  },
+  regionBand: {
+    position: 'absolute',
+    top: 0,
+    borderLeftWidth: 2,
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  regionLabel: {
+    position: 'absolute',
+    top: 1,
+    maxWidth: 130,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  regionLabelText: {
+    color: palette.text,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  regionAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  regionAddText: {
+    color: palette.accent2,
+    fontSize: 11,
+    fontWeight: '700',
   },
   insightTabs: {
     flexDirection: 'row',

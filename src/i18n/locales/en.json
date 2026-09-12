@@ -990,7 +990,8 @@
       "cloudBackupDone": "Project backed up to the cloud (the plan; media stays local for now).",
       "cloudRestoreDone": "Cloud version restored — the previous state stays as one undo step.",
       "cloudRestoreNone": "No cloud backup for this project yet.",
-      "cloudSyncNote": "Backs up the project plan (JSON) to your account — restore it on any device. Media-file cloud sync is a separate, later step."
+      "cloudSyncNote": "Backs up the project plan (JSON) to your account — restore it on any device. Media-file cloud sync is a separate, later step.",
+      "proActiveUntil": "Remix Pro active — until {{date}}"
     },
     "filter": {
       "sectionFilters": "Filters",

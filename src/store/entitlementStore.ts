@@ -31,7 +31,18 @@ interface Persisted {
   tier: Tier;
   /** ISO dátum, ameddig a Pro érvényes; `null` = lejárat nélkül (dev/örökös) */
   proUntil: string | null;
+  /**
+   * DEV-override: a `mockUpgrade()` állítja, és a `syncFromUser` TISZTELETBEN
+   * tartja — sosem downgrade-el alá. Enélkül a szerver `free` sora azonnal
+   * visszaállítaná Free-re a dev-Pro-t (a Pro „nem maradna bekapcsolva").
+   * Éles buildben (`__DEV__ === false`) hatástalan.
+   */
+  devPro?: boolean;
 }
+
+/** Egy „fizetés" hossza dev-ben: 1 hónap = 30 nap. */
+export const PRO_PERIOD_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface EntitlementState extends Persisted {
   /** kié a betöltött entitlement (null = nincs bejelentkezve) */
@@ -48,9 +59,11 @@ interface EntitlementState extends Persisted {
   syncFromUser: (userId: string | null) => Promise<void>;
   /** szint beállítása (valós IAP siker / szerver-szinkron után) */
   setTier: (tier: Tier, proUntil?: string | null) => void;
-  /** DEV/mock: azonnali Pro lejárat nélkül — teszteléshez (lokális override) */
+  /** DEV/mock: egy „fizetés" — Pro +30 napra (ismételt hívás hosszabbít). A
+   *  lejárati dátumot elmentjük; a syncFromUser tiszteletben tartja (nem
+   *  downgrade-el a lejárat előtt). Lokális dev-override. */
   mockUpgrade: () => void;
-  /** DEV: vissza Free-re */
+  /** DEV: vissza Free-re (a dev-override törlése is) */
   mockDowngrade: () => void;
 }
 
@@ -68,17 +81,28 @@ async function loadCache(userId: string | null): Promise<Persisted> {
       return {
         tier: p.tier === 'pro' ? 'pro' : 'free',
         proUntil: typeof p.proUntil === 'string' ? p.proUntil : null,
+        devPro: p.devPro === true,
       };
     }
   } catch {
     // sérült/hiányzó mentés — Free
   }
-  return { tier: 'free', proUntil: null };
+  return { tier: 'free', proUntil: null, devPro: false };
+}
+
+/** A `proUntil` a jövőben van-e (vagy null = lejárat nélkül). */
+function stillValid(proUntil: string | null): boolean {
+  if (proUntil == null) {
+    return true;
+  }
+  const until = Date.parse(proUntil);
+  return Number.isNaN(until) ? true : until > Date.now();
 }
 
 export const useEntitlement = create<EntitlementState>((set, get) => ({
   tier: 'free',
   proUntil: null,
+  devPro: false,
   userId: null,
   hydrated: false,
 
@@ -102,11 +126,18 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
 
   syncFromUser: async (userId) => {
     // 1) offline-first: a user cache-ét azonnal betöltjük (kijelentkezve Free)
+    let cached: Persisted = { tier: 'free', proUntil: null, devPro: false };
     if (userId) {
-      const cached = await loadCache(userId);
-      set({ userId, tier: cached.tier, proUntil: cached.proUntil, hydrated: true });
+      cached = await loadCache(userId);
+      set({
+        userId,
+        tier: cached.tier,
+        proUntil: cached.proUntil,
+        devPro: !!cached.devPro,
+        hydrated: true,
+      });
     } else {
-      set({ userId: null, tier: 'free', proUntil: null, hydrated: true });
+      set({ userId: null, tier: 'free', proUntil: null, devPro: false, hydrated: true });
       return;
     }
     // 2) hiteles forrás: Supabase. Sikernél felülírjuk + perzisztáljuk; hibánál
@@ -117,38 +148,46 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
       if (get().userId !== userId) {
         return;
       }
-      if (sub) {
-        const next: Persisted = {
-          tier: sub.tier,
-          proUntil: sub.tier === 'pro' ? sub.proUntil : null,
-        };
-        set(next);
-        persist(userId, next);
-      } else {
-        // nincs sor a szerveren → Free (és ezt cache-eljük is)
-        const next: Persisted = { tier: 'free', proUntil: null };
-        set(next);
-        persist(userId, next);
+      const server: Persisted = sub
+        ? { tier: sub.tier, proUntil: sub.tier === 'pro' ? sub.proUntil : null }
+        : { tier: 'free', proUntil: null };
+
+      // DEV-override: ha aktív és MÉG NEM járt le, ne engedjük a szervernek
+      // Free-re downgrade-elni (a dev-Pro maradjon bekapcsolva a lejáratig).
+      let next: Persisted = server;
+      const devPro = __DEV__ && !!cached.devPro && stillValid(cached.proUntil);
+      if (devPro && server.tier !== 'pro') {
+        next = { tier: 'pro', proUntil: cached.proUntil ?? null, devPro: true };
       }
+      set({ ...next, devPro });
+      persist(userId, { ...next, devPro });
     } catch {
       // best-effort; marad az offline cache
     }
   },
 
   setTier: (tier, proUntil = null) => {
-    const next: Persisted = { tier, proUntil: tier === 'pro' ? proUntil : null };
+    // valós IAP/szerver-forrás → a dev-override-ot töröljük
+    const next: Persisted = { tier, proUntil: tier === 'pro' ? proUntil : null, devPro: false };
     set(next);
     persist(get().userId, next);
   },
 
   mockUpgrade: () => {
-    const next: Persisted = { tier: 'pro', proUntil: null };
+    // egy „fizetés" = +30 nap. Ha még érvényes a Pro, ONNAN hosszabbítunk
+    // (megújítás), különben mosttól. A lejáratot elmentjük (devPro override).
+    const now = Date.now();
+    const current = get().proUntil;
+    const base =
+      current && Date.parse(current) > now ? Date.parse(current) : now;
+    const until = new Date(base + PRO_PERIOD_DAYS * DAY_MS).toISOString();
+    const next: Persisted = { tier: 'pro', proUntil: until, devPro: true };
     set(next);
     persist(get().userId, next);
   },
 
   mockDowngrade: () => {
-    const next: Persisted = { tier: 'free', proUntil: null };
+    const next: Persisted = { tier: 'free', proUntil: null, devPro: false };
     set(next);
     persist(get().userId, next);
   },

@@ -990,7 +990,8 @@
       "cloudBackupDone": "A projekt (terv) elmentve a felhőbe — a média egyelőre helyben marad.",
       "cloudRestoreDone": "Felhő-verzió visszaállítva — az előző állapot egy undo-lépésként megmarad.",
       "cloudRestoreNone": "Ehhez a projekthez még nincs felhő-mentés.",
-      "cloudSyncNote": "A projekt-tervet (JSON) a fiókodba menti — bármely eszközön visszaállítható. A médiafájlok felhő-szinkronja külön, későbbi lépés."
+      "cloudSyncNote": "A projekt-tervet (JSON) a fiókodba menti — bármely eszközön visszaállítható. A médiafájlok felhő-szinkronja külön, későbbi lépés.",
+      "proActiveUntil": "Remix Pro aktív — eddig: {{date}}"
     },
     "filter": {
       "sectionFilters": "Szűrők",

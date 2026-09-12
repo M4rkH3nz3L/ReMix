@@ -62,6 +62,7 @@ export function ExportPanel() {
   const project = useEditorStore((s) => s.project);
   const restoreProject = useEditorStore((s) => s.restoreProject);
   const isPro = useEntitlement((s) => s.isPro());
+  const proUntil = useEntitlement((s) => s.proUntil);
   const mockDowngrade = useEntitlement((s) => s.mockDowngrade);
   const openPaywall = usePaywall((s) => s.open);
   const [renderStatus, setRenderStatus] = useState<string | null>(null);
@@ -251,7 +252,13 @@ export function ExportPanel() {
           onLongPress={__DEV__ ? mockDowngrade : undefined}
         >
           <Ionicons name="sparkles" size={15} color={palette.accent} />
-          <Text style={styles.proActiveText}>{t('panels.export.proActive')}</Text>
+          <Text style={styles.proActiveText}>
+            {proUntil
+              ? t('panels.export.proActiveUntil', {
+                  date: new Date(proUntil).toLocaleDateString(),
+                })
+              : t('panels.export.proActive')}
+          </Text>
         </Pressable>
       ) : (
         <Pressable style={styles.proBanner} onPress={() => openPaywall()}>

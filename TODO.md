@@ -31,7 +31,11 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **Dev-override kizárása prodból** — az `entitlementStore.mockUpgrade()`
   (dev Pro-kapcsoló) NE legyen elérhető prod buildben; a Pro KIZÁRÓLAG a
   Supabase `subscriptions`-ből jöjjön (Phase 0 kész — a mock-gombokat `__DEV__`
-  mögé/ki kell zárni a release-ből).
+  mögé/ki kell zárni a release-ből). A `devPro` override a `syncFromUser`-ben már
+  `__DEV__`-guarded (prod buildben inert még akkor is, ha a cache-ben ott lenne),
+  és `mockUpgrade` egy „fizetés" = +30 nap lejárattal (a valós IAP `setTier`-t
+  hív, ami törli a dev-override-ot). Éles Pro-hoz: RevenueCat webhook →
+  `subscriptions.current_period_end` (a kliens onnan szinkronizál).
 
 ### Infra
 - [ ] **Supabase PROD instance** — ma LOKÁLIS dev fut (+100 port, API 54421). Kell:

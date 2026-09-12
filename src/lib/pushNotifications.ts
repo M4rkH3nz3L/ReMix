@@ -1,34 +1,73 @@
+import { isRunningInExpoGo } from 'expo';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+
+// ⚠️ CSAK TÍPUS-import (a fordító törli) — az expo-notifications futásidejű
+// betöltése lentebb, VÉDETTEN történik. Lásd a modul-leírást.
+import type * as NotificationsModule from 'expo-notifications';
 
 import { saveCurrentDevicePushToken } from '@/lib/deviceInfo';
 
 /**
  * 📲 Push / helyi értesítések rétege (expo-notifications).
  *
+ * ⚠️ EXPO GO + ANDROID: az `expo-notifications` SDK 53 óta **importáláskor dob**
+ * ott (a `DevicePushTokenAutoRegistration` mellékhatás push-token listenert
+ * regisztrál, a `warnOfExpoGoPushUsage` pedig Androidon `throw`-ol) — egy statikus
+ * import az egész appot ledöntötte. Ezért a modult LUSTÁN, `require`-rel töltjük,
+ * és Expo Go/Android alatt egyáltalán nem nyúlunk hozzá: ilyenkor minden hívás
+ * no-op, az app fut, az in-app értesítés-csengő (Supabase Realtime) változatlanul
+ * működik. Rendszer-értesítéshez ott dev build kell.
+ *
  * Két út egy modellre (`route` = deep-link cél):
- *   • REALTIME → HELYI notification — amíg fut az app, a Supabase Realtime
- *     kézbesíti az új sort, mi pedig rendszer-értesítésként megjelenítjük
- *     (`presentLocal`). Ez DEVEN (Expo Go is) működik, projectId nélkül.
+ *   • REALTIME → HELYI notification — amíg fut az app, a Realtime kézbesíti az
+ *     új sort, mi pedig rendszer-értesítésként megjelenítjük (`presentLocal`).
  *   • REMOTE push — háttérben is szól; ehhez Expo push-token (fizikai eszköz +
  *     EAS `projectId` + dev/prod build), token a `user_devices.push_token`-ba,
- *     a küldést a worker `POST /notify` intézi. projectId híján ez kimarad.
+ *     a küldést a worker `POST /notify` intézi.
  *
  * A koppintás mindkét úton a `data.route`-ra navigál — a navigációt a hívó
  * (`_layout`) végzi, ez a modul csak a `route`-ot adja vissza.
  */
 
-// Előtérben is jelenjen meg banner + listába kerüljön (a régi shouldShowAlert helyett).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+/** Expo Go + Android: az expo-notifications betöltése is hibát dob → kihagyjuk. */
+const BLOCKED = Platform.OS === 'android' && isRunningInExpoGo();
+
+/** Elérhető-e egyáltalán a rendszer-értesítés ezen a futtatókörnyezeten. */
+export function notificationsAvailable(): boolean {
+  return Platform.OS !== 'web' && !BLOCKED;
+}
+
+let moduleRef: typeof NotificationsModule | null = null;
+let triedRequire = false;
+
+/** Az expo-notifications modul, vagy null (web / Expo Go+Android / hiba). */
+function notif(): typeof NotificationsModule | null {
+  if (!notificationsAvailable()) {
+    return null;
+  }
+  if (moduleRef || triedRequire) {
+    return moduleRef;
+  }
+  triedRequire = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    moduleRef = require('expo-notifications') as typeof NotificationsModule;
+    // előtérben is legyen banner + listába kerüljön (a régi shouldShowAlert helyett)
+    moduleRef.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {
+    moduleRef = null;
+  }
+  return moduleRef;
+}
 
 /**
  * Az Android értesítés-csatorna azonosítója. MINDEN Android-értesítést ezen kell
@@ -49,13 +88,14 @@ let channelReady: Promise<void> | null = null;
  * lekérése előtt is — lásd Expo-doksi).
  */
 export async function ensureAndroidChannel(): Promise<void> {
-  if (Platform.OS !== 'android') {
+  const N = notif();
+  if (!N || Platform.OS !== 'android') {
     return;
   }
   if (!channelReady) {
-    channelReady = Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    channelReady = N.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: 'Remix',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: N.AndroidImportance.HIGH,
       lightColor: ACCENT,
       enableVibrate: true,
       showBadge: true,
@@ -78,20 +118,21 @@ export interface PushRegistration {
 
 /**
  * Engedélykérés + (ha lehet) Expo push-token beszerzése és mentése.
- * Web-en no-op. Local notification az engedély megléte esetén már működik;
- * a remote token opcionális (projectId + fizikai eszköz kell hozzá).
+ * Web-en / Expo Go+Androidon no-op. Local notification az engedély megléte esetén
+ * már működik; a remote token opcionális (projectId + fizikai eszköz kell hozzá).
  */
 export async function registerForPush(userId: string | null): Promise<PushRegistration> {
-  if (Platform.OS === 'web') {
+  const N = notif();
+  if (!N) {
     return { granted: false, token: null };
   }
   try {
     await ensureAndroidChannel();
 
-    const existing = await Notifications.getPermissionsAsync();
+    const existing = await N.getPermissionsAsync();
     let status = existing.status;
     if (status !== 'granted') {
-      const req = await Notifications.requestPermissionsAsync();
+      const req = await N.requestPermissionsAsync();
       status = req.status;
     }
     if (status !== 'granted') {
@@ -103,7 +144,7 @@ export async function registerForPush(userId: string | null): Promise<PushRegist
     if (!Device.isDevice || !projectId) {
       return { granted: true, token: null };
     }
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    const { data: token } = await N.getExpoPushTokenAsync({ projectId });
     if (token && userId) {
       await saveCurrentDevicePushToken(userId, token);
     }
@@ -125,14 +166,15 @@ export async function presentLocal(input: {
   route?: string;
   data?: Record<string, unknown>;
 }): Promise<void> {
-  if (Platform.OS === 'web') {
+  const N = notif();
+  if (!N) {
     return;
   }
   try {
     // a csatornának LÉTEZNIE kell az értesítés előtt (különben „Miscellaneous")
     await ensureAndroidChannel();
     const android = Platform.OS === 'android';
-    await Notifications.scheduleNotificationAsync({
+    await N.scheduleNotificationAsync({
       content: {
         title: input.title,
         body: input.body ?? undefined,
@@ -141,7 +183,7 @@ export async function presentLocal(input: {
         // Android: heads-up prioritás + márka-tint + rezgés
         ...(android
           ? {
-              priority: Notifications.AndroidNotificationPriority.HIGH,
+              priority: N.AndroidNotificationPriority.HIGH,
               color: ACCENT,
               vibrate: [0, 250, 250, 250],
             }
@@ -157,7 +199,9 @@ export async function presentLocal(input: {
 }
 
 /** Egy notification-válaszból (koppintás) kinyeri a deep-link `route`-ot. */
-function routeFromResponse(response: Notifications.NotificationResponse | null): string | null {
+function routeFromResponse(
+  response: NotificationsModule.NotificationResponse | null
+): string | null {
   const data = response?.notification.request.content.data as { route?: unknown } | undefined;
   return typeof data?.route === 'string' && data.route.length > 0 ? data.route : null;
 }
@@ -167,7 +211,11 @@ function routeFromResponse(response: Notifications.NotificationResponse | null):
  * a navigációt a hívó végzi. `() => void` leiratkozót ad vissza.
  */
 export function addNotificationResponseListener(onRoute: (route: string) => void): () => void {
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+  const N = notif();
+  if (!N) {
+    return () => {};
+  }
+  const sub = N.addNotificationResponseReceivedListener((response) => {
     const route = routeFromResponse(response);
     if (route) {
       onRoute(route);
@@ -181,11 +229,12 @@ export function addNotificationResponseListener(onRoute: (route: string) => void
  * `route`-ja (vagy null). A `_layout` ezt egyszer feldolgozza induláskor.
  */
 export async function getInitialNotificationRoute(): Promise<string | null> {
-  if (Platform.OS === 'web') {
+  const N = notif();
+  if (!N) {
     return null;
   }
   try {
-    const response = await Notifications.getLastNotificationResponseAsync();
+    const response = await N.getLastNotificationResponseAsync();
     return routeFromResponse(response);
   } catch {
     return null;

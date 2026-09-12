@@ -58,10 +58,14 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
   (`expo-notifications` telepítve + plugin; engedélykérés + handler; realtime-
   érkezés → rendszer-notification; koppintás → `route` deep-link; worker Expo
   Push API-küldés `notify.js`-ben). A HÁTTÉR-push-hoz már csak: EAS **projectId**
-  (`app.json` `extra.eas.projectId`) + fizikai eszközön futó **dev/prod build**
-  (Expo Go iOS-en nem ad remote tokent) — ekkor a `registerForPush` menti a
-  `user_devices.push_token`-t, és a worker push-a kézbesül. Deven a realtime→helyi
-  notification már MŰKÖDIK, projectId nélkül is.
+  (`app.json` `extra.eas.projectId`) + fizikai eszközön futó **dev/prod build** —
+  ekkor a `registerForPush` menti a `user_devices.push_token`-t, és a worker push-a
+  kézbesül.
+  ⚠️ **Expo Go korlátok (SDK 53+):** Androidon az `expo-notifications` már
+  IMPORTÁLÁSKOR hibát dob (a push-token auto-regisztráció mellékhatása), ezért ott
+  a modult egyáltalán nem töltjük be → **Expo Go/Androidon nincs rendszer-értesítés**
+  (sem helyi, sem remote), dev build kell hozzá. iOS Expo Go-ban a HELYI értesítés
+  megy (remote token nincs). Az **in-app csengő (Realtime) mindenhol működik**.
 - [ ] **Titkok / env** — prod env-ek: worker `ANTHROPIC_API_KEY` (vagy lokál AI),
   Supabase kulcsok, `EXPO_PUBLIC_*`. A `.env` gitignore-olt (OK) — prod titkok a
   CI/EAS secret-store-ból.

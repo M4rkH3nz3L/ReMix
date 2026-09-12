@@ -821,6 +821,13 @@
       "importSrtButton": "SRT-Untertitel importieren",
       "srtImportError": "Der SRT-Import ist fehlgeschlagen.",
       "srtNote": "Aus einer von Whisper / YouTube / CapCut generierten .srt-Datei wird eine fertige, getimte Untertitelspur — mit dem gewählten Stil.",
+      "translateSectionTitle": "🌍 Untertitel übersetzen",
+      "translatingStatus": "Übersetze nach {{lang}}…",
+      "translateTitle": "Untertitel übersetzen",
+      "translateNone": "Übersetzung fehlgeschlagen — läuft der Worker/die KI?",
+      "translateDoneTitle": "Untertitel übersetzt",
+      "translateDoneBody": "{{count}} Untertitel nach {{lang}} übersetzt (Timing beibehalten).",
+      "translateNote": "Übersetzt die aktuellen Untertitel an Ort und Stelle in die gewählte Sprache, das Timing bleibt. Ein Undo-Schritt.",
       "footerNote": "Die eingegebenen Zeilen werden gleichmäßig vom Abspielkopf bis zum Videoende verteilt; danach kannst du sie einzeln auf der Timeline anpassen."
     },
     "export": {

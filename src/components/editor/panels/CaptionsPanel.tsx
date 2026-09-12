@@ -9,7 +9,7 @@ import { assignSpeakers, captionBand, captionY, speakerColor } from '@/lib/capti
 import { applyCaptionSuggestions, heuristicSuggestions } from '@/lib/captionStudio';
 import { fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import type { FaceBoxLike } from '@/lib/faceRegion';
-import { fetchCaptionSuggestions } from '@/lib/captionStudioClient';
+import { fetchCaptionSuggestions, fetchCaptionTranslations } from '@/lib/captionStudioClient';
 import { makeId } from '@/lib/id';
 import { pickSrt } from '@/lib/media';
 import {
@@ -24,7 +24,7 @@ import { alignWordTimings, cuesToCaptionTime } from '@/lib/wordTiming';
 import { mapCuesToTimeline, parseSrt } from '@/lib/srt';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import { usePaywall } from '@/store/paywallStore';
+import { guardPro, usePaywall } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { TextClip, TextStylePreset, VideoClip } from '@/types/project';
 
@@ -32,6 +32,15 @@ import type { TextClip, TextStylePreset, VideoClip } from '@/types/project';
 const MIN_CAPTION = 1;
 const MAX_CAPTION = 5;
 const FALLBACK_CAPTION = 2.5;
+
+/** 🌍 felirat-fordítás cél-nyelvei (a nevek endonimák — nem kell i18n) */
+const TARGET_LANGS: { code: string; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'hu', label: 'Magyar' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+];
 
 /**
  * Gyors felirat: soronként egy caption, a lejátszófejtől a videósáv végéig
@@ -46,6 +55,7 @@ export function CaptionsPanel() {
   const [studioStatus, setStudioStatus] = useState<string | null>(null);
   const [layoutStatus, setLayoutStatus] = useState<string | null>(null);
   const [wordStatus, setWordStatus] = useState<string | null>(null);
+  const [translateStatus, setTranslateStatus] = useState<string | null>(null);
 
   /**
    * 🎤 Szó-szintű karaoke-időzítés: a Whisper SZÓ-átiratához igazítja a
@@ -262,6 +272,56 @@ export function CaptionsPanel() {
       t('panels.captions.smartPositionDoneTitle'),
       t('panels.captions.smartPositionDoneBody', { count: moved })
     );
+  };
+
+  // 🌍 Felirat-fordítás (Phase 4.2): a meglévő feliratok szövegét a cél-nyelvre
+  // fordítja (időzítés változatlan), egy undo-lépésben. Pro (guardPro → paywall).
+  const runTranslate = async (lang: string) => {
+    if (translateStatus) {
+      return;
+    }
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tk) => tk.type === 'captions');
+    const captions = (track?.clips ?? []).filter((c): c is TextClip => c.kind === 'text');
+    if (!state.project || !track || captions.length === 0) {
+      Alert.alert(t('panels.captions.translateTitle'), t('panels.captions.noCaptionsOnTrack'));
+      return;
+    }
+    setTranslateStatus(t('panels.captions.translatingStatus', { lang }));
+    try {
+      await guardPro(
+        async () => {
+          const segs = captions.map((c) => ({ id: c.id, text: c.text }));
+          const translated = await withProgress(t('panels.captions.translateTitle'), () =>
+            fetchCaptionTranslations(segs, lang)
+          );
+          if (!translated || translated.length === 0) {
+            Alert.alert(t('panels.captions.translateTitle'), t('panels.captions.translateNone'));
+            return;
+          }
+          const map = new Map(translated.map((s) => [s.id, s.text]));
+          let n = 0;
+          const clips = track.clips.map((c) => {
+            const tx = c.kind === 'text' ? map.get(c.id) : undefined;
+            if (tx) {
+              n += 1;
+              return { ...c, text: tx };
+            }
+            return c;
+          });
+          useEditorStore
+            .getState()
+            .dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'ai');
+          Alert.alert(
+            t('panels.captions.translateDoneTitle'),
+            t('panels.captions.translateDoneBody', { count: n, lang })
+          );
+        },
+        (e) => Alert.alert(t('panels.captions.translateTitle'), e.message)
+      );
+    } finally {
+      setTranslateStatus(null);
+    }
   };
 
   // ✨ Caption Studio: kiemelt szavak + emoji a meglévő feliratokra — AI-val,
@@ -530,6 +590,23 @@ export function CaptionsPanel() {
         <Text style={styles.note}>
           {t('panels.captions.srtNote')}
         </Text>
+      </PanelSection>
+
+      <PanelSection title={t('panels.captions.translateSectionTitle')}>
+        <View style={styles.row}>
+          {TARGET_LANGS.map((l) => (
+            <Chip
+              key={l.code}
+              label={l.label}
+              active={false}
+              onPress={() => {
+                void runTranslate(l.label);
+              }}
+            />
+          ))}
+        </View>
+        {translateStatus ? <Text style={styles.note}>{translateStatus}</Text> : null}
+        <Text style={styles.note}>{t('panels.captions.translateNote')}</Text>
       </PanelSection>
 
       <Text style={styles.note}>

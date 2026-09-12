@@ -610,6 +610,37 @@ async function runHighlights(context, aiConfig) {
   );
 }
 
+// --- 🌍 Felirat-fordítás / lokalizáció (Phase 4.2) --------------------------
+
+const TranslateReplySchema = z.object({
+  segments: z.array(z.object({ id: z.string(), text: z.string() })),
+});
+
+const TRANSLATE_SYSTEM = `Feliratszövegeket fordítasz egy videószerkesztőben. A
+bemenet felirat-szegmensek (id + text). Fordítsd le MINDEGYIK "text"-et a kért
+CÉLNYELVRE.
+
+Szabályok:
+- Természetes, TÖMÖR feliratszöveg — a hosszt nagyjából tartsd (feliratba fér).
+- Az "id"-t VÁLTOZATLANUL add vissza minden szegmensnél; MINDEN bemeneti
+  szegmensre adj egy kimenetit.
+- Tulajdonneveket, márkákat, hashtageket, @említéseket NE fordíts.
+- A választ CSAK a séma szerinti JSON-ban add.`;
+
+/**
+ * @param segments [{id, text}] felirat-szegmensek
+ * @param lang cél-nyelv neve (pl. "English", "Deutsch")
+ * @returns {Promise<{segments: [{id, text}]}>}
+ */
+async function runTranslateCaptions(segments, lang, aiConfig) {
+  return runStructured(
+    TRANSLATE_SYSTEM,
+    `CÉLNYELV: ${lang}\n\nSZEGMENSEK:\n${JSON.stringify(segments, null, 1)}`,
+    TranslateReplySchema,
+    aiConfig
+  );
+}
+
 module.exports = {
   runAssistant,
   runAutoEdit,
@@ -618,6 +649,7 @@ module.exports = {
   runHookGenerator,
   runStoryEngine,
   runThumbHeadlines,
+  runTranslateCaptions,
   sanitizeAiConfig,
   aiAvailable,
   aiProvider,

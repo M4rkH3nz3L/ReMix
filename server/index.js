@@ -12,7 +12,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 
-const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, sanitizeAiConfig } = require('./ai');
+const { aiAvailable, aiProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
@@ -276,6 +276,21 @@ app.post('/ai/hooks', express.json({ limit: '256kb' }), (req, res) => {
     .then((reply) => res.json(reply))
     .catch((err) => {
       console.error('Hook hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
+// 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
+app.post('/ai/translate', express.json({ limit: '512kb' }), (req, res) => {
+  const { segments, lang, aiConfig } = req.body ?? {};
+  if (!Array.isArray(segments) || segments.length === 0 || !lang) {
+    res.status(400).json({ error: 'Hiányzó szegmensek vagy célnyelv.' });
+    return;
+  }
+  runTranslateCaptions(segments.slice(0, 200), String(lang).slice(0, 40), sanitizeAiConfig(aiConfig))
+    .then((reply) => res.json(reply))
+    .catch((err) => {
+      console.error('Translate hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
 });

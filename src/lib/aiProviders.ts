@@ -56,8 +56,8 @@ export const AI_PROVIDER_KINDS: Record<
 };
 
 /** Az AI-feladatok, amikhez külön modell rendelhető (mind a `runStructured`-ön megy).
- *  A `storyStructure` (Story Engine) egyelőre nincs a profil-mátrixban (AI_TASKS),
- *  ezért az alapértelmezett providerre esik vissza — külön picker később. */
+ *  Feladatonként a Profil „AI-modellek feladatonként" mátrixában (AI_TASKS)
+ *  ÉS a felhasználási pontokon (AiProviderPicker) is beállítható. */
 export type AiTask =
   | 'assistant'
   | 'autoEdit'
@@ -73,6 +73,7 @@ export const AI_TASKS: AiTask[] = [
   'captionStudio',
   'hooks',
   'thumbHeadlines',
+  'storyStructure',
 ];
 
 function currentUserId(): string {

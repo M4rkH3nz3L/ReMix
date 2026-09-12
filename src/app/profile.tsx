@@ -27,12 +27,16 @@ import {
 } from '@/lib/accountValidation';
 import {
   AI_PROVIDER_KINDS,
+  AI_TASKS,
   type AiProvider,
   type AiProviderKind,
+  type AiTask,
   createAiProvider,
   deleteAiProvider,
   listAiProviders,
+  listTaskAssignments,
   setDefaultAiProvider,
+  setTaskAssignment,
   updateAiProvider,
 } from '@/lib/aiProviders';
 import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
@@ -87,6 +91,8 @@ export default function ProfileScreen() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [providers, setProviders] = useState<AiProvider[]>([]);
+  // 🤖 feladat → provider hozzárendelések (a „AI-modellek feladatonként" mátrixhoz)
+  const [taskAssign, setTaskAssign] = useState<Partial<Record<AiTask, string>>>({});
 
   const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -98,10 +104,11 @@ export default function ProfileScreen() {
     if (!configured) {
       return;
     }
-    Promise.all([fetchProfile(), listAiProviders()])
-      .then(([p, list]) => {
+    Promise.all([fetchProfile(), listAiProviders(), listTaskAssignments()])
+      .then(([p, list, tasks]) => {
         setProfile(p);
         setProviders(list);
+        setTaskAssign(tasks);
       })
       .catch((e: unknown) => {
         Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
@@ -215,6 +222,22 @@ export default function ProfileScreen() {
     setDefaultAiProvider(p.id)
       .then(() => refresh())
       .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+  };
+
+  // 🤖 feladat → provider választás (Auto = null); optimista + perzisztálva
+  const pickTask = (task: AiTask, providerId: string | null) => {
+    setTaskAssign((prev) => {
+      const next = { ...prev };
+      if (providerId) {
+        next[task] = providerId;
+      } else {
+        delete next[task];
+      }
+      return next;
+    });
+    setTaskAssignment(task, providerId).catch((e: Error) =>
+      Alert.alert(t('common.error'), e.message)
+    );
   };
 
   const onSignOut = () => {
@@ -378,6 +401,36 @@ export default function ProfileScreen() {
               <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
               <Text style={styles.addText}>{t('profile.addModel')}</Text>
             </Pressable>
+          </View>
+
+          {/* — AI-modellek feladatonként (mátrix) — */}
+          <Text style={styles.sectionTitle}>{t('profile.aiTasksSection')}</Text>
+          <Text style={styles.sectionHint}>{t('profile.aiTasksHint')}</Text>
+          <View style={styles.card}>
+            {providers.length === 0 ? (
+              <Text style={styles.emptyText}>{t('profile.aiTasksNoModels')}</Text>
+            ) : (
+              AI_TASKS.map((task) => (
+                <View key={task} style={styles.taskRow}>
+                  <Text style={styles.taskLabel}>{t('profile.task_' + task)}</Text>
+                  <View style={styles.taskChips}>
+                    <Chip
+                      label={t('aiPicker.auto')}
+                      active={!taskAssign[task]}
+                      onPress={() => pickTask(task, null)}
+                    />
+                    {providers.map((p) => (
+                      <Chip
+                        key={p.id}
+                        label={p.label}
+                        active={taskAssign[task] === p.id}
+                        onPress={() => pickTask(task, p.id)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))
+            )}
           </View>
 
           {/* — Fiók — */}
@@ -578,6 +631,14 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12 },
   addText: { color: palette.accent, fontSize: 14, fontWeight: '700' },
   emptyText: { color: palette.textDim, fontSize: 13, paddingVertical: 6 },
+  taskRow: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.border,
+    gap: 6,
+  },
+  taskLabel: { color: palette.text, fontSize: 13, fontWeight: '600' },
+  taskChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   emailText: { color: palette.text, fontSize: 14, marginBottom: 10 },
   signOutBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   signOutText: { color: palette.danger, fontSize: 15, fontWeight: '700' },

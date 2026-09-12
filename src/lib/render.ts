@@ -252,6 +252,9 @@ export interface LibraryTrack {
   /** mp */
   duration: number;
   url: string;
+  /** egységes metaadat (videóhoz-illesztés): BPM (0 = n/a) + energia 0–1 */
+  bpm?: number;
+  energy?: number;
 }
 
 /** A worker hang-könyvtára (generált SFX + a server/music mappa fájljai). */

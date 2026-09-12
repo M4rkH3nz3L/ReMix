@@ -737,6 +737,7 @@
       "downloading": "Wird geladen…",
       "seconds": "{{value}} Sek.",
       "libraryHint": "Tippe zum Hinzufügen — landet am Playhead auf der Audiospur. Eigene Musik: Ordner server/music.",
+      "matchToVideo": "🎯 Zum Video passend",
       "ownFileTitle": "Eigene Datei",
       "importMusic": "Musik aus Datei importieren",
       "importFailed": "Der Import ist fehlgeschlagen.",

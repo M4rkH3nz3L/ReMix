@@ -1456,11 +1456,14 @@ app.get('/music', (_req, res) => {
     .then((items) => {
       libraryCache = items;
       res.json({
-        tracks: items.map(({ id, name, kind, duration }) => ({
+        tracks: items.map(({ id, name, kind, duration, bpm, energy }) => ({
           id,
           name,
           kind,
           duration,
+          // egységes metaadat minden trackre (videóhoz-illesztéshez)
+          bpm: bpm ?? 0,
+          energy: typeof energy === 'number' ? energy : 0.5,
           url: `/music/${encodeURIComponent(id)}/file`,
         })),
       });

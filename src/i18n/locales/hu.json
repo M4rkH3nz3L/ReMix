@@ -737,6 +737,7 @@
       "downloading": "Letöltés…",
       "seconds": "{{value}} mp",
       "libraryHint": "Koppints a hozzáadáshoz — a lejátszófejnél kerül a hang-sávra. Saját zenék: server/music mappa.",
+      "matchToVideo": "🎯 Videóhoz illesztés",
       "ownFileTitle": "Saját fájl",
       "importMusic": "Zene importálása fájlból",
       "importFailed": "Az import nem sikerült.",

@@ -16,6 +16,7 @@ import { setChannelKeyframe } from '@/lib/keyframes';
 import { pickAudio } from '@/lib/media';
 import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
+import { projectMusicTarget, rankLibrary, trackMatchScore } from '@/lib/musicMatch';
 import { fetchTtsVoices, generateTts, type TtsVoice } from '@/lib/tts';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -38,6 +39,8 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const [library, setLibrary] = useState<LibraryTrack[] | null>(null);
   const [libraryError, setLibraryError] = useState(false);
   const [busyTrack, setBusyTrack] = useState<string | null>(null);
+  // 🎵 videóhoz-illesztés: a könyvtár rangsorolása a projekt energiájához
+  const [matchMode, setMatchMode] = useState(false);
 
   // 🗣️ AI-hang (TTS)
   const [ttsText, setTtsText] = useState('');
@@ -223,19 +226,43 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
           </Text>
         ) : (
           <View style={styles.trackList}>
-            {library!.map((track) => (
-              <Pressable
-                key={track.id}
-                style={styles.trackRow}
-                onPress={() => addFromLibrary(track)}
-              >
-                <Text style={styles.trackIcon}>{track.kind === 'music' ? '🎵' : '💥'}</Text>
-                <Text style={styles.trackName} numberOfLines={1}>
-                  {busyTrack === track.id ? t('panels.audio.downloading') : track.name}
-                </Text>
-                <Text style={styles.trackDuration}>{t('panels.audio.seconds', { value: track.duration.toFixed(1) })}</Text>
-              </Pressable>
-            ))}
+            {(() => {
+              const project = useEditorStore.getState().project;
+              const on = matchMode && !!project;
+              const target = on ? projectMusicTarget(project!) : 0;
+              const shown = on ? rankLibrary(library!, project!) : library!;
+              return (
+                <>
+                  <Pressable
+                    onPress={() => setMatchMode((v) => !v)}
+                    hitSlop={6}
+                    style={[styles.matchToggle, on ? styles.matchToggleOn : null]}
+                  >
+                    <Text style={[styles.matchToggleText, on ? styles.matchToggleTextOn : null]}>
+                      {t('panels.audio.matchToVideo')}
+                    </Text>
+                  </Pressable>
+                  {shown.map((track) => (
+                    <Pressable
+                      key={track.id}
+                      style={styles.trackRow}
+                      onPress={() => addFromLibrary(track)}
+                    >
+                      <Text style={styles.trackIcon}>{track.kind === 'music' ? '🎵' : '💥'}</Text>
+                      <Text style={styles.trackName} numberOfLines={1}>
+                        {busyTrack === track.id ? t('panels.audio.downloading') : track.name}
+                      </Text>
+                      {on ? (
+                        <Text style={styles.matchBadge}>
+                          {Math.round(trackMatchScore(track, target) * 100)}%
+                        </Text>
+                      ) : null}
+                      <Text style={styles.trackDuration}>{t('panels.audio.seconds', { value: track.duration.toFixed(1) })}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              );
+            })()}
             <Text style={styles.note}>
               {t('panels.audio.libraryHint')}
             </Text>
@@ -468,6 +495,33 @@ const styles = StyleSheet.create({
   trackDuration: {
     color: palette.textDim,
     fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  matchToggle: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 6,
+  },
+  matchToggleOn: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  matchToggleText: {
+    color: palette.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  matchToggleTextOn: {
+    color: palette.accent,
+  },
+  matchBadge: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
 });

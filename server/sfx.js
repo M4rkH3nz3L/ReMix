@@ -5,8 +5,21 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const { analyzeBeats } = require('./beats');
+
 const SFX_DIR = path.join(__dirname, 'assets', 'sfx');
 const MUSIC_DIR = path.join(__dirname, 'music');
+
+/**
+ * Egységes energia-proxy (0–1) a BPM-ből: minél gyorsabb, annál „pörgősebb".
+ * A BPM tracok között összehasonlítható és robusztus (a nyers flux-átlagnál jobb).
+ */
+function energyFromBpm(bpm) {
+  if (!bpm || bpm <= 0) {
+    return 0.5;
+  }
+  return Math.min(1, Math.max(0.1, (bpm - 70) / 90));
+}
 
 /** id → { name, lavfi } — az aevalsrc-kifejezések egyszerű, de használható SFX-ek */
 const SFX_DEFS = [
@@ -108,6 +121,9 @@ async function listLibrary() {
         kind: 'sfx',
         file,
         duration: await probeDuration(file),
+        // egységes metaadat: az SFX egyszeri, „pörgős" — BPM nem értelmezhető
+        bpm: 0,
+        energy: 0.6,
       });
     }
   }
@@ -116,12 +132,21 @@ async function listLibrary() {
     : [];
   for (const f of musicFiles) {
     const file = path.join(MUSIC_DIR, f);
+    // egységes metaadat a zenéhez: BPM + energia (a /beats-et hajtó analyzeBeats-ből)
+    let bpm = 0;
+    try {
+      bpm = (await analyzeBeats(file)).bpm || 0;
+    } catch {
+      // elemzés-hiba → semleges energia, a track így is használható
+    }
     items.push({
       id: `music-${f}`,
       name: f.replace(/\.[^.]+$/, ''),
       kind: 'music',
       file,
       duration: await probeDuration(file),
+      bpm: Math.round(bpm),
+      energy: Math.round(energyFromBpm(bpm) * 100) / 100,
     });
   }
   return items;

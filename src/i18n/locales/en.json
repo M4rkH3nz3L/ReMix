@@ -389,6 +389,7 @@
     },
     "transportBar": {
       "markerTitle": "Marker",
+      "recolorMarker": "Recolor",
       "deleteMarkerConfirm": "Delete „{{label}}”?",
       "defaultMarkerLabel": "Marker {{number}}",
       "newMarkerTitle": "New marker",

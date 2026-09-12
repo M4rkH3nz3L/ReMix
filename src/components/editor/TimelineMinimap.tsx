@@ -81,7 +81,7 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
           {markers.map((m) => (
             <View
               key={m.id}
-              style={{ position: 'absolute', left: m.time * secToX - 0.5, top: 0, bottom: 0, width: 1, backgroundColor: palette.accent2 }}
+              style={{ position: 'absolute', left: m.time * secToX - 0.5, top: 0, bottom: 0, width: 1, backgroundColor: m.color ?? palette.accent2 }}
             />
           ))}
           {/* viewport-téglalap — csak túllógásnál (különben a teljes sáv, felesleges) */}

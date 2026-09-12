@@ -389,6 +389,7 @@
     },
     "transportBar": {
       "markerTitle": "Jelölő",
+      "recolorMarker": "Átszínezés",
       "deleteMarkerConfirm": "„{{label}}” törlése?",
       "defaultMarkerLabel": "Jelölő {{number}}",
       "newMarkerTitle": "Új jelölő",

@@ -383,8 +383,11 @@ export function Timeline() {
                   onPress={() => useEditorStore.getState().setPlayhead(m.time)}
                   style={[styles.markerFlag, { left: m.time * pps }]}
                 >
-                  <View style={styles.markerStem} />
-                  <Text style={styles.markerText} numberOfLines={1}>
+                  <View style={[styles.markerStem, m.color ? { backgroundColor: m.color } : null]} />
+                  <Text
+                    style={[styles.markerText, m.color ? { color: m.color } : null]}
+                    numberOfLines={1}
+                  >
                     {m.label}
                   </Text>
                 </Pressable>

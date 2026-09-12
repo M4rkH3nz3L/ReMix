@@ -16,6 +16,13 @@ import type { Marker } from '@/types/project';
 /** közös üres tömb — hogy a selector referenciája ne változzon (lásd lent) */
 const EMPTY_MARKERS: Marker[] = [];
 
+/** jelölő-szín paletta — új jelölő ciklikusan kap színt, az „átszínezés" ezen lépked */
+export const MARKER_COLORS = ['#ff5ca8', '#4a9eff', '#2ecc8f', '#ffb454', '#a06bff', '#ff6b6b'];
+export function nextMarkerColor(current?: string): string {
+  const i = current ? MARKER_COLORS.indexOf(current) : -1;
+  return MARKER_COLORS[(i + 1) % MARKER_COLORS.length];
+}
+
 export function TransportBar() {
   const { t } = useTranslation();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -48,6 +55,16 @@ export function TransportBar() {
       Alert.alert(t('editor.transportBar.markerTitle'), t('editor.transportBar.deleteMarkerConfirm', { label: nearMarker.label }), [
         { text: t('common.cancel'), style: 'cancel' },
         {
+          text: t('editor.transportBar.recolorMarker'),
+          onPress: () =>
+            state.dispatch({
+              type: 'SET_MARKERS',
+              markers: markers.map((m) =>
+                m.id === nearMarker.id ? { ...m, color: nextMarkerColor(m.color) } : m
+              ),
+            }),
+        },
+        {
           text: t('common.delete'),
           style: 'destructive',
           onPress: () =>
@@ -60,12 +77,14 @@ export function TransportBar() {
       return;
     }
     const defaultLabel = t('editor.transportBar.defaultMarkerLabel', { number: markers.length + 1 });
+    // új jelölő ciklikus színt kap (a jelölő-sorszám szerint)
+    const color = MARKER_COLORS[markers.length % MARKER_COLORS.length];
     const add = (label?: string) =>
       state.dispatch({
         type: 'SET_MARKERS',
         markers: [
           ...markers,
-          { id: makeId('mk'), time: playhead, label: (label ?? '').trim() || defaultLabel },
+          { id: makeId('mk'), time: playhead, label: (label ?? '').trim() || defaultLabel, color },
         ],
       });
     // az Alert.prompt csak iOS-en létezik — Androidon alapnévvel megy be

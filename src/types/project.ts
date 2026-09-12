@@ -594,6 +594,9 @@ export interface Marker {
   /** idővonal-mp */
   time: number;
   label: string;
+  /** jelölő-szín (hex); hiányzik = alapértelmezett. Csak szerkesztő-navigáció,
+   *  nem renderelődik → tetszőlegesen színezhető paritás-gond nélkül. */
+  color?: string;
 }
 
 /** 🎬 Story-fejezet fajtája (short-form dramaturgia): Hook→Context→Value→CTA. */

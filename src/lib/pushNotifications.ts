@@ -30,16 +30,38 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/** Android-csatorna (a bannerhez/hanghoz kell) — iOS-en nincs hatása. */
-async function ensureAndroidChannel(): Promise<void> {
+/**
+ * Az Android értesítés-csatorna azonosítója. MINDEN Android-értesítést ezen kell
+ * kiküldeni (`trigger.channelId`) — csatorna nélkül a rendszer a „Miscellaneous"
+ * fallback csatornára teszi DEFAULT fontossággal, ami NEM ad heads-up bannert.
+ */
+const ANDROID_CHANNEL_ID = 'default';
+
+/** a márka-akcentus (a notification-ikon tintje + LED-szín) */
+const ACCENT = '#7c5cff';
+
+let channelReady: Promise<void> | null = null;
+
+/**
+ * Android-csatorna (a bannerhez/hanghoz kell) — iOS-en no-op. Idempotens és
+ * cache-elt, mert a push-regisztráció ÉS minden helyi megjelenítés is hívja
+ * (a csatornának léteznie kell az első értesítés előtt, és a push-token
+ * lekérése előtt is — lásd Expo-doksi).
+ */
+export async function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') {
     return;
   }
-  await Notifications.setNotificationChannelAsync('default', {
-    name: 'Remix',
-    importance: Notifications.AndroidImportance.HIGH,
-    lightColor: '#0c0d12',
-  });
+  if (!channelReady) {
+    channelReady = Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+      name: 'Remix',
+      importance: Notifications.AndroidImportance.HIGH,
+      lightColor: ACCENT,
+      enableVibrate: true,
+      showBadge: true,
+    }).then(() => undefined);
+  }
+  await channelReady;
 }
 
 /** Az EAS projectId (a remote push-tokenhez kell); dev/Expo Go-ban általában nincs. */
@@ -107,14 +129,27 @@ export async function presentLocal(input: {
     return;
   }
   try {
+    // a csatornának LÉTEZNIE kell az értesítés előtt (különben „Miscellaneous")
+    await ensureAndroidChannel();
+    const android = Platform.OS === 'android';
     await Notifications.scheduleNotificationAsync({
       content: {
         title: input.title,
         body: input.body ?? undefined,
         sound: true,
         data: { route: input.route ?? null, id: input.id ?? null, ...(input.data ?? {}) },
+        // Android: heads-up prioritás + márka-tint + rezgés
+        ...(android
+          ? {
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+              color: ACCENT,
+              vibrate: [0, 250, 250, 250],
+            }
+          : null),
       },
-      trigger: null, // azonnal
+      // Androidon a csatornát a triggerben kell megadni (ChannelAwareTriggerInput);
+      // `null` → fallback csatorna, ami elnyomja a bannert. iOS: null = azonnal.
+      trigger: android ? { channelId: ANDROID_CHANNEL_ID } : null,
     });
   } catch {
     // ha a helyi megjelenítés elbukik, a realtime csengő akkor is frissül

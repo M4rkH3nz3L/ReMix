@@ -1,5 +1,7 @@
 import { makeId } from '@/lib/id';
+import type { ProgressUpdate } from '@/lib/progress';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
+import { renderProjectVersion, uploadMedia } from '@/lib/render';
 import { saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -245,6 +247,41 @@ export async function publishPost(
     throw new Error(error.message);
   }
   return toPost(data as PostRow, new Set(), new Set());
+}
+
+/**
+ * 🎞️ A projekt RENDERELT videójának megosztása a feedbe. Ha még nincs renderelt
+ * változat → renderel + a projektre menti; ha még nincs feltöltve → feltölti a
+ * publikus Storage-ba; majd posztol a valódi `video_url`-lel. Az így elkészült
+ * renderelt változat (uri + url) a projekten marad (újramegosztáshoz).
+ * Visszaadja a posztot + a frissített projektet.
+ */
+export async function publishRenderedProject(
+  project: Project,
+  onProgress?: (u: ProgressUpdate) => void,
+  opts?: { visibility?: PostVisibility }
+): Promise<{ post: FeedPost; project: Project }> {
+  let updated = project;
+  let rendered = project.rendered;
+
+  if (!rendered?.uri) {
+    rendered = await renderProjectVersion(project, onProgress);
+    updated = { ...updated, rendered };
+    await saveProject(updated);
+  }
+  if (!rendered.url) {
+    const url = await uploadMedia(rendered.uri, `${project.id}.mp4`);
+    rendered = { ...rendered, url };
+    updated = { ...updated, rendered };
+    await saveProject(updated);
+  }
+
+  const post = await publishPost(updated, {
+    visibility: opts?.visibility ?? 'public',
+    videoUrl: rendered.url ?? null,
+    posterUrl: rendered.posterUrl ?? null,
+  });
+  return { post, project: updated };
 }
 
 /** Töröl egy saját posztot. */

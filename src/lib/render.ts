@@ -11,9 +11,10 @@ import {
   renderLocal,
 } from '@/lib/nativeRender';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
-import { uploadFetch } from '@/lib/upload';
+import { projectDuration } from '@/lib/projectUtils';
+import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { withFingerprints } from '@/lib/fingerprint';
-import type { Project } from '@/types/project';
+import type { Project, RenderedVersion } from '@/types/project';
 
 /**
  * Render-kliens. Két út:
@@ -155,6 +156,63 @@ export async function renderMp4(
 
   // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)
   return renderCloud(project, onProgress, settings, opts?.signal);
+}
+
+/**
+ * 🎞️ A projekt RENDERELT VÁLTOZATÁNAK elkészítése és PERZISZTÁLÁSA a projekthez.
+ * Render (eszköz/felhő) → a kész MP4-et a document-tárba másoljuk (a cache-ből,
+ * ami törlődhet) → visszaadjuk a `RenderedVersion`-t (a hívó a projektre menti).
+ */
+export async function renderProjectVersion(
+  project: Project,
+  onProgress?: (update: ProgressUpdate) => void,
+  settings?: RenderSettings,
+  opts?: RenderOptions
+): Promise<RenderedVersion> {
+  const file = await renderMp4(project, onProgress, settings, opts);
+  const dir = new Directory(Paths.document, 'renders');
+  try {
+    if (!dir.exists) {
+      dir.create({ intermediates: true });
+    }
+  } catch {
+    // ha nem hozható létre, marad a cache-uri (a copy alább akkor is próbál)
+  }
+  const dest = new File(dir, `${project.id}.mp4`);
+  let uri = file.uri;
+  try {
+    if (dest.exists) {
+      dest.delete();
+    }
+    file.copy(dest);
+    uri = dest.uri;
+  } catch {
+    // a másolás bukott → a (cache-beli) render-uri-t adjuk vissza
+  }
+  return {
+    uri,
+    renderedAt: new Date().toISOString(),
+    durationSec: Math.round(projectDuration(project) * 10) / 10,
+  };
+}
+
+/**
+ * Egy helyi médiafájl (renderelt videó / borító) feltöltése a workeren át a
+ * publikus Storage-ba → a publikus URL (a feed / cross-device lejátszáshoz).
+ */
+export async function uploadMedia(uri: string, name?: string): Promise<string> {
+  const base = cloudBaseUrl();
+  const form = await mediaFormData(uri, name);
+  const res = await uploadFetch(`${base}/media/upload`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(msg || tr('lib.render.uploadFailed'));
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data.url) {
+    throw new Error(tr('lib.render.uploadFailed'));
+  }
+  return data.url;
 }
 
 /** Felhő-render (Pro): fel a workernek → poll → kész MP4 letöltése. */

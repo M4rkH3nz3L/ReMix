@@ -1059,7 +1059,8 @@
       "cloudRestoreDone": "Cloud-Version wiederhergestellt — der vorherige Stand bleibt als ein Undo-Schritt.",
       "cloudRestoreNone": "Noch kein Cloud-Backup für dieses Projekt.",
       "cloudSyncNote": "Sichert den Projektplan (JSON) in deinem Konto — auf jedem Gerät wiederherstellbar. Medien-Cloud-Sync ist ein separater, späterer Schritt.",
-      "proActiveUntil": "Remix Pro aktiv — bis {{date}}"
+      "proActiveUntil": "Remix Pro aktiv — bis {{date}}",
+      "renderedReady": "Gerenderte Version im Projekt gespeichert."
     },
     "filter": {
       "sectionFilters": "Filter",
@@ -1818,7 +1819,8 @@
       "collectNativeOnly": "Collect ist in der nativen App verfügbar (iOS/Android).",
       "packagingStartFailed": "Das Verpacken konnte nicht gestartet werden.",
       "packagingError": "Verpackungsfehler.",
-      "packagingTimeout": "Das Verpacken hat zu lange gedauert — versuch es noch mal."
+      "packagingTimeout": "Das Verpacken hat zu lange gedauert — versuch es noch mal.",
+      "uploadFailed": "Upload fehlgeschlagen."
     },
     "speedRamp": {
       "presetHero": "🦸 Hero",
@@ -2052,7 +2054,8 @@
     "remixPrompt": "Als neues Projekt zum Remixen öffnen?",
     "remix": "Remix",
     "shareToFeed": "Im Feed teilen",
-    "sharedOk": "Dein Video ist jetzt im Feed."
+    "sharedOk": "Dein Video ist jetzt im Feed.",
+    "rendering": "Rendern & Teilen…"
   },
   "channel": {
     "posts": "Beiträge",

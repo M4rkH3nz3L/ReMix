@@ -911,6 +911,36 @@ app.post('/waveform', upload.any(), (req, res) => {
   );
 });
 
+// 🎞️ Média-feltöltés (renderelt videó / borító) → publikus Storage-URL. A kliens
+// a renderelt fájlt küldi (multipart), a feed ezt a URL-t játssza (cross-device).
+app.post('/media/upload', upload.any(), async (req, res) => {
+  if (!s3Enabled()) {
+    res.status(503).json({ error: 'storage nincs konfigurálva (S3_* env)' });
+    return;
+  }
+  const f = (req.files ?? [])[0];
+  if (!f) {
+    res.status(400).json({ error: 'nincs fájl' });
+    return;
+  }
+  try {
+    const extRaw = path.extname(f.originalname || '') || `.${(f.mimetype || '').split('/')[1] || 'bin'}`;
+    const ext = extRaw.replace(/[^.\w]/g, '');
+    const key = `feed/${crypto.randomUUID()}${ext}`;
+    await uploadFile(key, f.path, f.mimetype);
+    res.json({ url: publicUrl(key), key });
+  } catch (err) {
+    console.error('Media upload hiba:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    try {
+      fs.unlinkSync(f.path);
+    } catch {
+      // takarítás best-effort
+    }
+  }
+});
+
 app.post('/render', upload.any(), (req, res) => {
   let project;
   let uriMap;

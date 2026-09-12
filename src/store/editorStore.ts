@@ -258,6 +258,8 @@ interface EditorState {
   undo: () => void;
   redo: () => void;
   markSaved: () => void;
+  /** a renderelt változat rögzítése a projekten (artefaktum — nem undo/dirty) */
+  setRendered: (rendered: Project['rendered']) => void;
 }
 
 /**
@@ -979,6 +981,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   closeAudioStudio: () => set({ audioStudioClipId: null }),
 
   markSaved: () => set({ dirty: false }),
+
+  setRendered: (rendered) =>
+    set((s) => (s.project ? { project: { ...s.project, rendered } } : s)),
 }));
 
 /** A kijelölt klip kényelmi selectora. */

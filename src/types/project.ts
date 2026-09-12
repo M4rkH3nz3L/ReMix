@@ -718,12 +718,31 @@ export interface ProjectSeo {
   keywords: string[];
 }
 
+/**
+ * 🎞️ A projekt RENDERELT VÁLTOZATA — a kész MP4, a projekthez tárolva. A `uri`
+ * a helyi, perzisztált fájl (azonnali lejátszás/újramegosztás); a `url` a
+ * feltöltött publikus cím (a feed / cross-device lejátszáshoz). Újrarenderelésig
+ * érvényes.
+ */
+export interface RenderedVersion {
+  uri: string;
+  url?: string;
+  posterUri?: string;
+  posterUrl?: string;
+  renderedAt: string;
+  durationSec: number;
+  width?: number;
+  height?: number;
+}
+
 export interface Project {
   id: string;
   name: string;
   aspectRatio: AspectRatio;
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
+  /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */
+  rendered?: RenderedVersion;
   tracks: Track[];
   /** a projekt által hivatkozott médiafájlok */
   assets: Asset[];

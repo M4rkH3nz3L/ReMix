@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,6 +43,12 @@ export default function FeedScreen() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // egyetlen lejátszó, ami az AKTÍV poszt videójára vált (renderelt MP4 URL)
+  const player = useVideoPlayer(null, (p) => {
+    p.loop = true;
+  });
 
   const load = useCallback((m: FeedMode) => {
     listFeed(m)
@@ -113,16 +120,36 @@ export default function FeedScreen() {
   const viewedRef = useRef<Set<string>>(new Set());
   const onViewable = useRef((info: { viewableItems: ViewToken[] }) => {
     const first = info.viewableItems[0]?.item as FeedPost | undefined;
-    if (first && !viewedRef.current.has(first.id)) {
-      viewedRef.current.add(first.id);
-      recordView(first.id);
+    if (first) {
+      setActiveId(first.id);
+      if (!viewedRef.current.has(first.id)) {
+        viewedRef.current.add(first.id);
+        recordView(first.id);
+      }
     }
   }).current;
 
+  // az aktív poszt videójának lejátszása (ha van renderelt URL)
+  useEffect(() => {
+    const active = posts.find((p) => p.id === activeId);
+    const uri = active?.videoUri ?? null;
+    if (uri) {
+      player.replace(uri);
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [activeId, posts, player]);
+
   const openCreator = (post: FeedPost) => router.push(`/channel/${post.creator.id}`);
-  const openPost = (post: FeedPost) => {
-    if (post.videoUri) {
-      // renderelt videó (Storage) — a lejátszó kezeli
+  const onTapItem = (post: FeedPost) => {
+    if (post.id === activeId && post.videoUri) {
+      // renderelt videó: koppintásra szünet/lejátszás
+      if (player.playing) {
+        player.pause();
+      } else {
+        player.play();
+      }
       return;
     }
     if (post.projectId) {
@@ -134,8 +161,15 @@ export default function FeedScreen() {
 
   const renderItem = ({ item }: { item: FeedPost }) => (
     <View style={[styles.page, { height: pageHeight, width }]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => openPost(item)}>
-        {item.posterUri ? (
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => onTapItem(item)}>
+        {item.id === activeId && item.videoUri ? (
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            nativeControls={false}
+          />
+        ) : item.posterUri ? (
           <Image source={{ uri: item.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <LinearGradient colors={['#1a1e2e', '#0c0d12', '#241a3a']} style={StyleSheet.absoluteFill} />
@@ -172,7 +206,7 @@ export default function FeedScreen() {
           />
           <Text style={styles.railCount}>{compact(item.counts.likes)}</Text>
         </Pressable>
-        <Pressable style={styles.railBtn} onPress={() => openPost(item)}>
+        <Pressable style={styles.railBtn} onPress={() => onTapItem(item)}>
           <Ionicons name="chatbubble-outline" size={32} color="#fff" />
           <Text style={styles.railCount}>{compact(item.counts.comments)}</Text>
         </Pressable>
@@ -248,6 +282,7 @@ export default function FeedScreen() {
           data={posts}
           keyExtractor={(p) => p.id}
           renderItem={renderItem}
+          extraData={activeId}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           snapToInterval={pageHeight}

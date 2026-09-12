@@ -33,9 +33,11 @@ import type { VideoTemplate } from '@/constants/templates';
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { useLayout } from '@/hooks/useLayout';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
-import { publishPost } from '@/lib/feed';
+import { publishRenderedProject } from '@/lib/feed';
 import { makeId } from '@/lib/id';
 import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
+import { guardPro } from '@/store/paywallStore';
+import { withProgress } from '@/store/progressStore';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { formatTime } from '@/lib/time';
@@ -202,14 +204,26 @@ export default function ProjectsScreen() {
 
   const shareToFeed = (meta: ProjectMeta) => {
     loadProject(meta.id)
-      .then((p) => (p ? publishPost(p) : undefined))
-      .then((post) => {
-        if (post) {
-          Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
-            { text: t('common.ok') },
-            { text: t('nav.feed'), onPress: () => router.push('/feed') },
-          ]);
+      .then((p) => {
+        if (!p) {
+          return;
         }
+        // render (ha kell) → feltöltés → posztolás; Pro-kapu a felhő-renderre
+        return guardPro(
+          () =>
+            withProgress(t('feed.rendering'), (report) => publishRenderedProject(p, report)).then(
+              (res) => {
+                if (res) {
+                  refresh();
+                  Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
+                    { text: t('common.ok') },
+                    { text: t('nav.feed'), onPress: () => router.push('/feed') },
+                  ]);
+                }
+              }
+            ),
+          (e) => Alert.alert(t('common.error'), e.message)
+        );
       })
       .catch((e: Error) => Alert.alert(t('common.error'), e.message));
   };

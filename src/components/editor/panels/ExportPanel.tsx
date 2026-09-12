@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -29,6 +30,7 @@ import {
 } from '@/lib/render';
 import type { PostTarget } from '@/lib/render';
 import { shareVidedFile } from '@/lib/videdFile';
+import { publishRenderedProject } from '@/lib/feed';
 import { useEditorStore } from '@/store/editorStore';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { pullProject, pushProject } from '@/lib/cloudSync';
@@ -166,6 +168,32 @@ export function ExportPanel() {
     ).finally(() => setRenderStatus(null));
   };
 
+  // 📱 Megosztás a FEEDBE: render (ha kell) → publikus feltöltés → poszt a
+  // renderelt videóval. A renderelt változat a projekten marad (újramegosztáshoz).
+  const shareToFeed = () => {
+    if (renderStatus) {
+      return;
+    }
+    setRenderStatus(t('common.processing'));
+    void guardPro(
+      () =>
+        withProgress(t('feed.rendering'), (report) =>
+          publishRenderedProject(project, report).then((res) => {
+            useEditorStore.getState().setRendered(res.project.rendered);
+            Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
+              { text: t('common.ok') },
+              { text: t('nav.feed'), onPress: () => router.push('/feed') },
+            ]);
+          })
+        ),
+      (err) => {
+        if (!isRenderCancelledError(err)) {
+          Alert.alert(t('feed.shareToFeed'), err.message);
+        }
+      }
+    ).finally(() => setRenderStatus(null));
+  };
+
   const guard = (fn: () => Promise<void>) => () => {
     fn().catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
   };
@@ -269,6 +297,18 @@ export function ExportPanel() {
           <Ionicons name="chevron-forward" size={16} color={palette.textDim} />
         </Pressable>
       )}
+
+      <PrimaryButton
+        label={t('feed.shareToFeed')}
+        icon="play-circle-outline"
+        onPress={shareToFeed}
+        disabled={!!renderStatus}
+      />
+      {project.rendered ? (
+        <Text style={{ color: palette.textDim, fontSize: 12, textAlign: 'center' }}>
+          {t('panels.export.renderedReady')}
+        </Text>
+      ) : null}
 
       <PanelSection title={t('panels.export.videoSection')}>
         <Text style={styles.settingLabel}>{t('panels.export.resolution')}</Text>

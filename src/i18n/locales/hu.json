@@ -1059,7 +1059,8 @@
       "cloudRestoreDone": "Felhő-verzió visszaállítva — az előző állapot egy undo-lépésként megmarad.",
       "cloudRestoreNone": "Ehhez a projekthez még nincs felhő-mentés.",
       "cloudSyncNote": "A projekt-tervet (JSON) a fiókodba menti — bármely eszközön visszaállítható. A médiafájlok felhő-szinkronja külön, későbbi lépés.",
-      "proActiveUntil": "Remix Pro aktív — eddig: {{date}}"
+      "proActiveUntil": "Remix Pro aktív — eddig: {{date}}",
+      "renderedReady": "A renderelt változat a projekthez mentve."
     },
     "filter": {
       "sectionFilters": "Szűrők",
@@ -1818,7 +1819,8 @@
       "collectNativeOnly": "A Collect a natív appból érhető el (iOS/Android).",
       "packagingStartFailed": "A csomagolás indítása nem sikerült.",
       "packagingError": "Csomagolás-hiba.",
-      "packagingTimeout": "A csomagolás túl sokáig tartott — próbáld újra."
+      "packagingTimeout": "A csomagolás túl sokáig tartott — próbáld újra.",
+      "uploadFailed": "A feltöltés nem sikerült."
     },
     "speedRamp": {
       "presetHero": "🦸 Hero",
@@ -2052,7 +2054,8 @@
     "remixPrompt": "Megnyitod új projektként remixeléshez?",
     "remix": "Remix",
     "shareToFeed": "Megosztás a feedbe",
-    "sharedOk": "A videód felkerült a feedre."
+    "sharedOk": "A videód felkerült a feedre.",
+    "rendering": "Renderelés és megosztás…"
   },
   "channel": {
     "posts": "Posztok",

@@ -40,6 +40,9 @@ import {
   updateAiProvider,
 } from '@/lib/aiProviders';
 import { AI_CAPABILITIES, generatePersona, personaLabel } from '@/lib/aiPersona';
+import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
+import { AvatarSvg } from '@/components/AvatarSvg';
+import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
 import { useAuth } from '@/store/authStore';
 
@@ -62,6 +65,7 @@ interface ProviderForm {
   personaEmoji: string;
   personaStory: string;
   capabilities: string[];
+  avatar: AvatarConfig;
 }
 
 const EMPTY_FORM: ProviderForm = {
@@ -75,6 +79,7 @@ const EMPTY_FORM: ProviderForm = {
   personaEmoji: '',
   personaStory: '',
   capabilities: [],
+  avatar: DEFAULT_AVATAR,
 };
 
 /**
@@ -175,6 +180,7 @@ export default function ProfileScreen() {
       personaEmoji: p.personaEmoji ?? '',
       personaStory: p.personaStory ?? '',
       capabilities: p.capabilities ?? [],
+      avatar: p.avatar ?? DEFAULT_AVATAR,
     });
     setEditorOpen(true);
   };
@@ -201,6 +207,7 @@ export default function ProfileScreen() {
       personaEmoji: form.personaEmoji,
       personaStory: form.personaStory,
       capabilities: form.capabilities,
+      avatar: form.avatar,
     };
     try {
       if (form.id) {
@@ -386,6 +393,7 @@ export default function ProfileScreen() {
                       size={20}
                       color={p.isDefault ? palette.accent : palette.textDim}
                     />
+                    {p.avatar ? <AvatarSvg config={p.avatar} size={34} /> : null}
                     <View style={{ flex: 1 }}>
                       <View style={styles.providerTitleRow}>
                         <Text style={styles.providerLabel} numberOfLines={1}>
@@ -568,22 +576,20 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <View style={styles.personaNameRow}>
-                <TextInput
-                  value={form.personaEmoji}
-                  onChangeText={(v) => setForm((f) => ({ ...f, personaEmoji: v.slice(0, 4) }))}
-                  placeholder="🤖"
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, styles.emojiInput]}
-                />
-                <TextInput
-                  value={form.personaName}
-                  onChangeText={(v) => setForm((f) => ({ ...f, personaName: v }))}
-                  placeholder={t('profile.personaNamePlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, { flex: 1 }]}
-                />
-              </View>
+              {/* 🧑‍🎨 karakter-építő (a user rakja össze) */}
+              <AvatarBuilder
+                value={form.avatar}
+                onChange={(a) => setForm((f) => ({ ...f, avatar: a }))}
+              />
+
+              <Text style={styles.fieldLabel}>{t('profile.personaNameLabel')}</Text>
+              <TextInput
+                value={form.personaName}
+                onChangeText={(v) => setForm((f) => ({ ...f, personaName: v }))}
+                placeholder={t('profile.personaNamePlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+              />
 
               <TextInput
                 value={form.personaStory}
@@ -599,8 +605,8 @@ export default function ProfileScreen() {
                   setForm((f) => ({
                     ...f,
                     personaName: p.name,
-                    personaEmoji: p.emoji,
                     personaStory: p.story,
+                    avatar: randomAvatar(),
                   }));
                 }}
                 style={styles.addRow}

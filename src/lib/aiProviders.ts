@@ -1,3 +1,4 @@
+import { normalizeAvatar, type AvatarConfig } from '@/lib/avatar';
 import { hasSupabaseConfig, requireSupabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -27,6 +28,8 @@ export interface AiProvider {
   personaName?: string;
   personaEmoji?: string;
   personaStory?: string;
+  /** 🧑‍🎨 összerakott karakter-avatar (SVG-vonások); ha nincs, a legacy emoji */
+  avatar?: AvatarConfig;
   /** mire való: 'text' | 'image' | 'video' | 'audio' | 'captions' | 'music' | 'ideas' */
   capabilities?: string[];
 }
@@ -101,12 +104,13 @@ interface Row {
   persona_name?: string | null;
   persona_emoji?: string | null;
   persona_story?: string | null;
+  persona_avatar?: unknown;
   capabilities?: string[] | null;
 }
 
 /** a select-mezők (list/create/update egységesen ezt kéri) */
 const ROW_COLUMNS =
-  'id, label, provider, base_url, model, api_key, is_default, persona_name, persona_emoji, persona_story, capabilities';
+  'id, label, provider, base_url, model, api_key, is_default, persona_name, persona_emoji, persona_story, persona_avatar, capabilities';
 
 function toProvider(row: Row): AiProvider {
   const kind = (['openai', 'anthropic', 'ollama', 'custom'] as const).includes(
@@ -125,6 +129,7 @@ function toProvider(row: Row): AiProvider {
     personaName: row.persona_name ?? undefined,
     personaEmoji: row.persona_emoji ?? undefined,
     personaStory: row.persona_story ?? undefined,
+    avatar: row.persona_avatar ? normalizeAvatar(row.persona_avatar) : undefined,
     capabilities: row.capabilities ?? [],
   };
 }
@@ -162,6 +167,7 @@ export async function createAiProvider(input: AiProviderInput): Promise<AiProvid
       persona_name: input.personaName?.trim() || null,
       persona_emoji: input.personaEmoji?.trim() || null,
       persona_story: input.personaStory?.trim() || null,
+      persona_avatar: input.avatar ?? null,
       capabilities: input.capabilities ?? [],
       is_default: (count ?? 0) === 0, // az első provider legyen az alapértelmezett
     })
@@ -190,6 +196,7 @@ export async function updateAiProvider(
       persona_name: patch.personaName?.trim() || null,
       persona_emoji: patch.personaEmoji?.trim() || null,
       persona_story: patch.personaStory?.trim() || null,
+      persona_avatar: patch.avatar ?? null,
       capabilities: patch.capabilities ?? [],
     })
     .eq('id', id);

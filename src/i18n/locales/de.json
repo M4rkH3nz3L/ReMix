@@ -17,6 +17,15 @@
     "cap_music": "Musik",
     "cap_ideas": "Ideen"
   },
+  "avatar": {
+    "skin": "Hautton",
+    "hairColor": "Haarfarbe",
+    "background": "Hintergrund",
+    "hairStyle": "Haare",
+    "face": "Ausdruck",
+    "accessory": "Accessoire",
+    "randomize": "Überrasch mich"
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",
@@ -104,6 +113,7 @@
     "personaSection": "👤 Charakter (Persona)",
     "personaHint": "Gib diesem Modell einen Namen und eine kleine Geschichte — damit es sich wie dein eigener Assistent anfühlt.",
     "personaPurpose": "Wofür ist es da?",
+    "personaNameLabel": "Name",
     "personaNamePlaceholder": "Name (z. B. Luna)",
     "personaStoryPlaceholder": "Eine kurze, persönliche Geschichte…",
     "personaGenerate": "✨ Charakter generieren",

@@ -17,6 +17,15 @@
     "cap_music": "zene",
     "cap_ideas": "ötletelés"
   },
+  "avatar": {
+    "skin": "Bőrszín",
+    "hairColor": "Hajszín",
+    "background": "Háttér",
+    "hairStyle": "Haj",
+    "face": "Kifejezés",
+    "accessory": "Kiegészítő",
+    "randomize": "Lepj meg"
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",
@@ -104,6 +113,7 @@
     "personaSection": "👤 Karakter (persona)",
     "personaHint": "Adj a modellnek nevet és egy kis sztorit — hogy tényleg a saját asszisztensednek érződjön.",
     "personaPurpose": "Mire való?",
+    "personaNameLabel": "Név",
     "personaNamePlaceholder": "Név (pl. Luna)",
     "personaStoryPlaceholder": "Egy rövid, személyes sztori…",
     "personaGenerate": "✨ Karakter generálása",

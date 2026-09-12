@@ -30,8 +30,10 @@
 - ⏳ **Phase 5** — ✅ 5.2 (helyi): verzió-pillanatképek + visszaállítás (on-device,
   ingyen). Hátra (felhő-tárhely kell): 5.1 projekt-sync, 5.3 collab, 5.4 media-
   library, 5.5 remix-graph; + 5.2 felhő-verziótörténet.
-- ⛔ **Blokkolt/döntés:** 4.4 AI zene/B-roll (nincs library-metaadat/B-roll forrás),
-  4.5 A/B (Pro+, fedésben hooks/auto-edittel), 1.4 diarization (modelldöntés).
+- ✅ **4.4 (zene):** egységes track-metaadat (worker: BPM+energia) + videóhoz-
+  illesztő rangsor a könyvtárban. (B-roll még blokkolt: nincs tartalom-forrás.)
+- ⛔ **Blokkolt/döntés:** 4.4 B-roll (nincs forrás), 4.5 A/B (Pro+, fedésben
+  hooks/auto-edittel), 1.4 diarization (modelldöntés).
 - ▶️ Következő: Phase 5 felhő-rész (sync) — nagyobb, döntést igényel.
 
 ---

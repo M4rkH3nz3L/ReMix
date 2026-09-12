@@ -1,4 +1,8 @@
 {
+  "aiPicker": {
+    "model": "AI model",
+    "auto": "Auto"
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",

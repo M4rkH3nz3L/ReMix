@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { aspectValue, palette, textStylePresets } from '@/constants/editor';
 import { isProRequiredError } from '@/lib/backend';
@@ -540,6 +541,7 @@ export function CaptionsPanel() {
       </PanelSection>
 
       <PanelSection title="✨ Caption Studio">
+        <AiProviderPicker task="captionStudio" />
         <PrimaryButton
           icon="flash-outline"
           label={studioStatus ?? t('panels.captions.highlightsEmoji')}

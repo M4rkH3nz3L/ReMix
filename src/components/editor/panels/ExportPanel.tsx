@@ -29,6 +29,7 @@ import {
 import type { PostTarget } from '@/lib/render';
 import { shareVidedFile } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
+import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { pullProject, pushProject } from '@/lib/cloudSync';
 
 const RESOLUTIONS = [
@@ -363,6 +364,7 @@ export function ExportPanel() {
       </PanelSection>
 
       <PanelSection title="Thumbnail Studio">
+        <AiProviderPicker task="thumbHeadlines" />
         <PrimaryButton
           icon="images-outline"
           label={thumbStatus ?? t('panels.export.thumbSuggestions')}

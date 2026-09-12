@@ -1,4 +1,8 @@
 {
+  "aiPicker": {
+    "model": "AI modell",
+    "auto": "Auto"
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",

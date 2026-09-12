@@ -1,4 +1,8 @@
 {
+  "aiPicker": {
+    "model": "KI-Modell",
+    "auto": "Auto"
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",

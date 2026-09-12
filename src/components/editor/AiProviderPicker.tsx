@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { personaLabel } from '@/lib/aiPersona';
 import {
   listAiProviders,
   listTaskAssignments,
@@ -60,7 +61,12 @@ export function AiProviderPicker({ task }: { task: AiTask }) {
       <View style={styles.row}>
         <Chip label={t('aiPicker.auto')} active={!selected} onPress={() => pick(null)} />
         {models.map((m) => (
-          <Chip key={m.id} label={m.label} active={selected === m.id} onPress={() => pick(m.id)} />
+          <Chip
+            key={m.id}
+            label={personaLabel(m) ?? m.label}
+            active={selected === m.id}
+            onPress={() => pick(m.id)}
+          />
         ))}
       </View>
     </View>

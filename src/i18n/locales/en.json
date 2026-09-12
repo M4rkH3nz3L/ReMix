@@ -3,6 +3,20 @@
     "model": "AI model",
     "auto": "Auto"
   },
+  "aiPersona": {
+    "story": "Hi, I'm {{name}}, and I help you with: {{purpose}}. {{flavor}}",
+    "capGeneric": "anything creative",
+    "flavor1": "Just say the word and let's create together!",
+    "flavor2": "I'm always here when you need a spark.",
+    "flavor3": "Together we'll make the work more fun.",
+    "cap_text": "writing",
+    "cap_image": "image generation",
+    "cap_video": "video generation",
+    "cap_audio": "audio",
+    "cap_captions": "captions",
+    "cap_music": "music",
+    "cap_ideas": "ideas"
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",
@@ -87,6 +101,12 @@
     "task_hooks": "Hook generator",
     "task_thumbHeadlines": "Thumbnail headlines",
     "task_storyStructure": "Story engine",
+    "personaSection": "👤 Character (persona)",
+    "personaHint": "Give this model a name and a little story — so it feels like your own assistant.",
+    "personaPurpose": "What's it for?",
+    "personaNamePlaceholder": "Name (e.g. Luna)",
+    "personaStoryPlaceholder": "A short, personal story…",
+    "personaGenerate": "✨ Generate character",
     "accountSection": "Account",
     "savedTitle": "Saved",
     "profileSaved": "Your details have been updated.",

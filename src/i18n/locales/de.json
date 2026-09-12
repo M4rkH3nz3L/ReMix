@@ -3,6 +3,20 @@
     "model": "KI-Modell",
     "auto": "Auto"
   },
+  "aiPersona": {
+    "story": "Hi, ich bin {{name}} und helfe dir bei: {{purpose}}. {{flavor}}",
+    "capGeneric": "allem Kreativen",
+    "flavor1": "Sag einfach Bescheid und wir legen zusammen los!",
+    "flavor2": "Ich bin immer da, wenn du einen Funken brauchst.",
+    "flavor3": "Zusammen macht die Arbeit mehr Spaß.",
+    "cap_text": "Texte",
+    "cap_image": "Bildgenerierung",
+    "cap_video": "Videogenerierung",
+    "cap_audio": "Audio",
+    "cap_captions": "Untertitel",
+    "cap_music": "Musik",
+    "cap_ideas": "Ideen"
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",
@@ -87,6 +101,12 @@
     "task_hooks": "Hook-Generator",
     "task_thumbHeadlines": "Thumbnail-Titel",
     "task_storyStructure": "Story-Engine",
+    "personaSection": "👤 Charakter (Persona)",
+    "personaHint": "Gib diesem Modell einen Namen und eine kleine Geschichte — damit es sich wie dein eigener Assistent anfühlt.",
+    "personaPurpose": "Wofür ist es da?",
+    "personaNamePlaceholder": "Name (z. B. Luna)",
+    "personaStoryPlaceholder": "Eine kurze, persönliche Geschichte…",
+    "personaGenerate": "✨ Charakter generieren",
     "accountSection": "Konto",
     "savedTitle": "Gespeichert",
     "profileSaved": "Deine Daten wurden aktualisiert.",

@@ -23,6 +23,12 @@ export interface AiProvider {
   /** API-kulcs (Ollama/lokális esetén üres is lehet) */
   apiKey: string;
   isDefault: boolean;
+  /** 👤 persona (karakter) — személyesebb hangulathoz; mind opcionális */
+  personaName?: string;
+  personaEmoji?: string;
+  personaStory?: string;
+  /** mire való: 'text' | 'image' | 'video' | 'audio' | 'captions' | 'music' | 'ideas' */
+  capabilities?: string[];
 }
 
 /** Új provider bevitele (id/isDefault nélkül). */
@@ -92,7 +98,15 @@ interface Row {
   model: string;
   api_key: string | null;
   is_default: boolean;
+  persona_name?: string | null;
+  persona_emoji?: string | null;
+  persona_story?: string | null;
+  capabilities?: string[] | null;
 }
+
+/** a select-mezők (list/create/update egységesen ezt kéri) */
+const ROW_COLUMNS =
+  'id, label, provider, base_url, model, api_key, is_default, persona_name, persona_emoji, persona_story, capabilities';
 
 function toProvider(row: Row): AiProvider {
   const kind = (['openai', 'anthropic', 'ollama', 'custom'] as const).includes(
@@ -108,6 +122,10 @@ function toProvider(row: Row): AiProvider {
     model: row.model,
     apiKey: row.api_key ?? '',
     isDefault: row.is_default,
+    personaName: row.persona_name ?? undefined,
+    personaEmoji: row.persona_emoji ?? undefined,
+    personaStory: row.persona_story ?? undefined,
+    capabilities: row.capabilities ?? [],
   };
 }
 
@@ -116,7 +134,7 @@ export async function listAiProviders(): Promise<AiProvider[]> {
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('user_ai_providers')
-    .select('id, label, provider, base_url, model, api_key, is_default')
+    .select(ROW_COLUMNS)
     .order('is_default', { ascending: false })
     .order('label', { ascending: true });
   if (error) {
@@ -141,9 +159,13 @@ export async function createAiProvider(input: AiProviderInput): Promise<AiProvid
       base_url: input.baseUrl.trim() || null,
       model: input.model.trim(),
       api_key: input.apiKey.trim() || null,
+      persona_name: input.personaName?.trim() || null,
+      persona_emoji: input.personaEmoji?.trim() || null,
+      persona_story: input.personaStory?.trim() || null,
+      capabilities: input.capabilities ?? [],
       is_default: (count ?? 0) === 0, // az első provider legyen az alapértelmezett
     })
-    .select('id, label, provider, base_url, model, api_key, is_default')
+    .select(ROW_COLUMNS)
     .single();
   if (error) {
     throw new Error(error.message);
@@ -165,6 +187,10 @@ export async function updateAiProvider(
       base_url: patch.baseUrl.trim() || null,
       model: patch.model.trim(),
       api_key: patch.apiKey.trim() || null,
+      persona_name: patch.personaName?.trim() || null,
+      persona_emoji: patch.personaEmoji?.trim() || null,
+      persona_story: patch.personaStory?.trim() || null,
+      capabilities: patch.capabilities ?? [],
     })
     .eq('id', id);
   if (error) {
@@ -211,7 +237,7 @@ export async function getDefaultAiProvider(): Promise<AiProvider | null> {
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('user_ai_providers')
-    .select('id, label, provider, base_url, model, api_key, is_default')
+    .select(ROW_COLUMNS)
     .eq('is_default', true)
     .limit(1)
     .maybeSingle();

@@ -39,6 +39,7 @@ import {
   setTaskAssignment,
   updateAiProvider,
 } from '@/lib/aiProviders';
+import { AI_CAPABILITIES, generatePersona, personaLabel } from '@/lib/aiPersona';
 import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
 import { useAuth } from '@/store/authStore';
 
@@ -57,6 +58,10 @@ interface ProviderForm {
   baseUrl: string;
   model: string;
   apiKey: string;
+  personaName: string;
+  personaEmoji: string;
+  personaStory: string;
+  capabilities: string[];
 }
 
 const EMPTY_FORM: ProviderForm = {
@@ -66,6 +71,10 @@ const EMPTY_FORM: ProviderForm = {
   baseUrl: '',
   model: '',
   apiKey: '',
+  personaName: '',
+  personaEmoji: '',
+  personaStory: '',
+  capabilities: [],
 };
 
 /**
@@ -162,6 +171,10 @@ export default function ProfileScreen() {
       baseUrl: p.baseUrl,
       model: p.model,
       apiKey: p.apiKey,
+      personaName: p.personaName ?? '',
+      personaEmoji: p.personaEmoji ?? '',
+      personaStory: p.personaStory ?? '',
+      capabilities: p.capabilities ?? [],
     });
     setEditorOpen(true);
   };
@@ -184,6 +197,10 @@ export default function ProfileScreen() {
       baseUrl: form.baseUrl,
       model: form.model,
       apiKey: form.apiKey,
+      personaName: form.personaName,
+      personaEmoji: form.personaEmoji,
+      personaStory: form.personaStory,
+      capabilities: form.capabilities,
     };
     try {
       if (form.id) {
@@ -372,7 +389,7 @@ export default function ProfileScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={styles.providerTitleRow}>
                         <Text style={styles.providerLabel} numberOfLines={1}>
-                          {p.label}
+                          {personaLabel(p) ?? p.label}
                         </Text>
                         {p.isDefault ? (
                           <View style={styles.defaultBadge}>
@@ -383,8 +400,15 @@ export default function ProfileScreen() {
                         ) : null}
                       </View>
                       <Text style={styles.providerMeta} numberOfLines={1}>
+                        {personaLabel(p) ? `${p.label} · ` : ''}
                         {PROVIDER_LABEL[p.provider]} · {p.model || '—'}
                         {p.apiKey ? ' · 🔑' : ''}
+                        {p.capabilities && p.capabilities.length > 0
+                          ? ' · ' +
+                            p.capabilities
+                              .map((c) => AI_CAPABILITIES.find((x) => x.id === c)?.emoji ?? '')
+                              .join('')
+                          : ''}
                       </Text>
                     </View>
                   </Pressable>
@@ -422,7 +446,7 @@ export default function ProfileScreen() {
                     {providers.map((p) => (
                       <Chip
                         key={p.id}
-                        label={p.label}
+                        label={personaLabel(p) ?? p.label}
                         active={taskAssign[task] === p.id}
                         onPress={() => pickTask(task, p.id)}
                       />
@@ -520,6 +544,70 @@ export default function ProfileScreen() {
                 secureTextEntry
               />
               <Text style={styles.hint}>{t('profile.apiKeyHint')}</Text>
+
+              {/* 👤 Karakter (persona) — személyesebb hangulat */}
+              <Text style={styles.fieldLabel}>{t('profile.personaSection')}</Text>
+              <Text style={styles.hint}>{t('profile.personaHint')}</Text>
+
+              <Text style={styles.fieldLabel}>{t('profile.personaPurpose')}</Text>
+              <View style={styles.chipRow}>
+                {AI_CAPABILITIES.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={`${c.emoji} ${t('aiPersona.cap_' + c.id)}`}
+                    active={form.capabilities.includes(c.id)}
+                    onPress={() =>
+                      setForm((f) => ({
+                        ...f,
+                        capabilities: f.capabilities.includes(c.id)
+                          ? f.capabilities.filter((x) => x !== c.id)
+                          : [...f.capabilities, c.id],
+                      }))
+                    }
+                  />
+                ))}
+              </View>
+
+              <View style={styles.personaNameRow}>
+                <TextInput
+                  value={form.personaEmoji}
+                  onChangeText={(v) => setForm((f) => ({ ...f, personaEmoji: v.slice(0, 4) }))}
+                  placeholder="🤖"
+                  placeholderTextColor={palette.textDim}
+                  style={[styles.input, styles.emojiInput]}
+                />
+                <TextInput
+                  value={form.personaName}
+                  onChangeText={(v) => setForm((f) => ({ ...f, personaName: v }))}
+                  placeholder={t('profile.personaNamePlaceholder')}
+                  placeholderTextColor={palette.textDim}
+                  style={[styles.input, { flex: 1 }]}
+                />
+              </View>
+
+              <TextInput
+                value={form.personaStory}
+                onChangeText={(v) => setForm((f) => ({ ...f, personaStory: v }))}
+                placeholder={t('profile.personaStoryPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={[styles.input, styles.storyInput]}
+                multiline
+              />
+              <Pressable
+                onPress={() => {
+                  const p = generatePersona(form.capabilities);
+                  setForm((f) => ({
+                    ...f,
+                    personaName: p.name,
+                    personaEmoji: p.emoji,
+                    personaStory: p.story,
+                  }));
+                }}
+                style={styles.addRow}
+              >
+                <Ionicons name="sparkles-outline" size={20} color={palette.accent} />
+                <Text style={styles.addText}>{t('profile.personaGenerate')}</Text>
+              </Pressable>
             </ScrollView>
 
             {savingProvider ? (
@@ -639,6 +727,9 @@ const styles = StyleSheet.create({
   },
   taskLabel: { color: palette.text, fontSize: 13, fontWeight: '600' },
   taskChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  personaNameRow: { flexDirection: 'row', gap: 8 },
+  emojiInput: { width: 56, textAlign: 'center' },
+  storyInput: { minHeight: 64, textAlignVertical: 'top' },
   emailText: { color: palette.text, fontSize: 14, marginBottom: 10 },
   signOutBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   signOutText: { color: palette.danger, fontSize: 15, fontWeight: '700' },

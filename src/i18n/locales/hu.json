@@ -3,6 +3,20 @@
     "model": "AI modell",
     "auto": "Auto"
   },
+  "aiPersona": {
+    "story": "Szia, {{name}} vagyok, és ebben segítek: {{purpose}}. {{flavor}}",
+    "capGeneric": "bármiben, ami kreatív",
+    "flavor1": "Szólj bátran, és csináljuk együtt!",
+    "flavor2": "Mindig itt vagyok, ha kell egy kis lendület.",
+    "flavor3": "Együtt pörgősebb lesz a munka.",
+    "cap_text": "szövegírás",
+    "cap_image": "képgenerálás",
+    "cap_video": "videógenerálás",
+    "cap_audio": "hang",
+    "cap_captions": "feliratozás",
+    "cap_music": "zene",
+    "cap_ideas": "ötletelés"
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",
@@ -87,6 +101,12 @@
     "task_hooks": "Hook-generátor",
     "task_thumbHeadlines": "Borítókép-címek",
     "task_storyStructure": "Story Engine",
+    "personaSection": "👤 Karakter (persona)",
+    "personaHint": "Adj a modellnek nevet és egy kis sztorit — hogy tényleg a saját asszisztensednek érződjön.",
+    "personaPurpose": "Mire való?",
+    "personaNamePlaceholder": "Név (pl. Luna)",
+    "personaStoryPlaceholder": "Egy rövid, személyes sztori…",
+    "personaGenerate": "✨ Karakter generálása",
     "accountSection": "Fiók",
     "savedTitle": "Mentve",
     "profileSaved": "Az adataid frissültek.",

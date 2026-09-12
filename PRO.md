@@ -22,7 +22,9 @@
 - ⏳ **1.6** Emotion (opcionális, később).
 - ✅ **Phase 2** — 2.1 semantic select (találatok → multi-select) · 2.2 találat-
   kiemelés az idővonalon · 2.3 objektum-címkék a vision-indexben.
-- ▶️ Következő: **Phase 3** (EDIT — AI copilot mélyítés) vagy 1.4 (modelldöntés után).
+- ✅ **Phase 3** — 3.1 „tedd ütősebbé" összetett javaslat · 3.2 parancs-whitelist
+  (átmenet + szín) · 3.3 rough-cut → shorts (highlight-jelöltek).
+- ▶️ Következő: **Phase 4** (PUBLISH — AI social & lokalizáció) vagy 1.4 (modelldöntés után).
 
 ---
 

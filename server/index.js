@@ -35,6 +35,7 @@ const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
+const { billingAvailable, activatePro, deactivatePro, handleRevenueCatEvent } = require('./billing');
 
 const WHISPER_MODEL =
   process.env.WHISPER_MODEL || path.join(__dirname, 'models', 'ggml-base.bin');
@@ -96,6 +97,8 @@ app.get('/health', async (_req, res) => {
     tts: ttsAvailable(),
     youtube: ytAvailable(),
     notify: notifyAvailable(),
+    billing: billingAvailable(),
+    revenuecat: !!process.env.RC_WEBHOOK_AUTH,
     render: queueEnabled() && s3Enabled() ? 'cloud+local' : 'local',
     cloudRenderMinSec: parseInt(process.env.CLOUD_RENDER_MIN_SEC || '15', 10),
   });
@@ -324,6 +327,60 @@ app.post('/invite', express.json({ limit: '32kb' }), (req, res) => {
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('Invite hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
+});
+
+// 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat
+// webhookon jön, lásd lentebb). service_role-lal ír a subscriptions-be.
+// ⚠️ PROD: JWT-verifikáció + a valós fizetés IGAZOLÁSA nélkül NE aktiváljon
+//    (ez az endpoint prod-ban csak admin/promó lehet) — lásd TODO.md Fizetés.
+app.post('/billing/activate', express.json({ limit: '16kb' }), (req, res) => {
+  if (!billingAvailable()) {
+    res.status(503).json({ error: 'billing nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    return;
+  }
+  const { userId, days } = req.body ?? {};
+  activatePro(userId, { days: Number.isFinite(days) ? days : 30, source: 'manual' })
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('Billing activate hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
+});
+
+// 💳 Pro visszavonás — DEV/manuális (teszteléshez). ⚠️ PROD: admin-only.
+app.post('/billing/deactivate', express.json({ limit: '16kb' }), (req, res) => {
+  if (!billingAvailable()) {
+    res.status(503).json({ error: 'billing nincs konfigurálva' });
+    return;
+  }
+  deactivatePro((req.body ?? {}).userId, { source: 'manual', status: 'canceled' })
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('Billing deactivate hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
+});
+
+// 💳 RevenueCat webhook — a VALÓS pénz-út (App Store / Play IAP). A RevenueCat
+// egy általad megadott Authorization-fejlécet küld: RC_WEBHOOK_AUTH env-ből.
+// Beállítva: az egyezést ellenőrizzük; enélkül 503 (nincs bekötve).
+app.post('/billing/revenuecat', express.json({ limit: '256kb' }), (req, res) => {
+  const secret = process.env.RC_WEBHOOK_AUTH;
+  if (!secret || !billingAvailable()) {
+    res.status(503).json({ error: 'RevenueCat webhook nincs konfigurálva (RC_WEBHOOK_AUTH / service_role)' });
+    return;
+  }
+  const auth = req.headers.authorization || '';
+  if (auth !== secret && auth !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  handleRevenueCatEvent(req.body ?? {})
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('RevenueCat webhook hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
 });

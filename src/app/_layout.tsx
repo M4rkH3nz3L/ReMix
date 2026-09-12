@@ -11,6 +11,7 @@ import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
+import { configureBilling } from '@/lib/billing';
 import {
   addNotificationResponseListener,
   getInitialNotificationRoute,
@@ -54,6 +55,12 @@ export default function RootLayout() {
     if (userId) {
       void registerForPush(userId);
     }
+  }, [userId]);
+
+  // 💳 billing (RevenueCat): a usert összekötjük az IAP-fiókkal (logIn), hogy a
+  // webhook a mi user-id-nkra írja a Pro-t. No-op Expo Go-ban / kulcs nélkül.
+  useEffect(() => {
+    void configureBilling(userId);
   }, [userId]);
 
   // 📲 notification-koppintás → deep-link (előtér/háttér + hideg indítás)

@@ -1,19 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { accentGradient, palette } from '@/constants/editor';
+import {
+  activateProDev,
+  billingClientAvailable,
+  purchasePro,
+  PurchaseCancelledError,
+  restorePurchases,
+} from '@/lib/billing';
 import { capabilityLabel, proCapabilities } from '@/lib/capabilities';
-import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 
 /**
  * 🔒 Remix Pro paywall — a felhő-funkciók (AI + felhő-HD render) ajánlata.
  *
  * Egyetlen példány él a szerkesztő gyökerében; a `usePaywall` store nyitja.
- * A vásárlás most `mockUpgrade()` (dev) — éles buildben ezt a natív IAP-réteg
- * (App Store / Play) váltja `setTier('pro', proUntil)`-ra.
+ * A vásárlás VALÓS: RevenueCat IAP (App Store / Play), ha elérhető (natív build
+ * + kulcs); dev-ben a szerver-hiteles /billing/activate (30 nap). A Pro-t a
+ * szerver (`subscriptions`) tartja — a kliens onnan szinkronizál.
  */
 
 /** amit a Pro NEM zár el — hangsúlyozza, hogy az alap ingyen marad */
@@ -24,20 +32,65 @@ export function PaywallSheet() {
   const visible = usePaywall((s) => s.visible);
   const capability = usePaywall((s) => s.capability);
   const close = usePaywall((s) => s.close);
-  const mockUpgrade = useEntitlement((s) => s.mockUpgrade);
+  const [busy, setBusy] = useState(false);
 
   const perks = proCapabilities();
   const trigger = capability ? capabilityLabel(capability) : null;
+  const canBuy = billingClientAvailable();
 
-  const onUpgrade = () => {
-    // DEV: azonnali Pro a teszteléshez. Éles buildben NINCS valódi IAP-réteg
-    // (TODO(IAP): RevenueCat/StoreKit) → nem osztunk ingyen Prót, csak jelezzük.
-    if (__DEV__) {
-      mockUpgrade();
-      close();
+  const onUpgrade = async () => {
+    if (busy) {
       return;
     }
-    Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
+    setBusy(true);
+    try {
+      // 1) VALÓS IAP (RevenueCat) — natív build + kulcs esetén
+      if (canBuy) {
+        const ok = await purchasePro();
+        if (ok) {
+          close();
+        }
+        return;
+      }
+      // 2) DEV: szerver-hiteles aktiválás (30 nap) a workeren át
+      if (__DEV__) {
+        const ok = await activateProDev();
+        if (ok) {
+          close();
+        }
+        return;
+      }
+      // 3) nincs natív build / store-termék → tájékoztatás
+      Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
+    } catch (e) {
+      if (e instanceof PurchaseCancelledError) {
+        return; // felhasználó megszakította — nincs hibajelzés
+      }
+      Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRestore = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const ok = await restorePurchases();
+      Alert.alert(
+        t('paywallSheet.restoreTitle'),
+        ok ? t('paywallSheet.restoreOk') : t('paywallSheet.restoreNone')
+      );
+      if (ok) {
+        close();
+      }
+    } catch (e) {
+      Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -92,7 +145,7 @@ export function PaywallSheet() {
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable onPress={onUpgrade} style={styles.ctaPressable}>
+            <Pressable onPress={onUpgrade} disabled={busy} style={styles.ctaPressable}>
               <LinearGradient
                 colors={[...accentGradient]}
                 start={{ x: 0, y: 0 }}
@@ -101,12 +154,19 @@ export function PaywallSheet() {
               >
                 <Ionicons name="rocket" size={16} color={palette.text} />
                 <Text style={styles.ctaText}>
-                  {t('paywallSheet.activatePro')}
-                  {__DEV__ ? ' (DEV)' : ''}
+                  {busy
+                    ? t('paywallSheet.activating')
+                    : t('paywallSheet.activatePro')}
+                  {!canBuy && __DEV__ ? ' (DEV)' : ''}
                 </Text>
               </LinearGradient>
             </Pressable>
-            <Pressable onPress={close} style={styles.dismiss}>
+            {canBuy ? (
+              <Pressable onPress={onRestore} disabled={busy} style={styles.dismiss}>
+                <Text style={styles.dismissText}>{t('paywallSheet.restore')}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={close} disabled={busy} style={styles.dismiss}>
               <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
             </Pressable>
             <Text style={styles.legal}>{t('paywallSheet.legal')}</Text>

@@ -1456,7 +1456,13 @@
     "notNow": "Jetzt nicht",
     "comingSoonTitle": "Bald verfügbar",
     "comingSoonBody": "In-App-Käufe sind noch nicht verfügbar — Pro wird in einem künftigen Update kaufbar sein.",
-    "legal": "Käufe laufen aktuell im Entwickler-Testmodus (sofortiges Pro). In Produktions-Builds tritt ein App Store / Play-Abo an dessen Stelle."
+    "legal": "Käufe laufen aktuell im Entwickler-Testmodus (sofortiges Pro). In Produktions-Builds tritt ein App Store / Play-Abo an dessen Stelle.",
+    "errorTitle": "Kauf-Fehler",
+    "activating": "Wird aktiviert…",
+    "restore": "Käufe wiederherstellen",
+    "restoreTitle": "Wiederherstellen",
+    "restoreOk": "Dein Pro-Abo wurde wiederhergestellt.",
+    "restoreNone": "Kein aktiver Kauf gefunden."
   },
   "playerScreen": {
     "quizCorrect": "Richtige Antwort! 🎉",
@@ -1811,6 +1817,12 @@
       "phaseDownload": "Herunterladen aufs Gerät",
       "phaseDone": "Fertig",
       "importFailed": "Import fehlgeschlagen."
+    },
+    "billing": {
+      "iapUnavailable": "In-App-Kauf ist in diesem Build nicht verfügbar.",
+      "noOffer": "Derzeit ist kein Pro-Angebot verfügbar.",
+      "noUser": "Bitte melde dich zuerst an.",
+      "activateFailed": "Aktivierung fehlgeschlagen."
     }
   },
   "store": {

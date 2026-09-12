@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { deactivateProDev } from '@/lib/billing';
 import { isNativeRenderAvailable } from '@/lib/nativeRender';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -63,7 +64,6 @@ export function ExportPanel() {
   const restoreProject = useEditorStore((s) => s.restoreProject);
   const isPro = useEntitlement((s) => s.isPro());
   const proUntil = useEntitlement((s) => s.proUntil);
-  const mockDowngrade = useEntitlement((s) => s.mockDowngrade);
   const openPaywall = usePaywall((s) => s.open);
   const [renderStatus, setRenderStatus] = useState<string | null>(null);
   const [collectStatus, setCollectStatus] = useState<string | null>(null);
@@ -249,7 +249,7 @@ export function ExportPanel() {
         // a hosszú-nyomásos Free-re-váltás CSAK dev-buildben (rejtett teszt-gesztus)
         <Pressable
           style={styles.proActive}
-          onLongPress={__DEV__ ? mockDowngrade : undefined}
+          onLongPress={__DEV__ ? () => void deactivateProDev() : undefined}
         >
           <Ionicons name="sparkles" size={15} color={palette.accent} />
           <Text style={styles.proActiveText}>

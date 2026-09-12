@@ -1456,7 +1456,13 @@
     "notNow": "Not now",
     "comingSoonTitle": "Coming soon",
     "comingSoonBody": "In-app purchases aren't available yet — Pro will be purchasable in a future update.",
-    "legal": "Purchases are currently in developer test mode (instant Pro). In production builds an App Store / Play subscription takes its place."
+    "legal": "Purchases are currently in developer test mode (instant Pro). In production builds an App Store / Play subscription takes its place.",
+    "errorTitle": "Purchase error",
+    "activating": "Activating…",
+    "restore": "Restore purchases",
+    "restoreTitle": "Restore",
+    "restoreOk": "Your Pro subscription was restored.",
+    "restoreNone": "No active purchase found."
   },
   "playerScreen": {
     "quizCorrect": "Correct answer! 🎉",
@@ -1811,6 +1817,12 @@
       "phaseDownload": "Downloading to device",
       "phaseDone": "Done",
       "importFailed": "Import failed."
+    },
+    "billing": {
+      "iapUnavailable": "In-app purchase isn't available on this build.",
+      "noOffer": "No Pro offer is available right now.",
+      "noUser": "Please sign in first.",
+      "activateFailed": "Activation failed."
     }
   },
   "store": {

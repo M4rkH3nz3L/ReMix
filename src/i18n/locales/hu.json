@@ -1456,7 +1456,13 @@
     "notNow": "Most nem",
     "comingSoonTitle": "Hamarosan",
     "comingSoonBody": "Az alkalmazáson belüli vásárlás még nem elérhető — a Pro egy későbbi frissítésben lesz megvásárolható.",
-    "legal": "A vásárlás most fejlesztői teszt-mód (azonnali Pro). Éles buildben az App Store / Play előfizetés lép a helyére."
+    "legal": "A vásárlás most fejlesztői teszt-mód (azonnali Pro). Éles buildben az App Store / Play előfizetés lép a helyére.",
+    "errorTitle": "Vásárlási hiba",
+    "activating": "Aktiválás…",
+    "restore": "Vásárlások visszaállítása",
+    "restoreTitle": "Visszaállítás",
+    "restoreOk": "A Pro-előfizetésed visszaállítva.",
+    "restoreNone": "Nincs aktív vásárlás."
   },
   "playerScreen": {
     "quizCorrect": "Helyes válasz! 🎉",
@@ -1811,6 +1817,12 @@
       "phaseDownload": "Letöltés az eszközre",
       "phaseDone": "Kész",
       "importFailed": "Az import nem sikerült."
+    },
+    "billing": {
+      "iapUnavailable": "Az alkalmazáson belüli vásárlás ebben a buildben nem érhető el.",
+      "noOffer": "Jelenleg nincs elérhető Pro-ajánlat.",
+      "noUser": "Előbb jelentkezz be.",
+      "activateFailed": "Az aktiválás nem sikerült."
     }
   },
   "store": {

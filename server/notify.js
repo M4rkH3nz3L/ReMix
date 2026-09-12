@@ -172,4 +172,4 @@ async function inviteMember(input) {
   return { status: 'pending', email };
 }
 
-module.exports = { notifyAvailable, sendNotification, inviteMember };
+module.exports = { adminClient, notifyAvailable, sendNotification, inviteMember };

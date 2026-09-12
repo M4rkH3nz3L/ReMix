@@ -22,12 +22,15 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 - [ ] **BYOK SSRF-védelem** — a worker a felhasználó `baseUrl`-jére POST-ol
   (`server/ai.js` `runOpenAICompatible`, lásd a kód SSRF-megjegyzését). Prod-ban
   **provider-allowlist** (csak ismert AI-hosztok), vagy belső-IP tiltás.
-- [ ] **`/notify` + `/invite` jogosultság** — a worker `POST /notify` és
-  `POST /invite` service_role-lal ír (megkerüli az RLS-t), ma hitelesítés NÉLKÜL
-  (dev). Prod-ban a hívó Supabase JWT-jét verifikálni kell + eldönteni **ki kinek
-  küldhet / ki hívhat meg** (invite: csak a projekt TULAJA). Enélkül bárki
-  bármelyik projektbe felvehet tagot / spam-elhet. A worker általános JWT-
-  tételéhez kötve (lásd fentebb). Az `user_id_by_email` RPC már service_role-only.
+- [ ] **`/notify` + `/invite` + `/billing/activate` jogosultság** — a worker ezen
+  végpontjai service_role-lal írnak (megkerülik az RLS-t), ma hitelesítés NÉLKÜL
+  (dev). Prod-ban a hívó Supabase JWT-jét verifikálni kell + jogosultság: notify
+  (**ki kinek küldhet**), invite (**csak a tulaj hívhat meg**), billing/activate
+  (**admin/promó-only** — a valós Pro a RevenueCat webhookon jöjjön, ne ezen az
+  úton). Enélkül bárki tagot vehet fel / spam-elhet / **ingyen Pro-t adhat magának**.
+  A worker általános JWT-tételéhez kötve (lásd fentebb). Az `user_id_by_email` RPC
+  már service_role-only. A `/billing/revenuecat` webhook már `RC_WEBHOOK_AUTH`
+  fejléc-ellenőrzés mögött van.
 - [ ] **Dev-override kizárása prodból** — az `entitlementStore.mockUpgrade()`
   (dev Pro-kapcsoló) NE legyen elérhető prod buildben; a Pro KIZÁRÓLAG a
   Supabase `subscriptions`-ből jöjjön (Phase 0 kész — a mock-gombokat `__DEV__`
@@ -61,11 +64,24 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
   CI/EAS secret-store-ból.
 
 ### Fizetés
-- [ ] **Billing (RevenueCat)** — valós Pro-bevételhez (Phase 6). Store-termékek
-  (App Store / Play), `react-native-purchases` SDK, sikeres vásárlás →
-  `entitlement.setTier('pro', proUntil)`, webhook → `subscriptions` tábla
-  (`source:'revenuecat'`). **A Phase 0 backend erre kész**; store-setup + eszköz-
-  teszt kell hozzá.
+A Pro szerver-hiteles (`subscriptions` tábla, dátumos 30 napos időszakok); a
+kliens onnan szinkronizál, self-grant NINCS. A teljes kód KÉSZ és tesztelt
+(worker `billing.js` + `/billing/activate` + RevenueCat webhook `/billing/revenuecat`;
+kliens `lib/billing.ts` + paywall valós aktiválás + „vásárlások visszaállítása").
+A go-live-hoz külső fiók/build kell:
+- [ ] **RevenueCat élesítés** — RevenueCat-fiók + App Store Connect / Play Console
+  **előfizetési termék** (30 napos), a terméket egy „pro" **entitlementhez** kötni.
+  Kulcsok env-be: `EXPO_PUBLIC_RC_IOS_KEY` / `EXPO_PUBLIC_RC_ANDROID_KEY` (kliens),
+  `RC_WEBHOOK_AUTH` (worker — a webhook Authorization-fejléce). A RevenueCat
+  dashboardon a webhook URL = `<CLOUD_URL>/billing/revenuecat`.
+- [ ] **EAS natív build** — `react-native-purchases` natív modul; Expo Go-ban a
+  vásárlás nem elérhető (a kliens dev-ben a szerver-hiteles `/billing/activate`
+  útra esik vissza — 30 nap). Éles pénz csak dev/prod buildben + store-termékkel.
+- [ ] **`/billing/activate` prod-védelme** — ma dev/manuális/promó út auth NÉLKÜL
+  (bárki aktiválhat). Prod-ban: admin/promó-only VAGY teljesen kikapcsolva; a valós
+  aktiválás KIZÁRÓLAG a RevenueCat webhookon jöjjön (lásd Biztonság: worker JWT).
+- Backend + kliens flow: **KÉSZ** (deven end-to-end tesztelve — activate/renewal/
+  webhook auth/EXPIRATION).
 
 ---
 

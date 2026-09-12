@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import {
   listFeed,
@@ -29,6 +31,13 @@ import {
   toggleSave,
 } from '@/lib/feed';
 import type { FeedMode, FeedPost } from '@/types/social';
+import type { InteractiveClip } from '@/types/project';
+
+/** Egy poszt interaktív (hotspot) klipjei a hordozott project-snapshotból. */
+function hotspotsOf(post: FeedPost): InteractiveClip[] {
+  const track = post.projectSnapshot?.tracks?.find((tr) => tr.type === 'interactive');
+  return (track?.clips ?? []).filter((c): c is InteractiveClip => c.kind === 'interactive');
+}
 
 function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -44,6 +53,7 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [hotspotTime, setHotspotTime] = useState(0);
 
   // egyetlen lejátszó, ami az AKTÍV poszt videójára vált (renderelt MP4 URL)
   const player = useVideoPlayer(null, (p) => {
@@ -141,6 +151,35 @@ export default function FeedScreen() {
     }
   }, [activeId, posts, player]);
 
+  // hotspot-időzítés: az aktív poszt lejátszási idejét figyeljük (ha van hotspot)
+  useEffect(() => {
+    const active = posts.find((p) => p.id === activeId);
+    if (!active || hotspotsOf(active).length === 0) {
+      return;
+    }
+    const iv = setInterval(() => setHotspotTime(player.currentTime ?? 0), 250);
+    return () => clearInterval(iv);
+  }, [activeId, posts, player]);
+
+  const handleHotspot = (clip: InteractiveClip) => {
+    const a = clip.action;
+    if (a.type === 'url') {
+      Linking.openURL(a.url).catch(() => {});
+    } else if (a.type === 'seek') {
+      player.currentTime = a.toTime;
+    } else if (a.type === 'quiz') {
+      Alert.alert(
+        a.question,
+        undefined,
+        a.answers.map((ans, i) => ({
+          text: ans,
+          onPress: () =>
+            Alert.alert(i === a.correctIndex ? '✅' : '❌', ans),
+        }))
+      );
+    }
+  };
+
   const openCreator = (post: FeedPost) => router.push(`/channel/${post.creator.id}`);
   const onTapItem = (post: FeedPost) => {
     if (post.id === activeId && post.videoUri) {
@@ -175,6 +214,23 @@ export default function FeedScreen() {
           <LinearGradient colors={['#1a1e2e', '#0c0d12', '#241a3a']} style={StyleSheet.absoluteFill} />
         )}
       </Pressable>
+
+      {/* interaktív hotspotok (az aktív, épp látható időablakban) */}
+      {item.id === activeId
+        ? hotspotsOf(item)
+            .filter((c) => hotspotTime >= c.start && hotspotTime < c.start + c.duration)
+            .map((c) => (
+              <HotspotOverlay
+                key={c.id}
+                clip={c}
+                t={hotspotTime - c.start}
+                box={{ w: width, h: pageHeight }}
+                mode="play"
+                selected={false}
+                onPress={handleHotspot}
+              />
+            ))
+        : null}
 
       {/* felül: cím + típus */}
       {!item.posterUri ? (
@@ -226,6 +282,12 @@ export default function FeedScreen() {
 
       {/* alul-bal: alkotó + felirat */}
       <View style={[styles.caption, { bottom: BOTTOM_NAV_HEIGHT + 24 }]}>
+        {item.promoted ? (
+          <View style={styles.sponsored}>
+            <Ionicons name="megaphone" size={11} color="#fff" />
+            <Text style={styles.sponsoredText}>{t('feed.sponsored')}</Text>
+          </View>
+        ) : null}
         <Pressable onPress={() => openCreator(item)}>
           <Text style={styles.creator}>@{item.creator.username}</Text>
         </Pressable>
@@ -348,6 +410,17 @@ const styles = StyleSheet.create({
   caption: { position: 'absolute', left: 14, right: 84, gap: 5 },
   creator: { color: '#fff', fontSize: 16, fontWeight: '800' },
   captionText: { color: '#fff', fontSize: 14 },
+  sponsored: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: '#00000066',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  sponsoredText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   tags: { color: '#cbb8ff', fontSize: 13, fontWeight: '600' },
   remixOf: { color: '#ffffffcc', fontSize: 12, fontWeight: '600' },
 });

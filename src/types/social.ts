@@ -78,6 +78,8 @@ export interface FeedPost {
   remixOfCreator?: string;
   visibility: PostVisibility;
   moderationStatus: ModerationStatus;
+  /** kiemelt (megfizetett promóció) — a feed előre sorolja + jelvényt mutat */
+  promoted?: boolean;
   /** zene-attribúció (SOCIAL §5) — hiányában a cím megy „eredeti hang"-ként */
   music?: string;
   createdAt: string;

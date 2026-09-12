@@ -29,6 +29,7 @@ interface PostRow {
   project_snapshot: Project | null;
   visibility: string;
   moderation_status: string;
+  promoted: boolean;
   remixable: boolean;
   remix_of_post_id: string | null;
   remix_of_creator: string | null;
@@ -45,7 +46,7 @@ interface PostRow {
 }
 
 const POST_COLUMNS =
-  'id, creator_id, project_id, title, description, hashtags, video_url, poster_url, aspect_ratio, duration_sec, project_snapshot, visibility, moderation_status, remixable, remix_of_post_id, remix_of_creator, music, creator_username, creator_name, creator_avatar, likes, comments, saves, views, remixes, created_at';
+  'id, creator_id, project_id, title, description, hashtags, video_url, poster_url, aspect_ratio, duration_sec, project_snapshot, visibility, moderation_status, promoted, remixable, remix_of_post_id, remix_of_creator, music, creator_username, creator_name, creator_avatar, likes, comments, saves, views, remixes, created_at';
 
 function toCreator(r: PostRow): Creator {
   return {
@@ -75,6 +76,7 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     remixOfCreator: r.remix_of_creator ?? undefined,
     visibility: r.visibility as PostVisibility,
     moderationStatus: r.moderation_status as FeedPost['moderationStatus'],
+    promoted: r.promoted,
     music: r.music ?? undefined,
     createdAt: r.created_at,
     counts: { likes: r.likes, comments: r.comments, saves: r.saves, views: r.views, remixes: r.remixes },
@@ -124,6 +126,8 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
     .select(POST_COLUMNS)
     .eq('visibility', 'public')
     .eq('moderation_status', 'ok')
+    // kiemelt (megfizetett) posztok előre, aztán legújabb
+    .order('promoted', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
   if (creatorIds) {

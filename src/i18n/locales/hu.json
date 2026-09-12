@@ -2055,7 +2055,8 @@
     "remix": "Remix",
     "shareToFeed": "Megosztás a feedbe",
     "sharedOk": "A videód felkerült a feedre.",
-    "rendering": "Renderelés és megosztás…"
+    "rendering": "Renderelés és megosztás…",
+    "sponsored": "Kiemelt"
   },
   "channel": {
     "posts": "Posztok",
@@ -2065,5 +2066,26 @@
     "following2": "Követve",
     "editProfile": "Profil szerkesztése",
     "noPosts": "Még nincs poszt."
+  },
+  "promote": {
+    "cta": "Kiemelés",
+    "hint": "Emeld ki ezt a posztot: adj meg egy büdzsét és egy nézőnkénti összeget — előrébb kerül a feedben, amíg a büdzsé tart.",
+    "budget": "Büdzsé (kredit)",
+    "costPerView": "Nézőnkénti összeg (kredit)",
+    "target": "≈ {{views}} megtekintés",
+    "confirm": "Kiemelés {{budget}} 🪙-ért",
+    "done": "Kiemelés elindítva — max. {{views}} megtekintés.",
+    "status_active": "Állapot: aktív",
+    "status_paused": "Állapot: szüneteltetve",
+    "status_done": "Állapot: befejezve"
+  },
+  "stats": {
+    "title": "Statisztika",
+    "views": "▶ {{n}} megtekintés",
+    "likes": "♥ {{n}} kedvelés",
+    "saves": "🔖 {{n}} mentés",
+    "comments": "💬 {{n}} komment",
+    "remixes": "🔀 {{n}} remix",
+    "promoLine": "Kiemelés: {{delivered}}/{{target}} megtekintés · {{spent}} 🪙 elköltve"
   }
 }

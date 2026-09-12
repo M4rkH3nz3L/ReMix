@@ -2055,7 +2055,8 @@
     "remix": "Remix",
     "shareToFeed": "Share to feed",
     "sharedOk": "Your video is live on the feed.",
-    "rendering": "Rendering & sharing…"
+    "rendering": "Rendering & sharing…",
+    "sponsored": "Sponsored"
   },
   "channel": {
     "posts": "Posts",
@@ -2065,5 +2066,26 @@
     "following2": "Following",
     "editProfile": "Edit profile",
     "noPosts": "No posts yet."
+  },
+  "promote": {
+    "cta": "Promote",
+    "hint": "Boost this post: set a budget and an amount per view — it stays higher in the feed until the budget runs out.",
+    "budget": "Budget (credits)",
+    "costPerView": "Cost per view (credits)",
+    "target": "≈ {{views}} views",
+    "confirm": "Promote for {{budget}} 🪙",
+    "done": "Promotion started — up to {{views}} views.",
+    "status_active": "Status: active",
+    "status_paused": "Status: paused",
+    "status_done": "Status: finished"
+  },
+  "stats": {
+    "title": "Statistics",
+    "views": "▶ {{n}} views",
+    "likes": "♥ {{n}} likes",
+    "saves": "🔖 {{n}} saves",
+    "comments": "💬 {{n}} comments",
+    "remixes": "🔀 {{n}} remixes",
+    "promoLine": "Promotion: {{delivered}}/{{target}} views · {{spent}} 🪙 spent"
   }
 }

@@ -126,6 +126,16 @@ Deven end-to-end tesztelt (publikálás/engagement-számlálók/RLS/remix/follow
   `video_url`/`poster_url` üres → a más eszközről jött poszt borító/placeholder).
   Kell: a render + borító feltöltése Supabase Storage-ba (a „Média-fájl felhő-sync"
   tétellel közös), majd inline autoplay (`expo-video`) a feedben.
+- [x] **Feed autoplay + hotspotok + promóció + statisztika** (KÉSZ) — a feed
+  lapozásra autoplayel (expo-video, egy lejátszó az aktív posztra vált); az
+  interaktív **hotspotok** a feedben is működnek (url/seek/quiz, idő-ablakos);
+  **poszt-promóció** (reklám/kiemelés): kredit-büdzsé + nézőnkénti összeg →
+  escrow (`promote_post` RPC) + nézőnkénti költés a `record_post_view`-ban +
+  `promoted` flag → feed-előre + „Kiemelt" jelvény; **statisztika**: posztonkénti
+  számlálók + `creator_totals` aggregátum a csatornán. Deven end-to-end tesztelt.
+- [ ] **Promóció-finomítás** — lemondás/visszatérítés (a maradék büdzsé vissza),
+  szüneteltetés, célzás (közönség/hashtag), a promóció-bevétel ma platform-
+  sink (nincs alkotói részesedés); promotált tartalom moderációja.
 - [ ] **Kommentek** — `post_comments` tábla + UI (a `src/types/social.ts` már
   modellezi: nested reply, mention, pin). Ma a komment-szám placeholder.
 - [ ] **For-You ranking** — ma „legújabb"; később engagement/hasonlóság-alapú

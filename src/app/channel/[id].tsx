@@ -7,16 +7,26 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { getChannel, remixFromPost, toggleFollow, type ChannelData } from '@/lib/feed';
+import { deletePost, getChannel, remixFromPost, toggleFollow, type ChannelData } from '@/lib/feed';
+import { InsufficientCreditsError } from '@/lib/shop';
+import {
+  creatorTotals,
+  postPromotion,
+  promotePost,
+  type CreatorTotals,
+} from '@/lib/promotion';
 import type { FeedPost } from '@/types/social';
 
 function compact(n: number): string {
@@ -32,6 +42,11 @@ export default function ChannelScreen() {
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
   const [followers, setFollowers] = useState(0);
+  const [totals, setTotals] = useState<CreatorTotals | null>(null);
+  const [promoteFor, setPromoteFor] = useState<FeedPost | null>(null);
+  const [budget, setBudget] = useState('50');
+  const [cpv, setCpv] = useState('1');
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     if (!id) {
@@ -43,6 +58,9 @@ export default function ChannelScreen() {
         setFollowing(d.isFollowing);
         setFollowers(d.followers);
       })
+      .catch(() => {});
+    creatorTotals(id)
+      .then(setTotals)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
@@ -61,9 +79,53 @@ export default function ChannelScreen() {
     toggleFollow(id, next).catch(() => {});
   };
 
+  const showStats = (post: FeedPost) => {
+    postPromotion(post.id)
+      .then((promo) => {
+        const lines = [
+          t('stats.views', { n: post.counts.views }),
+          t('stats.likes', { n: post.counts.likes }),
+          t('stats.saves', { n: post.counts.saves }),
+          t('stats.comments', { n: post.counts.comments }),
+          t('stats.remixes', { n: post.counts.remixes }),
+        ];
+        if (promo) {
+          lines.push(
+            '',
+            t('stats.promoLine', {
+              delivered: promo.viewsDelivered,
+              target: promo.viewsTarget,
+              spent: promo.spentCredits,
+            }),
+            t(`promote.status_${promo.status}`)
+          );
+        }
+        Alert.alert(t('stats.title'), lines.join('\n'));
+      })
+      .catch(() => {});
+  };
+
   const openPost = (post: FeedPost) => {
-    if (post.projectId && data?.isMe) {
-      router.push(`/player/${post.projectId}`);
+    if (data?.isMe) {
+      // saját poszt → kezelés: kiemelés / statisztika / (lejátszás) / törlés
+      const buttons: {
+        text: string;
+        style?: 'cancel' | 'destructive';
+        onPress?: () => void;
+      }[] = [
+        { text: t('promote.cta'), onPress: () => setPromoteFor(post) },
+        { text: t('stats.title'), onPress: () => showStats(post) },
+      ];
+      if (post.projectId) {
+        buttons.push({ text: t('feed.remix'), onPress: () => router.push(`/player/${post.projectId}`) });
+      }
+      buttons.push({
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => deletePost(post.id).then(load).catch(() => {}),
+      });
+      buttons.push({ text: t('common.cancel'), style: 'cancel' });
+      Alert.alert(post.title, undefined, buttons);
       return;
     }
     if (post.remixable && post.projectSnapshot) {
@@ -81,6 +143,38 @@ export default function ChannelScreen() {
       ]);
     }
   };
+
+  const doPromote = () => {
+    if (!promoteFor || busy) {
+      return;
+    }
+    const b = parseInt(budget, 10) || 0;
+    const c = Math.max(1, parseInt(cpv, 10) || 1);
+    setBusy(true);
+    promotePost(promoteFor.id, b, c)
+      .then((r) => {
+        setPromoteFor(null);
+        Alert.alert(t('promote.cta'), t('promote.done', { views: r.viewsTarget }));
+        load();
+      })
+      .catch((e: unknown) => {
+        if (e instanceof InsufficientCreditsError) {
+          Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('shop.buyCredits'), onPress: () => router.push('/shop') },
+          ]);
+        } else {
+          Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => setBusy(false));
+  };
+
+  const targetViews = (() => {
+    const b = parseInt(budget, 10) || 0;
+    const c = Math.max(1, parseInt(cpv, 10) || 1);
+    return Math.floor(b / c);
+  })();
 
   const displayName = data?.creator?.displayName ?? t('nav.channel');
   const username = data?.creator?.username ?? (id ?? '').slice(0, 8);
@@ -150,6 +244,13 @@ export default function ChannelScreen() {
                   <Text style={styles.statLabel}>{t('channel.following')}</Text>
                 </View>
               </View>
+              {totals ? (
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsText}>
+                    ▶ {compact(totals.views)} · ♥ {compact(totals.likes)} · 🔀 {compact(totals.remixes)}
+                  </Text>
+                </View>
+              ) : null}
               {data?.isMe ? (
                 <Pressable style={styles.editBtn} onPress={() => router.push('/profile')}>
                   <Ionicons name="settings-outline" size={16} color={palette.text} />
@@ -170,6 +271,47 @@ export default function ChannelScreen() {
           ListEmptyComponent={<Text style={styles.empty}>{t('channel.noPosts')}</Text>}
         />
       )}
+
+      {/* — kiemelés (promóció) modal — */}
+      <Modal
+        visible={promoteFor !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPromoteFor(null)}
+      >
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPromoteFor(null)} />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{t('promote.cta')}</Text>
+            <Text style={styles.sheetHint}>{t('promote.hint')}</Text>
+            <Text style={styles.fieldLabel}>{t('promote.budget')}</Text>
+            <TextInput
+              style={styles.input}
+              value={budget}
+              onChangeText={setBudget}
+              keyboardType="number-pad"
+              placeholderTextColor={palette.textDim}
+            />
+            <Text style={styles.fieldLabel}>{t('promote.costPerView')}</Text>
+            <TextInput
+              style={styles.input}
+              value={cpv}
+              onChangeText={setCpv}
+              keyboardType="number-pad"
+              placeholderTextColor={palette.textDim}
+            />
+            <Text style={styles.targetText}>{t('promote.target', { views: targetViews })}</Text>
+            <View style={{ marginTop: 10 }}>
+              <PrimaryButton
+                label={t('promote.confirm', { budget: parseInt(budget, 10) || 0 })}
+                icon="megaphone-outline"
+                onPress={doPromote}
+                disabled={busy || targetViews < 1}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <BottomNav active="channel" />
     </SafeAreaView>
@@ -236,4 +378,31 @@ const styles = StyleSheet.create({
   gridViews: { position: 'absolute', left: 5, bottom: 5, flexDirection: 'row', alignItems: 'center', gap: 3 },
   gridViewsText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   empty: { color: palette.textDim, textAlign: 'center', paddingVertical: 40 },
+  totalsRow: { marginTop: 10, backgroundColor: palette.surfaceHigh, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  totalsText: { color: palette.text, fontSize: 13, fontWeight: '700' },
+  backdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 20,
+    gap: 8,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  sheetTitle: { color: palette.text, fontSize: 18, fontWeight: '800' },
+  sheetHint: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
+  fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
+  input: {
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: palette.text,
+    fontSize: 15,
+  },
+  targetText: { color: palette.accent, fontSize: 14, fontWeight: '700', marginTop: 8 },
 });
+

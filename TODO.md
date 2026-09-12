@@ -30,7 +30,10 @@ Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
   úton). Enélkül bárki tagot vehet fel / spam-elhet / **ingyen Pro-t adhat magának**.
   A worker általános JWT-tételéhez kötve (lásd fentebb). Az `user_id_by_email` RPC
   már service_role-only. A `/billing/revenuecat` webhook már `RC_WEBHOOK_AUTH`
-  fejléc-ellenőrzés mögött van.
+  fejléc-ellenőrzés mögött van. Ugyanez a `/shop/credits/grant`-ra (kredit-
+  önkiosztás veszélye) — a valós top-up csak a RevenueCat consumable webhookon.
+  A vásárlás (`purchase_shop_item`) már atomikus SECURITY DEFINER RPC (self-grant
+  kizárva), a `user_credits`/`grant_credits` írás service_role-only.
 - [ ] **Dev-override kizárása prodból** — az `entitlementStore.mockUpgrade()`
   (dev Pro-kapcsoló) NE legyen elérhető prod buildben; a Pro KIZÁRÓLAG a
   Supabase `subscriptions`-ből jöjjön (Phase 0 kész — a mock-gombokat `__DEV__`
@@ -82,6 +85,29 @@ A go-live-hoz külső fiók/build kell:
   aktiválás KIZÁRÓLAG a RevenueCat webhookon jöjjön (lásd Biztonság: worker JWT).
 - Backend + kliens flow: **KÉSZ** (deven end-to-end tesztelve — activate/renewal/
   webhook auth/EXPIRATION).
+
+### Shop / marketplace (kredit / Facebook-Stars-modell)
+A userek eladhatják a saját tartalmaikat (ma: projekt-sablon), mások kredittel
+megvehetik és HASZNÁLHATJÁK. Kredit-egyenleg **szerver-hiteles** (`user_credits`,
+RLS csak olvasás); vásárlás **atomikus RPC**-n (`purchase_shop_item`: levon/jóváír
++30% platform-jutalék/rögzít); payload **RLS-gate-elt** (csak eladó/vevő). Backend
++ kliens + UI **KÉSZ**, deven end-to-end tesztelt (publikálás/vétel/jutalék/gating/
+kredit-top-up dev+RevenueCat consumable). Go-live:
+- [ ] **Kredit-csomag IAP** — RevenueCat **consumable** termékek (`credits_100`,
+  `credits_500`, `credits_1200`) a store-okban; a kliens kredit-vásárlás kösse
+  ezekre (ma dev `/shop/credits/grant`). A webhook már kezeli a `credits_<n>`
+  productot → jóváírás.
+- [ ] **Alkotói kifizetés (payout)** — a gyűjtött kredit valós pénzre váltása
+  (Stripe Connect / manuális), KYC/adó/kifizetés-megfelelőség. Ez a „creators cash
+  out" rész; a `credit_transactions` napló + `payout` kind már megvan.
+- [ ] **Asset-tárolás** — a nem-sablon típusokhoz (overlay/LUT/SFX/font) fájl-
+  feltöltés (Supabase Storage) + előnézet (`preview_url`); ma a payload JSON
+  (projekt-sablon). A `kind` mezők + UI már készek.
+- [ ] **Moderáció** — jelentés/eltávolítás, tartalom-szabályzat, spam/szerzői jog
+  szűrés (a piactér skálázásához).
+- [ ] **`/shop/credits/grant` prod-védelme** — ma dev/manuális, auth NÉLKÜL
+  (bárki adhat magának kreditet). Prod-ban admin-only / kikapcsolva; a valós
+  top-up KIZÁRÓLAG a RevenueCat consumable webhookon (lásd Biztonság).
 
 ---
 

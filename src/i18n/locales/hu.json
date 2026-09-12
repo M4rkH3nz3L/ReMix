@@ -271,6 +271,49 @@
       "description": "Egy gondolat, ami megállítja a görgetést",
       "line0": "„Ide jön az idézet, ami megállítja a görgetést.\"",
       "line1": "— a szerző"
+    },
+    "pov": {
+      "name": "POV",
+      "description": "Magával ragadó nézőpont-sztori ütős csattanóval",
+      "line0": "POV: most találtál…",
+      "line1": "Meséld el itt a sztorit…",
+      "line2": "Várd ki a végét 🤯"
+    },
+    "listicle": {
+      "name": "Lista",
+      "description": "Pörgős „3 dolog” lista, ami végignézeti a videót",
+      "line0": "3 DOLOG, AMIT BÁRCSAK TUDTAM VOLNA",
+      "line1": "1. Első…",
+      "line2": "2. Második…",
+      "line3": "3. Harmadik…"
+    },
+    "tutorial": {
+      "name": "Útmutató",
+      "description": "Lépésről lépésre bemutató, tiszta lépésekkel",
+      "line0": "ÍGY CSINÁLD 🧠",
+      "line1": "1. lépés — …",
+      "line2": "2. lépés — …",
+      "line3": "3. lépés — …"
+    },
+    "promo-sale": {
+      "name": "Akció / Promó",
+      "description": "Energikus kedvezmény-promó kóddal és CTA-val",
+      "line0": "AKCIÓ 🔥",
+      "line1": "-50% MA",
+      "line2": "Kód: SAVE50",
+      "line3": "Vásárolj most ➡️"
+    },
+    "testimonial": {
+      "name": "Vélemény",
+      "description": "Vásárlói idézet 5 csillagos nyomatékkal (social proof)",
+      "line0": "„Ez mindent megváltoztatott nálam.”",
+      "line1": "★★★★★ — elégedett vásárló"
+    },
+    "meme": {
+      "name": "Mém",
+      "description": "Felső és alsó feliratos mém-formátum",
+      "line0": "AMIKOR A VÁGÁS",
+      "line1": "EGYSZERŰEN ÜT"
     }
   },
   "editor": {
@@ -1946,5 +1989,49 @@
     },
     "noAccess": "Nincs hozzáférésed ehhez a projekthez.",
     "viewerBanner": "Néző — csak olvasható. A módosításaid nem menthetők a felhőbe."
+  },
+  "shop": {
+    "title": "Piactér",
+    "tabBrowse": "Böngészés",
+    "tabPurchases": "Vásárlásaim",
+    "tabSell": "Eladás",
+    "allKinds": "Mind",
+    "kind": {
+      "template": "Sablon",
+      "overlay": "Réteg",
+      "lut": "LUT",
+      "sfx": "Hang",
+      "sticker": "Matrica",
+      "font": "Betű",
+      "preset": "Beállítás"
+    },
+    "free": "Ingyen",
+    "creator": "Alkotó",
+    "buyFor": "Megveszem · {{price}} 🪙",
+    "getFree": "Ingyen elveszem",
+    "owned": "Megvéve",
+    "useInProject": "Használd a projektben",
+    "useUnsupported": "Ez a típus még nem nyitható projektként.",
+    "boughtTitle": "Megvéve",
+    "boughtBody": "A(z) {{title}} a tiéd. Használod most?",
+    "needCreditsTitle": "Nincs elég kredit",
+    "needCreditsBody": "Tölts fel kreditet a vásárláshoz.",
+    "buyCredits": "Kredit vásárlása",
+    "emptyBrowse": "Még nincs tétel — legyél te az első eladó!",
+    "emptyPurchases": "Még nem vásároltál semmit.",
+    "emptyListings": "Még nem árulsz semmit.",
+    "live": "Élő",
+    "removed": "Levéve",
+    "unpublish": "Levétel",
+    "unpublishConfirm": "Leveszed ezt a tételt a piacról?",
+    "publishCta": "Tétel eladása",
+    "publishHint": "Tedd közzé az egyik projekted sablonként, amit mások megvehetnek és használhatnak.",
+    "publishNow": "Közzététel",
+    "publishedOk": "A tételed felkerült a piactérre.",
+    "publishNoProject": "A projekt betöltése nem sikerült.",
+    "titleLabel": "Cím",
+    "priceLabel": "Ár (kredit)",
+    "creditsHint": "A kredit a piactér fizetőeszköze. Az éles appban App Store / Play-en veszed; itt (dev) azonnal jóváíródik.",
+    "devGrant": "dev"
   }
 }

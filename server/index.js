@@ -35,7 +35,13 @@ const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
-const { billingAvailable, activatePro, deactivatePro, handleRevenueCatEvent } = require('./billing');
+const {
+  billingAvailable,
+  activatePro,
+  deactivatePro,
+  grantCredits,
+  handleRevenueCatEvent,
+} = require('./billing');
 
 const WHISPER_MODEL =
   process.env.WHISPER_MODEL || path.join(__dirname, 'models', 'ggml-base.bin');
@@ -345,6 +351,22 @@ app.post('/billing/activate', express.json({ limit: '16kb' }), (req, res) => {
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('Billing activate hiba:', err.message);
+      res.status(400).json({ error: err.message });
+    });
+});
+
+// 🪙 Shop kredit feltöltés — DEV/manuális (a valós top-up a RevenueCat consumable
+// webhookon, `credits_<n>` product). ⚠️ PROD: admin-only / valós fizetés-igazolás.
+app.post('/shop/credits/grant', express.json({ limit: '16kb' }), (req, res) => {
+  if (!billingAvailable()) {
+    res.status(503).json({ error: 'billing nincs konfigurálva' });
+    return;
+  }
+  const { userId, amount } = req.body ?? {};
+  grantCredits(userId, Number.isFinite(amount) ? amount : 100, 'topup', 'manual')
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('Credit grant hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
 });

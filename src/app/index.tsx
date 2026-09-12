@@ -31,9 +31,7 @@ import {
 } from '@/constants/templates';
 import type { VideoTemplate } from '@/constants/templates';
 import { useLayout } from '@/hooks/useLayout';
-import { withProgress } from '@/store/progressStore';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
-import { createDemoProjects } from '@/lib/demoProjects';
 import { makeId } from '@/lib/id';
 import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
@@ -94,7 +92,6 @@ export default function ProjectsScreen() {
   const [aspect, setAspect] = useState<AspectRatio>('9:16');
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [demoBusy, setDemoBusy] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [shared, setShared] = useState<SharedProject[]>([]);
   const { t } = useTranslation();
@@ -300,31 +297,14 @@ export default function ProjectsScreen() {
           <Text style={styles.importLabel}>{t('auth.account')}</Text>
         </Pressable>
         <Pressable
-          onPress={() => {
-            if (demoBusy) {
-              return;
-            }
-            setDemoBusy(true);
-            withProgress(t('home.demoProgressLabel'), (report) => createDemoProjects(report))
-              .then((n) => {
-                refresh();
-                Alert.alert(
-                  t('home.demoTitle'),
-                  n > 0 ? t('home.demoCreated', { count: n }) : t('home.demoExist')
-                );
-              })
-              .catch((err: Error) => Alert.alert(t('home.demoTitle'), err.message))
-              .finally(() => setDemoBusy(false));
-          }}
+          onPress={() => router.push('/shop')}
           hitSlop={8}
           style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('shop.title')}
         >
-          <Ionicons
-            name={demoBusy ? 'hourglass-outline' : 'sparkles-outline'}
-            size={20}
-            color={palette.textDim}
-          />
-          <Text style={styles.importLabel}>{demoBusy ? t('home.demosLoading') : t('home.demos')}</Text>
+          <Ionicons name="storefront-outline" size={20} color={palette.accent} />
+          <Text style={[styles.importLabel, { color: palette.accent }]}>{t('shop.title')}</Text>
         </Pressable>
         <Pressable onPress={importVided} hitSlop={8} style={styles.importButton}>
           <Ionicons name="download-outline" size={20} color={palette.textDim} />

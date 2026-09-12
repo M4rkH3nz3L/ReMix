@@ -271,6 +271,49 @@
       "description": "One thought that stops the scroll",
       "line0": "“Your quote that stops the scroll goes here.”",
       "line1": "— the author"
+    },
+    "pov": {
+      "name": "POV",
+      "description": "Immersive point-of-view story with a punchy payoff",
+      "line0": "POV: you just found…",
+      "line1": "Tell the story here…",
+      "line2": "Wait for it 🤯"
+    },
+    "listicle": {
+      "name": "Listicle",
+      "description": "Snappy “3 things” list that keeps viewers watching",
+      "line0": "3 THINGS I WISH I KNEW",
+      "line1": "1. First one…",
+      "line2": "2. Second one…",
+      "line3": "3. Third one…"
+    },
+    "tutorial": {
+      "name": "Tutorial",
+      "description": "Step-by-step how-to with clear on-screen steps",
+      "line0": "HOW TO DO IT 🧠",
+      "line1": "Step 1 — …",
+      "line2": "Step 2 — …",
+      "line3": "Step 3 — …"
+    },
+    "promo-sale": {
+      "name": "Sale / Promo",
+      "description": "High-energy discount promo with a code and CTA",
+      "line0": "SALE 🔥",
+      "line1": "-50% TODAY",
+      "line2": "Code: SAVE50",
+      "line3": "Shop now ➡️"
+    },
+    "testimonial": {
+      "name": "Testimonial",
+      "description": "Customer quote with a 5-star kicker for social proof",
+      "line0": "“This changed everything for me.”",
+      "line1": "★★★★★ — happy customer"
+    },
+    "meme": {
+      "name": "Meme",
+      "description": "Top and bottom caption meme format",
+      "line0": "WHEN THE EDIT",
+      "line1": "JUST HITS DIFFERENT"
     }
   },
   "editor": {
@@ -1946,5 +1989,49 @@
     },
     "noAccess": "You don't have access to this project.",
     "viewerBanner": "Viewer — read-only. Your changes won't be saved to the cloud."
+  },
+  "shop": {
+    "title": "Shop",
+    "tabBrowse": "Browse",
+    "tabPurchases": "My items",
+    "tabSell": "Sell",
+    "allKinds": "All",
+    "kind": {
+      "template": "Template",
+      "overlay": "Overlay",
+      "lut": "LUT",
+      "sfx": "SFX",
+      "sticker": "Sticker",
+      "font": "Font",
+      "preset": "Preset"
+    },
+    "free": "Free",
+    "creator": "Creator",
+    "buyFor": "Buy · {{price}} 🪙",
+    "getFree": "Get free",
+    "owned": "Owned",
+    "useInProject": "Use in project",
+    "useUnsupported": "This item type can't be opened as a project yet.",
+    "boughtTitle": "Purchased",
+    "boughtBody": "{{title}} is yours. Use it now?",
+    "needCreditsTitle": "Not enough credits",
+    "needCreditsBody": "Top up your credits to buy this.",
+    "buyCredits": "Buy credits",
+    "emptyBrowse": "No items yet — be the first to sell!",
+    "emptyPurchases": "You haven't bought anything yet.",
+    "emptyListings": "You're not selling anything yet.",
+    "live": "Live",
+    "removed": "Removed",
+    "unpublish": "Remove",
+    "unpublishConfirm": "Remove this item from the shop?",
+    "publishCta": "Sell an item",
+    "publishHint": "Publish one of your projects as a template others can buy and use.",
+    "publishNow": "Publish",
+    "publishedOk": "Your item is live in the shop.",
+    "publishNoProject": "Couldn't load the project.",
+    "titleLabel": "Title",
+    "priceLabel": "Price (credits)",
+    "creditsHint": "Credits are the shop currency. In the live app you buy them via the App Store / Play; here (dev) they are granted instantly.",
+    "devGrant": "dev"
   }
 }

@@ -65,6 +65,32 @@ async function activatePro(userId, opts = {}) {
   return { tier: 'pro', proUntil: end };
 }
 
+/**
+ * 🪙 Kredit jóváírása (Shop top-up) — service_role, a grant_credits RPC-n át.
+ * IAP consumable (RevenueCat) vagy dev/manuális. Visszaadja az új egyenleget.
+ */
+async function grantCredits(userId, amount, kind = 'topup', note = null) {
+  const sb = adminClient();
+  if (!sb) {
+    throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY nincs beállítva a workeren.');
+  }
+  const uid = String(userId || '').trim();
+  const amt = Math.trunc(Number(amount));
+  if (!uid || !Number.isFinite(amt) || amt <= 0) {
+    throw new Error('userId és pozitív amount kötelező.');
+  }
+  const { data, error } = await sb.rpc('grant_credits', {
+    p_user: uid,
+    p_amount: amt,
+    p_kind: kind,
+    p_note: note,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return { balance: data };
+}
+
 /** Pro visszavonása (lejárat/visszatérítés/lemondás után). */
 async function deactivatePro(userId, opts = {}) {
   const sb = adminClient();
@@ -109,6 +135,13 @@ async function handleRevenueCatEvent(body) {
     throw new Error('app_user_id hiányzik az eseményből.');
   }
   const type = ev.type;
+  // 🪙 Shop kredit-csomag (consumable): a product_id `credits_<n>` alakú → n kredit
+  const creditMatch = /^credits_(\d+)$/.exec(String(ev.product_id || ''));
+  if (creditMatch && (type === 'NON_RENEWING_PURCHASE' || type === 'INITIAL_PURCHASE')) {
+    const amount = parseInt(creditMatch[1], 10);
+    await grantCredits(uid, amount, 'topup', ev.product_id);
+    return { credited: amount };
+  }
   if (RC_GRANT.has(type)) {
     return activatePro(uid, {
       source: 'revenuecat',
@@ -129,5 +162,6 @@ module.exports = {
   billingAvailable,
   activatePro,
   deactivatePro,
+  grantCredits,
   handleRevenueCatEvent,
 };

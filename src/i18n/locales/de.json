@@ -271,6 +271,49 @@
       "description": "Ein Gedanke, der das Scrollen stoppt",
       "line0": "„Hier kommt dein Zitat, das das Scrollen stoppt.“",
       "line1": "— der Autor"
+    },
+    "pov": {
+      "name": "POV",
+      "description": "Immersive Ich-Perspektive mit knackiger Pointe",
+      "line0": "POV: du hast gerade…",
+      "line1": "Erzähl die Story hier…",
+      "line2": "Warte ab 🤯"
+    },
+    "listicle": {
+      "name": "Listicle",
+      "description": "Knackige „3 Dinge“-Liste, die die Zuschauer hält",
+      "line0": "3 DINGE, DIE ICH GERN GEWUSST HÄTTE",
+      "line1": "1. Erstes…",
+      "line2": "2. Zweites…",
+      "line3": "3. Drittes…"
+    },
+    "tutorial": {
+      "name": "Tutorial",
+      "description": "Schritt-für-Schritt-Anleitung mit klaren Schritten",
+      "line0": "SO GEHT’S 🧠",
+      "line1": "Schritt 1 — …",
+      "line2": "Schritt 2 — …",
+      "line3": "Schritt 3 — …"
+    },
+    "promo-sale": {
+      "name": "Sale / Promo",
+      "description": "Energiegeladene Rabattaktion mit Code und CTA",
+      "line0": "SALE 🔥",
+      "line1": "-50% HEUTE",
+      "line2": "Code: SAVE50",
+      "line3": "Jetzt shoppen ➡️"
+    },
+    "testimonial": {
+      "name": "Kundenstimme",
+      "description": "Kundenzitat mit 5-Sterne-Kicker als Social Proof",
+      "line0": "„Das hat für mich alles verändert.“",
+      "line1": "★★★★★ — zufriedener Kunde"
+    },
+    "meme": {
+      "name": "Meme",
+      "description": "Meme-Format mit Text oben und unten",
+      "line0": "WENN DER SCHNITT",
+      "line1": "EINFACH SITZT"
     }
   },
   "editor": {
@@ -1946,5 +1989,49 @@
     },
     "noAccess": "Du hast keinen Zugriff auf dieses Projekt.",
     "viewerBanner": "Betrachter — schreibgeschützt. Deine Änderungen werden nicht in der Cloud gespeichert."
+  },
+  "shop": {
+    "title": "Shop",
+    "tabBrowse": "Entdecken",
+    "tabPurchases": "Meine Käufe",
+    "tabSell": "Verkaufen",
+    "allKinds": "Alle",
+    "kind": {
+      "template": "Vorlage",
+      "overlay": "Overlay",
+      "lut": "LUT",
+      "sfx": "SFX",
+      "sticker": "Sticker",
+      "font": "Schrift",
+      "preset": "Preset"
+    },
+    "free": "Gratis",
+    "creator": "Creator",
+    "buyFor": "Kaufen · {{price}} 🪙",
+    "getFree": "Gratis holen",
+    "owned": "Gekauft",
+    "useInProject": "Im Projekt nutzen",
+    "useUnsupported": "Dieser Typ kann noch nicht als Projekt geöffnet werden.",
+    "boughtTitle": "Gekauft",
+    "boughtBody": "{{title}} gehört dir. Jetzt nutzen?",
+    "needCreditsTitle": "Zu wenig Credits",
+    "needCreditsBody": "Lade Credits auf, um das zu kaufen.",
+    "buyCredits": "Credits kaufen",
+    "emptyBrowse": "Noch keine Artikel — sei der Erste!",
+    "emptyPurchases": "Du hast noch nichts gekauft.",
+    "emptyListings": "Du verkaufst noch nichts.",
+    "live": "Live",
+    "removed": "Entfernt",
+    "unpublish": "Entfernen",
+    "unpublishConfirm": "Diesen Artikel aus dem Shop entfernen?",
+    "publishCta": "Etwas verkaufen",
+    "publishHint": "Veröffentliche eines deiner Projekte als Vorlage, die andere kaufen und nutzen können.",
+    "publishNow": "Veröffentlichen",
+    "publishedOk": "Dein Artikel ist im Shop.",
+    "publishNoProject": "Projekt konnte nicht geladen werden.",
+    "titleLabel": "Titel",
+    "priceLabel": "Preis (Credits)",
+    "creditsHint": "Credits sind die Shop-Währung. In der Live-App kaufst du sie über App Store / Play; hier (dev) werden sie sofort gutgeschrieben.",
+    "devGrant": "dev"
   }
 }

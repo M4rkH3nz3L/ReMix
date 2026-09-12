@@ -114,6 +114,70 @@ export const templates: VideoTemplate[] = [
       { start: 3, duration: 2, y: 0.65, fontSize: 4, color: '#8b90a3', stylePreset: 'plain', animation: 'fade' },
     ],
   },
+  {
+    id: 'pov',
+    emoji: '🎬',
+    aspectRatio: '9:16',
+    trending: true,
+    texts: [
+      { start: 0, duration: 3, y: 0.2, fontSize: 6.5, stylePreset: 'outline', animation: 'slide' },
+      { start: 3, duration: 4, y: 0.78, fontSize: 4.5, stylePreset: 'bubble', animation: 'karaoke' },
+      { start: 7, duration: 2.5, y: 0.5, fontSize: 6, stylePreset: 'neon', color: '#ff5ca8', animation: 'pulse' },
+    ],
+  },
+  {
+    id: 'listicle',
+    emoji: '📋',
+    aspectRatio: '9:16',
+    trending: true,
+    texts: [
+      { start: 0, duration: 2, y: 0.22, fontSize: 7, stylePreset: 'outline', animation: 'pop' },
+      { start: 2, duration: 2.2, y: 0.5, fontSize: 5, stylePreset: 'bubble', animation: 'slide' },
+      { start: 4.2, duration: 2.2, y: 0.5, fontSize: 5, stylePreset: 'bubble', animation: 'slide' },
+      { start: 6.4, duration: 2.2, y: 0.5, fontSize: 5, stylePreset: 'bubble', animation: 'slide' },
+    ],
+  },
+  {
+    id: 'tutorial',
+    emoji: '🧑‍🏫',
+    aspectRatio: '9:16',
+    texts: [
+      { start: 0, duration: 2.5, y: 0.2, fontSize: 6.5, stylePreset: 'outline', animation: 'pop' },
+      { start: 2.5, duration: 2.5, y: 0.8, fontSize: 4.5, stylePreset: 'bubble', animation: 'slide' },
+      { start: 5, duration: 2.5, y: 0.8, fontSize: 4.5, stylePreset: 'bubble', animation: 'slide' },
+      { start: 7.5, duration: 2.5, y: 0.8, fontSize: 4.5, stylePreset: 'bubble', animation: 'slide' },
+    ],
+  },
+  {
+    id: 'promo-sale',
+    emoji: '🔥',
+    aspectRatio: '9:16',
+    trending: true,
+    texts: [
+      { start: 0, duration: 2, y: 0.28, fontSize: 9, color: '#ffd166', stylePreset: 'outline', animation: 'shake' },
+      { start: 2, duration: 2, y: 0.48, fontSize: 7, stylePreset: 'neon', color: '#ff5c72', animation: 'pop' },
+      { start: 4, duration: 2, y: 0.7, fontSize: 5, stylePreset: 'bubble', animation: 'slide' },
+      { start: 6, duration: 2.5, y: 0.85, fontSize: 5.5, stylePreset: 'neon', color: '#2ecc8f', animation: 'pulse' },
+    ],
+  },
+  {
+    id: 'testimonial',
+    emoji: '⭐',
+    aspectRatio: '1:1',
+    texts: [
+      { start: 0, duration: 5, y: 0.4, fontSize: 5.5, stylePreset: 'plain', animation: 'typewriter' },
+      { start: 4, duration: 2, y: 0.62, fontSize: 4, color: '#ffd166', stylePreset: 'plain', animation: 'fade' },
+    ],
+  },
+  {
+    id: 'meme',
+    emoji: '😂',
+    aspectRatio: '9:16',
+    texts: [
+      { start: 0, duration: 6, y: 0.12, fontSize: 6, stylePreset: 'outline', animation: 'pop' },
+      { start: 0, duration: 6, y: 0.88, fontSize: 6, stylePreset: 'outline', animation: 'pop' },
+    ],
+  },
 ];
 
 /** Projekt a sablonból — a szövegsáv előre fel van töltve, a videó a creatoré.

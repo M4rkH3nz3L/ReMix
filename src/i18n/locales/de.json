@@ -708,6 +708,8 @@
       "qkind_dark": "unterbelichtet (dunkel)",
       "qkind_bright": "überbelichtet (hell)",
       "cutToolsNote": "FFmpeg-basierte Stille-, Szenen- und Beat-Analyse auf dem Worker — funktioniert auch ohne KI-Schlüssel.",
+      "sectionSocial": "📱 Social-Format",
+      "socialNote": "Ein Tipp: wechselt zum Seitenverhältnis der Plattform, aktiviert Safe Zones und rahmt die Clips (motivfolgend) auf die neue Leinwand um.",
       "sectionSoundDesign": "🔊 Sound Design AI",
       "sectionSuggestion": "Vorschlag",
       "applyCommandsBtn_one": "{{count}} Aktion anwenden",

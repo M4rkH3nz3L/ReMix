@@ -708,6 +708,8 @@
       "qkind_dark": "alulexponált (sötét)",
       "qkind_bright": "túlexponált (világos)",
       "cutToolsNote": "FFmpeg-alapú csend-, jelenet- és beat-elemzés a workeren — AI-kulcs nélkül is működik.",
+      "sectionSocial": "📱 Social formátum",
+      "socialNote": "Egy koppintás: a platform képarányára vált, bekapcsolja a safe-zone-t, és a klipeket (téma-követő) átkeretezi az új vászonra.",
       "sectionSoundDesign": "🔊 Sound Design AI",
       "sectionSuggestion": "Javaslat",
       "applyCommandsBtn_one": "{{count}} művelet alkalmazása",

@@ -67,6 +67,15 @@ import type { VideoClip } from '@/types/project';
 
 const QUICK_ACTIONS = ['makeEngaging', 'shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
+/** 📱 közösségi platform → cél-képarány (a márkanevek fixek, nem i18n) */
+const SOCIAL_PRESETS: { id: string; label: string; aspect: '16:9' | '9:16' | '1:1' }[] = [
+  { id: 'tiktok', label: 'TikTok', aspect: '9:16' },
+  { id: 'reels', label: 'Reels', aspect: '9:16' },
+  { id: 'shorts', label: 'Shorts', aspect: '9:16' },
+  { id: 'youtube', label: 'YouTube', aspect: '16:9' },
+  { id: 'instagram', label: 'Instagram', aspect: '1:1' },
+];
+
 /**
  * AI-asszisztens (full-plan F3): utasítás → a worker Claude-dal parancslistát
  * készít → jóváhagyás után a Command Bus-on fut le (actor: 'ai'), teljes
@@ -1301,6 +1310,26 @@ export function AssistantPanel() {
     }
   };
 
+  /**
+   * 📱 AI social variant (Phase 4.1): egy platform-gombbal a projekt a helyes
+   * képarányra vált (SET_ASPECT), bekapcsol a safe-zone, és lefut a téma-követő
+   * reframe az új arányra (Pro — a smartReframe kezeli a Pro-gate-et + confirmot).
+   */
+  const applySocialPreset = (aspect: '16:9' | '9:16' | '1:1') => {
+    const state = useEditorStore.getState();
+    if (!state.project) {
+      return;
+    }
+    if (state.project.aspectRatio !== aspect) {
+      state.dispatch({ type: 'SET_ASPECT', aspectRatio: aspect });
+    }
+    if (!state.showSafeZones) {
+      state.toggleSafeZones();
+    }
+    // az arány már frissült (a dispatch szinkron) → reframe az új vászonra
+    smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
+  };
+
   // --- Smart Search (P0‑8) ---
   const [searchQuery, setSearchQuery] = useState('');
   const [searchStatus, setSearchStatus] = useState<string | null>(null);
@@ -1814,6 +1843,20 @@ export function AssistantPanel() {
           }}
         />
         <Text style={styles.note}>{t('panels.assistant.cutToolsNote')}</Text>
+      </PanelSection>
+
+      <PanelSection title={t('panels.assistant.sectionSocial')}>
+        <View style={styles.row}>
+          {SOCIAL_PRESETS.map((p) => (
+            <Chip
+              key={p.id}
+              label={`${p.label} · ${p.aspect}`}
+              active={false}
+              onPress={() => applySocialPreset(p.aspect)}
+            />
+          ))}
+        </View>
+        <Text style={styles.note}>{t('panels.assistant.socialNote')}</Text>
       </PanelSection>
 
       <PanelSection title={t('panels.assistant.sectionSoundDesign')}>

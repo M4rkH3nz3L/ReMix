@@ -9,7 +9,7 @@ import { aspectValue, filters, palette } from '@/constants/editor';
 import { requestCutout } from '@/lib/bgremove';
 import { CAMERA_PRESETS, buildCameraMove } from '@/lib/camera3d';
 import { statsToAutoAdjust, statsToMatchAdjust } from '@/lib/colorAuto';
-import { fetchColorStats } from '@/lib/colorClient';
+import { fetchColorStats, fetchPixelColor } from '@/lib/colorClient';
 import { requestDepthFocus, requestDepthParallax } from '@/lib/depthClient';
 import { faceUnionRegion, fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
@@ -86,6 +86,27 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
   const setPickTarget = useEditorStore((s) => s.setPickTarget);
   const [blurTrackBusy, setBlurTrackBusy] = useState(false);
+
+  /** 🎨 green screen színpipetta: a vásznon rákoppintasz a háttérre → az a kulcs-szín */
+  const pickChromaColor = () => {
+    Alert.alert(t('panels.filter.chromaPickTitle'), t('panels.filter.chromaPickHint'));
+    setPickTarget((point) => {
+      const st = useEditorStore.getState();
+      const atSec =
+        clip.kind === 'video' ? clip.trimIn + Math.max(0, st.playhead - clip.start) * clip.speed : 0;
+      fetchPixelColor(clip.uri, atSec, point.x, point.y)
+        .then((hex) => {
+          if (hex) {
+            updateClip(clip.id, {
+              chromaKey: { similarity: 0.18, ...clip.chromaKey, color: hex },
+            });
+          } else {
+            Alert.alert(t('panels.filter.sectionGreenScreen'), t('panels.filter.chromaPickFailed'));
+          }
+        })
+        .catch(() => {});
+    });
+  };
 
   /** 🎯 blur követi az objektumot: a vásznon rákoppintasz, a régió végigköveti (videón) */
   const trackBlur = (point: { x: number; y: number }) => {
@@ -1209,6 +1230,14 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               })
             }
           />
+          {/* 🎨 színpipetta: a vászonról mintavett kulcs-szín (custom, nem preset) */}
+          <Chip
+            label={t('panels.filter.chromaPick')}
+            active={
+              !!clip.chromaKey && clip.chromaKey.color !== '#00ff00' && clip.chromaKey.color !== '#0000ff'
+            }
+            onPress={pickChromaColor}
+          />
         </View>
         {clip.chromaKey ? (
           <Stepper
@@ -1245,6 +1274,39 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             onInc={() =>
               updateClip(clip.id, {
                 chromaKey: { ...clip.chromaKey!, spill: clamp((clip.chromaKey!.spill ?? 0) + 0.2, 0, 1) },
+              })
+            }
+          />
+        ) : null}
+        {/* 🪶 Feather: az él lágysága (blend); ✂️ Edge: a matte-perem be/kifelé tolása */}
+        {clip.chromaKey ? (
+          <Stepper
+            label={t('panels.filter.feather')}
+            value={`${Math.round((clip.chromaKey.blend ?? 0.05) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, blend: clamp((clip.chromaKey!.blend ?? 0.05) - 0.02, 0, 0.3) },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, blend: clamp((clip.chromaKey!.blend ?? 0.05) + 0.02, 0, 0.3) },
+              })
+            }
+          />
+        ) : null}
+        {clip.chromaKey ? (
+          <Stepper
+            label={t('panels.filter.chromaEdge')}
+            value={`${(clip.chromaKey.edge ?? 0) > 0 ? '+' : ''}${Math.round((clip.chromaKey.edge ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, edge: clamp((clip.chromaKey!.edge ?? 0) - 0.25, -1, 1) },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, edge: clamp((clip.chromaKey!.edge ?? 0) + 0.25, -1, 1) },
               })
             }
           />

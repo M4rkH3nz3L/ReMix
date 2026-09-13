@@ -1278,7 +1278,12 @@
       "matteLuma": "Luma",
       "matteAlpha": "Alpha",
       "matteInvert": "Invert",
-      "noteMatte": "The clip shows only where the matte image is BRIGHT (luma) or OPAQUE (alpha). Clips the layer to an external image/logo/gradient shape — clipping mask in the render."
+      "noteMatte": "The clip shows only where the matte image is BRIGHT (luma) or OPAQUE (alpha). Clips the layer to an external image/logo/gradient shape — clipping mask in the render.",
+      "chromaPick": "🎨 Color picker",
+      "chromaPickTitle": "Color picker",
+      "chromaPickHint": "Tap the background on the canvas — that becomes the key color.",
+      "chromaPickFailed": "Couldn’t sample the color (worker running?).",
+      "chromaEdge": "Edge (choke/grow)"
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

@@ -288,6 +288,12 @@ export interface ChromaKey {
    * a téma pereméről. 0/hiányzó = ki, 0.1–1 = erősség. A renderben `despill`.
    */
   spill?: number;
+  /**
+   * ✂️ Él-igazítás (matte choke/grow): a kulcsolt alfa élének befelé (−, a perem
+   * „megevése") / kifelé (+) tolása. −1…1, 0/hiányzó = ki. A renderben az alfán
+   * `erosion`/`dilation` (|edge|·4 menet) — a zöld/kék maradék-perem eltüntetésére.
+   */
+  edge?: number;
 }
 
 /**

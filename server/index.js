@@ -18,7 +18,7 @@ const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
 const { computeFocusAssets, computeParallaxAssets, depthAvailable, depthLayerDir, ensureDepth } = require('./depth');
 const { bgRemoveAvailable, bgRemoveDir, computeCutout } = require('./bgremove');
-const { colorStats } = require('./color');
+const { colorStats, pixelColor } = require('./color');
 const { detectFaces, faceAvailable } = require('./face');
 const { listStickers3d, renderSticker3d, stickers3dAvailable } = require('./sticker3d');
 const { listSkies, replaceSky } = require('./sky');
@@ -601,6 +601,31 @@ app.post('/color/stats', upload.any(), (req, res) => {
     .catch((err) => {
       cleanup();
       console.error('color-stats hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
+// 🎨 Színpipetta: pixel-szín a médiakockán a (x,y) vászon-normalizált ponton
+app.post('/color/pixel', upload.any(), (req, res) => {
+  const file = (req.files ?? [])[0];
+  if (!file) {
+    res.status(400).json({ error: 'Hiányzó médiafájl.' });
+    return;
+  }
+  const cleanup = () => {
+    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+  };
+  const atSec = Number(req.body.atSec);
+  const x = Number(req.body.x);
+  const y = Number(req.body.y);
+  pixelColor(file.path, Number.isFinite(atSec) ? atSec : 0, Number.isFinite(x) ? x : 0.5, Number.isFinite(y) ? y : 0.5)
+    .then((r) => {
+      cleanup();
+      res.json(r);
+    })
+    .catch((err) => {
+      cleanup();
+      console.error('color-pixel hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
 });

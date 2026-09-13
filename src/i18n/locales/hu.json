@@ -1278,7 +1278,12 @@
       "matteLuma": "Luma",
       "matteAlpha": "Alfa",
       "matteInvert": "Invertálás",
-      "noteMatte": "A klip csak ott látszik, ahol a matte-kép VILÁGOS (luma) vagy ÁTLÁTSZATLAN (alpha). Egy külső kép/logó/gradiens formájára vágja a klipet — clipping mask a renderben."
+      "noteMatte": "A klip csak ott látszik, ahol a matte-kép VILÁGOS (luma) vagy ÁTLÁTSZATLAN (alpha). Egy külső kép/logó/gradiens formájára vágja a klipet — clipping mask a renderben.",
+      "chromaPick": "🎨 Színpipetta",
+      "chromaPickTitle": "Színpipetta",
+      "chromaPickHint": "Koppints a vásznon a hátterre — az lesz a kulcs-szín.",
+      "chromaPickFailed": "Nem sikerült színt mintát venni (fut a worker?).",
+      "chromaEdge": "Él (choke/grow)"
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

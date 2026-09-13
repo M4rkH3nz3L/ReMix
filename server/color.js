@@ -104,4 +104,30 @@ async function colorStats(file, atSec = 0) {
   };
 }
 
-module.exports = { colorStats };
+/**
+ * 🎨 Színpipetta: a fájl atSec kockájának pixel-színe a (x,y) vászon-normalizált
+ * ponton (0–1). A forrás-kockát SIZE×SIZE-ra skálázzuk (mint a statoknál), a
+ * normalizált pontról 1 px-t vágunk ki → hex. Green screen manuális kulcsolásához.
+ */
+async function pixelColor(file, atSec = 0, x = 0.5, y = 0.5) {
+  const seek = atSec > 0.001 ? ['-ss', String(atSec)] : [];
+  const cx = Math.round(Math.min(1, Math.max(0, x)) * (SIZE - 1));
+  const cy = Math.round(Math.min(1, Math.max(0, y)) * (SIZE - 1));
+  const rgb = await run('ffmpeg', [
+    '-v', 'error',
+    ...seek,
+    '-i', file,
+    '-vf', `scale=${SIZE}:${SIZE},crop=1:1:${cx}:${cy}`,
+    '-frames:v', '1',
+    '-f', 'rawvideo',
+    '-pix_fmt', 'rgb24',
+    'pipe:1',
+  ]);
+  if (rgb.length < 3) {
+    throw new Error('Nem sikerült pixelt olvasni.');
+  }
+  const hex = '#' + [rgb[0], rgb[1], rgb[2]].map((v) => v.toString(16).padStart(2, '0')).join('');
+  return { color: hex };
+}
+
+module.exports = { colorStats, pixelColor };

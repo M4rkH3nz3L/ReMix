@@ -1278,7 +1278,12 @@
       "matteLuma": "Luma",
       "matteAlpha": "Alpha",
       "matteInvert": "Invertieren",
-      "noteMatte": "Der Clip erscheint nur, wo das Matte-Bild HELL (Luma) bzw. DECKEND (Alpha) ist — Clipping-Maske im Render."
+      "noteMatte": "Der Clip erscheint nur, wo das Matte-Bild HELL (Luma) bzw. DECKEND (Alpha) ist — Clipping-Maske im Render.",
+      "chromaPick": "🎨 Farbpipette",
+      "chromaPickTitle": "Farbpipette",
+      "chromaPickHint": "Tippe auf den Hintergrund — das wird die Schlüsselfarbe.",
+      "chromaPickFailed": "Farbe konnte nicht erfasst werden (Worker aktiv?).",
+      "chromaEdge": "Kante (Choke/Grow)"
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

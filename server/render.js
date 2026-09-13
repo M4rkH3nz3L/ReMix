@@ -360,6 +360,24 @@ function matteChain(clip, W, H, labelIn, idx, graph, addInput, dur) {
   return `mtm${idx}`;
 }
 
+/**
+ * ✂️ Chroma-él igazítás (matte choke/grow): a kulcsolt fg alfáján `erosion`
+ * (edge<0 = perem megevése) vagy `dilation` (edge>0 = növelés) |edge|·4 menetben.
+ * Visszaadja az új címkét, vagy a bemenetit, ha nincs edge.
+ */
+function edgeChain(clip, labelIn, idx, graph) {
+  const e = clip.chromaKey && clip.chromaKey.edge;
+  if (!e) {
+    return labelIn;
+  }
+  const passes = Math.min(4, Math.max(1, Math.round(Math.abs(e) * 4)));
+  const op = Array(passes).fill(e < 0 ? 'erosion' : 'dilation').join(',');
+  graph.push(`[${labelIn}]split[egf${idx}][egfa${idx}]`);
+  graph.push(`[egfa${idx}]alphaextract,${op}[ega${idx}]`);
+  graph.push(`[egf${idx}][ega${idx}]alphamerge[egm${idx}]`);
+  return `egm${idx}`;
+}
+
 function filterDrawbox(clip, W, H) {
   const f = FILTERS[clip.filterId];
   if (!f) {
@@ -1220,7 +1238,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           );
           graph.push(decode + fgChain + `[bfg${i}]`);
         }
-        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
+        const fgE = edgeChain(clip, `bfg${i}`, i, graph);
+        const fgFinal = withMask(i, fgE, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
         const fgM = matteChain(clip, W, H, fgFinal, i, graph, addInput, seg.duration);
         graph.push(
           `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
@@ -1340,7 +1359,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           );
           graph.push(`[${idx}:v]fps=${FPS},${fgChain}[bfg${i}]`);
         }
-        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
+        const fgE = edgeChain(clip, `bfg${i}`, i, graph);
+        const fgFinal = withMask(i, fgE, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
         const fgM = matteChain(clip, W, H, fgFinal, i, graph, addInput, seg.duration);
         graph.push(
           `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`

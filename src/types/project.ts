@@ -597,6 +597,8 @@ export interface Marker {
   /** jelölő-szín (hex); hiányzik = alapértelmezett. Csak szerkesztő-navigáció,
    *  nem renderelődik → tetszőlegesen színezhető paritás-gond nélkül. */
   color?: string;
+  /** szabad-szöveges megjegyzés (rendezői jegyzet) — csak szerkesztő-oldali */
+  note?: string;
 }
 
 /**

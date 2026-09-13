@@ -357,7 +357,14 @@
       "label": "Snap-Stärke",
       "off": "Snap aus",
       "normal": "Snap",
-      "strong": "Snap+"
+      "strong": "Snap+",
+      "targetsTitle": "Einrast-Ziele",
+      "targetsMessage": "Woran Clip-Kanten und der Abspielkopf einrasten.",
+      "targetPlayhead": "Abspielkopf",
+      "targetClips": "Clip-Kanten",
+      "targetMarkers": "Marker",
+      "targetBeats": "Beats",
+      "targetRegions": "Regionen"
     },
     "remixGraph": {
       "title": "Remix-Herkunft",
@@ -447,7 +454,11 @@
       "collapse": "🔽 Spur einklappen",
       "expand": "🔼 Spur ausklappen",
       "minimap": "Zeitleisten-Minimap",
-      "height": "📏 Höhe (wechseln)"
+      "height": "📏 Höhe (wechseln)",
+      "hide": "🙈 Spur ausblenden",
+      "show": "👁️ Spur einblenden",
+      "autoHeightOn": "📐 Auto-Höhe an",
+      "autoHeightOff": "📐 Auto-Höhe aus"
     },
     "timelineClip": {
       "lockedTitle": "Ebene gesperrt",
@@ -532,7 +543,9 @@
       "deleteMarkerConfirm": "„{{label}}“ löschen?",
       "defaultMarkerLabel": "Marker {{number}}",
       "newMarkerTitle": "Neuer Marker",
-      "newMarkerMessage": "Am Abspielkopf ({{time}}). Marker erscheinen auf dem Lineal, Clips rasten beim Ziehen daran ein und werden mit dem Projekt gespeichert."
+      "newMarkerMessage": "Am Abspielkopf ({{time}}). Marker erscheinen auf dem Lineal, Clips rasten beim Ziehen daran ein und werden mit dem Projekt gespeichert.",
+      "frameBack": "Ein Bild zurück",
+      "frameFwd": "Ein Bild vor"
     },
     "track": {
       "video": "Video / Bild",
@@ -578,6 +591,34 @@
       "bubble": "Blase",
       "outline": "Kontur",
       "neon": "Neon"
+    },
+    "range": {
+      "title": "Bereich",
+      "message": "Was mit dem gewählten Bereich tun?",
+      "region": "Region aus Bereich",
+      "delete": "Bereich löschen (Ripple)",
+      "clear": "Auswahl löschen",
+      "setIn": "Bereichsanfang",
+      "setOut": "Bereichsende"
+    },
+    "razor": {
+      "label": "Rasierklinge (Tippen schneidet)"
+    },
+    "marker": {
+      "noteTitle": "Notiz",
+      "rename": "Umbenennen",
+      "renameTitle": "Marker-Name",
+      "editNote": "Notiz bearbeiten",
+      "addNote": "Notiz hinzufügen",
+      "menuMessage": "Marker bearbeiten"
+    },
+    "trim": {
+      "label": "Trim-Modus",
+      "normal": "Trim",
+      "ripple": "Ripple",
+      "roll": "Roll",
+      "slip": "Slip",
+      "slide": "Slide"
     }
   },
   "editorScreen": {
@@ -1907,7 +1948,10 @@
       "rippleLength_one": "Ripple-Länge ({{count}} Clip verschoben)",
       "rippleLength_other": "Ripple-Länge ({{count}} Clips verschoben)",
       "closeGap": "Lücke schließen",
-      "groupMove": "Gruppe verschoben"
+      "groupMove": "Gruppe verschoben",
+      "deleteRange": "Bereich löschen ({{seconds}}s)",
+      "rollEdit": "Roll-Schnitt",
+      "slideEdit": "Slide-Schnitt"
     },
     "progress": {
       "starting": "Wird gestartet…"

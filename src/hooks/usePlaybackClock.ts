@@ -24,8 +24,17 @@ export function usePlaybackClock(): void {
     const tick = (now: number) => {
       if (last !== null) {
         const dt = (now - last) / 1000;
-        const { playhead, project, loop, variantPreview, setPlayhead, setPlaying } =
-          useEditorStore.getState();
+        const {
+          playhead,
+          project,
+          loop,
+          variantPreview,
+          playbackRate,
+          rangeIn,
+          rangeOut,
+          setPlayhead,
+          setPlaying,
+        } = useEditorStore.getState();
         if (variantPreview && variantPreview.length > 0) {
           const step = stepPreviewPlayhead(variantPreview, playhead, dt, loop);
           setPlayhead(step.playhead);
@@ -35,12 +44,29 @@ export function usePlaybackClock(): void {
           }
         } else {
           const duration = project ? projectDuration(project) : 0;
-          const next = playhead + dt;
-          if (next >= duration) {
-            if (loop && duration > 0) {
-              setPlayhead(0);
+          // ⏯️ shuttle-sebesség (J/K/L): negatív = visszafelé; 🅸🅾 loop + range = hurok a tartományon
+          const rate = playbackRate || 1;
+          const confined = loop && rangeIn != null && rangeOut != null && rangeOut > rangeIn;
+          const loStart = confined ? rangeIn : 0;
+          const hiEnd = confined ? rangeOut : duration;
+          const next = playhead + dt * rate;
+          if (rate < 0) {
+            if (next <= loStart) {
+              if (loop && hiEnd > loStart) {
+                setPlayhead(hiEnd);
+              } else {
+                setPlayhead(loStart);
+                setPlaying(false);
+                return;
+              }
             } else {
-              setPlayhead(duration);
+              setPlayhead(next);
+            }
+          } else if (next >= hiEnd) {
+            if (loop && hiEnd > loStart) {
+              setPlayhead(loStart);
+            } else {
+              setPlayhead(hiEnd);
               setPlaying(false);
               return;
             }

@@ -9,6 +9,7 @@ import { PacingLane } from '@/components/editor/PacingLane';
 import { StoryLane } from '@/components/editor/StoryLane';
 import { TimelineClip } from '@/components/editor/TimelineClip';
 import { TimelineMinimap } from '@/components/editor/TimelineMinimap';
+import { nextMarkerColor } from '@/components/editor/TransportBar';
 import {
   BASE_PX_PER_SEC,
   palette,
@@ -26,6 +27,34 @@ import type { TrackType } from '@/types/project';
 
 /** ezeken a sávokon van hang — csak ezek kapnak némítás/solo gombot */
 const AUDIBLE_TRACKS: TrackType[] = ['video', 'music', 'voiceover', 'sfx'];
+
+/** vizuális sávok — ezek kapnak láthatóság (szem) kapcsolót az előnézethez */
+const VISUAL_TRACKS: TrackType[] = [
+  'video',
+  'pip',
+  'adjust',
+  'text',
+  'captions',
+  'overlay',
+  'interactive',
+];
+
+/**
+ * 📏 Automatikus sáv-magasság szorzói: a hang-sávok magasabbak a hullámformának,
+ * a videó/PiP a filmstripnek, a vékony overlay/felirat/grade alacsonyabb.
+ */
+const AUTO_HEIGHT_FACTOR: Record<TrackType, number> = {
+  video: 1.3,
+  pip: 1.1,
+  adjust: 0.8,
+  text: 0.8,
+  captions: 0.8,
+  overlay: 0.8,
+  interactive: 0.8,
+  music: 1.4,
+  voiceover: 1.3,
+  sfx: 1,
+};
 
 /** sáv-ikonok a tablet-fejléchez (látványterv: ikon + címke oszlop) */
 const trackIcons: Record<TrackType, keyof typeof Ionicons.glyphMap> = {
@@ -94,6 +123,27 @@ export function Timeline() {
   const recolorRegion = useEditorStore((s) => s.recolorRegion);
   const snapStrength = useEditorStore((s) => s.snapStrength);
   const cycleSnapStrength = useEditorStore((s) => s.cycleSnapStrength);
+  const snapTargets = useEditorStore((s) => s.snapTargets);
+  const toggleSnapTarget = useEditorStore((s) => s.toggleSnapTarget);
+  // ✂️ borotva-mód (koppintásra vág) + képkocka-pontos split
+  const razorMode = useEditorStore((s) => s.razorMode);
+  const toggleRazorMode = useEditorStore((s) => s.toggleRazorMode);
+  const splitClipAt = useEditorStore((s) => s.splitClipAt);
+  // ✂️ trim-mód (normal/ripple/roll/slip/slide) — a fogantyú/test-húzás viselkedése
+  const trimMode = useEditorStore((s) => s.trimMode);
+  const cycleTrimMode = useEditorStore((s) => s.cycleTrimMode);
+  // 👁️ láthatóság + 📏 automatikus magasság
+  const hiddenTracks = useEditorStore((s) => s.hiddenTracks);
+  const autoTrackHeight = useEditorStore((s) => s.autoTrackHeight);
+  const toggleAutoTrackHeight = useEditorStore((s) => s.toggleAutoTrackHeight);
+  // 🅸🅾 tartomány-kijelölés
+  const rangeIn = useEditorStore((s) => s.rangeIn);
+  const rangeOut = useEditorStore((s) => s.rangeOut);
+  const setRangeIn = useEditorStore((s) => s.setRangeIn);
+  const setRangeOut = useEditorStore((s) => s.setRangeOut);
+  const clearRange = useEditorStore((s) => s.clearRange);
+  const deleteRange = useEditorStore((s) => s.deleteRange);
+  const regionFromRange = useEditorStore((s) => s.regionFromRange);
 
   /**
    * Telefonon nincs fejléc-oszlop, ezért a lebegő sáv-címke koppintása nyitja
@@ -104,10 +154,10 @@ export function Timeline() {
     const solo = soloTracks.includes(type);
     const locked = lockedTracks.includes(type);
     const collapsed = collapsedTracks.includes(type);
-    Alert.alert(
-      t(trackLabels[type]),
-      t('editor.timeline.trackMenuMessage'),
-      [
+    const hidden = hiddenTracks.includes(type);
+    const buttons: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
+    if (AUDIBLE_TRACKS.includes(type)) {
+      buttons.push(
         {
           text: muted ? t('editor.timeline.unmute') : t('editor.timeline.mute'),
           onPress: () => toggleTrackFlag(type, 'mute'),
@@ -115,22 +165,134 @@ export function Timeline() {
         {
           text: solo ? t('editor.timeline.soloOff') : t('editor.timeline.soloOn'),
           onPress: () => toggleTrackFlag(type, 'solo'),
-        },
-        {
-          text: locked ? t('editor.timeline.unlock') : t('editor.timeline.lock'),
-          onPress: () => toggleTrackFlag(type, 'lock'),
-        },
-        {
-          text: collapsed ? t('editor.timeline.expand') : t('editor.timeline.collapse'),
-          onPress: () => toggleTrackFlag(type, 'collapse'),
-        },
-        {
-          text: t('editor.timeline.height'),
-          onPress: () => cycleTrackHeight(type),
-        },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]
+        }
+      );
+    }
+    if (VISUAL_TRACKS.includes(type)) {
+      buttons.push({
+        text: hidden ? t('editor.timeline.show') : t('editor.timeline.hide'),
+        onPress: () => toggleTrackFlag(type, 'hidden'),
+      });
+    }
+    buttons.push(
+      {
+        text: locked ? t('editor.timeline.unlock') : t('editor.timeline.lock'),
+        onPress: () => toggleTrackFlag(type, 'lock'),
+      },
+      {
+        text: collapsed ? t('editor.timeline.expand') : t('editor.timeline.collapse'),
+        onPress: () => toggleTrackFlag(type, 'collapse'),
+      },
+      {
+        text: t('editor.timeline.height'),
+        onPress: () => cycleTrackHeight(type),
+      },
+      {
+        text: autoTrackHeight ? t('editor.timeline.autoHeightOff') : t('editor.timeline.autoHeightOn'),
+        onPress: () => toggleAutoTrackHeight(),
+      },
+      { text: t('common.cancel'), style: 'cancel' }
     );
+    Alert.alert(t(trackLabels[type]), t('editor.timeline.trackMenuMessage'), buttons);
+  };
+
+  /** ✂️ borotva-vágás: az adott sávon a `time`-nál elvágja a lefedő klipet */
+  const razorCutAt = (type: TrackType, time: number) => {
+    if (lockedTracks.includes(type)) {
+      return;
+    }
+    const track = project?.tracks.find((tk) => tk.type === type);
+    const clip = track?.clips.find((c) => c.start + 0.05 < time && time < c.start + c.duration - 0.05);
+    if (clip) {
+      splitClipAt(clip.id, Math.round(time * 100) / 100);
+    }
+  };
+
+  /** 🧲 illesztési célpont-fajták kapcsolója (a magnet hosszú nyomására) */
+  const openSnapMenu = () => {
+    const row = (key: keyof typeof snapTargets, labelKey: string) => ({
+      text: `${snapTargets[key] ? '✓ ' : '  '}${t(labelKey)}`,
+      onPress: () => toggleSnapTarget(key),
+    });
+    Alert.alert(t('editor.snap.targetsTitle'), t('editor.snap.targetsMessage'), [
+      row('playhead', 'editor.snap.targetPlayhead'),
+      row('clips', 'editor.snap.targetClips'),
+      row('markers', 'editor.snap.targetMarkers'),
+      row('beats', 'editor.snap.targetBeats'),
+      row('regions', 'editor.snap.targetRegions'),
+      { text: t('common.done'), style: 'cancel' },
+    ]);
+  };
+
+  /** 🅸🅾 tartomány-műveletek (a range-sávra koppintva) */
+  const openRangeMenu = () => {
+    Alert.alert(t('editor.range.title'), t('editor.range.message'), [
+      { text: t('editor.range.region'), onPress: () => regionFromRange() },
+      { text: t('editor.range.delete'), style: 'destructive', onPress: () => deleteRange() },
+      { text: t('editor.range.clear'), onPress: () => clearRange() },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  /** 🔖 jelölő-menü (átnevezés / jegyzet / átszínezés / törlés) — a zászló hosszú nyomására */
+  const openMarkerMenu = (markerId: string) => {
+    const state = useEditorStore.getState();
+    const markers = state.project?.markers ?? [];
+    const m = markers.find((x) => x.id === markerId);
+    if (!m) {
+      return;
+    }
+    const save = (patch: Partial<typeof m>) =>
+      state.dispatch({
+        type: 'SET_MARKERS',
+        markers: markers.map((x) => (x.id === markerId ? { ...x, ...patch } : x)),
+      });
+    const promptNote = () => {
+      if (typeof Alert.prompt === 'function') {
+        Alert.prompt(
+          t('editor.marker.noteTitle'),
+          undefined,
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.save'), onPress: (v?: string) => save({ note: (v ?? '').trim() || undefined }) },
+          ],
+          'plain-text',
+          m.note ?? ''
+        );
+      }
+    };
+    const buttons: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
+    if (typeof Alert.prompt === 'function') {
+      buttons.push({
+        text: t('editor.marker.rename'),
+        onPress: () =>
+          Alert.prompt(
+            t('editor.marker.renameTitle'),
+            undefined,
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('common.save'), onPress: (v?: string) => save({ label: (v ?? '').trim() || m.label }) },
+            ],
+            'plain-text',
+            m.label
+          ),
+      });
+      buttons.push({ text: m.note ? t('editor.marker.editNote') : t('editor.marker.addNote'), onPress: promptNote });
+    }
+    buttons.push(
+      {
+        text: t('editor.transportBar.recolorMarker'),
+        onPress: () => save({ color: nextMarkerColor(m.color) }),
+      },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () =>
+          state.dispatch({ type: 'SET_MARKERS', markers: markers.filter((x) => x.id !== markerId) }),
+      },
+      { text: t('common.cancel'), style: 'cancel' }
+    );
+    Alert.alert(m.label, m.note ?? t('editor.marker.menuMessage'), buttons);
   };
 
   const scrollRef = useRef<ScrollView>(null);
@@ -230,7 +392,11 @@ export function Timeline() {
   const th = (t: TrackType) =>
     collapsedTracks.includes(t)
       ? COLLAPSED_H
-      : Math.round(trackHeights[t] * L.editor.trackScale * (trackHeightScale[t] ?? 1));
+      : Math.round(
+          trackHeights[t] *
+            L.editor.trackScale *
+            (autoTrackHeight ? AUTO_HEIGHT_FACTOR[t] : trackHeightScale[t] ?? 1)
+        );
 
   const totalTracksHeight = visibleTracks.reduce((sum, t) => sum + th(t), 0);
 
@@ -260,9 +426,52 @@ export function Timeline() {
             </Text>
           </Pressable>
         ))}
-        {/* 🧲 illesztés-erősség: normál → erős → ki */}
+        {/* ✂️ trim-mód: normal → ripple → roll → slip → slide (a fogantyú/test-húzás viselkedése) */}
+        <Pressable
+          onPress={cycleTrimMode}
+          hitSlop={4}
+          style={[styles.snapBtn, { marginLeft: 'auto' }, trimMode !== 'normal' ? styles.iconBtnActive : null]}
+          accessibilityLabel={t('editor.trim.label')}
+        >
+          <Ionicons
+            name="git-compare-outline"
+            size={12}
+            color={trimMode === 'normal' ? palette.textDim : palette.accent}
+          />
+          <Text style={[styles.regionAddText, trimMode === 'normal' ? { color: palette.textDim } : { color: palette.accent }]}>
+            {t('editor.trim.' + trimMode)}
+          </Text>
+        </Pressable>
+        {/* ✂️ borotva-mód: koppintásra vág az idővonalon */}
+        <Pressable
+          onPress={toggleRazorMode}
+          hitSlop={4}
+          style={[styles.iconBtn, razorMode ? styles.iconBtnActive : null]}
+          accessibilityLabel={t('editor.razor.label')}
+        >
+          <Ionicons name="cut" size={13} color={razorMode ? palette.accent : palette.textDim} />
+        </Pressable>
+        {/* 🅸🅾 tartomány kezdet/vég a lejátszófejnél */}
+        <Pressable
+          onPress={setRangeIn}
+          hitSlop={4}
+          style={[styles.iconBtn, rangeIn != null ? styles.iconBtnActive : null]}
+          accessibilityLabel={t('editor.range.setIn')}
+        >
+          <Text style={[styles.ioText, rangeIn != null ? { color: palette.accent } : null]}>I</Text>
+        </Pressable>
+        <Pressable
+          onPress={setRangeOut}
+          hitSlop={4}
+          style={[styles.iconBtn, rangeOut != null ? styles.iconBtnActive : null]}
+          accessibilityLabel={t('editor.range.setOut')}
+        >
+          <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>O</Text>
+        </Pressable>
+        {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
         <Pressable
           onPress={cycleSnapStrength}
+          onLongPress={openSnapMenu}
           hitSlop={4}
           style={styles.snapBtn}
           accessibilityLabel={t('editor.snap.label')}
@@ -337,6 +546,19 @@ export function Timeline() {
                         />
                       </Pressable>
                     </>
+                  ) : null}
+                  {VISUAL_TRACKS.includes(type) ? (
+                    <Pressable
+                      hitSlop={6}
+                      onPress={() => toggleTrackFlag(type, 'hidden')}
+                      style={styles.headerBtn}
+                    >
+                      <Ionicons
+                        name={hiddenTracks.includes(type) ? 'eye-off-outline' : 'eye-outline'}
+                        size={12}
+                        color={hiddenTracks.includes(type) ? palette.accent2 : palette.textDim}
+                      />
+                    </Pressable>
                   ) : null}
                   <Pressable
                     hitSlop={6}
@@ -443,12 +665,13 @@ export function Timeline() {
                   </Text>
                 </Pressable>
               ))}
-              {/* 🔖 szerkezeti jelölők: zászló + felirat, koppintásra odaugrik */}
+              {/* 🔖 szerkezeti jelölők: zászló + felirat, koppintásra odaugrik, hosszú nyomásra menü */}
               {(project.markers ?? []).map((m) => (
                 <Pressable
                   key={m.id}
                   hitSlop={8}
                   onPress={() => useEditorStore.getState().setPlayhead(m.time)}
+                  onLongPress={() => openMarkerMenu(m.id)}
                   style={[styles.markerFlag, { left: m.time * pps }]}
                 >
                   <View style={[styles.markerStem, m.color ? { backgroundColor: m.color } : null]} />
@@ -458,8 +681,48 @@ export function Timeline() {
                   >
                     {m.label}
                   </Text>
+                  {/* 📝 jegyzet-jelző pötty */}
+                  {m.note ? (
+                    <View style={[styles.markerNoteDot, m.color ? { backgroundColor: m.color } : null]} />
+                  ) : null}
                 </Pressable>
               ))}
+              {/* 🅸🅾 tartomány-kijelölés: teljes-magas sáv + kezdet/vég vonal + fogantyú-chip */}
+              {rangeIn != null ? (
+                <View
+                  pointerEvents="none"
+                  style={[styles.rangeEdge, { left: rangeIn * pps, height: RULER_HEIGHT + totalTracksHeight }]}
+                />
+              ) : null}
+              {rangeOut != null ? (
+                <View
+                  pointerEvents="none"
+                  style={[styles.rangeEdge, { left: rangeOut * pps, height: RULER_HEIGHT + totalTracksHeight }]}
+                />
+              ) : null}
+              {rangeIn != null && rangeOut != null && rangeOut > rangeIn ? (
+                <>
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.rangeBand,
+                      {
+                        left: rangeIn * pps,
+                        width: (rangeOut - rangeIn) * pps,
+                        height: RULER_HEIGHT + totalTracksHeight,
+                      },
+                    ]}
+                  />
+                  <Pressable
+                    hitSlop={6}
+                    onPress={openRangeMenu}
+                    style={[styles.rangeChip, { left: rangeIn * pps }]}
+                  >
+                    <Ionicons name="scan-outline" size={10} color={palette.accent} />
+                    <Text style={styles.rangeChipText}>{(rangeOut - rangeIn).toFixed(1)}s</Text>
+                  </Pressable>
+                </>
+              ) : null}
             </View>
             {visibleTracks.map((type) => {
               const track = project.tracks.find((t) => t.type === type);
@@ -511,6 +774,13 @@ export function Timeline() {
                         </Pressable>
                       ))
                     : null}
+                  {/* ✂️ borotva-réteg: koppintásra elvágja a lefedő klipet ezen a sávon */}
+                  {razorMode && !collapsedTracks.includes(type) && !lockedTracks.includes(type) ? (
+                    <Pressable
+                      style={styles.razorLayer}
+                      onPress={(e) => razorCutAt(type, e.nativeEvent.locationX / pps)}
+                    />
+                  ) : null}
                 </View>
               );
             })}
@@ -568,6 +838,9 @@ export function Timeline() {
                   ) : null}
                   {collapsedTracks.includes(type) ? (
                     <Ionicons name="chevron-expand" size={9} color={palette.textDim} />
+                  ) : null}
+                  {hiddenTracks.includes(type) ? (
+                    <Ionicons name="eye-off-outline" size={9} color={palette.accent2} />
                   ) : null}
                 </Pressable>
               </View>
@@ -729,9 +1002,79 @@ const styles = StyleSheet.create({
   },
   insightTabs: {
     flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    rowGap: 4,
     gap: 6,
     marginHorizontal: 8,
     marginBottom: 3,
+  },
+  iconBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 24,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  iconBtnActive: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  ioText: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  razorLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  rangeEdge: {
+    position: 'absolute',
+    top: 0,
+    width: 1.5,
+    marginLeft: -0.75,
+    backgroundColor: palette.accent,
+    opacity: 0.9,
+  },
+  rangeBand: {
+    position: 'absolute',
+    top: 0,
+    backgroundColor: `${palette.accent}22`,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderColor: palette.accent,
+  },
+  rangeChip: {
+    position: 'absolute',
+    top: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.accent,
+    backgroundColor: `${palette.accent}33`,
+  },
+  rangeChipText: {
+    color: palette.text,
+    fontSize: 9,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  markerNoteDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.accent2,
   },
   insightTab: {
     paddingHorizontal: 8,

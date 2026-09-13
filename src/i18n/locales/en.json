@@ -357,7 +357,14 @@
       "label": "Snap strength",
       "off": "Snap off",
       "normal": "Snap",
-      "strong": "Snap+"
+      "strong": "Snap+",
+      "targetsTitle": "Snap targets",
+      "targetsMessage": "What clip edges and the playhead snap to.",
+      "targetPlayhead": "Playhead",
+      "targetClips": "Clip edges",
+      "targetMarkers": "Markers",
+      "targetBeats": "Beats",
+      "targetRegions": "Regions"
     },
     "remixGraph": {
       "title": "Remix lineage",
@@ -447,7 +454,11 @@
       "collapse": "🔽 Collapse track",
       "expand": "🔼 Expand track",
       "minimap": "Timeline minimap",
-      "height": "📏 Height (cycle)"
+      "height": "📏 Height (cycle)",
+      "hide": "🙈 Hide track",
+      "show": "👁️ Show track",
+      "autoHeightOn": "📐 Auto height on",
+      "autoHeightOff": "📐 Auto height off"
     },
     "timelineClip": {
       "lockedTitle": "Layer locked",
@@ -532,7 +543,9 @@
       "deleteMarkerConfirm": "Delete „{{label}}”?",
       "defaultMarkerLabel": "Marker {{number}}",
       "newMarkerTitle": "New marker",
-      "newMarkerMessage": "At the playhead ({{time}}). Markers show on the ruler, clips snap to them when dragged, and they save with the project."
+      "newMarkerMessage": "At the playhead ({{time}}). Markers show on the ruler, clips snap to them when dragged, and they save with the project.",
+      "frameBack": "One frame back",
+      "frameFwd": "One frame forward"
     },
     "track": {
       "video": "Video / image",
@@ -578,6 +591,34 @@
       "bubble": "Bubble",
       "outline": "Outline",
       "neon": "Neon"
+    },
+    "range": {
+      "title": "Range",
+      "message": "What to do with the selected range?",
+      "region": "Region from range",
+      "delete": "Delete range (ripple)",
+      "clear": "Clear selection",
+      "setIn": "Set range in",
+      "setOut": "Set range out"
+    },
+    "razor": {
+      "label": "Razor (tap to cut)"
+    },
+    "marker": {
+      "noteTitle": "Note",
+      "rename": "Rename",
+      "renameTitle": "Marker name",
+      "editNote": "Edit note",
+      "addNote": "Add note",
+      "menuMessage": "Edit marker"
+    },
+    "trim": {
+      "label": "Trim mode",
+      "normal": "Trim",
+      "ripple": "Ripple",
+      "roll": "Roll",
+      "slip": "Slip",
+      "slide": "Slide"
     }
   },
   "editorScreen": {
@@ -1907,7 +1948,10 @@
       "rippleLength_one": "ripple length ({{count}} clip shifted)",
       "rippleLength_other": "ripple length ({{count}} clips shifted)",
       "closeGap": "close gap",
-      "groupMove": "group move"
+      "groupMove": "group move",
+      "deleteRange": "delete range ({{seconds}}s)",
+      "rollEdit": "roll edit",
+      "slideEdit": "slide edit"
     },
     "progress": {
       "starting": "Starting…"

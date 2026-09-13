@@ -357,7 +357,14 @@
       "label": "Illesztés erőssége",
       "off": "Illesztés ki",
       "normal": "Illesztés",
-      "strong": "Illesztés+"
+      "strong": "Illesztés+",
+      "targetsTitle": "Illesztési célpontok",
+      "targetsMessage": "Mihez illeszkedjen a klip-él és a lejátszófej.",
+      "targetPlayhead": "Lejátszófej",
+      "targetClips": "Klip-élek",
+      "targetMarkers": "Jelölők",
+      "targetBeats": "Beatek",
+      "targetRegions": "Régiók"
     },
     "remixGraph": {
       "title": "Remix-származás",
@@ -447,7 +454,11 @@
       "collapse": "🔽 Sáv összecsukása",
       "expand": "🔼 Sáv kinyitása",
       "minimap": "Idővonal-minimap",
-      "height": "📏 Magasság (léptet)"
+      "height": "📏 Magasság (léptet)",
+      "hide": "🙈 Sáv elrejtése",
+      "show": "👁️ Sáv megjelenítése",
+      "autoHeightOn": "📐 Auto magasság be",
+      "autoHeightOff": "📐 Auto magasság ki"
     },
     "timelineClip": {
       "lockedTitle": "Zárolt sáv",
@@ -532,7 +543,9 @@
       "deleteMarkerConfirm": "„{{label}}” törlése?",
       "defaultMarkerLabel": "Jelölő {{number}}",
       "newMarkerTitle": "Új jelölő",
-      "newMarkerMessage": "A lejátszófejnél ({{time}}). A jelölők a vonalzón látszanak, a klip-húzás rájuk snappel, és a projekttel mentődnek."
+      "newMarkerMessage": "A lejátszófejnél ({{time}}). A jelölők a vonalzón látszanak, a klip-húzás rájuk snappel, és a projekttel mentődnek.",
+      "frameBack": "Egy kockát vissza",
+      "frameFwd": "Egy kockát előre"
     },
     "track": {
       "video": "Videó / kép",
@@ -578,6 +591,34 @@
       "bubble": "Buborék",
       "outline": "Kontúr",
       "neon": "Neon"
+    },
+    "range": {
+      "title": "Tartomány",
+      "message": "Mit tegyünk a kijelölt tartománnyal?",
+      "region": "Régió a tartományból",
+      "delete": "Tartomány törlése (ripple)",
+      "clear": "Kijelölés törlése",
+      "setIn": "Tartomány kezdete",
+      "setOut": "Tartomány vége"
+    },
+    "razor": {
+      "label": "Borotva (vágás koppintásra)"
+    },
+    "marker": {
+      "noteTitle": "Jegyzet",
+      "rename": "Átnevezés",
+      "renameTitle": "Jelölő neve",
+      "editNote": "Jegyzet szerkesztése",
+      "addNote": "Jegyzet hozzáadása",
+      "menuMessage": "Jelölő szerkesztése"
+    },
+    "trim": {
+      "label": "Trim-mód",
+      "normal": "Trim",
+      "ripple": "Ripple",
+      "roll": "Roll",
+      "slip": "Slip",
+      "slide": "Slide"
     }
   },
   "editorScreen": {
@@ -1907,7 +1948,10 @@
       "rippleLength_one": "ripple-hossz ({{count}} klip csúszott)",
       "rippleLength_other": "ripple-hossz ({{count}} klip csúszott)",
       "closeGap": "hézag bezárása",
-      "groupMove": "csoport mozgatása"
+      "groupMove": "csoport mozgatása",
+      "deleteRange": "tartomány törlése ({{seconds}} mp)",
+      "rollEdit": "roll-vágás",
+      "slideEdit": "slide-vágás"
     },
     "progress": {
       "starting": "Indítás…"

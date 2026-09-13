@@ -1,5 +1,6 @@
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -8,10 +9,12 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 import { ClipFilmstrip } from '@/components/editor/ClipFilmstrip';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { MIN_CLIP_DURATION, SNAP_PX, palette, trackColors } from '@/constants/editor';
+import { getProxyUriSync } from '@/lib/proxy';
 import { maxVideoDuration } from '@/lib/projectUtils';
-import { clamp } from '@/lib/time';
+import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
+import { clamp, formatTime } from '@/lib/time';
 import { SNAP_FACTOR, useEditorStore } from '@/store/editorStore';
-import type { Clip, TrackType } from '@/types/project';
+import type { Clip, TrackType, VideoClip } from '@/types/project';
 import type { TFunction } from 'i18next';
 
 interface Props {
@@ -75,10 +78,17 @@ function TimelineClipInner({
   const locked = useEditorStore((s) => s.lockedTracks.includes(trackType));
   const toggleTrackFlag = useEditorStore((s) => s.toggleTrackFlag);
   const updateClip = useEditorStore((s) => s.updateClip);
+  // ✂️ trim-mód (normal/ripple/roll/slip/slide) — a fogantyú és a test-húzás viselkedése
+  const trimMode = useEditorStore((s) => s.trimMode);
   // 🎯 fókusz mód: ha van kijelölés és ez NEM az, halványabb (kiemeli az aktívat)
   const focusMode = useEditorStore((s) => s.focusMode);
   const hasSelection = useEditorStore((s) => s.selectedClipId != null);
   const dimmed = focusMode && hasSelection && !selected && !multiSelected;
+
+  // 🔍 clip-edge preview: trim közben a szélen lévő képkocka + időkód lebeg
+  const [edge, setEdge] = useState<{ side: 'left' | 'right'; srcTime: number; tlTime: number } | null>(
+    null
+  );
 
   const moveDX = useSharedValue(0);
   const leftDelta = useSharedValue(0);
@@ -90,52 +100,86 @@ function TimelineClipInner({
     rightDelta.value = 0;
   }, [clip.start, clip.duration, pps, moveDX, leftDelta, rightDelta]);
 
-  /**
-   * A legközelebbi rácspont, ha SNAP_PX-en belül van: a zene beatjei (P0‑2)
-   * ÉS a 🔖 szerkezeti jelölők — így a klip a refrénhez/CTA-hoz is igazítható.
-   */
   // 🧲 az illesztési küszöb az erősség-beállítás szerint (0 = kikapcsolt snap)
   const snapPx = () => SNAP_PX * SNAP_FACTOR[useEditorStore.getState().snapStrength];
-  const nearestBeat = (t: number): number | null => {
-    const state = useEditorStore.getState();
-    const targets = [
-      ...state.beatTimes,
-      ...(state.project?.markers ?? []).map((m) => m.time),
-    ];
-    let best: number | null = null;
-    let bestDist = snapPx() / pps;
-    for (const b of targets) {
-      const d = Math.abs(b - t);
+
+  /**
+   * 🧲 A konfigurált illesztési CÉLPONTOK (a magnet-menü kapcsolói szerint): a
+   * lejátszófej, MÁS klipek élei (start+vég), a 🔖 jelölők, a zene-beatek és a
+   * 🏷️ régiók határai. A saját klip élei kimaradnak. `snapTargets.off` → üres.
+   */
+  const collectSnapTargets = (): number[] => {
+    const st = useEditorStore.getState();
+    const cfg = st.snapTargets;
+    const targets: number[] = [0];
+    if (cfg.playhead) {
+      targets.push(st.playhead);
+    }
+    if (cfg.beats) {
+      targets.push(...st.beatTimes);
+    }
+    if (cfg.markers) {
+      targets.push(...(st.project?.markers ?? []).map((m) => m.time));
+    }
+    if (cfg.regions) {
+      for (const r of st.project?.regions ?? []) {
+        targets.push(r.start, r.end);
+      }
+    }
+    if (cfg.clips) {
+      for (const tk of st.project?.tracks ?? []) {
+        for (const c of tk.clips) {
+          if (c.id !== clip.id) {
+            targets.push(c.start, c.start + c.duration);
+          }
+        }
+      }
+    }
+    return targets;
+  };
+
+  /** A `value` legközelebbi célponthoz illesztve, ha SNAP_PX-en belül van. */
+  const snapEdge = (value: number): number => {
+    const px = snapPx();
+    if (px <= 0) {
+      return value;
+    }
+    const thresh = px / pps;
+    let best = value;
+    let bestDist = thresh;
+    for (const target of collectSnapTargets()) {
+      const d = Math.abs(target - value);
       if (d < bestDist) {
         bestDist = d;
-        best = b;
+        best = target;
       }
+    }
+    if (best !== value) {
+      selectionHaptic();
     }
     return best;
   };
 
   const commitMove = (dx: number) => {
-    const { playhead } = useEditorStore.getState();
-    let proposed = Math.max(0, clip.start + dx / pps);
-    let snapped = false;
-    const snapTargets = [0, playhead, Math.max(0, playhead - clip.duration)];
-    for (const target of snapTargets) {
-      if (Math.abs((proposed - target) * pps) < snapPx()) {
-        proposed = target;
-        snapped = true;
-        selectionHaptic();
-        break;
-      }
-    }
-    if (!snapped) {
-      const beat = nearestBeat(proposed);
-      if (beat !== null) {
-        proposed = beat;
-        selectionHaptic();
-      }
-    }
     moveDX.value = 0;
     const st = useEditorStore.getState();
+    // ✂️ slip/slide: a test-húzás nem repozícionál, hanem a forrást/szomszédot csúsztatja
+    if (trimMode === 'slip') {
+      st.slipEdit(clip.id, dx / pps);
+      return;
+    }
+    if (trimMode === 'slide') {
+      st.slideEdit(clip.id, dx / pps);
+      return;
+    }
+    const raw = Math.max(0, clip.start + dx / pps);
+    // magnetikus él: a START vagy a VÉG illeszkedjen a legközelebbi célponthoz
+    const snapStart = snapEdge(raw);
+    const snapEndAsStart = snapEdge(raw + clip.duration) - clip.duration;
+    const proposed = Math.max(
+      0,
+      Math.abs(snapStart - raw) <= Math.abs(snapEndAsStart - raw) ? snapStart : snapEndAsStart
+    );
     // 🔗 linkelt klipek (#59): a link-csoport együtt mozog (kijelölés nélkül is)
     const link = st.linkGroupOf(clip.id);
     if (link) {
@@ -154,12 +198,20 @@ function TimelineClipInner({
   };
 
   const commitTrimLeft = (dx: number) => {
-    let deltaSec = dx / pps;
-    deltaSec = clamp(deltaSec, -clip.start, clip.duration - MIN_CLIP_DURATION);
+    leftDelta.value = 0;
+    setEdge(null);
+    // 🌀 roll: a bal él a KORÁBBI szomszéddal közös vágáspontot tolja
+    if (trimMode === 'roll') {
+      useEditorStore.getState().rollEdit(clip.id, 'left', dx / pps);
+      return;
+    }
+    // magnetikus bal él a célpontokhoz
+    const rawStart = clip.start + dx / pps;
+    const snappedStart = snapEdge(rawStart);
+    let deltaSec = clamp(snappedStart - clip.start, -clip.start, clip.duration - MIN_CLIP_DURATION);
     if (clip.kind === 'video') {
       // a forrásfájl elejénél tovább nem húzható vissza
       deltaSec = Math.max(deltaSec, -clip.trimIn / clip.speed);
-      leftDelta.value = 0;
       updateClip(clip.id, {
         start: clip.start + deltaSec,
         duration: clip.duration - deltaSec,
@@ -167,7 +219,6 @@ function TimelineClipInner({
       });
       return;
     }
-    leftDelta.value = 0;
     updateClip(clip.id, {
       start: clip.start + deltaSec,
       duration: clip.duration - deltaSec,
@@ -175,25 +226,54 @@ function TimelineClipInner({
   };
 
   const commitTrimRight = (dx: number) => {
-    const max = clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
-    let duration = clamp(clip.duration + dx / pps, MIN_CLIP_DURATION, max);
-    // a klip vége beatre igazodik, ha közel van
-    const beat = nearestBeat(clip.start + duration);
-    if (beat !== null) {
-      const snappedDur = clamp(beat - clip.start, MIN_CLIP_DURATION, max);
-      if (Math.abs(snappedDur - duration) * pps < snapPx()) {
-        duration = snappedDur;
-        selectionHaptic();
-      }
-    }
     rightDelta.value = 0;
-    // ⏭️ ripple módban a hossz-változás tolja a mögötte lévőket (minden sávon)
+    setEdge(null);
     const state = useEditorStore.getState();
-    if (state.rippleMode && state.rippleResize(clip.id, duration)) {
+    // 🌀 roll: a jobb él a KÖVETKEZŐ szomszéddal közös vágáspontot tolja
+    if (trimMode === 'roll') {
+      state.rollEdit(clip.id, 'right', dx / pps);
+      return;
+    }
+    const max = clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
+    const snappedEnd = snapEdge(clip.start + clip.duration + dx / pps);
+    const duration = clamp(snappedEnd - clip.start, MIN_CLIP_DURATION, max);
+    // ⏭️ ripple: a hossz-változás tolja a mögötte lévőket (minden sávon). Explicit
+    // ripple trim-mód VAGY a globális ripple-kapcsoló bekapcsolja.
+    const ripple = trimMode === 'ripple' || (trimMode === 'normal' && state.rippleMode);
+    if (ripple && state.rippleResize(clip.id, duration)) {
       return;
     }
     updateClip(clip.id, { duration });
   };
+
+  // 🔍 clip-edge preview frissítése húzás közben (a forrás-időt frame-re kvantálva,
+  // változatlan érték esetén nem renderel újra)
+  const previewLeft = (dx: number) => {
+    let deltaSec = clamp(dx / pps, -clip.start, clip.duration - MIN_CLIP_DURATION);
+    if (clip.kind === 'video') {
+      deltaSec = Math.max(deltaSec, -clip.trimIn / clip.speed);
+    }
+    const tlTime = clip.start + deltaSec;
+    const srcTime = clip.kind === 'video' ? clip.trimIn + deltaSec * clip.speed : 0;
+    // frame-nyi küszöb: húzás közben csak érdemi elmozdulásra renderel újra
+    setEdge((prev) =>
+      prev && prev.side === 'left' && Math.abs(prev.tlTime - tlTime) < 0.02
+        ? prev
+        : { side: 'left', srcTime, tlTime }
+    );
+  };
+  const previewRight = (dx: number) => {
+    const max = clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
+    const duration = clamp(clip.duration + dx / pps, MIN_CLIP_DURATION, max);
+    const tlTime = clip.start + duration;
+    const srcTime = clip.kind === 'video' ? clip.trimIn + duration * clip.speed : 0;
+    setEdge((prev) =>
+      prev && prev.side === 'right' && Math.abs(prev.tlTime - tlTime) < 0.02
+        ? prev
+        : { side: 'right', srcTime, tlTime }
+    );
+  };
+  const clearEdge = () => setEdge(null);
 
   // köteg-módban a koppintás hozzáad/elvesz, egyébként átvált az elsődleges
   // kijelölésre (a köteg ilyenkor elévül — lásd selectClip a store-ban)
@@ -241,9 +321,13 @@ function TimelineClipInner({
     .activeOffsetX([-4, 4])
     .onUpdate((e) => {
       leftDelta.value = e.translationX;
+      runOnJS(previewLeft)(e.translationX);
     })
     .onEnd((e) => {
       runOnJS(commitTrimLeft)(e.translationX);
+    })
+    .onFinalize(() => {
+      runOnJS(clearEdge)();
     });
 
   const trimRightPan = Gesture.Pan()
@@ -251,9 +335,13 @@ function TimelineClipInner({
     .activeOffsetX([-4, 4])
     .onUpdate((e) => {
       rightDelta.value = e.translationX;
+      runOnJS(previewRight)(e.translationX);
     })
     .onEnd((e) => {
       runOnJS(commitTrimRight)(e.translationX);
+    })
+    .onFinalize(() => {
+      runOnJS(clearEdge)();
     });
 
   const baseWidth = clip.duration * pps;
@@ -333,8 +421,47 @@ function TimelineClipInner({
             </GestureDetector>
           </>
         ) : null}
+        {/* 🔍 clip-edge preview: a vágott szélen lévő képkocka + időkód */}
+        {edge ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.edgePreview,
+              edge.side === 'left' ? styles.edgePreviewLeft : styles.edgePreviewRight,
+            ]}
+          >
+            {clip.kind === 'video' ? <EdgeThumb clip={clip} srcTime={edge.srcTime} /> : null}
+            {clip.kind === 'image' ? (
+              <Image source={{ uri: clip.uri }} style={styles.edgeThumb} contentFit="cover" />
+            ) : null}
+            <Text style={styles.edgeTime}>{formatTime(edge.tlTime)}</Text>
+          </View>
+        ) : null}
       </Animated.View>
     </GestureDetector>
+  );
+}
+
+/** Egyetlen képkocka a trim-szélen lévő forrás-időpontról (cache-elt, proxyból). */
+function EdgeThumb({ clip, srcTime }: { clip: VideoClip; srcTime: number }) {
+  const [uri, setUri] = useState<string | null>(null);
+  const qTime = snapThumbTime(srcTime);
+  useEffect(() => {
+    let alive = true;
+    const source = getProxyUriSync(clip.uri) ?? clip.uri;
+    getFilmstrip(source, [qTime]).then((uris) => {
+      if (alive) {
+        setUri(uris[0] ?? null);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [clip.uri, qTime]);
+  return uri ? (
+    <Image source={{ uri }} style={styles.edgeThumb} contentFit="cover" />
+  ) : (
+    <View style={styles.edgeThumb} />
   );
 }
 
@@ -396,6 +523,35 @@ const styles = StyleSheet.create({
     height: '40%',
     borderRadius: 1,
     backgroundColor: palette.bg,
+  },
+  edgePreview: {
+    position: 'absolute',
+    top: -52,
+    alignItems: 'center',
+    gap: 2,
+    padding: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: '#07080dee',
+  },
+  edgePreviewLeft: {
+    left: -12,
+  },
+  edgePreviewRight: {
+    right: -12,
+  },
+  edgeThumb: {
+    width: 56,
+    height: 32,
+    borderRadius: 3,
+    backgroundColor: palette.surfaceHigh,
+  },
+  edgeTime: {
+    color: palette.text,
+    fontSize: 9,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 });
 

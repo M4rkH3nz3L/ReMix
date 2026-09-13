@@ -92,6 +92,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const maskEdit = useEditorStore((s) => s.maskEdit);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
+  // 👁️ elrejtett (vizuális) sávok — az előnézetből kimaradnak (monitorozás, nem render)
+  const hiddenTracks = useEditorStore((s) => s.hiddenTracks);
   // 🎙️ ha a JAVÍTOTT hang szól külön lejátszóról (AudioLayer/VideoVoice), a
   // videó saját sávját némítani kell — különben a kettő egyszerre szólna
   const videoVoiceActive = useEditorStore((s) => s.videoVoiceActive);
@@ -143,7 +145,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     return { x: snap.x, y: snap.y };
   };
 
-  const visual = project ? activeVisualClip(project, playhead) : null;
+  // 👁️ a fő videó/kép sáv elrejtve → nincs vizuális klip az előnézetben
+  const visual = project && !hiddenTracks.includes('video') ? activeVisualClip(project, playhead) : null;
   const videoClip = visual?.kind === 'video' ? (visual as VideoClip) : null;
   const imageClip = visual?.kind === 'image' ? (visual as ImageClip) : null;
 
@@ -267,24 +270,27 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   // minden szöveg-jellegű réteg: címek + feliratok + matricák
   const textClips = project
     ? (['text', 'captions', 'overlay'] as const).flatMap((type) => {
+        if (hiddenTracks.includes(type)) {
+          return []; // 👁️ elrejtett sáv kimarad az előnézetből
+        }
         const track = project.tracks.find((t) => t.type === type);
         return track
           ? clipsAt<TextClip>(track, playhead).filter((c) => c.kind === 'text')
           : [];
       })
     : [];
-  const interactiveClips = project
-    ? clipsAt<InteractiveClip>(trackOf(project, 'interactive'), playhead).filter(
-        (c) => c.kind === 'interactive'
-      )
-    : [];
-  const shapeClips = project
-    ? clipsAt<ShapeClip>(trackOf(project, 'overlay'), playhead).filter(
-        (c) => c.kind === 'shape'
-      )
-    : [];
+  const interactiveClips =
+    project && !hiddenTracks.includes('interactive')
+      ? clipsAt<InteractiveClip>(trackOf(project, 'interactive'), playhead).filter(
+          (c) => c.kind === 'interactive'
+        )
+      : [];
+  const shapeClips =
+    project && !hiddenTracks.includes('overlay')
+      ? clipsAt<ShapeClip>(trackOf(project, 'overlay'), playhead).filter((c) => c.kind === 'shape')
+      : [];
   // 🎨 grade-réteg(ek) a playheadnél: a teljes kompozitra ható tint-közelítés
-  const adjustClips = project ? activeAdjustClips(project, playhead) : [];
+  const adjustClips = project && !hiddenTracks.includes('adjust') ? activeAdjustClips(project, playhead) : [];
 
   const filterId = videoClip?.filterId ?? imageClip?.filterId ?? 'none';
   const filter = filters.find((f) => f.id === filterId);
@@ -796,7 +802,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           ))}
 
           {/* 🎬 PiP-réteg: a pip-sáv aktív klipje a fő videó fölé (2. szinkron videó) */}
-          <PipLayer box={box} editable={mode === 'edit'} />
+          {hiddenTracks.includes('pip') ? null : <PipLayer box={box} editable={mode === 'edit'} />}
 
           {/* 🎨 grade-réteg-közelítés: az adjust-sáv aktív klipjei a TELJES
               kompozitot tintelik — előbb a filmes preset (grade), majd a kézi

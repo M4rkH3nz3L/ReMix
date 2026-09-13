@@ -1,7 +1,7 @@
 import { t as tr } from 'i18next';
 import { create } from 'zustand';
 
-import { MAX_ZOOM, MIN_ZOOM } from '@/constants/editor';
+import { MAX_ZOOM, MIN_CLIP_DURATION, MIN_ZOOM } from '@/constants/editor';
 import {
   applyBatchPatch,
   batchablePatch,
@@ -11,7 +11,7 @@ import {
 import { applyCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import { makeId } from '@/lib/id';
-import { findClip, projectDuration } from '@/lib/projectUtils';
+import { findClip, maxVideoDuration, projectDuration } from '@/lib/projectUtils';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
@@ -25,6 +25,35 @@ export type InsightLane = 'story' | 'map' | 'pacing';
 export type SnapStrength = 'off' | 'normal' | 'strong';
 /** erősség → SNAP_PX szorzó (0 = nincs illesztés) */
 export const SNAP_FACTOR: Record<SnapStrength, number> = { off: 0, normal: 1, strong: 2 };
+
+/**
+ * ✂️ Trim-mód (profi vágó-viselkedés). A `normal` a hagyományos trim/mozgatás;
+ * a `ripple` a mögötte lévőket tolja; a `roll`, `slip`, `slide` a szomszédos
+ * klipekkel dolgozik (lásd `rollEdit`/`slipEdit`/`slideEdit`). A trim-fogantyú
+ * a roll/ripple/normal szerint viselkedik, a klip-test húzása a slip/slide/normal
+ * szerint — így egy módválasztóval az összes profi vágás elérhető.
+ */
+export type TrimMode = 'normal' | 'ripple' | 'roll' | 'slip' | 'slide';
+export const TRIM_MODES: TrimMode[] = ['normal', 'ripple', 'roll', 'slip', 'slide'];
+
+/**
+ * 🧲 Illesztési CÉLPONTOK: melyik fajtára kapjon a klip-él/lejátszófej. A magnet
+ * gomb hosszú nyomása kapcsolja őket; a `snapStrength: 'off'` mindent kikapcsol.
+ */
+export interface SnapTargets {
+  playhead: boolean;
+  clips: boolean;
+  markers: boolean;
+  beats: boolean;
+  regions: boolean;
+}
+export const DEFAULT_SNAP_TARGETS: SnapTargets = {
+  playhead: true,
+  clips: true,
+  markers: true,
+  beats: true,
+  regions: true,
+};
 
 /** 🏷️ timeline-régió színek — új régió ciklikusan kap, az átszínezés ezen lépked */
 const REGION_COLORS = ['#7c5cff', '#4a9eff', '#2ecc8f', '#ffb454', '#ff5ca8', '#ff6b6b'];
@@ -113,6 +142,24 @@ interface EditorState {
   snapGrid: number;
   /** 🧲 idővonal-illesztés erőssége (klip-él → beat/marker/playhead); session-szintű */
   snapStrength: SnapStrength;
+  /** 🧲 mely célpont-fajtákra illeszt (playhead/klip-élek/marker/beat/régió); session-szintű */
+  snapTargets: SnapTargets;
+  /** ✂️ Borotva-mód: az idővonalra koppintás elvágja az alatta lévő klipet; session-szintű */
+  razorMode: boolean;
+  /** ✂️ Trim-mód (normal/ripple/roll/slip/slide) — a fogantyú és a test-húzás viselkedése; session-szintű */
+  trimMode: TrimMode;
+  /**
+   * 👁️ Elrejtett (vizuális) sávok — az ELŐNÉZETBŐL kimaradnak (monitorozás,
+   * mint a hang mute-ja); NEM kerül a projektbe, NEM hat a renderre.
+   */
+  hiddenTracks: TrackType[];
+  /** 📏 automatikus sáv-magasság: a magasság a sáv tartalom-típusából jön, a kézi szorzót felülírja; session-szintű */
+  autoTrackHeight: boolean;
+  /** ⏯️ shuttle-sebesség (J/K/L): negatív = visszafelé, 0 = áll; a lejátszó-óra ezzel skálázza a dt-t */
+  playbackRate: number;
+  /** 🅸🅾 tartomány-kijelölés kezdete/vége (idővonal-mp); null = nincs. A hurok és a tartomány-műveletek alapja */
+  rangeIn: number | null;
+  rangeOut: number | null;
   /** 🛡️ safe-zone overlay az előnézeten (TikTok/Reels/YT UI-zónák); session-szintű */
   showSafeZones: boolean;
   /** 🎯 fókusz mód: kijelöléskor a TÖBBI idővonal-klip elhalványul; session-szintű */
@@ -179,9 +226,13 @@ interface EditorState {
   selectClips: (ids: string[]) => void;
   copyStyle: () => boolean;
   pasteStyle: () => number;
-  toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse') => void;
+  toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse' | 'hidden') => void;
   /** sáv-magasság léptetése: 1× → 1.6× → 2.4× → 1× */
   cycleTrackHeight: (type: TrackType) => void;
+  /** látszik-e a (vizuális) sáv az ELŐNÉZETBEN (hiddenTracks alapján) */
+  isTrackVisible: (type: TrackType) => boolean;
+  /** 📏 automatikus sáv-magasság ki/be */
+  toggleAutoTrackHeight: () => void;
   /** a TÖBB-kijelölt klipek együttes eltolása az idővonalon (csoport-mozgatás) */
   nudgeSelectedBy: (deltaSec: number) => void;
   /** megadott klipek együttes eltolása (csoport-clamppal) — link/selection közös magja */
@@ -217,11 +268,39 @@ interface EditorState {
   /** a javasolt vágások alkalmazása (a lefedő videóklipek splitelése), majd elvetés */
   applySuggestedCuts: () => void;
   setRippleMode: (on: boolean) => void;
+  /** ✂️ borotva-mód ki/be (az idővonalra koppintás vág) */
+  setRazorMode: (on: boolean) => void;
+  toggleRazorMode: () => void;
+  /** ✂️ trim-mód beállítása / léptetése (normal→ripple→roll→slip→slide→normal) */
+  setTrimMode: (mode: TrimMode) => void;
+  cycleTrimMode: () => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
   setSnapGrid: (grid: number) => void;
   toggleSafeZones: () => void;
   /** 🧲 illesztés-erősség léptetése: normál → erős → ki → normál */
   cycleSnapStrength: () => void;
+  /** 🧲 egy illesztési célpont-fajta ki/bekapcsolása */
+  toggleSnapTarget: (key: keyof SnapTargets) => void;
+  /** ⏯️ shuttle: sebesség beállítása (J/K/L) — a lejátszás ehhez igazodik */
+  setPlaybackRate: (rate: number) => void;
+  /** ⏯️ shuttle-léptetés: dir<0 = J (vissza), dir>0 = L (előre); ismételve gyorsít */
+  shuttle: (dir: -1 | 1) => void;
+  /** 🅸 tartomány kezdete a lejátszófejnél */
+  setRangeIn: () => void;
+  /** 🅾 tartomány vége a lejátszófejnél */
+  setRangeOut: () => void;
+  /** tartomány-kijelölés törlése */
+  clearRange: () => void;
+  /** a kijelölt tartomány ripple-törlése (a rés bezárul minden nem-zárolt sávon) */
+  deleteRange: () => boolean;
+  /** régió létrehozása a kijelölt tartományból */
+  regionFromRange: () => void;
+  /** 🌀 roll-vágás: a klip és a szomszéd közti VÁGÁSPONT eltolása (a projekt-hossz marad) */
+  rollEdit: (clipId: string, edge: 'left' | 'right', deltaSec: number) => void;
+  /** 🌀 slip-vágás: csak a forrás be/ki-pont csúszik (a klip helye/hossza marad) — csak videón */
+  slipEdit: (clipId: string, deltaSec: number) => void;
+  /** 🌀 slide-vágás: a klip elcsúszik, a szomszédok elnyelik (a projekt-hossz marad) */
+  slideEdit: (clipId: string, deltaSec: number) => void;
   toggleFocusMode: () => void;
   setComparingOriginal: (on: boolean) => void;
   setCompareSplit: (v: number | null) => void;
@@ -276,8 +355,16 @@ const SESSION_RESET = {
   multiSelectMode: false,
   drawBrush: null,
   rippleMode: false,
+  razorMode: false,
+  trimMode: 'normal' as TrimMode,
   snapGrid: 0,
   snapStrength: 'normal' as SnapStrength,
+  snapTargets: { ...DEFAULT_SNAP_TARGETS },
+  hiddenTracks: [] as TrackType[],
+  autoTrackHeight: false,
+  playbackRate: 1,
+  rangeIn: null as number | null,
+  rangeOut: null as number | null,
   showSafeZones: false,
   focusMode: false,
   comparingOriginal: false,
@@ -590,7 +677,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? 'soloTracks'
           : flag === 'collapse'
             ? 'collapsedTracks'
-            : 'lockedTracks';
+            : flag === 'hidden'
+              ? 'hiddenTracks'
+              : 'lockedTracks';
     const list = get()[key];
     const next = list.includes(type) ? list.filter((t) => t !== type) : [...list, type];
     // zároláskor a sávon lévő kijelölés elévül (különben zárolt klipet
@@ -610,8 +699,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const cur = get().trackHeightScale[type] ?? 1;
     const idx = steps.indexOf(cur);
     const next = steps[(idx + 1) % steps.length] ?? 1;
-    set((s) => ({ trackHeightScale: { ...s.trackHeightScale, [type]: next } }));
+    // kézi léptetés kikapcsolja az automatikus magasságot (a user átvette az irányítást)
+    set((s) => ({ autoTrackHeight: false, trackHeightScale: { ...s.trackHeightScale, [type]: next } }));
   },
+
+  isTrackVisible: (type) => !get().hiddenTracks.includes(type),
+
+  toggleAutoTrackHeight: () => set((s) => ({ autoTrackHeight: !s.autoTrackHeight })),
 
   nudgeClipsBy: (idList, deltaSec) => {
     const { project } = get();
@@ -818,6 +912,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setRippleMode: (on) => set({ rippleMode: on }),
 
+  // borotva és rajzoló-mód kizárja egymást (mindkettő a vászon/idővonal koppintását foglalja)
+  setRazorMode: (on) => set(on ? { razorMode: true, drawBrush: null } : { razorMode: false }),
+  toggleRazorMode: () => set((s) => (s.razorMode ? { razorMode: false } : { razorMode: true, drawBrush: null })),
+
+  setTrimMode: (mode) => set({ trimMode: mode }),
+  cycleTrimMode: () =>
+    set((s) => ({ trimMode: TRIM_MODES[(TRIM_MODES.indexOf(s.trimMode) + 1) % TRIM_MODES.length] })),
+
   setDrawBrush: (brush) => set({ drawBrush: brush }),
 
   setSnapGrid: (grid) => set({ snapGrid: grid }),
@@ -828,6 +930,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       snapStrength:
         s.snapStrength === 'normal' ? 'strong' : s.snapStrength === 'strong' ? 'off' : 'normal',
     })),
+  toggleSnapTarget: (key) =>
+    set((s) => ({ snapTargets: { ...s.snapTargets, [key]: !s.snapTargets[key] } })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   setComparingOriginal: (on) => set({ comparingOriginal: on }),
   setCompareSplit: (v) => set({ compareSplit: v }),
@@ -904,6 +1008,247 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  setRangeIn: () => {
+    const { playhead, rangeOut } = get();
+    const t = Math.round(playhead * 100) / 100;
+    set({ rangeIn: t, rangeOut: rangeOut != null && rangeOut > t ? rangeOut : null });
+  },
+  setRangeOut: () => {
+    const { playhead, rangeIn } = get();
+    const t = Math.round(playhead * 100) / 100;
+    set({ rangeOut: t, rangeIn: rangeIn != null && rangeIn < t ? rangeIn : null });
+  },
+  clearRange: () => set({ rangeIn: null, rangeOut: null }),
+
+  regionFromRange: () => {
+    const { project, rangeIn, rangeOut } = get();
+    if (!project || rangeIn == null || rangeOut == null || rangeOut - rangeIn < 0.05) {
+      return;
+    }
+    const regions = project.regions ?? [];
+    const region: TimelineRegion = {
+      id: makeId('rgn'),
+      start: rangeIn,
+      end: rangeOut,
+      label: tr('store.editor.regionDefault', { n: regions.length + 1 }),
+      color: REGION_COLORS[regions.length % REGION_COLORS.length],
+    };
+    if (get().dispatch({ type: 'SET_REGIONS', regions: [...regions, region] })) {
+      set({ rangeIn: null, rangeOut: null });
+    }
+  },
+
+  deleteRange: () => {
+    const { project, rangeIn, rangeOut, lockedTracks } = get();
+    if (!project || rangeIn == null || rangeOut == null) {
+      return false;
+    }
+    const inT = rangeIn;
+    const outT = rangeOut;
+    const span = outT - inT;
+    if (span < 0.05) {
+      return false;
+    }
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    const trackPatches: { trackType: TrackType; clips: Clip[] }[] = [];
+    for (const track of project.tracks) {
+      if (lockedTracks.includes(track.type)) {
+        continue;
+      }
+      let changed = false;
+      const out: Clip[] = [];
+      for (const c of track.clips) {
+        const s = c.start;
+        const e = c.start + c.duration;
+        if (e <= inT + 0.001) {
+          out.push(c); // teljesen a range előtt — marad
+          continue;
+        }
+        if (s >= outT - 0.001) {
+          out.push({ ...c, start: round(s - span) }); // teljesen utána — balra csúszik
+          changed = true;
+          continue;
+        }
+        // a range-be lóg: a metszet kiesik, a bal/jobb szegmens marad
+        changed = true;
+        const leftDur = Math.min(e, inT) - s;
+        const keepLeft = leftDur >= MIN_CLIP_DURATION;
+        if (keepLeft) {
+          out.push({ ...c, duration: round(leftDur) });
+        }
+        const rStart = Math.max(s, outT);
+        const rDur = e - rStart;
+        if (rDur >= MIN_CLIP_DURATION) {
+          const seg = { ...c, start: round(rStart - span), duration: round(rDur) } as Clip;
+          // a jobb szegmens forrás-be-pontja a kivágott rész UTÁNI tartalomra ugrik
+          if (seg.kind === 'video' && c.kind === 'video') {
+            seg.id = makeId('clip');
+            seg.trimIn = round(c.trimIn + (rStart - s) * c.speed);
+          } else if (keepLeft) {
+            seg.id = makeId('clip'); // ha a bal is megmarad, a jobbnak új id kell
+          }
+          out.push(seg);
+        }
+      }
+      if (changed) {
+        trackPatches.push({ trackType: track.type, clips: out });
+      }
+    }
+    if (trackPatches.length === 0) {
+      return false;
+    }
+    const ok = get().dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks: trackPatches,
+      label: tr('store.editor.deleteRange', { seconds: span.toFixed(1) }),
+    });
+    if (ok) {
+      set({
+        rangeIn: null,
+        rangeOut: null,
+        selectedClipId: null,
+        multiSelectIds: [],
+        multiSelectMode: false,
+        playhead: inT,
+      });
+    }
+    return ok;
+  },
+
+  rollEdit: (clipId, edge, deltaSec) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    const found = findClip(project, clipId);
+    if (!found) {
+      return;
+    }
+    const track = found.track;
+    const c = found.clip;
+    const sorted = [...track.clips].sort((a, b) => a.start - b.start);
+    const idx = sorted.findIndex((x) => x.id === clipId);
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    if (edge === 'right') {
+      const next = sorted[idx + 1];
+      if (!next || Math.abs(next.start - (c.start + c.duration)) > 0.05) {
+        return; // roll csak érintkező szomszéddal
+      }
+      let d = clamp(deltaSec, MIN_CLIP_DURATION - c.duration, next.duration - MIN_CLIP_DURATION);
+      if (c.kind === 'video') {
+        d = Math.min(d, maxVideoDuration(c) - c.duration); // c forrás-vége
+      }
+      if (next.kind === 'video') {
+        d = Math.max(d, -next.trimIn / next.speed); // next forrás-eleje
+      }
+      if (Math.abs(d) < 0.001) {
+        return;
+      }
+      const newC = { ...c, duration: round(c.duration + d) } as Clip;
+      const newNext = { ...next, start: round(next.start + d), duration: round(next.duration - d) } as Clip;
+      if (newNext.kind === 'video' && next.kind === 'video') {
+        newNext.trimIn = round(next.trimIn + d * next.speed);
+      }
+      const clips = track.clips.map((x) => (x.id === c.id ? newC : x.id === next.id ? newNext : x));
+      get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.rollEdit') });
+    } else {
+      const prev = sorted[idx - 1];
+      if (!prev || Math.abs(prev.start + prev.duration - c.start) > 0.05) {
+        return;
+      }
+      let d = clamp(deltaSec, MIN_CLIP_DURATION - prev.duration, c.duration - MIN_CLIP_DURATION);
+      if (prev.kind === 'video') {
+        d = Math.min(d, maxVideoDuration(prev) - prev.duration); // prev forrás-vége
+      }
+      if (c.kind === 'video') {
+        d = Math.max(d, -c.trimIn / c.speed); // c forrás-eleje
+      }
+      if (Math.abs(d) < 0.001) {
+        return;
+      }
+      const newPrev = { ...prev, duration: round(prev.duration + d) } as Clip;
+      const newC = { ...c, start: round(c.start + d), duration: round(c.duration - d) } as Clip;
+      if (newC.kind === 'video' && c.kind === 'video') {
+        newC.trimIn = round(c.trimIn + d * c.speed);
+      }
+      const clips = track.clips.map((x) => (x.id === prev.id ? newPrev : x.id === c.id ? newC : x));
+      get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.rollEdit') });
+    }
+  },
+
+  slipEdit: (clipId, deltaSec) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    const c = findClip(project, clipId)?.clip;
+    if (!c || c.kind !== 'video') {
+      return; // slip csak videón értelmes (forrás-ablak csúsztatás)
+    }
+    // drag jobbra → korábbi forrás-tartalom (trimIn csökken); a látható ablak = duration*speed
+    const windowSrc = c.duration * c.speed;
+    const newTrimIn = clamp(c.trimIn - deltaSec * c.speed, 0, Math.max(0, c.sourceDuration - windowSrc));
+    if (Math.abs(newTrimIn - c.trimIn) < 0.001) {
+      return;
+    }
+    get().updateClip(clipId, { trimIn: Math.round(newTrimIn * 1000) / 1000 });
+  },
+
+  slideEdit: (clipId, deltaSec) => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    const found = findClip(project, clipId);
+    if (!found) {
+      return;
+    }
+    const track = found.track;
+    const c = found.clip;
+    const sorted = [...track.clips].sort((a, b) => a.start - b.start);
+    const idx = sorted.findIndex((x) => x.id === clipId);
+    const prev = sorted[idx - 1];
+    const next = sorted[idx + 1];
+    const touchingPrev = !!prev && Math.abs(prev.start + prev.duration - c.start) <= 0.05;
+    const touchingNext = !!next && Math.abs(next.start - (c.start + c.duration)) <= 0.05;
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    let d = deltaSec;
+    if (touchingPrev) {
+      d = Math.max(d, MIN_CLIP_DURATION - prev!.duration);
+      if (prev!.kind === 'video') {
+        d = Math.min(d, maxVideoDuration(prev!) - prev!.duration);
+      }
+    } else {
+      d = Math.max(d, -c.start); // szomszéd nélkül csak a 0 a korlát
+    }
+    if (touchingNext) {
+      d = Math.min(d, next!.duration - MIN_CLIP_DURATION);
+      if (next!.kind === 'video') {
+        d = Math.max(d, -next!.trimIn / next!.speed);
+      }
+    }
+    if (Math.abs(d) < 0.001) {
+      return;
+    }
+    const clips = track.clips.map((x) => {
+      if (x.id === c.id) {
+        return { ...x, start: round(x.start + d) } as Clip;
+      }
+      if (touchingPrev && x.id === prev!.id) {
+        return { ...x, duration: round(x.duration + d) } as Clip;
+      }
+      if (touchingNext && x.id === next!.id) {
+        const n = { ...x, start: round(x.start + d), duration: round(x.duration - d) } as Clip;
+        if (n.kind === 'video' && x.kind === 'video') {
+          n.trimIn = round(x.trimIn + d * x.speed);
+        }
+        return n;
+      }
+      return x;
+    });
+    get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.slideEdit') });
+  },
+
   isTrackAudible: (type) => {
     const { mutedTracks, soloTracks } = get();
     // ha bármi solóban van, CSAK az szól — ez a szokásos keverőpult-logika
@@ -927,6 +1272,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPlaying: (playing) => set({ isPlaying: playing }),
 
   setLoop: (loop) => set({ loop }),
+
+  setPlaybackRate: (rate) => set({ playbackRate: rate }),
+
+  shuttle: (dir) => {
+    // sebesség-létra: 1× → 2× → 4× (irány szerint előjelezve). Ellentétes irányba
+    // koppintva először 1×-re vált, csak azonos irányban gyorsít tovább.
+    const LADDER = [1, 2, 4];
+    const cur = get().playbackRate;
+    const sameDir = dir > 0 ? cur >= 1 : cur <= -1;
+    const mag = sameDir ? LADDER[Math.min(LADDER.indexOf(Math.abs(cur)) + 1, LADDER.length - 1)] ?? 1 : 1;
+    set({ playbackRate: dir * mag, isPlaying: true });
+  },
 
   setBeatGrid: (beatTimes, downbeatTimes) => set({ beatTimes, downbeatTimes }),
   setVariantPreview: (ranges) => set({ variantPreview: ranges }),

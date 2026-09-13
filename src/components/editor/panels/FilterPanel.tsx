@@ -15,6 +15,7 @@ import { faceUnionRegion, fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
 import { addMaskKeyframe, hasMaskTrack, maskKeyframeTimes, removeMaskKeyframeAt, sampleMaskAt, trackToPoints } from '@/lib/maskAnim';
 import { smoothMask } from '@/lib/maskEdit';
+import { trackSubject } from '@/lib/track';
 import { PHOTO_ANIM_PRESETS, buildPhotoAnimation } from '@/lib/photoAnimate';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { SKY_PRESETS, replaceSky } from '@/lib/skyClient';
@@ -112,6 +113,40 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
       setRotoMask(true);
     } else {
       Alert.alert(t('panels.filter.maskTrackFace'), t('panels.filter.trackNoFace'));
+    }
+  };
+
+  /** 🎯 követés a mozgó témára: a maszk középpontjából indított pont-követés (/track) */
+  const trackMaskToSubject = async () => {
+    const mask = clip.mask;
+    if (!mask) {
+      return;
+    }
+    const project = useEditorStore.getState().project;
+    const [aw, ah] = (project?.aspectRatio ?? '16:9').split(':').map(Number);
+    const speed = clip.kind === 'video' ? clip.speed : 1;
+    const startSec = clip.kind === 'video' ? clip.trimIn : 0;
+    const durationSec = clip.duration * speed;
+    try {
+      const pts = await trackSubject(clip.uri, {
+        startSec,
+        durationSec,
+        cx: mask.x,
+        cy: mask.y,
+        aspectW: aw || 16,
+        aspectH: ah || 9,
+      });
+      if (pts && pts.length >= 2) {
+        // a pont-idő a startSec-től forrás-mp → klip-lokálisra a sebességgel osztunk
+        updateClip(clip.id, {
+          mask: trackToPoints(mask, pts.map((p) => ({ time: p.t / speed, x: p.x, y: p.y }))),
+        });
+        setRotoMask(true);
+      } else {
+        Alert.alert(t('panels.filter.maskTrackSubject'), t('panels.filter.trackNoSubject'));
+      }
+    } catch (err) {
+      Alert.alert(t('panels.filter.maskTrackSubject'), (err as Error).message);
     }
   };
   const intensity = clip.filterIntensity ?? 1;
@@ -1034,6 +1069,13 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
                     label={t('panels.filter.maskKeyClear')}
                     active={false}
                     onPress={() => updateClip(clip.id, { mask: { ...clip.mask!, track: undefined } })}
+                  />
+                  <Chip
+                    label={t('panels.filter.maskTrackSubject')}
+                    active={false}
+                    onPress={() => {
+                      trackMaskToSubject().catch(() => {});
+                    }}
                   />
                   <Chip
                     label={t('panels.filter.maskTrackFace')}

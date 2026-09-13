@@ -595,9 +595,19 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
    * teljes per-frame; poligon per-vertex ha a pontszám állandó és ≤16, különben
    * a klip közepéhez legközelebbi keret statikus alakja (dokumentált korlát).
    */
-  const withMask = (i, fgLabel, mask, dur, skip = 0) => {
+  const withMask = (i, fgLabel, mask, dur, skip = 0, maskInputIdx = null) => {
     if (!mask) {
       return fgLabel;
+    }
+    // 🎬 kész szürke maszk-videó (worker-rasterizer, tetszőleges pontszám +
+    // feather-animáció): csak az fg-alfa szorzása kell, geq nélkül
+    if (maskInputIdx != null) {
+      graph.push(`[${maskInputIdx}:v]scale=${W}:${H},format=gray[mimg${i}]`);
+      graph.push(`[${fgLabel}]split[mf${i}][mfa${i}]`);
+      graph.push(`[mfa${i}]alphaextract[mae${i}]`);
+      graph.push(`[mae${i}][mimg${i}]blend=all_mode=multiply:shortest=1[mab${i}]`);
+      graph.push(`[mf${i}][mab${i}]alphamerge[mfg${i}]`);
+      return `mfg${i}`;
     }
     const track =
       Array.isArray(mask.track) && mask.track.length > 0
@@ -989,6 +999,40 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     return out;
   };
 
+  // 🎬 ANIMÁLT MASZK pre-pass (async, a szinkron forEach ELŐTT): a track-kel bíró
+  // maszkokhoz per-frame szürke PNG-képsort gyártunk (worker-rasterizer) — ez
+  // oldja fel a ≤16 csúcsú per-frame geq korlátot (tetszőleges pontszám +
+  // feather-animáció). Chromium/hiba esetén NEM állítunk indexet → a withMask a
+  // geq-útra esik vissza (a statikus maszkok érintetlenek).
+  const maskSeqIdx = {};
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const c = seg.clip;
+    if (
+      (seg.kind === 'video' || seg.kind === 'image') &&
+      c &&
+      c.mask &&
+      Array.isArray(c.mask.track) &&
+      c.mask.track.length > 0
+    ) {
+      try {
+        const { renderMaskSequence } = require('./mask-render');
+        const dir = path.join(workDir, `mask_${i}`);
+        fs.mkdirSync(dir, { recursive: true });
+        const seqM = await renderMaskSequence(
+          c.mask,
+          { skip: seg.skip, duration: seg.duration, fps: FPS, W, H },
+          dir
+        );
+        if (seqM) {
+          maskSeqIdx[i] = addInput(['-framerate', String(FPS), '-i', seqM.pattern]);
+        }
+      } catch (err) {
+        console.warn('mask-render kihagyva:', err.message); // → geq fallback
+      }
+    }
+  }
+
   segments.forEach((seg, i) => {
     const label = `seg${i}`;
     if (seg.kind === 'gap') {
@@ -1064,7 +1108,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           );
           graph.push(decode + fgChain + `[bfg${i}]`);
         }
-        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip);
+        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
         graph.push(
           `[${baseLabel}][${fgFinal}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );
@@ -1183,7 +1227,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           );
           graph.push(`[${idx}:v]fps=${FPS},${fgChain}[bfg${i}]`);
         }
-        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip);
+        const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
         graph.push(
           `[${baseLabel}][${fgFinal}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );

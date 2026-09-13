@@ -1246,7 +1246,9 @@
       "maskTrackFace": "🎯 Track to face",
       "trackNoFace": "No trackable face found (worker running? Pro?).",
       "rotoNote": "Rotoscope: move the playhead, adjust the mask on the canvas — each edit sets a keyframe at the playhead and the in-between frames interpolate. The render bakes a per-frame mask.",
-      "maskKeyDelHere": "◇ Delete keyframe"
+      "maskKeyDelHere": "◇ Delete keyframe",
+      "maskTrackSubject": "🎯 Track subject",
+      "trackNoSubject": "Couldn’t track the subject (worker running? Pro?)."
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

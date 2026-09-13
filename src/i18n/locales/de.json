@@ -1246,7 +1246,9 @@
       "maskTrackFace": "🎯 Gesicht verfolgen",
       "trackNoFace": "Kein verfolgbares Gesicht gefunden (Worker aktiv? Pro?).",
       "rotoNote": "Rotoskopie: Abspielkopf bewegen, Maske auf der Leinwand anpassen — jede Änderung setzt einen Keyframe am Abspielkopf, dazwischen wird interpoliert. Der Render backt eine Maske pro Bild.",
-      "maskKeyDelHere": "◇ Keyframe löschen"
+      "maskKeyDelHere": "◇ Keyframe löschen",
+      "maskTrackSubject": "🎯 Objekt verfolgen",
+      "trackNoSubject": "Objekt konnte nicht verfolgt werden (Worker aktiv? Pro?)."
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

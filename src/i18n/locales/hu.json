@@ -1246,7 +1246,9 @@
       "maskTrackFace": "🎯 Követés arcra",
       "trackNoFace": "Nem találtam követhető arcot (fut a worker? Pro?).",
       "rotoNote": "Rotoszkóp: mozgasd a lejátszófejet, igazítsd a maszkot a vásznon — minden igazítás kulcskockát tesz a lejátszófejnél, a köztes képkockák interpolálnak. A render per-frame maszkot éget be.",
-      "maskKeyDelHere": "◇ Kulcskocka törlése"
+      "maskKeyDelHere": "◇ Kulcskocka törlése",
+      "maskTrackSubject": "🎯 Követés (téma)",
+      "trackNoSubject": "Nem sikerült követni a témát (fut a worker? Pro?)."
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

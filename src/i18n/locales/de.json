@@ -1239,7 +1239,14 @@
       "chipSmooth": "〰️ Glätten",
       "noteDrawMask": "Zeichne die Maske des gewählten Clips mit Finger/Stift auf die Leinwand — beim Loslassen wird sie zur Polygon-Maske, mit den Griffen verfeinerbar.",
       "maskExpand": "Erweiterung",
-      "maskOpacity": "Masken-Deckkraft"
+      "maskOpacity": "Masken-Deckkraft",
+      "rotoscope": "🎬 Rotoskopie",
+      "maskKeyHere": "◆ Keyframe hier",
+      "maskKeyClear": "Animation löschen",
+      "maskTrackFace": "🎯 Gesicht verfolgen",
+      "trackNoFace": "Kein verfolgbares Gesicht gefunden (Worker aktiv? Pro?).",
+      "rotoNote": "Rotoskopie: Abspielkopf bewegen, Maske auf der Leinwand anpassen — jede Änderung setzt einen Keyframe am Abspielkopf, dazwischen wird interpoliert. Der Render backt eine Maske pro Bild.",
+      "maskKeyDelHere": "◇ Keyframe löschen"
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

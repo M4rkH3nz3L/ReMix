@@ -30,6 +30,7 @@ import {
 } from '@/lib/keyframes';
 import { adjustTintLayers } from '@/lib/adjustPreview';
 import { pathBounds, polylinePoints, simplifyPath, toBoxSpace } from '@/lib/draw';
+import { addMaskKeyframe, hasMaskTrack, sampleMaskAt } from '@/lib/maskAnim';
 import { maskFromStroke } from '@/lib/maskEdit';
 import { makeId } from '@/lib/id';
 import { ensureProxy, getProxyUriSync } from '@/lib/proxy';
@@ -92,6 +93,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const drawBrush = useEditorStore((s) => s.drawBrush);
   const drawMaskMode = useEditorStore((s) => s.drawMaskMode);
   const maskEdit = useEditorStore((s) => s.maskEdit);
+  const rotoMask = useEditorStore((s) => s.rotoMask);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
   // 👁️ elrejtett (vizuális) sávok — az előnézetből kimaradnak (monitorozás, nem render)
@@ -881,14 +883,26 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             />
           ))}
 
-          {/* ✂️ maszk-fogantyúk a kijelölt klip maszkján */}
-          {maskEdit && selectedClipId && visual && 'mask' in visual && visual.mask ? (
-            <MaskOverlay
-              mask={visual.mask}
-              box={{ w: boxW, h: boxH }}
-              onChange={(next) => updateClip(visual.id, { mask: next })}
-            />
-          ) : null}
+          {/* ✂️ maszk-fogantyúk a kijelölt klip maszkján; 🎬 rotoszkóp-módban a
+              lejátszófejnél interpolált maszk látszik, és a szerkesztés kulcskockát ír */}
+          {maskEdit && selectedClipId && visual && 'mask' in visual && visual.mask
+            ? (() => {
+                const baseMask = visual.mask;
+                const tInClip = clamp(playhead - visual.start, 0, visual.duration);
+                const shown = hasMaskTrack(baseMask) ? sampleMaskAt(baseMask, tInClip) : baseMask;
+                return (
+                  <MaskOverlay
+                    mask={shown}
+                    box={{ w: boxW, h: boxH }}
+                    onChange={(next) =>
+                      updateClip(visual.id, {
+                        mask: rotoMask ? addMaskKeyframe(baseMask, tInClip, next) : next,
+                      })
+                    }
+                  />
+                );
+              })()
+            : null}
 
           {/* ✏️ a húzás közben rajzolódó vonal (forma VAGY szabadkézi maszk) */}
           {(drawBrush || drawMaskMode) && strokeLive.length >= 2 ? (

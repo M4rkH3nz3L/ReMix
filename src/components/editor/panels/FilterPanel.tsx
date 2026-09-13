@@ -11,8 +11,9 @@ import { CAMERA_PRESETS, buildCameraMove } from '@/lib/camera3d';
 import { statsToAutoAdjust, statsToMatchAdjust } from '@/lib/colorAuto';
 import { fetchColorStats } from '@/lib/colorClient';
 import { requestDepthFocus, requestDepthParallax } from '@/lib/depthClient';
-import { faceUnionRegion, fetchFaces } from '@/lib/faceClient';
+import { faceUnionRegion, fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
+import { addMaskKeyframe, hasMaskTrack, maskKeyframeTimes, removeMaskKeyframeAt, sampleMaskAt, trackToPoints } from '@/lib/maskAnim';
 import { smoothMask } from '@/lib/maskEdit';
 import { PHOTO_ANIM_PRESETS, buildPhotoAnimation } from '@/lib/photoAnimate';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
@@ -77,6 +78,42 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const setMaskEdit = useEditorStore((s) => s.setMaskEdit);
   const drawMaskMode = useEditorStore((s) => s.drawMaskMode);
   const setDrawMaskMode = useEditorStore((s) => s.setDrawMaskMode);
+  const rotoMask = useEditorStore((s) => s.rotoMask);
+  const setRotoMask = useEditorStore((s) => s.setRotoMask);
+  const playhead = useEditorStore((s) => s.playhead);
+  const setPlayhead = useEditorStore((s) => s.setPlayhead);
+
+  /** 🎯 követés arcra: a maszkot a detektált elsődleges arc mozgásához kulcskockázza (Pro) */
+  const trackMaskToFace = async () => {
+    const mask = clip.mask;
+    if (!mask) {
+      return;
+    }
+    const project = useEditorStore.getState().project;
+    const [aw, ah] = (project?.aspectRatio ?? '16:9').split(':').map(Number);
+    const N = 6;
+    const samples: { time: number; x: number; y: number }[] = [];
+    try {
+      for (let i = 0; i < N; i++) {
+        const tl = ((i + 0.5) / N) * clip.duration;
+        const atSec = clip.kind === 'video' ? clip.trimIn + tl * clip.speed : tl;
+        const faces = await fetchFaces(clip.uri, { atSec, aspectW: aw || 16, aspectH: ah || 9 });
+        const face = faces ? pickPrimaryFace(faces) : null;
+        if (face) {
+          samples.push({ time: tl, x: face.x, y: face.y });
+        }
+      }
+    } catch (err) {
+      Alert.alert(t('panels.filter.maskTrackFace'), (err as Error).message);
+      return;
+    }
+    if (samples.length >= 2) {
+      updateClip(clip.id, { mask: trackToPoints(mask, samples) });
+      setRotoMask(true);
+    } else {
+      Alert.alert(t('panels.filter.maskTrackFace'), t('panels.filter.trackNoFace'));
+    }
+  };
   const intensity = clip.filterIntensity ?? 1;
   const [depthBusy, setDepthBusy] = useState(false);
 
@@ -965,6 +1002,63 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
                 })
               }
             />
+            {/* 🎬 Rotoszkóp / követés: a maszk geometriája kulcskockákkal animálható */}
+            <View style={styles.row}>
+              <Chip
+                label={t('panels.filter.rotoscope')}
+                active={rotoMask}
+                onPress={() => setRotoMask(!rotoMask)}
+              />
+              {rotoMask || hasMaskTrack(clip.mask) ? (
+                <>
+                  <Chip
+                    label={t('panels.filter.maskKeyHere')}
+                    active={false}
+                    onPress={() => {
+                      const tl = clamp(playhead - clip.start, 0, clip.duration);
+                      updateClip(clip.id, {
+                        mask: addMaskKeyframe(clip.mask!, tl, sampleMaskAt(clip.mask!, tl)),
+                      });
+                    }}
+                  />
+                  <Chip
+                    label={t('panels.filter.maskKeyDelHere')}
+                    active={false}
+                    onPress={() =>
+                      updateClip(clip.id, {
+                        mask: removeMaskKeyframeAt(clip.mask!, clamp(playhead - clip.start, 0, clip.duration)),
+                      })
+                    }
+                  />
+                  <Chip
+                    label={t('panels.filter.maskKeyClear')}
+                    active={false}
+                    onPress={() => updateClip(clip.id, { mask: { ...clip.mask!, track: undefined } })}
+                  />
+                  <Chip
+                    label={t('panels.filter.maskTrackFace')}
+                    active={false}
+                    onPress={() => {
+                      trackMaskToFace().catch(() => {});
+                    }}
+                  />
+                </>
+              ) : null}
+            </View>
+            {/* ◆ kulcskocka-lista: koppintásra a lejátszófej odaugrik */}
+            {maskKeyframeTimes(clip.mask).length > 0 ? (
+              <View style={styles.row}>
+                {maskKeyframeTimes(clip.mask).map((tt) => (
+                  <Chip
+                    key={tt.toFixed(2)}
+                    label={`◆ ${(clip.start + tt).toFixed(1)}s`}
+                    active={Math.abs(playhead - clip.start - tt) < 0.05}
+                    onPress={() => setPlayhead(clip.start + tt)}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {rotoMask ? <Text style={styles.note}>{t('panels.filter.rotoNote')}</Text> : null}
           </>
         ) : null}
         <Text style={styles.note}>

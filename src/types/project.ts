@@ -223,6 +223,32 @@ export interface ClipMask {
    * A renderben az alfa-rámpa alsó szintjét emeli meg.
    */
   opacity?: number;
+  /**
+   * 🎬 Rotoszkóp / követés: a maszk GEOMETRIÁJÁNAK kulcskockái klip-lokális
+   * időben. Ha van (≥1 keret), a maszk a `track`-ból interpolálódik (a fenti
+   * x/y/w/h/points a kulcskocka nélküli alap). Így a maszk követhet egy témát,
+   * vagy képkockánként újrarajzolható (rotoszkóp). A `shape`/`invert`/`opacity`
+   * a `track`-tól függetlenül, a klip szintjén él.
+   */
+  track?: MaskFrame[];
+}
+
+/**
+ * 🎬 Egy maszk-kulcskocka: a geometria pillanatképe egy klip-lokális időpontban.
+ * A `shape`-et NEM hordozza (az a ClipMason állandó); a poligon-pontok
+ * interpolációja csak AZONOS pontszámú szomszédos keretek közt fut (különben az
+ * előző keret pontjait tartja — „stepped" rotoszkóp).
+ */
+export interface MaskFrame {
+  /** klip-lokális idő (mp) */
+  time: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  feather?: number;
+  expand?: number;
+  points?: { x: number; y: number }[];
 }
 
 /**

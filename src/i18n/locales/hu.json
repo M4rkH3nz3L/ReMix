@@ -1239,7 +1239,14 @@
       "chipSmooth": "〰️ Simítás",
       "noteDrawMask": "Rajzold körbe ujjal/tollal a vásznon a kijelölt klip maszkját — felengedéskor poligon-maszk lesz, a fogantyúkkal finomítható.",
       "maskExpand": "Kiterjesztés",
-      "maskOpacity": "Maszk-átlátszóság"
+      "maskOpacity": "Maszk-átlátszóság",
+      "rotoscope": "🎬 Rotoszkóp",
+      "maskKeyHere": "◆ Kulcskocka itt",
+      "maskKeyClear": "Animáció törlése",
+      "maskTrackFace": "🎯 Követés arcra",
+      "trackNoFace": "Nem találtam követhető arcot (fut a worker? Pro?).",
+      "rotoNote": "Rotoszkóp: mozgasd a lejátszófejet, igazítsd a maszkot a vásznon — minden igazítás kulcskockát tesz a lejátszófejnél, a köztes képkockák interpolálnak. A render per-frame maszkot éget be.",
+      "maskKeyDelHere": "◇ Kulcskocka törlése"
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

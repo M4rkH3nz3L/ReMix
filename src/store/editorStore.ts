@@ -178,6 +178,12 @@ interface EditorState {
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
   maskEdit: boolean;
   /**
+   * 🎬 Rotoszkóp-mód: ha aktív, a maszk vászon-szerkesztése a LEJÁTSZÓFEJNÉL
+   * kulcskockát ír (ClipMask.track), nem az alap-maszkot — így a maszk
+   * képkockánként újrarajzolható / követhet egy témát.
+   */
+  rotoMask: boolean;
+  /**
    * 🎙️ Szól-e épp a videóklip JAVÍTOTT hangja külön lejátszóról. Ilyenkor a
    * videó saját hangját némítani kell, különben duplán szólna.
    */
@@ -313,6 +319,8 @@ interface EditorState {
   setCompareSplit: (v: number | null) => void;
   setInsightLane: (lane: InsightLane) => void;
   setMaskEdit: (on: boolean) => void;
+  /** 🎬 rotoszkóp-mód ki/be (a maszk-szerkesztés a lejátszófejnél kulcskockát ír) */
+  setRotoMask: (on: boolean) => void;
   setVideoVoiceActive: (on: boolean) => void;
   /** ripple-törlés: a klipek eltűnnek és a lyuk bezárul (false = nem futott) */
   rippleDelete: (clipIds: string[]) => boolean;
@@ -383,6 +391,7 @@ const SESSION_RESET = {
   compareSplit: null as number | null,
   insightLane: 'story' as InsightLane,
   maskEdit: false,
+  rotoMask: false,
   videoVoiceActive: false,
   mutedTracks: [] as TrackType[],
   soloTracks: [] as TrackType[],
@@ -989,6 +998,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setInsightLane: (lane) => set({ insightLane: lane }),
 
   setMaskEdit: (on) => set({ maskEdit: on }),
+
+  setRotoMask: (on) => set(on ? { rotoMask: true, maskEdit: true } : { rotoMask: false }),
 
   setVideoVoiceActive: (on) => set({ videoVoiceActive: on }),
 

@@ -1239,7 +1239,14 @@
       "chipSmooth": "〰️ Smooth",
       "noteDrawMask": "Trace the selected clip’s mask on the canvas with finger/pen — on release it becomes a polygon mask, refine with the handles.",
       "maskExpand": "Expansion",
-      "maskOpacity": "Mask opacity"
+      "maskOpacity": "Mask opacity",
+      "rotoscope": "🎬 Rotoscope",
+      "maskKeyHere": "◆ Keyframe here",
+      "maskKeyClear": "Clear animation",
+      "maskTrackFace": "🎯 Track to face",
+      "trackNoFace": "No trackable face found (worker running? Pro?).",
+      "rotoNote": "Rotoscope: move the playhead, adjust the mask on the canvas — each edit sets a keyframe at the playhead and the in-between frames interpolate. The render bakes a per-frame mask.",
+      "maskKeyDelHere": "◇ Delete keyframe"
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

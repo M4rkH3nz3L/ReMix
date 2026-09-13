@@ -119,3 +119,125 @@ export function maskBox(mask: ClipMask): { x: number; y: number; w: number; h: n
   }
   return { x: mask.x, y: mask.y, w: mask.w, h: mask.h };
 }
+
+/** pont → szakasz távolság négyzete (vászon-normalizált) */
+function distToSeg(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number }
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy || 1e-9;
+  const t = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  const cx = a.x + t * dx;
+  const cy = a.y + t * dy;
+  return (p.x - cx) ** 2 + (p.y - cy) ** 2;
+}
+
+/**
+ * Új csúcs beszúrása a poligonba a (x,y) koppintáshoz LEGKÖZELEBBI élre — így a
+ * pontsűrűség ott nő, ahol a felhasználó finomítani akar (rotoszkóp-workflow).
+ */
+export function insertVertex(mask: ClipMask, x: number, y: number): ClipMask {
+  if (mask.shape !== 'polygon' || !mask.points || mask.points.length < 3) {
+    return mask;
+  }
+  const pts = mask.points;
+  const p = { x: clamp01(x), y: clamp01(y) };
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const d = distToSeg(p, pts[i], pts[(i + 1) % pts.length]);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  const points = [
+    ...pts.slice(0, best + 1),
+    { x: round(p.x), y: round(p.y) },
+    ...pts.slice(best + 1),
+  ];
+  return { ...mask, points, ...pointsBounds(points)! };
+}
+
+/** csúcs törlése (min. 3 marad); a befoglaló doboz újraszámolva */
+export function removeVertex(mask: ClipMask, index: number): ClipMask {
+  if (mask.shape !== 'polygon' || !mask.points || mask.points.length <= 3) {
+    return mask;
+  }
+  const points = mask.points.filter((_, i) => i !== index);
+  return { ...mask, points, ...pointsBounds(points)! };
+}
+
+/**
+ * Zárt görbe simítása Catmull‑Rom splájnnal (bezier-szerű lágy él): minden
+ * szakaszt `perSeg` köztes ponttal sűrít. A render poligonként kezeli, így a
+ * sima maszk paritásban marad — csak több csúcs. A túl sok pontot ritkítjuk.
+ */
+export function smoothClosedPoints(
+  pts: { x: number; y: number }[],
+  perSeg = 4
+): { x: number; y: number }[] {
+  const n = pts.length;
+  if (n < 3) {
+    return pts;
+  }
+  // ne robbanjon a csúcsszám (a render kifejezése lineárisan nő vele): a
+  // szakaszonkénti mintaszámot úgy vágjuk, hogy a kimenet ≤ CAP maradjon.
+  const CAP = 64;
+  const samples = Math.min(perSeg, Math.floor(CAP / n));
+  if (samples < 2) {
+    return pts; // már elég sűrű — a simításnak nincs értelme
+  }
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % n];
+    const p3 = pts[(i + 2) % n];
+    for (let s = 0; s < samples; s++) {
+      const t = s / samples;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      // Catmull‑Rom → pozíció
+      const x =
+        0.5 *
+        (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+      const y =
+        0.5 *
+        (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+      out.push({ x: round(clamp01(x)), y: round(clamp01(y)) });
+    }
+  }
+  return out;
+}
+
+/** simítás a maszk poligon-pontjaira (a befoglaló doboz újraszámolva) */
+export function smoothMask(mask: ClipMask): ClipMask {
+  if (mask.shape !== 'polygon' || !mask.points || mask.points.length < 3) {
+    return mask;
+  }
+  const points = smoothClosedPoints(mask.points);
+  return { ...mask, points, ...pointsBounds(points)! };
+}
+
+/**
+ * Poligon-maszk építése szabadkézi (vászon-normalizált) pontsorból: ritkítás
+ * után zárt poligon + befoglaló doboz. Kevés pont esetén nem érvényes maszk (null).
+ */
+export function maskFromStroke(
+  raw: { x: number; y: number }[],
+  feather = 0.04
+): ClipMask | null {
+  const pts = raw.map((p) => ({ x: round(clamp01(p.x)), y: round(clamp01(p.y)) }));
+  if (pts.length < 3) {
+    return null;
+  }
+  const b = pointsBounds(pts)!;
+  if (b.w < MIN_SIZE * 2 && b.h < MIN_SIZE * 2) {
+    return null; // túl kicsi „firka" — nem maszk
+  }
+  return { shape: 'polygon', points: pts, ...b, feather };
+}

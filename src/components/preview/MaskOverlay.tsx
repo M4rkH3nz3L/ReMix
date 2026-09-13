@@ -3,7 +3,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
 import { palette } from '@/constants/editor';
-import { maskBox, moveMask, moveVertex, resizeMask } from '@/lib/maskEdit';
+import { insertVertex, maskBox, moveMask, moveVertex, removeVertex, resizeMask } from '@/lib/maskEdit';
 import type { ClipMask } from '@/types/project';
 
 const HANDLE = 26;
@@ -30,10 +30,12 @@ export function MaskOverlay({
   onChange: (next: ClipMask) => void;
 }) {
   const b = maskBox(mask);
-  const left = (b.x - b.w / 2) * box.w;
-  const top = (b.y - b.h / 2) * box.h;
-  const width = b.w * box.w;
-  const height = b.h * box.h;
+  // 🩹 kiterjesztés vizuális közelítése: az él minden irányban kifelé/befelé tolva
+  const e = mask.expand ?? 0;
+  const left = (b.x - b.w / 2 - e) * box.w;
+  const top = (b.y - b.h / 2 - e) * box.h;
+  const width = Math.max(6, (b.w + 2 * e) * box.w);
+  const height = Math.max(6, (b.h + 2 * e) * box.h);
 
   const commitMove = (dx: number, dy: number) => {
     onChange(moveMask(mask, dx / Math.max(1, box.w), dy / Math.max(1, box.h)));
@@ -48,9 +50,22 @@ export function MaskOverlay({
   const commitVertex = (index: number, px: number, py: number) => {
     onChange(moveVertex(mask, index, px / Math.max(1, box.w), py / Math.max(1, box.h)));
   };
+  // ✚ csúcs beszúrása a keretre koppintva (poligonnál); ✖ törlés hosszú nyomásra
+  const commitInsert = (px: number, py: number) => {
+    onChange(insertVertex(mask, px / Math.max(1, box.w), py / Math.max(1, box.h)));
+  };
+  const commitDeleteVertex = (index: number) => {
+    onChange(removeVertex(mask, index));
+  };
 
-  const movePan = Gesture.Pan().onEnd((e) => {
-    runOnJS(commitMove)(e.translationX, e.translationY);
+  const insertTap = Gesture.Tap()
+    .enabled(mask.shape === 'polygon')
+    .onEnd((ev) => {
+      // ev.x/ev.y a keret bal-felső sarkához képest → vászon-px
+      runOnJS(commitInsert)(left + ev.x, top + ev.y);
+    });
+  const movePan = Gesture.Pan().onEnd((ev) => {
+    runOnJS(commitMove)(ev.translationX, ev.translationY);
   });
   const resizePan = Gesture.Pan().onEnd((e) => {
     runOnJS(commitResize)(e.translationX, e.translationY);
@@ -60,7 +75,7 @@ export function MaskOverlay({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <GestureDetector gesture={movePan}>
+      <GestureDetector gesture={Gesture.Race(movePan, insertTap)}>
         <View
           style={[
             styles.frame,
@@ -89,15 +104,21 @@ export function MaskOverlay({
 
       {/* poligon-csúcsok: egyenként húzhatók */}
       {points.map((p, i) => {
-        const vertexPan = Gesture.Pan().onEnd((e) => {
+        const vertexPan = Gesture.Pan().onEnd((ev) => {
           runOnJS(commitVertex)(
             i,
-            p.x * box.w + e.translationX,
-            p.y * box.h + e.translationY
+            p.x * box.w + ev.translationX,
+            p.y * box.h + ev.translationY
           );
         });
+        // hosszú nyomás a csúcson = törlés (min. 3 pont marad)
+        const vertexDelete = Gesture.LongPress()
+          .minDuration(350)
+          .onStart(() => {
+            runOnJS(commitDeleteVertex)(i);
+          });
         return (
-          <GestureDetector key={i} gesture={vertexPan}>
+          <GestureDetector key={i} gesture={Gesture.Race(vertexPan, vertexDelete)}>
             <View
               style={[
                 styles.handle,

@@ -30,6 +30,7 @@ import {
 } from '@/lib/keyframes';
 import { adjustTintLayers } from '@/lib/adjustPreview';
 import { pathBounds, polylinePoints, simplifyPath, toBoxSpace } from '@/lib/draw';
+import { maskFromStroke } from '@/lib/maskEdit';
 import { makeId } from '@/lib/id';
 import { ensureProxy, getProxyUriSync } from '@/lib/proxy';
 import { snapPosition } from '@/lib/snapping';
@@ -89,6 +90,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const selectClip = useEditorStore((s) => s.selectClip);
   const updateClip = useEditorStore((s) => s.updateClip);
   const drawBrush = useEditorStore((s) => s.drawBrush);
+  const drawMaskMode = useEditorStore((s) => s.drawMaskMode);
   const maskEdit = useEditorStore((s) => s.maskEdit);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
@@ -380,7 +382,23 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     const raw = strokeRef.current;
     strokeRef.current = [];
     setStrokeLive([]);
-    if (!brush || raw.length < 2 || !state.project) {
+    if (!state.project) {
+      return;
+    }
+    // ✂️ szabadkézi maszk: a zárt pálya a kijelölt videó/kép klip poligon-maszkja
+    if (state.drawMaskMode) {
+      if (raw.length < 3 || !visualId) {
+        return;
+      }
+      const mask = maskFromStroke(simplifyPath(raw));
+      if (mask) {
+        state.updateClip(visualId, { mask });
+        state.setDrawMaskMode(false); // egy rajz → kész; a fogantyúkkal finomítható
+        state.setMaskEdit(true);
+      }
+      return;
+    }
+    if (!brush || raw.length < 2) {
       return;
     }
     const simplified = simplifyPath(raw);
@@ -419,7 +437,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     });
 
   const drawPan = Gesture.Pan()
-    .enabled(Boolean(drawBrush))
+    .enabled(Boolean(drawBrush) || drawMaskMode)
     .minDistance(0)
     .onBegin((e) => {
       runOnJS(addStrokePoint)(e.x, e.y);
@@ -472,12 +490,13 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
 
   // rajzoló-módban a rajzolás mindent megelőz (különben a húzás a klipet
   // mozgatná, a csippentés pedig zoomolna a vonal helyett)
-  const canvasGesture = drawBrush
-    ? drawPan
-    : Gesture.Race(
-        Gesture.Simultaneous(pinch, panCanvas),
-        Gesture.Exclusive(doubleTapReset, tapSelect)
-      );
+  const canvasGesture =
+    drawBrush || drawMaskMode
+      ? drawPan
+      : Gesture.Race(
+          Gesture.Simultaneous(pinch, panCanvas),
+          Gesture.Exclusive(doubleTapReset, tapSelect)
+        );
 
   // a worklet minden renderben újraépül, a committed/boxW értékek frissek.
   // Térbeli döntésnél (🧊 3D V1) a sorrend a renderrel egyezik: a 2D-forgatás
@@ -871,8 +890,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             />
           ) : null}
 
-          {/* ✏️ a húzás közben rajzolódó vonal (még nem klip) */}
-          {drawBrush && strokeLive.length >= 2 ? (
+          {/* ✏️ a húzás közben rajzolódó vonal (forma VAGY szabadkézi maszk) */}
+          {(drawBrush || drawMaskMode) && strokeLive.length >= 2 ? (
             <Svg
               pointerEvents="none"
               width={boxW}
@@ -881,12 +900,12 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             >
               <Polyline
                 points={polylinePoints(strokeLive, boxW, boxH)}
-                fill="none"
-                stroke={drawBrush.color}
-                strokeWidth={Math.max(1, (drawBrush.width / 100) * boxH)}
+                fill={drawMaskMode ? `${palette.accent}22` : 'none'}
+                stroke={drawBrush?.color ?? palette.accent}
+                strokeWidth={Math.max(1, ((drawBrush?.width ?? 2) / 100) * boxH)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={drawBrush.style === 'highlighter' ? 0.42 : 1}
+                opacity={drawBrush?.style === 'highlighter' ? 0.42 : 1}
               />
             </Svg>
           ) : null}

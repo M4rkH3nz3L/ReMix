@@ -138,6 +138,11 @@ interface EditorState {
    * mozgat), és felengedéskor forma-klip lesz belőle. `null` = kikapcsolva.
    */
   drawBrush: { color: string; width: number; style: BrushStyle; glow: boolean } | null;
+  /**
+   * ✂️ Szabadkézi maszk-mód: ha aktív, a vásznon az ujjal/tollal húzott zárt
+   * pálya a kijelölt videó/kép klip POLIGON-MASZKJÁVÁ válik (nem forma-klip).
+   */
+  drawMaskMode: boolean;
   /** 📐 vászon-rács osztása a snaphez (0 = nincs rács); session-szintű */
   snapGrid: number;
   /** 🧲 idővonal-illesztés erőssége (klip-él → beat/marker/playhead); session-szintű */
@@ -275,6 +280,8 @@ interface EditorState {
   setTrimMode: (mode: TrimMode) => void;
   cycleTrimMode: () => void;
   setDrawBrush: (brush: EditorState['drawBrush']) => void;
+  /** ✂️ szabadkézi maszk-mód ki/be (kizárja a rajzoló-módot és a borotvát) */
+  setDrawMaskMode: (on: boolean) => void;
   setSnapGrid: (grid: number) => void;
   toggleSafeZones: () => void;
   /** 🧲 illesztés-erősség léptetése: normál → erős → ki → normál */
@@ -358,6 +365,7 @@ const SESSION_RESET = {
   multiSelectIds: [] as string[],
   multiSelectMode: false,
   drawBrush: null,
+  drawMaskMode: false,
   rippleMode: false,
   razorMode: false,
   trimMode: 'normal' as TrimMode,
@@ -959,7 +967,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   cycleTrimMode: () =>
     set((s) => ({ trimMode: TRIM_MODES[(TRIM_MODES.indexOf(s.trimMode) + 1) % TRIM_MODES.length] })),
 
-  setDrawBrush: (brush) => set({ drawBrush: brush }),
+  setDrawBrush: (brush) => set(brush ? { drawBrush: brush, drawMaskMode: false } : { drawBrush: brush }),
+
+  // szabadkézi maszk kizárja a forma-rajzolót és a borotvát (mind a vászon/idővonal koppintását foglalja)
+  setDrawMaskMode: (on) =>
+    set(on ? { drawMaskMode: true, drawBrush: null, razorMode: false } : { drawMaskMode: false }),
 
   setSnapGrid: (grid) => set({ snapGrid: grid }),
   toggleSafeZones: () => set((s) => ({ showSafeZones: !s.showSafeZones })),

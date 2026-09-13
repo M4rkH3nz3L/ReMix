@@ -1234,7 +1234,12 @@
       "aiCutoutDoneBody": "A téma külön rétegként került a vászonra — az eredeti fotót törölheted vagy kicserélheted, a kivágás alá bármilyen háttér tehető.",
       "sectionImageStudio": "Kép Stúdió",
       "openImageStudio": "Kép Stúdió megnyitása",
-      "imageStudioHint": "Vágás, forgatás, tükrözés, rajz és korrekció — mind az eszközödön, feltöltés nélkül."
+      "imageStudioHint": "Vágás, forgatás, tükrözés, rajz és korrekció — mind az eszközödön, feltöltés nélkül.",
+      "chipDrawMask": "✏️ Rajzolt maszk",
+      "chipSmooth": "〰️ Simítás",
+      "noteDrawMask": "Rajzold körbe ujjal/tollal a vásznon a kijelölt klip maszkját — felengedéskor poligon-maszk lesz, a fogantyúkkal finomítható.",
+      "maskExpand": "Kiterjesztés",
+      "maskOpacity": "Maszk-átlátszóság"
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

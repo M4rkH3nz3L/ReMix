@@ -198,7 +198,9 @@ export interface ClipBase {
  */
 export interface ClipMask {
   shape: 'rectangle' | 'ellipse' | 'polygon';
-  /** freeform maszk csúcsai (vászon-normalizált, min. 3) — polygon esetén */
+  /** freeform maszk csúcsai (vászon-normalizált, min. 3) — polygon esetén. A
+   *  szabadkézi rajz és a bezier-simítás is ide sűrűsödik (a render poligonként
+   *  értelmezi, egyetlen szürke kockán). */
   points?: { x: number; y: number }[];
   /** középpont, 0–1 */
   x: number;
@@ -209,6 +211,18 @@ export interface ClipMask {
   /** lágy szél (0–0.3, hiányzó = 0.05) */
   feather?: number;
   invert?: boolean;
+  /**
+   * 🩹 Kiterjesztés (dilate/erode): a maszk élének kifelé (+) / befelé (−)
+   * tolása. Ellipszisnél/téglalapnél él-eltolás, poligonnál a súlypontból
+   * skálázás. −0.3…0.3, hiányzó/0 = nincs hatás. A renderben.
+   */
+  expand?: number;
+  /**
+   * 🌓 Maszk-átlátszóság: a KIMASZKOLT (elrejtett) terület megtartott
+   * átlátszatlansága (0 = teljesen levágva, 1 = nincs vágás). Hiányzó = 0.
+   * A renderben az alfa-rámpa alsó szintjét emeli meg.
+   */
+  opacity?: number;
 }
 
 /**

@@ -13,6 +13,7 @@ import { fetchColorStats } from '@/lib/colorClient';
 import { requestDepthFocus, requestDepthParallax } from '@/lib/depthClient';
 import { faceUnionRegion, fetchFaces } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
+import { smoothMask } from '@/lib/maskEdit';
 import { PHOTO_ANIM_PRESETS, buildPhotoAnimation } from '@/lib/photoAnimate';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { SKY_PRESETS, replaceSky } from '@/lib/skyClient';
@@ -74,6 +75,8 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const updateClip = useEditorStore((s) => s.updateClip);
   const maskEdit = useEditorStore((s) => s.maskEdit);
   const setMaskEdit = useEditorStore((s) => s.setMaskEdit);
+  const drawMaskMode = useEditorStore((s) => s.drawMaskMode);
+  const setDrawMaskMode = useEditorStore((s) => s.setDrawMaskMode);
   const intensity = clip.filterIntensity ?? 1;
   const [depthBusy, setDepthBusy] = useState(false);
 
@@ -844,6 +847,19 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
           ))}
+          {/* ✂️ szabadkézi maszk: ujjal/tollal a vászonra rajzolva (mobil-first) */}
+          <Chip
+            label={t('panels.filter.chipDrawMask')}
+            active={drawMaskMode}
+            onPress={() => setDrawMaskMode(!drawMaskMode)}
+          />
+          {clip.mask?.shape === 'polygon' ? (
+            <Chip
+              label={t('panels.filter.chipSmooth')}
+              active={false}
+              onPress={() => updateClip(clip.id, { mask: smoothMask(clip.mask!) })}
+            />
+          ) : null}
           {clip.mask ? (
             <Chip
               label={t('panels.filter.chipInvert')}
@@ -854,6 +870,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             />
           ) : null}
         </View>
+        {drawMaskMode ? <Text style={styles.note}>{t('panels.filter.noteDrawMask')}</Text> : null}
         {clip.mask ? (
           <>
             <Chip
@@ -915,6 +932,36 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
               onInc={() =>
                 updateClip(clip.id, {
                   mask: { ...clip.mask!, feather: clamp((clip.mask!.feather ?? 0.05) + 0.02, 0, 0.3) },
+                })
+              }
+            />
+            {/* 🩹 kiterjesztés (dilate/erode): az él kifelé/befelé tolása */}
+            <Stepper
+              label={t('panels.filter.maskExpand')}
+              value={`${(clip.mask.expand ?? 0) > 0 ? '+' : ''}${Math.round((clip.mask.expand ?? 0) * 100)}%`}
+              onDec={() =>
+                updateClip(clip.id, {
+                  mask: { ...clip.mask!, expand: clamp((clip.mask!.expand ?? 0) - 0.02, -0.3, 0.3) },
+                })
+              }
+              onInc={() =>
+                updateClip(clip.id, {
+                  mask: { ...clip.mask!, expand: clamp((clip.mask!.expand ?? 0) + 0.02, -0.3, 0.3) },
+                })
+              }
+            />
+            {/* 🌓 maszk-átlátszóság: a kimaszkolt terület megtartott láthatósága */}
+            <Stepper
+              label={t('panels.filter.maskOpacity')}
+              value={`${Math.round((clip.mask.opacity ?? 0) * 100)}%`}
+              onDec={() =>
+                updateClip(clip.id, {
+                  mask: { ...clip.mask!, opacity: clamp((clip.mask!.opacity ?? 0) - 0.1, 0, 1) },
+                })
+              }
+              onInc={() =>
+                updateClip(clip.id, {
+                  mask: { ...clip.mask!, opacity: clamp((clip.mask!.opacity ?? 0) + 0.1, 0, 1) },
                 })
               }
             />

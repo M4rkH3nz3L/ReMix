@@ -565,15 +565,22 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     const rw = ((Math.max(mask.w, 0.02) * W) / 2).toFixed(1);
     const rh = ((Math.max(mask.h, 0.02) * H) / 2).toFixed(1);
     const f = Math.min(0.3, Math.max(mask.feather ?? 0.05, 0.005));
+    // 🩹 kiterjesztés: az él kifelé (+) / befelé (−) tolása; ellipszis/téglalap
+    // él-eltolás, poligon súlypont-skálázás
+    const E = Math.max(-0.5, Math.min(0.5, mask.expand ?? 0));
     let wExpr;
     if (mask.shape === 'polygon' && Array.isArray(mask.points) && mask.points.length >= 3) {
       // freeform: a poligont a SÚLYPONTBÓL háromszögekre bontjuk, és minden
       // háromszögre „benne van?" tesztet írunk (előjeles területek) — az
       // uniójuk adja a maszkot. Konkáv alakzatra is jó, mert a szomszédos
       // csúcsokból képzett legyező lefedi a belsőt.
-      const pts = mask.points.map((p) => ({ x: p.x * W, y: p.y * H }));
+      let pts = mask.points.map((p) => ({ x: p.x * W, y: p.y * H }));
       const cxP = pts.reduce((s2, p) => s2 + p.x, 0) / pts.length;
       const cyP = pts.reduce((s2, p) => s2 + p.y, 0) / pts.length;
+      // kiterjesztés poligonon: a csúcsok súlypontból skálázva (uniform → a súlypont marad)
+      if (E !== 0) {
+        pts = pts.map((p) => ({ x: cxP + (p.x - cxP) * (1 + E), y: cyP + (p.y - cyP) * (1 + E) }));
+      }
       const n = (v) => Number(v).toFixed(1);
       const tri = [];
       for (let k = 0; k < pts.length; k++) {
@@ -595,16 +602,23 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       wExpr = `min(${tri.join('+')},1)`;
     } else if (mask.shape === 'ellipse') {
       const d = `sqrt(pow((X-${cx})/${rw},2)+pow((Y-${cy})/${rh},2))`;
-      wExpr = `min(max((1-${d})/${f.toFixed(3)},0),1)`;
+      // E az iso-kontúrt tolja (kifelé, ha +) — a sugár arányában
+      wExpr = `min(max((${(1 + E).toFixed(3)}-${d})/${f.toFixed(3)},0),1)`;
     } else {
       const fpx = Math.max(2, f * H).toFixed(1);
+      const off = (E * H).toFixed(1); // él-eltolás pixelben
       const dEdge =
         `min(min(X-(${cx}-${rw}),(${cx}+${rw})-X),` +
         `min(Y-(${cy}-${rh}),(${cy}+${rh})-Y))`;
-      wExpr = `min(max((${dEdge})/${fpx},0),1)`;
+      wExpr = `min(max((${dEdge}+${off})/${fpx},0),1)`;
     }
     if (mask.invert) {
       wExpr = `(1-${wExpr})`;
+    }
+    // 🌓 maszk-átlátszóság: a kimaszkolt terület megtartott láthatósága (alfa-padló)
+    const mo = Math.max(0, Math.min(1, mask.opacity ?? 0));
+    if (mo > 0) {
+      wExpr = `(${mo.toFixed(3)}+${(1 - mo).toFixed(3)}*(${wExpr}))`;
     }
     const frames = Math.ceil(dur * FPS) + 2;
     graph.push(

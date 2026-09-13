@@ -1234,7 +1234,12 @@
       "aiCutoutDoneBody": "The subject was placed on the canvas as a separate layer — you can delete or replace the original photo, and any background can go beneath the cutout.",
       "sectionImageStudio": "Image Studio",
       "openImageStudio": "Open Image Studio",
-      "imageStudioHint": "Crop, rotate, flip, draw and adjust — all on your device, no upload."
+      "imageStudioHint": "Crop, rotate, flip, draw and adjust — all on your device, no upload.",
+      "chipDrawMask": "✏️ Draw mask",
+      "chipSmooth": "〰️ Smooth",
+      "noteDrawMask": "Trace the selected clip’s mask on the canvas with finger/pen — on release it becomes a polygon mask, refine with the handles.",
+      "maskExpand": "Expansion",
+      "maskOpacity": "Mask opacity"
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

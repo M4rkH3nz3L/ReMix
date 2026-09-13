@@ -1234,7 +1234,12 @@
       "aiCutoutDoneBody": "Das Motiv wurde als separate Ebene auf die Leinwand gelegt — du kannst das Originalfoto löschen oder ersetzen, und unter die Freistellung kann jeder Hintergrund.",
       "sectionImageStudio": "Bild-Studio",
       "openImageStudio": "Bild-Studio öffnen",
-      "imageStudioHint": "Zuschneiden, drehen, spiegeln, zeichnen und anpassen — alles auf deinem Gerät, ohne Upload."
+      "imageStudioHint": "Zuschneiden, drehen, spiegeln, zeichnen und anpassen — alles auf deinem Gerät, ohne Upload.",
+      "chipDrawMask": "✏️ Maske zeichnen",
+      "chipSmooth": "〰️ Glätten",
+      "noteDrawMask": "Zeichne die Maske des gewählten Clips mit Finger/Stift auf die Leinwand — beim Loslassen wird sie zur Polygon-Maske, mit den Griffen verfeinerbar.",
+      "maskExpand": "Erweiterung",
+      "maskOpacity": "Masken-Deckkraft"
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

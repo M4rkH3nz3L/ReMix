@@ -112,8 +112,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **🧱 Compound clip / pre-compose** (Toolbar → *Pre-compose* több-kijelölésnél):
   a kijelölt klipeket EGY beágyazott kompozíciós blokká fogja össze (hosszú
   projekthez). A render **rekurzívan** legyártja a beágyazott idővonalat, és a
-  compound klipre a szokásos effekt/trim/blend/matte is hat. *(Az élő előnézet
-  jelenleg durva; a renderelt proxy-előnézet follow-up.)*
+  compound klipre a szokásos effekt/trim/blend/matte is hat. A **valós előnézet**
+  a *Pontos* panel → **🧱 Compound → „Előnézet renderelése"** gombbal kérhető
+  (proxy MP4, local-first; a timeline-on „🧱 Compound" címke jelzi).
 - **Adjustment layer / grade-réteg** (`AdjustClip`): az alatta lévő teljes
   kompozitra ható színkorrekció (lásd Grade/Adjust).
 

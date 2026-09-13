@@ -335,6 +335,31 @@ function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph, skip = 0) {
   return true;
 }
 
+/**
+ * 🎭 Track/luma/alpha matte: egy külső média (kép) fényereje (luma) vagy alfája
+ * adja a klip átlátszóságát. A matte WxH-ra skálázva → gray/alphaextract (opc.
+ * negate) → a fg-alfával szorozva (alphamerge). Visszaadja az új címkét, vagy a
+ * bemenetit, ha nincs matte.
+ */
+function matteChain(clip, W, H, labelIn, idx, graph, addInput, dur) {
+  const m = clip.matte;
+  if (!m || !m.uri) {
+    return labelIn;
+  }
+  const mIdx = addInput(['-loop', '1', '-t', dur.toFixed(3), '-i', m.uri]);
+  const inv = m.invert ? ',negate' : '';
+  if (m.type === 'alpha') {
+    graph.push(`[${mIdx}:v]scale=${W}:${H},format=rgba,alphaextract${inv}[mta${idx}]`);
+  } else {
+    graph.push(`[${mIdx}:v]scale=${W}:${H},format=gray${inv}[mta${idx}]`);
+  }
+  graph.push(`[${labelIn}]split[mtf${idx}][mtfa${idx}]`);
+  graph.push(`[mtfa${idx}]alphaextract[mtae${idx}]`);
+  graph.push(`[mtae${idx}][mta${idx}]blend=all_mode=multiply:shortest=1[mtab${idx}]`);
+  graph.push(`[mtf${idx}][mtab${idx}]alphamerge[mtm${idx}]`);
+  return `mtm${idx}`;
+}
+
 function filterDrawbox(clip, W, H) {
   const f = FILTERS[clip.filterId];
   if (!f) {
@@ -1131,7 +1156,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           graph.push(decode + fgScale + `[${src}]`);
         }
         withTransform(i, src, clip, seg.duration, suffix, baseLabel);
-      } else if (blur || clip.chromaKey || clip.mask) {
+      } else if (blur || clip.chromaKey || clip.mask || clip.matte) {
         // composite-út: contain-fit fg (chroma + maszk alfa-formálással) az
         // alap fölé — az alap fekete vagy a klip elmosott cover-je
         const fgChain =
@@ -1152,8 +1177,9 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           graph.push(decode + fgChain + `[bfg${i}]`);
         }
         const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
+        const fgM = matteChain(clip, W, H, fgFinal, i, graph, addInput, seg.duration);
         graph.push(
-          `[${baseLabel}][${fgFinal}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
+          `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );
       } else {
         graph.push(
@@ -1247,7 +1273,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           graph.push(`[${idx}:v]fps=${FPS},${fgScale}[${src}]`);
         }
         withTransform(i, src, clip, seg.duration, suffix, baseLabel);
-      } else if (blur || clip.chromaKey || clip.mask) {
+      } else if (blur || clip.chromaKey || clip.mask || clip.matte) {
         // composite-út: blur-nál contain-fit, különben cover-fit fg; chroma +
         // maszk alfa-formálás, az alap fekete vagy az elmosott cover
         const fgChain = blur
@@ -1271,8 +1297,9 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           graph.push(`[${idx}:v]fps=${FPS},${fgChain}[bfg${i}]`);
         }
         const fgFinal = withMask(i, `bfg${i}`, clip.mask, seg.duration, seg.skip, maskSeqIdx[i]);
+        const fgM = matteChain(clip, W, H, fgFinal, i, graph, addInput, seg.duration);
         graph.push(
-          `[${baseLabel}][${fgFinal}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
+          `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );
       } else {
         graph.push(

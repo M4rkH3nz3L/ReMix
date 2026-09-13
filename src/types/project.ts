@@ -291,6 +291,21 @@ export interface ChromaKey {
 }
 
 /**
+ * 🎭 Track/luma/alpha matte: egy KÜLSŐ média (kép) fényereje (`luma`) vagy alfája
+ * (`alpha`) adja a klip átlátszóságát — a klip csak ott látszik, ahol a matte
+ * világos (luma) / átlátszatlan (alpha). Az `invert` megfordítja. A renderben a
+ * matte a WxH-ra skálázva, gray/alphaextract → a fg-alfával szorozva (alphamerge).
+ * Így „clipping mask" / luma-matte effekt tetszőleges média-formával.
+ */
+export interface ClipMatte {
+  /** a matte média elérése (kép; a videó-matte az első kockára fagy — v1) */
+  uri: string;
+  /** `luma` = a fényerő az alfa; `alpha` = a matte saját alfája */
+  type: 'luma' | 'alpha';
+  invert?: boolean;
+}
+
+/**
  * Keverési mód (blend): a réteg a mögötte lévő képpel keveredik (nem takar).
  * Az RN `mixBlendMode` ÉS az ffmpeg `blend=all_mode` is ismeri mindegyiket.
  */
@@ -371,6 +386,8 @@ export interface VideoClip extends ClipBase {
   opacity?: number;
   /** maszk (transform nélküli klipen érvényesül a renderben) */
   mask?: ClipMask;
+  /** 🎭 track/luma/alpha matte: külső média fényereje/alfája adja az átlátszóságot */
+  matte?: ClipMatte;
   /** green screen kulcsolás */
   chromaKey?: ChromaKey;
   /** képjavítás (fényerő/kontraszt/szaturáció/hőmérséklet/vignetta) */
@@ -410,6 +427,8 @@ export interface ImageClip extends ClipBase {
   opacity?: number;
   /** maszk (transform nélküli klipen érvényesül a renderben) */
   mask?: ClipMask;
+  /** 🎭 track/luma/alpha matte: külső média fényereje/alfája adja az átlátszóságot */
+  matte?: ClipMatte;
   /** green screen kulcsolás */
   chromaKey?: ChromaKey;
   /** képjavítás (fényerő/kontraszt/szaturáció/hőmérséklet/vignetta) */

@@ -1270,7 +1270,14 @@
       "blurTrackPlayhead": "A lejátszófej a klip fölött álljon.",
       "blurTrackDone": "Kész a blur-követés",
       "blurTrackDoneBody": "{{count}} kulcskocka — az elmosás követi az objektumot.",
-      "spill": "Spill (zöld/kék perem)"
+      "spill": "Spill (zöld/kék perem)",
+      "sectionMatte": "🎭 Matte (luma/alpha)",
+      "mattePick": "Matte-kép választása",
+      "matteReplace": "Matte cseréje",
+      "matteLuma": "Luma",
+      "matteAlpha": "Alfa",
+      "matteInvert": "Invertálás",
+      "noteMatte": "A klip csak ott látszik, ahol a matte-kép VILÁGOS (luma) vagy ÁTLÁTSZATLAN (alpha). Egy külső kép/logó/gradiens formájára vágja a klipet — clipping mask a renderben."
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

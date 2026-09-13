@@ -15,6 +15,7 @@ import { faceUnionRegion, fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
 import { addMaskKeyframe, hasMaskTrack, maskKeyframeTimes, removeMaskKeyframeAt, sampleMaskAt, trackToPoints } from '@/lib/maskAnim';
 import { smoothMask } from '@/lib/maskEdit';
+import { pickImage } from '@/lib/media';
 import { trackSubject } from '@/lib/track';
 import { PHOTO_ANIM_PRESETS, buildPhotoAnimation } from '@/lib/photoAnimate';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
@@ -1251,6 +1252,50 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         <Text style={styles.note}>
           {t('panels.filter.noteGreenScreen')}
         </Text>
+      </PanelSection>
+
+      {/* 🎭 Track / luma / alpha matte: egy külső kép fényereje/alfája adja az átlátszóságot */}
+      <PanelSection title={t('panels.filter.sectionMatte')}>
+        <View style={styles.row}>
+          <Chip
+            label={clip.matte ? t('panels.filter.matteReplace') : t('panels.filter.mattePick')}
+            active={Boolean(clip.matte)}
+            onPress={() => {
+              pickImage()
+                .then((p) => {
+                  if (p) {
+                    updateClip(clip.id, {
+                      matte: { uri: p.uri, type: clip.matte?.type ?? 'luma', invert: clip.matte?.invert },
+                    });
+                  }
+                })
+                .catch(() => {});
+            }}
+          />
+          {clip.matte ? (
+            <Chip label={t('common.none')} active={false} onPress={() => updateClip(clip.id, { matte: undefined })} />
+          ) : null}
+        </View>
+        {clip.matte ? (
+          <View style={styles.row}>
+            <Chip
+              label={t('panels.filter.matteLuma')}
+              active={clip.matte.type === 'luma'}
+              onPress={() => updateClip(clip.id, { matte: { ...clip.matte!, type: 'luma' } })}
+            />
+            <Chip
+              label={t('panels.filter.matteAlpha')}
+              active={clip.matte.type === 'alpha'}
+              onPress={() => updateClip(clip.id, { matte: { ...clip.matte!, type: 'alpha' } })}
+            />
+            <Chip
+              label={t('panels.filter.matteInvert')}
+              active={clip.matte.invert === true}
+              onPress={() => updateClip(clip.id, { matte: { ...clip.matte!, invert: !clip.matte!.invert } })}
+            />
+          </View>
+        ) : null}
+        <Text style={styles.note}>{t('panels.filter.noteMatte')}</Text>
       </PanelSection>
     </View>
   );

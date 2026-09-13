@@ -1270,7 +1270,14 @@
       "blurTrackPlayhead": "Put the playhead over the clip.",
       "blurTrackDone": "Blur tracking done",
       "blurTrackDoneBody": "{{count}} keyframes — the blur follows the object.",
-      "spill": "Spill suppression"
+      "spill": "Spill suppression",
+      "sectionMatte": "🎭 Matte (luma/alpha)",
+      "mattePick": "Pick matte image",
+      "matteReplace": "Replace matte",
+      "matteLuma": "Luma",
+      "matteAlpha": "Alpha",
+      "matteInvert": "Invert",
+      "noteMatte": "The clip shows only where the matte image is BRIGHT (luma) or OPAQUE (alpha). Clips the layer to an external image/logo/gradient shape — clipping mask in the render."
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

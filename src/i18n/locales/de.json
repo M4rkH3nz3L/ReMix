@@ -1270,7 +1270,14 @@
       "blurTrackPlayhead": "Setze den Abspielkopf über den Clip.",
       "blurTrackDone": "Blur-Verfolgung fertig",
       "blurTrackDoneBody": "{{count}} Keyframes — der Blur folgt dem Objekt.",
-      "spill": "Spill-Unterdrückung"
+      "spill": "Spill-Unterdrückung",
+      "sectionMatte": "🎭 Matte (Luma/Alpha)",
+      "mattePick": "Matte-Bild wählen",
+      "matteReplace": "Matte ersetzen",
+      "matteLuma": "Luma",
+      "matteAlpha": "Alpha",
+      "matteInvert": "Invertieren",
+      "noteMatte": "Der Clip erscheint nur, wo das Matte-Bild HELL (Luma) bzw. DECKEND (Alpha) ist — Clipping-Maske im Render."
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

@@ -83,6 +83,67 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const setRotoMask = useEditorStore((s) => s.setRotoMask);
   const playhead = useEditorStore((s) => s.playhead);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
+  const setPickTarget = useEditorStore((s) => s.setPickTarget);
+  const [blurTrackBusy, setBlurTrackBusy] = useState(false);
+
+  /** 🎯 blur követi az objektumot: a vásznon rákoppintasz, a régió végigköveti (videón) */
+  const trackBlur = (point: { x: number; y: number }) => {
+    if (clip.kind !== 'video' || blurTrackBusy) {
+      return;
+    }
+    const state = useEditorStore.getState();
+    const project = state.project;
+    if (!project) {
+      return;
+    }
+    if (state.playhead < clip.start || state.playhead >= clip.start + clip.duration) {
+      Alert.alert(t('panels.filter.blurTrackTitle'), t('panels.filter.blurTrackPlayhead'));
+      return;
+    }
+    const endTl = Math.min(clip.start + clip.duration, state.playhead + 15);
+    const durTl = endTl - state.playhead;
+    if (durTl < 0.5) {
+      Alert.alert(t('panels.filter.blurTrackTitle'), t('panels.filter.trackNoSubject'));
+      return;
+    }
+    const startInClip = state.playhead - clip.start;
+    setBlurTrackBusy(true);
+    trackSubject(clip.uri, {
+      startSec: clip.trimIn + startInClip * clip.speed,
+      durationSec: durTl * clip.speed,
+      cx: point.x,
+      cy: point.y,
+      aspectW: aspectValue(project.aspectRatio),
+      aspectH: 1,
+    })
+      .then((points) => {
+        if (!points) {
+          Alert.alert(t('panels.filter.blurTrackTitle'), t('panels.filter.trackNoSubject'));
+          return;
+        }
+        // klip-lokális idő = a szakasz kezdete + forrás-idő/sebesség
+        const track = points.map((p) => ({ t: startInClip + p.t / clip.speed, x: p.x, y: p.y }));
+        const prev = clip.faceBlur;
+        state.updateClip(clip.id, {
+          faceBlur: {
+            x: point.x,
+            y: point.y,
+            w: prev?.w ?? 0.25,
+            h: prev?.h ?? 0.25,
+            strength: prev?.strength ?? 1,
+            pixelate: prev?.pixelate,
+            track,
+          },
+        });
+        Alert.alert(t('panels.filter.blurTrackDone'), t('panels.filter.blurTrackDoneBody', { count: track.length }));
+      })
+      .catch((err: Error) => Alert.alert(t('panels.filter.blurTrackTitle'), err.message))
+      .finally(() => setBlurTrackBusy(false));
+  };
+  const startBlurTrackPick = () => {
+    Alert.alert(t('panels.filter.blurTrackTitle'), t('panels.filter.blurTrackHint'));
+    setPickTarget((point) => trackBlur(point));
+  };
 
   /** 🎯 követés arcra: a maszkot a detektált elsődleges arc mozgásához kulcskockázza (Pro) */
   const trackMaskToFace = async () => {
@@ -676,6 +737,20 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
                   faceBlur: { ...clip.faceBlur!, pixelate: !clip.faceBlur!.pixelate },
                 })
               }
+            />
+          ) : null}
+          {/* 🎯 az elmosás követ egy kijelölt objektumot (videón) */}
+          {clip.kind === 'video' ? (
+            <Chip
+              label={
+                blurTrackBusy
+                  ? t('panels.filter.tracking')
+                  : clip.faceBlur?.track?.length
+                    ? t('panels.filter.blurTrackOn')
+                    : t('panels.filter.blurTrack')
+              }
+              active={Boolean(clip.faceBlur?.track?.length)}
+              onPress={startBlurTrackPick}
             />
           ) : null}
         </View>

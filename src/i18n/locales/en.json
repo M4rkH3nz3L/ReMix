@@ -1248,7 +1248,15 @@
       "rotoNote": "Rotoscope: move the playhead, adjust the mask on the canvas — each edit sets a keyframe at the playhead and the in-between frames interpolate. The render bakes a per-frame mask.",
       "maskKeyDelHere": "◇ Delete keyframe",
       "maskTrackSubject": "🎯 Track subject",
-      "trackNoSubject": "Couldn’t track the subject (worker running? Pro?)."
+      "trackNoSubject": "Couldn’t track the subject (worker running? Pro?).",
+      "tracking": "Tracking…",
+      "blurTrack": "🎯 Blur follows object",
+      "blurTrackOn": "🎯 Blur follows ✓",
+      "blurTrackTitle": "Blur tracking",
+      "blurTrackHint": "Tap the object to blur on the canvas — the blur follows it through the video.",
+      "blurTrackPlayhead": "Put the playhead over the clip.",
+      "blurTrackDone": "Blur tracking done",
+      "blurTrackDoneBody": "{{count}} keyframes — the blur follows the object."
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

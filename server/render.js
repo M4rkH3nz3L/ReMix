@@ -278,7 +278,7 @@ function motionChain(clip, dur) {
   return plain;
 }
 
-function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph) {
+function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph, skip = 0) {
   const fb = clip.faceBlur;
   if (!fb) {
     return false;
@@ -286,8 +286,6 @@ function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph) {
   const even = (v) => Math.max(2, Math.round(v / 2) * 2);
   const bw = even(Math.min(1, Math.max(0.03, fb.w)) * W);
   const bh = even(Math.min(1, Math.max(0.03, fb.h)) * H);
-  const bx = even(Math.min(W - bw, Math.max(0, (fb.x - fb.w / 2) * W)));
-  const by = even(Math.min(H - bh, Math.max(0, (fb.y - fb.h / 2) * H)));
   const strength = Math.min(2, Math.max(0.3, fb.strength ?? 1));
   // mozaik: a régió ~14 blokk szélesre zsugorodik, majd pont-mintásan vissza —
   // a blokkméret így a régió MÉRETÉHEZ igazodik (felismerhetetlen arc), nem
@@ -299,9 +297,37 @@ function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph) {
         Math.round((blocks * bh) / bw)
       )},scale=${bw}:${bh}:flags=neighbor`
     : `gblur=sigma=${(Math.min(bw, bh) * 0.09 * strength).toFixed(1)}`;
+
+  // 🎯 KÖVETÉS: fix méretű régió, mozgó középpont — a crop/overlay x/y per-frame
+  // T-kifejezés (T = szűrő-idő + skip = klip-lokális). Track nélkül statikus.
+  const track = Array.isArray(fb.track) && fb.track.length > 0 ? [...fb.track].sort((a, b) => a.t - b.t) : null;
+  let bxTok;
+  let byTok;
+  if (track) {
+    const T = `(t+${skip.toFixed(3)})`;
+    const px5 = (v) => Number(v).toFixed(5);
+    const axisExpr = (axis, fb0) => {
+      const fr = track.map((p) => ({ t: p.t, v: p[axis] ?? fb0 }));
+      let expr = px5(fr[fr.length - 1].v);
+      for (let k = fr.length - 2; k >= 0; k--) {
+        const a = fr[k];
+        const b = fr[k + 1];
+        const span = Math.max(b.t - a.t, 0.001);
+        const P = `min(max((${T}-${px5(a.t)})/${px5(span)},0),1)`;
+        expr = `if(lt(${T},${px5(b.t)}),(${px5(a.v)}+${px5(b.v - a.v)}*${P}),${expr})`;
+      }
+      return `if(lt(${T},${px5(fr[0].t)}),${px5(fr[0].v)},${expr})`;
+    };
+    // középpont → bal-felső sarok, a képkeretre klippelve
+    bxTok = `clip((${axisExpr('x', fb.x)})*${W}-${bw / 2},0,${W - bw})`;
+    byTok = `clip((${axisExpr('y', fb.y)})*${H}-${bh / 2},0,${H - bh})`;
+  } else {
+    bxTok = String(even(Math.min(W - bw, Math.max(0, (fb.x - fb.w / 2) * W))));
+    byTok = String(even(Math.min(H - bh, Math.max(0, (fb.y - fb.h / 2) * H))));
+  }
   graph.push(`[${labelIn}]split[fbA${idx}][fbB${idx}]`);
-  graph.push(`[fbB${idx}]crop=${bw}:${bh}:${bx}:${by},${effect}[fbC${idx}]`);
-  graph.push(`[fbA${idx}][fbC${idx}]overlay=${bx}:${by}[${labelOut}]`);
+  graph.push(`[fbB${idx}]crop=w=${bw}:h=${bh}:x='${bxTok}':y='${byTok}',${effect}[fbC${idx}]`);
+  graph.push(`[fbA${idx}][fbC${idx}]overlay=x='${bxTok}':y='${byTok}'[${labelOut}]`);
   return true;
 }
 
@@ -1254,7 +1280,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     // 🙈 arc-elmosás: a kész szegmens-kép kap egy záró blur-lépést a régión
     if (seg.kind !== 'gap' && seg.clip?.faceBlur) {
       const blurred = `segfb${i}`;
-      if (faceBlurChain(seg.clip, W, H, outLabel, blurred, i, graph)) {
+      if (faceBlurChain(seg.clip, W, H, outLabel, blurred, i, graph, seg.skip)) {
         outLabel = blurred;
       }
     }

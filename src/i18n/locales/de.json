@@ -1248,7 +1248,15 @@
       "rotoNote": "Rotoskopie: Abspielkopf bewegen, Maske auf der Leinwand anpassen — jede Änderung setzt einen Keyframe am Abspielkopf, dazwischen wird interpoliert. Der Render backt eine Maske pro Bild.",
       "maskKeyDelHere": "◇ Keyframe löschen",
       "maskTrackSubject": "🎯 Objekt verfolgen",
-      "trackNoSubject": "Objekt konnte nicht verfolgt werden (Worker aktiv? Pro?)."
+      "trackNoSubject": "Objekt konnte nicht verfolgt werden (Worker aktiv? Pro?).",
+      "tracking": "Verfolge…",
+      "blurTrack": "🎯 Blur folgt Objekt",
+      "blurTrackOn": "🎯 Blur folgt ✓",
+      "blurTrackTitle": "Blur-Verfolgung",
+      "blurTrackHint": "Tippe auf das zu verpixelnde Objekt — der Blur folgt ihm durch das Video.",
+      "blurTrackPlayhead": "Setze den Abspielkopf über den Clip.",
+      "blurTrackDone": "Blur-Verfolgung fertig",
+      "blurTrackDoneBody": "{{count}} Keyframes — der Blur folgt dem Objekt."
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

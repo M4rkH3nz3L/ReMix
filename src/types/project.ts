@@ -95,6 +95,12 @@ export interface FaceBlur {
   strength?: number;
   /** pixeles (mozaik) elmosás a lágy helyett */
   pixelate?: boolean;
+  /**
+   * 🎯 Objektum-követés: a blur-régió KÖZÉPPONTJÁNAK klip-lokális pont-sora — ha
+   * van, a régió (fix mérettel) képkockánként a követett objektumhoz mozog a
+   * renderben (crop/overlay `t`-kifejezés). A szélek előtt/után az érték tartva.
+   */
+  track?: { t: number; x: number; y: number }[];
 }
 
 /**

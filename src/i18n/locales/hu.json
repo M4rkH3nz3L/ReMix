@@ -1248,7 +1248,15 @@
       "rotoNote": "Rotoszkóp: mozgasd a lejátszófejet, igazítsd a maszkot a vásznon — minden igazítás kulcskockát tesz a lejátszófejnél, a köztes képkockák interpolálnak. A render per-frame maszkot éget be.",
       "maskKeyDelHere": "◇ Kulcskocka törlése",
       "maskTrackSubject": "🎯 Követés (téma)",
-      "trackNoSubject": "Nem sikerült követni a témát (fut a worker? Pro?)."
+      "trackNoSubject": "Nem sikerült követni a témát (fut a worker? Pro?).",
+      "tracking": "Követés…",
+      "blurTrack": "🎯 Blur követ objektumot",
+      "blurTrackOn": "🎯 Blur követ ✓",
+      "blurTrackTitle": "Blur-követés",
+      "blurTrackHint": "Koppints a vásznon az elmosandó objektumra — az elmosás végigköveti a videón.",
+      "blurTrackPlayhead": "A lejátszófej a klip fölött álljon.",
+      "blurTrackDone": "Kész a blur-követés",
+      "blurTrackDoneBody": "{{count}} kulcskocka — az elmosás követi az objektumot."
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

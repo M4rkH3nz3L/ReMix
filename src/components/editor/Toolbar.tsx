@@ -42,6 +42,7 @@ export function Toolbar() {
   // 🔗 link-csoportok: linkelt klipek együtt mozognak
   const projectLinks = useEditorStore((s) => s.project?.links);
   const linkSelected = useEditorStore((s) => s.linkSelected);
+  const preCompose = useEditorStore((s) => s.preCompose);
   const unlinkClip = useEditorStore((s) => s.unlinkClip);
   const isLinked = !!selected && !!projectLinks?.some((g) => g.includes(selected.id));
   const canPasteStyle = Boolean(
@@ -370,7 +371,14 @@ export function Toolbar() {
               }}
             />
             {multiSelectMode && multiSelectIds.length >= 1 ? (
-              <ToolButton icon="link" label={t('editor.toolbar.link')} onPress={linkSelected} />
+              <>
+                <ToolButton icon="link" label={t('editor.toolbar.link')} onPress={linkSelected} />
+                <ToolButton
+                  icon="cube-outline"
+                  label={t('editor.toolbar.precompose')}
+                  onPress={preCompose}
+                />
+              </>
             ) : null}
             {isLinked ? (
               <ToolButton

@@ -535,7 +535,8 @@
       "music": "Musik",
       "layers": "Ebenen",
       "library": "Bibliothek",
-      "export": "Export"
+      "export": "Export",
+      "precompose": "Vorkomp."
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -2057,7 +2058,8 @@
       "deleteRange": "Bereich löschen ({{seconds}}s)",
       "rollEdit": "Roll-Schnitt",
       "slideEdit": "Slide-Schnitt",
-      "beatMarker": "♪ Beat"
+      "beatMarker": "♪ Beat",
+      "preCompose": "Vorkompose ({{count}} Clips)"
     },
     "progress": {
       "starting": "Wird gestartet…"

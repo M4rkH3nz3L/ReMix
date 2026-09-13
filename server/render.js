@@ -467,6 +467,48 @@ function runFfmpegWithProgress(args, totalSeconds, onProgress) {
  * @param onProgress opcionális 0-1 előrehaladás-visszahívás
  * @returns az elkészült mp4 útvonala
  */
+/**
+ * 🧱 Compound / pre-compose feloldása: a `comp`-ot hordozó video-klipeket a
+ * beágyazott al-idővonalukból REKURZÍVAN MP4-be rendereli, és a klip uri-ját a
+ * kész fájlra cseréli (a `comp`-ot törli) → onnantól sima videó-klip. Így a fő
+ * render változatlan úton kompozitál. A rekurzió a levél-kompozícióknál megáll.
+ */
+async function resolveCompounds(project, workDir, settings) {
+  let idx = 0;
+  const tracks = [];
+  for (const tk of project.tracks) {
+    const clips = [];
+    for (const c of tk.clips) {
+      if (c.kind === 'video' && c.comp && Array.isArray(c.comp.tracks) && c.comp.tracks.length > 0) {
+        const sub = {
+          id: `${c.id}-comp`,
+          name: 'comp',
+          aspectRatio: c.comp.aspectRatio || project.aspectRatio,
+          tracks: c.comp.tracks,
+          assets: c.comp.assets || [],
+          createdAt: '',
+          updatedAt: '',
+          schemaVersion: project.schemaVersion,
+        };
+        const subDir = path.join(workDir, `comp_${idx++}`);
+        try {
+          fs.mkdirSync(subDir, { recursive: true });
+          await renderProject(sub, subDir, () => {}, settings); // ← rekurzió
+          const mp4 = path.join(subDir, 'out.mp4');
+          const dur = projectDuration(sub);
+          clips.push({ ...c, uri: mp4, comp: undefined, trimIn: c.trimIn ?? 0, sourceDuration: dur, speed: c.speed ?? 1 });
+          continue;
+        } catch (err) {
+          console.warn('pre-compose render kihagyva:', err.message); // → a nyers uri marad
+        }
+      }
+      clips.push(c);
+    }
+    tracks.push({ ...tk, clips });
+  }
+  return { ...project, tracks };
+}
+
 async function renderProject(project, workDir, onProgress, settings = {}) {
   // export-beállítások (P0-design): felbontás/fps/minőség a kliens Export
   // paneljéről — a FPS a modul-konstans árnyékolásával jut el minden lánchoz
@@ -480,6 +522,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
   const even = (v) => Math.round((v * scale) / 2) * 2;
   const canvas = { w: even(base.w), h: even(base.h) };
   const { w: W, h: H } = canvas;
+  // 🧱 compound clip / pre-compose: a beágyazott kompozíciók rekurzív renderje MP4-be
+  project = await resolveCompounds(project, workDir, settings);
   const total = projectDuration(project);
   if (total <= 0) {
     throw new Error('Üres projekt — nincs mit renderelni.');

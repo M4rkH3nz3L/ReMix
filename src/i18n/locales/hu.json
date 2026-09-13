@@ -535,7 +535,8 @@
       "music": "Zene",
       "layers": "Rétegek",
       "library": "Tár",
-      "export": "Export"
+      "export": "Export",
+      "precompose": "Pre-compose"
     },
     "transportBar": {
       "markerTitle": "Jelölő",
@@ -2057,7 +2058,8 @@
       "deleteRange": "tartomány törlése ({{seconds}} mp)",
       "rollEdit": "roll-vágás",
       "slideEdit": "slide-vágás",
-      "beatMarker": "♪ beat"
+      "beatMarker": "♪ beat",
+      "preCompose": "pre-compose ({{count}} klip)"
     },
     "progress": {
       "starting": "Indítás…"

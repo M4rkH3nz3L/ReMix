@@ -347,6 +347,13 @@ export interface PipFrame {
 
 export interface VideoClip extends ClipBase {
   kind: 'video';
+  /**
+   * 🧱 Compound clip / pre-compose: ha van, ez a klip egy BEÁGYAZOTT kompozíció
+   * (al-idővonal) — a render REKURZÍVAN legyártja MP4-be, és azt használja
+   * forrásként (a `uri` a nyers/proxy előnézethez marad). Így sok klip EGY
+   * kezelhető blokká fogható össze (hosszú projekt), effekt/blend/trim rá is hat.
+   */
+  comp?: NestedComposition;
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
   assetId?: string;
   uri: string;
@@ -709,6 +716,20 @@ export type Clip =
   | InteractiveClip
   | ShapeClip
   | AdjustClip;
+
+/**
+ * 🧱 Beágyazott kompozíció (compound clip / pre-compose): egy önálló al-idővonal,
+ * amit a render rekurzívan MP4-be renderel, majd a szülő-klip forrásaként használ.
+ * Újraszerkeszthető (a klipek itt maradnak), és a compound klip effektjei/trimje
+ * a kész beágyazott képre hatnak.
+ */
+export interface NestedComposition {
+  aspectRatio: AspectRatio;
+  tracks: Track[];
+  assets: Asset[];
+  /** a beágyazott idővonal teljes hossza (mp) */
+  duration: number;
+}
 
 export interface Track {
   id: string;

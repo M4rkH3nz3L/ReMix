@@ -252,6 +252,8 @@ interface EditorState {
   linkGroupOf: (clipId: string) => string[] | null;
   /** a jelenlegi több-kijelölés linkelése egy csoporttá (min. 2 klip) */
   linkSelected: () => void;
+  /** 🧱 pre-compose: a kijelölt klipeket EGY compound (beágyazott kompozíciós) videóklippé fogja össze */
+  preCompose: () => void;
   /** a klipet tartalmazó link-csoport feloldása */
   unlinkClip: (clipId: string) => void;
   /** 🎬 story-fejezet hozzáadása a lejátszófejnél (adott fajtával) */
@@ -788,6 +790,71 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return true;
     });
     get().dispatch({ type: 'SET_LINKS', links: [...rest, [...merged]] });
+  },
+
+  preCompose: () => {
+    const { project } = get();
+    if (!project) {
+      return;
+    }
+    const ids = new Set(get().allSelectedIds());
+    if (ids.size < 1) {
+      return;
+    }
+    // a kijelölt klipek + sávjuk begyűjtése, a csoport idő-tartománya
+    const picked: { type: TrackType; clip: Clip }[] = [];
+    let minStart = Infinity;
+    let maxEnd = 0;
+    for (const tk of project.tracks) {
+      for (const c of tk.clips) {
+        if (ids.has(c.id)) {
+          picked.push({ type: tk.type, clip: c });
+          minStart = Math.min(minStart, c.start);
+          maxEnd = Math.max(maxEnd, c.start + c.duration);
+        }
+      }
+    }
+    if (picked.length === 0 || !Number.isFinite(minStart)) {
+      return;
+    }
+    const span = Math.max(0.1, Math.round((maxEnd - minStart) * 1000) / 1000);
+    // beágyazott kompozíció sávjai: a klipek 0-hoz igazítva, fajtánként csoportosítva
+    const byType = new Map<TrackType, Clip[]>();
+    for (const { type, clip } of picked) {
+      const shifted = { ...clip, start: Math.round((clip.start - minStart) * 1000) / 1000 } as Clip;
+      byType.set(type, [...(byType.get(type) ?? []), shifted]);
+    }
+    const compTracks = [...byType].map(([type, clips]) => ({ id: makeId('trk'), type, name: type, clips }));
+    // durva előnézeti uri: az első videó/kép klip forrása (a pontos előnézet renderelt proxy — follow-up)
+    const media = picked.map((p) => p.clip).find((c) => c.kind === 'video' || c.kind === 'image');
+    const compound = {
+      kind: 'video',
+      id: makeId('clip'),
+      start: Math.round(minStart * 1000) / 1000,
+      duration: span,
+      uri: media && 'uri' in media ? (media as { uri: string }).uri : '',
+      trimIn: 0,
+      sourceDuration: span,
+      speed: 1,
+      volume: 1,
+      filterId: 'none',
+      comp: { aspectRatio: project.aspectRatio, assets: project.assets, duration: span, tracks: compTracks },
+    } as Clip;
+    // a kijelölt klipek eltávolítva minden érintett sávról; a compound a videó-sávra
+    const affected = new Set<TrackType>(picked.map((p) => p.type));
+    affected.add('video');
+    const tracks = project.tracks
+      .filter((tk) => affected.has(tk.type))
+      .map((tk) => {
+        let clips = tk.clips.filter((c) => !ids.has(c.id));
+        if (tk.type === 'video') {
+          clips = [...clips, compound];
+        }
+        return { trackType: tk.type, clips };
+      });
+    if (get().dispatch({ type: 'REPLACE_TRACKS', tracks, label: tr('store.editor.preCompose', { count: picked.length }) })) {
+      set({ selectedClipId: compound.id, multiSelectIds: [], multiSelectMode: false });
+    }
   },
 
   unlinkClip: (clipId) => {

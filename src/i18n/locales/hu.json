@@ -1432,7 +1432,20 @@
       "outlineColor_black": "Fekete",
       "outlineColor_pink": "Pink",
       "outlineWidth": "Kontúr vastagsága",
-      "glowOutlineNote": "Mindkettő a forma SZILUETTJÉT követi, ezért a nyílon, a csillagon és a kép-kitöltésű logón is működik — ott, ahol a sima keret nem. A renderben látszik pontosan; az előnézet közelít."
+      "glowOutlineNote": "Mindkettő a forma SZILUETTJÉT követi, ezért a nyílon, a csillagon és a kép-kitöltésű logón is működik — ott, ahol a sima keret nem. A renderben látszik pontosan; az előnézet közelít.",
+      "trackSectionTitle": "🎯 Objektum-követés",
+      "trackObject": "Kövess egy objektumot",
+      "tracking": "Követés…",
+      "trackClear": "Követés törlése",
+      "trackNote": "Koppints a videón a követendő objektumra — a forma/3D-matrica utána mozog. A lejátszófej a klip fölött, videó fölött legyen.",
+      "trackTitle": "Objektum-követés",
+      "trackPickHint": "Koppints a vásznon a követendő objektumra.",
+      "trackNeedVideo": "A lejátszófej alatt legyen egy videó, amin a követés fut.",
+      "trackPlayheadOnClip": "A lejátszófej a klip fölött álljon.",
+      "trackTooShort": "Túl rövid szakasz a követéshez.",
+      "trackFailed": "A követés nem sikerült (fut a worker? Pro?).",
+      "trackDone": "Kész a követés",
+      "trackDoneBody": "{{count}} kulcskocka — a forma követi az objektumot."
     },
     "speed": {
       "rampNotApplicable": "Ehhez a kliphez nem alkalmazható (túl rövid?).",

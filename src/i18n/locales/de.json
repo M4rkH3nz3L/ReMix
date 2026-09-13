@@ -1432,7 +1432,20 @@
       "outlineColor_black": "Schwarz",
       "outlineColor_pink": "Pink",
       "outlineWidth": "Konturstärke",
-      "glowOutlineNote": "Beide folgen der SILHOUETTE der Form, deshalb funktionieren sie auch bei Pfeil, Stern und dem bildgefüllten Logo — dort, wo ein einfacher Rahmen nicht greift. Im Render ist es exakt zu sehen; die Vorschau nähert es an."
+      "glowOutlineNote": "Beide folgen der SILHOUETTE der Form, deshalb funktionieren sie auch bei Pfeil, Stern und dem bildgefüllten Logo — dort, wo ein einfacher Rahmen nicht greift. Im Render ist es exakt zu sehen; die Vorschau nähert es an.",
+      "trackSectionTitle": "🎯 Objektverfolgung",
+      "trackObject": "Objekt verfolgen",
+      "tracking": "Verfolge…",
+      "trackClear": "Verfolgung löschen",
+      "trackNote": "Tippe auf das zu verfolgende Objekt — Form/3D-Sticker folgt ihm. Der Abspielkopf muss über dem Clip und über einem Video stehen.",
+      "trackTitle": "Objektverfolgung",
+      "trackPickHint": "Tippe auf das zu verfolgende Objekt auf der Leinwand.",
+      "trackNeedVideo": "Unter dem Abspielkopf muss ein Video sein.",
+      "trackPlayheadOnClip": "Setze den Abspielkopf über den Clip.",
+      "trackTooShort": "Abschnitt zu kurz.",
+      "trackFailed": "Verfolgung fehlgeschlagen (Worker aktiv? Pro?).",
+      "trackDone": "Verfolgung fertig",
+      "trackDoneBody": "{{count}} Keyframes — die Form folgt dem Objekt."
     },
     "speed": {
       "rampNotApplicable": "Für diesen Clip nicht anwendbar (zu kurz?).",

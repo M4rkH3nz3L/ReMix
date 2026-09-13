@@ -1,9 +1,12 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
-import { palette, textColors } from '@/constants/editor';
+import { aspectValue, palette, textColors } from '@/constants/editor';
+import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
+import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip } from '@/types/project';
 
@@ -32,6 +35,60 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
   const updateClip = useEditorStore((s) => s.updateClip);
   const snapGrid = useEditorStore((s) => s.snapGrid);
   const setSnapGrid = useEditorStore((s) => s.setSnapGrid);
+  const setPickTarget = useEditorStore((s) => s.setPickTarget);
+  const [trackBusy, setTrackBusy] = useState(false);
+
+  /**
+   * 🎯 Objektum-követés: a vásznon rákoppintasz a követendő objektumra, a worker
+   * (a videón) végigköveti, és a FORMA (vagy shape-alapú 3D-matrica) a
+   * pozíció-kulcskockákkal utána mozog. Pro (objectTrack).
+   */
+  const runTrack = (point: { x: number; y: number }) => {
+    const state = useEditorStore.getState();
+    const project = state.project;
+    if (!project || trackBusy) {
+      return;
+    }
+    const video = activeVisualClip(project, state.playhead);
+    if (!video || video.kind !== 'video') {
+      Alert.alert(t('panels.shape.trackTitle'), t('panels.shape.trackNeedVideo'));
+      return;
+    }
+    if (state.playhead < clip.start || state.playhead >= clip.start + clip.duration) {
+      Alert.alert(t('panels.shape.trackTitle'), t('panels.shape.trackPlayheadOnClip'));
+      return;
+    }
+    const endTl = Math.min(clip.start + clip.duration, video.start + video.duration, state.playhead + 15);
+    const durTl = endTl - state.playhead;
+    if (durTl < 0.5) {
+      Alert.alert(t('panels.shape.trackTitle'), t('panels.shape.trackTooShort'));
+      return;
+    }
+    setTrackBusy(true);
+    trackSubject(video.uri, {
+      startSec: sourceTimeAt(video, state.playhead),
+      durationSec: durTl * video.speed,
+      cx: point.x,
+      cy: point.y,
+      aspectW: aspectValue(project.aspectRatio),
+      aspectH: 1,
+    })
+      .then((points) => {
+        if (!points) {
+          Alert.alert(t('panels.shape.trackTitle'), t('panels.shape.trackFailed'));
+          return;
+        }
+        const kf = pointsToPositionKeyframes(points, clip.position, state.playhead - clip.start, 1 / video.speed);
+        state.updateClip(clip.id, { keyframes: { ...clip.keyframes, ...kf } });
+        Alert.alert(t('panels.shape.trackDone'), t('panels.shape.trackDoneBody', { count: kf.x.length }));
+      })
+      .catch((err: Error) => Alert.alert(t('panels.shape.trackTitle'), err.message))
+      .finally(() => setTrackBusy(false));
+  };
+  const startTrackPick = () => {
+    Alert.alert(t('panels.shape.trackTitle'), t('panels.shape.trackPickHint'));
+    setPickTarget((p) => runTrack(p));
+  };
 
   return (
     <View>
@@ -277,6 +334,25 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         <Text style={styles.note}>
           {t('panels.shape.glowOutlineNote')}
         </Text>
+      </PanelSection>
+
+      {/* 🎯 Objektum-követés: a forma / 3D-matrica követi a videó egy objektumát */}
+      <PanelSection title={t('panels.shape.trackSectionTitle')}>
+        <View style={styles.row}>
+          <Chip
+            label={trackBusy ? t('panels.shape.tracking') : t('panels.shape.trackObject')}
+            active={trackBusy}
+            onPress={startTrackPick}
+          />
+          {clip.keyframes?.x?.length ? (
+            <Chip
+              label={t('panels.shape.trackClear')}
+              active={false}
+              onPress={() => updateClip(clip.id, { keyframes: undefined })}
+            />
+          ) : null}
+        </View>
+        <Text style={styles.note}>{t('panels.shape.trackNote')}</Text>
       </PanelSection>
     </View>
   );

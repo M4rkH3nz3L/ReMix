@@ -548,6 +548,12 @@ export interface ShapeClip extends ClipBase {
    * alakzatot és kép-kitöltést körberajzol.
    */
   outline?: { color: string; width: number };
+  /**
+   * 🎯 Animált pozíció/méret: x/y (0–1) + scale csatornák — a forma (és a
+   * shape-alapú 3D-matrica) így követhet egy objektumot / animálható. A render
+   * a szöveg-overlay-el KÖZÖS keyframe-úton kezeli (kfChannelExpr a position-re).
+   */
+  keyframes?: ClipKeyframes;
 }
 
 /**

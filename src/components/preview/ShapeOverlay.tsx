@@ -13,7 +13,9 @@ import Svg, {
 
 import { palette } from '@/constants/editor';
 import { polylinePoints } from '@/lib/draw';
+import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
+import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip } from '@/types/project';
 
 /** nyíl/csillag sokszögek 0–100-as koordinátákban — a renderrel megegyezőek */
@@ -100,8 +102,15 @@ export function ShapeOverlay({
     transform: [{ translateX: dragX.value }, { translateY: dragY.value }],
   }));
 
-  const w = clip.w * box.w;
-  const h = (clip.shape === 'line' ? Math.max(clip.h, 0.004) : clip.h) * box.h;
+  // 🎯 animált pozíció/méret a lejátszófejnél (követés/kulcskocka); kf nélkül a statikus érték
+  const playhead = useEditorStore((s) => s.playhead);
+  const tIn = clamp(playhead - clip.start, 0, clip.duration);
+  const posX = sampleChannel(clip.keyframes?.x, tIn, clip.position.x);
+  const posY = sampleChannel(clip.keyframes?.y, tIn, clip.position.y);
+  const kfScale = sampleChannel(clip.keyframes?.scale, tIn, 1);
+
+  const w = clip.w * kfScale * box.w;
+  const h = (clip.shape === 'line' ? Math.max(clip.h, 0.004) : clip.h) * kfScale * box.h;
   // a vonalvastagság a vászon MAGASSÁGÁNAK %-a (ugyanaz a szabály, mint a
   // renderben) — így az előnézet és a beégetett videó vonala egyforma vastag
   const strokePx = Math.max(1, ((clip.strokeWidth ?? 0.9) / 100) * box.h);
@@ -125,8 +134,8 @@ export function ShapeOverlay({
         style={[
           styles.wrap,
           {
-            left: clip.position.x * box.w - w / 2,
-            top: clip.position.y * box.h - h / 2,
+            left: posX * box.w - w / 2,
+            top: posY * box.h - h / 2,
             opacity: clip.opacity ?? 1,
             // valódi blend az előnézetben (RN új architektúra)
             mixBlendMode: clip.blendMode,

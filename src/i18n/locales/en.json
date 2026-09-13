@@ -1432,7 +1432,20 @@
       "outlineColor_black": "Black",
       "outlineColor_pink": "Pink",
       "outlineWidth": "Outline width",
-      "glowOutlineNote": "Both follow the SILHOUETTE of the shape, so they work on the arrow, the star and the image-fill logo too — where a plain border doesn't. It shows exactly in the render; the preview approximates it."
+      "glowOutlineNote": "Both follow the SILHOUETTE of the shape, so they work on the arrow, the star and the image-fill logo too — where a plain border doesn't. It shows exactly in the render; the preview approximates it.",
+      "trackSectionTitle": "🎯 Object tracking",
+      "trackObject": "Track an object",
+      "tracking": "Tracking…",
+      "trackClear": "Clear tracking",
+      "trackNote": "Tap the object to follow on the video — the shape/3D sticker moves with it. The playhead must be over the clip, above a video.",
+      "trackTitle": "Object tracking",
+      "trackPickHint": "Tap the object to follow on the canvas.",
+      "trackNeedVideo": "There must be a video under the playhead to track on.",
+      "trackPlayheadOnClip": "Put the playhead over the clip.",
+      "trackTooShort": "Section too short to track.",
+      "trackFailed": "Tracking failed (worker running? Pro?).",
+      "trackDone": "Tracking done",
+      "trackDoneBody": "{{count}} keyframes — the shape follows the object."
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

@@ -983,7 +983,8 @@
       "fxCompressor": "Compressor",
       "fxLimiter": "Limiter",
       "fxNormalize": "Normalize",
-      "fxHint": "Effects are baked in the render (granular, alongside the voiceEnhance bundle). The preview approximates."
+      "fxHint": "Effects are baked in the render (granular, alongside the voiceEnhance bundle). The preview approximates.",
+      "volumeAutomation": "Volume automation (graph editor)"
     },
     "captions": {
       "wordTiming": "Word timing",
@@ -1345,7 +1346,12 @@
       "keyframeHint": "Set the zoom/position on the canvas, then tap “◆ Keyframe here” — the clip animates between keyframes (the easing applies to the new keyframe). On a keyframed clip, pinch/drag also writes a keyframe.",
       "appearanceTitle": "Appearance",
       "rotation": "Rotation",
-      "opacity": "Opacity"
+      "opacity": "Opacity",
+      "chScale": "Scale",
+      "chX": "Position X",
+      "chY": "Position Y",
+      "chRotation": "Rotation",
+      "chOpacity": "Opacity"
     },
     "shape": {
       "shapeTitle": "Shape",

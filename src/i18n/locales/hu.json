@@ -983,7 +983,8 @@
       "fxCompressor": "Kompresszor",
       "fxLimiter": "Limiter",
       "fxNormalize": "Normalizálás",
-      "fxHint": "Az effektek a renderben égnek be (a −16 LUFS voiceEnhance csomag mellett, granulárisan). Az előnézet közelít."
+      "fxHint": "Az effektek a renderben égnek be (a −16 LUFS voiceEnhance csomag mellett, granulárisan). Az előnézet közelít.",
+      "volumeAutomation": "Hangerő-automáció (Graph Editor)"
     },
     "captions": {
       "wordTiming": "Szó-időzítés",
@@ -1345,7 +1346,12 @@
       "keyframeHint": "Állítsd be a zoomot/pozíciót a vásznon, majd „◆ Kulcskocka itt” — a klip a kulcskockák közt animálva mozog (az easing az új kulcskockára vonatkozik). Kulcskockás klipen a csippentés/húzás is kulcskockát ír.",
       "appearanceTitle": "Megjelenés",
       "rotation": "Forgatás",
-      "opacity": "Átlátszóság"
+      "opacity": "Átlátszóság",
+      "chScale": "Méret",
+      "chX": "Pozíció X",
+      "chY": "Pozíció Y",
+      "chRotation": "Forgatás",
+      "chOpacity": "Átlátszóság"
     },
     "shape": {
       "shapeTitle": "Forma",

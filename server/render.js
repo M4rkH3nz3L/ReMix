@@ -618,17 +618,41 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     return `mfg${i}`;
   };
 
-  /** forgatás + átlátszóság lánc az overlay-útvonal forrására (rgba-ban) */
-  const appearanceChain = (clip) => {
+  /**
+   * forgatás + átlátszóság lánc az overlay-útvonal forrására (rgba-ban).
+   * `skip` = a szegmens kezdete a klipen belül (mp) — a kulcskocka-idő
+   * klip-lokális, a szűrő-idő szegmens-lokális, ezért T = szűrő-idő + skip.
+   *
+   * Kulcskockás forgatás/átlátszóság esetén PER-FRAME (a kliens
+   * src/lib/keyframes.ts görbéivel megegyező kifejezés); a kimeret ilyenkor =
+   * bemeret (nincs pad/overlay-ütközés a withKeyframeMotionnel). Kulcskocka
+   * nélkül a régi statikus út fut — a meglévő renderek bitre változatlanok.
+   */
+  const appearanceChain = (clip, skip = 0) => {
     let s = chromaChain(clip) + ',format=rgba';
-    const rotation = clip.transform?.rotation ?? 0;
-    if (rotation !== 0) {
-      const rad = ((rotation % 360) * Math.PI) / 180;
-      s += `,rotate=${rad.toFixed(5)}:ow=rotw(${rad.toFixed(5)}):oh=roth(${rad.toFixed(5)}):c=black@0`;
+    const k = clip.keyframes ?? {};
+    if (k.rotation && k.rotation.length > 0) {
+      // rotate: a `t` a szűrő (szegmens-lokális) ideje → klip-idő = t + skip
+      const T = `(t+${skip.toFixed(3)})`;
+      const degExpr = kfChannelExpr(k.rotation, clip.transform?.rotation ?? 0, T);
+      s += `,rotate=a='(${degExpr})*PI/180':c=black@0`;
+    } else {
+      const rotation = clip.transform?.rotation ?? 0;
+      if (rotation !== 0) {
+        const rad = ((rotation % 360) * Math.PI) / 180;
+        s += `,rotate=${rad.toFixed(5)}:ow=rotw(${rad.toFixed(5)}):oh=roth(${rad.toFixed(5)}):c=black@0`;
+      }
     }
-    const opacity = clip.opacity ?? 1;
-    if (opacity < 1) {
-      s += `,colorchannelmixer=aa=${opacity.toFixed(3)}`;
+    if (k.opacity && k.opacity.length > 0) {
+      // geq per-frame alfa: a geq idő-változója `T` (nagybetű) → klip-idő = T + skip
+      const Tg = `(T+${skip.toFixed(3)})`;
+      const opExpr = kfChannelExpr(k.opacity, clip.opacity ?? 1, Tg);
+      s += `,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='clip((${opExpr}),0,1)*alpha(X,Y)'`;
+    } else {
+      const opacity = clip.opacity ?? 1;
+      if (opacity < 1) {
+        s += `,colorchannelmixer=aa=${opacity.toFixed(3)}`;
+      }
     }
     return s;
   };
@@ -653,8 +677,55 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     }
   };
 
+  // 🎞️ Köbös-Bézier easing (a kliens src/lib/keyframes.ts bezierEase-ével AZONOS
+  // felezéses megoldás) — az FFmpeg nem tud zárt alakban Bézier-időt visszafejteni,
+  // ezért a bezier-szegmenst finom LINEÁRIS al-kulcskockákra „sütjük", és a
+  // kész if-lánc ugyanazt a görbét reprodukálja (preview↔render paritás).
+  const bezierEaseNode = (cp, p) => {
+    if (p <= 0) return 0;
+    if (p >= 1) return 1;
+    const [x1, y1, x2, y2] = cp;
+    const bx = (u) => { const v = 1 - u; return 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u; };
+    const by = (u) => { const v = 1 - u; return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u; };
+    let lo = 0, hi = 1, u = p;
+    for (let i = 0; i < 24; i++) {
+      u = (lo + hi) / 2;
+      const x = bx(u);
+      if (Math.abs(x - p) < 1e-5) break;
+      if (x < p) lo = u; else hi = u;
+    }
+    return by(u);
+  };
+  const BEZIER_STEPS = 16;
+  const expandBezier = (kfs) => {
+    if (!kfs || kfs.length < 2 || !kfs.some((k) => k.easing === 'bezier' && Array.isArray(k.bezier))) {
+      return kfs;
+    }
+    const out = [];
+    for (let i = 0; i < kfs.length; i++) {
+      const a = kfs[i];
+      const b = kfs[i + 1];
+      if (b && a.easing === 'bezier' && Array.isArray(a.bezier)) {
+        // a szegmens kezdő-pontja + BEZIER_STEPS-1 köztes lineáris al-pont
+        out.push({ time: a.time, value: a.value, easing: 'linear' });
+        for (let s = 1; s < BEZIER_STEPS; s++) {
+          const p = s / BEZIER_STEPS;
+          out.push({
+            time: a.time + p * (b.time - a.time),
+            value: a.value + (b.value - a.value) * bezierEaseNode(a.bezier, p),
+            easing: 'linear',
+          });
+        }
+      } else {
+        out.push(a);
+      }
+    }
+    return out;
+  };
+
   /** kulcskocka-csatorna → darabonkénti if-lánc a T időkifejezésre */
-  const kfChannelExpr = (kfs, fallback, T) => {
+  const kfChannelExpr = (rawKfs, fallback, T) => {
+    const kfs = expandBezier(rawKfs); // bezier → finom lineáris LUT (paritás)
     if (!kfs || kfs.length === 0) {
       return Number(fallback).toFixed(5);
     }
@@ -673,8 +744,13 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
 
   const hasKf = (clip) => {
     const k = clip.keyframes;
+    // a forgatás/átlátszóság kulcskocka is ide sorolja a klipet, hogy az
+    // appearanceChain per-frame úton fusson (a motion scale/pan no-op marad)
     return Boolean(
-      k && ['scale', 'x', 'y'].some((c) => Array.isArray(k[c]) && k[c].length > 0)
+      k &&
+        ['scale', 'x', 'y', 'rotation', 'opacity'].some(
+          (c) => Array.isArray(k[c]) && k[c].length > 0
+        )
     );
   };
 
@@ -849,7 +925,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         // animált zoom/pan: fit (contain) méretű rgba forrás → keyframe-lánc
         const fit =
           `scale=${W}:${H}:force_original_aspect_ratio=decrease,setsar=1` +
-          appearanceChain(clip) +
+          appearanceChain(clip, seg.skip) +
           tiltChain(clip);
         let baseLabel;
         if (blur) {
@@ -869,7 +945,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         const fgScale =
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
           `crop=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1` +
-          appearanceChain(clip) +
+          appearanceChain(clip, seg.skip) +
           tiltChain(clip);
         let baseLabel;
         if (blur) {
@@ -965,7 +1041,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         const fit =
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
           `crop=${W}:${H},setsar=1` +
-          appearanceChain(clip) +
+          appearanceChain(clip, seg.skip) +
           tiltChain(clip);
         let baseLabel;
         if (blur) {
@@ -985,7 +1061,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         const fgScale =
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
           `crop=${boxW}:${boxH},setsar=1` +
-          appearanceChain(clip) +
+          appearanceChain(clip, seg.skip) +
           tiltChain(clip);
         let baseLabel;
         if (blur) {

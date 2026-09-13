@@ -17,15 +17,74 @@ import type {
 /** két kulcskocka ennyin belül "ugyanaz az időpont" (csere, nem beszúrás) */
 export const KF_EPS = 0.05;
 
-export const KEYFRAME_CHANNELS = ['scale', 'x', 'y', 'volume'] as const;
+export const KEYFRAME_CHANNELS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume'] as const;
 export type KeyframeChannel = (typeof KEYFRAME_CHANNELS)[number];
 
-const EASE_FNS: Record<KeyframeEasing, (p: number) => number> = {
+const EASE_FNS: Record<Exclude<KeyframeEasing, 'bezier'>, (p: number) => number> = {
   linear: (p) => p,
   easeIn: (p) => p * p,
   easeOut: (p) => 1 - (1 - p) * (1 - p),
   easeInOut: (p) => p * p * (3 - 2 * p), // smoothstep
 };
+
+/**
+ * A preset-easingek köbös-Bézier vezérpontjai (CSS-konvenció) — a Graph Editor
+ * ezzel inicializálja a fogókat, amikor a felhasználó „egyénire" (bezier) vált.
+ */
+export const PRESET_BEZIER: Record<Exclude<KeyframeEasing, 'bezier'>, [number, number, number, number]> = {
+  linear: [0, 0, 1, 1],
+  easeIn: [0.42, 0, 1, 1],
+  easeOut: [0, 0, 0.58, 1],
+  easeInOut: [0.42, 0, 0.58, 1],
+};
+
+/**
+ * Köbös-Bézier easing: a `p` idő-frakcióhoz (0–1) tartozó ÉRTÉK, a
+ * `[x1,y1,x2,y2]` vezérpontokkal (végpontok 0,0 és 1,1). Mivel az `x(u)=p`
+ * nincs zárt alakban, felezéssel keressük az `u` paramétert (robusztus, ~1e-6).
+ * A render (server/render.js) UGYANEZT a görbét finom lineáris lépcsőkre süti.
+ */
+export function bezierEase(cp: [number, number, number, number], p: number): number {
+  if (p <= 0) {
+    return 0;
+  }
+  if (p >= 1) {
+    return 1;
+  }
+  const [x1, y1, x2, y2] = cp;
+  const bx = (u: number) => {
+    const v = 1 - u;
+    return 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u;
+  };
+  const by = (u: number) => {
+    const v = 1 - u;
+    return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u;
+  };
+  let lo = 0;
+  let hi = 1;
+  let u = p;
+  for (let i = 0; i < 24; i++) {
+    u = (lo + hi) / 2;
+    const x = bx(u);
+    if (Math.abs(x - p) < 1e-5) {
+      break;
+    }
+    if (x < p) {
+      lo = u;
+    } else {
+      hi = u;
+    }
+  }
+  return by(u);
+}
+
+/** A kulcskocka easingjének görbéje a `p` (0–1) idő-frakción. */
+export function easeValue(kf: Keyframe, p: number): number {
+  if (kf.easing === 'bezier' && kf.bezier) {
+    return bezierEase(kf.bezier, p);
+  }
+  return EASE_FNS[kf.easing === 'bezier' ? 'easeInOut' : kf.easing](p);
+}
 
 /** Egy csatorna mintavétele t-nél; szélek előtt/után az érték tartva. */
 export function sampleChannel(
@@ -49,7 +108,7 @@ export function sampleChannel(
     if (t < b.time) {
       const span = b.time - a.time;
       const p = span > 0 ? (t - a.time) / span : 1;
-      return a.value + (b.value - a.value) * EASE_FNS[a.easing](p);
+      return a.value + (b.value - a.value) * easeValue(a, p);
     }
   }
   return last.value;
@@ -75,6 +134,7 @@ export function sampleClipTransform(
     scale: sampleChannel(k.scale, t, base.scale),
     x: sampleChannel(k.x, t, base.x),
     y: sampleChannel(k.y, t, base.y),
+    rotation: sampleChannel(k.rotation, t, base.rotation ?? 0),
   };
 }
 

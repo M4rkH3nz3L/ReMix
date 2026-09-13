@@ -371,27 +371,49 @@ export interface CanvasTransform {
   rotation?: number;
 }
 
-/** A kulcskocka easingje: az EBBŐL a kulcskockából induló átmenet görbéje. */
-export type KeyframeEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+/**
+ * A kulcskocka easingje: az EBBŐL a kulcskockából induló átmenet görbéje.
+ * A `bezier` egyéni köbös Bézier-görbe — a vezérpontokat a `Keyframe.bezier`
+ * hordozza (CSS `cubic-bezier(x1,y1,x2,y2)` konvenció, végpontok 0,0 és 1,1).
+ */
+export type KeyframeEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'bezier';
 
 export interface Keyframe {
   /** idő a klip kezdetétől (mp, idővonal-időben) */
   time: number;
   value: number;
   easing: KeyframeEasing;
+  /**
+   * Egyéni köbös Bézier vezérpontok `[x1,y1,x2,y2]` (0–1 időben, az érték
+   * túllőhet 0–1-en = „overshoot"). Csak `easing: 'bezier'` esetén él; a render
+   * finom lineáris al-kulcskockákra „süti" (paritás, mert az FFmpeg nem tud
+   * zárt alakban Bézier-időt visszafejteni).
+   */
+  bezier?: [number, number, number, number];
 }
 
 /**
- * Kulcskockázható csatornák (P0‑5): vászon-transzform zoom/pan + hangerő-
- * automáció. Az első kulcskocka előtt / az utolsó után az érték tartva;
- * csatorna nélkül a klip statikus értéke él. A forgatás/átlátszóság statikus
- * marad (a render nem tud hatékony per-frame alfát — paritás miatt nem
- * kulcskockázzuk).
+ * Kulcskockázható csatornák: vászon-transzform zoom/pan (scale/x/y), forgatás
+ * (rotation), átlátszóság (opacity) és hangerő-automáció (volume). Az első
+ * kulcskocka előtt / az utolsó után az érték tartva; csatorna nélkül a klip
+ * statikus értéke él. A render UGYANEZEKET a görbéket alkalmazza (paritás) —
+ * a rotation/opacity per-frame is a megjelenés-láncban (guarded: kulcskocka
+ * nélkül a viselkedés a régi statikus úttal bitre azonos).
  */
 export interface ClipKeyframes {
   scale?: Keyframe[];
   x?: Keyframe[];
   y?: Keyframe[];
+  /**
+   * forgatás fokban (videó/kép; a statikus transform.rotation az alap). A render
+   * a megjelenés-láncban per-frame `rotate` kifejezéssel animálja.
+   */
+  rotation?: Keyframe[];
+  /**
+   * átlátszóság 0–1 (videó/kép; a statikus clip.opacity az alap). A render
+   * per-frame alfával animálja — kulcskocka nélkül a klip végig átlátszatlan.
+   */
+  opacity?: Keyframe[];
   /** hangerő-automáció 0–1 (videó- és hangklipen; a statikus volume az alap) */
   volume?: Keyframe[];
 }

@@ -2,21 +2,36 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { EDIT_FPS, FRAME, MIN_CLIP_DURATION, palette } from '@/constants/editor';
-import {
-  KF_EPS,
-  keyframeTimes,
-  removeKeyframesAt,
-  sampleClipTransform,
-  setChannelKeyframe,
-} from '@/lib/keyframes';
+import type { KeyframeChannel } from '@/lib/keyframes';
 import { maxVideoDuration } from '@/lib/projectUtils';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { Clip, KeyframeEasing } from '@/types/project';
+import type { Clip, ImageClip, VideoClip } from '@/types/project';
 
 const STEP = 0.1;
+
+/**
+ * 🎞️ A Graph Editorban szerkeszthető transzform-csatornák (videó/kép): érték-
+ * tartomány + a kulcskocka nélküli szél-érték + megjelenítés.
+ */
+type ChannelCfg = {
+  id: Extract<KeyframeChannel, 'scale' | 'x' | 'y' | 'rotation' | 'opacity'>;
+  label: string;
+  min: number;
+  max: number;
+  fallback: (clip: VideoClip | ImageClip) => number;
+  fmt: (v: number) => string;
+};
+const TRANSFORM_CHANNELS: ChannelCfg[] = [
+  { id: 'scale', label: 'panels.precision.chScale', min: 0.2, max: 4, fallback: (c) => c.transform?.scale ?? 1, fmt: (v) => `${v.toFixed(2)}×` },
+  { id: 'x', label: 'panels.precision.chX', min: -0.75, max: 0.75, fallback: (c) => c.transform?.x ?? 0, fmt: (v) => `${Math.round(v * 100)}%` },
+  { id: 'y', label: 'panels.precision.chY', min: -0.75, max: 0.75, fallback: (c) => c.transform?.y ?? 0, fmt: (v) => `${Math.round(v * 100)}%` },
+  { id: 'rotation', label: 'panels.precision.chRotation', min: -180, max: 180, fallback: (c) => c.transform?.rotation ?? 0, fmt: (v) => `${Math.round(v)}°` },
+  { id: 'opacity', label: 'panels.precision.chOpacity', min: 0, max: 1, fallback: (c) => c.opacity ?? 1, fmt: (v) => `${Math.round(v * 100)}%` },
+];
 
 /**
  * A léptetés finomsága. Kockára állítva az érték a render KÉPKOCKA-RÁCSÁRA
@@ -32,20 +47,13 @@ function snap(value: number, mode: StepMode): number {
     : Math.round(value * 100) / 100;
 }
 
-const EASINGS: { id: KeyframeEasing }[] = [
-  { id: 'easeInOut' },
-  { id: 'linear' },
-  { id: 'easeIn' },
-  { id: 'easeOut' },
-];
-
 /** Pro eszköz: kezdet/hossz tizedmásodperces igazítása + lejátszófej-műveletek. */
 export function PrecisionPanel({ clip }: { clip: Clip }) {
   const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
   const playhead = useEditorStore((s) => s.playhead);
-  const [easing, setEasing] = useState<KeyframeEasing>('easeInOut');
+  const [kfChannel, setKfChannel] = useState<ChannelCfg['id']>('scale');
   const [stepMode, setStepMode] = useState<StepMode>('sec');
   const step = stepMode === 'frame' ? FRAME : STEP;
 
@@ -146,80 +154,38 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
         <PanelSection title={t('panels.precision.keyframesTitle')}>
+          <View style={styles.row}>
+            {TRANSFORM_CHANNELS.map((c) => (
+              <Chip
+                key={c.id}
+                label={t(c.label)}
+                active={kfChannel === c.id}
+                onPress={() => setKfChannel(c.id)}
+              />
+            ))}
+          </View>
           {(() => {
-            const tInClip = clamp(playhead - clip.start, 0, clip.duration);
-            const times = keyframeTimes(clip.keyframes);
-            const onKeyframe = times.some((t) => Math.abs(t - tInClip) <= KF_EPS);
-            const addAtPlayhead = () => {
-              const current = sampleClipTransform(clip, tInClip);
-              const k = clip.keyframes ?? {};
-              updateClip(clip.id, {
-                keyframes: {
-                  scale: setChannelKeyframe(k.scale, tInClip, current.scale, easing),
-                  x: setChannelKeyframe(k.x, tInClip, current.x, easing),
-                  y: setChannelKeyframe(k.y, tInClip, current.y, easing),
-                },
-              });
-            };
+            const cfg = TRANSFORM_CHANNELS.find((c) => c.id === kfChannel) ?? TRANSFORM_CHANNELS[0];
+            const media = clip as VideoClip | ImageClip;
             return (
-              <>
-                <View style={styles.row}>
-                  <Chip
-                    label={
-                      onKeyframe
-                        ? t('panels.precision.keyframeUpdate')
-                        : t('panels.precision.keyframeHere')
-                    }
-                    active={onKeyframe}
-                    onPress={addAtPlayhead}
-                  />
-                  {onKeyframe ? (
-                    <Chip
-                      label={t('panels.precision.keyframeDeleteHere')}
-                      active={false}
-                      onPress={() =>
-                        updateClip(clip.id, {
-                          keyframes: removeKeyframesAt(clip.keyframes, tInClip),
-                        })
-                      }
-                    />
-                  ) : null}
-                  {times.length > 0 ? (
-                    <Chip
-                      label={t('panels.precision.keyframeDeleteAll')}
-                      active={false}
-                      onPress={() => updateClip(clip.id, { keyframes: undefined })}
-                    />
-                  ) : null}
-                </View>
-                <View style={styles.row}>
-                  {EASINGS.map((e) => (
-                    <Chip
-                      key={e.id}
-                      label={t('panels.precision.easing_' + e.id)}
-                      active={easing === e.id}
-                      onPress={() => setEasing(e.id)}
-                    />
-                  ))}
-                </View>
-                {times.length > 0 ? (
-                  <View style={styles.row}>
-                    {times.map((t) => (
-                      <Chip
-                        key={t.toFixed(2)}
-                        label={`◆ ${formatTime(clip.start + t)}`}
-                        active={Math.abs(t - tInClip) <= KF_EPS}
-                        onPress={() => setPlayhead(clip.start + t)}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-                <Text style={styles.range}>
-                  {t('panels.precision.keyframeHint')}
-                </Text>
-              </>
+              <KeyframeGraphEditor
+                keyframes={media.keyframes?.[cfg.id] ?? []}
+                duration={clip.duration}
+                min={cfg.min}
+                max={cfg.max}
+                fallback={cfg.fallback(media)}
+                playhead={clamp(playhead - clip.start, 0, clip.duration)}
+                onChange={(next) =>
+                  updateClip(clip.id, {
+                    keyframes: { ...media.keyframes, [cfg.id]: next.length > 0 ? next : undefined },
+                  })
+                }
+                onSeek={(tt) => setPlayhead(clip.start + tt)}
+                formatValue={cfg.fmt}
+              />
             );
           })()}
+          <Text style={styles.range}>{t('panels.precision.keyframeHint')}</Text>
         </PanelSection>
       ) : null}
 

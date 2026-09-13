@@ -983,7 +983,8 @@
       "fxCompressor": "Kompressor",
       "fxLimiter": "Limiter",
       "fxNormalize": "Normalisieren",
-      "fxHint": "Effekte werden im Render angewendet (granular, neben dem voiceEnhance-Paket). Die Vorschau nähert an."
+      "fxHint": "Effekte werden im Render angewendet (granular, neben dem voiceEnhance-Paket). Die Vorschau nähert an.",
+      "volumeAutomation": "Lautstärke-Automation (Graph-Editor)"
     },
     "captions": {
       "wordTiming": "Wort-Timing",
@@ -1345,7 +1346,12 @@
       "keyframeHint": "Stelle Zoom/Position auf der Leinwand ein, dann tippe „◆ Keyframe hier“ — der Clip bewegt sich animiert zwischen den Keyframes (das Easing gilt für den neuen Keyframe). Bei einem Clip mit Keyframes schreibt auch Kneifen/Ziehen einen Keyframe.",
       "appearanceTitle": "Aussehen",
       "rotation": "Drehung",
-      "opacity": "Deckkraft"
+      "opacity": "Deckkraft",
+      "chScale": "Skalierung",
+      "chX": "Position X",
+      "chY": "Position Y",
+      "chRotation": "Drehung",
+      "chOpacity": "Deckkraft"
     },
     "shape": {
       "shapeTitle": "Form",

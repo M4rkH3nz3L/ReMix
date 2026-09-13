@@ -9,11 +9,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { makeId } from '@/lib/id';
-import { setChannelKeyframe } from '@/lib/keyframes';
 import { pickAudio } from '@/lib/media';
 import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
@@ -41,6 +41,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   );
   const [beatMode, setBeatMode] = useState<'beat' | 'downbeat'>('downbeat');
   const [beatBusy, setBeatBusy] = useState(false);
+  const playhead = useEditorStore((s) => s.playhead);
 
   // 🎛️ per-klip audio-FX olvasó/író segédek (a kijelölt klipre)
   const fx: AudioFx = clip?.audioFx ?? {};
@@ -539,34 +540,23 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
               />
             )}
           </View>
-          <View style={styles.chipRow}>
-            <Chip
-              label={t('panels.audio.volumeKeyframe')}
-              active={false}
-              onPress={() => {
-                const state = useEditorStore.getState();
-                const t = clamp(state.playhead - clip.start, 0, clip.duration);
-                const k = clip.keyframes ?? {};
-                updateClip(clip.id, {
-                  keyframes: {
-                    ...k,
-                    volume: setChannelKeyframe(k.volume, t, clip.volume, 'linear'),
-                  },
-                });
-              }}
-            />
-            {clip.keyframes?.volume?.length ? (
-              <Chip
-                label={t('panels.audio.clearAutomation', { count: clip.keyframes.volume.length })}
-                active={false}
-                onPress={() =>
-                  updateClip(clip.id, {
-                    keyframes: { ...clip.keyframes, volume: undefined },
-                  })
-                }
-              />
-            ) : null}
-          </View>
+          {/* 🎚️ hangerő-automáció Graph Editorral (value/time görbe, bezier) */}
+          <Text style={styles.note}>{t('panels.audio.volumeAutomation')}</Text>
+          <KeyframeGraphEditor
+            keyframes={clip.keyframes?.volume ?? []}
+            duration={clip.duration}
+            min={0}
+            max={1}
+            fallback={clip.volume}
+            playhead={clamp(playhead - clip.start, 0, clip.duration)}
+            onChange={(next) =>
+              updateClip(clip.id, {
+                keyframes: { ...clip.keyframes, volume: next.length > 0 ? next : undefined },
+              })
+            }
+            onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
+            formatValue={(v) => `${Math.round(v * 100)}%`}
+          />
           <Text style={styles.note}>
             {t('panels.audio.mixHint')}
           </Text>

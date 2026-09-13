@@ -502,7 +502,14 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     ],
   }));
 
-  const mediaOpacity = (videoClip ?? imageClip)?.opacity ?? 1;
+  // 🎞️ átlátszóság-automáció: az opacity-csatorna a playheadből (kf nélkül a statikus opacity)
+  const mediaOpacity = visualForTransform
+    ? sampleChannel(
+        visualForTransform.keyframes?.opacity,
+        playhead - visualForTransform.start,
+        visualForTransform.opacity ?? 1
+      )
+    : (videoClip ?? imageClip)?.opacity ?? 1;
 
   // áttűnés feketéből/feketébe a vizuális klip szélein
   const visualClip = videoClip ?? imageClip;

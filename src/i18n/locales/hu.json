@@ -619,6 +619,19 @@
       "roll": "Roll",
       "slip": "Slip",
       "slide": "Slide"
+    },
+    "blend": {
+      "multiply": "Szorzás",
+      "screen": "Kivetítés",
+      "overlay": "Fedés",
+      "darken": "Sötétítés",
+      "lighten": "Világosítás",
+      "difference": "Különbség",
+      "exclusion": "Kizárás",
+      "hardlight": "Erős fény",
+      "softlight": "Lágy fény",
+      "colordodge": "Színkimosás",
+      "colorburn": "Színégetés"
     }
   },
   "editorScreen": {
@@ -1256,7 +1269,8 @@
       "blurTrackHint": "Koppints a vásznon az elmosandó objektumra — az elmosás végigköveti a videón.",
       "blurTrackPlayhead": "A lejátszófej a klip fölött álljon.",
       "blurTrackDone": "Kész a blur-követés",
-      "blurTrackDoneBody": "{{count}} kulcskocka — az elmosás követi az objektumot."
+      "blurTrackDoneBody": "{{count}} kulcskocka — az elmosás követi az objektumot.",
+      "spill": "Spill (zöld/kék perem)"
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

@@ -283,13 +283,34 @@ export interface ChromaKey {
   similarity: number;
   /** él-lágyítás 0–0.3 (hiányzó = 0.05) */
   blend?: number;
+  /**
+   * 🟢 Spill-suppression: a kulcs-szín (zöld/kék) visszaverődésének eltávolítása
+   * a téma pereméről. 0/hiányzó = ki, 0.1–1 = erősség. A renderben `despill`.
+   */
+  spill?: number;
 }
 
 /**
  * Keverési mód (blend): a réteg a mögötte lévő képpel keveredik (nem takar).
  * Az RN `mixBlendMode` ÉS az ffmpeg `blend=all_mode` is ismeri mindegyiket.
  */
-export type BlendMode = 'multiply' | 'screen' | 'overlay' | 'difference' | 'lighten';
+/**
+ * Keverési módok — a preview RN `mixBlendMode`-ja (CSS-név a `cssBlendMode`-dal)
+ * ÉS az ffmpeg `blend=all_mode` is ismeri mindet (a colordodge/colorburn az
+ * ffmpeg-ben `dodge`/`burn`, a preview-ban `color-dodge`/`color-burn`).
+ */
+export type BlendMode =
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'difference'
+  | 'exclusion'
+  | 'hardlight'
+  | 'softlight'
+  | 'colordodge'
+  | 'colorburn';
 
 /**
  * PiP-keret („webcam-bubble"): a pip-sávos klip lekerekített sarka/köre + kerete

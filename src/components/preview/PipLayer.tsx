@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
-import { palette } from '@/constants/editor';
+import { cssBlendMode, palette } from '@/constants/editor';
 import { activePipClips, sourceTimeAt } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
@@ -180,8 +180,8 @@ function PipClipLayer({
               backgroundColor: '#000',
               borderWidth: isSelected ? Math.max(2, borderW) : borderW,
               borderColor: isSelected ? palette.accent : borderCol,
-              // 🎨 keverés a fő videóval (light-leak/screen-overlay) — a renderrel egyezik
-              mixBlendMode: frame?.blendMode,
+              // 🎨 keverés a fő videóval (light-leak/screen-overlay) — a renderrel egyezik (CSS-név)
+              mixBlendMode: frame?.blendMode ? cssBlendMode(frame.blendMode) : undefined,
             },
           ]}
         >

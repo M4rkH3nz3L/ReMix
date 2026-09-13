@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
-import { aspectValue, palette, textColors } from '@/constants/editor';
+import { aspectValue, BLEND_MODES, palette, textColors } from '@/constants/editor';
 import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
@@ -155,21 +155,17 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
 
       <PanelSection title={t('panels.shape.blendTitle')}>
         <View style={styles.row}>
-          {(
-            [
-              { id: undefined, label: t('panels.shape.blendNormal') },
-              { id: 'multiply', label: t('panels.shape.blendMultiply') },
-              { id: 'screen', label: 'Screen' },
-              { id: 'overlay', label: 'Overlay' },
-              { id: 'lighten', label: t('panels.shape.blendLighten') },
-              { id: 'difference', label: t('panels.shape.blendDifference') },
-            ] as const
-          ).map((m) => (
+          <Chip
+            label={t('panels.shape.blendNormal')}
+            active={!clip.blendMode}
+            onPress={() => updateClip(clip.id, { blendMode: undefined })}
+          />
+          {BLEND_MODES.map((m) => (
             <Chip
-              key={String(m.id)}
-              label={m.label}
-              active={clip.blendMode === m.id}
-              onPress={() => updateClip(clip.id, { blendMode: m.id })}
+              key={m.value}
+              label={t(m.label)}
+              active={clip.blendMode === m.value}
+              onPress={() => updateClip(clip.id, { blendMode: m.value })}
             />
           ))}
         </View>

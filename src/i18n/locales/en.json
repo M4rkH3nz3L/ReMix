@@ -619,6 +619,19 @@
       "roll": "Roll",
       "slip": "Slip",
       "slide": "Slide"
+    },
+    "blend": {
+      "multiply": "Multiply",
+      "screen": "Screen",
+      "overlay": "Overlay",
+      "darken": "Darken",
+      "lighten": "Lighten",
+      "difference": "Difference",
+      "exclusion": "Exclusion",
+      "hardlight": "Hard light",
+      "softlight": "Soft light",
+      "colordodge": "Color dodge",
+      "colorburn": "Color burn"
     }
   },
   "editorScreen": {
@@ -1256,7 +1269,8 @@
       "blurTrackHint": "Tap the object to blur on the canvas — the blur follows it through the video.",
       "blurTrackPlayhead": "Put the playhead over the clip.",
       "blurTrackDone": "Blur tracking done",
-      "blurTrackDoneBody": "{{count}} keyframes — the blur follows the object."
+      "blurTrackDoneBody": "{{count}} keyframes — the blur follows the object.",
+      "spill": "Spill suppression"
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

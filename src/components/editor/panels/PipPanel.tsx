@@ -2,10 +2,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
-import { palette, textColors } from '@/constants/editor';
+import { BLEND_MODES, palette, textColors } from '@/constants/editor';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { BlendMode, ImageClip, PipFrame, VideoClip } from '@/types/project';
+import type { ImageClip, PipFrame, VideoClip } from '@/types/project';
 
 /** lekerekítés-presetek (a rövidebb él arányában) */
 const RADII: { id: string; value: number }[] = [
@@ -13,14 +13,6 @@ const RADII: { id: string; value: number }[] = [
   { id: 'rounded', value: 0.12 },
   { id: 'veryRound', value: 0.28 },
   { id: 'circle', value: 0.5 },
-];
-
-/** keverési módok a fő videóval (light-leak/overlay/dupla-expozíció) */
-const BLENDS: { label: string; value: BlendMode }[] = [
-  { label: '☀️ Screen', value: 'screen' },
-  { label: '🌑 Multiply', value: 'multiply' },
-  { label: '🎛️ Overlay', value: 'overlay' },
-  { label: '⬆️ Lighten', value: 'lighten' },
 ];
 
 /**
@@ -82,10 +74,10 @@ export function PipPanel({ clip }: { clip: VideoClip | ImageClip }) {
             active={!frame.blendMode}
             onPress={() => patch({ blendMode: undefined })}
           />
-          {BLENDS.map((b) => (
+          {BLEND_MODES.map((b) => (
             <Chip
               key={b.value}
-              label={b.label}
+              label={t(b.label)}
               active={frame.blendMode === b.value}
               onPress={() => patch({ blendMode: b.value })}
             />

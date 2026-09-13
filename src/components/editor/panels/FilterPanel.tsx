@@ -1231,6 +1231,23 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             }
           />
         ) : null}
+        {/* 🟢 spill-suppression: a zöld/kék perem eltávolítása a témáról */}
+        {clip.chromaKey ? (
+          <Stepper
+            label={t('panels.filter.spill')}
+            value={`${Math.round((clip.chromaKey.spill ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, spill: clamp((clip.chromaKey!.spill ?? 0) - 0.2, 0, 1) },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                chromaKey: { ...clip.chromaKey!, spill: clamp((clip.chromaKey!.spill ?? 0) + 0.2, 0, 1) },
+              })
+            }
+          />
+        ) : null}
         <Text style={styles.note}>
           {t('panels.filter.noteGreenScreen')}
         </Text>

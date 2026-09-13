@@ -11,7 +11,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import { palette } from '@/constants/editor';
+import { cssBlendMode, palette } from '@/constants/editor';
 import { polylinePoints } from '@/lib/draw';
 import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
@@ -137,8 +137,8 @@ export function ShapeOverlay({
             left: posX * box.w - w / 2,
             top: posY * box.h - h / 2,
             opacity: clip.opacity ?? 1,
-            // valódi blend az előnézetben (RN új architektúra)
-            mixBlendMode: clip.blendMode,
+            // valódi blend az előnézetben (RN új architektúra; CSS-névre fordítva)
+            mixBlendMode: clip.blendMode ? cssBlendMode(clip.blendMode) : undefined,
           },
           // árnyék-közelítés (a valódi, sziluett-követő drop-shadow a renderben)
           clip.shadow ? styles.shadow : null,

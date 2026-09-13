@@ -619,6 +619,19 @@
       "roll": "Roll",
       "slip": "Slip",
       "slide": "Slide"
+    },
+    "blend": {
+      "multiply": "Multiplizieren",
+      "screen": "Negativ multipl.",
+      "overlay": "Ineinanderkopieren",
+      "darken": "Abdunkeln",
+      "lighten": "Aufhellen",
+      "difference": "Differenz",
+      "exclusion": "Ausschluss",
+      "hardlight": "Hartes Licht",
+      "softlight": "Weiches Licht",
+      "colordodge": "Farbig abwedeln",
+      "colorburn": "Farbig nachbelichten"
     }
   },
   "editorScreen": {
@@ -1256,7 +1269,8 @@
       "blurTrackHint": "Tippe auf das zu verpixelnde Objekt — der Blur folgt ihm durch das Video.",
       "blurTrackPlayhead": "Setze den Abspielkopf über den Clip.",
       "blurTrackDone": "Blur-Verfolgung fertig",
-      "blurTrackDoneBody": "{{count}} Keyframes — der Blur folgt dem Objekt."
+      "blurTrackDoneBody": "{{count}} Keyframes — der Blur folgt dem Objekt.",
+      "spill": "Spill-Unterdrückung"
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

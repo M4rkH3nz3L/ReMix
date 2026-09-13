@@ -22,6 +22,10 @@ const CANVAS = {
   '1:1': { w: 1080, h: 1080 },
 };
 
+// 🎨 blend-mód → ffmpeg `blend=all_mode` név (a többi 1:1; a preview CSS-neve külön)
+const FFMPEG_BLEND = { colordodge: 'dodge', colorburn: 'burn' };
+const blendName = (m) => FFMPEG_BLEND[m] || m;
+
 function run(cmd, args, timeoutMs) {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { timeout: timeoutMs ?? 10 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -565,16 +569,29 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     );
   };
 
-  /** green screen (P0-10): a kulcs-szín átlátszóvá válik */
+  /** green screen (P0-10): a kulcs-szín átlátszóvá válik + opcionális spill-suppression */
   const chromaChain = (clip) => {
     const c = clip.chromaKey;
     if (!c) {
       return '';
     }
-    const color = String(c.color || '#00ff00').replace('#', '0x');
+    const hex = String(c.color || '#00ff00').replace('#', '');
+    const color = '0x' + hex;
     const sim = Math.min(0.45, Math.max(0.02, c.similarity ?? 0.18));
     const blend = Math.min(0.3, Math.max(0, c.blend ?? 0.05));
-    return `,chromakey=color=${color}:similarity=${sim.toFixed(3)}:blend=${blend.toFixed(3)}`;
+    let s = `,chromakey=color=${color}:similarity=${sim.toFixed(3)}:blend=${blend.toFixed(3)}`;
+    // 🟢 spill-suppression: a kulcs-szín visszaverődésének (zöld/kék perem)
+    // eltávolítása a témáról — az ffmpeg `despill` szűrőjével, a kulcs-szín
+    // domináns csatornájából kikövetkeztetett típussal (green/blue)
+    if (c.spill) {
+      const r = parseInt(hex.slice(0, 2) || '0', 16);
+      const g = parseInt(hex.slice(2, 4) || '0', 16);
+      const b = parseInt(hex.slice(4, 6) || '0', 16);
+      const type = b > g && b >= r ? 'blue' : 'green';
+      const mix = Math.min(1, Math.max(0.1, typeof c.spill === 'number' ? c.spill : 0.5));
+      s += `,despill=type=${type}:mix=${mix.toFixed(2)}:expand=${(mix * 0.4).toFixed(2)}`;
+    }
+    return s;
   };
 
   /**
@@ -1557,7 +1574,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         graph.push(`[${vLabel}]format=gbrp[blb${txN}]`);
         graph.push(`[blf${txN}]format=gbrp[blg${txN}]`);
         graph.push(
-          `[blb${txN}][blg${txN}]blend=all_mode=${clip.blendMode}:enable='between(t,${from.toFixed(
+          `[blb${txN}][blg${txN}]blend=all_mode=${blendName(clip.blendMode)}:enable='between(t,${from.toFixed(
             3
           )},${to.toFixed(3)})'[${next}]`
         );
@@ -1650,7 +1667,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       graph.push(`[${vLabel}]format=gbrp[pblb${pipN}]`);
       graph.push(`[pblf${pipN}]format=gbrp[pblg${pipN}]`);
       graph.push(
-        `[pblb${pipN}][pblg${pipN}]blend=all_mode=${bm}:enable='between(t,${start.toFixed(
+        `[pblb${pipN}][pblg${pipN}]blend=all_mode=${blendName(bm)}:enable='between(t,${start.toFixed(
           3
         )},${end.toFixed(3)})'[${next}]`
       );

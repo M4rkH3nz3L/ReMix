@@ -1,5 +1,6 @@
 import type {
   AspectRatio,
+  BlendMode,
   FilterId,
   TextAnimation,
   TextStylePreset,
@@ -137,6 +138,56 @@ export const textColors = [
   '#c447d6',
   '#f5a623',
 ];
+
+/**
+ * 🎨 Keverési módok — közös lista a PiP/Forma panelekhez. A `label` i18n-kulcs.
+ * A preview a `cssBlendMode`-dal fordítja RN `mixBlendMode`-ra, a render az
+ * ffmpeg `blend=all_mode`-ra (a colordodge/colorburn ott `dodge`/`burn`).
+ */
+export const BLEND_MODES: { value: BlendMode; label: string }[] = [
+  { value: 'multiply', label: 'editor.blend.multiply' },
+  { value: 'screen', label: 'editor.blend.screen' },
+  { value: 'overlay', label: 'editor.blend.overlay' },
+  { value: 'darken', label: 'editor.blend.darken' },
+  { value: 'lighten', label: 'editor.blend.lighten' },
+  { value: 'difference', label: 'editor.blend.difference' },
+  { value: 'exclusion', label: 'editor.blend.exclusion' },
+  { value: 'hardlight', label: 'editor.blend.hardlight' },
+  { value: 'softlight', label: 'editor.blend.softlight' },
+  { value: 'colordodge', label: 'editor.blend.colordodge' },
+  { value: 'colorburn', label: 'editor.blend.colorburn' },
+];
+
+/** RN `mixBlendMode` (CSS) blend-nevek — a `cssBlendMode` ezek egyikét adja */
+export type CssBlendMode =
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'difference'
+  | 'exclusion'
+  | 'hard-light'
+  | 'soft-light'
+  | 'color-dodge'
+  | 'color-burn';
+
+/** blend-mód → RN `mixBlendMode` (CSS) érték */
+export function cssBlendMode(m: BlendMode): CssBlendMode {
+  switch (m) {
+    case 'hardlight':
+      return 'hard-light';
+    case 'softlight':
+      return 'soft-light';
+    case 'colordodge':
+      return 'color-dodge';
+    case 'colorburn':
+      return 'color-burn';
+    default:
+      // a maradék (multiply/screen/overlay/darken/lighten/difference/exclusion) = érvényes CSS-név
+      return m as CssBlendMode;
+  }
+}
 
 export const speedPresets = [0.25, 0.5, 1, 1.5, 2, 4];
 

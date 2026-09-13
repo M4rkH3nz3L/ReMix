@@ -277,10 +277,19 @@ export async function pullSharedProject(
   return migrateProject(data.data as Project);
 }
 
+/** Monoton számláló egyedi realtime-topic-hoz (lásd `subscribeMembers`). */
+let channelSeq = 0;
+
 /**
  * REALTIME feliratkozás a projekt tagságának változásaira (meghívás/szerep/
  * eltávolítás). Bármely változásnál meghívja a callbacket (a hívó újratölti a
  * listát). `() => void` leiratkozót ad.
+ *
+ * A topic KÖTELEZŐEN egyedi (`:${++channelSeq}` utótag): a `sb.channel(topic)` a
+ * MÁR meglévő, azonos topic-ú csatornát adná vissza (a `removeChannel` aszinkron),
+ * és a már `subscribe()`-olt csatornán a `.on('postgres_changes', …)` dobna
+ * („cannot add … callbacks after `subscribe()`"). Egyedi topic-kal a gyors
+ * projekt-újranyitás is mindig friss, `closed` állapotú csatornát kap.
  */
 export function subscribeMembers(projectId: string, onChange: () => void): () => void {
   const sb = supabase;
@@ -288,7 +297,7 @@ export function subscribeMembers(projectId: string, onChange: () => void): () =>
     return () => {};
   }
   const channel = sb
-    .channel(`project_members:${projectId}`)
+    .channel(`project_members:${projectId}:${++channelSeq}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'project_members', filter: `project_id=eq.${projectId}` },
@@ -296,6 +305,6 @@ export function subscribeMembers(projectId: string, onChange: () => void): () =>
     )
     .subscribe();
   return () => {
-    sb.removeChannel(channel);
+    void sb.removeChannel(channel);
   };
 }

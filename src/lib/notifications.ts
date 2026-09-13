@@ -73,9 +73,19 @@ export async function markAllRead(): Promise<void> {
   await sb.from('notifications').update({ read: true }).eq('read', false);
 }
 
+/** Monoton számláló egyedi realtime-topic-hoz (lásd `subscribeNotifications`). */
+let channelSeq = 0;
+
 /**
  * REALTIME feliratkozás a user új értesítéseire (INSERT). Az RLS szűri, hogy csak
  * a sajátjait kapja. `() => void` leiratkozót ad vissza.
+ *
+ * A topic KÖTELEZŐEN egyedi (`:${++channelSeq}` utótag): a `sb.channel(topic)` a
+ * MÁR meglévő, azonos topic-ú csatornát adja vissza (a `removeChannel` aszinkron,
+ * csak a záró eseménykor törli a regiszterből), és a már `subscribe()`-olt
+ * csatornán a `.on('postgres_changes', …)` dobna („cannot add … callbacks after
+ * `subscribe()`"). Gyors újra-feliratkozáskor (StrictMode-remount, login→token-
+ * refresh) így mindig friss, `closed` állapotú csatornát kapunk.
  */
 export function subscribeNotifications(
   userId: string,
@@ -86,7 +96,7 @@ export function subscribeNotifications(
     return () => {};
   }
   const channel = sb
-    .channel(`notifications:${userId}`)
+    .channel(`notifications:${userId}:${++channelSeq}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
@@ -94,7 +104,7 @@ export function subscribeNotifications(
     )
     .subscribe();
   return () => {
-    sb.removeChannel(channel);
+    void sb.removeChannel(channel);
   };
 }
 

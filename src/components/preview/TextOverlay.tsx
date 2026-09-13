@@ -36,8 +36,58 @@ interface Props {
   onEdit?: (id: string) => void;
 }
 
+function bounceOut(x: number): number {
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (x < 1 / d1) return n1 * x * x;
+  if (x < 2 / d1) {
+    x -= 1.5 / d1;
+    return n1 * x * x + 0.75;
+  }
+  if (x < 2.5 / d1) {
+    x -= 2.25 / d1;
+    return n1 * x * x + 0.9375;
+  }
+  x -= 2.625 / d1;
+  return n1 * x * x + 0.984375;
+}
+
 /** Az animációk a playhead-ből számolódnak, így görgetésre is determinisztikusak. */
 function animatedProps(clip: TextClip, t: number) {
+  // 🎬 Kinetic typography — blokk-szintű KÖZELÍTÉS (a pontos per-char/word/line
+  // a renderben ég be; a typeOn itt valódi karakter-szeleteléssel megy)
+  const m = clip.textMotion;
+  if (m) {
+    const stagger = m.stagger ?? (m.by === 'char' ? 0.03 : m.by === 'word' ? 0.08 : 0.14);
+    const dur = m.dur ?? 0.4;
+    const nUnits =
+      m.by === 'char'
+        ? clip.text.length
+        : m.by === 'line'
+          ? clip.text.split('\n').length
+          : clip.text.split(/\s+/).filter(Boolean).length;
+    const eff = Math.min(stagger, 2.4 / Math.max(1, nUnits - 1));
+    const total = (Math.max(1, nUnits) - 1) * eff + dur;
+    const p = clamp(t / Math.max(0.15, total), 0, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    const len = clip.text.length;
+    switch (m.preset) {
+      case 'reveal':
+        return { opacity: e, translateY: (1 - e) * 24, scale: 1, chars: len };
+      case 'slideIn':
+        return { opacity: e, translateY: 0, scale: 1, chars: len };
+      case 'popIn': {
+        const o = p < 1 ? 1.25 * p * (2 - p) : 1;
+        return { opacity: clamp(p * 2, 0, 1), translateY: 0, scale: o, chars: len };
+      }
+      case 'bounce':
+        return { opacity: clamp(p * 3, 0, 1), translateY: (1 - bounceOut(p)) * 26, scale: 1, chars: len };
+      case 'typeOn':
+        return { opacity: 1, translateY: 0, scale: 1, chars: Math.floor(t / Math.max(0.01, eff)) };
+      case 'wave':
+        return { opacity: 1, translateY: Math.sin((t * Math.PI * 2) / 1.6) * 6, scale: 1, chars: len };
+    }
+  }
   const enter = clamp(t / 0.4, 0, 1);
   switch (clip.animation) {
     case 'fade':
@@ -196,7 +246,9 @@ export function TextOverlay({
   const fontSize = (clip.fontSize / 100) * box.h * kfScale;
   const preset = presetStyles(clip, fontSize);
   const shown =
-    clip.animation === 'typewriter' ? clip.text.slice(0, Math.max(0, anim.chars)) : clip.text;
+    clip.animation === 'typewriter' || clip.textMotion?.preset === 'typeOn'
+      ? clip.text.slice(0, Math.max(0, anim.chars))
+      : clip.text;
 
   // karaoke: a szavak az idő arányában "gyulladnak fel"; ✨ kiemelt szavaknál
   // (Caption Studio) sima feliraton is szavankénti render megy
@@ -252,6 +304,10 @@ export function TextOverlay({
               transform: [
                 { translateY: '-50%' },
                 { translateY: anim.translateY },
+                // ↕️ alapvonal-eltolás (baseline shift): + = felfelé
+                ...(clip.baselineShift
+                  ? ([{ translateY: -clip.baselineShift * fontSize }] as const)
+                  : []),
                 { scale: anim.scale },
                 // 3D döntés (közelítés — a pontos anyag/extrúzió a renderben)
                 ...(clip.text3d
@@ -264,6 +320,15 @@ export function TextOverlay({
               ],
             },
             preset.box,
+            // 🎨 granuláris háttér-doboz (gradient-kitöltéssel kizáró)
+            !clip.text3d && clip.textStyle?.background && !clip.textStyle?.gradient
+              ? {
+                  backgroundColor: clip.textStyle.background.color,
+                  paddingHorizontal: clip.textStyle.background.padding * fontSize,
+                  paddingVertical: clip.textStyle.background.padding * fontSize * 0.5,
+                  borderRadius: clip.textStyle.background.radius * fontSize,
+                }
+              : null,
           ]}
         >
           {clip.text3d ? (
@@ -293,6 +358,34 @@ export function TextOverlay({
                 textAlign: 'center',
               },
               clip.text3d ? null : preset.text,
+              // 🔡 tipográfia (tracking/leading) + 🎨 stílus-közelítés (a pontos
+              // gradient/kontúr a renderben ég be; itt a gradient a from-színnel,
+              // a glow/shadow textShadow-val közelít)
+              !clip.text3d
+                ? {
+                    ...(clip.letterSpacing
+                      ? { letterSpacing: clip.letterSpacing * fontSize }
+                      : null),
+                    ...(clip.lineHeight ? { lineHeight: clip.lineHeight * fontSize * 1.2 } : null),
+                    ...(clip.textStyle?.gradient ? { color: clip.textStyle.gradient.from } : null),
+                    ...(clip.textStyle?.glow
+                      ? {
+                          textShadowColor: clip.textStyle.glow.color,
+                          textShadowRadius: Math.max(4, clip.textStyle.glow.size * fontSize),
+                          textShadowOffset: { width: 0, height: 0 },
+                        }
+                      : clip.textStyle?.shadow
+                        ? {
+                            textShadowColor: clip.textStyle.shadow.color,
+                            textShadowRadius: Math.max(0, clip.textStyle.shadow.blur * fontSize),
+                            textShadowOffset: {
+                              width: clip.textStyle.shadow.dx * fontSize,
+                              height: clip.textStyle.shadow.dy * fontSize,
+                            },
+                          }
+                        : null),
+                  }
+                : null,
             ]}
           >
             {karaokeWords

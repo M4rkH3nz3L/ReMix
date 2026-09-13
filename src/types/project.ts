@@ -604,6 +604,67 @@ export interface TextClip extends ClipBase {
    * osztja el egyenletesen (a régi viselkedés).
    */
   wordTimings?: { t: number; d: number }[];
+  // ── Pro tipográfia (motion graphics) ───────────────────────────────────
+  /** 🔡 Betűköz (tracking): em-arány, pl. 0.1 = +10%. Renderben `letter-spacing`. */
+  letterSpacing?: number;
+  /** 📏 Sorköz (leading): szorzó, 1 = szoros … 2 = laza. Renderben `line-height`. */
+  lineHeight?: number;
+  /** ↕️ Alapvonal-eltolás (baseline shift): em-arány, + = felfelé. */
+  baselineShift?: number;
+  /** 🔠 Kerning (betűpár-illesztés) ki/be — renderben `font-kerning`. Hiányzó = be. */
+  kerning?: boolean;
+  /** 🎨 Granuláris szöveg-stílus (a `stylePreset` FÖLÉ rétegződik). */
+  textStyle?: TextStyle;
+  /**
+   * 🎬 Kinetic typography: per-karakter/szó/sor animáció. Ha van, FELÜLÍRJA az
+   * egyszerű `animation`-t — a render per-frame Chromium-szekvenciát éget
+   * (`renderTextSequence`), az előnézet a lejátszófejből közelít.
+   */
+  textMotion?: TextMotion;
+}
+
+/** Kinetic typography preset (a mozgás jellege egységenként). */
+export type TextMotionPreset =
+  | 'reveal' // beúszás + emelkedés
+  | 'popIn' // rugós pop (túllövéssel)
+  | 'slideIn' // becsúszás oldalról
+  | 'typeOn' // egységenkénti megjelenés (általánosított gépelés)
+  | 'wave' // hullámzás (folyamatos, kinetic)
+  | 'bounce'; // pattanó beérkezés
+
+/**
+ * 🎬 Kinetic typography konfiguráció. A `by` az animáció EGYSÉGE (karakter/szó/
+ * sor), a `stagger` az egységenkénti késleltetés (mp), a `dur` egy egység
+ * animáció-hossza (mp). A `wave` folyamatos (loop), a többi beérkező (egyszeri,
+ * majd a szöveg állva marad).
+ */
+export interface TextMotion {
+  preset: TextMotionPreset;
+  by: 'char' | 'word' | 'line';
+  /** egységenkénti késleltetés (mp), pl. 0.05 */
+  stagger?: number;
+  /** egy egység animáció-hossza (mp), pl. 0.4 */
+  dur?: number;
+}
+
+/**
+ * 🎨 Granuláris szöveg-stílus (motion graphics) — bármelyik mező opcionális, és
+ * a `stylePreset` FÖLÉ rétegződik (ha van, felülírja a preset adott aspektusát).
+ * A render CSS-ben égeti be (gradient text = background-clip:text; stroke =
+ * -webkit-text-stroke; shadow/glow = text-shadow; background = doboz). Az
+ * előnézet közelít (RN Text-korlátok: a gradient/stroke a renderben pontos).
+ */
+export interface TextStyle {
+  /** szöveg-kitöltő gradiens (a `color` helyett) */
+  gradient?: { from: string; to: string; angle?: number };
+  /** kontúr: szín + vastagság az em arányában (0…0.2) */
+  stroke?: { color: string; width: number };
+  /** vetett árnyék: szín + eltolás (em) + életlenség (em) */
+  shadow?: { color: string; dx: number; dy: number; blur: number };
+  /** külső ragyogás: szín + méret az em arányában (0…1) */
+  glow?: { color: string; size: number };
+  /** háttér-doboz: szín + padding (em) + lekerekítés (em) */
+  background?: { color: string; padding: number; radius: number };
 }
 
 /**

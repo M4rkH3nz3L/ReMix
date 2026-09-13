@@ -133,6 +133,14 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 ### Szöveg és felirat
 - **Szöveg**: tartalom, 20+ betűtípus, méret/vastagság/szín/háttér, animációk, pozíció +
   kulcskocka, sablonok, **objektum-követés**.
+- **🔡 Pro tipográfia** 🆕: **betűköz (tracking)** · **sorköz (leading)** · **alapvonal** ·
+  **kerning** — Chromium-renderben pontosan, előnézetben azonnal.
+- **🎨 Szöveg-stílus+** 🆕 (granuláris, a preset fölé): **gradient-kitöltés** (szín→szín + szög) ·
+  **kontúr** (szín/vastagság) · **árnyék** · **ragyogás** · **háttér-doboz** (padding/lekerekítés).
+- **🎬 Kinetic typography** 🆕: **per-karakter / per-szó / per-sor** animáció — presetek:
+  **Felúszás · Pop · Becsúszás · Gépelés · Hullám · Pattanás**, állítható egység-késleltetéssel
+  és -hosszal. A render per-frame Chromium-képsort éget (a beérkező után a szöveg kiáll,
+  a hullám ciklizál); az előnézet a lejátszófejből közelít.
 - **Felirat**: kézi felirat, stílus-presetek, időzítés, **SRT-import**.
 - **Átirat**: szóra koppintás, tartomány-kijelölés, kitöltő/ismétlés-jelölés, ripple-törlés.
 
@@ -267,6 +275,11 @@ A fő UI-zónák a leckékhez:
 1. *Művelet:* Adj szöveget. *Hol:* Toolbar → **Szöveg**. *Eredmény:* szöveg-klip + **Szöveg panel**.
 2. *Művelet:* Állítsd a stílust. *Hol:* Szöveg panel — betűtípus/méret/szín/háttér/**animáció**. *Eredmény:* élő előnézet.
 3. *Művelet:* Pozicionálj. *Hol:* **vászon** — húzd a szöveget (smart-guide-ok). *Eredmény:* a szöveg a helyére kerül.
+
+**5b. lecke — Pro tipográfia, stílus és kinetic typography**
+1. *Művelet:* Finomítsd a betűket. *Hol:* Szöveg panel → **Stílus** tab → **🔡 Tipográfia**: betűköz / sorköz / alapvonal / kerning. *Eredmény:* profi térközök.
+2. *Művelet:* Adj stílust. *Hol:* **🎨 Stílus+** → kapcsold be a **Gradient / Kontúr / Árnyék / Ragyogás / Háttér** valamelyikét, majd hangold (szín/vastagság/méret). *Eredmény:* gradient-kitöltés, kontúr, glow stb. (a renderben pontosan).
+3. *Művelet:* Animáld egységenként. *Hol:* **Anim** tab → **🎬 Kinetic typography** → **Mozgás** (Felúszás/Pop/Becsúszás/Gépelés/Hullám/Pattanás) → **Egység** (Karakter/Szó/Sor) → késleltetés/hossz. *Eredmény:* a szöveg egységenként lép be (a Hullám ciklizál).
 
 **6. lecke — Sávok kezelése**
 1. *Művelet:* Nyisd a sáv-menüt. *Hol:* a sáv **címkéjére/fejlécére** koppintás. *Eredmény:* némítás · solo · **👁️ láthatóság** · zárolás · összecsukás · **magasság** · **auto-magasság**.

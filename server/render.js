@@ -1627,9 +1627,70 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     const posX = hasTextKf
       ? `(${kfChannelExpr(textKf.x, clip.position.x, kfT)})*${W}`
       : (clip.position.x * W).toFixed(0);
-    const posY = hasTextKf
+    const posYRaw = hasTextKf
       ? `(${kfChannelExpr(textKf.y, clip.position.y, kfT)})*${H}`
       : (clip.position.y * H).toFixed(0);
+    // ↕️ alapvonal-eltolás (baseline shift): + = felfelé (kisebb y)
+    const blPx = Math.round((clip.baselineShift ?? 0) * fontPx);
+    const posY = blPx !== 0 ? `(${posYRaw}-${blPx})` : posYRaw;
+
+    // 🎬 Kinetic typography: per-char/word/line animált PNG-KÉPSOR (a statikus
+    // state-eket felülírja). A beérkező (loop=false) animáció után a beállt
+    // teljes szöveg (lastFile) áll ki a klip végéig; a wave (loop=true) a
+    // periódust ciklizálja.
+    if (clip.kind === 'text' && clip.textMotion) {
+      let seq = null;
+      try {
+        const { renderTextSequence } = require('./text-motion');
+        const tmDir = path.join(workDir, 'textmotion');
+        fs.mkdirSync(tmDir, { recursive: true });
+        seq = await renderTextSequence(clip, canvas, tmDir, FPS);
+      } catch (err) {
+        console.warn('kinetic text kihagyva:', err.message);
+      }
+      if (seq) {
+        const from = clipStart;
+        const to = clipEndT;
+        if (seq.loop) {
+          const idx = addInput(['-stream_loop', '-1', '-framerate', String(FPS), '-i', seq.pattern]);
+          const next = `vtx${txN}`;
+          graph.push(
+            `[${vLabel}][${idx}:v]overlay=x='${posX}-w/2':y='${posY}-h/2':eof_action=pass:enable='between(t,${from.toFixed(
+              3
+            )},${to.toFixed(3)})'[${next}]`
+          );
+          vLabel = next;
+          txN++;
+        } else {
+          const animEnd = Math.min(to, from + seq.animTotal);
+          // 1) a beérkező képsor a [from, animEnd] ablakban (setpts a klip elejére)
+          const seqIdx = addInput(['-framerate', String(FPS), '-i', seq.pattern]);
+          graph.push(`[${seqIdx}:v]format=rgba,setpts=PTS+${from.toFixed(3)}/TB[tseq${txN}]`);
+          const mid = `vtx${txN}`;
+          graph.push(
+            `[${vLabel}][tseq${txN}]overlay=x='${posX}-w/2':y='${posY}-h/2':eof_action=pass:enable='between(t,${from.toFixed(
+              3
+            )},${animEnd.toFixed(3)})'[${mid}]`
+          );
+          vLabel = mid;
+          txN++;
+          // 2) a beállt teljes szöveg a [animEnd, to] ablakban (statikus lastFile)
+          if (seq.lastFile && to - animEnd > 0.02) {
+            const lastIdx = addInput(['-i', seq.lastFile], `t|${seq.lastFile}`);
+            const next = `vtx${txN}`;
+            graph.push(
+              `[${vLabel}][${lastIdx}:v]overlay=x='${posX}-w/2':y='${posY}-h/2':enable='between(t,${animEnd.toFixed(
+                3
+              )},${to.toFixed(3)})'[${next}]`
+            );
+            vLabel = next;
+            txN++;
+          }
+        }
+        continue;
+      }
+      // seq == null (nincs Chromium) → visszaesés a normál state-kezelésre
+    }
 
     for (const state of t.states) {
       const from = clipStart + state.from;

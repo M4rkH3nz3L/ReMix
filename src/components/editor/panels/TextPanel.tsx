@@ -11,7 +11,7 @@ import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { TextClip } from '@/types/project';
+import type { TextClip, TextStyle } from '@/types/project';
 
 export function TextPanel({ clip }: { clip: TextClip }) {
   const { t: tr } = useTranslation();
@@ -146,6 +146,15 @@ export function TextPanel({ clip }: { clip: TextClip }) {
     });
   };
 
+  // 🎨 granuláris szöveg-stílus (textStyle) segédek
+  const ts = clip.textStyle ?? {};
+  const setTs = (patch: Partial<TextStyle>) => {
+    const next = { ...ts, ...patch };
+    // az undefined mezőket kiszűrjük, hogy üresen a textStyle is eltűnjön
+    (Object.keys(next) as (keyof TextStyle)[]).forEach((k) => next[k] === undefined && delete next[k]);
+    updateClip(clip.id, { textStyle: Object.keys(next).length ? next : undefined });
+  };
+
   return (
     <View>
       <PanelSection title={tr('panels.text.sectionText')}>
@@ -253,6 +262,189 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
+          <PanelSection title={tr('panels.text.sectionTypography')}>
+            <Stepper
+              label={tr('panels.text.tracking')}
+              value={`${(clip.letterSpacing ?? 0) > 0 ? '+' : ''}${Math.round((clip.letterSpacing ?? 0) * 100)}`}
+              onDec={() => updateClip(clip.id, { letterSpacing: clamp((clip.letterSpacing ?? 0) - 0.02, -0.1, 1) })}
+              onInc={() => updateClip(clip.id, { letterSpacing: clamp((clip.letterSpacing ?? 0) + 0.02, -0.1, 1) })}
+            />
+            <Stepper
+              label={tr('panels.text.leading')}
+              value={(clip.lineHeight ?? 1.25).toFixed(2)}
+              onDec={() => updateClip(clip.id, { lineHeight: clamp((clip.lineHeight ?? 1.25) - 0.1, 0.8, 3) })}
+              onInc={() => updateClip(clip.id, { lineHeight: clamp((clip.lineHeight ?? 1.25) + 0.1, 0.8, 3) })}
+            />
+            <Stepper
+              label={tr('panels.text.baseline')}
+              value={`${(clip.baselineShift ?? 0) > 0 ? '+' : ''}${Math.round((clip.baselineShift ?? 0) * 100)}`}
+              onDec={() => updateClip(clip.id, { baselineShift: clamp((clip.baselineShift ?? 0) - 0.05, -1, 1) })}
+              onInc={() => updateClip(clip.id, { baselineShift: clamp((clip.baselineShift ?? 0) + 0.05, -1, 1) })}
+            />
+            <View style={styles.row}>
+              <Chip
+                label={tr('panels.text.kerning')}
+                active={clip.kerning !== false}
+                onPress={() => updateClip(clip.id, { kerning: clip.kerning === false ? undefined : false })}
+              />
+            </View>
+          </PanelSection>
+
+          <PanelSection title={tr('panels.text.sectionTextStyle')}>
+            <View style={styles.row}>
+              <Chip
+                label={tr('panels.text.styleGradient')}
+                active={!!ts.gradient}
+                onPress={() =>
+                  setTs({ gradient: ts.gradient ? undefined : { from: clip.color, to: '#ffffff', angle: 135 } })
+                }
+              />
+              <Chip
+                label={tr('panels.text.styleStroke')}
+                active={!!ts.stroke}
+                onPress={() => setTs({ stroke: ts.stroke ? undefined : { color: '#000000', width: 0.04 } })}
+              />
+              <Chip
+                label={tr('panels.text.styleShadow')}
+                active={!!ts.shadow}
+                onPress={() =>
+                  setTs({ shadow: ts.shadow ? undefined : { color: '#000000', dx: 0, dy: 0.04, blur: 0.06 } })
+                }
+              />
+              <Chip
+                label={tr('panels.text.styleGlow')}
+                active={!!ts.glow}
+                onPress={() => setTs({ glow: ts.glow ? undefined : { color: clip.color, size: 0.4 } })}
+              />
+              <Chip
+                label={tr('panels.text.styleBg')}
+                active={!!ts.background}
+                onPress={() =>
+                  setTs({ background: ts.background ? undefined : { color: '#000000b3', padding: 0.4, radius: 0.3 } })
+                }
+              />
+            </View>
+
+            {ts.gradient ? (
+              <>
+                <Text style={styles.subLabel}>{tr('panels.text.styleGradientFrom')}</Text>
+                <View style={styles.row}>
+                  {textColors.map((c) => (
+                    <ColorDot
+                      key={'gf' + c}
+                      color={c}
+                      active={ts.gradient!.from === c}
+                      onPress={() => setTs({ gradient: { ...ts.gradient!, from: c } })}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.subLabel}>{tr('panels.text.styleGradientTo')}</Text>
+                <View style={styles.row}>
+                  {textColors.map((c) => (
+                    <ColorDot
+                      key={'gt' + c}
+                      color={c}
+                      active={ts.gradient!.to === c}
+                      onPress={() => setTs({ gradient: { ...ts.gradient!, to: c } })}
+                    />
+                  ))}
+                </View>
+                <Stepper
+                  label={tr('panels.text.styleGradientAngle')}
+                  value={`${Math.round(ts.gradient.angle ?? 135)}°`}
+                  onDec={() => setTs({ gradient: { ...ts.gradient!, angle: ((ts.gradient!.angle ?? 135) - 15 + 360) % 360 } })}
+                  onInc={() => setTs({ gradient: { ...ts.gradient!, angle: ((ts.gradient!.angle ?? 135) + 15) % 360 } })}
+                />
+              </>
+            ) : null}
+
+            {ts.stroke ? (
+              <>
+                <Stepper
+                  label={tr('panels.text.styleStrokeWidth')}
+                  value={`${Math.round(ts.stroke.width * 100)}`}
+                  onDec={() => setTs({ stroke: { ...ts.stroke!, width: clamp(ts.stroke!.width - 0.01, 0, 0.2) } })}
+                  onInc={() => setTs({ stroke: { ...ts.stroke!, width: clamp(ts.stroke!.width + 0.01, 0, 0.2) } })}
+                />
+                <View style={styles.row}>
+                  {textColors.map((c) => (
+                    <ColorDot
+                      key={'sk' + c}
+                      color={c}
+                      active={ts.stroke!.color === c}
+                      onPress={() => setTs({ stroke: { ...ts.stroke!, color: c } })}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {ts.glow ? (
+              <>
+                <Stepper
+                  label={tr('panels.text.styleGlowSize')}
+                  value={`${Math.round(ts.glow.size * 100)}`}
+                  onDec={() => setTs({ glow: { ...ts.glow!, size: clamp(ts.glow!.size - 0.1, 0, 1) } })}
+                  onInc={() => setTs({ glow: { ...ts.glow!, size: clamp(ts.glow!.size + 0.1, 0, 1) } })}
+                />
+                <View style={styles.row}>
+                  {textColors.map((c) => (
+                    <ColorDot
+                      key={'gl' + c}
+                      color={c}
+                      active={ts.glow!.color === c}
+                      onPress={() => setTs({ glow: { ...ts.glow!, color: c } })}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {ts.shadow ? (
+              <>
+                <Stepper
+                  label={tr('panels.text.styleShadowBlur')}
+                  value={`${Math.round(ts.shadow.blur * 100)}`}
+                  onDec={() => setTs({ shadow: { ...ts.shadow!, blur: clamp(ts.shadow!.blur - 0.02, 0, 0.4) } })}
+                  onInc={() => setTs({ shadow: { ...ts.shadow!, blur: clamp(ts.shadow!.blur + 0.02, 0, 0.4) } })}
+                />
+                <Stepper
+                  label={tr('panels.text.styleShadowY')}
+                  value={`${(ts.shadow.dy ?? 0) > 0 ? '+' : ''}${Math.round((ts.shadow.dy ?? 0) * 100)}`}
+                  onDec={() => setTs({ shadow: { ...ts.shadow!, dy: clamp((ts.shadow!.dy ?? 0) - 0.02, -0.3, 0.3) } })}
+                  onInc={() => setTs({ shadow: { ...ts.shadow!, dy: clamp((ts.shadow!.dy ?? 0) + 0.02, -0.3, 0.3) } })}
+                />
+              </>
+            ) : null}
+
+            {ts.background ? (
+              <>
+                <Stepper
+                  label={tr('panels.text.styleBgPadding')}
+                  value={`${Math.round(ts.background.padding * 100)}`}
+                  onDec={() => setTs({ background: { ...ts.background!, padding: clamp(ts.background!.padding - 0.1, 0, 2) } })}
+                  onInc={() => setTs({ background: { ...ts.background!, padding: clamp(ts.background!.padding + 0.1, 0, 2) } })}
+                />
+                <Stepper
+                  label={tr('panels.text.styleBgRadius')}
+                  value={`${Math.round(ts.background.radius * 100)}`}
+                  onDec={() => setTs({ background: { ...ts.background!, radius: clamp(ts.background!.radius - 0.1, 0, 2) } })}
+                  onInc={() => setTs({ background: { ...ts.background!, radius: clamp(ts.background!.radius + 0.1, 0, 2) } })}
+                />
+                <View style={styles.row}>
+                  {['#000000b3', '#ffffffcc', '#7c5cffcc', '#ff2ea6cc'].map((c) => (
+                    <ColorDot
+                      key={'bg' + c}
+                      color={c}
+                      active={ts.background!.color === c}
+                      onPress={() => setTs({ background: { ...ts.background!, color: c } })}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </PanelSection>
+
           <PanelSection title={tr('panels.text.section3d')}>
             <View style={styles.row}>
               <Chip
@@ -354,18 +546,107 @@ export function TextPanel({ clip }: { clip: TextClip }) {
       ) : null}
 
       {tab === 'anim' ? (
-        <PanelSection title={tr('panels.text.sectionAnimation')}>
-          <View style={styles.row}>
-            {textAnimations.map((anim) => (
+        <>
+          <PanelSection title={tr('panels.text.sectionAnimation')}>
+            <View style={styles.row}>
+              {textAnimations.map((anim) => (
+                <Chip
+                  key={anim.id}
+                  label={tr(anim.label)}
+                  active={clip.animation === anim.id && !clip.textMotion}
+                  onPress={() =>
+                    updateClip(clip.id, { animation: anim.id, textMotion: undefined })
+                  }
+                />
+              ))}
+            </View>
+          </PanelSection>
+
+          <PanelSection title={tr('panels.text.sectionKinetic')}>
+            <Text style={styles.subLabel}>{tr('panels.text.kineticPreset')}</Text>
+            <View style={styles.row}>
               <Chip
-                key={anim.id}
-                label={tr(anim.label)}
-                active={clip.animation === anim.id}
-                onPress={() => updateClip(clip.id, { animation: anim.id })}
+                label={tr('common.none')}
+                active={!clip.textMotion}
+                onPress={() => updateClip(clip.id, { textMotion: undefined })}
               />
-            ))}
-          </View>
-        </PanelSection>
+              {(['reveal', 'popIn', 'slideIn', 'typeOn', 'wave', 'bounce'] as const).map((preset) => (
+                <Chip
+                  key={preset}
+                  label={tr('panels.text.kinetic_' + preset)}
+                  active={clip.textMotion?.preset === preset}
+                  onPress={() =>
+                    updateClip(clip.id, {
+                      textMotion: { by: clip.textMotion?.by ?? 'word', ...clip.textMotion, preset },
+                    })
+                  }
+                />
+              ))}
+            </View>
+            {clip.textMotion ? (
+              <>
+                <Text style={styles.subLabel}>{tr('panels.text.kineticBy')}</Text>
+                <View style={styles.row}>
+                  {(['char', 'word', 'line'] as const).map((by) => (
+                    <Chip
+                      key={by}
+                      label={tr('panels.text.kineticBy_' + by)}
+                      active={clip.textMotion?.by === by}
+                      onPress={() =>
+                        updateClip(clip.id, { textMotion: { ...clip.textMotion!, by } })
+                      }
+                    />
+                  ))}
+                </View>
+                {clip.textMotion.preset !== 'wave' ? (
+                  <>
+                    <Stepper
+                      label={tr('panels.text.kineticStagger')}
+                      value={`${Math.round((clip.textMotion.stagger ?? (clip.textMotion.by === 'char' ? 0.03 : clip.textMotion.by === 'word' ? 0.08 : 0.14)) * 1000)}ms`}
+                      onDec={() =>
+                        updateClip(clip.id, {
+                          textMotion: {
+                            ...clip.textMotion!,
+                            stagger: clamp((clip.textMotion!.stagger ?? 0.08) - 0.02, 0, 0.5),
+                          },
+                        })
+                      }
+                      onInc={() =>
+                        updateClip(clip.id, {
+                          textMotion: {
+                            ...clip.textMotion!,
+                            stagger: clamp((clip.textMotion!.stagger ?? 0.08) + 0.02, 0, 0.5),
+                          },
+                        })
+                      }
+                    />
+                    <Stepper
+                      label={tr('panels.text.kineticDur')}
+                      value={`${(clip.textMotion.dur ?? 0.4).toFixed(2)}s`}
+                      onDec={() =>
+                        updateClip(clip.id, {
+                          textMotion: {
+                            ...clip.textMotion!,
+                            dur: clamp((clip.textMotion!.dur ?? 0.4) - 0.1, 0.1, 2),
+                          },
+                        })
+                      }
+                      onInc={() =>
+                        updateClip(clip.id, {
+                          textMotion: {
+                            ...clip.textMotion!,
+                            dur: clamp((clip.textMotion!.dur ?? 0.4) + 0.1, 0.1, 2),
+                          },
+                        })
+                      }
+                    />
+                  </>
+                ) : null}
+                <Text style={styles.note}>{tr('panels.text.kineticNote')}</Text>
+              </>
+            ) : null}
+          </PanelSection>
+        </>
       ) : null}
 
       {tab === 'extra' ? (
@@ -506,6 +787,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     alignItems: 'center',
+  },
+  subLabel: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 4,
   },
   fontChip: {
     borderWidth: 1,

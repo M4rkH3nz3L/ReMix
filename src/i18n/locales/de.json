@@ -472,7 +472,8 @@
       "ellipse": "Ellipse",
       "line": "Linie",
       "rectangle": "Rechteck",
-      "grade": "Grade"
+      "grade": "Grade",
+      "compound": "🧱 Compound"
     },
     "toolbar": {
       "newTextDefault": "Neuer Text",
@@ -1413,7 +1414,14 @@
       "trackTooShort": "Abschnitt zu kurz für die Verfolgung.",
       "trackFailed": "Verfolgung fehlgeschlagen (Worker aktiv? Pro?).",
       "trackDone": "Verfolgung fertig",
-      "trackDoneBody": "{{count}} Keyframes — das Bild folgt dem Objekt."
+      "trackDoneBody": "{{count}} Keyframes — das Bild folgt dem Objekt.",
+      "compoundTitle": "🧱 Compound-Clip",
+      "compoundInfo": "Verschachtelte Komposition · {{tracks}} Spuren",
+      "compoundRender": "🎬 Vorschau rendern",
+      "compoundRendering": "Rendere…",
+      "compoundNote": "Der Compound zeigt seinen echten Inhalt nach dem Rendern eines Proxys (lokal zuerst; Cloud = Pro bei Komplexität). Der EXPORT rendert ihn ohnehin rekursiv neu.",
+      "compoundDoneTitle": "Vorschau fertig",
+      "compoundDoneBody": "Der Compound-Clip zeigt nun die verschachtelte Komposition."
     },
     "shape": {
       "shapeTitle": "Form",

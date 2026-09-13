@@ -472,7 +472,8 @@
       "ellipse": "Ellipse",
       "line": "Line",
       "rectangle": "Rectangle",
-      "grade": "Grade"
+      "grade": "Grade",
+      "compound": "🧱 Compound"
     },
     "toolbar": {
       "newTextDefault": "New text",
@@ -1413,7 +1414,14 @@
       "trackTooShort": "Section too short to track.",
       "trackFailed": "Tracking failed (worker running? Pro?).",
       "trackDone": "Tracking done",
-      "trackDoneBody": "{{count}} keyframes — the image follows the object."
+      "trackDoneBody": "{{count}} keyframes — the image follows the object.",
+      "compoundTitle": "🧱 Compound clip",
+      "compoundInfo": "Nested composition · {{tracks}} tracks",
+      "compoundRender": "🎬 Render preview",
+      "compoundRendering": "Rendering…",
+      "compoundNote": "The compound shows its real content once you render a proxy (local-first; cloud = Pro if complex). EXPORT re-renders it recursively anyway.",
+      "compoundDoneTitle": "Preview ready",
+      "compoundDoneBody": "The compound clip now shows the nested composition."
     },
     "shape": {
       "shapeTitle": "Shape",

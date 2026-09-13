@@ -31,9 +31,11 @@ interface Props {
 function clipLabel(clip: Clip, t: TFunction): string {
   switch (clip.kind) {
     case 'video':
-      return clip.speed !== 1
-        ? t('editor.timelineClip.videoSpeed', { speed: clip.speed })
-        : t('editor.timelineClip.video');
+      return clip.comp
+        ? t('editor.timelineClip.compound')
+        : clip.speed !== 1
+          ? t('editor.timelineClip.videoSpeed', { speed: clip.speed })
+          : t('editor.timelineClip.video');
     case 'image':
       return t('editor.timelineClip.image');
     case 'text':

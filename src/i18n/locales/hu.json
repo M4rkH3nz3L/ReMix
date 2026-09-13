@@ -472,7 +472,8 @@
       "ellipse": "Ellipszis",
       "line": "Vonal",
       "rectangle": "Téglalap",
-      "grade": "Grade"
+      "grade": "Grade",
+      "compound": "🧱 Compound"
     },
     "toolbar": {
       "newTextDefault": "Új szöveg",
@@ -1413,7 +1414,14 @@
       "trackTooShort": "Túl rövid szakasz a követéshez.",
       "trackFailed": "A követés nem sikerült (fut a worker? Pro?).",
       "trackDone": "Kész a követés",
-      "trackDoneBody": "{{count}} kulcskocka — a kép követi az objektumot."
+      "trackDoneBody": "{{count}} kulcskocka — a kép követi az objektumot.",
+      "compoundTitle": "🧱 Compound klip",
+      "compoundInfo": "Beágyazott kompozíció · {{tracks}} sáv",
+      "compoundRender": "🎬 Előnézet renderelése",
+      "compoundRendering": "Renderelés…",
+      "compoundNote": "A compound a valós tartalmát mutatja, ha renderelsz egy proxyt (local-first; összetettnél felhő = Pro). Az EXPORT úgyis rekurzívan újrarendereli.",
+      "compoundDoneTitle": "Előnézet kész",
+      "compoundDoneBody": "A compound klip mostantól a beágyazott kompozíciót mutatja."
     },
     "shape": {
       "shapeTitle": "Forma",

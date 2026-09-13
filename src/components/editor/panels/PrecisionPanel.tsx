@@ -7,6 +7,7 @@ import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { aspectValue, EDIT_FPS, FRAME, MIN_CLIP_DURATION, palette } from '@/constants/editor';
 import type { KeyframeChannel } from '@/lib/keyframes';
 import { activeVisualClip, maxVideoDuration, sourceTimeAt } from '@/lib/projectUtils';
+import { isRenderCancelledError, renderMp4 } from '@/lib/render';
 import { clamp, formatTime } from '@/lib/time';
 import { pointsToPanKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
@@ -57,7 +58,43 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
   const [kfChannel, setKfChannel] = useState<ChannelCfg['id']>('scale');
   const [stepMode, setStepMode] = useState<StepMode>('sec');
   const [trackBusy, setTrackBusy] = useState(false);
+  const [proxyBusy, setProxyBusy] = useState(false);
   const setPickTarget = useEditorStore((s) => s.setPickTarget);
+
+  /**
+   * 🧱 Compound előnézet: a beágyazott kompozíciót MP4-proxyba rendereli
+   * (local-first, ingyen; összetettnél felhő = Pro), és a klip uri-ját a proxyra
+   * cseréli — így a compound a VALÓS tartalmát mutatja (a durva placeholder helyett).
+   * Az export úgyis rekurzívan újrarendereli a comp-ot, ez csak az előnézeté.
+   */
+  const renderCompoundProxy = async () => {
+    if (clip.kind !== 'video' || !clip.comp || proxyBusy) {
+      return;
+    }
+    setProxyBusy(true);
+    try {
+      const comp = clip.comp;
+      const sub = {
+        id: `${clip.id}-comp`,
+        name: 'comp',
+        aspectRatio: comp.aspectRatio,
+        tracks: comp.tracks,
+        assets: comp.assets,
+        createdAt: '',
+        updatedAt: '',
+        schemaVersion: 4,
+      };
+      const file = await renderMp4(sub, undefined, { resolution: 720, fps: 30, quality: 'medium', codec: 'h264' }, { mode: 'auto' });
+      updateClip(clip.id, { uri: file.uri });
+      Alert.alert(t('panels.precision.compoundDoneTitle'), t('panels.precision.compoundDoneBody'));
+    } catch (err) {
+      if (!isRenderCancelledError(err)) {
+        Alert.alert(t('panels.precision.compoundTitle'), (err as Error).message);
+      }
+    } finally {
+      setProxyBusy(false);
+    }
+  };
   const step = stepMode === 'frame' ? FRAME : STEP;
 
   /**
@@ -298,6 +335,25 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
             ) : null}
           </View>
           <Text style={styles.range}>{t('panels.precision.trackNote')}</Text>
+        </PanelSection>
+      ) : null}
+
+      {/* 🧱 Compound clip: a beágyazott kompozíció valós előnézete (proxy render) */}
+      {clip.kind === 'video' && clip.comp ? (
+        <PanelSection title={t('panels.precision.compoundTitle')}>
+          <Text style={styles.range}>
+            {t('panels.precision.compoundInfo', { tracks: clip.comp.tracks.length })}
+          </Text>
+          <View style={styles.row}>
+            <Chip
+              label={proxyBusy ? t('panels.precision.compoundRendering') : t('panels.precision.compoundRender')}
+              active={proxyBusy}
+              onPress={() => {
+                renderCompoundProxy().catch(() => {});
+              }}
+            />
+          </View>
+          <Text style={styles.range}>{t('panels.precision.compoundNote')}</Text>
         </PanelSection>
       ) : null}
     </View>

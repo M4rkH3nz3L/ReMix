@@ -75,8 +75,20 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 ### Vizuál
 - **Szűrő** panel: 20+ színszűrő + erősség, blend-módok, kamera-mozgás (pásztázás/zoom/
   forgatás keyframe-mel), **maszkolás** (lásd külön).
-- **Grade / Adjust** réteg: film-look presetek + kézi fényelés (fényerő/kontraszt/
-  szaturáció/hőmérséklet/vignetta), erősség, fade in/out.
+- **Grade / Adjust** réteg — **profi színfényelés** 🆕: film-look presetek + kézi
+  vezérlők három csoportban:
+  - **🎚️ Tónus:** expozíció · fényerő · kontraszt · csúcsfények · árnyékok · fehérek ·
+    feketék (a 4 utóbbi egy 5-pontos tónusgörbén, mint Lightroomban).
+  - **🎨 Szín:** valódi színhőmérséklet (`colortemperature` — a régi néma `colorbalance`
+    helyett), árnyalat (zöld↔magenta), szaturáció, **élénkség (vibrance)**.
+  - **📈 Görbék (Curves):** RGB + csatornánként (R/G/B) — koppints-húzd görbeszerkesztő
+    (Catmull-Rom rajz, a render `curves` köbös spline-ja).
+  - **🎨 HSL / Hue-Saturation:** globális színforgatás + telítettség + világosság.
+  - **🩻 Szkópok:** waveform · RGB-parade · vektorszkóp · hisztogram (a kijelölt klip
+    aktuális kockájáról, INGYEN, worker-generált).
+  - **🎞️ 3D LUT (.cube):** tetszőleges LUT importja, ill. a teljes grade exportja
+    `.cube`-ba (worker-bake az identitás-rácson) — megosztható/hordozható.
+  - erősség, fade in/out. A pontos színkorrekció a renderben ég be, az előnézet tinttel közelít.
 - **Áttűnés**: 3D (zoom/spin/flip/cube/circle/dissolve), 2D wipe/slide, stilizált
   (pixelize/blur/radial/fadeBlack/fadeWhite), fade.
 - **Sebesség**: 0,1×–10× + sebesség-rámpa, visszafelé, trim.
@@ -206,6 +218,8 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 | `upscale` | Felskálázás | PRO | cloud |
 
 ¹ `urlImport`: local-first ingyen; csak a worker-fallback Pro.
+² Worker-served, de **INGYEN** (determinisztikus mérőeszközök, nem AI, `renderServerUrl`):
+  hang-könyvtár · beat/hullámforma · színpipetta · **🩻 szkópok** 🆕 · **🎞️ LUT-export** 🆕.
 🆕 = az utolsó fejlesztési körökben érkezett.
 
 ---
@@ -290,6 +304,12 @@ A fő UI-zónák a leckékhez:
 2. *Művelet:* Green screen kulcsolás + finomítás. *Hol:* **Szűrő** panel → green screen: **🎨 Színpipetta** (koppints a háttérre) → **Tolerance** → **Feather** → **Spill** → **✂️ Edge**. *Eredmény:* a háttér eltűnik, a perem letisztul és pontosan igazítható (choke/grow).
 3. *Művelet:* Vágj a klipbe egy külső forma alapján. *Hol:* **Szűrő** panel → **🎭 Matte** → *Matte-kép választása* → **Luma/Alfa** + invertálás. *Eredmény:* a klip csak a matte világos/átlátszatlan részén látszik.
 4. *Művelet:* Fogj össze sok klipet egy blokká. *Hol:* jelölj ki több klipet (**Több** mód) → Toolbar → **Pre-compose**. *Eredmény:* egy compound (beágyazott) klip, ami egyben mozgatható/effektelhető; a render rekurzívan legyártja a tartalmát.
+
+**11c. lecke — Profi színfényelés (Basic · Curves · HSL · szkópok · LUT)**
+1. *Művelet:* Alapfényelés. *Hol:* **Grade** réteg (vagy klip → **Szűrő** panel) → **🎚️ Tónus**: expozíció / csúcsfények / árnyékok / fehérek / feketék, **🎨 Szín**: hőmérséklet / árnyalat / szaturáció / **élénkség**. *Eredmény:* a kép tónusa és színvilága a helyére kerül.
+2. *Művelet:* Görbézz. *Hol:* **📈 Görbék** → válts **RGB / R / G / B** közt, **koppints a rácsra** új ponthoz, **húzd** a pontokat. *Eredmény:* pontos tónus- és színcsatorna-kontroll.
+3. *Művelet:* Ellenőrizd méréssel. *Hol:* **🩻 Szkópok** → **Waveform / RGB-parade / Vektorszkóp / Hisztogram**; **⟳** a lejátszófejnél újramér. *Eredmény:* objektív kép a fényről és a színről.
+4. *Művelet:* LUT be/ki. *Hol:* **🎞️ 3D LUT** → **📥 .cube importálása** (kész look ráhúzása), vagy **📤 Export .cube** (a saját grade-ed hordozható LUT-ként). *Eredmény:* egységes, megosztható színvilág.
 
 ### 🔵 Pro (worker / AI)
 

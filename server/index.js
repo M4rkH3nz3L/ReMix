@@ -18,7 +18,7 @@ const { voiceChain } = require('./voicechain');
 const { renderImageDoc } = require('./imagedoc');
 const { computeFocusAssets, computeParallaxAssets, depthAvailable, depthLayerDir, ensureDepth } = require('./depth');
 const { bgRemoveAvailable, bgRemoveDir, computeCutout } = require('./bgremove');
-const { colorStats, pixelColor } = require('./color');
+const { colorStats, pixelColor, exportLut, scopeImage } = require('./color');
 const { detectFaces, faceAvailable } = require('./face');
 const { listStickers3d, renderSticker3d, stickers3dAvailable } = require('./sticker3d');
 const { listSkies, replaceSky } = require('./sky');
@@ -626,6 +626,51 @@ app.post('/color/pixel', upload.any(), (req, res) => {
     .catch((err) => {
       cleanup();
       console.error('color-pixel hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
+// 🎞️ LUT-export: a kliens elküldi a klip grade-jét (grade preset + adjust +
+// curves + HSL), a worker egy identitás-rácsot átfuttat a szín-láncon és .cube
+// 3D LUT-ot ad vissza. (Importált LUT-ot itt nem sütünk be — az a kliensen már
+// megvan; a vignettát kihagyjuk, mert pozíciófüggő.)
+app.post('/color/lut-export', express.json({ limit: '256kb' }), (req, res) => {
+  const clip = {
+    grade: typeof req.body.grade === 'string' ? req.body.grade : undefined,
+    strength: Number.isFinite(Number(req.body.strength)) ? Number(req.body.strength) : undefined,
+    adjust: req.body.adjust && typeof req.body.adjust === 'object' ? req.body.adjust : {},
+  };
+  const size = Number(req.body.size);
+  exportLut(clip, Number.isFinite(size) ? size : 33)
+    .then((cube) => {
+      res.type('text/plain').send(cube);
+    })
+    .catch((err) => {
+      console.error('lut-export hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
+// 🩻 Videoszkóp: egy médiakocka waveform/parade/vectorscope/histogram képe PNG-ben
+app.post('/color/scope', upload.any(), (req, res) => {
+  const file = (req.files ?? [])[0];
+  if (!file) {
+    res.status(400).json({ error: 'Hiányzó médiafájl.' });
+    return;
+  }
+  const cleanup = () => {
+    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+  };
+  const atSec = Number(req.body.atSec);
+  const type = typeof req.body.type === 'string' ? req.body.type : 'waveform';
+  scopeImage(file.path, Number.isFinite(atSec) ? atSec : 0, type)
+    .then((r) => {
+      cleanup();
+      res.json(r);
+    })
+    .catch((err) => {
+      cleanup();
+      console.error('color-scope hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
 });

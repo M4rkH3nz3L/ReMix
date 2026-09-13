@@ -4,18 +4,22 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ScopesView } from '@/components/editor/ScopesView';
+import { ToneCurveEditor } from '@/components/editor/ToneCurveEditor';
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
+import { ADJUST_FIELDS } from '@/constants/adjust';
 import { aspectValue, filters, palette } from '@/constants/editor';
 import { requestCutout } from '@/lib/bgremove';
 import { CAMERA_PRESETS, buildCameraMove } from '@/lib/camera3d';
 import { statsToAutoAdjust, statsToMatchAdjust } from '@/lib/colorAuto';
-import { fetchColorStats, fetchPixelColor } from '@/lib/colorClient';
+import { exportLutCube, fetchColorStats, fetchPixelColor } from '@/lib/colorClient';
 import { requestDepthFocus, requestDepthParallax } from '@/lib/depthClient';
+import { shareLutCube } from '@/lib/export';
 import { faceUnionRegion, fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
 import { addMaskKeyframe, hasMaskTrack, maskKeyframeTimes, removeMaskKeyframeAt, sampleMaskAt, trackToPoints } from '@/lib/maskAnim';
 import { smoothMask } from '@/lib/maskEdit';
-import { pickImage } from '@/lib/media';
+import { pickImage, pickLut } from '@/lib/media';
 import { trackSubject } from '@/lib/track';
 import { PHOTO_ANIM_PRESETS, buildPhotoAnimation } from '@/lib/photoAnimate';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
@@ -24,20 +28,9 @@ import type { SkyPreset } from '@/lib/skyClient';
 import { upscalePhoto } from '@/lib/upscaleClient';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { ClipAdjust, ClipMask, ImageClip, LightingPreset, VideoClip } from '@/types/project';
+import type { ClipMask, ImageClip, LightingPreset, VideoClip } from '@/types/project';
 
-const ADJUSTS: {
-  key: keyof ClipAdjust;
-  step: number;
-  min: number;
-  max: number;
-}[] = [
-  { key: 'brightness', step: 0.05, min: -0.3, max: 0.3 },
-  { key: 'contrast', step: 0.05, min: -0.4, max: 0.4 },
-  { key: 'saturation', step: 0.1, min: -1, max: 1 },
-  { key: 'temperature', step: 0.05, min: -0.3, max: 0.3 },
-  { key: 'vignette', step: 0.1, min: 0, max: 1 },
-];
+const ADJUSTS = ADJUST_FIELDS;
 
 const LIGHTING_PRESETS: { id: LightingPreset; label: string }[] = [
   { id: 'studio', label: '💡 Studio' },
@@ -306,6 +299,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     }
   };
   const [colorBusy, setColorBusy] = useState<'auto' | 'match' | null>(null);
+  const [lutBusy, setLutBusy] = useState(false);
   const [upscaleBusy, setUpscaleBusy] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
   const [skyBusy, setSkyBusy] = useState<string | null>(null);
@@ -453,6 +447,34 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
       return;
     }
     updateClip(clip.id, { adjust: { ...clip.adjust, ...adjust } });
+  };
+
+  // 🎞️ 3D LUT (.cube) importálása a klip grade-jébe
+  const importLut = async () => {
+    const res = await pickLut();
+    if (res === null) {
+      return;
+    }
+    if (res === 'invalid') {
+      Alert.alert(t('panels.adjust.lutTitle'), t('panels.adjust.lutInvalid'));
+      return;
+    }
+    updateClip(clip.id, { adjust: { ...clip.adjust, lut: { uri: res.uri, name: res.name } } });
+  };
+
+  // 🎞️ A klip aktuális képjavítása (curves + HSL is) → .cube LUT megosztása
+  const exportLut = async () => {
+    if (!clip.adjust || lutBusy) {
+      return;
+    }
+    setLutBusy(true);
+    const cube = await exportLutCube(clip.adjust);
+    setLutBusy(false);
+    if (!cube) {
+      Alert.alert(t('panels.adjust.lutTitle'), t('panels.adjust.lutExportFail'));
+      return;
+    }
+    await shareLutCube(`remix-clip-${clip.id.slice(0, 6)}`, cube);
   };
 
   // 🪄 AI kivágás: a fotó témája átlátszó hátterű overlay-rétegként kerül a
@@ -662,6 +684,42 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
             onPress={() => updateClip(clip.id, { adjust: undefined })}
           />
         ) : null}
+        <Text style={styles.subLabel}>{t('panels.adjust.curvesTitle')}</Text>
+        <ToneCurveEditor
+          value={clip.adjust?.curves}
+          onChange={(curves) => updateClip(clip.id, { adjust: { ...clip.adjust, curves } })}
+        />
+        <Text style={styles.subLabel}>{t('panels.adjust.lutTitle')}</Text>
+        <View style={styles.row}>
+          {clip.adjust?.lut ? (
+            <>
+              <Chip label={`🎞️ ${clip.adjust.lut.name}`} active onPress={importLut} />
+              <Chip
+                label={t('panels.adjust.lutRemove')}
+                active={false}
+                onPress={() => updateClip(clip.id, { adjust: { ...clip.adjust, lut: undefined } })}
+              />
+            </>
+          ) : (
+            <Chip label={t('panels.adjust.lutImport')} active={false} onPress={importLut} />
+          )}
+          {clip.adjust ? (
+            <Chip
+              label={lutBusy ? t('panels.adjust.lutExporting') : t('panels.adjust.lutExport')}
+              active={false}
+              onPress={exportLut}
+            />
+          ) : null}
+        </View>
+        <Text style={styles.subLabel}>{t('panels.adjust.scopesTitle')}</Text>
+        <ScopesView
+          uri={clip.uri}
+          atSec={
+            clip.kind === 'video'
+              ? clip.trimIn + Math.max(0, playhead - clip.start) * clip.speed
+              : 0
+          }
+        />
         {clip.kind === 'image' ? (
           <View style={styles.row}>
             <Chip
@@ -1404,5 +1462,12 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     lineHeight: 16,
+  },
+  subLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 4,
   },
 });

@@ -17,13 +17,14 @@ import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-nati
 
 import { ImageCropTool } from '@/components/editor/ImageCropTool';
 import { ImageMarkupTool } from '@/components/editor/ImageMarkupTool';
+import { type AdjustKey } from '@/constants/adjust';
 import { palette } from '@/constants/editor';
 import { adjustTintLayers } from '@/lib/adjustPreview';
 import { bakeImage, persistToMedia, type ImageOp } from '@/lib/imageEditor';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, ClipAdjust, ImageClip } from '@/types/project';
 
-const ADJUST_FIELDS: { key: keyof ClipAdjust; min: number; max: number }[] = [
+const ADJUST_FIELDS: { key: AdjustKey; min: number; max: number }[] = [
   { key: 'brightness', min: -0.3, max: 0.3 },
   { key: 'contrast', min: -0.4, max: 0.4 },
   { key: 'saturation', min: -1, max: 1 },

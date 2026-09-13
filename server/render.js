@@ -122,18 +122,102 @@ function adjustChain(clip, enableExpr) {
   const saturation = 1 + clampNum(a.saturation, -1, 1);
   const temperature = clampNum(a.temperature, -0.3, 0.3);
   const vignette = clampNum(a.vignette, 0, 1);
+  // Pro Basic-grade tónusvezérlők
+  const exposure = clampNum(a.exposure, -1, 1);
+  const highlights = clampNum(a.highlights, -1, 1);
+  const shadows = clampNum(a.shadows, -1, 1);
+  const whites = clampNum(a.whites, -1, 1);
+  const blacks = clampNum(a.blacks, -1, 1);
+  const tint = clampNum(a.tint, -0.3, 0.3);
+  const vibrance = clampNum(a.vibrance, -1, 1);
   // grade-réteg (adjust-sáv) esetén minden szűrő időablakot kap (enable),
   // hogy csak a klip tartama alatt hasson a teljes kompozitra
   const en = enableExpr ? `:enable='${enableExpr}'` : '';
   const parts = [];
+  if (exposure !== 0) {
+    // stop-alapú expozíció (a bemenet lineárisan felszorozva)
+    parts.push(`exposure=exposure=${exposure.toFixed(3)}${en}`);
+  }
   if (brightness !== 0 || contrast !== 1 || saturation !== 1) {
     parts.push(
       `eq=brightness=${brightness.toFixed(3)}:contrast=${contrast.toFixed(3)}:saturation=${saturation.toFixed(3)}${en}`
     );
   }
+  if (highlights !== 0 || shadows !== 0 || whites !== 0 || blacks !== 0) {
+    // 5-pontos tónusgörbe: feketék(0) · árnyékok(0.25) · közép(0.5) ·
+    // csúcsfények(0.75) · fehérek(1) — a klienses előnézet UGYANEZT közelíti.
+    const cl = (v) => Math.min(1, Math.max(0, v));
+    const pts = [
+      [0, cl(blacks * 0.15)],
+      [0.25, cl(0.25 + shadows * 0.15)],
+      [0.5, 0.5],
+      [0.75, cl(0.75 + highlights * 0.15)],
+      [1, cl(1 + whites * 0.15)],
+    ];
+    const spec = pts.map(([x, y]) => `${x.toFixed(3)}/${y.toFixed(3)}`).join(' ');
+    parts.push(`curves=all='${spec}'${en}`);
+  }
+  if (a.curves) {
+    // Manuális tónusgörbék (Curves): RGB (all) + csatornánként. A pontokat
+    // 0…1-be zárjuk, x szerint rendezzük; az identitás-görbét kihagyjuk.
+    const cl = (v) => Math.min(1, Math.max(0, Number(v) || 0));
+    const curveSpec = (points) => {
+      if (!Array.isArray(points) || points.length < 2) {
+        return null;
+      }
+      if (points.every((p) => Math.abs(cl(p.x) - cl(p.y)) < 1e-3)) {
+        return null; // identitás
+      }
+      return points
+        .map((p) => ({ x: cl(p.x), y: cl(p.y) }))
+        .sort((p, q) => p.x - q.x)
+        .map((p) => `${p.x.toFixed(3)}/${p.y.toFixed(3)}`)
+        .join(' ');
+    };
+    const chan = [];
+    const all = curveSpec(a.curves.rgb);
+    const r = curveSpec(a.curves.red);
+    const g = curveSpec(a.curves.green);
+    const b = curveSpec(a.curves.blue);
+    if (r) chan.push(`r='${r}'`);
+    if (g) chan.push(`g='${g}'`);
+    if (b) chan.push(`b='${b}'`);
+    if (all) chan.push(`all='${all}'`);
+    if (chan.length) {
+      parts.push(`curves=${chan.join(':')}${en}`);
+    }
+  }
   if (temperature !== 0) {
-    // meleg: vörös fel / kék le a középtónusokon (és fordítva)
-    parts.push(`colorbalance=rm=${temperature.toFixed(3)}:bm=${(-temperature).toFixed(3)}${en}`);
+    // valódi színhőmérséklet — a `colorbalance` ebben az ffmpeg-buildben néma,
+    // ezért `colortemperature`: 6500K a semleges, meleg(+) → alacsonyabb K,
+    // hideg(−) → magasabb K
+    const kelvin = Math.round(Math.min(40000, Math.max(1000, 6500 - temperature * 10000)));
+    parts.push(`colortemperature=temperature=${kelvin}${en}`);
+  }
+  if (tint !== 0) {
+    // színárnyalat: zöld ↔ magenta a zöld csatorna skálázásával (tint>0 = magenta)
+    parts.push(`colorchannelmixer=gg=${(1 - tint).toFixed(3)}${en}`);
+  }
+  if (vibrance !== 0) {
+    // élénkség: a kevésbé telített színeket emeli jobban (intenzitás -2…2)
+    parts.push(`vibrance=intensity=${vibrance.toFixed(3)}${en}`);
+  }
+  // HSL / Hue-Saturation (globális): egyetlen `hue` szűrő h/s/b paramétere
+  const hue = clampNum(a.hue, -1, 1);
+  const hslSat = clampNum(a.hslSaturation, -1, 1);
+  const hslLum = clampNum(a.hslLuminance, -1, 1);
+  if (hue !== 0 || hslSat !== 0 || hslLum !== 0) {
+    const hp = [];
+    if (hue !== 0) hp.push(`h=${(hue * 180).toFixed(2)}`);
+    if (hslSat !== 0) hp.push(`s=${(1 + hslSat).toFixed(3)}`);
+    if (hslLum !== 0) hp.push(`b=${(hslLum * 3).toFixed(3)}`);
+    parts.push(`hue=${hp.join(':')}${en}`);
+  }
+  if (a.lut && a.lut.uri) {
+    // kreatív 3D LUT (.cube). Az útvonalat egyszeres idézőjelbe zárjuk (a szóköz/
+    // kettőspont védve), a benne lévő idézőjelet '\'' szekvenciával escape-eljük.
+    const q = String(a.lut.uri).replace(/'/g, "'\\''");
+    parts.push(`lut3d='${q}'${en}`);
   }
   if (vignette > 0.01) {
     parts.push(`vignette=angle=${(vignette * (Math.PI / 4)).toFixed(4)}${en}`);
@@ -1998,4 +2082,4 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
 
 // az adjustChain a kép-dokumentum rasterizálójának is kell — ugyanaz a
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
-module.exports = { renderProject, projectDuration, adjustChain };
+module.exports = { renderProject, projectDuration, adjustChain, gradeChain };

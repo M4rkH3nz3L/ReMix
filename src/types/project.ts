@@ -273,6 +273,62 @@ export interface ClipAdjust {
   temperature?: number;
   /** 0 … 1 */
   vignette?: number;
+  // ── Pro Basic-grade (Lightroom-szerű tónusvezérlők) ────────────────────
+  /** 🌞 Expozíció, stop-ban. -1 … 1 (renderben `exposure`). */
+  exposure?: number;
+  /** ☀️ Csúcsfények (a felső tónusok). -1 … 1 (renderben `curves`). */
+  highlights?: number;
+  /** 🌑 Árnyékok (az alsó tónusok). -1 … 1 (renderben `curves`). */
+  shadows?: number;
+  /** ⬜ Fehérek (a legvilágosabb tónusok). -1 … 1 (renderben `curves`). */
+  whites?: number;
+  /** ⬛ Feketék (a legsötétebb tónusok). -1 … 1 (renderben `curves`). */
+  blacks?: number;
+  /** 💜 Színárnyalat: zöld ↔ magenta. -0.3 … 0.3 (renderben `colorchannelmixer` gg). */
+  tint?: number;
+  /** 🌈 Élénkség (a kevésbé telített színeket emeli jobban). -1 … 1 (renderben `vibrance`). */
+  vibrance?: number;
+  /** 📈 Tónusgörbék (RGB + csatornánként). Renderben `curves`. */
+  curves?: ToneCurves;
+  // ── HSL / Hue-Saturation (globális, Photoshop „Master") ────────────────
+  /** 🎨 Színforgatás: -1…1 → ±180°. Renderben `hue=h`. */
+  hue?: number;
+  /** 🎨 HSL-telítettség (szorzó). -1…1 (0 = szürke, +1 = dupla). Renderben `hue=s`. */
+  hslSaturation?: number;
+  /** 🎨 HSL-világosság (additív). -1…1. Renderben `hue=b`. */
+  hslLuminance?: number;
+  /**
+   * 🎞️ 3D LUT (.cube) — kreatív „look" a grade-lánc végén (vignette előtt).
+   * A renderben `lut3d`; az `uri` a lokalizált .cube fájl. A worker-render a
+   * .cube-ot a médiával együtt kapja meg (mint a klip-uri-kat).
+   */
+  lut?: ClipLut;
+}
+
+/** Importált 3D LUT (.cube). */
+export interface ClipLut {
+  uri: string;
+  name: string;
+}
+
+/** Egy tónusgörbe kontrollpontja (x = bemenet, y = kimenet, mindkettő 0…1). */
+export interface CurvePoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * 📈 Tónusgörbék (Curves): az `rgb` mindhárom csatornára (luma-jellegű), a
+ * `red`/`green`/`blue` csatornánként hat. Kontrollpont-listák (≥2 pont,
+ * x szerint rendezve); hiányzó/identitás görbe = nincs hatás. A renderben a
+ * `curves` szűrő (természetes köbös spline a pontokon át) — a szerkesztő
+ * Catmull-Rom spline-nal közelíti a görbét.
+ */
+export interface ToneCurves {
+  rgb?: CurvePoint[];
+  red?: CurvePoint[];
+  green?: CurvePoint[];
+  blue?: CurvePoint[];
 }
 
 /** Green screen (P0‑10): a kulcs-szín átlátszóvá válik a renderben. */

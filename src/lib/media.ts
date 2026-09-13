@@ -81,6 +81,32 @@ export async function pickAudio(): Promise<PickedAudio | null> {
   return { uri: persistToLibrary(asset.uri), name: asset.name };
 }
 
+export interface PickedLut {
+  uri: string;
+  name: string;
+}
+
+/**
+ * .cube 3D LUT kiválasztása. A `.cube`-nak nincs egységes MIME-ja, ezért szélesre
+ * nyitunk, és kiterjesztés alapján validálunk. `null` = elvetve; `'invalid'` =
+ * nem .cube (a hívó jelezzen). A fájlt az app tárába másoljuk (stabil uri).
+ */
+export async function pickLut(): Promise<PickedLut | 'invalid' | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ['application/octet-stream', 'text/plain', 'text/*', '*/*'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  const asset = result.assets[0];
+  if (!/\.cube$/i.test(asset.name)) {
+    return 'invalid';
+  }
+  return { uri: persistToLibrary(asset.uri), name: asset.name };
+}
+
 /** SRT-fájl kiválasztása és beolvasása; null, ha a felhasználó elvetette. */
 export async function pickSrt(): Promise<SrtCue[] | null> {
   const result = await DocumentPicker.getDocumentAsync({

@@ -44,6 +44,12 @@ async function shareJson(name: string, payload: unknown): Promise<void> {
   await shareFile(name, JSON.stringify(payload, null, 2), 'application/json');
 }
 
+/** Egy .cube 3D LUT megosztása/mentése (a színkorrekció-export eredménye). */
+export async function shareLutCube(name: string, cube: string): Promise<void> {
+  const fileName = name.toLowerCase().endsWith('.cube') ? name : `${name}.cube`;
+  await shareFile(fileName, cube, 'text/plain');
+}
+
 /** A felirat- és szövegsáv klipjei SRT-ként — bármely platform/lejátszó fogadja. */
 export async function shareCaptionsSrt(project: Project): Promise<boolean> {
   const cues = project.tracks

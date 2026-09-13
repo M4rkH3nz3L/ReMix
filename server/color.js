@@ -3,6 +3,9 @@
 // leképezője fordítja a meglévő ClipAdjust-ra (fényerő/kontraszt/szaturáció/
 // hőmérséklet), amit az előnézet és a render már ismer.
 const { execFile } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const SIZE = 128; // a statisztikához bőven elég, gyors
 
@@ -130,4 +133,96 @@ async function pixelColor(file, atSec = 0, x = 0.5, y = 0.5) {
   return { color: hex };
 }
 
-module.exports = { colorStats, pixelColor };
+// 🩻 Videoszkópok: az egyes típusok ffmpeg-szűrő-láncai (fix méretű PNG-t adnak).
+// A `null` display/format-lezárás nélkül a szűrők yuv-bemenetet várnak, ezért
+// előbb a megfelelő pixelformátumra konvertálunk, a végén rgb24-re a PNG-hez.
+const SCOPES = {
+  // luma-hullámforma (átlátszó overlay, tükrözve)
+  waveform:
+    'format=yuv420p,waveform=intensity=0.15:mirror=1:components=1:display=overlay,scale=320:256',
+  // RGB parade: a három csatorna hullámformája egymás mellett
+  parade:
+    'format=yuv444p,waveform=intensity=0.15:components=7:mode=column:display=parade,scale=360:256',
+  // vektorszkóp (szín-eloszlás színkerékben, graticule-lel)
+  vectorscope: 'format=yuv444p,vectorscope=mode=color3:graticule=green:flags=name,scale=256:256',
+  // hisztogram (R/G/B egymásra rakva)
+  histogram: 'histogram=display_mode=stack,scale=320:256',
+};
+
+/**
+ * 🩻 Videoszkóp-kép a fájl atSec kockájáról a kért típussal (waveform / parade /
+ * vectorscope / histogram) → base64 PNG. Determinisztikus mérőeszköz (nem
+ * modell) — a kliens overlay-ként mutatja a lejátszófejnél.
+ */
+async function scopeImage(file, atSec = 0, type = 'waveform') {
+  const chain = SCOPES[type] || SCOPES.waveform;
+  const seek = atSec > 0.001 ? ['-ss', String(atSec)] : [];
+  const png = await run('ffmpeg', [
+    '-v', 'error',
+    ...seek,
+    '-i', file,
+    '-vf', `${chain},format=rgb24`,
+    '-frames:v', '1',
+    '-c:v', 'png',
+    '-f', 'image2pipe',
+    'pipe:1',
+  ]);
+  if (!png || png.length < 100) {
+    throw new Error('Nem sikerült szkóp-képet készíteni.');
+  }
+  return { pngBase64: png.toString('base64'), type };
+}
+
+/**
+ * 🎞️ LUT-EXPORT: a klip aktuális grade-je (preset + kézi adjust + curves + HSL +
+ * esetleg importált LUT) → .cube 3D LUT szöveg. Egy IDENTITÁS-rácsot (S³ szín,
+ * .cube-sorrend: R gyorsan, majd G, majd B) 1×N képként átfuttatunk a grade
+ * lánc PER-PIXEL szűrőin (a vignettát KIHAGYJUK — az pozíciófüggő, nem szín-
+ * transzformáció), majd a visszaolvasott pixelekből írjuk a .cube-ot.
+ */
+async function exportLut(clip, size = 33) {
+  const { gradeChain } = require('./render');
+  const S = Math.max(2, Math.min(64, Math.round(size) || 33));
+  const N = S * S * S;
+  const grid = Buffer.alloc(N * 3);
+  let i = 0;
+  for (let b = 0; b < S; b++) {
+    for (let g = 0; g < S; g++) {
+      for (let r = 0; r < S; r++) {
+        grid[i++] = Math.round((r / (S - 1)) * 255);
+        grid[i++] = Math.round((g / (S - 1)) * 255);
+        grid[i++] = Math.round((b / (S - 1)) * 255);
+      }
+    }
+  }
+  // vignetta ki; importált LUT csak ha a fájl elérhető a workeren
+  const adjust = { ...(clip.adjust || {}), vignette: 0 };
+  if (adjust.lut && !(adjust.lut.uri && fs.existsSync(String(adjust.lut.uri)))) {
+    delete adjust.lut;
+  }
+  const chain = gradeChain({ ...clip, adjust }).replace(/^,/, '');
+  const vf = chain ? `format=rgb24,${chain},format=rgb24` : 'format=rgb24';
+
+  const inFile = path.join(os.tmpdir(), `lutgrid_${process.pid}_${N}.rgb`);
+  fs.writeFileSync(inFile, grid);
+  let out;
+  try {
+    out = await run('ffmpeg', [
+      '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${N}x1`, '-i', inFile,
+      '-vf', vf,
+      '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-',
+    ]);
+  } finally {
+    try { fs.unlinkSync(inFile); } catch { /* ignore */ }
+  }
+  const lines = ['# ReMix color grade export', `LUT_3D_SIZE ${S}`, ''];
+  for (let k = 0; k < N; k++) {
+    const r = (out[k * 3] / 255).toFixed(6);
+    const g = (out[k * 3 + 1] / 255).toFixed(6);
+    const b = (out[k * 3 + 2] / 255).toFixed(6);
+    lines.push(`${r} ${g} ${b}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+module.exports = { colorStats, pixelColor, exportLut, scopeImage };

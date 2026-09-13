@@ -5,6 +5,7 @@ import { uploadFetch } from '@/lib/upload';
 import type { ColorStats } from '@/lib/colorAuto';
 import { ensureCloud } from '@/lib/backend';
 import { renderServerUrl } from '@/lib/render';
+import type { ClipAdjust, GradeId } from '@/types/project';
 
 /**
  * 🎨 Color AI hálózati kliens: a worker /color/stats végpontja egy képkocka
@@ -62,6 +63,68 @@ export async function fetchPixelColor(
     }
     const body = (await res.json()) as { color?: string };
     return typeof body.color === 'string' ? body.color : null;
+  } catch {
+    return null;
+  }
+}
+
+export type ScopeType = 'waveform' | 'parade' | 'vectorscope' | 'histogram';
+
+/**
+ * 🩻 Videoszkóp: a worker /color/scope végpontja egy médiakocka
+ * waveform/parade/vectorscope/histogram képét adja PNG-ben. A visszatérő érték
+ * kész `data:image/png;base64,…` URI (RN <Image> forrásnak). INGYEN (mint a
+ * pipetta): `renderServerUrl`, nincs Pro-kapu. `null`, ha nem elérhető.
+ */
+export async function fetchScope(
+  uri: string,
+  atSec: number,
+  type: ScopeType
+): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  const base = renderServerUrl();
+  try {
+    const form = new FormData();
+    form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'media');
+    form.append('atSec', String(Math.max(0, atSec)));
+    form.append('type', type);
+    const res = await uploadFetch(`${base}/color/scope`, { method: 'POST', body: form });
+    if (!res.ok) {
+      return null;
+    }
+    const body = (await res.json()) as { pngBase64?: string };
+    return typeof body.pngBase64 === 'string' ? `data:image/png;base64,${body.pngBase64}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 🎞️ LUT-export: a klip aktuális grade-jét (grade preset + kézi adjust + curves
+ * + HSL) a worker egy identitás-rácson átfuttatja és .cube 3D LUT szöveget ad.
+ * INGYEN (mint a pipetta): `renderServerUrl`, nincs Pro-kapu. `null`, ha nem
+ * elérhető a worker. (Importált LUT-ot nem süt be — az a kliensen már megvan.)
+ */
+export async function exportLutCube(
+  adjust: ClipAdjust,
+  grade?: GradeId,
+  strength?: number,
+  size = 33
+): Promise<string | null> {
+  const base = renderServerUrl();
+  try {
+    const res = await fetch(`${base}/color/lut-export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adjust, grade, strength, size }),
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const text = await res.text();
+    return text.includes('LUT_3D_SIZE') ? text : null;
   } catch {
     return null;
   }

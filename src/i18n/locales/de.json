@@ -1365,7 +1365,20 @@
       "chX": "Position X",
       "chY": "Position Y",
       "chRotation": "Drehung",
-      "chOpacity": "Deckkraft"
+      "chOpacity": "Deckkraft",
+      "trackSectionTitle": "🎯 Objektverfolgung",
+      "trackObject": "Objekt verfolgen",
+      "tracking": "Verfolge…",
+      "trackClear": "Verfolgung löschen",
+      "trackNote": "Tippe auf das zu verfolgende Objekt im Video (z. B. den Ball) — Bild/Sticker folgt ihm. Der Abspielkopf muss über dem Clip und über einem Video stehen.",
+      "trackTitle": "Objektverfolgung",
+      "trackPickHint": "Tippe auf das zu verfolgende Objekt auf der Leinwand.",
+      "trackNeedVideo": "Unter dem Abspielkopf muss ein Video sein, auf dem verfolgt wird.",
+      "trackPlayheadOnClip": "Setze den Abspielkopf über den Clip.",
+      "trackTooShort": "Abschnitt zu kurz für die Verfolgung.",
+      "trackFailed": "Verfolgung fehlgeschlagen (Worker aktiv? Pro?).",
+      "trackDone": "Verfolgung fertig",
+      "trackDoneBody": "{{count}} Keyframes — das Bild folgt dem Objekt."
     },
     "shape": {
       "shapeTitle": "Form",
@@ -1762,7 +1775,8 @@
         "colorAi": "KI-Farbe",
         "tts": "Text zu Sprache",
         "soundLibrary": "Sound-Bibliothek",
-        "collab": "Projekt-Zusammenarbeit"
+        "collab": "Projekt-Zusammenarbeit",
+        "objectTrack": "Objektverfolgung"
       }
     },
     "captureFrame": {

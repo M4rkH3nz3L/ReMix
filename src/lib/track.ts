@@ -1,18 +1,20 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { ensureCloud } from '@/lib/backend';
 import { uploadFetch } from '@/lib/upload';
-import { renderServerUrl } from '@/lib/render';
 
 /**
- * Követés-kliens (P0‑6): a worker /track végpontja a megadott vászon-pontot
- * követi a videó egy szakaszán (NCC-tracker) — az eredményből a szöveg/matrica
- * pozíció-kulcskockái épülnek (delta-mozgás az induló pozícióhoz képest).
+ * 🎯 Objektum-követés kliens (P0‑6): a worker /track végpontja a megadott
+ * vászon-pontot (nem csak arcot!) követi a videó egy szakaszán (NCC-tracker) —
+ * az eredményből a szöveg/matrica/kép/maszk pozíció-kulcskockái épülnek
+ * (delta-mozgás az induló ponthoz képest). Az `objectTrack` capability alá esik
+ * (worker → Pro); nincs Pro → `ensureCloud` dob, a UI paywallra fordítja.
  */
 
 import type { TrackPoint } from '@/lib/trackPlan';
 
-export { pointsToPositionKeyframes } from '@/lib/trackPlan';
+export { pointsToPanKeyframes, pointsToPositionKeyframes } from '@/lib/trackPlan';
 export type { TrackPoint };
 
 export async function trackSubject(
@@ -29,7 +31,7 @@ export async function trackSubject(
   if (Platform.OS === 'web') {
     return null;
   }
-  const base = renderServerUrl();
+  const base = ensureCloud('objectTrack'); // Pro-kapu + a (dev/felhő) worker báziscíme
   try {
     await fetch(`${base}/health`);
   } catch {

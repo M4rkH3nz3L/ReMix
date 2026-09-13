@@ -58,3 +58,41 @@ export function pointsToPositionKeyframes(
   // közel állandó méretnél a scale-csatorna elmarad (zajt nem kulcskockázunk)
   return sMax - sMin > 0.06 ? { x, y, scale } : { x, y };
 }
+
+/**
+ * Pont-sor → transform-PÁSZTÁZÁS (x/y) kulcskockák: mint a pozíció-változat, de
+ * a vászon-transzform offsetjéhez (±0.75, KÖZÉP=0) klippel — így a KÉP / 3D-kép
+ * / matrica-kép elem a követett objektummal EGYÜTT csúszik. Pure — tesztelhető.
+ */
+export function pointsToPanKeyframes(
+  points: TrackPoint[],
+  origin: { x: number; y: number },
+  timeOffset: number,
+  timeScale = 1,
+  stepSec = 0.34
+): { x: Keyframe[]; y: Keyframe[]; scale?: Keyframe[] } {
+  const x: Keyframe[] = [];
+  const y: Keyframe[] = [];
+  const scale: Keyframe[] = [];
+  const first = points[0];
+  let lastT = -Infinity;
+  let sMin = Infinity;
+  let sMax = -Infinity;
+  const clampPan = (v: number) => Math.max(-0.75, Math.min(0.75, v));
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const isEdge = i === 0 || i === points.length - 1;
+    if (!isEdge && p.t - lastT < stepSec) {
+      continue;
+    }
+    lastT = p.t;
+    const time = Math.max(0, timeOffset + p.t * timeScale);
+    x.push({ time, value: clampPan(origin.x + (p.x - first.x)), easing: 'linear' });
+    y.push({ time, value: clampPan(origin.y + (p.y - first.y)), easing: 'linear' });
+    const s = Math.max(0.4, Math.min(2.5, (p.s ?? 1) / (first.s ?? 1)));
+    scale.push({ time, value: s, easing: 'linear' });
+    sMin = Math.min(sMin, s);
+    sMax = Math.max(sMax, s);
+  }
+  return sMax - sMin > 0.06 ? { x, y, scale } : { x, y };
+}

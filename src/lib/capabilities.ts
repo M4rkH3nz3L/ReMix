@@ -33,6 +33,7 @@ export type CapabilityId =
   | 'depth3d' // mélység / 3D / parallax
   | 'faceTools' // arc-követés / retusálás
   | 'reframe' // AI újrakeretezés (vízszintes → álló)
+  | 'objectTrack' // 🎯 általános objektum-követés (NCC-tracker a workeren) — szöveg/matrica/kép/3D/maszk/blur követi a kijelölt objektumot
   | 'upscale' // felskálázás
   | 'skyReplace' // ég-csere
   | 'colorAi' // AI szín / auto-grade
@@ -68,6 +69,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
   faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },
   reframe: { where: 'cloud', pro: true, label: 'lib.capabilities.label.reframe' },
+  objectTrack: { where: 'cloud', pro: true, label: 'lib.capabilities.label.objectTrack' },
   upscale: { where: 'cloud', pro: true, label: 'lib.capabilities.label.upscale' },
   skyReplace: { where: 'cloud', pro: true, label: 'lib.capabilities.label.skyReplace' },
   colorAi: { where: 'cloud', pro: true, label: 'lib.capabilities.label.colorAi' },

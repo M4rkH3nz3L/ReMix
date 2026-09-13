@@ -1365,7 +1365,20 @@
       "chX": "Position X",
       "chY": "Position Y",
       "chRotation": "Rotation",
-      "chOpacity": "Opacity"
+      "chOpacity": "Opacity",
+      "trackSectionTitle": "🎯 Object tracking",
+      "trackObject": "Track an object",
+      "tracking": "Tracking…",
+      "trackClear": "Clear tracking",
+      "trackNote": "Tap the object to follow on the video (e.g. the ball) — the image/sticker then moves with it. The playhead must be over the clip, above a video.",
+      "trackTitle": "Object tracking",
+      "trackPickHint": "Tap the object to follow on the canvas.",
+      "trackNeedVideo": "There must be a video under the playhead to track on.",
+      "trackPlayheadOnClip": "Put the playhead over the clip.",
+      "trackTooShort": "Section too short to track.",
+      "trackFailed": "Tracking failed (worker running? Pro?).",
+      "trackDone": "Tracking done",
+      "trackDoneBody": "{{count}} keyframes — the image follows the object."
     },
     "shape": {
       "shapeTitle": "Shape",
@@ -1762,7 +1775,8 @@
         "colorAi": "AI color",
         "tts": "Text to speech",
         "soundLibrary": "Sound library",
-        "collab": "Project collaboration"
+        "collab": "Project collaboration",
+        "objectTrack": "Object tracking"
       }
     },
     "captureFrame": {

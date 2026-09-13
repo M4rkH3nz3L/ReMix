@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
-import { EDIT_FPS, FRAME, MIN_CLIP_DURATION, palette } from '@/constants/editor';
+import { aspectValue, EDIT_FPS, FRAME, MIN_CLIP_DURATION, palette } from '@/constants/editor';
 import type { KeyframeChannel } from '@/lib/keyframes';
-import { maxVideoDuration } from '@/lib/projectUtils';
+import { activeVisualClip, maxVideoDuration, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp, formatTime } from '@/lib/time';
+import { pointsToPanKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, ImageClip, VideoClip } from '@/types/project';
 
@@ -55,7 +56,62 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
   const playhead = useEditorStore((s) => s.playhead);
   const [kfChannel, setKfChannel] = useState<ChannelCfg['id']>('scale');
   const [stepMode, setStepMode] = useState<StepMode>('sec');
+  const [trackBusy, setTrackBusy] = useState(false);
+  const setPickTarget = useEditorStore((s) => s.setPickTarget);
   const step = stepMode === 'frame' ? FRAME : STEP;
+
+  /**
+   * 🎯 Objektum-követés: a felhasználó a vásznon rákoppint a követendő objektumra,
+   * a worker (NCC-tracker) végigköveti a videón, és a KÉP a pásztázással utána
+   * mozog (a kép a videó fölötti overlay/PiP; a videót követi). Pro (objectTrack).
+   */
+  const runTrackImage = (point: { x: number; y: number }) => {
+    const state = useEditorStore.getState();
+    const project = state.project;
+    if (!project || trackBusy || clip.kind !== 'image') {
+      return;
+    }
+    const video = activeVisualClip(project, state.playhead);
+    if (!video || video.kind !== 'video') {
+      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackNeedVideo'));
+      return;
+    }
+    if (state.playhead < clip.start || state.playhead >= clip.start + clip.duration) {
+      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackPlayheadOnClip'));
+      return;
+    }
+    const endTl = Math.min(clip.start + clip.duration, video.start + video.duration, state.playhead + 15);
+    const durTl = endTl - state.playhead;
+    if (durTl < 0.5) {
+      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackTooShort'));
+      return;
+    }
+    const base = { x: clip.transform?.x ?? 0, y: clip.transform?.y ?? 0 };
+    setTrackBusy(true);
+    trackSubject(video.uri, {
+      startSec: sourceTimeAt(video, state.playhead),
+      durationSec: durTl * video.speed,
+      cx: point.x,
+      cy: point.y,
+      aspectW: aspectValue(project.aspectRatio),
+      aspectH: 1,
+    })
+      .then((points) => {
+        if (!points) {
+          Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackFailed'));
+          return;
+        }
+        const kf = pointsToPanKeyframes(points, base, state.playhead - clip.start, 1 / video.speed);
+        state.updateClip(clip.id, { keyframes: { ...clip.keyframes, ...kf } });
+        Alert.alert(t('panels.precision.trackDone'), t('panels.precision.trackDoneBody', { count: kf.x.length }));
+      })
+      .catch((err: Error) => Alert.alert(t('panels.precision.trackTitle'), err.message))
+      .finally(() => setTrackBusy(false));
+  };
+  const startTrackPick = () => {
+    Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackPickHint'));
+    setPickTarget((point) => runTrackImage(point));
+  };
 
   const maxDuration =
     clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
@@ -221,6 +277,27 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
               updateClip(clip.id, { opacity: clamp((clip.opacity ?? 1) + 0.1, 0.1, 1) })
             }
           />
+        </PanelSection>
+      ) : null}
+
+      {/* 🎯 Objektum-követés: a kép/matrica a videó egy kijelölt objektumát követi */}
+      {clip.kind === 'image' ? (
+        <PanelSection title={t('panels.precision.trackSectionTitle')}>
+          <View style={styles.row}>
+            <Chip
+              label={trackBusy ? t('panels.precision.tracking') : t('panels.precision.trackObject')}
+              active={trackBusy}
+              onPress={startTrackPick}
+            />
+            {clip.keyframes?.x?.length ? (
+              <Chip
+                label={t('panels.precision.trackClear')}
+                active={false}
+                onPress={() => updateClip(clip.id, { keyframes: undefined })}
+              />
+            ) : null}
+          </View>
+          <Text style={styles.range}>{t('panels.precision.trackNote')}</Text>
         </PanelSection>
       ) : null}
     </View>

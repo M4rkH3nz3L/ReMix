@@ -1365,7 +1365,20 @@
       "chX": "Pozíció X",
       "chY": "Pozíció Y",
       "chRotation": "Forgatás",
-      "chOpacity": "Átlátszóság"
+      "chOpacity": "Átlátszóság",
+      "trackSectionTitle": "🎯 Objektum-követés",
+      "trackObject": "Kövess egy objektumot",
+      "tracking": "Követés…",
+      "trackClear": "Követés törlése",
+      "trackNote": "Koppints a videón a követendő objektumra (pl. labda) — a kép/matrica utána mozog. A lejátszófejnek a klip fölött kell állnia, videó fölött.",
+      "trackTitle": "Objektum-követés",
+      "trackPickHint": "Koppints a vásznon a követendő objektumra.",
+      "trackNeedVideo": "A lejátszófej alatt legyen egy videó, amin a követés fut.",
+      "trackPlayheadOnClip": "A lejátszófej a klip fölött álljon.",
+      "trackTooShort": "Túl rövid szakasz a követéshez.",
+      "trackFailed": "A követés nem sikerült (fut a worker? Pro?).",
+      "trackDone": "Kész a követés",
+      "trackDoneBody": "{{count}} kulcskocka — a kép követi az objektumot."
     },
     "shape": {
       "shapeTitle": "Forma",
@@ -1762,7 +1775,8 @@
         "colorAi": "AI szín",
         "tts": "Szöveg → beszéd",
         "soundLibrary": "Hang-könyvtár",
-        "collab": "Projekt-kollaboráció"
+        "collab": "Projekt-kollaboráció",
+        "objectTrack": "Objektum-követés"
       }
     },
     "captureFrame": {

@@ -7,7 +7,9 @@ import { aspectValue, palette, textAnimations, textColors, textStylePresets } fr
 import { fontOptions } from '@/constants/fonts';
 import { TEXT_TEMPLATES, type TextTemplate } from '@/constants/textTemplates';
 import { fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
+import { makeId } from '@/lib/id';
 import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
+import { bakeTextToImage } from '@/lib/textBake';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -125,6 +127,51 @@ export function TextPanel({ clip }: { clip: TextClip }) {
 
   const updateClip = useEditorStore((s) => s.updateClip);
   const [tab, setTab] = useState<'style' | 'anim' | 'extra'>('style');
+  const [shapeBusy, setShapeBusy] = useState(false);
+
+  /**
+   * 🔁 Text → Shape → Animation: a szöveget a teljes stílusával képpé sütjük
+   * (worker), és forma-klipet (kép-kitöltés) hozunk létre belőle az overlay
+   * sávon — a szöveg pozíció/skála kulcskockáit örökölve. Így a forma-eszköztár
+   * (blend / glow / kontúr / lekerekítés / kulcskocka / objektum-követés) is
+   * ráhúzható. A szövegklip megmarad (nem-destruktív).
+   */
+  const convertToShape = async () => {
+    if (shapeBusy) {
+      return;
+    }
+    setShapeBusy(true);
+    const aspect = aspectValue(useEditorStore.getState().project?.aspectRatio ?? '9:16');
+    const baked = await bakeTextToImage(clip, aspect);
+    setShapeBusy(false);
+    if (!baked) {
+      Alert.alert(tr('panels.text.toShapeTitle'), tr('panels.text.toShapeFail'));
+      return;
+    }
+    const { addClip, selectClip } = useEditorStore.getState();
+    const id = makeId('clip');
+    const w = clamp(baked.w / baked.canvasW, 0.05, 0.98);
+    const h = clamp(baked.h / baked.canvasH, 0.02, 0.98);
+    addClip(
+      'overlay',
+      {
+        kind: 'shape',
+        id,
+        start: clip.start,
+        duration: clip.duration,
+        shape: 'rectangle',
+        position: { ...clip.position },
+        w,
+        h,
+        fill: 'transparent',
+        imageUri: baked.uri,
+        // a szöveg pozíció/skála kulcskockái átöröklődnek → az animáció megmarad
+        keyframes: clip.keyframes,
+      },
+      { id: makeId('ast'), kind: 'image', uri: baked.uri, provider: 'local', name: 'text-shape' }
+    );
+    selectClip(id);
+  };
 
   /**
    * Sablon alkalmazása: MINDEN look-mezőt explicit átír (a nem használtakat is
@@ -736,6 +783,17 @@ export function TextPanel({ clip }: { clip: TextClip }) {
               />
             </View>
             <Text style={styles.note}>{tr('panels.text.maskRevealNote')}</Text>
+          </PanelSection>
+
+          <PanelSection title={tr('panels.text.sectionToShape')}>
+            <PrimaryButton
+              icon="shapes-outline"
+              label={shapeBusy ? tr('panels.text.toShapeBusy') : tr('panels.text.toShape')}
+              onPress={() => {
+                void convertToShape();
+              }}
+            />
+            <Text style={styles.note}>{tr('panels.text.toShapeNote')}</Text>
           </PanelSection>
 
           <PanelSection title={tr('panels.text.sectionTracking')}>

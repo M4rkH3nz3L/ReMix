@@ -1703,7 +1703,13 @@
       "pathNote": "Text runs along the curve. The curvature is exact in the render; the preview shows it flat.",
       "sectionMaskText": "🪟 Text mask",
       "maskReveal": "Video in text",
-      "maskRevealNote": "The text shape is a window into the layer below: sharp video inside the letters, blurred + darkened around it. Bakes in the render."
+      "maskRevealNote": "The text shape is a window into the layer below: sharp video inside the letters, blurred + darkened around it. Bakes in the render.",
+      "sectionToShape": "🔁 Text → Shape",
+      "toShape": "Convert to shape",
+      "toShapeBusy": "Converting…",
+      "toShapeTitle": "Text → Shape",
+      "toShapeFail": "Conversion is unavailable (no render server).",
+      "toShapeNote": "The text is baked to an image with its full style and turned into a shape clip — so the shape toolkit (blend, glow, outline, corner radius, keyframes, object tracking) applies too. The text clip is kept."
     },
     "transcript": {
       "title": "Transcript",

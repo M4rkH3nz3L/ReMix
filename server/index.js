@@ -675,6 +675,24 @@ app.post('/color/scope', upload.any(), (req, res) => {
     });
 });
 
+// 🔁 Text → Shape: egy szövegklip a teljes stílusával átlátszó PNG-vé sütve,
+// hogy forma-klip kép-kitöltéseként tovább animálható legyen (kép + w/h).
+app.post('/text/bake', express.json({ limit: '256kb' }), (req, res) => {
+  const clip = req.body.clip;
+  const canvas = req.body.canvas;
+  if (!clip || typeof clip.text !== 'string' || !canvas || !canvas.w || !canvas.h) {
+    res.status(400).json({ error: 'Hiányzó szövegklip / vászon.' });
+    return;
+  }
+  const { bakeTextPng } = require('./text-render');
+  bakeTextPng(clip, { w: Math.round(canvas.w), h: Math.round(canvas.h) })
+    .then((r) => res.json(r))
+    .catch((err) => {
+      console.error('text-bake hiba:', err.message);
+      res.status(500).json({ error: err.message });
+    });
+});
+
 // 🪄 AI background removal (P1 v1, fotón): u2net CPU-n → téma-kivágás
 // átlátszó háttérrel (md5-cache) — a kliens overlay-képként használja.
 app.post('/bgremove', upload.any(), (req, res) => {

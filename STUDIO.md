@@ -145,6 +145,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   (SVG `textPath`), állítható görbülettel.
 - **🪟 Szöveg-maszk (videó a betűkben)** 🆕: a szöveg alakja ablak az alatta lévő képre —
   a betűkben éles videó, körülötte elmosott + sötétített változat.
+- **🔁 Szöveg → Forma → Animáció** 🆕: a szöveget a teljes stílusával képpé sütjük (worker),
+  és **forma-klipet** készítünk belőle — így a **forma-eszköztár** (blend / glow / kontúr /
+  lekerekítés / kulcskocka / objektum-követés) is ráhúzható; a pozíció/skála kulcskockák
+  átöröklődnek. A szövegklip megmarad (nem-destruktív).
 - **Felirat**: kézi felirat, stílus-presetek, időzítés, **SRT-import**.
 - **Átirat**: szóra koppintás, tartomány-kijelölés, kitöltő/ismétlés-jelölés, ripple-törlés.
 
@@ -230,8 +234,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 | `upscale` | Felskálázás | PRO | cloud |
 
 ¹ `urlImport`: local-first ingyen; csak a worker-fallback Pro.
-² Worker-served, de **INGYEN** (determinisztikus mérőeszközök, nem AI, `renderServerUrl`):
-  hang-könyvtár · beat/hullámforma · színpipetta · **🩻 szkópok** 🆕 · **🎞️ LUT-export** 🆕.
+² Worker-served, de **INGYEN** (determinisztikus mérőeszközök/renderek, nem AI, `renderServerUrl`):
+  hang-könyvtár · beat/hullámforma · színpipetta · **🩻 szkópok** · **🎞️ LUT-export** ·
+  **🔁 Szöveg → Forma bake** 🆕.
 🆕 = az utolsó fejlesztési körökben érkezett.
 
 ---
@@ -284,6 +289,11 @@ A fő UI-zónák a leckékhez:
 1. *Művelet:* Finomítsd a betűket. *Hol:* Szöveg panel → **Stílus** tab → **🔡 Tipográfia**: betűköz / sorköz / alapvonal / kerning. *Eredmény:* profi térközök.
 2. *Művelet:* Adj stílust. *Hol:* **🎨 Stílus+** → kapcsold be a **Gradient / Kontúr / Árnyék / Ragyogás / Háttér** valamelyikét, majd hangold (szín/vastagság/méret). *Eredmény:* gradient-kitöltés, kontúr, glow stb. (a renderben pontosan).
 3. *Művelet:* Animáld egységenként. *Hol:* **Anim** tab → **🎬 Kinetic typography** → **Mozgás** (Felúszás/Pop/Becsúszás/Gépelés/Hullám/Pattanás) → **Egység** (Karakter/Szó/Sor) → késleltetés/hossz. *Eredmény:* a szöveg egységenként lép be (a Hullám ciklizál).
+
+**5c. lecke — Szöveg görbén, szöveg-maszk és Szöveg → Forma**
+1. *Művelet:* Görbítsd a szöveget. *Hol:* **Extra** tab → **🛤️ Szöveg görbén** → Ív/Völgy/Hullám/Kör + görbület. *Eredmény:* a betűk a görbe mentén futnak (a renderben).
+2. *Művelet:* Tedd a videót a betűkbe. *Hol:* **Extra** → **🪟 Szöveg-maszk** → *Videó a betűkben*. *Eredmény:* a betűkben éles videó, körülötte sötét/elmosott.
+3. *Művelet:* Alakítsd formává. *Hol:* **Extra** → **🔁 Szöveg → Forma** → *Alakítás formává*. *Eredmény:* forma-klip a szövegből — a **Forma** panel eszközeivel (blend/glow/kontúr/kulcskocka/követés) tovább animálható.
 
 **6. lecke — Sávok kezelése**
 1. *Művelet:* Nyisd a sáv-menüt. *Hol:* a sáv **címkéjére/fejlécére** koppintás. *Eredmény:* némítás · solo · **👁️ láthatóság** · zárolás · összecsukás · **magasság** · **auto-magasság**.

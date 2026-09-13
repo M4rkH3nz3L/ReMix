@@ -837,9 +837,36 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
   return results;
 }
 
+/**
+ * 🔁 Text → Shape: egyetlen szövegklipet a TELJES stílusával (font, tipográfia,
+ * gradient, kontúr, glow, path, 3D) átlátszó hátterű PNG-vé süt, hogy forma-
+ * klip kép-kitöltéseként (imageUri) tovább animálható/stílusozható legyen a
+ * forma-eszköztárral. Az animációt/kinetic-et a bake-hez kikapcsoljuk (statikus
+ * kép kell). @returns { pngBase64, w, h }
+ */
+async function bakeTextPng(clip, canvas) {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'txtbake-'));
+  try {
+    const bakeClip = { ...clip, animation: 'none', textMotion: undefined, maskReveal: undefined };
+    const res = await renderTextPngs([bakeClip], canvas, outDir);
+    const st = res[0] && res[0].states && res[0].states[0];
+    if (!st) {
+      throw new Error('Nem sikerült a szöveget képpé alakítani.');
+    }
+    return {
+      pngBase64: fs.readFileSync(st.file).toString('base64'),
+      w: st.w,
+      h: st.h,
+    };
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+}
+
 module.exports = {
   renderTextPngs,
   renderShapePngs,
+  bakeTextPng,
   // a kinetic (per-frame) szöveg-szekvencia UGYANEZEKET a helpereket használja
   findChromium,
   fontFaceCss,

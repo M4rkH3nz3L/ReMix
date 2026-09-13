@@ -1703,7 +1703,13 @@
       "pathNote": "Der Text folgt der Kurve. Die Krümmung ist im Render exakt; die Vorschau zeigt ihn flach.",
       "sectionMaskText": "🪟 Textmaske",
       "maskReveal": "Video im Text",
-      "maskRevealNote": "Die Textform ist ein Fenster zur Ebene darunter: scharfes Video in den Buchstaben, ringsum unscharf + abgedunkelt. Wird im Render gebacken."
+      "maskRevealNote": "Die Textform ist ein Fenster zur Ebene darunter: scharfes Video in den Buchstaben, ringsum unscharf + abgedunkelt. Wird im Render gebacken.",
+      "sectionToShape": "🔁 Text → Form",
+      "toShape": "In Form umwandeln",
+      "toShapeBusy": "Umwandeln…",
+      "toShapeTitle": "Text → Form",
+      "toShapeFail": "Umwandlung nicht verfügbar (kein Render-Server).",
+      "toShapeNote": "Der Text wird mit vollem Stil zu einem Bild gebacken und in einen Form-Clip umgewandelt — so gilt auch das Form-Werkzeug (Blend, Leuchten, Kontur, Rundung, Keyframes, Objektverfolgung). Der Text-Clip bleibt erhalten."
     },
     "transcript": {
       "title": "Transkript",

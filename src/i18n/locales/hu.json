@@ -1703,7 +1703,13 @@
       "pathNote": "A szöveg a görbe mentén fut. A görbület a renderben pontos; az előnézet laposan mutatja.",
       "sectionMaskText": "🪟 Szöveg-maszk",
       "maskReveal": "Videó a betűkben",
-      "maskRevealNote": "A szöveg alakja ablak az alatta lévő képre: a betűkben az éles videó látszik, körülötte elmosott + sötétített változat. A renderben ég be."
+      "maskRevealNote": "A szöveg alakja ablak az alatta lévő képre: a betűkben az éles videó látszik, körülötte elmosott + sötétített változat. A renderben ég be.",
+      "sectionToShape": "🔁 Szöveg → Forma",
+      "toShape": "Alakítás formává",
+      "toShapeBusy": "Alakítás…",
+      "toShapeTitle": "Szöveg → Forma",
+      "toShapeFail": "A konverzió nem érhető el (nincs render-szerver).",
+      "toShapeNote": "A szöveget a teljes stílusával képpé sütjük, és forma-klipet készítünk belőle — így a forma-eszköztár (blend, glow, kontúr, lekerekítés, kulcskocka, objektum-követés) is ráhúzható. A szövegklip megmarad."
     },
     "transcript": {
       "title": "Átirat",

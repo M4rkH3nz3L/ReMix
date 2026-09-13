@@ -339,6 +339,84 @@ function text3dHtml(clip, fontPx, canvasW) {
   </body></html>`;
 }
 
+/**
+ * 🛤️ Szöveg görbe mentén (text path): inline SVG `textPath`. A görbe alakja
+ * arc (domb) / valley (völgy) / wave (hullám) / circle (kör). A kitöltés
+ * (gradient/szín), a kontúr és a tracking a `textStyle`/klip-mezőkből; a
+ * glow/árnyék CSS `drop-shadow` szűrővel. A doboz-hátteret path-on nem tesszük.
+ */
+function textPathHtml(clip, fontPx, canvasW) {
+  const tp = clip.textPath;
+  const curve = Math.min(1, Math.max(0, tp.curve ?? 0.5));
+  const ts = clip.textStyle || {};
+  const W = Math.round(canvasW * 0.85);
+  const amp = curve * fontPx * 2;
+  const isCircle = tp.shape === 'circle';
+  // kör: a kerület ~ a szöveg hossza; a sugár ezt kielégíti
+  const est = Math.max(fontPx * 2, Array.from(clip.text).length * fontPx * 0.6);
+  const r = Math.max(fontPx * 1.2, est / (2 * Math.PI));
+  const H = isCircle ? Math.round(2 * r + fontPx * 2.4) : Math.round(amp * 2 + fontPx * 2.4);
+  const svgW = isCircle ? H : W;
+  const cy = H / 2;
+  let d;
+  if (isCircle) {
+    const cx = svgW / 2;
+    // felül kezdődő kör (óramutató-irányban) — a szöveg körbefut
+    d = `M ${cx},${(cy - r).toFixed(1)} A ${r.toFixed(1)},${r.toFixed(1)} 0 1,1 ${(cx - 0.01).toFixed(2)},${(cy - r).toFixed(1)}`;
+  } else if (tp.shape === 'valley') {
+    d = `M 0,${cy} Q ${W / 2},${cy + amp} ${W},${cy}`;
+  } else if (tp.shape === 'wave') {
+    d = `M 0,${cy} Q ${W * 0.25},${cy - amp} ${W * 0.5},${cy} T ${W},${cy}`;
+  } else {
+    // arc (domb)
+    d = `M 0,${cy} Q ${W / 2},${cy - amp} ${W},${cy}`;
+  }
+  // kitöltés: gradient (SVG def) vagy tömör szín
+  let gradDef = '';
+  let fill = clip.color || '#ffffff';
+  if (ts.gradient) {
+    const a = ((ts.gradient.angle ?? 135) * Math.PI) / 180;
+    const x2 = (Math.cos(a) * 0.5 + 0.5).toFixed(3);
+    const y2 = (Math.sin(a) * 0.5 + 0.5).toFixed(3);
+    gradDef = `<linearGradient id="tg" x1="${(0.5 - Math.cos(a) * 0.5).toFixed(3)}" y1="${(0.5 - Math.sin(a) * 0.5).toFixed(3)}" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="${ts.gradient.from}"/><stop offset="1" stop-color="${ts.gradient.to}"/></linearGradient>`;
+    fill = 'url(#tg)';
+  }
+  const strokeAttr =
+    ts.stroke && ts.stroke.width > 0
+      ? ` stroke="${ts.stroke.color}" stroke-width="${Math.max(1, ts.stroke.width * fontPx).toFixed(1)}" paint-order="stroke"`
+      : '';
+  const filters = [];
+  if (ts.glow && ts.glow.size > 0) {
+    const g = ts.glow.size * fontPx;
+    filters.push(`drop-shadow(0 0 ${(g * 0.5).toFixed(1)}px ${ts.glow.color})`);
+    filters.push(`drop-shadow(0 0 ${g.toFixed(1)}px ${ts.glow.color})`);
+  }
+  if (ts.shadow) {
+    filters.push(
+      `drop-shadow(${(ts.shadow.dx * fontPx).toFixed(1)}px ${(ts.shadow.dy * fontPx).toFixed(1)}px ${(ts.shadow.blur * fontPx).toFixed(1)}px ${ts.shadow.color})`
+    );
+  }
+  const filterStyle = filters.length ? `filter:${filters.join(' ')};` : '';
+  const ls = clip.letterSpacing ? ` letter-spacing="${(clip.letterSpacing * fontPx).toFixed(1)}"` : '';
+  const text = escapeHtmlLite(clip.text);
+  const pad = Math.round(fontPx * 0.6);
+  return `<!doctype html><html><head><style>${fontFaceCss(clip.fontFamily)}</style></head>
+    <body style="margin:0;background:transparent;">
+      <svg id="t" width="${svgW}" height="${H}" viewBox="${-pad} ${-pad} ${svgW + 2 * pad} ${H + 2 * pad}"
+           style="overflow:visible;display:block;font-family:${fontFamilyCss(clip.fontFamily)};font-weight:${clip.fontWeight === 'bold' ? 700 : 400};${filterStyle}">
+        <defs>${gradDef}</defs>
+        <path id="tp" d="${d}" fill="none"/>
+        <text font-size="${fontPx}" fill="${fill}"${strokeAttr}${ls}>
+          <textPath href="#tp" startOffset="50%" text-anchor="middle">${text}</textPath>
+        </text>
+      </svg>
+    </body></html>`;
+}
+
+function escapeHtmlLite(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 async function renderTextPngs(textClips, canvas, outDir) {
   if (textClips.length === 0) {
     return [];
@@ -380,6 +458,29 @@ async function renderTextPngs(textClips, canvas, outDir) {
               to: null,
               w: Math.ceil(box3?.width ?? 0),
               h: Math.ceil(box3?.height ?? 0),
+            },
+          ],
+        });
+        continue;
+      }
+
+      // 🛤️ Szöveg görbe mentén (text path): SVG textPath, egyetlen állapot
+      if (clip.textPath) {
+        await page.setContent(textPathHtml(clip, fontPx, canvas.w));
+        await page.evaluate(() => document.fonts.ready);
+        const elp = page.locator('#t');
+        const filep = path.join(outDir, `text_${i}_0.png`);
+        const boxp = await elp.boundingBox();
+        await elp.screenshot({ path: filep, omitBackground: true });
+        results.push({
+          clip,
+          states: [
+            {
+              file: filep,
+              from: 0,
+              to: null,
+              w: Math.ceil(boxp?.width ?? 0),
+              h: Math.ceil(boxp?.height ?? 0),
             },
           ],
         });

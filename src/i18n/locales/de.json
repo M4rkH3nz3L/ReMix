@@ -1693,7 +1693,17 @@
       "kineticBy_line": "Zeile",
       "kineticStagger": "Verzögerung / Einheit",
       "kineticDur": "Einheitsdauer",
-      "kineticNote": "Animation pro Einheit: Zeichen/Wörter/Zeilen erscheinen nacheinander. Die genaue Bewegung wird im Render gebacken; die Vorschau nähert an."
+      "kineticNote": "Animation pro Einheit: Zeichen/Wörter/Zeilen erscheinen nacheinander. Die genaue Bewegung wird im Render gebacken; die Vorschau nähert an.",
+      "sectionTextPath": "🛤️ Text auf Pfad",
+      "path_arc": "Bogen",
+      "path_valley": "Tal",
+      "path_wave": "Welle",
+      "path_circle": "Kreis",
+      "pathCurve": "Krümmung",
+      "pathNote": "Der Text folgt der Kurve. Die Krümmung ist im Render exakt; die Vorschau zeigt ihn flach.",
+      "sectionMaskText": "🪟 Textmaske",
+      "maskReveal": "Video im Text",
+      "maskRevealNote": "Die Textform ist ein Fenster zur Ebene darunter: scharfes Video in den Buchstaben, ringsum unscharf + abgedunkelt. Wird im Render gebacken."
     },
     "transcript": {
       "title": "Transkript",

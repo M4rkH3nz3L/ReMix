@@ -621,6 +621,24 @@ export interface TextClip extends ClipBase {
    * (`renderTextSequence`), az előnézet a lejátszófejből közelít.
    */
   textMotion?: TextMotion;
+  /**
+   * 🛤️ Szöveg görbe mentén (text path): a betűk egy ív/völgy/hullám/kör mentén
+   * futnak. A render SVG `textPath`-tal égeti be; az előnézet laposan közelít.
+   */
+  textPath?: TextPath;
+  /**
+   * 🪟 Szöveg-maszk (mask text / „videó a betűkben"): a szöveg alakja ABLAK az
+   * alatta lévő kompozitra — a betűkben az éles videó látszik, körülötte a
+   * kompozit elmosott + sötétített változata. Csak a klip idővonal-ablakában.
+   * A renderben `alphaextract` + `pad` + `alphamerge` + `overlay`.
+   */
+  maskReveal?: boolean;
+}
+
+/** 🛤️ Görbe, amely mentén a szöveg fut. `curve` = görbület/amplitúdó (0…1). */
+export interface TextPath {
+  shape: 'arc' | 'valley' | 'wave' | 'circle';
+  curve: number;
 }
 
 /** Kinetic typography preset (a mozgás jellege egységenként). */

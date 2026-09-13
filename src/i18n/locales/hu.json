@@ -1693,7 +1693,17 @@
       "kineticBy_line": "Sor",
       "kineticStagger": "Késleltetés / egység",
       "kineticDur": "Egység hossza",
-      "kineticNote": "Egységenkénti animáció: a karakterek/szavak/sorok sorban lépnek be. A pontos mozgás a renderben ég be, az előnézet közelít."
+      "kineticNote": "Egységenkénti animáció: a karakterek/szavak/sorok sorban lépnek be. A pontos mozgás a renderben ég be, az előnézet közelít.",
+      "sectionTextPath": "🛤️ Szöveg görbén",
+      "path_arc": "Ív",
+      "path_valley": "Völgy",
+      "path_wave": "Hullám",
+      "path_circle": "Kör",
+      "pathCurve": "Görbület",
+      "pathNote": "A szöveg a görbe mentén fut. A görbület a renderben pontos; az előnézet laposan mutatja.",
+      "sectionMaskText": "🪟 Szöveg-maszk",
+      "maskReveal": "Videó a betűkben",
+      "maskRevealNote": "A szöveg alakja ablak az alatta lévő képre: a betűkben az éles videó látszik, körülötte elmosott + sötétített változat. A renderben ég be."
     },
     "transcript": {
       "title": "Átirat",

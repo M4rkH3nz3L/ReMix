@@ -690,6 +690,54 @@ export function TextPanel({ clip }: { clip: TextClip }) {
             </View>
           </PanelSection>
 
+          <PanelSection title={tr('panels.text.sectionTextPath')}>
+            <View style={styles.row}>
+              <Chip
+                label={tr('common.none')}
+                active={!clip.textPath}
+                onPress={() => updateClip(clip.id, { textPath: undefined })}
+              />
+              {(['arc', 'valley', 'wave', 'circle'] as const).map((shape) => (
+                <Chip
+                  key={shape}
+                  label={tr('panels.text.path_' + shape)}
+                  active={clip.textPath?.shape === shape}
+                  onPress={() =>
+                    updateClip(clip.id, { textPath: { curve: clip.textPath?.curve ?? 0.5, shape } })
+                  }
+                />
+              ))}
+            </View>
+            {clip.textPath && clip.textPath.shape !== 'circle' ? (
+              <Stepper
+                label={tr('panels.text.pathCurve')}
+                value={`${Math.round(clip.textPath.curve * 100)}`}
+                onDec={() =>
+                  updateClip(clip.id, {
+                    textPath: { ...clip.textPath!, curve: clamp(clip.textPath!.curve - 0.1, 0, 1) },
+                  })
+                }
+                onInc={() =>
+                  updateClip(clip.id, {
+                    textPath: { ...clip.textPath!, curve: clamp(clip.textPath!.curve + 0.1, 0, 1) },
+                  })
+                }
+              />
+            ) : null}
+            {clip.textPath ? <Text style={styles.note}>{tr('panels.text.pathNote')}</Text> : null}
+          </PanelSection>
+
+          <PanelSection title={tr('panels.text.sectionMaskText')}>
+            <View style={styles.row}>
+              <Chip
+                label={tr('panels.text.maskReveal')}
+                active={!!clip.maskReveal}
+                onPress={() => updateClip(clip.id, { maskReveal: clip.maskReveal ? undefined : true })}
+              />
+            </View>
+            <Text style={styles.note}>{tr('panels.text.maskRevealNote')}</Text>
+          </PanelSection>
+
           <PanelSection title={tr('panels.text.sectionTracking')}>
             <PrimaryButton
               icon="locate-outline"

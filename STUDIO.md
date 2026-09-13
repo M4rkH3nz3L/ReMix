@@ -141,6 +141,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   **Felúszás · Pop · Becsúszás · Gépelés · Hullám · Pattanás**, állítható egység-késleltetéssel
   és -hosszal. A render per-frame Chromium-képsort éget (a beérkező után a szöveg kiáll,
   a hullám ciklizál); az előnézet a lejátszófejből közelít.
+- **🛤️ Szöveg görbén (text path)** 🆕: a betűk **ív / völgy / hullám / kör** mentén futnak
+  (SVG `textPath`), állítható görbülettel.
+- **🪟 Szöveg-maszk (videó a betűkben)** 🆕: a szöveg alakja ablak az alatta lévő képre —
+  a betűkben éles videó, körülötte elmosott + sötétített változat.
 - **Felirat**: kézi felirat, stílus-presetek, időzítés, **SRT-import**.
 - **Átirat**: szóra koppintás, tartomány-kijelölés, kitöltő/ismétlés-jelölés, ripple-törlés.
 

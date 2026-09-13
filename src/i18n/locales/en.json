@@ -1693,7 +1693,17 @@
       "kineticBy_line": "Line",
       "kineticStagger": "Delay / unit",
       "kineticDur": "Unit duration",
-      "kineticNote": "Per-unit animation: characters/words/lines enter in sequence. The exact motion bakes in the render; the preview approximates."
+      "kineticNote": "Per-unit animation: characters/words/lines enter in sequence. The exact motion bakes in the render; the preview approximates.",
+      "sectionTextPath": "🛤️ Text on path",
+      "path_arc": "Arc",
+      "path_valley": "Valley",
+      "path_wave": "Wave",
+      "path_circle": "Circle",
+      "pathCurve": "Curvature",
+      "pathNote": "Text runs along the curve. The curvature is exact in the render; the preview shows it flat.",
+      "sectionMaskText": "🪟 Text mask",
+      "maskReveal": "Video in text",
+      "maskRevealNote": "The text shape is a window into the layer below: sharp video inside the letters, blurred + darkened around it. Bakes in the render."
     },
     "transcript": {
       "title": "Transcript",

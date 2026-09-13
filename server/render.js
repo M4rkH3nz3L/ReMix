@@ -1634,6 +1634,36 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     const blPx = Math.round((clip.baselineShift ?? 0) * fontPx);
     const posY = blPx !== 0 ? `(${posYRaw}-${blPx})` : posYRaw;
 
+    // 🪟 Szöveg-maszk (mask text): a szöveg alakja ABLAK az alatta lévő
+    // kompozitra — a betűkben éles videó, körülötte elmosott+sötétített változat.
+    // A szöveg alfáját (a state-PNG) a vászonra pad-eljük, azzal maszkoljuk a
+    // kompozit egy másolatát, majd a sötétített bg-re overlay-ezzük; a teljes
+    // hatás a klip idővonal-ablakában cseréli le a képet (enable-lel).
+    if (clip.kind === 'text' && clip.maskReveal && t.states[0]) {
+      const st = t.states[0];
+      const from = clipStart;
+      const to = clipEndT;
+      const tw = Math.max(2, st.w || 2);
+      const th = Math.max(2, st.h || 2);
+      const padX = Math.max(0, Math.min(W - tw, Math.round(clip.position.x * W - tw / 2)));
+      const padY = Math.max(0, Math.min(H - th, Math.round(clip.position.y * H - th / 2)));
+      const tIdx = addInput(['-i', st.file], `t|${st.file}`);
+      const next = `vtx${txN}`;
+      graph.push(`[${vLabel}]split=3[mrg${txN}][mrf${txN}][mrb${txN}]`);
+      graph.push(`[mrb${txN}]boxblur=8:1,eq=brightness=-0.30:saturation=0.75[mrdk${txN}]`);
+      graph.push(`[${tIdx}:v]alphaextract,pad=${W}:${H}:${padX}:${padY}:color=black[mrm${txN}]`);
+      graph.push(`[mrf${txN}][mrm${txN}]alphamerge[mrwin${txN}]`);
+      graph.push(`[mrdk${txN}][mrwin${txN}]overlay=0:0[mreff${txN}]`);
+      graph.push(
+        `[mrg${txN}][mreff${txN}]overlay=0:0:enable='between(t,${from.toFixed(3)},${to.toFixed(
+          3
+        )})'[${next}]`
+      );
+      vLabel = next;
+      txN++;
+      continue;
+    }
+
     // 🎬 Kinetic typography: per-char/word/line animált PNG-KÉPSOR (a statikus
     // state-eket felülírja). A beérkező (loop=false) animáció után a beállt
     // teljes szöveg (lastFile) áll ki a klip végéig; a wave (loop=true) a

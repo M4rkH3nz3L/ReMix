@@ -101,8 +101,11 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   difference, exclusion, hardlight, softlight, colordodge, colorburn — a **Forma**
   és a **PiP-keret** panelen; a preview `mixBlendMode`-dal, a render ffmpeg
   `blend=all_mode`-dal (WYSIWYG, a dodge/burn kissé közelít).
-- **Green screen / chroma key** (`ChromaKey`): kulcs-szín + tűrés + él-lágyítás,
-  **+ 🟢 spill-suppression** (a zöld/kék perem eltávolítása a témáról — `despill`).
+- **Green screen / chroma key** (`ChromaKey`) — teljes manuális workflow (az AI
+  háttér-eltávolítás MELLETT, más folyamat): **🎨 Color Picker** (a vásznon a
+  háttérre koppintva mintavett kulcs-szín, nem csak preset zöld/kék) → **Tolerance**
+  (similarity) → **Feather** (él-lágyítás) → **🟢 Spill** (a zöld/kék perem
+  eltávolítása, `despill`) → **✂️ Edge** (matte choke/grow, `erosion`/`dilation`).
 - **🎭 Track / luma / alpha matte** (`ClipMatte`, Szűrő panel): egy külső kép
   fényereje (luma) vagy alfája (alpha) adja a klip átlátszóságát → clipping mask
   tetszőleges média-formára; invertálható.
@@ -283,7 +286,7 @@ A fő UI-zónák a leckékhez:
 
 **11b. lecke — Compositing (blend, green screen, matte, pre-compose)**
 1. *Művelet:* Keverd a réteget az alatta lévővel. *Hol:* **Forma** / **PiP** panel → blend-mód (multiply/screen/overlay/…/hardlight). *Eredmény:* a réteg a blend szerint keveredik.
-2. *Művelet:* Green screen kulcsolás + tisztítás. *Hol:* **Szűrő** panel → green screen (kulcs-szín + tűrés) → **Spill** stepper. *Eredmény:* a háttér eltűnik, a zöld/kék perem letisztul.
+2. *Művelet:* Green screen kulcsolás + finomítás. *Hol:* **Szűrő** panel → green screen: **🎨 Színpipetta** (koppints a háttérre) → **Tolerance** → **Feather** → **Spill** → **✂️ Edge**. *Eredmény:* a háttér eltűnik, a perem letisztul és pontosan igazítható (choke/grow).
 3. *Művelet:* Vágj a klipbe egy külső forma alapján. *Hol:* **Szűrő** panel → **🎭 Matte** → *Matte-kép választása* → **Luma/Alfa** + invertálás. *Eredmény:* a klip csak a matte világos/átlátszatlan részén látszik.
 4. *Művelet:* Fogj össze sok klipet egy blokká. *Hol:* jelölj ki több klipet (**Több** mód) → Toolbar → **Pre-compose**. *Eredmény:* egy compound (beágyazott) klip, ami egyben mozgatható/effektelhető; a render rekurzívan legyártja a tartalmát.
 

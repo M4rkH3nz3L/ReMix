@@ -954,7 +954,36 @@
       "clearAutomation_other": "Clear automation ({{count}})",
       "mixHint": "Voice Studio (noise reduction + compressor + loudness) and ducking take effect in the rendered MP4. Volume automation: set the volume, move the playhead to the desired point, and hit ◆ — the volume crosses over between keyframes (in preview and render alike).",
       "emptyHint": "Select an audio clip on the timeline to mix, or add music with the „Music” button.",
-      "openHangStudio": "Open Sound Studio"
+      "openHangStudio": "Open Sound Studio",
+      "pan": "Pan (L/R)",
+      "panCenter": "center",
+      "panL": "L",
+      "panR": "R",
+      "beatTitle": "🥁 Beat → markers / cuts",
+      "beatDownbeat": "Downbeat",
+      "beatEveryBeat": "Every beat",
+      "beatDetecting": "Detecting beats…",
+      "beatToMarkers": "→ Markers",
+      "beatToCuts": "→ Cut points",
+      "beatApplyCuts": "Apply cuts ({{count}})",
+      "beatDiscardCuts": "Discard cuts",
+      "beatHint": "Markers or non-destructive cut points from the music beats (cuts are applied separately).",
+      "beatNone": "No beats found (is the worker running? is there a music clip?).",
+      "beatMarkersDone": "{{count}} markers added.",
+      "fxTitle": "🎛️ Pro audio (effects)",
+      "fxHighpass": "High-pass (rumble)",
+      "fxLowpass": "Low-pass (hiss)",
+      "fxEqLow": "EQ low",
+      "fxEqMid": "EQ mid",
+      "fxEqHigh": "EQ high",
+      "fxReverb": "Reverb",
+      "fxDelay": "Delay (echo)",
+      "fxDenoise": "Denoise",
+      "fxDeEsser": "De-esser",
+      "fxCompressor": "Compressor",
+      "fxLimiter": "Limiter",
+      "fxNormalize": "Normalize",
+      "fxHint": "Effects are baked in the render (granular, alongside the voiceEnhance bundle). The preview approximates."
     },
     "captions": {
       "wordTiming": "Word timing",
@@ -1951,7 +1980,8 @@
       "groupMove": "group move",
       "deleteRange": "delete range ({{seconds}}s)",
       "rollEdit": "roll edit",
-      "slideEdit": "slide edit"
+      "slideEdit": "slide edit",
+      "beatMarker": "♪ beat"
     },
     "progress": {
       "starting": "Starting…"

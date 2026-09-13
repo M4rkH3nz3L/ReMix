@@ -954,7 +954,36 @@
       "clearAutomation_other": "Automation löschen ({{count}})",
       "mixHint": "Voice Studio (Rauschunterdrückung + Kompressor + Loudness) und Ducking wirken im gerenderten MP4. Lautstärke-Automation: stelle die Lautstärke ein, setze den Playhead an den gewünschten Punkt und drücke ◆ — die Lautstärke blendet zwischen den Keyframes über (in Vorschau und Render).",
       "emptyHint": "Wähle einen Audioclip auf der Timeline zum Mischen aus oder füge Musik mit dem „Musik”-Button hinzu.",
-      "openHangStudio": "Sound-Studio öffnen"
+      "openHangStudio": "Sound-Studio öffnen",
+      "pan": "Panorama (L/R)",
+      "panCenter": "Mitte",
+      "panL": "L",
+      "panR": "R",
+      "beatTitle": "🥁 Beat → Marker / Schnitte",
+      "beatDownbeat": "Taktschlag",
+      "beatEveryBeat": "Jeder Beat",
+      "beatDetecting": "Beat-Erkennung…",
+      "beatToMarkers": "→ Marker",
+      "beatToCuts": "→ Schnittpunkte",
+      "beatApplyCuts": "Schnitte anwenden ({{count}})",
+      "beatDiscardCuts": "Schnitte verwerfen",
+      "beatHint": "Marker oder nicht-destruktive Schnittpunkte aus den Musik-Beats (Schnitte werden separat angewendet).",
+      "beatNone": "Keine Beats gefunden (läuft der Worker? gibt es einen Musik-Clip?).",
+      "beatMarkersDone": "{{count}} Marker hinzugefügt.",
+      "fxTitle": "🎛️ Pro-Audio (Effekte)",
+      "fxHighpass": "Hochpass (Rumpeln)",
+      "fxLowpass": "Tiefpass (Zischen)",
+      "fxEqLow": "EQ Tiefen",
+      "fxEqMid": "EQ Mitten",
+      "fxEqHigh": "EQ Höhen",
+      "fxReverb": "Hall",
+      "fxDelay": "Delay (Echo)",
+      "fxDenoise": "Entrauschen",
+      "fxDeEsser": "De-Esser",
+      "fxCompressor": "Kompressor",
+      "fxLimiter": "Limiter",
+      "fxNormalize": "Normalisieren",
+      "fxHint": "Effekte werden im Render angewendet (granular, neben dem voiceEnhance-Paket). Die Vorschau nähert an."
     },
     "captions": {
       "wordTiming": "Wort-Timing",
@@ -1951,7 +1980,8 @@
       "groupMove": "Gruppe verschoben",
       "deleteRange": "Bereich löschen ({{seconds}}s)",
       "rollEdit": "Roll-Schnitt",
-      "slideEdit": "Slide-Schnitt"
+      "slideEdit": "Slide-Schnitt",
+      "beatMarker": "♪ Beat"
     },
     "progress": {
       "starting": "Wird gestartet…"

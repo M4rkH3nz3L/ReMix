@@ -322,6 +322,10 @@ interface EditorState {
   setPlaying: (playing: boolean) => void;
   setLoop: (loop: boolean) => void;
   setBeatGrid: (beatTimes: number[], downbeatTimes: number[]) => void;
+  /** 🥁 markerek a beat-rácsból (minden beat vagy csak az ütemegy); @returns hány új jelölő */
+  markersFromBeats: (mode: 'beat' | 'downbeat') => number;
+  /** 🥁 javasolt vágáspontok a beat-rácsból (nem-destruktív; az applySuggestedCuts alkalmazza) */
+  cutsFromBeats: (mode: 'beat' | 'downbeat') => number;
   setVariantPreview: (ranges: { start: number; end: number }[] | null) => void;
   setPickTarget: (fn: ((point: { x: number; y: number }) => void) | null) => void;
   setZoom: (zoom: number) => void;
@@ -908,6 +912,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }
     set({ suggestedCuts: [] });
+  },
+
+  markersFromBeats: (mode) => {
+    const { project, beatTimes, downbeatTimes } = get();
+    if (!project) {
+      return 0;
+    }
+    const times = mode === 'downbeat' ? downbeatTimes : beatTimes;
+    if (times.length === 0) {
+      return 0;
+    }
+    const markers = [...(project.markers ?? [])];
+    let added = 0;
+    for (const time of times) {
+      const t2 = Math.round(time * 100) / 100;
+      // már meglévő jelölő közelébe (±0.05 mp) ne tegyünk másikat
+      if (markers.some((m) => Math.abs(m.time - t2) < 0.05)) {
+        continue;
+      }
+      markers.push({ id: makeId('mk'), time: t2, label: tr('store.editor.beatMarker'), color: '#4a9eff' });
+      added += 1;
+    }
+    if (added === 0) {
+      return 0;
+    }
+    get().dispatch({ type: 'SET_MARKERS', markers });
+    return added;
+  },
+
+  cutsFromBeats: (mode) => {
+    const { beatTimes, downbeatTimes } = get();
+    const times = mode === 'downbeat' ? downbeatTimes : beatTimes;
+    // nem-destruktív: szaggatott jelölés; a felhasználó az applySuggestedCuts-tal alkalmazza
+    get().setSuggestedCuts(times);
+    return times.length;
   },
 
   setRippleMode: (on) => set({ rippleMode: on }),

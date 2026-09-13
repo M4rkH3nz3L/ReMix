@@ -11,6 +11,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { detectBeats, timelineBeats } from '@/lib/beats';
 import { makeId } from '@/lib/id';
 import { setChannelKeyframe } from '@/lib/keyframes';
 import { pickAudio } from '@/lib/media';
@@ -21,7 +22,7 @@ import { fetchTtsVoices, generateTts, type TtsVoice } from '@/lib/tts';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
-import type { AudioClip, TextClip } from '@/types/project';
+import type { AudioClip, AudioFx, TextClip } from '@/types/project';
 
 /**
  * Hang-panel: voiceover-felvétel közvetlenül az appból + a kijelölt hangklip
@@ -31,6 +32,79 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const addClip = useEditorStore((s) => s.addClip);
+  // 🥁 beat → marker / vágás
+  const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
+  const hasAudio = useEditorStore((s) =>
+    (s.project?.tracks ?? []).some(
+      (tk) => (tk.type === 'music' || tk.type === 'voiceover' || tk.type === 'sfx') && tk.clips.length > 0
+    )
+  );
+  const [beatMode, setBeatMode] = useState<'beat' | 'downbeat'>('downbeat');
+  const [beatBusy, setBeatBusy] = useState(false);
+
+  // 🎛️ per-klip audio-FX olvasó/író segédek (a kijelölt klipre)
+  const fx: AudioFx = clip?.audioFx ?? {};
+  const eq = fx.eq ?? { low: 0, mid: 0, high: 0 };
+  const setFx = (patch: Partial<AudioFx>) => {
+    if (clip) {
+      updateClip(clip.id, { audioFx: { ...fx, ...patch } });
+    }
+  };
+  const setEq = (patch: Partial<typeof eq>) => setFx({ eq: { ...eq, ...patch } });
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  const panLabel = (p: number) =>
+    Math.abs(p) < 0.05
+      ? t('panels.audio.panCenter')
+      : `${p < 0 ? t('panels.audio.panL') : t('panels.audio.panR')} ${Math.round(Math.abs(p) * 100)}%`;
+
+  /**
+   * A beat-rács forrása: a zenesáv első klipje (vagy a kijelölt hangklip). A
+   * detektálás fájlonként cache-elt; ha még nincs rács a store-ban, itt kérjük le.
+   */
+  const beatSource = (): AudioClip | null => {
+    const project = useEditorStore.getState().project;
+    const music = project?.tracks
+      .find((x) => x.type === 'music')
+      ?.clips.filter((c): c is AudioClip => c.kind === 'audio')
+      .sort((a, b) => a.start - b.start)[0];
+    return music ?? clip ?? null;
+  };
+  const ensureBeats = async (): Promise<boolean> => {
+    const st = useEditorStore.getState();
+    if (st.beatTimes.length > 0) {
+      return true;
+    }
+    const src = beatSource();
+    if (!src) {
+      return false;
+    }
+    setBeatBusy(true);
+    try {
+      const grid = await detectBeats(src.uri);
+      if (!grid || grid.beats.length === 0) {
+        return false;
+      }
+      st.setBeatGrid(timelineBeats(src, grid.beats), timelineBeats(src, grid.downbeats));
+      return true;
+    } finally {
+      setBeatBusy(false);
+    }
+  };
+  const runBeatMarkers = async () => {
+    if (!(await ensureBeats())) {
+      Alert.alert(t('panels.audio.beatTitle'), t('panels.audio.beatNone'));
+      return;
+    }
+    const n = useEditorStore.getState().markersFromBeats(beatMode);
+    Alert.alert(t('panels.audio.beatTitle'), t('panels.audio.beatMarkersDone', { count: n }));
+  };
+  const runBeatCuts = async () => {
+    if (!(await ensureBeats())) {
+      Alert.alert(t('panels.audio.beatTitle'), t('panels.audio.beatNone'));
+      return;
+    }
+    useEditorStore.getState().cutsFromBeats(beatMode);
+  };
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -353,7 +427,65 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
         )}
       </PanelSection>
 
+      {hasAudio ? (
+        <PanelSection title={t('panels.audio.beatTitle')}>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t('panels.audio.beatDownbeat')}
+              active={beatMode === 'downbeat'}
+              onPress={() => setBeatMode('downbeat')}
+            />
+            <Chip
+              label={t('panels.audio.beatEveryBeat')}
+              active={beatMode === 'beat'}
+              onPress={() => setBeatMode('beat')}
+            />
+          </View>
+          {beatBusy ? (
+            <View style={styles.ttsBusy}>
+              <ActivityIndicator color={palette.accent} />
+              <Text style={styles.note}>{t('panels.audio.beatDetecting')}</Text>
+            </View>
+          ) : (
+            <View style={styles.chipRow}>
+              <Chip
+                label={t('panels.audio.beatToMarkers')}
+                active={false}
+                onPress={() => {
+                  runBeatMarkers().catch(() => {});
+                }}
+              />
+              <Chip
+                label={t('panels.audio.beatToCuts')}
+                active={false}
+                onPress={() => {
+                  runBeatCuts().catch(() => {});
+                }}
+              />
+            </View>
+          )}
+          {suggestedCuts.length > 0 ? (
+            <>
+              <PrimaryButton
+                icon="cut"
+                label={t('panels.audio.beatApplyCuts', { count: suggestedCuts.length })}
+                onPress={() => useEditorStore.getState().applySuggestedCuts()}
+              />
+              <View style={styles.chipRow}>
+                <Chip
+                  label={t('panels.audio.beatDiscardCuts')}
+                  active={false}
+                  onPress={() => useEditorStore.getState().clearSuggestedCuts()}
+                />
+              </View>
+            </>
+          ) : null}
+          <Text style={styles.note}>{t('panels.audio.beatHint')}</Text>
+        </PanelSection>
+      ) : null}
+
       {clip ? (
+        <>
         <PanelSection title={t('panels.audio.mixTitle', { label: clip.label })}>
           <PrimaryButton
             icon="options-outline"
@@ -377,6 +509,13 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             value={t('panels.audio.seconds', { value: clip.fadeOut.toFixed(1) })}
             onDec={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut - 0.5, 0, 10) })}
             onInc={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut + 0.5, 0, 10) })}
+          />
+          {/* 🎚️ sztereó pásztázás (bal ↔ jobb) — a renderben */}
+          <Stepper
+            label={t('panels.audio.pan')}
+            value={panLabel(clip.pan ?? 0)}
+            onDec={() => updateClip(clip.id, { pan: clamp(round1((clip.pan ?? 0) - 0.2), -1, 1) })}
+            onInc={() => updateClip(clip.id, { pan: clamp(round1((clip.pan ?? 0) + 0.2), -1, 1) })}
           />
           <View style={styles.chipRow}>
             {clip.source === 'voiceover' ? (
@@ -432,6 +571,61 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             {t('panels.audio.mixHint')}
           </Text>
         </PanelSection>
+
+        {/* 🎛️ Pro audio-effektek — a renderben alkalmazódnak (előnézet közelít) */}
+        <PanelSection title={t('panels.audio.fxTitle')}>
+          <Stepper
+            label={t('panels.audio.fxHighpass')}
+            value={fx.highpass ? `${fx.highpass} Hz` : t('common.off')}
+            onDec={() => setFx({ highpass: (fx.highpass ?? 0) <= 60 ? 0 : (fx.highpass ?? 0) - 20 })}
+            onInc={() => setFx({ highpass: (fx.highpass ?? 0) === 0 ? 60 : Math.min(300, (fx.highpass ?? 0) + 20) })}
+          />
+          <Stepper
+            label={t('panels.audio.fxLowpass')}
+            value={fx.lowpass ? `${Math.round(fx.lowpass / 1000)} kHz` : t('common.off')}
+            onDec={() => setFx({ lowpass: (fx.lowpass ?? 0) === 0 ? 16000 : Math.max(2000, (fx.lowpass ?? 0) - 2000) })}
+            onInc={() => setFx({ lowpass: (fx.lowpass ?? 0) === 0 || (fx.lowpass ?? 0) >= 16000 ? 0 : (fx.lowpass ?? 0) + 2000 })}
+          />
+          <Stepper
+            label={t('panels.audio.fxEqLow')}
+            value={`${eq.low > 0 ? '+' : ''}${eq.low} dB`}
+            onDec={() => setEq({ low: Math.max(-12, eq.low - 3) })}
+            onInc={() => setEq({ low: Math.min(12, eq.low + 3) })}
+          />
+          <Stepper
+            label={t('panels.audio.fxEqMid')}
+            value={`${eq.mid > 0 ? '+' : ''}${eq.mid} dB`}
+            onDec={() => setEq({ mid: Math.max(-12, eq.mid - 3) })}
+            onInc={() => setEq({ mid: Math.min(12, eq.mid + 3) })}
+          />
+          <Stepper
+            label={t('panels.audio.fxEqHigh')}
+            value={`${eq.high > 0 ? '+' : ''}${eq.high} dB`}
+            onDec={() => setEq({ high: Math.max(-12, eq.high - 3) })}
+            onInc={() => setEq({ high: Math.min(12, eq.high + 3) })}
+          />
+          <Stepper
+            label={t('panels.audio.fxReverb')}
+            value={`${Math.round((fx.reverb ?? 0) * 100)}%`}
+            onDec={() => setFx({ reverb: Math.max(0, round1((fx.reverb ?? 0) - 0.2)) })}
+            onInc={() => setFx({ reverb: Math.min(1, round1((fx.reverb ?? 0) + 0.2)) })}
+          />
+          <Stepper
+            label={t('panels.audio.fxDelay')}
+            value={`${Math.round((fx.delay ?? 0) * 100)}%`}
+            onDec={() => setFx({ delay: Math.max(0, round1((fx.delay ?? 0) - 0.2)) })}
+            onInc={() => setFx({ delay: Math.min(1, round1((fx.delay ?? 0) + 0.2)) })}
+          />
+          <View style={styles.chipRow}>
+            <Chip label={t('panels.audio.fxDenoise')} active={fx.denoise === true} onPress={() => setFx({ denoise: !fx.denoise })} />
+            <Chip label={t('panels.audio.fxDeEsser')} active={fx.deEsser === true} onPress={() => setFx({ deEsser: !fx.deEsser })} />
+            <Chip label={t('panels.audio.fxCompressor')} active={fx.compressor === true} onPress={() => setFx({ compressor: !fx.compressor })} />
+            <Chip label={t('panels.audio.fxLimiter')} active={fx.limiter === true} onPress={() => setFx({ limiter: !fx.limiter })} />
+            <Chip label={t('panels.audio.fxNormalize')} active={fx.normalize === true} onPress={() => setFx({ normalize: !fx.normalize })} />
+          </View>
+          <Text style={styles.note}>{t('panels.audio.fxHint')}</Text>
+        </PanelSection>
+        </>
       ) : (
         <Text style={styles.note}>
           {t('panels.audio.emptyHint')}

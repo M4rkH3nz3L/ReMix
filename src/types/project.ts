@@ -482,6 +482,35 @@ export interface ShapeClip extends ClipBase {
   outline?: { color: string; width: number };
 }
 
+/**
+ * 🎛️ Per-klip audio-effekt lánc (Pro audio) — a RENDERBEN alkalmazódik (FFmpeg),
+ * a `voiceEnhance`/`deReverb` egygombos csomag MELLETT, granuláris vezérléssel.
+ * Az előnézet ezt (a szűrőkhöz hasonlóan) nem játssza pontosan — a render a
+ * mérvadó (lásd README). Minden mező hiánya = kikapcsolt (semleges).
+ */
+export interface AudioFx {
+  /** aluláteresztő: e Hz alatti dörej vágása (pl. 80); 0/hiányzó = ki */
+  highpass?: number;
+  /** felüláteresztő: e Hz fölötti sziszegés vágása (pl. 12000); 0/hiányzó = ki */
+  lowpass?: number;
+  /** 3-sávos EQ erősítés dB-ben (-12…12); mind 0 = ki */
+  eq?: { low: number; mid: number; high: number };
+  /** zajszűrés (afftdn) */
+  denoise?: boolean;
+  /** sziszegés-csökkentés (deesser) */
+  deEsser?: boolean;
+  /** kompresszor (dinamika-szűkítés) */
+  compressor?: boolean;
+  /** limiter (kemény plafon a csúcsokra) */
+  limiter?: boolean;
+  /** loudness-normalizálás −16 LUFS-re (loudnorm) */
+  normalize?: boolean;
+  /** visszhang-tér mértéke 0–1 (aecho) */
+  reverb?: number;
+  /** echo/delay mértéke 0–1 (aecho) */
+  delay?: number;
+}
+
 export interface AudioClip extends ClipBase {
   kind: 'audio';
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
@@ -490,6 +519,10 @@ export interface AudioClip extends ClipBase {
   label: string;
   /** 0–1 */
   volume: number;
+  /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */
+  pan?: number;
+  /** 🎛️ per-klip audio-effekt lánc (Pro audio) — a renderben */
+  audioFx?: AudioFx;
   /** fade hossz mp-ben */
   fadeIn: number;
   fadeOut: number;

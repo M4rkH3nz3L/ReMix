@@ -12,7 +12,7 @@ const path = require('path');
 const { bgRemoveDir } = require('./bgremove');
 const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
-const { VOICE_ENHANCE, dereverbChain } = require('./voicechain');
+const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter } = require('./voicechain');
 
 const FPS = 30;
 
@@ -1563,6 +1563,9 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       `[${idx}:a]atrim=0:${clip.duration.toFixed(3)},asetpts=PTS-STARTPTS,` +
       (clip.deReverb ? DEREVERB : '') +
       (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+      // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
+      audioFxChain(clip.audioFx) +
+      panFilter(clip.pan) +
       volumeExpr(clip, 0);
     if (clip.fadeIn > 0) {
       chain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`;

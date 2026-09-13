@@ -954,7 +954,36 @@
       "clearAutomation_other": "Automáció törlése ({{count}})",
       "mixHint": "A Voice Studio (zajszűrés + kompresszor + loudness) és a ducking a renderelt MP4-ben érvényesül. Hangerő-automáció: állítsd a hangerőt, állj a playheaddel a kívánt pontra, és üsd le a ◆-t — a hangerő a kulcskockák közt átúszik (előnézetben és renderben is).",
       "emptyHint": "Jelölj ki egy hangklipet az idővonalon a keveréshez, vagy adj hozzá zenét a „Zene” gombbal.",
-      "openHangStudio": "Hang Stúdió megnyitása"
+      "openHangStudio": "Hang Stúdió megnyitása",
+      "pan": "Pásztázás (L/R)",
+      "panCenter": "közép",
+      "panL": "B",
+      "panR": "J",
+      "beatTitle": "🥁 Beat → jelölők / vágás",
+      "beatDownbeat": "Ütemegy",
+      "beatEveryBeat": "Minden beat",
+      "beatDetecting": "Beat-detektálás…",
+      "beatToMarkers": "→ Jelölők",
+      "beatToCuts": "→ Vágáspontok",
+      "beatApplyCuts": "Vágás alkalmazása ({{count}})",
+      "beatDiscardCuts": "Vágások elvetése",
+      "beatHint": "A zene beatjeiből jelölők vagy nem-destruktív vágáspontok (utóbbit külön kell alkalmazni).",
+      "beatNone": "Nem sikerült beatet találni (fut a worker? van zeneklip?).",
+      "beatMarkersDone": "{{count}} jelölő hozzáadva.",
+      "fxTitle": "🎛️ Pro audio (effektek)",
+      "fxHighpass": "Aluláteresztő (dörej)",
+      "fxLowpass": "Felüláteresztő (sziszegés)",
+      "fxEqLow": "EQ mély",
+      "fxEqMid": "EQ közép",
+      "fxEqHigh": "EQ magas",
+      "fxReverb": "Reverb (tér)",
+      "fxDelay": "Delay (echo)",
+      "fxDenoise": "Zajszűrés",
+      "fxDeEsser": "De-esser",
+      "fxCompressor": "Kompresszor",
+      "fxLimiter": "Limiter",
+      "fxNormalize": "Normalizálás",
+      "fxHint": "Az effektek a renderben égnek be (a −16 LUFS voiceEnhance csomag mellett, granulárisan). Az előnézet közelít."
     },
     "captions": {
       "wordTiming": "Szó-időzítés",
@@ -1951,7 +1980,8 @@
       "groupMove": "csoport mozgatása",
       "deleteRange": "tartomány törlése ({{seconds}} mp)",
       "rollEdit": "roll-vágás",
-      "slideEdit": "slide-vágás"
+      "slideEdit": "slide-vágás",
+      "beatMarker": "♪ beat"
     },
     "progress": {
       "starting": "Indítás…"

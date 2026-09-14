@@ -179,6 +179,22 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         </Text>
       </PanelSection>
 
+      <PanelSection title={t('panels.speed.interpTitle')}>
+        <View style={styles.row}>
+          {(['none', 'blend', 'flow'] as const).map((mode) => (
+            <Chip
+              key={mode}
+              label={t('panels.speed.interp_' + mode)}
+              active={(clip.timeInterp ?? 'none') === mode}
+              onPress={() =>
+                updateClip(clip.id, { timeInterp: mode === 'none' ? undefined : mode })
+              }
+            />
+          ))}
+        </View>
+        <Text style={styles.note}>{t('panels.speed.interpNote')}</Text>
+      </PanelSection>
+
       <PanelSection title={t('panels.speed.volumeTitle')}>
         <Stepper
           label={t('panels.speed.clipAudio')}

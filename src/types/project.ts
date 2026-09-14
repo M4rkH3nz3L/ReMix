@@ -456,6 +456,13 @@ export interface VideoClip extends ClipBase {
    */
   motionBlur?: number;
   /**
+   * ⏱️ Idő-interpoláció (time remapping minőség) lassításnál/gyorsításnál:
+   * `flow` = optical flow / mozgásbecslés (minterpolate mci — a legsimább),
+   * `blend` = képkocka-keverés (frame blending), `none`/hiányzó = kockadobás/-
+   * duplázás (a régi motionBlur-alapú auto). A renderben; az előnézet a nyerset mutatja.
+   */
+  timeInterp?: 'none' | 'blend' | 'flow';
+  /**
    * 🎯 Videó-stabilizálás (a renderben, `deshake`): a bemozdulást képkockánként
    * kompenzálja. A meglévő minőség-vizsgálat (qualityScan) csak MÉR — ez a
    * tényleges stabilizálás.

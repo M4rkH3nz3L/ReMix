@@ -350,18 +350,35 @@ function selectiveChain(clip, W, H, labelIn, labelOut, idx, graph, addInput, dur
 function motionChain(clip, dur) {
   const strength = Math.max(0, Math.min(1, clip.motionBlur ?? 0));
   const plain = `fps=${FPS},`;
+  const fast = clip.speed > 1.05;
+  const slow = clip.speed < 0.95;
+  const speedupBlend = () => {
+    // a sebességgel arányos keverési ablak (2× → ~4 kocka, 6×-nál a 8-as plafon)
+    const frames = Math.max(2, Math.min(8, Math.round(1 + Math.max(strength, 0.5) * clip.speed * 1.6)));
+    return `tmix=frames=${frames},${plain}`;
+  };
+  // ⏱️ explicit idő-interpoláció (time remapping) — felülírja a motionBlur-autót
+  const interp = clip.timeInterp;
+  if (interp && interp !== 'none') {
+    if (slow && dur <= 12) {
+      return interp === 'flow'
+        ? `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,`
+        : `minterpolate=fps=${FPS}:mi_mode=blend,`; // képkocka-keverés
+    }
+    if (fast) {
+      return speedupBlend();
+    }
+    return plain;
+  }
+  // vissza a motionBlur-alapú viselkedésre (kompatibilitás)
   if (strength <= 0) {
     return plain;
   }
-  if (clip.speed > 1.05) {
-    // a sebességgel arányos keverési ablak (2× → ~4 kocka, 6×-nál a 8-as plafon)
-    const frames = Math.max(2, Math.min(8, Math.round(1 + strength * clip.speed * 1.6)));
-    return `tmix=frames=${frames},${plain}`;
+  if (fast) {
+    return speedupBlend();
   }
-  if (clip.speed < 0.95 && dur <= 8) {
-    return (
-      `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,`
-    );
+  if (slow && dur <= 8) {
+    return `minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,`;
   }
   return plain;
 }

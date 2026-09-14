@@ -1614,7 +1614,12 @@
       "clearAutomation_one": "Automation löschen ({{count}})",
       "clearAutomation_other": "Automation löschen ({{count}})",
       "enhancedAudioNote": "🎙️ Der verbesserte Ton ist auch in der VORSCHAU zu hören (der Worker verarbeitet ihn mit derselben Kette wie der Render). Beim ersten Abspielen läuft ein paar Sekunden noch der rohe Ton, bis er fertig ist.",
-      "volumeAutomationNote": "Lautstärke-Automation: stell die Lautstärke ein, geh mit dem Playhead zur gewünschten Stelle und tippe auf ◆ — die Lautstärke blendet zwischen den Keyframes über."
+      "volumeAutomationNote": "Lautstärke-Automation: stell die Lautstärke ein, geh mit dem Playhead zur gewünschten Stelle und tippe auf ◆ — die Lautstärke blendet zwischen den Keyframes über.",
+      "interpTitle": "⏱️ Zeit-Interpolation",
+      "interp_none": "Keine",
+      "interp_blend": "Mischen",
+      "interp_flow": "Optical Flow",
+      "interpNote": "Zwischenbild-Qualität beim Verlangsamen: Keine (Bildwiederholung) · Mischen (Frame-Blending) · Optical Flow (bewegungsschätzend, am glättesten). Wird im Render gebacken."
     },
     "sticker": {
       "object3dTitle": "3D-Objekt",

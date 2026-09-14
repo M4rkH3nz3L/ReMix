@@ -1614,7 +1614,12 @@
       "clearAutomation_one": "Automáció törlése ({{count}})",
       "clearAutomation_other": "Automáció törlése ({{count}})",
       "enhancedAudioNote": "🎙️ A javított hang az ELŐNÉZETBEN is hallható (a worker ugyanazzal a lánccal dolgozza fel, mint a render). Az első lejátszáskor pár másodpercig még a nyers hang szól, amíg elkészül.",
-      "volumeAutomationNote": "Hangerő-automáció: állítsd a hangerőt, állj a playheaddel a kívánt pontra, és üsd le a ◆-t — a hangerő a kulcskockák közt átúszik."
+      "volumeAutomationNote": "Hangerő-automáció: állítsd a hangerőt, állj a playheaddel a kívánt pontra, és üsd le a ◆-t — a hangerő a kulcskockák közt átúszik.",
+      "interpTitle": "⏱️ Idő-interpoláció",
+      "interp_none": "Nincs",
+      "interp_blend": "Keverés",
+      "interp_flow": "Optical flow",
+      "interpNote": "Lassításnál a köztes kockák minősége: Nincs (kockadoblás) · Keverés (frame blending) · Optical flow (mozgásbecsléssel a legsimább). A renderben ég be."
     },
     "sticker": {
       "object3dTitle": "3D objektum",

@@ -1614,7 +1614,12 @@
       "clearAutomation_one": "Clear automation ({{count}})",
       "clearAutomation_other": "Clear automation ({{count}})",
       "enhancedAudioNote": "🎙️ The enhanced audio is also heard in the PREVIEW (the worker processes it with the same chain as the render). On the first playback the raw audio plays for a few seconds until it's ready.",
-      "volumeAutomationNote": "Volume automation: set the volume, move the playhead to the desired point, and hit ◆ — the volume fades between the keyframes."
+      "volumeAutomationNote": "Volume automation: set the volume, move the playhead to the desired point, and hit ◆ — the volume fades between the keyframes.",
+      "interpTitle": "⏱️ Time interpolation",
+      "interp_none": "None",
+      "interp_blend": "Blend",
+      "interp_flow": "Optical flow",
+      "interpNote": "In-between frame quality when slowing down: None (frame drop/dup) · Blend (frame blending) · Optical flow (motion-estimated, smoothest). Bakes in the render."
     },
     "sticker": {
       "object3dTitle": "3D object",

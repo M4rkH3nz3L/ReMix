@@ -1664,6 +1664,52 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       continue;
     }
 
+    // 🎞️ Path-animáció (drawOn / morph): per-frame forma-képsor; a beérkező
+    // animáció után a beállt alak (lastFile) áll ki a klip végéig.
+    if (
+      clip.kind === 'shape' &&
+      clip.pathAnim &&
+      Array.isArray(clip.points) &&
+      clip.points.length >= 2
+    ) {
+      let seq = null;
+      try {
+        const { renderPathSequence } = require('./shape-motion');
+        const psDir = path.join(workDir, 'pathanim');
+        fs.mkdirSync(psDir, { recursive: true });
+        seq = await renderPathSequence(clip, canvas, psDir, FPS);
+      } catch (err) {
+        console.warn('path-anim kihagyva:', err.message);
+      }
+      if (seq) {
+        const from = clipStart;
+        const to = clipEndT;
+        const animEnd = Math.min(to, from + seq.animTotal);
+        const seqIdx = addInput(['-framerate', String(FPS), '-i', seq.pattern]);
+        graph.push(`[${seqIdx}:v]format=rgba,setpts=PTS+${from.toFixed(3)}/TB[pseq${txN}]`);
+        const mid = `vtx${txN}`;
+        graph.push(
+          `[${vLabel}][pseq${txN}]overlay=x='${posX}-w/2':y='${posY}-h/2':eof_action=pass:enable='between(t,${from.toFixed(
+            3
+          )},${animEnd.toFixed(3)})'[${mid}]`
+        );
+        vLabel = mid;
+        txN++;
+        if (seq.lastFile && to - animEnd > 0.02) {
+          const lastIdx = addInput(['-i', seq.lastFile], `t|${seq.lastFile}`);
+          const next2 = `vtx${txN}`;
+          graph.push(
+            `[${vLabel}][${lastIdx}:v]overlay=x='${posX}-w/2':y='${posY}-h/2':enable='between(t,${animEnd.toFixed(
+              3
+            )},${to.toFixed(3)})'[${next2}]`
+          );
+          vLabel = next2;
+          txN++;
+        }
+        continue;
+      }
+    }
+
     // 🎬 Kinetic typography: per-char/word/line animált PNG-KÉPSOR (a statikus
     // state-eket felülírja). A beérkező (loop=false) animáció után a beállt
     // teljes szöveg (lastFile) áll ki a klip végéig; a wave (loop=true) a

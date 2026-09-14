@@ -1549,7 +1549,14 @@
       "bool_intersect": "Schnitt",
       "bool_exclude": "Ausschließen",
       "boolHint": "Wähle EINE weitere Form (Mehrfachauswahl), um sie mit der aktuellen zu kombinieren.",
-      "boolFail": "Die beiden Formen lassen sich nicht kombinieren (keine Überlappung oder ungültig)."
+      "boolFail": "Die beiden Formen lassen sich nicht kombinieren (keine Überlappung oder ungültig).",
+      "pathAnimTitle": "🎞️ Pfad-Animation",
+      "pathAnim_drawOn": "Zeichnen",
+      "pathAnim_morph": "Morph",
+      "pathAnimDur": "Dauer",
+      "morphCapture": "Ziel erfassen",
+      "morphRecapture": "Ziel aktualisieren",
+      "morphNote": "Erfasst die aktuelle Form als Ziel, dann bearbeite den Pfad zur START-Form — der Render interpoliert von Start zu Ziel."
     },
     "speed": {
       "rampNotApplicable": "Für diesen Clip nicht anwendbar (zu kurz?).",

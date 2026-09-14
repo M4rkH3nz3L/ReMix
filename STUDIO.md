@@ -106,6 +106,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **🔗 Boolean műveletek** 🆕: **egyesítés / kivonás / metszet / kizárás** két kijelölt
   formán (többes kijelölés). Az eredmény összetett path (`subpaths` + `fill-rule`);
   a metszet/kivonás Sutherland–Hodgman-vágással pontos, függőség nélkül.
+- **🎞️ Path-animáció** 🆕: **megrajzol (draw-on)** — a vonal megrajzolja magát
+  (stroke-reveal + kitöltés-beúszás), és **morph** — a path átalakul egy rögzített
+  célalakba. A render per-frame Chromium-képsort éget (a beérkező után a beállt alak áll ki).
 - **Matrica** (ingyenes rész): emoji + részecske (konfetti/csillám/hó/parázs).
 - **PiP** keret: lekerekítés, keret, árnyék, blend.
 
@@ -349,6 +352,12 @@ A fő UI-zónák a leckékhez:
 2. *Művelet:* Görbézz. *Hol:* **📈 Görbék** → válts **RGB / R / G / B** közt, **koppints a rácsra** új ponthoz, **húzd** a pontokat. *Eredmény:* pontos tónus- és színcsatorna-kontroll.
 3. *Művelet:* Ellenőrizd méréssel. *Hol:* **🩻 Szkópok** → **Waveform / RGB-parade / Vektorszkóp / Hisztogram**; **⟳** a lejátszófejnél újramér. *Eredmény:* objektív kép a fényről és a színről.
 4. *Művelet:* LUT be/ki. *Hol:* **🎞️ 3D LUT** → **📥 .cube importálása** (kész look ráhúzása), vagy **📤 Export .cube** (a saját grade-ed hordozható LUT-ként). *Eredmény:* egységes, megosztható színvilág.
+
+**11d. lecke — Vektorformák (toll, gradient, boolean, path-animáció)**
+1. *Művelet:* Rajzolj path-t. *Hol:* **Forma** panel → *path* → **✏️ Toll / horgonypontok**: koppints új horgonyhoz, húzd a horgonyokat, a kijelölt **fogóit** húzva görbíts; **simítás / sarok / zárás**. *Eredmény:* pontos Bézier-forma (zárva = kitöltött).
+2. *Művelet:* Színezd gradienssel. *Hol:* **🌈 Fejlett gradient** → **Lineáris/Radiális/Konikus** + stopok (szín/pozíció/±) + szög. *Eredmény:* multi-stop kitöltés. Vonalhoz: **✂️ szaggatás / vég / illesztés**.
+3. *Művelet:* Kombinálj két formát. *Hol:* jelölj ki **két** formát (többes) → **🔗 Boolean** → egyesítés / kivonás / metszet / kizárás. *Eredmény:* egy összetett forma.
+4. *Művelet:* Animáld a path-t. *Hol:* **🎞️ Path-animáció** → **Megrajzol** (a vonal megrajzolja magát) vagy **Morph** (rögzíts célalakot, majd szerkeszd a kezdőt). *Eredmény:* a renderben a path animálva ég be.
 
 ### 🔵 Pro (worker / AI)
 

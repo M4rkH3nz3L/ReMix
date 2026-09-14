@@ -175,6 +175,66 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         </PanelSection>
       ) : null}
 
+      {clip.shape === 'path' && (clip.points?.length ?? 0) >= 2 ? (
+        <PanelSection title={t('panels.shape.pathAnimTitle')}>
+          <View style={styles.row}>
+            <Chip
+              label={t('common.none')}
+              active={!clip.pathAnim}
+              onPress={() => updateClip(clip.id, { pathAnim: undefined })}
+            />
+            <Chip
+              label={t('panels.shape.pathAnim_drawOn')}
+              active={clip.pathAnim?.mode === 'drawOn'}
+              onPress={() =>
+                updateClip(clip.id, { pathAnim: { mode: 'drawOn', dur: clip.pathAnim?.dur ?? 1 } })
+              }
+            />
+            <Chip
+              label={t('panels.shape.pathAnim_morph')}
+              active={clip.pathAnim?.mode === 'morph'}
+              onPress={() =>
+                updateClip(clip.id, {
+                  pathAnim: { mode: 'morph', dur: clip.pathAnim?.dur ?? 1, to: clip.pathAnim?.to },
+                })
+              }
+            />
+          </View>
+          {clip.pathAnim ? (
+            <Stepper
+              label={t('panels.shape.pathAnimDur')}
+              value={`${(clip.pathAnim.dur ?? 1).toFixed(1)}s`}
+              onDec={() =>
+                updateClip(clip.id, {
+                  pathAnim: { ...clip.pathAnim!, dur: clamp((clip.pathAnim!.dur ?? 1) - 0.2, 0.2, 8) },
+                })
+              }
+              onInc={() =>
+                updateClip(clip.id, {
+                  pathAnim: { ...clip.pathAnim!, dur: clamp((clip.pathAnim!.dur ?? 1) + 0.2, 0.2, 8) },
+                })
+              }
+            />
+          ) : null}
+          {clip.pathAnim?.mode === 'morph' ? (
+            <>
+              <Chip
+                label={
+                  clip.pathAnim.to
+                    ? t('panels.shape.morphRecapture')
+                    : t('panels.shape.morphCapture')
+                }
+                active={!!clip.pathAnim.to}
+                onPress={() =>
+                  updateClip(clip.id, { pathAnim: { ...clip.pathAnim!, to: clip.points } })
+                }
+              />
+              <Text style={styles.note}>{t('panels.shape.morphNote')}</Text>
+            </>
+          ) : null}
+        </PanelSection>
+      ) : null}
+
       <PanelSection title={t('panels.shape.boolTitle')}>
         {multiSelectIds.length === 1 ? (
           <View style={styles.row}>

@@ -719,6 +719,19 @@ export interface PathPoint {
   h2?: { x: number; y: number };
 }
 
+/**
+ * 🎞️ Path-animáció. `drawOn`: a stroke a klip elején megrajzolódik (`dur` mp),
+ * majd áll; `morph`: a `points` a `dur` alatt átinterpolál a `to` alakba (a
+ * kettőt egyenlő pontszámra újramintázzuk).
+ */
+export interface PathAnim {
+  mode: 'drawOn' | 'morph';
+  /** időtartam (mp) */
+  dur: number;
+  /** morph-célalak (path-pontok, a klip dobozához normalizálva) — csak `morph` */
+  to?: PathPoint[];
+}
+
 export interface ShapeClip extends ClipBase {
   kind: 'shape';
   shape: 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'star' | 'path';
@@ -746,6 +759,12 @@ export interface ShapeClip extends ClipBase {
   subpaths?: PathPoint[][];
   /** kitöltési szabály az összetett path-hoz (union=nonzero, exclude=evenodd) */
   fillRule?: 'nonzero' | 'evenodd';
+  /**
+   * 🎞️ Path-animáció: `drawOn` = a vonal „megrajzolja magát" (stroke-reveal +
+   * kitöltés-beúszás); `morph` = a `points` átalakul a `to` alakba. A render
+   * per-frame Chromium-képsort éget; az előnézet a lejátszófejből közelít.
+   */
+  pathAnim?: PathAnim;
   /** a vonal vastagsága a vászon MAGASSÁGÁNAK %-ában */
   strokeWidth?: number;
   /** ✂️ szaggatás: a kötőjel + rés hossza a vonalvastagság arányában (0/hiányzó = folytonos) */

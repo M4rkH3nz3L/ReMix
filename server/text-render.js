@@ -972,6 +972,7 @@ module.exports = {
   renderTextPngs,
   renderShapePngs,
   bakeTextPng,
+  pathDataJs,
   // a kinetic (per-frame) szöveg-szekvencia UGYANEZEKET a helpereket használja
   findChromium,
   fontFaceCss,

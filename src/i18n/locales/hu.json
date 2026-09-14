@@ -1549,7 +1549,14 @@
       "bool_intersect": "Metszet",
       "bool_exclude": "Kizárás",
       "boolHint": "Jelölj ki EGY másik formát is (többes kijelölés), hogy kombinálhasd az aktuálissal.",
-      "boolFail": "A két forma nem kombinálható (nincs átfedés vagy érvénytelen alak)."
+      "boolFail": "A két forma nem kombinálható (nincs átfedés vagy érvénytelen alak).",
+      "pathAnimTitle": "🎞️ Path-animáció",
+      "pathAnim_drawOn": "Megrajzol",
+      "pathAnim_morph": "Morph",
+      "pathAnimDur": "Időtartam",
+      "morphCapture": "Célalak rögzítése",
+      "morphRecapture": "Célalak frissítése",
+      "morphNote": "A jelenlegi alakot rögzíti célként, majd szerkeszd a path-t a KEZDŐ alakra — a render a kezdőből a célalakba interpolál."
     },
     "speed": {
       "rampNotApplicable": "Ehhez a kliphez nem alkalmazható (túl rövid?).",

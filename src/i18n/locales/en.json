@@ -1549,7 +1549,14 @@
       "bool_intersect": "Intersect",
       "bool_exclude": "Exclude",
       "boolHint": "Select ONE more shape (multi-select) to combine it with the current one.",
-      "boolFail": "The two shapes cannot be combined (no overlap or invalid shape)."
+      "boolFail": "The two shapes cannot be combined (no overlap or invalid shape).",
+      "pathAnimTitle": "🎞️ Path animation",
+      "pathAnim_drawOn": "Draw on",
+      "pathAnim_morph": "Morph",
+      "pathAnimDur": "Duration",
+      "morphCapture": "Capture target",
+      "morphRecapture": "Update target",
+      "morphNote": "Captures the current shape as the target, then edit the path to the START shape — the render interpolates from start to target."
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

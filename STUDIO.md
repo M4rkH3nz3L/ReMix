@@ -216,6 +216,12 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **ImageDoc** (Creative Canvas): réteg-alapú képszerkesztés, rasterizálás klippé.
 - **Local MP4 export** (`localRender`): natív render, felbontás/FPS/minőség, mentés a
   Fotókba, SRT-export, `.ReMix` projektfájl.
+- **📤 Export-kontroll** (Toolbar → Export): **platform-presetek** (TikTok / Reels / Shorts /
+  YouTube / Instagram — a preset a chipeket állítja), és **Haladó** kodek-beállítások:
+  **H.264 / HEVC / AV1 / ProRes**, **bitráta-mód (CRF/VBR/CBR) + cél-bitráta**, **GOP**,
+  **8/10-bit**, **színtér Rec.709 / Rec.2020 / HDR (PQ)**, **audio mintavétel/csatorna**.
+  Az alap H.264 CRF eszközön (ingyen) renderel; minden tényleges pro encode-kontroll a
+  felhő-workerre kerül (Pro).
 
 ### AI-asszisztens — ingyenes rész
 - **Brand Kit**, **Motion/Look-csomagok**, **Intro/Outro** sablonok, **Safe zone**,
@@ -234,8 +240,11 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 ## PRO — előfizetéses (felhő-worker / AI / cloud-tárhely)
 
 ### Render és tárhely
-- **Felhő HD/4K render** (`cloudRender`, AV1/ProRes) + AI-thumbnail/headline, feed-közzététel,
-  platform-posztolás; **projekt felhő-mentés** (`cloudSync`); **kollaboráció** (`collab`).
+- **Felhő HD/4K render** (`cloudRender`): **H.264 / HEVC / AV1 / ProRes**, **CRF/VBR/CBR
+  bitráta + GOP**, **10-bit**, **HDR (PQ) / Rec.2020** — a FFmpeg-worker az enkóder-argokat a
+  `RenderSettings`-ből építi (`videoEncoderArgs`/`audioEncoderArgs`); a ProRes `.mov`-ba megy.
+  + AI-thumbnail/headline, feed-közzététel, platform-posztolás; **projekt felhő-mentés**
+  (`cloudSync`); **kollaboráció** (`collab`).
 
 ### Import · felirat · beszéd
 - **Import linkből** (`urlImport`, hibrid: eszközön ingyen próbál, worker-fallback Pro);
@@ -420,7 +429,7 @@ A fő UI-zónák a leckékhez:
 
 **15. lecke — Export**
 1. *Művelet:* Nyisd az Exportot. *Hol:* Toolbar → **Export**.
-2. *Művelet:* Állíts felbontást/FPS-t/minőséget, majd exportálj. *Hol:* **Local MP4** (ingyen, eszközön) vagy **Felhő HD/4K** `[PRO]`; **közzététel a feedbe** `[PRO]`. *Eredmény:* kész MP4 a Fotókban / a feltöltött publikus videó.
+2. *Művelet:* Válassz **platform-presetet** (TikTok/Reels/Shorts/YouTube/Instagram) vagy állíts felbontást/FPS-t/minőséget/kodeket; a **Haladó** alatt bitráta (CRF/VBR/CBR), GOP, 8/10-bit, színtér (Rec.709/2020/HDR), audio. Majd exportálj. *Hol:* **Local MP4** (ingyen, eszközön) vagy **Felhő HD/4K** `[PRO]`; **közzététel a feedbe** `[PRO]`. *Eredmény:* kész MP4 a Fotókban / a feltöltött publikus videó.
 
 **16. lecke — Teljesítmény nehéz felvételnél (proxy)**
 1. *Művelet:* Importálj nehéz (4K/60/10-bit) videót. *Eredmény:* a háttérben proxy készül; a vágás gyors marad, a render az eredetivel fut.

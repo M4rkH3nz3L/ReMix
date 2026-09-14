@@ -25,10 +25,11 @@ import { getTimelineTranscript } from '@/lib/transcripts';
 import {
   collectAndShareProject,
   isRenderCancelledError,
+  PLATFORM_PRESETS,
   renderAndPost,
   renderAndShareMp4,
 } from '@/lib/render';
-import type { PostTarget } from '@/lib/render';
+import type { ExportPlatform, PostTarget, RenderSettings } from '@/lib/render';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
 import { useEditorStore } from '@/store/editorStore';
@@ -74,6 +75,16 @@ export function ExportPanel() {
   const [fps, setFps] = useState<number>(30);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [codec, setCodec] = useState<'h264' | 'hevc' | 'av1' | 'prores'>('h264');
+  const [platform, setPlatform] = useState<ExportPlatform | null>(null);
+  // 🎚️ Pro export-kontroll (Advanced): bitráta / GOP / bit-mélység / szín / audio
+  const [advOpen, setAdvOpen] = useState(false);
+  const [bitrateMode, setBitrateMode] = useState<'crf' | 'vbr' | 'cbr'>('crf');
+  const [bitrateMbps, setBitrateMbps] = useState<number>(10);
+  const [gop, setGop] = useState<number>(0); // 0 = auto (fps × 2)
+  const [bitDepth, setBitDepth] = useState<8 | 10>(8);
+  const [colorMode, setColorMode] = useState<'rec709' | 'rec2020' | 'hdr'>('rec709');
+  const [sampleRate, setSampleRate] = useState<44100 | 48000>(48000);
+  const [channels, setChannels] = useState<1 | 2>(2);
   const [thumbStatus, setThumbStatus] = useState<string | null>(null);
   const [thumbs, setThumbs] = useState<ThumbCandidate[] | null>(null);
   const [headlines, setHeadlines] = useState<string[] | null>(null);
@@ -129,8 +140,39 @@ export function ExportPanel() {
 
   const durationSec = projectDuration(project);
   const mbps =
-    (BASE_MBPS[resolution] ?? 8) * QUALITY_MULT[quality] * (0.35 + 0.65 * (fps / 30));
+    bitrateMode === 'crf'
+      ? (BASE_MBPS[resolution] ?? 8) * QUALITY_MULT[quality] * (0.35 + 0.65 * (fps / 30))
+      : bitrateMbps;
   const estimatedMb = (durationSec * mbps) / 8;
+
+  // az összes chip → egyetlen RenderSettings (a worker/natív render ezt kapja)
+  const buildSettings = (): RenderSettings => ({
+    resolution,
+    fps,
+    quality,
+    codec,
+    bitrateMode,
+    bitrateMbps: bitrateMode === 'crf' ? undefined : bitrateMbps,
+    gop: gop > 0 ? gop : undefined,
+    bitDepth: colorMode === 'hdr' ? 10 : bitDepth,
+    colorSpace: colorMode === 'rec2020' ? 'rec2020' : 'rec709',
+    hdr: colorMode === 'hdr',
+    sampleRate,
+    channels,
+    audioBitrateKbps: 192,
+  });
+
+  // 📲 platform-preset alkalmazása a chipekre (a felhasználó utána felülírhatja)
+  const applyPlatform = (p: ExportPlatform) => {
+    setPlatform(p);
+    const s = PLATFORM_PRESETS[p].settings;
+    if (s.resolution) setResolution(s.resolution);
+    if (s.fps) setFps(s.fps);
+    if (s.quality) setQuality(s.quality);
+    if (s.codec) setCodec(s.codec);
+    if (s.bitrateMode) setBitrateMode(s.bitrateMode);
+    if (s.bitrateMbps) setBitrateMbps(s.bitrateMbps);
+  };
 
   // 📱 Export az ESZKÖZÖN (ingyen, szerver nélkül) — a build natív renderelője
   const exportLocal = () => {
@@ -139,7 +181,7 @@ export function ExportPanel() {
     }
     setRenderStatus(t('common.processing'));
     withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
-      renderAndShareMp4(project, report, { resolution, fps, quality, codec }, { mode: 'local', signal })
+      renderAndShareMp4(project, report, buildSettings(), { mode: 'local', signal })
     )
       .catch((err: Error) => {
         if (!isRenderCancelledError(err)) {
@@ -158,7 +200,7 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withCancellableProgress(t('panels.export.cloudHdRender'), (report, signal) =>
-          renderAndShareMp4(project, report, { resolution, fps, quality, codec }, { mode: 'cloud', signal })
+          renderAndShareMp4(project, report, buildSettings(), { mode: 'cloud', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
@@ -208,7 +250,7 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withCancellableProgress(t('panels.export.postTo', { target }), (report, signal) =>
-          renderAndPost(project, target, report, { resolution, fps, quality, codec }, { mode: 'auto', signal })
+          renderAndPost(project, target, report, buildSettings(), { mode: 'auto', signal })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
@@ -311,6 +353,17 @@ export function ExportPanel() {
       ) : null}
 
       <PanelSection title={t('panels.export.videoSection')}>
+        <Text style={styles.settingLabel}>{t('panels.export.platformPreset')}</Text>
+        <View style={styles.row}>
+          {(Object.keys(PLATFORM_PRESETS) as ExportPlatform[]).map((p) => (
+            <Chip
+              key={p}
+              label={`${PLATFORM_PRESETS[p].label} ${PLATFORM_PRESETS[p].aspect}`}
+              active={platform === p}
+              onPress={() => applyPlatform(p)}
+            />
+          ))}
+        </View>
         <Text style={styles.settingLabel}>{t('panels.export.resolution')}</Text>
         <View style={styles.row}>
           {RESOLUTIONS.map((r) => (
@@ -360,6 +413,82 @@ export function ExportPanel() {
           {estimatedMb < 1 ? '<1' : Math.round(estimatedMb)} MB
         </Text>
         <Text style={styles.note}>{t('panels.export.codecCloudNote')}</Text>
+
+        {/* 🎚️ Advanced export-kontroll: bitráta / GOP / mélység / szín / audio */}
+        <Pressable style={styles.advToggle} onPress={() => setAdvOpen((v) => !v)}>
+          <Ionicons name={advOpen ? 'chevron-down' : 'chevron-forward'} size={15} color={palette.textDim} />
+          <Text style={styles.advToggleText}>{t('panels.export.advanced')}</Text>
+        </Pressable>
+        {advOpen ? (
+          <View style={{ gap: 8 }}>
+            <Text style={styles.settingLabel}>{t('panels.export.bitrateMode')}</Text>
+            <View style={styles.row}>
+              {(['crf', 'vbr', 'cbr'] as const).map((m) => (
+                <Chip
+                  key={m}
+                  label={t('panels.export.bitrate_' + m)}
+                  active={bitrateMode === m}
+                  onPress={() => setBitrateMode(m)}
+                />
+              ))}
+            </View>
+            {bitrateMode !== 'crf' ? (
+              <>
+                <Text style={styles.settingLabel}>{t('panels.export.bitrate')}</Text>
+                <View style={styles.row}>
+                  {[6, 10, 16, 24, 40].map((b) => (
+                    <Chip key={b} label={`${b} Mbps`} active={bitrateMbps === b} onPress={() => setBitrateMbps(b)} />
+                  ))}
+                </View>
+              </>
+            ) : null}
+            <Text style={styles.settingLabel}>{t('panels.export.gop')}</Text>
+            <View style={styles.row}>
+              {[
+                { v: 0, l: t('panels.export.gopAuto') },
+                { v: 30, l: '30' },
+                { v: 60, l: '60' },
+                { v: 120, l: '120' },
+              ].map((g) => (
+                <Chip key={g.v} label={g.l} active={gop === g.v} onPress={() => setGop(g.v)} />
+              ))}
+            </View>
+            <Text style={styles.settingLabel}>{t('panels.export.bitDepth')}</Text>
+            <View style={styles.row}>
+              {([8, 10] as const).map((d) => (
+                <Chip key={d} label={`${d}-bit`} active={bitDepth === d} onPress={() => setBitDepth(d)} />
+              ))}
+            </View>
+            <Text style={styles.settingLabel}>{t('panels.export.colorSpace')}</Text>
+            <View style={styles.row}>
+              {(
+                [
+                  { id: 'rec709', l: 'Rec.709' },
+                  { id: 'rec2020', l: 'Rec.2020' },
+                  { id: 'hdr', l: 'HDR' },
+                ] as const
+              ).map((c) => (
+                <Chip key={c.id} label={c.l} active={colorMode === c.id} onPress={() => setColorMode(c.id)} />
+              ))}
+            </View>
+            <Text style={styles.settingLabel}>{t('panels.export.audio')}</Text>
+            <View style={styles.row}>
+              {([44100, 48000] as const).map((sr) => (
+                <Chip key={sr} label={`${sr / 1000} kHz`} active={sampleRate === sr} onPress={() => setSampleRate(sr)} />
+              ))}
+              {(
+                [
+                  { v: 1, l: t('panels.export.mono') },
+                  { v: 2, l: t('panels.export.stereo') },
+                ] as const
+              ).map((ch) => (
+                <Chip key={ch.v} label={ch.l} active={channels === ch.v} onPress={() => setChannels(ch.v)} />
+              ))}
+            </View>
+            <Text style={styles.note}>{t('panels.export.advancedNote')}</Text>
+          </View>
+        ) : null}
+
         <PrimaryButton
           icon="phone-portrait-outline"
           label={renderStatus ?? t('panels.export.exportOnDeviceFree')}
@@ -653,6 +782,19 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 12,
     fontWeight: '600',
+  },
+  advToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  advToggleText: {
+    color: palette.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   thumbRow: {
     flexDirection: 'row',

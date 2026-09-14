@@ -94,6 +94,69 @@ function atempoChain(speed) {
   return parts.join(',');
 }
 
+const V_ENCODER = { h264: 'libx264', hevc: 'libx265', av1: 'libsvtav1', prores: 'prores_ks' };
+
+/**
+ * 🎚️ Pro export videó-enkóder argumentumok: kodek (H.264/HEVC/AV1/ProRes),
+ * bit-mélység (8/10), bitráta-mód (CRF/VBR/CBR + bitráta), GOP, és szín-tér/HDR
+ * (Rec.709 / Rec.2020 / PQ). A ProRes intra-only + 10-bit 4:2:2 (.mov).
+ */
+function videoEncoderArgs(settings, fps, crf) {
+  const codec = V_ENCODER[settings.codec] ? settings.codec : 'h264';
+  const enc = V_ENCODER[codec];
+  const depth10 = settings.bitDepth === 10 || settings.hdr === true;
+  const gop = Math.max(2, Math.round(Number(settings.gop) || fps * 2));
+  const mode = settings.bitrateMode || 'crf';
+  const mbps = Math.max(0, Number(settings.bitrateMbps) || 0);
+  const args = ['-c:v', enc];
+
+  if (codec === 'prores') {
+    // ProRes: 10-bit 4:2:2, HQ profil (3); a bitrátát a profil vezérli
+    args.push('-profile:v', '3', '-pix_fmt', 'yuv422p10le');
+  } else {
+    args.push('-pix_fmt', depth10 ? 'yuv420p10le' : 'yuv420p');
+    if (codec === 'av1') {
+      args.push('-preset', '6');
+    } else {
+      args.push('-preset', 'veryfast');
+      if (codec === 'hevc') {
+        args.push('-tag:v', 'hvc1'); // Apple/QuickTime-kompatibilis HEVC az mp4-ben
+      }
+    }
+    // rate control
+    if (mode === 'cbr' && mbps > 0) {
+      args.push('-b:v', `${mbps}M`, '-maxrate', `${mbps}M`, '-minrate', `${mbps}M`, '-bufsize', `${mbps * 2}M`);
+    } else if (mode === 'vbr' && mbps > 0) {
+      args.push('-b:v', `${mbps}M`, '-maxrate', `${(mbps * 1.5).toFixed(1)}M`, '-bufsize', `${mbps * 2}M`);
+    } else {
+      args.push('-crf', String(crf));
+    }
+    args.push('-g', String(gop));
+  }
+
+  // szín-tér / HDR (a tag-elés; a 10-bit HDR PQ-hoz kell)
+  if (settings.hdr === true) {
+    args.push('-colorspace', 'bt2020nc', '-color_primaries', 'bt2020', '-color_trc', 'smpte2084');
+  } else if (settings.colorSpace === 'rec2020') {
+    args.push('-colorspace', 'bt2020nc', '-color_primaries', 'bt2020', '-color_trc', 'bt709');
+  } else {
+    args.push('-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709');
+  }
+  return args;
+}
+
+/** 🎚️ Pro export hang-enkóder args: AAC + bitráta/mintavétel/csatorna. */
+function audioEncoderArgs(settings) {
+  const args = ['-c:a', 'aac', '-b:a', `${Math.max(64, Math.round(Number(settings.audioBitrateKbps) || 192))}k`];
+  if (settings.sampleRate) {
+    args.push('-ar', String(settings.sampleRate));
+  }
+  if (settings.channels) {
+    args.push('-ac', String(settings.channels));
+  }
+  return args;
+}
+
 /** filterId → drawbox szín/átlátszóság (az app előnézetének megfelelően) */
 const FILTERS = {
   warm: { color: 'ff9d4d', opacity: 0.18 },
@@ -2291,18 +2354,16 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
   const scriptFile = path.join(workDir, 'filtergraph.txt');
   fs.writeFileSync(scriptFile, graph.join(';\n'));
 
-  const outFile = path.join(workDir, 'out.mp4');
+  // ProRes-t .mov konténerbe (az mp4 nem szabványos hozzá)
+  const outFile = path.join(workDir, settings.codec === 'prores' ? 'out.mov' : 'out.mp4');
   const args = [
     '-y',
     ...inputs.flat(),
     '-filter_complex_script', scriptFile,
     '-map', '[vout]',
     '-map', '[aout]',
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', String(CRF),
-    '-c:a', 'aac',
-    '-b:a', '192k',
+    ...videoEncoderArgs(settings, FPS, CRF),
+    ...audioEncoderArgs(settings),
     '-t', total.toFixed(3),
     '-movflags', '+faststart',
     outFile,

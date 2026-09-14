@@ -1196,7 +1196,22 @@
       "cloudRestoreNone": "No cloud backup for this project yet.",
       "cloudSyncNote": "Backs up the project plan (JSON) to your account — restore it on any device. Media-file cloud sync is a separate, later step.",
       "proActiveUntil": "Remix Pro active — until {{date}}",
-      "renderedReady": "Rendered version saved to the project."
+      "renderedReady": "Rendered version saved to the project.",
+      "platformPreset": "Platform preset",
+      "advanced": "Advanced",
+      "bitrateMode": "Bitrate mode",
+      "bitrate_crf": "CRF (auto)",
+      "bitrate_vbr": "VBR",
+      "bitrate_cbr": "CBR",
+      "bitrate": "Bitrate",
+      "gop": "GOP (keyframe)",
+      "gopAuto": "Auto",
+      "bitDepth": "Bit depth",
+      "colorSpace": "Color space",
+      "audio": "Audio",
+      "mono": "Mono",
+      "stereo": "Stereo",
+      "advancedNote": "Advanced codec settings (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) render in the cloud (Pro)."
     },
     "filter": {
       "sectionFilters": "Filters",

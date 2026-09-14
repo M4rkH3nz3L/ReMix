@@ -1196,7 +1196,22 @@
       "cloudRestoreNone": "Ehhez a projekthez még nincs felhő-mentés.",
       "cloudSyncNote": "A projekt-tervet (JSON) a fiókodba menti — bármely eszközön visszaállítható. A médiafájlok felhő-szinkronja külön, későbbi lépés.",
       "proActiveUntil": "Remix Pro aktív — eddig: {{date}}",
-      "renderedReady": "A renderelt változat a projekthez mentve."
+      "renderedReady": "A renderelt változat a projekthez mentve.",
+      "platformPreset": "Platform preset",
+      "advanced": "Haladó",
+      "bitrateMode": "Bitráta-mód",
+      "bitrate_crf": "CRF (auto)",
+      "bitrate_vbr": "VBR",
+      "bitrate_cbr": "CBR",
+      "bitrate": "Bitráta",
+      "gop": "GOP (kulcskocka)",
+      "gopAuto": "Auto",
+      "bitDepth": "Bit-mélység",
+      "colorSpace": "Színtér",
+      "audio": "Hang",
+      "mono": "Mono",
+      "stereo": "Sztereó",
+      "advancedNote": "A haladó kodek-beállítások (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) felhő-renderrel készülnek (Pro)."
     },
     "filter": {
       "sectionFilters": "Szűrők",

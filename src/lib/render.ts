@@ -74,16 +74,79 @@ export interface RenderSettings {
   quality: 'low' | 'medium' | 'high';
   /** cél-kodek (alap: h264); av1/prores + 8K csak felhő-renderrel */
   codec?: RenderCodec;
+  // ── Pro export-kontroll (a felhő-worker honorálja) ─────────────────────
+  /** bitráta-mód: crf (minőség-alapú, alap) · vbr (cél + csúcs) · cbr (konstans) */
+  bitrateMode?: 'crf' | 'vbr' | 'cbr';
+  /** cél-bitráta Mbps-ban (vbr/cbr esetén; crf-nél nem használt) */
+  bitrateMbps?: number;
+  /** GOP (kulcskocka-táv) képkockában; hiányzó = fps×2 */
+  gop?: number;
+  /** szín-mélység: 8 (alap) vagy 10 bit */
+  bitDepth?: 8 | 10;
+  /** szín-tér: rec709 (alap, SDR) vagy rec2020 (széles gamut) */
+  colorSpace?: 'rec709' | 'rec2020';
+  /** HDR (PQ / SMPTE-2084) — 10-bit + rec2020 kényszerű */
+  hdr?: boolean;
+  /** hang mintavétel: 44100 / 48000 */
+  sampleRate?: 44100 | 48000;
+  /** hang csatorna-elrendezés: 1 (mono) / 2 (sztereó) */
+  channels?: 1 | 2;
+  /** hang bitráta kbps (alap 192) */
+  audioBitrateKbps?: number;
 }
 
 /**
  * Igaz, ha a beállítás CSAK felhő-renderrel teljesíthető: az eszköz-render
- * H.264/HEVC-t és max 4K-t tud, az AV1/ProRes és a 8K a felhő-worker dolga.
- * (A tényleges kodek-támogatás a felhő-render backendjétől függ — a kliens a
- * `settings.codec`-et továbbítja, a worker azt honorálja, amit tud.)
+ * H.264-et, 8-bitet, Rec.709-et és max 4K-t tud; az AV1/ProRes/HEVC, a 10-bit,
+ * a HDR/Rec.2020 és a 8K a felhő-worker (ffmpeg) dolga.
  */
+/** 📲 Platform export-presetek: a platform ajánlott kimeneti beállításai. */
+export type ExportPlatform = 'tiktok' | 'reels' | 'shorts' | 'youtube' | 'instagram';
+export const PLATFORM_PRESETS: Record<
+  ExportPlatform,
+  { label: string; aspect: string; settings: Partial<RenderSettings> }
+> = {
+  tiktok: {
+    label: 'TikTok',
+    aspect: '9:16',
+    settings: { resolution: 1080, fps: 30, quality: 'high', codec: 'h264', bitrateMode: 'vbr', bitrateMbps: 10 },
+  },
+  reels: {
+    label: 'Reels',
+    aspect: '9:16',
+    settings: { resolution: 1080, fps: 30, quality: 'high', codec: 'h264', bitrateMode: 'vbr', bitrateMbps: 10 },
+  },
+  shorts: {
+    label: 'Shorts',
+    aspect: '9:16',
+    settings: { resolution: 1080, fps: 30, quality: 'high', codec: 'h264', bitrateMode: 'vbr', bitrateMbps: 10 },
+  },
+  youtube: {
+    label: 'YouTube',
+    aspect: '16:9',
+    settings: { resolution: 1080, fps: 30, quality: 'high', codec: 'h264', bitrateMode: 'vbr', bitrateMbps: 12 },
+  },
+  instagram: {
+    label: 'Instagram',
+    aspect: '4:5',
+    settings: { resolution: 1080, fps: 30, quality: 'high', codec: 'h264', bitrateMode: 'vbr', bitrateMbps: 10 },
+  },
+};
+
 export function settingsNeedCloud(s: RenderSettings): boolean {
-  return s.codec === 'av1' || s.codec === 'prores' || s.resolution > 2160;
+  // Az eszközön futó (natív) render csak H.264 CRF-et tud, felbontásból/fps-ből.
+  // Minden tényleges pro encode-kontroll (más kodek, cél-bitráta, egyedi GOP,
+  // 10-bit, HDR, Rec.2020, >4K) a felhő-workerre kerül — hogy a UI ne ígérjen
+  // olyat, amit a lokális út elnyel.
+  return (
+    (s.codec !== undefined && s.codec !== 'h264') ||
+    s.resolution > 2160 ||
+    s.bitDepth === 10 ||
+    s.hdr === true ||
+    s.colorSpace === 'rec2020' ||
+    (s.bitrateMode !== undefined && s.bitrateMode !== 'crf') ||
+    (s.gop !== undefined && s.gop > 0)
+  );
 }
 
 /**

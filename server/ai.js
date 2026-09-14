@@ -122,6 +122,17 @@ Szabályok:
   ({type, duration}); a duration 0.2–1.5 mp.
 - SZÍN/hangulat: UPDATE_CLIP patch.adjust ({brightness/contrast/saturation/
   temperature/vignette}) — csak a valóban kért mezőket add meg, a tartományon belül.
+- IDŐSÁVRA szóló utasítás (pl. "az első 5 mp", "a közepén", "az utolsó snitt"):
+  a kontextus klip-listájából (start/duration) keresd ki az ADOTT IDŐSÁVBA eső
+  klipeket, és MINDEGYIKRE adj külön UPDATE_CLIP-et — ne csak egyre.
+- HANGULAT/energia-utasítás (pl. "legyen agresszívabb / pörgősebb / energikusabb
+  / nyugodtabb / filmesebb"): NE kérj vissza, hanem fordítsd le TÖBB mező
+  együttes állítására a megcélzott klipeken:
+  · agresszív / pörgős / energikus → speed 1.2–1.5, filterId 'vivid',
+    adjust.contrast +0.15–0.25 és saturation +0.15–0.3, rövid gyors átmenet
+    (transitionOut zoom/flip, 0.2–0.3 mp);
+  · nyugodt / filmes / lágy → speed 0.9–1.0, filterId 'warm' vagy 'sunset',
+    adjust.temperature +0.1, hosszabb 'dissolve' átmenet (0.6–1.0 mp).
 
 Példák (utasítás → commands):
 - "Nevezd át a projektet Vlogra" → [{"type":"RENAME_PROJECT","name":"Vlog"}]
@@ -129,7 +140,10 @@ Példák (utasítás → commands):
 - "Vágd ketté a c12 klipet 3 mp-nél" → [{"type":"SPLIT_CLIP","clipId":"c12","time":3}]
 - "Halkítsd le a c3-at" → [{"type":"UPDATE_CLIP","clipId":"c3","patch":{"volume":0.3}}]
 - "Tegyél feloldó átmenetet a c1 után" → [{"type":"UPDATE_CLIP","clipId":"c1","patch":{"transitionOut":{"type":"dissolve","duration":0.5}}}]
-- "Legyen a c2 melegebb és kontrasztosabb" → [{"type":"UPDATE_CLIP","clipId":"c2","patch":{"adjust":{"temperature":0.15,"contrast":0.15}}}]`;
+- "Legyen a c2 melegebb és kontrasztosabb" → [{"type":"UPDATE_CLIP","clipId":"c2","patch":{"adjust":{"temperature":0.15,"contrast":0.15}}}]
+- "Legyen az első 5 mp agresszívabb" (kontextus: c1 0–3s, c2 3–6s) →
+  [{"type":"UPDATE_CLIP","clipId":"c1","patch":{"speed":1.3,"filterId":"vivid","adjust":{"contrast":0.2,"saturation":0.25},"transitionOut":{"type":"zoom","duration":0.25}}},
+   {"type":"UPDATE_CLIP","clipId":"c2","patch":{"speed":1.3,"filterId":"vivid","adjust":{"contrast":0.2}}}]`;
 
 /** a lokális runtime elérhetősége — rövid cache-sel, hogy a /health gyors legyen */
 let localProbe = { at: 0, ok: false };

@@ -260,7 +260,21 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   **automatikus felirat** (`autoCaption`, Whisper + fordítás + karaoke); **felirat-fordítás** és
   **🌍 kétnyelvű felirat** (eredeti + fordítás egy sorban alatta); **TTS** (`tts`).
 
-### AI-vágás és -elemzés (AssistantPanel)
+### 🤖 AI mint editor control layer (AssistantPanel)
+- **Természetes nyelvű szerkesztés**: az utasítás (pl. „legyen az első 5 mp agresszívabb")
+  végigmegy a **READ → UNDERSTAND → PLAN → COMMAND BUS → EDIT → PREVIEW → APPROVE** láncon.
+  Az AI SOHA nem írja közvetlenül a projektet — csak a szigorú parancs-sémán át.
+  - **READ/UNDERSTAND** (`buildAiContext`): rétegzett kontextus (projekt · sávok tömör
+    klip-leírásokkal · playhead/kijelölés · esemény-napló · beszéd-átirat) — nem a nyers JSON.
+  - **PLAN** (worker `/ai/assist`, structured output): a modell whitelist-parancsokat ad
+    (UPDATE_CLIP a sebesség/szűrő/adjust/átmenet/hangerő/fade mezőkre, SPLIT/REMOVE,
+    ADD_TEXT_CLIPS, SET_ASPECT, RENAME). „Vibe"-utasítás (agresszív/nyugodt/filmes) →
+    az idősávba eső klipekre TÖBB mező együtt (speed + vivid szűrő + kontraszt + gyors átmenet).
+  - **PREVIEW/APPROVE** 🆕 (`describeAiPlan`): tételes, FELOLDOTT terv — melyik klip, mi
+    változik *miről mire* (pl. „video (0–3s): sebesség 1×→1.3× · színkorrekció: contrast +0.2”),
+    a lépés indokával; a **👁 Megnéz** a lejátszófejet a régióra ugratja + kijelöli a klipet.
+  - **COMMAND BUS/EDIT** (`toEditorCommands` → `applyBatch`, actor: `ai`): a teljes köteg
+    **egyetlen, visszavonható lépés**.
 - **AI Auto-Edit** (`autoEdit`, 15/30/60 mp + Shorts/B-roll), **story-struktúra**
   (`storyAnalyze`), **tempó-elemzés** (`pacingAnalyze`), **minőség-ellenőrzés**
   (`qualityScan`), **Smart Reframe** (`reframe`), Smart Search / Hook / Sound Design AI /

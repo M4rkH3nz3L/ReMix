@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,8 +12,10 @@ import { uploadFetch } from '@/lib/upload';
 import { askAssistant } from '@/lib/ai';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { AiCharacterPicker } from '@/components/editor/AiCharacterPicker';
-import { buildAiContext, describeAiCommand, toEditorCommands } from '@/lib/aiCommands';
+import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
+import { describeAiPlan } from '@/lib/aiPlan';
+import type { AiPlanItem } from '@/lib/aiPlan';
 import {
   applyBrandCaptions,
   buildWatermarkClip,
@@ -1435,6 +1438,19 @@ export function AssistantPanel() {
     );
   };
 
+  // 👁️ terv-elem előnézete alkalmazás ELŐTT: a lejátszófej az érintett régióra
+  // ugrik, és (ha van) kijelöli az érintett klipet — a felhasználó látja, mit
+  // fog az AI módosítani, mielőtt jóváhagyja.
+  const previewPlanItem = (item: AiPlanItem) => {
+    const s = useEditorStore.getState();
+    if (item.time != null) {
+      s.setPlayhead(item.time);
+    }
+    if (item.clipId) {
+      s.selectClip(item.clipId);
+    }
+  };
+
   const apply = () => {
     if (!reply) {
       return;
@@ -1894,21 +1910,40 @@ export function AssistantPanel() {
           <Text style={styles.message}>{reply.message}</Text>
           {reply.commands.length > 0 ? (
             <>
-              {/* 🤖 AI action preview (#35): tételesen, mi fog változni — alkalmazás ELŐTT */}
+              {/* 🤖 Terv-preview (control layer): tételes, FELOLDOTT diff — melyik
+                  klip, mi változik miről mire; ▶-vel a régióra ugorva alkalmazás ELŐTT */}
               <Text style={styles.changeHeader}>
-                {t('panels.assistant.changesHeader', { count: reply.commands.length })}
+                {t('panels.assistant.planHeader', { count: reply.commands.length })}
               </Text>
-              {reply.commands.map((c, i) => (
-                <Text key={i} style={styles.changeItem}>
-                  {'•  '}
-                  {describeAiCommand(c, t)}
-                </Text>
+              {describeAiPlan(
+                reply.commands,
+                useEditorStore.getState().project!,
+                t
+              ).map((item, i) => (
+                <View key={i} style={styles.planRow}>
+                  <View style={styles.planBody}>
+                    <Text style={styles.planTitle}>{item.title}</Text>
+                    {item.detail ? <Text style={styles.planDetail}>{item.detail}</Text> : null}
+                    {item.reason ? <Text style={styles.planReason}>💡 {item.reason}</Text> : null}
+                  </View>
+                  {item.time != null ? (
+                    <Pressable
+                      style={styles.planJump}
+                      onPress={() => previewPlanItem(item)}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="eye-outline" size={14} color={palette.accent} />
+                      <Text style={styles.planJumpText}>{t('panels.assistant.planPreview')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               ))}
               <PrimaryButton
                 icon="checkmark"
                 label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
                 onPress={apply}
               />
+              <Text style={styles.note}>{t('panels.assistant.planApproveNote')}</Text>
             </>
           ) : null}
           <Chip label={t('panels.assistant.discard')} active={false} onPress={() => setReply(null)} />
@@ -1998,6 +2033,49 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 12,
     lineHeight: 18,
+  },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.border,
+  },
+  planBody: {
+    flex: 1,
+    gap: 2,
+  },
+  planTitle: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  planDetail: {
+    color: palette.textDim,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  planReason: {
+    color: palette.accent,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  planJump: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  planJumpText: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: '700',
   },
   subLabel: {
     color: palette.textDim,

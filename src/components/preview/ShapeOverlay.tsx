@@ -139,6 +139,11 @@ export function ShapeOverlay({
   // a vonalvastagság a vászon MAGASSÁGÁNAK %-a (ugyanaz a szabály, mint a
   // renderben) — így az előnézet és a beégetett videó vonala egyforma vastag
   const strokePx = Math.max(1, ((clip.strokeWidth ?? 0.9) / 100) * box.h);
+  // ✂️ szaggatás (a vonalvastagság arányában) — a render dasharray-jével egyezik
+  const dashArray =
+    clip.strokeDash && clip.strokeDash > 0
+      ? [clip.strokeDash * strokePx, clip.strokeDash * strokePx]
+      : undefined;
   const radius =
     clip.shape === 'ellipse'
       ? Math.max(w, h)
@@ -181,8 +186,9 @@ export function ShapeOverlay({
                 fill="none"
                 stroke={clip.glow.color}
                 strokeWidth={strokePx * 2.4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeLinecap={clip.strokeCap ?? 'round'}
+                strokeLinejoin={clip.strokeJoin ?? 'round'}
+                strokeDasharray={dashArray}
                 opacity={0.35}
               />
             ) : null}
@@ -191,8 +197,9 @@ export function ShapeOverlay({
               fill="none"
               stroke={clip.fill}
               strokeWidth={strokePx}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeLinecap={clip.strokeCap ?? 'round'}
+              strokeLinejoin={clip.strokeJoin ?? 'round'}
+              strokeDasharray={dashArray}
             />
           </Svg>
         ) : clip.shape === 'arrow' || clip.shape === 'star' ? (

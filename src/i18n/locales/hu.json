@@ -1531,7 +1531,16 @@
       "gradAngle": "Szög",
       "gradStop": "Stop",
       "gradStopPos": "Pozíció",
-      "gradAddStop": "+ Stop"
+      "gradAddStop": "+ Stop",
+      "strokeDash": "Szaggatás",
+      "strokeCap": "Vonalvég",
+      "strokeJoin": "Illesztés",
+      "cap_round": "Kerek",
+      "cap_butt": "Vágott",
+      "cap_square": "Négyzet",
+      "join_round": "Kerek",
+      "join_miter": "Éles",
+      "join_bevel": "Levágott"
     },
     "speed": {
       "rampNotApplicable": "Ehhez a kliphez nem alkalmazható (túl rövid?).",

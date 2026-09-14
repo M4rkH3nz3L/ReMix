@@ -677,9 +677,17 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         const pts = clip.points
           .map((pt) => `${(pt.x * w).toFixed(1)},${(pt.y * h).toFixed(1)}`)
           .join(' ');
+        // ✂️ stroke-attribútumok: vonalvég/illesztés + szaggatás (a dash a
+        // vonalvastagság arányában, hogy méretfüggetlen legyen)
+        const cap = clip.strokeCap ?? 'round';
+        const join = clip.strokeJoin ?? 'round';
+        const dashArr =
+          clip.strokeDash && clip.strokeDash > 0
+            ? ` stroke-dasharray="${(clip.strokeDash * sw).toFixed(1)} ${(clip.strokeDash * sw).toFixed(1)}"`
+            : '';
         const glow = clip.glow
           ? `<polyline points="${pts}" fill="none" stroke="${clip.glow.color}" ` +
-            `stroke-width="${sw * 2.4}" stroke-linecap="round" stroke-linejoin="round" ` +
+            `stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr} ` +
             `opacity="0.55" filter="url(#blur)"/>`
           : '';
         pathSvg =
@@ -691,7 +699,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
             : '') +
           glow +
           `<polyline points="${pts}" fill="none" stroke="${clip.fill}" ` +
-          `stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}/>` +
           `</svg>`;
       }
 
@@ -748,13 +756,16 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           (gradDef ? `<defs>${gradDef}</defs>` : '') +
           `<polygon points="${pts}" fill="${fillRef}"` +
           (strokeW > 0
-            ? ` stroke="${strokeCol}" stroke-width="${strokeW * 2}" stroke-linejoin="round" paint-order="stroke"`
+            ? ` stroke="${strokeCol}" stroke-width="${strokeW * 2}" stroke-linejoin="${clip.strokeJoin ?? 'round'}" paint-order="stroke"` +
+              (clip.strokeDash && clip.strokeDash > 0
+                ? ` stroke-dasharray="${(clip.strokeDash * strokeW * 2).toFixed(1)} ${(clip.strokeDash * strokeW * 2).toFixed(1)}"`
+                : '')
             : '') +
           `/></svg>`;
       }
       const border =
         borderWidth > 0 && !clipPath && !useSvgPoly
-          ? `border:${borderWidth}px solid ${clip.borderColor ?? '#ffffff'};`
+          ? `border:${borderWidth}px ${clip.strokeDash && clip.strokeDash > 0 ? 'dashed' : 'solid'} ${clip.borderColor ?? '#ffffff'};`
           : '';
       // az árnyék a sziluettet követi (drop-shadow), és túlnyúlik a formán —
       // a wrapper paddingje ad neki helyet, a screenshot a wrapperről készül

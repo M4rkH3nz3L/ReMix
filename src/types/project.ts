@@ -725,6 +725,12 @@ export interface ShapeClip extends ClipBase {
   points?: { x: number; y: number }[];
   /** a vonal vastagsága a vászon MAGASSÁGÁNAK %-ában */
   strokeWidth?: number;
+  /** ✂️ szaggatás: a kötőjel + rés hossza a vonalvastagság arányában (0/hiányzó = folytonos) */
+  strokeDash?: number;
+  /** vonalvég (path): 'round' (alap) | 'butt' | 'square' */
+  strokeCap?: 'butt' | 'round' | 'square';
+  /** vonal-illesztés (path/kontúr): 'round' (alap) | 'miter' | 'bevel' */
+  strokeJoin?: 'miter' | 'round' | 'bevel';
   /** két-színű lineáris gradiens (135°) — LEGACY; új: `gradient` */
   fillGradient?: { from: string; to: string };
   /**

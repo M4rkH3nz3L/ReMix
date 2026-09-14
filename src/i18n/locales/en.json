@@ -1531,7 +1531,16 @@
       "gradAngle": "Angle",
       "gradStop": "Stop",
       "gradStopPos": "Position",
-      "gradAddStop": "+ Stop"
+      "gradAddStop": "+ Stop",
+      "strokeDash": "Dash",
+      "strokeCap": "Line cap",
+      "strokeJoin": "Line join",
+      "cap_round": "Round",
+      "cap_butt": "Butt",
+      "cap_square": "Square",
+      "join_round": "Round",
+      "join_miter": "Miter",
+      "join_bevel": "Bevel"
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

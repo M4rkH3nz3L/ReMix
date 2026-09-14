@@ -302,6 +302,42 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           }
         />
         <Stepper
+          label={t('panels.shape.strokeDash')}
+          value={
+            clip.strokeDash && clip.strokeDash > 0
+              ? `${clip.strokeDash.toFixed(1)}×`
+              : t('common.off')
+          }
+          onDec={() => updateClip(clip.id, { strokeDash: clamp((clip.strokeDash ?? 0) - 0.5, 0, 8) })}
+          onInc={() => updateClip(clip.id, { strokeDash: clamp((clip.strokeDash ?? 0) + 0.5, 0, 8) })}
+        />
+        {clip.shape === 'path' ? (
+          <>
+            <Text style={styles.subLabel}>{t('panels.shape.strokeCap')}</Text>
+            <View style={styles.row}>
+              {(['round', 'butt', 'square'] as const).map((cap) => (
+                <Chip
+                  key={cap}
+                  label={t('panels.shape.cap_' + cap)}
+                  active={(clip.strokeCap ?? 'round') === cap}
+                  onPress={() => updateClip(clip.id, { strokeCap: cap })}
+                />
+              ))}
+            </View>
+            <Text style={styles.subLabel}>{t('panels.shape.strokeJoin')}</Text>
+            <View style={styles.row}>
+              {(['round', 'miter', 'bevel'] as const).map((join) => (
+                <Chip
+                  key={join}
+                  label={t('panels.shape.join_' + join)}
+                  active={(clip.strokeJoin ?? 'round') === join}
+                  onPress={() => updateClip(clip.id, { strokeJoin: join })}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+        <Stepper
           label={t('panels.shape.opacity')}
           value={`${Math.round((clip.opacity ?? 1) * 100)}%`}
           onDec={() =>

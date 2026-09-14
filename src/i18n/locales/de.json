@@ -1531,7 +1531,16 @@
       "gradAngle": "Winkel",
       "gradStop": "Stopp",
       "gradStopPos": "Position",
-      "gradAddStop": "+ Stopp"
+      "gradAddStop": "+ Stopp",
+      "strokeDash": "Strich",
+      "strokeCap": "Linienende",
+      "strokeJoin": "Verbindung",
+      "cap_round": "Rund",
+      "cap_butt": "Stumpf",
+      "cap_square": "Quadrat",
+      "join_round": "Rund",
+      "join_miter": "Spitz",
+      "join_bevel": "Abgeschr."
     },
     "speed": {
       "rampNotApplicable": "Für diesen Clip nicht anwendbar (zu kurz?).",

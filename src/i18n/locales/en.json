@@ -1619,7 +1619,13 @@
       "interp_none": "None",
       "interp_blend": "Blend",
       "interp_flow": "Optical flow",
-      "interpNote": "In-between frame quality when slowing down: None (frame drop/dup) · Blend (frame blending) · Optical flow (motion-estimated, smoothest). Bakes in the render."
+      "interpNote": "In-between frame quality when slowing down: None (frame drop/dup) · Blend (frame blending) · Optical flow (motion-estimated, smoothest). Bakes in the render.",
+      "freezeTitle": "❄️ Freeze / hold frame",
+      "freezeDuration": "Freeze length",
+      "freezeAtPlayhead": "Freeze frame at playhead",
+      "freezeFail": "Could not capture the frame (device only).",
+      "freezeNotInClip": "Move the playhead inside the clip.",
+      "freezeNote": "Inserts a still at the playhead: the image holds, later clips ripple over, while the spanning audio keeps playing."
     },
     "sticker": {
       "object3dTitle": "3D object",

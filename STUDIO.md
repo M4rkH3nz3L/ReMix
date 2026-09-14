@@ -113,7 +113,11 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   - erősség, fade in/out. A pontos színkorrekció a renderben ég be, az előnézet tinttel közelít.
 - **Áttűnés**: 3D (zoom/spin/flip/cube/circle/dissolve), 2D wipe/slide, stilizált
   (pixelize/blur/radial/fadeBlack/fadeWhite), fade.
-- **Sebesség**: 0,1×–10× + sebesség-rámpa, visszafelé, trim.
+- **Sebesség / time remapping**: 0,1×–10× + **speed ramp** presetek és **egyéni
+  sebesség-görbe** (velocity graph: húzható log-oszlopok, szegmens ±, kiegyenesítés),
+  visszafelé, trim. 🆕 **⏱️ Idő-interpoláció** (optical flow / képkocka-keverés / nincs)
+  a sima lassításhoz, és **❄️ Freeze / hold frame**: a lejátszófejnél állókocka — a kép
+  áll, a többi klip ripple-el, az átívelő hang tovább szól.
 - **Forma** panel: téglalap/ellipszis/vonal, kitöltés/gradiens/glow/kontúr, körítés,
   rács-illesztés — **+ pozíció/méret kulcskocka és objektum-követés**.
 - **🌈 Fejlett gradient** 🆕 (forma + ImageDoc-háttér): **multi-stop** kitöltés,
@@ -412,6 +416,11 @@ A fő UI-zónák a leckékhez:
 2. *Művelet:* Szinkronizálj hang alapján. *Hol:* **🎚️ Auto-sync (hang)**. *Eredmény:* a szögök a hullámforma alapján egymáshoz igazodnak.
 3. *Művelet:* Vágj élőben. *Hol:* **🔴 Élő szögváltás** → indítsd a lejátszást, és koppints a szög gombjaira — minden váltás vágást rögzít.
 4. *Művelet:* Építs szekvenciát. *Hol:* **🎬 Multicam-szekvencia létrehozása**. *Eredmény:* a fő sávra néma videóklipek kerülnek a vágások szerint, a master hangja folytonosan szól; a vágások normál klipként tovább finomíthatók.
+
+**18. lecke — Time remapping (sebesség-görbe, interpoláció, freeze)**
+1. *Művelet:* Rajzolj sebesség-görbét. *Hol:* egy videóklip → **Sebesség** panel → **Egyéni görbe** → húzd az oszlopokat (velocity graph), szegmenst ±-szal adj/vegyél; **Alkalmaz**. *Eredmény:* a klip a görbe szerint gyorsul/lassul (a hossza változatlan).
+2. *Művelet:* Simítsd a lassítást. *Hol:* **⏱️ Idő-interpoláció** → **Optical flow** (mozgásbecslés) vagy **Keverés**. *Eredmény:* sima slow-motion köztes kockákkal (a renderben).
+3. *Művelet:* Fagyassz kockát. *Hol:* **❄️ Freeze / hold frame** → állítsd a hosszt → **Kocka fagyasztása a lejátszófejnél**. *Eredmény:* a kép megáll, a többi klip arrébb csúszik, a hang tovább szól.
 
 ---
 

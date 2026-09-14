@@ -1619,7 +1619,13 @@
       "interp_none": "Keine",
       "interp_blend": "Mischen",
       "interp_flow": "Optical Flow",
-      "interpNote": "Zwischenbild-Qualität beim Verlangsamen: Keine (Bildwiederholung) · Mischen (Frame-Blending) · Optical Flow (bewegungsschätzend, am glättesten). Wird im Render gebacken."
+      "interpNote": "Zwischenbild-Qualität beim Verlangsamen: Keine (Bildwiederholung) · Mischen (Frame-Blending) · Optical Flow (bewegungsschätzend, am glättesten). Wird im Render gebacken.",
+      "freezeTitle": "❄️ Standbild / Freeze",
+      "freezeDuration": "Freeze-Länge",
+      "freezeAtPlayhead": "Bild am Abspielkopf einfrieren",
+      "freezeFail": "Bild konnte nicht erfasst werden (nur auf dem Gerät).",
+      "freezeNotInClip": "Setze den Abspielkopf in den Clip.",
+      "freezeNote": "Fügt am Abspielkopf ein Standbild ein: das Bild hält, spätere Clips rücken nach, der übergreifende Ton läuft weiter."
     },
     "sticker": {
       "object3dTitle": "3D-Objekt",

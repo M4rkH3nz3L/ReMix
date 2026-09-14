@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
+import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { palette, speedPresets } from '@/constants/editor';
+import { captureFrame } from '@/lib/captureFrame';
+import { buildFreezePlan } from '@/lib/freeze';
 import { makeId } from '@/lib/id';
 import { setChannelKeyframe } from '@/lib/keyframes';
 import { maxVideoDuration } from '@/lib/projectUtils';
@@ -20,6 +22,36 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
   const [rampBlur, setRampBlur] = useState(0.6);
   // 🚀 egyéni görbe: null = preset-mód, tömb = a szerkesztőben állított görbe
   const [customCurve, setCustomCurve] = useState<number[] | null>(null);
+  // ❄️ freeze frame hossza (mp)
+  const [freezeDur, setFreezeDur] = useState(2);
+
+  // ❄️ Freeze / hold frame: a lejátszófejnél állókockát szúr be, a kép áll, a
+  // hang tovább szól (az átívelő hangklip nem tolódik); minden más ripple-el.
+  const freezeFrame = async () => {
+    const state = useEditorStore.getState();
+    if (!state.project) {
+      return;
+    }
+    const captured = await captureFrame(clip, state.playhead);
+    if (!captured) {
+      Alert.alert(t('panels.speed.freezeTitle'), t('panels.speed.freezeFail'));
+      return;
+    }
+    const plan = buildFreezePlan(state.project, clip.id, state.playhead, freezeDur, {
+      ...captured.clip,
+      assetId: captured.asset.id,
+    });
+    if (!plan) {
+      Alert.alert(t('panels.speed.freezeTitle'), t('panels.speed.freezeNotInClip'));
+      return;
+    }
+    state.dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks: plan.tracks,
+      assets: [captured.asset],
+      label: t('panels.speed.freezeTitle'),
+    });
+  };
 
   // 🚀 speed ramp: preset VAGY egyéni görbe → lépcsős sebességű darabok,
   // egy undo-lépésben
@@ -193,6 +225,21 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
           ))}
         </View>
         <Text style={styles.note}>{t('panels.speed.interpNote')}</Text>
+      </PanelSection>
+
+      <PanelSection title={t('panels.speed.freezeTitle')}>
+        <Stepper
+          label={t('panels.speed.freezeDuration')}
+          value={`${freezeDur.toFixed(1)}s`}
+          onDec={() => setFreezeDur((d) => clamp(Math.round((d - 0.5) * 10) / 10, 0.3, 10))}
+          onInc={() => setFreezeDur((d) => clamp(Math.round((d + 0.5) * 10) / 10, 0.3, 10))}
+        />
+        <PrimaryButton
+          icon="snow-outline"
+          label={t('panels.speed.freezeAtPlayhead')}
+          onPress={() => void freezeFrame()}
+        />
+        <Text style={styles.note}>{t('panels.speed.freezeNote')}</Text>
       </PanelSection>
 
       <PanelSection title={t('panels.speed.volumeTitle')}>

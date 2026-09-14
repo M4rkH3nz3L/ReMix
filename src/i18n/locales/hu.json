@@ -1619,7 +1619,13 @@
       "interp_none": "Nincs",
       "interp_blend": "Keverés",
       "interp_flow": "Optical flow",
-      "interpNote": "Lassításnál a köztes kockák minősége: Nincs (kockadoblás) · Keverés (frame blending) · Optical flow (mozgásbecsléssel a legsimább). A renderben ég be."
+      "interpNote": "Lassításnál a köztes kockák minősége: Nincs (kockadoblás) · Keverés (frame blending) · Optical flow (mozgásbecsléssel a legsimább). A renderben ég be.",
+      "freezeTitle": "❄️ Freeze / hold frame",
+      "freezeDuration": "Fagyasztás hossza",
+      "freezeAtPlayhead": "Kocka fagyasztása a lejátszófejnél",
+      "freezeFail": "A képkocka elkapása nem sikerült (csak eszközön).",
+      "freezeNotInClip": "Állítsd a lejátszófejet a klipen belülre.",
+      "freezeNote": "A lejátszófejnél állókockát szúr be: a kép megáll, a többi klip arrébb csúszik, az átívelő hang viszont tovább szól."
     },
     "sticker": {
       "object3dTitle": "3D objektum",

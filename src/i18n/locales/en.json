@@ -450,7 +450,8 @@
       "title_pip": "PiP frame",
       "title_export": "Export",
       "closePanel": "Close panel",
-      "title_multicam": "🎬 Multicam"
+      "title_multicam": "🎬 Multicam",
+      "title_creatorPreset": "🎨 Creator Preset"
     },
     "timeline": {
       "trackMenuMessage": "Mute and solo affect ONLY the preview — the exported video is not changed by them. For permanent muting, adjust the clip's volume.",
@@ -548,7 +549,8 @@
       "library": "Library",
       "export": "Export",
       "precompose": "Pre-compose",
-      "multicam": "Multicam"
+      "multicam": "Multicam",
+      "creatorPreset": "Preset"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1862,6 +1864,25 @@
       "noCuts": "Record at least one angle switch first.",
       "buildNote": "The cuts become muted video clips on the main track, and the master angle audio becomes one continuous clip on the voiceover track.",
       "masterAudio": "Multicam audio"
+    },
+    "creatorPreset": {
+      "title": "Creator Preset",
+      "defaultName": "My style",
+      "saveTitle": "💾 Save style",
+      "namePlaceholder": "Preset name (e.g. My YouTube Style)",
+      "motion": "Motion + transitions",
+      "intro": "Intro",
+      "outro": "Outro",
+      "saveButton": "Save style as preset",
+      "saveNote": "Saves font, colors, caption style, logo and music from the current project; motion/intro/outro come from above.",
+      "saved": "\"{{name}}\" saved.",
+      "listTitle": "📁 My presets",
+      "empty": "No saved presets yet. Set your style and save it above.",
+      "apply": "Apply",
+      "applied": "\"{{name}}\" applied: {{parts}}.",
+      "nothingToApply": "This preset is empty or nothing to apply.",
+      "tagCaptions": "captions",
+      "tagLogo": "logo"
     }
   },
   "paywallSheet": {

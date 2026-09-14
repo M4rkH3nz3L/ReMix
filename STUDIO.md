@@ -216,6 +216,14 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **Brand Kit**, **Motion/Look-csomagok**, **Intro/Outro** sablonok, **Safe zone**,
   variáns-előnézet/-alkalmazás, **beat-pulzus/flash**.
 
+### 🎨 Creator Preset (Toolbar → Preset) 🆕
+- Egy NEVEZETT „stílus" ("My YouTube Style") egy csomagban: **Font · Colors · Captions ·
+  Logo** (Brand Kitből, a projektből derítve) + **Motion + Transitions** (Motion pack) +
+  **Intro/Outro** sablon + **Sound** (a projekt zenéje).
+- **Több preset** menthető/törölhető (eszközön, AsyncStorage), és **egy gombbal a
+  projektre alkalmazható** ("Apply") — a meglévő, tesztelt apply-utakon (brand-feliratok,
+  vízjel, motion pack, intro/outro ripple, háttérzene).
+
 ---
 
 ## PRO — előfizetéses (felhő-worker / AI / cloud-tárhely)
@@ -423,6 +431,10 @@ A fő UI-zónák a leckékhez:
 **17b. lecke — Átmenet-szerkesztő**
 1. *Művelet:* Tegyél átmenetet. *Hol:* klip → **Áttűnés** panel → válassz típust a *Következő klipre* alatt. *Eredmény:* átmenet a következő klipre.
 2. *Művelet:* Finomhangold. *Hol:* **🎬 Átmenet szerkesztése** → **hossz · irány · easing · erősség · elmosás · zoom-lökés · forgás-lökés**. *Eredmény:* a flourishök az átmenet ablakában hatnak (a renderben égnek be).
+
+**17c. lecke — Creator Preset (saját stílus egy gombra)**
+1. *Művelet:* Állítsd össze a stílust. *Hol:* Toolbar → **Preset** → adj nevet (pl. „My YouTube Style"), válassz **Motion + Intro + Outro** csomagot; a betűtípus/színek/felirat/logó/zene a jelenlegi projektből derül. *Eredmény:* mentett preset.
+2. *Művelet:* Húzd rá egy másik projektre. *Hol:* **Presetjeim** → **Alkalmaz**. *Eredmény:* a font/színek/felirat-stílus/logó + motion + átmenetek + intro/outro + zene egy lépésben ráépül.
 
 **18. lecke — Time remapping (sebesség-görbe, interpoláció, freeze)**
 1. *Művelet:* Rajzolj sebesség-görbét. *Hol:* egy videóklip → **Sebesség** panel → **Egyéni görbe** → húzd az oszlopokat (velocity graph), szegmenst ±-szal adj/vegyél; **Alkalmaz**. *Eredmény:* a klip a görbe szerint gyorsul/lassul (a hossza változatlan).

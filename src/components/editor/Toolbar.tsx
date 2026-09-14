@@ -570,6 +570,12 @@ export function Toolbar() {
               active={activePanel === 'assistant'}
               onPress={() => togglePanel('assistant')}
             />
+            <ToolButton
+              icon="bookmarks-outline"
+              label={t('editor.toolbar.creatorPreset')}
+              active={activePanel === 'creatorPreset'}
+              onPress={() => togglePanel('creatorPreset')}
+            />
             <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
             <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
             <ToolButton icon="albums-outline" label="PiP" onPress={addPip} />

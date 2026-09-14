@@ -450,7 +450,8 @@
       "title_pip": "PiP-Rahmen",
       "title_export": "Export",
       "closePanel": "Panel schließen",
-      "title_multicam": "🎬 Multicam"
+      "title_multicam": "🎬 Multicam",
+      "title_creatorPreset": "🎨 Creator-Preset"
     },
     "timeline": {
       "trackMenuMessage": "Stumm und Solo wirken sich NUR auf die Vorschau aus — das exportierte Video wird dadurch nicht verändert. Zum dauerhaften Stummschalten passe die Lautstärke des Clips an.",
@@ -548,7 +549,8 @@
       "library": "Bibliothek",
       "export": "Export",
       "precompose": "Vorkomp.",
-      "multicam": "Multicam"
+      "multicam": "Multicam",
+      "creatorPreset": "Preset"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1862,6 +1864,25 @@
       "noCuts": "Nimm zuerst mindestens einen Winkelwechsel auf.",
       "buildNote": "Die Schnitte werden zu stummen Videoclips auf der Hauptspur, der Master-Ton wird zu einem durchgehenden Clip auf der Voiceover-Spur.",
       "masterAudio": "Multicam-Ton"
+    },
+    "creatorPreset": {
+      "title": "Creator-Preset",
+      "defaultName": "Mein Stil",
+      "saveTitle": "💾 Stil speichern",
+      "namePlaceholder": "Preset-Name (z. B. My YouTube Style)",
+      "motion": "Motion + Übergänge",
+      "intro": "Intro",
+      "outro": "Outro",
+      "saveButton": "Stil als Preset speichern",
+      "saveNote": "Speichert Schrift, Farben, Untertitelstil, Logo und Musik aus dem aktuellen Projekt; Motion/Intro/Outro von oben.",
+      "saved": "„{{name}}\" gespeichert.",
+      "listTitle": "📁 Meine Presets",
+      "empty": "Noch keine Presets. Stelle deinen Stil ein und speichere ihn oben.",
+      "apply": "Anwenden",
+      "applied": "„{{name}}\" angewendet: {{parts}}.",
+      "nothingToApply": "Dieses Preset ist leer oder nichts anzuwenden.",
+      "tagCaptions": "Untertitel",
+      "tagLogo": "Logo"
     }
   },
   "paywallSheet": {

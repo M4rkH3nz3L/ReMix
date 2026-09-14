@@ -8,6 +8,7 @@ import { AssistantPanel } from '@/components/editor/panels/AssistantPanel';
 import { PipPanel } from '@/components/editor/panels/PipPanel';
 import { AudioPanel } from '@/components/editor/panels/AudioPanel';
 import { CaptionsPanel } from '@/components/editor/panels/CaptionsPanel';
+import { CreatorPresetPanel } from '@/components/editor/panels/CreatorPresetPanel';
 import { ImageDocPanel } from '@/components/editor/panels/ImageDocPanel';
 import { ExportPanel } from '@/components/editor/panels/ExportPanel';
 import { FilterPanel } from '@/components/editor/panels/FilterPanel';
@@ -116,6 +117,9 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
       break;
     case 'multicam':
       content = <MulticamPanel />;
+      break;
+    case 'creatorPreset':
+      content = <CreatorPresetPanel />;
       break;
   }
 

@@ -450,7 +450,8 @@
       "title_pip": "PiP-keret",
       "title_export": "Exportálás",
       "closePanel": "Panel bezárása",
-      "title_multicam": "🎬 Multicam"
+      "title_multicam": "🎬 Multicam",
+      "title_creatorPreset": "🎨 Creator Preset"
     },
     "timeline": {
       "trackMenuMessage": "A némítás és a solo CSAK az előnézetre hat — az exportált videó nem változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.",
@@ -548,7 +549,8 @@
       "library": "Tár",
       "export": "Export",
       "precompose": "Pre-compose",
-      "multicam": "Multicam"
+      "multicam": "Multicam",
+      "creatorPreset": "Preset"
     },
     "transportBar": {
       "markerTitle": "Jelölő",
@@ -1862,6 +1864,25 @@
       "noCuts": "Előbb rögzíts legalább egy szögváltást.",
       "buildNote": "A vágásokból néma videóklipek kerülnek a fő sávra, a master szög hangja pedig folytonos audióként a voiceover-sávra.",
       "masterAudio": "Multicam hang"
+    },
+    "creatorPreset": {
+      "title": "Creator Preset",
+      "defaultName": "Saját stílus",
+      "saveTitle": "💾 Stílus mentése",
+      "namePlaceholder": "Preset neve (pl. My YouTube Style)",
+      "motion": "Motion + átmenetek",
+      "intro": "Intro",
+      "outro": "Outro",
+      "saveButton": "Stílus mentése presetként",
+      "saveNote": "A betűtípust, színeket, felirat-stílust, logót és a zenét a jelenlegi projektből menti; a motion/intro/outro fentről jön.",
+      "saved": "„{{name}}\" mentve.",
+      "listTitle": "📁 Presetjeim",
+      "empty": "Még nincs mentett preset. Állítsd be a stílust, és mentsd el fent.",
+      "apply": "Alkalmaz",
+      "applied": "„{{name}}\" alkalmazva: {{parts}}.",
+      "nothingToApply": "Ehhez a preset üres vagy nincs mit alkalmazni.",
+      "tagCaptions": "felirat",
+      "tagLogo": "logó"
     }
   },
   "paywallSheet": {

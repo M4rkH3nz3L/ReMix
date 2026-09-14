@@ -49,6 +49,12 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 
 ### Projekt és idővonal
 - Projekt: létrehozás (16:9 / 9:16 / 1:1), lista, törlés, automatikus draft-mentés.
+- **🎞️ Frame-kvantált idő-modell (timebase)** 🆕: a projekt saját **frame-rátán** fut
+  (`project.fps`, 24/25/30/50/60 — a Pontos panelen állítható, `SET_FPS`, undo-zható). A
+  **vágás a frame-rácsra ül** (`splitClipAt` → `snapToFrame`), a lejátszófej **kockára
+  léptethető** (◀▮ ▮▶), és az idő **timecode**-ként jelenik meg (`HH:MM:SS:FF`) a
+  transport-sávon és a Pontos panelen (`frames.ts`, pure + tesztelt). A régi projektek
+  30 fps-re esnek vissza.
 - Többsávos idővonal (videó/kép · PiP · grade · szöveg · felirat · overlay · interaktív ·
   zene · voiceover · SFX): középre rögzített lejátszófej, görgetéses léptetés, kétujjas
   zoom (0,2×–4×).

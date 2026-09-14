@@ -1176,6 +1176,9 @@ export interface Project {
   id: string;
   name: string;
   aspectRatio: AspectRatio;
+  /** 🎞️ szerkesztési frame-ráta (timebase): a vágások/kulcskockák erre a rácsra
+   *  ülnek, a timecode (HH:MM:SS:FF) ebből számol. Hiányzó = DEFAULT_FPS (30). */
+  fps?: number;
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */

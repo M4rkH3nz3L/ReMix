@@ -1559,7 +1559,9 @@
       "compoundRendering": "Renderelés…",
       "compoundNote": "A compound a valós tartalmát mutatja, ha renderelsz egy proxyt (local-first; összetettnél felhő = Pro). Az EXPORT úgyis rekurzívan újrarendereli.",
       "compoundDoneTitle": "Előnézet kész",
-      "compoundDoneBody": "A compound klip mostantól a beágyazott kompozíciót mutatja."
+      "compoundDoneBody": "A compound klip mostantól a beágyazott kompozíciót mutatja.",
+      "timebaseTitle": "Timebase (frame-ráta)",
+      "timebaseNote": "A projekt {{fps}} fps-en fut — a vágások, kulcskockák és a timecode erre a rácsra ülnek."
     },
     "shape": {
       "shapeTitle": "Forma",
@@ -2203,7 +2205,8 @@
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",
       "relinkUri": "média újracsatolva: {{file}}",
-      "updateAsset": "Média-metaadat: {{keys}}"
+      "updateAsset": "Média-metaadat: {{keys}}",
+      "setFps": "Frame-ráta: {{fps}} fps"
     },
     "demoData": {
       "labelMusic": "Zene",

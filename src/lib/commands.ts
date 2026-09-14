@@ -28,6 +28,7 @@ export type EditorCommand =
   | { type: 'REMOVE_CLIP'; clipId: string }
   | { type: 'SPLIT_CLIP'; clipId: string; time: number }
   | { type: 'SET_ASPECT'; aspectRatio: AspectRatio }
+  | { type: 'SET_FPS'; fps: number }
   | { type: 'RENAME_PROJECT'; name: string }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
@@ -146,6 +147,14 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, aspectRatio: cmd.aspectRatio };
+
+    case 'SET_FPS': {
+      const fps = Math.round(cmd.fps);
+      if (!(fps > 0) || (project.fps ?? 30) === fps) {
+        return null;
+      }
+      return { ...project, fps };
+    }
 
     case 'RENAME_PROJECT': {
       const name = cmd.name.trim();
@@ -321,6 +330,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.splitClip', { time: cmd.time.toFixed(2) });
     case 'SET_ASPECT':
       return tr('lib.commands.setAspect', { aspectRatio: cmd.aspectRatio });
+    case 'SET_FPS':
+      return tr('lib.commands.setFps', { fps: cmd.fps });
     case 'RENAME_PROJECT':
       return tr('lib.commands.renameProject', { name: cmd.name });
     case 'SET_PARTICLES':

@@ -10,6 +10,7 @@ import {
 } from '@/lib/batchEdit';
 import { applyCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
+import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
 import { findClip, maxVideoDuration, projectDuration } from '@/lib/projectUtils';
@@ -602,7 +603,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   splitClipAt: (clipId, time) => {
-    return get().dispatch({ type: 'SPLIT_CLIP', clipId, time });
+    // 🎞️ a vágás a projekt frame-rácsára ül (fél kocka csúszás már látszik)
+    const snapped = snapToFrame(time, projectFps(get().project));
+    return get().dispatch({ type: 'SPLIT_CLIP', clipId, time: snapped });
   },
 
   selectClip: (clipId) => {

@@ -1559,7 +1559,9 @@
       "compoundRendering": "Rendering…",
       "compoundNote": "The compound shows its real content once you render a proxy (local-first; cloud = Pro if complex). EXPORT re-renders it recursively anyway.",
       "compoundDoneTitle": "Preview ready",
-      "compoundDoneBody": "The compound clip now shows the nested composition."
+      "compoundDoneBody": "The compound clip now shows the nested composition.",
+      "timebaseTitle": "Timebase (frame rate)",
+      "timebaseNote": "Project runs at {{fps}} fps — cuts, keyframes and timecode snap to this grid."
     },
     "shape": {
       "shapeTitle": "Shape",
@@ -2203,7 +2205,8 @@
       "replaceTracks_one": "{{count}} track rebuilt",
       "replaceTracks_other": "{{count}} tracks rebuilt",
       "relinkUri": "media relinked: {{file}}",
-      "updateAsset": "Media metadata: {{keys}}"
+      "updateAsset": "Media metadata: {{keys}}",
+      "setFps": "Frame rate: {{fps}} fps"
     },
     "demoData": {
       "labelMusic": "Music",

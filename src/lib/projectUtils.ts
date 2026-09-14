@@ -39,6 +39,7 @@ export function createEmptyProject(
     id: makeId('prj'),
     name,
     aspectRatio,
+    fps: 30,
     // a SEO-meta a létrehozáskor kötelező (Új projekt űrlap); demo/import útján
     // hiányozhat — ezért opcionális a mezőn, és csak akkor kerül be, ha van
     ...(seo ? { seo } : {}),

@@ -1559,7 +1559,9 @@
       "compoundRendering": "Rendere…",
       "compoundNote": "Der Compound zeigt seinen echten Inhalt nach dem Rendern eines Proxys (lokal zuerst; Cloud = Pro bei Komplexität). Der EXPORT rendert ihn ohnehin rekursiv neu.",
       "compoundDoneTitle": "Vorschau fertig",
-      "compoundDoneBody": "Der Compound-Clip zeigt nun die verschachtelte Komposition."
+      "compoundDoneBody": "Der Compound-Clip zeigt nun die verschachtelte Komposition.",
+      "timebaseTitle": "Timebase (Bildrate)",
+      "timebaseNote": "Projekt läuft mit {{fps}} fps — Schnitte, Keyframes und Timecode rasten auf diesem Raster ein."
     },
     "shape": {
       "shapeTitle": "Form",
@@ -2203,7 +2205,8 @@
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",
       "relinkUri": "Medien neu verknüpft: {{file}}",
-      "updateAsset": "Medien-Metadaten: {{keys}}"
+      "updateAsset": "Medien-Metadaten: {{keys}}",
+      "setFps": "Bildrate: {{fps}} fps"
     },
     "demoData": {
       "labelMusic": "Musik",

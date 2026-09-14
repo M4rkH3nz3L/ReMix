@@ -4,11 +4,19 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
-import { aspectValue, EDIT_FPS, FRAME, MIN_CLIP_DURATION, palette } from '@/constants/editor';
+import { aspectValue, MIN_CLIP_DURATION, palette } from '@/constants/editor';
+import {
+  FPS_OPTIONS,
+  formatTimecode,
+  frameDuration,
+  projectFps,
+  secToFrame,
+  snapToFrame,
+} from '@/lib/frames';
 import type { KeyframeChannel } from '@/lib/keyframes';
 import { activeVisualClip, maxVideoDuration, sourceTimeAt } from '@/lib/projectUtils';
 import { isRenderCancelledError, renderMp4 } from '@/lib/render';
-import { clamp, formatTime } from '@/lib/time';
+import { clamp } from '@/lib/time';
 import { pointsToPanKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, ImageClip, VideoClip } from '@/types/project';
@@ -42,11 +50,9 @@ const TRANSFORM_CHANNELS: ChannelCfg[] = [
  */
 type StepMode = 'sec' | 'frame';
 
-/** kerekítés a lépés-mód szerint */
-function snap(value: number, mode: StepMode): number {
-  return mode === 'frame'
-    ? Math.round(value * EDIT_FPS) / EDIT_FPS
-    : Math.round(value * 100) / 100;
+/** kerekítés a lépés-mód szerint (frame-módban a projekt frame-rácsára) */
+function snap(value: number, mode: StepMode, fps: number): number {
+  return mode === 'frame' ? snapToFrame(value, fps) : Math.round(value * 100) / 100;
 }
 
 /** Pro eszköz: kezdet/hossz tizedmásodperces igazítása + lejátszófej-műveletek. */
@@ -60,6 +66,8 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
   const [trackBusy, setTrackBusy] = useState(false);
   const [proxyBusy, setProxyBusy] = useState(false);
   const setPickTarget = useEditorStore((s) => s.setPickTarget);
+  const fps = useEditorStore((s) => projectFps(s.project));
+  const dispatch = useEditorStore((s) => s.dispatch);
 
   /**
    * 🧱 Compound előnézet: a beágyazott kompozíciót MP4-proxyba rendereli
@@ -95,7 +103,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
       setProxyBusy(false);
     }
   };
-  const step = stepMode === 'frame' ? FRAME : STEP;
+  const step = stepMode === 'frame' ? frameDuration(fps) : STEP;
 
   /**
    * 🎯 Objektum-követés: a felhasználó a vásznon rákoppint a követendő objektumra,
@@ -154,18 +162,18 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
     clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
 
   const setStart = (start: number) => {
-    updateClip(clip.id, { start: Math.max(0, snap(start, stepMode)) });
+    updateClip(clip.id, { start: Math.max(0, snap(start, stepMode, fps)) });
   };
 
   const setDuration = (duration: number) => {
     updateClip(clip.id, {
-      duration: snap(clamp(duration, MIN_CLIP_DURATION, maxDuration), stepMode),
+      duration: snap(clamp(duration, MIN_CLIP_DURATION, maxDuration), stepMode, fps),
     });
   };
 
   /** a lejátszófej léptetése ugyanazzal a finomsággal */
   const nudgePlayhead = (dir: 1 | -1) => {
-    setPlayhead(snap(playhead + dir * step, stepMode));
+    setPlayhead(snap(playhead + dir * step, stepMode, fps));
   };
 
   const alignToPlayhead = () => {
@@ -175,6 +183,21 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
 
   return (
     <View>
+      {/* 🎞️ Timebase: a projekt frame-rátája (egész app erre a rácsra ül) */}
+      <PanelSection title={t('panels.precision.timebaseTitle')}>
+        <View style={styles.row}>
+          {FPS_OPTIONS.map((f) => (
+            <Chip
+              key={f}
+              label={`${f}`}
+              active={fps === f}
+              onPress={() => dispatch({ type: 'SET_FPS', fps: f })}
+            />
+          ))}
+        </View>
+        <Text style={styles.range}>{t('panels.precision.timebaseNote', { fps })}</Text>
+      </PanelSection>
+
       <PanelSection title={t('panels.precision.timingTitle')}>
         <View style={styles.row}>
           <Chip
@@ -183,29 +206,29 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
             onPress={() => setStepMode('sec')}
           />
           <Chip
-            label={t('panels.precision.stepFrame', { fps: EDIT_FPS })}
+            label={t('panels.precision.stepFrame', { fps })}
             active={stepMode === 'frame'}
             onPress={() => setStepMode('frame')}
           />
         </View>
         <Stepper
           label={t('panels.precision.start')}
-          value={formatTime(clip.start)}
+          value={formatTimecode(clip.start, fps)}
           onDec={() => setStart(clip.start - step)}
           onInc={() => setStart(clip.start + step)}
         />
         <Stepper
           label={t('panels.precision.length')}
-          value={formatTime(clip.duration)}
+          value={formatTimecode(clip.duration, fps)}
           onDec={() => setDuration(clip.duration - step)}
           onInc={() => setDuration(clip.duration + step)}
         />
         <Text style={styles.range}>
-          {formatTime(clip.start)} → {formatTime(clip.start + clip.duration)}
+          {formatTimecode(clip.start, fps)} → {formatTimecode(clip.start + clip.duration, fps)}
           {stepMode === 'frame'
             ? t('panels.precision.frameInfo', {
-                startFrame: Math.round(clip.start * EDIT_FPS),
-                frameCount: Math.round(clip.duration * EDIT_FPS),
+                startFrame: secToFrame(clip.start, fps),
+                frameCount: secToFrame(clip.duration, fps),
               })
             : ''}
         </Text>

@@ -6,7 +6,8 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DetailPreview } from '@/components/editor/DetailPreview';
 import { HistoryModal } from '@/components/editor/HistoryModal';
-import { accentGradient, FRAME, palette } from '@/constants/editor';
+import { accentGradient, palette } from '@/constants/editor';
+import { formatTimecode, frameDuration, projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatTime } from '@/lib/time';
@@ -40,6 +41,7 @@ export function TransportBar() {
   const canUndo = useEditorStore((s) => s.past.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
   const duration = useEditorStore((s) => (s.project ? projectDuration(s.project) : 0));
+  const fps = useEditorStore((s) => projectFps(s.project));
   // FONTOS: a selector STABIL referenciát adjon vissza — a `?? []` minden
   // híváskor új tömböt csinálna, amitől a zustand egyenlőség-vizsgálata sosem
   // teljesül és a komponens végtelenül újrarenderel („Maximum update depth")
@@ -120,14 +122,14 @@ export function TransportBar() {
     setPlaying(true);
   };
 
-  /** ⏭️ képkocka-pontos léptetés: a lejátszófejet a frame-rácsra igazítja, majd ±1 kocka */
+  /** ⏭️ képkocka-pontos léptetés: a lejátszófejet a projekt frame-rácsára igazítja, majd ±1 kocka */
   const stepFrame = (dir: -1 | 1) => {
     if (isPlaying) {
       setPlaying(false);
     }
     setPlaybackRate(1);
-    const snapped = Math.round(playhead / FRAME) * FRAME;
-    setPlayhead(Math.max(0, snapped + dir * FRAME));
+    const snapped = snapToFrame(playhead, fps);
+    setPlayhead(Math.max(0, snapped + dir * frameDuration(fps)));
   };
 
   // ⏯️ shuttle-kijelző: |sebesség| ≠ 1 esetén jelöli (pl. „2×", „-4×")
@@ -200,7 +202,8 @@ export function TransportBar() {
         </Pressable>
         <Text style={styles.time}>
           {rateLabel ? <Text style={styles.rate}>{rateLabel} </Text> : null}
-          {formatTime(playhead)} <Text style={styles.timeDim}>/ {formatTime(duration)}</Text>
+          {formatTimecode(playhead, fps)}{' '}
+          <Text style={styles.timeDim}>/ {formatTimecode(duration, fps)}</Text>
         </Text>
       </View>
 

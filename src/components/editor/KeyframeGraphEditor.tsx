@@ -14,7 +14,7 @@ const HEIGHT = 160;
 const PAD = 16;
 const CURVE_SAMPLES = 72;
 
-const EASINGS: KeyframeEasing[] = ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bezier'];
+const EASINGS: KeyframeEasing[] = ['linear', 'easeIn', 'easeOut', 'easeInOut', 'hold', 'bezier'];
 
 interface Props {
   keyframes: Keyframe[];

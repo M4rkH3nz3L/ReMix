@@ -112,8 +112,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **📈 Graph Editor** (Pontos / Hang panel): value/time görbe a **valós interpolációval**
   kirajzolva; húzható kulcskocka-pontok (idő+érték), koppintásra hozzáadás, törlés,
   lejátszófej-kurzor.
-- **Easing per kulcskocka**: linear · ease in · ease out · ease in/out · **egyéni köbös
-  Bézier** (húzható vezérfogók, overshoot is).
+- **Easing per kulcskocka**: linear · ease in · ease out · ease in/out · **🅷 hold (step)** 🆕
+  (az érték a következő kulcskockáig áll, majd ugrik — pose-to-pose animáció) · **egyéni köbös
+  Bézier** (húzható vezérfogók, overshoot is). Mind teljes **preview↔render paritással**.
 
 ### Vizuál
 - **Szűrő** panel: 20+ színszűrő + erősség, blend-módok, kamera-mozgás (pásztázás/zoom/

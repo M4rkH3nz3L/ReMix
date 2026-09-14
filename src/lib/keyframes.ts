@@ -25,6 +25,8 @@ const EASE_FNS: Record<Exclude<KeyframeEasing, 'bezier'>, (p: number) => number>
   easeIn: (p) => p * p,
   easeOut: (p) => 1 - (1 - p) * (1 - p),
   easeInOut: (p) => p * p * (3 - 2 * p), // smoothstep
+  // 🅷 Hold (step): az érték a következő kulcskockáig ÁLL (progressz = 0), majd ugrik
+  hold: () => 0,
 };
 
 /**
@@ -36,6 +38,7 @@ export const PRESET_BEZIER: Record<Exclude<KeyframeEasing, 'bezier'>, [number, n
   easeIn: [0.42, 0, 1, 1],
   easeOut: [0, 0, 0.58, 1],
   easeInOut: [0.42, 0, 0.58, 1],
+  hold: [0, 0, 1, 1], // csak a hold→bezier váltás induló fogói (a hold maga nem görbe)
 };
 
 /**

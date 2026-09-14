@@ -1095,6 +1095,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         return `(1-pow(1-${P},2))`;
       case 'easeInOut':
         return `(${P}*${P}*(3-2*${P}))`;
+      case 'hold':
+        return '0'; // 🅷 step: az érték a szegmensben áll (a.value), majd a köv. kulcskockán ugrik
       default:
         return P;
     }

@@ -583,7 +583,7 @@ export interface CanvasTransform {
  * A `bezier` egyéni köbös Bézier-görbe — a vezérpontokat a `Keyframe.bezier`
  * hordozza (CSS `cubic-bezier(x1,y1,x2,y2)` konvenció, végpontok 0,0 és 1,1).
  */
-export type KeyframeEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'bezier';
+export type KeyframeEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'hold' | 'bezier';
 
 export interface Keyframe {
   /** idő a klip kezdetétől (mp, idővonal-időben) */

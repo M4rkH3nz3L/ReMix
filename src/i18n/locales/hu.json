@@ -1131,7 +1131,23 @@
       "translateDoneTitle": "Feliratok lefordítva",
       "translateDoneBody": "{{count}} felirat lefordítva erre: {{lang}} (időzítés megtartva).",
       "translateNote": "A jelenlegi feliratokat helyben lefordítja a választott nyelvre, az időzítés marad. Egy undo-lépés.",
-      "footerNote": "A beírt sorok a lejátszófejtől a videó végéig egyenletesen oszlanak el, utána egyenként igazíthatod őket az idővonalon."
+      "footerNote": "A beírt sorok a lejátszófejtől a videó végéig egyenletesen oszlanak el, utána egyenként igazíthatod őket az idővonalon.",
+      "safeZoneChip": "Safe-zone",
+      "safeZoneTitle": "Safe-zone ellenőrzés",
+      "safeZoneAllOk": "Minden felirat a biztonságos sávon belül van.",
+      "safeZoneDone": "{{count}} feliratot visszatoltam a biztonságos sávba.",
+      "bilingualSectionTitle": "Kétnyelvű felirat",
+      "bilingualTitle": "Kétnyelvű felirat",
+      "bilingualNote": "Az eredeti szöveg marad, alá kerül a fordítás (két sor). A már kétnyelvűeknél az első sor az eredeti.",
+      "bilingualDone": "{{count}} felirat kétnyelvű lett ({{lang}}).",
+      "profanitySectionTitle": "Nyelvezet (káromkodás)",
+      "profanityTitle": "Káromkodás-szűrés",
+      "profanityNote": "A leggyakoribb erős szavakat maszkolja (en/hu/de) — platform-barát felirathoz. Nem teljes lista.",
+      "profanityNone": "Nem találtam szűrendő szót a feliratokban.",
+      "profanityDone": "{{count}} szót cseréltem le.",
+      "profanityMask": "Maszk (f***)",
+      "profanityStars": "Csillagok (****)",
+      "profanityRemove": "Törlés"
     },
     "export": {
       "writingHeadlines": "Címek írása…",
@@ -1211,7 +1227,8 @@
       "audio": "Hang",
       "mono": "Mono",
       "stereo": "Sztereó",
-      "advancedNote": "A haladó kodek-beállítások (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) felhő-renderrel készülnek (Pro)."
+      "advancedNote": "A haladó kodek-beállítások (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) felhő-renderrel készülnek (Pro).",
+      "captionsFormatsNote": "SRT: univerzális. WebVTT: web/HTML5, sor-pozícióval. ASS: stílussal (szín, pozíció, félkövér)."
     },
     "filter": {
       "sectionFilters": "Szűrők",

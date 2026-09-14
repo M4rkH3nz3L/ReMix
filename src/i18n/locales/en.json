@@ -1131,7 +1131,23 @@
       "translateDoneTitle": "Captions translated",
       "translateDoneBody": "{{count}} caption(s) translated to {{lang}} (timing kept).",
       "translateNote": "Translates the current captions in place to the chosen language, keeping the timing. One undo step.",
-      "footerNote": "The entered lines are spread evenly from the playhead to the end of the video; afterwards you can adjust them one by one on the timeline."
+      "footerNote": "The entered lines are spread evenly from the playhead to the end of the video; afterwards you can adjust them one by one on the timeline.",
+      "safeZoneChip": "Safe zone",
+      "safeZoneTitle": "Safe-zone check",
+      "safeZoneAllOk": "All captions are within the safe zone.",
+      "safeZoneDone": "Moved {{count}} caption(s) back into the safe zone.",
+      "bilingualSectionTitle": "Bilingual captions",
+      "bilingualTitle": "Bilingual captions",
+      "bilingualNote": "Keeps the original and adds the translation below it (two lines). For already-bilingual clips the first line is the original.",
+      "bilingualDone": "{{count}} caption(s) are now bilingual ({{lang}}).",
+      "profanitySectionTitle": "Language (profanity)",
+      "profanityTitle": "Profanity filter",
+      "profanityNote": "Masks the most common strong words (en/hu/de) for platform-friendly captions. Not an exhaustive list.",
+      "profanityNone": "No words to filter were found in the captions.",
+      "profanityDone": "Replaced {{count}} word(s).",
+      "profanityMask": "Mask (f***)",
+      "profanityStars": "Stars (****)",
+      "profanityRemove": "Remove"
     },
     "export": {
       "writingHeadlines": "Writing headlines…",
@@ -1211,7 +1227,8 @@
       "audio": "Audio",
       "mono": "Mono",
       "stereo": "Stereo",
-      "advancedNote": "Advanced codec settings (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) render in the cloud (Pro)."
+      "advancedNote": "Advanced codec settings (HEVC/AV1/ProRes, 10-bit, HDR, Rec.2020) render in the cloud (Pro).",
+      "captionsFormatsNote": "SRT: universal. WebVTT: web/HTML5 with line position. ASS: with styling (color, position, bold)."
     },
     "filter": {
       "sectionFilters": "Filters",

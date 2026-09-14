@@ -1131,7 +1131,23 @@
       "translateDoneTitle": "Untertitel übersetzt",
       "translateDoneBody": "{{count}} Untertitel nach {{lang}} übersetzt (Timing beibehalten).",
       "translateNote": "Übersetzt die aktuellen Untertitel an Ort und Stelle in die gewählte Sprache, das Timing bleibt. Ein Undo-Schritt.",
-      "footerNote": "Die eingegebenen Zeilen werden gleichmäßig vom Abspielkopf bis zum Videoende verteilt; danach kannst du sie einzeln auf der Timeline anpassen."
+      "footerNote": "Die eingegebenen Zeilen werden gleichmäßig vom Abspielkopf bis zum Videoende verteilt; danach kannst du sie einzeln auf der Timeline anpassen.",
+      "safeZoneChip": "Safe-Zone",
+      "safeZoneTitle": "Safe-Zone-Prüfung",
+      "safeZoneAllOk": "Alle Untertitel liegen in der sicheren Zone.",
+      "safeZoneDone": "{{count}} Untertitel in die sichere Zone zurückgeschoben.",
+      "bilingualSectionTitle": "Zweisprachige Untertitel",
+      "bilingualTitle": "Zweisprachige Untertitel",
+      "bilingualNote": "Das Original bleibt, die Übersetzung kommt darunter (zwei Zeilen). Bei bereits zweisprachigen Clips ist die erste Zeile das Original.",
+      "bilingualDone": "{{count}} Untertitel sind jetzt zweisprachig ({{lang}}).",
+      "profanitySectionTitle": "Sprache (Schimpfwörter)",
+      "profanityTitle": "Schimpfwort-Filter",
+      "profanityNote": "Maskiert die häufigsten starken Wörter (en/hu/de) für plattformfreundliche Untertitel. Keine vollständige Liste.",
+      "profanityNone": "Keine zu filternden Wörter in den Untertiteln gefunden.",
+      "profanityDone": "{{count}} Wort/Wörter ersetzt.",
+      "profanityMask": "Maske (f***)",
+      "profanityStars": "Sterne (****)",
+      "profanityRemove": "Entfernen"
     },
     "export": {
       "writingHeadlines": "Titel werden geschrieben…",
@@ -1211,7 +1227,8 @@
       "audio": "Audio",
       "mono": "Mono",
       "stereo": "Stereo",
-      "advancedNote": "Erweiterte Codec-Einstellungen (HEVC/AV1/ProRes, 10-Bit, HDR, Rec.2020) werden in der Cloud gerendert (Pro)."
+      "advancedNote": "Erweiterte Codec-Einstellungen (HEVC/AV1/ProRes, 10-Bit, HDR, Rec.2020) werden in der Cloud gerendert (Pro).",
+      "captionsFormatsNote": "SRT: universell. WebVTT: Web/HTML5 mit Zeilenposition. ASS: mit Styling (Farbe, Position, fett)."
     },
     "filter": {
       "sectionFilters": "Filter",

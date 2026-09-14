@@ -19,7 +19,12 @@ import {
   suggestThumbnails,
 } from '@/lib/thumbStudio';
 import type { ThumbCandidate } from '@/lib/thumbStudio';
-import { shareCaptionsSrt, shareInteractiveMetadata } from '@/lib/export';
+import {
+  shareCaptionsAss,
+  shareCaptionsSrt,
+  shareCaptionsVtt,
+  shareInteractiveMetadata,
+} from '@/lib/export';
 import { projectDuration } from '@/lib/projectUtils';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import {
@@ -260,8 +265,11 @@ export function ExportPanel() {
     ).finally(() => setRenderStatus(null));
   };
 
-  const exportSrt = () => {
-    shareCaptionsSrt(project)
+  // felirat-export a választott formátumban (SRT / WebVTT / ASS)
+  const exportCaptions = (fmt: 'srt' | 'vtt' | 'ass') => {
+    const share =
+      fmt === 'vtt' ? shareCaptionsVtt : fmt === 'ass' ? shareCaptionsAss : shareCaptionsSrt;
+    share(project)
       .then((had) => {
         if (!had) {
           Alert.alert(t('panels.export.noCaptionsTitle'), t('panels.export.noCaptionsMessage'));
@@ -606,14 +614,15 @@ export function ExportPanel() {
       </PanelSection>
 
       <PanelSection title={t('panels.export.captionsSection')}>
-        <PrimaryButton
-          icon="chatbox-ellipses-outline"
-          label={t('panels.export.shareCaptionsSrt')}
-          onPress={exportSrt}
-        />
+        <View style={styles.row}>
+          <Chip label="SRT" active={false} onPress={() => exportCaptions('srt')} />
+          <Chip label="WebVTT" active={false} onPress={() => exportCaptions('vtt')} />
+          <Chip label="ASS" active={false} onPress={() => exportCaptions('ass')} />
+        </View>
         <Text style={styles.note}>
           {t('panels.export.captionsNote')}
         </Text>
+        <Text style={styles.note}>{t('panels.export.captionsFormatsNote')}</Text>
       </PanelSection>
 
       <PanelSection title={t('panels.export.interactiveSection')}>

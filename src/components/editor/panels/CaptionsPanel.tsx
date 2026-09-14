@@ -19,6 +19,8 @@ import {
   trackEnd,
   trackOf,
 } from '@/lib/projectUtils';
+import { replaceProfanity, type ProfanityMode } from '@/lib/profanity';
+import { captionInSafeZone, fitCaptionY, safeZone } from '@/lib/safeZone';
 import { transcribeToSrt } from '@/lib/render';
 import { getProjectWordCues } from '@/lib/transcripts';
 import { alignWordTimings, cuesToCaptionTime } from '@/lib/wordTiming';
@@ -366,6 +368,122 @@ export function CaptionsPanel() {
     }
   };
 
+  // 🌍 Kétnyelvű felirat: az EREDETIT megtartja, alá teszi a fordítást (két sor).
+  // A már kétnyelvű klipeknél az első sort veszi eredetinek → újrafuttatható. Pro.
+  const runBilingual = async (lang: string) => {
+    if (translateStatus) {
+      return;
+    }
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tk) => tk.type === 'captions');
+    const captions = (track?.clips ?? []).filter((c): c is TextClip => c.kind === 'text');
+    if (!state.project || !track || captions.length === 0) {
+      Alert.alert(t('panels.captions.bilingualTitle'), t('panels.captions.noCaptionsOnTrack'));
+      return;
+    }
+    setTranslateStatus(t('panels.captions.translatingStatus', { lang }));
+    try {
+      await guardPro(
+        async () => {
+          const segs = captions.map((c) => ({ id: c.id, text: c.text.split('\n')[0] }));
+          const translated = await withProgress(t('panels.captions.bilingualTitle'), () =>
+            fetchCaptionTranslations(segs, lang)
+          );
+          if (!translated || translated.length === 0) {
+            Alert.alert(t('panels.captions.bilingualTitle'), t('panels.captions.translateNone'));
+            return;
+          }
+          const map = new Map(translated.map((s) => [s.id, s.text]));
+          let n = 0;
+          const clips = track.clips.map((c) => {
+            const tx = c.kind === 'text' ? map.get(c.id) : undefined;
+            if (tx && c.kind === 'text') {
+              n += 1;
+              const orig = c.text.split('\n')[0];
+              return { ...c, text: `${orig}\n${tx}` };
+            }
+            return c;
+          });
+          useEditorStore
+            .getState()
+            .dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'ai');
+          Alert.alert(
+            t('panels.captions.bilingualTitle'),
+            t('panels.captions.bilingualDone', { count: n, lang })
+          );
+        },
+        (e) => Alert.alert(t('panels.captions.bilingualTitle'), e.message)
+      );
+    } finally {
+      setTranslateStatus(null);
+    }
+  };
+
+  // 🧼 Káromkodás-maszkolás: on-device, determinista (nem AI); egy undo-lépés.
+  const runProfanity = (mode: ProfanityMode) => {
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tk) => tk.type === 'captions');
+    const captions = (track?.clips ?? []).filter((c): c is TextClip => c.kind === 'text');
+    if (!track || captions.length === 0) {
+      Alert.alert(t('panels.captions.profanityTitle'), t('panels.captions.noCaptionsOnTrack'));
+      return;
+    }
+    let total = 0;
+    const clips = track.clips.map((c) => {
+      if (c.kind !== 'text') {
+        return c;
+      }
+      const res = replaceProfanity(c.text, mode);
+      if (res.count === 0) {
+        return c;
+      }
+      total += res.count;
+      return { ...c, text: res.text };
+    });
+    if (total === 0) {
+      Alert.alert(t('panels.captions.profanityTitle'), t('panels.captions.profanityNone'));
+      return;
+    }
+    state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips });
+    Alert.alert(t('panels.captions.profanityTitle'), t('panels.captions.profanityDone', { count: total }));
+  };
+
+  // 🛡️ Safe-zone validáció: a biztonságos sávon KÍVÜL eső feliratokat visszatolja
+  // (a platform-UI ne takarja). On-device, determinista; egy undo-lépés.
+  const runSafeZone = () => {
+    const state = useEditorStore.getState();
+    const project = state.project;
+    const track = project?.tracks.find((tk) => tk.type === 'captions');
+    const captions = (track?.clips ?? []).filter((c): c is TextClip => c.kind === 'text');
+    if (!project || !track || captions.length === 0) {
+      Alert.alert(t('panels.captions.safeZoneTitle'), t('panels.captions.noCaptionsOnTrack'));
+      return;
+    }
+    const zone = safeZone(project.aspectRatio);
+    let moved = 0;
+    const clips = track.clips.map((c) => {
+      if (c.kind !== 'text') {
+        return c;
+      }
+      const rect = { x: c.position.x, y: c.position.y, band: captionBand(c.text, c.fontSize) };
+      if (captionInSafeZone(rect, zone)) {
+        return c;
+      }
+      const y = Math.round(fitCaptionY(rect, zone) * 1000) / 1000;
+      if (Math.abs(y - c.position.y) < 0.005) {
+        return c;
+      }
+      moved += 1;
+      return { ...c, position: { ...c.position, y } };
+    });
+    if (moved === 0) {
+      Alert.alert(t('panels.captions.safeZoneTitle'), t('panels.captions.safeZoneAllOk'));
+      return;
+    }
+    state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips });
+    Alert.alert(t('panels.captions.safeZoneTitle'), t('panels.captions.safeZoneDone', { count: moved }));
+  };
+
   // ✨ Caption Studio: kiemelt szavak + emoji a meglévő feliratokra — AI-val,
   // AI nélkül heurisztikával; egy undo-lépés (REPLACE_TRACK_CLIPS)
   const runCaptionStudio = async () => {
@@ -589,6 +707,11 @@ export function CaptionsPanel() {
               }
             }}
           />
+          <Chip
+            label={t('panels.captions.safeZoneChip')}
+            active={false}
+            onPress={runSafeZone}
+          />
         </View>
         <Text style={styles.note}>
           {t('panels.captions.captionStudioNote')}
@@ -659,6 +782,37 @@ export function CaptionsPanel() {
         </View>
         {translateStatus ? <Text style={styles.note}>{translateStatus}</Text> : null}
         <Text style={styles.note}>{t('panels.captions.translateNote')}</Text>
+      </PanelSection>
+
+      <PanelSection title={t('panels.captions.bilingualSectionTitle')}>
+        <View style={styles.row}>
+          {TARGET_LANGS.map((l) => (
+            <Chip
+              key={l.code}
+              label={l.label}
+              active={false}
+              onPress={() => {
+                void runBilingual(l.label);
+              }}
+            />
+          ))}
+        </View>
+        <Text style={styles.note}>{t('panels.captions.bilingualNote')}</Text>
+      </PanelSection>
+
+      <PanelSection title={t('panels.captions.profanitySectionTitle')}>
+        <View style={styles.row}>
+          {(
+            [
+              { id: 'mask', label: t('panels.captions.profanityMask') },
+              { id: 'stars', label: t('panels.captions.profanityStars') },
+              { id: 'remove', label: t('panels.captions.profanityRemove') },
+            ] as const
+          ).map((m) => (
+            <Chip key={m.id} label={m.label} active={false} onPress={() => runProfanity(m.id)} />
+          ))}
+        </View>
+        <Text style={styles.note}>{t('panels.captions.profanityNote')}</Text>
       </PanelSection>
 
       <Text style={styles.note}>

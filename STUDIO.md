@@ -199,6 +199,13 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   lekerekítés / kulcskocka / objektum-követés) is ráhúzható; a pozíció/skála kulcskockák
   átöröklődnek. A szövegklip megmarad (nem-destruktív).
 - **Felirat**: kézi felirat, stílus-presetek, időzítés, **SRT-import**.
+- **✨ Caption Studio**: kiemelt szavak + emoji (heurisztika ingyen / AI), **beszélő-színek** és
+  **beszélő-címkék** (forrás+arc heurisztikus diarization), **szó-szintű karaoke-időzítés**,
+  **okos pozíció** (arc-elkerülés).
+- **🧼 Káromkodás-maszkolás** 🆕 (eszközön, determinista): maszk (f\*\*\*) / csillagok / törlés,
+  en/hu/de szólistával; egy undo-lépés.
+- **🛡️ Safe-zone validáció** 🆕 (eszközön): a platform-UI sávjain kívülre eső feliratokat
+  visszatolja a biztonságos sávba (a `SafeZoneOverlay` arányaival egyezően).
 - **Átirat**: szóra koppintás, tartomány-kijelölés, kitöltő/ismétlés-jelölés, ripple-törlés.
 
 ### Hang
@@ -215,7 +222,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **Hotspot**: URL / ugrás-időpontra / kvíz; **interaktív lejátszó**.
 - **ImageDoc** (Creative Canvas): réteg-alapú képszerkesztés, rasterizálás klippé.
 - **Local MP4 export** (`localRender`): natív render, felbontás/FPS/minőség, mentés a
-  Fotókba, SRT-export, `.ReMix` projektfájl.
+  Fotókba, `.ReMix` projektfájl.
+- **📝 Felirat-export**: **SRT** (univerzális) · **WebVTT** (web/HTML5, sor-pozícióval) ·
+  **ASS** (stílussal: szín, pontos pozíció, félkövér, betűméret) — mind eszközön.
 - **📤 Export-kontroll** (Toolbar → Export): **platform-presetek** (TikTok / Reels / Shorts /
   YouTube / Instagram — a preset a chipeket állítja), és **Haladó** kodek-beállítások:
   **H.264 / HEVC / AV1 / ProRes**, **bitráta-mód (CRF/VBR/CBR) + cél-bitráta**, **GOP**,
@@ -248,7 +257,8 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 
 ### Import · felirat · beszéd
 - **Import linkből** (`urlImport`, hibrid: eszközön ingyen próbál, worker-fallback Pro);
-  **automatikus felirat** (`autoCaption`, Whisper + fordítás + karaoke); **TTS** (`tts`).
+  **automatikus felirat** (`autoCaption`, Whisper + fordítás + karaoke); **felirat-fordítás** és
+  **🌍 kétnyelvű felirat** (eredeti + fordítás egy sorban alatta); **TTS** (`tts`).
 
 ### AI-vágás és -elemzés (AssistantPanel)
 - **AI Auto-Edit** (`autoEdit`, 15/30/60 mp + Shorts/B-roll), **story-struktúra**

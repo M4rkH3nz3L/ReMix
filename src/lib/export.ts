@@ -1,9 +1,11 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
+import { serializeAss } from '@/lib/ass';
 import { projectDuration } from '@/lib/projectUtils';
 import { serializeSrt } from '@/lib/srt';
-import type { InteractiveClip, Project, TextClip } from '@/types/project';
+import { serializeVtt } from '@/lib/vtt';
+import type { AspectRatio, InteractiveClip, Project, TextClip } from '@/types/project';
 
 /**
  * Az interaktív elemeket NEM sütjük bele a videóba: a lejátszó (web/mobil)
@@ -50,22 +52,74 @@ export async function shareLutCube(name: string, cube: string): Promise<void> {
   await shareFile(fileName, cube, 'text/plain');
 }
 
-/** A felirat- és szövegsáv klipjei SRT-ként — bármely platform/lejátszó fogadja. */
-export async function shareCaptionsSrt(project: Project): Promise<boolean> {
-  const cues = project.tracks
+/** a felirat- és szövegsáv szöveg-klipjei, idő szerint rendezve (közös alap) */
+function captionTextClips(project: Project): TextClip[] {
+  return project.tracks
     .filter((t) => t.type === 'captions' || t.type === 'text')
     .flatMap((t) => t.clips.filter((c): c is TextClip => c.kind === 'text'))
     .slice()
-    .sort((a, b) => a.start - b.start)
-    .map((clip) => ({
-      start: clip.start,
-      end: clip.start + clip.duration,
-      text: clip.text,
-    }));
-  if (cues.length === 0) {
+    .sort((a, b) => a.start - b.start);
+}
+
+/** PlayRes a képarányból (az ASS pozíció-számításhoz) */
+function aspectToPlayRes(aspect: AspectRatio): { width: number; height: number } {
+  if (aspect === '9:16') {
+    return { width: 1080, height: 1920 };
+  }
+  if (aspect === '1:1') {
+    return { width: 1080, height: 1080 };
+  }
+  return { width: 1920, height: 1080 };
+}
+
+/** A felirat- és szövegsáv klipjei SRT-ként — bármely platform/lejátszó fogadja. */
+export async function shareCaptionsSrt(project: Project): Promise<boolean> {
+  const clips = captionTextClips(project);
+  if (clips.length === 0) {
     return false;
   }
+  const cues = clips.map((clip) => ({
+    start: clip.start,
+    end: clip.start + clip.duration,
+    text: clip.text,
+  }));
   await shareFile(`${project.name}-felirat.srt`, serializeSrt(cues), 'application/x-subrip');
+  return true;
+}
+
+/** WebVTT export — a HTML5/webes lejátszók natív felirata, sor-pozícióval együtt. */
+export async function shareCaptionsVtt(project: Project): Promise<boolean> {
+  const clips = captionTextClips(project);
+  if (clips.length === 0) {
+    return false;
+  }
+  const cues = clips.map((clip) => ({
+    start: clip.start,
+    end: clip.start + clip.duration,
+    text: clip.text,
+    y: clip.position?.y,
+  }));
+  await shareFile(`${project.name}-felirat.vtt`, serializeVtt(cues), 'text/vtt');
+  return true;
+}
+
+/** ASS export — stílussal (szín, félkövér, pontos pozíció, betűméret) együtt. */
+export async function shareCaptionsAss(project: Project): Promise<boolean> {
+  const clips = captionTextClips(project);
+  if (clips.length === 0) {
+    return false;
+  }
+  const res = aspectToPlayRes(project.aspectRatio);
+  const cues = clips.map((clip) => ({
+    start: clip.start,
+    end: clip.start + clip.duration,
+    text: clip.text,
+    color: clip.color,
+    bold: clip.fontWeight === 'bold',
+    position: clip.position,
+    fontSizePct: clip.fontSize,
+  }));
+  await shareFile(`${project.name}-felirat.ass`, serializeAss(cues, res), 'text/x-ssa');
   return true;
 }
 

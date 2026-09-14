@@ -1523,7 +1523,15 @@
       "trackTooShort": "Abschnitt zu kurz.",
       "trackFailed": "Verfolgung fehlgeschlagen (Worker aktiv? Pro?).",
       "trackDone": "Verfolgung fertig",
-      "trackDoneBody": "{{count}} Keyframes — die Form folgt dem Objekt."
+      "trackDoneBody": "{{count}} Keyframes — die Form folgt dem Objekt.",
+      "gradientAdvanced": "🌈 Erweiterter Verlauf",
+      "gradType_linear": "Linear",
+      "gradType_radial": "Radial",
+      "gradType_conic": "Konisch",
+      "gradAngle": "Winkel",
+      "gradStop": "Stopp",
+      "gradStopPos": "Position",
+      "gradAddStop": "+ Stopp"
     },
     "speed": {
       "rampNotApplicable": "Für diesen Clip nicht anwendbar (zu kurz?).",

@@ -1523,7 +1523,15 @@
       "trackTooShort": "Túl rövid szakasz a követéshez.",
       "trackFailed": "A követés nem sikerült (fut a worker? Pro?).",
       "trackDone": "Kész a követés",
-      "trackDoneBody": "{{count}} kulcskocka — a forma követi az objektumot."
+      "trackDoneBody": "{{count}} kulcskocka — a forma követi az objektumot.",
+      "gradientAdvanced": "🌈 Fejlett gradient",
+      "gradType_linear": "Lineáris",
+      "gradType_radial": "Radiális",
+      "gradType_conic": "Konikus",
+      "gradAngle": "Szög",
+      "gradStop": "Stop",
+      "gradStopPos": "Pozíció",
+      "gradAddStop": "+ Stop"
     },
     "speed": {
       "rampNotApplicable": "Ehhez a kliphez nem alkalmazható (túl rövid?).",

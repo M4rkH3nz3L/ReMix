@@ -8,15 +8,40 @@ import Svg, {
   LinearGradient as SvgGradient,
   Polygon,
   Polyline,
+  RadialGradient as SvgRadial,
+  Rect,
   Stop,
 } from 'react-native-svg';
 
 import { cssBlendMode, palette } from '@/constants/editor';
 import { polylinePoints } from '@/lib/draw';
+import { angleToLinearPoints, sortedStops } from '@/lib/gradient';
 import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { ShapeClip } from '@/types/project';
+import type { ShapeClip, ShapeGradient } from '@/types/project';
+
+/** react-native-svg gradient-def a fejlett gradientből (poligon-kitöltéshez).
+ *  A konikust az SVG nem tudja → lineárisként közelít (a render pontos). */
+function SvgGradientDef({ id, gradient }: { id: string; gradient: ShapeGradient }) {
+  const stops = sortedStops(gradient.stops);
+  const els = stops.map((s, i) => <Stop key={i} offset={s.at} stopColor={s.color} />);
+  if (gradient.type === 'radial') {
+    return (
+      <SvgRadial id={id} cx="0.5" cy="0.5" r="0.5">
+        {els}
+      </SvgRadial>
+    );
+  }
+  const a = ((gradient.angle ?? 135) * Math.PI) / 180;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  return (
+    <SvgGradient id={id} x1={0.5 - dx / 2} y1={0.5 - dy / 2} x2={0.5 + dx / 2} y2={0.5 + dy / 2}>
+      {els}
+    </SvgGradient>
+  );
+}
 
 /** nyíl/csillag sokszögek 0–100-as koordinátákban — a renderrel megegyezőek */
 const POLYGONS: Record<'arrow' | 'star', [number, number][]> = {
@@ -172,7 +197,11 @@ export function ShapeOverlay({
           </Svg>
         ) : clip.shape === 'arrow' || clip.shape === 'star' ? (
           <Svg width={w} height={h}>
-            {clip.fillGradient ? (
+            {clip.gradient ? (
+              <Defs>
+                <SvgGradientDef id={`g-${clip.id}`} gradient={clip.gradient} />
+              </Defs>
+            ) : clip.fillGradient ? (
               <Defs>
                 <SvgGradient id={`g-${clip.id}`} x1="0" y1="0" x2="1" y2="1">
                   <Stop offset="0" stopColor={clip.fillGradient.from} />
@@ -182,7 +211,7 @@ export function ShapeOverlay({
             ) : null}
             <Polygon
               points={polygonPoints(clip.shape, w, h)}
-              fill={clip.fillGradient ? `url(#g-${clip.id})` : clip.fill}
+              fill={clip.gradient || clip.fillGradient ? `url(#g-${clip.id})` : clip.fill}
             />
           </Svg>
         ) : clip.imageUri ? (
@@ -191,6 +220,29 @@ export function ShapeOverlay({
             style={[baseStyle, { overflow: 'hidden' }]}
             contentFit="contain"
           />
+        ) : clip.gradient ? (
+          clip.gradient.type === 'radial' ? (
+            // radiális: react-native-svg (a doboz méretét kitöltő rect)
+            <Svg width={w} height={h} style={baseStyle}>
+              <Defs>
+                <SvgGradientDef id={`bg-${clip.id}`} gradient={clip.gradient} />
+              </Defs>
+              <Rect x="0" y="0" width={w} height={h} rx={radius} fill={`url(#bg-${clip.id})`} />
+            </Svg>
+          ) : (
+            // lineáris + (közelítő) konikus: expo-linear-gradient multi-stoppal
+            <LinearGradient
+              colors={
+                sortedStops(clip.gradient.stops).map((s) => s.color) as [string, string, ...string[]]
+              }
+              locations={
+                sortedStops(clip.gradient.stops).map((s) => s.at) as [number, number, ...number[]]
+              }
+              start={angleToLinearPoints(clip.gradient.angle).start}
+              end={angleToLinearPoints(clip.gradient.angle).end}
+              style={baseStyle}
+            />
+          )
         ) : clip.fillGradient ? (
           <LinearGradient
             colors={[clip.fillGradient.from, clip.fillGradient.to]}

@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
 import { aspectValue, BLEND_MODES, palette, textColors } from '@/constants/editor';
+import { DEFAULT_GRADIENT, sortedStops } from '@/lib/gradient';
 import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
-import type { ShapeClip } from '@/types/project';
+import type { ShapeClip, ShapeGradient } from '@/types/project';
 
 const GRADIENTS: { id: string; from: string; to: string }[] = [
   { id: 'purplePink', from: '#7c5cff', to: '#ff5ca8' },
@@ -37,6 +38,14 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
   const setSnapGrid = useEditorStore((s) => s.setSnapGrid);
   const setPickTarget = useEditorStore((s) => s.setPickTarget);
   const [trackBusy, setTrackBusy] = useState(false);
+
+  // 🌈 fejlett gradient (multi-stop lineáris / radiális / konikus) segédek
+  const grad = clip.gradient;
+  const setGradient = (g: ShapeGradient | undefined) => updateClip(clip.id, { gradient: g });
+  const setGradType = (type: ShapeGradient['type']) =>
+    setGradient(grad ? { ...grad, type } : { ...DEFAULT_GRADIENT, type });
+  const setStops = (stops: ShapeGradient['stops']) =>
+    grad && setGradient({ ...grad, stops });
 
   /**
    * 🎯 Objektum-követés: a vásznon rákoppintasz a követendő objektumra, a worker
@@ -150,6 +159,77 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
               />
             ) : null}
           </View>
+
+          {/* 🌈 fejlett gradient: multi-stop lineáris / radiális / konikus */}
+          <Text style={styles.subLabel}>{t('panels.shape.gradientAdvanced')}</Text>
+          <View style={styles.row}>
+            <Chip
+              label={t('common.off')}
+              active={!grad}
+              onPress={() => setGradient(undefined)}
+            />
+            {(['linear', 'radial', 'conic'] as const).map((type) => (
+              <Chip
+                key={type}
+                label={t('panels.shape.gradType_' + type)}
+                active={grad?.type === type}
+                onPress={() => setGradType(type)}
+              />
+            ))}
+          </View>
+          {grad ? (
+            <>
+              {grad.type !== 'radial' ? (
+                <Stepper
+                  label={t('panels.shape.gradAngle')}
+                  value={`${Math.round(grad.angle ?? 135)}°`}
+                  onDec={() => setGradient({ ...grad, angle: ((grad.angle ?? 135) - 15 + 360) % 360 })}
+                  onInc={() => setGradient({ ...grad, angle: ((grad.angle ?? 135) + 15) % 360 })}
+                />
+              ) : null}
+              {grad.stops.map((stop, i) => (
+                <View key={i} style={styles.stopBlock}>
+                  <Text style={styles.stopLabel}>
+                    {t('panels.shape.gradStop')} {i + 1} · {Math.round(stop.at * 100)}%
+                  </Text>
+                  <View style={styles.row}>
+                    {textColors.map((color) => (
+                      <ColorDot
+                        key={color}
+                        color={color}
+                        active={stop.color === color}
+                        onPress={() => setStops(grad.stops.map((s, j) => (j === i ? { ...s, color } : s)))}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.row}>
+                    <Stepper
+                      label={t('panels.shape.gradStopPos')}
+                      value={`${Math.round(stop.at * 100)}`}
+                      onDec={() =>
+                        setStops(grad.stops.map((s, j) => (j === i ? { ...s, at: clamp(s.at - 0.05, 0, 1) } : s)))
+                      }
+                      onInc={() =>
+                        setStops(grad.stops.map((s, j) => (j === i ? { ...s, at: clamp(s.at + 0.05, 0, 1) } : s)))
+                      }
+                    />
+                    {grad.stops.length > 2 ? (
+                      <Chip
+                        label={t('common.remove')}
+                        active={false}
+                        onPress={() => setStops(grad.stops.filter((_, j) => j !== i))}
+                      />
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+              <Chip
+                label={t('panels.shape.gradAddStop')}
+                active={false}
+                onPress={() => setStops(sortedStops([...grad.stops, { color: '#ffffff', at: 0.5 }]))}
+              />
+            </>
+          ) : null}
         </PanelSection>
       )}
 
@@ -372,5 +452,17 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     lineHeight: 16,
+  },
+  stopBlock: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.border,
+    gap: 4,
+  },
+  stopLabel: {
+    color: palette.text,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
 });

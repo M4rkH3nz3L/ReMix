@@ -574,6 +574,41 @@ async function renderTextPngs(textClips, canvas, outDir) {
   return results;
 }
 
+/** 🌈 CSS gradient-string a fejlett gradientből (rect/ellipse/path-doboz + konikus). */
+function cssGradient(g) {
+  const stops = (g.stops || [])
+    .map((s) => `${s.color} ${Math.round(Math.min(1, Math.max(0, s.at ?? 0)) * 100)}%`)
+    .join(', ');
+  if (g.type === 'radial') {
+    return `radial-gradient(circle at center, ${stops})`;
+  }
+  if (g.type === 'conic') {
+    return `conic-gradient(from ${(g.angle ?? 0).toFixed(1)}deg at center, ${stops})`;
+  }
+  return `linear-gradient(${(g.angle ?? 135).toFixed(1)}deg, ${stops})`;
+}
+
+/** 🌈 SVG gradient-def (arrow/star polygon lineáris/radiális kitöltéséhez). */
+function svgGradientDef(id, g) {
+  const stops = (g.stops || [])
+    .map(
+      (s) =>
+        `<stop offset="${Math.min(1, Math.max(0, s.at ?? 0)).toFixed(3)}" stop-color="${s.color}"/>`
+    )
+    .join('');
+  if (g.type === 'radial') {
+    return `<radialGradient id="${id}" cx="0.5" cy="0.5" r="0.5">${stops}</radialGradient>`;
+  }
+  // lineáris: a CSS-szöget (0°=fel, óramutató) SVG-vektorra képezzük
+  const a = ((g.angle ?? 135) * Math.PI) / 180;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  return (
+    `<linearGradient id="${id}" x1="${(0.5 - dx * 0.5).toFixed(3)}" y1="${(0.5 - dy * 0.5).toFixed(3)}" ` +
+    `x2="${(0.5 + dx * 0.5).toFixed(3)}" y2="${(0.5 + dy * 0.5).toFixed(3)}">${stops}</linearGradient>`
+  );
+}
+
 /**
  * Forma-klipek rasterizálása (Creative Canvas): a CSS ugyanazt rajzolja, mint
  * az app ShapeOverlay-e (kitöltés/gradiens/keret/lekerekítés) — a kimenet a
@@ -608,9 +643,11 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       const borderWidth = Math.round(((clip.borderWidth ?? 0) / 100) * canvas.h);
       // kép-kitöltés (logó/watermark): a fájl data-URI-ként ágyazódik be —
       // az SVG-t a Chromium natívan rendereli, méretezés contain-nel
-      let background = clip.fillGradient
-        ? `linear-gradient(135deg, ${clip.fillGradient.from}, ${clip.fillGradient.to})`
-        : clip.fill;
+      let background = clip.gradient
+        ? cssGradient(clip.gradient)
+        : clip.fillGradient
+          ? `linear-gradient(135deg, ${clip.fillGradient.from}, ${clip.fillGradient.to})`
+          : clip.fill;
       let backgroundExtra = '';
       const isImageFillEarly = Boolean(clip.imageUri && fs.existsSync(clip.imageUri));
       if (isImageFillEarly) {
@@ -680,14 +717,23 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       // Kép-kitöltésnél marad a clip-path: ott a kitöltés egy háttérkép, amit
       // az SVG polygon nem tudna átvenni.
       const svgPoly = POLY_POINTS[clip.shape];
-      const useSvgPoly = Boolean(svgPoly) && !isImageFillEarly;
+      // konikus gradienst az SVG nem tud → az ilyen poligon clip-path-ra esik
+      // vissza (a CSS-háttér konikus gradientjével)
+      const polyConic = Boolean(clip.gradient && clip.gradient.type === 'conic');
+      const useSvgPoly = Boolean(svgPoly) && !isImageFillEarly && !polyConic;
       const clipPath = svgPoly && !useSvgPoly
         ? `clip-path:polygon(${svgPoly.map(([px, py]) => `${px}% ${py}%`).join(', ')});`
         : '';
       if (useSvgPoly) {
         const pts = svgPoly.map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`).join(' ');
         const gradId = `pg${i}`;
-        const fillRef = clip.fillGradient ? `url(#${gradId})` : clip.fill;
+        // új multi-stop gradient > legacy fillGradient > tömör szín
+        const gradDef = clip.gradient
+          ? svgGradientDef(gradId, clip.gradient)
+          : clip.fillGradient
+            ? `<linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${clip.fillGradient.from}"/><stop offset="1" stop-color="${clip.fillGradient.to}"/></linearGradient>`
+            : '';
+        const fillRef = gradDef ? `url(#${gradId})` : clip.fill;
         const strokeW = clip.outline
           ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
           : borderWidth > 0
@@ -699,11 +745,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         polySvg =
           `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" ` +
           `style="overflow:visible;display:block">` +
-          (clip.fillGradient
-            ? `<defs><linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">` +
-              `<stop offset="0" stop-color="${clip.fillGradient.from}"/>` +
-              `<stop offset="1" stop-color="${clip.fillGradient.to}"/></linearGradient></defs>`
-            : '') +
+          (gradDef ? `<defs>${gradDef}</defs>` : '') +
           `<polygon points="${pts}" fill="${fillRef}"` +
           (strokeW > 0
             ? ` stroke="${strokeCol}" stroke-width="${strokeW * 2}" stroke-linejoin="round" paint-order="stroke"`

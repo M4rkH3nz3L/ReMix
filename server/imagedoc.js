@@ -51,6 +51,7 @@ function fillAsShape(layer) {
     h: 1,
     fill: layer.fill,
     fillGradient: layer.fillGradient,
+    gradient: layer.gradient,
   };
 }
 

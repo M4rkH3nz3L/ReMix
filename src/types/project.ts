@@ -690,6 +690,23 @@ export interface TextStyle {
  * Az előnézet natívan rajzolja, a render a Chromium-raszter útvonalon égeti be
  * — a kettő vizuálisan egyezik.
  */
+/** 🌈 Gradient-stop: szín + pozíció (0…1). */
+export interface GradientStop {
+  color: string;
+  at: number;
+}
+
+/**
+ * 🌈 Fejlett gradient (Shape / ImageDoc): multi-stop, lineáris / radiális /
+ * konikus. Az `angle` a lineáris/konikus szög (CSS-konvenció, fok); a `stops`
+ * legalább 2, `at` szerint növekvő.
+ */
+export interface ShapeGradient {
+  type: 'linear' | 'radial' | 'conic';
+  angle?: number;
+  stops: GradientStop[];
+}
+
 export interface ShapeClip extends ClipBase {
   kind: 'shape';
   shape: 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'star' | 'path';
@@ -708,8 +725,15 @@ export interface ShapeClip extends ClipBase {
   points?: { x: number; y: number }[];
   /** a vonal vastagsága a vászon MAGASSÁGÁNAK %-ában */
   strokeWidth?: number;
-  /** két-színű lineáris gradiens (135°) */
+  /** két-színű lineáris gradiens (135°) — LEGACY; új: `gradient` */
   fillGradient?: { from: string; to: string };
+  /**
+   * 🌈 Fejlett gradient-kitöltés (multi-stop lineáris / radiális / konikus). Ha
+   * van, FELÜLÍRJA a `fillGradient`-et és a `fill`-t. A renderben CSS/SVG
+   * gradient, az előnézetben expo-linear-gradient (lineáris) / react-native-svg
+   * (radiális); a konikus a renderben pontos, előnézetben közelít.
+   */
+  gradient?: ShapeGradient;
   /** kép-kitöltés (logó/watermark, PNG/JPG/SVG) — felülírja a fill/gradienst */
   imageUri?: string;
   /** blend-mód a alatta lévő rétegekkel (hiányzó = normál rárakás) */
@@ -966,6 +990,8 @@ export interface FillLayer extends ImageLayerBase {
   kind: 'fill';
   fill: string;
   fillGradient?: { from: string; to: string };
+  /** 🌈 fejlett gradient (multi-stop lineáris / radiális / konikus) — felülírja a fillGradient-et */
+  gradient?: ShapeGradient;
 }
 
 /** fotó-réteg: a kép + a videóból ismert képjavítás/szűrő/maszk */

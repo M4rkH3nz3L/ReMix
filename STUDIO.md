@@ -93,7 +93,11 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   (pixelize/blur/radial/fadeBlack/fadeWhite), fade.
 - **Sebesség**: 0,1×–10× + sebesség-rámpa, visszafelé, trim.
 - **Forma** panel: téglalap/ellipszis/vonal, kitöltés/gradiens/glow/kontúr, körítés,
-  rács-illesztés — **+ pozíció/méret kulcskocka és objektum-követés** 🆕.
+  rács-illesztés — **+ pozíció/méret kulcskocka és objektum-követés**.
+- **🌈 Fejlett gradient** 🆕 (forma + ImageDoc-háttér): **multi-stop** kitöltés,
+  **lineáris / radiális / konikus** típus, állítható szöggel és stop-szerkesztővel
+  (szín + pozíció / hozzáad / töröl). A renderben CSS/SVG gradient, az előnézetben
+  expo-linear-gradient (lineáris) / react-native-svg (radiális); a konikus a renderben pontos.
 - **Matrica** (ingyenes rész): emoji + részecske (konfetti/csillám/hó/parázs).
 - **PiP** keret: lekerekítés, keret, árnyék, blend.
 

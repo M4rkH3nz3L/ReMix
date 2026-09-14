@@ -1523,7 +1523,15 @@
       "trackTooShort": "Section too short to track.",
       "trackFailed": "Tracking failed (worker running? Pro?).",
       "trackDone": "Tracking done",
-      "trackDoneBody": "{{count}} keyframes — the shape follows the object."
+      "trackDoneBody": "{{count}} keyframes — the shape follows the object.",
+      "gradientAdvanced": "🌈 Advanced gradient",
+      "gradType_linear": "Linear",
+      "gradType_radial": "Radial",
+      "gradType_conic": "Conic",
+      "gradAngle": "Angle",
+      "gradStop": "Stop",
+      "gradStopPos": "Position",
+      "gradAddStop": "+ Stop"
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

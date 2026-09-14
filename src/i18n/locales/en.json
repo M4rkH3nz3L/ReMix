@@ -421,7 +421,11 @@
       "empty": "No saved versions — tap Save version to snapshot the current state.",
       "restore": "Restore",
       "restoreTitle": "Restore version",
-      "restoreConfirm": "Restore \"{{name}}\"? The current state stays as one undo step."
+      "restoreConfirm": "Restore \"{{name}}\"? The current state stays as one undo step.",
+      "autoLabel": "Autosave",
+      "copySuffix": "(copy)",
+      "compareTitle": "Compare with current",
+      "compareBody": "Duration: {{durA}}s → {{durB}}s\nClips: {{clipsA}} → {{clipsB}}\n\nAdded: {{added}} · Removed: {{removed}} · Changed: {{changed}}"
     },
     "detailPreview": {
       "title": "Detail preview",

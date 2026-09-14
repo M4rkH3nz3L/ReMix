@@ -421,7 +421,11 @@
       "empty": "Keine gespeicherten Versionen — tippe auf „Version speichern“, um den aktuellen Stand festzuhalten.",
       "restore": "Wiederherstellen",
       "restoreTitle": "Version wiederherstellen",
-      "restoreConfirm": "„{{name}}“ wiederherstellen? Der aktuelle Stand bleibt als ein Undo-Schritt erhalten."
+      "restoreConfirm": "„{{name}}“ wiederherstellen? Der aktuelle Stand bleibt als ein Undo-Schritt erhalten.",
+      "autoLabel": "Autosave",
+      "copySuffix": "(Kopie)",
+      "compareTitle": "Mit aktuell vergleichen",
+      "compareBody": "Dauer: {{durA}}s → {{durB}}s\nClips: {{clipsA}} → {{clipsB}}\n\nNeu: {{added}} · Entfernt: {{removed}} · Geändert: {{changed}}"
     },
     "detailPreview": {
       "title": "Detailvorschau",

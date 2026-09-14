@@ -28,7 +28,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
-import { loadEvents, loadProject, saveEvents, saveProject } from '@/lib/storage';
+import { loadEvents, loadProject, recordAutoVersion, saveEvents, saveProject } from '@/lib/storage';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
 import { indexProjectVision } from '@/lib/visionSearch';
@@ -185,11 +185,16 @@ export default function EditorScreen() {
     const timer = setTimeout(() => {
       const state = useEditorStore.getState();
       if (state.project && state.dirty) {
+        const snap = state.project;
         Promise.all([
-          saveProject(state.project),
-          saveEvents(state.project.id, state.events),
+          saveProject(snap),
+          saveEvents(snap.id, state.events),
         ])
-          .then(() => state.markSaved())
+          .then(() => {
+            state.markSaved();
+            // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
+            recordAutoVersion(snap).catch(() => {});
+          })
           .catch(() => {});
       }
     }, AUTOSAVE_MS);

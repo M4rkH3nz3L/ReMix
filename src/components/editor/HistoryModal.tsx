@@ -8,6 +8,7 @@ import { describeCommand } from '@/lib/commands';
 import type { EventActor } from '@/lib/commands';
 import { makeId } from '@/lib/id';
 import { loadVersions, saveVersions, type ProjectVersion } from '@/lib/storage';
+import { compareProjects } from '@/lib/versionDiff';
 import { useEditorStore } from '@/store/editorStore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -57,13 +58,52 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
     }
     const v: ProjectVersion = {
       id: makeId('ver'),
-      name: t('editor.versions.defaultName', { n: versions.length + 1 }),
+      name: t('editor.versions.defaultName', { n: versions.filter((x) => x.kind !== 'auto').length + 1 }),
       at: new Date().toISOString(),
       project: p,
+      kind: 'manual',
     };
     const next = [...versions, v];
     setVersions(next);
     saveVersions(p.id, next).catch(() => {});
+  };
+
+  // 📑 verzió duplikálása → új (kézi) verzió-bejegyzés ugyanabból az állapotból
+  const duplicateVersion = (v: ProjectVersion) => {
+    if (!projectId) {
+      return;
+    }
+    const copy: ProjectVersion = {
+      id: makeId('ver'),
+      name: `${v.name || t('editor.versions.autoLabel')} ${t('editor.versions.copySuffix')}`,
+      at: new Date().toISOString(),
+      project: v.project,
+      kind: 'manual',
+    };
+    const next = [...versions, copy];
+    setVersions(next);
+    saveVersions(projectId, next).catch(() => {});
+  };
+
+  // 🔍 összehasonlítás a JELENLEGI állapottal (mi változott a pillanatkép óta)
+  const compareVersion = (v: ProjectVersion) => {
+    const cur = useEditorStore.getState().project;
+    if (!cur) {
+      return;
+    }
+    const d = compareProjects(v.project, cur);
+    Alert.alert(
+      t('editor.versions.compareTitle'),
+      t('editor.versions.compareBody', {
+        durA: d.durationA,
+        durB: d.durationB,
+        clipsA: d.clipsA,
+        clipsB: d.clipsB,
+        added: d.added,
+        removed: d.removed,
+        changed: d.changed,
+      })
+    );
   };
 
   const restoreVersion = (v: ProjectVersion) => {
@@ -106,11 +146,21 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
           ) : (
             [...versions].reverse().map((v) => (
               <View style={styles.row} key={v.id}>
-                <Ionicons name="time-outline" size={15} color={palette.textDim} />
+                <Ionicons
+                  name={v.kind === 'auto' ? 'sync-outline' : 'bookmark'}
+                  size={15}
+                  color={v.kind === 'auto' ? palette.textDim : palette.accent}
+                />
                 <Text style={styles.label} numberOfLines={1}>
-                  {v.name}
+                  {v.kind === 'auto' ? t('editor.versions.autoLabel') : v.name}
                 </Text>
                 <Text style={styles.time}>{shortTime(v.at)}</Text>
+                <Pressable onPress={() => compareVersion(v)} hitSlop={8}>
+                  <Ionicons name="git-compare-outline" size={15} color={palette.textDim} />
+                </Pressable>
+                <Pressable onPress={() => duplicateVersion(v)} hitSlop={8}>
+                  <Ionicons name="copy-outline" size={15} color={palette.textDim} />
+                </Pressable>
                 <Pressable onPress={() => restoreVersion(v)} hitSlop={8}>
                   <Text style={styles.action}>{t('editor.versions.restore')}</Text>
                 </Pressable>

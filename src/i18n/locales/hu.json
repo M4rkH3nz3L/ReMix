@@ -421,7 +421,11 @@
       "empty": "Nincs mentett verzió — koppints a „Verzió mentése” gombra a jelenlegi állapot rögzítéséhez.",
       "restore": "Visszaállítás",
       "restoreTitle": "Verzió visszaállítása",
-      "restoreConfirm": "Visszaállítod ezt: „{{name}}”? A jelenlegi állapot egy undo-lépésként megmarad."
+      "restoreConfirm": "Visszaállítod ezt: „{{name}}”? A jelenlegi állapot egy undo-lépésként megmarad.",
+      "autoLabel": "Autosave",
+      "copySuffix": "(másolat)",
+      "compareTitle": "Összehasonlítás a jelenlegivel",
+      "compareBody": "Hossz: {{durA}}s → {{durB}}s\nKlipek: {{clipsA}} → {{clipsB}}\n\nÚj: {{added}} · Törölt: {{removed}} · Módosított: {{changed}}"
     },
     "detailPreview": {
       "title": "Részlet-előnézet",

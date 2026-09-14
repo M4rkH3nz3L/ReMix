@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ProjectEvent } from '@/lib/commands';
+import { makeId } from '@/lib/id';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
 import type { Project, ProjectMeta } from '@/types/project';
 
@@ -16,6 +17,8 @@ export interface ProjectVersion {
   /** ISO időbélyeg */
   at: string;
   project: Project;
+  /** kézi pillanatkép vagy automatikus autosave-előzmény (hiányzó = manual) */
+  kind?: 'manual' | 'auto';
 }
 
 export async function listProjects(): Promise<ProjectMeta[]> {
@@ -85,6 +88,40 @@ export async function loadVersions(projectId: string): Promise<ProjectVersion[]>
 export async function saveVersions(projectId: string, versions: ProjectVersion[]): Promise<void> {
   // védőkorlát: legfeljebb 20 verzió / projekt (a legújabbak)
   await AsyncStorage.setItem(versionsKey(projectId), JSON.stringify(versions.slice(-20)));
+}
+
+/** 🕓 legfeljebb ennyi AUTO-verziót tartunk (a kézi pillanatképek megmaradnak) */
+const MAX_AUTO_VERSIONS = 8;
+/** két auto-mentés közti minimum (mp) — ne szemetelje tele a történetet */
+const AUTO_VERSION_THROTTLE_MS = 120000;
+
+/**
+ * 🕓 Autosave-előzmény: az autosave meghívja — egy időbélyegzett AUTO-verziót
+ * fűz a történethez (throttle-olva), a régi autókat nyesve. A kézi (manual)
+ * pillanatképeket nem érinti. Így a felhasználónak van visszaállítható előzménye
+ * akkor is, ha nem mentett kézzel.
+ */
+export async function recordAutoVersion(project: Project): Promise<void> {
+  try {
+    const versions = await loadVersions(project.id);
+    const lastAuto = [...versions].reverse().find((v) => v.kind === 'auto');
+    if (lastAuto && Date.now() - new Date(lastAuto.at).getTime() < AUTO_VERSION_THROTTLE_MS) {
+      return; // túl gyakori — kihagyjuk
+    }
+    const auto: ProjectVersion = {
+      id: makeId('ver'),
+      name: '',
+      at: new Date().toISOString(),
+      project,
+      kind: 'auto',
+    };
+    const manuals = versions.filter((v) => v.kind !== 'auto');
+    const autos = [...versions.filter((v) => v.kind === 'auto'), auto].slice(-MAX_AUTO_VERSIONS);
+    const next = [...manuals, ...autos].sort((a, b) => a.at.localeCompare(b.at));
+    await saveVersions(project.id, next);
+  } catch {
+    // az autosave-előzmény best-effort — hiba esetén csendben kihagyjuk
+  }
 }
 
 /** Az eseménynapló a projekt mellett, külön kulcson él — az undo nem érinti. */

@@ -40,6 +40,11 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   zoom (0,2×–4×).
 - **Undo/redo** (50 lépés), **stílus másolása/beillesztése**, **több-kijelölés** (köteg-
   stílus), klipek **össze-/szétkapcsolása** (link), mágneses illesztés haptikával.
+- **🕓 Verziók / előzmények** (TransportBar → 🕓): **kézi pillanatkép** (snapshot) +
+  🆕 **autosave-előzmény** (throttle-olt auto-verziók), **visszaállítás** (restore),
+  🆕 **verzió duplikálása** és 🆕 **összehasonlítás a jelenlegivel** (hossz/klipszám +
+  új/törölt/módosított klipek). On-device (projektenként max ~20 verzió); a **felhő-mentés**
+  (`cloudSync`) erre épülő alap.
 
 ### ⚡ Teljesítmény / proxy (mobil)
 - **Proxy-workflow**: a nehéz (4K/60/10-bit) forrásból a worker könnyű **munka-példányt**
@@ -435,6 +440,10 @@ A fő UI-zónák a leckékhez:
 **17c. lecke — Creator Preset (saját stílus egy gombra)**
 1. *Művelet:* Állítsd össze a stílust. *Hol:* Toolbar → **Preset** → adj nevet (pl. „My YouTube Style"), válassz **Motion + Intro + Outro** csomagot; a betűtípus/színek/felirat/logó/zene a jelenlegi projektből derül. *Eredmény:* mentett preset.
 2. *Művelet:* Húzd rá egy másik projektre. *Hol:* **Presetjeim** → **Alkalmaz**. *Eredmény:* a font/színek/felirat-stílus/logó + motion + átmenetek + intro/outro + zene egy lépésben ráépül.
+
+**17d. lecke — Verziók (pillanatkép, visszaállítás, összehasonlítás)**
+1. *Művelet:* Ments pillanatképet. *Hol:* **TransportBar → 🕓** → **Mentés**. *Eredmény:* névvel mentett verzió; a szerkesztés közben **autosave-verziók** is keletkeznek automatikusan.
+2. *Művelet:* Hasonlíts / duplikálj / állíts vissza. *Hol:* a verzió sorában **🔀 összehasonlítás** (mi változott a jelenlegihez képest), **⧉ duplikálás**, **Visszaállítás**. *Eredmény:* biztonságos kísérletezés — bármikor visszatérhetsz egy korábbi állapothoz.
 
 **18. lecke — Time remapping (sebesség-görbe, interpoláció, freeze)**
 1. *Művelet:* Rajzolj sebesség-görbét. *Hol:* egy videóklip → **Sebesség** panel → **Egyéni görbe** → húzd az oszlopokat (velocity graph), szegmenst ±-szal adj/vegyél; **Alkalmaz**. *Eredmény:* a klip a görbe szerint gyorsul/lassul (a hossza változatlan).

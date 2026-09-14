@@ -103,6 +103,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **✏️ Bézier path + toll-eszköz** 🆕: horgonypontok Bézier-fogókkal (`PathPoint`),
   **toll-szerkesztő** (koppints = új horgony, húzás = mozgatás, fogó-húzás = görbe),
   **simítás** (Catmull-Rom), **sarok**, **zárás** → zárt path = kitöltött (gradiens) forma.
+- **🔗 Boolean műveletek** 🆕: **egyesítés / kivonás / metszet / kizárás** két kijelölt
+  formán (többes kijelölés). Az eredmény összetett path (`subpaths` + `fill-rule`);
+  a metszet/kivonás Sutherland–Hodgman-vágással pontos, függőség nélkül.
 - **Matrica** (ingyenes rész): emoji + részecske (konfetti/csillám/hó/parázs).
 - **PiP** keret: lekerekítés, keret, árnyék, blend.
 

@@ -1542,7 +1542,14 @@
       "join_miter": "Miter",
       "join_bevel": "Bevel",
       "penTitle": "✏️ Pen / anchors",
-      "penNote": "Tap the canvas to add an anchor; drag anchors; the selected anchor's Bezier handles drag independently. Buttons: smooth, corner, close, delete."
+      "penNote": "Tap the canvas to add an anchor; drag anchors; the selected anchor's Bezier handles drag independently. Buttons: smooth, corner, close, delete.",
+      "boolTitle": "🔗 Boolean",
+      "bool_union": "Union",
+      "bool_subtract": "Subtract",
+      "bool_intersect": "Intersect",
+      "bool_exclude": "Exclude",
+      "boolHint": "Select ONE more shape (multi-select) to combine it with the current one.",
+      "boolFail": "The two shapes cannot be combined (no overlap or invalid shape)."
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

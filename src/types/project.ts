@@ -738,6 +738,14 @@ export interface ShapeClip extends ClipBase {
   points?: PathPoint[];
   /** zárt path (kitöltött forma) — a toll-eszköz zárt sokszöge/görbéje */
   closed?: boolean;
+  /**
+   * 🔗 Összetett path (boolean-művelet eredménye): több zárt al-path egy
+   * formában, `fillRule` szerint kitöltve. Ha van, a `points` helyett ezt
+   * rajzoljuk. A boolean teljes vászon-térben dolgozik → a shape `w=h=1`.
+   */
+  subpaths?: PathPoint[][];
+  /** kitöltési szabály az összetett path-hoz (union=nonzero, exclude=evenodd) */
+  fillRule?: 'nonzero' | 'evenodd';
   /** a vonal vastagsága a vászon MAGASSÁGÁNAK %-ában */
   strokeWidth?: number;
   /** ✂️ szaggatás: a kötőjel + rés hossza a vonalvastagság arányában (0/hiányzó = folytonos) */

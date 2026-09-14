@@ -693,10 +693,18 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       // a Chromium az SVG-t élsimítja (a clip-path-ot nem), és a `stroke`
       // pontosan követi a vonalat — kerek sapkával/illesztéssel.
       let pathSvg = '';
-      if (clip.shape === 'path' && Array.isArray(clip.points) && clip.points.length >= 2) {
+      const hasSubpaths = Array.isArray(clip.subpaths) && clip.subpaths.length > 0;
+      if (
+        clip.shape === 'path' &&
+        (hasSubpaths || (Array.isArray(clip.points) && clip.points.length >= 2))
+      ) {
         const sw = Math.max(1, Math.round(((clip.strokeWidth ?? 0.9) / 100) * canvas.h));
-        const closed = Boolean(clip.closed);
-        const d = pathDataJs(clip.points, w, h, closed);
+        // 🔗 összetett path (boolean) = zárt, kitöltött, fill-rule-lal
+        const closed = Boolean(clip.closed || hasSubpaths);
+        const d = hasSubpaths
+          ? clip.subpaths.map((sp) => pathDataJs(sp, w, h, true)).join(' ')
+          : pathDataJs(clip.points, w, h, closed);
+        const fillRuleAttr = hasSubpaths ? ` fill-rule="${clip.fillRule || 'nonzero'}"` : '';
         // ✂️ stroke-attribútumok: vonalvég/illesztés + szaggatás
         const cap = clip.strokeCap ?? 'round';
         const join = clip.strokeJoin ?? 'round';
@@ -735,7 +743,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
             ? ` stroke="${cStrokeCol}" stroke-width="${cStrokeW}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`
             : '';
         const glow = clip.glow
-          ? `<path d="${d}" ${closed ? `fill="${clip.glow.color}"` : `fill="none" stroke="${clip.glow.color}" stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`} opacity="0.5" filter="url(#blur)"/>`
+          ? `<path d="${d}"${fillRuleAttr} ${closed ? `fill="${clip.glow.color}"` : `fill="none" stroke="${clip.glow.color}" stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`} opacity="0.5" filter="url(#blur)"/>`
           : '';
         pathSvg =
           `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block">` +
@@ -743,7 +751,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
             ? `<defs>${clip.glow ? `<filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(1, sw * 0.6)}"/></filter>` : ''}${gradDefPath}</defs>`
             : '') +
           glow +
-          `<path d="${d}" fill="${fillAttr}"${closed ? strokeAttrs : ` stroke="${clip.fill}" stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`}/>` +
+          `<path d="${d}"${fillRuleAttr} fill="${fillAttr}"${closed ? strokeAttrs : ` stroke="${clip.fill}" stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`}/>` +
           `</svg>`;
       }
 

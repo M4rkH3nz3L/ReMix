@@ -5,8 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
 import { aspectValue, BLEND_MODES, palette, textColors } from '@/constants/editor';
 import { PathEditor } from '@/components/editor/PathEditor';
+import { booleanShapes, type BooleanOp } from '@/lib/boolean';
 import { DEFAULT_GRADIENT, sortedStops } from '@/lib/gradient';
-import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
+import { makeId } from '@/lib/id';
+import { activeVisualClip, clipEnd, findClip, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
@@ -38,7 +40,47 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
   const snapGrid = useEditorStore((s) => s.snapGrid);
   const setSnapGrid = useEditorStore((s) => s.setSnapGrid);
   const setPickTarget = useEditorStore((s) => s.setPickTarget);
+  const multiSelectIds = useEditorStore((s) => s.multiSelectIds);
   const [trackBusy, setTrackBusy] = useState(false);
+
+  // 🔗 Boolean: az elsődleges formát a MÁSIK kijelölt formával kombinálja
+  const combineWith = (op: BooleanOp) => {
+    const state = useEditorStore.getState();
+    const project = state.project;
+    if (!project || state.multiSelectIds.length !== 1) {
+      return;
+    }
+    const other = findClip(project, state.multiSelectIds[0])?.clip;
+    if (!other || other.kind !== 'shape') {
+      return;
+    }
+    const result = booleanShapes(clip, other, op);
+    if (!result) {
+      Alert.alert(t('panels.shape.boolTitle'), t('panels.shape.boolFail'));
+      return;
+    }
+    const id = makeId('clip');
+    const start = Math.min(clip.start, other.start);
+    const duration = Math.max(clipEnd(clip), clipEnd(other)) - start;
+    state.removeClip(clip.id);
+    state.removeClip(other.id);
+    state.addClip('overlay', {
+      kind: 'shape',
+      id,
+      start,
+      duration,
+      shape: 'path',
+      closed: true,
+      position: { x: 0.5, y: 0.5 },
+      w: 1,
+      h: 1,
+      fill: clip.fill,
+      subpaths: result.subpaths,
+      fillRule: result.fillRule,
+      ...(clip.gradient ? { gradient: clip.gradient } : {}),
+    });
+    state.selectClip(id);
+  };
 
   // 🌈 fejlett gradient (multi-stop lineáris / radiális / konikus) segédek
   const grad = clip.gradient;
@@ -132,6 +174,23 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           <Text style={styles.note}>{t('panels.shape.penNote')}</Text>
         </PanelSection>
       ) : null}
+
+      <PanelSection title={t('panels.shape.boolTitle')}>
+        {multiSelectIds.length === 1 ? (
+          <View style={styles.row}>
+            {(['union', 'subtract', 'intersect', 'exclude'] as const).map((op) => (
+              <Chip
+                key={op}
+                label={t('panels.shape.bool_' + op)}
+                active={false}
+                onPress={() => combineWith(op)}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.note}>{t('panels.shape.boolHint')}</Text>
+        )}
+      </PanelSection>
 
       {clip.imageUri ? (
         <PanelSection title={t('panels.shape.imageTitle')}>

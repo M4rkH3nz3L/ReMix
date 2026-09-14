@@ -176,42 +176,55 @@ export function ShapeOverlay({
           selected && editable ? styles.selected : null,
         ]}
       >
-        {clip.shape === 'path' && clip.points && clip.points.length >= 2 ? (
-          // ✏️ szabadkézi vonal — a renderrel AZONOS pont-sztringből, hogy az
-          // előnézet és a beégetett videó ugyanazt rajzolja
+        {clip.shape === 'path' && ((clip.points?.length ?? 0) >= 2 || clip.subpaths?.length) ? (
+          // ✏️ path / bezier / összetett (boolean) — a renderrel AZONOS `d`-ből
           <Svg width={w} height={h} style={styles.pathSvg}>
-            {clip.gradient && clip.closed ? (
-              <Defs>
-                <SvgGradientDef id={`p-${clip.id}`} gradient={clip.gradient} />
-              </Defs>
-            ) : null}
-            {clip.glow ? (
-              <Path
-                d={pathData(clip.points, w, h, clip.closed)}
-                fill={clip.closed ? clip.glow.color : 'none'}
-                stroke={clip.closed ? undefined : clip.glow.color}
-                strokeWidth={clip.closed ? undefined : strokePx * 2.4}
-                strokeLinecap={clip.strokeCap ?? 'round'}
-                strokeLinejoin={clip.strokeJoin ?? 'round'}
-                strokeDasharray={dashArray}
-                opacity={0.35}
-              />
-            ) : null}
-            <Path
-              d={pathData(clip.points, w, h, clip.closed)}
-              fill={
-                clip.closed
-                  ? clip.gradient
-                    ? `url(#p-${clip.id})`
-                    : clip.fill
-                  : 'none'
-              }
-              stroke={clip.closed ? (clip.borderWidth ? clip.borderColor ?? '#ffffff' : undefined) : clip.fill}
-              strokeWidth={clip.closed ? (clip.borderWidth ? strokePx : undefined) : strokePx}
-              strokeLinecap={clip.strokeCap ?? 'round'}
-              strokeLinejoin={clip.strokeJoin ?? 'round'}
-              strokeDasharray={dashArray}
-            />
+            {(() => {
+              const pathClosed = Boolean(clip.closed || clip.subpaths?.length);
+              const d = clip.subpaths?.length
+                ? clip.subpaths.map((sp) => pathData(sp, w, h, true)).join(' ')
+                : pathData(clip.points ?? [], w, h, clip.closed);
+              return (
+                <>
+                  {clip.gradient && pathClosed ? (
+                    <Defs>
+                      <SvgGradientDef id={`p-${clip.id}`} gradient={clip.gradient} />
+                    </Defs>
+                  ) : null}
+                  {clip.glow ? (
+                    <Path
+                      d={d}
+                      fillRule={clip.fillRule}
+                      fill={pathClosed ? clip.glow.color : 'none'}
+                      stroke={pathClosed ? undefined : clip.glow.color}
+                      strokeWidth={pathClosed ? undefined : strokePx * 2.4}
+                      strokeLinecap={clip.strokeCap ?? 'round'}
+                      strokeLinejoin={clip.strokeJoin ?? 'round'}
+                      strokeDasharray={dashArray}
+                      opacity={0.35}
+                    />
+                  ) : null}
+                  <Path
+                    d={d}
+                    fillRule={clip.fillRule}
+                    fill={
+                      pathClosed ? (clip.gradient ? `url(#p-${clip.id})` : clip.fill) : 'none'
+                    }
+                    stroke={
+                      pathClosed
+                        ? clip.borderWidth
+                          ? clip.borderColor ?? '#ffffff'
+                          : undefined
+                        : clip.fill
+                    }
+                    strokeWidth={pathClosed ? (clip.borderWidth ? strokePx : undefined) : strokePx}
+                    strokeLinecap={clip.strokeCap ?? 'round'}
+                    strokeLinejoin={clip.strokeJoin ?? 'round'}
+                    strokeDasharray={dashArray}
+                  />
+                </>
+              );
+            })()}
           </Svg>
         ) : clip.shape === 'arrow' || clip.shape === 'star' ? (
           <Svg width={w} height={h}>

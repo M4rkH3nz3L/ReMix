@@ -1542,7 +1542,14 @@
       "join_miter": "Éles",
       "join_bevel": "Levágott",
       "penTitle": "✏️ Toll / horgonypontok",
-      "penNote": "Koppints a vászonra új horgonyhoz; húzd a horgonyokat; a kijelölt Bézier-fogói külön húzhatók. Gombok: simítás, sarok, zárás, törlés."
+      "penNote": "Koppints a vászonra új horgonyhoz; húzd a horgonyokat; a kijelölt Bézier-fogói külön húzhatók. Gombok: simítás, sarok, zárás, törlés.",
+      "boolTitle": "🔗 Boolean",
+      "bool_union": "Egyesítés",
+      "bool_subtract": "Kivonás",
+      "bool_intersect": "Metszet",
+      "bool_exclude": "Kizárás",
+      "boolHint": "Jelölj ki EGY másik formát is (többes kijelölés), hogy kombinálhasd az aktuálissal.",
+      "boolFail": "A két forma nem kombinálható (nincs átfedés vagy érvénytelen alak)."
     },
     "speed": {
       "rampNotApplicable": "Ehhez a kliphez nem alkalmazható (túl rövid?).",

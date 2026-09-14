@@ -1327,7 +1327,14 @@
       "adjust_vibrance": "Dynamik",
       "adjust_hue": "Farbtondrehung",
       "adjust_hslSaturation": "HSL-Sättigung",
-      "adjust_hslLuminance": "HSL-Helligkeit"
+      "adjust_hslLuminance": "HSL-Helligkeit",
+      "sectionStabilize": "🎯 Stabilisierung",
+      "stabilizeAuto": "Automatische Stabilisierung",
+      "stabilizeStrength": "Stärke",
+      "stabilizeSmoothness": "Glättung",
+      "stabilizeCrop": "Zuschnitt / Zoom",
+      "stabilizeRollingShutter": "Rolling-Shutter-Korrektur",
+      "stabilizeNote": "Der Render gleicht das Verwackeln pro Bild aus (deshake). Der Zuschnitt zoomt hinein, um die wandernden Ränder zu verbergen; die Rolling-Shutter-Korrektur ist näherungsweise (volle RS-Korrektur braucht ein eigenes Tool). Die Vorschau zeigt das Rohmaterial."
     },
     "hotspot": {
       "defaultQuestion": "Wie lautet die Frage?",

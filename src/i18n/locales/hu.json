@@ -1327,7 +1327,14 @@
       "adjust_vibrance": "Élénkség",
       "adjust_hue": "Színforgatás",
       "adjust_hslSaturation": "HSL-telítettség",
-      "adjust_hslLuminance": "HSL-világosság"
+      "adjust_hslLuminance": "HSL-világosság",
+      "sectionStabilize": "🎯 Stabilizálás",
+      "stabilizeAuto": "Automatikus stabilizálás",
+      "stabilizeStrength": "Erősség",
+      "stabilizeSmoothness": "Simaság",
+      "stabilizeCrop": "Kivágás / zoom",
+      "stabilizeRollingShutter": "Rolling shutter korrekció",
+      "stabilizeNote": "A bemozdulást a render kompenzálja képkockánként (deshake). A kivágás a bemozduló szélekre nagyít; a rolling shutter korrekció közelítő (a teljes RS-javításhoz külön eszköz kell). Az előnézet a nyers felvételt mutatja."
     },
     "hotspot": {
       "defaultQuestion": "Mi a kérdés?",

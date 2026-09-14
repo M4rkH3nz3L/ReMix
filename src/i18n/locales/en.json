@@ -1327,7 +1327,14 @@
       "adjust_vibrance": "Vibrance",
       "adjust_hue": "Hue shift",
       "adjust_hslSaturation": "HSL saturation",
-      "adjust_hslLuminance": "HSL luminance"
+      "adjust_hslLuminance": "HSL luminance",
+      "sectionStabilize": "🎯 Stabilization",
+      "stabilizeAuto": "Automatic stabilization",
+      "stabilizeStrength": "Strength",
+      "stabilizeSmoothness": "Smoothness",
+      "stabilizeCrop": "Crop / zoom",
+      "stabilizeRollingShutter": "Rolling-shutter correction",
+      "stabilizeNote": "The render compensates camera shake per frame (deshake). Crop zooms in to hide the moving edges; rolling-shutter correction is approximate (full RS fix needs a dedicated tool). The preview shows the raw footage."
     },
     "hotspot": {
       "defaultQuestion": "What is the question?",

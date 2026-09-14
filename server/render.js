@@ -366,6 +366,38 @@ function motionChain(clip, dur) {
   return plain;
 }
 
+/**
+ * 🎯 Videó-stabilizálás (`deshake`, egymenetes). A `strength` a keresési
+ * tartományt (rx/ry, 16 többszöröse), a `smoothness` a blokkméretet, a `crop`
+ * a szélek eltüntetéséhez befelé kivágást ad (a downstream fit-scale nagyítja
+ * vissza). RS: finomabb blokk + clamp él. Vezető filter-lánc (a nyers kockára,
+ * a méretezés ELŐTT); vesszővel zár, hogy a `decode`-hoz fűzhető legyen.
+ */
+function stabilizeChain(clip) {
+  const s = clip.stabilize;
+  if (!s || !s.automatic) {
+    return '';
+  }
+  const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v)));
+  const strength = cl(s.strength ?? 0.5, 0, 1);
+  const rx = 16 * Math.min(4, Math.max(1, Math.round(1 + strength * 3))); // 16…64 (16 többszöröse)
+  const smoothness = cl(s.smoothness ?? 0.5, 0, 1);
+  let blocksize = Math.round(8 + smoothness * 40); // 8…48
+  const crop = cl(s.crop ?? 0, 0, 1);
+  const edge = s.rollingShutter ? 2 : 3; // rs → clamp; egyébként mirror
+  if (s.rollingShutter) {
+    blocksize = Math.max(8, Math.round(blocksize * 0.6)); // finomabb becslés
+  }
+  let chain = `deshake=rx=${rx}:ry=${rx}:edge=${edge}:blocksize=${blocksize}`;
+  if (crop > 0.01) {
+    // a képet befelé kivágjuk (középre); a szélek bemozduló sávja eltűnik, a
+    // downstream méretezés nagyítja vissza a vászonra
+    const z = (1 - crop * 0.15).toFixed(3);
+    chain += `,crop=trunc(iw*${z}/2)*2:trunc(ih*${z}/2)*2`;
+  }
+  return chain + ',';
+}
+
 function faceBlurChain(clip, W, H, labelIn, labelOut, idx, graph, skip = 0) {
   const fb = clip.faceBlur;
   if (!fb) {
@@ -1261,7 +1293,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       const decode =
         `[${idx}:v]trim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
         `setpts=(PTS-STARTPTS)/${clip.speed},` +
-        motionChain(clip, seg.duration);
+        motionChain(clip, seg.duration) +
+        stabilizeChain(clip);
       // AI Select esetén az adjust NEM a teljes képre megy — a maszkolt
       // lépés adja hozzá a szegmens végén
       const suffix = (clip.selective ? '' : adjustChain(clip)) + lightingChain(clip) + filterDrawbox(clip, W, H) + fadeFilters(clip, seg.duration);

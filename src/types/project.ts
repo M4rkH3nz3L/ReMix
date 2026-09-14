@@ -407,6 +407,26 @@ export interface PipFrame {
   blendMode?: BlendMode;
 }
 
+/**
+ * 🎯 Videó-stabilizálás beállításai (a renderben `deshake`-kel). Az `automatic`
+ * flag csak azt jelzi, hogy be van kapcsolva (a `deshake` maga automatikus
+ * mozgásbecslést végez). A `rollingShutter` finomabb blokk-becslést + clamp
+ * élt kér a görgő-zár wobble csökkentésére (a teljes RS-korrekció ffmpeg-ben
+ * korlátozott — nincs dedikált szűrő).
+ */
+export interface Stabilize {
+  /** be van-e kapcsolva */
+  automatic: boolean;
+  /** erősség 0…1 → a keresési tartomány (rx/ry 16…64) */
+  strength?: number;
+  /** simaság 0…1 → a mozgásbecslő blokkmérete (nagyobb = simább, kevésbé precíz) */
+  smoothness?: number;
+  /** kivágás/zoom 0…1 → a képet befelé nagyítja, hogy a bemozduló szélek eltűnjenek */
+  crop?: number;
+  /** görgő-zár (rolling shutter) korrekció (közelítő) */
+  rollingShutter?: boolean;
+}
+
 export interface VideoClip extends ClipBase {
   kind: 'video';
   /**
@@ -435,6 +455,12 @@ export interface VideoClip extends ClipBase {
    * renderben (az előnézet a nyers sebességet mutatja).
    */
   motionBlur?: number;
+  /**
+   * 🎯 Videó-stabilizálás (a renderben, `deshake`): a bemozdulást képkockánként
+   * kompenzálja. A meglévő minőség-vizsgálat (qualityScan) csak MÉR — ez a
+   * tényleges stabilizálás.
+   */
+  stabilize?: Stabilize;
   /** Voice Studio: visszhang-csökkentés (szobahang) — a renderben */
   deReverb?: boolean;
   filterId: FilterId;

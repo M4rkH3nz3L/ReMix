@@ -75,6 +75,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 ### Vizuál
 - **Szűrő** panel: 20+ színszűrő + erősség, blend-módok, kamera-mozgás (pásztázás/zoom/
   forgatás keyframe-mel), **maszkolás** (lásd külön).
+- **🎯 Stabilizálás** 🆕 (videó): automatikus bemozdulás-kompenzálás a renderben
+  (`deshake`) — **erősség** (keresési tartomány), **simaság** (blokkméret), **kivágás/zoom**
+  (a bemozduló szélek eltüntetése), **rolling-shutter korrekció** (közelítő). A minőség-
+  vizsgálat (Pro) MÉR, ez STABILIZÁL; az előnézet a nyers felvételt mutatja.
 - **Grade / Adjust** réteg — **profi színfényelés** 🆕: film-look presetek + kézi
   vezérlők három csoportban:
   - **🎚️ Tónus:** expozíció · fényerő · kontraszt · csúcsfények · árnyékok · fehérek ·
@@ -371,6 +375,10 @@ A fő UI-zónák a leckékhez:
 **14. lecke — Kép-AI és AI-vágás `[PRO]`**
 1. *Művelet:* Emeld ki az alanyt / cseréld az eget / skálázz fel. *Hol:* **Szűrő** panel → háttér-eltávolítás / ég-csere / felskálázás.
 2. *Művelet:* Automatikus vágás/újrakeretezés. *Hol:* **AI-asszisztens** → Auto-Edit / Smart Reframe / Shorts.
+
+**14b. lecke — Videó-stabilizálás**
+1. *Művelet:* Kapcsold be. *Hol:* videóklip → **Szűrő** panel → **🎯 Stabilizálás** → *Automatikus stabilizálás*. *Eredmény:* a render kompenzálja a bemozdulást.
+2. *Művelet:* Hangold. *Hol:* **Erősség** (mekkora rázást fog be) · **Simaság** · **Kivágás/zoom** (a bemozduló szélek eltüntetése) · **Rolling-shutter korrekció**. *Eredmény:* a beégetett videó stabil (az előnézet a nyerset mutatja).
 
 **15. lecke — Export**
 1. *Művelet:* Nyisd az Exportot. *Hol:* Toolbar → **Export**.

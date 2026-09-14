@@ -197,6 +197,13 @@ export interface Asset {
   /** relinkhez (F2) */
   hash?: string;
   size?: number;
+  // ── 📂 Organize (Pro Workflow): asset-rendszerezés metaadatai ──────────────
+  /** kedvenc jelölés (gyors szűréshez) */
+  favorite?: boolean;
+  /** 0–5 csillag értékelés (0/hiányzó = nincs) */
+  rating?: number;
+  /** címkék / „bin"-ek (pl. „A-roll", „hook", „keep") */
+  tags?: string[];
 }
 
 export interface ClipBase {

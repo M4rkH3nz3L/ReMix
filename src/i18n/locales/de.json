@@ -455,7 +455,8 @@
       "title_export": "Export",
       "closePanel": "Panel schließen",
       "title_multicam": "🎬 Multicam",
-      "title_creatorPreset": "🎨 Creator-Preset"
+      "title_creatorPreset": "🎨 Creator-Preset",
+      "title_workflow": "Pro Workflow"
     },
     "timeline": {
       "trackMenuMessage": "Stumm und Solo wirken sich NUR auf die Vorschau aus — das exportierte Video wird dadurch nicht verändert. Zum dauerhaften Stummschalten passe die Lautstärke des Clips an.",
@@ -554,7 +555,8 @@
       "export": "Export",
       "precompose": "Vorkomp.",
       "multicam": "Multicam",
-      "creatorPreset": "Preset"
+      "creatorPreset": "Preset",
+      "workflow": "Workflow"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1956,6 +1958,53 @@
       "nothingToApply": "Dieses Preset ist leer oder nichts anzuwenden.",
       "tagCaptions": "Untertitel",
       "tagLogo": "Logo"
+    },
+    "workflow": {
+      "title": "Pro Workflow",
+      "progress": "{{done}}/{{total}} Phasen fertig",
+      "intro": "Die Profi-Schnittschritte der Reihe nach. Tippe eine Phase an — die passenden Werkzeuge öffnen sich. Der Haken zeigt, wo schon Inhalt ist.",
+      "currentTag": "du bist hier",
+      "organizeEmpty": "Noch keine Medien importiert. Beginne mit der Import-Phase.",
+      "stage_import": "Import",
+      "stage_organize": "Organisieren",
+      "stage_roughcut": "Rohschnitt",
+      "stage_finecut": "Feinschnitt",
+      "stage_audio": "Audio",
+      "stage_color": "Farbe",
+      "stage_motion": "Motion / Grafik",
+      "stage_captions": "Untertitel",
+      "stage_qc": "Qualitätsprüfung",
+      "stage_export": "Export",
+      "desc_import": "Material einbringen: Video, Bilder, Musik — über die +-Werkzeuge unten oder die Sound-Bibliothek.",
+      "desc_organize": "Medien organisieren: Favorit, 1–5-Sterne-Bewertung und Tags (keep / broll / hook…), um die besten Takes schnell zu finden.",
+      "desc_roughcut": "Das Story-Gerüst: die besten Teile auswählen und ordnen. AI Auto-Edit, Szenen- und Totzeit-Schnitte beschleunigen es.",
+      "desc_finecut": "Verfeinern: Trim, Schnitt, Übergänge, Tempo — bildgenau.",
+      "desc_audio": "Mischen: Lautstärke, Fades, Musik, Soundeffekte, Pro-Audio.",
+      "desc_color": "Farbe: Grade, LUT, Adjust — ein konsistenter, stimmungsvoller Look.",
+      "desc_motion": "Motion & Grafik: Textanimation, Formen, PiP, Keyframes.",
+      "desc_captions": "Untertitel: Auto, Karaoke, Stil, Übersetzung, Safe-Zone.",
+      "desc_qc": "Prüfung vor dem Export: Qualitätsscan, Safe-Zone, Aufnahmefehler — im KI-Panel.",
+      "desc_export": "Fertig: Auflösung/Codec/Plattform-Preset, dann speichern oder veröffentlichen.",
+      "tool_library": "Sound-Bibliothek",
+      "tool_assistant": "KI-Assistent",
+      "tool_precision": "Präzision",
+      "tool_transition": "Übergang",
+      "tool_speed": "Tempo",
+      "tool_audio": "Audio",
+      "tool_adjust": "Grade",
+      "tool_shape": "Form",
+      "tool_text": "Text",
+      "tool_pip": "PiP",
+      "tool_captions": "Untertitel",
+      "tool_export": "Export",
+      "kind_video": "Video",
+      "kind_image": "Bild",
+      "kind_audio": "Audio",
+      "tag_keep": "keep",
+      "tag_maybe": "evtl.",
+      "tag_aroll": "A-Roll",
+      "tag_broll": "B-Roll",
+      "tag_hook": "Hook"
     }
   },
   "paywallSheet": {
@@ -2153,7 +2202,8 @@
       "removeImageDoc": "Bilddokument gelöscht",
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",
-      "relinkUri": "Medien neu verknüpft: {{file}}"
+      "relinkUri": "Medien neu verknüpft: {{file}}",
+      "updateAsset": "Medien-Metadaten: {{keys}}"
     },
     "demoData": {
       "labelMusic": "Musik",

@@ -22,6 +22,7 @@ import { StickerPanel } from '@/components/editor/panels/StickerPanel';
 import { TextPanel } from '@/components/editor/panels/TextPanel';
 import { TranscriptPanel } from '@/components/editor/panels/TranscriptPanel';
 import { TransitionPanel } from '@/components/editor/panels/TransitionPanel';
+import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import {
@@ -120,6 +121,9 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
       break;
     case 'creatorPreset':
       content = <CreatorPresetPanel />;
+      break;
+    case 'workflow':
+      content = <WorkflowPanel />;
       break;
   }
 

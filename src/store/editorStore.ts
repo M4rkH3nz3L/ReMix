@@ -83,6 +83,7 @@ export type PanelId =
   | 'export'
   | 'multicam'
   | 'creatorPreset'
+  | 'workflow'
   | null;
 
 /** Kijelöléshez nem kötött panelek — nyitva maradnak kijelölés nélkül is. */
@@ -97,6 +98,7 @@ const STANDALONE_PANELS: PanelId[] = [
   'transcript',
   'multicam',
   'creatorPreset',
+  'workflow',
 ];
 
 const HISTORY_LIMIT = 50;

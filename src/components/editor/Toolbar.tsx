@@ -565,6 +565,12 @@ export function Toolbar() {
         ) : (
           <>
             <ToolButton
+              icon="git-branch-outline"
+              label={t('editor.toolbar.workflow')}
+              active={activePanel === 'workflow'}
+              onPress={() => togglePanel('workflow')}
+            />
+            <ToolButton
               icon="sparkles-outline"
               label="AI"
               active={activePanel === 'assistant'}

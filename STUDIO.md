@@ -33,6 +33,20 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 
 ## SIMA — ingyenes (minden az eszközön fut)
 
+### 🎬 Pro Workflow (Toolbar → Workflow) 🆕
+- A profi vágás **10 szakasza** vezetett lépcsőként a „nagy toolbar" helyett:
+  **Import → Rendszerezés → Nyers vágás → Finom vágás → Hang → Szín → Mozgás →
+  Feliratok → Minőség-ellenőrzés → Export.** Nem új funkció — RÉTEG a meglévő eszközök
+  fölött (`workflow.ts` + `WorkflowPanel`).
+- **Állapot a projektből számolva** (`stageStatus`): minden szakasz pipát kap, ahol már
+  van érdemi tartalom (pl. Szín = van adjust/LUT/filter; Feliratok = van felirat-klip;
+  Export = renderelt), és a panel a **következő lépést** ajánlja.
+- Szakaszonként a **meglévő panelek** nyílnak (a Command Bus-on át) — nincs duplikált logika.
+- **Organize (asset-rendszerezés)** 🆕: minden médiához **kedvenc**, **1–5 csillag
+  értékelés** és **címkék/„bin"-ek** (keep / talán / A-roll / B-roll / hook) — a döntés
+  a projekt asset-jén tárolva (`UPDATE_ASSET` command, undo-zható), a metaadatokkal
+  (felbontás/hossz) együtt. Ez a rész eddig hiányzott.
+
 ### Projekt és idővonal
 - Projekt: létrehozás (16:9 / 9:16 / 1:1), lista, törlés, automatikus draft-mentés.
 - Többsávos idővonal (videó/kép · PiP · grade · szöveg · felirat · overlay · interaktív ·

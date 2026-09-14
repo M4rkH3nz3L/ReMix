@@ -455,7 +455,8 @@
       "title_export": "Exportálás",
       "closePanel": "Panel bezárása",
       "title_multicam": "🎬 Multicam",
-      "title_creatorPreset": "🎨 Creator Preset"
+      "title_creatorPreset": "🎨 Creator Preset",
+      "title_workflow": "Pro Workflow"
     },
     "timeline": {
       "trackMenuMessage": "A némítás és a solo CSAK az előnézetre hat — az exportált videó nem változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.",
@@ -554,7 +555,8 @@
       "export": "Export",
       "precompose": "Pre-compose",
       "multicam": "Multicam",
-      "creatorPreset": "Preset"
+      "creatorPreset": "Preset",
+      "workflow": "Workflow"
     },
     "transportBar": {
       "markerTitle": "Jelölő",
@@ -1956,6 +1958,53 @@
       "nothingToApply": "Ehhez a preset üres vagy nincs mit alkalmazni.",
       "tagCaptions": "felirat",
       "tagLogo": "logó"
+    },
+    "workflow": {
+      "title": "Pro Workflow",
+      "progress": "{{done}}/{{total}} szakasz kész",
+      "intro": "A profi vágás lépései sorban. Koppints egy szakaszra — a megfelelő eszközök nyílnak meg. A pipa azt jelzi, hol van már tartalom.",
+      "currentTag": "itt tartasz",
+      "organizeEmpty": "Még nincs importált média. Kezdd az Import szakaszban.",
+      "stage_import": "Import",
+      "stage_organize": "Rendszerezés",
+      "stage_roughcut": "Nyers vágás",
+      "stage_finecut": "Finom vágás",
+      "stage_audio": "Hang",
+      "stage_color": "Szín",
+      "stage_motion": "Mozgás / Grafika",
+      "stage_captions": "Feliratok",
+      "stage_qc": "Minőség-ellenőrzés",
+      "stage_export": "Export",
+      "desc_import": "Vidd be a nyersanyagot: videó, kép, zene — a lenti + eszközökkel vagy a hang-könyvtárból.",
+      "desc_organize": "Rendszerezd a médiát: kedvenc, 1–5 csillag értékelés és címkék (keep / broll / hook…), hogy gyorsan megtaláld a legjobb felvételeket.",
+      "desc_roughcut": "A történet váza: válaszd ki és rendezd a legjobb részeket. AI Auto-Edit, jelenet- és holtidő-vágás gyorsítja.",
+      "desc_finecut": "Pontosítás: trim, vágás, átmenetek, sebesség — kockapontosan.",
+      "desc_audio": "Keverés: hangerő, fade, zene, hangeffektek, pro-audio.",
+      "desc_color": "Szín: grade, LUT, adjust — egységes, hangulatos kép.",
+      "desc_motion": "Mozgás és grafika: szöveg-animáció, formák, PiP, kulcskockák.",
+      "desc_captions": "Feliratok: automata, karaoke, stílus, fordítás, safe-zone.",
+      "desc_qc": "Ellenőrzés export előtt: minőség-szkennelés, safe-zone, felvétel-hibák — az AI panelen.",
+      "desc_export": "Kész: felbontás/kodek/platform-preset, majd mentés vagy közzététel.",
+      "tool_library": "Hang-könyvtár",
+      "tool_assistant": "AI-asszisztens",
+      "tool_precision": "Pontos",
+      "tool_transition": "Átmenet",
+      "tool_speed": "Sebesség",
+      "tool_audio": "Hang",
+      "tool_adjust": "Grade",
+      "tool_shape": "Forma",
+      "tool_text": "Szöveg",
+      "tool_pip": "PiP",
+      "tool_captions": "Feliratok",
+      "tool_export": "Export",
+      "kind_video": "videó",
+      "kind_image": "kép",
+      "kind_audio": "hang",
+      "tag_keep": "keep",
+      "tag_maybe": "talán",
+      "tag_aroll": "A-roll",
+      "tag_broll": "B-roll",
+      "tag_hook": "hook"
     }
   },
   "paywallSheet": {
@@ -2153,7 +2202,8 @@
       "removeImageDoc": "kép-dokumentum törölve",
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",
-      "relinkUri": "média újracsatolva: {{file}}"
+      "relinkUri": "média újracsatolva: {{file}}",
+      "updateAsset": "Média-metaadat: {{keys}}"
     },
     "demoData": {
       "labelMusic": "Zene",

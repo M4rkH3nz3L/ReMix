@@ -30,6 +30,7 @@ export type EditorCommand =
   | { type: 'SET_ASPECT'; aspectRatio: AspectRatio }
   | { type: 'RENAME_PROJECT'; name: string }
   | { type: 'ADD_ASSET'; asset: Asset }
+  | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
   /** teljes sáv-újraépítés egy undo-lépésben (pl. AI cut-lista alkalmazása) */
   | { type: 'REPLACE_TRACK_CLIPS'; trackType: TrackType; clips: Clip[] }
   /**
@@ -168,6 +169,21 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, assets: [...project.assets, cmd.asset] };
+
+    case 'UPDATE_ASSET': {
+      // csak az Organize-metaadatokat engedjük (rating/favorite/tags/name)
+      const allowed: (keyof Asset)[] = ['favorite', 'rating', 'tags', 'name'];
+      const patch = Object.fromEntries(
+        Object.entries(cmd.patch).filter(([k]) => allowed.includes(k as keyof Asset))
+      );
+      if (Object.keys(patch).length === 0 || !project.assets.some((a) => a.id === cmd.assetId)) {
+        return null;
+      }
+      return {
+        ...project,
+        assets: project.assets.map((a) => (a.id === cmd.assetId ? { ...a, ...patch } : a)),
+      };
+    }
 
     case 'REPLACE_TRACK_CLIPS':
       if (!project.tracks.some((t) => t.type === cmd.trackType)) {
@@ -316,6 +332,8 @@ export function describeCommand(cmd: EditorCommand): string {
         : tr('lib.commands.particlesOff');
     case 'ADD_ASSET':
       return tr('lib.commands.addAsset', { name: cmd.asset.name ?? cmd.asset.kind });
+    case 'UPDATE_ASSET':
+      return tr('lib.commands.updateAsset', { keys: Object.keys(cmd.patch).join(', ') });
     case 'REPLACE_TRACK_CLIPS':
       return tr('lib.commands.replaceTrackClips', {
         trackType: cmd.trackType,

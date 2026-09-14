@@ -455,7 +455,8 @@
       "title_export": "Export",
       "closePanel": "Close panel",
       "title_multicam": "🎬 Multicam",
-      "title_creatorPreset": "🎨 Creator Preset"
+      "title_creatorPreset": "🎨 Creator Preset",
+      "title_workflow": "Pro Workflow"
     },
     "timeline": {
       "trackMenuMessage": "Mute and solo affect ONLY the preview — the exported video is not changed by them. For permanent muting, adjust the clip's volume.",
@@ -554,7 +555,8 @@
       "export": "Export",
       "precompose": "Pre-compose",
       "multicam": "Multicam",
-      "creatorPreset": "Preset"
+      "creatorPreset": "Preset",
+      "workflow": "Workflow"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1956,6 +1958,53 @@
       "nothingToApply": "This preset is empty or nothing to apply.",
       "tagCaptions": "captions",
       "tagLogo": "logo"
+    },
+    "workflow": {
+      "title": "Pro Workflow",
+      "progress": "{{done}}/{{total}} stages done",
+      "intro": "The pro editing steps in order. Tap a stage — the right tools open. The check marks where content already exists.",
+      "currentTag": "you're here",
+      "organizeEmpty": "No media imported yet. Start with the Import stage.",
+      "stage_import": "Import",
+      "stage_organize": "Organize",
+      "stage_roughcut": "Rough cut",
+      "stage_finecut": "Fine cut",
+      "stage_audio": "Audio",
+      "stage_color": "Color",
+      "stage_motion": "Motion / Graphics",
+      "stage_captions": "Captions",
+      "stage_qc": "Quality check",
+      "stage_export": "Export",
+      "desc_import": "Bring in footage: video, images, music — via the + tools below or the sound library.",
+      "desc_organize": "Organize your media: favorite, 1–5 star rating and tags (keep / broll / hook…) to find the best takes fast.",
+      "desc_roughcut": "The story skeleton: pick and order the best parts. AI Auto-Edit, scene and dead-air cuts speed it up.",
+      "desc_finecut": "Refine: trim, split, transitions, speed — frame-accurate.",
+      "desc_audio": "Mix: volume, fades, music, sound effects, pro audio.",
+      "desc_color": "Color: grade, LUT, adjust — a consistent, moody look.",
+      "desc_motion": "Motion & graphics: text animation, shapes, PiP, keyframes.",
+      "desc_captions": "Captions: auto, karaoke, style, translation, safe zone.",
+      "desc_qc": "Review before export: quality scan, safe zone, footage issues — on the AI panel.",
+      "desc_export": "Done: resolution/codec/platform preset, then save or publish.",
+      "tool_library": "Sound library",
+      "tool_assistant": "AI assistant",
+      "tool_precision": "Precision",
+      "tool_transition": "Transition",
+      "tool_speed": "Speed",
+      "tool_audio": "Audio",
+      "tool_adjust": "Grade",
+      "tool_shape": "Shape",
+      "tool_text": "Text",
+      "tool_pip": "PiP",
+      "tool_captions": "Captions",
+      "tool_export": "Export",
+      "kind_video": "video",
+      "kind_image": "image",
+      "kind_audio": "audio",
+      "tag_keep": "keep",
+      "tag_maybe": "maybe",
+      "tag_aroll": "A-roll",
+      "tag_broll": "B-roll",
+      "tag_hook": "hook"
     }
   },
   "paywallSheet": {
@@ -2153,7 +2202,8 @@
       "removeImageDoc": "image document deleted",
       "replaceTracks_one": "{{count}} track rebuilt",
       "replaceTracks_other": "{{count}} tracks rebuilt",
-      "relinkUri": "media relinked: {{file}}"
+      "relinkUri": "media relinked: {{file}}",
+      "updateAsset": "Media metadata: {{keys}}"
     },
     "demoData": {
       "labelMusic": "Music",

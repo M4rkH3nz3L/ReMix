@@ -10,6 +10,8 @@
  * mind ingyen működik rajta.
  */
 
+import type { PathPoint } from '@/types/project';
+
 export interface Point {
   x: number;
   y: number;
@@ -139,4 +141,60 @@ export const BRUSH_COLORS = [
  */
 export function polylinePoints(points: Point[], w: number, h: number): string {
   return points.map((p) => `${(p.x * w).toFixed(1)},${(p.y * h).toFixed(1)}`).join(' ');
+}
+
+/**
+ * ✏️ SVG path `d` a horgonypontokból (Bézier-tudatos): a fogóval (`h1`/`h2`)
+ * rendelkező szegmensek köbös görbék (C), a többi egyenes (L). `closed` → Z.
+ * KÖZÖS a renderrel és az előnézettel (a text-render.js tükrözi).
+ */
+export function pathData(
+  points: PathPoint[],
+  w: number,
+  h: number,
+  closed = false
+): string {
+  if (points.length === 0) {
+    return '';
+  }
+  const P = (p: { x: number; y: number }) => `${(p.x * w).toFixed(2)},${(p.y * h).toFixed(2)}`;
+  const n = points.length;
+  let d = `M${P(points[0])}`;
+  const segments = closed ? n : n - 1;
+  for (let i = 0; i < segments; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    if (a.h2 || b.h1) {
+      d += `C${P(a.h2 ?? a)} ${P(b.h1 ?? b)} ${P(b)}`;
+    } else {
+      d += `L${P(b)}`;
+    }
+  }
+  if (closed) {
+    d += 'Z';
+  }
+  return d;
+}
+
+/**
+ * Polyline-pontok → sima Bézier: minden horgonyhoz a szomszédokból Catmull-Rom
+ * érintőt számol, abból be/kimenő fogót. `corner` (fogó nélkül) → éles sarok.
+ */
+export function smoothToBezier(points: Point[], closed = false, k = 1 / 6): PathPoint[] {
+  const n = points.length;
+  if (n < 3) {
+    return points.map((p) => ({ x: p.x, y: p.y }));
+  }
+  return points.map((p, i) => {
+    const prev = closed ? points[(i - 1 + n) % n] : points[i - 1] ?? p;
+    const next = closed ? points[(i + 1) % n] : points[i + 1] ?? p;
+    const tx = (next.x - prev.x) * k;
+    const ty = (next.y - prev.y) * k;
+    return {
+      x: p.x,
+      y: p.y,
+      h1: { x: p.x - tx, y: p.y - ty },
+      h2: { x: p.x + tx, y: p.y + ty },
+    };
+  });
 }

@@ -1540,7 +1540,9 @@
       "cap_square": "Quadrat",
       "join_round": "Rund",
       "join_miter": "Spitz",
-      "join_bevel": "Abgeschr."
+      "join_bevel": "Abgeschr.",
+      "penTitle": "✏️ Zeichenstift / Anker",
+      "penNote": "Tippe auf die Fläche für einen Anker; ziehe Anker; die Bezier-Griffe des gewählten Ankers ziehen separat. Tasten: glätten, Ecke, schließen, löschen."
     },
     "speed": {
       "rampNotApplicable": "Für diesen Clip nicht anwendbar (zu kurz?).",

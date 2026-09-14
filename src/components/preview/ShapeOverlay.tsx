@@ -6,15 +6,15 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 import Svg, {
   Defs,
   LinearGradient as SvgGradient,
+  Path,
   Polygon,
-  Polyline,
   RadialGradient as SvgRadial,
   Rect,
   Stop,
 } from 'react-native-svg';
 
 import { cssBlendMode, palette } from '@/constants/editor';
-import { polylinePoints } from '@/lib/draw';
+import { pathData } from '@/lib/draw';
 import { angleToLinearPoints, sortedStops } from '@/lib/gradient';
 import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
@@ -180,23 +180,34 @@ export function ShapeOverlay({
           // ✏️ szabadkézi vonal — a renderrel AZONOS pont-sztringből, hogy az
           // előnézet és a beégetett videó ugyanazt rajzolja
           <Svg width={w} height={h} style={styles.pathSvg}>
+            {clip.gradient && clip.closed ? (
+              <Defs>
+                <SvgGradientDef id={`p-${clip.id}`} gradient={clip.gradient} />
+              </Defs>
+            ) : null}
             {clip.glow ? (
-              <Polyline
-                points={polylinePoints(clip.points, w, h)}
-                fill="none"
-                stroke={clip.glow.color}
-                strokeWidth={strokePx * 2.4}
+              <Path
+                d={pathData(clip.points, w, h, clip.closed)}
+                fill={clip.closed ? clip.glow.color : 'none'}
+                stroke={clip.closed ? undefined : clip.glow.color}
+                strokeWidth={clip.closed ? undefined : strokePx * 2.4}
                 strokeLinecap={clip.strokeCap ?? 'round'}
                 strokeLinejoin={clip.strokeJoin ?? 'round'}
                 strokeDasharray={dashArray}
                 opacity={0.35}
               />
             ) : null}
-            <Polyline
-              points={polylinePoints(clip.points, w, h)}
-              fill="none"
-              stroke={clip.fill}
-              strokeWidth={strokePx}
+            <Path
+              d={pathData(clip.points, w, h, clip.closed)}
+              fill={
+                clip.closed
+                  ? clip.gradient
+                    ? `url(#p-${clip.id})`
+                    : clip.fill
+                  : 'none'
+              }
+              stroke={clip.closed ? (clip.borderWidth ? clip.borderColor ?? '#ffffff' : undefined) : clip.fill}
+              strokeWidth={clip.closed ? (clip.borderWidth ? strokePx : undefined) : strokePx}
               strokeLinecap={clip.strokeCap ?? 'round'}
               strokeLinejoin={clip.strokeJoin ?? 'round'}
               strokeDasharray={dashArray}

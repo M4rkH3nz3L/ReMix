@@ -574,6 +574,30 @@ async function renderTextPngs(textClips, canvas, outDir) {
   return results;
 }
 
+/** ✏️ SVG path `d` a horgonypontokból (Bézier-tudatos) — a kliens draw.ts tükre. */
+function pathDataJs(points, w, h, closed) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return '';
+  }
+  const P = (p) => `${(p.x * w).toFixed(2)},${(p.y * h).toFixed(2)}`;
+  const n = points.length;
+  let d = `M${P(points[0])}`;
+  const segments = closed ? n : n - 1;
+  for (let i = 0; i < segments; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    if (a.h2 || b.h1) {
+      d += `C${P(a.h2 || a)} ${P(b.h1 || b)} ${P(b)}`;
+    } else {
+      d += `L${P(b)}`;
+    }
+  }
+  if (closed) {
+    d += 'Z';
+  }
+  return d;
+}
+
 /** 🌈 CSS gradient-string a fejlett gradientből (rect/ellipse/path-doboz + konikus). */
 function cssGradient(g) {
   const stops = (g.stops || [])
@@ -670,36 +694,56 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       // pontosan követi a vonalat — kerek sapkával/illesztéssel.
       let pathSvg = '';
       if (clip.shape === 'path' && Array.isArray(clip.points) && clip.points.length >= 2) {
-        const sw = Math.max(
-          1,
-          Math.round(((clip.strokeWidth ?? 0.9) / 100) * canvas.h)
-        );
-        const pts = clip.points
-          .map((pt) => `${(pt.x * w).toFixed(1)},${(pt.y * h).toFixed(1)}`)
-          .join(' ');
-        // ✂️ stroke-attribútumok: vonalvég/illesztés + szaggatás (a dash a
-        // vonalvastagság arányában, hogy méretfüggetlen legyen)
+        const sw = Math.max(1, Math.round(((clip.strokeWidth ?? 0.9) / 100) * canvas.h));
+        const closed = Boolean(clip.closed);
+        const d = pathDataJs(clip.points, w, h, closed);
+        // ✂️ stroke-attribútumok: vonalvég/illesztés + szaggatás
         const cap = clip.strokeCap ?? 'round';
         const join = clip.strokeJoin ?? 'round';
         const dashArr =
           clip.strokeDash && clip.strokeDash > 0
             ? ` stroke-dasharray="${(clip.strokeDash * sw).toFixed(1)} ${(clip.strokeDash * sw).toFixed(1)}"`
             : '';
+        // zárt path = kitöltött forma (gradient/szín) + opcionális kontúr;
+        // nyitott path = vonal a `fill` színével
+        let fillAttr = 'none';
+        let gradDefPath = '';
+        if (closed) {
+          if (clip.gradient && clip.gradient.type !== 'conic') {
+            gradDefPath = svgGradientDef(`pgp${i}`, clip.gradient);
+            fillAttr = `url(#pgp${i})`;
+          } else if (clip.gradient && clip.gradient.type === 'conic') {
+            // SVG path-fill nem tud konikust → az első stop színe
+            fillAttr = (clip.gradient.stops[0] && clip.gradient.stops[0].color) || clip.fill;
+          } else if (clip.fillGradient) {
+            gradDefPath = `<linearGradient id="pgp${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${clip.fillGradient.from}"/><stop offset="1" stop-color="${clip.fillGradient.to}"/></linearGradient>`;
+            fillAttr = `url(#pgp${i})`;
+          } else {
+            fillAttr = clip.fill;
+          }
+        }
+        const cStrokeW = closed
+          ? clip.outline
+            ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
+            : clip.borderWidth
+              ? borderWidth
+              : 0
+          : sw;
+        const cStrokeCol = closed ? clip.outline?.color ?? clip.borderColor ?? '#ffffff' : clip.fill;
+        const strokeAttrs =
+          cStrokeW > 0
+            ? ` stroke="${cStrokeCol}" stroke-width="${cStrokeW}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`
+            : '';
         const glow = clip.glow
-          ? `<polyline points="${pts}" fill="none" stroke="${clip.glow.color}" ` +
-            `stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr} ` +
-            `opacity="0.55" filter="url(#blur)"/>`
+          ? `<path d="${d}" ${closed ? `fill="${clip.glow.color}"` : `fill="none" stroke="${clip.glow.color}" stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`} opacity="0.5" filter="url(#blur)"/>`
           : '';
         pathSvg =
-          `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" ` +
-          `style="overflow:visible;display:block">` +
-          (clip.glow
-            ? `<defs><filter id="blur" x="-50%" y="-50%" width="200%" height="200%">` +
-              `<feGaussianBlur stdDeviation="${Math.max(1, sw * 0.6)}"/></filter></defs>`
+          `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block">` +
+          (clip.glow || gradDefPath
+            ? `<defs>${clip.glow ? `<filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(1, sw * 0.6)}"/></filter>` : ''}${gradDefPath}</defs>`
             : '') +
           glow +
-          `<polyline points="${pts}" fill="none" stroke="${clip.fill}" ` +
-          `stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}/>` +
+          `<path d="${d}" fill="${fillAttr}"${closed ? strokeAttrs : ` stroke="${clip.fill}" stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`}/>` +
           `</svg>`;
       }
 

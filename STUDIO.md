@@ -100,6 +100,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   expo-linear-gradient (lineáris) / react-native-svg (radiális); a konikus a renderben pontos.
 - **✂️ Vonal-stílus** 🆕: **szaggatás (dash)** a path-on és a formakontúrokon, valamint
   **vonalvég** (kerek/vágott/négyzet) és **illesztés** (kerek/éles/levágott) a path-on.
+- **✏️ Bézier path + toll-eszköz** 🆕: horgonypontok Bézier-fogókkal (`PathPoint`),
+  **toll-szerkesztő** (koppints = új horgony, húzás = mozgatás, fogó-húzás = görbe),
+  **simítás** (Catmull-Rom), **sarok**, **zárás** → zárt path = kitöltött (gradiens) forma.
 - **Matrica** (ingyenes rész): emoji + részecske (konfetti/csillám/hó/parázs).
 - **PiP** keret: lekerekítés, keret, árnyék, blend.
 

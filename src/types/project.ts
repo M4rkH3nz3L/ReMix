@@ -707,6 +707,18 @@ export interface ShapeGradient {
   stops: GradientStop[];
 }
 
+/**
+ * ✏️ Path-horgonypont (Bézier). `x`/`y` a horgony (0…1 a klip-dobozban); `h1` a
+ * BEJÖVŐ, `h2` a KIMENŐ Bézier-fogó abszolút normalizált pozíciója (nem relatív).
+ * Fogók nélkül a szegmens egyenes.
+ */
+export interface PathPoint {
+  x: number;
+  y: number;
+  h1?: { x: number; y: number };
+  h2?: { x: number; y: number };
+}
+
 export interface ShapeClip extends ClipBase {
   kind: 'shape';
   shape: 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'star' | 'path';
@@ -718,11 +730,14 @@ export interface ShapeClip extends ClipBase {
   /** kitöltő szín (hex) — gradiens esetén a tartalék */
   fill: string;
   /**
-   * ✏️ Szabadkézi vonal (`shape: 'path'`) pontjai — a klip SAJÁT dobozához
-   * normalizálva (0–1), nem a vászonhoz. A vonal a `fill` színével és
-   * `strokeWidth` vastagsággal rajzolódik; a `fill` itt vonalszín, nem kitöltés.
+   * ✏️ Path (`shape: 'path'`) horgonypontjai — a klip SAJÁT dobozához
+   * normalizálva (0–1). Bézier-fogók nélkül egyenes (polyline); `h1`/`h2`
+   * fogókkal köbös Bézier-görbe. Nyitott path = `strokeWidth` vonal a `fill`
+   * színével; `closed` path = kitöltött forma (fill/gradient) + opcionális kontúr.
    */
-  points?: { x: number; y: number }[];
+  points?: PathPoint[];
+  /** zárt path (kitöltött forma) — a toll-eszköz zárt sokszöge/görbéje */
+  closed?: boolean;
   /** a vonal vastagsága a vászon MAGASSÁGÁNAK %-ában */
   strokeWidth?: number;
   /** ✂️ szaggatás: a kötőjel + rés hossza a vonalvastagság arányában (0/hiányzó = folytonos) */

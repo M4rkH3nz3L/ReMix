@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Chip, ColorDot, PanelSection, Stepper } from '@/components/ui/controls';
 import { aspectValue, BLEND_MODES, palette, textColors } from '@/constants/editor';
+import { PathEditor } from '@/components/editor/PathEditor';
 import { DEFAULT_GRADIENT, sortedStops } from '@/lib/gradient';
 import { activeVisualClip, sourceTimeAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
@@ -119,6 +120,18 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
           ))}
         </View>
       </PanelSection>
+
+      {clip.shape === 'path' ? (
+        <PanelSection title={t('panels.shape.penTitle')}>
+          <PathEditor
+            points={clip.points ?? []}
+            closed={clip.closed}
+            onChange={(points) => updateClip(clip.id, { points })}
+            onClosedChange={(closed) => updateClip(clip.id, { closed: closed || undefined })}
+          />
+          <Text style={styles.note}>{t('panels.shape.penNote')}</Text>
+        </PanelSection>
+      ) : null}
 
       {clip.imageUri ? (
         <PanelSection title={t('panels.shape.imageTitle')}>

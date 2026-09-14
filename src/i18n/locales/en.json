@@ -1540,7 +1540,9 @@
       "cap_square": "Square",
       "join_round": "Round",
       "join_miter": "Miter",
-      "join_bevel": "Bevel"
+      "join_bevel": "Bevel",
+      "penTitle": "✏️ Pen / anchors",
+      "penNote": "Tap the canvas to add an anchor; drag anchors; the selected anchor's Bezier handles drag independently. Buttons: smooth, corner, close, delete."
     },
     "speed": {
       "rampNotApplicable": "Can't be applied to this clip (too short?).",

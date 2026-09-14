@@ -17,6 +17,40 @@ export interface TrackPoint {
 }
 
 /**
+ * 🎯 Track-simítás (zero-phase mozgóátlag): a nyers NCC-tracker kimenete
+ * kockánként remeg — ez a KÖZÉPPONTOS (nem késő) átlag kisimítja a jittert, de
+ * a téma valós mozgását követi (nem marad le mögötte, mint egy egyszerű EMA).
+ * `strength` 0…1 → ±0…4 kocka ablak. Pure — tesztelhető.
+ */
+export function smoothTrackPoints(points: TrackPoint[], strength = 0.5): TrackPoint[] {
+  const s = Math.max(0, Math.min(1, strength));
+  const radius = Math.round(s * 4);
+  if (radius < 1 || points.length < 3) {
+    return points;
+  }
+  const n = points.length;
+  const avg = (arr: number[], i: number) => {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - radius); j <= Math.min(n - 1, i + radius); j++) {
+      sum += arr[j];
+      count += 1;
+    }
+    return sum / count;
+  };
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const hasS = points.some((p) => p.s != null);
+  const ss = points.map((p) => p.s ?? 1);
+  return points.map((p, i) => ({
+    ...p,
+    x: avg(xs, i),
+    y: avg(ys, i),
+    ...(hasS ? { s: avg(ss, i) } : {}),
+  }));
+}
+
+/**
  * Pont-sor → x/y kulcskocka-csatornák DELTA-mozgásként: a réteg az induló
  * pozíciójából indul, és a követett pont elmozdulását veszi át. Ritkítva
  * (~3/mp), lineáris easinggel. 🧊 3D követés: ha a téma látszó mérete érdemben
@@ -30,18 +64,20 @@ export function pointsToPositionKeyframes(
   timeOffset: number,
   /** forrás-mp → idővonal-mp szorzó (1/speed) */
   timeScale = 1,
-  stepSec = 0.34
+  stepSec = 0.34,
+  smooth = 0.5
 ): { x: Keyframe[]; y: Keyframe[]; scale?: Keyframe[] } {
   const x: Keyframe[] = [];
   const y: Keyframe[] = [];
   const scale: Keyframe[] = [];
-  const first = points[0];
+  const pts = smoothTrackPoints(points, smooth);
+  const first = pts[0];
   let lastT = -Infinity;
   let sMin = Infinity;
   let sMax = -Infinity;
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    const isEdge = i === 0 || i === points.length - 1;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const isEdge = i === 0 || i === pts.length - 1;
     if (!isEdge && p.t - lastT < stepSec) {
       continue;
     }
@@ -69,19 +105,21 @@ export function pointsToPanKeyframes(
   origin: { x: number; y: number },
   timeOffset: number,
   timeScale = 1,
-  stepSec = 0.34
+  stepSec = 0.34,
+  smooth = 0.5
 ): { x: Keyframe[]; y: Keyframe[]; scale?: Keyframe[] } {
   const x: Keyframe[] = [];
   const y: Keyframe[] = [];
   const scale: Keyframe[] = [];
-  const first = points[0];
+  const pts = smoothTrackPoints(points, smooth);
+  const first = pts[0];
   let lastT = -Infinity;
   let sMin = Infinity;
   let sMax = -Infinity;
   const clampPan = (v: number) => Math.max(-0.75, Math.min(0.75, v));
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    const isEdge = i === 0 || i === points.length - 1;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const isEdge = i === 0 || i === pts.length - 1;
     if (!isEdge && p.t - lastT < stepSec) {
       continue;
     }

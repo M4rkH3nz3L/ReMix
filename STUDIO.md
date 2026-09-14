@@ -312,6 +312,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **Bármi követheti**: **szöveg** · **matrica** (emoji=text) · **kép / 3D-kép** · **forma /
   3D-forma** · **maszk** (rotoszkóp) · **elmosás (blur)** — a követett pontsorból pozíció-
   (és méret-) kulcskockák épülnek, a maszknál track-keretek, a blurnál mozgó régió.
+- **🎯 Track-simítás** 🆕: a nyers NCC-kimenet kockánként remeg — egy **zero-phase
+  (nem késő) mozgóátlag** kisimítja a jittert, miközben a téma valós mozgását követi
+  (`smoothTrackPoints`, pure + tesztelt); alapból bekapcsolva minden követés-fogyasztónál
+  (pásztázás/pozíció kulcskockák), erősség-paraméterrel.
 - **Arc-alapú változatok** a `faceTools` alatt (arc-blur, arcra ragasztott 3D, beszélő-címke).
 
 ### Matrica / 3D

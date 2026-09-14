@@ -172,7 +172,16 @@
       "revenuecat": "App Store / Play",
       "stripe": "Kártya",
       "promo": "Promó"
-    }
+    },
+    "perfSection": "Teljesítmény",
+    "perfHint": "A vágás közben a nehéz (4K/60/10-bit) videók helyett könnyű proxy játszódik; a végső render mindig az eredetivel fut.",
+    "proxyLabel": "Proxy (vágási munka-példány)",
+    "proxyQuality": "Proxy minőség",
+    "proxyQuality_low": "Alacsony (360p)",
+    "proxyQuality_medium": "Közepes (540p)",
+    "proxyQuality_high": "Magas (720p)",
+    "cacheSize": "Gyorsítótár mérete",
+    "clearCache": "Gyorsítótár ürítése"
   },
   "home": {
     "appName": "Remix",

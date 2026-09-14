@@ -20,6 +20,11 @@ export interface WaveformData {
 
 const memory = new Map<string, Promise<WaveformData | null>>();
 
+/** A hullámforma session-cache (memória) ürítése — cache-kezeléshez. */
+export function clearWaveformMemory(): void {
+  memory.clear();
+}
+
 function hashKey(input: string): string {
   // djb2 — csak cache-fájlnévhez kell
   let h = 5381;

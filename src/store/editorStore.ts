@@ -11,12 +11,17 @@ import {
 import { applyCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import { makeId } from '@/lib/id';
+import { setProxyConfig } from '@/lib/proxy';
 import { findClip, maxVideoDuration, projectDuration } from '@/lib/projectUtils';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
 import type { PacingInsight } from '@/lib/pacingClient';
 import type { Asset, Chapter, ChapterKind, Clip, Project, TimelineRegion, TrackType } from '@/types/project';
+
+/** 🎯 proxy minőség-tier → a proxy leghosszabb oldala (px) */
+export type ProxyQuality = 'low' | 'medium' | 'high';
+export const PROXY_MAX_SIDE: Record<ProxyQuality, number> = { low: 640, medium: 960, high: 1280 };
 
 /** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
 export type InsightLane = 'story' | 'map' | 'pacing';
@@ -291,6 +296,11 @@ interface EditorState {
   /** ✂️ szabadkézi maszk-mód ki/be (kizárja a rajzoló-módot és a borotvát) */
   setDrawMaskMode: (on: boolean) => void;
   setSnapGrid: (grid: number) => void;
+  /** 🎯 proxy (vágási munka-példány) be/ki + minőség-tier */
+  proxyEnabled: boolean;
+  proxyQuality: ProxyQuality;
+  setProxyEnabled: (on: boolean) => void;
+  setProxyQuality: (q: ProxyQuality) => void;
   toggleSafeZones: () => void;
   /** 🧲 illesztés-erősség léptetése: normál → erős → ki → normál */
   cycleSnapStrength: () => void;
@@ -424,6 +434,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   future: [],
   dirty: false,
   events: [],
+  // 🎯 teljesítmény: NEM session-reset, hogy projektváltáskor is megmaradjon
+  proxyEnabled: true,
+  proxyQuality: 'medium',
   ...SESSION_RESET,
 
   loadProject: (project, events) =>
@@ -1044,6 +1057,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({ trimMode: TRIM_MODES[(TRIM_MODES.indexOf(s.trimMode) + 1) % TRIM_MODES.length] })),
 
   setDrawBrush: (brush) => set(brush ? { drawBrush: brush, drawMaskMode: false } : { drawBrush: brush }),
+
+  setProxyEnabled: (on) => {
+    setProxyConfig({ enabled: on });
+    set({ proxyEnabled: on });
+  },
+  setProxyQuality: (q) => {
+    setProxyConfig({ maxSide: PROXY_MAX_SIDE[q] });
+    set({ proxyQuality: q });
+  },
 
   // szabadkézi maszk kizárja a forma-rajzolót és a borotvát (mind a vászon/idővonal koppintását foglalja)
   setDrawMaskMode: (on) =>

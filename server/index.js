@@ -1457,7 +1457,13 @@ app.post('/proxy', upload.any(), (req, res) => {
         res.status(422).json({ error: 'Nincs videó-stream a fájlban.' });
         return;
       }
-      if (Math.max(dims[0], dims[1]) <= 1280) {
+      // 🎚️ minőség-tier: a kliens a kért leghosszabb oldalt küldi (maxSide);
+      // ha a forrás eleve ennél kisebb, nincs mit nyerni (skip)
+      const maxSide = Math.min(
+        2160,
+        Math.max(320, Math.round(Number(req.body?.maxSide) || 1280))
+      );
+      if (Math.max(dims[0], dims[1]) <= maxSide) {
         fs.rm(workDir, { recursive: true, force: true }, () => {});
         res.json({ skip: true });
         return;
@@ -1470,7 +1476,7 @@ app.post('/proxy', upload.any(), (req, res) => {
       execFile(
         'ffmpeg',
         ['-y', '-i', file.path,
-         '-vf', 'scale=w=1280:h=1280:force_original_aspect_ratio=decrease:force_divisible_by=2',
+         '-vf', `scale=w=${maxSide}:h=${maxSide}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
          '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out],
         { timeout: 20 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 },

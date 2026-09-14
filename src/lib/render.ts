@@ -12,6 +12,7 @@ import {
 } from '@/lib/nativeRender';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
+import { renderCacheKey } from '@/lib/projectHash';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { withFingerprints } from '@/lib/fingerprint';
 import type { Project, RenderedVersion } from '@/types/project';
@@ -133,6 +134,17 @@ export async function renderMp4(
   }
   const mode = opts?.mode ?? 'auto';
   const effective = settings ?? DEFAULT_SETTINGS;
+
+  // 🗃️ Render-cache: ha a projekt + beállítás változatlan a legutóbbi renderhez
+  // képest, a kész fájlt azonnal visszaadjuk (nincs újra-render). A kulcs a
+  // render-releváns tartalom + a beállítás hash-e; a cache Paths.cache-ben él.
+  const cacheKey = renderCacheKey(project, effective);
+  const cached = cachedRenderFile(cacheKey);
+  if (cached) {
+    onProgress?.({ phase: tr('lib.render.phaseShare'), ratio: 1 });
+    return cached;
+  }
+
   // av1/prores + 8K csak felhőben megy → az eszköz-utat kizárjuk
   const needCloud = settingsNeedCloud(effective);
 
@@ -142,20 +154,65 @@ export async function renderMp4(
     !needCloud &&
     isNativeRenderAvailable() &&
     canRenderLocally(project, effective);
+  let out: File;
   if (canLocal) {
     onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: 0 });
-    return renderLocal(project, effective, (p) =>
+    out = await renderLocal(project, effective, (p) =>
       onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p })
     );
-  }
-  if (mode === 'local') {
+  } else if (mode === 'local') {
     // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,
     // vagy nincs natív modul (pl. Expo Go)
     throw needCloud ? new Error(tr('lib.render.codecNeedsCloud')) : new LocalRenderUnavailableError();
+  } else {
+    // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)
+    out = await renderCloud(project, onProgress, settings, opts?.signal);
   }
+  return storeRenderCache(cacheKey, out);
+}
 
-  // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)
-  return renderCloud(project, onProgress, settings, opts?.signal);
+/** Render-cache mappa (OS által üríthető cache-terület). */
+function renderCacheDir(): Directory {
+  return new Directory(Paths.cache, 'rendercache');
+}
+
+/** A kulcshoz tartozó gyorsítótár-fájl, ha létezik (különben null). */
+function cachedRenderFile(key: string): File | null {
+  try {
+    const file = new File(renderCacheDir(), `${key}.mp4`);
+    return file.exists ? file : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A kész rendert a cache-be másolja (a régi bejegyzéseket kiürítve — csak a
+ * legutóbbit tartjuk, hogy ne hízzon). Hiba esetén az eredeti fájlt adja vissza.
+ */
+function storeRenderCache(key: string, file: File): File {
+  try {
+    const dir = renderCacheDir();
+    if (!dir.exists) {
+      dir.create({ intermediates: true });
+    } else {
+      // csak a legutóbbi rendert tartjuk
+      for (const e of dir.list()) {
+        if (e instanceof File) {
+          try {
+            e.delete();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    const dest = new File(dir, `${key}.mp4`);
+    file.copy(dest);
+    return dest.exists ? dest : file;
+  } catch {
+    return file;
+  }
 }
 
 /**

@@ -9,6 +9,8 @@ import { Platform } from 'react-native';
  */
 
 const cache = new Map<string, Promise<string | null>>();
+/** 🛡️ memóriavédelem: a képkocka-cache felső határa (a legrégebbit dobjuk) */
+const MAX_CACHE = 300;
 
 function thumbAt(uri: string, second: number): Promise<string | null> {
   const key = `${uri}@${second}`;
@@ -20,9 +22,26 @@ function thumbAt(uri: string, second: number): Promise<string | null> {
     })
       .then((result) => result.uri)
       .catch(() => null);
+    // a legrégebben beszúrt bejegyzést dobjuk, ha túlnőne a cache
+    while (cache.size >= MAX_CACHE) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) {
+        break;
+      }
+      cache.delete(oldest);
+    }
+    cache.set(key, pending);
+  } else {
+    // LRU: a használt kulcs a sor végére kerül
+    cache.delete(key);
     cache.set(key, pending);
   }
   return pending;
+}
+
+/** A memória-képcache ürítése (cache-kezelés / memória-nyomás alatt). */
+export function clearThumbnailCache(): void {
+  cache.clear();
 }
 
 /** cache-barát időpont: fél másodpercre kerekítve */

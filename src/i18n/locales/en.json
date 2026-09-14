@@ -172,7 +172,16 @@
       "revenuecat": "App Store / Play",
       "stripe": "Card",
       "promo": "Promo"
-    }
+    },
+    "perfSection": "Performance",
+    "perfHint": "While editing, heavy (4K/60/10-bit) videos play as a light proxy; the final render always uses the original.",
+    "proxyLabel": "Proxy (editing copy)",
+    "proxyQuality": "Proxy quality",
+    "proxyQuality_low": "Low (360p)",
+    "proxyQuality_medium": "Medium (540p)",
+    "proxyQuality_high": "High (720p)",
+    "cacheSize": "Cache size",
+    "clearCache": "Clear cache"
   },
   "home": {
     "appName": "Remix",

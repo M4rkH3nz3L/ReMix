@@ -41,6 +41,20 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
 - **Undo/redo** (50 lépés), **stílus másolása/beillesztése**, **több-kijelölés** (köteg-
   stílus), klipek **össze-/szétkapcsolása** (link), mágneses illesztés haptikával.
 
+### ⚡ Teljesítmény / proxy (mobil)
+- **Proxy-workflow**: a nehéz (4K/60/10-bit) forrásból a worker könnyű **munka-példányt**
+  (proxy) készít; a vágás/előnézet ezt játssza (gyors dekódolás/seek), a **végső render
+  mindig az eredetivel** fut (a klip uri-ja sosem íródik át).
+- **Háttér-generálás**: importkor és projekt-nyitáskor automatikusan indul (nem blokkol).
+- **🎚️ Proxy be/ki + minőség-tier** 🆕: Alacsony 360p / Közepes 540p / Magas 720p — a
+  Profil → **Teljesítmény** alatt (a tier-váltás új proxyt old fel; a cache tierenként külön).
+- **🧹 Cache-kezelés** 🆕: a proxy- és hullámforma-gyorsítótár mérete + egy gombos ürítés
+  (a projekt-médiát és a renderelt kimeneteket nem érinti).
+- **🗃️ Render-cache** 🆕: változatlan projekt + azonos beállítás → a legutóbbi render azonnal
+  újrahasznosul (nincs újra-render), a kulcs a render-releváns tartalom + beállítás hash-e.
+- **🛡️ Memóriavédelem** 🆕: legfeljebb 2 párhuzamos proxy-transzkód; a képkocka-cache LRU-
+  korláttal (a legrégebbit dobja).
+
 ### Idővonal — profi vágó-eszközök 🆕
 - **Vágás** a lejátszófejnél; **✂️ Borotva-mód** (insight-sáv olló): koppintásra vág az
   idővonalon a koppintás pontján.
@@ -383,6 +397,11 @@ A fő UI-zónák a leckékhez:
 **15. lecke — Export**
 1. *Művelet:* Nyisd az Exportot. *Hol:* Toolbar → **Export**.
 2. *Művelet:* Állíts felbontást/FPS-t/minőséget, majd exportálj. *Hol:* **Local MP4** (ingyen, eszközön) vagy **Felhő HD/4K** `[PRO]`; **közzététel a feedbe** `[PRO]`. *Eredmény:* kész MP4 a Fotókban / a feltöltött publikus videó.
+
+**16. lecke — Teljesítmény nehéz felvételnél (proxy)**
+1. *Művelet:* Importálj nehéz (4K/60/10-bit) videót. *Eredmény:* a háttérben proxy készül; a vágás gyors marad, a render az eredetivel fut.
+2. *Művelet:* Állítsd a proxyt. *Hol:* **Profil → Teljesítmény** → proxy be/ki + minőség (Alacsony/Közepes/Magas). *Eredmény:* gyengébb eszközön alacsonyabb tier = folyékonyabb előnézet.
+3. *Művelet:* Szabadíts fel helyet. *Hol:* ugyanott → **Gyorsítótár ürítése**. *Eredmény:* a proxy/hullámforma-cache törlődik (a projekt és a renderek megmaradnak).
 
 ---
 

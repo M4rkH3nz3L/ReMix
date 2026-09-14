@@ -19,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { type CacheReport, cacheReport, clearCaches, formatBytes } from '@/lib/cacheManager';
+import { type ProxyQuality, useEditorStore } from '@/store/editorStore';
 import {
   isNonEmpty,
   isValidBirthday,
@@ -125,6 +127,17 @@ export default function ProfileScreen() {
   const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
   const [editorOpen, setEditorOpen] = useState(false);
   const [savingProvider, setSavingProvider] = useState(false);
+
+  // 🎯 teljesítmény / gyorsítótár
+  const proxyEnabled = useEditorStore((s) => s.proxyEnabled);
+  const proxyQuality = useEditorStore((s) => s.proxyQuality);
+  const setProxyEnabled = useEditorStore((s) => s.setProxyEnabled);
+  const setProxyQuality = useEditorStore((s) => s.setProxyQuality);
+  const [cacheInfo, setCacheInfo] = useState<CacheReport>(() => cacheReport());
+  const onClearCache = useCallback(() => {
+    clearCaches();
+    setCacheInfo(cacheReport());
+  }, []);
 
   // adatok betöltése/frissítése — promise-chain (a setState .then/.finally
   // callbackben fut, nem az effekt szinkron testében), fókuszkor újratölt
@@ -587,6 +600,43 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          {/* — Teljesítmény / gyorsítótár — */}
+          <Text style={styles.sectionTitle}>{t('profile.perfSection')}</Text>
+          <Text style={styles.sectionHint}>{t('profile.perfHint')}</Text>
+          <View style={styles.card}>
+            <View style={styles.perfRow}>
+              <Text style={styles.perfLabel}>{t('profile.proxyLabel')}</Text>
+              <Chip
+                label={proxyEnabled ? t('common.on') : t('common.off')}
+                active={proxyEnabled}
+                onPress={() => setProxyEnabled(!proxyEnabled)}
+              />
+            </View>
+            {proxyEnabled ? (
+              <View style={styles.perfRow}>
+                <Text style={styles.perfLabel}>{t('profile.proxyQuality')}</Text>
+                <View style={styles.perfChips}>
+                  {(['low', 'medium', 'high'] as ProxyQuality[]).map((q) => (
+                    <Chip
+                      key={q}
+                      label={t('profile.proxyQuality_' + q)}
+                      active={proxyQuality === q}
+                      onPress={() => setProxyQuality(q)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.perfRow}>
+              <Text style={styles.perfLabel}>{t('profile.cacheSize')}</Text>
+              <Text style={styles.perfValue}>{formatBytes(cacheInfo.total)}</Text>
+            </View>
+            <Pressable onPress={onClearCache} style={styles.signOutBtn}>
+              <Ionicons name="trash-outline" size={18} color={palette.danger} />
+              <Text style={styles.signOutText}>{t('profile.clearCache')}</Text>
+            </Pressable>
+          </View>
+
           {/* — Fiók — */}
           <Text style={styles.sectionTitle}>{t('profile.accountSection')}</Text>
           <View style={styles.card}>
@@ -802,6 +852,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionHint: { color: palette.textDim, fontSize: 12, lineHeight: 16, marginBottom: 8 },
+  perfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  perfLabel: { color: palette.text, fontSize: 14, fontWeight: '600' },
+  perfValue: { color: palette.textDim, fontSize: 14, fontVariant: ['tabular-nums'] },
+  perfChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   card: {
     backgroundColor: palette.surface,
     borderRadius: 18,

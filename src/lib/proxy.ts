@@ -14,10 +14,60 @@ import { renderServerUrl } from '@/lib/render';
 
 const POLL_MS = 1500;
 const MAX_POLLS = 400; // ~10 perc
+/** 🛡️ memóriavédelem: egyszerre legfeljebb ennyi proxy-transzkód fusson */
+const MAX_CONCURRENT = 2;
 
 /** originalUri → proxyUri (null = nem kell/nem lehet proxy — eredetit használjuk) */
 const memory = new Map<string, string | null>();
 const inflight = new Map<string, Promise<string | null>>();
+
+/** 🎚️ session-konfiguráció: on/off + a proxy leghosszabb oldala (minőség-tier) */
+let config = { enabled: true, maxSide: 960 };
+
+/**
+ * Proxy-beállítás (on/off + minőség). Ha változik, a session-cache-t ürítjük,
+ * hogy a lejátszó az új tier proxyját (vagy az eredetit) oldja fel újra. A
+ * lemez-cache megmarad (a kulcs a maxSide-ot is tartalmazza).
+ */
+export function setProxyConfig(next: { enabled?: boolean; maxSide?: number }): void {
+  const enabled = next.enabled ?? config.enabled;
+  const maxSide = next.maxSide ?? config.maxSide;
+  if (enabled === config.enabled && maxSide === config.maxSide) {
+    return;
+  }
+  config = { enabled, maxSide };
+  memory.clear();
+  inflight.clear();
+}
+
+export function getProxyConfig(): { enabled: boolean; maxSide: number } {
+  return { ...config };
+}
+
+/** A proxy session-cache (memória) ürítése — cache-kezeléshez/memória-nyomásra. */
+export function clearProxyMemory(): void {
+  memory.clear();
+  inflight.clear();
+}
+
+// egyszerű szemafor a párhuzamos transzkódok korlátozásához
+let activeTranscodes = 0;
+const transcodeWaiters: (() => void)[] = [];
+function acquireSlot(): Promise<void> {
+  if (activeTranscodes < MAX_CONCURRENT) {
+    activeTranscodes++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => transcodeWaiters.push(resolve));
+}
+function releaseSlot(): void {
+  activeTranscodes--;
+  const next = transcodeWaiters.shift();
+  if (next) {
+    activeTranscodes++;
+    next();
+  }
+}
 
 function hashKey(input: string): string {
   let h = 5381;
@@ -43,6 +93,9 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
  * ensureProxy() végzi a háttérben.
  */
 export function getProxyUriSync(uri: string): string | null {
+  if (!config.enabled) {
+    return null;
+  }
   return memory.get(uri) ?? null;
 }
 
@@ -52,7 +105,7 @@ export function getProxyUriSync(uri: string): string | null {
  * eleve kicsi, vagy bármi hiba történik — a szerkesztés sosem áll meg rajta.
  */
 export function ensureProxy(uri: string): Promise<string | null> {
-  if (Platform.OS === 'web' || uri.startsWith('http')) {
+  if (!config.enabled || Platform.OS === 'web' || uri.startsWith('http')) {
     return Promise.resolve(null);
   }
   if (memory.has(uri)) {
@@ -62,13 +115,15 @@ export function ensureProxy(uri: string): Promise<string | null> {
   if (running) {
     return running;
   }
+  const maxSide = config.maxSide;
   const task = (async (): Promise<string | null> => {
     try {
       const source = new File(uri);
       if (!source.exists) {
         return null;
       }
-      const key = hashKey(`${source.name}_${source.size ?? 0}`);
+      // a kulcs a minőség-tiert (maxSide) is tartalmazza → tierenként külön proxy
+      const key = hashKey(`${source.name}_${source.size ?? 0}_${maxSide}`);
       const dir = new Directory(Paths.document, 'proxies');
       if (!dir.exists) {
         dir.create();
@@ -86,33 +141,44 @@ export function ensureProxy(uri: string): Promise<string | null> {
         return null; // worker nem fut — az eredetivel megyünk tovább
       }
 
-      const form = new FormData();
-      form.append('media', new File(uri) as unknown as Blob, source.name);
-      const submit = await uploadFetch(`${base}/proxy`, { method: 'POST', body: form });
-      const body = await submit.json();
-      if (!submit.ok) {
-        return null;
-      }
-      if (body.skip) {
-        // a forrás eleve ≤720p — nincs mit nyerni, ezt megjegyezzük
-        memory.set(uri, null);
-        return null;
-      }
-
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-        const res = await fetchWithTimeout(`${base}/render/${body.id}`, 5000);
-        const status = await res.json();
-        if (status.state === 'done') {
-          const file = await File.downloadFileAsync(`${base}/render/${body.id}/file`, target);
-          memory.set(uri, file.uri);
-          return file.uri;
-        }
-        if (status.state === 'error') {
+      // 🛡️ a nehéz transzkódot a szemafor korlátozza (max 2 párhuzamos)
+      await acquireSlot();
+      try {
+        // a beállítás közben válthatott (off / más tier) — ne pazaroljunk
+        if (!config.enabled || config.maxSide !== maxSide) {
           return null;
         }
+        const form = new FormData();
+        form.append('media', new File(uri) as unknown as Blob, source.name);
+        form.append('maxSide', String(maxSide));
+        const submit = await uploadFetch(`${base}/proxy`, { method: 'POST', body: form });
+        const body = await submit.json();
+        if (!submit.ok) {
+          return null;
+        }
+        if (body.skip) {
+          // a forrás eleve ≤ a kért tier — nincs mit nyerni, ezt megjegyezzük
+          memory.set(uri, null);
+          return null;
+        }
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+          const res = await fetchWithTimeout(`${base}/render/${body.id}`, 5000);
+          const status = await res.json();
+          if (status.state === 'done') {
+            const file = await File.downloadFileAsync(`${base}/render/${body.id}/file`, target);
+            memory.set(uri, file.uri);
+            return file.uri;
+          }
+          if (status.state === 'error') {
+            return null;
+          }
+        }
+        return null;
+      } finally {
+        releaseSlot();
       }
-      return null;
     } catch {
       return null;
     }

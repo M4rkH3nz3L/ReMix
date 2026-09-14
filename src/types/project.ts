@@ -151,6 +151,18 @@ export interface TransitionOut {
     | 'radial';
   /** mp (0.2–1.5) */
   duration: number;
+  /** 🧭 irány (irányos átmeneteknél az xfade-variánst választja) */
+  direction?: 'left' | 'right' | 'up' | 'down';
+  /** időzítés-görbe (a crossfade-nél eased progress; a többinél tárolt) */
+  easing?: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  /** globális erősség 0…1 — a blur/zoom/rotation flourisököt skálázza (hiányzó = 1) */
+  intensity?: number;
+  /** 🌫️ elmosás-flourish az átmenet-ablakban 0…1 (a renderben `gblur`) */
+  blur?: number;
+  /** 🔍 zoom-lökés az átmenet-ablakban 0…1 (crop-pulzus) */
+  zoom?: number;
+  /** 🔄 forgás-lökés az átmenet-ablakban 0…1 (`rotate`-pulzus) */
+  rotation?: number;
 }
 
 /**

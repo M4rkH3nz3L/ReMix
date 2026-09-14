@@ -43,6 +43,25 @@ export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
   const fadeOut = clip.fadeOutSec ?? 0;
   const half = clip.duration / 2;
 
+  // 🎬 Transition → Edit: az aktuális átmenet paraméterei
+  const to = clip.transitionOut;
+  const setTrans = (patch: Partial<TransitionOut>) =>
+    to && updateClip(clip.id, { transitionOut: { ...to, ...patch } });
+  const dirFamily =
+    !!to && (to.type.startsWith('wipe') || to.type.startsWith('slide') || to.type === 'cube');
+  // 0…1 flourish-stepper (intensity/blur/zoom/rotation)
+  const flourish = (key: 'intensity' | 'blur' | 'zoom' | 'rotation', def: number) => {
+    const v = to?.[key] ?? def;
+    return (
+      <Stepper
+        label={t('panels.transition.' + key)}
+        value={`${Math.round(v * 100)}`}
+        onDec={() => setTrans({ [key]: clamp(Math.round((v - 0.1) * 100) / 100, 0, 1) })}
+        onInc={() => setTrans({ [key]: clamp(Math.round((v + 0.1) * 100) / 100, 0, 1) })}
+      />
+    );
+  };
+
   return (
     <View>
       <PanelSection title={t('panels.transition.fadeSectionTitle')}>
@@ -90,32 +109,57 @@ export function TransitionPanel({ clip }: { clip: VideoClip | ImageClip }) {
             />
           ))}
         </View>
-        {clip.transitionOut ? (
-          <Stepper
-            label={t('panels.transition.length')}
-            value={t('panels.transition.seconds', { value: clip.transitionOut.duration.toFixed(2) })}
-            onDec={() =>
-              updateClip(clip.id, {
-                transitionOut: {
-                  ...clip.transitionOut!,
-                  duration: clamp(clip.transitionOut!.duration - 0.1, 0.2, 1.5),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transitionOut: {
-                  ...clip.transitionOut!,
-                  duration: clamp(clip.transitionOut!.duration + 0.1, 0.2, 1.5),
-                },
-              })
-            }
-          />
-        ) : null}
         <Text style={styles.note}>
           {t('panels.transition.nextClipNote')}
         </Text>
       </PanelSection>
+
+      {to ? (
+        <PanelSection title={t('panels.transition.editTitle')}>
+          <Stepper
+            label={t('panels.transition.length')}
+            value={t('panels.transition.seconds', { value: to.duration.toFixed(2) })}
+            onDec={() => setTrans({ duration: clamp(to.duration - 0.1, 0.2, 1.5) })}
+            onInc={() => setTrans({ duration: clamp(to.duration + 0.1, 0.2, 1.5) })}
+          />
+          {dirFamily ? (
+            <>
+              <Text style={styles.subLabel}>{t('panels.transition.direction')}</Text>
+              <View style={styles.row}>
+                {(['left', 'right', 'up', 'down'] as const).map((dir) => (
+                  <Chip
+                    key={dir}
+                    label={t('panels.transition.dir_' + dir)}
+                    active={(to.direction ?? '') === dir}
+                    onPress={() => setTrans({ direction: dir })}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+          {to.type === 'dissolve' ? (
+            <>
+              <Text style={styles.subLabel}>{t('panels.transition.easing')}</Text>
+              <View style={styles.row}>
+                {(['linear', 'easeIn', 'easeOut', 'easeInOut'] as const).map((ez) => (
+                  <Chip
+                    key={ez}
+                    label={t('panels.transition.easing_' + ez)}
+                    active={(to.easing ?? 'linear') === ez}
+                    onPress={() => setTrans({ easing: ez })}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+          <Text style={styles.subLabel}>{t('panels.transition.flourishTitle')}</Text>
+          {flourish('intensity', 1)}
+          {flourish('blur', 0)}
+          {flourish('zoom', 0)}
+          {flourish('rotation', 0)}
+          <Text style={styles.note}>{t('panels.transition.editNote')}</Text>
+        </PanelSection>
+      ) : null}
     </View>
   );
 }
@@ -130,5 +174,12 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     lineHeight: 16,
+  },
+  subLabel: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 4,
   },
 });

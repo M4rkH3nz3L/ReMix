@@ -112,7 +112,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
     `.cube`-ba (worker-bake az identitás-rácson) — megosztható/hordozható.
   - erősség, fade in/out. A pontos színkorrekció a renderben ég be, az előnézet tinttel közelít.
 - **Áttűnés**: 3D (zoom/spin/flip/cube/circle/dissolve), 2D wipe/slide, stilizált
-  (pixelize/blur/radial/fadeBlack/fadeWhite), fade.
+  (pixelize/blur/radial/fadeBlack/fadeWhite), fade. 🆕 **Átmenet-szerkesztő** (Áttűnés →
+  szerkesztés): **hossz · irány** (irányos átmeneteknél az xfade-variáns) · **easing**
+  (eased crossfade) · **erősség** · **elmosás / zoom-lökés / forgás-lökés** flourishök az
+  átmenet-ablakban (a renderben `xfade` + enable-elt `gblur`/`zoompan`/`rotate`).
 - **Sebesség / time remapping**: 0,1×–10× + **speed ramp** presetek és **egyéni
   sebesség-görbe** (velocity graph: húzható log-oszlopok, szegmens ±, kiegyenesítés),
   visszafelé, trim. 🆕 **⏱️ Idő-interpoláció** (optical flow / képkocka-keverés / nincs)
@@ -416,6 +419,10 @@ A fő UI-zónák a leckékhez:
 2. *Művelet:* Szinkronizálj hang alapján. *Hol:* **🎚️ Auto-sync (hang)**. *Eredmény:* a szögök a hullámforma alapján egymáshoz igazodnak.
 3. *Művelet:* Vágj élőben. *Hol:* **🔴 Élő szögváltás** → indítsd a lejátszást, és koppints a szög gombjaira — minden váltás vágást rögzít.
 4. *Művelet:* Építs szekvenciát. *Hol:* **🎬 Multicam-szekvencia létrehozása**. *Eredmény:* a fő sávra néma videóklipek kerülnek a vágások szerint, a master hangja folytonosan szól; a vágások normál klipként tovább finomíthatók.
+
+**17b. lecke — Átmenet-szerkesztő**
+1. *Művelet:* Tegyél átmenetet. *Hol:* klip → **Áttűnés** panel → válassz típust a *Következő klipre* alatt. *Eredmény:* átmenet a következő klipre.
+2. *Művelet:* Finomhangold. *Hol:* **🎬 Átmenet szerkesztése** → **hossz · irány · easing · erősség · elmosás · zoom-lökés · forgás-lökés**. *Eredmény:* a flourishök az átmenet ablakában hatnak (a renderben égnek be).
 
 **18. lecke — Time remapping (sebesség-görbe, interpoláció, freeze)**
 1. *Művelet:* Rajzolj sebesség-görbét. *Hol:* egy videóklip → **Sebesség** panel → **Egyéni görbe** → húzd az oszlopokat (velocity graph), szegmenst ±-szal adj/vegyél; **Alkalmaz**. *Eredmény:* a klip a görbe szerint gyorsul/lassul (a hossza változatlan).

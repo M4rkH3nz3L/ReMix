@@ -1587,12 +1587,56 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           1.5,
           segments[i].duration
         );
+        // 🧭 irány: az irányos családoknál (wipe/slide/cube) az xfade-variánst váltja
+        let xmode = mode;
+        if (trans.direction) {
+          if (trans.type.startsWith('wipe')) xmode = `wipe${trans.direction}`;
+          else if (trans.type.startsWith('slide')) xmode = `slide${trans.direction}`;
+          else if (trans.type === 'cube') xmode = `smooth${trans.direction}`;
+        }
+        // ⏩ easing: a tiszta crossfade-nél (dissolve) eased progress egyéni expr-rel
+        const ez = trans.easing && trans.easing !== 'linear' ? trans.easing : null;
+        let xfadeArgs;
+        if (ez && trans.type === 'dissolve') {
+          const P =
+            ez === 'easeIn' ? 'P*P' : ez === 'easeOut' ? '(1-(1-P)*(1-P))' : 'if(lt(P,0.5),2*P*P,1-2*(1-P)*(1-P))';
+          xfadeArgs = `transition=custom:expr='A*(1-(${P}))+B*(${P})'`;
+        } else {
+          xfadeArgs = `transition=${xmode}`;
+        }
+        const w0 = accDur;
+        const w1 = accDur + d;
+        const xfLabel = `vxf${i}`;
         graph.push(
           `[${acc}]tpad=stop_mode=clone:stop_duration=${d.toFixed(3)}[vex${i}]`
         );
         graph.push(
-          `[vex${i}][${norm[i]}]xfade=transition=${mode}:duration=${d.toFixed(3)}:offset=${accDur.toFixed(3)}[${next}]`
+          `[vex${i}][${norm[i]}]xfade=${xfadeArgs}:duration=${d.toFixed(3)}:offset=${accDur.toFixed(3)}[${xfLabel}]`
         );
+        // 🎛️ átmenet-flourishök az ablakra ([w0,w1]): zoom-lökés (zoompan),
+        // elmosás (gblur enable), forgás-lökés (rotate enable) — az intensity skálázza
+        const I = Math.max(0, Math.min(1, trans.intensity ?? 1));
+        const fx = [];
+        if ((trans.zoom ?? 0) > 0.01) {
+          fx.push(
+            `zoompan=z='1+${(trans.zoom * I * 0.3).toFixed(3)}*max(0,sin(PI*(time-${w0.toFixed(3)})/${d.toFixed(3)}))':d=1:s=${W}x${H}:fps=${FPS}`
+          );
+        }
+        if ((trans.blur ?? 0) > 0.01) {
+          fx.push(
+            `gblur=sigma=${(trans.blur * I * 18).toFixed(1)}:enable='between(t,${w0.toFixed(3)},${w1.toFixed(3)})'`
+          );
+        }
+        if ((trans.rotation ?? 0) > 0.01) {
+          fx.push(
+            `rotate=a='${(trans.rotation * I * 0.6).toFixed(3)}*sin(PI*max(0,min(1,(t-${w0.toFixed(3)})/${d.toFixed(3)})))':c=black:enable='between(t,${w0.toFixed(3)},${w1.toFixed(3)})'`
+          );
+        }
+        if (fx.length) {
+          graph.push(`[${xfLabel}]${fx.join(',')}[${next}]`);
+        } else {
+          graph.push(`[${xfLabel}]null[${next}]`);
+        }
       } else {
         graph.push(`[${acc}][${norm[i]}]concat=n=2:v=1:a=0[${next}]`);
       }

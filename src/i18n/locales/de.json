@@ -449,7 +449,8 @@
       "title_adjust": "Grade-Ebene",
       "title_pip": "PiP-Rahmen",
       "title_export": "Export",
-      "closePanel": "Panel schließen"
+      "closePanel": "Panel schließen",
+      "title_multicam": "🎬 Multicam"
     },
     "timeline": {
       "trackMenuMessage": "Stumm und Solo wirken sich NUR auf die Vorschau aus — das exportierte Video wird dadurch nicht verändert. Zum dauerhaften Stummschalten passe die Lautstärke des Clips an.",
@@ -546,7 +547,8 @@
       "layers": "Ebenen",
       "library": "Bibliothek",
       "export": "Export",
-      "precompose": "Vorkomp."
+      "precompose": "Vorkomp.",
+      "multicam": "Multicam"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1812,6 +1814,26 @@
       "type_radial": "🕐 Radial",
       "type_fadeBlack": "🎬 Über Schwarz",
       "type_fadeWhite": "⚪ Über Weiß"
+    },
+    "multicam": {
+      "title": "Multicam",
+      "anglesTitle": "🎥 Kamerawinkel",
+      "angleN": "Winkel {{n}}",
+      "master": "Master",
+      "addAngle": "+ Winkel hinzufügen",
+      "autoSync": "🎚️ Auto-Sync (Audio)",
+      "syncing": "Synchronisieren…",
+      "syncFail": "Audio-Sync fehlgeschlagen (zu wenig Waveform-Daten).",
+      "anglesNote": "Füge 2–6 Winkel desselben Ereignisses hinzu. ⭐ macht einen Winkel zum Master (Referenz + finaler Ton); Auto-Sync richtet sie per Waveform aus.",
+      "liveTitle": "🔴 Live-Winkelwechsel",
+      "cutsCount": "Schnitte: {{count}}",
+      "liveNote": "Starte die Wiedergabe und tippe auf einen Winkel zum Wechseln — jeder Wechsel setzt einen Schnitt zur aktuellen Zeit.",
+      "buildTitle": "🎬 Sequenz",
+      "create": "Multicam-Sequenz erstellen",
+      "creating": "Erstellen…",
+      "noCuts": "Nimm zuerst mindestens einen Winkelwechsel auf.",
+      "buildNote": "Die Schnitte werden zu stummen Videoclips auf der Hauptspur, der Master-Ton wird zu einem durchgehenden Clip auf der Voiceover-Spur.",
+      "masterAudio": "Multicam-Ton"
     }
   },
   "paywallSheet": {

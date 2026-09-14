@@ -449,7 +449,8 @@
       "title_adjust": "Grade-réteg",
       "title_pip": "PiP-keret",
       "title_export": "Exportálás",
-      "closePanel": "Panel bezárása"
+      "closePanel": "Panel bezárása",
+      "title_multicam": "🎬 Multicam"
     },
     "timeline": {
       "trackMenuMessage": "A némítás és a solo CSAK az előnézetre hat — az exportált videó nem változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.",
@@ -546,7 +547,8 @@
       "layers": "Rétegek",
       "library": "Tár",
       "export": "Export",
-      "precompose": "Pre-compose"
+      "precompose": "Pre-compose",
+      "multicam": "Multicam"
     },
     "transportBar": {
       "markerTitle": "Jelölő",
@@ -1812,6 +1814,26 @@
       "type_radial": "🕐 Radiális",
       "type_fadeBlack": "🎬 Feketén át",
       "type_fadeWhite": "⚪ Fehéren át"
+    },
+    "multicam": {
+      "title": "Multicam",
+      "anglesTitle": "🎥 Kameraszögek",
+      "angleN": "{{n}}. szög",
+      "master": "master",
+      "addAngle": "+ Szög hozzáadása",
+      "autoSync": "🎚️ Auto-sync (hang)",
+      "syncing": "Szinkronizálás…",
+      "syncFail": "A hang-szinkron nem sikerült (nincs elég hangsáv-adat).",
+      "anglesNote": "Adj hozzá 2–6 szöget ugyanarról az eseményről. A ⭐ teszi az adott szöget masterré (referencia + a végső hang); az auto-sync a hullámforma alapján igazítja őket.",
+      "liveTitle": "🔴 Élő szögváltás",
+      "cutsCount": "Vágások: {{count}}",
+      "liveNote": "Indítsd el a lejátszást, és koppints egy szögre a váltáshoz — minden váltás vágást rögzít az aktuális időnél.",
+      "buildTitle": "🎬 Szekvencia",
+      "create": "Multicam-szekvencia létrehozása",
+      "creating": "Létrehozás…",
+      "noCuts": "Előbb rögzíts legalább egy szögváltást.",
+      "buildNote": "A vágásokból néma videóklipek kerülnek a fő sávra, a master szög hangja pedig folytonos audióként a voiceover-sávra.",
+      "masterAudio": "Multicam hang"
     }
   },
   "paywallSheet": {

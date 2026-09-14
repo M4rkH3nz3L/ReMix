@@ -13,6 +13,7 @@ import { ExportPanel } from '@/components/editor/panels/ExportPanel';
 import { FilterPanel } from '@/components/editor/panels/FilterPanel';
 import { HotspotPanel } from '@/components/editor/panels/HotspotPanel';
 import { LibraryPanel } from '@/components/editor/panels/LibraryPanel';
+import { MulticamPanel } from '@/components/editor/panels/MulticamPanel';
 import { PrecisionPanel } from '@/components/editor/panels/PrecisionPanel';
 import { ShapePanel } from '@/components/editor/panels/ShapePanel';
 import { SpeedPanel } from '@/components/editor/panels/SpeedPanel';
@@ -112,6 +113,9 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
       break;
     case 'export':
       content = <ExportPanel />;
+      break;
+    case 'multicam':
+      content = <MulticamPanel />;
       break;
   }
 

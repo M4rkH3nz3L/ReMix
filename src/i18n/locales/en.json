@@ -449,7 +449,8 @@
       "title_adjust": "Grade layer",
       "title_pip": "PiP frame",
       "title_export": "Export",
-      "closePanel": "Close panel"
+      "closePanel": "Close panel",
+      "title_multicam": "🎬 Multicam"
     },
     "timeline": {
       "trackMenuMessage": "Mute and solo affect ONLY the preview — the exported video is not changed by them. For permanent muting, adjust the clip's volume.",
@@ -546,7 +547,8 @@
       "layers": "Layers",
       "library": "Library",
       "export": "Export",
-      "precompose": "Pre-compose"
+      "precompose": "Pre-compose",
+      "multicam": "Multicam"
     },
     "transportBar": {
       "markerTitle": "Marker",
@@ -1812,6 +1814,26 @@
       "type_radial": "🕐 Radial",
       "type_fadeBlack": "🎬 Through black",
       "type_fadeWhite": "⚪ Through white"
+    },
+    "multicam": {
+      "title": "Multicam",
+      "anglesTitle": "🎥 Camera angles",
+      "angleN": "Angle {{n}}",
+      "master": "master",
+      "addAngle": "+ Add angle",
+      "autoSync": "🎚️ Auto-sync (audio)",
+      "syncing": "Syncing…",
+      "syncFail": "Audio sync failed (not enough waveform data).",
+      "anglesNote": "Add 2–6 angles of the same event. ⭐ makes an angle the master (reference + final audio); auto-sync aligns them by waveform.",
+      "liveTitle": "🔴 Live angle switching",
+      "cutsCount": "Cuts: {{count}}",
+      "liveNote": "Start playback and tap an angle to switch — each switch records a cut at the current time.",
+      "buildTitle": "🎬 Sequence",
+      "create": "Create multicam sequence",
+      "creating": "Creating…",
+      "noCuts": "Record at least one angle switch first.",
+      "buildNote": "The cuts become muted video clips on the main track, and the master angle audio becomes one continuous clip on the voiceover track.",
+      "masterAudio": "Multicam audio"
     }
   },
   "paywallSheet": {

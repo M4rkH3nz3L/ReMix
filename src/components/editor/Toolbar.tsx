@@ -573,6 +573,12 @@ export function Toolbar() {
             <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
             <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
             <ToolButton icon="albums-outline" label="PiP" onPress={addPip} />
+            <ToolButton
+              icon="videocam-outline"
+              label={t('editor.toolbar.multicam')}
+              active={activePanel === 'multicam'}
+              onPress={() => togglePanel('multicam')}
+            />
             <ToolButton icon="color-filter-outline" label={t('editor.toolbar.grade')} onPress={addAdjust} />
             <ToolButton icon="image-outline" label={t('editor.toolbar.image')} onPress={addImage} />
             <ToolButton icon="text-outline" label={t('editor.toolbar.text')} onPress={addText} />

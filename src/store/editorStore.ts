@@ -81,6 +81,7 @@ export type PanelId =
   | 'pip'
   | 'imagedoc'
   | 'export'
+  | 'multicam'
   | null;
 
 /** Kijelöléshez nem kötött panelek — nyitva maradnak kijelölés nélkül is. */
@@ -93,6 +94,7 @@ const STANDALONE_PANELS: PanelId[] = [
   'assistant',
   'library',
   'transcript',
+  'multicam',
 ];
 
 const HISTORY_LIMIT = 50;

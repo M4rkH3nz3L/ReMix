@@ -71,6 +71,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   **régió a tartományból**, **ripple range-törlés**.
 - **🔖 Jelölők**: a lejátszófejnél könyvjelző; a vonalzón hosszú nyomásra **átnevezés /
   jegyzet / átszínezés / törlés**; a klip-él a jelölőre is illeszthető.
+- **🎬 Multicam** 🆕 (Toolbar → Multicam): 2–6 kameraszög egy eseményről, **hang-alapú
+  auto-sync** (waveform-keresztkorreláció), **élő szögváltás** (lejátszás közben a szögre
+  koppintva vágást rögzít), majd **multicam-szekvencia** — néma videóklipek a fő sávra +
+  a master szög folytonos hangja. A vágások utólag normál klipekként finomíthatók.
 
 ### Transport — profi lejátszás 🆕
 - **J / K / L shuttle** (vissza / szünet / előre; ismételve 1×→2×→4×, visszafelé is).
@@ -402,6 +406,12 @@ A fő UI-zónák a leckékhez:
 1. *Művelet:* Importálj nehéz (4K/60/10-bit) videót. *Eredmény:* a háttérben proxy készül; a vágás gyors marad, a render az eredetivel fut.
 2. *Művelet:* Állítsd a proxyt. *Hol:* **Profil → Teljesítmény** → proxy be/ki + minőség (Alacsony/Közepes/Magas). *Eredmény:* gyengébb eszközön alacsonyabb tier = folyékonyabb előnézet.
 3. *Művelet:* Szabadíts fel helyet. *Hol:* ugyanott → **Gyorsítótár ürítése**. *Eredmény:* a proxy/hullámforma-cache törlődik (a projekt és a renderek megmaradnak).
+
+**17. lecke — Multicam (több kameraszög)**
+1. *Művelet:* Add hozzá a szögeket. *Hol:* Toolbar → **Multicam** → **+ Szög hozzáadása** (2–6 videó ugyanarról az eseményről); a ⭐-gal állítsd be a mastert.
+2. *Művelet:* Szinkronizálj hang alapján. *Hol:* **🎚️ Auto-sync (hang)**. *Eredmény:* a szögök a hullámforma alapján egymáshoz igazodnak.
+3. *Művelet:* Vágj élőben. *Hol:* **🔴 Élő szögváltás** → indítsd a lejátszást, és koppints a szög gombjaira — minden váltás vágást rögzít.
+4. *Művelet:* Építs szekvenciát. *Hol:* **🎬 Multicam-szekvencia létrehozása**. *Eredmény:* a fő sávra néma videóklipek kerülnek a vágások szerint, a master hangja folytonosan szól; a vágások normál klipként tovább finomíthatók.
 
 ---
 

@@ -94,6 +94,23 @@ function atempoChain(speed) {
   return parts.join(',');
 }
 
+/**
+ * 🛡️ Csak HELYI fájl kerülhet az FFmpeg bemenetére. Az FFmpeg a `-i`-n (és a
+ * `lut3d`-ben) érti a `http(s)://`, `file://`, `pipe:`, `concat:` stb. sémákat —
+ * egy séma-előtagos érték így belső HTTP-kérést indítana a workerről, vagy
+ * tetszőleges helyi fájlt olvasna be. A `/render` átírja a klip-uri-kat a
+ * feltöltött fájlokra, de a BEÁGYAZOTT kompozíciók belső klipjei nem mennek át
+ * azon a cikluson — ez a mélységi védelem azokra is hat.
+ * @returns a path, vagy null ha nem elfogadható
+ */
+function localPathOnly(p) {
+  const s = String(p || '');
+  if (!s || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(s)) {
+    return null; // bármilyen séma-előtag (http:, file:, pipe:, concat:, C:)
+  }
+  return s;
+}
+
 const V_ENCODER = { h264: 'libx264', hevc: 'libx265', av1: 'libsvtav1', prores: 'prores_ks' };
 
 /**
@@ -297,8 +314,12 @@ function adjustChain(clip, enableExpr) {
   if (a.lut && a.lut.uri) {
     // kreatív 3D LUT (.cube). Az útvonalat egyszeres idézőjelbe zárjuk (a szóköz/
     // kettőspont védve), a benne lévő idézőjelet '\'' szekvenciával escape-eljük.
-    const q = String(a.lut.uri).replace(/'/g, "'\\''");
-    parts.push(`lut3d='${q}'${en}`);
+    // 🛡️ Séma-előtagos érték (http:/file:/…) kimarad — lásd `localPathOnly`.
+    const lutPath = localPathOnly(a.lut.uri);
+    if (lutPath) {
+      const q = lutPath.replace(/'/g, "'\\''");
+      parts.push(`lut3d='${q}'${en}`);
+    }
   }
   if (vignette > 0.01) {
     parts.push(`vignette=angle=${(vignette * (Math.PI / 4)).toFixed(4)}${en}`);
@@ -560,7 +581,12 @@ function matteChain(clip, W, H, labelIn, idx, graph, addInput, dur) {
   if (!m || !m.uri) {
     return labelIn;
   }
-  const mIdx = addInput(['-loop', '1', '-t', dur.toFixed(3), '-i', m.uri]);
+  // 🛡️ csak HELYI fájl mehet az `-i`-re (séma-előtag → a matte kimarad)
+  const mattePath = localPathOnly(m.uri);
+  if (!mattePath) {
+    return labelIn;
+  }
+  const mIdx = addInput(['-loop', '1', '-t', dur.toFixed(3), '-i', mattePath]);
   const inv = m.invert ? ',negate' : '';
   if (m.type === 'alpha') {
     graph.push(`[${mIdx}:v]scale=${W}:${H},format=rgba,alphaextract${inv}[mta${idx}]`);

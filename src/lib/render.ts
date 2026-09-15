@@ -58,6 +58,16 @@ function mediaUris(project: Project): string[] {
       if (clip.kind === 'shape' && clip.imageUri) {
         uris.add(clip.imageUri);
       }
+      // 🎭 track/luma matte és 🎞️ 3D LUT: ezek is a worker FFmpeg `-i`-jére
+      // mennek, tehát fel KELL tölteni őket. (Enélkül a felhő-render az eszköz
+      // helyi útvonalát kapná — ami ott nem létezik —, a worker pedig
+      // ellenőrzés nélkül nyitná meg: lásd a `/render` URI-átírását.)
+      if ('matte' in clip && clip.matte?.uri) {
+        uris.add(clip.matte.uri);
+      }
+      if ('adjust' in clip && clip.adjust?.lut?.uri) {
+        uris.add(clip.adjust.lut.uri);
+      }
     }
   }
   return [...uris];

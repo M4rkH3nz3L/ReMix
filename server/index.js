@@ -1127,6 +1127,30 @@ app.post('/render', upload.any(), (req, res) => {
           missing.push(clip.id);
         }
       }
+      // 🛡️ A matte és a LUT is az FFmpeg `-i`-jére / `lut3d`-jébe megy. Ezek
+      // eddig KIMARADTAK az átírásból, így a kliens által küldött nyers érték
+      // jutott az FFmpeg-hez — az pedig érti a http(s):// és file:// sémát is:
+      // belső HTTP-kérés kényszeríthető, vagy a worker gépén lévő tetszőleges
+      // kép/LUT beleégethető a kimenetbe (amit a támadó letölt). Most csak
+      // FELTÖLTÖTT fájlra mutathatnak; ismeretlen cím → a kérés elutasítva.
+      if (clip.matte && clip.matte.uri) {
+        const field = uriMap[clip.matte.uri];
+        const file = field ? fieldToFile.get(field) : null;
+        if (file) {
+          clip.matte.uri = file;
+        } else {
+          missing.push(`${clip.id} (matte)`);
+        }
+      }
+      if (clip.adjust && clip.adjust.lut && clip.adjust.lut.uri) {
+        const field = uriMap[clip.adjust.lut.uri];
+        const file = field ? fieldToFile.get(field) : null;
+        if (file) {
+          clip.adjust.lut.uri = file;
+        } else {
+          missing.push(`${clip.id} (LUT)`);
+        }
+      }
     }
   }
   if (missing.length > 0) {

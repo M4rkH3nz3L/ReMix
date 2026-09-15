@@ -8,9 +8,11 @@
     "scheme": "remix",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.h3nz3l.remix"
     },
     "android": {
+      "package": "com.h3nz3l.remix",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

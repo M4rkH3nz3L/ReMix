@@ -724,7 +724,15 @@
       "scope_histogram": "Histogram",
       "scopeHint": "Tap a scope to measure the current frame.",
       "scopeFail": "Scope is unavailable (no render server).",
-      "scopeRefresh": "Refresh at playhead"
+      "scopeRefresh": "Refresh at playhead",
+      "balanceTitle": "Color Balance (3-way)",
+      "balanceNote": "Shadows / midtones / highlights RGB offset (color wheels). The exact effect renders server-side; the preview approximates with a net tint.",
+      "balShadows": "Shadows",
+      "balMidtones": "Midtones",
+      "balHighlights": "Highlights",
+      "balCh_r": "Red",
+      "balCh_g": "Green",
+      "balCh_b": "Blue"
     },
     "assistant": {
       "modelSection": "Model",

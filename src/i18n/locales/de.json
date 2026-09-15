@@ -724,7 +724,15 @@
       "scope_histogram": "Histogramm",
       "scopeHint": "Tippe auf ein Skop, um das aktuelle Bild zu messen.",
       "scopeFail": "Skop nicht verfügbar (kein Render-Server).",
-      "scopeRefresh": "Am Abspielkopf aktualisieren"
+      "scopeRefresh": "Am Abspielkopf aktualisieren",
+      "balanceTitle": "Color Balance (3-Wege)",
+      "balanceNote": "Schatten / Mitteltöne / Lichter RGB-Versatz (Color Wheels). Der genaue Effekt wird gerendert; die Vorschau nähert mit einem Netto-Farbstich an.",
+      "balShadows": "Schatten",
+      "balMidtones": "Mitteltöne",
+      "balHighlights": "Lichter",
+      "balCh_r": "Rot",
+      "balCh_g": "Grün",
+      "balCh_b": "Blau"
     },
     "assistant": {
       "modelSection": "Modell",

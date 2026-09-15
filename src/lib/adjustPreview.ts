@@ -43,5 +43,24 @@ export function adjustTintLayers(adjust: ClipAdjust): { color: string; opacity: 
   if (s < 0) {
     push('#808080', -s * 0.55);
   }
+  // 🎨 3-way color balance: az overlay nem tud tónus-régióra hatni, ezért a
+  // három tartomány NETTÓ színirányát adjuk egyetlen tintként (a középtónus a
+  // domináns); a régió-szelektív pontos hatás a renderben ég be.
+  const bal = adjust.balance;
+  if (bal) {
+    const net = (k: 'r' | 'g' | 'b') =>
+      (bal.sh?.[k] ?? 0) * 0.5 + (bal.mid?.[k] ?? 0) + (bal.hi?.[k] ?? 0) * 0.5;
+    const r = net('r');
+    const g = net('g');
+    const b = net('b');
+    const mag = Math.max(Math.abs(r), Math.abs(g), Math.abs(b));
+    if (mag > 0.01) {
+      const ch = (v: number) =>
+        Math.round(Math.max(0, Math.min(255, 128 + v * 127)))
+          .toString(16)
+          .padStart(2, '0');
+      push(`#${ch(r)}${ch(g)}${ch(b)}`, mag * 0.5);
+    }
+  }
   return layers;
 }

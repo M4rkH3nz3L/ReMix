@@ -48,6 +48,30 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
     );
   };
 
+  // 🎨 3-way color balance: egy tartomány (árnyék/középtónus/csúcsfény) egy
+  // csatornája (R/G/B); az érték -1…1, a többi mező megmarad (mély-merge).
+  const balance = adjust.balance ?? {};
+  const setBalance = (range: 'sh' | 'mid' | 'hi', ch: 'r' | 'g' | 'b', v: number) => {
+    const cur = balance[range] ?? {};
+    const nv = Math.round(clamp(v, -1, 1) * 100) / 100;
+    updateClip(clip.id, {
+      adjust: { ...adjust, balance: { ...balance, [range]: { ...cur, [ch]: nv } } },
+    });
+  };
+  const renderBalanceRange = (range: 'sh' | 'mid' | 'hi') =>
+    (['r', 'g', 'b'] as const).map((ch) => {
+      const value = balance[range]?.[ch] ?? 0;
+      return (
+        <Stepper
+          key={`${range}${ch}`}
+          label={t('panels.adjust.balCh_' + ch)}
+          value={`${value > 0 ? '+' : ''}${Math.round(value * 100)}`}
+          onDec={() => setBalance(range, ch, value - 0.1)}
+          onInc={() => setBalance(range, ch, value + 0.1)}
+        />
+      );
+    });
+
   const importLut = async () => {
     const res = await pickLut();
     if (res === null) {
@@ -137,6 +161,17 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
         </PanelSection>
       ))}
 
+      {/* 🎨 3-way color balance (color wheels): árnyék / középtónus / csúcsfény */}
+      <PanelSection title={t('panels.adjust.balanceTitle')}>
+        <Text style={styles.balLabel}>{t('panels.adjust.balShadows')}</Text>
+        {renderBalanceRange('sh')}
+        <Text style={styles.balLabel}>{t('panels.adjust.balMidtones')}</Text>
+        {renderBalanceRange('mid')}
+        <Text style={styles.balLabel}>{t('panels.adjust.balHighlights')}</Text>
+        {renderBalanceRange('hi')}
+        <Text style={styles.note}>{t('panels.adjust.balanceNote')}</Text>
+      </PanelSection>
+
       <PanelSection title={t('panels.adjust.lutTitle')}>
         <View style={styles.row}>
           {adjust.lut ? (
@@ -200,5 +235,13 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     lineHeight: 16,
+  },
+  balLabel: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: 6,
   },
 });

@@ -132,6 +132,9 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   - **📈 Görbék (Curves):** RGB + csatornánként (R/G/B) — koppints-húzd görbeszerkesztő
     (Catmull-Rom rajz, a render `curves` köbös spline-ja).
   - **🎨 HSL / Hue-Saturation:** globális színforgatás + telítettség + világosság.
+  - **🎨 Color Balance (3-way / color wheels)** 🆕: az **árnyékok / középtónusok /
+    csúcsfények** külön RGB-eltolása (renderben `colorbalance` rs/gs/bs · rm/gm/bm ·
+    rh/gh/bh; az előnézet nettó tinttel közelít). Ez a klasszikus kolorista 3-way korrektor.
   - **🩻 Szkópok:** waveform · RGB-parade · vektorszkóp · hisztogram (a kijelölt klip
     aktuális kockájáról, INGYEN, worker-generált).
   - **🎞️ 3D LUT (.cube):** tetszőleges LUT importja, ill. a teljes grade exportja

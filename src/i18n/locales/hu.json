@@ -724,7 +724,15 @@
       "scope_histogram": "Hisztogram",
       "scopeHint": "Koppints egy szkópra a jelenlegi kocka méréséhez.",
       "scopeFail": "A szkóp nem érhető el (nincs render-szerver).",
-      "scopeRefresh": "Frissítés a lejátszófejnél"
+      "scopeRefresh": "Frissítés a lejátszófejnél",
+      "balanceTitle": "Color Balance (3-way)",
+      "balanceNote": "Árnyék / középtónus / csúcsfény RGB-eltolása (color wheels). A pontos hatás a renderben ég be, az előnézet nettó tinttel közelít.",
+      "balShadows": "Árnyékok",
+      "balMidtones": "Középtónusok",
+      "balHighlights": "Csúcsfények",
+      "balCh_r": "Vörös",
+      "balCh_g": "Zöld",
+      "balCh_b": "Kék"
     },
     "assistant": {
       "modelSection": "Modell",

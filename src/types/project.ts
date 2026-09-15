@@ -317,6 +317,16 @@ export interface ClipAdjust {
   /** 🎨 HSL-világosság (additív). -1…1. Renderben `hue=b`. */
   hslLuminance?: number;
   /**
+   * 🎨 3-way color balance (color wheels): az árnyékok / középtónusok / csúcsfények
+   * RGB-eltolása, komponensenként -1…1. Renderben `colorbalance` (rs/gs/bs ·
+   * rm/gm/bm · rh/gh/bh); az előnézet nettó tinttel közelít.
+   */
+  balance?: {
+    sh?: { r?: number; g?: number; b?: number };
+    mid?: { r?: number; g?: number; b?: number };
+    hi?: { r?: number; g?: number; b?: number };
+  };
+  /**
    * 🎞️ 3D LUT (.cube) — kreatív „look" a grade-lánc végén (vignette előtt).
    * A renderben `lut3d`; az `uri` a lokalizált .cube fájl. A worker-render a
    * .cube-ot a médiával együtt kapja meg (mint a klip-uri-kat).

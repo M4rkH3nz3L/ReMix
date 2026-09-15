@@ -276,6 +276,24 @@ function adjustChain(clip, enableExpr) {
     if (hslLum !== 0) hp.push(`b=${(hslLum * 3).toFixed(3)}`);
     parts.push(`hue=${hp.join(':')}${en}`);
   }
+  // 🎨 3-way color balance (color wheels): árnyék/középtónus/csúcsfény RGB-eltolás.
+  // A colorbalance ebben a buildben ÉL (a temperature-hez volt csak gyenge midtone-on).
+  if (a.balance) {
+    const b = a.balance;
+    const terms = [];
+    const add = (key, val) => {
+      const v = clampNum(val, -1, 1) * 0.6; // ízléses skálázás (a nyers ±1 túlzó)
+      if (Math.abs(v) > 0.001) {
+        terms.push(`${key}=${v.toFixed(3)}`);
+      }
+    };
+    add('rs', b.sh?.r); add('gs', b.sh?.g); add('bs', b.sh?.b);
+    add('rm', b.mid?.r); add('gm', b.mid?.g); add('bm', b.mid?.b);
+    add('rh', b.hi?.r); add('gh', b.hi?.g); add('bh', b.hi?.b);
+    if (terms.length) {
+      parts.push(`colorbalance=${terms.join(':')}${en}`);
+    }
+  }
   if (a.lut && a.lut.uri) {
     // kreatív 3D LUT (.cube). Az útvonalat egyszeres idézőjelbe zárjuk (a szóköz/
     // kettőspont védve), a benne lévő idézőjelet '\'' szekvenciával escape-eljük.

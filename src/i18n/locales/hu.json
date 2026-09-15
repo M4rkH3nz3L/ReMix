@@ -667,7 +667,8 @@
     "rail_captions": "Felirat",
     "rail_transcript": "Átirat",
     "rail_sticker": "Elemek",
-    "rail_export": "Export"
+    "rail_export": "Export",
+    "saveFailed": "Nincs elmentve — újrapróbálom"
   },
   "panels": {
     "adjust": {

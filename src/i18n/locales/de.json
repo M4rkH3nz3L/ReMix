@@ -667,7 +667,8 @@
     "rail_captions": "Untertitel",
     "rail_transcript": "Transkript",
     "rail_sticker": "Elemente",
-    "rail_export": "Export"
+    "rail_export": "Export",
+    "saveFailed": "Nicht gespeichert — erneuter Versuch"
   },
   "panels": {
     "adjust": {

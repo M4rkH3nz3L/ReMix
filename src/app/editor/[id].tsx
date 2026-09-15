@@ -59,6 +59,9 @@ export default function EditorScreen() {
   const [relinking, setRelinking] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
   const [collab, setCollab] = useState<{ ownerId: string; role: CollabRole } | null>(null);
+  // 💾 mentés-állapot: bukott-e az utolsó autosave, és hányadik újrapróbánál tartunk
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveAttempt, setSaveAttempt] = useState(0);
   const L = useLayout();
 
   usePlaybackClock();
@@ -177,29 +180,39 @@ export default function EditorScreen() {
     );
   }, [projectId]);
 
-  // autosave: minden módosítás után rövid szünettel mentünk
+  // autosave: minden módosítás után rövid szünettel mentünk.
+  // ⚠️ A mentés bukását NEM nyeljük el: a `saveAttempt` növelése újraindítja ezt
+  // az effectet (a `dirty` és a `project` referencia ilyenkor változatlan, tehát
+  // enélkül SOHA nem lenne újrapróbálkozás), a `saveFailed` pedig láthatóvá
+  // teszi a felhasználónak, hogy a munkája nincs elmentve.
   useEffect(() => {
     if (!dirty || !project) {
       return;
     }
+    // exponenciális visszalépés: 0,8 s → 1,6 s → 3,2 s … max 10 s
+    const delay =
+      saveAttempt === 0 ? AUTOSAVE_MS : Math.min(AUTOSAVE_MS * 2 ** saveAttempt, 10_000);
     const timer = setTimeout(() => {
       const state = useEditorStore.getState();
-      if (state.project && state.dirty) {
-        const snap = state.project;
-        Promise.all([
-          saveProject(snap),
-          saveEvents(snap.id, state.events),
-        ])
-          .then(() => {
-            state.markSaved();
-            // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
-            recordAutoVersion(snap).catch(() => {});
-          })
-          .catch(() => {});
+      if (!state.project || !state.dirty) {
+        return;
       }
-    }, AUTOSAVE_MS);
+      const snap = state.project;
+      Promise.all([saveProject(snap), saveEvents(snap.id, state.events)])
+        .then(() => {
+          state.markSaved();
+          setSaveFailed(false);
+          setSaveAttempt(0);
+          // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
+          recordAutoVersion(snap).catch(() => {});
+        })
+        .catch(() => {
+          setSaveFailed(true);
+          setSaveAttempt((n) => n + 1); // ← ez indítja az újrapróbálkozást
+        });
+    }, delay);
     return () => clearTimeout(timer);
-  }, [dirty, project]);
+  }, [dirty, project, saveAttempt]);
 
   // kilépéskor végső mentés
   useEffect(() => {
@@ -262,6 +275,12 @@ export default function EditorScreen() {
           {project?.name ?? '…'}
           {dirty ? ' •' : ''}
         </Text>
+        {/* 💾 a mentés bukott — a felhasználó ne higgye, hogy a munkája biztonságban van */}
+        {saveFailed ? (
+          <Text style={styles.saveFailed} numberOfLines={1}>
+            ⚠️ {t('editorScreen.saveFailed')}
+          </Text>
+        ) : null}
         {project?.remixOf ? (
           <Pressable
             onPress={() => setLineageOpen(true)}
@@ -515,6 +534,12 @@ const styles = StyleSheet.create({
     color: palette.accent,
     fontSize: 10,
     fontWeight: '600',
+    marginTop: 1,
+  },
+  saveFailed: {
+    color: palette.danger,
+    fontSize: 10,
+    fontWeight: '700',
     marginTop: 1,
   },
   headerActions: {

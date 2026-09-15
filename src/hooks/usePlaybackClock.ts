@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 
 import { projectDuration } from '@/lib/projectUtils';
@@ -11,12 +12,19 @@ import { useEditorStore } from '@/store/editorStore';
  *
  * ▶ Változat-előnézet módban (Auto Edit) az óra a keep-sávokon ugrálva halad
  * — a sávok sorrendjében, a projekt módosítása nélkül.
+ *
+ * ⚠️ FÓKUSZ-KAPU: a hookot TÖBB képernyő is hívja (szerkesztő és lejátszó), és a
+ * navigáció `push`-sal megy, tehát az előző képernyő MOUNTOLVA marad. Kapu nélkül
+ * két rAF-ciklus futna, és mivel mindkettő a store-ból olvas és `playhead + dt`-t
+ * ír vissza, a lejátszófej DUPLA sebességgel haladna. Csak a fókuszált képernyő
+ * tickel.
  */
 export function usePlaybackClock(): void {
   const isPlaying = useEditorStore((s) => s.isPlaying);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying || !isFocused) {
       return;
     }
     let frame = 0;
@@ -80,5 +88,5 @@ export function usePlaybackClock(): void {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isPlaying]);
+  }, [isPlaying, isFocused]);
 }

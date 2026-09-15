@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +59,8 @@ export default function FeedScreen() {
   const player = useVideoPlayer(null, (p) => {
     p.loop = true;
   });
+  // a feed `push`-sal nyit más képernyőt → mountolva marad; a videó ne szóljon takarva
+  const isFocused = useIsFocused();
 
   const load = useCallback((m: FeedMode) => {
     listFeed(m)
@@ -139,17 +141,20 @@ export default function FeedScreen() {
     }
   }).current;
 
-  // az aktív poszt videójának lejátszása (ha van renderelt URL)
+  // az aktív poszt videójának lejátszása (ha van renderelt URL).
+  // ⚠️ Csak FÓKUSZBAN: a feedből `push`-sal megyünk a szerkesztőbe/csatornára/
+  // lejátszóba, tehát a feed mountolva marad — kapu nélkül a videó a háttérben
+  // tovább szólna a megnyitott képernyő alatt.
   useEffect(() => {
     const active = posts.find((p) => p.id === activeId);
     const uri = active?.videoUri ?? null;
-    if (uri) {
+    if (uri && isFocused) {
       player.replace(uri);
       player.play();
     } else {
       player.pause();
     }
-  }, [activeId, posts, player]);
+  }, [activeId, posts, player, isFocused]);
 
   // hotspot-időzítés: az aktív poszt lejátszási idejét figyeljük (ha van hotspot)
   useEffect(() => {

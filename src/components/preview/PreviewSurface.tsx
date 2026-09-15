@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useIsFocused } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +83,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const toggleSafeZones = useEditorStore((s) => s.toggleSafeZones);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
+  // a takart képernyő (push-navigáció mögött) ne játsszon — lásd a play/pause effektet
+  const isFocused = useIsFocused();
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const focusMode = useEditorStore((s) => s.focusMode);
   const comparingOriginal = useEditorStore((s) => s.comparingOriginal);
@@ -218,14 +221,16 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
   }, [player, videoClip, playhead, videoAudible]);
 
-  // play/pause követése
+  // play/pause követése — ⚠️ csak a FÓKUSZÁLT képernyőn. A szerkesztő mountolva
+  // marad a lejátszó képernyő mögött (`push`), kapu nélkül tehát két videó szólna
+  // egyszerre ugyanarra az `isPlaying` állapotra.
   useEffect(() => {
-    if (isPlaying && videoClip) {
+    if (isPlaying && videoClip && isFocused) {
       player.play();
     } else {
       player.pause();
     }
-  }, [player, isPlaying, videoClip]);
+  }, [player, isPlaying, videoClip, isFocused]);
 
   // álló lejátszófejnél (görgetés/vágás) pontos seek
   useEffect(() => {

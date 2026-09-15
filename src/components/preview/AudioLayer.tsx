@@ -1,4 +1,5 @@
 import { useAudioPlayer } from 'expo-audio';
+import { useIsFocused } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
 import { sampleChannel } from '@/lib/keyframes';
@@ -26,8 +27,18 @@ function fadeFactor(clip: AudioClip, t: number): number {
  * Láthatatlan réteg: sávonként egy lejátszó (zene + voiceover + SFX egyszerre
  * szól), a rAF-órához szinkronizálva. Egy sávon belül átfedésnél a legutóbb
  * kezdődő klip szól; a fade-görbék a hangerőn keresztül érvényesülnek.
+ *
+ * ⚠️ FÓKUSZ-KAPU: a réteget a szerkesztő ÉS a lejátszó képernyő is mountolja, és
+ * a navigáció `push`-sal megy (az előző képernyő mountolva marad). Kapu nélkül
+ * mindkét példány 4 natív lejátszót tartana életben ugyanarra a `isPlaying`
+ * állapotra — duplikált hang és felesleges dekóder-terhelés. Takart képernyőn
+ * nem rendereljük, így a lejátszók fel is szabadulnak.
  */
 export function AudioLayer() {
+  const isFocused = useIsFocused();
+  if (!isFocused) {
+    return null;
+  }
   return (
     <>
       {AUDIO_TRACKS.map((type) => (

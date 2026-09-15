@@ -79,6 +79,10 @@ hívnak ([backend.ts](src/lib/backend.ts)); nincs Pro → `ProRequiredError` →
   újrahasznosul (nincs újra-render), a kulcs a render-releváns tartalom + beállítás hash-e.
 - **🛡️ Memóriavédelem** 🆕: legfeljebb 2 párhuzamos proxy-transzkód; a képkocka-cache LRU-
   korláttal (a legrégebbit dobja).
+- **🎞️ PiP-lejátszó életciklus** 🆕: a több-videóréteges PiP-nél már csak a **videó**-klip
+  nyit natív lejátszót — a **kép**-PiP nem (közös `usePipClipLayout`), így felesleges
+  üresjárati player nem terheli a memóriát/dekódert. (A timeline-klipek `React.memo`-val
+  nem renderelnek újra a lejátszófej mozgására; a hot-path selectorok stabilak.)
 
 ### Idővonal — profi vágó-eszközök 🆕
 - **Vágás** a lejátszófejnél; **✂️ Borotva-mód** (insight-sáv olló): koppintásra vág az

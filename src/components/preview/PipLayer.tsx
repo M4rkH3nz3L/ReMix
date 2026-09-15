@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -13,8 +13,10 @@ import type { ImageClip, VideoClip } from '@/types/project';
 /**
  * PiP-réteg (több videóréteg): a pip-sáv MINDEN, a lejátszófejnél aktív klipjét
  * a fő videó FÖLÉ rendereli (idősorrendben — a később kezdődő kerül felülre, a
- * render-overlay sorrendjével egyezően). Minden klip önálló `PipClipLayer`, saját
- * szinkronizált lejátszóval, gesztusaival és keretével.
+ * render-overlay sorrendjével egyezően). A VIDEÓ-klip saját szinkron lejátszót
+ * kap; a KÉP-klip NEM hoz létre videolejátszót (a közös elrendezés/gesztus/keret
+ * a `usePipClipLayout` hookban, hogy egy üresjárati natív player se induljon
+ * feleslegesen — perf).
  */
 export function PipLayer({ box, editable }: { box: { w: number; h: number }; editable: boolean }) {
   const project = useEditorStore((s) => s.project);
@@ -23,83 +25,33 @@ export function PipLayer({ box, editable }: { box: { w: number; h: number }; edi
 
   return (
     <>
-      {clips.map((clip) => (
-        <PipClipLayer key={clip.id} clip={clip} box={box} editable={editable} />
-      ))}
+      {clips.map((clip) =>
+        clip.kind === 'video' ? (
+          <PipVideoClip key={clip.id} clip={clip} box={box} editable={editable} />
+        ) : (
+          <PipImageClip key={clip.id} clip={clip} box={box} editable={editable} />
+        )
+      )}
     </>
   );
 }
 
 /**
- * Egyetlen PiP-klip: 2. `expo-video` lejátszó a mesterórához szinkronban
- * (forráscsere+seek+play/pause a fő videó mintájára), a `transform` szerint
- * méretezve+pozicionálva, húzható+csippenthető, a `pipFrame` szerint keretezve.
+ * Közös PiP-elrendezés: `transform` szerinti méret+pozíció, húzás+csippentés
+ * (élő shared-value, commit a végén), és a `pipFrame` (lekerekítés/keret/árnyék/
+ * blend). Nincs benne lejátszó — így a kép- és videó-változat is használhatja.
  */
-function PipClipLayer({
-  clip,
-  box,
-  editable,
-}: {
-  clip: VideoClip | ImageClip;
-  box: { w: number; h: number };
-  editable: boolean;
-}) {
-  const playhead = useEditorStore((s) => s.playhead);
-  const isPlaying = useEditorStore((s) => s.isPlaying);
+function usePipClipLayout(
+  clip: VideoClip | ImageClip,
+  box: { w: number; h: number },
+  editable: boolean
+) {
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const updateClip = useEditorStore((s) => s.updateClip);
   const selectClip = useEditorStore((s) => s.selectClip);
   const asset = useEditorStore((s) =>
     clip.assetId ? s.project?.assets.find((a) => a.id === clip.assetId) : null
   );
-
-  const videoClip = clip.kind === 'video' ? clip : null;
-  const imageClip = clip.kind === 'image' ? clip : null;
-
-  const player = useVideoPlayer(null);
-  const loadedUri = useRef<string | null>(null);
-
-  // forráscsere + kezdő-seek
-  useEffect(() => {
-    const uri = videoClip?.uri ?? null;
-    if (loadedUri.current === uri) {
-      return;
-    }
-    loadedUri.current = uri;
-    player
-      .replaceAsync(uri)
-      .then(() => {
-        if (!videoClip) {
-          return;
-        }
-        const st = useEditorStore.getState();
-        player.currentTime = sourceTimeAt(videoClip, st.playhead);
-        if (st.isPlaying) {
-          player.play();
-        }
-      })
-      .catch(() => {});
-  }, [player, videoClip]);
-
-  // sebesség + hangerő
-  useEffect(() => {
-    if (videoClip) {
-      player.playbackRate = videoClip.speed;
-      player.volume = videoClip.volume ?? 1;
-    }
-  }, [player, videoClip]);
-
-  // play/pause + álló seek
-  useEffect(() => {
-    if (isPlaying && videoClip) {
-      player.play();
-    } else {
-      player.pause();
-      if (videoClip && !isPlaying) {
-        player.currentTime = sourceTimeAt(videoClip, playhead);
-      }
-    }
-  }, [player, isPlaying, videoClip, playhead]);
 
   // ---- elrendezés (a renderrel egyezően: width = scale·W, aspect a forrásból) ----
   const tr = clip.transform ?? { scale: 0.32, x: 0.3, y: -0.32 };
@@ -161,38 +113,138 @@ function PipClipLayer({
   const borderCol = frame?.borderColor ?? '#ffffff';
   const isSelected = editable && selectedClipId === clip.id;
 
+  return {
+    composed,
+    animStyle,
+    left,
+    top,
+    pipW,
+    pipH,
+    opacity: clip.opacity ?? 1,
+    shadow: !!frame?.shadow,
+    radiusPx,
+    borderW,
+    borderCol,
+    isSelected,
+    blendMode: frame?.blendMode ? cssBlendMode(frame.blendMode) : undefined,
+  };
+}
+
+/** Közös PiP-wrapper (gesztus + árnyékos külső + vágó belső); a média a `children`. */
+function PipClipFrame({
+  layout,
+  children,
+}: {
+  layout: ReturnType<typeof usePipClipLayout>;
+  children: ReactNode;
+}) {
   return (
-    <GestureDetector gesture={composed}>
+    <GestureDetector gesture={layout.composed}>
       <Animated.View
         style={[
           styles.outer,
-          { left, top, width: pipW, height: pipH, opacity: clip.opacity ?? 1 },
-          frame?.shadow ? styles.shadow : null,
-          animStyle,
+          { left: layout.left, top: layout.top, width: layout.pipW, height: layout.pipH, opacity: layout.opacity },
+          layout.shadow ? styles.shadow : null,
+          layout.animStyle,
         ]}
       >
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
             {
-              borderRadius: radiusPx,
+              borderRadius: layout.radiusPx,
               overflow: 'hidden',
               backgroundColor: '#000',
-              borderWidth: isSelected ? Math.max(2, borderW) : borderW,
-              borderColor: isSelected ? palette.accent : borderCol,
+              borderWidth: layout.isSelected ? Math.max(2, layout.borderW) : layout.borderW,
+              borderColor: layout.isSelected ? palette.accent : layout.borderCol,
               // 🎨 keverés a fő videóval (light-leak/screen-overlay) — a renderrel egyezik (CSS-név)
-              mixBlendMode: frame?.blendMode ? cssBlendMode(frame.blendMode) : undefined,
+              mixBlendMode: layout.blendMode,
             },
           ]}
         >
-          {videoClip ? (
-            <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-          ) : imageClip ? (
-            <Image source={{ uri: imageClip.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          ) : null}
+          {children}
         </Animated.View>
       </Animated.View>
     </GestureDetector>
+  );
+}
+
+/**
+ * Videó PiP-klip: 2. `expo-video` lejátszó a mesterórához szinkronban
+ * (forráscsere+seek+play/pause a fő videó mintájára).
+ */
+function PipVideoClip({
+  clip,
+  box,
+  editable,
+}: {
+  clip: VideoClip;
+  box: { w: number; h: number };
+  editable: boolean;
+}) {
+  const isPlaying = useEditorStore((s) => s.isPlaying);
+  const playhead = useEditorStore((s) => s.playhead);
+  const layout = usePipClipLayout(clip, box, editable);
+  const player = useVideoPlayer(null);
+  const loadedUri = useRef<string | null>(null);
+
+  // forráscsere + kezdő-seek
+  useEffect(() => {
+    const uri = clip.uri;
+    if (loadedUri.current === uri) {
+      return;
+    }
+    loadedUri.current = uri;
+    player
+      .replaceAsync(uri)
+      .then(() => {
+        const st = useEditorStore.getState();
+        player.currentTime = sourceTimeAt(clip, st.playhead);
+        if (st.isPlaying) {
+          player.play();
+        }
+      })
+      .catch(() => {});
+  }, [player, clip]);
+
+  // sebesség + hangerő
+  useEffect(() => {
+    player.playbackRate = clip.speed;
+    player.volume = clip.volume ?? 1;
+  }, [player, clip]);
+
+  // play/pause + álló seek
+  useEffect(() => {
+    if (isPlaying) {
+      player.play();
+    } else {
+      player.pause();
+      player.currentTime = sourceTimeAt(clip, playhead);
+    }
+  }, [player, isPlaying, clip, playhead]);
+
+  return (
+    <PipClipFrame layout={layout}>
+      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+    </PipClipFrame>
+  );
+}
+
+/** Kép PiP-klip: NINCS videolejátszó — csak a közös elrendezés + a kép. */
+function PipImageClip({
+  clip,
+  box,
+  editable,
+}: {
+  clip: ImageClip;
+  box: { w: number; h: number };
+  editable: boolean;
+}) {
+  const layout = usePipClipLayout(clip, box, editable);
+  return (
+    <PipClipFrame layout={layout}>
+      <Image source={{ uri: clip.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+    </PipClipFrame>
   );
 }
 

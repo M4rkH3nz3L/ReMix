@@ -5,6 +5,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod');
 const { z } = require('zod');
+const { assertSafeAiBaseUrl } = require('./ssrf');
 
 const MODEL = process.env.AI_MODEL || 'claude-opus-4-8';
 
@@ -270,6 +271,12 @@ function sanitizeAiConfig(raw) {
  * módban kérünk, majd zod-dal validálunk — ez a legszélesebb körben támogatott.
  */
 async function runOpenAICompatible(system, userContent, schema, cfg) {
+  // 🛡️ SSRF: a baseUrl a FELHASZNÁLÓTÓL jön → allowlist + privát-IP tiltás a
+  // hívás ELŐTT (enélkül a worker belső hálózati címekre kényszeríthető)
+  const safe = await assertSafeAiBaseUrl(cfg.baseUrl);
+  if (!safe.ok) {
+    throw new Error(safe.error);
+  }
   const base = cfg.baseUrl.replace(/\/+$/, '');
   const sys =
     `${system}\n\nVÁLASZ: kizárólag EGYETLEN JSON-objektum, ami megfelel ennek a ` +
@@ -281,6 +288,8 @@ async function runOpenAICompatible(system, userContent, schema, cfg) {
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers,
+    // 🛡️ a redirect-követés megkerülné az allowlistet (a 302 bárhová vihetne)
+    redirect: 'error',
     body: JSON.stringify({
       model: cfg.model,
       messages: [
@@ -668,6 +677,13 @@ async function probeProvider(cfg) {
   if (!base) {
     return false;
   }
+  // 🛡️ SSRF: ez a végpont a találatot VISSZAADJA a hívónak, ezért ellenőrzés
+  // nélkül belső port-szkennerként lenne használható (169.254.169.254, 10/8,
+  // localhost:*). Nem-engedélyezett cél → egyszerűen „nem elérhető".
+  const safe = await assertSafeAiBaseUrl(base);
+  if (!safe.ok) {
+    return false;
+  }
   const headers = {};
   if (isAnthropic) {
     if (cfg.apiKey) {
@@ -680,7 +696,7 @@ async function probeProvider(cfg) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
   try {
-    const res = await fetch(`${base}/models`, { headers, signal: controller.signal });
+    const res = await fetch(`${base}/models`, { headers, redirect: 'error', signal: controller.signal });
     return res.ok;
   } catch {
     return false;

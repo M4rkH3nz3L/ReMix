@@ -21,17 +21,83 @@ export interface ProjectVersion {
   kind?: 'manual' | 'auto';
 }
 
-export async function listProjects(): Promise<ProjectMeta[]> {
+/** a projekt-lista bejegyzése egy projektből (a mentés és az index-újraépítés közös magja) */
+function metaOf(project: Project): ProjectMeta {
+  return {
+    id: project.id,
+    name: project.name,
+    aspectRatio: project.aspectRatio,
+    duration: projectDuration(project),
+    clipCount: project.tracks.reduce((n, t) => n + t.clips.length, 0),
+    updatedAt: project.updatedAt,
+  };
+}
+
+/** a sérült index jelzése (a „nincs projekt" esettől megkülönböztetve) */
+class ProjectIndexCorruptError extends Error {}
+
+/**
+ * A nyers index. Hiányzó kulcs = üres lista (ez a normális első indítás), de a
+ * SÉRÜLT tartalom hibát dob — különben a hívó „nincs projekt"-ként értelmezné,
+ * és a következő mentés felülírná az indexet (adatvesztés).
+ */
+async function readIndex(): Promise<ProjectMeta[]> {
   const raw = await AsyncStorage.getItem(INDEX_KEY);
   if (!raw) {
     return [];
   }
+  let parsed: unknown;
   try {
-    const metas = JSON.parse(raw) as ProjectMeta[];
-    return metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    parsed = JSON.parse(raw);
   } catch {
+    throw new ProjectIndexCorruptError('az index nem érvényes JSON');
+  }
+  if (!Array.isArray(parsed)) {
+    throw new ProjectIndexCorruptError('az index nem lista');
+  }
+  return (parsed as ProjectMeta[]).filter(
+    (m) => m && typeof m.id === 'string' && typeof m.updatedAt === 'string'
+  );
+}
+
+/**
+ * 🛟 Index-újraépítés a TÉNYLEGESEN tárolt projektekből. Sérült index esetén ez
+ * menti meg a munkát: végigmegy a `vided.project.v1.*` kulcsokon, és mindből
+ * kiolvassa a lista-bejegyzést. Az egyenként olvashatatlan projekt kimarad, a
+ * többi megmarad.
+ */
+async function rebuildIndex(): Promise<ProjectMeta[]> {
+  const prefix = projectKey('');
+  const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(prefix));
+  if (keys.length === 0) {
     return [];
   }
+  const entries = await AsyncStorage.multiGet(keys);
+  const metas: ProjectMeta[] = [];
+  for (const [, raw] of entries) {
+    if (!raw) {
+      continue;
+    }
+    try {
+      metas.push(metaOf(migrateProject(JSON.parse(raw) as Project)));
+    } catch {
+      // ez az EGY projekt olvashatatlan — a többi mehet tovább
+    }
+  }
+  return metas;
+}
+
+export async function listProjects(): Promise<ProjectMeta[]> {
+  let metas: ProjectMeta[];
+  try {
+    metas = await readIndex();
+  } catch {
+    // 🛟 sérült index → újraépítés a tárolt projektekből, és visszaírás, hogy a
+    // következő olvasás már ép legyen. Ha a visszaírás nem megy, a lista akkor is jó.
+    metas = await rebuildIndex();
+    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(metas)).catch(() => {});
+  }
+  return metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function loadProject(id: string): Promise<Project | null> {
@@ -49,16 +115,10 @@ export async function loadProject(id: string): Promise<Project | null> {
 
 export async function saveProject(project: Project): Promise<void> {
   const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
+  // a `listProjects` sérült indexnél ÚJRAÉPÍT (nem üres listát ad), így a
+  // következő sor nem törli ki a többi projektet az indexből
   const metas = await listProjects();
-  const meta: ProjectMeta = {
-    id: stamped.id,
-    name: stamped.name,
-    aspectRatio: stamped.aspectRatio,
-    duration: projectDuration(stamped),
-    clipCount: stamped.tracks.reduce((n, t) => n + t.clips.length, 0),
-    updatedAt: stamped.updatedAt,
-  };
-  const nextIndex = [meta, ...metas.filter((m) => m.id !== stamped.id)];
+  const nextIndex = [metaOf(stamped), ...metas.filter((m) => m.id !== stamped.id)];
   await AsyncStorage.multiSet([
     [projectKey(stamped.id), JSON.stringify(stamped)],
     [INDEX_KEY, JSON.stringify(nextIndex)],

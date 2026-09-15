@@ -2137,7 +2137,8 @@
       "phaseCutPlanning": "Schnittplanung"
     },
     "backend": {
-      "proRequired": "Die Funktion „{{label}}“ erfordert ein Remix-Pro-Abo."
+      "proRequired": "Die Funktion „{{label}}“ erfordert ein Remix-Pro-Abo.",
+      "insecureUrl": "Die Cloud-Adresse ist nicht sicher (https erforderlich): {{url}}"
     },
     "batchEdit": {
       "filter": "Filter: {{value}}",

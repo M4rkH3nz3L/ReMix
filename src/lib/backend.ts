@@ -55,9 +55,25 @@ export function renderServerUrl(): string {
 export function cloudBaseUrl(): string {
   const hosted = process.env.EXPO_PUBLIC_CLOUD_URL?.trim();
   if (hosted) {
-    return hosted.replace(/\/+$/, '');
+    return assertSecureUrl(hosted.replace(/\/+$/, ''));
   }
-  return renderServerUrl();
+  return assertSecureUrl(renderServerUrl());
+}
+
+/**
+ * 🔒 Titkosítatlan HTTP tiltása a RELEASE buildben.
+ *
+ * A worker felé a bejelentkezett felhasználó Supabase-tokenje, a BYOK AI-kulcsa
+ * és a teljes projekt-médiája utazik. Sima HTTP-n ez lehallgatható/módosítható.
+ * Release buildben az iOS ATS és az Android network-security-config amúgy is
+ * BLOKKOLNÁ a `http://`-t — ott a hívás némán elhalna; így viszont beszédes hibát
+ * kapunk, a fejlesztésben pedig (`__DEV__`) a helyi worker változatlanul megy.
+ */
+function assertSecureUrl(url: string): string {
+  if (__DEV__ || url.startsWith('https://')) {
+    return url;
+  }
+  throw new Error(tr('lib.backend.insecureUrl', { url }));
 }
 
 /** A művelet Pro-előfizetést igényel — a UI ezt paywallra fordítja. */

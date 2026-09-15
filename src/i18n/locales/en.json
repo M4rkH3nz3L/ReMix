@@ -2137,7 +2137,8 @@
       "phaseCutPlanning": "Cut planning"
     },
     "backend": {
-      "proRequired": "The “{{label}}” feature requires a Remix Pro subscription."
+      "proRequired": "The “{{label}}” feature requires a Remix Pro subscription.",
+      "insecureUrl": "The cloud service URL is not secure (https required): {{url}}"
     },
     "batchEdit": {
       "filter": "filter: {{value}}",

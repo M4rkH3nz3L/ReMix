@@ -3,7 +3,7 @@
  *
  * A React Native-hez a hivatalos minta kell (Expo v57 + Supabase JS v2):
  *   - `react-native-url-polyfill/auto`  — a supabase-js URL()-t használ,
- *   - session-tárolás AsyncStorage-ban (mint a többi store perzisztálása),
+ *   - session-tárolás TITKOSÍTVA (Keychain/Keystore) a `secureStorage`-on át,
  *   - `autoRefreshToken` + AppState-figyelő: előtérben frissül a token,
  *     háttérben leáll (különben feleslegesen járna).
  *
@@ -14,9 +14,10 @@
  */
 import 'react-native-url-polyfill/auto';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
+
+import { secureStorage } from '@/lib/secureStorage';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
@@ -33,7 +34,12 @@ export function hasSupabaseConfig(): boolean {
 export const supabase: SupabaseClient | null = hasSupabaseConfig()
   ? createClient(url!, anonKey!, {
       auth: {
-        storage: AsyncStorage,
+        // 🔒 a session (access + REFRESH token) a Keychain/Keystore mögé megy,
+        // nem sima AsyncStorage-fájlba (az rootolt eszközön / backupból
+        // kiolvasható). A `secureStorage` darabol a ~2 KB-os iOS-korlát miatt,
+        // és az első olvasáskor MIGRÁLJA a régi helyről — a már bejelentkezett
+        // felhasználók nem esnek ki a frissítéskor.
+        storage: secureStorage,
         autoRefreshToken: true,
         persistSession: true,
         // mobilon nincs URL-alapú OAuth-callback (a deep link külön kezelendő)

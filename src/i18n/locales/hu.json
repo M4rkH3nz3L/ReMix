@@ -2137,7 +2137,8 @@
       "phaseCutPlanning": "Vágás-tervezés"
     },
     "backend": {
-      "proRequired": "A(z) „{{label}}” funkció Remix Pro-előfizetést igényel."
+      "proRequired": "A(z) „{{label}}” funkció Remix Pro-előfizetést igényel.",
+      "insecureUrl": "A felhő-szolgáltatás címe nem biztonságos (https kell): {{url}}"
     },
     "batchEdit": {
       "filter": "szűrő: {{value}}",

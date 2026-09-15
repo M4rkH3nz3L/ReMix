@@ -1,4 +1,5 @@
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import { pushProject } from '@/lib/cloudSync';
 import { migrateProject } from '@/lib/projectUtils';
 import { requireSupabase, supabase } from '@/lib/supabase';
@@ -180,9 +181,10 @@ export async function inviteMember(input: {
   role: Exclude<CollabRole, 'owner'>;
 }): Promise<InviteResult> {
   ensureCloud('collab'); // Pro-kapu a tulajnak
+  // 🔐 a worker az ownerId-t a VERIFIKÁLT tokenből veszi („csak a tulaj hívhat meg")
   const res = await fetch(`${cloudBaseUrl()}/invite`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await workerJsonHeaders(),
     body: JSON.stringify({ ...input, invitedBy: currentUserId() }),
   });
   if (!res.ok) {

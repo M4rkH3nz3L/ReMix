@@ -1,4 +1,5 @@
 import { cloudBaseUrl } from '@/lib/backend';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -155,9 +156,10 @@ export async function sendNotification(
   }
 ): Promise<boolean> {
   try {
+    // 🔐 a worker hitelesítést kér (a névtelen push-spam ellen)
     const res = await fetch(`${cloudBaseUrl()}/notify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await workerJsonHeaders(),
       body: JSON.stringify({ userId, ...input }),
     });
     return res.ok;

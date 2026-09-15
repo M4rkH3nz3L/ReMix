@@ -2,6 +2,7 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 
@@ -165,7 +166,7 @@ export async function activateProDev(days = 30): Promise<boolean> {
   }
   const res = await fetch(`${cloudBaseUrl()}/billing/activate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await workerJsonHeaders(),
     body: JSON.stringify({ userId, days }),
   });
   if (!res.ok) {
@@ -186,7 +187,7 @@ export async function deactivateProDev(): Promise<void> {
   }
   await fetch(`${cloudBaseUrl()}/billing/deactivate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await workerJsonHeaders(),
     body: JSON.stringify({ userId }),
   }).catch(() => {});
   useEntitlement.getState().setTier('free');

@@ -3,6 +3,7 @@ import { makeId } from '@/lib/id';
 import { migrateProject } from '@/lib/projectUtils';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { saveProject } from '@/lib/storage';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import type { Project } from '@/types/project';
 
@@ -282,9 +283,10 @@ export async function buyCreditsDev(amount: number): Promise<number> {
   if (!userId) {
     throw new Error('Nincs bejelentkezett felhasználó.');
   }
+  // 🔐 a worker a userId-t a VERIFIKÁLT tokenből veszi (a body-beli csak dev-fallback)
   const res = await fetch(`${cloudBaseUrl()}/shop/credits/grant`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await workerJsonHeaders(),
     body: JSON.stringify({ userId, amount }),
   });
   if (!res.ok) {

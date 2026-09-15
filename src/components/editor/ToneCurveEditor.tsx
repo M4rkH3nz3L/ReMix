@@ -44,6 +44,20 @@ export function ToneCurveEditor({ value, onChange }: Props) {
   const points = normalizeCurve(value?.[channel] ?? IDENTITY_CURVE);
   const ptsRef = useRef(points);
   ptsRef.current = points;
+  /**
+   * 🖐️ Húzás alatti HELYI vázlat (az AKTUÁLIS csatorna pontjai) — a store-ba csak
+   * a gesztus VÉGÉN commitolunk. Enélkül minden húzás-frame egy dispatch lenne
+   * (60/mp), ami undo-lépést és esemény-napló bejegyzést is gyárt; az 50 lépéses
+   * history 0,8 mp alatt elfogyna.
+   */
+  const [draft, setDraft] = useState<CurvePoint[] | null>(null);
+  const draftRef = useRef<CurvePoint[] | null>(null);
+  const putDraft = (pts: CurvePoint[]) => {
+    draftRef.current = pts;
+    setDraft(pts);
+  };
+  /** amit MUTATUNK: húzás alatt a vázlat, egyébként a value-ból számolt pontok */
+  const view = draft ?? points;
 
   const innerW = Math.max(1, w - 2 * PAD);
   const innerH = HEIGHT - 2 * PAD;
@@ -87,26 +101,20 @@ export function ToneCurveEditor({ value, onChange }: Props) {
     const hiX = next ? next.x - MIN_DX : 1;
     const nx = isEdge ? start.x : Math.min(hiX, Math.max(loX, start.x + dx / innerW));
     const ny = Math.min(1, Math.max(0, start.y - dy / innerH));
-    onChange(
-      buildFor(pts.map((p, j) => (j === i ? { x: nx, y: ny } : p)))
-    );
-  };
-
-  // moveDrag közben nem normalizálunk (a húzás alatt stabil indexek kellenek)
-  const buildFor = (pts: CurvePoint[]): ToneCurves | undefined => {
-    const nextChan = isIdentityCurve(pts) ? undefined : pts;
-    const next: ToneCurves = { ...value };
-    if (nextChan) {
-      next[channel] = nextChan;
-    } else {
-      delete next[channel];
-    }
-    const empty = !next.rgb && !next.red && !next.green && !next.blue;
-    return empty ? undefined : next;
+    // csak a helyi vázlatba (a store-ba az `endGesture` commitol egyszer);
+    // húzás alatt NEM normalizálunk — stabil indexek kellenek
+    putDraft(pts.map((p, j) => (j === i ? { x: nx, y: ny } : p)));
   };
 
   const endGesture = () => {
     dragStart.current = null;
+    // 🖐️ a gesztus VÉGÉN megy egyetlen commit a store-ba → egy undo-lépés
+    const pending = draftRef.current;
+    draftRef.current = null;
+    setDraft(null);
+    if (pending) {
+      commit(pending); // a commit normalizál
+    }
     Haptics.selectionAsync().catch(() => {});
   };
 
@@ -142,7 +150,7 @@ export function ToneCurveEditor({ value, onChange }: Props) {
   // görbe-útvonal (Catmull-Rom mintavétel)
   let path = '';
   if (w > 0) {
-    const samples = sampleCurvePath(points);
+    const samples = sampleCurvePath(view);
     path = samples
       .map((p, i) => `${i === 0 ? 'M' : 'L'}${xToPx(p.x).toFixed(1)},${yToPx(p.y).toFixed(1)}`)
       .join(' ');
@@ -215,7 +223,7 @@ export function ToneCurveEditor({ value, onChange }: Props) {
               strokeDasharray="3 3"
             />
             <Path d={path} stroke={chanColor} strokeWidth={2} fill="none" />
-            {points.map((p, i) => (
+            {view.map((p, i) => (
               <Circle
                 key={i}
                 cx={xToPx(p.x)}
@@ -230,7 +238,7 @@ export function ToneCurveEditor({ value, onChange }: Props) {
         ) : null}
 
         {w > 0
-          ? points.map((p, i) => {
+          ? view.map((p, i) => {
               const pan = Gesture.Pan()
                 .onStart(() => runOnJS(beginDrag)(i))
                 .onUpdate((e) => runOnJS(moveDrag)(i, e.translationX, e.translationY))
@@ -252,21 +260,21 @@ export function ToneCurveEditor({ value, onChange }: Props) {
 
       <View style={styles.row}>
         <Text style={styles.axis}>
-          {sel != null && points[sel]
-            ? `${Math.round(points[sel].x * 255)} → ${Math.round(points[sel].y * 255)}`
+          {sel != null && view[sel]
+            ? `${Math.round(view[sel].x * 255)} → ${Math.round(view[sel].y * 255)}`
             : 'be → ki (0–255)'}
         </Text>
         <View style={styles.spacer} />
         <Pressable
           hitSlop={6}
           onPress={deleteSel}
-          disabled={sel == null || sel === 0 || sel === points.length - 1}
+          disabled={sel == null || sel === 0 || sel === view.length - 1}
           style={styles.iconBtn}
         >
           <Ionicons
             name="trash-outline"
             size={18}
-            color={sel == null || sel === 0 || sel === points.length - 1 ? palette.border : palette.danger}
+            color={sel == null || sel === 0 || sel === view.length - 1 ? palette.border : palette.danger}
           />
         </Pressable>
         <Pressable hitSlop={6} onPress={resetChannel} disabled={!modified} style={styles.iconBtn}>

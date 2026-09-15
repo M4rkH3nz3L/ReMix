@@ -33,6 +33,19 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
   const dragStart = useRef<PathPoint | null>(null);
   const ptsRef = useRef(points);
   ptsRef.current = points;
+  /**
+   * 🖐️ Húzás alatti HELYI vázlat — a store-ba csak a gesztus VÉGÉN commitolunk.
+   * Enélkül minden húzás-frame egy dispatch lenne (60/mp), ami undo-lépést és
+   * esemény-napló bejegyzést is gyárt; az 50 lépéses history 0,8 mp alatt elfogyna.
+   */
+  const [draft, setDraft] = useState<PathPoint[] | null>(null);
+  const draftRef = useRef<PathPoint[] | null>(null);
+  const putDraft = (pts: PathPoint[]) => {
+    draftRef.current = pts;
+    setDraft(pts);
+  };
+  /** amit MUTATUNK: húzás alatt a vázlat, egyébként a props */
+  const view = draft ?? points;
 
   const side = Math.max(1, w);
   const toPx = (v: number) => PAD + v * (side - 2 * PAD);
@@ -61,7 +74,7 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
     const next: PathPoint = { x: nx, y: ny };
     if (start.h1) next.h1 = { x: start.h1.x + (nx - start.x), y: start.h1.y + (ny - start.y) };
     if (start.h2) next.h2 = { x: start.h2.x + (nx - start.x), y: start.h2.y + (ny - start.y) };
-    onChange(pts.map((p, j) => (j === i ? next : p)));
+    putDraft(pts.map((p, j) => (j === i ? next : p)));
   };
 
   const beginHandle = (i: number) => {
@@ -76,11 +89,18 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
     const base = start[which] ?? { x: start.x, y: start.y };
     const nx = Math.min(1, Math.max(0, base.x + dx / (side - 2 * PAD)));
     const ny = Math.min(1, Math.max(0, base.y + dy / (side - 2 * PAD)));
-    onChange(pts.map((p, j) => (j === i ? { ...p, [which]: { x: nx, y: ny } } : p)));
+    putDraft(pts.map((p, j) => (j === i ? { ...p, [which]: { x: nx, y: ny } } : p)));
   };
 
   const endGesture = () => {
     dragStart.current = null;
+    // 🖐️ a gesztus VÉGÉN megy egyetlen commit a store-ba → egy undo-lépés
+    const pending = draftRef.current;
+    draftRef.current = null;
+    setDraft(null);
+    if (pending) {
+      commit(pending);
+    }
     Haptics.selectionAsync().catch(() => {});
   };
 
@@ -113,8 +133,8 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
     );
   };
 
-  const selPt = sel != null ? points[sel] : null;
-  const d = pathData(points, side, side, closed);
+  const selPt = sel != null ? view[sel] : null;
+  const d = pathData(view, side, side, closed);
 
   return (
     <View>
@@ -145,7 +165,7 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
                 <Circle cx={toPx(selPt.h2.x)} cy={toPx(selPt.h2.y)} r={4} fill={palette.accent2} />
               </>
             ) : null}
-            {points.map((p, i) => (
+            {view.map((p, i) => (
               <Circle key={i} cx={toPx(p.x)} cy={toPx(p.y)} r={i === sel ? 6 : 4} fill={i === sel ? palette.text : palette.accent} stroke={palette.bg} strokeWidth={1.5} />
             ))}
           </Svg>
@@ -153,7 +173,7 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
 
         {/* horgony hit-targetek */}
         {w > 0
-          ? points.map((p, i) => {
+          ? view.map((p, i) => {
               const pan = Gesture.Pan()
                 .onStart(() => runOnJS(beginDrag)(i))
                 .onUpdate((e) => runOnJS(moveAnchor)(i, e.translationX, e.translationY))

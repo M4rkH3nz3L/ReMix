@@ -58,6 +58,21 @@ export function KeyframeGraphEditor({
   // a legfrissebb kulcskockák a gesztus-callbackekhez (a prop záródása elavulhat)
   const kfsRef = useRef(keyframes);
   kfsRef.current = keyframes;
+  /**
+   * 🖐️ Húzás alatti HELYI vázlat. A gesztus közben NEM commitolunk a store-ba:
+   * különben minden frame egy dispatch lenne (60/mp), ami undo-lépést és
+   * esemény-napló bejegyzést is gyárt — az 50 lépéses history 0,8 mp húzás alatt
+   * elfogyna. Ugyanaz a minta, mint a TimelineClip-ben: élő helyi állapot,
+   * commit az `onEnd`-en. Kirajzolni a vázlatot rajzoljuk, ha van.
+   */
+  const [draft, setDraft] = useState<Keyframe[] | null>(null);
+  const draftRef = useRef<Keyframe[] | null>(null);
+  const putDraft = (kfs: Keyframe[]) => {
+    draftRef.current = kfs;
+    setDraft(kfs);
+  };
+  /** amit MUTATUNK: húzás alatt a vázlat, egyébként a props */
+  const view = draft ?? keyframes;
 
   const innerW = Math.max(1, w - 2 * PAD);
   const innerH = HEIGHT - 2 * PAD;
@@ -78,7 +93,7 @@ export function KeyframeGraphEditor({
   if (w > 0) {
     for (let i = 0; i <= CURVE_SAMPLES; i++) {
       const t = (i / CURVE_SAMPLES) * dur;
-      const v = sampleChannel(keyframes, t, fallback);
+      const v = sampleChannel(view, t, fallback);
       path += `${i === 0 ? 'M' : 'L'}${xToPx(t).toFixed(1)},${vToPx(v).toFixed(1)} `;
     }
   }
@@ -105,7 +120,8 @@ export function KeyframeGraphEditor({
     const isEdge = i === 0 || i === kfs.length - 1;
     const nt = isEdge ? start.time : Math.min(hiT, Math.max(loT, start.time + (dx / innerW) * dur));
     const nv = Math.min(max, Math.max(min, start.value - (dy / innerH) * span));
-    onChange(kfs.map((k, j) => (j === i ? { ...k, time: Math.round(nt * 1000) / 1000, value: nv } : k)));
+    // csak a helyi vázlatba (a store-ba az `endGesture` commitol egyszer)
+    putDraft(kfs.map((k, j) => (j === i ? { ...k, time: Math.round(nt * 1000) / 1000, value: nv } : k)));
   };
 
   // ── Bézier-fogó húzása (a kijelölt kf szegmensén) ────────────────────────────
@@ -138,12 +154,19 @@ export function KeyframeGraphEditor({
       handle === 1
         ? [Math.min(1, Math.max(0, x1 + dxN)), y1 + dyValFrac, x2, y2]
         : [x1, y1, Math.min(1, Math.max(0, x2 + dxN)), y2 + dyValFrac];
-    onChange(kfs.map((k, j) => (j === sel ? { ...k, bezier: next } : k)));
+    putDraft(kfs.map((k, j) => (j === sel ? { ...k, bezier: next } : k)));
   };
 
   const endGesture = () => {
     dragStart.current = null;
     bezierStart.current = null;
+    // 🖐️ a gesztus VÉGÉN megy egyetlen commit a store-ba → egy undo-lépés
+    const pending = draftRef.current;
+    draftRef.current = null;
+    setDraft(null);
+    if (pending) {
+      commit(pending);
+    }
     Haptics.selectionAsync().catch(() => {});
   };
 
@@ -191,8 +214,8 @@ export function KeyframeGraphEditor({
     );
   };
 
-  const selKf = sel != null ? keyframes[sel] : null;
-  const selNext = sel != null ? keyframes[sel + 1] : null;
+  const selKf = sel != null ? view[sel] : null;
+  const selNext = sel != null ? view[sel + 1] : null;
   const showBezier = !!selKf && !!selNext && selKf.easing === 'bezier';
   const bez = selKf?.bezier ?? PRESET_BEZIER.easeInOut;
   const h1 = showBezier
@@ -248,7 +271,7 @@ export function KeyframeGraphEditor({
               </>
             ) : null}
             {/* kulcskockák */}
-            {keyframes.map((k, i) => (
+            {view.map((k, i) => (
               <Circle
                 key={i}
                 cx={xToPx(k.time)}
@@ -264,7 +287,7 @@ export function KeyframeGraphEditor({
 
         {/* húzó hit-targetek a kulcskockákra (a görbe fölött) */}
         {w > 0
-          ? keyframes.map((k, i) => {
+          ? view.map((k, i) => {
               const pan = Gesture.Pan()
                 .onStart(() => runOnJS(beginDrag)(i))
                 .onUpdate((e) => runOnJS(moveDrag)(i, e.translationX, e.translationY))

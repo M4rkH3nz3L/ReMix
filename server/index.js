@@ -35,6 +35,7 @@ const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
+const { callerId, corsAllowlist, requireAuth } = require('./auth');
 const {
   billingAvailable,
   activatePro,
@@ -48,6 +49,25 @@ const WHISPER_MODEL =
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
 
+/**
+ * 🔐 A MANUÁLIS fizetési út (Pro-aktiválás, kredit-jóváírás, Pro-visszavonás)
+ * alapból KI VAN KAPCSOLVA. Éles környezetben a Pro/kredit kizárólag a védett
+ * RevenueCat webhookon keresztül jöhet — a manuális végpontok csak fejlesztéshez
+ * valók, és kifejezett `ALLOW_DEV_BILLING=1` kell hozzájuk.
+ */
+const DEV_BILLING = process.env.ALLOW_DEV_BILLING === '1';
+function devBillingGuard(_req, res, next) {
+  if (!DEV_BILLING) {
+    res.status(403).json({
+      error:
+        'A manuális aktiválás ki van kapcsolva. A Pro/kredit a RevenueCat webhookon jön ' +
+        '(fejlesztéshez: ALLOW_DEV_BILLING=1).',
+    });
+    return;
+  }
+  next();
+}
+
 const app = express();
 const jobs = new Map(); // id → { state: 'processing'|'done'|'error', file?, error?, dir }
 
@@ -58,11 +78,10 @@ app.use((req, _res, next) => {
   next();
 });
 
-// a webes dev-előnézet (8081) másik originről hívja a workert
-app.use((_req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  next();
-});
+// 🔐 CORS: ALLOWLIST a korábbi `*` helyett. A `*` miatt a service_role-os
+// végpontok bármely weboldalról hívhatók voltak. A natív app nem küld Origin-t,
+// így az érintetlen; a böngészős dev-előnézethez a CORS_ORIGINS env kell.
+app.use(corsAllowlist());
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -307,9 +326,18 @@ app.post('/ai/probe', express.json({ limit: '64kb' }), (req, res) => {
 // notifications-be (realtime kézbesíti) + best-effort Expo push a push_tokenekre.
 // ⚠️ PROD: JWT-verifikáció + hívó-jogosultság (ki kinek küldhet) mögé kell tenni,
 //    lásd TODO.md „Biztonság" (a worker ma nem hitelesít).
-app.post('/notify', express.json({ limit: '64kb' }), (req, res) => {
+app.post('/notify', express.json({ limit: '64kb' }), requireAuth, (req, res) => {
   if (!notifyAvailable()) {
     res.status(503).json({ error: 'notify nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
+    return;
+  }
+  // 🔐 A hitelesítés megszünteti a NÉVTELEN push-spam/phishing vektort (eddig
+  // bárki küldhetett tetszőleges usernek tetszőleges értesítést). A címzett
+  // továbbra is a body-ból jön — ez a végpont dolga (collab: komment/mention).
+  // ⚠️ Következő lépés: címzettenkénti jogosultság (közös projekt-tagság)
+  //    ellenőrzése — ahhoz projekt-kontextus is kell a kérésben.
+  if (!callerId(req, 'dev')) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
     return;
   }
   sendNotification(req.body ?? {})
@@ -324,12 +352,24 @@ app.post('/notify', express.json({ limit: '64kb' }), (req, res) => {
 // invite + „meghívtak" értesítés. A névfeloldás (auth.users e-mail) miatt kell a
 // worker (a kliens az RLS-en nem lát más e-mailt). ⚠️ PROD: JWT + „ki hívhat meg"
 // jogosultság (csak a tulaj) mögé — lásd TODO.md Biztonság.
-app.post('/invite', express.json({ limit: '32kb' }), (req, res) => {
+app.post('/invite', express.json({ limit: '32kb' }), requireAuth, (req, res) => {
   if (!notifyAvailable()) {
     res.status(503).json({ error: 'invite nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
     return;
   }
-  inviteMember(req.body ?? {})
+  // 🔐 CSAK A TULAJ hívhat meg: az `ownerId` nem a body-ból érvényes, hanem a
+  // verifikált tokenből. Enélkül bárki felvehette magát `editor`-ként BÁRMELY
+  // projektbe (az RLS-t megkerülve), ha ismerte az owner/project id-t.
+  const owner = callerId(req, req.body?.ownerId);
+  if (!owner) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  if (req.user && req.body?.ownerId && req.body.ownerId !== owner) {
+    res.status(403).json({ error: 'Csak a projekt tulajdonosa hívhat meg tagot.' });
+    return;
+  }
+  inviteMember({ ...(req.body ?? {}), ownerId: owner, invitedBy: owner })
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('Invite hiba:', err.message);
@@ -339,14 +379,25 @@ app.post('/invite', express.json({ limit: '32kb' }), (req, res) => {
 
 // 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat
 // webhookon jön, lásd lentebb). service_role-lal ír a subscriptions-be.
-// ⚠️ PROD: JWT-verifikáció + a valós fizetés IGAZOLÁSA nélkül NE aktiváljon
-//    (ez az endpoint prod-ban csak admin/promó lehet) — lásd TODO.md Fizetés.
-app.post('/billing/activate', express.json({ limit: '16kb' }), (req, res) => {
+//
+// 🔐 KÉTRÉTEGŰ VÉDELEM:
+//   1. `devBillingGuard` — az egész manuális út KI VAN KAPCSOLVA, hacsak az
+//      ALLOW_DEV_BILLING=1 nincs beállítva. Prod-ban a Pro KIZÁRÓLAG a
+//      RevenueCat webhookon jöhet (az védett: RC_WEBHOOK_AUTH).
+//   2. `requireAuth` + a userId a VERIFIKÁLT tokenből — így még bekapcsolt
+//      dev-módban is csak SAJÁT magának adhat bárki Pro-t, másnak nem.
+// Korábban: `curl -d '{"userId":"<bármely uuid>","days":36500}'` = örökös Pro.
+app.post('/billing/activate', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
   if (!billingAvailable()) {
     res.status(503).json({ error: 'billing nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
     return;
   }
-  const { userId, days } = req.body ?? {};
+  const { days } = req.body ?? {};
+  const userId = callerId(req, (req.body ?? {}).userId);
+  if (!userId) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
   activatePro(userId, { days: Number.isFinite(days) ? days : 30, source: 'manual' })
     .then((result) => res.json(result))
     .catch((err) => {
@@ -356,13 +407,18 @@ app.post('/billing/activate', express.json({ limit: '16kb' }), (req, res) => {
 });
 
 // 🪙 Shop kredit feltöltés — DEV/manuális (a valós top-up a RevenueCat consumable
-// webhookon, `credits_<n>` product). ⚠️ PROD: admin-only / valós fizetés-igazolás.
-app.post('/shop/credits/grant', express.json({ limit: '16kb' }), (req, res) => {
+// webhookon, `credits_<n>` product). Ugyanaz a kétrétegű védelem, mint fent.
+app.post('/shop/credits/grant', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
   if (!billingAvailable()) {
     res.status(503).json({ error: 'billing nincs konfigurálva' });
     return;
   }
-  const { userId, amount } = req.body ?? {};
+  const { amount } = req.body ?? {};
+  const userId = callerId(req, (req.body ?? {}).userId);
+  if (!userId) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
   grantCredits(userId, Number.isFinite(amount) ? amount : 100, 'topup', 'manual')
     .then((result) => res.json(result))
     .catch((err) => {
@@ -371,13 +427,19 @@ app.post('/shop/credits/grant', express.json({ limit: '16kb' }), (req, res) => {
     });
 });
 
-// 💳 Pro visszavonás — DEV/manuális (teszteléshez). ⚠️ PROD: admin-only.
-app.post('/billing/deactivate', express.json({ limit: '16kb' }), (req, res) => {
+// 💳 Pro visszavonás — DEV/manuális (teszteléshez). Ugyanaz a kétrétegű védelem:
+// enélkül bárki visszavonhatta MÁS felhasználó Pro-ját (DoS).
+app.post('/billing/deactivate', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
   if (!billingAvailable()) {
     res.status(503).json({ error: 'billing nincs konfigurálva' });
     return;
   }
-  deactivatePro((req.body ?? {}).userId, { source: 'manual', status: 'canceled' })
+  const target = callerId(req, (req.body ?? {}).userId);
+  if (!target) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  deactivatePro(target, { source: 'manual', status: 'canceled' })
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('Billing deactivate hiba:', err.message);

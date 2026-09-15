@@ -35,13 +35,14 @@ const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
-const { callerId, corsAllowlist, requireAuth } = require('./auth');
+const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
 const {
   billingAvailable,
   activatePro,
   deactivatePro,
   grantCredits,
   handleRevenueCatEvent,
+  isPro,
 } = require('./billing');
 
 const WHISPER_MODEL =
@@ -55,6 +56,41 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
  * RevenueCat webhookon keresztül jöhet — a manuális végpontok csak fejlesztéshez
  * valók, és kifejezett `ALLOW_DEV_BILLING=1` kell hozzájuk.
  */
+/**
+ * 💳 SZERVER-HITELES Pro-kapu. A kliens `ensureCloud()`-ja csak UX (a lokális
+ * entitlement-állapotot nézi) — egy módosított kliens vagy egy curl enélkül
+ * ingyen használná a fizetős felhő-funkciókat. Ez a middleware a
+ * `subscriptions` táblából dönt, a VERIFIKÁLT token user-ére.
+ *
+ * ⚠️ A lista a kliens `src/lib/capabilities.ts` `where:'cloud', pro:true`
+ *    sorait tükrözi. A determinisztikus, szándékosan INGYENES worker-utilok
+ *    (beat/csend/jelenet/szkóp/proxy/thumbnail/hook/asszisztens) NEM kerülnek
+ *    kapu mögé — azok a `renderServerUrl()`-en mennek, `ensureCloud` nélkül.
+ */
+function requirePro(req, res, next) {
+  if (INSECURE_DEV) {
+    next(); // lokális fejlesztés — a requireAuth már naplózott róla
+    return;
+  }
+  const uid = req.user?.id;
+  if (!uid) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  isPro(uid)
+    .then((pro) => {
+      if (pro) {
+        next();
+        return;
+      }
+      res.status(402).json({ error: 'Ehhez a funkcióhoz Pro-előfizetés szükséges.', pro: true });
+    })
+    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
+}
+
+/** rövidítés: hitelesítés + szerver-hiteles Pro-ellenőrzés egy lépésben */
+const proOnly = [requireAuth, requirePro];
+
 const DEV_BILLING = process.env.ALLOW_DEV_BILLING === '1';
 function devBillingGuard(_req, res, next) {
   if (!DEV_BILLING) {
@@ -130,7 +166,7 @@ app.get('/health', async (_req, res) => {
 });
 
 // 🔗 URL-import (YouTube stb.): teljes videó / csak hang / egy képkocka
-app.post('/youtube', express.json({ limit: '8kb' }), async (req, res) => {
+app.post('/youtube', express.json({ limit: '8kb' }), ...proOnly, async (req, res) => {
   if (!ytAvailable()) {
     res.status(501).json({ error: 'A yt-dlp nincs telepítve a workeren (brew install yt-dlp).' });
     return;
@@ -155,7 +191,7 @@ app.get('/youtube/:id/:name', (req, res) => {
 app.get('/tts/voices', async (_req, res) => {
   res.json({ available: ttsAvailable(), voices: await listVoices() });
 });
-app.post('/tts', express.json({ limit: '256kb' }), async (req, res) => {
+app.post('/tts', express.json({ limit: '256kb' }), ...proOnly, async (req, res) => {
   if (!ttsAvailable()) {
     res.status(501).json({ error: 'A TTS csak macOS dev-workeren érhető el.' });
     return;
@@ -178,7 +214,7 @@ app.get('/tts/:id/:name', (req, res) => {
 
 // 🙂 Arc-detektálás egy képkockán (UltraFace, CPU) — a dobozok a megadott
 // vászon-arányra normalizálva jönnek (a tracker/pozicionálás nyelvén).
-app.post('/faces', upload.any(), (req, res) => {
+app.post('/faces', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -245,7 +281,7 @@ app.get('/sky/presets', (_req, res) => {
   res.json({ presets: listSkies() });
 });
 
-app.post('/sky', upload.any(), (req, res) => {
+app.post('/sky', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   const preset = String(req.body.preset ?? 'sunset');
   if (!file) {
@@ -272,7 +308,7 @@ app.post('/sky', upload.any(), (req, res) => {
 });
 
 // 🔍 Upscale / Enhance (CC V2): fotó felnagyítása szuper-felbontással
-app.post('/upscale', upload.any(), (req, res) => {
+app.post('/upscale', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -470,7 +506,7 @@ app.post('/billing/revenuecat', express.json({ limit: '256kb' }), (req, res) => 
 });
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
-app.post('/ai/translate', express.json({ limit: '512kb' }), (req, res) => {
+app.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, (req, res) => {
   const { segments, lang, aiConfig } = req.body ?? {};
   if (!Array.isArray(segments) || segments.length === 0 || !lang) {
     res.status(400).json({ error: 'Hiányzó szegmensek vagy célnyelv.' });
@@ -485,7 +521,7 @@ app.post('/ai/translate', express.json({ limit: '512kb' }), (req, res) => {
 });
 
 // 🎯 Highlights (Phase 3.3): long-form → több önálló short-jelölt (idő-ablak)
-app.post('/ai/highlights', express.json({ limit: '512kb' }), (req, res) => {
+app.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
@@ -500,7 +536,7 @@ app.post('/ai/highlights', express.json({ limit: '512kb' }), (req, res) => {
 });
 
 // 🎬 Story Engine (Phase 1.1): jelek (hossz + átirat) → dramaturgiai fejezetek
-app.post('/ai/story', express.json({ limit: '512kb' }), (req, res) => {
+app.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
@@ -757,7 +793,7 @@ app.post('/text/bake', express.json({ limit: '256kb' }), (req, res) => {
 
 // 🪄 AI background removal (P1 v1, fotón): u2net CPU-n → téma-kivágás
 // átlátszó háttérrel (md5-cache) — a kliens overlay-képként használja.
-app.post('/bgremove', upload.any(), (req, res) => {
+app.post('/bgremove', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -922,7 +958,7 @@ app.post('/ai/assist', express.json({ limit: '2mb' }), (req, res) => {
 
 // AI Edit Engine (P0-1): elemzett jelek → 3 vágás-változat (keep-sávok +
 // felirat-javaslatok) — a kliens fordítja commandokká és kér jóváhagyást.
-app.post('/ai/autoedit', express.json({ limit: '2mb' }), (req, res) => {
+app.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
@@ -938,7 +974,7 @@ app.post('/ai/autoedit', express.json({ limit: '2mb' }), (req, res) => {
 
 // Auto-caption: médiafájl → hang kinyerése → Whisper → SRT.
 // A kliens a kapott SRT-t a meglévő import-útvonalon dolgozza fel.
-app.post('/captions', upload.any(), (req, res) => {
+app.post('/captions', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1063,7 +1099,7 @@ app.post('/waveform', upload.any(), (req, res) => {
 
 // 🎞️ Média-feltöltés (renderelt videó / borító) → publikus Storage-URL. A kliens
 // a renderelt fájlt küldi (multipart), a feed ezt a URL-t játssza (cross-device).
-app.post('/media/upload', upload.any(), async (req, res) => {
+app.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
   if (!s3Enabled()) {
     res.status(503).json({ error: 'storage nincs konfigurálva (S3_* env)' });
     return;
@@ -1091,7 +1127,7 @@ app.post('/media/upload', upload.any(), async (req, res) => {
   }
 });
 
-app.post('/render', upload.any(), (req, res) => {
+app.post('/render', upload.any(), ...proOnly, (req, res) => {
   let project;
   let uriMap;
   try {
@@ -1321,7 +1357,7 @@ app.post('/beats', upload.any(), (req, res) => {
 
 // Pont-követés (P0-6 tracking): a megadott vászon-pont követése a szakaszon —
 // NCC template-tracker (track.js), a válasz vászon-normalizált pont-sor.
-app.post('/track', upload.any(), (req, res) => {
+app.post('/track', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1435,7 +1471,7 @@ app.post('/thumbnails', upload.any(), (req, res) => {
 
 // Auto Reframe (P0-7): a téma középpont-útja a szakaszon (mozgás-centroid) —
 // forrás-normalizált pontok + forrás-méret; a kliens fordít crop-kulcskockákra.
-app.post('/reframe', upload.any(), (req, res) => {
+app.post('/reframe', upload.any(), ...proOnly, (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });

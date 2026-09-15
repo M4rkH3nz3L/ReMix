@@ -158,10 +158,46 @@ async function handleRevenueCatEvent(body) {
   return { ignored: type || 'unknown' };
 }
 
+/**
+ * 💳 Van-e ÉRVÉNYES Pro-előfizetése a felhasználónak (szerver-hiteles).
+ *
+ * A kliens `isProNow()`-ja csak a lokális zustand-állapotot olvassa, tehát
+ * UX-célú: egy módosított kliens (vagy egy sima curl) enélkül ingyen használná a
+ * fizetős felhő-funkciókat. A hiteles forrás EZ: a `subscriptions` sor, ahol a
+ * tier `pro`, a státusz aktív, és a periódus még nem járt le.
+ *
+ * Hiba esetén `false` (fail-closed) — inkább tagadjuk meg, mint hogy ingyen adjuk.
+ */
+async function isPro(userId) {
+  const sb = adminClient();
+  const uid = String(userId || '').trim();
+  if (!sb || !uid) {
+    return false;
+  }
+  try {
+    const { data, error } = await sb
+      .from('subscriptions')
+      .select('tier, status, current_period_end')
+      .eq('user_id', uid)
+      .maybeSingle();
+    if (error || !data || data.tier !== 'pro') {
+      return false;
+    }
+    if (data.status && !['active', 'trialing', 'in_grace_period'].includes(data.status)) {
+      return false;
+    }
+    const end = data.current_period_end ? Date.parse(data.current_period_end) : NaN;
+    return !Number.isNaN(end) && end > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   billingAvailable,
   activatePro,
   deactivatePro,
   grantCredits,
   handleRevenueCatEvent,
+  isPro,
 };

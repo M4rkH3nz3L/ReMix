@@ -178,6 +178,29 @@ Az `expo-secure-store` nincs is a függőségek között; minden AsyncStorage (t
 
 **Javítás — minimum:** (a) unit-tesztek a már pure, tesztelhető magokra (`frames.ts`, `keyframes.ts`, `trackPlan.ts`, `commands.ts`, `workflow.ts`, `safeZone.ts`, `profanity.ts`, `vtt.ts`, `ass.ts` — ezek mind szándékosan expo-mentesek); (b) `npm run audit` minőség-kapu script: `expo-doctor && expo lint && tsc --noEmit && knip && npm audit`; (c) CI workflow, ami ezt futtatja.
 
+### P1-9 · A webes statikus render elszáll (`window is not defined`) 🆕
+**Súlyosság: KÖZEPES** · `app.json` `web.output: "static"` · `src/lib/supabase.ts`
+
+Az `npx expo start --web` (és így az `expo export --platform web`) **nem áll fel**:
+az expo-router statikus renderelése Node-környezetben futtatja a fát, ahol a
+Supabase `__loadSession` → a storage-adapter `getItem`-je → `AsyncStorage`
+web-implementációja `window.localStorage`-ot használ → `ReferenceError: window is
+not defined`. A dev-szerver ismétlődően összeomlik, a HTTP kérés soha nem kap
+választ.
+
+**Ellenőrizve, hogy NEM a P1-5 okozta:** a `dcf62e5^` verzióban is
+`storage: AsyncStorage` volt, azaz pontosan ugyanez a hívási lánc futott —
+a hiba korábbi.
+
+**Következmény:** a konfigurált `web.output: "static"` ma nem működik. Mobilra
+nincs hatása (a natív buildet nem érinti), de ha a web cél, ez blokkoló.
+
+**Javítás iránya:** a Supabase storage-adapter legyen SSR-biztos — ha nincs
+`window`/`localStorage` (Node), adjon vissza `null`-t írás/olvasásnál a
+perzisztencia helyett. A `secureStorage`-ban ez egy `typeof window === 'undefined'`
+ág. (Megjegyzés: a web-render ezen túl is korlátozott — a videó/kamera/média-tár
+natív modulok ott nem futnak.)
+
 ### P1-8 · Környezet-higiénia ✅
 - **`@types/react-native@^0.72.8` közvetlenül telepítve** (`package.json:57`) — a típusok a `react-native` **0.86**-ban vannak; egy 0.72-es típuscsomag ütközik. Eltávolítandó.
 - **25 Expo-csomag patch-eltérésben** az SDK 57 elvárásához képest (`expo` 57.0.19 vs ~57.0.22, `expo-router`, `expo-video`, `expo-audio`…). Javítás: `npx expo install --fix` — **commit után**, mert patch-szintű, de natív modulokat érint.

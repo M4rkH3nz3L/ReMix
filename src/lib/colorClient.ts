@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { uploadFetch } from '@/lib/upload';
+import { mediaFormData, uploadFetch } from '@/lib/upload';
 import type { ColorStats } from '@/lib/colorAuto';
 import { ensureCloud } from '@/lib/backend';
 import { renderServerUrl } from '@/lib/render';
@@ -17,13 +17,7 @@ export async function fetchColorStats(
 ): Promise<ColorStats | null> {
   const base = ensureCloud('colorAi');
   try {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('media', blob, uri.split('/').pop() ?? 'media');
-    } else {
-      form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'media');
-    }
+    const form = await mediaFormData(uri);
     form.append('atSec', String(Math.max(0, atSec)));
     const res = await uploadFetch(`${base}/color/stats`, { method: 'POST', body: form });
     if (!res.ok) {

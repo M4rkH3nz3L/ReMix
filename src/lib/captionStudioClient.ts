@@ -1,4 +1,4 @@
-import { aiFetch } from '@/lib/aiFetch';
+import { aiFetch, aiPostJsonOrNull } from '@/lib/aiFetch';
 import { aiConfigForTask } from '@/lib/aiProviders';
 import type { CaptionSuggestion } from '@/lib/captionStudio';
 import { ensureCloud } from '@/lib/backend';
@@ -13,16 +13,11 @@ export async function fetchCaptionSuggestions(
 ): Promise<CaptionSuggestion[] | null> {
   try {
     const aiConfig = await aiConfigForTask('captionStudio');
-    const res = await aiFetch(`${ensureCloud('autoCaption')}/ai/captionstudio`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segments, aiConfig }),
-    });
-    if (!res.ok) {
-      return null;
-    }
-    const body = (await res.json()) as { segments: CaptionSuggestion[] };
-    return Array.isArray(body.segments) ? body.segments : null;
+    const body = await aiPostJsonOrNull<{ segments: CaptionSuggestion[] }>(
+      `${ensureCloud('autoCaption')}/ai/captionstudio`,
+      { segments, aiConfig }
+    );
+    return body && Array.isArray(body.segments) ? body.segments : null;
   } catch {
     return null;
   }
@@ -47,6 +42,10 @@ export async function fetchCaptionTranslations(
   if (!res.ok) {
     return null;
   }
-  const body = (await res.json()) as { segments?: { id: string; text: string }[] };
+  // a `.catch()` nélkül egy nem-JSON válasz (502 / proxy-hibaoldal) „JSON Parse
+  // error"-t dobna a felhasználó arcába; így csak „nincs fordítás" lesz belőle
+  const body = (await res.json().catch(() => ({}))) as {
+    segments?: { id: string; text: string }[];
+  };
   return Array.isArray(body.segments) ? body.segments : null;
 }

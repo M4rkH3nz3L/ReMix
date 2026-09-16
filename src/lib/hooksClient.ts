@@ -1,4 +1,4 @@
-import { aiFetch } from '@/lib/aiFetch';
+import { aiPostJsonOrNull } from '@/lib/aiFetch';
 import { aiConfigForTask } from '@/lib/aiProviders';
 import type { HookSuggestion } from '@/lib/hooks';
 import { renderServerUrl } from '@/lib/render';
@@ -10,16 +10,16 @@ import { renderServerUrl } from '@/lib/render';
 export async function fetchHooks(summary: string): Promise<HookSuggestion[] | null> {
   try {
     const aiConfig = await aiConfigForTask('hooks');
-    // időkorláttal — enélkül a beragadt lokális modell örökre elnyelné a hívást
-    const res = await aiFetch(`${renderServerUrl()}/ai/hooks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary, aiConfig }),
-    });
-    if (!res.ok) {
+    // időkorláttal — enélkül a beragadt lokális modell örökre elnyelné a hívást.
+    // A helper a nem-JSON választ (502 / proxy-hibaoldal) is `null`-ra fordítja,
+    // szemben a korábbi nyers `res.json()`-nel, ami ilyenkor DOBOTT.
+    const body = await aiPostJsonOrNull<{ hooks: HookSuggestion[] }>(
+      `${renderServerUrl()}/ai/hooks`,
+      { summary, aiConfig }
+    );
+    if (!body) {
       return null;
     }
-    const body = (await res.json()) as { hooks: HookSuggestion[] };
     const list = (body.hooks ?? [])
       .filter((h) => h && typeof h.text === 'string' && h.text.trim().length > 0)
       .map((h) => ({ text: h.text.trim(), style: String(h.style ?? '').trim() }))

@@ -81,12 +81,16 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     []
   );
 
-  // bezáráskor a folyamatban lévő visszaszámlálás megszakad
+  // a modal bezárásakor (a nyitott állapot CLEANUP-jában) a folyamatban lévő
+  // visszaszámlálás megszakad — így nem indul felvétel a már eltűnt UI mögött
   useEffect(() => {
     if (!visible) {
+      return;
+    }
+    return () => {
       clearCountdown();
       setCountdown(0);
-    }
+    };
   }, [visible]);
 
   const saveAndAdd = async (uri: string, recorded: number) => {

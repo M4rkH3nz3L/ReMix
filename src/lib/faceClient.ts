@@ -1,7 +1,5 @@
-import { File } from 'expo-file-system';
-import { Platform } from 'react-native';
 
-import { uploadFetch } from '@/lib/upload';
+import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { ensureCloud } from '@/lib/backend';
 
 /**
@@ -25,13 +23,7 @@ export async function fetchFaces(
 ): Promise<FaceBox[] | null> {
   const base = ensureCloud('faceTools');
   try {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('media', blob, uri.split('/').pop() ?? 'media');
-    } else {
-      form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'media');
-    }
+    const form = await mediaFormData(uri);
     form.append('atSec', String(Math.max(0, opts.atSec ?? 0)));
     form.append('aspectW', String(opts.aspectW));
     form.append('aspectH', String(opts.aspectH));

@@ -70,3 +70,36 @@ export async function aiPostJson<T>(
   }
   return parsed as T;
 }
+
+/**
+ * Ugyanaz, de BEST-EFFORT: hiba esetén `null`, nem dobás.
+ *
+ * Az AI-kiegészítők (hook-javaslat, felirat-stúdió, story, highlights) nem
+ * kritikus utak — a hívó `null`-ra elegánsan visszaesik. Ez a helper azt is
+ * orvosolja, amit a kézzel ismételt változatok elrontottak: ott a nyers
+ * `(await res.json()) as T` DOBOTT, ha a worker nem JSON-t adott (502, proxy-
+ * vagy tunnel-hibaoldal HTML-lel) — itt ilyenkor is `null` jön.
+ */
+export async function aiPostJsonOrNull<T>(
+  url: string,
+  body: unknown,
+  timeoutMs = AI_TIMEOUT_MS
+): Promise<T | null> {
+  try {
+    const res = await aiFetch(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      timeoutMs
+    );
+    if (!res.ok) {
+      return null;
+    }
+    return ((await res.json().catch(() => null)) as T) ?? null;
+  } catch {
+    return null;
+  }
+}

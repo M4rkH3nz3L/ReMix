@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { uploadFetch } from '@/lib/upload';
+import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { ensureCloud } from '@/lib/backend';
 
 /**
@@ -21,13 +21,7 @@ export interface CutoutResult {
 export async function requestCutout(uri: string): Promise<CutoutResult | null> {
   const base = ensureCloud('bgRemove');
   try {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('media', blob, uri.split('/').pop() ?? 'photo');
-    } else {
-      form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'photo');
-    }
+    const form = await mediaFormData(uri);
     const res = await uploadFetch(`${base}/bgremove`, { method: 'POST', body: form });
     if (!res.ok) {
       return null;

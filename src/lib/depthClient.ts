@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { uploadFetch } from '@/lib/upload';
+import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 
 /**
@@ -45,14 +45,7 @@ export async function requestDepthParallax(
 ): Promise<DepthParallaxResult | null> {
   const base = renderServerUrl();
   try {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      // weben a natív {uri} FormData-trükk nem megy — blobként töltjük fel
-      const blob = await (await fetch(uri)).blob();
-      form.append('media', blob, uri.split('/').pop() ?? 'photo');
-    } else {
-      form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'photo');
-    }
+    const form = await mediaFormData(uri);
     const res = await uploadFetch(`${base}/depth/parallax`, { method: 'POST', body: form });
     if (!res.ok) {
       return null;
@@ -82,13 +75,7 @@ export interface DepthFocusResult {
 export async function requestDepthFocus(uri: string): Promise<DepthFocusResult | null> {
   const base = renderServerUrl();
   try {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('media', blob, uri.split('/').pop() ?? 'photo');
-    } else {
-      form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'photo');
-    }
+    const form = await mediaFormData(uri);
     const res = await uploadFetch(`${base}/depth/focus`, { method: 'POST', body: form });
     if (!res.ok) {
       return null;

@@ -230,8 +230,11 @@ export async function renderMp4(
   let out: File;
   if (canLocal) {
     onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: 0 });
-    out = await renderLocal(project, effective, (p) =>
-      onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p })
+    out = await renderLocal(
+      project,
+      effective,
+      (p) => onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p }),
+      opts?.signal // ✕ gomb: eddig NEM ment át ide, ezért hatástalan volt
     );
   } else if (mode === 'local') {
     // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,

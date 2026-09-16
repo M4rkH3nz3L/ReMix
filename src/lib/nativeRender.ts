@@ -42,6 +42,18 @@ export function isNativeRenderAvailable(): boolean {
   return Native != null;
 }
 
+/**
+ * Megszakítási hiba a `render.ts` `RenderCancelledError`-ével AZONOS néven.
+ * Szándékosan nem importáljuk az osztályt: a `render.ts` behúzza ezt a modult,
+ * tehát körkörös import lenne. Az `isRenderCancelledError()` NÉV alapján is
+ * felismeri, ezért a hívók egységesen kezelik.
+ */
+function cancelledError(): Error {
+  const err = new Error(tr('lib.render.cancelled'));
+  err.name = 'RenderCancelledError';
+  return err;
+}
+
 /** Az eszközön-render nem elérhető ezen a buildon (pl. Expo Go). */
 export class LocalRenderUnavailableError extends Error {
   constructor() {
@@ -152,11 +164,19 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
 /**
  * Eszközön-render: a projekt → MP4 a telefonon, szerver nélkül. A kész fájl
  * `File`-ját adja vissza (a cache-ben). Nincs natív modul → dob.
+ *
+ * ⚠️ MEGSZAKÍTÁS — őszinte korlát: a natív modul felülete `exportPlan(plan, out)`,
+ * NINCS benne cancel. A háttérben futó kódolást tehát nem tudjuk ténylegesen
+ * leállítani. Amit a `signal` megtesz: azonnal elengedi a hívást — a
+ * folyamat-jelző eltűnik, a részeredményt eldobjuk, nem kerül megosztásra vagy a
+ * Fotókba. Ez lényegesen jobb a korábbi állapotnál, ahol a ✕ gomb LÁTSZOTT, de
+ * semmit nem csinált. Valódi megszakításhoz a natív modult kell bővíteni.
  */
 export async function renderLocal(
   project: Project,
   settings: RenderSettings,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  signal?: AbortSignal
 ): Promise<File> {
   if (!Native) {
     throw new LocalRenderUnavailableError();
@@ -181,7 +201,20 @@ export async function renderLocal(
     ? Native.addListener('onProgress', (e) => onProgress(e.progress))
     : null;
   try {
-    const outUri = await Native.exportPlan(JSON.stringify(plan), target.uri);
+    const exporting = Native.exportPlan(JSON.stringify(plan), target.uri);
+    if (!signal) {
+      return new File(await exporting);
+    }
+    if (signal.aborted) {
+      throw cancelledError();
+    }
+    // versenyeztetés: amelyik előbb — a kész render vagy a megszakítás
+    const outUri = await Promise.race([
+      exporting,
+      new Promise<never>((_, reject) => {
+        signal.addEventListener('abort', () => reject(cancelledError()), { once: true });
+      }),
+    ]);
     return new File(outUri);
   } finally {
     sub?.remove();

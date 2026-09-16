@@ -202,22 +202,27 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       .catch(() => {});
   }, [player, videoClip, playbackUri]);
 
-  // sebesség + hangerő követése (🎚️ volume-automációval a playheadből)
+  // sebesség + hangerő követése (🎚️ volume-automációval a playheadből).
+  // ⚡ A playhead ~60×/mp változik, de a hangerő általában NEM — ezért csak
+  // érdemi eltérésnél írunk a natív lejátszóra (a fölösleges bridge-hívás a
+  // JS-szálat és a natív oldalt is terheli). A küszöb hallhatatlanul kicsi.
+  const lastVolRef = useRef<number | null>(null);
   useEffect(() => {
-    if (videoClip) {
-      player.playbackRate = videoClip.speed;
-      // 🎚️ a videósáv némítása/solója is csak az előnézetre hat
-      player.volume = videoAudible
-        ? clamp(
-            sampleChannel(
-              videoClip.keyframes?.volume,
-              playhead - videoClip.start,
-              videoClip.volume
-            ),
-            0,
-            1
-          )
-        : 0;
+    if (!videoClip) {
+      return;
+    }
+    player.playbackRate = videoClip.speed;
+    // 🎚️ a videósáv némítása/solója is csak az előnézetre hat
+    const vol = videoAudible
+      ? clamp(
+          sampleChannel(videoClip.keyframes?.volume, playhead - videoClip.start, videoClip.volume),
+          0,
+          1
+        )
+      : 0;
+    if (lastVolRef.current === null || Math.abs(vol - lastVolRef.current) > 0.005) {
+      player.volume = vol;
+      lastVolRef.current = vol;
     }
   }, [player, videoClip, playhead, videoAudible]);
 

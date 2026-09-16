@@ -224,7 +224,9 @@ export function TransportBar() {
           color={loop ? palette.accent : palette.textDim}
         />
       </Pressable>
-      <HistoryModal visible={historyOpen} onClose={() => setHistoryOpen(false)} />
+      {/* ⚡ csak nyitva mountoljuk: zárva is a TransportBar minden renderjével
+          lefutott volna a benne lévő `[...events].reverse()` (max 300 elem) */}
+      {historyOpen ? <HistoryModal visible onClose={() => setHistoryOpen(false)} /> : null}
     </View>
   );
 }

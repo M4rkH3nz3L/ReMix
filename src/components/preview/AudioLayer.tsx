@@ -269,7 +269,11 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     } catch {}
   }, [player, isPlaying, clip]);
 
-  // álló óránál seek, futásnál hangerő + fade követés
+  // álló óránál seek, futásnál hangerő + fade követés.
+  // ⚡ A playhead ~60×/mp változik, és ebből a rétegből 4 példány fut (zene,
+  // voiceover, SFX, videó-hang) — küszöb nélkül ez 240 natív hangerő-írás
+  // másodpercenként. Csak érdemi eltérésnél írunk (a fade-görbe így is sima).
+  const lastVolRef = useRef<number | null>(null);
   useEffect(() => {
     if (!clip) {
       return;
@@ -278,7 +282,11 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     try {
       // 🎚️ hangerő-automáció: a volume-csatorna a playheadből interpolál
       const automated = sampleChannel(clip.keyframes?.volume, t, clip.volume);
-      player.volume = audible ? clamp(automated * fadeFactor(clip, t), 0, 1) : 0;
+      const vol = audible ? clamp(automated * fadeFactor(clip, t), 0, 1) : 0;
+      if (lastVolRef.current === null || Math.abs(vol - lastVolRef.current) > 0.005) {
+        player.volume = vol;
+        lastVolRef.current = vol;
+      }
       if (!isPlaying) {
         player.seekTo(Math.max(0, t)).catch(() => {});
       }

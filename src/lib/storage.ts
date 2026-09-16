@@ -9,6 +9,8 @@ const INDEX_KEY = 'vided.projects.v1';
 const projectKey = (id: string) => `vided.project.v1.${id}`;
 const eventsKey = (id: string) => `vided.events.v1.${id}`;
 const versionsKey = (id: string) => `vided.versions.v1.${id}`;
+/** ⚡ az utolsó AUTO-verzió időbélyege külön, apró kulcson (olcsó throttle-döntés) */
+const lastAutoKey = (id: string) => `vided.versions.lastauto.v1.${id}`;
 
 /** 🕓 Projekt-verzió (pillanatkép): a projekt TELJES állapota egy néven, on-device. */
 export interface ProjectVersion {
@@ -128,7 +130,12 @@ export async function saveProject(project: Project): Promise<void> {
 export async function deleteProject(id: string): Promise<void> {
   const metas = await listProjects();
   await AsyncStorage.multiSet([[INDEX_KEY, JSON.stringify(metas.filter((m) => m.id !== id))]]);
-  await AsyncStorage.multiRemove([projectKey(id), eventsKey(id), versionsKey(id)]);
+  await AsyncStorage.multiRemove([
+    projectKey(id),
+    eventsKey(id),
+    versionsKey(id),
+    lastAutoKey(id),
+  ]);
 }
 
 /** 🕓 A projekt mentett verziói (külön kulcson, mint az események). */
@@ -163,10 +170,18 @@ const AUTO_VERSION_THROTTLE_MS = 120000;
  */
 export async function recordAutoVersion(project: Project): Promise<void> {
   try {
+    // ⚡ A throttle-t OLCSÓN döntjük el: az utolsó auto-verzió időbélyege külön,
+    // apró kulcson van. Korábban ehhez a TELJES verzió-listát beolvastuk és
+    // JSON-parse-oltuk (max 20 projekt-pillanatkép, több megabájt), majd a
+    // döntés után jellemzően eldobtuk — minden autosave-nél, a JS-szálon.
+    const lastAt = await AsyncStorage.getItem(lastAutoKey(project.id));
+    if (lastAt && Date.now() - Number(lastAt) < AUTO_VERSION_THROTTLE_MS) {
+      return; // túl gyakori — kihagyjuk, olvasás nélkül
+    }
     const versions = await loadVersions(project.id);
     const lastAuto = [...versions].reverse().find((v) => v.kind === 'auto');
     if (lastAuto && Date.now() - new Date(lastAuto.at).getTime() < AUTO_VERSION_THROTTLE_MS) {
-      return; // túl gyakori — kihagyjuk
+      return; // a régi (időbélyeg-kulcs nélküli) adatra is helyesen dönt
     }
     const auto: ProjectVersion = {
       id: makeId('ver'),
@@ -179,6 +194,8 @@ export async function recordAutoVersion(project: Project): Promise<void> {
     const autos = [...versions.filter((v) => v.kind === 'auto'), auto].slice(-MAX_AUTO_VERSIONS);
     const next = [...manuals, ...autos].sort((a, b) => a.at.localeCompare(b.at));
     await saveVersions(project.id, next);
+    // az olcsó throttle-kulcs frissítése (a következő hívás már ebből dönt)
+    await AsyncStorage.setItem(lastAutoKey(project.id), String(Date.now()));
   } catch {
     // az autosave-előzmény best-effort — hiba esetén csendben kihagyjuk
   }

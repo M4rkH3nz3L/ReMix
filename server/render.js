@@ -802,13 +802,18 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
   // feliratok + formák rasterizálása (közös Chromium-útvonal); a formák a
   // szöveg-overlay lánccal kompatibilis bejegyzésekként kerülnek a sorba —
   // a formák ELŐBB, hogy a szöveg rájuk kerülhessen
+  // ⚠️ KÜLÖN try/catch: egyetlen hibás FORMA nem viheti el az ÖSSZES feliratot.
+  // (Korábban közös blokkban voltak, így egy rossz méretű forma miatt a videó
+  // „sikeresen" elkészült — csak épp szöveg és felirat nélkül.)
   let texts = [];
   try {
-    const shapes = await renderShapePngs(shapeClips, canvas, workDir);
-    const labels = await renderTextPngs(textClips, canvas, workDir);
-    texts = [...shapes, ...labels];
+    texts.push(...(await renderShapePngs(shapeClips, canvas, workDir)));
   } catch (err) {
-    // felirat nélkül is leszállítjuk a videót, de jelezzük
+    console.warn('Forma-rasterizálás kihagyva:', err.message);
+  }
+  try {
+    texts.push(...(await renderTextPngs(textClips, canvas, workDir)));
+  } catch (err) {
     console.warn('Felirat-rasterizálás kihagyva:', err.message);
   }
 

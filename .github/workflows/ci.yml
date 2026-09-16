@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, studio-social]
+  pull_request:
+
+jobs:
+  quality:
+    name: Minőség-kapu (typecheck · lint · teszt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Függőségek (kliens)
+        run: npm ci
+
+      - name: Függőségek (worker)
+        run: npm ci
+        working-directory: server
+
+      # Az AGENTS.md szerinti ellenőrzések. Bármelyik bukása megállítja a futást.
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Tesztek (kliens + worker)
+        run: npm test -- --ci
+
+      - name: Worker syntax-ellenőrzés
+        run: for f in server/*.js; do node -c "$f" || exit 1; done
+
+  doctor:
+    name: Expo-doctor (nem blokkoló)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx expo-doctor

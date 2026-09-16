@@ -642,6 +642,17 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
   if (shapeClips.length === 0) {
     return [];
   }
+  // 🛡️ Gyors bukás hibás méret esetén. A `w`/`h` hiánya (pl. régi/rossz alakú
+  // klip) NaN-t adna, amitől a Chromium egy 0 méretű, „nem látható" elemre
+  // várna a screenshot-időkorlátig (30 mp/klip) — ehelyett azonnal jelezzük.
+  const bad = shapeClips.find(
+    (c) => !Number.isFinite(c.w) || !Number.isFinite(c.h) || c.w <= 0 || c.h <= 0
+  );
+  if (bad) {
+    throw new Error(
+      `Hibás forma-méret (${bad.id}): w=${bad.w}, h=${bad.h} — a ShapeClip top-level w/h mezőt vár (0–1).`
+    );
+  }
   const executablePath = findChromium();
   if (!executablePath) {
     throw new Error('Nincs elérhető Chromium a forma-rasterizáláshoz (CHROMIUM_PATH?)');

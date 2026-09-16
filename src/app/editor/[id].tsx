@@ -59,6 +59,9 @@ export default function EditorScreen() {
   const [relinking, setRelinking] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
   const [collab, setCollab] = useState<{ ownerId: string; role: CollabRole } | null>(null);
+  /** 🔍 a vision-index előmelegítő időzítője — projektváltáskor törlendő */
+  const visionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 💾 mentés-állapot: bukott-e az utolsó autosave, és hányadik újrapróbánál tartunk
   const [saveFailed, setSaveFailed] = useState(false);
   const [saveAttempt, setSaveAttempt] = useState(0);
@@ -106,16 +109,26 @@ export default function EditorScreen() {
     if (current?.id === id) {
       return;
     }
+    // ⚠️ `alive` guard: a betöltés a GLOBÁLIS szerkesztő-store-t írja. Gyors
+    // A→B→A projektváltásnál enélkül a későn beérkező (elavult) válasz felülírná
+    // a frisset — rossz projekt jelenhetne meg a szerkesztőben.
+    let alive = true;
     Promise.all([loadProject(id), loadEvents(id)])
       .then(([loaded, events]) => {
+        if (!alive) {
+          return;
+        }
         if (loaded) {
           useEditorStore.getState().loadProject(loaded, events);
           // hiányzó média felismerése megnyitáskor (törölt/áthelyezett fájlok)
           if (Platform.OS !== 'web') {
             setMissingMedia(findMissingMedia(loaded));
             // 🔍 vision-index előmelegítés (P0‑8): a Smart Search első
-            // keresése így azonnali — fájlonként cache-elt, hiba nem érdekes
-            setTimeout(() => {
+            // keresése így azonnali — fájlonként cache-elt, hiba nem érdekes.
+            // ⚠️ refben tartjuk: gyors ki-be lépésnél enélkül minden megnyitás
+            // indított egy worker-feltöltéssel járó indexelést egy MÁR LEZÁRT
+            // projektre (a cleanup törli).
+            visionTimerRef.current = setTimeout(() => {
               indexProjectVision(loaded).catch(() => {});
             }, 4000);
           }
@@ -123,7 +136,18 @@ export default function EditorScreen() {
           setMissing(true);
         }
       })
-      .catch(() => setMissing(true));
+      .catch(() => {
+        if (alive) {
+          setMissing(true);
+        }
+      });
+    return () => {
+      alive = false;
+      if (visionTimerRef.current) {
+        clearTimeout(visionTimerRef.current);
+        visionTimerRef.current = null;
+      }
+    };
   }, [id]);
 
   /** Újracsatolás: előbb tartalom-egyezés alapján automatikusan, a maradékra kézi választó. */

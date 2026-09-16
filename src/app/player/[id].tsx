@@ -50,13 +50,19 @@ export default function PlayerScreen() {
     if (current?.id === id) {
       return;
     }
+    // ⚠️ `alive` guard: a betöltés a GLOBÁLIS store-t írja — gyors váltásnál a
+    // késői válasz enélkül felülírná a frisset (lásd editor/[id].tsx)
+    let alive = true;
     loadProject(id)
       .then((loaded) => {
-        if (loaded) {
+        if (alive && loaded) {
           useEditorStore.getState().loadProject(loaded);
         }
       })
       .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   useEffect(() => {

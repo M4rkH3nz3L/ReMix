@@ -53,6 +53,9 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  /** ⏱️ a 3-2-1 visszaszámláló — külön ref, hogy bezáráskor törölhető legyen */
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const clearTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -60,7 +63,31 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     }
   };
 
-  useEffect(() => clearTimer, []);
+  const clearCountdown = () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  };
+
+  // ⚠️ a visszaszámlálót IS törölni kell: enélkül a modal bezárása (vagy a
+  // komponens lebontása) után is lefutott, és elindította a felvételt egy már
+  // eltűnt UI mögött
+  useEffect(
+    () => () => {
+      clearTimer();
+      clearCountdown();
+    },
+    []
+  );
+
+  // bezáráskor a folyamatban lévő visszaszámlálás megszakad
+  useEffect(() => {
+    if (!visible) {
+      clearCountdown();
+      setCountdown(0);
+    }
+  }, [visible]);
 
   const saveAndAdd = async (uri: string, recorded: number) => {
     const project = useEditorStore.getState().project;
@@ -139,10 +166,11 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     }
     setCountdown(3);
     const t0 = Date.now();
-    const iv = setInterval(() => {
+    clearCountdown(); // biztos, ami biztos: ne fusson kettő
+    countdownRef.current = setInterval(() => {
       const left = 3 - Math.floor((Date.now() - t0) / 1000);
       if (left <= 0) {
-        clearInterval(iv);
+        clearCountdown();
         setCountdown(0);
         beginRecording();
       } else {

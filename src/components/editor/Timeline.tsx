@@ -97,7 +97,6 @@ export function Timeline() {
   const { t } = useTranslation();
   const L = useLayout();
   const project = useEditorStore((s) => s.project);
-  const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
@@ -339,16 +338,44 @@ export function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicKey]);
 
-  // lejátszás alatt / programozott seek után a scroll követi a playheadet
+  /**
+   * ⚡ A scroll IMPERATÍVAN követi a lejátszófejet — a Timeline NEM iratkozik fel
+   * a `playhead`-re.
+   *
+   * A playhead lejátszás közben ~60×/mp változik, de ebben a komponensben az
+   * EGYETLEN felhasználása ez a `scrollTo` volt. Feliratkozva minden tick
+   * újraépítette a teljes fát (vonalzó-osztások, beat-pontok — egy 3 perces,
+   * 120 BPM-es zenénél ~450 View —, régiók, jelölők, vágás-javaslatok, keresési
+   * találatok), ráadásul a React Compiler ezt a komponenst kihagyja (a fájlban
+   * lévő eslint-disable miatt), tehát kézi memoizálás sincs mögötte.
+   * A store-feliratkozás React-render NÉLKÜL fut le.
+   */
+  const ppsRef = useRef(pps);
+  ppsRef.current = pps;
+  useEffect(
+    () =>
+      useEditorStore.subscribe((s, prev) => {
+        if (s.playhead === prev.playhead || scrubbing.current) {
+          return;
+        }
+        const target = s.playhead * ppsRef.current;
+        if (Math.abs(target - lastScrollX.current) > 2) {
+          scrollRef.current?.scrollTo({ x: target, animated: false });
+        }
+      }),
+    []
+  );
+
+  // zoom-váltáskor (pps változik) egyszer újra pozicionálunk — ez ritka esemény
   useEffect(() => {
     if (scrubbing.current) {
       return;
     }
-    const target = playhead * pps;
+    const target = useEditorStore.getState().playhead * pps;
     if (Math.abs(target - lastScrollX.current) > 2) {
       scrollRef.current?.scrollTo({ x: target, animated: false });
     }
-  }, [playhead, pps]);
+  }, [pps]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;

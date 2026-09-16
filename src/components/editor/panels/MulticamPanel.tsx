@@ -309,7 +309,7 @@ export function MulticamPanel() {
             </Text>
           </View>
           <View style={styles.angleGrid}>
-            {angles.map((a, i) => (
+            {angles.map((_a, i) => (
               <Pressable
                 key={i}
                 onPress={() => pickAngle(i)}

@@ -12,7 +12,11 @@
       "@/assets/*": [
         "./assets/*"
       ]
-    }
+    },
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "**/*.ts",

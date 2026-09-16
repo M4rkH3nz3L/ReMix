@@ -98,6 +98,19 @@ export function KeyframeGraphEditor({
     }
   }
 
+  /**
+   * Kulcskocka kijelölése koppintásra — és a lejátszófej ODA ugratása, ha a hívó
+   * kért `onSeek`-et. (A propot a Pontos és a Hang panel átadja; eddig a
+   * komponens sosem hívta meg, így a koppintás némán csak kijelölt.)
+   */
+  const selectKeyframe = (i: number) => {
+    setSel(i);
+    const target = kfsRef.current[i];
+    if (target && onSeek) {
+      onSeek(target.time);
+    }
+  };
+
   // ── kulcskocka húzása ───────────────────────────────────────────────────────
   const beginDrag = (i: number) => {
     const kf = kfsRef.current[i];
@@ -292,7 +305,7 @@ export function KeyframeGraphEditor({
                 .onStart(() => runOnJS(beginDrag)(i))
                 .onUpdate((e) => runOnJS(moveDrag)(i, e.translationX, e.translationY))
                 .onEnd(() => runOnJS(endGesture)());
-              const tap = Gesture.Tap().onEnd(() => runOnJS(setSel)(i));
+              const tap = Gesture.Tap().onEnd(() => runOnJS(selectKeyframe)(i));
               return (
                 <GestureDetector key={i} gesture={Gesture.Race(pan, tap)}>
                   <View

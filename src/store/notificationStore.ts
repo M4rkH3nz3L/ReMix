@@ -29,7 +29,7 @@ let unsub: (() => void) | null = null;
 
 const countUnread = (items: AppNotification[]) => items.filter((n) => !n.read).length;
 
-export const useNotifications = create<NotificationState>((set, get) => ({
+export const useNotifications = create<NotificationState>((set) => ({
   items: [],
   unread: 0,
   hydrated: false,

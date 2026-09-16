@@ -2504,7 +2504,8 @@
     "titleLabel": "Cím",
     "priceLabel": "Ár (kredit)",
     "creditsHint": "A kredit a piactér fizetőeszköze. Az éles appban App Store / Play-en veszed; itt (dev) azonnal jóváíródik.",
-    "devGrant": "dev"
+    "devGrant": "dev",
+    "loadFailed": "Nem sikerült betölteni. Ellenőrizd a kapcsolatot."
   },
   "nav": {
     "feed": "Feed",
@@ -2526,7 +2527,8 @@
     "shareToFeed": "Megosztás a feedbe",
     "sharedOk": "A videód felkerült a feedre.",
     "rendering": "Renderelés és megosztás…",
-    "sponsored": "Kiemelt"
+    "sponsored": "Kiemelt",
+    "followFailed": "A követés nem sikerült."
   },
   "channel": {
     "posts": "Posztok",

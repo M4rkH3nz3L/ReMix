@@ -87,22 +87,27 @@ export default function FeedScreen() {
 
   const onLike = (post: FeedPost) => {
     const liked = !post.viewerLiked;
-    patch(post.id, (p) => ({
+    const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
-      viewerLiked: liked,
-      counts: { ...p.counts, likes: p.counts.likes + (liked ? 1 : -1) },
-    }));
-    toggleLike(post.id, liked).catch(() => {});
+      viewerLiked: on,
+      counts: { ...p.counts, likes: p.counts.likes + (on ? 1 : -1) },
+    });
+    patch(post.id, apply(liked)); // optimista: azonnali visszajelzés
+    // ⚠️ VISSZAGÖRGETÉS hibánál: enélkül az UI a szerverrel ELLENTÉTES állapotot
+    // mutatott a következő frissítésig (a felhasználó azt hitte, lájkolt)
+    toggleLike(post.id, liked).catch(() => patch(post.id, apply(!liked)));
   };
 
   const onSave = (post: FeedPost) => {
     const saved = !post.viewerSaved;
-    patch(post.id, (p) => ({
+    const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
-      viewerSaved: saved,
-      counts: { ...p.counts, saves: p.counts.saves + (saved ? 1 : -1) },
-    }));
-    toggleSave(post.id, saved).catch(() => {});
+      viewerSaved: on,
+      counts: { ...p.counts, saves: p.counts.saves + (on ? 1 : -1) },
+    });
+    patch(post.id, apply(saved));
+    // visszagörgetés hibánál (lásd onLike)
+    toggleSave(post.id, saved).catch(() => patch(post.id, apply(!saved)));
   };
 
   const onRemix = (post: FeedPost) => {
@@ -124,9 +129,14 @@ export default function FeedScreen() {
       .finally(() => setBusy(false));
   };
 
+  // ⚠️ A sikert csak a hívás UTÁN jelentjük: korábban az Alert azonnal ment, így
+  // hálózati hiba esetén is azt mondtuk, hogy „követed" — pedig nem.
   const onFollow = (post: FeedPost) => {
-    toggleFollow(post.creator.id, true).catch(() => {});
-    Alert.alert(t('feed.title'), t('feed.followed', { name: post.creator.displayName }));
+    toggleFollow(post.creator.id, true)
+      .then(() =>
+        Alert.alert(t('feed.title'), t('feed.followed', { name: post.creator.displayName }))
+      )
+      .catch(() => Alert.alert(t('common.error'), t('feed.followFailed')));
   };
 
   const viewedRef = useRef<Set<string>>(new Set());

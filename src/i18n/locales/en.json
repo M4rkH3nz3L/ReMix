@@ -2504,7 +2504,8 @@
     "titleLabel": "Title",
     "priceLabel": "Price (credits)",
     "creditsHint": "Credits are the shop currency. In the live app you buy them via the App Store / Play; here (dev) they are granted instantly.",
-    "devGrant": "dev"
+    "devGrant": "dev",
+    "loadFailed": "Could not load. Check your connection."
   },
   "nav": {
     "feed": "Feed",
@@ -2526,7 +2527,8 @@
     "shareToFeed": "Share to feed",
     "sharedOk": "Your video is live on the feed.",
     "rendering": "Rendering & sharing…",
-    "sponsored": "Sponsored"
+    "sponsored": "Sponsored",
+    "followFailed": "Could not follow."
   },
   "channel": {
     "posts": "Posts",

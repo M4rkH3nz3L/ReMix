@@ -2504,7 +2504,8 @@
     "titleLabel": "Titel",
     "priceLabel": "Preis (Credits)",
     "creditsHint": "Credits sind die Shop-Währung. In der Live-App kaufst du sie über App Store / Play; hier (dev) werden sie sofort gutgeschrieben.",
-    "devGrant": "dev"
+    "devGrant": "dev",
+    "loadFailed": "Laden fehlgeschlagen. Prüfe die Verbindung."
   },
   "nav": {
     "feed": "Feed",
@@ -2526,7 +2527,8 @@
     "shareToFeed": "Im Feed teilen",
     "sharedOk": "Dein Video ist jetzt im Feed.",
     "rendering": "Rendern & Teilen…",
-    "sponsored": "Gesponsert"
+    "sponsored": "Gesponsert",
+    "followFailed": "Folgen fehlgeschlagen."
   },
   "channel": {
     "posts": "Beiträge",

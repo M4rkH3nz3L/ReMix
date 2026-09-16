@@ -61,6 +61,9 @@ export default function ShopScreen() {
   const [purchases, setPurchases] = useState<PurchasedItem[]>([]);
   const [listings, setListings] = useState<ShopItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // ⚠️ hiba ≠ üres: enélkül a hálózati hiba „üres boltként" jelent meg,
+  // és a felhasználónak esélye sem volt újrapróbálni
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [creditsOpen, setCreditsOpen] = useState(false);
@@ -78,18 +81,27 @@ export default function ShopScreen() {
     refreshBalance();
     if (tab === 'browse') {
       listShopItems({ kind: kind ?? undefined, sort: 'new' })
-        .then(setItems)
-        .catch(() => {})
+        .then((rows) => {
+          setItems(rows);
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false));
     } else if (tab === 'purchases') {
       myPurchases()
-        .then(setPurchases)
-        .catch(() => {})
+        .then((rows) => {
+          setPurchases(rows);
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false));
     } else {
       myListings()
-        .then(setListings)
-        .catch(() => {})
+        .then((rows) => {
+          setListings(rows);
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false));
     }
   }, [tab, kind, refreshBalance]);
@@ -346,6 +358,19 @@ export default function ShopScreen() {
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color={palette.accent} />
+        </View>
+      ) : loadError ? (
+        // ⚠️ hiba ≠ üres: a felhasználó lássa, hogy baj volt, és tudjon újrapróbálni
+        <View style={styles.loadingBox}>
+          <Text style={styles.empty}>{t('shop.loadFailed')}</Text>
+          <PrimaryButton
+            label={t('common.retry')}
+            icon="refresh-outline"
+            onPress={() => {
+              setLoading(true);
+              load();
+            }}
+          />
         </View>
       ) : tab === 'browse' ? (
         <FlatList

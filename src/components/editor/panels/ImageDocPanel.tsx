@@ -255,7 +255,7 @@ export function ImageDocPanel() {
                     {TEXT_COLORS.map((c) => (
                       <Pressable
                         key={c}
-                        onPress={() => commit(updateLayer(doc, layer.id, { color: c } as never))}
+                        onPress={() => commit(updateLayer(doc, layer.id, { color: c }))}
                         style={[
                           styles.swatch,
                           { backgroundColor: c },
@@ -271,14 +271,14 @@ export function ImageDocPanel() {
                       commit(
                         updateLayer(doc, layer.id, {
                           fontSize: Math.max(2, layer.fontSize - 0.5),
-                        } as never)
+                        })
                       )
                     }
                     onInc={() =>
                       commit(
                         updateLayer(doc, layer.id, {
                           fontSize: Math.min(24, layer.fontSize + 0.5),
-                        } as never)
+                        })
                       )
                     }
                   />
@@ -290,12 +290,12 @@ export function ImageDocPanel() {
                   <Chip
                     label={t('panels.imageDoc.fitCover')}
                     active={layer.fit !== 'contain'}
-                    onPress={() => commit(updateLayer(doc, layer.id, { fit: 'cover' } as never))}
+                    onPress={() => commit(updateLayer(doc, layer.id, { fit: 'cover' }))}
                   />
                   <Chip
                     label={t('panels.imageDoc.fitContain')}
                     active={layer.fit === 'contain'}
-                    onPress={() => commit(updateLayer(doc, layer.id, { fit: 'contain' } as never))}
+                    onPress={() => commit(updateLayer(doc, layer.id, { fit: 'contain' }))}
                   />
                 </View>
               ) : null}
@@ -304,7 +304,7 @@ export function ImageDocPanel() {
                   {TEXT_COLORS.map((c) => (
                     <Pressable
                       key={c}
-                      onPress={() => commit(updateLayer(doc, layer.id, { fill: c } as never))}
+                      onPress={() => commit(updateLayer(doc, layer.id, { fill: c }))}
                       style={[
                         styles.swatch,
                         { backgroundColor: c },

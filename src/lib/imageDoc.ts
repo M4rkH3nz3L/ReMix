@@ -48,10 +48,20 @@ export function removeLayer(doc: ImageDoc, id: string): ImageDoc {
   return { ...doc, layers, renderedUri: undefined };
 }
 
-export function updateLayer(
+/**
+ * Egy réteg mezőinek módosítása.
+ *
+ * ⚠️ A `patch` típusa SZÁNDÉKOSAN generikus. A naiv `Partial<ImageLayer>` a
+ * unió fölött disztributál (`Partial<FillLayer> | Partial<PhotoLayer> | …`),
+ * ezért egyetlen konkrét patch — pl. `{ fontSize: 12 }` — sem illeszkedett rá,
+ * és a hívóknak `as never`-t kellett írniuk. A generikus paraméter viszont a
+ * hívás helyén MÁR SZŰKÍTETT rétegtípusból következtethető, így a patch valódi
+ * típusellenőrzést kap az assertion helyett.
+ */
+export function updateLayer<L extends ImageLayer = ImageLayer>(
   doc: ImageDoc,
   id: string,
-  patch: Partial<ImageLayer>
+  patch: Partial<L>
 ): ImageDoc {
   let changed = false;
   const layers = doc.layers.map((l) => {

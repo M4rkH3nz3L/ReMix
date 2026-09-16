@@ -10,8 +10,18 @@ Interaktív videószerkesztő; architektúra és állapot a README.md-ben.
 - Egy rAF-mesteróra (`src/hooks/usePlaybackClock.ts`) hajtja a lejátszást; a
   videó/hang rétegek (`src/components/preview/`) ehhez szinkronizálnak — új
   időzített funkció a playheadből számoljon, ne saját órából.
-- Minden szerkesztő-művelet a zustand store `mutateProject`-jén megy át (undo!).
-- Idő mindenhol másodpercben, vászon-pozíciók 0–1 normalizálva.
-- Ellenőrzés: `npx tsc --noEmit` + `npm run lint` (a `react-hooks/immutability`
-  és `react-hooks/refs` szabályok szándékosan kikapcsolva — Reanimated shared
-  value-k és expo-video/audio player-mutációk miatt).
+- Minden szerkesztő-művelet a **command buson** megy át (undo!):
+  `useEditorStore.dispatch(command, actor)` — köteghez `applyBatch(commands, actor)`
+  —, amit a `src/lib/commands.ts` `applyCommand()` pure reducere hajt végre.
+  A projektet SOHA ne írd közvetlenül (nincs `.tracks.push`, `.clips.splice`,
+  `setState` a store-on kívül).
+- Idő mindenhol másodpercben, vászon-pozíciók 0–1 normalizálva. A vágások és
+  kulcskockák a projekt **frame-rácsára** ülnek (`src/lib/frames.ts`,
+  `project.fps`; a timecode `HH:MM:SS:FF`).
+- A `src/lib/` magok szándékosan expo-mentesek → önmagukban tesztelhetők; a
+  hálózati réteg a hozzájuk tartozó `*Client.ts`-ben van.
+- Ellenőrzés: **`npm run audit`** (= `tsc --noEmit` + `expo lint` + `jest`).
+  A `react-hooks/immutability` és `react-hooks/refs` szabályok szándékosan
+  kikapcsolva — Reanimated shared value-k és expo-video/audio player-mutációk
+  miatt. Új teszt: `src/**/*.test.ts` (kliens) vagy `server/**/*.test.js` (worker).
+- A nyitott technikai adósság és a go-live blokkolók: `AUDITBUGS.md`.

@@ -43,7 +43,7 @@ function fadeFactor(t: number, dur: number, fi: number, fo: number): number {
  *
  * A gyakori műveletek (hangerő, be-/kifedés, hossz-vágás, hang-javítás) AZ
  * ESZKÖZÖN, worker nélkül: az élő előnézet `expo-audio`-val szól, a szerkesztés
- * NEM-destruktív (a klip mezőit állítja `mutateProject`-en át → undo), és a
+ * NEM-destruktív (a klip mezőit állítja `dispatch`-en át → undo), és a
  * végleges keverés a (szintén eszközön futó) renderben történik. Így az
  * előnézet és az export egyezik, és nem kell külön hang-appot nyitni.
  */

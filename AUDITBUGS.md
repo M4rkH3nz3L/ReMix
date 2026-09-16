@@ -25,7 +25,18 @@
 
 A hiányzó pontok nem a feature-mélységből, hanem a **production-keményítés** hiányából jönnek. A megosztottság feltűnő: az *alkalmazás-szintű* munka ~8/10 szintű, a *kiadási* infrastruktúra viszont gyakorlatilag 0/10 — a projekt **fejlesztésre kiválóan konfigurált, kiadásra egyáltalán nincs konfigurálva**. Ehhez jön két néma adatvesztési út, egy dupla-sebesség bug, és egy hitelesítetlen worker.
 
-> **Állapot 2026-09-15:** a **P1-1 / P1-3 / P1-4 is javítva** (`7591aa8`, `dab619e`, `5344bde`, `13a69e7`) — a worker-hitelesítés élő támadás-tesztekkel igazolva. Korábban: mind az 5 **P0 javítva** (`661a694`, `30a93eb`, `73d9118`, `f1f87c8`, `757f0ce`), és a **P1-2 kiadás-blokkolókból 3/4 kész** (`4c75e7a`) — a B3 a te Expo-fiókodat igényli. A pontszám újraértékelése a preview build után esedékes.
+> **Állapot 2026-09-16 — P0/P1/P2/P3 nagyrészt lezárva.**
+> **P0: 5/5** · **P1: 7/7** · **P2: 5/6** (a React Compiler bail-ok mérésre várnak)
+> **P3: 6/15** — a kockázatmentes, mechanikus tételek kész (`0ea6944`, `052051f`,
+> `2a67079`, `51814c1`): 4 szigorúbb tsconfig-flag, −962 sor halott kód,
+> `updateLayer` generikus (6 `as never` megszűnt), időzítő-cleanup + `alive`
+> guardok, AGENTS.md a valós architektúrára. Teszt-infrastruktúra: **133 teszt**,
+> `npm run audit` + CI.
+> Hátra: P3-3 (határ-validáció), P3-5 (AssistantPanel/editorStore bontás),
+> P3-6 (duplikáció), P3-7 (retry), P3-8/9/10 (megszakíthatóság, res.json, UI-hibák),
+> P3-13/14 (cache-korlátok, events-payload).
+>
+> **Korábbi állapot 2026-09-15:** a **P1-1 / P1-3 / P1-4 is javítva** (`7591aa8`, `dab619e`, `5344bde`, `13a69e7`) — a worker-hitelesítés élő támadás-tesztekkel igazolva. Korábban: mind az 5 **P0 javítva** (`661a694`, `30a93eb`, `73d9118`, `f1f87c8`, `757f0ce`), és a **P1-2 kiadás-blokkolókból 3/4 kész** (`4c75e7a`) — a B3 a te Expo-fiókodat igényli. A pontszám újraértékelése a preview build után esedékes.
 
 ---
 

@@ -219,8 +219,31 @@ export function trackEnd(track: Track): number {
   return track.clips.reduce((max, c) => Math.max(max, clipEnd(c)), 0);
 }
 
+/**
+ * A projekt teljes hossza (a leghosszabb sáv vége).
+ *
+ * ⚡ MEMOIZÁLVA a projekt-objektum IDENTITÁSÁRA. Ez a függvény a legforróbb
+ * útvonalon fut: a `TransportBar` zustand-selectorában (tehát MINDEN store-
+ * `set`-nél), a rAF-óra minden tickjében, a `setPlayhead` clampjében és a
+ * `Timeline` minden renderjében — lejátszás közben ez percenként több ezer
+ * teljes klip-bejárást jelentene.
+ *
+ * A cache azért helyes, mert a szerkesztés KIZÁRÓLAG a command buson megy
+ * (`applyCommand`), ami spread-alapú, immutábilis: bármilyen változás ÚJ
+ * projekt-objektumot ad, tehát új cache-bejegyzést. Helyben mutáló írás
+ * elavult értéket adna — ilyen a kódbázisban nincs (az audit 0 megkerülést
+ * talált), és a `WeakMap` miatt a régi projektek szabadon felszabadulnak.
+ */
+const durationCache = new WeakMap<Project, number>();
+
 export function projectDuration(project: Project): number {
-  return project.tracks.reduce((max, t) => Math.max(max, trackEnd(t)), 0);
+  const hit = durationCache.get(project);
+  if (hit !== undefined) {
+    return hit;
+  }
+  const value = project.tracks.reduce((max, t) => Math.max(max, trackEnd(t)), 0);
+  durationCache.set(project, value);
+  return value;
 }
 
 /** A t időpontban aktív klipek egy sávon (start ≤ t < vég). */

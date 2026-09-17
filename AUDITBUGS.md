@@ -25,18 +25,44 @@
 
 A hiányzó pontok nem a feature-mélységből, hanem a **production-keményítés** hiányából jönnek. A megosztottság feltűnő: az *alkalmazás-szintű* munka ~8/10 szintű, a *kiadási* infrastruktúra viszont gyakorlatilag 0/10 — a projekt **fejlesztésre kiválóan konfigurált, kiadásra egyáltalán nincs konfigurálva**. Ehhez jön két néma adatvesztési út, egy dupla-sebesség bug, és egy hitelesítetlen worker.
 
-> **Állapot 2026-09-16 — P0/P1/P2/P3 nagyrészt lezárva.**
+> **Állapot 2026-09-17 — P0/P1/P2/P3 lezárva; kódolni való nem maradt.**
 > **P0: 5/5** · **P1: 7/7** · **P2: 5/6** (a React Compiler bail-ok mérésre várnak)
-> **P3: 10/15** — `2a75195` (duplikáció-konszolidáció + védett JSON), `c0d54c3`
-> (a halott ✕ gomb), `ebdf5bc` (a UI ne hazudjon: feed rollback + shop hiba≠üres).
-> Korábban: a kockázatmentes, mechanikus tételek kész (`0ea6944`, `052051f`,
-> `2a67079`, `51814c1`): 4 szigorúbb tsconfig-flag, −962 sor halott kód,
-> `updateLayer` generikus (6 `as never` megszűnt), időzítő-cleanup + `alive`
-> guardok, AGENTS.md a valós architektúrára. Teszt-infrastruktúra: **133 teszt**,
-> `npm run audit` + CI.
-> Hátra: **P3-3** (határ-validáció a 37 `.json() as T` helyen), **P3-5**
-> (AssistantPanel 2093 sor / editorStore 1541 sor bontása), **P3-7** (nulla retry),
-> **P3-13/14** (cache-korlátok, events-payload) — utóbbi kettő MÉRÉST igényel.
+> **P3: 15/15** — az utolsó öt tétel is kész:
+> - **P3-5** (`a4cbbe6`, `6234070`): az editorStore **1541 → 1360** sor. A
+>   roll/slip/slide → `lib/trimEdit.ts`, a range-törlés → `lib/rangeEdit.ts`, a
+>   pre-compose → `lib/preCompose.ts`. Mind tiszta függvény, a store koordinátor
+>   lett, nem motor. **63 új teszt** a projekt legkockázatosabb matematikájára.
+> - **P3-7** (`2aa674d`): retry-réteg (`lib/netRetry.ts`) — **szándékosan csak
+>   idempotens olvasásra** (render-poll, /music, /tts/voices, /stickers3d). A
+>   /shop, /billing, /media/upload, /invite, /notify **kimarad**: ott az ismétlés
+>   dupla terhelést okozna. 22 teszt, köztük a „nem próbálja újra" irány.
+> - **P3-3** (`9e28b1e`): `lib/parseGuards.ts` — tartalom-validáció ott, ahol a
+>   worker válasza klip-idővé / vágásponttá / kulcskockává válik (scenes,
+>   silence, shot-score, reframe). 21 teszt.
+> - **P3-14** (`cfdd841`): **MEGMÉRVE**, és a gyanú alábecsülte. 100 klipes
+>   projekten egy `REPLACE_TRACKS` **39,9 KB**, a vegyes napló **1,2 MB** — és
+>   ezt írta újra MINDEN autosave; a csupa nehéz napló **11,7 MB**, az Android
+>   2 MB/kulcs limit fölött. Ellenőrizve, hogy a naplót KIZÁRÓLAG a
+>   `describeCommand()` olvassa (nincs visszajátszás, és NEM ez az undo-verem),
+>   ezért `lib/eventLog.ts` a klipek helyére `{ id, kind }` csonkot tesz —
+>   a darabszám és az id-k megmaradnak (üres tömbbel a napló hazudna).
+>   **39,9 KB → 4,0 KB (~10×)**, `slim: true` jelöléssel. 10 teszt.
+> - **P3-13** (`d8674c5`, `d91750d`): `lib/lruCache.ts` (LRU, limit 64) a hat
+>   elemzés-cache-re, mind kapott `clear*Memory()`-t, és a `clearCaches()` végre
+>   hívja is őket. A filmstrip-JPEG-ek (`<cache>/VideoThumbnails/`, a natív
+>   forrásból ellenőrizve) mostantól **mérve és ürítve** — eddig a felhasználónak
+>   mutatott cache-méret kevesebb volt a valóságnál. 9 teszt.
+>
+> Teszt-infrastruktúra: **238 teszt**, `npm run audit` (tsc + lint + jest) + CI.
+> Korábban: `2a75195` (duplikáció-konszolidáció), `c0d54c3` (a halott ✕ gomb),
+> `ebdf5bc` (feed rollback + shop hiba≠üres), `0ea6944`/`052051f`/`2a67079`/
+> `51814c1` (4 szigorúbb tsconfig-flag, −962 sor halott kód, `updateLayer`
+> generikus, időzítő-cleanup, AGENTS.md a valós architektúrára).
+>
+> **Hátra — egyik sem kódolási feladat:** **P2-1** (React Compiler bail-ok: 42/60
+> függvény, köztük a Timeline és a PreviewSurface — eszközön mért profil nélkül
+> optimalizálni találgatás lenne), és **B3** (`npx eas init`), ami a te
+> Expo-fiókodat igényli.
 >
 > **Korábbi állapot 2026-09-15:** a **P1-1 / P1-3 / P1-4 is javítva** (`7591aa8`, `dab619e`, `5344bde`, `13a69e7`) — a worker-hitelesítés élő támadás-tesztekkel igazolva. Korábban: mind az 5 **P0 javítva** (`661a694`, `30a93eb`, `73d9118`, `f1f87c8`, `757f0ce`), és a **P1-2 kiadás-blokkolókból 3/4 kész** (`4c75e7a`) — a B3 a te Expo-fiókodat igényli. A pontszám újraértékelése a preview build után esedékes.
 

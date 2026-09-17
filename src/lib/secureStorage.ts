@@ -26,6 +26,19 @@ const CHUNK = 1800;
 /** weben nincs Keychain/Keystore — ott AsyncStorage a tár. Lusta hívás (nem React hook!), hogy tesztelhető maradjon. */
 const hasKeychain = () => Platform.OS !== 'web';
 
+/**
+ * 🖥️ Szerveroldali (SSR) futás: `web.output: "static"` mellett az expo-router
+ * NODE-ban rendereli le a fát, ahol nincs `window`. Az AsyncStorage web-
+ * implementációja viszont `window.localStorage`-ra épül → `ReferenceError:
+ * window is not defined`, és a statikus export elhasal, mielőtt bármit
+ * kirajzolna.
+ *
+ * Node-ban NINCS értelmes perzisztencia (nincs böngésző-session), ezért ott a
+ * tár csendben no-op: az olvasás `null`, az írás elnyelődik. A kliens-oldali
+ * hidratáláskor a valódi adapter veszi át, tehát a felhasználó semmit nem veszít.
+ */
+const isServer = () => typeof window === 'undefined';
+
 const countKey = (key: string) => `${key}.n`;
 const partKey = (key: string, i: number) => `${key}.${i}`;
 
@@ -89,6 +102,9 @@ async function secureDelete(key: string): Promise<void> {
  */
 export const secureStorage = {
   getItem: async (key: string): Promise<string | null> => {
+    if (isServer()) {
+      return null; // SSR: nincs böngésző-tár, és az AsyncStorage `window`-ra épül
+    }
     if (!hasKeychain()) {
       return AsyncStorage.getItem(key);
     }
@@ -111,6 +127,9 @@ export const secureStorage = {
   },
 
   setItem: async (key: string, value: string): Promise<void> => {
+    if (isServer()) {
+      return; // SSR: nincs hova írni — a kliens-oldali hidratálás majd elintézi
+    }
     if (!hasKeychain()) {
       await AsyncStorage.setItem(key, value);
       return;
@@ -124,6 +143,9 @@ export const secureStorage = {
   },
 
   removeItem: async (key: string): Promise<void> => {
+    if (isServer()) {
+      return;
+    }
     if (!hasKeychain()) {
       await AsyncStorage.removeItem(key);
       return;

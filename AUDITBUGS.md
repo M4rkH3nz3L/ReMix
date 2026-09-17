@@ -33,7 +33,7 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 6 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 7 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
@@ -45,7 +45,7 @@
 | 4 | ~~**S6** · `ios.privacyManifests`~~ | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ✔️ tracking=false + 4 adattípus |
 | 5 | ~~**K9** · `.env.example` hiányos~~ | a lelet ELÉVÜLT: mind a 7 változó dokumentálva van | ✔️ helyette a valódi csapda leírva |
 | 6 | ~~**P3-4** · 9 db `as never`~~ | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ✔️ produkciós kódban **0** maradt |
-| 7 | **P1-9** · webes statikus render (`window is not defined`) | a beállított `web.output: "static"` ma nem működik | ⬜️ |
+| 7 | ~~**P1-9** · webes statikus render (`window is not defined`)~~ | a beállított `web.output: "static"` ma nem működik | ✔️ 11 útvonal exportál, elő/utó méréssel |
 | 8 | **K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek | template-maradványok; kozmetikai, de a store-listán látszik | ⬜️ |
 | 9 | **EAS env** · a `preview` környezet lokális Supabase-t kapott, és 5 változó hiányzik | a mostani build auth/social/Pro nélkül fut — **hosztolt értékek kellenek (RÁD VÁR)** | ⬜️ |
 | 10 | **S2/S3** · `expo-updates` (OTA) és `expo-dev-client` | architekturális döntés, nem hibajavítás — **egyeztetést igényel** | ⬜️ |
@@ -266,7 +266,7 @@ Az `expo-secure-store` nincs is a függőségek között; minden AsyncStorage (t
 
 **Javítás — minimum:** (a) unit-tesztek a már pure, tesztelhető magokra (`frames.ts`, `keyframes.ts`, `trackPlan.ts`, `commands.ts`, `workflow.ts`, `safeZone.ts`, `profanity.ts`, `vtt.ts`, `ass.ts` — ezek mind szándékosan expo-mentesek); (b) `npm run audit` minőség-kapu script: `expo-doctor && expo lint && tsc --noEmit && knip && npm audit`; (c) CI workflow, ami ezt futtatja.
 
-### P1-9 · A webes statikus render elszáll (`window is not defined`) 🆕
+### ~~P1-9 · A webes statikus render elszáll (`window is not defined`)~~ — ✔️ **JAVÍTVA**
 **Súlyosság: KÖZEPES** · `app.json` `web.output: "static"` · `src/lib/supabase.ts`
 
 Az `npx expo start --web` (és így az `expo export --platform web`) **nem áll fel**:
@@ -283,10 +283,19 @@ a hiba korábbi.
 **Következmény:** a konfigurált `web.output: "static"` ma nem működik. Mobilra
 nincs hatása (a natív buildet nem érinti), de ha a web cél, ez blokkoló.
 
-**Javítás iránya:** a Supabase storage-adapter legyen SSR-biztos — ha nincs
-`window`/`localStorage` (Node), adjon vissza `null`-t írás/olvasásnál a
-perzisztencia helyett. A `secureStorage`-ban ez egy `typeof window === 'undefined'`
-ág. (Megjegyzés: a web-render ezen túl is korlátozott — a videó/kamera/média-tár
+**✔️ ELVÉGEZVE:** a `secureStorage` mindhárom művelete (`getItem`/`setItem`/`removeItem`)
+`typeof window === 'undefined'` esetén azonnal kilép — Node-ban nincs értelmes
+perzisztencia, a kliens-oldali hidratálás pedig átveszi, tehát a felhasználó
+semmit nem veszít.
+
+**Mérve mindkét irányban, nem feltételezve:**
+- javítás NÉLKÜL: `npx expo export --platform web` → `ReferenceError: window is not defined`;
+- javítással: **11 statikus útvonal** generálódik (`/`, `/auth`, `/feed`, `/shop`,
+  `/profile`, `/editor/[id]`, `/player/[id]`, `/channel/[id]`, `/collab/[id]`, …).
+
+4 regressziós teszt őrzi (SSR-ben `null`/no-op és hozzá SEM nyúl az
+AsyncStorage-hoz; `window` megléte esetén a normál út fut).
+(Megjegyzés: a web-render ezen túl is korlátozott — a videó/kamera/média-tár
 natív modulok ott nem futnak.)
 
 ### P1-8 · Környezet-higiénia ✅

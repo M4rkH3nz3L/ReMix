@@ -85,4 +85,48 @@ describe('secureStorage — titkosított session-tár', () => {
     expect(keychain.size).toBe(0);
     expect(await secureStorage.getItem('k')).toBeNull();
   });
+
+  describe('🖥️ SSR (Node, nincs `window`) — a statikus web-export ne haljon el', () => {
+    // A `web.output: "static"` mellett az expo-router NODE-ban rendereli a fát.
+    // Az AsyncStorage web-implementációja `window.localStorage`-ra épül, ezért
+    // enélkül a teljes export elszáll: `ReferenceError: window is not defined`.
+    const realWindow = globalThis.window;
+    // a külső `beforeEach` a TÁRAKAT üríti, a mock-hívásnaplót nem — itt viszont
+    // épp azt állítjuk, hogy NEM történt hívás, ezért külön nullázzuk
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+    afterEach(() => {
+      globalThis.window = realWindow;
+    });
+
+    const removeWindow = () => {
+      // @ts-expect-error — szándékosan szimuláljuk a Node-környezetet
+      delete globalThis.window;
+    };
+
+    it('olvasáskor `null`, és HOZZÁ SEM NYÚL az AsyncStorage-hoz', async () => {
+      removeWindow();
+      await expect(secureStorage.getItem('sb-session')).resolves.toBeNull();
+      expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('írás csendben elnyelődik (nincs hova perzisztálni)', async () => {
+      removeWindow();
+      await expect(secureStorage.setItem('sb-session', 'x')).resolves.toBeUndefined();
+      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('törlés sem dob', async () => {
+      removeWindow();
+      await expect(secureStorage.removeItem('sb-session')).resolves.toBeUndefined();
+      expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
+    });
+
+    it('ha VAN `window`, a normál út fut tovább (nem nyeltünk el mindent)', async () => {
+      await secureStorage.getItem('sb-session');
+      expect(SecureStore.getItemAsync).toHaveBeenCalled();
+    });
+  });
 });

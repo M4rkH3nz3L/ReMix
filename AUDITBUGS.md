@@ -29,6 +29,34 @@
 - **−4 tesztelés:** nincs komponens- vagy E2E-teszt; a 249 teszt a tiszta magokat és a határokat fedi, a UI-t nem.
 - **−3 egyéb:** 15 tranzitív npm-audit találat az Expo eszközláncából (két gyökér-ok), amit nem az app kontrollál.
 
+---
+
+## 📋 TODO — a maradék tételek, sorrendben
+
+> **Hol tartunk: 0 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
+> a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
+
+| # | Tétel | Miért most | Állapot |
+|---|---|---|---|
+| 1 | **P3-9** · nyers `res.json()` a `render.ts` 8 pontján | a felhasználó „JSON Parse error"-t lát a valódi hibaüzenet helyett | ⬜️ |
+| 2 | **P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ⬜️ |
+| 3 | **S7** · ATS / cleartext HTTP | release buildben az iOS ATS és az Android is blokkolja a `http://`-t → minden felhő-hívás némán elhal | ⬜️ |
+| 4 | **S6** · `ios.privacyManifests` | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ⬜️ |
+| 5 | **K9** · `.env.example` hiányos | 5 valóban használt `EXPO_PUBLIC_*` nincs dokumentálva → a következő build újra hiányos env-vel megy | ⬜️ |
+| 6 | **P3-4** · 9 db `as never` | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ⬜️ |
+| 7 | **P1-9** · webes statikus render (`window is not defined`) | a beállított `web.output: "static"` ma nem működik | ⬜️ |
+| 8 | **K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek | template-maradványok; kozmetikai, de a store-listán látszik | ⬜️ |
+| 9 | **EAS env** · a `preview` környezet lokális Supabase-t kapott, és 5 változó hiányzik | a mostani build auth/social/Pro nélkül fut — **hosztolt értékek kellenek (RÁD VÁR)** | ⬜️ |
+| 10 | **S2/S3** · `expo-updates` (OTA) és `expo-dev-client` | architekturális döntés, nem hibajavítás — **egyeztetést igényel** | ⬜️ |
+| 11 | **Mérésre vár 1.** · valódi render-számok lejátszás alatt | most már van futtatható build — ez dönti el, számít-e a 4 komponens fordító-kimaradása | ⬜️ |
+
+**Menet közben lezárva (a szakasz-szöveg utólag frissítve):**
+- **P2-5** ✔️ — a hangerő-küszöb (`> 0.005`) mindkét helyen megvan (`PreviewSurface.tsx`, `AudioLayer.tsx`).
+- **P2-6** ✔️ — a `HistoryModal` feltételesen mountolódik (`TransportBar.tsx:229`).
+- **K4** ✔️ — `ITSAppUsesNonExemptEncryption: false` (`07d7070`).
+- **B1–B4** ✔️ — bundle ID, `eas.json`, EAS-projekt (`@vided/remix`), env-hivatkozás.
+
 > **Állapot 2026-09-17 — P0/P1/P2/P3 lezárva; kódolni való nem maradt.**
 > **P0: 5/5** · **P1: 7/7** · **P2: 6/6** · **P3: 15/15** — az utolsó tételek:
 > - **P3-5** (`a4cbbe6`, `6234070`): az editorStore **1541 → 1360** sor. A

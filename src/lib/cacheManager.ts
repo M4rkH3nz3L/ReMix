@@ -1,7 +1,12 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
+import { clearBeatMemory } from '@/lib/beats';
+import { clearCutlistMemory } from '@/lib/cutlist';
 import { clearProxyMemory } from '@/lib/proxy';
 import { clearThumbnailCache } from '@/lib/thumbnails';
+import { clearTranscriptMemory } from '@/lib/transcripts';
+import { clearVisionMemory } from '@/lib/visionSearch';
+import { clearVoiceProxyMemory } from '@/lib/voiceProxy';
 import { clearWaveformMemory } from '@/lib/waveform';
 
 /**
@@ -67,6 +72,13 @@ export function clearCaches(): void {
   clearProxyMemory();
   clearWaveformMemory();
   clearThumbnailCache();
+  // az elemzés-cache-ek eddig KIMARADTAK innen: a „cache ürítése" gomb nem
+  // szabadította fel őket, pedig a munkamenet alatt korlátlanul nőttek
+  clearBeatMemory();
+  clearCutlistMemory();
+  clearTranscriptMemory();
+  clearVisionMemory();
+  clearVoiceProxyMemory();
 }
 
 /** Ember-olvasható méret. */

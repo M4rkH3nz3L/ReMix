@@ -1,6 +1,7 @@
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
+import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
 
 /**
  * Beat-engine kliens (P0‑2): a worker /beats végpontja BPM-et, beat/downbeat-
@@ -23,7 +24,12 @@ export interface BeatGrid {
   duration: number;
 }
 
-const memory = new Map<string, BeatGrid>();
+const memory = new LruCache<BeatGrid>(ANALYSIS_CACHE_LIMIT);
+
+/** 🧹 a beat-rács cache ürítése (a `cacheManager.clearCaches()` hívja) */
+export function clearBeatMemory(): void {
+  memory.clear();
+}
 
 async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   const controller = new AbortController();

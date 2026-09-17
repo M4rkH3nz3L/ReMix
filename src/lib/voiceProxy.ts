@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
+import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
 
 /**
  * 🎙️ Voice Studio ELŐNÉZETI PROXY.
@@ -31,7 +32,14 @@ export interface VoiceOpts {
 }
 
 /** uri+beállítás → helyi fájl (null = nincs/nem kell proxy) */
-const memory = new Map<string, string | null>();
+// a kiszórás itt biztonságos: a generált fájl a lemezen marad, és a következő
+// híváskor a `target.exists` ág azonnal visszatölti — nincs újragenerálás
+const memory = new LruCache<string | null>(ANALYSIS_CACHE_LIMIT);
+
+/** 🧹 a hang-proxy memória-térkép ürítése (a fájlokat NEM törli) */
+export function clearVoiceProxyMemory(): void {
+  memory.clear();
+}
 const inflight = new Map<string, Promise<string | null>>();
 
 function cacheKey(uri: string, opts: VoiceOpts): string {

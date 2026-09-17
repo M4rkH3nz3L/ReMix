@@ -6,6 +6,7 @@ import type { ProgressUpdate } from '@/lib/progress';
 import { mapCuesToTimeline, parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 import type { Project, VideoClip } from '@/types/project';
+import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
 
 /**
  * Idővonal-átirat az AI-kontextushoz (full-plan F3, szemantikus index): a
@@ -19,8 +20,14 @@ const MAX_AUTO_TRANSCRIBE_SECONDS = 15 * 60;
 /** ennyi sort adunk az AI-kontextusba legfeljebb */
 const MAX_CONTEXT_LINES = 200;
 
-const cueCache = new Map<string, SrtCue[]>();
-const wordCueCache = new Map<string, SrtCue[]>();
+const cueCache = new LruCache<SrtCue[]>(ANALYSIS_CACHE_LIMIT);
+const wordCueCache = new LruCache<SrtCue[]>(ANALYSIS_CACHE_LIMIT);
+
+/** 🧹 a felirat-cache ürítése (a `cacheManager.clearCaches()` hívja) */
+export function clearTranscriptMemory(): void {
+  cueCache.clear();
+  wordCueCache.clear();
+}
 
 /**
  * Szó-szintű cue-k a projekt videóihoz (text-based editing, P0‑3) —

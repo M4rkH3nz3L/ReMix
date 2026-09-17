@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
 import { rangeList, timeList } from '@/lib/parseGuards';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
@@ -18,8 +19,14 @@ import type { SilenceRange } from '@/lib/cutplan';
 export { buildCutPlan, buildSceneSplitPlan } from '@/lib/cutplan';
 export type { CutPlan, SceneSplitPlan, SilenceRange } from '@/lib/cutplan';
 
-const memory = new Map<string, SilenceRange[]>();
-const sceneMemory = new Map<string, number[]>();
+const memory = new LruCache<SilenceRange[]>(ANALYSIS_CACHE_LIMIT);
+const sceneMemory = new LruCache<number[]>(ANALYSIS_CACHE_LIMIT);
+
+/** 🧹 a csend/jelenet-elemzés ürítése (a `cacheManager.clearCaches()` hívja) */
+export function clearCutlistMemory(): void {
+  memory.clear();
+  sceneMemory.clear();
+}
 
 async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   const controller = new AbortController();

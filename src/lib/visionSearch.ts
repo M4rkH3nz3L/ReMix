@@ -13,6 +13,7 @@ import {
 } from '@/lib/visionIndex';
 import type { SearchHit, VisionEntry } from '@/lib/visionIndex';
 import type { Project, VideoClip } from '@/types/project';
+import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
 
 /**
  * Smart Search hálózati rétege (P0‑8): a projekt videóinak jelenet-keyframe-jei
@@ -20,7 +21,12 @@ import type { Project, VideoClip } from '@/types/project';
  * embedding-hasonlósággal fut (nomic-embed), kulcsszó-fallbackkel.
  */
 
-const indexCache = new Map<string, VisionEntry[]>();
+const indexCache = new LruCache<VisionEntry[]>(ANALYSIS_CACHE_LIMIT);
+
+/** 🧹 a vision-index ürítése (a `cacheManager.clearCaches()` hívja) */
+export function clearVisionMemory(): void {
+  indexCache.clear();
+}
 
 async function indexUri(
   uri: string,

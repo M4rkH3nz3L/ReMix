@@ -33,7 +33,9 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 8 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 8 / 11.** A build-runbook (env-ek, profilok, store-beadás,
+> füstteszt) a [PROD.md](PROD.md)-ben él — a maradék 9/10/11 tétel ott is
+> szerepel, mert mindhárom a kiadás előfeltétele. A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 

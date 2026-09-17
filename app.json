@@ -15,7 +15,10 @@
         "NSCameraUsageDescription": "Remix uses the camera so you can record video straight into your project.",
         "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos.",
         "NSPhotoLibraryUsageDescription": "Remix imports videos and photos from your library so you can edit them.",
-        "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library."
+        "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {

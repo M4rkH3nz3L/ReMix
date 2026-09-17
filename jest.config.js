@@ -1,11 +1,14 @@
 /**
- * Két külön teszt-projekt egy futtatóban:
+ * Három külön teszt-projekt egy futtatóban:
  *
  *  • `client` — a `src/` TypeScript moduljai. A `jest-expo` preset intézi a
  *    React Native / Expo transzformációt. A `lib/` magok szándékosan
  *    expo-mentesek (lásd AGENTS.md), ezért többségük natív modul nélkül fut.
  *  • `server` — a `server/` worker sima Node-JS kódja: nincs RN-transzform,
  *    node környezet.
+ *  • `build`  — a FORDÍTÁSI KIMENETET vizsgáló ellenőrzések (React Compiler
+ *    memoizálás). Ezek maguk futtatják a babel-transzformot, ezért sima Node
+ *    kell nekik — nem mehetnek a `client` RN-preset alá.
  *
  * Futtatás:  npm test        (egyszer, CI-barát)
  *            npm run test:watch
@@ -28,6 +31,11 @@ module.exports = {
       // csomag-teszteket kihagyjuk (feloldani viszont kell tudni onnan!)
       testMatch: ['<rootDir>/server/**/*.test.js'],
       testPathIgnorePatterns: ['<rootDir>/server/node_modules/'],
+    },
+    {
+      displayName: 'build',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/tools/**/*.test.js'],
     },
   ],
 };

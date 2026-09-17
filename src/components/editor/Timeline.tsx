@@ -23,7 +23,7 @@ import { detectBeats, timelineBeats } from '@/lib/beats';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatRuler } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { TrackType } from '@/types/project';
+import type { Project, TrackType } from '@/types/project';
 
 /** ezeken a sávokon van hang — csak ezek kapnak némítás/solo gombot */
 const AUDIBLE_TRACKS: TrackType[] = ['video', 'music', 'voiceover', 'sfx'];
@@ -87,6 +87,19 @@ function videoTrackGaps(
     cursor = Math.max(cursor, c.start + c.duration);
   }
   return gaps;
+}
+
+/**
+ * A zenesáv legkorábbi hangklipje — a beat-rács forrása. Azért van a komponensen
+ * KÍVÜL, hogy a render és a beat-effekt ugyanazt a szabályt használja anélkül,
+ * hogy az effektnek a render-beli objektum-referenciára kellene hivatkoznia.
+ */
+function firstMusicClip(project: Project | null | undefined) {
+  const clip = project?.tracks
+    .find((t) => t.type === 'music')
+    ?.clips.filter((c) => c.kind === 'audio')
+    .sort((a, b) => a.start - b.start)[0];
+  return clip?.kind === 'audio' ? clip : undefined;
 }
 
 /**
@@ -308,34 +321,36 @@ export function Timeline() {
   // beat-rács a zenesáv első klipjéből — jelölők a vonalzón + snap-célpontok
   const beatTimes = useEditorStore((s) => s.beatTimes);
   const downbeatTimes = useEditorStore((s) => s.downbeatTimes);
-  const musicClip = project?.tracks
-    .find((t) => t.type === 'music')
-    ?.clips.filter((c) => c.kind === 'audio')
-    .sort((a, b) => a.start - b.start)[0];
+  const musicClip = firstMusicClip(project);
   const musicKey = musicClip
     ? `${musicClip.uri}|${musicClip.start}|${musicClip.duration}`
     : null;
+  /**
+   * A klipet az effekt a STORE-ból veszi elő, nem a render-beli `musicClip`-ből.
+   * Így a dep-lista őszintén `[musicKey]` lehet, és nem kell elnémítani a
+   * hook-szabályt — korábban egy ilyen elnémítás miatt a React Compiler a
+   * TELJES Timeline-t kihagyta az optimalizálásból.
+   *
+   * ⚠️ A fordító a KOMMENTEKBEN is keresi az elnémító direktívát, ezért ide
+   * szándékosan nincs kiírva szó szerint: már a leírása is újra kiváltaná.
+   */
   useEffect(() => {
-    const setBeatGrid = useEditorStore.getState().setBeatGrid;
-    if (!musicClip || musicClip.kind !== 'audio') {
+    const { setBeatGrid, project: cur } = useEditorStore.getState();
+    const clip = firstMusicClip(cur);
+    if (!clip) {
       setBeatGrid([], []);
       return;
     }
     let alive = true;
-    detectBeats(musicClip.uri).then((grid) => {
+    detectBeats(clip.uri).then((grid) => {
       if (!alive || !grid || grid.beats.length === 0) {
         return;
       }
-      setBeatGrid(
-        timelineBeats(musicClip, grid.beats),
-        timelineBeats(musicClip, grid.downbeats)
-      );
+      setBeatGrid(timelineBeats(clip, grid.beats), timelineBeats(clip, grid.downbeats));
     });
     return () => {
       alive = false;
     };
-    // a musicKey lefedi a klip azonosságát
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicKey]);
 
   /**
@@ -346,12 +361,15 @@ export function Timeline() {
    * EGYETLEN felhasználása ez a `scrollTo` volt. Feliratkozva minden tick
    * újraépítette a teljes fát (vonalzó-osztások, beat-pontok — egy 3 perces,
    * 120 BPM-es zenénél ~450 View —, régiók, jelölők, vágás-javaslatok, keresési
-   * találatok), ráadásul a React Compiler ezt a komponenst kihagyja (a fájlban
-   * lévő eslint-disable miatt), tehát kézi memoizálás sincs mögötte.
-   * A store-feliratkozás React-render NÉLKÜL fut le.
+   * találatok). A store-feliratkozás React-render NÉLKÜL fut le.
    */
   const ppsRef = useRef(pps);
-  ppsRef.current = pps;
+  // a frissítés effektben, nem a render törzsében: a render-közbeni ref-írás
+  // React-anti-minta, és a fordító emiatt is kihagyná a komponenst. A zoom
+  // váltása amúgy is ritka, és a lenti `[pps]` effekt újra is pozicionál.
+  useEffect(() => {
+    ppsRef.current = pps;
+  }, [pps]);
   useEffect(
     () =>
       useEditorStore.subscribe((s, prev) => {

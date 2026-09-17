@@ -1,0 +1,56 @@
+# ⚠️ Az EAS ezt a fájlt a `.gitignore` HELYETT használja, nem mellette — ezért
+# minden kizárást meg KELL itt ismételni, különben pl. a node_modules is
+# feltöltődne. A `.gitignore` marad az igazság forrása a verziókezelésnek.
+#
+# Cél: a feltöltött archívum mérete. A `server/` worker önmagában 481 MB
+# (saját node_modules, 3D GLB-modellek, demó videók, onnxruntime), és a mobil-
+# buildhez SEMMI köze — a felhő-workert külön telepítjük. Enélkül minden egyes
+# build feltöltése ezzel a súllyal indul.
+
+# ── a worker: nem része a mobil-appnak ──────────────────────────────────────
+server/
+
+# ── függőségek és build-kimenet ─────────────────────────────────────────────
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# ── generált natív mappák (a prebuild újragenerálja) ────────────────────────
+/ios
+/android
+.kotlin/
+
+# ── aláíró kulcsok: SOHA ne kerüljenek fel ──────────────────────────────────
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.orig.*
+
+# ── helyi env (az EAS a saját környezeti változóit adja) ────────────────────
+.env
+.env*.local
+
+# ── fejlesztői zaj ──────────────────────────────────────────────────────────
+.git/
+.github/
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+example
+
+# ── ami csak nálunk kell: tesztek, audit-dokumentáció, eszközök ─────────────
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+tools/
+jest.config.js
+jest.setup.js
+AUDITBUGS.md

@@ -125,6 +125,41 @@ export async function retryRead(
   throw lastError instanceof Error ? lastError : new Error('network request failed');
 }
 
+/**
+ * 📥 A válasz-törzs JSON-ként — parse-hiba nélkül, beszédes üzenettel.
+ *
+ * A `await res.json()` hívás azonnal `SyntaxError`-t dob, ha a szerver NEM
+ * JSON-t ad: 502-es proxy-hibaoldalt, Cloudflare-ellenőrzést, lejárt tunnel
+ * HTML-jét. A felhasználó ilyenkor „JSON Parse error: Unexpected character: <"
+ * üzenetet lát — ami se nem érthető, se nem segít. Ráadásul több hívóhelyen a
+ * `.json()` MEGELŐZTE az `!res.ok` ágat, tehát épp az a kód nem futott le,
+ * amelyik a normális hibaüzenetet adta volna.
+ *
+ * Itt a törzset EGYSZER olvassuk szövegként, és csak utána próbáljuk értelmezni.
+ * Ha nem JSON, a hívó `fallback` üzenetét adjuk vissza a HTTP-státusszal — a
+ * nyers HTML-t sosem mutatjuk a felhasználónak.
+ *
+ * Üres törzs + sikeres válasz esetén `{}` jön vissza (204 No Content), hogy a
+ * hívó `body.valami ?? alapértelmezés` mintája továbbra is működjön.
+ */
+export async function readJson<T = Record<string, unknown>>(
+  res: Response,
+  fallback: string
+): Promise<T> {
+  const text = await res.text().catch(() => '');
+  if (!text.trim()) {
+    if (res.ok) {
+      return {} as T;
+    }
+    throw new Error(`${fallback} (HTTP ${res.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`${fallback} (HTTP ${res.status})`);
+  }
+}
+
 /** időtúllépés — MÁS, mint a felhasználói megszakítás: ezt szabad újrapróbálni */
 export class TimeoutError extends Error {
   constructor(ms: number) {

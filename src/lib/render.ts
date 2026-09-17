@@ -10,7 +10,7 @@ import {
   LocalRenderUnavailableError,
   renderLocal,
 } from '@/lib/nativeRender';
-import { fetchRead } from '@/lib/netRetry';
+import { fetchRead, readJson } from '@/lib/netRetry';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { renderCacheKey } from '@/lib/projectHash';
@@ -342,7 +342,7 @@ export async function uploadMedia(uri: string, name?: string): Promise<string> {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || tr('lib.render.uploadFailed'));
   }
-  const data = (await res.json()) as { url?: string };
+  const data = await readJson<{ url?: string }>(res, tr('lib.render.uploadFailed'));
   if (!data.url) {
     throw new Error(tr('lib.render.uploadFailed'));
   }
@@ -396,8 +396,13 @@ async function renderCloud(
   }
 
   const submit = await uploadFetch(`${base}/render`, { method: 'POST', body: form });
-  const submitBody = await submit.json();
-  if (!submit.ok) {
+  // ⚠️ a `.json()` KORÁBBAN itt futott, mint az `!ok` ág — egy 502-es HTML-oldal
+  // parse-hibát dobott, épp a beszédes üzenet helyett
+  const submitBody = await readJson<{ id?: string; error?: string }>(
+    submit,
+    tr('lib.render.renderStartFailed')
+  );
+  if (!submit.ok || !submitBody.id) {
     throw new Error(submitBody.error ?? tr('lib.render.renderStartFailed'));
   }
   const { id } = submitBody;
@@ -413,7 +418,10 @@ async function renderCloud(
     // kimaradás (lift, wifi→LTE) eldobná az egész munkát. A `signal` átmegy,
     // így a ✕ gomb továbbra is azonnal megszakít.
     const res = await fetchRead(`${base}/render/${id}`, { timeoutMs: 5000, signal });
-    const status = await res.json();
+    const status = await readJson<{ state?: string; error?: string; progress?: number }>(
+      res,
+      tr('lib.render.renderError')
+    );
     if (status.state === 'done') {
       onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
       const safeName = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'video';
@@ -460,8 +468,11 @@ export async function fetchSoundLibrary(): Promise<LibraryTrack[]> {
   if (!res.ok) {
     throw new Error(tr('lib.render.soundLibraryUnreachable'));
   }
-  const body = await res.json();
-  return body.tracks as LibraryTrack[];
+  const body = await readJson<{ tracks?: LibraryTrack[] }>(
+    res,
+    tr('lib.render.soundLibraryUnreachable')
+  );
+  return body.tracks ?? [];
 }
 
 /** Letölti a hangot az app dokumentum-mappájába; a helyi URI-t adja vissza. */
@@ -498,7 +509,7 @@ export async function transcribeToSrt(
   let health: { captions?: boolean };
   try {
     const res = await fetchWithTimeout(`${base}/health`, 3000);
-    health = await res.json();
+    health = await readJson<{ captions?: boolean }>(res, tr('lib.render.workerUnreachable', { base }));
   } catch {
     throw new Error(tr('lib.render.workerUnreachable', { base }));
   }
@@ -509,11 +520,18 @@ export async function transcribeToSrt(
   form.append('media', new File(uri) as unknown as Blob, fileName(uri));
   form.append('granularity', granularity);
   const res = await uploadFetch(`${base}/captions`, { method: 'POST', body: form });
-  const body = await res.json();
+  const body = await readJson<{ srt?: string; error?: string }>(
+    res,
+    tr('lib.render.transcriptionFailed')
+  );
   if (!res.ok) {
     throw new Error(body.error ?? tr('lib.render.transcriptionFailed'));
   }
-  return body.srt as string;
+  if (typeof body.srt !== 'string') {
+    // 200-as válasz `srt` nélkül: a feliratozás „sikerült", de nincs mit beszúrni
+    throw new Error(tr('lib.render.transcriptionFailed'));
+  }
+  return body.srt;
 }
 
 /**
@@ -561,8 +579,11 @@ export async function collectAndShareProject(
   form.append('uriMap', JSON.stringify(uriMap));
 
   const submit = await uploadFetch(`${base}/collect`, { method: 'POST', body: form });
-  const submitBody = await submit.json();
-  if (!submit.ok) {
+  const submitBody = await readJson<{ id?: string; error?: string }>(
+    submit,
+    tr('lib.render.packagingStartFailed')
+  );
+  if (!submit.ok || !submitBody.id) {
     throw new Error(submitBody.error ?? tr('lib.render.packagingStartFailed'));
   }
 
@@ -570,7 +591,10 @@ export async function collectAndShareProject(
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     const res = await fetchWithTimeout(`${base}/render/${submitBody.id}`, 5000);
-    const status = await res.json();
+    const status = await readJson<{ state?: string; error?: string }>(
+      res,
+      tr('lib.render.renderError')
+    );
     if (status.state === 'done') {
       onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
       const safe = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'projekt';

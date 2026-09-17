@@ -33,13 +33,13 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 0 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 1 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
 | # | Tétel | Miért most | Állapot |
 |---|---|---|---|
-| 1 | **P3-9** · nyers `res.json()` a `render.ts` 8 pontján | a felhasználó „JSON Parse error"-t lát a valódi hibaüzenet helyett | ⬜️ |
+| 1 | ~~**P3-9** · nyers `res.json()` a `render.ts` 8 pontján~~ | a felhasználó „JSON Parse error"-t lát a valódi hibaüzenet helyett | ✔️ `readJson()`, 7 teszt |
 | 2 | **P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ⬜️ |
 | 3 | **S7** · ATS / cleartext HTTP | release buildben az iOS ATS és az Android is blokkolja a `http://`-t → minden felhő-hívás némán elhal | ⬜️ |
 | 4 | **S6** · `ios.privacyManifests` | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ⬜️ |
@@ -390,8 +390,10 @@ Mivel a fordító kihagyja, minden frame-ben újraépül a teljes JSX: `rulerMar
 - `render.ts:384`, `:392-397` — a felhő-render feltöltési fázisa és poll-fetchjei nem kapják meg a signalt.
 - `collectAndShareProject` (`render.ts:507-585`) — 10 perces poll, nulla megszakítás.
 
-### P3-9 · Nyers `res.json()` → „JSON Parse error" a felhasználónak
-`render.ts:385, 398, 445, 494, 555` — ha a worker HTML-t ad (502, Cloudflare, tunnel-lejárat), a `.json()` dob, **mielőtt** az `!res.ok` ág beszédes üzenetet adna. A `aiFetch.ts:67` helyesen csinálja (`.json().catch(() => ({}))`) — ezt kell kiterjeszteni.
+### ~~P3-9 · Nyers `res.json()` → „JSON Parse error" a felhasználónak~~ — ✔️ **JAVÍTVA**
+**Megoldás:** `lib/netRetry.ts` → `readJson(res, fallback)` — a törzset EGYSZER olvassa szövegként, és csak utána értelmezi. Ha nem JSON, a hívó saját üzenetét adja a HTTP-státusszal; a nyers HTML sosem jut a felhasználóig. Mind a 8 hívóhely átállítva.
+**Amit menet közben kiadott:** három ponton (`/render`, `/captions`, `/collect`) a `.json()` az `!res.ok` ág ELŐTT futott, tehát épp a beszédes hibaüzenet maradt ki. A szigorúbb típusok ezen felül két ellenőrizetlen mezőt is felszínre hoztak (`submitBody.id`, `body.srt`) — mindkettő őrizve.
+**Eredeti lelet:** `render.ts:385, 398, 445, 494, 555` — ha a worker HTML-t ad (502, Cloudflare, tunnel-lejárat), a `.json()` dob, **mielőtt** az `!res.ok` ág beszédes üzenetet adna. A `aiFetch.ts:67` helyesen csinálja (`.json().catch(() => ({}))`) — ezt kell kiterjeszteni.
 
 ### P3-10 · UI-hibák, amik hazudnak a felhasználónak
 - **Shop:** `shop.tsx:80-83`, `:156-163`, `:74` — hálózati hiba = „üres bolt" (nincs `error` state, nincs retry); a **már kifizetett** tétel „Használat" gombja hiba esetén némán nem csinál semmit; hiba esetén 0 kredit jelenik meg.

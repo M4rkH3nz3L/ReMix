@@ -2,6 +2,7 @@ import {
   fetchRead,
   isAbortError,
   isRetryableStatus,
+  readJson,
   retryAfterMs,
   retryRead,
   TimeoutError,
@@ -196,6 +197,54 @@ describe('netRetry — újrapróbálkozás CSAK idempotens olvasásra', () => {
       ctrl.abort();
       await expect(p).rejects.toMatchObject({ name: 'AbortError' });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+
+  describe('readJson — a proxy HTML-je ne „JSON Parse error" legyen', () => {
+    const resWith = (status: number, text: string) =>
+      ({ status, ok: status < 400, text: () => Promise.resolve(text) }) as unknown as Response;
+
+    it('érvényes JSON-t normálisan visszaad', async () => {
+      await expect(readJson(resWith(200, '{"id":"abc"}'), 'hiba')).resolves.toEqual({ id: 'abc' });
+    });
+
+    it('502 + HTML-hibaoldal → a HÍVÓ üzenete, nem parse-hiba', async () => {
+      const html = '<!DOCTYPE html><html><body>502 Bad Gateway</body></html>';
+      await expect(readJson(resWith(502, html), 'A render indítása nem sikerült.')).rejects.toThrow(
+        'A render indítása nem sikerült. (HTTP 502)'
+      );
+    });
+
+    it('a nyers HTML-t SOHA nem mutatja meg', async () => {
+      const html = '<html><script>alert(1)</script></html>';
+      await expect(readJson(resWith(500, html), 'hiba')).rejects.toThrow(
+        expect.not.stringContaining('<')
+      );
+    });
+
+    it('Cloudflare-ellenőrzés (200 + HTML) is beszédes hibát ad', async () => {
+      await expect(readJson(resWith(200, '<html>Just a moment…</html>'), 'baj')).rejects.toThrow(
+        'baj (HTTP 200)'
+      );
+    });
+
+    it('204 No Content → üres objektum (a `body.x ?? alap` minta működjön)', async () => {
+      await expect(readJson(resWith(204, ''), 'hiba')).resolves.toEqual({});
+    });
+
+    it('üres törzs HIBA-státusszal viszont dob', async () => {
+      await expect(readJson(resWith(503, ''), 'nem elérhető')).rejects.toThrow(
+        'nem elérhető (HTTP 503)'
+      );
+    });
+
+    it('a szerver saját JSON-hibáját ÉRINTETLENÜL adja tovább (a hívó olvassa ki)', async () => {
+      const body = await readJson<{ error?: string }>(
+        resWith(400, '{"error":"a projekt túl hosszú"}'),
+        'általános'
+      );
+      expect(body.error).toBe('a projekt túl hosszú');
     });
   });
 

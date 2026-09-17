@@ -1,0 +1,6 @@
+{
+  "NSCameraUsageDescription": "Remix verwendet die Kamera, damit du Videos direkt in dein Projekt aufnehmen kannst.",
+  "NSMicrophoneUsageDescription": "Remix verwendet das Mikrofon, um Sprachaufnahmen und Ton für deine Videos aufzunehmen.",
+  "NSPhotoLibraryUsageDescription": "Remix importiert Videos und Fotos aus deiner Mediathek, damit du sie bearbeiten kannst.",
+  "NSPhotoLibraryAddUsageDescription": "Remix speichert deine fertigen Videos in deiner Mediathek."
+}

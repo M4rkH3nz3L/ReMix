@@ -33,14 +33,14 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 1 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 2 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
 | # | Tétel | Miért most | Állapot |
 |---|---|---|---|
 | 1 | ~~**P3-9** · nyers `res.json()` a `render.ts` 8 pontján~~ | a felhasználó „JSON Parse error"-t lát a valódi hibaüzenet helyett | ✔️ `readJson()`, 7 teszt |
-| 2 | **P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ⬜️ |
+| 2 | ~~**P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is~~ | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ✔️ sorrend-függetlenség bizonyítva |
 | 3 | **S7** · ATS / cleartext HTTP | release buildben az iOS ATS és az Android is blokkolja a `http://`-t → minden felhő-hívás némán elhal | ⬜️ |
 | 4 | **S6** · `ios.privacyManifests` | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ⬜️ |
 | 5 | **K9** · `.env.example` hiányos | 5 valóban használt `EXPO_PUBLIC_*` nincs dokumentálva → a következő build újra hiányos env-vel megy | ⬜️ |
@@ -217,7 +217,11 @@ eas build --profile preview --platform ios       # majd android
 **A jó hír: NINCS hiányzó iOS usage description** — a permission-lánc végigkövetve **teljes** (`NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription` mind magyar értékkel), és az Android-oldal is hiánytalan. Ez volt a legnagyobb elutasítási kockázat, és **átmegy**.
 
 **De törékeny:** az értékek azért helyesek, mert a `app.json:26-73` **plugin-sorrendje** szerencsés (`expo-audio` → `expo-media-library` → `expo-image-picker` → `expo-camera`, és a későbbi felülírja a korábbi angol defaultját). Ha valaki átrendezi a `plugins` tömböt, az `NSCameraUsageDescription` **némán angol defaultra vált**.
-**Javítás:** explicit `ios.infoPlist` blokk a sorrend-függőség helyett.
+**✔️ JAVÍTVA.** A `@expo/config-plugins` `ios/Permissions.js:33` sora dönt:
+`infoPlist[k] = permissions[k] || infoPlist[k] || default` — azaz **plugin-opció → app.json explicit értéke → plugin-alapérték**. Ezért a javítás két lépés: (1) explicit `ios.infoPlist` blokk, (2) a plugin-opciók KIVÉTELE (`expo-audio`, `expo-camera`, `expo-image-picker`, `expo-media-library`), különben azok továbbra is felülírnák. Így minden plugin a meglévő értéket találja.
+**Bizonyítva:** a négy érintett plugin sorrendjét megfordítva a feloldott értékek VÁLTOZATLANOK.
+**K10 is megoldva:** az alap angol (az App Review alapértelmezett nyelve), a magyar és német fordítás pedig `expo.locales` → `locales/hu.json`, `locales/de.json` (ebből `InfoPlist.strings` generálódik).
+**Ráadás:** az `NSFaceIDUsageDescription` a lefordítatlan `expo-secure-store` sablon-szöveg volt („Allow $(PRODUCT_NAME) to access your Face ID…"), holott az app SEHOL nem hív `requireAuthentication`-t, tehát Face ID-t soha nem vált ki. A kulcs `faceIDPermission: false`-szal törölve — nem deklarálunk nem használt jogosultságot.
 
 Egyetlen hiányzó Android permission: **`SCHEDULE_EXACT_ALARM`** (Android 12+) — csak ha ütemezett értesítés is megy (`pushNotifications.ts:177` `scheduleNotificationAsync`); azonnali `trigger: null` értesítéshez nem kell.
 

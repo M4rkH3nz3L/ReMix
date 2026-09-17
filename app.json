@@ -11,7 +11,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.h3nz3l.remix",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Remix uses the camera so you can record video straight into your project.",
+        "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos.",
+        "NSPhotoLibraryUsageDescription": "Remix imports videos and photos from your library so you can edit them.",
+        "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library."
       }
     },
     "android": {
@@ -52,32 +56,11 @@
         }
       ],
       "expo-video",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "A Remix a hangfelvételhez (voiceover) használja a mikrofont."
-        }
-      ],
+      "expo-audio",
       "expo-sharing",
-      [
-        "expo-media-library",
-        {
-          "savePhotosPermission": "A Remix a kész videókat a Fotókba menti."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "A Remix a galériából importál videókat és képeket a szerkesztéshez."
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "A Remix a videó-felvételhez használja a kamerát.",
-          "microphonePermission": "A Remix a videó-felvételhez használja a mikrofont."
-        }
-      ],
+      "expo-media-library",
+      "expo-image-picker",
+      "expo-camera",
       "expo-localization",
       "react-native-audio-api",
       [
@@ -89,7 +72,12 @@
         }
       ],
       "expo-asset",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-image",
       "expo-web-browser"
     ],
@@ -103,6 +91,10 @@
         "projectId": "42318da2-3155-4a07-b59e-8eadcf1580fb"
       }
     },
-    "owner": "vided"
+    "owner": "vided",
+    "locales": {
+      "hu": "./locales/hu.json",
+      "de": "./locales/de.json"
+    }
   }
 }

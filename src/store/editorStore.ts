@@ -13,8 +13,9 @@ import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
-import { findClip, maxVideoDuration, projectDuration } from '@/lib/projectUtils';
+import { findClip, projectDuration } from '@/lib/projectUtils';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
+import { buildRollEdit, buildSlideEdit, buildSlipEdit } from '@/lib/trimEdit';
 import { clamp } from '@/lib/time';
 import type { BrushStyle } from '@/lib/draw';
 import type { PacingInsight } from '@/lib/pacingClient';
@@ -1275,138 +1276,53 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return ok;
   },
 
+  // ✂️ A trim-matematika a `lib/trimEdit.ts`-ben él (tesztelhető, store-mentes);
+  // itt már csak a projekt-keresés és a dispatch marad.
   rollEdit: (clipId, edge, deltaSec) => {
     const { project } = get();
-    if (!project) {
-      return;
-    }
-    const found = findClip(project, clipId);
+    const found = project ? findClip(project, clipId) : null;
     if (!found) {
       return;
     }
-    const track = found.track;
-    const c = found.clip;
-    const sorted = [...track.clips].sort((a, b) => a.start - b.start);
-    const idx = sorted.findIndex((x) => x.id === clipId);
-    const round = (n: number) => Math.round(n * 1000) / 1000;
-    if (edge === 'right') {
-      const next = sorted[idx + 1];
-      if (!next || Math.abs(next.start - (c.start + c.duration)) > 0.05) {
-        return; // roll csak érintkező szomszéddal
-      }
-      let d = clamp(deltaSec, MIN_CLIP_DURATION - c.duration, next.duration - MIN_CLIP_DURATION);
-      if (c.kind === 'video') {
-        d = Math.min(d, maxVideoDuration(c) - c.duration); // c forrás-vége
-      }
-      if (next.kind === 'video') {
-        d = Math.max(d, -next.trimIn / next.speed); // next forrás-eleje
-      }
-      if (Math.abs(d) < 0.001) {
-        return;
-      }
-      const newC = { ...c, duration: round(c.duration + d) } as Clip;
-      const newNext = { ...next, start: round(next.start + d), duration: round(next.duration - d) } as Clip;
-      if (newNext.kind === 'video' && next.kind === 'video') {
-        newNext.trimIn = round(next.trimIn + d * next.speed);
-      }
-      const clips = track.clips.map((x) => (x.id === c.id ? newC : x.id === next.id ? newNext : x));
-      get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.rollEdit') });
-    } else {
-      const prev = sorted[idx - 1];
-      if (!prev || Math.abs(prev.start + prev.duration - c.start) > 0.05) {
-        return;
-      }
-      let d = clamp(deltaSec, MIN_CLIP_DURATION - prev.duration, c.duration - MIN_CLIP_DURATION);
-      if (prev.kind === 'video') {
-        d = Math.min(d, maxVideoDuration(prev) - prev.duration); // prev forrás-vége
-      }
-      if (c.kind === 'video') {
-        d = Math.max(d, -c.trimIn / c.speed); // c forrás-eleje
-      }
-      if (Math.abs(d) < 0.001) {
-        return;
-      }
-      const newPrev = { ...prev, duration: round(prev.duration + d) } as Clip;
-      const newC = { ...c, start: round(c.start + d), duration: round(c.duration - d) } as Clip;
-      if (newC.kind === 'video' && c.kind === 'video') {
-        newC.trimIn = round(c.trimIn + d * c.speed);
-      }
-      const clips = track.clips.map((x) => (x.id === prev.id ? newPrev : x.id === c.id ? newC : x));
-      get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.rollEdit') });
+    const clips = buildRollEdit(found.track, clipId, edge, deltaSec);
+    if (!clips) {
+      return;
     }
+    get().dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks: [{ trackType: found.track.type, clips }],
+      label: tr('store.editor.rollEdit'),
+    });
   },
 
   slipEdit: (clipId, deltaSec) => {
     const { project } = get();
-    if (!project) {
-      return;
-    }
-    const c = findClip(project, clipId)?.clip;
+    const c = project ? findClip(project, clipId)?.clip : null;
     if (!c || c.kind !== 'video') {
       return; // slip csak videón értelmes (forrás-ablak csúsztatás)
     }
-    // drag jobbra → korábbi forrás-tartalom (trimIn csökken); a látható ablak = duration*speed
-    const windowSrc = c.duration * c.speed;
-    const newTrimIn = clamp(c.trimIn - deltaSec * c.speed, 0, Math.max(0, c.sourceDuration - windowSrc));
-    if (Math.abs(newTrimIn - c.trimIn) < 0.001) {
+    const trimIn = buildSlipEdit(c, deltaSec);
+    if (trimIn === null) {
       return;
     }
-    get().updateClip(clipId, { trimIn: Math.round(newTrimIn * 1000) / 1000 });
+    get().updateClip(clipId, { trimIn });
   },
 
   slideEdit: (clipId, deltaSec) => {
     const { project } = get();
-    if (!project) {
-      return;
-    }
-    const found = findClip(project, clipId);
+    const found = project ? findClip(project, clipId) : null;
     if (!found) {
       return;
     }
-    const track = found.track;
-    const c = found.clip;
-    const sorted = [...track.clips].sort((a, b) => a.start - b.start);
-    const idx = sorted.findIndex((x) => x.id === clipId);
-    const prev = sorted[idx - 1];
-    const next = sorted[idx + 1];
-    const touchingPrev = !!prev && Math.abs(prev.start + prev.duration - c.start) <= 0.05;
-    const touchingNext = !!next && Math.abs(next.start - (c.start + c.duration)) <= 0.05;
-    const round = (n: number) => Math.round(n * 1000) / 1000;
-    let d = deltaSec;
-    if (touchingPrev) {
-      d = Math.max(d, MIN_CLIP_DURATION - prev!.duration);
-      if (prev!.kind === 'video') {
-        d = Math.min(d, maxVideoDuration(prev!) - prev!.duration);
-      }
-    } else {
-      d = Math.max(d, -c.start); // szomszéd nélkül csak a 0 a korlát
-    }
-    if (touchingNext) {
-      d = Math.min(d, next!.duration - MIN_CLIP_DURATION);
-      if (next!.kind === 'video') {
-        d = Math.max(d, -next!.trimIn / next!.speed);
-      }
-    }
-    if (Math.abs(d) < 0.001) {
+    const clips = buildSlideEdit(found.track, clipId, deltaSec);
+    if (!clips) {
       return;
     }
-    const clips = track.clips.map((x) => {
-      if (x.id === c.id) {
-        return { ...x, start: round(x.start + d) } as Clip;
-      }
-      if (touchingPrev && x.id === prev!.id) {
-        return { ...x, duration: round(x.duration + d) } as Clip;
-      }
-      if (touchingNext && x.id === next!.id) {
-        const n = { ...x, start: round(x.start + d), duration: round(x.duration - d) } as Clip;
-        if (n.kind === 'video' && x.kind === 'video') {
-          n.trimIn = round(x.trimIn + d * x.speed);
-        }
-        return n;
-      }
-      return x;
+    get().dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks: [{ trackType: found.track.type, clips }],
+      label: tr('store.editor.slideEdit'),
     });
-    get().dispatch({ type: 'REPLACE_TRACKS', tracks: [{ trackType: track.type, clips }], label: tr('store.editor.slideEdit') });
   },
 
   isTrackAudible: (type) => {

@@ -53,7 +53,7 @@ A hiányzó pontok nem a feature-mélységből, hanem a **production-keményít�
 >   forrásból ellenőrizve) mostantól **mérve és ürítve** — eddig a felhasználónak
 >   mutatott cache-méret kevesebb volt a valóságnál. 9 teszt.
 >
-> Teszt-infrastruktúra: **247 teszt**, `npm run audit` (tsc + lint + jest) + CI.
+> Teszt-infrastruktúra: **249 teszt**, `npm run audit` (tsc + lint + jest) + CI.
 > Korábban: `2a75195` (duplikáció-konszolidáció), `c0d54c3` (a halott ✕ gomb),
 > `ebdf5bc` (feed rollback + shop hiba≠üres), `0ea6944`/`052051f`/`2a67079`/
 > `51814c1` (4 szigorúbb tsconfig-flag, −962 sor halott kód, `updateLayer`
@@ -66,8 +66,9 @@ A hiányzó pontok nem a feature-mélységből, hanem a **production-keményít�
 >   gesztus-kódban van (szándékos kivétel). Új `build` jest-projekt:
 >   `tools/reactCompiler.test.js` őrzi, hogy a lista ne tudjon némán nőni.
 >
-> **Hátra:** **B3** (`npx eas init`), ami a te Expo-fiókodat igényli, és a
-> `noUncheckedIndexedAccess` fokozatos bevezetése (lásd „Mérésre vár" 4.).
+> **Hátra: csak a B3** (`npx eas init`), ami a te Expo-fiókodat igényli. A
+> `noUncheckedIndexedAccess` megvizsgálva → a bevezetése NEM javasolt (lásd
+> „Mérésre vár" 4.: 340 hiba, nulla valódi bug).
 >
 > **Korábbi állapot 2026-09-15:** a **P1-1 / P1-3 / P1-4 is javítva** (`7591aa8`, `dab619e`, `5344bde`, `13a69e7`) — a worker-hitelesítés élő támadás-tesztekkel igazolva. Korábban: mind az 5 **P0 javítva** (`661a694`, `30a93eb`, `73d9118`, `f1f87c8`, `757f0ce`), és a **P1-2 kiadás-blokkolókból 3/4 kész** (`4c75e7a`) — a B3 a te Expo-fiókodat igényli. A pontszám újraértékelése a preview build után esedékes.
 
@@ -266,19 +267,23 @@ Az eredeti „42/60 bail, az ÖSSZES forró komponens kiesik" szám **rossz konf
 | plugin önmagában, preset nélkül | 60 sikeres / 106 bail |
 | **valódi Expo-út (mérvadó)** | **76 .tsx-ből 46 memoizálva** |
 
-**A forró útvonal valós állapota:** 8-ból **5 rendben** — `TimelineClip` ✅, `AudioLayer` ✅, `PipLayer` ✅, `TransitionLayer` ✅, `ShapeOverlay` ✅. Az audit ezek közül a `TimelineClip`-et és az `AudioLayer`-t is bukóként sorolta. Ténylegesen **három** marad ki:
+**A forró útvonal valós állapota** (KOMPONENSENKÉNT mérve — lásd lentebb, miért lényeges):
 
-| Komponens | Ok |
-|---|---|
-| `Timeline.tsx` | a pinch-gesztus `onStart`/`onUpdate` closure-je refet ír (2 bail; volt 3) |
-| `PreviewSurface.tsx` | expo-video player-mutáció — hookból jövő érték módosítása |
-| `TextOverlay.tsx` | Reanimated shared value írása effekt-függőség után |
+| Komponens | Állapot | Ok |
+|---|---|---|
+| `AudioLayer` · `PipLayer` · `PipClipFrame` · `TransitionLayer` · `IncomingClip` · `ShapeOverlay` | ✅ memoizálva | — |
+| `Timeline` | ⛔️ | a pinch-gesztus `onStart`/`onUpdate` closure-je refet ír (2 bail; volt 3) |
+| `TimelineClipInner` | ⛔️ | 6× Reanimated shared value mutáció |
+| `PreviewSurface` | ⛔️ | expo-video player-mutáció — hookból jövő érték módosítása |
+| `TextOverlay` | ⛔️ | Reanimated shared value írása effekt-függőség után |
 
-**Elvégezve:** a `Timeline`-ból két valódi React-anti-minta kikerült (elnémított hook-szabállyal hazudó dep-lista → a klip a store-ból; `ppsRef.current = pps` a render törzséből → effektbe). A maradék kettő a gesztus-kódban van — pontosan az a kategória, amire az `AGENTS.md` szándékosan kikapcsolta a `react-hooks/refs`-et; a pinch-zoom átstrukturálása mérhetetlen haszonért kockázat, ezért **ott megálltunk**.
+> ⚠️ **A fájl-szintű mérés HAMIS biztonságot ad.** Egy fájlban együtt élhet lefordult és kimaradt komponens: a `TimelineClip.tsx`-ben a kis `EdgeThumb` segéd lefordul, miközben a FŐ `TimelineClipInner` kimarad. Az első javítási körben emiatt tévesen „megcáfoltam" az auditot a `TimelineClip` ügyében — **az audit itt jól látta**, az én mérésem volt rossz felbontású.
+
+**Elvégezve:** minden bail, ami elnémított hook-szabályból jött, megszűnt — ez a javítható kategória, és ezzel ki is merült. A `Timeline`-ban (dep-lista → a klip a store-ból; `ppsRef.current = pps` a render törzséből → effektbe) és az `AudioLayer` két belső komponensében (`VideoVoice`, `TrackAudio`: a dep-lista most csak primitíveket tartalmaz, mert a `clip`/`opts` objektum minden renderben új referencia volt). Mindegyik továbblépett a következő blokkolóra, ami már player-mutáció vagy shared value — az `AGENTS.md`-ben rögzített szándékos kivétel. A maradék `Timeline`-bail a gesztus-kódban van — pontosan az a kategória, amire az `AGENTS.md` szándékosan kikapcsolta a `react-hooks/refs`-et; a pinch-zoom átstrukturálása mérhetetlen haszonért kockázat, ezért **ott megálltunk**.
 
 > ⚠️ **Csapda:** a fordító a KOMMENTEKBEN is keresi az elnémító direktívát. Az a magyarázó megjegyzés, ami leírja, hogy eltávolítottuk, maga váltja ki újra a bail-t.
 
-**Őr:** `tools/reactCompiler.test.js` (új `build` jest-projekt) — a forró útvonal memoizálása a `npm run audit` része. A KIMENETET méri (`_c(n)`), nem a fordító naplóját; a lista kétirányúan kirögzített (elbukik, ha valami visszaesik, ÉS ha egy ismert kimaradó megjavul), és egy külön teszt magát a mérőműszert ellenőrzi.
+**Őr:** `tools/reactCompiler.test.js` (új `build` jest-projekt) — a forró útvonal memoizálása a `npm run audit` része. KOMPONENSENKÉNT méri a KIMENETET (a memoizált függvény törzse `$ = _c(n)`-nel nyit), nem a fordító naplóját. A lista kétirányúan kirögzített: elbukik, ha valami visszaesik, ÉS ha egy ismert kimaradó megjavul. Ismeretlen komponens-névre hibát dob (nem enged át némán) — ez rögtön el is kapta, hogy a `TimelineClip` valójában a `memo()` burkolat neve. Egy 11. teszt magát a mérőműszert ellenőrzi egy triviálisan fordítható próba-komponensen.
 
 ### P2-2 · A `Timeline` 60 Hz-en reconcile-ol egy `scrollTo` kedvéért ✅
 **Súlyosság: MAGAS** · `Timeline.tsx:100` (feliratkozás) — az **egyetlen** valódi felhasználás a `:343-351` scroll-effekt (`:855` csak stílusnév, `:218` snap-címke)
@@ -391,7 +396,7 @@ Ezeket **kódból nem lehet eldönteni** — eszközön mérendők, mielőtt hoz
 1. **`Timeline` / `PreviewSurface` / `TrackAudio` tényleges render-száma** 10 mp lejátszás alatt (React DevTools Profiler vagy `console.count`).
 2. **`JSON.stringify(project).length` + `JSON.stringify(events).length`** a `saveProject` előtt, 5 perc szerkesztés után — ez dönti el a P3-14 súlyosságát.
 3. **Timeline-virtualizáció** hosszú idővonalnál — a klipek memoizáltak, a cél rövid-formátum, ezért ez ma nem szűk keresztmetszet; gesztus-nehéz `ScrollView` ablakozása mérés nélkül kockázatos.
-4. **`noUncheckedIndexedAccess`** bekapcsolása 315 hibát adna, gócok: `boolean.ts` (36), `maskEdit.ts` (23), `trackPlan.ts` (19) — geometriai/kulcskocka-kód, ahol egy `undefined` `NaN`-ná fajul. Fokozatos, fájlonkénti bevezetés.
+4. ~~**`noUncheckedIndexedAccess`**~~ — ✅ **MEGVIZSGÁLVA, és a bevezetése NEM javasolt.** Ma 340 hibát ad (`boolean.ts` 36, `maskEdit.ts` 23, `trackPlan.ts` 19). Átnézve viszont **egyetlen valódi bug sincs köztük**: mind kötött ciklus (`i < poly.length`, `(i + 1) % n`), amit a TypeScript nem tud bizonyítani. Külső eredetű indexelés mindössze **3 helyen** van, és mindhárom bizonyíthatóan biztonságos (`?? []`, írás, illetve `String.split` — ami mindig ad legalább egy elemet). Külön kerestem a valódi veszélyes mintát is — `findIndex`/`indexOf` **−1**-es találata utáni indexelés őrizetlenül —, ebből **0 db** van. A flag bekapcsolása tehát ~340 `!` assertiont követelne nulla megtalált bug mellett, ami a `!` jelzés-értékét rontaná az egész kódbázisban. A külső adat határának védelmét a **P3-3** (`lib/parseGuards.ts`) már ellátja, célzottan.
 
 ---
 

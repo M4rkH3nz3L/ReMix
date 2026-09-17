@@ -33,5 +33,8 @@ export function uploadFetch(
     signal?: AbortSignal;
   }
 ): Promise<Response> {
-  return expoFetch(url, init as never) as unknown as Promise<Response>;
+  // A visszatérési cast MARAD: az `expo/fetch` saját `FetchResponse`-t ad, ami
+  // szerkezetileg Response-kompatibilis, de nem az. A bemeneti `as never`
+  // viszont felesleges volt — a `FetchRequestInit` elfogadja ezt az alakot.
+  return expoFetch(url, init) as unknown as Promise<Response>;
 }

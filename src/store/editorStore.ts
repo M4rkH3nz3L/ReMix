@@ -110,6 +110,14 @@ const HISTORY_LIMIT = 50;
 /** ennyi eseményt őrzünk meg projektenként (AI-memória nyersanyag) */
 const EVENT_LIMIT = 300;
 
+/** a sáv-kapcsolók state-kulcsai — mind `TrackType[]`-et tárol */
+type TrackFlagKey =
+  | 'mutedTracks'
+  | 'soloTracks'
+  | 'collapsedTracks'
+  | 'hiddenTracks'
+  | 'lockedTracks';
+
 interface EditorState {
   project: Project | null;
   selectedClipId: string | null;
@@ -738,7 +746,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             : flag === 'hidden'
               ? 'hiddenTracks'
               : 'lockedTracks';
-    const list = get()[key];
+    const list: TrackType[] = get()[key];
     const next = list.includes(type) ? list.filter((t) => t !== type) : [...list, type];
     // zároláskor a sávon lévő kijelölés elévül (különben zárolt klipet
     // szerkesztenének a panelek)
@@ -749,7 +757,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({ selectedClipId: null, multiSelectIds: [], multiSelectMode: false, activePanel: null });
       }
     }
-    set({ [key]: next } as never);
+    // a számított kulcs miatt kellett korábban `as never`: TS a
+    // `{ [key]: érték }` alakból index-szignatúrát képez. Egy célzottan szűkített
+    // patch-objektumon viszont a hozzárendelés típus-helyes, assertion nélkül —
+    // mind az öt kulcs `TrackType[]`-et tárol.
+    const patch: Partial<Pick<EditorState, TrackFlagKey>> = {};
+    patch[key] = next;
+    set(patch);
   },
 
   cycleTrackHeight: (type) => {

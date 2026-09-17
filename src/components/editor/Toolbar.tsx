@@ -15,7 +15,7 @@ import { ensureProxy } from '@/lib/proxy';
 import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
 import { clipEnd, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore } from '@/store/editorStore';
-import type { Clip } from '@/types/project';
+import type { Clip, TrackType } from '@/types/project';
 
 /**
  * Kontextusfüggő eszköztár: kijelölés nélkül a hozzáadás-műveletek, kijelölt
@@ -267,7 +267,7 @@ export function Toolbar() {
       .map((id) => findClip(project, id))
       .filter((f): f is NonNullable<typeof f> => f != null);
     const offset = duplicateOffset(picked.map((f) => f.clip));
-    const byTrack = new Map<string, Clip[]>();
+    const byTrack = new Map<TrackType, Clip[]>();
     for (const { track, clip } of picked) {
       const list = byTrack.get(track.type) ?? [...track.clips];
       list.push({ ...clip, id: makeId('clip'), start: clip.start + offset });
@@ -277,7 +277,7 @@ export function Toolbar() {
       {
         type: 'REPLACE_TRACKS',
         tracks: [...byTrack.entries()].map(([trackType, clips]) => ({
-          trackType: trackType as never,
+          trackType,
           clips: clips.sort((a, b) => a.start - b.start),
         })),
         label: t('editor.toolbar.clipsDuplicatedLabel', { count: ids.length }),

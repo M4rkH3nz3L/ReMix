@@ -33,7 +33,7 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 5 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 6 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
@@ -44,7 +44,7 @@
 | 3 | ~~**S7** · ATS / cleartext HTTP~~ | release buildben az iOS ATS és az Android is blokkolja a `http://`-t | ✔️ a lelet PONTATLAN volt — lásd lent |
 | 4 | ~~**S6** · `ios.privacyManifests`~~ | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ✔️ tracking=false + 4 adattípus |
 | 5 | ~~**K9** · `.env.example` hiányos~~ | a lelet ELÉVÜLT: mind a 7 változó dokumentálva van | ✔️ helyette a valódi csapda leírva |
-| 6 | **P3-4** · 9 db `as never` | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ⬜️ |
+| 6 | ~~**P3-4** · 9 db `as never`~~ | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ✔️ produkciós kódban **0** maradt |
 | 7 | **P1-9** · webes statikus render (`window is not defined`) | a beállított `web.output: "static"` ma nem működik | ⬜️ |
 | 8 | **K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek | template-maradványok; kozmetikai, de a store-listán látszik | ⬜️ |
 | 9 | **EAS env** · a `preview` környezet lokális Supabase-t kapott, és 5 változó hiányzik | a mostani build auth/social/Pro nélkül fut — **hosztolt értékek kellenek (RÁD VÁR)** | ⬜️ |
@@ -376,7 +376,15 @@ Mivel a fordító kihagyja, minden frame-ben újraépül a teljes JSX: `rulerMar
 
 **Javítás:** minimális kézi type-guard a projektbe **író** utakon (ahogy a `colorClient.ts:32` már csinálja); a `videdFile.ts:64` meglévő ellenőrzését emeljük közös `isProjectShape()` helperbe és használjuk a `loadProject`-ben.
 
-### P3-4 · Saját szignatúra-hibát takaró assertionök
+### ~~P3-4 · Saját szignatúra-hibát takaró assertionök~~ — ✔️ **JAVÍTVA**
+A produkciós kódban **nulla** `as never` maradt (a találatok: 3 saját teszt-mock, 1 teszt-fixture, és a javításokat leíró kommentek). Mindegyik valóban szignatúra-hiba tünete volt:
+- `imageDoc.ts` `updateLayer` → generikus paraméter (**6** assertion tűnt el);
+- `Toolbar.tsx:280` → a `Map` kulcsa `string` volt `TrackType` helyett;
+- `hooks.ts` `replaceHookClips` → a `TextClip[] | { kind; start }[]` union miatt a hívónak MINDKÉT irányban castolnia kellett; most generikus, a hívóhely assertion-mentes;
+- `editorStore.ts` sáv-kapcsolók → a számított kulcsból TS index-szignatúrát képez; szűkített `Partial<Pick<…>>` patch-objektummal a hozzárendelés típus-helyes;
+- `upload.ts:36` → a bemeneti `as never` egyszerűen **felesleges** volt (az `expo/fetch` `FetchRequestInit`-je elfogadja ezt az alakot); a visszatérési cast maradt, mert a `FetchResponse` nem azonos a `Response`-szal.
+
+**Eredeti lelet:**
 - `imageDoc.ts:51` `updateLayer(patch: Partial<ImageLayer>)` — a `Partial<>` disztributál a union felett → **6 db `as never`** az `ImageDocPanel.tsx`-ben. Javítás: `updateLayer<L extends ImageLayer>(doc, id, patch: Partial<L>)` — egy szignatúra-javítás, 6 assertion eltűnik.
 - `editorStore.ts:739` `set({ [key]: next } as never)` → explicit `switch`.
 - `Toolbar.tsx:280` → `Map<TrackType, Clip[]>`.

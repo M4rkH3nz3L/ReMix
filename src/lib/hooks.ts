@@ -43,10 +43,18 @@ export function buildHookClip(
  * A szöveg-sáv új klip-listája: a korábbi hook (a 0-nál kezdődő cím) lecserélve
  * — így a variánsok próbálgatása nem halmoz fel klipeket.
  */
-export function replaceHookClips(
-  clips: TextClip[] | { kind: string; start: number }[],
+/**
+ * A meglévő szöveg-klipek közé beteszi a hook-ot, a legelejére ragadt régi
+ * hookot pedig eldobja.
+ *
+ * Generikus, mert korábban `TextClip[] | { kind; start }[]` uniót várt — emiatt
+ * a hívónak MINDKÉT irányban `as never`-t kellett írnia. Így a bemeneti klip-típus
+ * végigmegy a visszatérési értékig, és a hívóhelyen nincs szükség assertionre.
+ */
+export function replaceHookClips<C extends { kind: string; start: number }>(
+  clips: readonly C[],
   hook: TextClip
-): (TextClip | { kind: string; start: number })[] {
+): (C | TextClip)[] {
   const kept = clips.filter((c) => !(c.kind === 'text' && c.start < 0.05));
   return [hook, ...kept].sort((a, b) => a.start - b.start);
 }

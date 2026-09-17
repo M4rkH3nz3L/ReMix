@@ -281,10 +281,7 @@ export function AssistantPanel() {
       () => makeId('clip')
     );
     const textTrack = state.project.tracks.find((t) => t.type === 'text');
-    const clips = replaceHookClips(
-      (textTrack?.clips ?? []) as never,
-      clip
-    ) as typeof clip[];
+    const clips = replaceHookClips(textTrack?.clips ?? [], clip);
     const ok = state.dispatch(
       { type: 'REPLACE_TRACK_CLIPS', trackType: 'text', clips },
       'ai'

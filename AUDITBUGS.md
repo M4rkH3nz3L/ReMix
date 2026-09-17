@@ -33,7 +33,7 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 3 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 4 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
@@ -42,7 +42,7 @@
 | 1 | ~~**P3-9** · nyers `res.json()` a `render.ts` 8 pontján~~ | a felhasználó „JSON Parse error"-t lát a valódi hibaüzenet helyett | ✔️ `readJson()`, 7 teszt |
 | 2 | ~~**P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is~~ | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ✔️ sorrend-függetlenség bizonyítva |
 | 3 | ~~**S7** · ATS / cleartext HTTP~~ | release buildben az iOS ATS és az Android is blokkolja a `http://`-t | ✔️ a lelet PONTATLAN volt — lásd lent |
-| 4 | **S6** · `ios.privacyManifests` | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ⬜️ |
+| 4 | ~~**S6** · `ios.privacyManifests`~~ | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ✔️ tracking=false + 4 adattípus |
 | 5 | **K9** · `.env.example` hiányos | 5 valóban használt `EXPO_PUBLIC_*` nincs dokumentálva → a következő build újra hiányos env-vel megy | ⬜️ |
 | 6 | **P3-4** · 9 db `as never` | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ⬜️ |
 | 7 | **P1-9** · webes statikus render (`window is not defined`) | a beállított `web.output: "static"` ma nem működik | ⬜️ |
@@ -206,7 +206,10 @@ eas build --profile preview --platform ios       # majd android
 - **S1 — Nincs `ios.buildNumber` / `android.versionCode`** (`app.json:5` csak `version: "1.0.0"`) → a **második** feltöltés elbukik („build number already used"). Megoldás: `cli.appVersionSource: "remote"` + `autoIncrement` az `eas.json`-ban.
 - **S2 — Nincs `expo-updates`, nincs `runtimeVersion`, nincs `updates` blokk** → **nincs OTA**: minden javításhoz teljes store-review. Bekapcsoláskor a `fingerprint` policy ajánlott.
 - **S3 — Nincs `expo-dev-client`** → a natív modulokat használó funkciók (eszközön futó render, IAP, hullámforma, push) **fejlesztés közben egyáltalán nem tesztelhetők**.
-- **S6 — Nincs `ios.privacyManifests`** → a `PrivacyInfo.xcprivacy` nem generálódik; az Apple „required reason API" deklarációk hiányosak lehetnek (AsyncStorage `NSPrivacyAccessedAPICategoryUserDefaults`, `expo-file-system` `…FileTimestamp`) → **ITMS-091061** figyelmeztetés feltöltéskor.
+- ~~**S6 — Nincs `ios.privacyManifests`**~~ — ✔️ **JAVÍTVA**, de a lelet indoklása **részben téves volt**. Végigmérve: **16 függőség szállít saját `PrivacyInfo.xcprivacy`-t**, ezek együtt lefedik a FileTimestamp (9×), UserDefaults (5×), SystemBootTime (3×) és DiskSpace (1×) kategóriákat — az Apple ezeket beolvasztja. Az AsyncStorage konkrétan **`FileTimestamp`-et** deklarál, **nem** `UserDefaults`-ot, ahogy a lelet állította. Az app saját rétege tiszta JS, required-reason API-t közvetlenül nem hív, ezért `NSPrivacyAccessedAPITypes` üres.
+  Ami app-szinten tényleg hiányzott, az a **tracking-nyilatkozat**: `NSPrivacyTracking: false` + üres `NSPrivacyTrackingDomains` — ellenőrizhetően igaz, mert a függőségek közt **egyetlen** tracking/reklám SDK sincs (Facebook, Firebase, AppsFlyer, Adjust, Segment, Sentry, AdMob mind hiányzik).
+  Deklarált adattípusok (mind „linked", **egyik sem tracking**, cél: App Functionality): e-mail (Supabase auth), user ID (Supabase + RevenueCat `appUserID`), vásárlási előzmény (RevenueCat), fotó/videó (felhő-render + feed-poszt).
+  ⚠️ **Beadás előtt vesd össze** az App Store Connect adatvédelmi kérdőívével — az a hivatalos felület; ez a manifest a bináris oldala.
 - ~~**S7 — Cleartext HTTP ATS-kivétel nélkül**~~ — ✔️ **RENDEZVE**, de a lelet **pontatlan volt**: nem „minden felhő-hívás némán elhal". Két külön útról van szó, és mindkettő rendben viselkedik:
   - **Pro / felhő:** a `cloudBaseUrl()` az `assertSecureUrl()`-ön megy át, ami release buildben **dob**, ha a cím nem `https://` (`backend.ts`) — cleartext tehát ide be sem jut.
   - **Ingyenes / LAN-worker** (`renderServerUrl()`, 12 modul): ellenőrizve **mind a 12-nél**, hogy hibánál `null`/`[]`-re esik vissza → a store-buildben ez a HELYES viselkedés (eszközön futó út), nem hiba.

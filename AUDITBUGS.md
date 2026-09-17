@@ -26,7 +26,7 @@
 A hiányzó pontok nem a feature-mélységből, hanem a **production-keményítés** hiányából jönnek. A megosztottság feltűnő: az *alkalmazás-szintű* munka ~8/10 szintű, a *kiadási* infrastruktúra viszont gyakorlatilag 0/10 — a projekt **fejlesztésre kiválóan konfigurált, kiadásra egyáltalán nincs konfigurálva**. Ehhez jön két néma adatvesztési út, egy dupla-sebesség bug, és egy hitelesítetlen worker.
 
 > **Állapot 2026-09-17 — P0/P1/P2/P3 lezárva; kódolni való nem maradt.**
-> **P0: 5/5** · **P1: 7/7** · **P2: 5/6** (a React Compiler bail-ok mérésre várnak)
+> **P0: 5/5** · **P1: 7/7** · **P2: 6/6** · **P3: 15/15**
 > **P3: 15/15** — az utolsó öt tétel is kész:
 > - **P3-5** (`a4cbbe6`, `6234070`): az editorStore **1541 → 1360** sor. A
 >   roll/slip/slide → `lib/trimEdit.ts`, a range-törlés → `lib/rangeEdit.ts`, a
@@ -53,16 +53,21 @@ A hiányzó pontok nem a feature-mélységből, hanem a **production-keményít�
 >   forrásból ellenőrizve) mostantól **mérve és ürítve** — eddig a felhasználónak
 >   mutatott cache-méret kevesebb volt a valóságnál. 9 teszt.
 >
-> Teszt-infrastruktúra: **238 teszt**, `npm run audit` (tsc + lint + jest) + CI.
+> Teszt-infrastruktúra: **247 teszt**, `npm run audit` (tsc + lint + jest) + CI.
 > Korábban: `2a75195` (duplikáció-konszolidáció), `c0d54c3` (a halott ✕ gomb),
 > `ebdf5bc` (feed rollback + shop hiba≠üres), `0ea6944`/`052051f`/`2a67079`/
 > `51814c1` (4 szigorúbb tsconfig-flag, −962 sor halott kód, `updateLayer`
 > generikus, időzítő-cleanup, AGENTS.md a valós architektúrára).
 >
-> **Hátra — egyik sem kódolási feladat:** **P2-1** (React Compiler bail-ok: 42/60
-> függvény, köztük a Timeline és a PreviewSurface — eszközön mért profil nélkül
-> optimalizálni találgatás lenne), és **B3** (`npx eas init`), ami a te
-> Expo-fiókodat igényli.
+> - **P2-1** (`349b9ab`): a React Compiler mérése MEGISMÉTELVE — az audit „42/60,
+>   az összes forró komponens kiesik" állítása **téves konfigból** származott. A
+>   valóság: 76 .tsx-ből **46 memoizálva**, a forró útvonal 8 komponenséből **5 jó**.
+>   A `Timeline` két valódi anti-mintája javítva (bail 3 → 2), a maradék a
+>   gesztus-kódban van (szándékos kivétel). Új `build` jest-projekt:
+>   `tools/reactCompiler.test.js` őrzi, hogy a lista ne tudjon némán nőni.
+>
+> **Hátra:** **B3** (`npx eas init`), ami a te Expo-fiókodat igényli, és a
+> `noUncheckedIndexedAccess` fokozatos bevezetése (lásd „Mérésre vár" 4.).
 >
 > **Korábbi állapot 2026-09-15:** a **P1-1 / P1-3 / P1-4 is javítva** (`7591aa8`, `dab619e`, `5344bde`, `13a69e7`) — a worker-hitelesítés élő támadás-tesztekkel igazolva. Korábban: mind az 5 **P0 javítva** (`661a694`, `30a93eb`, `73d9118`, `f1f87c8`, `757f0ce`), és a **P1-2 kiadás-blokkolókból 3/4 kész** (`4c75e7a`) — a B3 a te Expo-fiókodat igényli. A pontszám újraértékelése a preview build után esedékes.
 
@@ -250,21 +255,30 @@ natív modulok ott nem futnak.)
 
 ## 🟡 P2 — Teljesítmény (mind kódból bizonyított)
 
-### P2-1 · A React Compiler kihagyja az ÖSSZES forró editor-komponenst ✅
-**Súlyosság: MAGAS** · `app.json:76` (`"reactCompiler": true`) · `babel-plugin-react-compiler@1.0.0` (tranzitívan, `expo` → `babel-preset-expo`)
+### ~~P2-1 · A React Compiler kihagyja az ÖSSZES forró editor-komponenst~~ — ⚠️ **AZ ÁLLÍTÁS TÉVES VOLT**, újramérve (`349b9ab`)
+**Súlyosság: KÖZEPES** (nem MAGAS) · `app.json:80` (`"reactCompiler": true`)
 
-A fordítót lefuttatva: **60 komponensből 42 bail-el (41%)** — és pont a forró útvonal esik ki:
+Az eredeti „42/60 bail, az ÖSSZES forró komponens kiesik" szám **rossz konfigból** származott. A fordítót nem preset-opció kapcsolja be, hanem a **`caller.supportsReactCompiler`** (`babel-preset-expo/build/common.js:109`) — enélkül minden mérés nullát vagy félrevezető számot ad:
+
+| Mérés | Eredmény |
+|---|---|
+| `react-compiler-healthcheck` | 53/53 sikeres (saját, engedékenyebb config) |
+| plugin önmagában, preset nélkül | 60 sikeres / 106 bail |
+| **valódi Expo-út (mérvadó)** | **76 .tsx-ből 46 memoizálva** |
+
+**A forró útvonal valós állapota:** 8-ból **5 rendben** — `TimelineClip` ✅, `AudioLayer` ✅, `PipLayer` ✅, `TransitionLayer` ✅, `ShapeOverlay` ✅. Az audit ezek közül a `TimelineClip`-et és az `AudioLayer`-t is bukóként sorolta. Ténylegesen **három** marad ki:
 
 | Komponens | Ok |
 |---|---|
-| `Timeline.tsx:96` | `// eslint-disable-next-line react-hooks/exhaustive-deps` (`:339`) |
-| `PreviewSurface.tsx:78` (×3) | `player.currentTime = …` mutáció |
-| `TimelineClip.tsx:67` (×6) | shared-value mutációk |
-| `TextOverlay.tsx:173`, `AudioLayer.tsx:54,165` | ugyanaz |
+| `Timeline.tsx` | a pinch-gesztus `onStart`/`onUpdate` closure-je refet ír (2 bail; volt 3) |
+| `PreviewSurface.tsx` | expo-video player-mutáció — hookból jövő érték módosítása |
+| `TextOverlay.tsx` | Reanimated shared value írása effekt-függőség után |
 
-**Kritikus következtetés:** a projekt **egyetlen memoizálási stratégiája a fordító**, és **nulla kézi `useMemo` van a szerkesztő-útvonalon**. Az `eslint.config.js`-ben kikapcsolt `react-hooks/immutability` + `react-hooks/refs` nem „hamis pozitívot némít el", hanem **ugyanazokat a diagnosztikákat**, amik miatt a fordító kihagyja a komponenst — a lint hallgat, az optimalizálás elmarad, és nincs fallback.
+**Elvégezve:** a `Timeline`-ból két valódi React-anti-minta kikerült (elnémított hook-szabállyal hazudó dep-lista → a klip a store-ból; `ppsRef.current = pps` a render törzséből → effektbe). A maradék kettő a gesztus-kódban van — pontosan az a kategória, amire az `AGENTS.md` szándékosan kikapcsolta a `react-hooks/refs`-et; a pinch-zoom átstrukturálása mérhetetlen haszonért kockázat, ezért **ott megálltunk**.
 
-**Javítás:** (a) ahol lehet, a player-mutációk kiemelése `useEffect`-be, hogy a komponens fordítható legyen (a `PipLayer`, `TransitionLayer`, `ShapeOverlay` már így néz ki — **ezek le is fordulnak**); (b) ahol nem (`Timeline`, `PreviewSurface`), **kézi `useMemo`**; (c) CI-ellenőrzés, ami jelez, ha új forró komponens kerül a bail-listára.
+> ⚠️ **Csapda:** a fordító a KOMMENTEKBEN is keresi az elnémító direktívát. Az a magyarázó megjegyzés, ami leírja, hogy eltávolítottuk, maga váltja ki újra a bail-t.
+
+**Őr:** `tools/reactCompiler.test.js` (új `build` jest-projekt) — a forró útvonal memoizálása a `npm run audit` része. A KIMENETET méri (`_c(n)`), nem a fordító naplóját; a lista kétirányúan kirögzített (elbukik, ha valami visszaesik, ÉS ha egy ismert kimaradó megjavul), és egy külön teszt magát a mérőműszert ellenőrzi.
 
 ### P2-2 · A `Timeline` 60 Hz-en reconcile-ol egy `scrollTo` kedvéért ✅
 **Súlyosság: MAGAS** · `Timeline.tsx:100` (feliratkozás) — az **egyetlen** valódi felhasználás a `:343-351` scroll-effekt (`:855` csak stílusnév, `:218` snap-címke)

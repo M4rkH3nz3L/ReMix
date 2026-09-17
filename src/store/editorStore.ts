@@ -10,6 +10,7 @@ import {
 } from '@/lib/batchEdit';
 import { applyCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
+import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
 import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
@@ -505,11 +506,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (next === null) {
       return false;
     }
+    // 📉 a naplóba a KÖNNYÍTETT változat megy (a teljes klip-tömbök mérve 1,2 MB-ot
+    // írtak újra minden autosave-nél); a `project`/`past` természetesen teljes marad
     const event: ProjectEvent = {
       id: makeId('evt'),
       at: new Date().toISOString(),
       actor,
-      command,
+      command: slimForLog(command),
+      ...(isHeavyCommand(command) ? { slim: true as const } : {}),
     };
     set({
       project: next,
@@ -532,7 +536,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const next = applyCommand(cur, command);
       if (next !== null) {
         cur = next;
-        batchEvents.push({ id: makeId('evt'), at: new Date().toISOString(), actor, command });
+        batchEvents.push({
+          id: makeId('evt'),
+          at: new Date().toISOString(),
+          actor,
+          command: slimForLog(command),
+          ...(isHeavyCommand(command) ? { slim: true as const } : {}),
+        });
       }
     }
     if (batchEvents.length === 0) {

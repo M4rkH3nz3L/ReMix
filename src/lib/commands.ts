@@ -69,6 +69,12 @@ export interface ProjectEvent {
   at: string;
   actor: EventActor;
   command: EditorCommand;
+  /**
+   * A command nehéz mezői (klip-tömbök, kép-rétegek) csonkolva vannak — lásd
+   * `lib/eventLog.ts`. Ilyen commandot TILOS `applyCommand`-dal alkalmazni; a
+   * napló csak `describeCommand()`-hoz való.
+   */
+  slim?: true;
 }
 
 /**

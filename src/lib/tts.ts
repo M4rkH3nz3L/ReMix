@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import { makeId } from '@/lib/id';
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
+import { fetchRead } from '@/lib/netRetry';
 
 /**
  * TTS-kliens (AI-hang): a dev-worker `say`-alapú szöveg→beszéd végpontja.
@@ -30,7 +31,8 @@ function curate(voices: TtsVoice[]): TtsVoice[] {
 
 export async function fetchTtsVoices(): Promise<{ available: boolean; voices: TtsVoice[] }> {
   try {
-    const res = await fetch(`${cloudBaseUrl()}/tts/voices`);
+    // 🔁 katalógus-olvasás: idempotens → időkorlát + egy újrapróba
+    const res = await fetchRead(`${cloudBaseUrl()}/tts/voices`, { timeoutMs: 8000 });
     if (!res.ok) {
       return { available: false, voices: [] };
     }

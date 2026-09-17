@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { fetchRead } from '@/lib/netRetry';
 import { renderServerUrl } from '@/lib/render';
 
 /**
@@ -20,7 +21,8 @@ export interface Sticker3DEntry {
 
 export async function listStickers3d(): Promise<Sticker3DEntry[] | null> {
   try {
-    const res = await fetch(`${renderServerUrl()}/stickers3d`);
+    // 🔁 katalógus-olvasás: idempotens → időkorlát + egy újrapróba
+    const res = await fetchRead(`${renderServerUrl()}/stickers3d`, { timeoutMs: 8000 });
     if (!res.ok) {
       return null;
     }

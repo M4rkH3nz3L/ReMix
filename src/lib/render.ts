@@ -10,6 +10,7 @@ import {
   LocalRenderUnavailableError,
   renderLocal,
 } from '@/lib/nativeRender';
+import { fetchRead } from '@/lib/netRetry';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { renderCacheKey } from '@/lib/projectHash';
@@ -407,7 +408,11 @@ async function renderCloud(
       throw new RenderCancelledError();
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-    const res = await fetchWithTimeout(`${base}/render/${id}`, 5000);
+    // 🔁 A státusz-lekérés IDEMPOTENS olvasás — és itt a legdrágább a hiba: a
+    // média már fent van, a worker épp renderel, és egy pillanatnyi hálózat-
+    // kimaradás (lift, wifi→LTE) eldobná az egész munkát. A `signal` átmegy,
+    // így a ✕ gomb továbbra is azonnal megszakít.
+    const res = await fetchRead(`${base}/render/${id}`, { timeoutMs: 5000, signal });
     const status = await res.json();
     if (status.state === 'done') {
       onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
@@ -451,7 +456,7 @@ export interface LibraryTrack {
 /** A worker hang-könyvtára (generált SFX + a server/music mappa fájljai). */
 export async function fetchSoundLibrary(): Promise<LibraryTrack[]> {
   const base = cloudBaseUrl();
-  const res = await fetchWithTimeout(`${base}/music`, 5000);
+  const res = await fetchRead(`${base}/music`, { timeoutMs: 5000 }); // 🔁 tiszta olvasás
   if (!res.ok) {
     throw new Error(tr('lib.render.soundLibraryUnreachable'));
   }

@@ -33,7 +33,7 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 7 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 8 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
@@ -46,7 +46,7 @@
 | 5 | ~~**K9** · `.env.example` hiányos~~ | a lelet ELÉVÜLT: mind a 7 változó dokumentálva van | ✔️ helyette a valódi csapda leírva |
 | 6 | ~~**P3-4** · 9 db `as never`~~ | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ✔️ produkciós kódban **0** maradt |
 | 7 | ~~**P1-9** · webes statikus render (`window is not defined`)~~ | a beállított `web.output: "static"` ma nem működik | ✔️ 11 útvonal exportál, elő/utó méréssel |
-| 8 | **K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek | template-maradványok; kozmetikai, de a store-listán látszik | ⬜️ |
+| 8 | ~~**K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek~~ | template-maradványok; kozmetikai, de a store-listán látszik | ✔️ 2 valódi, 2 téves lelet |
 | 9 | **EAS env** · a `preview` környezet lokális Supabase-t kapott, és 5 változó hiányzik | a mostani build auth/social/Pro nélkül fut — **hosztolt értékek kellenek (RÁD VÁR)** | ⬜️ |
 | 10 | **S2/S3** · `expo-updates` (OTA) és `expo-dev-client` | architekturális döntés, nem hibajavítás — **egyeztetést igényel** | ⬜️ |
 | 11 | **Mérésre vár 1.** · valódi render-számok lejátszás alatt | most már van futtatható build — ez dönti el, számít-e a 4 komponens fordító-kimaradása | ⬜️ |
@@ -217,7 +217,12 @@ eas build --profile preview --platform ios       # majd android
   **Androidon szándékosan NEM** kapcsoltunk cleartextet: az `expo-build-properties` új függőséget és **globális** enyhítést jelentene, miközben a fallback amúgy is helyes. Ha később kell, ez tudatos döntés legyen, ne mellékhatás.
 - **K4** — `ITSAppUsesNonExemptEncryption` nincs beállítva → minden feltöltésnél kézi export-compliance kérdés.
 - **K10** — az iOS usage description-ök **csak magyarul** vannak, `InfoPlist.strings` lokalizáció nélkül, holott az app 3 nyelvű → angol-locale-os App Review-nál magyar szöveg jelenik meg.
-- **K5/K6/K7/K8** — splash `imageWidth: 76` (a dokumentált alapérték 100; a kép 512×512), nincs `dark` splash variáns `userInterfaceStyle: "automatic"` mellett; template-maradvány `adaptiveIcon.backgroundColor: "#E6F4FE"` a brand `#7c5cff`/`#0c0d12` helyett; értesítés-ikon 432×432 a javasolt 96×96 helyett; `favicon.png` 48×48.
+- **K5/K6/K7/K8** — ✔️ **RENDEZVE**; a négy leletből **kettő valódi volt, kettő téves**:
+  - **K5 ✔️** — splash `imageWidth: 76`. A `git log -S` szerint a **kiinduló commitból** (`fd33bed`) maradt, tehát sablon-maradvány, nem tudatos döntés (a plugin alapértéke 100). **200-ra állítva**, egyeztetés után — az 512 px-es forráshoz ez a bevett arány.
+  - **K7 ✔️** — `adaptiveIcon.backgroundColor: "#E6F4FE"` az Expo-sablon világoskékje, szintén a kiinduló commitból. **`#0c0d12`-re állítva**, azonosra a splash hátterével.
+  - **K6 ⛔️ NEM hiba** — „nincs `dark` splash variáns". A brand splash-háttér már eleve sötét (`#0c0d12`), tehát egy azonos `dark` blokk semmit nem érne. Világos splash készítése MÁRKA-döntés lenne, nem hibajavítás — szándékosan nem találtunk ki egyet.
+  - **K8 ⛔️ NEM hiba** — „értesítés-ikon 432×432 a javasolt 96×96 helyett". Az `expo-notifications` plugin `BASELINE_PIXEL_SIZE = 24`-ből skáláz (24/36/48/72/**96** px), és a FORRÁSBÓL kicsinyít minden sűrűségre. Egy 432×432-es forrás tehát **jobb** bemenet, mint a 96×96 — az utóbbi épp a legnagyobb sűrűség maximumát adná, tartalék nélkül.
+  - `favicon.png` 48×48 — a böngészők által kért 32/48-as tartományban van, nem hiba.
 - ~~**K9** — a `.env.example` nem dokumentálja…~~ — ✔️ **A LELET ELÉVÜLT**: mind a 7 ténylegesen használt `EXPO_PUBLIC_*` szerepel benne (ellenőrizve a kódból kinyert listával). A dokumentált `eas env:set --visibility plaintext` parancs is érvényes a mai CLI-ban.
   **Helyette az a csapda került be, ami a mai buildnél TÉNYLEG elsült:** a `.env` lokális Supabase-t tartalmazott (`http://127.0.0.1:54321`), és az `env:push` ezt egy az egyben feltöltötte. Telepített appban a `127.0.0.1` magát a készüléket jelenti — a build sikerül, elindul, és csak bejelentkezéskor derül ki, hogy semmi nem működik (a `http://` ráadásul az ATS miatt is tiltott). Most keretes figyelmeztetés + környezetenkénti „mi kell hova" tábla van a fájlban.
 

@@ -39,18 +39,30 @@ function waveformFiles(): File[] {
 
 const sumBytes = (files: File[]): number => files.reduce((s, f) => s + (f.size ?? 0), 0);
 
+/**
+ * Az `expo-video-thumbnails` mindkét platformon ide írja a generált JPEG-eket.
+ * A memória-cache kiszórása a FÁJLT nem törli, ezért a mappa a munkamenet alatt
+ * folyamatosan nő — eddig sem mérve, sem ürítve nem volt.
+ */
+function thumbnailDir(): Directory {
+  return new Directory(Paths.cache, 'VideoThumbnails');
+}
+
 export interface CacheReport {
   /** vágási proxyk össz-mérete (byte) */
   proxies: number;
   /** hullámforma-cache össz-mérete (byte) */
   waveforms: number;
+  /** filmstrip-képkockák össz-mérete (byte) */
+  thumbnails: number;
   total: number;
 }
 
 export function cacheReport(): CacheReport {
   const proxies = sumBytes(fileList(new Directory(Paths.document, 'proxies')));
   const waveforms = sumBytes(waveformFiles());
-  return { proxies, waveforms, total: proxies + waveforms };
+  const thumbnails = sumBytes(fileList(thumbnailDir()));
+  return { proxies, waveforms, thumbnails, total: proxies + waveforms + thumbnails };
 }
 
 /** Az eldobható cache-ek (proxy + hullámforma) törlése lemezről és memóriából. */
@@ -63,6 +75,13 @@ export function clearCaches(): void {
     }
   }
   for (const f of waveformFiles()) {
+    try {
+      f.delete();
+    } catch {
+      /* ignore */
+    }
+  }
+  for (const f of fileList(thumbnailDir())) {
     try {
       f.delete();
     } catch {

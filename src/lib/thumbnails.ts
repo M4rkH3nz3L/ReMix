@@ -1,6 +1,8 @@
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
 
+import { LruCache } from '@/lib/lruCache';
+
 /**
  * Filmstrip-képkockák a videóklipekhez (full-plan F2 thumbnail-szelet, kliens-
  * oldalon). Minden (uri, másodperc) párhoz egyszer generálunk képkockát; a
@@ -8,34 +10,26 @@ import { Platform } from 'react-native';
  * cache-találat. A generálás sorban fut, hogy ne terhelje túl a natív dekódert.
  */
 
-const cache = new Map<string, Promise<string | null>>();
-/** 🛡️ memóriavédelem: a képkocka-cache felső határa (a legrégebbit dobjuk) */
+/**
+ * 🛡️ memóriavédelem: a képkocka-cache felső határa. A generált JPEG-ek a
+ * `<cache>/VideoThumbnails/` mappába kerülnek (mindkét platformon) — a memóriából
+ * kiszórt bejegyzés fájlja ott marad, ezért a `cacheManager` MÉRI és ÜRÍTI azt
+ * a mappát.
+ */
 const MAX_CACHE = 300;
+const cache = new LruCache<Promise<string | null>>(MAX_CACHE);
 
 function thumbAt(uri: string, second: number): Promise<string | null> {
   const key = `${uri}@${second}`;
-  let pending = cache.get(key);
-  if (!pending) {
-    pending = VideoThumbnails.getThumbnailAsync(uri, {
+  const pending =
+    cache.get(key) ?? // az olvasás egyben frissít is (LRU)
+    VideoThumbnails.getThumbnailAsync(uri, {
       time: Math.max(0, Math.round(second * 1000)),
       quality: 0.4,
     })
       .then((result) => result.uri)
       .catch(() => null);
-    // a legrégebben beszúrt bejegyzést dobjuk, ha túlnőne a cache
-    while (cache.size >= MAX_CACHE) {
-      const oldest = cache.keys().next().value;
-      if (oldest === undefined) {
-        break;
-      }
-      cache.delete(oldest);
-    }
-    cache.set(key, pending);
-  } else {
-    // LRU: a használt kulcs a sor végére kerül
-    cache.delete(key);
-    cache.set(key, pending);
-  }
+  cache.set(key, pending);
   return pending;
 }
 

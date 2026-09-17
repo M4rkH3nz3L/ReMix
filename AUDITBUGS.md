@@ -33,7 +33,7 @@
 
 ## 📋 TODO — a maradék tételek, sorrendben
 
-> **Hol tartunk: 4 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
+> **Hol tartunk: 5 / 11.** A sorrend érték/kockázat szerint: elöl az olcsó és
 > egyértelmű javítások, hátul az, ami döntést vagy mérést igényel. Minden tétel
 > a saját szakaszára hivatkozik; ha egy kész, ITT is és a szakaszban is átvezetjük.
 
@@ -43,7 +43,7 @@
 | 2 | ~~**P1-2c + K10** · explicit `ios.infoPlist` usage description-ök, angolul is~~ | ma a plugin-SORREND dönti el az értékeket — átrendezésnél némán angol defaultra vált; a magyar szöveg angol App Review-nál hátrány | ✔️ sorrend-függetlenség bizonyítva |
 | 3 | ~~**S7** · ATS / cleartext HTTP~~ | release buildben az iOS ATS és az Android is blokkolja a `http://`-t | ✔️ a lelet PONTATLAN volt — lásd lent |
 | 4 | ~~**S6** · `ios.privacyManifests`~~ | `PrivacyInfo.xcprivacy` nélkül **ITMS-091061** figyelmeztetés minden feltöltésnél | ✔️ tracking=false + 4 adattípus |
-| 5 | **K9** · `.env.example` hiányos | 5 valóban használt `EXPO_PUBLIC_*` nincs dokumentálva → a következő build újra hiányos env-vel megy | ⬜️ |
+| 5 | ~~**K9** · `.env.example` hiányos~~ | a lelet ELÉVÜLT: mind a 7 változó dokumentálva van | ✔️ helyette a valódi csapda leírva |
 | 6 | **P3-4** · 9 db `as never` | saját szignatúra-hibát takarnak; típus-javítással eltűnnek | ⬜️ |
 | 7 | **P1-9** · webes statikus render (`window is not defined`) | a beállított `web.output: "static"` ma nem működik | ⬜️ |
 | 8 | **K5–K8** · splash/ikon/értesítés-ikon méretek, brand-színek | template-maradványok; kozmetikai, de a store-listán látszik | ⬜️ |
@@ -218,7 +218,8 @@ eas build --profile preview --platform ios       # majd android
 - **K4** — `ITSAppUsesNonExemptEncryption` nincs beállítva → minden feltöltésnél kézi export-compliance kérdés.
 - **K10** — az iOS usage description-ök **csak magyarul** vannak, `InfoPlist.strings` lokalizáció nélkül, holott az app 3 nyelvű → angol-locale-os App Review-nál magyar szöveg jelenik meg.
 - **K5/K6/K7/K8** — splash `imageWidth: 76` (a dokumentált alapérték 100; a kép 512×512), nincs `dark` splash variáns `userInterfaceStyle: "automatic"` mellett; template-maradvány `adaptiveIcon.backgroundColor: "#E6F4FE"` a brand `#7c5cff`/`#0c0d12` helyett; értesítés-ikon 432×432 a javasolt 96×96 helyett; `favicon.png` 48×48.
-- **K9** — a `.env.example` nem dokumentálja a ténylegesen használt `EXPO_PUBLIC_RC_IOS_KEY`, `EXPO_PUBLIC_RC_ANDROID_KEY`, `EXPO_PUBLIC_SERVER_URL` változókat (`src/lib/billing.ts:48-56`).
+- ~~**K9** — a `.env.example` nem dokumentálja…~~ — ✔️ **A LELET ELÉVÜLT**: mind a 7 ténylegesen használt `EXPO_PUBLIC_*` szerepel benne (ellenőrizve a kódból kinyert listával). A dokumentált `eas env:set --visibility plaintext` parancs is érvényes a mai CLI-ban.
+  **Helyette az a csapda került be, ami a mai buildnél TÉNYLEG elsült:** a `.env` lokális Supabase-t tartalmazott (`http://127.0.0.1:54321`), és az `env:push` ezt egy az egyben feltöltötte. Telepített appban a `127.0.0.1` magát a készüléket jelenti — a build sikerül, elindul, és csak bejelentkezéskor derül ki, hogy semmi nem működik (a `http://` ráadásul az ATS miatt is tiltott). Most keretes figyelmeztetés + környezetenkénti „mi kell hova" tábla van a fájlban.
 
 ### P1-2c · Törékeny jogosultság-lánc ⚠️
 **A jó hír: NINCS hiányzó iOS usage description** — a permission-lánc végigkövetve **teljes** (`NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription` mind magyar értékkel), és az Android-oldal is hiánytalan. Ez volt a legnagyobb elutasítási kockázat, és **átmegy**.

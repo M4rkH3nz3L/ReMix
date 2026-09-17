@@ -1,33 +1,36 @@
 # 🔍 ReMix — Production audit: javítandók
 
-**Audit dátuma:** 2026-09-15 · **Branch:** `studio-social` · **Terjedelem:** 222 TS/TSX fájl / 52 164 sor (`src/`) + 11 051 sor (`server/`)
+**Audit dátuma:** 2026-09-15 · **Újraértékelve:** 2026-09-17 · **Branch:** `studio-social` · **Terjedelem:** 246 TS/TSX fájl / 54 295 sor (`src/`) + 11 712 sor (`server/`)
 
 **Módszer:** `expo-doctor` · `expo lint` · `tsc --noEmit` · `npm audit` · `expo install --check` + 7 párhuzamos kód-audit (biztonság, hibakezelés, memória, TypeScript, architektúra, Expo/EAS, state/teljesítmény). Minden állítás fájl:sor bizonyítékkal; a ✅ jelölés azt jelenti, hogy **külön ellenőriztem**.
 
 ---
 
-## Pontszám: **57 / 100** — működő és jól megírt app, ami **kiadásra ma nincs konfigurálva**
+## Pontszám: **57 / 100** (eredeti, 2026-09-15) → **82 / 100** (újraértékelve, 2026-09-17)
 
-| Terület | Súly | Pont | Eredmény |
-|---|---:|---:|---:|
-| Architektúra | 15 | 7/10 | 10.5 |
-| TypeScript | 10 | 8/10 | 8.0 |
-| React-minőség | 10 | 6/10 | 6.0 |
-| **Expo-konfiguráció** | 10 | **3/10** | **3.0** |
-| Teljesítmény | 15 | 6/10 | 9.0 |
-| Memória | 10 | 7/10 | 7.0 |
-| API / hálózat | 10 | 6/10 | 6.0 |
-| Biztonság | 10 | 4/10 | 4.0 |
-| Tesztelés | 5 | 1/10 | 0.5 |
-| UX / hibakezelés | 5 | 6/10 | 3.0 |
+| Terület | Súly | Volt | Most | Mi változott |
+|---|---:|---:|---:|---|
+| Architektúra | 15 | 7/10 | **9**/10 | editorStore 1541→1360, a trim/range/pre-compose matematika tiszta `lib/` magokban; command bus továbbra is 0 megkerülés |
+| TypeScript | 10 | 8/10 | **9**/10 | 4 szigorúbb flag, 0 tsc-hiba, 4 db `any` 54 ezer sorra, 0 `@ts-ignore`; az elavult `@types/react-native` kidobva |
+| React-minőség | 10 | 6/10 | **7**/10 | az elnémított hook-szabályok a forró úton megszűntek; 10 `eslint-disable` maradt, mind indokolt |
+| **Expo-konfiguráció** | 10 | **3**/10 | **8**/10 | bundleId/package, eas.json, `expo-doctor` **21/21** (volt: 2 bukás); a B3 (`eas init`) hiányzik |
+| Teljesítmény | 15 | 6/10 | **8**/10 | a fordító-memoizálás MÉRVE és CI-ben őrizve; events-napló 1,2 MB → ~50 KB autosave-enként |
+| Memória | 10 | 7/10 | **9**/10 | LRU a 6 elemzés-cache-re + a thumbnail-mappa végre mérve és üríthető |
+| API / hálózat | 10 | 6/10 | **8**/10 | retry az idempotens olvasásokra, timeout a korábban korlátlan hívásokon, `parseGuards` a határon |
+| Biztonság | 10 | 4/10 | **9**/10 | worker-hitelesítés, CORS-allowlist, SSRF-védelem, fail-closed `isPro`, Keychain-tárolás |
+| **Tesztelés** | 5 | **1**/10 | **7**/10 | 0 → **249 teszt** 20 fájlban (kliens + worker + fordítási kimenet), `npm run audit` + CI |
+| UX / hibakezelés | 5 | 6/10 | **8**/10 | autosave-retry jelzéssel, feed-rollback, „hiba ≠ üres lista", a ✕ gomb végre hat |
 
-**Olvasat.** A *kódfegyelem* átlag feletti: `strict: true` + **0 tsc-hiba**, **0 lint-hiba**, 52 ezer sorra **3 db `any`**, **0 `@ts-ignore`**, **0 `console.log`**, 5 TODO 63 ezer sorban, a command bus **kivétel nélkül** betartva, nulla secret a repóban, teljes jogosultság-lánc, tiszta függőségi fa.
+**Az újraértékelés bizonyítékai:** `tsc --noEmit` 0 hiba · `expo lint` 0 hiba · `jest` 249/249 · `expo-doctor` 21/21 · 246 fájl / 54 295 sor (`src/`) + 11 712 sor (`server/`) · 0 `console.log` · 4 TODO.
 
-A hiányzó pontok nem a feature-mélységből, hanem a **production-keményítés** hiányából jönnek. A megosztottság feltűnő: az *alkalmazás-szintű* munka ~8/10 szintű, a *kiadási* infrastruktúra viszont gyakorlatilag 0/10 — a projekt **fejlesztésre kiválóan konfigurált, kiadásra egyáltalán nincs konfigurálva**. Ehhez jön két néma adatvesztési út, egy dupla-sebesség bug, és egy hitelesítetlen worker.
+**Ami a 100-ból hiányzik — és miért nem pótolható íróasztalnál:**
+- **−6 kiadás:** a **B3** (`npx eas init` + preview build) az Expo-fiókot igényli; enélkül a „kiadásra kész" nem igazolható, csak valószínűsíthető.
+- **−5 teljesítmény:** eszközön mért profil nincs. A `Timeline`, `TimelineClipInner`, `PreviewSurface` és `TextOverlay` a fordítóból kimarad (player-mutáció / Reanimated shared value — szándékos kivétel), de hogy ez MÉRHETŐEN számít-e, csak telefonon dől el.
+- **−4 tesztelés:** nincs komponens- vagy E2E-teszt; a 249 teszt a tiszta magokat és a határokat fedi, a UI-t nem.
+- **−3 egyéb:** 15 tranzitív npm-audit találat az Expo eszközláncából (két gyökér-ok), amit nem az app kontrollál.
 
 > **Állapot 2026-09-17 — P0/P1/P2/P3 lezárva; kódolni való nem maradt.**
-> **P0: 5/5** · **P1: 7/7** · **P2: 6/6** · **P3: 15/15**
-> **P3: 15/15** — az utolsó öt tétel is kész:
+> **P0: 5/5** · **P1: 7/7** · **P2: 6/6** · **P3: 15/15** — az utolsó tételek:
 > - **P3-5** (`a4cbbe6`, `6234070`): az editorStore **1541 → 1360** sor. A
 >   roll/slip/slide → `lib/trimEdit.ts`, a range-törlés → `lib/rangeEdit.ts`, a
 >   pre-compose → `lib/preCompose.ts`. Mind tiszta függvény, a store koordinátor

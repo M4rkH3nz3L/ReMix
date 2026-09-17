@@ -90,12 +90,18 @@ function VideoVoice() {
     : '';
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
+  // A dep-lista CSAK primitíveket tartalmaz (a `clip`/`opts` objektum minden
+  // renderben új referencia lenne), így őszinte lehet — nem kell elnémítani a
+  // hook-szabályt, és a React Compiler nem hagyja ki emiatt a komponenst.
+  const srcUri = eligible && clip ? clip.uri : null;
+  const enhance = clip?.voiceEnhance ?? false;
+  const deReverb = clip?.deReverb ?? false;
   useEffect(() => {
-    if (!clip || !opts || !eligible) {
+    if (!srcUri) {
       return;
     }
     let alive = true;
-    ensureVoiceProxy(clip.uri, opts).then((uri) => {
+    ensureVoiceProxy(srcUri, { voiceEnhance: enhance, deReverb }).then((uri) => {
       if (alive) {
         setFetched({ key, uri });
       }
@@ -103,8 +109,7 @@ function VideoVoice() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, eligible]);
+  }, [srcUri, enhance, deReverb, key]);
 
   const uri =
     clip && opts && eligible
@@ -211,12 +216,19 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     : '';
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
+  // csak primitív függőségek → őszinte dep-lista, elnémított hook-szabály nélkül
+  const voiceSrcUri = needsProxy && clip ? clip.uri : null;
+  const voiceEnhance = clip?.voiceEnhance ?? false;
+  const voiceDeReverb = clip?.deReverb ?? false;
   useEffect(() => {
-    if (!clip || !voiceOpts || !needsProxy) {
+    if (!voiceSrcUri) {
       return;
     }
     let alive = true;
-    ensureVoiceProxy(clip.uri, voiceOpts).then((uri) => {
+    ensureVoiceProxy(voiceSrcUri, {
+      voiceEnhance: voiceEnhance,
+      deReverb: voiceDeReverb,
+    }).then((uri) => {
       if (alive) {
         setFetched({ key: voiceKey, uri });
       }
@@ -224,9 +236,7 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     return () => {
       alive = false;
     };
-    // a voiceKey fedi a uri-t és mindkét kapcsolót
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceKey, needsProxy]);
+  }, [voiceSrcUri, voiceEnhance, voiceDeReverb, voiceKey]);
 
   const voiceUri =
     clip && voiceOpts && needsProxy

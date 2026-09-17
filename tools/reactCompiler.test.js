@@ -9,49 +9,64 @@ const babel = require('@babel/core');
  * stratégia a fordító. Ha egy komponens kiesik az optimalizálásból, azt ma
  * semmi nem jelzi — a lint hallgat, a build zöld, csak a telefon lesz lassabb.
  *
- * Ez a teszt a VALÓDI fordítási úton méri (`babel-preset-expo`,
- * `supportsReactCompiler: true`, ahogy a Metro hívja), és nem a fordító
- * naplójára hagyatkozik, hanem a KIMENETRE: a memoizált komponensben ott van a
- * `_c(n)` cache-hívás.
+ * KOMPONENSENKÉNT mér, nem fájlonként. Ez lényeges: egy fájlban együtt élhet
+ * lefordult és kimaradt függvény (a `TimelineClip.tsx`-ben például a kis
+ * `EdgeThumb` segéd lefordul, miközben a FŐ `TimelineClip` kimarad), ezért a
+ * fájl-szintű „van-e benne `_c(`" mérés HAMIS biztonságot ad.
  *
- * A lista szándékosan „kirögzített": ha valami elromlik VAGY megjavul, a teszt
- * elbukik, és ide kell átvezetni. Így a bail-lista nem tud némán nőni.
+ * A mérés a VALÓDI fordítási úton történik (`babel-preset-expo`,
+ * `caller.supportsReactCompiler: true`, ahogy a Metro hívja), és nem a fordító
+ * naplójára hagyatkozik, hanem a KIMENETRE: a memoizált függvény törzse
+ * `$ = _c(n)`-nel kezdődik.
+ *
+ * A lista szándékosan kétirányúan „kirögzített": elbukik, ha valami visszaesik,
+ * ÉS akkor is, ha egy ismert kimaradó megjavul — így nem tud sem némán nőni,
+ * sem elavulni.
  */
 
 const ROOT = path.join(__dirname, '..');
 
-/** a lejátszás/görgetés alatt folyamatosan dolgozó komponensek */
+/** fájl → a benne memoizálandó komponensek (a lejátszás alatt dolgozók) */
 const MUST_BE_MEMOIZED = [
-  'src/components/editor/TimelineClip.tsx',
-  'src/components/preview/AudioLayer.tsx',
-  'src/components/preview/PipLayer.tsx',
-  'src/components/preview/TransitionLayer.tsx',
-  'src/components/preview/ShapeOverlay.tsx',
+  ['src/components/preview/AudioLayer.tsx', 'AudioLayer'],
+  ['src/components/preview/PipLayer.tsx', 'PipLayer'],
+  ['src/components/preview/PipLayer.tsx', 'PipClipFrame'],
+  ['src/components/preview/TransitionLayer.tsx', 'TransitionLayer'],
+  ['src/components/preview/TransitionLayer.tsx', 'IncomingClip'],
+  ['src/components/preview/ShapeOverlay.tsx', 'ShapeOverlay'],
 ];
 
 /**
  * Ismert, ELFOGADOTT kimaradások — mindegyikhez az OK, hogy a következő olvasó
- * ne kezdje elölről a nyomozást. Ha valamelyik megjavul, a teszt szól.
+ * ne kezdje elölről a nyomozást.
+ *
+ * Közös nevező: expo-video/expo-audio player-mutáció vagy Reanimated shared
+ * value írása. Ezekre az `AGENTS.md` szándékosan kikapcsolta a
+ * `react-hooks/immutability` és `react-hooks/refs` szabályokat — a fordító
+ * viszont ugyanezeket látja, és emiatt hagyja ki a komponenst.
  */
-const KNOWN_BAILS = {
-  'src/components/editor/Timeline.tsx':
-    'a pinch-gesztus onStart/onUpdate closure-je refet ír — a gesztus-építő a render alatt fut',
-  'src/components/preview/PreviewSurface.tsx':
-    'expo-video player-mutáció (currentTime/volume/playbackRate) — hookból jövő érték módosítása',
-  'src/components/preview/TextOverlay.tsx':
-    'Reanimated shared value írása effekt-függőség után',
-};
+const KNOWN_BAILS = [
+  ['src/components/editor/Timeline.tsx', 'Timeline', 'pinch-gesztus closure refet ír'],
+  // a komponens neve a forrásban TimelineClipInner; a `TimelineClip` a memo() burkolat
+  ['src/components/editor/TimelineClip.tsx', 'TimelineClipInner', 'Reanimated shared value mutációk'],
+  ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', 'expo-video player-mutáció'],
+  ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
+];
 
-function memoCount(relPath) {
+const cache = new Map();
+function transformed(relPath) {
+  if (cache.has(relPath)) {
+    return cache.get(relPath);
+  }
   const file = path.join(ROOT, relPath);
   const { code } = babel.transformSync(fs.readFileSync(file, 'utf8'), {
     filename: file,
     presets: [[require.resolve('babel-preset-expo'), {}]],
     configFile: false,
     babelrc: false,
-    // pontosan azok a caller-jelzések, amikkel a Metro hívja a presetet;
-    // a `supportsReactCompiler` kapcsolja be a fordítót (babel-preset-expo
-    // build/common.js: getReactCompiler)
+    // pontosan azok a caller-jelzések, amikkel a Metro hívja a presetet; a
+    // fordítót a `supportsReactCompiler` kapcsolja be, NEM preset-opció
+    // (babel-preset-expo build/common.js: getReactCompiler)
     caller: {
       name: 'metro',
       platform: 'ios',
@@ -60,22 +75,33 @@ function memoCount(relPath) {
       supportsReactCompiler: true,
     },
   });
-  return (code.match(/_c\(\d+\)/g) || []).length;
+  cache.set(relPath, code);
+  return code;
+}
+
+/** a memoizált függvény törzse `$ = _c(n)`-nel nyit */
+function isMemoized(relPath, fnName) {
+  const code = transformed(relPath);
+  if (!new RegExp(`function\\s+${fnName}\\s*\\(`).test(code)) {
+    throw new Error(`${fnName} nem található a ${relPath} kimenetében — átnevezték?`);
+  }
+  return new RegExp(
+    `function\\s+${fnName}\\s*\\([^)]*\\)\\s*\\{\\s*(?:var|const|let)\\s+\\$\\s*=\\s*_c\\(`
+  ).test(code);
 }
 
 describe('React Compiler — a forró útvonal memoizálása', () => {
-  it.each(MUST_BE_MEMOIZED)('%s memoizálva van', (rel) => {
-    expect(memoCount(rel)).toBeGreaterThan(0);
+  it.each(MUST_BE_MEMOIZED)('%s · %s memoizálva van', (file, fn) => {
+    expect(isMemoized(file, fn)).toBe(true);
   });
 
-  it.each(Object.keys(KNOWN_BAILS))(
-    '%s még mindig kimarad (ha megjavult, vezesd át a listán!)',
-    (rel) => {
-      expect(memoCount(rel)).toBe(0);
-    }
-  );
+  it.each(KNOWN_BAILS)('%s · %s még mindig kimarad (%s)', (file, fn) => {
+    // ha ez elbukik, az JÓ hír: vedd ki a KNOWN_BAILS-ből, és tedd át a
+    // MUST_BE_MEMOIZED-ba, hogy ne tudjon visszaesni
+    expect(isMemoized(file, fn)).toBe(false);
+  });
 
-  it('a mérőműszer maga is működik (különben mindent „memoizáltnak" látnánk)', () => {
+  it('a mérőműszer maga is működik (különben mindent „kimaradtnak" látnánk)', () => {
     const probe = path.join(ROOT, 'tools', '__probe.tsx');
     fs.writeFileSync(
       probe,
@@ -87,7 +113,7 @@ describe('React Compiler — a forró útvonal memoizálása', () => {
     try {
       // egy triviálisan fordítható komponens MUSZÁJ hogy memoizálódjon — ha nem,
       // akkor a caller-konfig romlott el, és a fenti állítások értéktelenek
-      expect(memoCount('tools/__probe.tsx')).toBeGreaterThan(0);
+      expect(isMemoized('tools/__probe.tsx', 'Probe')).toBe(true);
     } finally {
       fs.unlinkSync(probe);
     }

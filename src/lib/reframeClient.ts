@@ -10,6 +10,7 @@ import {
 import { uploadFetch } from '@/lib/upload';
 import type { ReframePoint } from '@/lib/reframe';
 import { ensureCloud } from '@/lib/backend';
+import { finiteNum, finiteTime, mapValid, unitNum } from '@/lib/parseGuards';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { Clip, Project } from '@/types/project';
 
@@ -42,10 +43,21 @@ async function analyzeClipReframe(
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as ReframeReply;
-    return body.width > 0 && Array.isArray(body.points) && body.points.length > 0
-      ? body
-      : null;
+    const body = (await res.json()) as { width?: unknown; height?: unknown; points?: unknown };
+    const width = finiteNum(body.width);
+    const height = finiteNum(body.height);
+    if (width === null || height === null || width <= 0 || height <= 0) {
+      return null; // a méret osztóként szerepel a kulcskocka-számításban
+    }
+    // 🛡️ az x/y normalizált középpont → pan-kulcskocka: a 0–1-en kívüli érték
+    // a vásznon kívülre vinné a képet, a NaN pedig „eltüntetné" a klipet
+    const points = mapValid<ReframePoint>(body.points, (p) => {
+      const t = finiteTime(p.t);
+      const x = unitNum(p.x);
+      const y = unitNum(p.y);
+      return t === null || x === null || y === null ? null : { t, x, y };
+    });
+    return points.length > 0 ? { width, height, points } : null;
   } catch {
     return null;
   }

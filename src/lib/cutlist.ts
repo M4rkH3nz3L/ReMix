@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { rangeList, timeList } from '@/lib/parseGuards';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 
@@ -52,12 +53,15 @@ export async function detectSilence(uri: string): Promise<SilenceRange[] | null>
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as { silences: SilenceRange[] };
-    if (!Array.isArray(body.silences)) {
-      return null;
+    const raw = (await res.json())?.silences;
+    if (!Array.isArray(raw)) {
+      return null; // `null` = nem sikerült elemezni; `[]` = elemeztem, nincs csend
     }
-    memory.set(uri, body.silences);
-    return body.silences;
+    // 🛡️ a tartományok forrás-időként klip-hosszá válnak: a fordított vagy nem
+    // véges pár negatív hosszú klipet szülne, ezért itt esik ki, nem a vágásban
+    const silences = rangeList(raw);
+    memory.set(uri, silences);
+    return silences;
   } catch (err) {
     // a leggyakoribb ok: a mentett file:// út elszakadt (konténer-költözés)
     console.warn('detectSilence hiba:', (err as Error).message, '| uri:', uri);
@@ -87,12 +91,14 @@ export async function detectScenes(uri: string): Promise<number[] | null> {
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as { scenes: number[] };
-    if (!Array.isArray(body.scenes)) {
-      return null;
+    const raw = (await res.json())?.scenes;
+    if (!Array.isArray(raw)) {
+      return null; // a hiányzó elemzés MÁS, mint a „nincs jelenetváltás"
     }
-    sceneMemory.set(uri, body.scenes);
-    return body.scenes;
+    // 🛡️ ezek vágáspontok lesznek — növekvő, duplikátum-mentes, véges lista kell
+    const scenes = timeList(raw);
+    sceneMemory.set(uri, scenes);
+    return scenes;
   } catch {
     return null;
   }

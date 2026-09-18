@@ -54,7 +54,7 @@ import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { useRoles } from '@/store/roleStore';
-import { softDeleteAccount } from '@/lib/account';
+import { exportMyData, softDeleteAccount } from '@/lib/account';
 
 const PROVIDER_KINDS: AiProviderKind[] = ['openai', 'anthropic', 'ollama', 'custom'];
 const PROVIDER_LABEL: Record<AiProviderKind, string> = {
@@ -345,6 +345,13 @@ export default function ProfileScreen() {
     });
     setTaskAssignment(task, providerId).catch((e: Error) =>
       Alert.alert(t('common.error'), e.message)
+    );
+  };
+
+  // 📤 GDPR adat-export: az összes saját adat JSON-ban, megosztva
+  const onExportData = () => {
+    exportMyData().catch((e: unknown) =>
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
     );
   };
 
@@ -746,6 +753,14 @@ export default function ProfileScreen() {
             >
               <Ionicons name="document-text-outline" size={18} color={palette.textDim} />
               <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('legal.termsTitle')}</Text>
+              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
+            </Pressable>
+            <Pressable
+              onPress={onExportData}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
+            >
+              <Ionicons name="download-outline" size={18} color={palette.textDim} />
+              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('gdpr.exportTitle')}</Text>
               <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
             </Pressable>
           </View>

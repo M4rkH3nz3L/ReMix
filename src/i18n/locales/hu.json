@@ -2614,6 +2614,7 @@
     "deleteConfirm": "Deaktiválás",
     "deactivatedTitle": "A fiókod deaktiválva",
     "deactivatedBody": "A tartalmad most rejtve van mások elől. Visszaállítod a fiókot?",
-    "reactivate": "Visszaállítás"
+    "reactivate": "Visszaállítás",
+    "exportTitle": "Adataim letöltése"
   }
 }

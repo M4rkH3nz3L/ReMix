@@ -2614,6 +2614,7 @@
     "deleteConfirm": "Deaktivieren",
     "deactivatedTitle": "Konto deaktiviert",
     "deactivatedBody": "Deine Inhalte sind für andere verborgen. Konto wieder aktivieren?",
-    "reactivate": "Wieder aktivieren"
+    "reactivate": "Wieder aktivieren",
+    "exportTitle": "Meine Daten herunterladen"
   }
 }

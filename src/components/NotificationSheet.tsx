@@ -3,8 +3,9 @@ import type { ComponentProps } from 'react';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { palette } from '@/constants/editor';
 import type { NotificationType } from '@/lib/notifications';
 import { useNotifications } from '@/store/notificationStore';
@@ -49,54 +50,56 @@ export function NotificationSheet({ visible, onClose }: { visible: boolean; onCl
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.card} onPress={() => {}}>
-          <View style={styles.grabber} />
-          <View style={styles.head}>
-            <Text style={styles.title}>{t('notifications.title')}</Text>
-            {unread > 0 ? (
-              <Pressable onPress={markAll} hitSlop={6}>
-                <Text style={styles.markAll}>{t('notifications.markAll')}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          {items.length === 0 ? (
-            <Text style={styles.empty}>{t('notifications.empty')}</Text>
-          ) : (
-            <FlatList
-              data={items}
-              keyExtractor={(n) => n.id}
-              style={styles.list}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[styles.row, item.read ? null : styles.rowUnread]}
-                  onPress={() => openItem(item.id, item.route)}
-                >
-                  <Ionicons
-                    name={TYPE_ICON[item.type] ?? 'information-circle-outline'}
-                    size={18}
-                    color={item.read ? palette.textDim : palette.accent}
-                  />
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>
-                      {item.title}
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightFraction={0.6}
+      accessibilityLabel={t('notifications.title')}
+    >
+      <View style={styles.body}>
+        <View style={styles.head}>
+          <Text style={styles.title}>{t('notifications.title')}</Text>
+          {unread > 0 ? (
+            <Pressable onPress={markAll} hitSlop={6}>
+              <Text style={styles.markAll}>{t('notifications.markAll')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {items.length === 0 ? (
+          <Text style={styles.empty}>{t('notifications.empty')}</Text>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(n) => n.id}
+            style={styles.list}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.row, item.read ? null : styles.rowUnread]}
+                onPress={() => openItem(item.id, item.route)}
+              >
+                <Ionicons
+                  name={TYPE_ICON[item.type] ?? 'information-circle-outline'}
+                  size={18}
+                  color={item.read ? palette.textDim : palette.accent}
+                />
+                <View style={styles.rowText}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  {item.body ? (
+                    <Text style={styles.rowBody} numberOfLines={2}>
+                      {item.body}
                     </Text>
-                    {item.body ? (
-                      <Text style={styles.rowBody} numberOfLines={2}>
-                        {item.body}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text style={styles.time}>{shortTime(item.createdAt)}</Text>
-                </Pressable>
-              )}
-            />
-          )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+                  ) : null}
+                </View>
+                <Text style={styles.time}>{shortTime(item.createdAt)}</Text>
+              </Pressable>
+            )}
+          />
+        )}
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -138,24 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   bellBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  card: {
-    backgroundColor: palette.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 32,
-    gap: 8,
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.border,
-    marginBottom: 6,
-  },
+  body: { paddingHorizontal: 20, gap: 8 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: palette.text, fontSize: 18, fontWeight: '800' },
   markAll: { color: palette.accent, fontSize: 12, fontWeight: '700' },

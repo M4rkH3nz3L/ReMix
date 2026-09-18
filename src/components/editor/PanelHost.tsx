@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 
 import { AdjustPanel } from '@/components/editor/panels/AdjustPanel';
 import { AssistantPanel } from '@/components/editor/panels/AssistantPanel';
@@ -24,6 +25,7 @@ import { TranscriptPanel } from '@/components/editor/panels/TranscriptPanel';
 import { TransitionPanel } from '@/components/editor/panels/TransitionPanel';
 import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
+import { motion } from '@/design';
 import { useLayout } from '@/hooks/useLayout';
 import {
   selectPanelVisible,
@@ -135,7 +137,14 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
     : Math.min(L.isCompact ? 320 : 420, Math.round(L.height * 0.38));
 
   return (
-    <View
+    <Animated.View
+      // belépő: lapként alulról rugózik fel, dokkoltan finoman beúszik.
+      // Panelek KÖZÖTT nincs remount (a shell marad) — csak a tartalom morfol lent.
+      entering={
+        docked
+          ? FadeIn.duration(motion.duration.base)
+          : SlideInDown.duration(motion.duration.slow).easing(motion.easing.standard)
+      }
       style={[
         styles.container,
         docked
@@ -167,9 +176,12 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
         contentContainerStyle={{ paddingBottom: L.spacing.lg }}
         keyboardShouldPersistTaps="handled"
       >
-        {content}
+        {/* a panel-váltás tartalom-MORF: a keret marad, a tartalom átúszik */}
+        <Animated.View key={activePanel} entering={FadeIn.duration(motion.duration.fast)}>
+          {content}
+        </Animated.View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

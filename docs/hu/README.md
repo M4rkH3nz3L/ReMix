@@ -42,6 +42,7 @@ Jelmagyarázat: ✅ kész · 🚧 vázlat, kitöltésre vár
 | [coding-standards.md](development/coding-standards.md) | Kódolási szabályok (AGENTS.md-ből) | ✅ |
 | [testing.md](development/testing.md) | Tesztelés, `npm run audit` | ✅ |
 | [release.md](development/release.md) | EAS build, worker deploy | ✅ |
+| [ui-motion-plan.md](development/ui-motion-plan.md) | „Motion-first" fejlesztési terv (pro iOS-editor) | ✅ |
 
 ## Olvasási sorrend új fejlesztőnek
 

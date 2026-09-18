@@ -2602,7 +2602,12 @@
     "roleLabel": "display name",
     "users": "User roles",
     "pickRole": "Pick a role",
-    "deleteRoleTitle": "Delete role"
+    "deleteRoleTitle": "Delete role",
+    "reports": "Reports",
+    "noReports": "No open reports.",
+    "reportRemove": "Remove post",
+    "reportResolve": "Resolve",
+    "reportDismiss": "Dismiss"
   },
   "legal": {
     "privacyTitle": "Privacy Policy",
@@ -2616,5 +2621,16 @@
     "deactivatedBody": "Your content is hidden from others. Reactivate your account?",
     "reactivate": "Reactivate",
     "exportTitle": "Download my data"
+  },
+  "report": {
+    "title": "Report",
+    "pickReason": "Why are you reporting?",
+    "done": "Thanks, your report was received.",
+    "label": "Report",
+    "reason_spam": "Spam",
+    "reason_offensive": "Offensive",
+    "reason_harassment": "Harassment",
+    "reason_illegal": "Illegal",
+    "reason_other": "Other"
   }
 }

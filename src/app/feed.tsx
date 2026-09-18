@@ -25,6 +25,7 @@ import { CommentSheet } from '@/components/CommentSheet';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import {
+  currentUserId,
   listFeed,
   recordView,
   remixFromPost,
@@ -32,6 +33,7 @@ import {
   toggleLike,
   toggleSave,
 } from '@/lib/feed';
+import { REPORT_REASONS, reportPost } from '@/lib/reports';
 import type { FeedMode, FeedPost } from '@/types/social';
 import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
@@ -219,6 +221,23 @@ export default function FeedScreen() {
               Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
             ),
       },
+    ]);
+  };
+
+  // 🚩 poszt bejelentése (nem-saját) — ok-választó
+  const onReportPost = (post: FeedPost) => {
+    bumpChrome();
+    Alert.alert(t('report.title'), t('report.pickReason'), [
+      ...REPORT_REASONS.map((r) => ({
+        text: t(`report.reason_${r}`),
+        onPress: () =>
+          reportPost(post.id, r)
+            .then(() => Alert.alert(t('report.title'), t('report.done')))
+            .catch((e: unknown) =>
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+            ),
+      })),
+      { text: t('common.cancel'), style: 'cancel' as const },
     ]);
   };
 
@@ -413,6 +432,12 @@ export default function FeedScreen() {
           <Pressable style={styles.railBtn} onPress={() => onModerate(item)}>
             <Ionicons name="shield-outline" size={30} color={palette.danger} />
             <Text style={styles.railCount}>{t('feed.moderate.label')}</Text>
+          </Pressable>
+        ) : null}
+        {currentUserId() !== item.creator.id ? (
+          <Pressable style={styles.railBtn} onPress={() => onReportPost(item)}>
+            <Ionicons name="flag-outline" size={28} color="#fff" />
+            <Text style={styles.railCount}>{t('report.label')}</Text>
           </Pressable>
         ) : null}
       </View>

@@ -2602,7 +2602,12 @@
     "roleLabel": "megjelenő név",
     "users": "Felhasználók szerepe",
     "pickRole": "Válassz szerepet",
-    "deleteRoleTitle": "Szerep törlése"
+    "deleteRoleTitle": "Szerep törlése",
+    "reports": "Bejelentések",
+    "noReports": "Nincs nyitott bejelentés.",
+    "reportRemove": "Poszt eltávolítása",
+    "reportResolve": "Kezelve",
+    "reportDismiss": "Elutasít"
   },
   "legal": {
     "privacyTitle": "Adatkezelési tájékoztató",
@@ -2616,5 +2621,16 @@
     "deactivatedBody": "A tartalmad most rejtve van mások elől. Visszaállítod a fiókot?",
     "reactivate": "Visszaállítás",
     "exportTitle": "Adataim letöltése"
+  },
+  "report": {
+    "title": "Bejelentés",
+    "pickReason": "Miért jelented?",
+    "done": "Köszönjük, megkaptuk a bejelentést.",
+    "label": "Jelentés",
+    "reason_spam": "Spam",
+    "reason_offensive": "Sértő tartalom",
+    "reason_harassment": "Zaklatás",
+    "reason_illegal": "Jogsértő",
+    "reason_other": "Egyéb"
   }
 }

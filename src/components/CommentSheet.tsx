@@ -27,6 +27,7 @@ import {
 } from '@/lib/feed';
 import type { FeedPost } from '@/types/social';
 import { useRoles } from '@/store/roleStore';
+import { REPORT_REASONS, reportComment } from '@/lib/reports';
 
 /** Rövid relatív idő (pl. „3p", „2ó", „5n") — nincs külső függőség. */
 function ago(iso: string): string {
@@ -121,6 +122,22 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
     ]);
   };
 
+  // 🚩 komment bejelentése (nem-saját) — ok-választó
+  const onReport = (c: PostComment) => {
+    Alert.alert(t('report.title'), t('report.pickReason'), [
+      ...REPORT_REASONS.map((r) => ({
+        text: t(`report.reason_${r}`),
+        onPress: () =>
+          reportComment(c.id, r)
+            .then(() => Alert.alert(t('report.title'), t('report.done')))
+            .catch((e: unknown) =>
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+            ),
+      })),
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: PostComment }) => {
     const canDelete = me === item.authorId || isPostOwner || canModerate;
     return (
@@ -136,6 +153,11 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
           </Text>
           <Text style={styles.body}>{item.body}</Text>
         </View>
+        {me && me !== item.authorId ? (
+          <Pressable onPress={() => onReport(item)} hitSlop={8} style={styles.del}>
+            <Ionicons name="flag-outline" size={15} color={palette.textDim} />
+          </Pressable>
+        ) : null}
         {canDelete ? (
           <Pressable onPress={() => onDelete(item)} hitSlop={8} style={styles.del}>
             <Ionicons name="trash-outline" size={16} color={palette.textDim} />

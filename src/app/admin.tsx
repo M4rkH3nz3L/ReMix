@@ -23,11 +23,13 @@ import {
   listRolePermissions,
   listRoles,
   listUsersWithRoles,
+  moderatePostGlobal,
   setRolePermission,
   type AppPermission,
   type AppRole,
   type UserWithRole,
 } from '@/lib/roles';
+import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
 
 /**
@@ -41,11 +43,13 @@ export default function AdminScreen() {
   const { t } = useTranslation();
   const canRole = useRoles((s) => s.permissions.includes('role.manage'));
   const canUser = useRoles((s) => s.permissions.includes('user.manage'));
+  const canReview = useRoles((s) => s.permissions.includes('report.review'));
 
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [perms, setPerms] = useState<AppPermission[]>([]);
   const [pairs, setPairs] = useState<Set<string>>(new Set()); // `${role}|${perm}`
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSlug, setNewSlug] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -55,16 +59,23 @@ export default function AdminScreen() {
   const load = useCallback(() => {
     // (nincs szinkron setLoading az effektben — a kezdő `loading` már true; a
     // finally kapcsolja ki. Újratöltéskor spinner nélkül frissül.)
-    Promise.all([listRoles(), listPermissions(), listRolePermissions(), canUser ? listUsersWithRoles() : Promise.resolve([])])
-      .then(([r, p, rp, u]) => {
+    Promise.all([
+      listRoles(),
+      listPermissions(),
+      listRolePermissions(),
+      canUser ? listUsersWithRoles() : Promise.resolve([]),
+      canReview ? listOpenReports() : Promise.resolve([]),
+    ])
+      .then(([r, p, rp, u, rep]) => {
         setRoles(r);
         setPerms(p);
         setPairs(new Set(rp.map((x) => key(x.role, x.permission))));
         setUsers(u);
+        setReports(rep as ReportRow[]);
       })
       .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [canUser, t]);
+  }, [canUser, canReview, t]);
 
   useEffect(() => {
     load();
@@ -135,7 +146,25 @@ export default function AdminScreen() {
     );
   };
 
-  if (!canRole && !canUser) {
+  // 🚩 bejelentés lezárása (kezelve / elutasítva) — optimista
+  const doResolve = (id: string, status: 'resolved' | 'dismissed') => {
+    setReports((prev) => prev.filter((r) => r.id !== id));
+    resolveReport(id, status).catch((e: unknown) => {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+      load();
+    });
+  };
+  // 🚩 poszt-bejelentés kezelése: a poszt eltávolítása + a bejelentés lezárása
+  const doRemoveReported = (rep: ReportRow) => {
+    if (!rep.postId) {
+      return;
+    }
+    moderatePostGlobal(rep.postId, 'removed')
+      .then(() => doResolve(rep.id, 'resolved'))
+      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+  };
+
+  if (!canRole && !canUser && !canReview) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <Header t={t} />
@@ -235,6 +264,48 @@ export default function AdminScreen() {
               ))}
             </>
           ) : null}
+
+          {/* — 🚩 Bejelentések (report.review) — */}
+          {canReview ? (
+            <>
+              <Text style={styles.section}>{t('admin.reports')}</Text>
+              {reports.length === 0 ? (
+                <Text style={styles.dim}>{t('admin.noReports')}</Text>
+              ) : (
+                reports.map((rep) => (
+                  <View key={rep.id} style={styles.roleCard}>
+                    <Text style={styles.roleTitle}>
+                      {t(`report.reason_${rep.reason}`, { defaultValue: rep.reason })}{' '}
+                      <Text style={styles.roleSlug}>· {rep.targetType}</Text>
+                    </Text>
+                    {rep.note ? <Text style={styles.permDesc}>{rep.note}</Text> : null}
+                    <View style={styles.reportActions}>
+                      {rep.targetType === 'post' ? (
+                        <Pressable
+                          style={[styles.reportBtn, styles.reportRemove]}
+                          onPress={() => doRemoveReported(rep)}
+                        >
+                          <Text style={styles.reportBtnText}>{t('admin.reportRemove')}</Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        style={[styles.reportBtn, styles.reportResolve]}
+                        onPress={() => doResolve(rep.id, 'resolved')}
+                      >
+                        <Text style={styles.reportBtnText}>{t('admin.reportResolve')}</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.reportBtn, styles.reportDismiss]}
+                        onPress={() => doResolve(rep.id, 'dismissed')}
+                      >
+                        <Text style={styles.reportBtnTextDim}>{t('admin.reportDismiss')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </>
+          ) : null}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -319,4 +390,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   roleBadgeText: { color: palette.text, fontSize: 12, fontWeight: '700' },
+  reportActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  reportBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  reportRemove: { backgroundColor: palette.danger },
+  reportResolve: { backgroundColor: palette.accent },
+  reportDismiss: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
+  reportBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  reportBtnTextDim: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
 });

@@ -2602,7 +2602,12 @@
     "roleLabel": "Anzeigename",
     "users": "Benutzerrollen",
     "pickRole": "Rolle wählen",
-    "deleteRoleTitle": "Rolle löschen"
+    "deleteRoleTitle": "Rolle löschen",
+    "reports": "Meldungen",
+    "noReports": "Keine offenen Meldungen.",
+    "reportRemove": "Beitrag entfernen",
+    "reportResolve": "Erledigt",
+    "reportDismiss": "Ablehnen"
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",
@@ -2616,5 +2621,16 @@
     "deactivatedBody": "Deine Inhalte sind für andere verborgen. Konto wieder aktivieren?",
     "reactivate": "Wieder aktivieren",
     "exportTitle": "Meine Daten herunterladen"
+  },
+  "report": {
+    "title": "Meldung",
+    "pickReason": "Warum meldest du das?",
+    "done": "Danke, deine Meldung ist eingegangen.",
+    "label": "Melden",
+    "reason_spam": "Spam",
+    "reason_offensive": "Anstößig",
+    "reason_harassment": "Belästigung",
+    "reason_illegal": "Rechtswidrig",
+    "reason_other": "Sonstiges"
   }
 }

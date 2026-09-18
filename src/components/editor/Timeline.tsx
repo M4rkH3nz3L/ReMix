@@ -22,6 +22,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatRuler } from '@/lib/time';
+import { clipInWindow, windowFor } from '@/lib/virtualize';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project, TrackType } from '@/types/project';
 
@@ -69,6 +70,14 @@ const trackIcons: Record<TrackType, keyof typeof Ionicons.glyphMap> = {
   voiceover: 'mic',
   sfx: 'volume-high',
 };
+
+/**
+ * 🪟 Klip-virtualizáció küszöbei. Ennyi klip FÖLÖTT kapcsol be a windowing (ez
+ * alatt a rövid projekt a régi, „mindent renderel + nulla re-render" úton marad),
+ * és ennyi viewport-nyi overscan puffer van az ablak két szélén.
+ */
+const VIRTUALIZE_MIN_CLIPS = 60;
+const OVERSCAN_FACTOR = 1.5;
 
 /**
  * A video-sáv klipek közti (és vezető) hézagai — CSAK a fő videósávon jelent ez
@@ -313,6 +322,9 @@ export function Timeline() {
   const lastScrollX = useRef(0);
   const [viewportW, setViewportW] = useState(0);
   const zoomStart = useRef(zoom);
+  // 🪟 a virtualizációs ablak (px, a belső view lokális koordinátájában) — chunkolt
+  const [clipWindow, setClipWindow] = useState<{ start: number; end: number } | null>(null);
+  const winCenterRef = useRef(0);
 
   const pps = BASE_PX_PER_SEC * zoom;
   const duration = project ? projectDuration(project) : 0;
@@ -401,6 +413,17 @@ export function Timeline() {
     if (scrubbing.current && !isPlaying) {
       setPlayhead(x / pps);
     }
+    // 🪟 virtualizációs ablak: CHUNKOLT frissítés (csak fél viewportnyi elmozdulás
+    // után) és CSAK sok klipnél — így a rövid projekt „nulla re-render" viselkedése
+    // (a lejátszófej-scroll React-render nélkül fut) érintetlen marad.
+    if (viewportW > 0 && Math.abs(x - winCenterRef.current) >= viewportW * 0.5) {
+      const proj = useEditorStore.getState().project;
+      const count = proj ? proj.tracks.reduce((n, tk) => n + tk.clips.length, 0) : 0;
+      if (count > VIRTUALIZE_MIN_CLIPS) {
+        winCenterRef.current = x;
+        setClipWindow(windowFor(x, viewportW, OVERSCAN_FACTOR));
+      }
+    }
   };
 
   const pinch = Gesture.Pinch()
@@ -444,6 +467,18 @@ export function Timeline() {
         );
 
   const totalTracksHeight = visibleTracks.reduce((sum, t) => sum + th(t), 0);
+
+  // 🪟 klip-virtualizáció: hosszú projekten (sok klip) csak a látható ABLAK +
+  // overscan klipjeit rendereljük — a mountolt klip-komponensek száma korlátos
+  // marad, akárhány klip is van. Rövid projekten `virtualize=false` → mindent
+  // renderel (0 regresszió). Az ablak a lejátszófej-középhez képest centrált
+  // (a paddingHorizontal=viewportW/2 miatt a lokális ablak scrollX körül szimmetrikus).
+  const totalClipCount = project.tracks.reduce((n, tk) => n + tk.clips.length, 0);
+  const virtualize = viewportW > 0 && totalClipCount > VIRTUALIZE_MIN_CLIPS;
+  const clipWin = virtualize
+    ? (clipWindow ?? windowFor(lastScrollX.current, viewportW, OVERSCAN_FACTOR))
+    : null;
+  const clipVisible = (c: { start: number; duration: number }) => clipInWindow(c, clipWin, pps);
 
   // 🖥️ tablet/széles kijelző: fix fejléc-oszlop ikon+címkével a sávok elején;
   // a görgethető terület a saját szélességét méri, a scroll-matek változatlan.
@@ -784,7 +819,7 @@ export function Timeline() {
                   ]}
                 >
                   {track && !collapsedTracks.includes(type)
-                    ? track.clips.map((clip) => (
+                    ? track.clips.filter(clipVisible).map((clip) => (
                         <TimelineClip
                           key={clip.id}
                           clip={clip}

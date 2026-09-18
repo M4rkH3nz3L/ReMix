@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/ui/PressableScale';
 import { accentGradient, palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 
@@ -118,7 +119,7 @@ export function ToolButton({
         ? palette.accent
         : palette.text;
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
@@ -133,7 +134,7 @@ export function ToolButton({
     >
       <Ionicons name={icon} size={L.isCompact ? 20 : 23} color={color} />
       <Text style={[styles.toolLabel, { color, fontSize: L.font(10) }]}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -149,7 +150,7 @@ export function PrimaryButton({
   disabled?: boolean;
 }) {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
@@ -165,7 +166,7 @@ export function PrimaryButton({
         {icon ? <Ionicons name={icon} size={16} color={palette.text} /> : null}
         <Text style={styles.primaryButtonText}>{label}</Text>
       </LinearGradient>
-    </Pressable>
+    </PressableScale>
   );
 }
 

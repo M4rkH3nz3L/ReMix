@@ -1,10 +1,15 @@
 import { Image } from 'expo-image';
-import { haptics } from '@/design';
+import { haptics, motion } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { ClipFilmstrip } from '@/components/editor/ClipFilmstrip';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
@@ -95,6 +100,9 @@ function TimelineClipInner({
   const moveDX = useSharedValue(0);
   const leftDelta = useSharedValue(0);
   const rightDelta = useSharedValue(0);
+  // 🫳 „lift": húzás közben a klip finoman felemelkedik (scale + árnyék), hogy a
+  // felhasználó lássa, épp fogja — elengedéskor visszapattan (motion.spring.snappy).
+  const lift = useSharedValue(0);
 
   useEffect(() => {
     moveDX.value = 0;
@@ -308,6 +316,7 @@ function TimelineClipInner({
     .enabled(!locked)
     .activateAfterLongPress(220)
     .onStart(() => {
+      lift.value = withSpring(1, motion.spring.snappy);
       runOnJS(selectionHaptic)();
       runOnJS(selectClip)(clip.id);
     })
@@ -316,6 +325,9 @@ function TimelineClipInner({
     })
     .onEnd((e) => {
       runOnJS(commitMove)(e.translationX);
+    })
+    .onFinalize(() => {
+      lift.value = withSpring(0, motion.spring.snappy);
     });
 
   const trimLeftPan = Gesture.Pan()
@@ -350,8 +362,16 @@ function TimelineClipInner({
   const color = trackColors[trackType];
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: moveDX.value + leftDelta.value }],
+    transform: [
+      { translateX: moveDX.value + leftDelta.value },
+      { scale: 1 + lift.value * 0.04 },
+    ],
     width: Math.max(12, baseWidth - leftDelta.value + rightDelta.value),
+    // az árnyék csak húzás közben látszik — nyugalomban a klip lapos marad
+    shadowOpacity: lift.value * 0.4,
+    shadowRadius: 6 + lift.value * 8,
+    elevation: lift.value * 8,
+    zIndex: lift.value > 0 ? 30 : 0,
   }));
 
   return (
@@ -476,6 +496,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
     overflow: 'visible',
+    // a húzás-„lift" árnyékának bázisa (az opacity/radius animált, 0-ról indul)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
   },
   label: {
     fontSize: 11,

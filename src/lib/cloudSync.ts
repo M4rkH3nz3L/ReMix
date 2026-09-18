@@ -129,15 +129,31 @@ export async function syncProjectsFromCloud(): Promise<number> {
     if (!supabase || !uid) {
       return 0;
     }
-    const { data } = await supabase.from('cloud_projects').select('data').eq('user_id', uid);
-    if (!data) {
+    // ⚡ perf: előbb CSAK az id-k (könnyű lekérés), majd a helyileg HIÁNYZÓK teljes
+    // JSON-ját húzzuk le — nem parse-oljuk végig az összes felhő-projektet minden hívásnál.
+    const { data: ids } = await supabase
+      .from('cloud_projects')
+      .select('project_id')
+      .eq('user_id', uid);
+    if (!ids || ids.length === 0) {
       return 0;
     }
     const localIds = new Set((await listProjects()).map((m) => m.id));
+    const missing = (ids as { project_id: string }[])
+      .map((r) => r.project_id)
+      .filter((id) => !localIds.has(id));
+    if (missing.length === 0) {
+      return 0;
+    }
+    const { data: rows } = await supabase
+      .from('cloud_projects')
+      .select('data')
+      .eq('user_id', uid)
+      .in('project_id', missing);
     let restored = 0;
-    for (const row of data) {
+    for (const row of rows ?? []) {
       const p = migrateProject((row as { data: Project }).data);
-      if (p?.id && !localIds.has(p.id)) {
+      if (p?.id) {
         await saveProject(p);
         restored += 1;
       }

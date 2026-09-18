@@ -106,18 +106,25 @@ export default function ProjectsScreen() {
   const columns = gridColumns(L.width, 340, 4);
 
   const refresh = useCallback(() => {
-    // 🗄️ előbb a felhőből visszatöltjük a helyileg HIÁNYZÓ projekteket (best-effort,
-    // login nélkül no-op) — így újratelepítés/eszközváltás után is megvannak —, majd
-    // a helyi listát mutatjuk (ami már tartalmazza a visszatöltötteket).
-    syncProjectsFromCloud()
-      .then(() => listProjects())
-      .then(setProjects)
-      .catch(() => listProjects().then(setProjects).catch(() => {}));
+    // ⚡ fókuszkor csak a HELYI lista (olcsó); a felhő-visszatöltés egyszer, mountkor fut
+    listProjects().then(setProjects).catch(() => {});
     // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
     listSharedWithMe().then(setShared).catch(() => {});
   }, []);
 
   useFocusEffect(refresh);
+
+  // 🗄️ EGYSZERI felhő-visszatöltés belépéskor (NEM minden fókuszkor — perf): a
+  // helyileg HIÁNYZÓ projekteket hozza vissza (újratelepítés/eszközváltás után).
+  useEffect(() => {
+    syncProjectsFromCloud()
+      .then((n) => {
+        if (n > 0) {
+          refresh();
+        }
+      })
+      .catch(() => {});
+  }, [refresh]);
 
   // 🗑️ deaktivált fiók → helyreállítás-prompt belépés után (a tartalom addig rejtve)
   useEffect(() => {

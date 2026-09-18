@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -180,7 +180,7 @@ export function KeyframeGraphEditor({
     if (pending) {
       commit(pending);
     }
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const addAt = (px: number, py: number) => {
@@ -192,7 +192,7 @@ export function KeyframeGraphEditor({
     next.sort((a, b) => a.time - b.time);
     commit(next);
     setSel(next.findIndex((k) => Math.abs(k.time - t) <= KF_EPS));
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const addAtPlayhead = () => {

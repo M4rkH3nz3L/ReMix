@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -101,14 +101,14 @@ export function PathEditor({ points, closed, onChange, onClosedChange }: Props) 
     if (pending) {
       commit(pending);
     }
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const addAnchor = (px: number, py: number) => {
     const next = [...ptsRef.current, { x: toNorm(px), y: toNorm(py) }];
     commit(next);
     setSel(next.length - 1);
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const deleteSel = () => {

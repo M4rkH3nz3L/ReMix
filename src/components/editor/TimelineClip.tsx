@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -56,7 +56,7 @@ function clipLabel(clip: Clip, t: TFunction): string {
 }
 
 function selectionHaptic() {
-  Haptics.selectionAsync().catch(() => {});
+  haptics.selection();
 }
 
 /**

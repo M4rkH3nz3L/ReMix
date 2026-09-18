@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -115,7 +115,7 @@ export function ToneCurveEditor({ value, onChange }: Props) {
     if (pending) {
       commit(pending); // a commit normalizál
     }
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const addAt = (px: number, py: number) => {
@@ -127,7 +127,7 @@ export function ToneCurveEditor({ value, onChange }: Props) {
     const next = [...pts, { x, y: pxToY(py) }].sort((a, b) => a.x - b.x);
     commit(next);
     setSel(next.findIndex((p) => Math.abs(p.x - x) < 1e-4));
-    Haptics.selectionAsync().catch(() => {});
+    haptics.selection();
   };
 
   const deleteSel = () => {

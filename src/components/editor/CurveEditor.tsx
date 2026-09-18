@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -62,7 +62,7 @@ export function CurveEditor({
               runOnJS(setAt)(i, 1 - e.y / HEIGHT);
             })
             .onEnd(() => {
-              runOnJS(Haptics.selectionAsync)();
+              runOnJS(haptics.selection)();
             });
           return (
             <GestureDetector key={i} gesture={pan}>

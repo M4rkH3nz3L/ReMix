@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/design';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
@@ -235,7 +235,7 @@ export function Toolbar() {
     const { playhead } = useEditorStore.getState();
     const ok = splitClipAt(selected.id, playhead);
     if (ok) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      haptics.impact();
     } else {
       Alert.alert(t('editor.toolbar.cannotSplitTitle'), t('editor.toolbar.cannotSplitMessage'));
     }
@@ -421,7 +421,7 @@ export function Toolbar() {
                 if (!clipboard) {
                   return;
                 }
-                Haptics.selectionAsync().catch(() => {});
+                haptics.selection();
                 Alert.alert(
                   t('editor.toolbar.styleCopiedTitle'),
                   t('editor.toolbar.styleCopiedMessage', { style: describeStyle(clipboard.style) })
@@ -435,7 +435,7 @@ export function Toolbar() {
                 onPress={() => {
                   const n = useEditorStore.getState().pasteStyle();
                   if (n > 0) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    haptics.snap();
                   } else {
                     Alert.alert(t('editor.toolbar.styleAlertTitle'), t('editor.toolbar.nothingToPaste'));
                   }

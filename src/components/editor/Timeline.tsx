@@ -431,6 +431,17 @@ export function Timeline() {
       zoomStart.current = useEditorStore.getState().zoom;
     })
     .onUpdate((e) => {
+      // 🔍 KVANTÁLT commit: a store-t (és így a teljes Timeline re-rendert) csak
+      // érdemi (~4%) skálaváltozásnál írjuk — a pontos érték a pinch végén jön.
+      // Így csippentés közben a re-renderek száma töredékére esik; a 2.1 klip-
+      // virtualizációval együtt a hosszú idővonal csippentése is folyamatos marad.
+      const next = zoomStart.current * e.scale;
+      const cur = useEditorStore.getState().zoom;
+      if (cur <= 0 || Math.abs(next - cur) / cur >= 0.04) {
+        setZoom(next);
+      }
+    })
+    .onEnd((e) => {
       setZoom(zoomStart.current * e.scale);
     })
     .runOnJS(true);

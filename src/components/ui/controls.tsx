@@ -13,11 +13,14 @@ export function Chip({
   active,
   onPress,
   color,
+  leading,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
   color?: string;
+  /** opcionális bal-oldali elem (pl. avatar-ikon), a címke elé kerül */
+  leading?: ReactNode;
 }) {
   return (
     <Pressable
@@ -28,6 +31,7 @@ export function Chip({
         active && styles.chipGlow,
       ]}
     >
+      {leading}
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -167,6 +171,9 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 999,

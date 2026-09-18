@@ -18,8 +18,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { NotificationBell } from '@/components/NotificationBell';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { aspectRatios, palette } from '@/constants/editor';
 import { gridColumns } from '@/constants/layout';
@@ -33,12 +31,14 @@ import type { VideoTemplate } from '@/constants/templates';
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { useLayout } from '@/hooks/useLayout';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
-import { publishRenderedProject } from '@/lib/feed';
+import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
 import { makeId } from '@/lib/id';
 import { createEmptyProject, parseHashtags, parseKeywords } from '@/lib/projectUtils';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
+import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
+import { isMyAccountDeleted, reactivateAccount } from '@/lib/account';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { formatTime } from '@/lib/time';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
@@ -96,7 +96,6 @@ export default function ProjectsScreen() {
   const [aspect, setAspect] = useState<AspectRatio>('9:16');
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [langOpen, setLangOpen] = useState(false);
   const [shared, setShared] = useState<SharedProject[]>([]);
   const { t } = useTranslation();
   const L = useLayout();
@@ -107,12 +106,36 @@ export default function ProjectsScreen() {
   const columns = gridColumns(L.width, 340, 4);
 
   const refresh = useCallback(() => {
-    listProjects().then(setProjects).catch(() => {});
+    // 🗄️ előbb a felhőből visszatöltjük a helyileg HIÁNYZÓ projekteket (best-effort,
+    // login nélkül no-op) — így újratelepítés/eszközváltás után is megvannak —, majd
+    // a helyi listát mutatjuk (ami már tartalmazza a visszatöltötteket).
+    syncProjectsFromCloud()
+      .then(() => listProjects())
+      .then(setProjects)
+      .catch(() => listProjects().then(setProjects).catch(() => {}));
     // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
     listSharedWithMe().then(setShared).catch(() => {});
   }, []);
 
   useFocusEffect(refresh);
+
+  // 🗑️ deaktivált fiók → helyreállítás-prompt belépés után (a tartalom addig rejtve)
+  useEffect(() => {
+    isMyAccountDeleted()
+      .then((d) => {
+        if (!d) {
+          return;
+        }
+        Alert.alert(t('gdpr.deactivatedTitle'), t('gdpr.deactivatedBody'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('gdpr.reactivate'),
+            onPress: () => reactivateAccount().then(refresh).catch(() => {}),
+          },
+        ]);
+      })
+      .catch(() => {});
+  }, [refresh, t]);
 
   const resetCreateForm = () => {
     setName('');
@@ -140,6 +163,7 @@ export default function ProjectsScreen() {
     // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
     const project = createEmptyProject(title, aspect, { title, description, hashtags, keywords });
     await saveProject(project);
+    backupProjectToCloud(project); // 🗄️ azonnal a userhez a felhőbe is (best-effort)
     setCreating(false);
     resetCreateForm();
     router.push(`/editor/${project.id}`);
@@ -148,7 +172,10 @@ export default function ProjectsScreen() {
   const createFromTemplate = (template: VideoTemplate) => {
     const project = createProjectFromTemplate(template);
     saveProject(project)
-      .then(() => router.push(`/editor/${project.id}`))
+      .then(() => {
+        backupProjectToCloud(project); // 🗄️ felhő-backup (best-effort)
+        router.push(`/editor/${project.id}`);
+      })
       .catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
   };
 
@@ -159,7 +186,13 @@ export default function ProjectsScreen() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
-          deleteProject(meta.id).then(refresh).catch(() => {});
+          // „nincs projekt → nincs videó": helyi törlés + a projekthez tartozó
+          // feed-posztok törlése + a felhő-projekt törlése (a DB-trigger defenzíven
+          // szintén törli a posztokat, pl. még-nem-mentett felhő esetén is fedve).
+          deleteProject(meta.id)
+            .then(() => Promise.all([deletePostsForProject(meta.id), deleteCloudProject(meta.id)]))
+            .then(refresh)
+            .catch(() => {});
         },
       },
     ]);
@@ -306,17 +339,6 @@ export default function ProjectsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{t('home.appName')}</Text>
         </View>
-        <NotificationBell />
-        <Pressable
-          onPress={() => setLangOpen(true)}
-          hitSlop={8}
-          style={styles.importButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('language.title')}
-        >
-          <Ionicons name="language-outline" size={20} color={palette.textDim} />
-          <Text style={styles.importLabel}>{t('language.title')}</Text>
-        </Pressable>
         <Pressable
           onPress={() => router.push('/profile')}
           hitSlop={8}
@@ -618,7 +640,6 @@ export default function ProjectsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      <LanguageSwitcher visible={langOpen} onClose={() => setLangOpen(false)} />
       <BottomNav active="studio" />
     </SafeAreaView>
   );

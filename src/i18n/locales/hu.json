@@ -104,10 +104,15 @@
     "account": "Fiók",
     "signedInAs": "Bejelentkezve: {{email}}",
     "signOut": "Kijelentkezés",
-    "signOutConfirm": "Ki szeretnél jelentkezni?"
+    "signOutConfirm": "Ki szeretnél jelentkezni?",
+    "consentPrefix": "Elfogadom a",
+    "consentTerms": "Felhasználási feltételeket",
+    "consentAnd": " és az ",
+    "consentPrivacy": "Adatkezelési tájékoztatót"
   },
   "profile": {
     "title": "Profil",
+    "languageSection": "Nyelv",
     "personalSection": "Személyes adatok",
     "aiSection": "AI-modellek",
     "aiSectionHint": "Saját modellek: adj meg endpointot, modell-azonosítót és API-kulcsot. Az alapértelmezettet használják az AI-funkciók.",
@@ -121,7 +126,7 @@
     "task_thumbHeadlines": "Borítókép-címek",
     "task_storyStructure": "Story Engine",
     "personaSection": "👤 Karakter (persona)",
-    "personaHint": "Adj a modellnek nevet és egy kis sztorit — hogy tényleg a saját asszisztensednek érződjön.",
+    "personaHint": "Adj a modellednek arcot és egy kis sztorit — hogy tényleg a saját asszisztensednek érződjön. A nevét fent, a „Név” mezőben állítod be.",
     "personaPurpose": "Mire való?",
     "personaNameLabel": "Név",
     "personaNamePlaceholder": "Név (pl. Luna)",
@@ -181,7 +186,8 @@
     "proxyQuality_medium": "Közepes (540p)",
     "proxyQuality_high": "Magas (720p)",
     "cacheSize": "Gyorsítótár mérete",
-    "clearCache": "Gyorsítótár ürítése"
+    "clearCache": "Gyorsítótár ürítése",
+    "legalSection": "Jogi / Adatvédelem"
   },
   "home": {
     "appName": "Remix",
@@ -2510,7 +2516,8 @@
   "nav": {
     "feed": "Feed",
     "studio": "Stúdió",
-    "channel": "Csatorna"
+    "channel": "Csatorna",
+    "notifications": "Értesítők"
   },
   "feed": {
     "title": "Feed",
@@ -2528,7 +2535,24 @@
     "sharedOk": "A videód felkerült a feedre.",
     "rendering": "Renderelés és megosztás…",
     "sponsored": "Kiemelt",
-    "followFailed": "A követés nem sikerült."
+    "followFailed": "A követés nem sikerült.",
+    "tapHint": "Koppints 3×-t a menühöz",
+    "comments": {
+      "title": "Kommentek ({{n}})",
+      "empty": "Még nincs komment — szólj hozzá elsőként!",
+      "placeholder": "Írj hozzászólást…",
+      "deleteTitle": "Komment törlése",
+      "deleteBody": "Biztosan törlöd ezt a kommentet?",
+      "deleteFailed": "A komment törlése nem sikerült.",
+      "loginToComment": "Jelentkezz be a kommenteléshez"
+    },
+    "newBadge": "Új",
+    "moderate": {
+      "title": "Moderáció",
+      "body": "Eltávolítod ezt a posztot a nyilvános feedből?",
+      "remove": "Eltávolítás",
+      "label": "Mod"
+    }
   },
   "channel": {
     "posts": "Posztok",
@@ -2537,7 +2561,16 @@
     "follow": "Követés",
     "following2": "Követve",
     "editProfile": "Profil szerkesztése",
-    "noPosts": "Még nincs poszt."
+    "noPosts": "Még nincs poszt.",
+    "remixMod": {
+      "cta": "Remixek felügyelete ({{n}})",
+      "title": "Remixek a tartalmadból",
+      "hint": "Eltávolíthatod a nyilvános feedből azt a remixet, amit sértőnek tartasz (bármikor visszaállítható).",
+      "empty": "Még senki nem remixelte.",
+      "remove": "Eltávolítás",
+      "restore": "Visszaállítás",
+      "removedLabel": "Eltávolítva a feedből"
+    }
   },
   "promote": {
     "cta": "Kiemelés",
@@ -2559,5 +2592,28 @@
     "comments": "💬 {{n}} komment",
     "remixes": "🔀 {{n}} remix",
     "promoLine": "Kiemelés: {{delivered}}/{{target}} megtekintés · {{spent}} 🪙 elköltve"
+  },
+  "admin": {
+    "title": "Admin — szerepek & jogok",
+    "noAccess": "Nincs jogosultságod ehhez a felülethez.",
+    "rolePerms": "Szerepek és jogosultságok",
+    "newRole": "Új szerep",
+    "roleSlug": "azonosító (pl. editor)",
+    "roleLabel": "megjelenő név",
+    "users": "Felhasználók szerepe",
+    "pickRole": "Válassz szerepet",
+    "deleteRoleTitle": "Szerep törlése"
+  },
+  "legal": {
+    "privacyTitle": "Adatkezelési tájékoztató",
+    "termsTitle": "Felhasználási feltételek"
+  },
+  "gdpr": {
+    "deleteTitle": "Fiók törlése",
+    "deleteBody": "A fiókod és a tartalmad deaktiválódik és eltűnik a platformról (mások nem látják). Nem végleges: bejelentkezéssel bármikor visszaállíthatod.",
+    "deleteConfirm": "Deaktiválás",
+    "deactivatedTitle": "A fiókod deaktiválva",
+    "deactivatedBody": "A tartalmad most rejtve van mások elől. Visszaállítod a fiókot?",
+    "reactivate": "Visszaállítás"
   }
 }

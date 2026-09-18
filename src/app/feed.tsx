@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Linking,
   Pressable,
@@ -17,9 +18,10 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { CommentSheet } from '@/components/CommentSheet';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import {
@@ -31,6 +33,8 @@ import {
   toggleSave,
 } from '@/lib/feed';
 import type { FeedMode, FeedPost } from '@/types/social';
+import { moderatePostGlobal } from '@/lib/roles';
+import { useRoles } from '@/store/roleStore';
 import type { InteractiveClip } from '@/types/project';
 
 /** Egy poszt interaktív (hotspot) klipjei a hordozott project-snapshotból. */
@@ -48,12 +52,28 @@ function compact(n: number): string {
 export default function FeedScreen() {
   const { t } = useTranslation();
   const { height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // az akció-sor és a felirat az alsó menü FÖLÖTT üljön — a menü valós magassága
+  // BOTTOM_NAV_HEIGHT + a képernyő-alji biztonságos zóna (home indicator), nem csak 56
+  const chromeBottom = BOTTOM_NAV_HEIGHT + insets.bottom + 24;
   const [mode, setMode] = useState<FeedMode>('foryou');
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [commentFor, setCommentFor] = useState<FeedPost | null>(null);
+  // 🛡️ globális poszt-moderátor jog → „eltávolítás a feedből" gomb bármely poszton
+  const canModeratePost = useRoles((s) => s.permissions.includes('post.moderate'));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hotspotTime, setHotspotTime] = useState(0);
+  // A jobb oldali akció-sor (like/komment/mentés/remix) MINDIG látszik. A többi
+  // chrome (mód-váltó, felirat, alsó menü) alapból látszik, de hármas koppintás
+  // elrejti (immerzív, tiszta videó), és pár mp tétlenség után is elhalványul.
+  // A hirdetés-hotspotok mindig látszanak, azt sosem takarjuk el.
+  const [chromeVisible, setChromeVisible] = useState(true);
+  // minden interakció bumpolja → az auto-elrejtés 4 mp-es órája újraindul
+  const [chromeNonce, setChromeNonce] = useState(0);
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // egyetlen lejátszó, ami az AKTÍV poszt videójára vált (renderelt MP4 URL)
   const player = useVideoPlayer(null, (p) => {
@@ -61,6 +81,52 @@ export default function FeedScreen() {
   });
   // a feed `push`-sal nyit más képernyőt → mountolva marad; a videó ne szóljon takarva
   const isFocused = useIsFocused();
+
+  // felfedezhetőség: rövid, nem tolakodó tipp a hármas koppintásról, majd elhalványul
+  const [hintMounted, setHintMounted] = useState(true);
+  const hintOpacity = useRef(new Animated.Value(0)).current;
+  // 💬 a komment-gomb figyelemfelkeltő pulzálása (új funkció jelzése)
+  const commentPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(hintOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(2600),
+      Animated.timing(hintOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setHintMounted(false);
+      }
+    });
+  }, [hintOpacity]);
+
+  // 💬 a komment-gomb háttér-pulzálása (radar-effekt) — hogy a user észrevegye az újdonságot
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(commentPulse, { toValue: 1, duration: 1500, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [commentPulse]);
+
+  // koppintás-időzítő eltakarítása kilépéskor
+  useEffect(
+    () => () => {
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+      }
+    },
+    []
+  );
+
+  // auto-elrejtés: ha a kezelőfelület látszik, de 4 mp-ig nincs interakció, tűnjön el.
+  // A `chromeNonce` minden interakciónál változik → az óra újraindul.
+  useEffect(() => {
+    if (!chromeVisible) {
+      return;
+    }
+    const to = setTimeout(() => setChromeVisible(false), 4000);
+    return () => clearTimeout(to);
+  }, [chromeVisible, chromeNonce]);
 
   const load = useCallback((m: FeedMode) => {
     listFeed(m)
@@ -74,6 +140,7 @@ export default function FeedScreen() {
   }, [load, mode]);
 
   const changeMode = (m: FeedMode) => {
+    bumpChrome();
     if (m === mode) {
       return;
     }
@@ -85,7 +152,11 @@ export default function FeedScreen() {
   const patch = (id: string, fn: (p: FeedPost) => FeedPost) =>
     setPosts((prev) => prev.map((p) => (p.id === id ? fn(p) : p)));
 
+  // interakció a kezelőfelülettel → az auto-elrejtés órájának újraindítása
+  const bumpChrome = () => setChromeNonce((n) => n + 1);
+
   const onLike = (post: FeedPost) => {
+    bumpChrome();
     const liked = !post.viewerLiked;
     const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
@@ -99,6 +170,7 @@ export default function FeedScreen() {
   };
 
   const onSave = (post: FeedPost) => {
+    bumpChrome();
     const saved = !post.viewerSaved;
     const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
@@ -111,6 +183,7 @@ export default function FeedScreen() {
   };
 
   const onRemix = (post: FeedPost) => {
+    bumpChrome();
     if (busy) {
       return;
     }
@@ -131,7 +204,26 @@ export default function FeedScreen() {
 
   // ⚠️ A sikert csak a hívás UTÁN jelentjük: korábban az Alert azonnal ment, így
   // hálózati hiba esetén is azt mondtuk, hogy „követed" — pedig nem.
+  // 🛡️ globális moderáció: bármely poszt eltávolítása a feedből (post.moderate jog)
+  const onModerate = (post: FeedPost) => {
+    bumpChrome();
+    Alert.alert(t('feed.moderate.title'), t('feed.moderate.body'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('feed.moderate.remove'),
+        style: 'destructive',
+        onPress: () =>
+          moderatePostGlobal(post.id, 'removed')
+            .then(() => setPosts((prev) => prev.filter((p) => p.id !== post.id)))
+            .catch((e: unknown) =>
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+            ),
+      },
+    ]);
+  };
+
   const onFollow = (post: FeedPost) => {
+    bumpChrome();
     toggleFollow(post.creator.id, true)
       .then(() =>
         Alert.alert(t('feed.title'), t('feed.followed', { name: post.creator.displayName }))
@@ -196,22 +288,49 @@ export default function FeedScreen() {
   };
 
   const openCreator = (post: FeedPost) => router.push(`/channel/${post.creator.id}`);
+
+  // Egy koppintás: szünet/lejátszás. HÁROM koppintás: a kezelőfelület be/ki.
+  // Az egyszeri koppintást késleltetve dolgozzuk fel, hogy a hármast elkaphassuk —
+  // így a hármas koppintás nem villogtatja a lejátszást.
   const onTapItem = (post: FeedPost) => {
-    if (post.id === activeId && post.videoUri) {
-      // renderelt videó: koppintásra szünet/lejátszás
-      if (player.playing) {
-        player.pause();
-      } else {
-        player.play();
-      }
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
+    if (tapCountRef.current >= 3) {
+      tapCountRef.current = 0;
+      setHintMounted(false);
+      setChromeVisible((v) => !v);
       return;
     }
-    if (post.projectId) {
-      router.push(`/player/${post.projectId}`);
-    }
+    tapTimerRef.current = setTimeout(() => {
+      const taps = tapCountRef.current;
+      tapCountRef.current = 0;
+      tapTimerRef.current = null;
+      if (taps >= 2) {
+        return; // a dupla koppintást szándékosan nem használjuk
+      }
+      if (post.id === activeId && post.videoUri) {
+        // renderelt videó: koppintásra szünet/lejátszás
+        if (player.playing) {
+          player.pause();
+        } else {
+          player.play();
+        }
+      } else if (post.projectId) {
+        router.push(`/player/${post.projectId}`);
+      }
+    }, 260);
   };
 
   const pageHeight = height;
+
+  // a pulzáló glow-gyűrű stílusa (scale ki + elhalványul, loopban)
+  const pulseStyle = {
+    transform: [{ scale: commentPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2] }) }],
+    opacity: commentPulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+  };
 
   const renderItem = ({ item }: { item: FeedPost }) => (
     <View style={[styles.page, { height: pageHeight, width }]}>
@@ -230,23 +349,6 @@ export default function FeedScreen() {
         )}
       </Pressable>
 
-      {/* interaktív hotspotok (az aktív, épp látható időablakban) */}
-      {item.id === activeId
-        ? hotspotsOf(item)
-            .filter((c) => hotspotTime >= c.start && hotspotTime < c.start + c.duration)
-            .map((c) => (
-              <HotspotOverlay
-                key={c.id}
-                clip={c}
-                t={hotspotTime - c.start}
-                box={{ w: width, h: pageHeight }}
-                mode="play"
-                selected={false}
-                onPress={handleHotspot}
-              />
-            ))
-        : null}
-
       {/* felül: cím + típus */}
       {!item.posterUri ? (
         <View style={styles.centerTitle} pointerEvents="none">
@@ -257,8 +359,10 @@ export default function FeedScreen() {
         </View>
       ) : null}
 
-      {/* jobb oldali akció-sor */}
-      <View style={[styles.rail, { bottom: BOTTOM_NAV_HEIGHT + 24 }]}>
+      {/* jobb oldali akció-sor — MINDIG látszik: az EREDETI like/komment/mentés/remix
+          gombok az eredeti helyükön. A komment-gomb accent-színnel + pulzáló glow-val
+          + „Új" jelvénnyel kiemelve, hogy itt — az EREDETIN — látszódjon az új funkció. */}
+      <View style={[styles.rail, { bottom: chromeBottom }]}>
         <Pressable style={styles.railBtn} onPress={() => openCreator(item)}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -277,8 +381,20 @@ export default function FeedScreen() {
           />
           <Text style={styles.railCount}>{compact(item.counts.likes)}</Text>
         </Pressable>
-        <Pressable style={styles.railBtn} onPress={() => onTapItem(item)}>
-          <Ionicons name="chatbubble-outline" size={32} color="#fff" />
+        <Pressable
+          style={styles.railBtn}
+          onPress={() => {
+            bumpChrome();
+            setCommentFor(item);
+          }}
+        >
+          <View style={styles.commentIconWrap}>
+            <Animated.View style={[styles.commentRing, pulseStyle]} pointerEvents="none" />
+            <Ionicons name="chatbubbles" size={34} color={palette.accent} />
+            <View style={styles.railNew} pointerEvents="none">
+              <Text style={styles.railNewText}>{t('feed.newBadge')}</Text>
+            </View>
+          </View>
           <Text style={styles.railCount}>{compact(item.counts.comments)}</Text>
         </Pressable>
         <Pressable style={styles.railBtn} onPress={() => onSave(item)}>
@@ -293,52 +409,81 @@ export default function FeedScreen() {
           <Ionicons name="shuffle" size={32} color={palette.accent} />
           <Text style={styles.railCount}>{compact(item.counts.remixes)}</Text>
         </Pressable>
+        {canModeratePost ? (
+          <Pressable style={styles.railBtn} onPress={() => onModerate(item)}>
+            <Ionicons name="shield-outline" size={30} color={palette.danger} />
+            <Text style={styles.railCount}>{t('feed.moderate.label')}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {/* alul-bal: alkotó + felirat */}
-      <View style={[styles.caption, { bottom: BOTTOM_NAV_HEIGHT + 24 }]}>
-        {item.promoted ? (
-          <View style={styles.sponsored}>
-            <Ionicons name="megaphone" size={11} color="#fff" />
-            <Text style={styles.sponsoredText}>{t('feed.sponsored')}</Text>
-          </View>
-        ) : null}
-        <Pressable onPress={() => openCreator(item)}>
-          <Text style={styles.creator}>@{item.creator.username}</Text>
-        </Pressable>
-        <Text style={styles.captionText} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.hashtags.length > 0 ? (
-          <Text style={styles.tags} numberOfLines={1}>
-            {item.hashtags.map((h) => `#${h}`).join(' ')}
+      {/* alul-bal: alkotó + felirat — a többi chrome-mal együtt (hármas koppintás / auto-hide) */}
+      {chromeVisible ? (
+        <View style={[styles.caption, { bottom: chromeBottom }]}>
+          {item.promoted ? (
+            <View style={styles.sponsored}>
+              <Ionicons name="megaphone" size={11} color="#fff" />
+              <Text style={styles.sponsoredText}>{t('feed.sponsored')}</Text>
+            </View>
+          ) : null}
+          <Pressable onPress={() => openCreator(item)}>
+            <Text style={styles.creator}>@{item.creator.username}</Text>
+          </Pressable>
+          <Text style={styles.captionText} numberOfLines={2}>
+            {item.title}
           </Text>
-        ) : null}
-        {item.remixOfCreator ? (
-          <Text style={styles.remixOf}>🔀 {t('feed.remixOf', { name: item.remixOfCreator })}</Text>
-        ) : null}
-      </View>
+          {item.hashtags.length > 0 ? (
+            <Text style={styles.tags} numberOfLines={1}>
+              {item.hashtags.map((h) => `#${h}`).join(' ')}
+            </Text>
+          ) : null}
+          {item.remixOfCreator ? (
+            <Text style={styles.remixOf}>🔀 {t('feed.remixOf', { name: item.remixOfCreator })}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* interaktív hotspotok (az aktív, épp látható időablakban) — MINDIG legfelül,
+          hogy a hirdetés-hotspotokat a kezelőfelület soha ne takarja el */}
+      {item.id === activeId
+        ? hotspotsOf(item)
+            .filter((c) => hotspotTime >= c.start && hotspotTime < c.start + c.duration)
+            .map((c) => (
+              <HotspotOverlay
+                key={c.id}
+                clip={c}
+                t={hotspotTime - c.start}
+                box={{ w: width, h: pageHeight }}
+                mode="play"
+                selected={false}
+                onPress={handleHotspot}
+              />
+            ))
+        : null}
+
     </View>
   );
 
   return (
     <View style={styles.container}>
-      {/* felső mód-váltó */}
-      <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
-        <View style={styles.modeRow}>
-          <Pressable onPress={() => changeMode('following')}>
-            <Text style={[styles.modeText, mode === 'following' && styles.modeActive]}>
-              {t('feed.following')}
-            </Text>
-          </Pressable>
-          <Text style={styles.modeSep}>|</Text>
-          <Pressable onPress={() => changeMode('foryou')}>
-            <Text style={[styles.modeText, mode === 'foryou' && styles.modeActive]}>
-              {t('feed.forYou')}
-            </Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      {/* felső mód-váltó — csak a kezelőfelülettel együtt (hármas koppintás) */}
+      {chromeVisible ? (
+        <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
+          <View style={styles.modeRow}>
+            <Pressable onPress={() => changeMode('following')}>
+              <Text style={[styles.modeText, mode === 'following' && styles.modeActive]}>
+                {t('feed.following')}
+              </Text>
+            </Pressable>
+            <Text style={styles.modeSep}>|</Text>
+            <Pressable onPress={() => changeMode('foryou')}>
+              <Text style={[styles.modeText, mode === 'foryou' && styles.modeActive]}>
+                {t('feed.forYou')}
+              </Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      ) : null}
 
       {loading ? (
         <View style={styles.loadingBox}>
@@ -359,18 +504,42 @@ export default function FeedScreen() {
           data={posts}
           keyExtractor={(p) => p.id}
           renderItem={renderItem}
-          extraData={activeId}
+          extraData={`${activeId ?? ''}:${chromeVisible ? 1 : 0}`}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           snapToInterval={pageHeight}
           decelerationRate="fast"
+          onScrollBeginDrag={() => setChromeVisible(false)}
           onViewableItemsChanged={onViewable}
           viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
           getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         />
       )}
 
-      <BottomNav active="feed" />
+      {/* rövid, nem tolakodó tipp a hármas koppintásról (indulás után elhalványul) */}
+      {hintMounted && !chromeVisible ? (
+        <Animated.View style={[styles.tapHint, { opacity: hintOpacity }]} pointerEvents="none">
+          <Ionicons name="hand-left-outline" size={14} color="#fff" />
+          <Text style={styles.tapHintText}>{t('feed.tapHint')}</Text>
+        </Animated.View>
+      ) : null}
+
+      {/* alsó menü — csak hármas koppintás után (immerzív alap) */}
+      {chromeVisible ? <BottomNav active="feed" /> : null}
+
+      {/* 💬 komment-lap (a komment-gomb nyitja) */}
+      <CommentSheet
+        post={commentFor}
+        onClose={() => setCommentFor(null)}
+        onCountChange={(d) => {
+          if (commentFor) {
+            patch(commentFor.id, (p) => ({
+              ...p,
+              counts: { ...p.counts, comments: Math.max(0, p.counts.comments + d) },
+            }));
+          }
+        }}
+      />
     </View>
   );
 }
@@ -438,4 +607,36 @@ const styles = StyleSheet.create({
   sponsoredText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   tags: { color: '#cbb8ff', fontSize: 13, fontWeight: '600' },
   remixOf: { color: '#ffffffcc', fontSize: 12, fontWeight: '600' },
+  tapHint: {
+    position: 'absolute',
+    bottom: 48,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#00000088',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 30,
+  },
+  tapHintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  commentIconWrap: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  commentRing: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.accent,
+  },
+  railNew: {
+    position: 'absolute',
+    top: -6,
+    right: -12,
+    backgroundColor: palette.danger,
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  railNewText: { color: '#fff', fontSize: 8, fontWeight: '900', letterSpacing: 0.3 },
 });

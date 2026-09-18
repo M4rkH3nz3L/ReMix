@@ -19,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { setLanguage } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type CacheReport, cacheReport, clearCaches, formatBytes } from '@/lib/cacheManager';
 import { type ProxyQuality, useEditorStore } from '@/store/editorStore';
 import {
@@ -41,7 +43,7 @@ import {
   setTaskAssignment,
   updateAiProvider,
 } from '@/lib/aiProviders';
-import { AI_CAPABILITIES, generatePersona, personaLabel } from '@/lib/aiPersona';
+import { AI_CAPABILITIES, generatePersona } from '@/lib/aiPersona';
 import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
@@ -51,6 +53,8 @@ import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscr
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
+import { useRoles } from '@/store/roleStore';
+import { softDeleteAccount } from '@/lib/account';
 
 const PROVIDER_KINDS: AiProviderKind[] = ['openai', 'anthropic', 'ollama', 'custom'];
 const PROVIDER_LABEL: Record<AiProviderKind, string> = {
@@ -95,13 +99,17 @@ const EMPTY_FORM: ProviderForm = {
  *  - Kijelentkezés
  */
 export default function ProfileScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const configured = useAuth((s) => s.configured);
   const email = useAuth((s) => s.user?.email ?? '');
   const userId = useAuth((s) => s.user?.id ?? null);
   const signOut = useAuth((s) => s.signOut);
   // 💳 Pro-állapot reaktívan (aktiválás után azonnal frissül a szekció)
   const isPro = useEntitlement((s) => s.isPro());
+  // 🛡️ admin-belépő: csak szerep-/user-kezelő jog birtokosának látszik
+  const canAdmin = useRoles(
+    (s) => s.permissions.includes('role.manage') || s.permissions.includes('user.manage')
+  );
   const proUntil = useEntitlement((s) => s.proUntil);
   const [sub, setSub] = useState<SubscriptionDetails | null>(null);
   // a dátum-kijelzéseket effektben számoljuk (a render TISZTA marad — react-hooks/purity)
@@ -277,7 +285,9 @@ export default function ProfileScreen() {
       baseUrl: form.baseUrl,
       model: form.model,
       apiKey: form.apiKey,
-      personaName: form.personaName,
+      // EGY név: a persona neve = a modell neve (a „Név" mező), így a szerkesztő
+      // asszisztens-köszönései is ugyanazt a nevet használják
+      personaName: form.label,
       personaEmoji: form.personaEmoji,
       personaStory: form.personaStory,
       capabilities: form.capabilities,
@@ -338,6 +348,25 @@ export default function ProfileScreen() {
     );
   };
 
+  // 🗑️ GDPR soft-delete: a fiók deaktiválása (visszaállítható), majd kijelentkezés
+  const onDeleteAccount = () => {
+    Alert.alert(t('gdpr.deleteTitle'), t('gdpr.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('gdpr.deleteConfirm'),
+        style: 'destructive',
+        onPress: () =>
+          softDeleteAccount()
+            .then(() => {
+              void signOut();
+            })
+            .catch((e: unknown) =>
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+            ),
+      },
+    ]);
+  };
+
   const onSignOut = () => {
     Alert.alert(t('auth.account'), t('auth.signOutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -376,6 +405,31 @@ export default function ProfileScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* 🛡️ Admin-panel (RBAC) — csak jog-birtokosnak */}
+          {canAdmin ? (
+            <Pressable
+              onPress={() => router.push('/admin')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                backgroundColor: palette.surface,
+                borderWidth: 1,
+                borderColor: palette.border,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 13,
+                marginBottom: 10,
+              }}
+            >
+              <Ionicons name="shield-checkmark-outline" size={20} color={palette.accent} />
+              <Text style={{ flex: 1, color: palette.text, fontSize: 15, fontWeight: '700' }}>
+                {t('admin.title')}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={palette.textDim} />
+            </Pressable>
+          ) : null}
+
           {/* — Személyes adatok — */}
           <Text style={styles.sectionTitle}>{t('profile.personalSection')}</Text>
           <View style={styles.card}>
@@ -445,6 +499,23 @@ export default function ProfileScreen() {
                   }}
                 />
               )}
+            </View>
+          </View>
+
+          {/* — Nyelv — */}
+          <Text style={styles.sectionTitle}>{t('profile.languageSection')}</Text>
+          <View style={styles.card}>
+            <View style={styles.chipRow}>
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <Chip
+                  key={l.code}
+                  label={`${l.flag} ${l.native}`}
+                  active={i18n.language === l.code}
+                  onPress={() => {
+                    void setLanguage(l.code);
+                  }}
+                />
+              ))}
             </View>
           </View>
 
@@ -528,11 +599,11 @@ export default function ProfileScreen() {
                       size={20}
                       color={p.isDefault ? palette.accent : palette.textDim}
                     />
-                    {p.avatar ? <AvatarSvg config={p.avatar} size={34} /> : null}
+                    <AvatarSvg config={p.avatar} size={34} />
                     <View style={{ flex: 1 }}>
                       <View style={styles.providerTitleRow}>
                         <Text style={styles.providerLabel} numberOfLines={1}>
-                          {personaLabel(p) ?? p.label}
+                          {p.label}
                         </Text>
                         {p.isDefault ? (
                           <View style={styles.defaultBadge}>
@@ -543,7 +614,6 @@ export default function ProfileScreen() {
                         ) : null}
                       </View>
                       <Text style={styles.providerMeta} numberOfLines={1}>
-                        {personaLabel(p) ? `${p.label} · ` : ''}
                         {PROVIDER_LABEL[p.provider]} · {p.model || '—'}
                         {p.apiKey ? ' · 🔑' : ''}
                         {p.capabilities && p.capabilities.length > 0
@@ -583,13 +653,21 @@ export default function ProfileScreen() {
                   <View style={styles.taskChips}>
                     <Chip
                       label={t('aiPicker.auto')}
+                      leading={
+                        <Ionicons
+                          name="flash"
+                          size={13}
+                          color={!taskAssign[task] ? palette.text : palette.textDim}
+                        />
+                      }
                       active={!taskAssign[task]}
                       onPress={() => pickTask(task, null)}
                     />
                     {providers.map((p) => (
                       <Chip
                         key={p.id}
-                        label={personaLabel(p) ?? p.label}
+                        label={p.label}
+                        leading={<AvatarSvg config={p.avatar} size={18} />}
                         active={taskAssign[task] === p.id}
                         onPress={() => pickTask(task, p.id)}
                       />
@@ -644,6 +722,31 @@ export default function ProfileScreen() {
             <Pressable onPress={onSignOut} style={styles.signOutBtn}>
               <Ionicons name="log-out-outline" size={18} color={palette.danger} />
               <Text style={styles.signOutText}>{t('auth.signOut')}</Text>
+            </Pressable>
+            <Pressable onPress={onDeleteAccount} style={styles.signOutBtn}>
+              <Ionicons name="person-remove-outline" size={18} color={palette.danger} />
+              <Text style={styles.signOutText}>{t('gdpr.deleteTitle')}</Text>
+            </Pressable>
+          </View>
+
+          {/* — 📜 Jogi / Adatvédelem (GDPR) — */}
+          <Text style={styles.sectionTitle}>{t('profile.legalSection')}</Text>
+          <View style={styles.card}>
+            <Pressable
+              onPress={() => router.push('/legal?doc=privacy')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
+            >
+              <Ionicons name="shield-outline" size={18} color={palette.textDim} />
+              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('legal.privacyTitle')}</Text>
+              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/legal?doc=terms')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
+            >
+              <Ionicons name="document-text-outline" size={18} color={palette.textDim} />
+              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('legal.termsTitle')}</Text>
+              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
             </Pressable>
           </View>
         </ScrollView>
@@ -754,15 +857,6 @@ export default function ProfileScreen() {
                 onChange={(a) => setForm((f) => ({ ...f, avatar: a }))}
               />
 
-              <Text style={styles.fieldLabel}>{t('profile.personaNameLabel')}</Text>
-              <TextInput
-                value={form.personaName}
-                onChangeText={(v) => setForm((f) => ({ ...f, personaName: v }))}
-                placeholder={t('profile.personaNamePlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={styles.input}
-              />
-
               <TextInput
                 value={form.personaStory}
                 onChangeText={(v) => setForm((f) => ({ ...f, personaStory: v }))}
@@ -776,7 +870,8 @@ export default function ProfileScreen() {
                   const p = generatePersona(form.capabilities);
                   setForm((f) => ({
                     ...f,
-                    personaName: p.name,
+                    // csak akkor ad nevet, ha még nincs — a beírt nevet (pl. GYP) megőrzi
+                    label: f.label.trim() ? f.label : p.name,
                     personaStory: p.story,
                     avatar: randomAvatar(),
                   }));

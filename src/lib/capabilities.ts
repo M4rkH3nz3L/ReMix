@@ -63,8 +63,12 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   storyAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.storyAnalyze' },
   pacingAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pacingAnalyze' },
   qualityScan: { where: 'cloud', pro: true, label: 'lib.capabilities.label.qualityScan' },
-  cloudSync: { where: 'cloud', pro: true, label: 'lib.capabilities.label.cloudSync' },
-  collab: { where: 'cloud', pro: true, label: 'lib.capabilities.label.collab' },
+  // 🗄️ HIBRID adat-biztonság: a projekt-TERV (kis JSON, média nélkül) DB-mentése és
+  // a kollaboráció INGYENES — hogy a projektek SOHA ne vesszenek el (userhez kötve),
+  // és bárki megoszthasson/meghívhasson. A Pro-érték a NEHÉZ felhő marad: média-
+  // felhősync, HD/felhő-render, AI. (Lásd MONEY.md — ezt frissíteni kell.)
+  cloudSync: { where: 'cloud', pro: false, label: 'lib.capabilities.label.cloudSync' },
+  collab: { where: 'cloud', pro: false, label: 'lib.capabilities.label.collab' },
   bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
   faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },

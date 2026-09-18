@@ -29,6 +29,7 @@ import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
 import { loadEvents, loadProject, recordAutoVersion, saveEvents, saveProject } from '@/lib/storage';
+import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
 import { indexProjectVision } from '@/lib/visionSearch';
@@ -133,7 +134,28 @@ export default function EditorScreen() {
             }, 4000);
           }
         } else {
-          setMissing(true);
+          // 🗄️ helyileg hiányzik → próbáljuk a FELHŐBŐL (más eszköz / újratelepítés
+          // után is megnyílik; login nélkül a catch a „hiányzó" ágra visz)
+          pullProject(id)
+            .then((cloud) => {
+              if (!alive) {
+                return;
+              }
+              if (cloud) {
+                saveProject(cloud).catch(() => {}); // helyi visszaírás
+                useEditorStore.getState().loadProject(cloud, events);
+                if (Platform.OS !== 'web') {
+                  setMissingMedia(findMissingMedia(cloud));
+                }
+              } else {
+                setMissing(true);
+              }
+            })
+            .catch(() => {
+              if (alive) {
+                setMissing(true);
+              }
+            });
         }
       })
       .catch(() => {
@@ -229,6 +251,8 @@ export default function EditorScreen() {
           setSaveAttempt(0);
           // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
           recordAutoVersion(snap).catch(() => {});
+          // 🗄️ INGYENES felhő-backup (best-effort) — a projekt userhez mentve, ne vesszen el
+          backupProjectToCloud(snap);
         })
         .catch(() => {
           setSaveFailed(true);
@@ -245,6 +269,7 @@ export default function EditorScreen() {
       if (state.project && state.dirty) {
         saveProject(state.project).catch(() => {});
         saveEvents(state.project.id, state.events).catch(() => {});
+        backupProjectToCloud(state.project);
       }
       state.setPlaying(false);
       state.closeProject();

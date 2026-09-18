@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -49,6 +50,7 @@ export default function AuthScreen() {
   const [country, setCountry] = useState('');
   const [city, setCity] = useState('');
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(false); // 📜 GDPR: feltételek + adatkezelés elfogadva
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function AuthScreen() {
     !busy &&
     looksLikeEmail(email) &&
     password.length >= 6 &&
-    (!isSignUp || signUpFieldsValid);
+    (!isSignUp || (signUpFieldsValid && accepted));
 
   const submit = async () => {
     if (!canSubmit) {
@@ -280,6 +282,36 @@ export default function AuthScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {!configured ? <Text style={styles.error}>{t('auth.notConfigured')}</Text> : null}
+
+            {isSignUp ? (
+              <Pressable
+                onPress={() => setAccepted((v) => !v)}
+                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}
+              >
+                <Ionicons
+                  name={accepted ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={accepted ? palette.accent : palette.border}
+                />
+                <Text style={{ flex: 1, color: palette.textDim, fontSize: 13, lineHeight: 18 }}>
+                  {t('auth.consentPrefix')}{' '}
+                  <Text
+                    style={{ color: palette.accent, fontWeight: '700' }}
+                    onPress={() => router.push('/legal?doc=terms')}
+                  >
+                    {t('auth.consentTerms')}
+                  </Text>
+                  {t('auth.consentAnd')}
+                  <Text
+                    style={{ color: palette.accent, fontWeight: '700' }}
+                    onPress={() => router.push('/legal?doc=privacy')}
+                  >
+                    {t('auth.consentPrivacy')}
+                  </Text>
+                  .
+                </Text>
+              </Pressable>
+            ) : null}
 
             <View style={styles.submitWrap}>
               {busy ? (

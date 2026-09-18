@@ -2,9 +2,11 @@ import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
 import type { SignUpProfile } from '@/lib/accountValidation';
+import { CONSENT_VERSION } from '@/constants/legal';
 import { registerCurrentDevice } from '@/lib/deviceInfo';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { useEntitlement } from '@/store/entitlementStore';
+import { useRoles } from '@/store/roleStore';
 
 /**
  * 🔐 Auth-store — a bejelentkezett felhasználó EGYETLEN forrása.
@@ -76,6 +78,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ session: data.session, user: data.session?.user ?? null });
       // 💳 Pro-szint szinkronja a bejelentkezett userhez (offline-cache + Supabase)
       void useEntitlement.getState().syncFromUser(data.session?.user?.id ?? null);
+      void useRoles.getState().refresh(); // 🛡️ governance-jogok betöltése
       // már bejelentkezett user: aktuális eszköz frissítése (last_seen + adatok)
       if (data.session?.user) {
         void registerCurrentDevice(data.session.user.id);
@@ -90,6 +93,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         set({ session, user: session?.user ?? null });
         // 💳 minden auth-váltásnál újraszinkron: login → user szintje, logout → Free
         void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
+        void useRoles.getState().refresh(); // 🛡️ jogok újratöltése auth-váltáskor
       });
     }
     set({ hydrated: true });
@@ -112,6 +116,9 @@ export const useAuth = create<AuthState>((set, get) => ({
           birthday: profile.birthday.trim(),
           country: profile.country.trim(),
           city: profile.city.trim(),
+          // 📜 GDPR: a regisztrációkor adott hozzájárulás verziója — a trigger
+          // ebből rögzíti a user_consents naplóba (időbélyeggel).
+          consent_version: CONSENT_VERSION,
         },
       },
     });

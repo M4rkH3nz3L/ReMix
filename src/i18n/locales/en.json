@@ -104,10 +104,15 @@
     "account": "Account",
     "signedInAs": "Signed in as {{email}}",
     "signOut": "Sign out",
-    "signOutConfirm": "Do you want to sign out?"
+    "signOutConfirm": "Do you want to sign out?",
+    "consentPrefix": "I accept the",
+    "consentTerms": "Terms of Service",
+    "consentAnd": " and the ",
+    "consentPrivacy": "Privacy Policy"
   },
   "profile": {
     "title": "Profile",
+    "languageSection": "Language",
     "personalSection": "Personal details",
     "aiSection": "AI models",
     "aiSectionHint": "Bring your own models: set an endpoint, model id and API key. The default one is used by the AI features.",
@@ -121,7 +126,7 @@
     "task_thumbHeadlines": "Thumbnail headlines",
     "task_storyStructure": "Story engine",
     "personaSection": "👤 Character (persona)",
-    "personaHint": "Give this model a name and a little story — so it feels like your own assistant.",
+    "personaHint": "Give this model a face and a little story — so it feels like your own assistant. Set its name above, in the “Name” field.",
     "personaPurpose": "What's it for?",
     "personaNameLabel": "Name",
     "personaNamePlaceholder": "Name (e.g. Luna)",
@@ -181,7 +186,8 @@
     "proxyQuality_medium": "Medium (540p)",
     "proxyQuality_high": "High (720p)",
     "cacheSize": "Cache size",
-    "clearCache": "Clear cache"
+    "clearCache": "Clear cache",
+    "legalSection": "Legal / Privacy"
   },
   "home": {
     "appName": "Remix",
@@ -2510,7 +2516,8 @@
   "nav": {
     "feed": "Feed",
     "studio": "Studio",
-    "channel": "Channel"
+    "channel": "Channel",
+    "notifications": "Alerts"
   },
   "feed": {
     "title": "Feed",
@@ -2528,7 +2535,24 @@
     "sharedOk": "Your video is live on the feed.",
     "rendering": "Rendering & sharing…",
     "sponsored": "Sponsored",
-    "followFailed": "Could not follow."
+    "followFailed": "Could not follow.",
+    "tapHint": "Tap 3× for the menu",
+    "comments": {
+      "title": "Comments ({{n}})",
+      "empty": "No comments yet — be the first!",
+      "placeholder": "Add a comment…",
+      "deleteTitle": "Delete comment",
+      "deleteBody": "Delete this comment?",
+      "deleteFailed": "Couldn't delete the comment.",
+      "loginToComment": "Log in to comment"
+    },
+    "newBadge": "New",
+    "moderate": {
+      "title": "Moderation",
+      "body": "Remove this post from the public feed?",
+      "remove": "Remove",
+      "label": "Mod"
+    }
   },
   "channel": {
     "posts": "Posts",
@@ -2537,7 +2561,16 @@
     "follow": "Follow",
     "following2": "Following",
     "editProfile": "Edit profile",
-    "noPosts": "No posts yet."
+    "noPosts": "No posts yet.",
+    "remixMod": {
+      "cta": "Manage remixes ({{n}})",
+      "title": "Remixes of your content",
+      "hint": "Remove a remix you find offensive from the public feed (reversible any time).",
+      "empty": "No one has remixed this yet.",
+      "remove": "Remove",
+      "restore": "Restore",
+      "removedLabel": "Removed from feed"
+    }
   },
   "promote": {
     "cta": "Promote",
@@ -2559,5 +2592,28 @@
     "comments": "💬 {{n}} comments",
     "remixes": "🔀 {{n}} remixes",
     "promoLine": "Promotion: {{delivered}}/{{target}} views · {{spent}} 🪙 spent"
+  },
+  "admin": {
+    "title": "Admin — roles & permissions",
+    "noAccess": "You don`t have access to this panel.",
+    "rolePerms": "Roles & permissions",
+    "newRole": "New role",
+    "roleSlug": "slug (e.g. editor)",
+    "roleLabel": "display name",
+    "users": "User roles",
+    "pickRole": "Pick a role",
+    "deleteRoleTitle": "Delete role"
+  },
+  "legal": {
+    "privacyTitle": "Privacy Policy",
+    "termsTitle": "Terms of Service"
+  },
+  "gdpr": {
+    "deleteTitle": "Delete account",
+    "deleteBody": "Your account and content will be deactivated and hidden from others. Not permanent: log back in anytime to restore.",
+    "deleteConfirm": "Deactivate",
+    "deactivatedTitle": "Account deactivated",
+    "deactivatedBody": "Your content is hidden from others. Reactivate your account?",
+    "reactivate": "Reactivate"
   }
 }

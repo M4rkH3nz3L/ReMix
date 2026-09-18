@@ -294,6 +294,18 @@ export async function deletePost(postId: string): Promise<void> {
   await sb.from('posts').delete().eq('id', postId);
 }
 
+/**
+ * 🔗 Egy projekthez tartozó ÖSSZES saját feed-poszt törlése (a projekt törlésekor):
+ * „nincs projekt → nincs videó". Best-effort, csak a saját posztokra (RLS).
+ */
+export async function deletePostsForProject(projectId: string): Promise<void> {
+  const uid = currentUserId();
+  if (!supabase || !uid) {
+    return;
+  }
+  await supabase.from('posts').delete().eq('creator_id', uid).eq('project_id', projectId);
+}
+
 export async function toggleLike(postId: string, liked: boolean): Promise<void> {
   const sb = requireSupabase();
   const uid = currentUserId();
@@ -362,4 +374,136 @@ export async function remixFromPost(post: FeedPost): Promise<string | null> {
   });
   await saveProject(project);
   return project.id;
+}
+
+// ── 💬 Kommentek ────────────────────────────────────────────────────────────
+
+/** Egy komment (a szerző denormalizált — mint a posztnál, nincs cross-profil olvasás). */
+export interface PostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  author: Creator;
+  body: string;
+  createdAt: string;
+}
+
+interface CommentRow {
+  id: string;
+  post_id: string;
+  author_id: string;
+  body: string;
+  author_username: string | null;
+  author_name: string | null;
+  author_avatar: string | null;
+  created_at: string;
+}
+
+const COMMENT_COLUMNS =
+  'id, post_id, author_id, body, author_username, author_name, author_avatar, created_at';
+
+function toComment(r: CommentRow): PostComment {
+  return {
+    id: r.id,
+    postId: r.post_id,
+    authorId: r.author_id,
+    author: {
+      id: r.author_id,
+      username: r.author_username ?? r.author_id.slice(0, 8),
+      displayName: r.author_name ?? r.author_username ?? 'Creator',
+      avatarUri: r.author_avatar ?? undefined,
+    },
+    body: r.body,
+    createdAt: r.created_at,
+  };
+}
+
+/** Egy poszt kommentjei (legújabb elöl). Az RLS csak látható posztokra enged. */
+export async function listComments(postId: string, limit = 200): Promise<PostComment[]> {
+  const sb = requireSupabase();
+  const { data, error } = await sb
+    .from('post_comments')
+    .select(COMMENT_COLUMNS)
+    .eq('post_id', postId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []).map((r) => toComment(r as CommentRow));
+}
+
+/** Komment hozzáadása (a szerző = a bejelentkezett user; a szám­lálót trigger tartja). */
+export async function addComment(postId: string, body: string): Promise<PostComment> {
+  const sb = requireSupabase();
+  const uid = currentUserId();
+  if (!uid) {
+    throw new Error('Nincs bejelentkezett felhasználó.');
+  }
+  const text = body.trim();
+  if (!text) {
+    throw new Error('Üres komment.');
+  }
+  const { username, name } = await creatorFields();
+  const { data, error } = await sb
+    .from('post_comments')
+    .insert({
+      post_id: postId,
+      author_id: uid,
+      body: text.slice(0, 2000),
+      author_username: username,
+      author_name: name,
+    })
+    .select(COMMENT_COLUMNS)
+    .single();
+  if (error) {
+    throw new Error(error.message);
+  }
+  return toComment(data as CommentRow);
+}
+
+/**
+ * Komment törlése. Az RLS engedi a SZERZŐnek a sajátját, ÉS a POSZT-TULAJnak
+ * bármelyiket a saját posztján (moderáció) — a kliens csak megkísérli.
+ */
+export async function deleteComment(commentId: string): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.from('post_comments').delete().eq('id', commentId);
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+// ── 🔀 Remix-felügyelet (tulajdonosi moderáció) ─────────────────────────────
+
+/**
+ * Egy posztból SZÁRMAZÓ remixek (a `removed`-ekkel együtt — az RLS engedi, ha én
+ * vagyok a forrás-poszt tulajdonosa). A saját posztod remix-felügyeletéhez.
+ */
+export async function listRemixesOf(postId: string): Promise<FeedPost[]> {
+  const sb = requireSupabase();
+  const { data, error } = await sb
+    .from('posts')
+    .select(POST_COLUMNS)
+    .eq('remix_of_post_id', postId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const rows = (data ?? []) as PostRow[];
+  const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
+  return rows.map((r) => toPost(r, liked, saved));
+}
+
+/**
+ * A tartalmamból származó remix feed-láthatóságának moderálása (soft):
+ * `'removed'` → kikerül a nyilvános feedből (visszafordítható), `'ok'` → vissza.
+ * A jogosultságot a `moderate_remix` RPC ellenőrzi (csak a forrás-poszt tulaja).
+ */
+export async function moderateRemix(remixPostId: string, status: 'removed' | 'ok'): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('moderate_remix', { p_remix: remixPostId, p_status: status });
+  if (error) {
+    throw new Error(error.message);
+  }
 }

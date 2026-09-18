@@ -118,6 +118,7 @@ export default function RootLayout() {
             <Stack.Protected guard={authed}>
               <Stack.Screen name="index" />
               <Stack.Screen name="profile" />
+              <Stack.Screen name="admin" />
               <Stack.Screen name="editor/[id]" />
               <Stack.Screen name="player/[id]" />
               <Stack.Screen name="collab/[id]" />
@@ -128,6 +129,8 @@ export default function RootLayout() {
             <Stack.Protected guard={!authed}>
               <Stack.Screen name="auth" />
             </Stack.Protected>
+            {/* 📜 nyilvános (kijelentkezve is elérhető) — a regisztráció linkeli */}
+            <Stack.Screen name="legal" />
           </Stack>
         ) : (
           // amíg a session töltődik: rövid loading, hogy ne villanjon fel az auth-képernyő

@@ -54,7 +54,8 @@ export default function CollabScreen() {
   const { members, role, loading, error, open, close, refresh } = useCollab();
   const [localProject, setLocalProject] = useState<Project | null>(null);
   const [email, setEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<Exclude<CollabRole, 'owner'>>('editor');
+  // alap: NÉZŐ (a meghívott nézőként lép be; a tulaj utána adhat szerkesztő jogot)
+  const [inviteRole, setInviteRole] = useState<Exclude<CollabRole, 'owner'>>('viewer');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {

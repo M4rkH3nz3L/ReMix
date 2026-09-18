@@ -19,7 +19,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { deletePost, getChannel, remixFromPost, toggleFollow, type ChannelData } from '@/lib/feed';
+import {
+  deletePost,
+  getChannel,
+  listRemixesOf,
+  moderateRemix,
+  remixFromPost,
+  toggleFollow,
+  type ChannelData,
+} from '@/lib/feed';
 import { InsufficientCreditsError } from '@/lib/shop';
 import {
   creatorTotals,
@@ -47,6 +55,9 @@ export default function ChannelScreen() {
   const [budget, setBudget] = useState('50');
   const [cpv, setCpv] = useState('1');
   const [busy, setBusy] = useState(false);
+  const [remixFor, setRemixFor] = useState<FeedPost | null>(null);
+  const [remixes, setRemixes] = useState<FeedPost[]>([]);
+  const [remixLoading, setRemixLoading] = useState(false);
 
   const load = useCallback(() => {
     if (!id) {
@@ -105,6 +116,32 @@ export default function ChannelScreen() {
       .catch(() => {});
   };
 
+  const openRemixMod = (post: FeedPost) => {
+    setRemixFor(post);
+    setRemixLoading(true);
+    setRemixes([]);
+    listRemixesOf(post.id)
+      .then(setRemixes)
+      .catch(() => setRemixes([]))
+      .finally(() => setRemixLoading(false));
+  };
+
+  // egy remix feed-láthatóságának moderálása (soft removed/ok) — optimista
+  const doModerate = (remix: FeedPost, status: 'removed' | 'ok') => {
+    setRemixes((prev) =>
+      prev.map((r) => (r.id === remix.id ? { ...r, moderationStatus: status } : r))
+    );
+    moderateRemix(remix.id, status).catch((e: unknown) => {
+      // visszagörgetés hibánál
+      setRemixes((prev) =>
+        prev.map((r) =>
+          r.id === remix.id ? { ...r, moderationStatus: remix.moderationStatus } : r
+        )
+      );
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+    });
+  };
+
   const openPost = (post: FeedPost) => {
     if (data?.isMe) {
       // saját poszt → kezelés: kiemelés / statisztika / (lejátszás) / törlés
@@ -118,6 +155,12 @@ export default function ChannelScreen() {
       ];
       if (post.projectId) {
         buttons.push({ text: t('feed.remix'), onPress: () => router.push(`/player/${post.projectId}`) });
+      }
+      if (post.counts.remixes > 0) {
+        buttons.push({
+          text: t('channel.remixMod.cta', { n: post.counts.remixes }),
+          onPress: () => openRemixMod(post),
+        });
       }
       buttons.push({
         text: t('common.delete'),
@@ -313,6 +356,60 @@ export default function ChannelScreen() {
         </View>
       </Modal>
 
+      {/* — 🔀 remix-felügyelet modal (az eredeti tulaj moderálja a remixeket) — */}
+      <Modal
+        visible={remixFor !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRemixFor(null)}
+      >
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRemixFor(null)} />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{t('channel.remixMod.title')}</Text>
+            <Text style={styles.sheetHint}>{t('channel.remixMod.hint')}</Text>
+            {remixLoading ? (
+              <ActivityIndicator color={palette.accent} style={{ marginVertical: 24 }} />
+            ) : remixes.length === 0 ? (
+              <Text style={styles.remixEmpty}>{t('channel.remixMod.empty')}</Text>
+            ) : (
+              <FlatList
+                data={remixes}
+                keyExtractor={(r) => r.id}
+                style={{ maxHeight: 340 }}
+                renderItem={({ item }) => {
+                  const removed = item.moderationStatus === 'removed';
+                  return (
+                    <Pressable
+                      style={styles.remixRow}
+                      onPress={() => router.push(`/channel/${item.creator.id}`)}
+                    >
+                      <View style={styles.remixInfo}>
+                        <Text style={styles.remixTitle} numberOfLines={1}>
+                          @{item.creator.username}
+                        </Text>
+                        <Text style={styles.remixSub} numberOfLines={1}>
+                          {removed ? t('channel.remixMod.removedLabel') : item.title}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={[styles.remixBtn, removed ? styles.remixRestore : styles.remixRemove]}
+                        onPress={() => doModerate(item, removed ? 'ok' : 'removed')}
+                        hitSlop={6}
+                      >
+                        <Text style={styles.remixBtnText}>
+                          {removed ? t('channel.remixMod.restore') : t('channel.remixMod.remove')}
+                        </Text>
+                      </Pressable>
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <BottomNav active="channel" />
     </SafeAreaView>
   );
@@ -404,5 +501,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   targetText: { color: palette.accent, fontSize: 14, fontWeight: '700', marginTop: 8 },
+  remixEmpty: { color: palette.textDim, textAlign: 'center', paddingVertical: 24 },
+  remixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  remixInfo: { flex: 1 },
+  remixTitle: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  remixSub: { color: palette.textDim, fontSize: 12, marginTop: 1 },
+  remixBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  remixRemove: { backgroundColor: palette.danger },
+  remixRestore: { backgroundColor: palette.accent },
+  remixBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });
 

@@ -104,10 +104,15 @@
     "account": "Konto",
     "signedInAs": "Angemeldet als {{email}}",
     "signOut": "Abmelden",
-    "signOutConfirm": "Möchtest du dich abmelden?"
+    "signOutConfirm": "Möchtest du dich abmelden?",
+    "consentPrefix": "Ich akzeptiere die",
+    "consentTerms": "Nutzungsbedingungen",
+    "consentAnd": " und die ",
+    "consentPrivacy": "Datenschutzerklärung"
   },
   "profile": {
     "title": "Profil",
+    "languageSection": "Sprache",
     "personalSection": "Persönliche Daten",
     "aiSection": "KI-Modelle",
     "aiSectionHint": "Eigene Modelle: Endpunkt, Modell-ID und API-Schlüssel festlegen. Das Standardmodell nutzen die KI-Funktionen.",
@@ -121,7 +126,7 @@
     "task_thumbHeadlines": "Thumbnail-Titel",
     "task_storyStructure": "Story-Engine",
     "personaSection": "👤 Charakter (Persona)",
-    "personaHint": "Gib diesem Modell einen Namen und eine kleine Geschichte — damit es sich wie dein eigener Assistent anfühlt.",
+    "personaHint": "Gib diesem Modell ein Gesicht und eine kleine Geschichte — damit es sich wie dein eigener Assistent anfühlt. Den Namen legst du oben im Feld „Name“ fest.",
     "personaPurpose": "Wofür ist es da?",
     "personaNameLabel": "Name",
     "personaNamePlaceholder": "Name (z. B. Luna)",
@@ -181,7 +186,8 @@
     "proxyQuality_medium": "Mittel (540p)",
     "proxyQuality_high": "Hoch (720p)",
     "cacheSize": "Cache-Größe",
-    "clearCache": "Cache leeren"
+    "clearCache": "Cache leeren",
+    "legalSection": "Rechtliches / Datenschutz"
   },
   "home": {
     "appName": "Remix",
@@ -2510,7 +2516,8 @@
   "nav": {
     "feed": "Feed",
     "studio": "Studio",
-    "channel": "Kanal"
+    "channel": "Kanal",
+    "notifications": "Meldungen"
   },
   "feed": {
     "title": "Feed",
@@ -2528,7 +2535,24 @@
     "sharedOk": "Dein Video ist jetzt im Feed.",
     "rendering": "Rendern & Teilen…",
     "sponsored": "Gesponsert",
-    "followFailed": "Folgen fehlgeschlagen."
+    "followFailed": "Folgen fehlgeschlagen.",
+    "tapHint": "Tippe 3× für das Menü",
+    "comments": {
+      "title": "Kommentare ({{n}})",
+      "empty": "Noch keine Kommentare — sei der/die Erste!",
+      "placeholder": "Kommentar schreiben…",
+      "deleteTitle": "Kommentar löschen",
+      "deleteBody": "Diesen Kommentar löschen?",
+      "deleteFailed": "Kommentar konnte nicht gelöscht werden.",
+      "loginToComment": "Zum Kommentieren anmelden"
+    },
+    "newBadge": "Neu",
+    "moderate": {
+      "title": "Moderation",
+      "body": "Diesen Beitrag aus dem öffentlichen Feed entfernen?",
+      "remove": "Entfernen",
+      "label": "Mod"
+    }
   },
   "channel": {
     "posts": "Beiträge",
@@ -2537,7 +2561,16 @@
     "follow": "Folgen",
     "following2": "Folge ich",
     "editProfile": "Profil bearbeiten",
-    "noPosts": "Noch keine Beiträge."
+    "noPosts": "Noch keine Beiträge.",
+    "remixMod": {
+      "cta": "Remixe verwalten ({{n}})",
+      "title": "Remixe deiner Inhalte",
+      "hint": "Entferne einen anstößigen Remix aus dem öffentlichen Feed (jederzeit umkehrbar).",
+      "empty": "Noch niemand hat remixt.",
+      "remove": "Entfernen",
+      "restore": "Wiederherstellen",
+      "removedLabel": "Aus Feed entfernt"
+    }
   },
   "promote": {
     "cta": "Bewerben",
@@ -2559,5 +2592,28 @@
     "comments": "💬 {{n}} Kommentare",
     "remixes": "🔀 {{n}} Remixe",
     "promoLine": "Werbung: {{delivered}}/{{target}} Aufrufe · {{spent}} 🪙 ausgegeben"
+  },
+  "admin": {
+    "title": "Admin — Rollen & Rechte",
+    "noAccess": "Du hast keinen Zugriff auf dieses Panel.",
+    "rolePerms": "Rollen & Rechte",
+    "newRole": "Neue Rolle",
+    "roleSlug": "Kürzel (z. B. editor)",
+    "roleLabel": "Anzeigename",
+    "users": "Benutzerrollen",
+    "pickRole": "Rolle wählen",
+    "deleteRoleTitle": "Rolle löschen"
+  },
+  "legal": {
+    "privacyTitle": "Datenschutzerklärung",
+    "termsTitle": "Nutzungsbedingungen"
+  },
+  "gdpr": {
+    "deleteTitle": "Konto löschen",
+    "deleteBody": "Dein Konto und deine Inhalte werden deaktiviert und für andere ausgeblendet. Nicht endgültig: jederzeit durch erneutes Anmelden wiederherstellbar.",
+    "deleteConfirm": "Deaktivieren",
+    "deactivatedTitle": "Konto deaktiviert",
+    "deactivatedBody": "Deine Inhalte sind für andere verborgen. Konto wieder aktivieren?",
+    "reactivate": "Wieder aktivieren"
   }
 }

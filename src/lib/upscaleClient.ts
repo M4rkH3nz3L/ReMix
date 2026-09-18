@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
  * 🔍 Upscale / Enhance kliens (CC V2): a worker szuper-felbontással nagyítja
@@ -22,6 +23,7 @@ export async function upscalePhoto(
     const res = await uploadFetch(`${ensureCloud('upscale')}/upscale`, {
       method: 'POST',
       body: form,
+      headers: await workerAuthHeaders(),
     });
     if (!res.ok) {
       return null;

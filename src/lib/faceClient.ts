@@ -1,5 +1,6 @@
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import { ensureCloud } from '@/lib/backend';
 
 /**
@@ -27,7 +28,11 @@ export async function fetchFaces(
     form.append('atSec', String(Math.max(0, opts.atSec ?? 0)));
     form.append('aspectW', String(opts.aspectW));
     form.append('aspectH', String(opts.aspectH));
-    const res = await uploadFetch(`${base}/faces`, { method: 'POST', body: form });
+    const res = await uploadFetch(`${base}/faces`, {
+      method: 'POST',
+      body: form,
+      headers: await workerAuthHeaders(),
+    });
     if (!res.ok) {
       return null;
     }

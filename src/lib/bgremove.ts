@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import { ensureCloud } from '@/lib/backend';
 
 /**
@@ -22,7 +23,11 @@ export async function requestCutout(uri: string): Promise<CutoutResult | null> {
   const base = ensureCloud('bgRemove');
   try {
     const form = await mediaFormData(uri);
-    const res = await uploadFetch(`${base}/bgremove`, { method: 'POST', body: form });
+    const res = await uploadFetch(`${base}/bgremove`, {
+      method: 'POST',
+      body: form,
+      headers: await workerAuthHeaders(),
+    });
     if (!res.ok) {
       return null;
     }

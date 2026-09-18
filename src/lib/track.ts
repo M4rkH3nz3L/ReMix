@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
  * 🎯 Objektum-követés kliens (P0‑6): a worker /track végpontja a megadott
@@ -46,7 +47,11 @@ export async function trackSubject(
     form.append('cy', String(opts.cy));
     form.append('aspectW', String(opts.aspectW));
     form.append('aspectH', String(opts.aspectH));
-    const res = await uploadFetch(`${base}/track`, { method: 'POST', body: form });
+    const res = await uploadFetch(`${base}/track`, {
+      method: 'POST',
+      body: form,
+      headers: await workerAuthHeaders(),
+    });
     if (!res.ok) {
       return null;
     }

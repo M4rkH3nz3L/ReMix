@@ -12,6 +12,8 @@
 
 import { t as tr } from 'i18next';
 
+import { workerAuthHeaders } from '@/lib/workerAuth';
+
 /** alapértelmezett várakozás: a lokális modell bemelegedve 3–8 mp, de az első
  *  hívás modell-betöltéssel jár, ezért bőkezű a keret */
 export const AI_TIMEOUT_MS = 90_000;
@@ -37,7 +39,16 @@ export async function aiFetch(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    // 🔐 a proOnly AI-végpontok (autoedit/highlights/story/translate) requireAuth-ot
+    // várnak — a bejelentkezett felhasználó Supabase-tokenjét itt, KÖZPONTILAG
+    // csatoljuk (a nyitott végpontokon és a /health-en ártalmatlan). A hívó saját
+    // fejlécei nyernek, ha ütköznének.
+    const auth = await workerAuthHeaders();
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: { ...auth, ...(init.headers as Record<string, string> | undefined) },
+    });
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
       throw new AiTimeoutError(Math.round(timeoutMs / 1000));

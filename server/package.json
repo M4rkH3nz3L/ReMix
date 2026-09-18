@@ -5,8 +5,8 @@
   "description": "vided MP4 render worker — a projekt-JSON + médiafájlok alapján FFmpeg-gel renderel",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "worker": "node render-worker.js",
+    "start": "node --env-file-if-exists=.env index.js",
+    "worker": "node --env-file-if-exists=.env render-worker.js",
     "lint": "expo lint"
   },
   "dependencies": {

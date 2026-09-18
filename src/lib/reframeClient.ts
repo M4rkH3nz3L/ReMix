@@ -8,6 +8,7 @@ import {
   sourceWindow,
 } from '@/lib/reframe';
 import { uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { ReframePoint } from '@/lib/reframe';
 import { ensureCloud } from '@/lib/backend';
 import { finiteNum, finiteTime, mapValid, unitNum } from '@/lib/parseGuards';
@@ -39,7 +40,11 @@ async function analyzeClipReframe(
     form.append('media', new File(uri) as unknown as Blob, uri.split('/').pop() ?? 'media');
     form.append('startSec', String(startSec));
     form.append('durationSec', String(durationSec));
-    const res = await uploadFetch(`${base}/reframe`, { method: 'POST', body: form });
+    const res = await uploadFetch(`${base}/reframe`, {
+      method: 'POST',
+      body: form,
+      headers: await workerAuthHeaders(),
+    });
     if (!res.ok) {
       return null;
     }

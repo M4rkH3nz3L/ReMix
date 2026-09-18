@@ -15,6 +15,7 @@ import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { renderCacheKey } from '@/lib/projectHash';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import { withFingerprints } from '@/lib/fingerprint';
 import type { Project, RenderedVersion } from '@/types/project';
 
@@ -337,7 +338,11 @@ export async function renderProjectVersion(
 export async function uploadMedia(uri: string, name?: string): Promise<string> {
   const base = cloudBaseUrl();
   const form = await mediaFormData(uri, name);
-  const res = await uploadFetch(`${base}/media/upload`, { method: 'POST', body: form });
+  const res = await uploadFetch(`${base}/media/upload`, {
+    method: 'POST',
+    body: form,
+    headers: await workerAuthHeaders(),
+  });
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || tr('lib.render.uploadFailed'));
@@ -395,7 +400,11 @@ async function renderCloud(
     form.append('settings', JSON.stringify(settings));
   }
 
-  const submit = await uploadFetch(`${base}/render`, { method: 'POST', body: form });
+  const submit = await uploadFetch(`${base}/render`, {
+    method: 'POST',
+    body: form,
+    headers: await workerAuthHeaders(),
+  });
   // ⚠️ a `.json()` KORÁBBAN itt futott, mint az `!ok` ág — egy 502-es HTML-oldal
   // parse-hibát dobott, épp a beszédes üzenet helyett
   const submitBody = await readJson<{ id?: string; error?: string }>(
@@ -519,7 +528,11 @@ export async function transcribeToSrt(
   const form = new FormData();
   form.append('media', new File(uri) as unknown as Blob, fileName(uri));
   form.append('granularity', granularity);
-  const res = await uploadFetch(`${base}/captions`, { method: 'POST', body: form });
+  const res = await uploadFetch(`${base}/captions`, {
+    method: 'POST',
+    body: form,
+    headers: await workerAuthHeaders(),
+  });
   const body = await readJson<{ srt?: string; error?: string }>(
     res,
     tr('lib.render.transcriptionFailed')
@@ -578,7 +591,11 @@ export async function collectAndShareProject(
   form.append('project', JSON.stringify(stamped));
   form.append('uriMap', JSON.stringify(uriMap));
 
-  const submit = await uploadFetch(`${base}/collect`, { method: 'POST', body: form });
+  const submit = await uploadFetch(`${base}/collect`, {
+    method: 'POST',
+    body: form,
+    headers: await workerAuthHeaders(),
+  });
   const submitBody = await readJson<{ id?: string; error?: string }>(
     submit,
     tr('lib.render.packagingStartFailed')

@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import { makeId } from '@/lib/id';
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import { fetchRead } from '@/lib/netRetry';
 
 /**
@@ -51,7 +52,7 @@ export async function generateTts(
   const base = ensureCloud('tts');
   const res = await fetch(`${base}/tts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) },
     body: JSON.stringify({ text, voice }),
   });
   const body = await res.json();

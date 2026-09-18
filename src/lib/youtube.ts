@@ -3,6 +3,7 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
 import { importYouTubeLocal } from '@/lib/youtubeLocal';
@@ -71,7 +72,7 @@ export async function importYouTubeMedia(
   onProgress?.({ phase: tr('lib.youtube.phaseExtract') });
   const res = await fetch(`${base}/youtube`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) },
     body: JSON.stringify({ url, kind, atSec }),
   });
   const body = await res.json();

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
  * 🌅 Sky Replacement kliens (CC V2): a worker mélység-alapú ég-maszkkal
@@ -29,6 +30,7 @@ export async function replaceSky(uri: string, preset: SkyPreset): Promise<string
     const res = await uploadFetch(`${ensureCloud('skyReplace')}/sky`, {
       method: 'POST',
       body: form,
+      headers: await workerAuthHeaders(),
     });
     if (!res.ok) {
       return null;

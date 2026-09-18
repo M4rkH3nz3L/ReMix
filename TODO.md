@@ -14,17 +14,16 @@
 Ezek nélkül **nem szabad élesíteni** — biztonság, fizetés, infra.
 
 ### Biztonság
-- [ ] **Worker JWT-verifikáció** — a render/AI-worker (`server/index.js`) MA
-  nem ellenőriz tokent, a `Access-Control-Allow-Origin: *` (index.js:55) miatt a
-  fizetős végpontok **bárkinek** mennek. Prod-ban: a kliens küldje a Supabase
-  JWT-t, a worker verifikálja (+ Pro-ellenőrzés a `subscriptions`-ből), és CORS-
-  allowlist a saját domain(ek)re.
-- [ ] **BYOK SSRF-védelem** — a worker a felhasználó `baseUrl`-jére POST-ol
-  (`server/ai.js` `runOpenAICompatible`, lásd a kód SSRF-megjegyzését). Prod-ban
-  **provider-allowlist** (csak ismert AI-hosztok), vagy belső-IP tiltás.
-- [ ] **`/notify` + `/invite` + `/billing/activate` jogosultság** — a worker ezen
-  végpontjai service_role-lal írnak (megkerülik az RLS-t), ma hitelesítés NÉLKÜL
-  (dev). Prod-ban a hívó Supabase JWT-jét verifikálni kell + jogosultság: notify
+- [x] **Worker JWT-verifikáció** — ✅ JAVÍTVA: a worker `requireAuth`-ot használ
+  (`server/auth.js`: Supabase-JWT-verifikáció + `proOnly` Pro-ellenőrzés a
+  `subscriptions`-ből) és `corsAllowlist` (nem `*`). A kliens minden Pro/írás-hívása
+  `workerAuthHeaders()`-t csatol. Éles: a `SUPABASE_URL`/`ANON_KEY` a worker env-jébe.
+- [x] **BYOK SSRF-védelem** — ✅ JAVÍTVA: `server/ssrf.js` (host-allowlist + privát-IP
+  tiltás DNS-feloldás után), `ssrf.test.js`-sel; `AI_EXTRA_HOSTS` env a self-hosted
+  modellhez.
+- [x] **`/notify` + `/invite` + `/billing/activate` jogosultság** — ✅ JAVÍTVA: ezek
+  most `requireAuth` mögött (a hívó a VERIFIKÁLT tokenből), + `devBillingGuard` a
+  billing/kredit dev-útra. Az eredeti kockázat: notify
   (**ki kinek küldhet**), invite (**csak a tulaj hívhat meg**), billing/activate
   (**admin/promó-only** — a valós Pro a RevenueCat webhookon jöjjön, ne ezen az
   úton). Enélkül bárki tagot vehet fel / spam-elhet / **ingyen Pro-t adhat magának**.

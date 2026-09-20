@@ -1,7 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { duration } from '@/design/motion';
 import { getLesson, nextStepIndex, prevStepIndex, type Rect } from '@/lib/tutorial';
+
+/**
+ * A lecke-választó (BottomSheet) ÉS az overlay is RN `Modal`. iOS-en két natív
+ * Modal EGYSZERRE prezentálva/dismissálva BEFAGY (a prezentáció beragad). Ezért a
+ * választóból indított leckénél előbb bezárjuk a lapot, és csak a kilépő animáció
+ * (`motion.timing.exit` = duration.fast) + natív dismiss UTÁN nyitjuk az overlay-t.
+ */
+const MENU_HANDOFF_MS = duration.fast + 240;
 
 /**
  * 🎓 Tutorial-store — a felület-vezető állapota + a kiemelhető UI-elemek
@@ -58,7 +67,13 @@ export const useTutorial = create<TutorialState>((set, get) => ({
     if (!getLesson(lessonId)) {
       return;
     }
-    // a választó bezár, a lecke indul
+    // ha a választóból indul: előbb a lapot zárjuk, és a kilépő animáció UTÁN
+    // nyitjuk az overlay-t — különben két RN Modal fedné egymást (iOS befagy).
+    if (get().menuVisible) {
+      set({ menuVisible: false });
+      setTimeout(() => set({ activeLessonId: lessonId, stepIndex: 0 }), MENU_HANDOFF_MS);
+      return;
+    }
     set({ activeLessonId: lessonId, stepIndex: 0, menuVisible: false });
   },
 

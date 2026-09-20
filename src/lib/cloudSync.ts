@@ -1,4 +1,5 @@
 import { ensureCloud } from '@/lib/backend';
+import { backupProjectMedia, mediaRemoteMap } from '@/lib/mediaSync';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
 import { listProjects, saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
@@ -63,15 +64,38 @@ export async function pullProject(projectId: string): Promise<Project | null> {
 // (újratelepítés/eszközváltás után visszahozható). Best-effort: sosem dob, és
 // bejelentkezés nélkül csendben kihagyja (a helyi mentés a mérvadó).
 
-/** A projekt-terv felhő-mentése — BEST-EFFORT (nem dob, login nélkül skip). */
+/**
+ * A projekt felhő-mentése — BEST-EFFORT (nem dob, login nélkül skip).
+ *
+ * 🗄️ A projekt-terv MELLETT a MÉDIÁT is felmenti: minden helyi asset EGYSZER
+ * feltöltődik a Storage-ba (remoteUrl), így eszközváltás/újratelepítés után a
+ * betöltés vissza tudja állítani a „hiányzó" fájlokat. Idempotens: a már feltöltött
+ * remote-okat a MEGLÉVŐ felhő-másolatból olvassa, ezért asset-enként csak egyszer tölt.
+ */
 export async function backupProjectToCloud(project: Project): Promise<void> {
   try {
     const uid = useAuth.getState().user?.id;
     if (!supabase || !uid) {
       return;
     }
+    // már ismert remote-ok a korábbi felhő-másolatból (dupla-feltöltés ellen)
+    let known: Record<string, string> = {};
+    try {
+      const { data } = await supabase
+        .from('cloud_projects')
+        .select('data')
+        .eq('user_id', uid)
+        .eq('project_id', project.id)
+        .maybeSingle();
+      if (data?.data) {
+        known = mediaRemoteMap(migrateProject(data.data as Project));
+      }
+    } catch {
+      // nincs korábbi másolat / offline → minden helyi asset feltölthető
+    }
+    const { project: backed } = await backupProjectMedia(project, known);
     await supabase.from('cloud_projects').upsert(
-      { user_id: uid, project_id: project.id, name: project.name, data: project },
+      { user_id: uid, project_id: backed.id, name: backed.name, data: backed },
       { onConflict: 'user_id,project_id' }
     );
   } catch {

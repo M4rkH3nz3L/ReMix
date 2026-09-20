@@ -32,6 +32,8 @@ import { loadEvents, loadProject, recordAutoVersion, saveEvents, saveProject } f
 import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
+import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
+import type { Project } from '@/types/project';
 import { indexProjectVision } from '@/lib/visionSearch';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
@@ -120,11 +122,41 @@ export default function EditorScreen() {
         if (!alive) {
           return;
         }
+        // 🗄️ a hiányzó média AUTOMATIKUS visszaállítása a szerver-másolatból,
+        // mielőtt a kézi „relink" bannert felkínálnánk — a fájlok nem vesznek el.
+        const recoverMissingMedia = async (proj: Project) => {
+          if (Platform.OS === 'web') {
+            return;
+          }
+          if (findMissingMedia(proj).length === 0) {
+            if (alive) {
+              setMissingMedia([]);
+            }
+            return;
+          }
+          // remoteUrl-ök: a helyi assetből, vagy a felhő-projekt-másolatból
+          let remoteByUri = mediaRemoteMap(proj);
+          if (Object.keys(remoteByUri).length === 0) {
+            const cloud = await pullProject(proj.id).catch(() => null);
+            if (cloud) {
+              remoteByUri = mediaRemoteMap(cloud);
+            }
+          }
+          const res = await restoreMissingMedia(proj, remoteByUri);
+          if (!alive) {
+            return;
+          }
+          if (res.restored > 0) {
+            useEditorStore.getState().loadProject(res.project, events);
+            saveProject(res.project).catch(() => {});
+          }
+          setMissingMedia(res.missing);
+        };
         if (loaded) {
           useEditorStore.getState().loadProject(loaded, events);
-          // hiányzó média felismerése megnyitáskor (törölt/áthelyezett fájlok)
+          // hiányzó média felismerése + automatikus visszaállítás a szerverről
           if (Platform.OS !== 'web') {
-            setMissingMedia(findMissingMedia(loaded));
+            void recoverMissingMedia(loaded);
             // 🔍 vision-index előmelegítés (P0‑8): a Smart Search első
             // keresése így azonnali — fájlonként cache-elt, hiba nem érdekes.
             // ⚠️ refben tartjuk: gyors ki-be lépésnél enélkül minden megnyitás
@@ -146,7 +178,7 @@ export default function EditorScreen() {
                 saveProject(cloud).catch(() => {}); // helyi visszaírás
                 useEditorStore.getState().loadProject(cloud, events);
                 if (Platform.OS !== 'web') {
-                  setMissingMedia(findMissingMedia(cloud));
+                  void recoverMissingMedia(cloud);
                 }
               } else {
                 setMissing(true);
@@ -169,6 +201,18 @@ export default function EditorScreen() {
       if (visionTimerRef.current) {
         clearTimeout(visionTimerRef.current);
         visionTimerRef.current = null;
+      }
+    };
+  }, [id]);
+
+  // 🗄️ Adatbiztonság: a szerkesztőből kilépve a projekt + a MÉDIA a szerverre kerül
+  // (best-effort, idempotens — asset-enként egyszer tölt). Így eszközváltás vagy
+  // újratelepítés után a betöltés vissza tudja állítani a fájlokat.
+  useEffect(() => {
+    return () => {
+      const p = useEditorStore.getState().project;
+      if (p && p.id === id) {
+        void backupProjectToCloud(p);
       }
     };
   }, [id]);

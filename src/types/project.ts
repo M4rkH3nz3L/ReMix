@@ -197,6 +197,13 @@ export interface Asset {
   /** relinkhez (F2) */
   hash?: string;
   size?: number;
+  /**
+   * 🗄️ a médiafájl szerveren tárolt másolatának publikus URL-je. A média-backup
+   * (lib/mediaSync) tölti fel egyszer, és a felhő-projekt-másolat (cloud_projects)
+   * hordozza. Ha a helyi fájl elveszik (konténer-váltás/újratelepítés), a betöltés
+   * innen tölti vissza és relinkel — így nem marad tartósan „hiányzó fájl".
+   */
+  remoteUrl?: string;
   // ── 📂 Organize (Pro Workflow): asset-rendszerezés metaadatai ──────────────
   /** kedvenc jelölés (gyors szűréshez) */
   favorite?: boolean;

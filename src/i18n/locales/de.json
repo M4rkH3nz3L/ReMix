@@ -160,6 +160,11 @@
   "profile": {
     "title": "Profil",
     "languageSection": "Sprache",
+    "appearanceSection": "Kanal-Darstellung",
+    "appearanceHint": "Profilbild und Titelbild für deinen Kanal — im Feed und auf deinem Kanal sichtbar.",
+    "changeCover": "Titelbild",
+    "changeAvatar": "Profilbild ändern",
+    "imageUploading": "Bild wird hochgeladen…",
     "personalSection": "Persönliche Daten",
     "aiSection": "KI-Modelle",
     "aiSectionHint": "Eigene Modelle: Endpunkt, Modell-ID und API-Schlüssel festlegen. Das Standardmodell nutzen die KI-Funktionen.",

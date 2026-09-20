@@ -147,6 +147,8 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
 export interface ChannelData {
   userId: string;
   creator: Creator | null;
+  /** 🖼️ borítókép (banner) URL — a csatorna-fejlécben; hiányában gradient-placeholder */
+  coverUri?: string;
   posts: FeedPost[];
   followers: number;
   following: number;
@@ -184,14 +186,27 @@ export async function getChannel(userId: string): Promise<ChannelData> {
     isFollowing = !!fr;
   }
 
-  // ⚠️ A csatorna identitása eddig CSAK az első posztból jött → poszt nélküli
-  // csatorna (minden új fiók!) `creator: null`-t adott, és a UI a „Csatorna"
-  // (nav-címke) nevet + id-prefixet mutatta. Poszt hiányában a profilból építjük.
-  const creator = posts[0]?.creator ?? (await resolveChannelCreator(userId, me === userId));
+  // A csatorna identitása (név/avatar/borító) a profiles-ból — a PUBLIKUS mezőket
+  // BÁRKINEK a public_profile SECURITY DEFINER függvény adja (a privát mezők — telefon/
+  // születésnap — nem szivárognak). Így poszt nélküli csatorna is helyes fejlécet kap.
+  const { data: profRows } = await sb.rpc('public_profile', { p_user: userId });
+  const prof = (Array.isArray(profRows) ? profRows[0] : profRows) as
+    | { full_name: string | null; avatar_url: string | null; cover_url: string | null }
+    | undefined;
+  const emailHandle = me === userId ? (useAuth.getState().user?.email?.split('@')[0] ?? null) : null;
+  const username = posts[0]?.creator.username ?? emailHandle ?? userId.slice(0, 8);
+  const creator: Creator = {
+    id: userId,
+    username,
+    displayName: prof?.full_name || posts[0]?.creator.displayName || username,
+    avatarUri: reachableMediaUrl(prof?.avatar_url ?? null) ?? posts[0]?.creator.avatarUri,
+  };
+  const coverUri = reachableMediaUrl(prof?.cover_url ?? null) ?? undefined;
 
   return {
     userId,
     creator,
+    coverUri,
     posts,
     followers: s.followers ?? 0,
     following: s.following ?? 0,
@@ -201,42 +216,26 @@ export async function getChannel(userId: string): Promise<ChannelData> {
   };
 }
 
-/**
- * A csatorna tulajának identitása POSZT NÉLKÜL is: a nevet a `profiles`-ból, a
- * usernevet (posztokon denormalizált, e-mail-alapú) saját csatornánál az authból
- * vesszük. Más felhasználó e-mailje nem elérhető → ott az id-prefix marad.
- */
-async function resolveChannelCreator(userId: string, isMe: boolean): Promise<Creator> {
-  const sb = requireSupabase();
-  let name: string | null = null;
-  try {
-    const { data } = await sb.from('profiles').select('full_name').eq('id', userId).maybeSingle();
-    name = (data?.full_name as string | undefined) || null;
-  } catch {
-    // RLS/hálózati hiba → marad a fallback
-  }
-  let username: string | null = null;
-  if (isMe) {
-    const email = useAuth.getState().user?.email ?? null;
-    username = email ? email.split('@')[0] : null;
-  }
-  return {
-    id: userId,
-    username: username ?? userId.slice(0, 8),
-    displayName: name ?? username ?? 'Creator',
-  };
-}
-
-async function creatorFields(): Promise<{ username: string | null; name: string | null }> {
+async function creatorFields(): Promise<{
+  username: string | null;
+  name: string | null;
+  avatar: string | null;
+}> {
   const user = useAuth.getState().user;
   const email = user?.email ?? null;
   const username = email ? email.split('@')[0] : null;
   let name: string | null = username;
+  let avatar: string | null = null;
   if (supabase && user?.id) {
-    const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle();
     name = (data?.full_name as string | undefined) || username;
+    avatar = (data?.avatar_url as string | undefined) ?? null;
   }
-  return { username, name };
+  return { username, name, avatar };
 }
 
 /**
@@ -259,9 +258,10 @@ export async function publishPost(
   if (!uid) {
     throw new Error('Nincs bejelentkezett felhasználó.');
   }
-  const { username, name } = await creatorFields();
+  const { username, name, avatar } = await creatorFields();
   const row = {
     creator_id: uid,
+    creator_avatar: avatar,
     project_id: project.id,
     title: project.seo?.title || project.name,
     description: project.seo?.description ?? null,

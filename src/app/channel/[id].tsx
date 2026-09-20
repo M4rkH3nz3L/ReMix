@@ -269,8 +269,21 @@ export default function ChannelScreen() {
           contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
           ListHeaderComponent={
             <View style={styles.profileHead}>
+              {data?.coverUri ? (
+                <Image source={{ uri: data.coverUri }} style={styles.cover} contentFit="cover" />
+              ) : (
+                <View style={[styles.cover, styles.coverPlaceholder]} />
+              )}
               <View style={styles.bigAvatar}>
-                <Text style={styles.bigAvatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
+                {data?.creator?.avatarUri ? (
+                  <Image
+                    source={{ uri: data.creator.avatarUri }}
+                    style={styles.bigAvatarImg}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.bigAvatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
+                )}
               </View>
               <Text style={styles.displayName}>{displayName}</Text>
               <Text style={styles.handle}>@{username}</Text>
@@ -423,6 +436,8 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', color: palette.text, fontSize: 16, fontWeight: '800' },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   profileHead: { alignItems: 'center', paddingVertical: 16, gap: 6 },
+  cover: { alignSelf: 'stretch', height: 120, borderRadius: 14, backgroundColor: palette.surfaceHigh },
+  coverPlaceholder: { borderWidth: 1, borderColor: palette.border },
   bigAvatar: {
     width: 88,
     height: 88,
@@ -430,7 +445,12 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: palette.bg,
+    marginTop: -48,
   },
+  bigAvatarImg: { width: '100%', height: '100%' },
   bigAvatarText: { color: '#fff', fontSize: 40, fontWeight: '800' },
   displayName: { color: palette.text, fontSize: 18, fontWeight: '800', marginTop: 4 },
   handle: { color: palette.textDim, fontSize: 14 },

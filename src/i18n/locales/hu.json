@@ -160,6 +160,11 @@
   "profile": {
     "title": "Profil",
     "languageSection": "Nyelv",
+    "appearanceSection": "Csatorna megjelenése",
+    "appearanceHint": "Profilkép és borítókép a csatornádhoz — a feedben és a csatornádon is látszik.",
+    "changeCover": "Borító",
+    "changeAvatar": "Profilkép módosítása",
+    "imageUploading": "Kép feltöltése…",
     "personalSection": "Személyes adatok",
     "aiSection": "AI-modellek",
     "aiSectionHint": "Saját modellek: adj meg endpointot, modell-azonosítót és API-kulcsot. Az alapértelmezettet használják az AI-funkciók.",

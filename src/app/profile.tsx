@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +49,8 @@ import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { activateProDev, billingClientAvailable, deactivateProDev, restorePurchases } from '@/lib/billing';
-import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
+import { reachableMediaUrl } from '@/lib/mediaUrl';
+import { type AccountProfile, fetchProfile, pickAndUploadProfileImage, saveProfile } from '@/lib/profile';
 import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -126,6 +128,8 @@ export default function ProfileScreen() {
     birthday: '',
     country: '',
     city: '',
+    avatarUrl: '',
+    coverUrl: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [providers, setProviders] = useState<AiProvider[]>([]);
@@ -220,6 +224,31 @@ export default function ProfileScreen() {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // 🖼️ profil-/borítókép: választás + feltöltés → azonnal mentjük a profilhoz
+  const [imgBusy, setImgBusy] = useState(false);
+  const onPickProfileImage = async (kind: 'avatar' | 'cover') => {
+    if (imgBusy) {
+      return;
+    }
+    setImgBusy(true);
+    try {
+      const url = await pickAndUploadProfileImage();
+      if (!url) {
+        return; // a felhasználó mégse választott
+      }
+      const next: AccountProfile = {
+        ...profile,
+        [kind === 'avatar' ? 'avatarUrl' : 'coverUrl']: url,
+      };
+      setProfile(next);
+      await saveProfile(next);
+    } catch (e) {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setImgBusy(false);
     }
   };
 
@@ -470,6 +499,61 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color={palette.textDim} />
             </Pressable>
           ) : null}
+
+          {/* — Csatorna megjelenése: profil- és borítókép — */}
+          <Text style={styles.sectionTitle}>{t('profile.appearanceSection')}</Text>
+          <View style={styles.card}>
+            <View style={styles.coverWrap}>
+              <Pressable
+                onPress={() => onPickProfileImage('cover')}
+                disabled={imgBusy}
+                style={StyleSheet.absoluteFill}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.changeCover')}
+              >
+                {reachableMediaUrl(profile.coverUrl) ? (
+                  <Image
+                    source={{ uri: reachableMediaUrl(profile.coverUrl) ?? undefined }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, styles.coverPlaceholder]} />
+                )}
+              </Pressable>
+              <View style={styles.coverBadge} pointerEvents="none">
+                <Ionicons name="camera" size={13} color="#fff" />
+                <Text style={styles.coverBadgeText}>{t('profile.changeCover')}</Text>
+              </View>
+              <Pressable
+                onPress={() => onPickProfileImage('avatar')}
+                disabled={imgBusy}
+                style={styles.avatarEdit}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.changeAvatar')}
+              >
+                {reachableMediaUrl(profile.avatarUrl) ? (
+                  <Image
+                    source={{ uri: reachableMediaUrl(profile.avatarUrl) ?? undefined }}
+                    style={styles.avatarImg}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarInitial}>
+                      {(profile.fullName || '?').slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.avatarCam} pointerEvents="none">
+                  <Ionicons name="camera" size={11} color="#fff" />
+                </View>
+              </Pressable>
+            </View>
+            <Text style={styles.sectionHint}>
+              {imgBusy ? t('profile.imageUploading') : t('profile.appearanceHint')}
+            </Text>
+          </View>
 
           {/* — Személyes adatok — */}
           <Text style={styles.sectionTitle}>{t('profile.personalSection')}</Text>
@@ -1043,6 +1127,52 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
+  // 🖼️ csatorna-megjelenés: borító-banner + átfedő avatar
+  coverWrap: {
+    height: 132,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: palette.surfaceHigh,
+    marginBottom: 4,
+  },
+  coverPlaceholder: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
+  coverBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#00000088',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  coverBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  avatarEdit: { position: 'absolute', left: 12, bottom: 10 },
+  avatarImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: palette.surface,
+    backgroundColor: palette.accentSoft,
+  },
+  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: palette.text, fontSize: 26, fontWeight: '800' },
+  avatarCam: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: palette.surface,
+  },
   subHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   proBadge: {
     flexDirection: 'row',

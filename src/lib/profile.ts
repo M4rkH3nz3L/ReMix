@@ -1,3 +1,5 @@
+import { pickImage } from '@/lib/media';
+import { uploadMedia } from '@/lib/render';
 import { requireSupabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -15,6 +17,10 @@ export interface AccountProfile {
   birthday: string;
   country: string;
   city: string;
+  /** 🖼️ profilkép publikus Storage-URL (üres, ha nincs) — a csatornán/feedben látszik */
+  avatarUrl: string;
+  /** 🖼️ borítókép publikus Storage-URL (üres, ha nincs) — a csatorna-fejlécben */
+  coverUrl: string;
 }
 
 const EMPTY: AccountProfile = {
@@ -23,6 +29,8 @@ const EMPTY: AccountProfile = {
   birthday: '',
   country: '',
   city: '',
+  avatarUrl: '',
+  coverUrl: '',
 };
 
 function currentUserId(): string {
@@ -38,7 +46,7 @@ export async function fetchProfile(): Promise<AccountProfile> {
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, phone, birthday, country, city')
+    .select('full_name, phone, birthday, country, city, avatar_url, cover_url')
     .eq('id', currentUserId())
     .maybeSingle();
   if (error) {
@@ -53,6 +61,8 @@ export async function fetchProfile(): Promise<AccountProfile> {
     birthday: data.birthday ?? '',
     country: data.country ?? '',
     city: data.city ?? '',
+    avatarUrl: data.avatar_url ?? '',
+    coverUrl: data.cover_url ?? '',
   };
 }
 
@@ -67,10 +77,25 @@ export async function saveProfile(profile: AccountProfile): Promise<void> {
       birthday: profile.birthday.trim() || null,
       country: profile.country.trim() || null,
       city: profile.city.trim() || null,
+      avatar_url: profile.avatarUrl.trim() || null,
+      cover_url: profile.coverUrl.trim() || null,
     },
     { onConflict: 'id' },
   );
   if (error) {
     throw new Error(error.message);
   }
+}
+
+/**
+ * 🖼️ Profil- vagy borítókép választása + feltöltése → publikus Storage-URL (a
+ * worker /media/upload-ján). `null`, ha a felhasználó mégsem választott. A
+ * megjelenítés a URL-t `reachableMediaUrl`-lel oldja fel (dev-host).
+ */
+export async function pickAndUploadProfileImage(): Promise<string | null> {
+  const picked = await pickImage();
+  if (!picked) {
+    return null;
+  }
+  return uploadMedia(picked.uri);
 }

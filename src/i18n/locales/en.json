@@ -160,6 +160,11 @@
   "profile": {
     "title": "Profile",
     "languageSection": "Language",
+    "appearanceSection": "Channel appearance",
+    "appearanceHint": "Profile picture and cover image for your channel — shown in the feed and on your channel.",
+    "changeCover": "Cover",
+    "changeAvatar": "Change profile picture",
+    "imageUploading": "Uploading image…",
     "personalSection": "Personal details",
     "aiSection": "AI models",
     "aiSectionHint": "Bring your own models: set an endpoint, model id and API key. The default one is used by the AI features.",

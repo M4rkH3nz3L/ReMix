@@ -378,13 +378,20 @@ A fő UI-zónák a leckékhez:
   🔖 jelölő · részlet-előnézet · 🔁 loop.
 - **Eszköztár** (Toolbar): Videó · Kép · Szöveg · Felirat · Átirat · Matrica · Forma · Zene ·
   Szűrő · Áttűnés · Sebesség · Grade · Keret(PiP) · Rétegek · Hotspot · Pontos · Tár · Export.
-- **Panelek** (a kijelöléstől függően nyílnak).
+- **Panelek** (a kijelöléstől függően nyílnak; belépéskor alulról rugóznak fel, váltáskor a tartalom átúszik).
+- **Eszköz-rail** (nagy kijelzőn / fekvőben, bal oldalt): gyors panel-váltó ikonsor.
+- **Alsó lapok** (értesítés, komment, paywall): alulról rugóval jönnek, a **fogantyút lehúzva** bezárhatók.
 
 ### 🟢 Kezdő
 
 **1. lecke — Új projekt és az első klip**
 1. *Művelet:* Hozz létre projektet. *Hol:* főképernyő → **Új projekt** (válassz arányt: 16:9/9:16/1:1). *Eredmény:* megnyílik a szerkesztő üres idővonallal.
 2. *Művelet:* Adj hozzá videót. *Hol:* Eszköztár → **Videó** (vagy **Kép** / **Felvétel**). *Eredmény:* a klip megjelenik a videó-sávon, filmstrip-előnézettel.
+
+**1b. lecke — Ahogy az app reagál (mozgás · haptika · lehúzható lapok)**
+1. *Művelet:* Koppints bármelyik eszköz-gombra. *Hol:* **Eszköztár** gombjai. *Eredmény:* a gomb nyomásra rugósan összehúzódik, elengedve visszapattan — fizikai eszközön finom **haptika** kíséri.
+2. *Művelet:* Fogj meg és húzz egy klipet. *Hol:* **Idővonal** — nyomd-tartsd, majd húzd. *Eredmény:* a klip finoman „felemelkedik" (kissé nagyobb + árnyék), a rácshoz/lejátszófejhez **pattan** (haptikás koppintás), elengedve visszasimul.
+3. *Művelet:* Zárj be egy alsó lapot húzással. *Hol:* bármely **alsó lap** (pl. **🔔 értesítések**) → a tetején a **fogantyút húzd lefelé**. *Eredmény:* a lap követi az ujjad; egy küszöb fölött becsukódik (alatta visszapattan).
 
 **2. lecke — Navigáció és lejátszás**
 1. *Művelet:* Léptesd a lejátszófejet. *Hol:* **Idővonal** — húzd/görgetsd (a playhead középen áll). *Eredmény:* az előnézet a playheadhez ugrik.
@@ -420,6 +427,11 @@ A fő UI-zónák a leckékhez:
 **6. lecke — Sávok kezelése**
 1. *Művelet:* Nyisd a sáv-menüt. *Hol:* a sáv **címkéjére/fejlécére** koppintás. *Eredmény:* némítás · solo · **👁️ láthatóság** · zárolás · összecsukás · **magasság** · **auto-magasság**.
 2. *Művelet:* Rejts el egy vizuális sávot az előnézetből. *Hol:* **👁️ szem**. *Eredmény:* a sáv klipjei nem látszanak (monitorozás; a rendert nem érinti).
+
+**6b. lecke — Nagy kijelző és fekvő mód (iPad / landscape)**
+1. *Művelet:* Fordítsd az eszközt **fekvőbe**. *Hol:* telefon fekvő tájolás. *Eredmény:* átrendeződik — bal **eszköz-rail** · középen az **előnézet** · jobb oszlopban **TransportBar + idővonal/panel + eszköztár**; a videó kapja a legtöbb helyet, a tartalom **nem csúszik a bevágás (notch) alá**.
+2. *Művelet:* Nyiss egy panelt nagy kijelzőn. *Hol:* **iPad fekvő** (vagy desktop). *Eredmény:* teljes vágó-elrendezés — **rail | előnézet | dokkolt inspector | teljes szélességű idővonal** egyszerre látszik (a panel nem takarja el az idővonalat).
+3. *Művelet:* Térj vissza állóba. *Eredmény:* a kompakt, függőleges elrendezés — a panel az idővonal helyén jön fel.
 
 ### 🟡 Haladó
 
@@ -483,6 +495,12 @@ A fő UI-zónák a leckékhez:
 1. *Művelet:* Kapcsold be. *Hol:* videóklip → **Szűrő** panel → **🎯 Stabilizálás** → *Automatikus stabilizálás*. *Eredmény:* a render kompenzálja a bemozdulást.
 2. *Művelet:* Hangold. *Hol:* **Erősség** (mekkora rázást fog be) · **Simaság** · **Kivágás/zoom** (a bemozduló szélek eltüntetése) · **Rolling-shutter korrekció**. *Eredmény:* a beégetett videó stabil (az előnézet a nyerset mutatja).
 
+**14c. lecke — AI-változások előnézete és jóváhagyása `[PRO]`**
+1. *Művelet:* Kérj módosítást az AI-tól. *Hol:* **AI-asszisztens** panel → írd be az utasítást (pl. „vágd ki a csendeket"), majd küldd el. *Eredmény:* megjelenik a **változás-lista** (tételesen: melyik klip, mi változik miről mire) — az AI még **semmit nem módosít**.
+2. *Művelet:* Ellenőrizz egy tételt a helyén. *Hol:* a tétel melletti **Megnéz** (👁). *Eredmény:* a lejátszófej az érintett szakaszra ugrik.
+3. *Művelet:* Nézd meg a teljes eredményt élőben. *Hol:* **Előnézet** gomb. *Eredmény:* a szerkesztő **ideiglenesen alkalmazza** a köteget — a preview-felületen a tényleges végeredményt látod.
+4. *Művelet:* Dönts. *Hol:* **Megtartás** (marad — egy lépésben visszavonható) vagy **Visszavonás** (azonnal visszaáll az eredeti). *Eredmény:* az AI csak jóváhagyás után módosít véglegesen; a teljes köteg **egyetlen undo-lépés**.
+
 **15. lecke — Export**
 1. *Művelet:* Nyisd az Exportot. *Hol:* Toolbar → **Export**.
 2. *Művelet:* Válassz **platform-presetet** (TikTok/Reels/Shorts/YouTube/Instagram) vagy állíts felbontást/FPS-t/minőséget/kodeket; a **Haladó** alatt bitráta (CRF/VBR/CBR), GOP, 8/10-bit, színtér (Rec.709/2020/HDR), audio. Majd exportálj. *Hol:* **Local MP4** (ingyen, eszközön) vagy **Felhő HD/4K** `[PRO]`; **közzététel a feedbe** `[PRO]`. *Eredmény:* kész MP4 a Fotókban / a feltöltött publikus videó.
@@ -523,4 +541,8 @@ A fő UI-zónák a leckékhez:
 szabadkézi maszk/rotoszkóp, pro-audio-effektek, beat-vágás, teljes blend-készlet +
 green screen/spill + luma/alpha matte + compound/pre-compose) **+ alap MP4-export —
 minden az eszközön, ingyen.**
-**PRO = az AI-réteg, az objektum-követés, a felhő-HD-render és a cloud-tárhely — a fizetős workeren.**
+**PRO = az AI-réteg (AI-változások **előnézettel és jóváhagyással**), az objektum-követés, a felhő-HD-render és a cloud-tárhely — a fizetős workeren.**
+
+**UX = mozgásvezérelt felület:** rugós gombok és alsó lapok (lehúzással zárhatók), klip-„lift" húzáskor,
+kontextuális eszköztár-morf, egységes haptika, barátságos (kétrétegű) hibaüzenetek, és nagy kijelzőn/
+fekvőben dedikált NLE-elrendezés (rail + előnézet + dokkolt inspector + teljes idővonal).

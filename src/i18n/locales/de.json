@@ -995,6 +995,10 @@
       "planHeader": "Plan ({{count}} Schritt(e)) — prüfen, dann anwenden",
       "planPreview": "Ansehen",
       "planApproveNote": "Die KI ändert nichts, bis du auf Anwenden tippst. Der ganze Stapel ist ein rückgängig machbarer Schritt.",
+      "previewAll": "Vorschau",
+      "previewingNote": "In der Vorschau angewendet — sieh es dir an, dann behalten oder verwerfen.",
+      "keepChanges": "Behalten",
+      "revert": "Rückgängig",
       "plan": {
         "update": "Clip ändern",
         "remove": "Clip entfernen",

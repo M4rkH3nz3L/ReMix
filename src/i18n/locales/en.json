@@ -995,6 +995,10 @@
       "planHeader": "Plan ({{count}} step(s)) — review, then approve",
       "planPreview": "Preview",
       "planApproveNote": "The AI changes nothing until you tap Apply. The whole batch is a single undoable step.",
+      "previewAll": "Preview",
+      "previewingNote": "Applied in the preview — take a look, then keep or revert.",
+      "keepChanges": "Keep changes",
+      "revert": "Revert",
       "plan": {
         "update": "Update clip",
         "remove": "Remove clip",

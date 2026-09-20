@@ -16,6 +16,7 @@ import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import { describeAiPlan } from '@/lib/aiPlan';
 import type { AiPlanItem } from '@/lib/aiPlan';
+import { haptics } from '@/design';
 import {
   applyBrandCaptions,
   buildWatermarkClip,
@@ -89,6 +90,9 @@ export function AssistantPanel() {
     null
   );
   const [applied, setApplied] = useState<string | null>(null);
+  // 🤖 before/after preview: az AI-köteg ideiglenesen alkalmazva, megtekintésre
+  const [previewing, setPreviewing] = useState(false);
+  const [previewCount, setPreviewCount] = useState(0);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [intro, setIntro] = useState<IntroTemplate | null>(null);
   const [outro, setOutro] = useState<OutroTemplate | null>(null);
@@ -1465,6 +1469,39 @@ export function AssistantPanel() {
     );
   };
 
+  /**
+   * 🤖 Before/after preview: az AI-köteget IDEIGLENESEN alkalmazzuk, hogy a
+   * felhasználó a preview-felületen lássa a VALÓDI eredményt, majd megtarthatja
+   * (marad az undo-előzményben) vagy visszavonhatja. A köteg egy undo-lépés
+   * (applyBatch, #57), ezért a visszavonás egyetlen `undo()`.
+   */
+  const previewAll = () => {
+    if (!reply) {
+      return;
+    }
+    const commands = toEditorCommands(reply.commands, reply.message);
+    const ok = useEditorStore.getState().applyBatch(commands, 'ai');
+    if (ok > 0) {
+      setPreviewCount(ok);
+      setPreviewing(true);
+      haptics.selection();
+    } else {
+      setApplied(t('panels.assistant.noApplicableCommand'));
+    }
+  };
+  const keepPreview = () => {
+    setPreviewing(false);
+    setReply(null);
+    setInstruction('');
+    setApplied(t('panels.assistant.commandsApplied', { count: previewCount }));
+    haptics.success();
+  };
+  const revertPreview = () => {
+    useEditorStore.getState().undo();
+    setPreviewing(false);
+    haptics.selection();
+  };
+
   // AI Command Bar (P0‑1): a leggyakoribb power-parancsok egy sorban —
   // determinisztikus eszközök és AI-promptok vegyesen, egy koppintásra
   const commandBar: { label: string; run: () => void }[] = [
@@ -1935,15 +1972,40 @@ export function AssistantPanel() {
                   ) : null}
                 </View>
               ))}
-              <PrimaryButton
-                icon="checkmark"
-                label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
-                onPress={apply}
-              />
-              <Text style={styles.note}>{t('panels.assistant.planApproveNote')}</Text>
+              {previewing ? (
+                <>
+                  <Text style={styles.note}>{t('panels.assistant.previewingNote')}</Text>
+                  <PrimaryButton
+                    icon="checkmark"
+                    label={t('panels.assistant.keepChanges')}
+                    onPress={keepPreview}
+                  />
+                  <Chip
+                    label={t('panels.assistant.revert')}
+                    active={false}
+                    onPress={revertPreview}
+                  />
+                </>
+              ) : (
+                <>
+                  <Chip
+                    label={t('panels.assistant.previewAll')}
+                    active={false}
+                    onPress={previewAll}
+                  />
+                  <PrimaryButton
+                    icon="checkmark"
+                    label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
+                    onPress={apply}
+                  />
+                  <Text style={styles.note}>{t('panels.assistant.planApproveNote')}</Text>
+                </>
+              )}
             </>
           ) : null}
-          <Chip label={t('panels.assistant.discard')} active={false} onPress={() => setReply(null)} />
+          {previewing ? null : (
+            <Chip label={t('panels.assistant.discard')} active={false} onPress={() => setReply(null)} />
+          )}
         </PanelSection>
       ) : null}
 

@@ -133,8 +133,17 @@ export default function FeedScreen() {
 
   const load = useCallback((m: FeedMode) => {
     listFeed(m)
-      .then(setPosts)
-      .catch(() => setPosts([]))
+      .then((list) => {
+        setPosts(list);
+        // ⚡ az első elem AZONNAL aktív legyen — különben a lista „rajtra marad":
+        // az első videó a viewability-eseményig nem indul be. Érvényes meglévő
+        // aktívat megtartunk (frissítés/patch után ne ugorjon vissza az elejére).
+        setActiveId((prev) => (prev && list.some((p) => p.id === prev) ? prev : (list[0]?.id ?? null)));
+      })
+      .catch(() => {
+        setPosts([]);
+        setActiveId(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 

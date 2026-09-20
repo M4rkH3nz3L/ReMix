@@ -53,6 +53,10 @@
     "skip": "Kihagyás",
     "done": "Kész",
     "stepCounter": "{{current}}/{{total}}",
+    "menuTitle": "Bemutatók",
+    "levelBeginner": "Kezdő",
+    "levelAdvanced": "Haladó",
+    "levelPro": "Pro",
     "lessons": {
       "basics": {
         "title": "Első lépések",

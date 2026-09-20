@@ -53,6 +53,10 @@
     "skip": "Skip",
     "done": "Done",
     "stepCounter": "{{current}}/{{total}}",
+    "menuTitle": "Tutorials",
+    "levelBeginner": "Beginner",
+    "levelAdvanced": "Advanced",
+    "levelPro": "Pro",
     "lessons": {
       "basics": {
         "title": "First steps",

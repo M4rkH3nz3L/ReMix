@@ -23,7 +23,11 @@ interface TutorialState {
   stepIndex: number;
   completed: string[];
   hydrated: boolean;
+  /** a lecke-választó (TutorialMenu) látható-e */
+  menuVisible: boolean;
   targets: Record<string, () => Promise<Rect | null>>;
+  openMenu: () => void;
+  closeMenu: () => void;
   start: (lessonId: string) => void;
   next: () => void;
   prev: () => void;
@@ -44,13 +48,18 @@ export const useTutorial = create<TutorialState>((set, get) => ({
   stepIndex: 0,
   completed: [],
   hydrated: false,
+  menuVisible: false,
   targets: {},
+
+  openMenu: () => set({ menuVisible: true }),
+  closeMenu: () => set({ menuVisible: false }),
 
   start: (lessonId) => {
     if (!getLesson(lessonId)) {
       return;
     }
-    set({ activeLessonId: lessonId, stepIndex: 0 });
+    // a választó bezár, a lecke indul
+    set({ activeLessonId: lessonId, stepIndex: 0, menuVisible: false });
   },
 
   next: () => {

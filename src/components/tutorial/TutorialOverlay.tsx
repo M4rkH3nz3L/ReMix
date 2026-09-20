@@ -5,7 +5,7 @@ import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'r
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getLesson, type Rect, stepI18nKeys } from '@/lib/tutorial';
+import { getLesson, localize, type Rect } from '@/lib/tutorial';
 import { haptics, motion, palette, radius } from '@/design';
 import { useTutorial } from '@/store/tutorialStore';
 
@@ -30,7 +30,8 @@ export function TutorialOverlay() {
   const next = useTutorial((s) => s.next);
   const prev = useTutorial((s) => s.prev);
   const stop = useTutorial((s) => s.stop);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [rect, setRect] = useState<Rect | null>(null);
@@ -74,7 +75,6 @@ export function TutorialOverlay() {
 
   const total = lesson.steps.length;
   const isLast = stepIndex >= total - 1;
-  const keys = stepI18nKeys(lesson.id, step);
 
   const goNext = () => {
     haptics.impact();
@@ -144,7 +144,7 @@ export function TutorialOverlay() {
         >
           <View style={styles.cardHead}>
             <Text style={styles.lessonTitle} numberOfLines={1}>
-              {t(`tutorial.lessons.${lesson.id}.title`)}
+              {localize(lesson.title, lang)}
             </Text>
             <Pressable onPress={skip} hitSlop={10} accessibilityLabel={t('tutorial.skip')}>
               <Ionicons name="close" size={20} color={palette.textDim} />
@@ -156,16 +156,16 @@ export function TutorialOverlay() {
           </Text>
 
           {/* Művelet (mit tegyél) */}
-          <Text style={styles.action}>{t(keys.action)}</Text>
+          <Text style={styles.action}>{localize(step.action, lang)}</Text>
 
           {/* Hol (a kiemelt elem) */}
           <View style={styles.whereRow}>
             <Ionicons name="locate-outline" size={14} color={palette.accent} />
-            <Text style={styles.where}>{t(keys.where)}</Text>
+            <Text style={styles.where}>{localize(step.where, lang)}</Text>
           </View>
 
           {/* Eredmény (mit látsz) */}
-          <Text style={styles.result}>{t(keys.result)}</Text>
+          <Text style={styles.result}>{localize(step.result, lang)}</Text>
 
           <View style={styles.actions}>
             {stepIndex > 0 ? (

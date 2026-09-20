@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PaywallSheet } from '@/components/PaywallSheet';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
+import { TutorialMenu } from '@/components/tutorial/TutorialMenu';
 import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
@@ -145,8 +146,9 @@ export default function RootLayout() {
         <PaywallSheet />
         {/* futó hosszú műveletek: mit csinál · hol tart · mennyi van hátra */}
         <ProgressOverlay />
-        {/* 🎓 interaktív felület-vezető (spotlight + coach-kártya) */}
+        {/* 🎓 interaktív felület-vezető (spotlight + coach-kártya) + lecke-választó */}
         <TutorialOverlay />
+        <TutorialMenu />
       </ErrorBoundary>
     </GestureHandlerRootView>
   );

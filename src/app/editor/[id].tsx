@@ -402,7 +402,7 @@ export default function EditorScreen() {
       <View style={styles.headerActions}>
         {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
         <Pressable
-          onPress={() => useTutorial.getState().start('basics')}
+          onPress={() => useTutorial.getState().openMenu()}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t('tutorial.launch')}

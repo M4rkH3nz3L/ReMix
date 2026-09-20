@@ -442,8 +442,12 @@ export function Timeline() {
         setZoom(next);
       }
     })
-    .onEnd((e) => {
-      setZoom(zoomStart.current * e.scale);
+    .onEnd((e, success) => {
+      // csak SIKERES gesztusnál commitolunk — megszakított/elbukott pinch ne
+      // ugrasson egy nem szándékos zoomra (az onEnd success=false-szal is fut)
+      if (success) {
+        setZoom(zoomStart.current * e.scale);
+      }
     })
     .runOnJS(true);
 
@@ -490,7 +494,11 @@ export function Timeline() {
   const clipWin = virtualize
     ? (clipWindow ?? windowFor(lastScrollX.current, viewportW, OVERSCAN_FACTOR))
     : null;
-  const clipVisible = (c: { start: number; duration: number }) => clipInWindow(c, clipWin, pps);
+  // a kijelölt (és így a húzott) klipeket MINDIG rendereljük, akkor is, ha kigörögtek
+  // a virtualizációs ablakból — különben eltűnnének a trim-fogantyúk / megszakadna a
+  // folyó gesztus. (Kevés kijelölt klip van, a windowing haszna megmarad.)
+  const clipVisible = (c: { id: string; start: number; duration: number }) =>
+    clipInWindow(c, clipWin, pps) || c.id === selectedClipId || multiSelectIds.includes(c.id);
 
   // 🖥️ tablet/széles kijelző: fix fejléc-oszlop ikon+címkével a sávok elején;
   // a görgethető terület a saját szélességét méri, a scroll-matek változatlan.

@@ -38,29 +38,35 @@ export function TutorialOverlay() {
   const lesson = activeLessonId ? getLesson(activeLessonId) : null;
   const step = lesson?.steps[stepIndex] ?? null;
   const targetId = step?.target;
+  // a lépés targetjének mérő-fn-jére FELIRATKOZUNK: ha a target KÉSŐBB regisztrál
+  // (pl. a gomb csak a kijelölés megszűnte után mountol), az effekt újrafut és mér —
+  // nem marad némán spotlight nélkül.
+  const measureFn = useTutorial((s) => (targetId ? s.targets[targetId] : undefined));
 
-  // a target lemérése (spotlight) — a setState mindig async (timeout/then),
-  // hogy a layout kész legyen és ne fusson szinkron setState az effektben
+  // a target lemérése (spotlight). A mérés késleltetve (layout kész legyen), a
+  // setState async. A régi kiemelést AZONNAL töröljük, hogy lépésváltáskor ne
+  // villanjon a spotlight a KORÁBBI elemre a friss mérés megérkeztéig.
   useEffect(() => {
     let alive = true;
-    const measure = targetId ? useTutorial.getState().targets[targetId] : undefined;
-    if (!measure) {
-      const id = setTimeout(() => alive && setRect(null), 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRect(null);
+    if (!measureFn) {
       return () => {
         alive = false;
-        clearTimeout(id);
       };
     }
     const id = setTimeout(() => {
-      measure()
-        .then((r) => alive && setRect(r))
-        .catch(() => alive && setRect(null));
+      measureFn()
+        .then((r) => {
+          if (alive) setRect(r);
+        })
+        .catch(() => {});
     }, 60);
     return () => {
       alive = false;
       clearTimeout(id);
     };
-  }, [targetId, stepIndex, activeLessonId]);
+  }, [measureFn, stepIndex, activeLessonId]);
 
   if (!lesson || !step) {
     return null;

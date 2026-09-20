@@ -1,9 +1,9 @@
 import { haptics, motion } from '@/design';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
@@ -349,18 +349,25 @@ export function Toolbar() {
     setPanel(activePanel === panel ? null : panel);
   };
 
+  // kontextuális toolbar cross-fade REMOUNT NÉLKÜL: a tool-készlet váltásakor
+  // (idle↔kijelölés / más klip-fajta) csak az OPACITY pulzál — így a vízszintes
+  // görgetés pozíciója NEM ugrik vissza 0-ra (a keyed remount okozta regresszió).
+  const toolFade = useSharedValue(1);
+  const toolSig = selected ? `${selected.kind}${multiSelectMode ? '-m' : ''}` : 'idle';
+  useEffect(() => {
+    toolFade.value = 0;
+    toolFade.value = withTiming(1, { duration: motion.duration.fast });
+  }, [toolSig, toolFade]);
+  const toolRowStyle = useAnimatedStyle(() => ({ opacity: toolFade.value }));
+
   return (
     <View style={styles.container}>
       {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
       <SelectionInfo />
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {/* kontextuális toolbar: a tool-KÉSZLET váltásakor (idle↔kijelölés, más
-            klip-fajta) a tartalom finoman átúszik — „morph, nem csere" */}
-        <Animated.View
-          key={selected ? `sel-${selected.kind}${multiSelectMode ? '-m' : ''}` : 'idle'}
-          entering={FadeIn.duration(motion.duration.fast)}
-          style={styles.toolRow}
-        >
+        {/* kontextuális toolbar: a tool-KÉSZLET váltásakor a tartalom átúszik
+            (opacity cross-fade), de a sor NEM remountol → a scroll-pozíció marad */}
+        <Animated.View style={[styles.toolRow, toolRowStyle]}>
         {selected ? (
           <>
             <ToolButton icon="close-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />

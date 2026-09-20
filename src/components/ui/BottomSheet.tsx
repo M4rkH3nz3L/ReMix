@@ -66,6 +66,9 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const [rendered, setRendered] = useState(visible);
   const firstRun = useRef(true);
+  // a belépő rugót csak az első layout (valós magasság) után indítjuk, hogy a
+  // rövid lap ne a túlbecsült fallback-magasságból „ugorjon" fel
+  const measured = useRef(false);
 
   // progress: 0 = zárt (lecsúszva) … 1 = nyitott. Ez az EGYETLEN mozgás-driver.
   const progress = useSharedValue(visible ? 1 : 0);
@@ -82,7 +85,11 @@ export function BottomSheet({
       // nem ciklizál (rendered váltása nem futtatja újra az effektet).
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRendered(true);
-      progress.value = withSpring(1, motion.spring.smooth);
+      // ha már mértünk (nem az első nyitás), rögtön rugózunk; különben az onLayout
+      // indítja a belépő rugót a VALÓS magassággal (lásd onSheetLayout)
+      if (measured.current) {
+        progress.value = withSpring(1, motion.spring.smooth);
+      }
     } else {
       progress.value = withTiming(0, motion.timing.exit, (finished) => {
         if (finished) runOnJS(setRendered)(false);
@@ -94,7 +101,17 @@ export function BottomSheet({
 
   const onSheetLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
-    if (h > 0) sheetH.value = h;
+    if (h <= 0) {
+      return;
+    }
+    sheetH.value = h;
+    // első mérés nyitáskor → innen indul a belépő rugó a valós magasságból
+    if (!measured.current) {
+      measured.current = true;
+      if (visible) {
+        progress.value = withSpring(1, motion.spring.smooth);
+      }
+    }
   };
 
   const pan = Gesture.Pan()
@@ -104,7 +121,14 @@ export function BottomSheet({
     })
     .onEnd((e) => {
       if (e.translationY > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY) {
-        progress.value = withTiming(0, motion.timing.exit);
+        // ÖNMAGÁT unmountolja a kilépő animáció végén — nem függ attól, hogy a szülő
+        // flippeli-e a `visible`-t (különben láthatatlanul mountolva maradna és
+        // elnyelné az érintéseket az egész képernyőn)
+        progress.value = withTiming(0, motion.timing.exit, (finished) => {
+          if (finished) {
+            runOnJS(setRendered)(false);
+          }
+        });
         runOnJS(haptics.snap)();
         runOnJS(onClose)();
       } else {

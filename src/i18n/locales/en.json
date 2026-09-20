@@ -46,6 +46,43 @@
     "unknown": "Something went wrong. Your project is safe.",
     "retry": "Retry"
   },
+  "tutorial": {
+    "launch": "Interactive tour",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip",
+    "done": "Done",
+    "stepCounter": "{{current}}/{{total}}",
+    "lessons": {
+      "basics": {
+        "title": "First steps",
+        "s1_action": "Add a video to your project.",
+        "s1_where": "Toolbar → Video",
+        "s1_result": "The clip appears on the video track with a filmstrip preview.",
+        "s2_action": "Start playback, then pause.",
+        "s2_where": "Play/pause button (K)",
+        "s2_result": "The preview plays from the playhead; the head stays centered.",
+        "s3_action": "Move the playhead and zoom the timeline.",
+        "s3_where": "Timeline — drag/scroll; pinch with two fingers to zoom",
+        "s3_result": "Content moves under the head; the scale ranges 0.2×–4×.",
+        "s4_action": "Tap a clip to select it.",
+        "s4_where": "Timeline — tap the clip",
+        "s4_result": "A frame + trim handles appear, and the toolbar switches to the clip's tools."
+      },
+      "aiPreview": {
+        "title": "Preview AI changes",
+        "s1_action": "Open the AI assistant and ask for an edit.",
+        "s1_where": "Toolbar → AI",
+        "s1_result": "A change list appears — the AI hasn't modified anything yet.",
+        "s2_action": "See the result live with the Preview button.",
+        "s2_where": "AI panel → Preview",
+        "s2_result": "The editor applies the changes temporarily — you see the actual result.",
+        "s3_action": "Decide: keep or revert.",
+        "s3_where": "Keep / Revert",
+        "s3_result": "It only becomes permanent once you approve; Revert restores in one step."
+      }
+    }
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",

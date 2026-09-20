@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PaywallSheet } from '@/components/PaywallSheet';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
+import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
@@ -20,6 +21,7 @@ import {
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useNotifications } from '@/store/notificationStore';
+import { useTutorial } from '@/store/tutorialStore';
 
 /** Deep-link cél megnyitása egy notification koppintásából (best-effort). */
 function openNotificationRoute(route: string) {
@@ -41,6 +43,8 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrateAuth();
     void hydrateEntitlement();
+    // 🎓 befejezett tutorial-leckék betöltése
+    void useTutorial.getState().hydrate();
     // 🌍 mentett nyelvválasztás betöltése (a felismert eszköz-nyelv fölé)
     void hydrateLanguage();
   }, [hydrateAuth, hydrateEntitlement]);
@@ -141,6 +145,8 @@ export default function RootLayout() {
         <PaywallSheet />
         {/* futó hosszú műveletek: mit csinál · hol tart · mennyi van hátra */}
         <ProgressOverlay />
+        {/* 🎓 interaktív felület-vezető (spotlight + coach-kártya) */}
+        <TutorialOverlay />
       </ErrorBoundary>
     </GestureHandlerRootView>
   );

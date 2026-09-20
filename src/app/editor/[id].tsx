@@ -34,6 +34,7 @@ import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/vi
 import type { MissingMedia } from '@/lib/videdFile';
 import { indexProjectVision } from '@/lib/visionSearch';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
+import { useTutorial } from '@/store/tutorialStore';
 
 const AUTOSAVE_MS = 800;
 
@@ -343,6 +344,15 @@ export default function EditorScreen() {
         ) : null}
       </View>
       <View style={styles.headerActions}>
+        {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
+        <Pressable
+          onPress={() => useTutorial.getState().start('basics')}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('tutorial.launch')}
+        >
+          <Ionicons name="help-circle-outline" size={22} color={palette.textDim} />
+        </Pressable>
         <Pressable
           onPress={() =>
             router.push(`/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`)

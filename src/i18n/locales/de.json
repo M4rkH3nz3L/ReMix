@@ -46,6 +46,43 @@
     "unknown": "Etwas ist schiefgelaufen. Dein Projekt ist sicher.",
     "retry": "Erneut"
   },
+  "tutorial": {
+    "launch": "Interaktive Tour",
+    "next": "Weiter",
+    "back": "Zurück",
+    "skip": "Überspringen",
+    "done": "Fertig",
+    "stepCounter": "{{current}}/{{total}}",
+    "lessons": {
+      "basics": {
+        "title": "Erste Schritte",
+        "s1_action": "Füge ein Video zum Projekt hinzu.",
+        "s1_where": "Werkzeugleiste → Video",
+        "s1_result": "Der Clip erscheint auf der Videospur mit Filmstreifen-Vorschau.",
+        "s2_action": "Starte die Wiedergabe und pausiere dann.",
+        "s2_where": "Wiedergabe/Pause-Taste (K)",
+        "s2_result": "Die Vorschau spielt ab dem Abspielkopf; der Kopf bleibt mittig.",
+        "s3_action": "Bewege den Abspielkopf und zoome die Timeline.",
+        "s3_where": "Timeline — ziehen/scrollen; mit zwei Fingern zoomen",
+        "s3_result": "Der Inhalt bewegt sich unter dem Kopf; Maßstab 0,2×–4×.",
+        "s4_action": "Tippe auf einen Clip, um ihn auszuwählen.",
+        "s4_where": "Timeline — tippe auf den Clip",
+        "s4_result": "Rahmen + Trim-Griffe erscheinen, und die Werkzeugleiste wechselt zu den Clip-Werkzeugen."
+      },
+      "aiPreview": {
+        "title": "KI-Änderungen in der Vorschau",
+        "s1_action": "Öffne den KI-Assistenten und fordere eine Änderung an.",
+        "s1_where": "Werkzeugleiste → AI",
+        "s1_result": "Eine Änderungsliste erscheint — die KI hat noch nichts geändert.",
+        "s2_action": "Sieh das Ergebnis live mit der Vorschau-Taste.",
+        "s2_where": "KI-Panel → Vorschau",
+        "s2_result": "Der Editor wendet die Änderungen vorübergehend an — du siehst das echte Ergebnis.",
+        "s3_action": "Entscheide: behalten oder verwerfen.",
+        "s3_where": "Behalten / Rückgängig",
+        "s3_result": "Es wird erst nach deiner Bestätigung dauerhaft; Rückgängig stellt in einem Schritt wieder her."
+      }
+    }
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",

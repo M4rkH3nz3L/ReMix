@@ -10,6 +10,7 @@ import { StoryLane } from '@/components/editor/StoryLane';
 import { TimelineClip } from '@/components/editor/TimelineClip';
 import { TimelineMinimap } from '@/components/editor/TimelineMinimap';
 import { nextMarkerColor } from '@/components/editor/TransportBar';
+import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import {
   BASE_PX_PER_SEC,
   palette,
@@ -497,7 +498,7 @@ export function Timeline() {
   const showHeaders = L.editor.trackHeaderWidth > 0;
 
   return (
-    <View>
+    <TutorialTarget id="timeline">
       {/* 🔎 insight-sáv: egyszerre EGY nézet (story / minimap / pacing) — kevés chrome */}
       <View style={styles.insightTabs}>
         {(['story', 'map', 'pacing'] as const).map((k) => (
@@ -559,33 +560,36 @@ export function Timeline() {
         >
           <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>O</Text>
         </Pressable>
-        {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
-        <Pressable
-          onPress={cycleSnapStrength}
-          onLongPress={openSnapMenu}
-          hitSlop={4}
-          style={styles.snapBtn}
-          accessibilityLabel={t('editor.snap.label')}
-        >
-          <Ionicons
-            name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
-            size={12}
-            color={snapStrength === 'off' ? palette.textDim : palette.accent2}
-          />
-          <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
-            {t('editor.snap.' + snapStrength)}
-          </Text>
-        </Pressable>
-        {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
-        <Pressable
-          onPress={addRegion}
-          hitSlop={4}
-          style={styles.regionAddBtn}
-          accessibilityLabel={t('editor.regions.add')}
-        >
-          <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
-          <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
-        </Pressable>
+        {/* 🧲 illesztés + 🏷️ régió — MINDIG egy sorban (nem törhet külön a kettő) */}
+        <View style={styles.snapRegionGroup}>
+          {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
+          <Pressable
+            onPress={cycleSnapStrength}
+            onLongPress={openSnapMenu}
+            hitSlop={4}
+            style={styles.snapBtn}
+            accessibilityLabel={t('editor.snap.label')}
+          >
+            <Ionicons
+              name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
+              size={12}
+              color={snapStrength === 'off' ? palette.textDim : palette.accent2}
+            />
+            <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
+              {t('editor.snap.' + snapStrength)}
+            </Text>
+          </Pressable>
+          {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
+          <Pressable
+            onPress={addRegion}
+            hitSlop={4}
+            style={styles.regionAddBtn}
+            accessibilityLabel={t('editor.regions.add')}
+          >
+            <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
+            <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
+          </Pressable>
+        </View>
       </View>
       {insightLane === 'story' ? (
         <StoryLane />
@@ -950,7 +954,7 @@ export function Timeline() {
         </View>
       </View>
       </GestureDetector>
-    </View>
+    </TutorialTarget>
   );
 }
 
@@ -1068,18 +1072,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginLeft: 'auto',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: palette.border,
   },
+  // 🧲+🏷️ illesztés és régió EGY sorban tartva — a csoport egyben tördel (soha nem
+  // válik szét két sorba). A jobbra-tolást a trim gomb `marginLeft: auto`-ja intézi;
+  // itt NINCS második auto-margó (az okozta korábban a két sorba csúszást).
+  snapRegionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   regionAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginLeft: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,

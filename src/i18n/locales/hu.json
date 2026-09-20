@@ -46,6 +46,43 @@
     "unknown": "Valami hiba történt. A projekted biztonságban van.",
     "retry": "Újra"
   },
+  "tutorial": {
+    "launch": "Interaktív bemutató",
+    "next": "Tovább",
+    "back": "Vissza",
+    "skip": "Kihagyás",
+    "done": "Kész",
+    "stepCounter": "{{current}}/{{total}}",
+    "lessons": {
+      "basics": {
+        "title": "Első lépések",
+        "s1_action": "Adj hozzá egy videót a projekthez.",
+        "s1_where": "Eszköztár → Videó",
+        "s1_result": "A klip megjelenik a videó-sávon, filmstrip-előnézettel.",
+        "s2_action": "Indítsd el a lejátszást, majd állítsd meg.",
+        "s2_where": "Lejátszás/szünet gomb (K)",
+        "s2_result": "Az előnézet a lejátszófejtől játszik; a fej középen áll.",
+        "s3_action": "Léptesd a lejátszófejet és nagyíts az idővonalon.",
+        "s3_where": "Idővonal — húzd/görgesd; kétujjas csippentés a zoomhoz",
+        "s3_result": "A tartalom a fej alatt mozog; a lépték 0,2×–4× között vált.",
+        "s4_action": "Koppints egy klipre a kijelöléshez.",
+        "s4_where": "Idővonal — koppints a klipre",
+        "s4_result": "Keret + trim-fogantyúk jelennek meg, és az eszköztár a klip eszközeire vált."
+      },
+      "aiPreview": {
+        "title": "AI-változások előnézete",
+        "s1_action": "Nyisd meg az AI-asszisztenst és kérj egy módosítást.",
+        "s1_where": "Eszköztár → AI",
+        "s1_result": "Megjelenik a változás-lista — az AI még semmit nem módosít.",
+        "s2_action": "Nézd meg az eredményt élőben az Előnézet gombbal.",
+        "s2_where": "AI-panel → Előnézet",
+        "s2_result": "A szerkesztő ideiglenesen alkalmazza a változásokat — látod a végeredményt.",
+        "s3_action": "Döntsd el: tartsd meg vagy vond vissza.",
+        "s3_where": "Megtartás / Visszavonás",
+        "s3_result": "Csak jóváhagyás után módosul véglegesen; a Visszavonás egy lépésben visszaáll."
+      }
+    }
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",

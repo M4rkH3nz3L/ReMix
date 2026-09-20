@@ -7,6 +7,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
+import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { ToolButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { captureFrame } from '@/lib/captureFrame';
@@ -578,12 +579,14 @@ export function Toolbar() {
               active={activePanel === 'workflow'}
               onPress={() => togglePanel('workflow')}
             />
-            <ToolButton
-              icon="sparkles-outline"
-              label="AI"
-              active={activePanel === 'assistant'}
-              onPress={() => togglePanel('assistant')}
-            />
+            <TutorialTarget id="toolbar.ai">
+              <ToolButton
+                icon="sparkles-outline"
+                label="AI"
+                active={activePanel === 'assistant'}
+                onPress={() => togglePanel('assistant')}
+              />
+            </TutorialTarget>
             <ToolButton
               icon="bookmarks-outline"
               label={t('editor.toolbar.creatorPreset')}
@@ -591,7 +594,9 @@ export function Toolbar() {
               onPress={() => togglePanel('creatorPreset')}
             />
             <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
-            <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
+            <TutorialTarget id="toolbar.addVideo">
+              <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
+            </TutorialTarget>
             <ToolButton icon="albums-outline" label="PiP" onPress={addPip} />
             <ToolButton
               icon="videocam-outline"

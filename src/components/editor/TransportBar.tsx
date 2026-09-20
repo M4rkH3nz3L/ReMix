@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DetailPreview } from '@/components/editor/DetailPreview';
 import { HistoryModal } from '@/components/editor/HistoryModal';
+import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { accentGradient, palette } from '@/constants/editor';
 import { formatTimecode, frameDuration, projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -163,48 +164,54 @@ export function TransportBar() {
       </Pressable>
 
       <View style={styles.center}>
-        <Pressable onPress={() => setPlayhead(0)} hitSlop={6}>
-          <Ionicons name="play-skip-back" size={16} color={palette.text} />
-        </Pressable>
-        {/* ⏭️ képkocka-pontos léptetés (a 0,1 mp-es ugrás helyett) */}
-        <Pressable onPress={() => stepFrame(-1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameBack')}>
-          <Ionicons name="play-back" size={14} color={palette.textDim} />
-        </Pressable>
-        {/* ◀ J: shuttle vissza (ismételve gyorsít) */}
-        <Pressable onPress={() => shuttle(-1)} hitSlop={6} accessibilityLabel="J">
-          <Ionicons
-            name="chevron-back"
-            size={18}
-            color={isPlaying && playbackRate < 0 ? palette.accent : palette.textDim}
-          />
-        </Pressable>
-        {/* K: lejátszás/szünet */}
-        <Pressable onPress={togglePlay} style={styles.playPressable}>
-          <LinearGradient
-            colors={[...accentGradient]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.playButton}
-          >
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={palette.text} />
-          </LinearGradient>
-        </Pressable>
-        {/* ▶ L: shuttle előre (ismételve gyorsít) */}
-        <Pressable onPress={() => shuttle(1)} hitSlop={6} accessibilityLabel="L">
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={isPlaying && playbackRate > 1 ? palette.accent : palette.textDim}
-          />
-        </Pressable>
-        <Pressable onPress={() => stepFrame(1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameFwd')}>
-          <Ionicons name="play-forward" size={14} color={palette.textDim} />
-        </Pressable>
-        <Text style={styles.time}>
+        {/* ⏱️ időkijelző a gombok FÖLÖTT (külön sorban) — így mobilon is kifér a
+            transport-gombsor, nem szorul ki / lóg össze a szomszéd ikonokkal */}
+        <Text style={styles.time} numberOfLines={1}>
           {rateLabel ? <Text style={styles.rate}>{rateLabel} </Text> : null}
           {formatTimecode(playhead, fps)}{' '}
           <Text style={styles.timeDim}>/ {formatTimecode(duration, fps)}</Text>
         </Text>
+        <View style={styles.transportRow}>
+          <Pressable onPress={() => setPlayhead(0)} hitSlop={6}>
+            <Ionicons name="play-skip-back" size={16} color={palette.text} />
+          </Pressable>
+          {/* ⏭️ képkocka-pontos léptetés (a 0,1 mp-es ugrás helyett) */}
+          <Pressable onPress={() => stepFrame(-1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameBack')}>
+            <Ionicons name="play-back" size={14} color={palette.textDim} />
+          </Pressable>
+          {/* ◀ J: shuttle vissza (ismételve gyorsít) */}
+          <Pressable onPress={() => shuttle(-1)} hitSlop={6} accessibilityLabel="J">
+            <Ionicons
+              name="chevron-back"
+              size={18}
+              color={isPlaying && playbackRate < 0 ? palette.accent : palette.textDim}
+            />
+          </Pressable>
+          {/* K: lejátszás/szünet */}
+          <TutorialTarget id="transport.playPause">
+            <Pressable onPress={togglePlay} style={styles.playPressable}>
+              <LinearGradient
+                colors={[...accentGradient]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.playButton}
+              >
+                <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={palette.text} />
+              </LinearGradient>
+            </Pressable>
+          </TutorialTarget>
+          {/* ▶ L: shuttle előre (ismételve gyorsít) */}
+          <Pressable onPress={() => shuttle(1)} hitSlop={6} accessibilityLabel="L">
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={isPlaying && playbackRate > 1 ? palette.accent : palette.textDim}
+            />
+          </Pressable>
+          <Pressable onPress={() => stepFrame(1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameFwd')}>
+            <Ionicons name="play-forward" size={14} color={palette.textDim} />
+          </Pressable>
+        </View>
       </View>
 
       {/* 🔖 szerkezeti jelölő a lejátszófejnél */}
@@ -247,10 +254,15 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   center: {
+    // OSZLOP: felül az idő, alatta a transport-gombsor (mobilon így kifér)
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
+  },
+  transportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
   },
   rate: {
@@ -274,9 +286,9 @@ const styles = StyleSheet.create({
   },
   time: {
     color: palette.text,
-    fontSize: 11,
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
-    flexShrink: 1,
+    textAlign: 'center',
   },
   timeDim: {
     color: palette.textDim,

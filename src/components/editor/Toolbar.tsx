@@ -1,8 +1,9 @@
-import { haptics } from '@/design';
+import { haptics, motion } from '@/design';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
@@ -352,6 +353,13 @@ export function Toolbar() {
       {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
       <SelectionInfo />
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {/* kontextuális toolbar: a tool-KÉSZLET váltásakor (idle↔kijelölés, más
+            klip-fajta) a tartalom finoman átúszik — „morph, nem csere" */}
+        <Animated.View
+          key={selected ? `sel-${selected.kind}${multiSelectMode ? '-m' : ''}` : 'idle'}
+          entering={FadeIn.duration(motion.duration.fast)}
+          style={styles.toolRow}
+        >
         {selected ? (
           <>
             <ToolButton icon="close-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
@@ -639,6 +647,7 @@ export function Toolbar() {
             />
           </>
         )}
+        </Animated.View>
       </ScrollView>
       <CameraRecorder visible={showCamera} onClose={() => setShowCamera(false)} />
     </View>
@@ -651,5 +660,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingVertical: 4,
+  },
+  // a vízszintes görgetősor egyetlen animált tartalom-doboza (fade a váltáskor)
+  toolRow: {
+    flexDirection: 'row',
   },
 });

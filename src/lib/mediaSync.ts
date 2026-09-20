@@ -2,9 +2,8 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { reachableMediaUrl } from '@/lib/mediaUrl';
-import { relinkUri } from '@/lib/projectUtils';
 import { uploadMedia } from '@/lib/render';
-import { findMissingMedia, type MissingMedia } from '@/lib/videdFile';
+import { findMissingMedia, type RelinkPair } from '@/lib/videdFile';
 import type { Asset, Project } from '@/types/project';
 
 /**
@@ -39,7 +38,9 @@ export function needsBackup(asset: Asset, known: Record<string, string>): boolea
   if (asset.remoteUrl || known[asset.uri]) {
     return false;
   }
-  return asset.provider === 'local' || asset.provider === 'library';
+  // Bármely HELYI fájl (nem-http uri) mentendő — a `remote` provider is, ha a
+  // háttere letöltött file:// (a streamelhető http-t a fenti guard már kizárta).
+  return asset.provider === 'local' || asset.provider === 'library' || asset.provider === 'remote';
 }
 
 function fileExists(uri: string): boolean {
@@ -94,21 +95,26 @@ export async function backupProjectMedia(
 }
 
 /**
- * A hiányzó (helyileg nem elérhető) médiafájlok automatikus visszaállítása a
- * szerver-másolatból: letölti a `remoteUrl`-t egy determinisztikus cache-fájlba
- * és relinkeli a projektet. A `remoteByUri` a felhő-projektből származó
- * uri→remoteUrl térkép — ha a helyi assetnek magának nincs `remoteUrl`-je.
+ * A hiányzó (helyileg nem elérhető) médiafájlok letöltése a szerver-másolatból egy
+ * determinisztikus cache-fájlba, és a `oldUri→newUri` relink-PÁROK visszaadása.
+ *
+ * FONTOS: NEM alkalmazza magát a relinket a projektre — a párokat a HÍVÓ a
+ * command-buson (`RELINK_URI` dispatch) viszi a JELENLEGI store-projektre, hogy a
+ * több másodperces letöltés alatt tett szerkesztések ne vesszenek el, és az
+ * undo/playhead ne nullázódjon (nem `loadProject`). A `remoteByUri` a felhő-
+ * projekt-másolatból származó uri→remoteUrl térkép, ha a helyi assetnek nincs
+ * `remoteUrl`-je.
  */
 export async function restoreMissingMedia(
   project: Project,
   remoteByUri: Record<string, string> = {}
-): Promise<{ project: Project; restored: number; missing: MissingMedia[] }> {
+): Promise<{ pairs: RelinkPair[] }> {
   if (Platform.OS === 'web') {
-    return { project, restored: 0, missing: [] };
+    return { pairs: [] };
   }
   const missing = findMissingMedia(project);
   if (missing.length === 0) {
-    return { project, restored: 0, missing };
+    return { pairs: [] };
   }
   let dir: Directory;
   try {
@@ -117,10 +123,9 @@ export async function restoreMissingMedia(
       dir.create({ intermediates: true });
     }
   } catch {
-    return { project, restored: 0, missing };
+    return { pairs: [] };
   }
-  let next = project;
-  let restored = 0;
+  const pairs: RelinkPair[] = [];
   for (const m of missing) {
     const asset = project.assets.find((a) => a.uri === m.uri);
     const url = reachableMediaUrl(asset?.remoteUrl ?? remoteByUri[m.uri] ?? null);
@@ -131,14 +136,24 @@ export async function restoreMissingMedia(
     const base = url.split('?')[0].split('/').pop() || `${m.kind}-${asset?.id ?? 'media'}`;
     const target = new File(dir, base);
     try {
-      if (!target.exists) {
+      // A downloadFileAsync ATOMIKUS (temp → move CSAK siker után), így megszakadt
+      // letöltés NEM hagy csonka fájlt a cél-néven. A 0-bájtos cache-t (pl. hibás
+      // szerver-válasz) újratöltjük, és üres eredményt NEM relinkelünk.
+      if (!target.exists || (target.size ?? 0) === 0) {
         await File.downloadFileAsync(url, target);
       }
-      next = relinkUri(next, m.uri, target.uri);
-      restored += 1;
+      if ((target.size ?? 0) === 0) {
+        try {
+          target.delete();
+        } catch {
+          // takarítás best-effort
+        }
+        continue;
+      }
+      pairs.push({ oldUri: m.uri, newUri: target.uri });
     } catch {
       // egy fájl bukása nem állítja meg a többi visszaállítását
     }
   }
-  return { project: next, restored, missing: findMissingMedia(next) };
+  return { pairs };
 }

@@ -32,8 +32,11 @@ describe('needsBackup', () => {
       false
     );
   });
-  it('http-forrás / remote provider → nem kell (már a szerveren van)', () => {
+  it('http-forrás → nem kell (streamelhető, már a szerveren)', () => {
     expect(needsBackup(asset({ uri: 'https://cdn/x.mp4' }), {})).toBe(false);
-    expect(needsBackup(asset({ provider: 'remote' }), {})).toBe(false);
+    expect(needsBackup(asset({ provider: 'remote', uri: 'https://cdn/x.mp4' }), {})).toBe(false);
+  });
+  it('remote-provider DE helyi file:// uri → KELL (letöltött másolat, mentendő)', () => {
+    expect(needsBackup(asset({ provider: 'remote', uri: 'file:///dl.mp4' }), {})).toBe(true);
   });
 });

@@ -142,15 +142,27 @@ export default function EditorScreen() {
               remoteByUri = mediaRemoteMap(cloud);
             }
           }
-          const res = await restoreMissingMedia(proj, remoteByUri);
+          const { pairs } = await restoreMissingMedia(proj, remoteByUri);
           if (!alive) {
             return;
           }
-          if (res.restored > 0) {
-            useEditorStore.getState().loadProject(res.project, events);
-            saveProject(res.project).catch(() => {});
+          const store = useEditorStore.getState();
+          // csak akkor relinkelünk, ha MÉG ez a projekt van betöltve (a user nem
+          // váltott a több másodperces letöltés alatt)
+          if (store.project?.id !== proj.id) {
+            return;
           }
-          setMissingMedia(res.missing);
+          // a relinket a COMMAND BUSON visszük a JELENLEGI projektre (egy undo-lépés):
+          // így a letöltés alatt tett szerkesztések + az undo-előzmény/playhead
+          // MEGMARADNAK — NEM full-reload (loadProject), ami mindezt nullázná.
+          if (pairs.length > 0) {
+            store.applyBatch(
+              pairs.map((p) => ({ type: 'RELINK_URI' as const, oldUri: p.oldUri, newUri: p.newUri })),
+              'system'
+            );
+            saveProject(useEditorStore.getState().project!).catch(() => {});
+          }
+          setMissingMedia(findMissingMedia(useEditorStore.getState().project!));
         };
         if (loaded) {
           useEditorStore.getState().loadProject(loaded, events);

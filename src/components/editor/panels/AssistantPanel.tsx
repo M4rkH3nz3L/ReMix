@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { File } from 'expo-file-system';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -94,6 +94,10 @@ export function AssistantPanel() {
   // 🤖 before/after preview: az AI-köteg ideiglenesen alkalmazva, megtekintésre
   const [previewing, setPreviewing] = useState(false);
   const [previewCount, setPreviewCount] = useState(0);
+  // az undo-verem hossza a preview ELŐTT — a revert EDDIG göngyölít vissza (a köteg
+  // + a preview alatt esetleg tett szerkesztések), NEM vak undo() a user editjén
+  const previewBaseLen = useRef(0);
+  const previewingRef = useRef(false);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [intro, setIntro] = useState<IntroTemplate | null>(null);
   const [outro, setOutro] = useState<OutroTemplate | null>(null);
@@ -1477,16 +1481,18 @@ export function AssistantPanel() {
   /**
    * 🤖 Before/after preview: az AI-köteget IDEIGLENESEN alkalmazzuk, hogy a
    * felhasználó a preview-felületen lássa a VALÓDI eredményt, majd megtarthatja
-   * (marad az undo-előzményben) vagy visszavonhatja. A köteg egy undo-lépés
-   * (applyBatch, #57), ezért a visszavonás egyetlen `undo()`.
+   * (marad az undo-előzményben) vagy visszavonhatja. A revert a preview ELŐTTI
+   * undo-mélységig göngyölít vissza (lásd `revertToBase`) — nem vak `undo()`.
    */
   const previewAll = () => {
     if (!reply) {
       return;
     }
     const commands = toEditorCommands(reply.commands, reply.message);
+    const basePastLen = useEditorStore.getState().past.length;
     const ok = useEditorStore.getState().applyBatch(commands, 'ai');
     if (ok > 0) {
+      previewBaseLen.current = basePastLen;
       setPreviewCount(ok);
       setPreviewing(true);
       haptics.selection();
@@ -1501,11 +1507,37 @@ export function AssistantPanel() {
     setApplied(t('panels.assistant.commandsApplied', { count: previewCount }));
     haptics.success();
   };
+  // a projektet a preview ELŐTTI állapotra göngyölíti vissza a command-buson át
+  // (nem vak undo()): a köteget ÉS a preview alatt tett szerkesztéseket is
+  // visszavonja, így sosem a user egy random editjét törli.
+  const revertToBase = () => {
+    let guard = 0;
+    while (useEditorStore.getState().past.length > previewBaseLen.current && guard++ < 200) {
+      useEditorStore.getState().undo();
+    }
+  };
   const revertPreview = () => {
-    useEditorStore.getState().undo();
+    revertToBase();
     setPreviewing(false);
     haptics.selection();
   };
+  // a preview állapotot ref-ben is tartjuk (a unmount-cleanup olvassa)
+  useEffect(() => {
+    previewingRef.current = previewing;
+  }, [previewing]);
+  // panel-váltás / unmount PREVIEW közben → AUTO-REVERT: ne maradjon árva, csendben
+  // véglegesített ideiglenes köteg (store-only, nincs setState unmountoltan).
+  useEffect(
+    () => () => {
+      if (previewingRef.current) {
+        let guard = 0;
+        while (useEditorStore.getState().past.length > previewBaseLen.current && guard++ < 200) {
+          useEditorStore.getState().undo();
+        }
+      }
+    },
+    []
+  );
 
   // AI Command Bar (P0‑1): a leggyakoribb power-parancsok egy sorban —
   // determinisztikus eszközök és AI-promptok vegyesen, egy koppintásra

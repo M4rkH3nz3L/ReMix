@@ -25,7 +25,7 @@ import { TranscriptPanel } from '@/components/editor/panels/TranscriptPanel';
 import { TransitionPanel } from '@/components/editor/panels/TransitionPanel';
 import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
-import { motion } from '@/design';
+import { motion, radius } from '@/design';
 import { useLayout } from '@/hooks/useLayout';
 import {
   selectPanelVisible,
@@ -188,8 +188,8 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: palette.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,

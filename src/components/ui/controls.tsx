@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { accentGradient, palette } from '@/constants/editor';
+import { radius } from '@/design';
 import { useLayout } from '@/hooks/useLayout';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +27,7 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={[
         styles.chip,
         active && { backgroundColor: color ?? palette.accent, borderColor: color ?? palette.accent },
@@ -50,6 +52,7 @@ export function ColorDot({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={[
         styles.colorDot,
         { backgroundColor: color },
@@ -74,11 +77,11 @@ export function Stepper({
     <View style={styles.stepperRow}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepperControls}>
-        <Pressable onPress={onDec} style={styles.stepperButton}>
+        <Pressable onPress={onDec} hitSlop={6} style={styles.stepperButton}>
           <Ionicons name="remove" size={16} color={palette.text} />
         </Pressable>
         <Text style={styles.stepperValue}>{value}</Text>
-        <Pressable onPress={onInc} style={styles.stepperButton}>
+        <Pressable onPress={onInc} hitSlop={6} style={styles.stepperButton}>
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
       </View>
@@ -177,7 +180,7 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 7,
     backgroundColor: palette.surfaceHigh,
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     gap: 3,
-    borderRadius: 14,
+    borderRadius: radius.lg,
   },
   toolButtonActive: {
     backgroundColor: palette.accentSoft,
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryPressable: {
-    borderRadius: 14,
+    borderRadius: radius.lg,
     shadowColor: palette.accent,
     shadowOpacity: 0.45,
     shadowRadius: 12,
@@ -277,7 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     paddingVertical: 13,
     paddingHorizontal: 16,
   },

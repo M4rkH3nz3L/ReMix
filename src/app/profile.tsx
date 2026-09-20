@@ -49,6 +49,7 @@ import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { activateProDev, billingClientAvailable, deactivateProDev, restorePurchases } from '@/lib/billing';
+import { syncMyPostsAvatar } from '@/lib/feed';
 import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { type AccountProfile, fetchProfile, pickAndUploadProfileImage, saveProfile } from '@/lib/profile';
 import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
@@ -245,6 +246,10 @@ export default function ProfileScreen() {
       };
       setProfile(next);
       await saveProfile(next);
+      // a profilkép változását a KORÁBBI posztokra is átvezetjük (denormalizált feed-avatar)
+      if (kind === 'avatar') {
+        void syncMyPostsAvatar(url);
+      }
     } catch (e) {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {

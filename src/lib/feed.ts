@@ -321,6 +321,22 @@ export async function publishRenderedProject(
 }
 
 /** Töröl egy saját posztot. */
+/**
+ * A saját posztok denormalizált avatarjának frissítése, amikor a profilkép változik
+ * — így a KORÁBBI posztok is a friss profilképet mutatják a feedben. Best-effort.
+ */
+export async function syncMyPostsAvatar(avatarUrl: string | null): Promise<void> {
+  const uid = currentUserId();
+  if (!supabase || !uid) {
+    return;
+  }
+  try {
+    await supabase.from('posts').update({ creator_avatar: avatarUrl }).eq('creator_id', uid);
+  } catch {
+    // best-effort: a régi posztok maradnak a korábbi avatarral
+  }
+}
+
 export async function deletePost(postId: string): Promise<void> {
   const sb = requireSupabase();
   await sb.from('posts').delete().eq('id', postId);

@@ -394,9 +394,17 @@ export default function FeedScreen() {
         <View style={[styles.rail, { bottom: chromeBottom }]}>
         <Pressable style={styles.railBtn} onPress={() => openCreator(item)}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(item.creator.displayName || '?').slice(0, 1).toUpperCase()}
-            </Text>
+            {item.creator.avatarUri ? (
+              <Image
+                source={{ uri: item.creator.avatarUri }}
+                style={styles.avatarImg}
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {(item.creator.displayName || '?').slice(0, 1).toUpperCase()}
+              </Text>
+            )}
           </View>
           <Pressable style={styles.followDot} onPress={() => onFollow(item)} hitSlop={6}>
             <Ionicons name="add" size={12} color="#fff" />
@@ -611,7 +619,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+    overflow: 'hidden',
   },
+  avatarImg: { width: '100%', height: '100%' },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: '800' },
   followDot: {
     position: 'absolute',

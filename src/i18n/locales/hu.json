@@ -211,6 +211,12 @@
     "subDaysLeft_other": "{{count}} nap van hátra",
     "subNone": "Nincs aktív előfizetés",
     "subNoneHint": "Oldd fel a felhő-renderelést, az AI-eszközöket és a kollaborációt a Remix Pro-val.",
+    "devProTitle": "Pro (DEV)",
+    "devProOn": "Pro aktiválása (DEV)",
+    "devProOff": "Pro kikapcsolása (DEV)",
+    "devProActivated": "Pro aktiválva (dev · 30 nap). A szerver a hiteles forrás.",
+    "devProDeactivated": "Pro kikapcsolva (dev).",
+    "devProBusy": "Folyamatban…",
     "subscribeCta": "Előfizetés a Pro-ra",
     "subStatus": {
       "active": "Aktív",

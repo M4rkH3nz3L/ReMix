@@ -47,7 +47,7 @@ import { AI_CAPABILITIES, generatePersona } from '@/lib/aiPersona';
 import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
-import { billingClientAvailable, restorePurchases } from '@/lib/billing';
+import { activateProDev, billingClientAvailable, deactivateProDev, restorePurchases } from '@/lib/billing';
 import { type AccountProfile, fetchProfile, saveProfile } from '@/lib/profile';
 import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
 import { useAuth } from '@/store/authStore';
@@ -225,6 +225,37 @@ export default function ProfileScreen() {
 
   // 💳 előfizetés — feliratkozás (paywall) + korábbi vásárlás visszaállítása
   const onSubscribe = () => usePaywall.getState().open();
+
+  // 🧪 CSAK DEV: közvetlen Pro be/ki a szerver-hiteles /billing/activate|deactivate-tel.
+  // Éles buildben (__DEV__ === false) NEM renderelődik → ott kizárólag a valós IAP.
+  // A kliens itt sem grantel magának: a workert kéri (service_role a subscriptions-höz).
+  const [devBusy, setDevBusy] = useState(false);
+  const onDevActivate = async () => {
+    if (devBusy) {
+      return;
+    }
+    setDevBusy(true);
+    try {
+      await activateProDev();
+      Alert.alert(t('profile.devProTitle'), t('profile.devProActivated'));
+    } catch (e) {
+      Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setDevBusy(false);
+    }
+  };
+  const onDevDeactivate = async () => {
+    if (devBusy) {
+      return;
+    }
+    setDevBusy(true);
+    try {
+      await deactivateProDev();
+      Alert.alert(t('profile.devProTitle'), t('profile.devProDeactivated'));
+    } finally {
+      setDevBusy(false);
+    }
+  };
   const onRestore = () => {
     restorePurchases()
       .then((ok) =>
@@ -585,6 +616,33 @@ export default function ProfileScreen() {
                 </View>
               </>
             )}
+            {__DEV__ ? (
+              <Pressable
+                onPress={isPro ? onDevDeactivate : onDevActivate}
+                disabled={devBusy}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  marginTop: 12,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: palette.border,
+                  borderStyle: 'dashed',
+                }}
+              >
+                <Ionicons name="construct-outline" size={14} color={palette.accent2} />
+                <Text style={{ color: palette.accent2, fontSize: 12, fontWeight: '700' }}>
+                  {devBusy
+                    ? t('profile.devProBusy')
+                    : isPro
+                      ? t('profile.devProOff')
+                      : t('profile.devProOn')}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           {/* — AI-modellek — */}

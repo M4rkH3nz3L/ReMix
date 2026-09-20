@@ -211,6 +211,12 @@
     "subDaysLeft_other": "noch {{count}} Tage",
     "subNone": "Kein aktives Abo",
     "subNoneHint": "Schalte Cloud-Rendering, KI-Tools und Zusammenarbeit mit Remix Pro frei.",
+    "devProTitle": "Pro (DEV)",
+    "devProOn": "Pro aktivieren (DEV)",
+    "devProOff": "Pro deaktivieren (DEV)",
+    "devProActivated": "Pro aktiviert (Dev · 30 Tage). Der Server ist die Wahrheitsquelle.",
+    "devProDeactivated": "Pro deaktiviert (Dev).",
+    "devProBusy": "Läuft…",
     "subscribeCta": "Pro abonnieren",
     "subStatus": {
       "active": "Aktiv",

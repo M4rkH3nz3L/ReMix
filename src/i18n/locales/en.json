@@ -211,6 +211,12 @@
     "subDaysLeft_other": "{{count}} days left",
     "subNone": "No active subscription",
     "subNoneHint": "Unlock cloud rendering, AI tools and collaboration with Remix Pro.",
+    "devProTitle": "Pro (DEV)",
+    "devProOn": "Activate Pro (DEV)",
+    "devProOff": "Turn off Pro (DEV)",
+    "devProActivated": "Pro activated (dev · 30 days). The server is the source of truth.",
+    "devProDeactivated": "Pro turned off (dev).",
+    "devProBusy": "Working…",
     "subscribeCta": "Subscribe to Pro",
     "subStatus": {
       "active": "Active",

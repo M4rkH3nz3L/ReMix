@@ -1,4 +1,4 @@
-import i18n from 'i18next';
+import { t } from 'i18next';
 import { Alert } from 'react-native';
 
 import { toAppError } from '@/lib/errors';
@@ -18,5 +18,5 @@ import { toAppError } from '@/lib/errors';
 export function showError(e: unknown, context?: string): void {
   const err = toAppError(e);
   console.warn(context ? `${context}: ${err.detail}` : err.detail);
-  Alert.alert(i18n.t('errors.title'), i18n.t(`errors.${err.kind}`));
+  Alert.alert(t('errors.title'), t(`errors.${err.kind}`));
 }

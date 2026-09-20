@@ -18,11 +18,21 @@ const WORKER = Number(process.env.WORKER_PORT || 8787);
 const METRO = Number(process.env.METRO_PORT || 8081);
 const WORKER_LOG = process.env.WORKER_LOG || '';
 const METRO_LOG = process.env.METRO_LOG || '';
+const AI = Number(process.env.AI_PORT || 11434);
 
 const SERVICES = [
   { key: 'supabase', label: 'Supabase', url: `http://127.0.0.1:${SUPA}/rest/v1/` },
   { key: 'worker', label: 'Worker', url: `http://127.0.0.1:${WORKER}/health` },
   { key: 'metro', label: 'Metro (Expo)', url: `http://127.0.0.1:${METRO}/status` },
+  // OPCIONÁLIS, KÜLÖN indítandó (NEM a dev-up.sh része): helyi AI (Ollama). Ha le
+  // van állítva, az normális — nem rontja a „minden fut" állapotot.
+  {
+    key: 'ai',
+    label: 'AI (Ollama)',
+    url: `http://127.0.0.1:${AI}/api/tags`,
+    optional: true,
+    hint: 'leállítva · külön indítandó: ollama serve',
+  },
 ];
 
 async function ping(url) {
@@ -55,14 +65,16 @@ async function snapshot() {
 }
 
 function page(status) {
-  const allUp = status.every((s) => s.ok);
+  // a „minden fut" állapot CSAK a mag-szolgáltatásokat nézi — az opcionális
+  // (külön indítandó) AI leállítottsága NEM piros riasztás
+  const allUp = status.filter((s) => !s.optional).every((s) => s.ok);
   const expUrl = `exp://${LAN_IP}:${METRO}`;
   const pill = (s) => `
-    <div class="card ${s.ok ? 'up' : 'down'}">
+    <div class="card ${s.ok ? 'up' : s.optional ? 'off' : 'down'}">
       <div class="dot"></div>
       <div class="meta">
-        <div class="name">${esc(s.label)}</div>
-        <div class="sub">${s.ok ? `HTTP ${s.status} · ${s.ms}ms` : esc(s.error || 'nem elérhető')}</div>
+        <div class="name">${esc(s.label)}${s.optional ? '<span class="tag">KÜLÖN</span>' : ''}</div>
+        <div class="sub">${s.ok ? `HTTP ${s.status} · ${s.ms}ms` : s.optional ? esc(s.hint || 'leállítva · külön indítandó') : esc(s.error || 'nem elérhető')}</div>
       </div>
     </div>`;
   return `<!doctype html><html lang="hu"><head>
@@ -77,9 +89,11 @@ function page(status) {
     h1{font-size:17px;margin:0 0 2px} .muted{color:#8d93a8;font-size:12px}
     .grid{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
     .card{display:flex;align-items:center;gap:10px;background:#111420;border:1px solid #252a3d;border-radius:12px;padding:12px 14px;min-width:180px}
-    .card.up{border-color:#2ecc8f55} .card.down{border-color:#ff5c7255}
+    .card.up{border-color:#2ecc8f55} .card.down{border-color:#ff5c7255} .card.off{border-color:#3a3f52}
     .dot{width:10px;height:10px;border-radius:50%;background:#ff5c72}
     .up .dot{background:#2ecc8f;box-shadow:0 0 8px #2ecc8f}
+    .off .dot{background:#8d93a8;box-shadow:none}
+    .tag{font-size:9px;font-weight:800;letter-spacing:.5px;color:#8d93a8;border:1px solid #3a3f52;border-radius:5px;padding:1px 4px;margin-left:6px;vertical-align:middle}
     .name{font-weight:700} .sub{color:#8d93a8;font-size:12px;font-variant-numeric:tabular-nums}
     .connect{background:#111420;border:1px solid #252a3d;border-radius:14px;padding:16px;margin:14px 0}
     .url{font-size:20px;font-weight:800;color:#7c5cff;word-break:break-all}

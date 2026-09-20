@@ -387,16 +387,6 @@ export default function FeedScreen() {
         )}
       </Pressable>
 
-      {/* felül: cím + típus */}
-      {!item.posterUri ? (
-        <View style={styles.centerTitle} pointerEvents="none">
-          <Text style={styles.centerEmoji}>🎬</Text>
-          <Text style={styles.centerText} numberOfLines={3}>
-            {item.title}
-          </Text>
-        </View>
-      ) : null}
-
       {/* jobb oldali akció-sor — MINDIG látszik: az EREDETI like/komment/mentés/remix
           gombok az eredeti helyükön. A komment-gomb accent-színnel + pulzáló glow-val
           + „Új" jelvénnyel kiemelve, hogy itt — az EREDETIN — látszódjon az új funkció. */}
@@ -607,9 +597,6 @@ const styles = StyleSheet.create({
   },
   emptyCtaText: { color: '#fff', fontWeight: '800' },
   page: { justifyContent: 'flex-end' },
-  centerTitle: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  centerEmoji: { fontSize: 56 },
-  centerText: { color: '#ffffffdd', fontSize: 22, fontWeight: '800', textAlign: 'center' },
   rail: { position: 'absolute', right: 10, alignItems: 'center', gap: 18 },
   railBtn: { alignItems: 'center', gap: 3 },
   railCount: { color: '#fff', fontSize: 12, fontWeight: '700' },

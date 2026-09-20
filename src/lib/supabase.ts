@@ -15,11 +15,70 @@
 import 'react-native-url-polyfill/auto';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 import { AppState } from 'react-native';
 
 import { secureStorage } from '@/lib/secureStorage';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
+/**
+ * A LOKÁLIS Supabase címét fizikai eszközön a Metró gépére (LAN-IP) írjuk át:
+ * a `127.0.0.1`/`localhost` a TELEFONT jelentené, nem a dev-gépet — így „telón
+ * nem jó" a bejelentkezés. A Metró (`hostUri`) ugyanazon a gépen fut, mint a
+ * lokális Supabase, tehát a hoszt-neve a helyes cím. Szimulátoron/emun a
+ * loopback változatlanul jó, hosztolt (nem-loopback) URL-t pedig sosem bántunk.
+ * Ugyanaz a minta, mint a worker-címnél (lásd `@/lib/backend` renderServerUrl).
+ */
+/** Loopback (a saját készülék) hoszt? — 127.0.0.1 / localhost / 0.0.0.0. */
+function isLoopbackHost(u: string | undefined): boolean {
+  if (!u) {
+    return false;
+  }
+  try {
+    const h = new URL(u).hostname;
+    return h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0';
+  } catch {
+    return false;
+  }
+}
+
+function resolveSupabaseUrl(raw: string | undefined): string | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  try {
+    const u = new URL(trimmed);
+    const metroHost = Constants.expoConfig?.hostUri?.split(':')[0];
+    // csak akkor írjuk át, ha loopback CÍM van beállítva, de a Metró egy valódi
+    // (nem loopback) hoszton fut → fizikai eszköz LAN-on
+    if (
+      isLoopbackHost(trimmed) &&
+      metroHost &&
+      metroHost !== '127.0.0.1' &&
+      metroHost !== 'localhost'
+    ) {
+      u.hostname = metroHost;
+      return u.toString().replace(/\/$/, '');
+    }
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+// 🚫 DEV/PROD keveredés-védelem: éles (nem __DEV__) buildben a LOKÁLIS (loopback)
+// cím hibás konfiguráció — a telepített appban a saját készüléket jelentené, nem a
+// szervert. Ilyenkor a klienst „nincs konfigurálva" állapotban hagyjuk (beszédes
+// login-hiba), nem néma összeomlás. Dev-ben a resolveSupabaseUrl a Metró LAN-IP-
+// jére írja át, tehát fizikai eszközön is jó.
+if (!__DEV__ && isLoopbackHost(rawUrl)) {
+  console.error(
+    `[supabase] Éles buildhez LOKÁLIS cím van beállítva (${rawUrl?.trim()}). ` +
+      'Állíts be hosztolt EXPO_PUBLIC_SUPABASE_URL-t (.env.production / EAS env).'
+  );
+}
+const url = !__DEV__ && isLoopbackHost(rawUrl) ? undefined : resolveSupabaseUrl(rawUrl);
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
 /** Be van-e állítva a Supabase cím + anon-kulcs (van-e működő backend). */

@@ -387,10 +387,11 @@ export default function FeedScreen() {
         )}
       </Pressable>
 
-      {/* jobb oldali akció-sor — MINDIG látszik: az EREDETI like/komment/mentés/remix
-          gombok az eredeti helyükön. A komment-gomb accent-színnel + pulzáló glow-val
-          + „Új" jelvénnyel kiemelve, hogy itt — az EREDETIN — látszódjon az új funkció. */}
-      <View style={[styles.rail, { bottom: chromeBottom }]}>
+      {/* jobb oldali akció-sor (like/komment/mentés/remix/…) — a többi chrome-mal
+          EGYÜTT rejtőzik/jelenik meg (hármas koppintás / auto-hide): immerzív módban
+          csak a videó + a user-hotspotok látszanak. */}
+      {chromeVisible ? (
+        <View style={[styles.rail, { bottom: chromeBottom }]}>
         <Pressable style={styles.railBtn} onPress={() => openCreator(item)}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -449,7 +450,8 @@ export default function FeedScreen() {
             <Text style={styles.railCount}>{t('report.label')}</Text>
           </Pressable>
         ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {/* alul-bal: alkotó + felirat — a többi chrome-mal együtt (hármas koppintás / auto-hide) */}
       {chromeVisible ? (

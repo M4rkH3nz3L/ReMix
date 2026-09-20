@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { GestureResponderEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureResponderEvent, StyleSheet, Text, View } from 'react-native';
 
 import { palette, trackColors } from '@/constants/editor';
 import { projectDuration } from '@/lib/projectUtils';
@@ -8,13 +8,14 @@ import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 
 /**
- * 🗺️ Idővonal-minimap (#42/43): a TELJES projekt kicsinyített térképe + a
+ * 🗺️ Idővonal-minimap / scrubber: a TELJES projekt kicsinyített térképe + a
  * jelenlegi nézet (viewport) kiemelése — „hol vagyok a projektben?".
  *
- * Mindig látszik (kiválasztott fül soha ne legyen üres → nem tűnik hibának):
- * tartalom hiányában halvány súgó, egyébként a kicsinyített térkép. A viewport-
- * téglalap csak akkor jelenik meg, ha a tartalom túllóg a látható idővonalon
- * (van mit navigálni). Koppintásra a lejátszófej odaugrik; a középre rögzített
+ * ÁLLANDÓ csík KÖZVETLENÜL az idővonal fölött (nem insight-fül). Tartalom
+ * hiányában halvány súgó, egyébként a kicsinyített térkép. A viewport-téglalap
+ * csak akkor jelenik meg, ha a tartalom túllóg a látható idővonalon (van mit
+ * navigálni). Koppintásra ODAUGRIK, HÚZÁSRA folyamatosan végigpásztázza a
+ * lejátszófejet — így az egész idővonal „végignézhető"; a középre rögzített
  * playhead miatt a meglévő auto-scroll effekt igazítja a nagy idővonalat.
  */
 export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: number }) {
@@ -49,10 +50,12 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
   };
 
   return (
-    <Pressable
+    <View
       style={styles.strip}
-      onPress={seek}
       onLayout={(e) => setMapW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={seek}
+      onResponderMove={seek}
       accessibilityRole="adjustable"
       accessibilityLabel={t('editor.timeline.minimap')}
     >
@@ -92,7 +95,7 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
           <View style={[styles.playhead, { left: playhead * secToX - 0.5 }]} pointerEvents="none" />
         </>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 

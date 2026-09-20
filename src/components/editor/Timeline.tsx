@@ -507,9 +507,11 @@ export function Timeline() {
 
   return (
     <TutorialTarget id="timeline">
-      {/* 🔎 insight-sáv: egyszerre EGY nézet (story / minimap / pacing) — kevés chrome */}
+      {/* 🔎 insight-sáv: egyszerre EGY nézet (story / pacing) — kevés chrome. A
+          térkép (minimap) NEM fül többé: állandó scrubber-csík közvetlenül az
+          idővonal fölött (lásd lentebb). */}
       <View style={styles.insightTabs}>
-        {(['story', 'map', 'pacing'] as const).map((k) => (
+        {(['story', 'pacing'] as const).map((k) => (
           <Pressable
             key={k}
             onPress={() => setInsightLane(k)}
@@ -599,13 +601,12 @@ export function Timeline() {
           </Pressable>
         </View>
       </View>
-      {insightLane === 'story' ? (
-        <StoryLane />
-      ) : insightLane === 'map' ? (
-        <TimelineMinimap viewportW={viewportW} pps={pps} />
-      ) : (
-        <PacingLane />
-      )}
+      {insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
+      {/* 🗺️ állandó scrubber KÖZVETLENÜL az idővonal fölött: az egész projekt
+          kicsinyített térképe — koppintás/húzás a lejátszófejet mozgatja végig,
+          így az idővonal „végignézhető" (a középre rögzített fej auto-scrollja
+          igazítja a nagy idővonalat). */}
+      <TimelineMinimap viewportW={viewportW} pps={pps} />
       <GestureDetector gesture={pinch}>
         <View style={styles.outerRow}>
         {showHeaders ? (

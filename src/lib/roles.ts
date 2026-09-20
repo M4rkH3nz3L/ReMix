@@ -1,5 +1,4 @@
 import { requireSupabase, supabase } from '@/lib/supabase';
-import { useAuth } from '@/store/authStore';
 
 /**
  * 🛡️ Globális szerep/jogosultság (RBAC) kliens-réteg. A GLOBÁLIS governance-jogok
@@ -38,7 +37,17 @@ export interface UserWithRole {
 
 /** A bejelentkezett user GLOBÁLIS jogai (a `current_user_permissions` RPC). */
 export async function fetchMyPermissions(): Promise<string[]> {
-  if (!supabase || !useAuth.getState().user?.id) {
+  if (!supabase) {
+    return [];
+  }
+  // A bejelentkezettséget közvetlenül a Supabase-session-ből nézzük, NEM az
+  // authStore-ból — így nincs modul-körkörösség (authStore → roleStore → roles →
+  // authStore). A hívás úgyis az auth-váltás UTÁN fut (roleStore.refresh), tehát
+  // a session már betöltött.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
     return [];
   }
   const { data, error } = await supabase.rpc('current_user_permissions');

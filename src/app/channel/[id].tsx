@@ -219,8 +219,9 @@ export default function ChannelScreen() {
     return Math.floor(b / c);
   })();
 
-  const displayName = data?.creator?.displayName ?? t('nav.channel');
   const username = data?.creator?.username ?? (id ?? '').slice(0, 8);
+  // ⚠️ NE a „Csatorna" (nav-címke) legyen a név, ha nincs creator — inkább a handle
+  const displayName = data?.creator?.displayName || username;
 
   const gridItem = ({ item }: { item: FeedPost }) => (
     <Pressable style={styles.gridItem} onPress={() => openPost(item)}>

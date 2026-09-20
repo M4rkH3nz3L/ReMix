@@ -540,7 +540,13 @@ export default function EditorScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    // Fekvőben a notch / home-indicator az OLDALAKON van → ott a bal rail és az
+    // előnézet a bevágás alá csúszna; ezért fekvő módban a bal/jobb szélt is
+    // insetteljük. Állóban a bal/jobb inset 0, így ez nem változtat semmit.
+    <SafeAreaView
+      style={styles.container}
+      edges={L.isLandscape ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

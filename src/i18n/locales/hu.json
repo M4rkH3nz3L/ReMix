@@ -36,6 +36,16 @@
     "markAll": "Mind olvasott",
     "empty": "Még nincs értesítés."
   },
+  "errors": {
+    "title": "Hoppá",
+    "network": "Nincs kapcsolat a szerverrel. Ellenőrizd a hálózatot, és próbáld újra.",
+    "auth": "Jelentkezz be újra a folytatáshoz.",
+    "forbidden": "Nincs jogosultságod ehhez a művelethez.",
+    "notFound": "A kért tartalom nem található.",
+    "server": "A szerver most nem elérhető. Próbáld újra kicsit később.",
+    "unknown": "Valami hiba történt. A projekted biztonságban van.",
+    "retry": "Újra"
+  },
   "common": {
     "error": "Hiba",
     "cancel": "Mégse",

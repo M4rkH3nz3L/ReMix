@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { CommentSheet } from '@/components/CommentSheet';
+import { showError } from '@/components/ui/errorAlert';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import {
@@ -200,7 +201,7 @@ export default function FeedScreen() {
           router.push(`/editor/${pid}`);
         }
       })
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => showError(e, 'remix'))
       .finally(() => setBusy(false));
   };
 
@@ -217,9 +218,7 @@ export default function FeedScreen() {
         onPress: () =>
           moderatePostGlobal(post.id, 'removed')
             .then(() => setPosts((prev) => prev.filter((p) => p.id !== post.id)))
-            .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
-            ),
+            .catch((e: unknown) => showError(e)),
       },
     ]);
   };
@@ -233,9 +232,7 @@ export default function FeedScreen() {
         onPress: () =>
           reportPost(post.id, r)
             .then(() => Alert.alert(t('report.title'), t('report.done')))
-            .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
-            ),
+            .catch((e: unknown) => showError(e)),
       })),
       { text: t('common.cancel'), style: 'cancel' as const },
     ]);
@@ -269,12 +266,25 @@ export default function FeedScreen() {
   useEffect(() => {
     const active = posts.find((p) => p.id === activeId);
     const uri = active?.videoUri ?? null;
-    if (uri && isFocused) {
-      player.replace(uri);
-      player.play();
-    } else {
+    if (!uri || !isFocused) {
       player.pause();
+      return;
     }
+    // iOS-en a `replace` SZINKRON tölti az asszetet a fő szálon (UI-fagyás) →
+    // `replaceAsync`. A `cancelled` őr: ha közben vált az aktív poszt / elveszik a
+    // fókusz, a késve beérő betöltés NE indítson lejátszást a rossz videón.
+    let cancelled = false;
+    player
+      .replaceAsync(uri)
+      .then(() => {
+        if (!cancelled) {
+          player.play();
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [activeId, posts, player, isFocused]);
 
   // hotspot-időzítés: az aktív poszt lejátszási idejét figyeljük (ha van hotspot)

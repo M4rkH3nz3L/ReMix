@@ -16,6 +16,7 @@ import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import { describeAiPlan } from '@/lib/aiPlan';
 import type { AiPlanItem } from '@/lib/aiPlan';
+import { toAppError } from '@/lib/errors';
 import { haptics } from '@/design';
 import {
   applyBrandCaptions,
@@ -503,9 +504,13 @@ export function AssistantPanel() {
           : t('panels.assistant.replyNoCommands'),
       });
     } catch (err) {
-      // a hiba MOSTANTÓL a panel tetején, feltűnően jelenik meg
-      setApplied((err as Error).message);
-      setAiResult({ ok: false, text: (err as Error).message });
+      // 🧯 kétrétegű hiba: a fejlesztői részlet a logba, a felhasználó barátságos,
+      // cselekvésre hívó üzenetet lát (nem nyers „TypeError: …")
+      const appErr = toAppError(err);
+      console.warn('AI kérés hiba:', appErr.detail);
+      const friendly = t('errors.' + appErr.kind);
+      setApplied(friendly);
+      setAiResult({ ok: false, text: friendly });
     } finally {
       setStatus(null);
     }

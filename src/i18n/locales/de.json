@@ -36,6 +36,16 @@
     "markAll": "Alle als gelesen",
     "empty": "Noch keine Benachrichtigungen."
   },
+  "errors": {
+    "title": "Hoppla",
+    "network": "Server nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+    "auth": "Bitte melde dich erneut an, um fortzufahren.",
+    "forbidden": "Dazu hast du keine Berechtigung.",
+    "notFound": "Der angeforderte Inhalt wurde nicht gefunden.",
+    "server": "Der Server ist gerade nicht verfügbar. Bitte versuche es gleich noch einmal.",
+    "unknown": "Etwas ist schiefgelaufen. Dein Projekt ist sicher.",
+    "retry": "Erneut"
+  },
   "common": {
     "error": "Fehler",
     "cancel": "Abbrechen",

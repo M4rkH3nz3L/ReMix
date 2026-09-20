@@ -36,6 +36,16 @@
     "markAll": "Mark all read",
     "empty": "No notifications yet."
   },
+  "errors": {
+    "title": "Oops",
+    "network": "Can't reach the server. Check your connection and try again.",
+    "auth": "Please sign in again to continue.",
+    "forbidden": "You don't have permission for this action.",
+    "notFound": "The requested content wasn't found.",
+    "server": "The server is unavailable right now. Please try again shortly.",
+    "unknown": "Something went wrong. Your project is safe.",
+    "retry": "Retry"
+  },
   "common": {
     "error": "Error",
     "cancel": "Cancel",

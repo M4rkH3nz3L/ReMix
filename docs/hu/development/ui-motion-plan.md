@@ -11,6 +11,25 @@
 
 ---
 
+## Implementációs állapot (2026-09)
+
+A terv **kód-oldali** részei implementálva, végig zöld audittal (tsc + lint +
+jest 279). Amit külön kiemelünk: több tétel **már megvolt** — ezeket felülvizsgáltuk,
+nem építettük újra.
+
+| Tétel | Állapot |
+|---|---|
+| 0.2–0.3 design-token réteg (`src/design/`) + központi haptika | ✅ implementálva |
+| 1.1 motion a kulcs-átmenetekben · 1.2 `BottomSheet` primitív · 1.4 micro-interakciók (drag-lift, `PressableScale`) | ✅ implementálva |
+| 2.1 timeline klip-virtualizáció (`src/lib/virtualize.ts`) · 2.2 pinch churn-csökkentés | ✅ implementálva |
+| 3.1 AI before/after preview · 3.2 kontextuális toolbar-morf · 3.4 kétrétegű hiba (`src/lib/errors.ts`) | ✅ implementálva |
+| 3.3 loading UX · 2.3 playhead · 1.3 kontextuális toolbar-logika | ✅ már megvolt (felülvizsgálva) |
+| 4.1 iPad split (`expanded`) · 4.2 landscape (`medium+landscape`) | ✅ már megvolt + landscape safe-area fix |
+| 4.3 vizuális finomítás (radius-token + 44pt touch-target) | ✅ első kör kész |
+| **Eszköz-teszt-igényes finomhangolás** (layout-arányok, teljes shared-value pinch, idle-toolbar declutter) | ⏳ dev-build QA (0.1) után |
+
+---
+
 ## 0. Ami MÁR MEGVAN (ne építsük újra)
 
 A beillesztett „UI Constitution" nagy része **már teljesül** a kódban:

@@ -44,5 +44,12 @@ example
 server/models/
 server/storage.config.json
 
-# Supabase local env (a demo anon-kulcs publikus, de env-t nem verziózunk)
+# env — dev/prod KÜLÖN, hogy ne keveredjenek. A valós env-fájlokat nem verziózzuk,
+# csak a *.example sablonokat. (Prod értékek élesben inkább EAS env-változóként.)
 .env
+.env.development
+.env.production
+.env.preview
+
+# helyi dev-szolgáltatások logjai/PID-jei (dev-up.sh)
+.devlogs/

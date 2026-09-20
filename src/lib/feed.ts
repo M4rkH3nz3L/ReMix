@@ -1,4 +1,5 @@
 import { makeId } from '@/lib/id';
+import { reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
 import { renderProjectVersion, uploadMedia } from '@/lib/render';
@@ -53,7 +54,7 @@ function toCreator(r: PostRow): Creator {
     id: r.creator_id,
     username: r.creator_username ?? r.creator_id.slice(0, 8),
     displayName: r.creator_name ?? r.creator_username ?? 'Creator',
-    avatarUri: r.creator_avatar ?? undefined,
+    avatarUri: reachableMediaUrl(r.creator_avatar) ?? undefined,
   };
 }
 
@@ -64,8 +65,8 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     title: r.title,
     description: r.description ?? '',
     hashtags: r.hashtags ?? [],
-    videoUri: r.video_url,
-    posterUri: r.poster_url,
+    videoUri: reachableMediaUrl(r.video_url),
+    posterUri: reachableMediaUrl(r.poster_url),
     aspectRatio: (r.aspect_ratio as AspectRatio) ?? '9:16',
     durationSec: r.duration_sec,
     projectId: r.project_id ?? undefined,
@@ -183,15 +184,46 @@ export async function getChannel(userId: string): Promise<ChannelData> {
     isFollowing = !!fr;
   }
 
+  // ⚠️ A csatorna identitása eddig CSAK az első posztból jött → poszt nélküli
+  // csatorna (minden új fiók!) `creator: null`-t adott, és a UI a „Csatorna"
+  // (nav-címke) nevet + id-prefixet mutatta. Poszt hiányában a profilból építjük.
+  const creator = posts[0]?.creator ?? (await resolveChannelCreator(userId, me === userId));
+
   return {
     userId,
-    creator: posts[0]?.creator ?? null,
+    creator,
     posts,
     followers: s.followers ?? 0,
     following: s.following ?? 0,
     postCount: s.posts ?? posts.length,
     isFollowing,
     isMe: me === userId,
+  };
+}
+
+/**
+ * A csatorna tulajának identitása POSZT NÉLKÜL is: a nevet a `profiles`-ból, a
+ * usernevet (posztokon denormalizált, e-mail-alapú) saját csatornánál az authból
+ * vesszük. Más felhasználó e-mailje nem elérhető → ott az id-prefix marad.
+ */
+async function resolveChannelCreator(userId: string, isMe: boolean): Promise<Creator> {
+  const sb = requireSupabase();
+  let name: string | null = null;
+  try {
+    const { data } = await sb.from('profiles').select('full_name').eq('id', userId).maybeSingle();
+    name = (data?.full_name as string | undefined) || null;
+  } catch {
+    // RLS/hálózati hiba → marad a fallback
+  }
+  let username: string | null = null;
+  if (isMe) {
+    const email = useAuth.getState().user?.email ?? null;
+    username = email ? email.split('@')[0] : null;
+  }
+  return {
+    id: userId,
+    username: username ?? userId.slice(0, 8),
+    displayName: name ?? username ?? 'Creator',
   };
 }
 
@@ -411,7 +443,7 @@ function toComment(r: CommentRow): PostComment {
       id: r.author_id,
       username: r.author_username ?? r.author_id.slice(0, 8),
       displayName: r.author_name ?? r.author_username ?? 'Creator',
-      avatarUri: r.author_avatar ?? undefined,
+      avatarUri: reachableMediaUrl(r.author_avatar) ?? undefined,
     },
     body: r.body,
     createdAt: r.created_at,

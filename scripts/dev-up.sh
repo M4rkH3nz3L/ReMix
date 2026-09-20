@@ -51,9 +51,13 @@ report "Worker :8787" "http://127.0.0.1:8787/health" "$LOG/worker.log"
 
 # 3) Metro (Expo) — LAN mód. FIGYELEM: a mentett PID az `npx` launcheré, NEM a valódi
 # metro node-é; ezért a dev-down.sh a PORTOT tartó folyamatot is kilövi (port-alapú).
+# FONTOS: NINCS `CI=1` — az CI-módba kapcsolná a Metrót, ahol a fájlfigyelés/reload
+# KI van kapcsolva (a szerkesztések nem frissülnek, elavult bundle → „loadingol”).
+# A `</dev/null` a detachelt (TTY nélküli) indításhoz kell: az expo így nem próbál
+# interaktív TUI-t nyitni, de a watch-mód BE marad. (Watchman ajánlott: brew install watchman.)
 if ! up "http://127.0.0.1:8081/status"; then
   echo "Metro indítása…"
-  CI=1 nohup npx expo start --lan >"$LOG/metro.log" 2>&1 &
+  nohup npx expo start --lan </dev/null >"$LOG/metro.log" 2>&1 &
   echo $! >"$LOG/metro.pid"; disown 2>/dev/null || true
 fi
 report "Metro :8081" "http://127.0.0.1:8081/status" "$LOG/metro.log"

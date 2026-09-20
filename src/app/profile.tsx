@@ -252,6 +252,9 @@ export default function ProfileScreen() {
     try {
       await deactivateProDev();
       Alert.alert(t('profile.devProTitle'), t('profile.devProDeactivated'));
+    } catch (e) {
+      // a deactivate/refreshEntitlement hibáját is jelezzük (szimmetria az activate-tel)
+      Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
     } finally {
       setDevBusy(false);
     }

@@ -12,6 +12,24 @@ import { useTutorial } from '@/store/tutorialStore';
 const HOLE_PAD = 8;
 /** a kártya becsült magassága az elhelyezés-döntéshez (fölé/alá/középre) */
 const CARD_EST_H = 210;
+/**
+ * A mérés UTÁN történő layout-változásokra (pl. az eszköztár a targethez GÖRGET)
+ * többször is újramérünk — az utolsó látható eredmény nyer. Így nem ragad be a
+ * spotlight a görgetés előtti (kilógó) pozícióra.
+ */
+const MEASURE_ATTEMPTS_MS = [60, 320, 560];
+
+/** A mért elem KÖZEPE a képernyőn belül van-e? Ha kicsúszott (pl. az eszköztár
+ * még nem görgetett oda, vagy a target nincs is jelen), NEM rajzolunk félrevezető
+ * spotlightot — a kártya középre igazodik. */
+function isOnScreen(r: Rect, w: number, h: number): boolean {
+  if (r.width <= 0 || r.height <= 0) {
+    return false;
+  }
+  const cx = r.x + r.width / 2;
+  const cy = r.y + r.height / 2;
+  return cx >= 0 && cx <= w && cy >= 0 && cy <= h;
+}
 
 /**
  * 🎓 Felület-vezető overlay. Ha egy lecke aktív, a képernyőt elsötétíti, a
@@ -46,7 +64,9 @@ export function TutorialOverlay() {
 
   // a target lemérése (spotlight). A mérés késleltetve (layout kész legyen), a
   // setState async. A régi kiemelést AZONNAL töröljük, hogy lépésváltáskor ne
-  // villanjon a spotlight a KORÁBBI elemre a friss mérés megérkeztéig.
+  // villanjon a spotlight a KORÁBBI elemre a friss mérés megérkeztéig. Több
+  // időpontban mérünk (az eszköztár a targethez görgethet) — csak KÉPERNYŐN LÉVŐ
+  // eredményt fogadunk el, különben marad a középre igazított kártya.
   useEffect(() => {
     let alive = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -56,18 +76,21 @@ export function TutorialOverlay() {
         alive = false;
       };
     }
-    const id = setTimeout(() => {
+    const attempt = () => {
       measureFn()
         .then((r) => {
-          if (alive) setRect(r);
+          if (alive && r && isOnScreen(r, width, height)) {
+            setRect(r);
+          }
         })
         .catch(() => {});
-    }, 60);
+    };
+    const timers = MEASURE_ATTEMPTS_MS.map((d) => setTimeout(attempt, d));
     return () => {
       alive = false;
-      clearTimeout(id);
+      timers.forEach(clearTimeout);
     };
-  }, [measureFn, stepIndex, activeLessonId]);
+  }, [measureFn, stepIndex, activeLessonId, width, height]);
 
   if (!lesson || !step) {
     return null;

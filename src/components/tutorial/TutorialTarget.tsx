@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react';
-import { type StyleProp, View, type ViewStyle } from 'react-native';
+import { type LayoutChangeEvent, type StyleProp, View, type ViewStyle } from 'react-native';
 
 import type { Rect, TutorialTargetId } from '@/lib/tutorial';
 import { useTutorial } from '@/store/tutorialStore';
@@ -17,10 +17,14 @@ export function TutorialTarget({
   id,
   children,
   style,
+  onLayout,
 }: {
   id: TutorialTargetId;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** a burkoló View elrendezése (pl. a görgethető eszköztár a tartalom-x-et így
+   * jegyzi meg, hogy a targethez tudjon görgetni a tutorial alatt) */
+  onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const ref = useRef<View>(null);
   const register = useTutorial((s) => s.registerTarget);
@@ -49,7 +53,7 @@ export function TutorialTarget({
   }, [id, register, unregister]);
 
   return (
-    <View ref={ref} collapsable={false} style={style}>
+    <View ref={ref} collapsable={false} style={style} onLayout={onLayout}>
       {children}
     </View>
   );

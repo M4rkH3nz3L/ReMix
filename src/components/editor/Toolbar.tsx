@@ -1,7 +1,7 @@
 import { haptics, motion } from '@/design';
-import { useEffect, useState } from 'react';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -11,12 +11,14 @@ import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { ToolButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { captureFrame } from '@/lib/captureFrame';
+import { getLesson } from '@/lib/tutorial';
 import { makeId } from '@/lib/id';
 import { pickImage, pickVideo } from '@/lib/media';
 import { ensureProxy } from '@/lib/proxy';
 import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
 import { clipEnd, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore } from '@/store/editorStore';
+import { useTutorial } from '@/store/tutorialStore';
 import type { Clip, TrackType } from '@/types/project';
 
 /**
@@ -360,11 +362,32 @@ export function Toolbar() {
   }, [toolSig, toolFade]);
   const toolRowStyle = useAnimatedStyle(() => ({ opacity: toolFade.value }));
 
+  // 🎓 tutorial: a görgethető eszköztár a KIEMELT gombhoz görget, hogy a spotlight
+  // akkor is ráüljön, ha a target épp kilógott a sorból. A gombok a `rememberX`-szel
+  // jegyzik a tartalom-x-üket; az aktív lecke-lépés targetjére görgetünk.
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const targetX = useRef<Record<string, number>>({});
+  const rememberX = (id: string) => (e: LayoutChangeEvent) => {
+    targetX.current[id] = e.nativeEvent.layout.x;
+  };
+  const activeTutorialTarget = useTutorial((s) =>
+    s.activeLessonId ? (getLesson(s.activeLessonId)?.steps[s.stepIndex]?.target ?? null) : null
+  );
+  useEffect(() => {
+    if (!activeTutorialTarget) {
+      return;
+    }
+    const x = targetX.current[activeTutorialTarget];
+    if (x != null) {
+      scrollRef.current?.scrollTo({ x: Math.max(0, x - 24), animated: true });
+    }
+  }, [activeTutorialTarget]);
+
   return (
     <View style={styles.container}>
       {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
       <SelectionInfo />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false}>
         {/* kontextuális toolbar: a tool-KÉSZLET váltásakor a tartalom átúszik
             (opacity cross-fade), de a sor NEM remountol → a scroll-pozíció marad */}
         <Animated.View style={[styles.toolRow, toolRowStyle]}>
@@ -586,7 +609,7 @@ export function Toolbar() {
               active={activePanel === 'workflow'}
               onPress={() => togglePanel('workflow')}
             />
-            <TutorialTarget id="toolbar.ai">
+            <TutorialTarget id="toolbar.ai" onLayout={rememberX('toolbar.ai')}>
               <ToolButton
                 icon="sparkles-outline"
                 label="AI"
@@ -601,25 +624,33 @@ export function Toolbar() {
               onPress={() => togglePanel('creatorPreset')}
             />
             <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
-            <TutorialTarget id="toolbar.addVideo">
+            <TutorialTarget id="toolbar.addVideo" onLayout={rememberX('toolbar.addVideo')}>
               <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
             </TutorialTarget>
             <ToolButton icon="albums-outline" label="PiP" onPress={addPip} />
-            <ToolButton
-              icon="videocam-outline"
-              label={t('editor.toolbar.multicam')}
-              active={activePanel === 'multicam'}
-              onPress={() => togglePanel('multicam')}
-            />
-            <ToolButton icon="color-filter-outline" label={t('editor.toolbar.grade')} onPress={addAdjust} />
+            <TutorialTarget id="toolbar.multicam" onLayout={rememberX('toolbar.multicam')}>
+              <ToolButton
+                icon="videocam-outline"
+                label={t('editor.toolbar.multicam')}
+                active={activePanel === 'multicam'}
+                onPress={() => togglePanel('multicam')}
+              />
+            </TutorialTarget>
+            <TutorialTarget id="toolbar.grade" onLayout={rememberX('toolbar.grade')}>
+              <ToolButton icon="color-filter-outline" label={t('editor.toolbar.grade')} onPress={addAdjust} />
+            </TutorialTarget>
             <ToolButton icon="image-outline" label={t('editor.toolbar.image')} onPress={addImage} />
-            <ToolButton icon="text-outline" label={t('editor.toolbar.text')} onPress={addText} />
-            <ToolButton
-              icon="chatbox-ellipses-outline"
-              label={t('editor.toolbar.captions')}
-              active={activePanel === 'captions'}
-              onPress={() => togglePanel('captions')}
-            />
+            <TutorialTarget id="toolbar.text" onLayout={rememberX('toolbar.text')}>
+              <ToolButton icon="text-outline" label={t('editor.toolbar.text')} onPress={addText} />
+            </TutorialTarget>
+            <TutorialTarget id="toolbar.captions" onLayout={rememberX('toolbar.captions')}>
+              <ToolButton
+                icon="chatbox-ellipses-outline"
+                label={t('editor.toolbar.captions')}
+                active={activePanel === 'captions'}
+                onPress={() => togglePanel('captions')}
+              />
+            </TutorialTarget>
             <ToolButton
               icon="reader-outline"
               label={t('editor.toolbar.transcript')}
@@ -632,12 +663,14 @@ export function Toolbar() {
               active={activePanel === 'sticker'}
               onPress={() => togglePanel('sticker')}
             />
-            <ToolButton
-              icon="musical-notes-outline"
-              label={t('editor.toolbar.music')}
-              active={activePanel === 'audio'}
-              onPress={() => togglePanel('audio')}
-            />
+            <TutorialTarget id="toolbar.music" onLayout={rememberX('toolbar.music')}>
+              <ToolButton
+                icon="musical-notes-outline"
+                label={t('editor.toolbar.music')}
+                active={activePanel === 'audio'}
+                onPress={() => togglePanel('audio')}
+              />
+            </TutorialTarget>
             <ToolButton
               icon="layers-outline"
               label={t('editor.toolbar.layers')}
@@ -651,12 +684,14 @@ export function Toolbar() {
               onPress={() => togglePanel('library')}
             />
             <ToolButton icon="scan-outline" label="Hotspot" onPress={addHotspot} />
-            <ToolButton
-              icon="share-outline"
-              label={t('editor.toolbar.export')}
-              active={activePanel === 'export'}
-              onPress={() => togglePanel('export')}
-            />
+            <TutorialTarget id="toolbar.export" onLayout={rememberX('toolbar.export')}>
+              <ToolButton
+                icon="share-outline"
+                label={t('editor.toolbar.export')}
+                active={activePanel === 'export'}
+                onPress={() => togglePanel('export')}
+              />
+            </TutorialTarget>
           </>
         )}
         </Animated.View>

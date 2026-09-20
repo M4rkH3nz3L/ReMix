@@ -23,8 +23,21 @@ export function localize(loc: Loc, lang: string | undefined): string {
   return loc[key] ?? loc.hu;
 }
 
-/** A kiemelhető UI-elemek stabil azonosítói (a `TutorialTarget id`-je). */
-export type TutorialTargetId = 'toolbar.addVideo' | 'toolbar.ai' | 'transport.playPause' | 'timeline';
+/** A kiemelhető UI-elemek stabil azonosítói (a `TutorialTarget id`-je). A
+ * `toolbar.*` gombok a kijelölés NÉLKÜLI eszköztárban vannak (a passzív tour
+ * nem jelöl ki klipet), ezért ezek a leckék belépő lépéseihez megbízhatóan
+ * kiemelhetők; a görgethető sorban a Toolbar a targethez görget. */
+export type TutorialTargetId =
+  | 'toolbar.addVideo'
+  | 'toolbar.ai'
+  | 'toolbar.text'
+  | 'toolbar.music'
+  | 'toolbar.grade'
+  | 'toolbar.multicam'
+  | 'toolbar.captions'
+  | 'toolbar.export'
+  | 'transport.playPause'
+  | 'timeline';
 
 export interface TutorialStep {
   action: Loc;
@@ -134,7 +147,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Adj szöveget a videóhoz.', 'Add text to the video.', 'Füge Text hinzu.'),
         L('Eszköztár → Szöveg', 'Toolbar → Text', 'Werkzeugleiste → Text'),
-        L('Szöveg-klip + a Szöveg panel nyílik.', 'A text clip + the Text panel opens.', 'Text-Clip + das Text-Panel öffnet sich.')
+        L('Szöveg-klip + a Szöveg panel nyílik.', 'A text clip + the Text panel opens.', 'Text-Clip + das Text-Panel öffnet sich.'),
+        'toolbar.text'
       ),
       S(
         L('Állítsd a stílust: betűtípus, szín, animáció.', 'Set style: font, color, animation.', 'Stil: Schrift, Farbe, Animation.'),
@@ -156,7 +170,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Nyisd a sáv-menüt.', 'Open the track menu.', 'Öffne das Spur-Menü.'),
         L('Koppints a sáv címkéjére / fejlécére', 'Tap the track label / header', 'Tippe auf das Spur-Label'),
-        L('Némítás · solo · 👁️ láthatóság · zárolás · összecsukás · magasság.', 'Mute · solo · visibility · lock · collapse · height.', 'Stumm · Solo · Sichtbarkeit · Sperre · Höhe.')
+        L('Némítás · solo · 👁️ láthatóság · zárolás · összecsukás · magasság.', 'Mute · solo · visibility · lock · collapse · height.', 'Stumm · Solo · Sichtbarkeit · Sperre · Höhe.'),
+        'timeline'
       ),
       S(
         L('Rejts el egy vizuális sávot az előnézetből.', 'Hide a visual track from the preview.', 'Blende eine Spur aus.'),
@@ -219,7 +234,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Tölts be zenét.', 'Load music.', 'Lade Musik.'),
         L('Eszköztár → Zene', 'Toolbar → Music', 'Werkzeugleiste → Musik'),
-        L('Hangklip a zenesávon, hullámformával.', 'Audio clip on the music track.', 'Audioclip auf der Musikspur.')
+        L('Hangklip a zenesávon, hullámformával.', 'Audio clip on the music track.', 'Audioclip auf der Musikspur.'),
+        'toolbar.music'
       ),
       S(
         L('Készíts jelölőket/vágásokat a beatre.', 'Make markers/cuts on the beat.', 'Marker/Schnitte auf den Beat.'),
@@ -241,7 +257,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Alapfényelés: tónus és szín.', 'Basic grade: tone & color.', 'Basis-Grade: Ton & Farbe.'),
         L('Grade réteg / klip → Szűrő → 🎚️ Tónus, 🎨 Szín', 'Grade layer / Filter → 🎚️ Tone, 🎨 Color', 'Grade / Filter → 🎚️ Ton, 🎨 Farbe'),
-        L('Expozíció/árnyékok + hőmérséklet/szaturáció a helyére kerül.', 'Exposure/shadows + temp/saturation set.', 'Belichtung + Temperatur/Sättigung.')
+        L('Expozíció/árnyékok + hőmérséklet/szaturáció a helyére kerül.', 'Exposure/shadows + temp/saturation set.', 'Belichtung + Temperatur/Sättigung.'),
+        'toolbar.grade'
       ),
       S(
         L('Görbézz csatornánként.', 'Curve per channel.', 'Kurven pro Kanal.'),
@@ -343,8 +360,9 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
     steps: [
       S(
         L('Kérj feliratot a beszédből.', 'Request captions from speech.', 'Untertitel aus Sprache.'),
-        L('Felirat panel → „Felirat a beszédből (Whisper)"', 'Captions panel → "Captions from speech (Whisper)"', 'Untertitel-Panel → Whisper'),
-        L('Időzített feliratok (fordítás/karaoke opcióval).', 'Timed captions (translate/karaoke).', 'Getaktete Untertitel.')
+        L('Eszköztár → Felirat → „Felirat a beszédből (Whisper)"', 'Toolbar → Captions → "Captions from speech (Whisper)"', 'Werkzeugleiste → Untertitel → Whisper'),
+        L('Időzített feliratok (fordítás/karaoke opcióval).', 'Timed captions (translate/karaoke).', 'Getaktete Untertitel.'),
+        'toolbar.captions'
       ),
     ],
   },
@@ -418,7 +436,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Add hozzá a szögeket és szinkronizálj.', 'Add angles and sync.', 'Winkel hinzufügen, synchronisieren.'),
         L('Eszköztár → Multicam → + Szög · 🎚️ Auto-sync (hang)', 'Toolbar → Multicam → + Angle · 🎚️ Auto-sync (audio)', 'Werkzeugleiste → Multicam'),
-        L('A szögök a hullámforma alapján egymáshoz igazodnak.', 'Angles align by waveform.', 'Winkel richten sich aus.')
+        L('A szögök a hullámforma alapján egymáshoz igazodnak.', 'Angles align by waveform.', 'Winkel richten sich aus.'),
+        'toolbar.multicam'
       ),
       S(
         L('Vágj élőben és építs szekvenciát.', 'Cut live and build a sequence.', 'Live schneiden, Sequenz bauen.'),
@@ -435,7 +454,8 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
       S(
         L('Nyisd az Exportot és válassz presetet.', 'Open Export and pick a preset.', 'Öffne Export, wähle ein Preset.'),
         L('Eszköztár → Export → TikTok/Reels/Shorts/YouTube', 'Toolbar → Export → TikTok/Reels/Shorts/YouTube', 'Werkzeugleiste → Export'),
-        L('Felbontás/FPS/bitráta/kodek beáll; Haladó alatt HDR/10-bit.', 'Resolution/FPS/bitrate/codec set.', 'Auflösung/FPS/Bitrate/Codec.')
+        L('Felbontás/FPS/bitráta/kodek beáll; Haladó alatt HDR/10-bit.', 'Resolution/FPS/bitrate/codec set.', 'Auflösung/FPS/Bitrate/Codec.'),
+        'toolbar.export'
       ),
       S(
         L('Exportálj eszközön vagy felhőben, vagy oszd meg.', 'Export on device or cloud, or publish.', 'Exportiere lokal/Cloud oder teile.'),

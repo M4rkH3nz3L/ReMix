@@ -2582,8 +2582,21 @@
   "nav": {
     "feed": "Feed",
     "studio": "Studio",
+    "chat": "Chat",
     "channel": "Channel",
     "notifications": "Alerts"
+  },
+  "chat": {
+    "inbox": "Messages",
+    "inboxEmpty": "No conversations yet. Start one from a channel with the Message button.",
+    "conversation": "Conversation",
+    "projectConversation": "Project chat",
+    "someone": "Someone",
+    "noMessages": "No messages",
+    "message": "Message",
+    "messagePlaceholder": "Write a message…",
+    "send": "Send",
+    "startHint": "Say hi with the first message 👋"
   },
   "feed": {
     "title": "Feed",

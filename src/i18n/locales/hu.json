@@ -2582,8 +2582,21 @@
   "nav": {
     "feed": "Feed",
     "studio": "Stúdió",
+    "chat": "Chat",
     "channel": "Csatorna",
     "notifications": "Értesítők"
+  },
+  "chat": {
+    "inbox": "Üzenetek",
+    "inboxEmpty": "Még nincs beszélgetésed. Nyiss egyet egy csatornán az Üzenet gombbal.",
+    "conversation": "Beszélgetés",
+    "projectConversation": "Projekt-csevegés",
+    "someone": "Valaki",
+    "noMessages": "Nincs üzenet",
+    "message": "Üzenet",
+    "messagePlaceholder": "Írj üzenetet…",
+    "send": "Küldés",
+    "startHint": "Írj az első üzenettel 👋"
   },
   "feed": {
     "title": "Feed",

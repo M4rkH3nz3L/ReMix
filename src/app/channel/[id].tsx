@@ -28,6 +28,7 @@ import {
   toggleFollow,
   type ChannelData,
 } from '@/lib/feed';
+import { openDm } from '@/lib/chat';
 import { InsufficientCreditsError } from '@/lib/shop';
 import {
   creatorTotals,
@@ -88,6 +89,16 @@ export default function ChannelScreen() {
     setFollowing(next);
     setFollowers((n) => n + (next ? 1 : -1));
     toggleFollow(id, next).catch(() => {});
+  };
+
+  // 💬 közvetlen üzenet a csatorna tulajának (DM megnyitás/létrehozás)
+  const onMessage = () => {
+    if (!id) {
+      return;
+    }
+    openDm(id)
+      .then((convId) => router.push(`/chat/${convId}`))
+      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
   };
 
   const showStats = (post: FeedPost) => {
@@ -314,14 +325,19 @@ export default function ChannelScreen() {
                   <Text style={styles.editBtnText}>{t('channel.editProfile')}</Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  style={[styles.followBtn, following && styles.followingBtn]}
-                  onPress={onFollow}
-                >
-                  <Text style={[styles.followBtnText, following && styles.followingBtnText]}>
-                    {following ? t('channel.following2') : t('channel.follow')}
-                  </Text>
-                </Pressable>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={[styles.followBtn, following && styles.followingBtn]}
+                    onPress={onFollow}
+                  >
+                    <Text style={[styles.followBtnText, following && styles.followingBtnText]}>
+                      {following ? t('channel.following2') : t('channel.follow')}
+                    </Text>
+                  </Pressable>
+                  <Pressable style={styles.msgBtn} onPress={onMessage} accessibilityLabel={t('chat.message')}>
+                    <Ionicons name="chatbubble-outline" size={18} color={palette.text} />
+                  </Pressable>
+                </View>
               )}
             </View>
           }
@@ -459,7 +475,6 @@ const styles = StyleSheet.create({
   statNum: { color: palette.text, fontSize: 17, fontWeight: '800' },
   statLabel: { color: palette.textDim, fontSize: 12 },
   followBtn: {
-    marginTop: 14,
     backgroundColor: palette.accent,
     borderRadius: 999,
     paddingHorizontal: 40,
@@ -468,6 +483,17 @@ const styles = StyleSheet.create({
   followingBtn: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
   followBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   followingBtnText: { color: palette.text },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  msgBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   editBtn: {
     marginTop: 14,
     flexDirection: 'row',

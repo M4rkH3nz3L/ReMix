@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotificationSheet } from '@/components/NotificationSheet';
 import { palette } from '@/constants/editor';
 import { useAuth } from '@/store/authStore';
+import { useChat } from '@/store/chatStore';
 import { useNotifications } from '@/store/notificationStore';
 
 /**
@@ -20,13 +21,14 @@ import { useNotifications } from '@/store/notificationStore';
 
 export const BOTTOM_NAV_HEIGHT = 56;
 
-type NavKey = 'feed' | 'studio' | 'channel';
+type NavKey = 'feed' | 'studio' | 'chat' | 'channel';
 
 export function BottomNav({ active, translucent }: { active: NavKey; translucent?: boolean }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const myId = useAuth((s) => s.user?.id ?? null);
   const unread = useNotifications((s) => s.unread);
+  const chatUnread = useChat((s) => s.unreadTotal);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const go = (key: NavKey) => {
@@ -37,6 +39,8 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
       router.replace('/feed');
     } else if (key === 'studio') {
       router.replace('/');
+    } else if (key === 'chat') {
+      router.replace('/inbox');
     } else if (myId) {
       router.replace(`/channel/${myId}`);
     }
@@ -54,6 +58,8 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
 
   // 🔔 az olvasatlan értesítés kiemeli az ikont (accent), a badge a darabszámot mutatja
   const notifColor = unread > 0 ? palette.accent : inactive;
+  // 💬 chat: olvasatlan beszélgetés → kiemelés + badge
+  const chatColor = active === 'chat' ? (translucent ? '#fff' : palette.accent) : chatUnread > 0 ? palette.accent : inactive;
 
   return (
     <>
@@ -70,6 +76,26 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
       >
         {item('feed', active === 'feed' ? 'play' : 'play-outline', t('nav.feed'))}
         {item('studio', active === 'studio' ? 'grid' : 'grid-outline', t('nav.studio'))}
+        <Pressable
+          style={styles.item}
+          onPress={() => go('chat')}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.chat')}
+        >
+          <View>
+            <Ionicons
+              name={active === 'chat' ? 'chatbubble' : 'chatbubble-outline'}
+              size={23}
+              color={chatColor}
+            />
+            {chatUnread > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.label, { color: chatColor }]}>{t('nav.chat')}</Text>
+        </Pressable>
         {item('channel', active === 'channel' ? 'person' : 'person-outline', t('nav.channel'))}
         <Pressable
           style={styles.item}

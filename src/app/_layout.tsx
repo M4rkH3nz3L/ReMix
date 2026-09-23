@@ -20,6 +20,7 @@ import {
   registerForPush,
 } from '@/lib/pushNotifications';
 import { useAuth } from '@/store/authStore';
+import { useChat } from '@/store/chatStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useNotifications } from '@/store/notificationStore';
 import { useTutorial } from '@/store/tutorialStore';
@@ -53,6 +54,15 @@ export default function RootLayout() {
   // 🔔 értesítések: login → betöltés + realtime feliratkozás; logout → ürítés
   useEffect(() => {
     void useNotifications.getState().syncForUser(userId);
+  }, [userId]);
+
+  // 💬 chat-inbox: bejelentkezve a badge-hez realtime figyeljük a beszélgetéseket
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    const stop = useChat.getState().startInbox();
+    return stop;
   }, [userId]);
 
   // 📲 push: bejelentkezve engedélyt kérünk + (ha lehet) push-tokent mentünk
@@ -130,6 +140,8 @@ export default function RootLayout() {
               <Stack.Screen name="shop" />
               <Stack.Screen name="feed" />
               <Stack.Screen name="channel/[id]" />
+              <Stack.Screen name="inbox" />
+              <Stack.Screen name="chat/[id]" />
             </Stack.Protected>
             <Stack.Protected guard={!authed}>
               <Stack.Screen name="auth" />

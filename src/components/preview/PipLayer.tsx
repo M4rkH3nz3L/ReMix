@@ -223,6 +223,22 @@ function PipVideoClip({
     }
   }, [player, isPlaying, clip, playhead]);
 
+  // 🔒 árva natív lejátszás elleni védelem (mint a fő videónál): ha a lejátszó
+  // MAGÁTÓL elindul (iOS AVPlayer seek után), de a store szünetel, visszapauzáljuk
+  // — a lejátszófej állhat közben, ezért a playhead-alapú effektek nem fognák meg.
+  useEffect(() => {
+    const sub = player.addListener('playingChange', ({ isPlaying: nowPlaying }) => {
+      if (nowPlaying && !useEditorStore.getState().isPlaying) {
+        try {
+          player.pause();
+        } catch {
+          // a lejátszó épp cserélődik/tölt
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
   return (
     <PipClipFrame layout={layout}>
       <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />

@@ -237,6 +237,24 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
   }, [player, isPlaying, videoClip, isFocused]);
 
+  // 🔒 a natív lejátszó néha MAGÁTÓL elindul (iOS AVPlayer seek után) — ilyenkor a
+  // store SZÜNETEL, a mesteróra áll (a lejátszófej/timeline nem mozog), a gomb
+  // szünetet mutat, mégis megy a videó („árva" lejátszás). A playhead-alapú
+  // effektek nem fogják meg, mert a fej ÁLL — ezért közvetlenül a lejátszó
+  // állapot-eseményére iratkozunk fel, és ha a store szünetel, visszapauzáljuk.
+  useEffect(() => {
+    const sub = player.addListener('playingChange', ({ isPlaying: nowPlaying }) => {
+      if (nowPlaying && !useEditorStore.getState().isPlaying) {
+        try {
+          player.pause();
+        } catch {
+          // a lejátszó épp cserélődik/tölt — a play/pause effekt úgyis rendezi
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
   // álló lejátszófejnél (görgetés/vágás) pontos seek. FONTOS: a natív lejátszót
   // PAUZÁLTAN is tartjuk — különben (pl. iOS AVPlayer seek-viselkedés miatt) a
   // videó tovább játszhat, miközben a store/gomb szünetet mutat (playhead-scrub

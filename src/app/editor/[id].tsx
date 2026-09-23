@@ -27,6 +27,7 @@ import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
+import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
 import { loadEvents, loadProject, recordAutoVersion, saveEvents, saveProject } from '@/lib/storage';
@@ -36,6 +37,7 @@ import type { MissingMedia } from '@/lib/videdFile';
 import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
 import { indexProjectVision } from '@/lib/visionSearch';
+import { useChat } from '@/store/chatStore';
 import { useCollabLive } from '@/store/collabLiveStore';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
@@ -92,6 +94,20 @@ export default function EditorScreen() {
     void useCollabLive.getState().start(id);
     return () => useCollabLive.getState().stop();
   }, [collab?.ownerId, id, project?.id]);
+
+  // 💬 collab-chat: a projekt-beszélgetést nyitja (a résztvevőkkel) a chat-képernyőn
+  const openCollabChat = () => {
+    const owner = collab?.ownerId;
+    if (!owner || !id) {
+      return;
+    }
+    openProjectConversation(owner, id)
+      .then((convId) => {
+        void useChat.getState().loadInbox(); // a fejléc-cím/kind azonnal helyes legyen
+        router.push(`/chat/${convId}`);
+      })
+      .catch(() => {});
+  };
 
   // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
   // füléből: ?panel=assistant) — a projekt betöltése után EGYSZER nyitjuk meg
@@ -415,6 +431,17 @@ export default function EditorScreen() {
       <View style={styles.headerActions}>
         {/* 👥 élő résztvevők (realtime presence) — csak ha más is bent van */}
         <CollabPresence />
+        {/* 💬 collab-chat — csak megosztott projektnél */}
+        {collab ? (
+          <Pressable
+            onPress={openCollabChat}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.projectConversation')}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={21} color={palette.accent2} />
+          </Pressable>
+        ) : null}
         {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
         <Pressable
           onPress={() => useTutorial.getState().openMenu()}

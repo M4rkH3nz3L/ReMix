@@ -49,12 +49,22 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
     setPlayhead(clamp(e.nativeEvent.locationX / secToX, 0, totalDur));
   };
 
+  // a scrub SZÜNETELTETI a lejátszást — ugyanúgy, mint a fő idővonal húzása
+  // (onScrollBeginDrag). Enélkül a minimap-pal mozgatva a videó tovább menne, de a
+  // play/pause gomb nem váltana át (inkonzisztens, buggos érzés).
+  const beginScrub = (e: GestureResponderEvent) => {
+    if (useEditorStore.getState().isPlaying) {
+      useEditorStore.getState().setPlaying(false);
+    }
+    seek(e);
+  };
+
   return (
     <View
       style={styles.strip}
       onLayout={(e) => setMapW(e.nativeEvent.layout.width)}
       onStartShouldSetResponder={() => true}
-      onResponderGrant={seek}
+      onResponderGrant={beginScrub}
       onResponderMove={seek}
       accessibilityRole="adjustable"
       accessibilityLabel={t('editor.timeline.minimap')}

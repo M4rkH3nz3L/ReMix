@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# lokális teszt-userek (jelszavakat tartalmaz; csak a helyi dev Supabase-ben léteznek)
+users.json
+
 # Expo
 .expo/
 dist/

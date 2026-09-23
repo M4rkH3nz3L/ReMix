@@ -44,7 +44,8 @@ interface AuthState {
     password: string,
     profile: SignUpProfile,
   ) => Promise<AuthResult>;
-  signIn: (email: string, password: string) => Promise<AuthResult>;
+  /** belépés e-maillel, felhasználónévvel VAGY telefonnal (azonosító → e-mail feloldás) */
+  signIn: (identifier: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -112,6 +113,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       options: {
         data: {
           full_name: profile.fullName.trim(),
+          username: profile.username.trim(),
           phone: profile.phone.trim(),
           birthday: profile.birthday.trim(),
           country: profile.country.trim(),
@@ -136,9 +138,22 @@ export const useAuth = create<AuthState>((set, get) => ({
     return {};
   },
 
-  signIn: async (email, password) => {
+  signIn: async (identifier, password) => {
     if (!supabase) {
       return { error: 'Supabase nincs konfigurálva.' };
+    }
+    // e-mail → közvetlen; felhasználónév/telefon → e-mailre feloldás (RPC, belépés
+    // előtt fut, anon szerepként). A profiles owner-only RLS-t a definer kerüli meg.
+    let email = identifier.trim();
+    if (!email.includes('@')) {
+      const resolved = await supabase.rpc('resolve_login_email', { p_identifier: email });
+      if (resolved.error) {
+        return { error: messageOf(resolved.error) };
+      }
+      if (!resolved.data) {
+        return { error: 'Nincs ilyen felhasználó (e-mail, felhasználónév vagy telefon).' };
+      }
+      email = resolved.data as string;
     }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

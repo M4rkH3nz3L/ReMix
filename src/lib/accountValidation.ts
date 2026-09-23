@@ -8,6 +8,8 @@
 /** A signUp-hoz begyűjtött profil-mezők. */
 export interface SignUpProfile {
   fullName: string;
+  /** egyedi felhasználónév (belépéshez is használható) */
+  username: string;
   phone: string;
   /** ISO dátum: YYYY-MM-DD */
   birthday: string;
@@ -82,10 +84,19 @@ export function isNonEmpty(value: string): boolean {
   return value.trim().length > 0;
 }
 
+/**
+ * Felhasználónév: betűvel kezdődik, 3–20 karakter hosszú, csak [a-zA-Z0-9_].
+ * (A tényleges EGYEDISÉGET a DB unique-indexe kényszeríti ki.)
+ */
+export function isValidUsername(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9_]{2,19}$/.test(value.trim());
+}
+
 /** Az egész signUp-profil érvényes-e (a gomb engedélyezéséhez). */
 export function isSignUpProfileValid(profile: SignUpProfile): boolean {
   return (
     isValidFullName(profile.fullName) &&
+    isValidUsername(profile.username) &&
     isValidPhone(profile.phone) &&
     isValidBirthday(profile.birthday) &&
     isNonEmpty(profile.country) &&

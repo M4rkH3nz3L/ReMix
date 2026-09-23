@@ -23,6 +23,7 @@ import {
   isValidBirthday,
   isValidFullName,
   isValidPhone,
+  isValidUsername,
   looksLikeEmail,
 } from '@/lib/accountValidation';
 import { useAuth } from '@/store/authStore';
@@ -45,6 +46,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   // regisztrációs profil-mezők
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
   const [country, setCountry] = useState('');
@@ -59,21 +61,27 @@ export default function AuthScreen() {
 
   // mező-hibák csak akkor látszanak, ha már írt bele (üresen ne piroskodjon)
   const nameError = isSignUp && fullName.length > 0 && !isValidFullName(fullName);
+  const usernameError = isSignUp && username.length > 0 && !isValidUsername(username);
   const phoneError = isSignUp && phone.length > 0 && !isValidPhone(phone);
   const birthdayError =
     isSignUp && birthday.length > 0 && !isValidBirthday(birthday);
 
   const signUpFieldsValid =
     isValidFullName(fullName) &&
+    isValidUsername(username) &&
     isValidPhone(phone) &&
     isValidBirthday(birthday) &&
     isNonEmpty(country) &&
     isNonEmpty(city);
 
+  // belépéskor az azonosító e-mail / felhasználónév / telefon (elég nem üresnek lennie);
+  // regisztrációkor az e-mail KÖTELEZŐ (a fiók arra jön létre)
+  const identifierValid = isSignUp ? looksLikeEmail(email) : email.trim().length > 0;
+
   const canSubmit =
     configured &&
     !busy &&
-    looksLikeEmail(email) &&
+    identifierValid &&
     password.length >= 6 &&
     (!isSignUp || (signUpFieldsValid && accepted));
 
@@ -87,6 +95,7 @@ export default function AuthScreen() {
       const result = isSignUp
         ? await signUp(email.trim(), password, {
             fullName,
+            username,
             phone,
             birthday,
             country,
@@ -180,21 +189,40 @@ export default function AuthScreen() {
                 <Text style={nameError ? styles.error : styles.hint}>
                   {t('auth.nameHint')}
                 </Text>
+
+                <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
+                <TextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder={t('auth.usernamePlaceholder')}
+                  placeholderTextColor={palette.textDim}
+                  style={[styles.input, usernameError && styles.inputError]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="username"
+                  autoComplete="username-new"
+                  editable={!busy}
+                />
+                <Text style={usernameError ? styles.error : styles.hint}>
+                  {t('auth.usernameHint')}
+                </Text>
               </>
             ) : null}
 
-            <Text style={styles.fieldLabel}>{t('auth.emailLabel')}</Text>
+            <Text style={styles.fieldLabel}>
+              {isSignUp ? t('auth.emailLabel') : t('auth.identifierLabel')}
+            </Text>
             <TextInput
               value={email}
               onChangeText={setEmail}
-              placeholder={t('auth.emailPlaceholder')}
+              placeholder={isSignUp ? t('auth.emailPlaceholder') : t('auth.identifierPlaceholder')}
               placeholderTextColor={palette.textDim}
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
+              keyboardType={isSignUp ? 'email-address' : 'default'}
+              textContentType={isSignUp ? 'emailAddress' : 'username'}
+              autoComplete={isSignUp ? 'email' : 'username'}
               editable={!busy}
             />
 

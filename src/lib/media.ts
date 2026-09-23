@@ -1,4 +1,3 @@
-import { createAudioPlayer } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
@@ -78,6 +77,14 @@ export async function pickImage(): Promise<{ uri: string } | null> {
  * ilyenkor eshet vissza egy alapértelmezésre.
  */
 export async function probeAudioDuration(uri: string): Promise<number> {
+  // lazy (dinamikus) import: az expo-audio natív modult NE húzzuk be modul-szinten,
+  // különben minden, a media.ts-t tranzitívan importáló teszt betöltéskor elhasal
+  let createAudioPlayer: typeof import('expo-audio').createAudioPlayer;
+  try {
+    ({ createAudioPlayer } = await import('expo-audio'));
+  } catch {
+    return 0;
+  }
   return new Promise<number>((resolve) => {
     let player: ReturnType<typeof createAudioPlayer> | null = null;
     let sub: { remove: () => void } | null = null;

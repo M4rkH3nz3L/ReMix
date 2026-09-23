@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -23,6 +23,7 @@ import {
   currentUserId,
   deleteComment,
   listComments,
+  subscribeComments,
   type PostComment,
 } from '@/lib/feed';
 import type { FeedPost } from '@/types/social';
@@ -56,6 +57,12 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
 
   const me = currentUserId();
   const isPostOwner = !!post && me === post.creator.id;
+  // a számláló-callbacket refből hívjuk, hogy a realtime-effekt STABIL maradjon
+  // (ne iratkozzon újra minden szülő-renderre)
+  const onCountChangeRef = useRef(onCountChange);
+  useEffect(() => {
+    onCountChangeRef.current = onCountChange;
+  }, [onCountChange]);
   // 🛡️ globális moderátor-jog: bárki kommentjét törölheti (a szerző + poszt-tulaj mellé)
   const canModerate = useRoles((s) => s.permissions.includes('comment.moderate'));
   // származtatott betöltés-állapot → nincs szinkron setState az effektben
@@ -83,6 +90,23 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
       alive = false;
     };
   }, [post]);
+
+  // 🔴 élő kommentek: más felhasználó kommentje azonnal megjelenik (id szerint
+  // dedup — a saját optimista kommentet nem duplázzuk; a számláló csak a MÁSOK
+  // kommentjére nő, a sajátot az onSend számolta)
+  useEffect(() => {
+    const postId = post?.id;
+    if (!postId) {
+      return;
+    }
+    const unsub = subscribeComments(postId, (c) => {
+      setComments((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev]));
+      if (c.authorId !== me) {
+        onCountChangeRef.current(1);
+      }
+    });
+    return unsub;
+  }, [post?.id, me]);
 
   const onSend = () => {
     const body = text.trim();

@@ -492,7 +492,7 @@ export async function addComment(postId: string, body: string): Promise<PostComm
   if (!text) {
     throw new Error('Üres komment.');
   }
-  const { username, name } = await creatorFields();
+  const { username, name, avatar } = await creatorFields();
   const { data, error } = await sb
     .from('post_comments')
     .insert({
@@ -501,6 +501,7 @@ export async function addComment(postId: string, body: string): Promise<PostComm
       body: text.slice(0, 2000),
       author_username: username,
       author_name: name,
+      author_avatar: avatar,
     })
     .select(COMMENT_COLUMNS)
     .single();
@@ -508,6 +509,35 @@ export async function addComment(postId: string, body: string): Promise<PostComm
     throw new Error(error.message);
   }
   return toComment(data as CommentRow);
+}
+
+/** Monoton számláló egyedi realtime-topichoz (lásd a notifications mintát). */
+let commentChannelSeq = 0;
+
+/**
+ * 🔴 Élő kommentek egy poszthoz: új komment INSERT-re értesít. A `post_comments`
+ * tábla realtime-publikált; az RLS csak látható poszt kommentjeit engedi. A topic
+ * egyedi (`:${++seq}`) a gyors újra-feliratkozás miatt (mint a notifications/chat).
+ */
+export function subscribeComments(
+  postId: string,
+  onInsert: (c: PostComment) => void
+): () => void {
+  const sb = supabase;
+  if (!sb) {
+    return () => {};
+  }
+  const channel = sb
+    .channel(`post_comments:${postId}:${++commentChannelSeq}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
+      (payload) => onInsert(toComment(payload.new as CommentRow))
+    )
+    .subscribe();
+  return () => {
+    void sb.removeChannel(channel);
+  };
 }
 
 /**

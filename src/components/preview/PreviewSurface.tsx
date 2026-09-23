@@ -237,12 +237,18 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
   }, [player, isPlaying, videoClip, isFocused]);
 
-  // álló lejátszófejnél (görgetés/vágás) pontos seek
+  // álló lejátszófejnél (görgetés/vágás) pontos seek. FONTOS: a natív lejátszót
+  // PAUZÁLTAN is tartjuk — különben (pl. iOS AVPlayer seek-viselkedés miatt) a
+  // videó tovább játszhat, miközben a store/gomb szünetet mutat (playhead-scrub
+  // desync). A hang-réteg (AudioLayer) is így tesz minden seeknél.
   useEffect(() => {
     if (!videoClip || isPlaying) {
       return;
     }
     try {
+      if (player.playing) {
+        player.pause();
+      }
       player.currentTime = sourceTimeAt(videoClip, playhead);
     } catch {
       // a forrás még töltődik — a replaceAsync utáni seek rendezi

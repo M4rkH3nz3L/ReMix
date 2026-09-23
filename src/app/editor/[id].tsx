@@ -92,7 +92,24 @@ export default function EditorScreen() {
       return;
     }
     void useCollabLive.getState().start(id);
-    return () => useCollabLive.getState().stop();
+    // 👥 a saját lejátszófej broadcastja a többieknek (throttle ~150 ms — a playhead
+    // ~60×/mp változik, de a kurzornak elég a ritkább frissítés)
+    let last = 0;
+    const unsubCursor = useEditorStore.subscribe((s, prev) => {
+      if (s.playhead === prev.playhead) {
+        return;
+      }
+      const now = Date.now();
+      if (now - last < 150) {
+        return;
+      }
+      last = now;
+      useCollabLive.getState().sendCursor(s.playhead);
+    });
+    return () => {
+      unsubCursor();
+      useCollabLive.getState().stop();
+    };
   }, [collab?.ownerId, id, project?.id]);
 
   // 💬 collab-chat: a projekt-beszélgetést nyitja (a résztvevőkkel) a chat-képernyőn

@@ -24,6 +24,7 @@ import { detectBeats, timelineBeats } from '@/lib/beats';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatRuler } from '@/lib/time';
 import { clipInWindow, windowFor } from '@/lib/virtualize';
+import { useCollabLive } from '@/store/collabLiveStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project, TrackType } from '@/types/project';
 
@@ -121,6 +122,10 @@ export function Timeline() {
   const L = useLayout();
   const project = useEditorStore((s) => s.project);
   const isPlaying = useEditorStore((s) => s.isPlaying);
+  // 👥 kollaborátor-kurzorok (a többi szerkesztő lejátszófeje) — a tartalomba
+  // rajzoljuk, így a lokális playhead-görgetéssel EGYÜTT mozog, re-render nélkül;
+  // csak a résztvevők (throttle-olt) frissülésekor renderel újra
+  const collabCursors = useCollabLive((s) => s.participants);
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
@@ -910,6 +915,19 @@ export function Timeline() {
                 ]}
               />
             ))}
+            {/* 👥 kollaborátor-kurzorok: a többi szerkesztő lejátszófeje, saját színnel */}
+            {collabCursors.map((p) => (
+              <View
+                key={`cursor-${p.id}`}
+                pointerEvents="none"
+                style={[
+                  styles.remoteCursor,
+                  { left: p.playhead * pps, height: RULER_HEIGHT + totalTracksHeight, backgroundColor: p.color },
+                ]}
+              >
+                <View style={[styles.remoteCursorDot, { backgroundColor: p.color }]} />
+              </View>
+            ))}
           </View>
         </ScrollView>
 
@@ -1281,5 +1299,20 @@ const styles = StyleSheet.create({
     width: 2,
     backgroundColor: palette.text,
     borderRadius: 1,
+  },
+  remoteCursor: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    borderRadius: 1,
+    opacity: 0.9,
+  },
+  remoteCursorDot: {
+    position: 'absolute',
+    top: -2,
+    left: -3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

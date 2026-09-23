@@ -13,16 +13,18 @@ import { useEditorStore } from '@/store/editorStore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-/** ki végezte a műveletet — felhasználó / AI / rendszer */
+/** ki végezte a műveletet — felhasználó / AI / rendszer / távoli szerkesztő (collab) */
 const ACTOR_ICON: Record<EventActor, IoniconName> = {
   user: 'person-outline',
   ai: 'sparkles',
   system: 'settings-outline',
+  remote: 'people-outline',
 };
 const ACTOR_COLOR: Record<EventActor, string> = {
   user: palette.textDim,
   ai: palette.accent,
   system: palette.textDim,
+  remote: palette.accent2,
 };
 
 /** ISO → HH:MM (rövid idő a bejegyzéshez) */

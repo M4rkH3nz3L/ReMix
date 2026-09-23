@@ -110,6 +110,17 @@ const HISTORY_LIMIT = 50;
 /** ennyi eseményt őrzünk meg projektenként (AI-memória nyersanyag) */
 const EVENT_LIMIT = 300;
 
+/**
+ * 👥 Élő kollaboráció: ha aktív, a LOKÁLIS (nem 'remote') command-ok ide is mennek,
+ * hogy a collab-réteg broadcastolja őket a többi szerkesztőnek. A collabLive-store
+ * állítja be a csatorna nyitásakor, és `null`-ra a zárásakor. A store nem ismeri a
+ * hálózati réteget — csak egy függvényt hív (laza csatolás, tesztelhetőség).
+ */
+let liveBroadcaster: ((commands: EditorCommand[]) => void) | null = null;
+export function setLiveBroadcaster(fn: ((commands: EditorCommand[]) => void) | null): void {
+  liveBroadcaster = fn;
+}
+
 /** a sáv-kapcsolók state-kulcsai — mind `TrackType[]`-et tárol */
 type TrackFlagKey =
   | 'mutedTracks'
@@ -530,6 +541,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirty: true,
       events: [...events.slice(-EVENT_LIMIT + 1), event],
     });
+    // 👥 élő collab: a saját szerkesztést broadcastoljuk (a 'remote' visszajátszást nem)
+    if (actor !== 'remote') {
+      liveBroadcaster?.([command]);
+    }
     return true;
   },
 
@@ -564,6 +579,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirty: true,
       events: [...events, ...batchEvents].slice(-EVENT_LIMIT),
     });
+    // 👥 élő collab: a köteget EGY üzenetként broadcastoljuk (távoli oldalon is egy undo)
+    if (actor !== 'remote') {
+      liveBroadcaster?.(commands);
+    }
     return batchEvents.length;
   },
 

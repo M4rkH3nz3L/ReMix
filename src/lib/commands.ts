@@ -60,7 +60,7 @@ export type EditorCommand =
   | { type: 'UPSERT_IMAGE_DOC'; doc: ImageDoc; label?: string }
   | { type: 'REMOVE_IMAGE_DOC'; docId: string };
 
-export type EventActor = 'user' | 'ai' | 'system';
+export type EventActor = 'user' | 'ai' | 'system' | 'remote';
 
 /** A projekt-történet egy bejegyzése — az AI-memória (F3) nyersanyaga. */
 export interface ProjectEvent {

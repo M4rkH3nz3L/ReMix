@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CollabPresence } from '@/components/editor/CollabPresence';
 import { HangStudio } from '@/components/editor/HangStudio';
 import { ImageStudio } from '@/components/editor/ImageStudio';
 import { PanelHost } from '@/components/editor/PanelHost';
@@ -35,6 +36,7 @@ import type { MissingMedia } from '@/lib/videdFile';
 import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
 import { indexProjectVision } from '@/lib/visionSearch';
+import { useCollabLive } from '@/store/collabLiveStore';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
 
@@ -79,6 +81,17 @@ export default function EditorScreen() {
       myMembership(id).then(setCollab).catch(() => {});
     }
   }, [project?.id, id]);
+
+  // 👥 ÉLŐ collab: megosztott projektnél realtime csatorna (presence + parancs-szinkron).
+  // A start() belül ellenőrzi a tagságot — nem megosztott projektnél no-op.
+  useEffect(() => {
+    const owner = collab?.ownerId;
+    if (!owner || project?.id !== id) {
+      return;
+    }
+    void useCollabLive.getState().start(id);
+    return () => useCollabLive.getState().stop();
+  }, [collab?.ownerId, id, project?.id]);
 
   // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
   // füléből: ?panel=assistant) — a projekt betöltése után EGYSZER nyitjuk meg
@@ -400,6 +413,8 @@ export default function EditorScreen() {
         ) : null}
       </View>
       <View style={styles.headerActions}>
+        {/* 👥 élő résztvevők (realtime presence) — csak ha más is bent van */}
+        <CollabPresence />
         {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
         <Pressable
           onPress={() => useTutorial.getState().openMenu()}

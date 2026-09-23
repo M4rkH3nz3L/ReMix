@@ -18,6 +18,7 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
@@ -90,6 +91,8 @@ export default function FeedScreen() {
   const hintOpacity = useRef(new Animated.Value(0)).current;
   // 💬 a komment-gomb figyelemfelkeltő pulzálása (új funkció jelzése)
   const commentPulse = useRef(new Animated.Value(0)).current;
+  // ❤️ dupla-tap like: középső szív-pop animáció (TikTok-szerű)
+  const heartAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.sequence([
       Animated.timing(hintOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -180,6 +183,41 @@ export default function FeedScreen() {
     // mutatott a következő frissítésig (a felhasználó azt hitte, lájkolt)
     toggleLike(post.id, liked).catch(() => patch(post.id, apply(!liked)));
   };
+
+  // ❤️ középső szív-pop lejátszása (dupla-tap vizuális visszajelzése)
+  const popHeart = () => {
+    heartAnim.setValue(0);
+    Animated.sequence([
+      Animated.spring(heartAnim, { toValue: 1, friction: 4, tension: 90, useNativeDriver: true }),
+      Animated.delay(350),
+      Animated.timing(heartAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // dupla-tap a videón → LIKE (csak lájkol, nem vesz vissza) + szív-pop
+  const onDoubleTapLike = (post: FeedPost) => {
+    if (!post.viewerLiked) {
+      onLike(post);
+    } else {
+      bumpChrome();
+    }
+    popHeart();
+  };
+
+  // egyszeres tap = play/pause (onTapItem), dupla tap = like — a gesture-handler
+  // a dupla-tap elbukásáig vár az egyszeressel, így nincs kézi késleltetés/flicker
+  const tapGesture = (post: FeedPost) =>
+    Gesture.Exclusive(
+      Gesture.Tap()
+        .numberOfTaps(2)
+        .maxDuration(260)
+        .onEnd(() => onDoubleTapLike(post))
+        .runOnJS(true),
+      Gesture.Tap()
+        .maxDuration(260)
+        .onEnd(() => onTapItem(post))
+        .runOnJS(true)
+    );
 
   const onSave = (post: FeedPost) => {
     bumpChrome();
@@ -372,20 +410,40 @@ export default function FeedScreen() {
 
   const renderItem = ({ item }: { item: FeedPost }) => (
     <View style={[styles.page, { height: pageHeight, width }]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => onTapItem(item)}>
-        {item.id === activeId && item.videoUri ? (
-          <VideoView
-            player={player}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            nativeControls={false}
-          />
-        ) : item.posterUri ? (
-          <Image source={{ uri: item.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <LinearGradient colors={['#1a1e2e', '#0c0d12', '#241a3a']} style={StyleSheet.absoluteFill} />
-        )}
-      </Pressable>
+      <GestureDetector gesture={tapGesture(item)}>
+        <View style={StyleSheet.absoluteFill}>
+          {item.id === activeId && item.videoUri ? (
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              nativeControls={false}
+            />
+          ) : item.posterUri ? (
+            <Image source={{ uri: item.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : (
+            <LinearGradient colors={['#1a1e2e', '#0c0d12', '#241a3a']} style={StyleSheet.absoluteFill} />
+          )}
+        </View>
+      </GestureDetector>
+
+      {/* ❤️ dupla-tap like — középső szív-pop (csak az aktív oldalon, nem fog érintést) */}
+      {item.id === activeId ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.heartPop,
+            {
+              opacity: heartAnim,
+              transform: [
+                { scale: heartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.15] }) },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={120} color="#ffffff" />
+        </Animated.View>
+      ) : null}
 
       {/* jobb oldali akció-sor (like/komment/mentés/remix/…) — a többi chrome-mal
           EGYÜTT rejtőzik/jelenik meg (hármas koppintás / auto-hide): immerzív módban
@@ -607,6 +665,15 @@ const styles = StyleSheet.create({
   },
   emptyCtaText: { color: '#fff', fontWeight: '800' },
   page: { justifyContent: 'flex-end' },
+  heartPop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rail: { position: 'absolute', right: 10, alignItems: 'center', gap: 18 },
   railBtn: { alignItems: 'center', gap: 3 },
   railCount: { color: '#fff', fontSize: 12, fontWeight: '700' },

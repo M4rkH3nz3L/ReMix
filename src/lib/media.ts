@@ -1,3 +1,4 @@
+import { createAudioPlayer } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,6 +17,8 @@ export interface PickedVideo {
 export interface PickedAudio {
   uri: string;
   name: string;
+  /** a fájl VALÓS hossza másodpercben (0 = nem sikerült kiolvasni) */
+  duration: number;
 }
 
 /**
@@ -68,6 +71,54 @@ export async function pickImage(): Promise<{ uri: string } | null> {
   return { uri: persistToLibrary(result.assets[0].uri) };
 }
 
+/**
+ * 🎵 Egy hangfájl VALÓS hosszának kiolvasása (másodperc). A DocumentPicker NEM ad
+ * hosszt, ezért egy ideiglenes (néma, nem lejátszó) lejátszóval kiolvassuk a
+ * betöltött státuszból. `0`, ha nem sikerül (időkorlát/olvashatatlan) — a hívó
+ * ilyenkor eshet vissza egy alapértelmezésre.
+ */
+export async function probeAudioDuration(uri: string): Promise<number> {
+  return new Promise<number>((resolve) => {
+    let player: ReturnType<typeof createAudioPlayer> | null = null;
+    let sub: { remove: () => void } | null = null;
+    let done = false;
+    const finish = (d: number) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      try {
+        sub?.remove();
+      } catch {
+        // már eltávolítva
+      }
+      try {
+        player?.remove();
+      } catch {
+        // már felszabadítva
+      }
+      resolve(Number.isFinite(d) && d > 0 ? d : 0);
+    };
+    try {
+      player = createAudioPlayer(uri);
+    } catch {
+      finish(0);
+      return;
+    }
+    sub = player.addListener('playbackStatusUpdate', (status) => {
+      if (status.isLoaded && status.duration > 0) {
+        finish(status.duration);
+      }
+    });
+    // ha a metaadat már kész (cache), rögtön kiolvassuk
+    if (player.isLoaded && player.duration > 0) {
+      finish(player.duration);
+    }
+    // biztonsági időkorlát — ne lógjon, ha valamiért nem érkezik státusz
+    setTimeout(() => finish(player?.duration ?? 0), 5000);
+  });
+}
+
 export async function pickAudio(): Promise<PickedAudio | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: 'audio/*',
@@ -78,7 +129,10 @@ export async function pickAudio(): Promise<PickedAudio | null> {
     return null;
   }
   const asset = result.assets[0];
-  return { uri: persistToLibrary(asset.uri), name: asset.name };
+  const uri = persistToLibrary(asset.uri);
+  // a VALÓS hossz kiolvasása → a teljes fájl importálható (nem fix 10 mp)
+  const duration = await probeAudioDuration(uri).catch(() => 0);
+  return { uri, name: asset.name, duration };
 }
 
 export interface PickedLut {

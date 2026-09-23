@@ -243,7 +243,9 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const importOwn = async () => {
     const picked = await pickAudio();
     if (picked) {
-      addAudioClip(picked.uri, picked.name, 10);
+      // a TELJES fájlt importáljuk a valós hosszával (a user utólag trimmelheti);
+      // ha a hossz nem olvasható ki, óvatos alapérték
+      addAudioClip(picked.uri, picked.name, picked.duration > 0 ? picked.duration : 10);
     }
   };
 

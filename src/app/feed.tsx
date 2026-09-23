@@ -24,6 +24,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { CommentSheet } from '@/components/CommentSheet';
 import { showError } from '@/components/ui/errorAlert';
+import { haptics } from '@/design';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import {
@@ -194,8 +195,9 @@ export default function FeedScreen() {
     ]).start();
   };
 
-  // dupla-tap a videón → LIKE (csak lájkol, nem vesz vissza) + szív-pop
+  // dupla-tap a videón → LIKE (csak lájkol, nem vesz vissza) + szív-pop + haptika
   const onDoubleTapLike = (post: FeedPost) => {
+    haptics.impact();
     if (!post.viewerLiked) {
       onLike(post);
     } else {

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { haptics } from '@/design';
 import { currentUserId, type ChatMessage } from '@/lib/chat';
 import { useChat } from '@/store/chatStore';
 
@@ -40,6 +41,7 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
     }
     setText('');
     setSending(true);
+    haptics.selection();
     try {
       await send(body);
     } catch {

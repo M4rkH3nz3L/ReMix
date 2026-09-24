@@ -2602,7 +2602,16 @@
     "messagePlaceholder": "Írj üzenetet…",
     "send": "Küldés",
     "startHint": "Írj az első üzenettel 👋",
-    "typing": "{{name}} gépel…"
+    "typing": "{{name}} gépel…",
+    "group": "Csoport",
+    "newGroup": "Új csoport",
+    "addPeople": "Résztvevő hozzáadása",
+    "groupNamePlaceholder": "Csoport neve (opcionális)",
+    "noFollowing": "Kövess embereket, hogy csoportba hívhasd őket.",
+    "createGroup": "Csoport létrehozása",
+    "addSelected": "Hozzáadás ({{count}})",
+    "leaveGroup": "Kilépés a csoportból",
+    "manageGroup": "Csoport kezelése"
   },
   "feed": {
     "title": "Feed",

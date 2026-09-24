@@ -2602,7 +2602,16 @@
     "messagePlaceholder": "Write a message…",
     "send": "Send",
     "startHint": "Say hi with the first message 👋",
-    "typing": "{{name}} is typing…"
+    "typing": "{{name}} is typing…",
+    "group": "Group",
+    "newGroup": "New group",
+    "addPeople": "Add people",
+    "groupNamePlaceholder": "Group name (optional)",
+    "noFollowing": "Follow people to add them to a group.",
+    "createGroup": "Create group",
+    "addSelected": "Add ({{count}})",
+    "leaveGroup": "Leave group",
+    "manageGroup": "Manage group"
   },
   "feed": {
     "title": "Feed",

@@ -2602,7 +2602,16 @@
     "messagePlaceholder": "Nachricht schreiben…",
     "send": "Senden",
     "startHint": "Sag Hallo mit der ersten Nachricht 👋",
-    "typing": "{{name}} tippt…"
+    "typing": "{{name}} tippt…",
+    "group": "Gruppe",
+    "newGroup": "Neue Gruppe",
+    "addPeople": "Personen hinzufügen",
+    "groupNamePlaceholder": "Gruppenname (optional)",
+    "noFollowing": "Folge Leuten, um sie zu einer Gruppe hinzuzufügen.",
+    "createGroup": "Gruppe erstellen",
+    "addSelected": "Hinzufügen ({{count}})",
+    "leaveGroup": "Gruppe verlassen",
+    "manageGroup": "Gruppe verwalten"
   },
   "feed": {
     "title": "Feed",

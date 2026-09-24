@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { GroupCreateSheet } from '@/components/chat/GroupCreateSheet';
 import { palette } from '@/constants/editor';
-import type { Conversation } from '@/lib/chat';
+import { groupTitle, type Conversation } from '@/lib/chat';
 import { useChat } from '@/store/chatStore';
 
 /** Rövid, relatív idő (most/perc/óra/nap). */
@@ -27,6 +28,7 @@ export default function InboxScreen() {
   const conversations = useChat((s) => s.conversations);
   const loading = useChat((s) => s.inboxLoading);
   const loadInbox = useChat((s) => s.loadInbox);
+  const [groupOpen, setGroupOpen] = useState(false);
 
   // képernyőre lépéskor frissítünk (a realtime-figyelést a root indítja a badge-hez)
   useFocusEffect(
@@ -41,13 +43,16 @@ export default function InboxScreen() {
 
   const row = ({ item }: { item: Conversation }) => {
     const isProject = item.kind === 'project';
+    const isGroup = item.kind === 'group';
     const title = isProject
       ? t('chat.projectConversation')
-      : item.peer?.name || t('chat.someone');
+      : isGroup
+        ? groupTitle(item, t('chat.group'))
+        : item.peer?.name || t('chat.someone');
     return (
       <Pressable style={styles.row} onPress={() => open(item)} accessibilityRole="button">
         <View style={styles.avatar}>
-          {isProject ? (
+          {isProject || isGroup ? (
             <Ionicons name="people" size={22} color="#fff" />
           ) : item.peer?.avatar ? (
             <Image source={{ uri: item.peer.avatar }} style={styles.avatarImg} contentFit="cover" />
@@ -75,6 +80,14 @@ export default function InboxScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('chat.inbox')}</Text>
+        <Pressable
+          onPress={() => setGroupOpen(true)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('chat.newGroup')}
+        >
+          <Ionicons name="create-outline" size={24} color={palette.text} />
+        </Pressable>
       </View>
       {loading && conversations.length === 0 ? (
         <View style={styles.center}>
@@ -94,6 +107,12 @@ export default function InboxScreen() {
           }
         />
       )}
+      <GroupCreateSheet
+        visible={groupOpen}
+        onClose={() => setGroupOpen(false)}
+        mode="create"
+        onDone={(cid) => router.push(`/chat/${cid}`)}
+      />
       <BottomNav active="chat" />
     </SafeAreaView>
   );
@@ -101,7 +120,13 @@ export default function InboxScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.bg },
-  header: { paddingHorizontal: 16, paddingVertical: 12 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   headerTitle: { color: palette.text, fontSize: 22, fontWeight: '800' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: {

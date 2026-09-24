@@ -15,7 +15,7 @@ import { useAuth } from '@/store/authStore';
  * Ingyenes (a collab már ingyen — adatbiztonság).
  */
 
-export type ConversationKind = 'dm' | 'project';
+export type ConversationKind = 'dm' | 'project' | 'group';
 
 export interface ChatPeer {
   id: string;
@@ -31,8 +31,12 @@ export interface Conversation {
   lastMessageAt: string;
   lastMessagePreview: string | null;
   lastSenderId: string | null;
+  /** csoport neve (kind='group'); ha nincs, a tagnevekből képezzük a címet */
+  title?: string;
   /** DM-nél a MÁSIK fél (a fejléc/inbox-sorhoz); projekt-chatnél nincs */
   peer?: ChatPeer;
+  /** csoportnál a TÖBBI tag (avatar-stack + cím); DM/projektnél nincs */
+  members?: ChatPeer[];
   /** van-e nem-olvasott üzenet (a saját last_read_at-hez képest, más feladótól) */
   hasUnread: boolean;
 }
@@ -53,6 +57,7 @@ interface ConversationRow {
   kind: ConversationKind;
   owner_id: string | null;
   project_id: string | null;
+  title: string | null;
   last_message_at: string;
   last_message_preview: string | null;
   last_sender_id: string | null;
@@ -142,6 +147,67 @@ export async function openProjectConversation(ownerId: string, projectId: string
   return data as string;
 }
 
+// ── csoport (group DM) ──────────────────────────────────────────────────────
+/** Csoport létrehozása (név + kezdő tagok) → a beszélgetés id-ja. */
+export async function createGroup(title: string, memberIds: string[]): Promise<string> {
+  const sb = requireSupabase();
+  const { data, error } = await sb.rpc('create_group_conversation', {
+    p_title: title.trim(),
+    p_members: memberIds,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as string;
+}
+
+/** Tag hozzáadása egy csoporthoz (csak meglévő tag adhat hozzá). */
+export async function addGroupMember(conversationId: string, userId: string): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('add_group_member', { p_conv: conversationId, p_user: userId });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Kilépés a beszélgetésből (a saját tagságom törlése — csoportnál „elhagyom"). */
+export async function leaveConversation(conversationId: string): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('leave_conversation', { p_conv: conversationId });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Csoport átnevezése (csak tag). */
+export async function renameGroup(conversationId: string, title: string): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('rename_group', { p_conv: conversationId, p_title: title.trim() });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * A KÖVETETT userek mint jelöltek (csoportba hívható emberek). Nincs nyilvános
+ * user-kereső (GDPR: a profilok privátak), ezért a jelölt-halmaz az, akiket
+ * KÖVETEK — az ő publikus adataik a public_profile-lal jönnek.
+ */
+export async function listFollowingPeers(): Promise<ChatPeer[]> {
+  const sb = supabase;
+  const uid = currentUserId();
+  if (!sb || !uid) {
+    return [];
+  }
+  const { data } = await sb.from('follows').select('following_id').eq('follower_id', uid);
+  const ids = [...new Set((data ?? []).map((r: { following_id: string }) => r.following_id))];
+  if (ids.length === 0) {
+    return [];
+  }
+  const peers = await resolvePeers(ids);
+  return ids.map((id) => peers.get(id) ?? { id, name: null, avatar: null });
+}
+
 /** A beszélgetés olvasottra állítása (a saját last_read_at → most). */
 export async function markRead(conversationId: string): Promise<void> {
   const sb = supabase;
@@ -198,27 +264,30 @@ export async function listConversations(): Promise<Conversation[]> {
 
   const { data: convRows } = await sb
     .from('conversations')
-    .select('id, kind, owner_id, project_id, last_message_at, last_message_preview, last_sender_id')
+    .select('id, kind, owner_id, project_id, title, last_message_at, last_message_preview, last_sender_id')
     .order('last_message_at', { ascending: false });
   const rows = (convRows ?? []) as ConversationRow[];
   if (rows.length === 0) {
     return [];
   }
 
-  // DM-partnerek: a beszélgetés MÁSIK tagja
-  const dmIds = rows.filter((r) => r.kind === 'dm').map((r) => r.id);
-  const peerByConv = new Map<string, string>();
-  if (dmIds.length > 0) {
+  // a TÖBBI tag beszélgetésenként (DM: az egyetlen partner; csoport: a résztvevők)
+  const directIds = rows.filter((r) => r.kind === 'dm' || r.kind === 'group').map((r) => r.id);
+  const othersByConv = new Map<string, string[]>();
+  if (directIds.length > 0) {
     const { data: others } = await sb
       .from('conversation_members')
       .select('conversation_id, user_id')
-      .in('conversation_id', dmIds)
+      .in('conversation_id', directIds)
       .neq('user_id', uid);
-    (others ?? []).forEach((m: { conversation_id: string; user_id: string }) =>
-      peerByConv.set(m.conversation_id, m.user_id)
-    );
+    (others ?? []).forEach((m: { conversation_id: string; user_id: string }) => {
+      const arr = othersByConv.get(m.conversation_id) ?? [];
+      arr.push(m.user_id);
+      othersByConv.set(m.conversation_id, arr);
+    });
   }
-  const peers = await resolvePeers([...peerByConv.values()]);
+  const peers = await resolvePeers([...othersByConv.values()].flat());
+  const peerOf = (id: string): ChatPeer => peers.get(id) ?? { id, name: null, avatar: null };
 
   return rows.map((r) => {
     const read = lastRead.get(r.id);
@@ -226,19 +295,32 @@ export async function listConversations(): Promise<Conversation[]> {
       r.last_sender_id != null &&
       r.last_sender_id !== uid &&
       (!read || new Date(r.last_message_at).getTime() > new Date(read).getTime());
-    const peerId = peerByConv.get(r.id);
+    const others = othersByConv.get(r.id) ?? [];
     return {
       id: r.id,
       kind: r.kind,
       ownerId: r.owner_id ?? undefined,
       projectId: r.project_id ?? undefined,
+      title: r.title ?? undefined,
       lastMessageAt: r.last_message_at,
       lastMessagePreview: r.last_message_preview,
       lastSenderId: r.last_sender_id,
-      peer: peerId ? (peers.get(peerId) ?? { id: peerId, name: null, avatar: null }) : undefined,
+      peer: r.kind === 'dm' && others[0] ? peerOf(others[0]) : undefined,
+      members: r.kind === 'group' ? others.map(peerOf) : undefined,
       hasUnread,
     };
   });
+}
+
+/** A csoport megjelenített neve: a beállított cím, vagy a tagok nevéből képezve. */
+export function groupTitle(conv: Conversation, fallback: string): string {
+  if (conv.title) {
+    return conv.title;
+  }
+  const names = (conv.members ?? [])
+    .map((m) => m.name)
+    .filter((n): n is string => !!n);
+  return names.length > 0 ? names.join(', ') : fallback;
 }
 
 /** Egyetlen beszélgetés fejléce (pl. értesítésből/deep-linkből nyitva). */

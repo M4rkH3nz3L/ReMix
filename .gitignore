@@ -56,3 +56,11 @@ server/storage.config.json
 
 # helyi dev-szolgáltatások logjai/PID-jei (dev-up.sh)
 .devlogs/
+
+# editor / eszköz / OS junk (nem kell a repóba)
+.vscode/
+.claude/
+.idea/
+.cursor/
+.zed/
+*.swp

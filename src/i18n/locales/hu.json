@@ -2601,7 +2601,8 @@
     "message": "Üzenet",
     "messagePlaceholder": "Írj üzenetet…",
     "send": "Küldés",
-    "startHint": "Írj az első üzenettel 👋"
+    "startHint": "Írj az első üzenettel 👋",
+    "typing": "{{name}} gépel…"
   },
   "feed": {
     "title": "Feed",

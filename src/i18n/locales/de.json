@@ -2601,7 +2601,8 @@
     "message": "Nachricht",
     "messagePlaceholder": "Nachricht schreiben…",
     "send": "Senden",
-    "startHint": "Sag Hallo mit der ersten Nachricht 👋"
+    "startHint": "Sag Hallo mit der ersten Nachricht 👋",
+    "typing": "{{name}} tippt…"
   },
   "feed": {
     "title": "Feed",

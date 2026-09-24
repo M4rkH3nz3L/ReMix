@@ -2601,7 +2601,8 @@
     "message": "Message",
     "messagePlaceholder": "Write a message…",
     "send": "Send",
-    "startHint": "Say hi with the first message 👋"
+    "startHint": "Say hi with the first message 👋",
+    "typing": "{{name}} is typing…"
   },
   "feed": {
     "title": "Feed",

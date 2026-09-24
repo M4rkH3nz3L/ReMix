@@ -5,11 +5,13 @@ import {
   listConversations,
   listMessages,
   markRead,
+  openTypingChannel,
   sendMessage,
   subscribeInbox,
   subscribeMessages,
   type ChatMessage,
   type Conversation,
+  type TypingChannel,
 } from '@/lib/chat';
 
 /**
@@ -31,6 +33,8 @@ interface ChatState {
   messages: ChatMessage[];
   activeLoading: boolean;
   error: string | null;
+  /** ha valaki más ÉPP gépel az aktív beszélgetésben (a neve), különben null */
+  typingName: string | null;
 
   /** inbox betöltés + realtime figyelés indítása (badge). Visszaadja a leiratkozót. */
   startInbox: () => () => void;
@@ -40,10 +44,14 @@ interface ChatState {
   closeConversation: () => void;
   /** üzenet küldése az aktív beszélgetésbe (optimista) */
   send: (body: string) => Promise<void>;
+  /** jelzi a többieknek, hogy gépelek (a composer hívja; belül throttle-olt) */
+  notifyTyping: () => void;
 }
 
 let inboxUnsub: (() => void) | null = null;
 let activeUnsub: (() => void) | null = null;
+let typingChan: TypingChannel | null = null;
+let typingClearTimer: ReturnType<typeof setTimeout> | null = null;
 
 function unreadCount(list: Conversation[]): number {
   return list.reduce((n, c) => n + (c.hasUnread ? 1 : 0), 0);
@@ -57,6 +65,7 @@ export const useChat = create<ChatState>((set, get) => ({
   messages: [],
   activeLoading: false,
   error: null,
+  typingName: null,
 
   startInbox: () => {
     void get().loadInbox();
@@ -85,10 +94,16 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   openConversation: async (conversationId) => {
-    // előző beszélgetés realtime-leiratkozása
+    // előző beszélgetés realtime-leiratkozása (üzenet + gépel-jelző)
     activeUnsub?.();
     activeUnsub = null;
-    set({ activeId: conversationId, messages: [], activeLoading: true, error: null });
+    typingChan?.stop();
+    typingChan = null;
+    if (typingClearTimer) {
+      clearTimeout(typingClearTimer);
+      typingClearTimer = null;
+    }
+    set({ activeId: conversationId, messages: [], activeLoading: true, error: null, typingName: null });
     try {
       const msgs = await listMessages(conversationId);
       // közben nem váltottak-e másik beszélgetésre?
@@ -118,6 +133,17 @@ export const useChat = create<ChatState>((set, get) => ({
         // a saját nézetben olvasottnak számít
         void markRead(conversationId);
       });
+      // ⌨️ gépel-jelző: másik fél gépelését ~3,5 mp-ig mutatjuk, majd auto-törlés
+      typingChan = openTypingChannel(conversationId, (name) => {
+        if (get().activeId !== conversationId) {
+          return;
+        }
+        set({ typingName: name });
+        if (typingClearTimer) {
+          clearTimeout(typingClearTimer);
+        }
+        typingClearTimer = setTimeout(() => set({ typingName: null }), 3500);
+      });
     } catch (e) {
       set({ activeLoading: false, error: e instanceof Error ? e.message : 'Hiba' });
     }
@@ -126,7 +152,13 @@ export const useChat = create<ChatState>((set, get) => ({
   closeConversation: () => {
     activeUnsub?.();
     activeUnsub = null;
-    set({ activeId: null, messages: [], error: null });
+    typingChan?.stop();
+    typingChan = null;
+    if (typingClearTimer) {
+      clearTimeout(typingClearTimer);
+      typingClearTimer = null;
+    }
+    set({ activeId: null, messages: [], error: null, typingName: null });
     // az inbox olvasatlan-állapota frissüljön a bezárt beszélgetés után
     void get().loadInbox();
   },
@@ -149,5 +181,9 @@ export const useChat = create<ChatState>((set, get) => ({
       set({ error: e instanceof Error ? e.message : 'Nem sikerült elküldeni.' });
       throw e;
     }
+  },
+
+  notifyTyping: () => {
+    typingChan?.notifyTyping();
   },
 }));

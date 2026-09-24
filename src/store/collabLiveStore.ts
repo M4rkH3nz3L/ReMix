@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { myMembership } from '@/lib/collab';
+import { myMembership, pullSharedProject } from '@/lib/collab';
 import { openLiveChannel, type LiveChannel, type LiveParticipant } from '@/lib/collabLive';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -45,6 +45,21 @@ export const useCollabLive = create<CollabLiveState>((set, get) => ({
     const membership = await myMembership(projectId).catch(() => null);
     if (!membership) {
       return; // nem megosztott projekt → nincs élő collab
+    }
+    // 🔄 join-kori resync: a TAG (nem tulaj) a tulaj FRISS felhő-verzióját húzza —
+    // de CSAK ha nincs helyi mentetlen szerkesztése (dirty), így sosem clobberöl.
+    // Így konzisztens állapotból indul; a divergenciát az élő parancs-szinkron
+    // tartja utána. (A tulaj a forrás, ő nem húz vissza.)
+    if (membership.role !== 'owner') {
+      const ed = useEditorStore.getState();
+      if (ed.project?.id === projectId && !ed.dirty) {
+        const fresh = await pullSharedProject(membership.ownerId, projectId).catch(() => null);
+        const now = useEditorStore.getState();
+        // a pull alatt nem kezdett-e szerkeszteni / másik projektre váltani?
+        if (fresh && now.project?.id === projectId && !now.dirty) {
+          now.loadProject(fresh);
+        }
+      }
     }
     // saját denormalizált adatok (a presence-hez)
     let name = me.email?.split('@')[0] ?? 'Én';

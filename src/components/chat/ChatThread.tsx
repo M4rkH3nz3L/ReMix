@@ -27,6 +27,8 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
   const messages = useChat((s) => s.messages);
   const loading = useChat((s) => s.activeLoading);
   const send = useChat((s) => s.send);
+  const typingName = useChat((s) => s.typingName);
+  const notifyTyping = useChat((s) => s.notifyTyping);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const me = currentUserId();
@@ -86,11 +88,17 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
           }
         />
       )}
+      {typingName ? (
+        <Text style={styles.typing}>{t('chat.typing', { name: typingName })}</Text>
+      ) : null}
       <View style={styles.composer}>
         <TextInput
           style={styles.input}
           value={text}
-          onChangeText={setText}
+          onChangeText={(v) => {
+            setText(v);
+            notifyTyping();
+          }}
           placeholder={t('chat.messagePlaceholder')}
           placeholderTextColor={palette.textDim}
           multiline
@@ -111,6 +119,13 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  typing: {
+    color: palette.textDim,
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 12, paddingVertical: 12, gap: 6 },
   bubbleRow: { flexDirection: 'row', marginVertical: 1 },

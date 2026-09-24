@@ -352,3 +352,52 @@ export function subscribeInbox(onChange: () => void): () => void {
     void sb.removeChannel(channel);
   };
 }
+
+export interface TypingChannel {
+  /** jelzi a többieknek, hogy épp gépelek (belül throttle-olva) */
+  notifyTyping: () => void;
+  stop: () => void;
+}
+
+/**
+ * ⌨️ Gépel-jelző csatorna egy beszélgetéshez (Supabase broadcast — NEM perzisztens,
+ * nem üzenet). A `self:false` miatt a saját jelzést nem kapom vissza; a küldés
+ * ~1,5 mp-enként throttle-olt. A megjelenítést a hívó auto-törli pár mp után.
+ */
+export function openTypingChannel(
+  conversationId: string,
+  onTyping: (name: string) => void
+): TypingChannel {
+  const sb = supabase;
+  if (!sb) {
+    return { notifyTyping: () => {}, stop: () => {} };
+  }
+  let myName = 'Valaki';
+  void senderFields().then((f) => {
+    myName = f.name || f.username || 'Valaki';
+  });
+  const channel = sb
+    .channel(`chat-typing:${conversationId}:${++channelSeq}`, {
+      config: { broadcast: { self: false } },
+    })
+    .on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload && typeof payload.name === 'string') {
+        onTyping(payload.name);
+      }
+    })
+    .subscribe();
+  let last = 0;
+  return {
+    notifyTyping: () => {
+      const now = Date.now();
+      if (now - last < 1500) {
+        return;
+      }
+      last = now;
+      void channel.send({ type: 'broadcast', event: 'typing', payload: { name: myName } });
+    },
+    stop: () => {
+      void sb.removeChannel(channel);
+    },
+  };
+}

@@ -6,6 +6,7 @@ import {
   capabilityRequiresPro,
   type CapabilityId,
 } from '@/lib/capabilities';
+import { isSecureForRelease } from '@/lib/envConfig';
 import { isProNow } from '@/store/entitlementStore';
 
 /**
@@ -70,7 +71,8 @@ export function cloudBaseUrl(): string {
  * kapunk, a fejlesztésben pedig (`__DEV__`) a helyi worker változatlanul megy.
  */
 function assertSecureUrl(url: string): string {
-  if (__DEV__ || url.startsWith('https://')) {
+  // dev: minden mehet; prod: csak https ÉS nem-loopback (lásd `@/lib/envConfig`)
+  if (isSecureForRelease(url, __DEV__)) {
     return url;
   }
   throw new Error(tr('lib.backend.insecureUrl', { url }));

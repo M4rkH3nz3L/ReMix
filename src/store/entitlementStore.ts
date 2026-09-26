@@ -29,6 +29,13 @@ interface Persisted {
   tier: Tier;
   /** ISO dátum, ameddig a Pro érvényes; `null` = lejárat nélkül (promó/örökös) */
   proUntil: string | null;
+  /**
+   * 🧪 CSAK DEV: kliens-oldali Pro-felülírás a teszthez. A `syncFromUser` NEM
+   * írja felül (túléli a szerver-szinkront) — így weben is működik, ahol a
+   * kliens a hosztolt prod Supabase-t nézi, a dev-worker viszont a lokálisba ír.
+   * Éles útra NEM hat: a `activateProDev`/`setDevPro` a `__DEV__`-hez kötött UI-ból hívódik.
+   */
+  devPro?: boolean;
 }
 
 interface EntitlementState extends Persisted {
@@ -47,6 +54,8 @@ interface EntitlementState extends Persisted {
   /** OPTIMISTA szint-beállítás a szerver-válaszból (vásárlás/aktiválás után) —
    *  a következő `syncFromUser` a hiteles szerver-állapottal megerősíti. */
   setTier: (tier: Tier, proUntil?: string | null) => void;
+  /** 🧪 CSAK DEV: a kliens-oldali Pro-override be/ki (a `__DEV__` profil-gombból). */
+  setDevPro: (on: boolean) => void;
 }
 
 function persist(userId: string | null, p: Persisted): void {
@@ -63,22 +72,27 @@ async function loadCache(userId: string | null): Promise<Persisted> {
       return {
         tier: p.tier === 'pro' ? 'pro' : 'free',
         proUntil: typeof p.proUntil === 'string' ? p.proUntil : null,
+        devPro: p.devPro === true,
       };
     }
   } catch {
     // sérült/hiányzó mentés — Free
   }
-  return { tier: 'free', proUntil: null };
+  return { tier: 'free', proUntil: null, devPro: false };
 }
 
 export const useEntitlement = create<EntitlementState>((set, get) => ({
   tier: 'free',
   proUntil: null,
+  devPro: false,
   userId: null,
   hydrated: false,
 
   isPro: () => {
-    const { tier, proUntil } = get();
+    const { tier, proUntil, devPro } = get();
+    if (devPro) {
+      return true; // 🧪 dev-override (a szerver-szinkron sem kapcsolja ki)
+    }
     if (tier !== 'pro') {
       return false;
     }
@@ -99,9 +113,15 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     // 1) offline-first: a user cache-ét azonnal betöltjük (kijelentkezve Free)
     if (userId) {
       const cached = await loadCache(userId);
-      set({ userId, tier: cached.tier, proUntil: cached.proUntil, hydrated: true });
+      set({
+        userId,
+        tier: cached.tier,
+        proUntil: cached.proUntil,
+        devPro: cached.devPro === true,
+        hydrated: true,
+      });
     } else {
-      set({ userId: null, tier: 'free', proUntil: null, hydrated: true });
+      set({ userId: null, tier: 'free', proUntil: null, devPro: false, hydrated: true });
       return;
     }
     // 2) hiteles forrás: Supabase subscriptions. Sikernél felülírjuk +
@@ -112,9 +132,11 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
       if (get().userId !== userId) {
         return;
       }
+      // 🧪 a dev-override-ot a szerver-állapot NEM kapcsolja ki (túléli a szinkront)
+      const devPro = get().devPro === true;
       const next: Persisted = sub
-        ? { tier: sub.tier, proUntil: sub.tier === 'pro' ? sub.proUntil : null }
-        : { tier: 'free', proUntil: null };
+        ? { tier: sub.tier, proUntil: sub.tier === 'pro' ? sub.proUntil : null, devPro }
+        : { tier: 'free', proUntil: null, devPro };
       set(next);
       persist(userId, next);
     } catch {
@@ -123,7 +145,18 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
   },
 
   setTier: (tier, proUntil = null) => {
-    const next: Persisted = { tier, proUntil: tier === 'pro' ? proUntil : null };
+    const next: Persisted = {
+      tier,
+      proUntil: tier === 'pro' ? proUntil : null,
+      devPro: get().devPro === true,
+    };
+    set(next);
+    persist(get().userId, next);
+  },
+
+  setDevPro: (on) => {
+    const { tier, proUntil } = get();
+    const next: Persisted = { tier, proUntil, devPro: on };
     set(next);
     persist(get().userId, next);
   },

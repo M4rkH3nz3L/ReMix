@@ -355,7 +355,7 @@ export function LibraryPanel() {
           return null; // szűrésnél az üres források nem foglalnak helyet
         }
         return (
-          <PanelSection key={provider.id} title={provider.label}>
+          <PanelSection key={provider.id} title={t(provider.label)}>
             {st.state === 'loading' ? (
               <ActivityIndicator color={palette.accent} />
             ) : st.state === 'offline' ? (
@@ -363,7 +363,7 @@ export function LibraryPanel() {
             ) : st.state === 'error' ? (
               <Text style={styles.note}>{st.message}</Text>
             ) : visible.length === 0 ? (
-              <Text style={styles.note}>{provider.description}</Text>
+              <Text style={styles.note}>{t(provider.description)}</Text>
             ) : (
               visible.map((entry) => (
                 <Pressable

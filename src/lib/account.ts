@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -110,11 +111,31 @@ export async function exportMyData(): Promise<string> {
     role,
   };
 
+  const json = JSON.stringify(bundle, null, 2);
+  const name = 'remix-adatexport.json';
+
+  // 🌐 weben nincs fájlrendszer/megosztó → a böngésző letölti az export-JSON-t
+  if (Platform.OS === 'web') {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return name;
+  }
+
   const dir = new Directory(Paths.cache, 'export');
   if (!dir.exists) {
     dir.create();
   }
-  const file = new File(dir, 'remix-adatexport.json');
+  const file = new File(dir, name);
   try {
     if (file.exists) {
       file.delete();
@@ -122,7 +143,7 @@ export async function exportMyData(): Promise<string> {
   } catch {
     // a write úgyis felülírja
   }
-  file.write(JSON.stringify(bundle, null, 2));
+  file.write(json);
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(file.uri, {
       mimeType: 'application/json',

@@ -66,7 +66,10 @@ export async function importYouTubeMedia(
 
   // 2) 💳 FIZETŐS worker-út (HD, más oldalak, képkocka): yt-dlp + ffmpeg a
   //    workeren → Pro-kapu (ensureCloud dob, ha nincs előfizetés).
-  const base = ensureCloud('urlImport');
+  // 🌐 WEBEN nincs on-device alternatíva → a worker az EGYETLEN út: nyers
+  //    cloudBaseUrl() (a Pro-kaput a szerver dönti, a dev-worker átengedi),
+  //    mint a felhő-rendernél. Natívon marad az ensureCloud Pro-kapu.
+  const base = Platform.OS === 'web' ? cloudBaseUrl() : ensureCloud('urlImport');
   // a szerver-oldali kinyerés hossza nem mérhető előre (yt-dlp), ezért ez a
   // fázis határozatlan — de a felhasználó legalább látja, MI történik épp
   onProgress?.({ phase: tr('lib.youtube.phaseExtract') });
@@ -79,6 +82,19 @@ export async function importYouTubeMedia(
   if (!res.ok) {
     throw new Error(body.error ?? tr('lib.youtube.importFailed'));
   }
+  const remoteUrl = `${base}/youtube/${body.id}/${body.name}`;
+  // 🌐 weben nincs fájlrendszer (a `new File`/`downloadFileAsync` elszáll) → a
+  // worker URL-jét streameljük; a szerver-render feltöltéskor úgyis blobként húzza le
+  if (Platform.OS === 'web') {
+    onProgress?.({ phase: tr('lib.youtube.phaseDone'), ratio: 1 });
+    return {
+      uri: remoteUrl,
+      kind: body.kind,
+      duration: body.duration ?? 0,
+      width: body.width,
+      height: body.height,
+    };
+  }
   const ext = (body.name as string).split('.').pop() || 'mp4';
   const dir = new Directory(Paths.document, 'media');
   try {
@@ -88,7 +104,7 @@ export async function importYouTubeMedia(
   }
   const target = new File(dir, `yt_${makeId('m')}.${ext}`);
   onProgress?.({ phase: tr('lib.youtube.phaseDownload') });
-  await File.downloadFileAsync(`${base}/youtube/${body.id}/${body.name}`, target);
+  await File.downloadFileAsync(remoteUrl, target);
   onProgress?.({ phase: tr('lib.youtube.phaseDone'), ratio: 1 });
   return {
     uri: target.uri,

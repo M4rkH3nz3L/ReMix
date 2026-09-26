@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { haptics, motion } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -377,6 +377,9 @@ function TimelineClipInner({
   return (
     <GestureDetector gesture={Gesture.Race(movePan, tap)}>
       <Animated.View
+        // 🌐 web: megjelöljük a klipet, hogy az idővonal-panning (Timeline DOM
+        // handler) KIHAGYJA — a klipen a saját mozgatás/tap gesztus maradjon
+        {...(Platform.OS === 'web' ? ({ dataSet: { clip: 'true' } } as object) : null)}
         style={[
           styles.clip,
           {

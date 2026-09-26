@@ -393,7 +393,7 @@ export function Toolbar() {
         <Animated.View style={[styles.toolRow, toolRowStyle]}>
         {selected ? (
           <>
-            <ToolButton icon="close-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
+            <ToolButton icon="checkmark-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
             <ToolButton
               icon={multiSelectMode ? 'checkmark-done' : 'checkmark-done-outline'}
               label={multiSelectMode ? t('editor.toolbar.multiSelectActive', { count: batchCount }) : t('editor.toolbar.multiSelect')}
@@ -594,6 +594,8 @@ export function Toolbar() {
                 onPress={() => togglePanel('hotspot')}
               />
             ) : null}
+            {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
+            <View style={styles.toolSep} />
             <ToolButton
               icon="trash-outline"
               label={multiSelectIds.length > 0 ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
@@ -684,14 +686,8 @@ export function Toolbar() {
               onPress={() => togglePanel('library')}
             />
             <ToolButton icon="scan-outline" label="Hotspot" onPress={addHotspot} />
-            <TutorialTarget id="toolbar.export" onLayout={rememberX('toolbar.export')}>
-              <ToolButton
-                icon="share-outline"
-                label={t('editor.toolbar.export')}
-                active={activePanel === 'export'}
-                onPress={() => togglePanel('export')}
-              />
-            </TutorialTarget>
+            {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
+                egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
           </>
         )}
         </Animated.View>
@@ -711,5 +707,13 @@ const styles = StyleSheet.create({
   // a vízszintes görgetősor egyetlen animált tartalom-doboza (fade a váltáskor)
   toolRow: {
     flexDirection: 'row',
+  },
+  // függőleges elválasztó a destruktív művelet (Törlés) elkülönítéséhez
+  toolSep: {
+    width: 1,
+    height: 28,
+    alignSelf: 'center',
+    marginHorizontal: 8,
+    backgroundColor: palette.border,
   },
 });

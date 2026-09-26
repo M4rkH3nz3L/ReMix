@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 import { serializeAss } from '@/lib/ass';
 import { projectDuration } from '@/lib/projectUtils';
@@ -35,10 +36,32 @@ export function buildInteractiveMetadata(project: Project) {
 }
 
 async function shareFile(name: string, content: string, mimeType: string): Promise<void> {
+  // 🌐 weben nincs natív fájlrendszer/megosztó (a `new File(Paths.cache)` +
+  // `Sharing` elszáll) → a böngésző letölti a fájlt (Blob → `<a download>`).
+  if (Platform.OS === 'web') {
+    downloadTextWeb(name, content, mimeType);
+    return;
+  }
   const file = new File(Paths.cache, name);
   file.write(content);
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: name });
+  }
+}
+
+/** 🌐 Szöveges tartalom böngészős letöltése (a web-es „megosztás" megfelelője). */
+function downloadTextWeb(name: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 

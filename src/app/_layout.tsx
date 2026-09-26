@@ -10,6 +10,7 @@ import { PaywallSheet } from '@/components/PaywallSheet';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { TutorialMenu } from '@/components/tutorial/TutorialMenu';
 import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
+import { WebAlertHost } from '@/components/WebAlertHost';
 import { palette } from '@/constants/editor';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
@@ -161,6 +162,9 @@ export default function RootLayout() {
         {/* 🎓 interaktív felület-vezető (spotlight + coach-kártya) + lecke-választó */}
         <TutorialOverlay />
         <TutorialMenu />
+        {/* 🌐 web-Alert: a react-native-web Alert no-op → gombos modál, hogy a
+            megerősítők/akció-lapok (pl. „megosztás a feedben") weben is működjenek */}
+        <WebAlertHost />
       </ErrorBoundary>
     </GestureHandlerRootView>
   );

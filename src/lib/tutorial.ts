@@ -453,7 +453,7 @@ export const TUTORIAL_LESSONS: TutorialLesson[] = [
     steps: [
       S(
         L('Nyisd az Exportot és válassz presetet.', 'Open Export and pick a preset.', 'Öffne Export, wähle ein Preset.'),
-        L('Eszköztár → Export → TikTok/Reels/Shorts/YouTube', 'Toolbar → Export → TikTok/Reels/Shorts/YouTube', 'Werkzeugleiste → Export'),
+        L('Fejléc → Export → TikTok/Reels/Shorts/YouTube', 'Header → Export → TikTok/Reels/Shorts/YouTube', 'Kopfzeile → Export'),
         L('Felbontás/FPS/bitráta/kodek beáll; Haladó alatt HDR/10-bit.', 'Resolution/FPS/bitrate/codec set.', 'Auflösung/FPS/Bitrate/Codec.'),
         'toolbar.export'
       ),

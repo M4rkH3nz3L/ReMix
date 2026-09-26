@@ -39,6 +39,25 @@ function fileName(uri: string): string {
   return last.split('?')[0];
 }
 
+/**
+ * Egy médiafájl hozzáadása a multipart formhoz. Natívan az expo-file-system
+ * `File` adja a Blob-interfészt; WEBEN a `new File(uri)` nem létezik (natív-only),
+ * ezért az URI-t (blob:/data:/http) blobként töltjük le és úgy fűzzük hozzá.
+ */
+async function appendMediaPart(
+  form: FormData,
+  field: string,
+  uri: string,
+  name: string
+): Promise<void> {
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    form.append(field, blob, name);
+  } else {
+    form.append(field, new File(uri) as unknown as Blob, name);
+  }
+}
+
 
 async function fetchWithTimeout(url: string, ms: number, init?: RequestInit) {
   const controller = new AbortController();
@@ -354,14 +373,19 @@ export async function uploadMedia(uri: string, name?: string): Promise<string> {
   return data.url;
 }
 
-/** Felhő-render (Pro): fel a workernek → poll → kész MP4 letöltése. */
-async function renderCloud(
+/**
+ * A felhő-render KÖZÖS magja: média-feltöltés (web-biztos) → indítás → poll.
+ * A kész job azonosítóját adja vissza; a LETÖLTÉS a hívóé, mert platformfüggő
+ * (natívan `File`-ba, weben Blobként/URL-lel). A `base` a worker címe — natívan
+ * a Pro-kapu mögötti `ensureCloud(...)`, weben a nyers `cloudBaseUrl()`.
+ */
+async function submitAndPollRender(
+  base: string,
   project: Project,
   onProgress?: (update: ProgressUpdate) => void,
   settings?: RenderSettings,
   signal?: AbortSignal
-): Promise<File> {
-  const base = ensureCloud('cloudRender');
+): Promise<string> {
   // A három fázis EGY 0–1 skálára vetítve, hogy a sáv sose ugorjon vissza.
   // A súlyok a fázisok tipikus időarányai (a render viszi az idő nagy részét).
   const PHASE_UPLOAD = tr('lib.render.phaseUpload');
@@ -382,10 +406,12 @@ async function renderCloud(
   const form = new FormData();
   const uriMap: Record<string, string> = {};
   const uris = mediaUris(project);
-  uris.forEach((uri, i) => {
+  for (let i = 0; i < uris.length; i++) {
+    const uri = uris[i];
     const field = `f${i}`;
     uriMap[uri] = field;
-    form.append(field, new File(uri) as unknown as Blob, fileName(uri));
+    // 🌐 weben a natív `new File(uri)` nem megy → a médiát blobként fűzzük hozzá
+    await appendMediaPart(form, field, uri, fileName(uri));
     onProgress?.({
       phase: PHASE_UPLOAD,
       ratio: stages.ratioFor(PHASE_UPLOAD, (i + 1) / Math.max(1, uris.length)),
@@ -393,7 +419,7 @@ async function renderCloud(
       total: uris.length,
       unit: tr('lib.render.unitFile'),
     });
-  });
+  }
   form.append('project', JSON.stringify(project));
   form.append('uriMap', JSON.stringify(uriMap));
   if (settings) {
@@ -433,16 +459,7 @@ async function renderCloud(
     );
     if (status.state === 'done') {
       onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
-      const safeName = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'video';
-      const target = new File(Paths.cache, `${safeName}.mp4`);
-      try {
-        if (target.exists) {
-          target.delete();
-        }
-      } catch {
-        // ha nem törölhető, a letöltés úgyis hibát ad
-      }
-      return await File.downloadFileAsync(`${base}/render/${id}/file`, target);
+      return id;
     }
     if (status.state === 'error') {
       throw new Error(status.error ?? tr('lib.render.renderError'));
@@ -456,6 +473,90 @@ async function renderCloud(
     }
   }
   throw new Error(tr('lib.render.renderTimeout'));
+}
+
+/** Felhő-render (Pro, NATÍV): fel a workernek → poll → kész MP4 letöltése File-ba. */
+async function renderCloud(
+  project: Project,
+  onProgress?: (update: ProgressUpdate) => void,
+  settings?: RenderSettings,
+  signal?: AbortSignal
+): Promise<File> {
+  const base = ensureCloud('cloudRender');
+  const id = await submitAndPollRender(base, project, onProgress, settings, signal);
+  const safeName = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'video';
+  const target = new File(Paths.cache, `${safeName}.mp4`);
+  try {
+    if (target.exists) {
+      target.delete();
+    }
+  } catch {
+    // ha nem törölhető, a letöltés úgyis hibát ad
+  }
+  return await File.downloadFileAsync(`${base}/render/${id}/file`, target);
+}
+
+/**
+ * 🌐 WEB: a szerver renderel (on-device render weben NINCS) → a kész MP4 workeren
+ * elérhető URL-je. NINCS kliens-oldali Pro-kapu: weben a render KIZÁRÓLAG a
+ * workeren mehet, a jogosultságot maga a szerver dönti el (a dev-worker ezt
+ * `ALLOW_INSECURE_DEV`-vel átengedi). `cloudBaseUrl()` a worker címe.
+ */
+export async function renderCloudFileUrl(
+  project: Project,
+  onProgress?: (update: ProgressUpdate) => void,
+  settings?: RenderSettings,
+  signal?: AbortSignal
+): Promise<string> {
+  const base = cloudBaseUrl();
+  const id = await submitAndPollRender(base, project, onProgress, settings, signal);
+  return `${base}/render/${id}/file`;
+}
+
+/**
+ * 🌐 WEB: szerver-render → a kész MP4 feltöltése a publikus Storage-ba (feedhez).
+ * A `uploadMedia` weben a worker-URL-t blobként tölti fel → tartós, publikus URL.
+ */
+export async function renderAndUploadWeb(
+  project: Project,
+  onProgress?: (update: ProgressUpdate) => void,
+  settings?: RenderSettings
+): Promise<RenderedVersion> {
+  const fileUrl = await renderCloudFileUrl(project, onProgress, settings);
+  const url = await uploadMedia(fileUrl, `${project.id}.mp4`);
+  return {
+    uri: url,
+    url,
+    renderedAt: new Date().toISOString(),
+    durationSec: Math.round(projectDuration(project) * 10) / 10,
+  };
+}
+
+/**
+ * 🌐 WEB: szerver-render → a kész MP4 letöltése a böngészőben (nincs natív
+ * megosztó/Fotók). Blob → object-URL → rejtett `<a download>`.
+ */
+export async function renderAndDownloadWeb(
+  project: Project,
+  onProgress?: (update: ProgressUpdate) => void,
+  settings?: RenderSettings,
+  signal?: AbortSignal
+): Promise<void> {
+  const fileUrl = await renderCloudFileUrl(project, onProgress, settings, signal);
+  const blob = await (await fetch(fileUrl)).blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const safeName = project.name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'video';
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `${safeName}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+  onProgress?.({ phase: tr('lib.render.phaseShare'), ratio: 1 });
 }
 
 export interface LibraryTrack {
@@ -653,21 +754,26 @@ export async function renderAndShareMp4(
   settings?: RenderSettings,
   opts?: RenderOptions
 ): Promise<void> {
+  // 🌐 weben nincs on-device render / natív megosztó → a SZERVER renderel, és a
+  // böngésző letölti a kész MP4-et (a `mode` itt nem értelmezett — csak felhő van)
+  if (Platform.OS === 'web') {
+    await renderAndDownloadWeb(project, onProgress, settings, opts?.signal);
+    return;
+  }
   const file = await renderMp4(project, onProgress, settings, opts);
 
+  // ide már csak NATÍVON jutunk (weben fentebb visszatértünk) → mentés a Fotókba
   let savedToPhotos = false;
-  if (Platform.OS !== 'web') {
-    try {
-      const MediaLibrary = await import('expo-media-library');
-      const permission = await MediaLibrary.requestPermissionsAsync(true);
-      if (permission.granted) {
-        onProgress?.({ phase: tr('lib.render.phaseSavingToPhotos'), ratio: 1 });
-        await MediaLibrary.saveToLibraryAsync(file.uri);
-        savedToPhotos = true;
-      }
-    } catch {
-      // engedély-megtagadás vagy hiba — a megosztó így is felajánlja a mentést
+  try {
+    const MediaLibrary = await import('expo-media-library');
+    const permission = await MediaLibrary.requestPermissionsAsync(true);
+    if (permission.granted) {
+      onProgress?.({ phase: tr('lib.render.phaseSavingToPhotos'), ratio: 1 });
+      await MediaLibrary.saveToLibraryAsync(file.uri);
+      savedToPhotos = true;
     }
+  } catch {
+    // engedély-megtagadás vagy hiba — a megosztó így is felajánlja a mentést
   }
 
   onProgress?.({

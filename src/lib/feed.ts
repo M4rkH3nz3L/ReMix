@@ -1,12 +1,14 @@
+import { Platform } from 'react-native';
+
 import { makeId } from '@/lib/id';
 import { reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
-import { migrateProject, projectDuration } from '@/lib/projectUtils';
-import { renderProjectVersion, uploadMedia } from '@/lib/render';
+import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
+import { renderAndUploadWeb, renderProjectVersion, uploadMedia } from '@/lib/render';
 import { saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
-import type { AspectRatio, Project } from '@/types/project';
+import type { Asset, AspectRatio, Project, Track, VideoClip } from '@/types/project';
 import type { Creator, FeedMode, FeedPost, PostVisibility } from '@/types/social';
 
 /**
@@ -27,7 +29,8 @@ interface PostRow {
   poster_url: string | null;
   aspect_ratio: string;
   duration_sec: number;
-  project_snapshot: Project | null;
+  /** CSAK az interaktív (hotspot) réteg a feed-overlayhez — NEM a szerkeszthető projekt */
+  project_snapshot: { tracks: Track[] } | null;
   visibility: string;
   moderation_status: string;
   promoted: boolean;
@@ -46,6 +49,9 @@ interface PostRow {
   created_at: string;
 }
 
+// FONTOS: a `project_snapshot` CSAK az interaktív (hotspot) réteget hordozza a
+// feed-overlayhez — NEM a teljes szerkeszthető projektet. A remix a renderelt
+// videót importálja, az eredeti réteg-projektet a remixelő nem érheti el.
 const POST_COLUMNS =
   'id, creator_id, project_id, title, description, hashtags, video_url, poster_url, aspect_ratio, duration_sec, project_snapshot, visibility, moderation_status, promoted, remixable, remix_of_post_id, remix_of_creator, music, creator_username, creator_name, creator_avatar, likes, comments, saves, views, remixes, created_at';
 
@@ -70,7 +76,7 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     aspectRatio: (r.aspect_ratio as AspectRatio) ?? '9:16',
     durationSec: r.duration_sec,
     projectId: r.project_id ?? undefined,
-    projectSnapshot: r.project_snapshot ?? undefined,
+    interactive: r.project_snapshot ?? undefined,
     rendered: !!r.video_url,
     remixable: r.remixable,
     remixOfPostId: r.remix_of_post_id ?? undefined,
@@ -125,14 +131,16 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
   let q = sb
     .from('posts')
     .select(POST_COLUMNS)
-    .eq('visibility', 'public')
     .eq('moderation_status', 'ok')
     // kiemelt (megfizetett) posztok előre, aztán legújabb
     .order('promoted', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
   if (creatorIds) {
-    q = q.in('creator_id', creatorIds);
+    // a követett csatornák NYILVÁNOS + KÖVETŐK-only posztjai (az RLS is ezt engedi)
+    q = q.in('creator_id', creatorIds).in('visibility', ['public', 'followers']);
+  } else {
+    q = q.eq('visibility', 'public');
   }
   const { data, error } = await q;
   if (error) {
@@ -259,6 +267,11 @@ export async function publishPost(
     throw new Error('Nincs bejelentkezett felhasználó.');
   }
   const { username, name, avatar } = await creatorFields();
+  // CSAK az interaktív (hotspot) réteget hordozzuk a poszton (feed-overlay) — a
+  // teljes, szerkeszthető projektet SZÁNDÉKOSAN nem (a remix a videót importálja).
+  const interactiveTrack = project.tracks.find((tr) => tr.type === 'interactive');
+  const interactiveSnapshot =
+    interactiveTrack && interactiveTrack.clips.length > 0 ? { tracks: [interactiveTrack] } : null;
   const row = {
     creator_id: uid,
     creator_avatar: avatar,
@@ -270,7 +283,7 @@ export async function publishPost(
     poster_url: opts?.posterUrl ?? null,
     aspect_ratio: project.aspectRatio,
     duration_sec: Math.round(projectDuration(project) * 10) / 10,
-    project_snapshot: { ...project },
+    project_snapshot: interactiveSnapshot,
     visibility: opts?.visibility ?? 'public',
     remixable: true,
     remix_of_post_id: opts?.remixOfPostId ?? null,
@@ -301,7 +314,12 @@ export async function publishRenderedProject(
   let rendered = project.rendered;
 
   if (!rendered?.uri) {
-    rendered = await renderProjectVersion(project, onProgress);
+    // 🌐 weben nincs on-device render → a SZERVER renderel + a kész MP4 a Storage-ba
+    // kerül (a visszakapott `rendered` már url-lel). Natívan: eszköz/felhő render.
+    rendered =
+      Platform.OS === 'web'
+        ? await renderAndUploadWeb(project, onProgress)
+        : await renderProjectVersion(project, onProgress);
     updated = { ...updated, rendered };
     await saveProject(updated);
   }
@@ -316,6 +334,9 @@ export async function publishRenderedProject(
     visibility: opts?.visibility ?? 'public',
     videoUrl: rendered.url ?? null,
     posterUrl: rendered.posterUrl ?? null,
+    // ha ez remix-projekt, csatoljuk a forrás-poszthoz (remix_of_post_id → lineage)
+    remixOfPostId: updated.remixOf?.postId,
+    remixOfCreator: updated.remixOf?.name,
   });
   return { post, project: updated };
 }
@@ -405,21 +426,47 @@ export async function recordView(postId: string): Promise<void> {
 }
 
 /**
- * REMIX: a poszt project_snapshotjából ÚJ helyi projekt (a Studióban nyílik). A
- * remix-lánc attribúciója (remix_of_post_id) a `remixOf`-ban utazik, hogy a
- * későbbi publikálás beköthesse. Visszaadja az új projekt id-ját, vagy null.
+ * REMIX (új modell): NEM az eredeti projektet klónozzuk, hanem a poszt RENDERELT
+ * videóját (`videoUri`) importáljuk egy ÚJ, üres projektbe — a remixelő ezt
+ * kiegészítheti, de az eredeti réteg-projektet nem éri el/szerkeszti. Az új projekt
+ * logikusan elnevezve („Remix – <cím>"), és megjegyzi a forrás-posztot (`remixOf.postId`),
+ * hogy publikáláskor a poszthoz csatolódjon. Visszaadja az új projekt id-ját, vagy null.
  */
 export async function remixFromPost(post: FeedPost): Promise<string | null> {
-  const snap = post.projectSnapshot;
-  if (!snap || !post.remixable) {
+  // renderelt videó nélkül nincs mit importálni
+  if (!post.remixable || !post.videoUri) {
     return null;
   }
-  const project = migrateProject({
-    ...(snap as Project),
-    id: makeId('prj'),
-    name: `${post.title} (remix)`,
-    remixOf: { projectId: post.projectId ?? post.id, name: post.creator.displayName },
-  });
+  const duration = post.durationSec > 0 ? post.durationSec : 5;
+  const assetId = makeId('ast');
+  const clip: VideoClip = {
+    kind: 'video',
+    id: makeId('clip'),
+    start: 0,
+    duration,
+    uri: post.videoUri,
+    assetId,
+    trimIn: 0,
+    sourceDuration: duration,
+    speed: 1,
+    volume: 1,
+    filterId: 'none',
+  };
+  const asset: Asset = {
+    id: assetId,
+    kind: 'video',
+    uri: post.videoUri,
+    provider: 'remote',
+    remoteUrl: post.videoUri,
+    duration,
+  };
+  const base = createEmptyProject(`Remix – ${post.title}`, post.aspectRatio ?? '9:16');
+  const project: Project = {
+    ...base,
+    assets: [asset],
+    tracks: base.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [clip] } : tr)),
+    remixOf: { projectId: post.projectId ?? post.id, name: post.creator.displayName, postId: post.id },
+  };
   await saveProject(project);
   return project.id;
 }

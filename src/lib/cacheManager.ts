@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import { clearBeatMemory } from '@/lib/beats';
 import { clearCutlistMemory } from '@/lib/cutlist';
@@ -16,11 +17,25 @@ import { clearWaveformMemory } from '@/lib/waveform';
  * mert azok a projekthez tartozó tartalmak, nem eldobható cache.
  */
 
-function fileList(dir: Directory): File[] {
-  if (!dir.exists) {
+/**
+ * Az új expo-file-system API (`Directory`/`File`/`Paths`) NATÍV-only — weben a
+ * `new Directory(...)` már a KONSTRUKTORBAN elszáll (`this.validatePath is not a
+ * function`). Weben amúgy sincs on-device proxy/hullámforma/thumbnail cache
+ * (azok natív pipeline-ok), ezért ott a lemezes rész NO-OP: a riport nulla, az
+ * ürítés csak a memória-cache-eket takarítja. A `Directory`-t THUNK-ból építjük,
+ * hogy maga a konstrukció is a try/catch mögé essen.
+ */
+const HAS_DISK_CACHE = Platform.OS !== 'web';
+
+function fileList(makeDir: () => Directory): File[] {
+  if (!HAS_DISK_CACHE) {
     return [];
   }
   try {
+    const dir = makeDir();
+    if (!dir.exists) {
+      return [];
+    }
     return dir.list().filter((e): e is File => e instanceof File);
   } catch {
     return [];
@@ -28,6 +43,9 @@ function fileList(dir: Directory): File[] {
 }
 
 function waveformFiles(): File[] {
+  if (!HAS_DISK_CACHE) {
+    return [];
+  }
   try {
     return new Directory(Paths.cache)
       .list()
@@ -59,15 +77,15 @@ export interface CacheReport {
 }
 
 export function cacheReport(): CacheReport {
-  const proxies = sumBytes(fileList(new Directory(Paths.document, 'proxies')));
+  const proxies = sumBytes(fileList(() => new Directory(Paths.document, 'proxies')));
   const waveforms = sumBytes(waveformFiles());
-  const thumbnails = sumBytes(fileList(thumbnailDir()));
+  const thumbnails = sumBytes(fileList(() => thumbnailDir()));
   return { proxies, waveforms, thumbnails, total: proxies + waveforms + thumbnails };
 }
 
 /** Az eldobható cache-ek (proxy + hullámforma) törlése lemezről és memóriából. */
 export function clearCaches(): void {
-  for (const f of fileList(new Directory(Paths.document, 'proxies'))) {
+  for (const f of fileList(() => new Directory(Paths.document, 'proxies'))) {
     try {
       f.delete();
     } catch {
@@ -81,7 +99,7 @@ export function clearCaches(): void {
       /* ignore */
     }
   }
-  for (const f of fileList(thumbnailDir())) {
+  for (const f of fileList(() => thumbnailDir())) {
     try {
       f.delete();
     } catch {

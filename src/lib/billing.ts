@@ -164,24 +164,34 @@ export async function activateProDev(days = 30): Promise<boolean> {
   if (!userId) {
     throw new Error(tr('lib.billing.noUser'));
   }
-  const res = await fetch(`${cloudBaseUrl()}/billing/activate`, {
-    method: 'POST',
-    headers: await workerJsonHeaders(),
-    body: JSON.stringify({ userId, days }),
-  });
-  if (!res.ok) {
-    const msg = await res.text().catch(() => '');
-    throw new Error(msg || tr('lib.billing.activateFailed'));
+  // 🧪 Kliens-oldali dev-override ELŐSZÖR: így WEBEN is működik, ahol a kliens a
+  // hosztolt prod Supabase-t nézi, a dev-worker viszont a lokálisba ír (a prod
+  // subscriptions-t nem látná) — és túléli a `syncFromUser`-t.
+  useEntitlement.getState().setDevPro(true);
+  // A szerver-hiteles út best-effort: natívon (kliens+worker azonos Supabase) ez
+  // valódi subscriptions-sort ír; ha a worker elérhetetlen, a dev-override akkor is áll.
+  try {
+    const res = await fetch(`${cloudBaseUrl()}/billing/activate`, {
+      method: 'POST',
+      headers: await workerJsonHeaders(),
+      body: JSON.stringify({ userId, days }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { proUntil?: string | null };
+      useEntitlement.getState().setTier('pro', data.proUntil ?? null);
+    }
+  } catch {
+    // a worker nem elérhető — a dev-override marad az aktív Pro-forrás
   }
-  const data = (await res.json()) as { proUntil?: string | null };
-  useEntitlement.getState().setTier('pro', data.proUntil ?? null);
-  await refreshEntitlement();
   return useEntitlement.getState().isPro();
 }
 
-/** DEV/manuális visszavonás a worker /billing/deactivate-en. */
+/** DEV/manuális visszavonás: a kliens-override KI + a worker /billing/deactivate (best-effort). */
 export async function deactivateProDev(): Promise<void> {
   const userId = useAuth.getState().user?.id;
+  // előbb a dev-override le, hogy weben is azonnal Free legyen
+  useEntitlement.getState().setDevPro(false);
+  useEntitlement.getState().setTier('free');
   if (!userId) {
     return;
   }
@@ -190,6 +200,4 @@ export async function deactivateProDev(): Promise<void> {
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ userId }),
   }).catch(() => {});
-  useEntitlement.getState().setTier('free');
-  await refreshEntitlement();
 }

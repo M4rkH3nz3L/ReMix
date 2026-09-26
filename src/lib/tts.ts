@@ -1,5 +1,6 @@
 import { t as tr } from 'i18next';
 import { Directory, File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import { makeId } from '@/lib/id';
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
@@ -59,6 +60,12 @@ export async function generateTts(
   if (!res.ok) {
     throw new Error(body.error ?? tr('lib.tts.generateFailed'));
   }
+  const remoteUrl = `${base}/tts/${body.id}/${body.name}`;
+  // 🌐 weben nincs fájlrendszer → a worker-URL-t streameljük (mint a hang-könyvtár);
+  // a szerver-render feltöltéskor úgyis blobként húzza le ezt az URL-t
+  if (Platform.OS === 'web') {
+    return { uri: remoteUrl, duration: body.duration ?? 0 };
+  }
   const dir = new Directory(Paths.document, 'media');
   try {
     dir.create();
@@ -66,6 +73,6 @@ export async function generateTts(
     /* már létezik */
   }
   const target = new File(dir, `tts_${makeId('v')}.m4a`);
-  await File.downloadFileAsync(`${base}/tts/${body.id}/${body.name}`, target);
+  await File.downloadFileAsync(remoteUrl, target);
   return { uri: target.uri, duration: body.duration ?? 0 };
 }

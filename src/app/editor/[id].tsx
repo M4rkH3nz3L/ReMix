@@ -22,6 +22,7 @@ import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
+import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
@@ -44,24 +45,12 @@ import { useTutorial } from '@/store/tutorialStore';
 
 const AUTOSAVE_MS = 800;
 
-/** A bal oldali eszköz-rail elemei (medium/expanded elrendezésben). */
-const RAIL_ITEMS = [
-  { icon: 'sparkles-outline', panel: 'assistant' },
-  { icon: 'server-outline', panel: 'library' },
-  { icon: 'musical-notes-outline', panel: 'audio' },
-  { icon: 'chatbox-ellipses-outline', panel: 'captions' },
-  { icon: 'reader-outline', panel: 'transcript' },
-  { icon: 'happy-outline', panel: 'sticker' },
-  { icon: 'share-outline', panel: 'export' },
-] as const;
-
 export default function EditorScreen() {
   const { t } = useTranslation();
   const { id, panel } = useLocalSearchParams<{ id: string; panel?: string }>();
   const project = useEditorStore((s) => s.project);
   const dirty = useEditorStore((s) => s.dirty);
   const panelVisible = useEditorStore(selectPanelVisible);
-  const activePanel = useEditorStore((s) => s.activePanel);
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
@@ -425,14 +414,17 @@ export default function EditorScreen() {
       <View style={styles.headerTitleWrap}>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {project?.name ?? '…'}
-          {dirty ? ' •' : ''}
         </Text>
-        {/* 💾 a mentés bukott — a felhasználó ne higgye, hogy a munkája biztonságban van */}
+        {/* 💾 mentés-állapot: hiba esetén figyelmeztetés, egyébként Mentve/Mentés… */}
         {saveFailed ? (
           <Text style={styles.saveFailed} numberOfLines={1}>
             ⚠️ {t('editorScreen.saveFailed')}
           </Text>
-        ) : null}
+        ) : (
+          <Text style={styles.saveState} numberOfLines={1}>
+            {dirty ? `● ${t('editorScreen.saving')}` : `✓ ${t('editorScreen.saved')}`}
+          </Text>
+        )}
         {project?.remixOf ? (
           <Pressable
             onPress={() => setLineageOpen(true)}
@@ -491,20 +483,26 @@ export default function EditorScreen() {
         >
           <Ionicons name="play-circle-outline" size={24} color={palette.accent} />
         </Pressable>
-        <Pressable
-          onPress={() => useEditorStore.getState().setPanel('export')}
-          hitSlop={8}
-        >
-          <LinearGradient
-            colors={[...accentGradient]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.exportButton}
+        {/* Az EGYETLEN Export belépő (az alsó Toolbarból kivéve — nincs duplikáció).
+            TutorialTarget: a felület-vezető export-lépése ide mutat. */}
+        <TutorialTarget id="toolbar.export">
+          <Pressable
+            onPress={() => useEditorStore.getState().setPanel('export')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('editor.toolbar.export')}
           >
-            <Ionicons name="share-outline" size={14} color="#fff" />
-            <Text style={styles.exportButtonText}>Export</Text>
-          </LinearGradient>
-        </Pressable>
+            <LinearGradient
+              colors={[...accentGradient]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.exportButton}
+            >
+              <Ionicons name="share-outline" size={14} color="#fff" />
+              <Text style={styles.exportButtonText}>Export</Text>
+            </LinearGradient>
+          </Pressable>
+        </TutorialTarget>
       </View>
     </View>
   );
@@ -533,59 +531,16 @@ export default function EditorScreen() {
       </Pressable>
     ) : null;
 
-  const rail = (
-    <View
-      style={[
-        styles.toolRail,
-        { width: L.editor.railWidth, paddingTop: L.spacing.sm, gap: L.spacing.xs },
-      ]}
-    >
-      {RAIL_ITEMS.map((item) => {
-        const active = activePanel === item.panel;
-        const label = t('editorScreen.rail_' + item.panel);
-        return (
-          <Pressable
-            key={item.panel}
-            style={[
-              styles.railItem,
-              { width: L.editor.railWidth - 10, minHeight: L.touchMin },
-              active ? styles.railItemActive : null,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            onPress={() =>
-              useEditorStore.getState().setPanel(active ? null : item.panel)
-            }
-          >
-            <Ionicons
-              name={item.icon}
-              size={L.isExpanded ? 22 : 19}
-              color={active ? '#fff' : palette.textDim}
-            />
-            <Text
-              style={[
-                styles.railLabel,
-                { fontSize: L.font(9) },
-                active ? styles.railLabelActive : null,
-              ]}
-            >
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-
   /**
    * Három elrendezés, méret-osztály szerint (lásd `@/constants/layout`):
    *
    *  expanded — iPad fekvő/desktop. Teljes vágó-elrendezés: fejléc végig felül,
-   *    alatta rail | előnézet+transport | DOKKOLT inspector, legalul teljes
-   *    szélességű idővonal. A panel és az idővonal EGYSZERRE látszik.
+   *    alatta előnézet+transport | DOKKOLT inspector, legalul teljes szélességű
+   *    idővonal. A panel és az idővonal EGYSZERRE látszik. (Az eszközök az alsó
+   *    Toolbarban vannak — nincs külön bal oldali rail.)
    *  medium+fekvő — telefon fekvőben: kevés a magasság, ezért a vezérlők jobb
    *    oszlopba kerülnek, a videó kapja a bal oldalt.
-   *  medium+álló — iPad állóban: rail + függőleges rakás, az idővonal VÉGIG
+   *  medium+álló — iPad állóban: függőleges rakás, az idővonal VÉGIG
    *    látszik, a panel alulról jön fel fölé.
    *  compact — telefon állóban: az eredeti rakás, a panel az idővonal helyén.
    */
@@ -597,7 +552,6 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         <View style={styles.expandedBand}>
-          {rail}
           <View style={styles.expandedCenter}>
             <PreviewSurface mode="edit" />
             <TransportBar />
@@ -615,7 +569,6 @@ export default function EditorScreen() {
   } else if (L.sizeClass === 'medium' && L.isLandscape) {
     body = (
       <View style={styles.landscapeRow}>
-        {rail}
         <View style={styles.landscapePreview}>
           <PreviewSurface mode="edit" />
         </View>
@@ -638,7 +591,6 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         <View style={styles.expandedBand}>
-          {rail}
           <View style={styles.expandedCenter}>
             <PreviewSurface mode="edit" />
             <TransportBar />
@@ -665,9 +617,9 @@ export default function EditorScreen() {
   }
 
   return (
-    // Fekvőben a notch / home-indicator az OLDALAKON van → ott a bal rail és az
-    // előnézet a bevágás alá csúszna; ezért fekvő módban a bal/jobb szélt is
-    // insetteljük. Állóban a bal/jobb inset 0, így ez nem változtat semmit.
+    // Fekvőben a notch / home-indicator az OLDALAKON van → ott az előnézet a
+    // bevágás alá csúszna; ezért fekvő módban a bal/jobb szélt is insetteljük.
+    // Állóban a bal/jobb inset 0, így ez nem változtat semmit.
     <SafeAreaView
       style={styles.container}
       edges={L.isLandscape ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
@@ -722,6 +674,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 1,
   },
+  saveState: {
+    color: palette.textDim,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -757,36 +715,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
-  // expanded/medium-álló középső sáv: rail | előnézet | (dokkolt inspector)
+  // expanded/medium-álló középső sáv: előnézet | (dokkolt inspector)
   expandedBand: {
     flex: 1,
     flexDirection: 'row',
   },
   expandedCenter: {
     flex: 1,
-  },
-  toolRail: {
-    alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: palette.border,
-    backgroundColor: palette.surface,
-  },
-  railItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  railItemActive: {
-    backgroundColor: palette.accent,
-  },
-  railLabel: {
-    color: palette.textDim,
-    fontWeight: '700',
-  },
-  railLabelActive: {
-    color: '#fff',
   },
   landscapePreview: {
     flex: 1,

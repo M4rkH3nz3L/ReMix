@@ -417,7 +417,9 @@
       "compareOriginal": "Halten für Vergleich mit Original",
       "original": "Original",
       "edited": "Bearbeitet",
-      "compareSlider": "Vorher/Nachher-Regler"
+      "compareSlider": "Vorher/Nachher-Regler",
+      "emptyNoClip": "Kein Clip unter dem Abspielkopf",
+      "emptyHint": "Füge Medien über die Werkzeugleiste unten hinzu (Video · Bild · Musik)"
     },
     "selection": {
       "notVisible": "In diesem Frame nicht sichtbar — zum Springen tippen.",
@@ -741,7 +743,9 @@
     "rail_transcript": "Transkript",
     "rail_sticker": "Elemente",
     "rail_export": "Export",
-    "saveFailed": "Nicht gespeichert — erneuter Versuch"
+    "saveFailed": "Nicht gespeichert — erneuter Versuch",
+    "saved": "Gespeichert",
+    "saving": "Speichern…"
   },
   "panels": {
     "adjust": {
@@ -2628,6 +2632,12 @@
     "shareToFeed": "Im Feed teilen",
     "sharedOk": "Dein Video ist jetzt im Feed.",
     "rendering": "Rendern & Teilen…",
+    "visibilityTitle": "Wer kann das sehen?",
+    "visibilityPrompt": "Lege fest, für wen dieses Video sichtbar ist.",
+    "visPublic": "Öffentlich",
+    "visFollowers": "Follower",
+    "visPrivate": "Privat",
+    "remixesLabel": "{{n}} Remixe",
     "sponsored": "Gesponsert",
     "followFailed": "Folgen fehlgeschlagen.",
     "tapHint": "Tippe 3× für das Menü",

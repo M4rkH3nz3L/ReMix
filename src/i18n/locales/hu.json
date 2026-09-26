@@ -417,7 +417,9 @@
       "compareOriginal": "Tartsd nyomva az eredetihez",
       "original": "Eredeti",
       "edited": "Szerkesztett",
-      "compareSlider": "Előtte/utána csúszka"
+      "compareSlider": "Előtte/utána csúszka",
+      "emptyNoClip": "Nincs klip a lejátszófej alatt",
+      "emptyHint": "Adj hozzá médiát a lenti eszköztárból (Videó · Kép · Zene)"
     },
     "selection": {
       "notVisible": "Ezen a képkockán nem látható — koppints az odaugráshoz.",
@@ -741,7 +743,9 @@
     "rail_transcript": "Átirat",
     "rail_sticker": "Elemek",
     "rail_export": "Export",
-    "saveFailed": "Nincs elmentve — újrapróbálom"
+    "saveFailed": "Nincs elmentve — újrapróbálom",
+    "saved": "Mentve",
+    "saving": "Mentés…"
   },
   "panels": {
     "adjust": {
@@ -2628,6 +2632,12 @@
     "shareToFeed": "Megosztás a feedbe",
     "sharedOk": "A videód felkerült a feedre.",
     "rendering": "Renderelés és megosztás…",
+    "visibilityTitle": "Ki láthatja?",
+    "visibilityPrompt": "Állítsd be, kinek jelenjen meg ez a videó.",
+    "visPublic": "Nyilvános",
+    "visFollowers": "Követők",
+    "visPrivate": "Privát",
+    "remixesLabel": "{{n}} remix",
     "sponsored": "Kiemelt",
     "followFailed": "A követés nem sikerült.",
     "tapHint": "Koppints 3×-t a menühöz",

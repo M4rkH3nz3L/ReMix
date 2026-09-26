@@ -650,7 +650,9 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             <View style={styles.empty}>
               {mode === 'edit' ? (
                 <Text style={styles.emptyText}>
-                  Nincs klip a lejátszófej alatt{'\n'}Adj hozzá videót a + gombbal
+                  {t('editor.preview.emptyNoClip')}
+                  {'\n'}
+                  {t('editor.preview.emptyHint')}
                 </Text>
               ) : null}
             </View>

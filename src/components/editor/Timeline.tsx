@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 
 import { PacingLane } from '@/components/editor/PacingLane';
@@ -326,6 +326,8 @@ export function Timeline() {
   const scrubbing = useRef(false);
   const scrubEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastScrollX = useRef(0);
+  // 🖱️ web: az idővonal-konténer DOM-node-ja (egér fogd-és-húzd + wheel a sávterületen)
+  const timelineRef = useRef<View>(null);
   const [viewportW, setViewportW] = useState(0);
   const zoomStart = useRef(zoom);
   // 🪟 a virtualizációs ablak (px, a belső view lokális koordinátájában) — chunkolt
@@ -455,6 +457,99 @@ export function Timeline() {
       }
     })
     .runOnJS(true);
+
+  // 🖱️ WEB: az egér nem gördíti a vízszintes ScrollView-t. A sávterületet fogd-és-húzd
+  // módon toljuk oldalra (mint egy térképet), a MŰKÖDŐ scrollRef.scrollTo-val. A
+  // klipekre NEM hat: a `data-clip`-jelölt elemen indított húzást kihagyjuk, így a
+  // klip saját mozgatása marad. Wheel bárhol az idővonal fölött → görgetés. Csak weben.
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+    const node = timelineRef.current as unknown as HTMLElement | null;
+    if (!node) {
+      return;
+    }
+    const beginScrub = () => {
+      scrubbing.current = true;
+      if (scrubEndTimer.current) {
+        clearTimeout(scrubEndTimer.current);
+      }
+      if (useEditorStore.getState().isPlaying) {
+        setPlaying(false);
+      }
+    };
+    const endScrubSoon = () => {
+      scrubEndTimer.current = setTimeout(() => {
+        scrubbing.current = false;
+      }, 140);
+    };
+    let dragging = false;
+    let startX = 0;
+    let startLeft = 0;
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) {
+        return;
+      }
+      // GEOMETRIAI klip-kizárás: ha a pointer egy klip dobozában van, a húzás a
+      // klip saját mozgatásáé (a `closest('[data-clip]')` a RNGH/overlay DOM-fa
+      // miatt nem volt megbízható — a dobozok metszete az).
+      const onClip = Array.from(document.querySelectorAll('[data-clip]')).some((el) => {
+        const r = el.getBoundingClientRect();
+        return (
+          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+        );
+      });
+      if (onClip) {
+        return;
+      }
+      dragging = true;
+      startX = e.clientX;
+      startLeft = lastScrollX.current;
+      beginScrub();
+      try {
+        node.setPointerCapture(e.pointerId);
+      } catch {
+        /* nem támogatott — a mozgás akkor is működik */
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) {
+        return;
+      }
+      const targetX = Math.max(0, startLeft - (e.clientX - startX));
+      scrollRef.current?.scrollTo({ x: targetX, animated: false });
+    };
+    const onUp = () => {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      endScrubSoon();
+    };
+    const onWheel = (e: WheelEvent) => {
+      const d = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) {
+        return;
+      }
+      beginScrub();
+      scrollRef.current?.scrollTo({ x: Math.max(0, lastScrollX.current + d), animated: false });
+      e.preventDefault();
+      endScrubSoon();
+    };
+    node.addEventListener('pointerdown', onDown);
+    node.addEventListener('pointermove', onMove);
+    node.addEventListener('pointerup', onUp);
+    node.addEventListener('pointercancel', onUp);
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      node.removeEventListener('pointerdown', onDown);
+      node.removeEventListener('pointermove', onMove);
+      node.removeEventListener('pointerup', onUp);
+      node.removeEventListener('pointercancel', onUp);
+      node.removeEventListener('wheel', onWheel);
+    };
+  }, [setPlaying, project?.id]);
 
   if (!project) {
     return null;
@@ -686,14 +781,19 @@ export function Timeline() {
           </View>
         ) : null}
         <View
-          style={styles.container}
+          ref={timelineRef}
+          style={[
+            styles.container,
+            // 🖱️ weben jelezzük, hogy a sávterület fogd-és-húzd módon tolható
+            Platform.OS === 'web' ? ({ cursor: 'grab' } as unknown as ViewStyle) : null,
+          ]}
           onLayout={(e) => setViewportW(e.nativeEvent.layout.width)}
         >
         <ScrollView
           ref={scrollRef}
           horizontal
           bounces={false}
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={Platform.OS === 'web'}
           scrollEventThrottle={16}
           onScroll={onScroll}
           onScrollBeginDrag={() => {

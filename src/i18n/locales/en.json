@@ -196,6 +196,7 @@
     "accountSection": "Account",
     "savedTitle": "Saved",
     "profileSaved": "Your details have been updated.",
+    "usernameTaken": "This username is already taken.",
     "noModels": "No models yet. Add one to use your own AI.",
     "addModel": "Add model",
     "editModel": "Edit model",

@@ -26,6 +26,7 @@ import {
   isValidUsername,
   looksLikeEmail,
 } from '@/lib/accountValidation';
+import { isUsernameAvailable } from '@/lib/profile';
 import { useAuth } from '@/store/authStore';
 
 type Mode = 'signIn' | 'signUp';
@@ -92,6 +93,13 @@ export default function AuthScreen() {
     setBusy(true);
     setError(null);
     try {
+      // 🔑 regisztrációnál előbb a felhasználónév-foglaltság (beszédes hiba a
+      // nyers DB-unique-violation helyett); a DB-index amúgy is véd
+      if (isSignUp && !(await isUsernameAvailable(username.trim()))) {
+        setError(t('profile.usernameTaken'));
+        setBusy(false);
+        return;
+      }
       const result = isSignUp
         ? await signUp(email.trim(), password, {
             fullName,

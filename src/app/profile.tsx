@@ -29,6 +29,7 @@ import {
   isValidBirthday,
   isValidFullName,
   isValidPhone,
+  isValidUsername,
 } from '@/lib/accountValidation';
 import {
   AI_PROVIDER_KINDS,
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
   // configured=false esetén nincs mit tölteni → azonnal false (nem villog a spinner)
   const [loading, setLoading] = useState(configured);
   const [profile, setProfile] = useState<AccountProfile>({
+    username: '',
     fullName: '',
     phone: '',
     birthday: '',
@@ -204,9 +206,11 @@ export default function ProfileScreen() {
     setProfile((prev) => ({ ...prev, [key]: value }));
 
   const nameError = profile.fullName.length > 0 && !isValidFullName(profile.fullName);
+  const usernameError = profile.username.length > 0 && !isValidUsername(profile.username);
   const phoneError = profile.phone.length > 0 && !isValidPhone(profile.phone);
   const birthdayError = profile.birthday.length > 0 && !isValidBirthday(profile.birthday);
   const profileValid =
+    isValidUsername(profile.username) &&
     isValidFullName(profile.fullName) &&
     isValidPhone(profile.phone) &&
     isValidBirthday(profile.birthday) &&
@@ -222,7 +226,15 @@ export default function ProfileScreen() {
       await saveProfile(profile);
       Alert.alert(t('profile.savedTitle'), t('profile.profileSaved'));
     } catch (e) {
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      // beszédes üzenet a username-hibákra (a lib sentinel-kódot dob)
+      const friendly =
+        msg === 'USERNAME_TAKEN'
+          ? t('profile.usernameTaken')
+          : msg === 'USERNAME_REQUIRED'
+            ? t('auth.usernameHint')
+            : msg;
+      Alert.alert(t('common.error'), friendly);
     } finally {
       setSavingProfile(false);
     }
@@ -563,6 +575,21 @@ export default function ProfileScreen() {
           {/* — Személyes adatok — */}
           <Text style={styles.sectionTitle}>{t('profile.personalSection')}</Text>
           <View style={styles.card}>
+            {/* 🔑 EGYEDI felhasználónév (login-handle) — ezzel is be lehet lépni; NEM a display name */}
+            <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
+            <TextInput
+              value={profile.username}
+              onChangeText={(v) => setField('username', v.trim())}
+              placeholder={t('auth.usernamePlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, usernameError && styles.inputError]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={usernameError ? styles.error : styles.sectionHint}>
+              {t('auth.usernameHint')}
+            </Text>
+
             <Text style={styles.fieldLabel}>{t('auth.nameLabel')}</Text>
             <TextInput
               value={profile.fullName}

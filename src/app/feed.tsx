@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useIsFocused } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
   Animated,
   FlatList,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ import { palette } from '@/constants/editor';
 import {
   currentUserId,
   listFeed,
+  listRemixesOf,
   recordView,
   remixFromPost,
   toggleFollow,
@@ -42,11 +44,14 @@ import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
 import type { InteractiveClip } from '@/types/project';
 
-/** Egy poszt interaktív (hotspot) klipjei a hordozott project-snapshotból. */
+/** Egy poszt interaktív (hotspot) klipjei a poszton hordozott interaktív rétegből. */
 function hotspotsOf(post: FeedPost): InteractiveClip[] {
-  const track = post.projectSnapshot?.tracks?.find((tr) => tr.type === 'interactive');
+  const track = post.interactive?.tracks?.find((tr) => tr.type === 'interactive');
   return (track?.clips ?? []).filter((c): c is InteractiveClip => c.kind === 'interactive');
 }
+
+/** a poszthoz csatolt remix-sáv egy kártyájának szélessége (snap-lapozáshoz) */
+const REMIX_CARD_W = 116;
 
 function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -69,6 +74,9 @@ export default function FeedScreen() {
   // 🛡️ globális poszt-moderátor jog → „eltávolítás a feedből" gomb bármely poszton
   const canModeratePost = useRoles((s) => s.permissions.includes('post.moderate'));
   const [activeId, setActiveId] = useState<string | null>(null);
+  // 🔀 az egyes posztokhoz CSATOLT remixek (lazy — csak az aktív poszté töltődik),
+  // a poszt alján balról-jobbra lapozható remix-sávhoz
+  const [remixMap, setRemixMap] = useState<Record<string, FeedPost[]>>({});
   const [hotspotTime, setHotspotTime] = useState(0);
   // A jobb oldali akció-sor (like/komment/mentés/remix) MINDIG látszik. A többi
   // chrome (mód-váltó, felirat, alsó menü) alapból látszik, de hármas koppintás
@@ -83,7 +91,15 @@ export default function FeedScreen() {
   // egyetlen lejátszó, ami az AKTÍV poszt videójára vált (renderelt MP4 URL)
   const player = useVideoPlayer(null, (p) => {
     p.loop = true;
+    // 🌐 weben a HANGOS autoplay tiltott → némán indítunk (különben a videó „el sem
+    // indul"); a hangot a rail némítás-gombja kapcsolja be (kattintás = user gesztus).
+    if (Platform.OS === 'web') {
+      p.muted = true;
+    }
   });
+  // némítás-állapot (weben alapból néma az autoplayhez)
+  const [muted, setMuted] = useState(Platform.OS === 'web');
+  const mutedRef = useRef(Platform.OS === 'web');
   // a feed `push`-sal nyit más képernyőt → mountolva marad; a videó ne szóljon takarva
   const isFocused = useIsFocused();
 
@@ -239,7 +255,7 @@ export default function FeedScreen() {
     if (busy) {
       return;
     }
-    if (!post.remixable || !post.projectSnapshot) {
+    if (!post.remixable || !post.videoUri) {
       Alert.alert(t('feed.title'), t('feed.notRemixable'));
       return;
     }
@@ -315,6 +331,21 @@ export default function FeedScreen() {
   useEffect(() => {
     const active = posts.find((p) => p.id === activeId);
     const uri = active?.videoUri ?? null;
+    // 🌐 web: a lejátszást a natív <video autoPlay> intézi (az expo-video web-play
+    // nem indít). Itt csak a FÓKUSZ-váltásra reagálunk: elhagyva a feedet szünet,
+    // visszatérve folytatás (a feed mountolva marad más képernyő alatt).
+    if (Platform.OS === 'web') {
+      const v = document.querySelector('video');
+      if (v) {
+        if (!uri || !isFocused) {
+          v.pause();
+        } else {
+          v.muted = mutedRef.current;
+          void v.play().catch(() => {});
+        }
+      }
+      return;
+    }
     if (!uri || !isFocused) {
       player.pause();
       return;
@@ -327,6 +358,7 @@ export default function FeedScreen() {
       .replaceAsync(uri)
       .then(() => {
         if (!cancelled) {
+          player.muted = mutedRef.current; // a replace ne nullázza a némítást
           player.play();
         }
       })
@@ -345,6 +377,26 @@ export default function FeedScreen() {
     const iv = setInterval(() => setHotspotTime(player.currentTime ?? 0), 250);
     return () => clearInterval(iv);
   }, [activeId, posts, player]);
+
+  // 🔀 az aktív poszt remixeinek betöltése (lazy) — a poszthoz CSATOLT, balról-jobbra
+  // lapozható remix-sávhoz. Csak akkor kér le, ha van remix és még nincs betöltve.
+  useEffect(() => {
+    const active = posts.find((p) => p.id === activeId);
+    if (!active || active.counts.remixes <= 0 || remixMap[active.id]) {
+      return;
+    }
+    let alive = true;
+    listRemixesOf(active.id)
+      .then((rx) => {
+        if (alive) {
+          setRemixMap((m) => ({ ...m, [active.id]: rx }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [activeId, posts, remixMap]);
 
   const handleHotspot = (clip: InteractiveClip) => {
     const a = clip.action;
@@ -403,6 +455,11 @@ export default function FeedScreen() {
   };
 
   const pageHeight = height;
+  // 🖥️ weben/széles nézetben a feed egy KÖZÉPRE igazított, 9:16 „telefon"-oszlop —
+  // különben a teljes szélességű lap szétvágja a függőleges videót és szétszórja az
+  // overlay-eket (desktop-káosz). Mobilon a teljes szélesség marad (contentW = width).
+  const isWideWeb = Platform.OS === 'web' && width > 540;
+  const contentW = isWideWeb ? Math.min(width, Math.round(pageHeight * (9 / 16))) : width;
 
   // a pulzáló glow-gyűrű stílusa (scale ki + elhalványul, loopban)
   const pulseStyle = {
@@ -412,15 +469,40 @@ export default function FeedScreen() {
 
   const renderItem = ({ item }: { item: FeedPost }) => (
     <View style={[styles.page, { height: pageHeight, width }]}>
+      {/* 🖥️ középre igazított 9:16 oszlop (weben) — az overlay-ek EHHEZ igazodnak */}
+      <View style={[styles.column, { width: contentW, height: pageHeight }]}>
       <GestureDetector gesture={tapGesture(item)}>
         <View style={StyleSheet.absoluteFill}>
           {item.id === activeId && item.videoUri ? (
-            <VideoView
-              player={player}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              nativeControls={false}
-            />
+            Platform.OS === 'web' ? (
+              // 🌐 web: NATÍV <video> (az expo-video web-lejátszója nem indít autoplay-t);
+              // némítva a böngésző engedi az autoplay-t, a rail gombja kapcsol hangot.
+              createElement('video', {
+                src: item.videoUri,
+                autoPlay: true,
+                muted,
+                loop: true,
+                playsInline: true,
+                controls: false,
+                poster: item.posterUri ?? undefined,
+                style: {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000',
+                },
+              })
+            ) : (
+              <VideoView
+                player={player}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                nativeControls={false}
+              />
+            )
           ) : item.posterUri ? (
             <Image source={{ uri: item.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
@@ -478,6 +560,30 @@ export default function FeedScreen() {
           />
           <Text style={styles.railCount}>{compact(item.counts.likes)}</Text>
         </Pressable>
+        {/* 🔊 némítás — weben a videó némán autoplayez; ez kapcsolja be a hangot */}
+        <Pressable
+          style={styles.railBtn}
+          onPress={() => {
+            const nm = !mutedRef.current;
+            mutedRef.current = nm;
+            setMuted(nm);
+            player.muted = nm;
+            if (Platform.OS === 'web') {
+              // web: közvetlenül a <video>-n (az expo-video play/muted nem propagál megbízhatóan)
+              const v = document.querySelector('video');
+              if (v) {
+                v.muted = nm;
+                if (!nm) {
+                  void v.play().catch(() => {});
+                }
+              }
+            } else if (!nm && item.id === activeId) {
+              player.play();
+            }
+          }}
+        >
+          <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={30} color="#fff" />
+        </Pressable>
         <Pressable
           style={styles.railBtn}
           onPress={() => {
@@ -521,6 +627,45 @@ export default function FeedScreen() {
         </View>
       ) : null}
 
+      {/* 🔀 a poszthoz CSATOLT remixek — balról-jobbra lapozható sáv a felirat fölött.
+          Csak az aktív poszton (a remixek lustán töltődnek) és chrome-mal együtt. */}
+      {chromeVisible && (remixMap[item.id]?.length ?? 0) > 0 ? (
+        <View style={[styles.remixStrip, { bottom: chromeBottom + 84 }]}>
+          <Text style={styles.remixStripLabel}>
+            🔀 {t('feed.remixesLabel', { n: remixMap[item.id].length })}
+          </Text>
+          <FlatList
+            horizontal
+            data={remixMap[item.id]}
+            keyExtractor={(r) => r.id}
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={REMIX_CARD_W + 10}
+            decelerationRate="fast"
+            contentContainerStyle={styles.remixRow}
+            renderItem={({ item: rx }) => (
+              <Pressable style={styles.remixCard} onPress={() => openCreator(rx)}>
+                {rx.posterUri ? (
+                  <Image source={{ uri: rx.posterUri }} style={styles.remixThumb} contentFit="cover" />
+                ) : (
+                  <LinearGradient colors={['#241a3a', '#0c0d12']} style={styles.remixThumb} />
+                )}
+                <View style={styles.remixMeta}>
+                  <Text style={styles.remixCreator} numberOfLines={1}>
+                    @{rx.creator.username}
+                  </Text>
+                  <View style={styles.remixCounts}>
+                    <Ionicons name="heart" size={11} color="#fff" />
+                    <Text style={styles.remixCountText}>{compact(rx.counts.likes)}</Text>
+                    <Ionicons name="shuffle" size={11} color="#fff" style={styles.remixCountIcon} />
+                    <Text style={styles.remixCountText}>{compact(rx.counts.remixes)}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            )}
+          />
+        </View>
+      ) : null}
+
       {/* alul-bal: alkotó + felirat — a többi chrome-mal együtt (hármas koppintás / auto-hide) */}
       {chromeVisible ? (
         <View style={[styles.caption, { bottom: chromeBottom }]}>
@@ -557,14 +702,14 @@ export default function FeedScreen() {
                 key={c.id}
                 clip={c}
                 t={hotspotTime - c.start}
-                box={{ w: width, h: pageHeight }}
+                box={{ w: contentW, h: pageHeight }}
                 mode="play"
                 selected={false}
                 onPress={handleHotspot}
               />
             ))
         : null}
-
+      </View>
     </View>
   );
 
@@ -666,7 +811,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   emptyCtaText: { color: '#fff', fontWeight: '800' },
-  page: { justifyContent: 'flex-end' },
+  page: { justifyContent: 'flex-end', alignItems: 'center', backgroundColor: '#000' },
+  // a középre igazított 9:16 videó-oszlop (weben szűkebb, mobilon teljes szélesség)
+  column: { alignSelf: 'center', overflow: 'hidden', backgroundColor: '#000' },
   heartPop: {
     position: 'absolute',
     top: 0,
@@ -719,6 +866,28 @@ const styles = StyleSheet.create({
   sponsoredText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   tags: { color: '#cbb8ff', fontSize: 13, fontWeight: '600' },
   remixOf: { color: '#ffffffcc', fontSize: 12, fontWeight: '600' },
+  // 🔀 a poszthoz csatolt remix-lapozó sáv (balról-jobbra)
+  remixStrip: { position: 'absolute', left: 12, right: 84 },
+  remixStripLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 6,
+    letterSpacing: 0.3,
+  },
+  remixRow: { gap: 10, paddingRight: 12 },
+  remixCard: {
+    width: REMIX_CARD_W,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#00000066',
+  },
+  remixThumb: { width: REMIX_CARD_W, height: REMIX_CARD_W * 1.3, backgroundColor: '#1a1e2e' },
+  remixMeta: { paddingHorizontal: 6, paddingVertical: 5, gap: 3 },
+  remixCreator: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  remixCounts: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  remixCountText: { color: '#ffffffcc', fontSize: 10, fontWeight: '600' },
+  remixCountIcon: { marginLeft: 6 },
   tapHint: {
     position: 'absolute',
     bottom: 48,

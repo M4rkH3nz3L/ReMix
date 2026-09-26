@@ -11,6 +11,9 @@ import { useAuth } from '@/store/authStore';
  */
 
 export interface AccountProfile {
+  /** 🔑 EGYEDI login-handle (@username) — ezzel is be lehet lépni. NEM a display name. */
+  username: string;
+  /** megjelenített név a csatornán/feedben (nem egyedi) */
   fullName: string;
   phone: string;
   /** ISO dátum: YYYY-MM-DD (üres, ha nincs) */
@@ -24,6 +27,7 @@ export interface AccountProfile {
 }
 
 const EMPTY: AccountProfile = {
+  username: '',
   fullName: '',
   phone: '',
   birthday: '',
@@ -46,7 +50,7 @@ export async function fetchProfile(): Promise<AccountProfile> {
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, phone, birthday, country, city, avatar_url, cover_url')
+    .select('username, full_name, phone, birthday, country, city, avatar_url, cover_url')
     .eq('id', currentUserId())
     .maybeSingle();
   if (error) {
@@ -56,6 +60,7 @@ export async function fetchProfile(): Promise<AccountProfile> {
     return { ...EMPTY };
   }
   return {
+    username: data.username ?? '',
     fullName: data.full_name ?? '',
     phone: data.phone ?? '',
     birthday: data.birthday ?? '',
@@ -69,9 +74,15 @@ export async function fetchProfile(): Promise<AccountProfile> {
 /** A profil mentése (upsert — ha a trigger-sor valamiért hiányozna, létrejön). */
 export async function saveProfile(profile: AccountProfile): Promise<void> {
   const supabase = requireSupabase();
+  const username = profile.username.trim();
+  if (!username) {
+    // a username KÖTELEZŐ (NOT NULL + egyedi) — a képernyő is validál előtte
+    throw new Error('USERNAME_REQUIRED');
+  }
   const { error } = await supabase.from('profiles').upsert(
     {
       id: currentUserId(),
+      username,
       full_name: profile.fullName.trim() || null,
       phone: profile.phone.trim() || null,
       birthday: profile.birthday.trim() || null,
@@ -83,8 +94,23 @@ export async function saveProfile(profile: AccountProfile): Promise<void> {
     { onConflict: 'id' },
   );
   if (error) {
+    // 23505 = egyedi-index ütközés → foglalt felhasználónév (beszédes hiba a UI-nak)
+    if ((error as { code?: string }).code === '23505' || /username|duplicate key/i.test(error.message)) {
+      throw new Error('USERNAME_TAKEN');
+    }
     throw new Error(error.message);
   }
+}
+
+/** Szabad-e a felhasználónév? (regisztráció/profil előtt, session nélkül is) */
+export async function isUsernameAvailable(username: string): Promise<boolean> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc('username_available', { p_username: username });
+  if (error) {
+    // hiba esetén ne blokkoljunk (a DB unique-index úgyis véd) — engedjük tovább
+    return true;
+  }
+  return data === true;
 }
 
 /**

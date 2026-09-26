@@ -196,6 +196,7 @@
     "accountSection": "Konto",
     "savedTitle": "Gespeichert",
     "profileSaved": "Deine Daten wurden aktualisiert.",
+    "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
     "noModels": "Noch keine Modelle. Füge eines hinzu, um deine eigene KI zu nutzen.",
     "addModel": "Modell hinzufügen",
     "editModel": "Modell bearbeiten",

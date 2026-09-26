@@ -196,6 +196,7 @@
     "accountSection": "Fiók",
     "savedTitle": "Mentve",
     "profileSaved": "Az adataid frissültek.",
+    "usernameTaken": "Ez a felhasználónév már foglalt.",
     "noModels": "Még nincs modell. Adj hozzá egyet a saját AI-hoz.",
     "addModel": "Modell hozzáadása",
     "editModel": "Modell szerkesztése",

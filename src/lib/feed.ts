@@ -199,10 +199,11 @@ export async function getChannel(userId: string): Promise<ChannelData> {
   // születésnap — nem szivárognak). Így poszt nélküli csatorna is helyes fejlécet kap.
   const { data: profRows } = await sb.rpc('public_profile', { p_user: userId });
   const prof = (Array.isArray(profRows) ? profRows[0] : profRows) as
-    | { full_name: string | null; avatar_url: string | null; cover_url: string | null }
+    | { full_name: string | null; username: string | null; avatar_url: string | null; cover_url: string | null }
     | undefined;
   const emailHandle = me === userId ? (useAuth.getState().user?.email?.split('@')[0] ?? null) : null;
-  const username = posts[0]?.creator.username ?? emailHandle ?? userId.slice(0, 8);
+  // az EGYEDI username a profiles-ból (public_profile); csak fallback a poszt/email
+  const username = prof?.username ?? posts[0]?.creator.username ?? emailHandle ?? userId.slice(0, 8);
   const creator: Creator = {
     id: userId,
     username,
@@ -231,15 +232,19 @@ async function creatorFields(): Promise<{
 }> {
   const user = useAuth.getState().user;
   const email = user?.email ?? null;
-  const username = email ? email.split('@')[0] : null;
-  let name: string | null = username;
+  const emailHandle = email ? email.split('@')[0] : null;
+  // a poszt „username"-je az EGYEDI login-handle (profiles.username), NEM az
+  // email-előtag; a display name a full_name (a kettő szándékosan külön mező)
+  let username: string | null = emailHandle;
+  let name: string | null = null;
   let avatar: string | null = null;
   if (supabase && user?.id) {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, avatar_url')
+      .select('username, full_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle();
+    username = (data?.username as string | undefined) || emailHandle;
     name = (data?.full_name as string | undefined) || username;
     avatar = (data?.avatar_url as string | undefined) ?? null;
   }

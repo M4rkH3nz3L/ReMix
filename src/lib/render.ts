@@ -17,6 +17,8 @@ import { renderCacheKey } from '@/lib/projectHash';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { withFingerprints } from '@/lib/fingerprint';
+import { requireSupabase } from '@/lib/supabase';
+import { makeId } from '@/lib/id';
 import type { Project, RenderedVersion } from '@/types/project';
 
 /**
@@ -355,6 +357,15 @@ export async function renderProjectVersion(
  * publikus Storage-ba → a publikus URL (a feed / cross-device lejátszáshoz).
  */
 export async function uploadMedia(uri: string, name?: string): Promise<string> {
+  // 🌐 WEB: közvetlenül a kliens Supabase Storage-ába (a feed/avatar/borító a prod
+  // storage-ból szolgáljon, ne a worker lokális S3-jából — az prodon 404). Natívon
+  // marad a worker /media/upload út (az eszköz-fájlt tölti fel).
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    const ext = (name?.split('.').pop() || blob.type.split('/').pop() || 'bin').split('?')[0];
+    const contentType = blob.type || 'application/octet-stream';
+    return uploadBlobToStorage(blob, `media/${makeId('m')}.${ext}`, contentType);
+  }
   const base = cloudBaseUrl();
   const form = await mediaFormData(uri, name);
   const res = await uploadFetch(`${base}/media/upload`, {
@@ -514,8 +525,26 @@ export async function renderCloudFileUrl(
 }
 
 /**
- * 🌐 WEB: szerver-render → a kész MP4 feltöltése a publikus Storage-ba (feedhez).
- * A `uploadMedia` weben a worker-URL-t blobként tölti fel → tartós, publikus URL.
+ * 🌐 WEB: egy blob feltöltése KÖZVETLENÜL a kliens Supabase Storage-ába (`renders`
+ * bucket, public). MIÉRT: eddig a worker a SAJÁT (lokális dev) S3-jába töltött, és a
+ * prod-kliens azt a prod storage-ra írta át → ott nincs a fájl (404). Így a fájl
+ * ugyanabba a Supabase-be kerül, amit a kliens/feed olvas (prodon = prod). A publikus
+ * URL loopback-mentes (prod) vagy loopback (lokál) — a `reachableMediaUrl` kezeli.
+ */
+async function uploadBlobToStorage(blob: Blob, path: string, contentType: string): Promise<string> {
+  const sb = requireSupabase();
+  const { error } = await sb.storage.from('renders').upload(path, blob, {
+    contentType,
+    upsert: true,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return sb.storage.from('renders').getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * 🌐 WEB: szerver-render → a kész MP4 feltöltése a kliens Supabase Storage-ába (feedhez).
  */
 export async function renderAndUploadWeb(
   project: Project,
@@ -523,7 +552,8 @@ export async function renderAndUploadWeb(
   settings?: RenderSettings
 ): Promise<RenderedVersion> {
   const fileUrl = await renderCloudFileUrl(project, onProgress, settings);
-  const url = await uploadMedia(fileUrl, `${project.id}.mp4`);
+  const blob = await (await fetch(fileUrl)).blob();
+  const url = await uploadBlobToStorage(blob, `feed/${makeId('v')}.mp4`, 'video/mp4');
   return {
     uri: url,
     url,

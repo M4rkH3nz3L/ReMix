@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 
 import { describeCommand } from '@/lib/commands';
 import type { EditorCommand, ProjectEvent } from '@/lib/commands';
+import type { MemoryCategory } from '@/lib/creatorMemory';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
@@ -105,7 +106,15 @@ export function buildAiContext(
   project: Project,
   playhead: number,
   selectedClipId: string | null,
-  events: ProjectEvent[]
+  events: ProjectEvent[],
+  /**
+   * 🧠 Creator Memory (PM4) — a perzisztens alkotói kontextus kategóriánként
+   * (`memoryContext(...)` a `@/lib/creatorMemory`-ból). Ha megvan, a
+   * `creatorMemory` réteg alá kerül, hogy az AI ismerje a creator stílusát,
+   * felirat-/hang-/szín-preferenciáit stb. Opcionális — a régi hívók változatlanul
+   * működnek.
+   */
+  memory?: Partial<Record<MemoryCategory, string[]>> | null
 ): Record<string, unknown> {
   return {
     project: {
@@ -125,6 +134,7 @@ export function buildAiContext(
       selectedClipId,
     },
     recentActions: events.slice(-15).map((e) => `${e.actor}: ${describeCommand(e.command)}`),
+    ...(memory && Object.keys(memory).length > 0 ? { creatorMemory: memory } : {}),
   };
 }
 

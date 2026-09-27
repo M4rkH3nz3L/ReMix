@@ -34,18 +34,34 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 
 ---
 
+## ⭐ Állapot — 2026-09-27: a MODELL/MAG-réteg KÉSZ
+
+A `studio-social` ágon a MISSING.md **teljes tesztelhető mag-rétege elkészült** — tiszta, expo-mentes, determinisztikus `src/lib` magok, mindegyik jest-teszttel, `npm run audit` **zöld**. Amit egy eszköz nélkül, unit-tesztelten meg lehetett építeni, az **kész**; a maradék `[ ]` tételek **UI / natív / worker / Supabase-integráció**, amelyekhez futó app + `/verify` (nem jest) kell.
+
+**Platform-mag (PM1–4):** Creator Memory · Universal Asset Library · ⌘K Universal Search · Creative Graph · Workspace · CreativeDocument (`ProjectKind` + `projectKinds`) — **+ felhő-perzisztencia PRODon** (`creator_memory`/`asset_library`/`workspace` JSONB, RLS; kliensek).
+
+**8 stúdió-mag:** ✍️ `writingDoc`+`markdown` · 🎧 `mixer` · 🎵 `musicTime` · 🎮 `gameHighlights`+`captureCenter` · 📸 `photoDevelop` · 🎨 `layout`+`designSystem` · 🎤 `pitch` · 💻 `codeDiff` · (+ 🎬 `lutImport`+`edl`).
+
+**Közös rendszer-magok:** 🗓️ `planner` · 🔄 `versions` · 🧩 `workflowTemplate` · 📊 `analytics` · 🔁 `creatorLoop` · 👥 `collabComments` · 💬 `chatCommands` · 💰 `business` · 🧠 `agents` · 🛒 `marketplace` · 🎚️ `automation` · 🤖 `genMedia`.
+
+**Capability-katalógus** minden AI-képességgel bővült (writeAssist/pitchCorrect/screenRecord/genImage/genVideo/genMusic/voiceClone/aiAvatar), i18n en/hu/de.
+
+**Ami maradt (jest-tel nem igazolható → külön fázis):** minden stúdió UI-képernyője; natív felvétel (kamera-luxus, screen-record, RAW-dekódolás); worker-renderek (mixer→ffmpeg, pitch-shift, átmenet-render, generatív inferencia, stem-bővítés); Figma-szerű multiplayer-kurzor; code-editor/terminal; API-doksi/SDK/webhook/embed (E8); MIDI/piano-roll (saját RFC). A per-tétel „Hátra:" jelölések ezt pontosítják.
+
+---
+
 ## 1. Alkotó-fedettségi térkép (2026-09-27-i audit)
 
 | Alkotó | Fedettség | Fő hiány → epik |
 | --- | --- | --- |
-| 🎬 Videós | ~85% ✅ | média-management, felvétel-luxus, LUT-import, átmenet-render → **S-VIDEO** + [VIDEO.md](./VIDEO.md) |
+| 🎬 Videós | ~88% ✅ | LUT-import + EDL-export **mag kész** (`lutImport.ts`/`edl.ts`); hátra: média-management/felvétel-luxus/átmenet-render (UI/worker) → **S-VIDEO** + [VIDEO.md](./VIDEO.md) |
 | ✍️ Író | ~75% 🟢 | Writer Studio **mag kész** (Book→Chapter+bible+markdown+AI-context — `writingDoc.ts`); hátra: UI + worker → **S-WRITER** |
-| 🎧 Producer | ~75% 🟢 | mixer-mag **kész** (channel/bus/send/sidechain/master + validáció/render-terv — `mixer.ts`); hátra: worker-render + automation-lane + UI → **S-PRODUCER** |
-| 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
+| 🎧 Producer | ~80% 🟢 | mixer + automation-lane **mag kész** (`mixer.ts`/`automation.ts`); hátra: worker-render + UI → **S-PRODUCER** |
+| 🤖 AI Creator | ~70% 🟢 | generatív média capability+adapter **mag kész** (`genMedia.ts`) + Creator Memory/Graph/Loop; hátra: inferencia-adapter + UI → **S-GENAI** |
 | 📸 Fotós | ~62% 🟡 | non-destruktív RAW-develop param-mag **kész** (detail+sync — `photoDevelop.ts`); hátra: RAW-dekódolás + retus-ecsetek + culling-UI → **S-PHOTO** |
-| 🎨 Designer | ~62% 🟡 | layout-engine **mag kész** (auto-layout/align/distribute/grid/constraints — `layout.ts`); hátra: vektor-node-editing + komponens/design-system + vektor-export → **S-DESIGN** |
+| 🎨 Designer | ~68% 🟡 | layout + design-system + SVG-export **mag kész** (`layout.ts`/`designSystem.ts`); hátra: vektor-node-editing + collab + PDF/WebP → **S-DESIGN** |
 | 🎤 Énekes | ~55% 🟡 | pitch-correction + harmónia terv-mag **kész** (`pitch.ts`); hátra: pitch-detektálás/render (worker) + comping + UI → **S-VOCAL** |
-| 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
+| 🎙️ Podcaster | ~60% 🟡 | silence/filler + chapters + RSS + audiogram + repurpose **mag kész** (`podcast.ts`); hátra: multitrack/remote UI + worker → **S-PODCAST** |
 | 🎮 Gamer | ~55% 🟡 | capture-terv + jel-alapú auto-highlight/montázs **mag kész** (`gameHighlights.ts`/`captureCenter.ts`); hátra: natív rögzítés + UI + stream → **S-GAMER** |
 | 💻 Developer | ~45% 🟠 | diff/patch **mag kész** (Git/diff + DIFF→APPROVE→APPLY — `codeDiff.ts`); hátra: code-editor/file-tree/terminal UI + API-doksi/SDK → **S-CODE** + **E8** |
 | 🎵 Zenész | ~40% 🟠 | időzítés-mag **kész** (bars/beats+tempo-map+quantize+loop — `musicTime.ts`); hátra: MIDI/piano-roll/hangszer/felvétel → **S-MUSIC** |
@@ -345,6 +361,8 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 ---
 
 ## 7. Alkotónkénti hiány-checklist (appendix — minden persona egy pillantással)
+
+> ℹ️ Ez az appendix a 2026-09-27 ELŐTTI pillanatképet mutatja; a tényleges állapot a fenti **⭐ Állapot** szekcióban + a per-epik „mag kész / Hátra:" jelöléseiben van. A listázott tételek nagy részének a **modell/mag-rétege elkészült**; a maradék UI/natív/worker.
 
 **🎬 Videós** → **S-VIDEO** · [VIDEO.md](./VIDEO.md): [ ] média-management (binek/tags/ratings) · [ ] felvétel-luxus (multicam/lock/fps/teleprompter) · [ ] source/program monitor + audio-méter · [ ] nested/adjustment clips · [ ] LUT-import · [ ] színkerekek · [ ] átmenet-render · [ ] XML/EDL · [ ] batch render-sor
 

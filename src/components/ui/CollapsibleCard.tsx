@@ -12,9 +12,13 @@ import {
 
 import { palette } from '@/constants/editor';
 
-// Androidon a LayoutAnimation külön engedélyt kér (weben/iOS-en no-op/alap)
+// A régi (bridge-es) Androidon a LayoutAnimation külön engedélyt kért; a New
+// Architecture-ben (bridgeless) ez no-op és figyelmeztet — ott a LayoutAnimation
+// alapból engedélyezett, ezért kihagyjuk a hívást. (Weben/iOS-en eleve no-op/alap.)
+const RN_BRIDGELESS = (globalThis as { RN$Bridgeless?: boolean }).RN$Bridgeless === true;
 if (
   Platform.OS === 'android' &&
+  !RN_BRIDGELESS &&
   UIManager.setLayoutAnimationEnabledExperimental
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

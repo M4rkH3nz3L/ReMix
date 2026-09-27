@@ -277,11 +277,11 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### E-Planner — Creator Planner  ·  MASTER §21
 
-**Mai állapot:** teljesen hiányzik ([schedules.ts](../../src/lib/schedules.ts) ma render-sor-poll).
+**Mai állapot:** a Planner-**MAG kész** — [planner.ts](../../src/lib/planner.ts) (10 teszt, audit-zöld) a Workspace `WorkspaceTask` kanbanja fölött ([workspace.ts](../../src/lib/workspace.ts)). A [schedules.ts](../../src/lib/schedules.ts) a render-sor-poll (más réteg).
 
-- [ ] ✚ pipeline: Ideas → Backlog → Production → Editing → Review → **Scheduled → Published** (kanban).
-- [ ] ✚ **tartalomnaptár** platformonként (YouTube/TikTok/Instagram/Spotify/Podcast/blog/newsletter).
-- [ ] ✚ AI: „ezen a héten mit kell elkészítenem?", „melyik projekt áll félbe?", „készíts publikációs tervet".
+- [x] ✅ pipeline: Ideas → Backlog → Production → Editing → Review → **Scheduled → Published** — a `TaskStatus`/`TASK_STATUSES` kanban + `nextStatus`/`prevStatus`/`isActive` ([planner.ts](../../src/lib/planner.ts) `PIPELINE`).
+- [x] ✅ **tartalomnaptár** platformonként — `CONTENT_PLATFORMS` (YouTube/TikTok/Instagram/Spotify/Podcast/blog/newsletter) + `WorkspaceTask.platform`/`scheduledFor` + `scheduleTask` + `calendarByDate` (nap szerint) + `upcomingByPlatform`.
+- [x] ✅ AI-lekérdezések magja: `weekPlan` („ezen a héten mit kell?"), `stalledTasks` („melyik áll félbe?" — aktív + rég nem érintett), `publishSchedule` („publikációs terv"), `plannerSummary` (kanban-darabszámok). *Hátra: kanban + naptár UI + a platform-publikálás bekötése.*
 
 ### E-Analytics — Creator Analytics  ·  MASTER §22
 

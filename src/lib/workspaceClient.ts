@@ -81,6 +81,8 @@ function coerceTask(raw: unknown): WorkspaceTask | null {
     title: o.title,
     status: isStatus(o.status) ? o.status : 'idea',
     ...(typeof o.projectId === 'string' ? { projectId: o.projectId } : {}),
+    ...(typeof o.platform === 'string' ? { platform: o.platform } : {}),
+    ...(typeof o.scheduledFor === 'string' ? { scheduledFor: o.scheduledFor } : {}),
     createdAt: str(o.createdAt),
     updatedAt: str(o.updatedAt),
   };

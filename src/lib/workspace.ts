@@ -80,6 +80,10 @@ export interface WorkspaceTask {
   status: TaskStatus;
   /** opcionális projekt-hivatkozás (melyik projekthez tartozik a feladat). */
   projectId?: string;
+  /** 🗓️ cél-platform (a tartalomnaptárhoz) — a `@/lib/planner` `ContentPlatform`-ja */
+  platform?: string;
+  /** 🗓️ tervezett közzétételi időpont (ISO) — a naptár/publikációs terv alapja */
+  scheduledFor?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,7 +173,7 @@ export function removeNote(ws: Workspace, id: string, now = new Date().toISOStri
 export function addTask(
   ws: Workspace,
   title: string,
-  opts: { status?: TaskStatus; projectId?: string } = {},
+  opts: { status?: TaskStatus; projectId?: string; platform?: string; scheduledFor?: string } = {},
   now = new Date().toISOString()
 ): Workspace {
   const clean = title.trim();
@@ -181,10 +185,36 @@ export function addTask(
     title: clean,
     status: opts.status ?? 'idea',
     ...(opts.projectId ? { projectId: opts.projectId } : {}),
+    ...(opts.platform ? { platform: opts.platform } : {}),
+    ...(opts.scheduledFor ? { scheduledFor: opts.scheduledFor } : {}),
     createdAt: now,
     updatedAt: now,
   };
   return { ...ws, tasks: [...ws.tasks, task], updatedAt: now };
+}
+
+/** Feladat ütemezése: platform + tervezett időpont (opcionálisan a státusz is). */
+export function scheduleTask(
+  ws: Workspace,
+  id: string,
+  patch: { scheduledFor?: string; platform?: string; status?: TaskStatus },
+  now = new Date().toISOString()
+): Workspace {
+  let changed = false;
+  const tasks = ws.tasks.map((t) => {
+    if (t.id !== id) {
+      return t;
+    }
+    changed = true;
+    return {
+      ...t,
+      ...(patch.scheduledFor !== undefined ? { scheduledFor: patch.scheduledFor } : {}),
+      ...(patch.platform !== undefined ? { platform: patch.platform } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      updatedAt: now,
+    };
+  });
+  return changed ? { ...ws, tasks, updatedAt: now } : ws;
 }
 
 export function setTaskStatus(

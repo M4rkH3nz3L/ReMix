@@ -10,6 +10,7 @@ import {
   removeNote,
   removeProjectRef,
   removeTask,
+  scheduleTask,
   setTaskStatus,
   splitWorkspace,
   tasksByStatus,
@@ -77,6 +78,15 @@ describe('workspace — jegyzetek + feladatok (Planner-mag)', () => {
     expect(ws.notes).toHaveLength(1);
     ws = removeNote(ws, ws.notes[0].id, T1);
     expect(ws.notes).toHaveLength(0);
+  });
+
+  it('scheduleTask platformot + tervezett időpontot + státuszt állít', () => {
+    let ws = emptyWorkspace('W', {}, T0);
+    ws = addTask(ws, 'Vlog', {}, T0);
+    const id = ws.tasks[0].id;
+    ws = scheduleTask(ws, id, { scheduledFor: '2026-09-29T10:00:00.000Z', platform: 'youtube', status: 'scheduled' }, T1);
+    expect(ws.tasks[0]).toMatchObject({ platform: 'youtube', scheduledFor: '2026-09-29T10:00:00.000Z', status: 'scheduled' });
+    expect(scheduleTask(ws, 'nope', { platform: 'x' }, T1)).toBe(ws);
   });
 
   it('addTask / setTaskStatus / tasksByStatus / removeTask', () => {

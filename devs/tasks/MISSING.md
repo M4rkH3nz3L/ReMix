@@ -42,7 +42,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | ✍️ Író | ~75% 🟢 | Writer Studio **mag kész** (Book→Chapter+bible+markdown+AI-context — `writingDoc.ts`); hátra: UI + worker → **S-WRITER** |
 | 🎧 Producer | ~75% 🟢 | mixer-mag **kész** (channel/bus/send/sidechain/master + validáció/render-terv — `mixer.ts`); hátra: worker-render + automation-lane + UI → **S-PRODUCER** |
 | 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
-| 📸 Fotós | ~55% 🟡 | RAW, retus (healing/clone), culling/batch → **S-PHOTO** |
+| 📸 Fotós | ~62% 🟡 | non-destruktív RAW-develop param-mag **kész** (detail+sync — `photoDevelop.ts`); hátra: RAW-dekódolás + retus-ecsetek + culling-UI → **S-PHOTO** |
 | 🎨 Designer | ~55% 🟡 | vektor-motor, layout-engine, komponens/design-system, vektor-export → **S-DESIGN** |
 | 🎤 Énekes | ~45% 🟡 | Vocal Studio (pitch/harmónia/comping) → **S-VOCAL** |
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
@@ -137,7 +137,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** rétegelt kép-stúdió ([imageDoc.ts](../../src/lib/imageDoc.ts)), görbék/HSL/3-way ([curves.ts](../../src/lib/curves.ts)), AI-retus (bgremove/upscale/sky/depth/face). Részletek: [IMAGE.md](./IMAGE.md).
 
-**RAW (MASTER §3):** [ ] ✚ RAW/DNG/ProRAW import + metaadat · [ ] non-destruktív RAW-develop · [ ] exposure/highlights/shadows/whites/blacks/temperature/tint · [ ] **texture/clarity/dehaze** · [ ] sharpening · [ ] noise-reduction · [ ] chromatic-aberration/lens-correction/distortion/vignette.
+**RAW (MASTER §3):** [ ] RAW/DNG/ProRAW import + metaadat *(natív dekódolás — worker, hátra)* · [x] ✅ **non-destruktív RAW-develop param-mag** — [photoDevelop.ts](../../src/lib/photoDevelop.ts) (13 teszt, audit-zöld): a `ClipAdjust` tónus/szín-vezérlőire (exposure/highlights/shadows/whites/blacks/temperature/tint/vibrance/görbék) épít + új **DetailParams** (**texture/clarity/dehaze** · sharpening · noise-reduction · chromatic-aberration · lens-distortion · vignette), `clampDevelop`/`isNeutralDevelop`, **copy/paste + `syncDevelop`** (csoport-allowlist: tone/color/detail/lens — a batch-fotózás magja), `developToFilterPlan` (deklaratív, a workerhez) + `summarizeDevelop`. *Hátra: a natív RAW-dekódolás + a filter-terv render-bekötése + retus-ecsetek.*
 
 **Retus (MASTER §3):** [ ] ✚ **healing brush** · [ ] clone stamp · [ ] blemish removal · [ ] skin-retouch · [ ] teeth/eyes · [ ] dodge & burn · [ ] frequency-separation workflow · [ ] face-aware retouch (a face-detektálás megvan — [faceClient.ts](../../src/lib/faceClient.ts)).
 

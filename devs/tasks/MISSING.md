@@ -257,10 +257,10 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### E-Versions — Version Control (globális)  ·  MASTER §18
 
-**Mai állapot:** videó-verzióhistory elindult ([autoVersion.test.ts](../../src/lib/autoVersion.test.ts), [versionDiff.ts](../../src/lib/versionDiff.ts)).
+**Mai állapot:** a **globális verzió-mag KÉSZ** — [versions.ts](../../src/lib/versions.ts) (14 teszt, audit-zöld); a videó-tartalmi diff a [versionDiff.ts](../../src/lib/versionDiff.ts), a kódé a [codeDiff.ts](../../src/lib/codeDiff.ts).
 
-- [ ] ✚ **globális** állapotok: Draft/Review/Approved/Published/Archived + v1/v2/v3.
-- [ ] ✚ minden creator-típusnál: **diff/restore/duplicate/branch/compare/comment/approve** — designer „mi változott?", zenész „mi változott a mixben?", író „mi változott a fejezetben?", developer „git diff".
+- [x] ✅ **globális állapotgép**: Draft → Review → Approved → Published → Archived (`VersionStatus` + `canTransition`/`nextStatuses`, csak engedélyezett átmenet) + v1/v2/v3 auto-címke.
+- [x] ✅ minden creator-típusnál (domain-agnosztikus, a verzió `ref`-et hordoz): **restore/duplicate/branch/compare/approve** — `addVersion`/`duplicateVersion`(=branch)/`restoreVersion` (nem-destruktív) / `setStatus`+`approveVersion`/`publishVersion`/`archiveVersion` / `lineage` (ős-lánc) / `compareVersions` (meta) / `latestByStatus` / `statusCounts`. A **tartalmi** „mi változott?" a típus-specifikus diff (video `versionDiff`, code `codeDiff`, szöveg a `markdown`) a `ref`-snapshotokból. *Hátra: comment-réteg + a snapshot-tárolás bekötése + UI.*
 
 ### E-Collab — Creative Collaboration  ·  MASTER §19
 

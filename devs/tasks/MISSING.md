@@ -285,10 +285,10 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### E-Analytics — Creator Analytics  ·  MASTER §22
 
-**Mai állapot:** hiányzik (a poszt-számlálók denormalizáltak, de nincs dashboard).
+**Mai állapot:** az **analitika-MAG kész** — [analytics.ts](../../src/lib/analytics.ts) (13 teszt, audit-zöld); a poszt-számlálók/edit-sessionök/lépés-időzítések a hívótól jönnek, ez az ELEMZŐ réteg (dashboard-UI hátra).
 
-- [ ] ✚ **nem csak social**: Content/Projects/Audience/Revenue/**Workflow/Productivity** (mennyit szerkesztett, melyik workflow lassú, melyik template/hook/thumbnail működik).
-- [ ] ✚ AI: „miért működött ez a videó jobban?".
+- [x] ✅ **nem csak social**: `engagementRate`/`retentionRate` + `summarize` (Content) + `breakdownBy` (**melyik hook/thumbnail/template/platform működik** — átlag-engagement szerint rangsorolva) + `topPerformers`; **Workflow/Productivity**: `productivity` (mennyit szerkesztett — projekt/nap bontás) + `slowestSteps` (melyik workflow-lépés lassú, arányban).
+- [x] ✅ AI-alap: **`whyItWorked`** — a tartalom engagement/views/retention eltérése a mezőny átlagától (|delta| szerint) → nyers alapanyag a „miért működött ez jobban?" válaszhoz. *Hátra: dashboard-UI + a nyers statok bekötése (feed-számlálók/eventLog).*
 
 ### E-Business — Creator Business / CRM  ·  MASTER §23
 

@@ -301,13 +301,13 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** Shop kész ([shop.ts](../../src/lib/shop.ts)) — template/LUT/SFX/font/preset, atomi vásárlás-RPC, 30% jutalék.
 
-- [ ] ✚ **vásárolható/eladható bővítés**: music/**sample-packs/MIDI/instruments**/3D-assets/graphics/photo-presets/**design-systems/workflows/AI-agents/AI-personas** → creator→creator economy.
+- [x] ✅ **item-kind katalógus kész** — [marketplace.ts](../../src/lib/marketplace.ts) (a `MARKET_ITEM_KINDS`: template/LUT/SFX/font/preset + music/sample-pack/MIDI/instrument/3D/graphic/photo-preset/design-system/workflow/AI-agent/AI-persona, kategóriákkal + legacy-jelöléssel; `newMarketKinds`/`marketKindsByCategory`). *Hátra: a shop-DB item-type bővítése + payload-kezelés + eladó-UI a meglévő atomi vásárlás-RPC fölött.*
 
 ### E-Agents — AI Agent Marketplace  ·  MASTER §25
 
 **Mai állapot:** AI-persona-alap megvan ([aiPersona.ts](../../src/lib/aiPersona.ts)); agent-piac nincs.
 
-- [ ] ✚ szerep-agentek (🎬 Video Editor / 🎨 Art Director / 🎵 Music Producer / 📸 Photo Editor / ✍️ Writing / 🎙️ Podcast Producer / 💻 Coding / 📱 Social Media) — mind UGYANAZ az API: READ → UNDERSTAND → PLAN → PROPOSE → APPROVE → **COMMAND BUS** → EXECUTE → VERIFY. *(A mostani AI Edit Engine az alap.)*
+- [x] ✅ **MAG kész** — [agents.ts](../../src/lib/agents.ts) (8 teszt az agents+marketplace-re, audit-zöld): `ROLE_AGENTS` (Video Editor / Art Director / Music Producer / Photo Editor / Writing / Podcast Producer / Coding / Social Media) + a közös `AGENT_PIPELINE` (READ → UNDERSTAND → PLAN → PROPOSE → APPROVE → EXECUTE → VERIFY) futtatás-motorral (`startAgentRun`/`advanceAgentStage`/`agentProgress`). *(A jóváhagyás után a COMMAND BUS-t az [aiCommands.ts](../../src/lib/aiCommands.ts) hajtja.)* *Hátra: az agentek bekötése a valós AI-hívásokhoz + agent-piac UI (eladhatóság: [marketplace.ts](../../src/lib/marketplace.ts) `ai-agent`).*
 
 ### E-Loop — Retention loop  ·  MASTER §27
 

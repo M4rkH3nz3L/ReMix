@@ -144,6 +144,7 @@ export default function RootLayout() {
               <Stack.Screen name="collab/[id]" />
               <Stack.Screen name="shop" />
               <Stack.Screen name="search" />
+              <Stack.Screen name="command" />
               <Stack.Screen name="live" />
               <Stack.Screen name="channel/[id]" />
               <Stack.Screen name="inbox" />

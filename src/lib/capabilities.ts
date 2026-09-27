@@ -38,6 +38,7 @@ export type CapabilityId =
   | 'skyReplace' // ég-csere
   | 'colorAi' // AI szín / auto-grade
   | 'tts' // szöveg → beszéd / Voice Studio
+  | 'writeAssist' // ✍️ Writer Studio AI: rewrite/tone/summarize/expand/translate/outline
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
 /**
@@ -78,6 +79,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   skyReplace: { where: 'cloud', pro: true, label: 'lib.capabilities.label.skyReplace' },
   colorAi: { where: 'cloud', pro: true, label: 'lib.capabilities.label.colorAi' },
   tts: { where: 'cloud', pro: true, label: 'lib.capabilities.label.tts' },
+  writeAssist: { where: 'cloud', pro: true, label: 'lib.capabilities.label.writeAssist' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
   soundLibrary: { where: 'cloud', pro: false, label: 'lib.capabilities.label.soundLibrary' },
 };

@@ -39,7 +39,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | Alkotó | Fedettség | Fő hiány → epik |
 | --- | --- | --- |
 | 🎬 Videós | ~85% ✅ | média-management, felvétel-luxus, LUT-import, átmenet-render → **S-VIDEO** + [VIDEO.md](./VIDEO.md) |
-| ✍️ Író | ~65% 🟢 | **nincs Writer Studio** (rich-text/fejezet/kutatás) → **S-WRITER** |
+| ✍️ Író | ~75% 🟢 | Writer Studio **mag kész** (Book→Chapter+bible+markdown+AI-context — `writingDoc.ts`); hátra: UI + worker → **S-WRITER** |
 | 🎧 Producer | ~60% 🟢 | mixer-busz, sidechain, automation, send → **S-PRODUCER** |
 | 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
 | 📸 Fotós | ~55% 🟡 | RAW, retus (healing/clone), culling/batch → **S-PHOTO** |
@@ -208,15 +208,15 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### S-WRITER — ✍️ Író  ·  MASTER §9 (teljesen hiányzó stúdió)
 
-**Mai állapot:** felirat/átirat/story-AI/hook megvan a videó-kontextusban ([captionStudio.ts](../../src/lib/captionStudio.ts), [storyClient.ts](../../src/lib/storyClient.ts), [textedit.ts](../../src/lib/textedit.ts)) — de **nincs önálló Writer Studio** (`writing` dokumentumtípus, PM1).
+**Mai állapot:** a `writing` dokumentumtípus + Writer Studio **MAG kész** — [writingDoc.ts](../../src/lib/writingDoc.ts) + [markdown.ts](../../src/lib/markdown.ts) (23 teszt, audit-zöld). A `writing` kind adat-szinten él (PM1 CreativeDocument), a Workspace/Graph/Memory/⌘K hordozza. Videó-oldali segédek: [captionStudio.ts](../../src/lib/captionStudio.ts), [storyClient.ts](../../src/lib/storyClient.ts), [textedit.ts](../../src/lib/textedit.ts).
 
-**Editor (MASTER §9):** [ ] ✚ rich-text/**Markdown** · [ ] headings/lists/tables/footnotes · [ ] links/images/embeds.
+**Editor (MASTER §9):** [x] ✅ **Markdown**-mag ([markdown.ts](../../src/lib/markdown.ts) — `stripMarkdown`/`wordCount`/`charCount`/`readingTimeMin`/`extractOutline` TOC-vázlat, kódblokk-tudatosan) + `writingStats` (fejezetenként összegzett szó/karakter/olvasási-idő). *Hátra: WYSIWYG/lists/tables/footnotes/embeds UI.*
 
-**Dokumentum-struktúra (MASTER §9):** [ ] ✚ Workspace → Book → Chapters · [ ] Characters/Locations/Research/Notes (a PM1 Workspace-en).
+**Dokumentum-struktúra (MASTER §9):** [x] ✅ **Book → Chapters + story bible** — [writingDoc.ts](../../src/lib/writingDoc.ts) `WritingDoc` (chapters + `BibleEntry`: character/location/research/note) a command-bus reduceren (`applyWritingCommand`: fejezet/bible CRUD + `MOVE_CHAPTER` átrendezés, mind immutábilis/undo-zható). *Hátra: a Workspace-hez kötés + felhő-perzisztencia (a JSONB-minta kész).*
 
-**Writing tools (MASTER §9):** [ ] ✚ grammar/spelling · [ ] rewrite/tone · [ ] summarize/expand/shorten · [ ] **translate** (a caption-fordítás megvan) · [ ] outline/brainstorm · [ ] citation-management. *(Mind az AI-command buszra.)*
+**Writing tools (MASTER §9):** [x] ✅ capability-alap — `writeAssist` (cloud+pro) a [capabilities.ts](../../src/lib/capabilities.ts)-ben (rewrite/tone/summarize/expand/translate/outline az AI-command buszra), i18n en/hu/de. *Hátra: a worker-végpont + a konkrét eszköz-parancsok bekötése.*
 
-**AI context (MASTER §9):** [ ] ✚ az AI tudja: ki a szereplő · mi történt az előző fejezetben · milyen stílusban írsz · milyen terminológiát használsz → **Creator Memory** (PM4).
+**AI context (MASTER §9):** [x] ✅ **`buildWritingContext`** ([writingDoc.ts](../../src/lib/writingDoc.ts)) — az AI megkapja: aktuális fejezet (kivonat) · **előző fejezet szinopszisa** · szereplők/helyszínek/kutatás/jegyzetek · a Creator Memory **`writing`-stílusa/terminológiája** (PM4 `memoryContext`).
 
 **Videós-átfedés (audit ★):** [ ] ★ teleprompter (→ S-VIDEO felvétel is) · [ ] ★ script/screenplay-sablon · [ ] ★ kézi felirat-finomhangoló UI.
 

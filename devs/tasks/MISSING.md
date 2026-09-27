@@ -190,7 +190,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mixer + busz (MASTER §7):** [x] ✅ csatorna-strip: **Volume/Pan/EQ/Compressor/Sends/Sidechain/Bus-output** ([mixer.ts](../../src/lib/mixer.ts) `ChannelStrip` + immutábilis reducerek) · [x] ✅ **busz-rendszer** (drum/vocal/music/fx/group → master; többlépcsős, `resolveOutputChain`/`signalPath`) · [x] ✅ **sidechain** (`Sidechain` key-channel modell — az `autoDuck` valódi alapja; a render-terv hordozza) · **routing-validáció** (dangling output + **ciklus-detektálás** + hiányzó send-cél/sidechain-kulcs) + solo/mute-feloldás + `toRenderPlan` (busz-topo-rendezés a workerhez) + `mixerFromProject` bridge. *Hátra: a worker ffmpeg-filtergráf a render-tervből + FX-inzertek + UI.*
 
-**Automation (MASTER §7):** [ ] ✚ volume/pan/**plugin-paraméter**/send/mute/filter automation (a volume-keyframe már megvan).
+**Automation (MASTER §7):** [x] ✅ **MAG kész** — [automation.ts](../../src/lib/automation.ts) (8 teszt, audit-zöld): `AutomationLane` (volume/pan/mute/send/filter/**plugin-paraméter**, csatornánként) + breakpoint-kezelés (`addPoint` upsert/rendezés, `removePoint`) + **`valueAt`** (linear interpoláció + szél-kitartás; mute = lépcsős). A volume-keyframe általánosítása. *Hátra: a lane-ek render-bekötése (a mixer render-tervbe) + UI.*
 
 **Mastering (MASTER §7):** [x] LUFS/true-peak/limiter/compressor/EQ/loudness-meter/waveform/clipping-detektálás ([audioAnalyze.ts](../../src/lib/audioAnalyze.ts)) · [x] ✅ **stereo-width** + **parallel (NY) kompresszió** MODELLEZVE a [mixer.ts](../../src/lib/mixer.ts) `MasterBus`-ában (render-terv hordozza) · [ ] parametrikus multiband + állítható crossover. *Hátra: a worker-render bekötése a `MasterBus`-ból.*
 

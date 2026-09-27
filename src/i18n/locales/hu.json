@@ -2415,6 +2415,7 @@
     "capabilities": {
       "label": {
         "localRender": "Export az eszközön",
+        "screenRecord": "Képernyő- / game-felvétel",
         "cloudRender": "Felhő HD/4K render",
         "autoCaption": "Automatikus felirat",
         "urlImport": "Import linkből (YouTube/TikTok)",

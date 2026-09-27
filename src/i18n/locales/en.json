@@ -2415,6 +2415,7 @@
     "capabilities": {
       "label": {
         "localRender": "Export on device",
+        "screenRecord": "Screen / game recording",
         "cloudRender": "Cloud HD/4K render",
         "autoCaption": "Automatic captions",
         "urlImport": "Import from link (YouTube/TikTok)",

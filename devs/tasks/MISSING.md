@@ -46,7 +46,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | 🎨 Designer | ~55% 🟡 | vektor-motor, layout-engine, komponens/design-system, vektor-export → **S-DESIGN** |
 | 🎤 Énekes | ~45% 🟡 | Vocal Studio (pitch/harmónia/comping) → **S-VOCAL** |
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
-| 🎮 Gamer | ~40% 🟠 | Capture Center (screen/game/webcam), gaming-editor, stream → **S-GAMER** |
+| 🎮 Gamer | ~55% 🟡 | capture-terv + jel-alapú auto-highlight/montázs **mag kész** (`gameHighlights.ts`/`captureCenter.ts`); hátra: natív rögzítés + UI + stream → **S-GAMER** |
 | 💻 Developer | ~35% 🟠 | **nincs Code Studio** + API-doksi/SDK/embed → **S-CODE** + **E8** |
 | 🎵 Zenész | ~40% 🟠 | időzítés-mag **kész** (bars/beats+tempo-map+quantize+loop — `musicTime.ts`); hátra: MIDI/piano-roll/hangszer/felvétel → **S-MUSIC** |
 
@@ -198,11 +198,11 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### S-GAMER — 🎮 Gamer  ·  audit-★E2 + MASTER §8
 
-**Mai állapot:** highlight (beszéd-alapú — [highlightsClient.ts](../../src/lib/highlightsClient.ts)), speed-ramp, reframe, kamera-felvétel. A **capture** hiányzik.
+**Mai állapot:** highlight (beszéd-alapú — [highlightsClient.ts](../../src/lib/highlightsClient.ts)), speed-ramp, reframe, kamera-felvétel. A **capture-terv + jel-alapú auto-highlight MAG kész** ([captureCenter.ts](../../src/lib/captureCenter.ts) + [gameHighlights.ts](../../src/lib/gameHighlights.ts), 18 teszt, audit-zöld).
 
-**Capture Center (MASTER §8):** [ ] ✚ **screen-recording** (`screenRecord` capability **`local`/ingyen** — ReplayKit / MediaProjection) · [ ] game-recording · [ ] mikrofon/webcam/**system-audio/party-audio külön sávokra** · [ ] **replay-buffer / instant-replay** · [ ] clip/hotkey-marker.
+**Capture Center (MASTER §8):** [x] ✅ **`screenRecord` capability** (`local`/ingyen) a [capabilities.ts](../../src/lib/capabilities.ts)-ben (i18n en/hu/de) + **capture-terv modell** ([captureCenter.ts](../../src/lib/captureCenter.ts)): screen/game/webcam/mic/**system-audio/party-audio KÜLÖN sávokra**, **replay-buffer** (instant-replay) mp, **hotkey-markerek**, terv-validáció (nincs forrás / nincs videó / ütköző sáv). *Hátra: a natív rögzítés (ReplayKit/MediaProjection) bekötése.*
 
-**Gaming editor (MASTER §8):** [ ] ✚ kill/death/round-markerek · [ ] match-timeline · [ ] **automatic highlight / best-moments** (audio-csúcs + scene-váltás — a mostani beszéd-alapú kevés) · [ ] **reaction-cam/facecam** (egykattintós kulcsolás-preset a chroma/bgremove + PIP fölött) · [ ] game-audio/voice-chat sávok.
+**Gaming editor (MASTER §8):** [x] ✅ kill/death/round/clip **markerek** + **automatic highlight / best-moments** — [gameHighlights.ts](../../src/lib/gameHighlights.ts) `detectHighlights` (**audio-energia-csúcs + jelenet-váltás + markerek** klaszterezve — a beszéd-alapúnál gazdagabb), `momentsToSegments` (pre/post keret + átfedés-összevonás), `buildMontage` (top-score válogatás cél-hosszra + időrend + trim), `filterByMarker` („mutasd az összes killt"). *Hátra: match-timeline UI + facecam-kulcs-preset (chroma/bgremove+PIP fölött) + game-audio/voice-chat sávok bekötése.*
 
 **AI (MASTER §8):** [ ] ✚ „Mutasd az összes killt" · „30 mp-es montage" · „legjobb clutch" · „TikTok-verzió" — a command buszra, a highlight+reframe+beat ([beats.ts](../../src/lib/beats.ts)) újrahasznosításával. [ ] multi-forrás auto-szinkron (game+webcam+mic — a [multicam.ts](../../src/lib/multicam.ts) `correlateOffset`). [ ] live-stream (RTMP) → **E-Growth**.
 

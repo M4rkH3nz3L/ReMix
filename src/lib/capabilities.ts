@@ -19,6 +19,7 @@ export type Where = 'local' | 'cloud';
 export type CapabilityId =
   // ── ESZKÖZÖN, INGYEN ────────────────────────────────────────────────
   | 'localRender' // alap MP4 export a telefonon (natív AVFoundation/MediaCodec)
+  | 'screenRecord' // 🎮 képernyő-/game-felvétel (ReplayKit / MediaProjection) — eszközön, ingyen
   // ── FELHŐ-WORKER, PRO ───────────────────────────────────────────────
   | 'cloudRender' // felhő HD/4K render (queue + S3), gyorsabb, nagyobb felbontás
   | 'autoCaption' // Whisper: beszéd → felirat
@@ -56,6 +57,7 @@ type CapabilityMeta =
 
 export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   localRender: { where: 'local', pro: false, label: 'lib.capabilities.label.localRender' },
+  screenRecord: { where: 'local', pro: false, label: 'lib.capabilities.label.screenRecord' },
 
   cloudRender: { where: 'cloud', pro: true, label: 'lib.capabilities.label.cloudRender' },
   autoCaption: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoCaption' },

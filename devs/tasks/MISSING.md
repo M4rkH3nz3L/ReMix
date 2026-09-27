@@ -224,11 +224,11 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** felvétel + Voice Enhance + Whisper-átirat + **audio-only export** (WAV/MP3/AAC/FLAC — [render.ts](../../src/lib/render.ts)) + podcast-master preset. A disztribúció + multitrack-workflow hiányzik.
 
-**Podcast Studio (MASTER §10):** [ ] ✚ Host/Guest/Music/SFX/Ads/**Room-tone** sávok · [ ] **multitrack + remote guests** · [ ] separate audio tracks · [ ] **automatic sync** (a [multicam.ts](../../src/lib/multicam.ts) korrelációja) · [ ] **silence-removal** (a `silence` végpont megvan, tegyük ki panelként) · [ ] **filler-word removal** · [ ] speaker-detection.
+**Podcast Studio (MASTER §10):** [ ] Host/Guest/Music/SFX/Ads/Room-tone sávok *(UI)* · [ ] multitrack + remote guests *(UI/worker)* · [ ] automatic sync (a [multicam.ts](../../src/lib/multicam.ts) korrelációja) · [x] ✅ **silence-removal terv** + [x] ✅ **filler-word removal terv** — [podcast.ts](../../src/lib/podcast.ts) (`silenceGaps`/`tightenSilencePlan` + `fillerRanges`, 9 teszt) · [ ] speaker-detection *(worker)*.
 
-**Kimenetek (MASTER §10):** [ ] ✚ **chapters/timestamps** · [ ] show-notes · [ ] clips · [ ] **audiograms/waveform-video** (a [waveform.ts](../../src/lib/waveform.ts) csúcslistájából) · [ ] subtitles (megvan) · [ ] podcast-cover · [ ] **RSS-feed** generálás (worker-végpont) · [ ] show-oldal ([channel/[id].tsx](../../src/app/channel/%5Bid%5D.tsx) fölött).
+**Kimenetek (MASTER §10):** [x] ✅ **chapters/timestamps** (`chaptersToTimestamps`/`formatTimestamp`) · [ ] show-notes *(AI)* · [ ] clips · [x] ✅ **audiogram-sávok** (`audiogramBars` a [waveform.ts](../../src/lib/waveform.ts) csúcslistájából) · [x] subtitles (megvan) · [ ] podcast-cover · [x] ✅ **RSS-feed** generálás (`buildPodcastRss` — RSS 2.0 + iTunes) · [ ] show-oldal *(UI)*.
 
-**Egy felvételből → sok (MASTER §10 — „nagyon ReMix-kompatibilis"):** [ ] ✚ AI-pipeline: 2 órás podcast → Full episode + 10 highlight + 20 Shorts + quote-cards + audiogramok + transcript + chapters + show-notes + social-posztok. *(→ Workflow Template, §5-Templates.)*
+**Egy felvételből → sok (MASTER §10 — „nagyon ReMix-kompatibilis"):** [x] ✅ **workflow-sablon kész** — `PODCAST_REPURPOSE` ([podcast.ts](../../src/lib/podcast.ts)): transcript → chapters → highlights → shorts → quote-cards → audiogram → show-notes → social-posts (a [workflowTemplate.ts](../../src/lib/workflowTemplate.ts) futtató-motorján, capability-gatinggel). *Hátra: a lépések bekötése a valós AI/worker-műveletekhez.*
 
 ### S-CODE — 💻 Developer  ·  MASTER §11 (új kategória)
 

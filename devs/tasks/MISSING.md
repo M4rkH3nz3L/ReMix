@@ -311,7 +311,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### E-Loop — Retention loop  ·  MASTER §27
 
-- [ ] ✚ a „függővé tétel" loop kiépítése: CREATE → SAVE → SHARE → FEEDBACK → **REMIX** → IMPROVE → PUBLISH → ANALYZE → **AI LEARNS** → CREATE BETTER. *(A remix + feed + AI-context már mind megvan — a hiány a zárt kör + analytics-visszacsatolás.)*
+- [x] ✅ a „függővé tétel" loop **magja kész** — [creatorLoop.ts](../../src/lib/creatorLoop.ts) (8 teszt, audit-zöld): a `LOOP_STAGES` (create→save→share→publish→analyze→learn) + `loopStageOf`/`loopProgress`, és a ZÁRÓ visszacsatolás: `analyticsInsights` (a mezőny-átlag fölött teljesítő győztes hook/thumbnail/template lift-tel) → **`learnFromAnalytics`** = az „AI LEARNS" lépés, ami a tanulságot a Creator Memory `workflow`-tényévé írja (stabil kulccsal → ismétlésre MEGERŐSÍT). Így a következő CREATE már a tudással indul → **CREATE BETTER**. *(A remix + feed + AI-context megvolt; ez zárja a kört.)* *Hátra: a nyers statok bekötése + a memória-olvasás a generáló AI-ban (már bekötve a `buildAiContext`-be).*
 
 ---
 

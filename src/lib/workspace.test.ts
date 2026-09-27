@@ -4,12 +4,14 @@ import { projectsUsingAsset } from '@/lib/creativeGraph';
 import {
   addNote,
   addTask,
+  assembleWorkspace,
   emptyWorkspace,
   ingestProject,
   removeNote,
   removeProjectRef,
   removeTask,
   setTaskStatus,
+  splitWorkspace,
   tasksByStatus,
   upsertProjectRef,
   workspaceGraph,
@@ -166,5 +168,32 @@ describe('workspace — származtatott nézetek (Graph + ⌘K)', () => {
     const ws = build();
     const r = workspaceSearch(ws, 'neon', { now: NOW });
     expect(r.some((x) => x.scope === 'music')).toBe(true);
+  });
+});
+
+describe('workspace — split/assemble (perzisztencia-hasítás)', () => {
+  const build = (): Workspace => {
+    let ws = emptyWorkspace('H3nz3L', { ownerId: 'u1', ownerName: 'H3nz3L' }, T0);
+    ws = ingestProject(ws, mkProject({ id: 'p1', name: 'Vlog' }), { learn: true }, T0);
+    ws = addNote(ws, 'ötlet', T0);
+    ws = addTask(ws, 'Vágás', {}, T0);
+    return ws;
+  };
+
+  it('splitWorkspace kiemeli a globális library/memory-t a workspace-részből', () => {
+    const { doc, library, memory } = splitWorkspace(build());
+    expect((doc as unknown as { library?: unknown }).library).toBeUndefined();
+    expect((doc as unknown as { memory?: unknown }).memory).toBeUndefined();
+    expect(doc.projects).toHaveLength(1);
+    expect(doc.notes).toHaveLength(1);
+    expect(doc.tasks).toHaveLength(1);
+    expect(library.assets).toHaveLength(2);
+    expect(memory.facts.length).toBeGreaterThan(0);
+  });
+
+  it('assemble(split(ws)) visszaállítja az eredeti workspace-t (round-trip)', () => {
+    const ws = build();
+    const { doc, library, memory } = splitWorkspace(ws);
+    expect(assembleWorkspace(doc, library, memory)).toEqual(ws);
   });
 });

@@ -330,3 +330,28 @@ export function workspaceSearchDocs(ws: Workspace): SearchDoc[] {
 export function workspaceSearch(ws: Workspace, query: string, opts: SearchOptions = {}): SearchResult[] {
   return search(workspaceSearchDocs(ws), query, opts);
 }
+
+// ── Perzisztencia-hasítás (a felhő-kliensekhez) ──────────────────────────────
+
+/**
+ * A workspace SAJÁT része (projekt-refek/notes/tasks/brand/sablon) — a globális
+ * `library`/`memory` NÉLKÜL. A felhő-perzisztencia ezt a részt külön tárolja a
+ * per-user Asset Librarytől és Creator Memorytól (azok minden workspace-re
+ * közösek), így a `workspace` sor kicsi marad és nincs adat-duplikáció.
+ */
+export type WorkspaceDoc = Omit<Workspace, 'library' | 'memory'>;
+
+/** A teljes (memóriabeli) workspace szétbontása a tárolandó részekre. */
+export function splitWorkspace(ws: Workspace): {
+  doc: WorkspaceDoc;
+  library: AssetLibrary;
+  memory: CreatorMemory;
+} {
+  const { library, memory, ...doc } = ws;
+  return { doc, library, memory };
+}
+
+/** A per-user globális library+memory és a workspace-rész összeállítása egy teljes workspace-szé. */
+export function assembleWorkspace(doc: WorkspaceDoc, library: AssetLibrary, memory: CreatorMemory): Workspace {
+  return { ...doc, library, memory };
+}

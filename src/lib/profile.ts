@@ -1,3 +1,4 @@
+import type { PrivacyLevel } from '@/lib/creatorProfile';
 import { pickImage } from '@/lib/media';
 import { uploadMedia } from '@/lib/render';
 import { requireSupabase } from '@/lib/supabase';
@@ -24,6 +25,27 @@ export interface AccountProfile {
   avatarUrl: string;
   /** 🖼️ borítókép publikus Storage-URL (üres, ha nincs) — a csatorna-fejlécben */
   coverUrl: string;
+  // ── 🎨 Creator réteg (bemutatkozás) ──
+  /** rövid bemutatkozás (≈160–500) — a creator-page fejlécében */
+  bio: string;
+  /** „Rólam" */
+  aboutMe: string;
+  /** „Mit készítek?" */
+  whatIMake: string;
+  /** „Jelenleg ezen dolgozom…" */
+  workingOn: string;
+  /** creator-típus id-k (lásd CREATOR_TYPES) — több is választható */
+  creatorTypes: string[];
+  /** készség-tagek (pl. Video Editing, AI) */
+  skills: string[];
+  /** érdeklődési tagek */
+  interests: string[];
+  /** beszélt nyelvek */
+  languages: string[];
+  /** IANA időzóna (pl. Europe/Budapest) */
+  timezone: string;
+  /** mezőnkénti láthatóság; hiányzó kulcs = az adott mező alapértelmezése */
+  fieldPrivacy: Record<string, PrivacyLevel>;
 }
 
 const EMPTY: AccountProfile = {
@@ -35,7 +57,29 @@ const EMPTY: AccountProfile = {
   city: '',
   avatarUrl: '',
   coverUrl: '',
+  bio: '',
+  aboutMe: '',
+  whatIMake: '',
+  workingOn: '',
+  creatorTypes: [],
+  skills: [],
+  interests: [],
+  languages: [],
+  timezone: '',
+  fieldPrivacy: {},
 };
+
+/** Friss, üres profil (a szerkesztő kezdőállapotához) — új tömb/objektum-példányokkal. */
+export function emptyProfile(): AccountProfile {
+  return {
+    ...EMPTY,
+    creatorTypes: [],
+    skills: [],
+    interests: [],
+    languages: [],
+    fieldPrivacy: {},
+  };
+}
 
 function currentUserId(): string {
   const id = useAuth.getState().user?.id;
@@ -50,7 +94,9 @@ export async function fetchProfile(): Promise<AccountProfile> {
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from('profiles')
-    .select('username, full_name, phone, birthday, country, city, avatar_url, cover_url')
+    .select(
+      'username, full_name, phone, birthday, country, city, avatar_url, cover_url, bio, about_me, what_i_make, working_on, creator_types, skills, interests, languages, timezone, field_privacy'
+    )
     .eq('id', currentUserId())
     .maybeSingle();
   if (error) {
@@ -68,6 +114,16 @@ export async function fetchProfile(): Promise<AccountProfile> {
     city: data.city ?? '',
     avatarUrl: data.avatar_url ?? '',
     coverUrl: data.cover_url ?? '',
+    bio: data.bio ?? '',
+    aboutMe: data.about_me ?? '',
+    whatIMake: data.what_i_make ?? '',
+    workingOn: data.working_on ?? '',
+    creatorTypes: (data.creator_types as string[] | null) ?? [],
+    skills: (data.skills as string[] | null) ?? [],
+    interests: (data.interests as string[] | null) ?? [],
+    languages: (data.languages as string[] | null) ?? [],
+    timezone: data.timezone ?? '',
+    fieldPrivacy: (data.field_privacy as Record<string, PrivacyLevel> | null) ?? {},
   };
 }
 
@@ -90,6 +146,16 @@ export async function saveProfile(profile: AccountProfile): Promise<void> {
       city: profile.city.trim() || null,
       avatar_url: profile.avatarUrl.trim() || null,
       cover_url: profile.coverUrl.trim() || null,
+      bio: profile.bio.trim() || null,
+      about_me: profile.aboutMe.trim() || null,
+      what_i_make: profile.whatIMake.trim() || null,
+      working_on: profile.workingOn.trim() || null,
+      creator_types: profile.creatorTypes,
+      skills: profile.skills,
+      interests: profile.interests,
+      languages: profile.languages,
+      timezone: profile.timezone.trim() || null,
+      field_privacy: profile.fieldPrivacy,
     },
     { onConflict: 'id' },
   );
@@ -123,5 +189,17 @@ export async function pickAndUploadProfileImage(): Promise<string | null> {
   if (!picked) {
     return null;
   }
-  return uploadMedia(picked.uri);
+  // profilkép/borító — nem projekthez tartozik → `profile/<fájl>`
+  return uploadMedia(picked.uri, { kind: 'profile' });
+}
+
+/** Csak KIVÁLASZTÁS (feltöltés nélkül) — a borító-igazítóhoz. `null`, ha mégse. */
+export async function pickProfileImageLocal(): Promise<string | null> {
+  const picked = await pickImage();
+  return picked?.uri ?? null;
+}
+
+/** Egy (esetleg már bevágott) helyi kép feltöltése → publikus Storage-URL. */
+export async function uploadProfileImage(uri: string): Promise<string> {
+  return uploadMedia(uri, { kind: 'profile' });
 }

@@ -4,6 +4,7 @@ import { findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils'
 import type {
   AspectRatio,
   Asset,
+  AudioMaster,
   Chapter,
   Clip,
   ImageDoc,
@@ -50,6 +51,8 @@ export type EditorCommand =
   /** 🔖 a marker-lista cseréje (hozzáadás/törlés/átnevezés egy lépésben) */
   | { type: 'SET_MARKERS'; markers: Marker[] }
   | { type: 'SET_CHAPTERS'; chapters: Chapter[] }
+  | { type: 'SET_AUDIO_MASTER'; audioMaster: AudioMaster | null }
+  | { type: 'SET_TRACK_GAIN'; trackType: TrackType; gain: number }
   | { type: 'SET_REGIONS'; regions: TimelineRegion[] }
   | { type: 'SET_LINKS'; links: string[][] }
   /**
@@ -259,6 +262,23 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, regions: next.length > 0 ? next : undefined };
     }
 
+    case 'SET_AUDIO_MASTER': {
+      const next = cmd.audioMaster;
+      if (JSON.stringify(project.audioMaster ?? null) === JSON.stringify(next ?? null)) {
+        return null;
+      }
+      return { ...project, audioMaster: next ?? undefined };
+    }
+
+    case 'SET_TRACK_GAIN': {
+      const g = Math.max(0, Math.min(1, cmd.gain));
+      const prev = project.trackMix ?? {};
+      if ((prev[cmd.trackType]?.gain ?? 1) === g) {
+        return null;
+      }
+      return { ...project, trackMix: { ...prev, [cmd.trackType]: { gain: g } } };
+    }
+
     case 'SET_LINKS': {
       // csak a 2+ elemű csoportok érdekesek; rendezve az összehasonlításhoz
       const next = cmd.links.filter((g) => g.length > 1).map((g) => [...g].sort());
@@ -360,6 +380,16 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setMarkers', { count: cmd.markers.length });
     case 'SET_CHAPTERS':
       return tr('lib.commands.setChapters', { count: cmd.chapters.length });
+    case 'SET_AUDIO_MASTER':
+      return tr('lib.commands.setAudioMaster', {
+        target: cmd.audioMaster?.target ?? 'off',
+        defaultValue: `Master: ${cmd.audioMaster?.target ?? 'off'}`,
+      });
+    case 'SET_TRACK_GAIN':
+      return tr('lib.commands.setTrackGain', {
+        track: cmd.trackType,
+        defaultValue: `Track gain: ${cmd.trackType}`,
+      });
     case 'SET_REGIONS':
       return tr('lib.commands.setRegions', { count: cmd.regions.length });
     case 'SET_LINKS':

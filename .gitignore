@@ -64,3 +64,11 @@ server/storage.config.json
 .cursor/
 .zed/
 *.swp
+
+# futásidejű szerver-artefaktumok (renderelt média, worker-log, render-cache)
+server/media/
+server/worker.log
+server/assets/stickers3d/cache/
+
+# szórvány AI-képek a repó gyökerében
+/ChatGPT Image*.png

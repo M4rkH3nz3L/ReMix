@@ -8,13 +8,13 @@
  * ráképződjön — a jelenlegi tár AsyncStorage-alapú, de az API-alak azonos.
  */
 
-import type { AspectRatio, Project } from '@/types/project';
+import type { AspectRatio, Track } from '@/types/project';
 
 /** Feed-módok (M3). A ranker az M11-ben jön — most heurisztikus. */
 export type FeedMode = 'foryou' | 'following' | 'latest';
 
-/** Poszt-láthatóság (SOCIAL §13). */
-export type PostVisibility = 'public' | 'unlisted' | 'private';
+/** Poszt-láthatóság (TikTok-modell): mindenki / a követők / csak az alkotó. */
+export type PostVisibility = 'public' | 'followers' | 'private';
 
 /** Moderációs állapot — már az első sémában (M9 anti-cél: ne utólag). */
 export type ModerationStatus = 'ok' | 'pending' | 'removed';
@@ -48,9 +48,9 @@ export interface PostEngagement {
 
 /**
  * Feed-poszt. A `videoUri` a lejátszható forrás (renderelt MP4, vagy render
- * hiányában a nyers első videóklip előnézete — lásd `rendered`). A remixhez a
- * `projectId`-t a Studio lokális tárában keressük; ha nincs meg (pl. másik
- * eszközről érkezett poszt), a `projectSnapshot` a tartalék.
+ * hiányában a nyers első videóklip előnézete — lásd `rendered`). REMIX: a
+ * `videoUri` renderelt videóját importáljuk egy ÚJ projektbe — az eredeti
+ * réteg-projektet a remixelő NEM éri el (privátság).
  */
 export interface FeedPost {
   id: string;
@@ -64,10 +64,11 @@ export interface FeedPost {
   posterUri: string | null;
   aspectRatio: AspectRatio;
   durationSec: number;
-  /** a szerkeszthető projekt azonosítója (a Studio lokális tárában) */
+  /** a szerkeszthető projekt azonosítója (a Studio lokális tárában, csak a sajátodé) */
   projectId?: string;
-  /** hordozható projekt-pillanatkép a remixhez (M2 `.vided` analógja) */
-  projectSnapshot?: Project;
+  /** CSAK a lejátszáshoz kellő interaktív (hotspot) réteg — NEM a szerkeszthető
+   *  projekt. A remix a `videoUri` videóját importálja, ezt a réteget nem. */
+  interactive?: { tracks: Track[] };
   /** true, ha a `videoUri` a teljes idővonal renderje (nem csak az első klip) */
   rendered: boolean;
   /** remixelhető-e (M4): ha false, csak megtekintés */

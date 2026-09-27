@@ -3,6 +3,7 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Asset } from '@/types/project';
 
 /**
@@ -47,11 +48,11 @@ export interface StorageProvider {
   probeDuration?(entry: StorageEntry): Promise<number | null>;
 }
 
-async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
+async function fetchWithTimeout(url: string, ms: number, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -134,7 +135,8 @@ function remoteSourceProvider(source: {
     async list() {
       const res = await fetchWithTimeout(
         `${renderServerUrl()}/storage/${encodeURIComponent(source.id)}/list`,
-        15000
+        15000,
+        { headers: await workerAuthHeaders() }
       );
       const body = await res.json();
       if (!res.ok) {
@@ -167,7 +169,8 @@ function remoteSourceProvider(source: {
           `${renderServerUrl()}/storage/${encodeURIComponent(source.id)}/probe?path=${encodeURIComponent(
             entry.path ?? ''
           )}`,
-          20000
+          20000,
+          { headers: await workerAuthHeaders() }
         );
         const body = await res.json();
         return typeof body.duration === 'number' ? body.duration : null;
@@ -188,7 +191,9 @@ export const storageProviders: StorageProvider[] = [serverLibraryProvider];
 export async function loadStorageProviders(): Promise<StorageProvider[]> {
   const providers = [...storageProviders];
   try {
-    const res = await fetchWithTimeout(`${renderServerUrl()}/storage/sources`, 4000);
+    const res = await fetchWithTimeout(`${renderServerUrl()}/storage/sources`, 4000, {
+      headers: await workerAuthHeaders(),
+    });
     if (res.ok) {
       const body = (await res.json()) as {
         sources: { id: string; label: string; type: string }[];

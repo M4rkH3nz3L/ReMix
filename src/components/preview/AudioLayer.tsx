@@ -67,6 +67,7 @@ function VideoVoice() {
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setVideoVoiceActive = useEditorStore((s) => s.setVideoVoiceActive);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
 
   const track = project ? project.tracks.find((t) => t.type === 'video') : null;
   const clip = track
@@ -156,11 +157,12 @@ function VideoVoice() {
     // a proxy a TELJES forrás hangja, ezért a forrás-időre kell tekerni
     const sourceTime = clip.trimIn + (playhead - clip.start);
     try {
-      player.volume = clamp(
-        sampleChannel(clip.keyframes?.volume, playhead - clip.start, clip.volume),
-        0,
-        1
-      );
+      player.volume =
+        clamp(
+          sampleChannel(clip.keyframes?.volume, playhead - clip.start, clip.volume),
+          0,
+          1
+        ) * masterVolume;
       if (isPlaying) {
         if (!player.playing) {
           player.seekTo(Math.max(0, sourceTime)).catch(() => {});
@@ -173,7 +175,7 @@ function VideoVoice() {
     } catch {
       // a lejátszó még nem áll készen
     }
-  }, [player, uri, clip, playhead, isPlaying]);
+  }, [player, uri, clip, playhead, isPlaying, masterVolume]);
 
   return null;
 }
@@ -185,9 +187,12 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
   // 🎚️ sáv-monitorozás: némítás/solo CSAK az előnézetre hat (a render nem tud róla)
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
   const audible =
     soloTracks.length > 0 ? soloTracks.includes(trackType) : !mutedTracks.includes(trackType);
 
+  // 🎚️ sávonkénti mixer-gain (fader) — az előnézetben (a render is honorálja)
+  const trackGain = project?.trackMix?.[trackType]?.gain ?? 1;
   const track = project ? project.tracks.find((t) => t.type === trackType) : null;
   const active = track
     ? clipsAt<AudioClip>(track, playhead).filter((c) => c.kind === 'audio')
@@ -262,7 +267,8 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     try {
       player.replace(playUri);
       const state = useEditorStore.getState();
-      player.seekTo(Math.max(0, state.playhead - clip.start)).catch(() => {});
+      // forrás-idő = trimIn + a klip-eleji offset (a klip a forráson belül vág)
+      player.seekTo(Math.max(0, (clip.trimIn ?? 0) + state.playhead - clip.start)).catch(() => {});
       if (state.isPlaying) {
         player.play();
       }
@@ -292,16 +298,17 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     try {
       // 🎚️ hangerő-automáció: a volume-csatorna a playheadből interpolál
       const automated = sampleChannel(clip.keyframes?.volume, t, clip.volume);
-      const vol = audible ? clamp(automated * fadeFactor(clip, t), 0, 1) : 0;
+      const vol = (audible ? clamp(automated * fadeFactor(clip, t), 0, 1) : 0) * trackGain * masterVolume;
       if (lastVolRef.current === null || Math.abs(vol - lastVolRef.current) > 0.005) {
         player.volume = vol;
         lastVolRef.current = vol;
       }
       if (!isPlaying) {
-        player.seekTo(Math.max(0, t)).catch(() => {});
+        // álló óránál a forrás-időre tekerünk (trimIn + klip-offset)
+        player.seekTo(Math.max(0, (clip.trimIn ?? 0) + t)).catch(() => {});
       }
     } catch {}
-  }, [player, playhead, isPlaying, clip, audible]);
+  }, [player, playhead, isPlaying, clip, audible, masterVolume, trackGain]);
 
   return null;
 }

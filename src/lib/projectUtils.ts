@@ -3,6 +3,7 @@ import { t as tr } from 'i18next';
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
+import { createImageDoc } from '@/lib/imageDoc';
 import type {
   AdjustClip,
   AspectRatio,
@@ -10,11 +11,32 @@ import type {
   Clip,
   ImageClip,
   Project,
+  ProjectKind,
   ProjectSeo,
   Track,
   TrackType,
   VideoClip,
 } from '@/types/project';
+
+/** A projekt fajtája, alapértelmezéssel (a régi, kind nélküli projektek videók). */
+export function projectKind(project: { kind?: ProjectKind }): ProjectKind {
+  return project.kind ?? 'video';
+}
+
+/**
+ * A projekt-fajtához tartozó szerkesztő-útvonal — a főképernyő ebből routol a
+ * megfelelő stúdióba (a videó a teljes `/editor`, a kép/hang a saját stúdiója).
+ */
+export function studioRoute(kind: ProjectKind | undefined, id: string): string {
+  switch (kind ?? 'video') {
+    case 'image':
+      return `/studio/image/${id}`;
+    case 'audio':
+      return `/studio/audio/${id}`;
+    default:
+      return `/editor/${id}`;
+  }
+}
 
 const CANONICAL_TRACKS: { type: TrackType; name: string }[] = [
   { type: 'video', name: 'lib.projectUtils.trackVideo' },
@@ -32,17 +54,22 @@ const CANONICAL_TRACKS: { type: TrackType; name: string }[] = [
 export function createEmptyProject(
   name: string,
   aspectRatio: AspectRatio,
-  seo?: ProjectSeo
+  seo?: ProjectSeo,
+  kind: ProjectKind = 'video'
 ): Project {
   const now = new Date().toISOString();
   return {
     id: makeId('prj'),
     name,
+    kind,
     aspectRatio,
     fps: 30,
     // a SEO-meta a létrehozáskor kötelező (Új projekt űrlap); demo/import útján
     // hiányozhat — ezért opcionális a mezőn, és csak akkor kerül be, ha van
     ...(seo ? { seo } : {}),
+    // MINDEN fajta megkapja a kanonikus sávokat: a kép/hang kimenete a
+    // videó-editorban is használható, és így a közös `trackOf`/lib-függvények
+    // sosem dobnak hiányzó-sáv kivételt (a stúdiók a szerkesztő-UI-t szűkítik).
     tracks: CANONICAL_TRACKS.map((t) => ({
       id: makeId('trk'),
       type: t.type,
@@ -50,9 +77,14 @@ export function createEmptyProject(
       clips: [],
     })),
     assets: [],
+    // 🎨 a képstúdió a réteg-fát szerkeszti → egy üres kép-dokumentum előre,
+    // hogy a stúdiónak legyen mivel indulnia (a kirasterizált PNG lesz a média)
+    ...(kind === 'image'
+      ? { imageDocs: [createImageDoc(name, aspectRatio, () => makeId('lyr'))] }
+      : {}),
     createdAt: now,
     updatedAt: now,
-    schemaVersion: 5,
+    schemaVersion: 6,
   };
 }
 
@@ -101,6 +133,25 @@ export function findAssetByUri(project: Project, uri: string): Asset | null {
   return project.assets.find((a) => a.uri === uri) ?? null;
 }
 
+/**
+ * A projekt média-asseteinek ISMERT bájt-összege (uri szerint deduplikálva). Csak a
+ * betöltött `asset.size`-okat összegzi (ezt a szerver-backup tölti fel a mért
+ * bájttal) — kliens-oldali BECSLÉS. A hiteles, pontos per-projekt tárhely (amit a MI
+ * tárolónkon foglal) a `projectStorageBytes(projectId)` a `@/lib/storageQuota`-ból.
+ */
+export function projectMediaBytes(project: Project): number {
+  const seen = new Set<string>();
+  let total = 0;
+  for (const a of project.assets) {
+    if (seen.has(a.uri)) {
+      continue;
+    }
+    seen.add(a.uri);
+    total += a.size ?? 0;
+  }
+  return total;
+}
+
 /** Séma-migráció betöltéskor — idempotens, lépcsőzetes. */
 export function migrateProject(project: Project): Project {
   let next = project;
@@ -117,6 +168,10 @@ export function migrateProject(project: Project): Project {
   if (next.schemaVersion < 5) {
     // v4 → v5: a később bevezetett sávok (pip, adjust) pótlása a régi projektekben
     next = ensureCanonicalTracks(next);
+  }
+  if (next.schemaVersion < 6) {
+    // v5 → v6: projekt-fajta (kind) — a régi, kind nélküli projektek videók
+    next = { ...next, kind: next.kind ?? 'video', schemaVersion: 6 };
   }
   return next;
 }

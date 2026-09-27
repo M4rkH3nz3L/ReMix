@@ -506,4 +506,15 @@ Fontos, hogy ez is rögzüljön — több terület átlag feletti:
 
 ---
 
+## 🖼️ Kép Stúdió — flag-elt follow-up (2026-09-27)
+
+A `devs/tasks/IMAGE.md` **A+B fázisa KÉSZ és böngészőben verifikálva** (project + scoped mód, 0 konzol-hiba; audit zöld). A C fázis on-device UI-része + az E PNG-export/„kép→videó" kész. Az alábbiak **szándékosan NEM készültek** — worker/model-infrát vagy nagy dedikált UI-t igényelnek, és nem fake-elhetők (ugyanaz az elv, mint az AUDIO.md Fázis D AI-nál):
+
+- **Fázis D — AI (worker/model, Pro):** structural AI (command-generátor), AI Select (u2net szegmentáció), generative fill, generatív háttér/objektum. A `SelectiveEdit`/bgremove worker-minta megvan, de külön endpoint + model kell.
+- **Fázis C — nagy dedikált UI / modell-gap:** `RasterLayer` rajz-réteg (pixel-dokumentum, memória-csempézés kell) · SVG parser → scene-graph (`src/lib/svgImport.ts`) · toll/Bézier path-szerkesztő UI · boolean-művelet UI (a `subpaths`/`fillRule` modell KÉSZ) · maszk minden réteg-típuson + clipping/gradient-maszk (ma `PhotoLayer.mask`) · `GroupLayer` · HSL/HSV picker + eyedropper (pixel-olvasás kell) · multi-select a vásznon.
+- **Fázis E — export-formátumok:** JPEG/WebP/AVIF (worker minőség-param) · SVG/PDF vektor-export a scene-graphból.
+- **Runtime-függőség:** a `renderImageDoc` (végleges PNG-raszter) a render-worker-t igényli (weben `null`) — a scene-graph szerkesztés + előnézet on-device fut, de a mentett/exportált PNG online (ugyanaz a dev-stack-feltétel, mint az audio-exportnál).
+
+---
+
 *Készült: Claude Opus 4.8 · 7 párhuzamos kód-audit + automatikus health check · minden ✅ jelölésű állítás külön ellenőrizve*

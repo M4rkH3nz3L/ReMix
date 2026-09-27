@@ -18,6 +18,7 @@ import { MaskOverlay } from '@/components/preview/MaskOverlay';
 import { PipLayer } from '@/components/preview/PipLayer';
 import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
+import { videoFill } from '@/components/preview/videoFill';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { aspectValue, filters, palette } from '@/constants/editor';
@@ -70,15 +71,18 @@ const LIGHTING_TINTS: Record<string, { color: string; opacity: number }> = {
 interface Props {
   mode: 'edit' | 'play';
   onHotspotPress?: (clip: InteractiveClip) => void;
+  /** ▶️ szerkesztésben: a projekt megnyitása a teljes lejátszóban (play-gomb a preview-n) */
+  onOpenPlayer?: () => void;
 }
 
 /**
  * Az előnézet: a playhead alatti videó/kép klip + a szöveg- és hotspot-overlay-ek.
  * A videólejátszó a rAF-órához szinkronizál (forráscsere, seek, drift-korrekció).
  */
-export function PreviewSurface({ mode, onHotspotPress }: Props) {
+export function PreviewSurface({ mode, onHotspotPress, onOpenPlayer }: Props) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
   const showSafeZones = useEditorStore((s) => s.showSafeZones);
   const toggleSafeZones = useEditorStore((s) => s.toggleSafeZones);
   const playhead = useEditorStore((s) => s.playhead);
@@ -212,19 +216,20 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       return;
     }
     player.playbackRate = videoClip.speed;
-    // 🎚️ a videósáv némítása/solója is csak az előnézetre hat
-    const vol = videoAudible
+    // 🎚️ a videósáv némítása/solója is csak az előnézetre hat; a master-hangerő skáláz
+    const base = videoAudible
       ? clamp(
           sampleChannel(videoClip.keyframes?.volume, playhead - videoClip.start, videoClip.volume),
           0,
           1
         )
       : 0;
+    const vol = base * masterVolume;
     if (lastVolRef.current === null || Math.abs(vol - lastVolRef.current) > 0.005) {
       player.volume = vol;
       lastVolRef.current = vol;
     }
-  }, [player, videoClip, playhead, videoAudible]);
+  }, [player, videoClip, playhead, videoAudible, masterVolume]);
 
   // play/pause követése — ⚠️ csak a FÓKUSZÁLT képernyőn. A szerkesztő mountolva
   // marad a lejátszó képernyő mögött (`push`), kapu nélkül tehát két videó szólna
@@ -608,7 +613,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               {videoClip ? (
                 <VideoView
                   player={player}
-                  style={[StyleSheet.absoluteFill, { opacity: 0.55 }]}
+                  style={[videoFill, { opacity: 0.55 }]}
                   contentFit="cover"
                   nativeControls={false}
                 />
@@ -633,7 +638,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               {videoClip ? (
                 <VideoView
                   player={player}
-                  style={StyleSheet.absoluteFill}
+                  style={videoFill}
                   contentFit="contain"
                   nativeControls={false}
                 />
@@ -1045,6 +1050,20 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           <Text style={styles.originalBadgeText}>{t('editor.preview.original')}</Text>
         </View>
       ) : null}
+
+      {/* ▶️ play a preview-n: a projekt megnyitása a teljes lejátszóban (a felső menü
+          play-gombja innen került ide). Csak szerkesztésben, ha épp nem játszik. */}
+      {mode === 'edit' && onOpenPlayer && project && !isPlaying ? (
+        <Pressable
+          onPress={onOpenPlayer}
+          style={styles.playOverlay}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Play"
+        >
+          <Ionicons name="play" size={30} color="#fff" style={{ marginLeft: 3 }} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -1059,6 +1078,20 @@ const styles = StyleSheet.create({
   canvas: {
     backgroundColor: '#05060a',
     overflow: 'hidden',
+  },
+  playOverlay: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -32,
+    marginTop: -32,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.92,
   },
   safeToggle: {
     position: 'absolute',

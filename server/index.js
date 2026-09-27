@@ -32,9 +32,15 @@ const { renderProject } = require('./render');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
-const { queueEnabled, enqueueRender, getRenderJob } = require('./queue');
+const { queueEnabled, enqueueRender, getRenderJob, listRenderJobs, renderConcurrency } = require('./queue');
+const { listWorkers } = require('./workers-registry');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
-const { notifyAvailable, sendNotification, inviteMember } = require('./notify');
+const { mediaStoreEnabled, uploadMedia: mediaStoreUpload, LOCAL_DIR: MEDIA_LOCAL_DIR, BUCKET: MEDIA_BUCKET } = require('./mediastore');
+const { QuotaExceededError, quotaAvailable, usageFor, recordObject, wouldExceed } = require('./quota');
+const userStorage = require('./userStorage');
+const { notifyAvailable, sendNotification, inviteMember, adminClient } = require('./notify');
+const { payoutsConfigured, sendPayout } = require('./payouts');
+const { stemsConfigured, separateStems } = require('./stems');
 const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
 const {
   billingAvailable,
@@ -119,6 +125,17 @@ app.use((req, _res, next) => {
 // így az érintetlen; a böngészős dev-előnézethez a CORS_ORIGINS env kell.
 app.use(corsAllowlist());
 
+// 🗂️ LOKÁLIS média-tár statikus szolgálása (dev): a renderelt/feltöltött fájlok a
+// böngészhető `server/media` mappából (MEDIA_LOCAL_DIR) — a feed innen játssza a
+// videót. `express.static` támogatja a Range-kéréseket (videó-seek), így a natív
+// `<video>` gond nélkül streameli. Auth NÉLKÜL: publikus tartalom (a `renders`
+// bucket is public volt) — más útvonalak auth-védettek maradnak.
+if (MEDIA_LOCAL_DIR) {
+  fs.mkdirSync(MEDIA_LOCAL_DIR, { recursive: true });
+  app.use('/m', express.static(MEDIA_LOCAL_DIR, { fallthrough: false, maxAge: '1h' }));
+  console.log(`média-tár (lokális): ${MEDIA_LOCAL_DIR} → /m`);
+}
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, _file, cb) => {
@@ -161,6 +178,8 @@ app.get('/health', async (_req, res) => {
     billing: billingAvailable(),
     revenuecat: !!process.env.RC_WEBHOOK_AUTH,
     render: queueEnabled() && s3Enabled() ? 'cloud+local' : 'local',
+    // feed-média tár: prod Supabase Storage (service_role) VAGY S3 — projekt-mappákba tölt
+    storage: mediaStoreEnabled(),
     cloudRenderMinSec: parseInt(process.env.CLOUD_RENDER_MIN_SEC || '15', 10),
   });
 });
@@ -1100,22 +1119,81 @@ app.post('/waveform', upload.any(), (req, res) => {
 // 🎞️ Média-feltöltés (renderelt videó / borító) → publikus Storage-URL. A kliens
 // a renderelt fájlt küldi (multipart), a feed ezt a URL-t játssza (cross-device).
 app.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
-  if (!s3Enabled()) {
-    res.status(503).json({ error: 'storage nincs konfigurálva (S3_* env)' });
-    return;
-  }
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });
     return;
   }
+  // 👤 a hívó a VERIFIKÁLT tokenből (dev-ben body.userId fallback) — ő terhelődik
+  const uid = callerId(req, req.body?.userId);
+  const bytes = Number(f.size || 0);
+  const extRaw = path.extname(f.originalname || '') || `.${(f.mimetype || '').split('/')[1] || 'bin'}`;
+  const ext = extRaw.replace(/[^.\w]/g, '');
+  // a KÉRÉSBŐL épített worker-origin (LAN-on is stimmel; a lokális-disk URL-hez is)
+  const publicBase = `${req.protocol}://${req.get('host')}`;
   try {
-    const extRaw = path.extname(f.originalname || '') || `.${(f.mimetype || '').split('/')[1] || 'bin'}`;
-    const ext = extRaw.replace(/[^.\w]/g, '');
-    const key = `feed/${crypto.randomUUID()}${ext}`;
-    await uploadFile(key, f.path, f.mimetype);
-    res.json({ url: publicUrl(key), key });
+    // 🎯 AKTÍV TÁRHELY-CÉL: ha a user KÜLSŐ forrást jelölt ki, ODA mentünk (a saját
+    // felhőjébe) — nem a MI (kvótás) tárhelyünkre, és a MI tárhely-konfig sem kell.
+    // A visszaadott URL a proxyzott, VISSZAOLVASHATÓ út (a capability-token viszi a
+    // jogosultságot bearer nélkül — a lejátszó/letöltő ezt hívja később is).
+    let target = null;
+    if (uid) {
+      try {
+        target = await userStorage.getDefaultTarget(uid);
+      } catch {
+        target = null;
+      }
+    }
+    if (target) {
+      const filename = `${crypto.randomUUID()}${ext}`;
+      const { path: extPath, token } = await userStorage.uploadToSource(
+        uid,
+        target,
+        f.path,
+        filename,
+        f.mimetype
+      );
+      const url = `${publicBase}/storage/${encodeURIComponent(target)}/file?path=${encodeURIComponent(
+        extPath
+      )}&it=${encodeURIComponent(token)}`;
+      res.json({ url, key: extPath, size: bytes, target });
+      return;
+    }
+
+    // ── ReMix-tárhely (alap): a MI tárolónkba + KVÓTA ──
+    if (!mediaStoreEnabled()) {
+      res.status(503).json({ error: 'storage nincs konfigurálva (SUPABASE service_role vagy S3_* env)' });
+      return;
+    }
+    if (uid && quotaAvailable()) {
+      const { exceeded, usage } = await wouldExceed(uid, bytes);
+      if (exceeded) {
+        res.status(507).json({ error: 'quota_exceeded', usage });
+        return;
+      }
+    }
+    // 📁 PROJEKT-rendezett kulcs: <projectId>/<kind>/<uuid>.<ext> (projekt nélkül <kind>/…)
+    const kind = String(req.body?.kind || 'media').replace(/[^a-z]/gi, '').slice(0, 20) || 'media';
+    const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
+    const file = `${crypto.randomUUID()}${ext}`;
+    const key = projectId ? `${projectId}/${kind}/${file}` : `${kind}/${file}`;
+    const url = await mediaStoreUpload(key, f.path, f.mimetype, publicBase);
+    // 🗄️ felvétel a bájt-naplóba (atomikus kvóta-ellenőrzéssel — verseny-biztos)
+    if (uid && quotaAvailable()) {
+      await recordObject(uid, {
+        projectId: projectId || null,
+        bucket: MEDIA_BUCKET,
+        key,
+        bytes,
+        source: 'server',
+      });
+    }
+    res.json({ url, key, size: bytes });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      res.status(507).json({ error: 'quota_exceeded', usage: err.usage });
+      return;
+    }
     console.error('Media upload hiba:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
@@ -1124,6 +1202,225 @@ app.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
     } catch {
       // takarítás best-effort
     }
+  }
+});
+
+// 🎚️ Hang-analízis (AUDIO-MASTER Analyze): egy feltöltött hangon az ffmpeg
+// `loudnorm` MÉRŐ-menete (print_format=json) → Integrated LUFS / True Peak / LRA,
+// + egy `showspectrumpic` spektrum-kép (best-effort, a média-tárba).
+app.post('/audio/analyze', upload.any(), requireAuth, async (req, res) => {
+  const f = (req.files ?? [])[0];
+  if (!f) {
+    res.status(400).json({ error: 'nincs fájl' });
+    return;
+  }
+  const measure = () =>
+    new Promise((resolve) => {
+      execFile(
+        'ffmpeg',
+        ['-hide_banner', '-nostats', '-i', f.path, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
+        { timeout: 120000, maxBuffer: 4 * 1024 * 1024 },
+        (_e, _o, stderr) => resolve(/\{[\s\S]*?"input_i"[\s\S]*?\}/.exec(stderr || '')?.[0] ?? null)
+      );
+    });
+  try {
+    const raw = await measure();
+    if (!raw) {
+      res.status(500).json({ error: 'Az analízis nem sikerült.' });
+      return;
+    }
+    const j = JSON.parse(raw);
+    const out = { lufs: Number(j.input_i), truePeak: Number(j.input_tp), lra: Number(j.input_lra) };
+    // 📊 zaj-alap + dinamika-tartomány (astats) — best-effort
+    try {
+      const st2 = await new Promise((resolve) =>
+        execFile(
+          'ffmpeg',
+          ['-hide_banner', '-nostats', '-i', f.path, '-af', 'astats=metadata=1', '-f', 'null', '-'],
+          { timeout: 120000, maxBuffer: 8 * 1024 * 1024 },
+          (_e, _o, se) => resolve(se || '')
+        )
+      );
+      const nf = /Noise floor dB:\s*(-?[\d.]+)/.exec(st2);
+      const dr = /Dynamic range:\s*([\d.]+)/.exec(st2);
+      if (nf) {
+        out.noise = Number(nf[1]);
+      }
+      if (dr) {
+        out.dynamicRange = Number(dr[1]);
+      }
+    } catch {
+      // az astats opcionális
+    }
+    // 🎨 spektrum-kép (opcionális): showspectrumpic → média-tár
+    if (mediaStoreEnabled()) {
+      try {
+        const specPath = `${f.path}.png`;
+        await new Promise((resolve, reject) =>
+          execFile(
+            'ffmpeg',
+            ['-y', '-i', f.path, '-lavfi', 'showspectrumpic=s=600x220:legend=0', specPath],
+            { timeout: 60000 },
+            (e) => (e ? reject(e) : resolve())
+          )
+        );
+        const publicBase = `${req.protocol}://${req.get('host')}`;
+        out.spectrum = await mediaStoreUpload(`analyze/${crypto.randomUUID()}.png`, specPath, 'image/png', publicBase);
+        try {
+          fs.unlinkSync(specPath);
+        } catch {
+          // takarítás best-effort
+        }
+      } catch {
+        // a spektrum opcionális — a mérés attól még megy
+      }
+    }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    try {
+      fs.unlinkSync(f.path);
+    } catch {
+      // takarítás best-effort
+    }
+  }
+});
+
+// 🎚️ Stem-szeparáció (AI audio, Phase D) — Pro + Demucs (env-kapuzva). A feltöltött
+// hangot vocals/drums/bass/other WAV-okra bontja, feltölti a média-tárba, és
+// visszaadja a stemek URL-jeit. A kliens ezekből ÚJ hangklipeket rak a sávokra.
+app.post('/audio/stems', upload.any(), ...proOnly, async (req, res) => {
+  if (!stemsConfigured()) {
+    res.status(503).json({ error: 'A stem-szeparáció nincs konfigurálva (Demucs).' });
+    return;
+  }
+  if (!mediaStoreEnabled()) {
+    res.status(503).json({ error: 'storage nincs konfigurálva (SUPABASE service_role vagy S3_* env)' });
+    return;
+  }
+  const f = (req.files ?? [])[0];
+  if (!f) {
+    res.status(400).json({ error: 'nincs fájl' });
+    return;
+  }
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-stems-'));
+  const publicBase = `${req.protocol}://${req.get('host')}`;
+  try {
+    const stems = await separateStems(f.path, workDir);
+    const out = [];
+    for (const s of stems) {
+      const key = `stems/${crypto.randomUUID()}-${s.name}.wav`;
+      const url = await mediaStoreUpload(key, s.path, 'audio/wav', publicBase);
+      out.push({ name: s.name, url });
+    }
+    res.json({ stems: out });
+  } catch (err) {
+    console.error('Stem-szeparáció hiba:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    try {
+      fs.unlinkSync(f.path);
+    } catch {
+      // takarítás best-effort
+    }
+    try {
+      fs.rmSync(workDir, { recursive: true, force: true });
+    } catch {
+      // takarítás best-effort
+    }
+  }
+});
+
+// 🗄️ Tárhely-használat/kvóta (profil-kijelzés): a MI tárhelyünkön fekvő bájtok +
+// az alap (tier) és a koinos bónusz. A hívó a VERIFIKÁLT tokenből.
+app.get('/storage/usage', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  if (!quotaAvailable()) {
+    res.status(503).json({ error: 'A tárhely-elszámolás nincs konfigurálva (service_role).' });
+    return;
+  }
+  try {
+    res.json({ usage: await usageFor(uid) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 💸 Kifizetés: koin → pénz (3 Ft/koin). A koin-levonást + a 'pending' payout-sort
+// az atomikus request_payout_for RPC végzi, majd megpróbáljuk a provider-utalást
+// (PayPal). Provider nélkül a kérelem 'pending' marad (manuális teljesítés). A
+// hívó a VERIFIKÁLT tokenből — mást nem lehet a nevében kifizettetni.
+app.post('/wallet/payout', requireAuth, express.json({ limit: '4kb' }), async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  const sb = adminClient();
+  if (!sb) {
+    res.status(503).json({ error: 'A kifizetés nincs konfigurálva (service_role).' });
+    return;
+  }
+  const coins = Math.trunc(Number(req.body?.coins || 0));
+  if (!Number.isFinite(coins) || coins <= 0) {
+    res.status(400).json({ error: 'Érvénytelen koin-mennyiség.' });
+    return;
+  }
+  try {
+    const { data: acct } = await sb
+      .from('payout_accounts')
+      .select('provider, email')
+      .eq('user_id', uid)
+      .maybeSingle();
+    if (!acct || !acct.email) {
+      res.status(400).json({ error: 'no_payout_account' });
+      return;
+    }
+    // levon + 'pending' payout-sor (atomikus, szerver-hiteles)
+    const { data: reqRow, error: rpcErr } = await sb.rpc('request_payout_for', {
+      p_user: uid,
+      p_coins: coins,
+    });
+    if (rpcErr) {
+      if (/insufficient_credits/.test(rpcErr.message)) {
+        res.status(400).json({ error: 'insufficient_credits' });
+        return;
+      }
+      if (/below_min_payout/.test(rpcErr.message)) {
+        res.status(400).json({ error: 'below_min_payout' });
+        return;
+      }
+      throw new Error(rpcErr.message);
+    }
+    if (!payoutsConfigured()) {
+      // provider nincs beállítva → a kérelem 'pending' marad (manuális teljesítés)
+      res.json({ status: 'pending', ...reqRow });
+      return;
+    }
+    try {
+      const ref = await sendPayout(acct, reqRow.amount_huf, `ReMix payout ${reqRow.request_id}`);
+      await sb.rpc('resolve_payout', {
+        p_request: reqRow.request_id,
+        p_status: 'paid',
+        p_provider_ref: ref,
+      });
+      res.json({ status: 'paid', provider_ref: ref, ...reqRow });
+    } catch (perr) {
+      // provider-hiba → koin-visszatérítés a resolve_payout-ban
+      await sb.rpc('resolve_payout', {
+        p_request: reqRow.request_id,
+        p_status: 'failed',
+        p_provider_ref: null,
+      });
+      res.status(502).json({ error: `payout_failed: ${perr.message}` });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1216,6 +1513,12 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
   // külön worker(ek) renderelnek (skálázható, túléli az API-újraindítást).
   if (queueEnabled() && s3Enabled() && totalDuration > CLOUD_MIN_SEC) {
     const id = crypto.randomBytes(8).toString('hex');
+    // 👤 A jobhoz a HÍVÓT is elmentjük: prod-ban a verifikált tokenből
+    // (req.user.id), dev-ben (INSECURE_DEV) a kliens által küldött userId a
+    // fallback. Ebből lesz a „Sor" nézet „a te renderelésed" jelölése + a kész
+    // értesítés célja. A projekt-név és -hossz a listázáshoz/ETA-hoz kell.
+    const uid = req.user?.id || (req.body.userId ? String(req.body.userId).trim() : '') || null;
+    const projectName = (project.seo?.title || project.name || '').slice(0, 200) || null;
     (async () => {
       const localToKey = new Map();
       for (const f of req.files ?? []) {
@@ -1233,7 +1536,14 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
           }
         }
       }
-      await enqueueRender(id, { project, settings: settingsRaw });
+      await enqueueRender(id, {
+        project,
+        settings: settingsRaw,
+        userId: uid,
+        projectId: project.id ?? null,
+        projectName,
+        durationSec: Math.round(totalDuration),
+      });
     })()
       .then(() => res.json({ id, mode: 'cloud' }))
       .catch((err) => {
@@ -1690,6 +2000,151 @@ app.post('/collect', upload.any(), (req, res) => {
   );
 });
 
+/**
+ * 📋 A felhő-render SOR állapota a „Sor" (schedules) nézethez: ki mit renderel,
+ * hányan vannak a hívó előtt, és kb. mennyi idő múlva kész. A pozíció és az ETA
+ * a VALÓS feldolgozási sorrendből (active + waiting FIFO) és a worker-számból
+ * (concurrency) számolódik. Az ETA egy job becsült ideje = videó-hossz ×
+ * RENDER_ETA_FACTOR (a `veryfast` preset gyorsabb a valós időnél); a futó jobnál
+ * a mért haladásból (progress + eltelt idő) pontosítunk. Csak a hívó saját
+ * jobjai kapnak `mine:true` jelölést — a többi projekt neve is látszik (nyilvános
+ * sor), de a cél a saját várakozási idő megmutatása.
+ */
+app.get('/render/queue', requireAuth, async (req, res) => {
+  if (!queueEnabled()) {
+    res.json({ enabled: false, concurrency: 0, jobs: [], mineAhead: null, mineEtaSec: null });
+    return;
+  }
+  const uid = req.user?.id || (req.query.userId ? String(req.query.userId).trim() : '') || null;
+  const FACTOR = Math.max(0.05, parseFloat(process.env.RENDER_ETA_FACTOR || '0.7'));
+  const now = Date.now();
+  try {
+    const [snap, workers] = await Promise.all([listRenderJobs(), listWorkers().catch(() => [])]);
+    const C = Math.max(1, snap.concurrency);
+    // egy job becsült renderideje (mp) — 0 hossz esetén óvatos alapérték
+    const estSec = (j) => Math.max(3, (j.durationSec > 0 ? j.durationSec : 20) * FACTOR);
+
+    // melyik jobot melyik fázisban töri épp egy worker (download/render/upload)
+    // — a beszédes „éppen tölti be / renderel / feltölti" szöveghez a kliensen.
+    const phaseByJob = new Map();
+    for (const w of workers) {
+      for (const aj of w.activeJobs ?? []) {
+        if (aj.jobId && aj.phaseKey) {
+          phaseByJob.set(aj.jobId, aj.phaseKey);
+        }
+      }
+    }
+
+    // worker-slotok legkorábbi szabaddá válása (mp, most=0). A futó jobok
+    // lefoglalják a slotokat a hátralévő idejükre; a maradék slot azonnal szabad.
+    const active = snap.active;
+    const slots = [];
+    for (let i = 0; i < C; i++) {
+      const a = active[i];
+      if (!a) {
+        slots.push(0);
+        continue;
+      }
+      let remaining = estSec(a);
+      if (a.progress > 0 && a.startedAt) {
+        const elapsed = Math.max(0, (now - a.startedAt) / 1000);
+        remaining = Math.max(2, elapsed * (100 / a.progress - 1));
+      }
+      slots.push(remaining);
+    }
+    slots.sort((x, y) => x - y);
+
+    const out = [];
+    let idx = 0; // 1-alapú pozíció az active+waiting sorban
+    for (const a of active) {
+      idx += 1;
+      const remaining =
+        a.progress > 0 && a.startedAt
+          ? Math.max(2, ((now - a.startedAt) / 1000) * (100 / a.progress - 1))
+          : estSec(a);
+      out.push({
+        ...view(a, uid),
+        position: idx,
+        etaSec: Math.round(remaining),
+        startInSec: 0,
+        phaseKey: phaseByJob.get(a.id) || 'render',
+      });
+    }
+    // várakozók: a legkorábban szabad slotra kerülnek, FIFO-ban
+    for (const w of snap.waiting) {
+      idx += 1;
+      slots.sort((x, y) => x - y);
+      const startInSec = slots[0];
+      const dur = estSec(w);
+      slots[0] = startInSec + dur;
+      out.push({
+        ...view(w, uid),
+        position: idx,
+        startInSec: Math.round(startInSec),
+        etaSec: Math.round(startInSec + dur),
+      });
+    }
+    // lezárt jobok (nemrég) — pozíció/ETA nélkül, csak státusz + eredmény
+    for (const c of snap.completed) {
+      out.push({ ...view(c, uid), position: null, etaSec: null, startInSec: null });
+    }
+    for (const f of snap.failed) {
+      out.push({ ...view(f, uid), position: null, etaSec: null, startInSec: null });
+    }
+
+    // a hívó legközelebbi (futó VAGY váró) jobja → „hányan vannak előtted" + ETA
+    const mineNext = out.find((j) => j.mine && (j.state === 'active' || j.state === 'waiting'));
+    res.json({
+      enabled: true,
+      concurrency: C,
+      now,
+      jobs: out,
+      workers: workers.map((w) => workerView(w, uid)),
+      mineAhead: mineNext ? mineNext.position - 1 : null,
+      mineEtaSec: mineNext ? mineNext.etaSec : null,
+    });
+  } catch (err) {
+    console.error('render-queue hiba:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** A schedules-sor egy jobjának kliens-mezői (userId-t NEM szivárogtatjuk ki). */
+function view(j, uid) {
+  return {
+    id: j.id,
+    state: j.state,
+    progress: j.progress, // 0-100
+    projectName: j.projectName,
+    projectId: uid && j.userId === uid ? j.projectId : null, // deep-link csak a sajátra
+    mine: Boolean(uid && j.userId && j.userId === uid),
+    durationSec: j.durationSec,
+    enqueuedAt: j.enqueuedAt,
+    finishedAt: j.finishedAt,
+    failedReason: j.state === 'failed' ? j.failedReason : null,
+  };
+}
+
+/** Egy worker kliens-mezői a „Sor" nézethez (a nevet/leírást a kliens fordítja). */
+function workerView(w, uid) {
+  return {
+    id: w.id,
+    shortId: w.shortId ?? null,
+    icon: w.icon || 'hardware-chip-outline',
+    roleKey: w.roleKey || 'render',
+    concurrency: w.concurrency ?? 1,
+    status: w.status || 'idle', // 'idle' | 'busy'
+    startedAt: w.startedAt ?? null,
+    activeJobs: (w.activeJobs ?? []).map((aj) => ({
+      jobId: aj.jobId,
+      projectName: aj.projectName ?? null,
+      phaseKey: aj.phaseKey || 'render',
+      progress: typeof aj.progress === 'number' ? aj.progress : 0,
+      mine: Boolean(uid && aj.userId && aj.userId === uid),
+    })),
+  };
+}
+
 app.get('/render/:id', async (req, res) => {
   // a rövid (lokális) render a jobs-mapben van; a hosszú (felhő) a queue-ban
   const job = jobs.get(req.params.id);
@@ -1735,34 +2190,177 @@ app.get('/render/:id/file', async (req, res) => {
   res.status(404).json({ error: 'A render még nem készült el.' });
 });
 
-// Storage-gateway (full-plan F2): távoli források (WebDAV/NAS…) listázása és
-// auth-proxys streamelése — a hitelesítés a storage.config.json-ban, a kliens
-// sosem látja. Új forrás: server/storage.config.json (lásd .example).
-app.get('/storage/sources', (_req, res) => {
-  const { describeSources } = require('./storage');
-  res.json({ sources: describeSources() });
+// 🔌 Storage-gateway: a user SAJÁT külső forrásai (Google Drive / Dropbox / WebDAV
+// / S3) a `user_storage_providers` táblából + a legacy globális admin-config
+// (storage.config.json). A hitelesítés (OAuth token/kulcs) a WORKEREN marad — a
+// kliens sosem látja, csak a proxyzott végpontokat. Minden route requireAuth.
+app.get('/storage/sources', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
+  try {
+    const { describeSources } = require('./storage');
+    const user = uid ? await userStorage.describeUserSources(uid) : [];
+    // a user sajátjai + a legacy globális admin-források (ha be van állítva config)
+    res.json({ sources: [...user, ...describeSources()] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/storage/:sourceId/list', (req, res) => {
+// A user bekötött külső forrásai a profil-kezeléshez (státusszal, globális nélkül).
+app.get('/storage/connected', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    const [providers, defaultTarget] = await Promise.all([
+      userStorage.listConnected(uid),
+      userStorage.getDefaultTarget(uid),
+    ]);
+    // default: a kijelölt forrás-id, vagy null (= ReMix-tárhely az alap)
+    res.json({ providers, default: defaultTarget });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🎯 Az AKTÍV tárhely-cél beállítása: { sourceId } (null/üres → ReMix-tárhely).
+// Ide ment ezután MINDEN studio, és innen olvas vissza.
+app.post('/storage/default', requireAuth, express.json({ limit: '4kb' }), async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    const sourceId = req.body?.sourceId ? String(req.body.sourceId) : null;
+    await userStorage.setDefaultTarget(uid, sourceId);
+    res.json({ ok: true, default: sourceId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔑 Külső forrás bekötése — OAuth (Drive/Dropbox) VAGY manuális (WebDAV/S3).
+// OAuth: visszaad egy authorize-URL-t, amit a kliens böngészőben megnyit.
+app.post('/storage/oauth/:provider/start', requireAuth, express.json({ limit: '4kb' }), (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    const redirectBase =
+      process.env.OAUTH_REDIRECT_BASE || `${req.protocol}://${req.get('host')}`;
+    const { url } = userStorage.oauthStartUrl(
+      uid,
+      req.params.provider,
+      redirectBase,
+      typeof req.body?.returnUrl === 'string' ? req.body.returnUrl : null
+    );
+    res.json({ url });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// OAuth-callback: a szolgáltató IDE tér vissza (nincs bearer → a state hordja a
+// usert). Token-csere → DB-sor, majd egy záró-oldal (opcionális deep-link).
+app.get('/storage/oauth/:provider/callback', async (req, res) => {
+  const { code, state, error: oauthErr } = req.query;
+  if (oauthErr) {
+    res.status(400).send(`OAuth hiba: ${String(oauthErr)}`);
+    return;
+  }
+  try {
+    const ret = await userStorage.oauthCallback(
+      req.params.provider,
+      String(code || ''),
+      String(state || '')
+    );
+    const target = ret ? String(ret) : '';
+    res.set('Content-Type', 'text/html; charset=utf-8').send(
+      `<!doctype html><meta charset="utf-8"><title>Kész</title>` +
+        `<body style="font-family:system-ui;padding:2rem;text-align:center">` +
+        `<h2>✅ Tárhely bekötve</h2><p>Bezárhatod ezt az ablakot.</p>` +
+        (target ? `<script>location.replace(${JSON.stringify(target)})</script>` : '') +
+        `</body>`
+    );
+  } catch (err) {
+    res.status(400).send(`Bekötés sikertelen: ${err.message}`);
+  }
+});
+
+// Manuális forrás (WebDAV/S3): a kulcsokat a kliens küldi, a workeren tároljuk.
+app.post('/storage/connect', requireAuth, express.json({ limit: '8kb' }), async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  const type = String(req.body?.type || '');
+  if (!['webdav', 's3'].includes(type)) {
+    res.status(400).json({ error: 'Csak webdav/s3 köthető be manuálisan (Drive/Dropbox: OAuth).' });
+    return;
+  }
+  try {
+    const id = await userStorage.upsertProvider(uid, {
+      type,
+      label: String(req.body?.label || type),
+      config: req.body?.config || {},
+    });
+    res.json({ id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/storage/:sourceId/disconnect', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    await userStorage.disconnectSource(uid, req.params.sourceId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/storage/:sourceId/list', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
   const { listSource } = require('./storage');
-  listSource(req.params.sourceId)
-    .then((entries) => {
-      if (entries === null) {
-        res.status(404).json({ error: 'Ismeretlen forrás.' });
-        return;
-      }
-      res.json({ entries });
-    })
-    .catch((err) => res.status(502).json({ error: err.message }));
+  try {
+    // előbb a user saját forrása, aztán a legacy globális admin-config
+    let entries = uid ? await userStorage.listUserSource(uid, req.params.sourceId) : null;
+    if (entries === null) {
+      entries = await listSource(req.params.sourceId);
+    }
+    if (entries === null) {
+      res.status(404).json({ error: 'Ismeretlen forrás.' });
+      return;
+    }
+    res.json({ entries });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 // hossz-lekérdezés hozzáadás előtt: az ffprobe a saját gateway-URL-t olvassa
-// (faststart médiánál csak a fejlécet tölti le, nem a teljes fájlt)
-app.get('/storage/:sourceId/probe', (req, res) => {
+// (faststart médiánál csak a fejlécet tölti le). A self-hívás egy capability-
+// tokennel jut át az authos /file-on (az ffprobe nem küld bearert).
+app.get('/storage/:sourceId/probe', requireAuth, (req, res) => {
+  const uid = callerId(req, req.query.userId);
   const rel = typeof req.query.path === 'string' ? req.query.path : '';
+  const it = uid
+    ? `&it=${encodeURIComponent(userStorage.fileToken(uid, req.params.sourceId, rel))}`
+    : '';
   const selfUrl = `http://127.0.0.1:${PORT}/storage/${encodeURIComponent(
     req.params.sourceId
-  )}/file?path=${encodeURIComponent(rel)}`;
+  )}/file?path=${encodeURIComponent(rel)}${it}`;
   execFile(
     'ffprobe',
     ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', selfUrl],
@@ -1778,10 +2376,26 @@ app.get('/storage/:sourceId/probe', (req, res) => {
   );
 });
 
+// A /file NEM használ requireAuth middleware-t: a stream-URL BEÁGYAZÓDIK a
+// projektbe és a lejátszó bearer nélkül hívja → a hozzáférés a capability-token
+// (`it`) VAGY (ha jelen van) a bejelentkezett user. A tokent a `listUserSource`
+// tette az URL-be; a visszavonás a DB-sor törlése.
 app.get('/storage/:sourceId/file', (req, res) => {
   const { streamSourceFile } = require('./storage');
   const rel = typeof req.query.path === 'string' ? req.query.path : '';
-  streamSourceFile(req.params.sourceId, rel, res).catch((err) => {
+  let uid = callerId(req, null);
+  if (!uid && typeof req.query.it === 'string') {
+    uid = userStorage.verifyFileToken(req.query.it, req.params.sourceId, rel);
+  }
+  (async () => {
+    const own = uid ? await userStorage.findUserSource(uid, req.params.sourceId) : null;
+    if (own) {
+      await userStorage.streamUserSourceFile(uid, req.params.sourceId, rel, res);
+    } else {
+      // legacy globális admin-forrás (auth nélkül is elérhető, ahogy eddig)
+      await streamSourceFile(req.params.sourceId, rel, res);
+    }
+  })().catch((err) => {
     if (!res.headersSent) {
       res.status(502).json({ error: err.message });
     }

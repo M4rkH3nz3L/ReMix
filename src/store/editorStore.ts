@@ -208,6 +208,8 @@ interface EditorState {
   comparingOriginal: boolean;
   /** 🅱️ before/after SLIDER: null = ki; 0–1 = elválasztó helye (bal=eredeti, jobb=szerkesztett) */
   compareSplit: number | null;
+  /** 🔊 fő (master) lejátszási hangerő 0–1 — a preview/player minden hangját skálázza */
+  masterVolume: number;
   /** 🔎 az idővonal fölötti insight-sáv aktív nézete (story / minimap / pacing) */
   insightLane: InsightLane;
   /** ✂️ maszk-fogantyúk a vásznon (a Szűrők panelről kapcsolva) */
@@ -359,6 +361,7 @@ interface EditorState {
   toggleFocusMode: () => void;
   setComparingOriginal: (on: boolean) => void;
   setCompareSplit: (v: number | null) => void;
+  setMasterVolume: (v: number) => void;
   setInsightLane: (lane: InsightLane) => void;
   setMaskEdit: (on: boolean) => void;
   /** 🎬 rotoszkóp-mód ki/be (a maszk-szerkesztés a lejátszófejnél kulcskockát ír) */
@@ -431,6 +434,7 @@ const SESSION_RESET = {
   focusMode: false,
   comparingOriginal: false,
   compareSplit: null as number | null,
+  masterVolume: 1,
   insightLane: 'story' as InsightLane,
   maskEdit: false,
   rotoMask: false,
@@ -1089,6 +1093,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   setComparingOriginal: (on) => set({ comparingOriginal: on }),
   setCompareSplit: (v) => set({ compareSplit: v }),
+  setMasterVolume: (v) => set({ masterVolume: Math.max(0, Math.min(1, v)) }),
   setInsightLane: (lane) => set({ insightLane: lane }),
 
   setMaskEdit: (on) => set({ maskEdit: on }),

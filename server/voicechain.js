@@ -116,4 +116,72 @@ function panFilter(pan) {
   return `aformat=channel_layouts=stereo,pan=stereo|c0=${lg}*c0|c1=${rg}*c1,`;
 }
 
-module.exports = { VOICE_ENHANCE, dereverbChain, voiceChain, audioFxChain, panFilter, RNNOISE };
+// ── 🎚️ Projekt-szintű MASTER (AUDIO-MASTER) — KÉTMENETES, EQ + multiband ──────
+// A hiteles mastering: (1) EQ + multiband kompresszió a keverékre, (2) loudnorm
+// MÉRÉS, (3) a mért értékekkel `linear=true` loudnorm (PONTOS cél-LUFS/TP), (4)
+// alimiter biztonsági plafon. A mérés+alkalmazás a renderben (render.js) fut; itt
+// a MÉRÉS ELŐTTI gráfot (EQ+multiband) építjük, hogy a loudnorm a feldolgozott
+// jelet mérje. A `mcompand` vessző-escaping helyett filter_complex 3-sávos
+// `acompressor` (biztonságos).
+
+function masterLra(dynamics) {
+  return dynamics === 'natural' ? 11 : dynamics === 'punchy' ? 5 : 7;
+}
+
+function dbToLinear(db) {
+  return Math.round(Math.pow(10, db / 20) * 1000) / 1000;
+}
+
+/** EQ-filterek (bass/equalizer/treble) a nem-nulla sávokra; '' ha mind 0. */
+function masterEq(eq) {
+  if (!eq) {
+    return '';
+  }
+  const parts = [];
+  if (eq.low) {
+    parts.push(`bass=g=${eq.low}:f=110`);
+  }
+  if (eq.mid) {
+    parts.push(`equalizer=f=1000:width_type=q:w=1:g=${eq.mid}`);
+  }
+  if (eq.high) {
+    parts.push(`treble=g=${eq.high}:f=8000`);
+  }
+  return parts.join(',');
+}
+
+const COMP = 'acompressor=threshold=-18dB:ratio=2:attack=20:release=250:makeup=1';
+
+/**
+ * A MÉRÉS ELŐTTI master-gráf `[0:a]` → `[<out>]`: EQ + (opcionális) 3-sávos
+ * multiband kompresszió. A hívó (render.js) fűzi hozzá a loudnorm+alimiter-t
+ * (mérő- ill. alkalmazó-menetben). Filter_complex-részlet (`;`-vel tagolva).
+ */
+function masterGraph(master, out = 'mst') {
+  const eq = masterEq(master.eq);
+  const eqNode = eq ? `[0:a]${eq}[meq]` : `[0:a]anull[meq]`;
+  if (!master.multiband) {
+    return `${eqNode};[meq]anull[${out}]`;
+  }
+  // 3 sáv: mély (<250 Hz) · közép (250–4000) · magas (>4000), sávonként kompresszor
+  return (
+    `${eqNode};` +
+    `[meq]asplit=3[b1][b2][b3];` +
+    `[b1]lowpass=f=250,${COMP}[c1];` +
+    `[b2]highpass=f=250,lowpass=f=4000,${COMP}[c2];` +
+    `[b3]highpass=f=4000,${COMP}[c3];` +
+    `[c1][c2][c3]amix=inputs=3:normalize=0[${out}]`
+  );
+}
+
+module.exports = {
+  VOICE_ENHANCE,
+  dereverbChain,
+  voiceChain,
+  audioFxChain,
+  panFilter,
+  masterGraph,
+  masterLra,
+  dbToLinear,
+  RNNOISE,
+};

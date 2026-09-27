@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
+import { videoFill } from '@/components/preview/videoFill';
 import { cssBlendMode, palette } from '@/constants/editor';
 import { activePipClips, sourceTimeAt } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
@@ -241,7 +242,7 @@ function PipVideoClip({
 
   return (
     <PipClipFrame layout={layout}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      <VideoView player={player} style={videoFill} contentFit="cover" nativeControls={false} />
     </PipClipFrame>
   );
 }

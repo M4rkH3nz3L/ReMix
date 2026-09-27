@@ -13,6 +13,7 @@
     "expo-audio": "~57.0.5",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.17",
+    "expo-dev-client": "~57.0.19",
     "expo-device": "~57.0.2",
     "expo-document-picker": "~57.0.2",
     "expo-file-system": "~57.0.6",
@@ -67,8 +68,8 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",

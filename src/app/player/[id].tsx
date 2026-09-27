@@ -6,6 +6,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -35,6 +36,8 @@ export default function PlayerScreen() {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setPlaying = useEditorStore((s) => s.setPlaying);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
+  const setMasterVolume = useEditorStore((s) => s.setMasterVolume);
   const { t } = useTranslation();
 
   const [quiz, setQuiz] = useState<InteractiveClip | null>(null);
@@ -68,7 +71,15 @@ export default function PlayerScreen() {
   useEffect(() => {
     // belépéskor elölről indítunk
     setPlayhead(0);
-    setPlaying(true);
+    // 🌐 WEB: a böngésző TILTJA a hangos lejátszást felhasználói gesztus nélkül
+    // (közvetlen URL-megnyitásnál nincs gesztus). Ha itt auto-indítanánk, a
+    // rAF-mesteróra léptetné a lejátszófejet és a videó NÉMÁN „pörögne" — pont a
+    // „nincs hang" tünet. Ezért weben nem auto-indítunk: az első Play-koppintás
+    // (gesztus) indítja el HANGGAL, és onnantól a böngésző a lejátszást engedi.
+    // Natívon marad az azonnali autoplay.
+    if (Platform.OS !== 'web') {
+      setPlaying(true);
+    }
     return () => setPlaying(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,6 +125,24 @@ export default function PlayerScreen() {
         <Pressable onPress={() => router.back()} style={styles.closeButton} hitSlop={8}>
           <Ionicons name="close" size={22} color={palette.text} />
         </Pressable>
+        {/* ▶️ Középső Play — állj/vége állapotban látszik. Weben ez a KOPPINTÁS az
+            a felhasználói gesztus, ami feloldja a böngésző hangos-lejátszás tiltását
+            (különben néma maradna); a quiz-modal a takarásával úgyis fölé kerül. */}
+        {!isPlaying && quiz === null ? (
+          <Pressable
+            onPress={() => {
+              if (playhead >= duration && duration > 0) {
+                setPlayhead(0);
+              }
+              setPlaying(true);
+            }}
+            style={styles.centerPlay}
+            accessibilityRole="button"
+            accessibilityLabel={t('playerScreen.play')}
+          >
+            <Ionicons name="play" size={40} color="#fff" style={{ marginLeft: 5 }} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.controls}>
@@ -127,6 +156,31 @@ export default function PlayerScreen() {
           style={styles.playButton}
         >
           <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color={palette.text} />
+        </Pressable>
+        {/* 🔊 hangerő: az ikon némít/visszakapcsol, a csík húzva/koppintva állít (master) */}
+        <Pressable
+          onPress={() => setMasterVolume(masterVolume > 0 ? 0 : 1)}
+          hitSlop={8}
+          accessibilityLabel="Volume"
+        >
+          <Ionicons
+            name={masterVolume === 0 ? 'volume-mute' : masterVolume < 0.5 ? 'volume-low' : 'volume-high'}
+            size={20}
+            color={palette.text}
+          />
+        </Pressable>
+        <Pressable
+          style={styles.volTrack}
+          onPress={(e) => {
+            const w = volWidth.value || 1;
+            setMasterVolume(e.nativeEvent.locationX / w);
+          }}
+          onLayout={(e) => {
+            volWidth.value = e.nativeEvent.layout.width;
+          }}
+        >
+          <View style={styles.volTrackBg} />
+          <View style={[styles.volFill, { width: `${Math.round(masterVolume * 100)}%` }]} />
         </Pressable>
         <Pressable
           style={styles.progressTrack}
@@ -199,6 +253,8 @@ export default function PlayerScreen() {
 
 /** a progress-sáv mért szélessége (nem state — nem kell újrarender) */
 const progressWidth = { value: 0 };
+/** a hangerő-csík mért szélessége */
+const volWidth = { value: 0 };
 
 const styles = StyleSheet.create({
   container: {
@@ -219,6 +275,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  centerPlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -36,
+    marginTop: -36,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.92,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,6 +303,24 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  volTrack: {
+    width: 64,
+    height: 20,
+    justifyContent: 'center',
+  },
+  volTrackBg: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.surfaceHigh,
+  },
+  volFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.accent,
   },
   progressTrack: {
     flex: 1,

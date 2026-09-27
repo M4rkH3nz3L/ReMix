@@ -242,6 +242,53 @@ async function s3Stream(source, key, res) {
   obj.Body.pipe(res);
 }
 
+// ------------------------------------------------------------- Írás (upload)
+
+/** MKCOL a szülő-mappára (best-effort) — sok WebDAV-szerver nem hoz létre auto-dirt. */
+async function davMkcol(source, rel) {
+  try {
+    await fetch(davUrl(source, rel), {
+      method: 'MKCOL',
+      headers: davAuthHeader(source),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    // ha már létezik / nem támogatott — a PUT úgyis eldönti
+  }
+}
+
+/** Helyi fájl feltöltése WebDAV-ra a `rel` (forrás-gyökérhez képesti) útra. */
+async function davUpload(source, rel, localPath, contentType) {
+  const parent = rel.split('/').slice(0, -1).join('/');
+  if (parent) {
+    await davMkcol(source, parent);
+  }
+  const body = fs.readFileSync(localPath);
+  const res = await fetch(davUrl(source, rel), {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType || 'application/octet-stream', ...davAuthHeader(source) },
+    body,
+    signal: AbortSignal.timeout(10 * 60 * 1000),
+  });
+  if (!res.ok && ![200, 201, 204].includes(res.status)) {
+    throw new Error(`WebDAV feltöltés hiba (${res.status})`);
+  }
+}
+
+/** Helyi fájl feltöltése S3-ra a `key` alá. */
+async function s3Upload(source, key, localPath, contentType) {
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const client = s3Client(source);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: source.bucket,
+      Key: key,
+      Body: fs.readFileSync(localPath),
+      ContentType: contentType || 'application/octet-stream',
+    })
+  );
+}
+
 // ---------------------------------------------------------------- Gateway
 
 /** a Tár panel forrás-listája (hitelesítés nélküli metaadat) */
@@ -284,4 +331,16 @@ async function streamSourceFile(id, rel, res) {
   res.status(400).json({ error: `Ismeretlen forrás-típus: ${source.type}` });
 }
 
-module.exports = { describeSources, listSource, streamSourceFile };
+module.exports = {
+  describeSources,
+  listSource,
+  streamSourceFile,
+  // per-user gateway (userStorage.js) újrahasznosítja a connectorokat:
+  mediaKind,
+  davListMedia,
+  davStream,
+  davUpload,
+  s3ListMedia,
+  s3Stream,
+  s3Upload,
+};

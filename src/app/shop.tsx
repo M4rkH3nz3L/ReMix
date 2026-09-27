@@ -19,7 +19,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import {
-  buyCreditsDev,
   creditBalance,
   getPayload,
   InsufficientCreditsError,
@@ -48,7 +47,6 @@ const KIND_EMOJI: Record<ShopKind, string> = {
   preset: '🎛️',
 };
 
-const CREDIT_PACKS = [100, 500, 1200];
 
 type Tab = 'browse' | 'purchases' | 'sell';
 
@@ -66,7 +64,6 @@ export default function ShopScreen() {
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [creditsOpen, setCreditsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [myProjects, setMyProjects] = useState<ProjectMeta[]>([]);
   const [pubProjectId, setPubProjectId] = useState<string | null>(null);
@@ -151,7 +148,7 @@ export default function ShopScreen() {
         if (e instanceof InsufficientCreditsError) {
           Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
             { text: t('common.cancel'), style: 'cancel' },
-            { text: t('shop.buyCredits'), onPress: () => setCreditsOpen(true) },
+            { text: t('shop.buyCredits'), onPress: () => router.push('/profile') },
           ]);
         } else {
           Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
@@ -172,19 +169,6 @@ export default function ShopScreen() {
         }
       })
       .catch(() => {})
-      .finally(() => setBusy(false));
-  };
-
-  const onTopUp = (amount: number) => {
-    setBusy(true);
-    buyCreditsDev(amount)
-      .then((b) => {
-        setBalance(b);
-        setCreditsOpen(false);
-      })
-      .catch((e: unknown) =>
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
-      )
       .finally(() => setBusy(false));
   };
 
@@ -319,9 +303,10 @@ export default function ShopScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {t('shop.title')}
         </Text>
-        <Pressable onPress={() => setCreditsOpen(true)} hitSlop={8} style={styles.balancePill}>
+        {/* egyenleg → a pénztárca (profil): koin-vétel/küldés/kiváltás + dev-adás */}
+        <Pressable onPress={() => router.push('/profile')} hitSlop={8} style={styles.balancePill}>
           <Text style={styles.balanceText}>{balance} 🪙</Text>
-          <Ionicons name="add-circle" size={16} color={palette.accent} />
+          <Ionicons name="wallet-outline" size={16} color={palette.accent} />
         </Pressable>
       </View>
 
@@ -397,33 +382,6 @@ export default function ShopScreen() {
           ListEmptyComponent={<Text style={styles.empty}>{t('shop.emptyListings')}</Text>}
         />
       )}
-
-      {/* — kredit-vásárlás modal — */}
-      <Modal visible={creditsOpen} transparent animationType="slide" onRequestClose={() => setCreditsOpen(false)}>
-        <View style={styles.backdrop}>
-          <Pressable style={styles.backdropTap} onPress={() => setCreditsOpen(false)} />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{t('shop.buyCredits')}</Text>
-            <Text style={styles.sheetHint}>{t('shop.creditsHint')}</Text>
-            <View style={styles.packRow}>
-              {CREDIT_PACKS.map((amt) => (
-                <Pressable
-                  key={amt}
-                  style={styles.pack}
-                  disabled={busy}
-                  onPress={() => onTopUp(amt)}
-                >
-                  <Text style={styles.packAmount}>{amt} 🪙</Text>
-                  <Text style={styles.packDev}>{t('shop.devGrant')}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={() => setCreditsOpen(false)} style={styles.dismiss}>
-              <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       {/* — publikálás modal — */}
       <Modal visible={publishOpen} transparent animationType="slide" onRequestClose={() => setPublishOpen(false)}>

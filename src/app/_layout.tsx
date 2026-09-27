@@ -132,14 +132,19 @@ export default function RootLayout() {
             }}
           >
             <Stack.Protected guard={authed}>
+              {/* 🏠 a gyökér (`/`) a FEED (home); a projektek listája a `/studio` */}
               <Stack.Screen name="index" />
+              <Stack.Screen name="studio/index" />
               <Stack.Screen name="profile" />
               <Stack.Screen name="admin" />
               <Stack.Screen name="editor/[id]" />
+              <Stack.Screen name="studio/image/[id]" />
+              <Stack.Screen name="studio/audio/[id]" />
               <Stack.Screen name="player/[id]" />
               <Stack.Screen name="collab/[id]" />
               <Stack.Screen name="shop" />
-              <Stack.Screen name="feed" />
+              <Stack.Screen name="search" />
+              <Stack.Screen name="live" />
               <Stack.Screen name="channel/[id]" />
               <Stack.Screen name="inbox" />
               <Stack.Screen name="chat/[id]" />

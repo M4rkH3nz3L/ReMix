@@ -24,6 +24,16 @@ export const palette = {
 /** a márka-gradiens (gombok, aktív állapotok, play) */
 export const accentGradient = ['#7c5cff', '#b95ce0', '#ff5ca8'] as const;
 
+/**
+ * A csatorna-borító képaránya (szélesség / magasság) — SZABVÁNYOS Facebook
+ * borító-arány (851 × 315 px ≈ 2.7:1). Fekvő, keskeny banner: a teljes
+ * szélességet kitölti, a magasság ebből adódik (mobilon ≈120–145, weben a
+ * böngésző-szélességtől arányosan). Ugyanezt az arányt használja a
+ * borító-igazító vágókeret ÉS a megjelenítés (profil + csatorna), hogy amit a
+ * felhasználó beállít, PONTOSAN az legyen látható mindenhol.
+ */
+export const COVER_ASPECT = 851 / 315;
+
 /** sáv-színek az idővonalon */
 export const trackColors: Record<TrackType, string> = {
   video: '#3d6bff',

@@ -7,6 +7,18 @@
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 
 /**
+ * 🎛️ A projekt FAJTÁJA = melyik „stúdió” hozza létre / szerkeszti. A három
+ * stúdió EGYÜTT alkotja a Studiót:
+ * - `video`: a teljes idővonalas videószerkesztő (a `/editor/[id]` útvonal);
+ * - `image`: réteg-fás képszerkesztő (a projekt egy `ImageDoc`-ot hordoz);
+ * - `audio`: hang-/zeneszerkesztő.
+ *
+ * A kép- és hang-projekt KIMENETE a videó-editorban is felhasználható médiaként.
+ * Hiányzó érték = `video` (a séma-6 előtti, régi projektek mind videók).
+ */
+export type ProjectKind = 'video' | 'image' | 'audio';
+
+/**
  * Sávok (full-plan F0.5): a tartalom-típusok kapnak sávot; a transition/filter/
  * mask/animáció a klip property-je marad. A hang három sávra bomlik (zene /
  * voiceover / SFX — egyszerre szólhatnak), a felirat és a matrica/grafika
@@ -547,6 +559,13 @@ export interface ImageClip extends ClipBase {
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
   assetId?: string;
   uri: string;
+  /**
+   * 🎨 Vissza-hivatkozás a szerkeszthető RÉTEG-FÁRA (Kép Stúdió). Ha van, az
+   * `uri` a `project.imageDocs`-ban lévő ilyen id-jű `ImageDoc` renderelt PNG-je
+   * — a Kép Stúdió NEM destruktívan, a réteg-fán szerkeszti tovább (a régi,
+   * destruktív egy-kép szerkesztő helyett). Hiányzik → sima (nem réteges) kép.
+   */
+  docId?: string;
   filterId: FilterId;
   /** a szűrő erőssége 0–1 (hiányzó = 1) */
   filterIntensity?: number;
@@ -920,6 +939,10 @@ export interface AudioClip extends ClipBase {
   assetId?: string;
   uri: string;
   label: string;
+  /** 🎚️ forráson belüli kezdet (mp) — mint a VideoClip.trimIn; hiányzó = 0 */
+  trimIn?: number;
+  /** a forrás teljes hossza (mp) — a trim ENNYIN belül mozoghat; hiányzó = duration */
+  sourceDuration?: number;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */
@@ -1189,9 +1212,29 @@ export interface RenderedVersion {
   height?: number;
 }
 
+/** 🎚️ Projekt-szintű MASTER (AUDIO-MASTER): a teljes keverék hangosítása/plafonja. */
+export type AudioMasterTarget = 'video' | 'podcast' | 'music' | 'social' | 'custom';
+export type AudioMasterDynamics = 'natural' | 'balanced' | 'punchy';
+export interface AudioMaster {
+  /** cél-preset (a többi mezőt ez tölti, kivéve 'custom') */
+  target: AudioMasterTarget;
+  /** integrált hangosság cél (LUFS) — a renderben KÉTMENETES `loudnorm` */
+  lufs: number;
+  /** valódi csúcs plafon (dBTP) — a renderben `loudnorm=TP` + `alimiter` */
+  truePeak: number;
+  /** dinamika-jelleg (a loudnorm LRA-ját hangolja) */
+  dynamics: AudioMasterDynamics;
+  /** 🎛️ master-EQ (dB, ±12): tonális balansz a végső keveréken. Mind 0 = ki */
+  eq?: { low: number; mid: number; high: number };
+  /** multiband kompresszor (mcompand) — a keverék dinamikájának faragása */
+  multiband?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
+  /** 🎛️ a projekt fajtája (melyik stúdió); hiányzó = 'video' (régi projektek) */
+  kind?: ProjectKind;
   aspectRatio: AspectRatio;
   /** 🎞️ szerkesztési frame-ráta (timebase): a vágások/kulcskockák erre a rácsra
    *  ülnek, a timecode (HH:MM:SS:FF) ebből számol. Hiányzó = DEFAULT_FPS (30). */
@@ -1212,8 +1255,9 @@ export interface Project {
   /** 🎬 story-struktúra fejezetek (Hook/Context/Value/CTA) — a videó „térképe" */
   chapters?: Chapter[];
   /** 🔀 remix-forrás: miből készült ez a projekt (duplikálás/remix). A lineage-
-   *  lánc a szülő-hivatkozások (remixOf.projectId) mentén bejárható. */
-  remixOf?: { projectId: string; name: string };
+   *  lánc a szülő-hivatkozások mentén bejárható; a `postId` a forrás FEED-poszté,
+   *  hogy publikáláskor a remix a poszthoz csatolódjon (remix_of_post_id). */
+  remixOf?: { projectId: string; name: string; postId?: string };
   /** 🔗 link-csoportok: az egy csoportban lévő klipek együtt mozognak (persisztált) */
   links?: string[][];
   /**
@@ -1222,15 +1266,23 @@ export interface Project {
    * réteg-fa itt marad — ezért bármikor újraszerkeszthető.
    */
   imageDocs?: ImageDoc[];
+  /** 🎚️ projekt-szintű audio-master (hiányzó = nincs; opcionális/additív) */
+  audioMaster?: AudioMaster;
+  /** 🎚️ sávonkénti mixer-gain (fader, 0–1) — a music/voiceover/sfx sávokra; a
+   *  hiányzó sáv = 1.0. Az előnézetben ÉS a renderben érvényesül (persistált). */
+  trackMix?: Partial<Record<TrackType, { gain: number }>>;
   createdAt: string;
   updatedAt: string;
-  /** 1: assets nélkül · 2: asset-registry · 3: sáv-bővítés · 4: kulcskockák (a betöltés migrál) */
+  /** 1: assets nélkül · 2: asset-registry · 3: sáv-bővítés · 4: kulcskockák ·
+   *  5: kanonikus sávok pótlása · 6: projekt-fajta (kind) — a betöltés migrál */
   schemaVersion: number;
 }
 
 export interface ProjectMeta {
   id: string;
   name: string;
+  /** 🎛️ a projekt fajtája (a főképernyő ez alapján routol a helyes stúdióba) */
+  kind?: ProjectKind;
   aspectRatio: AspectRatio;
   duration: number;
   clipCount: number;

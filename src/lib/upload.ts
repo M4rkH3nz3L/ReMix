@@ -10,8 +10,16 @@ import { Platform } from 'react-native';
  * Minden worker-feltöltés ezen a segéden megy át.
  */
 
-/** FormData a médiafájllal — natívan File-lal, weben letöltött blobbal */
-export async function mediaFormData(uri: string, name?: string): Promise<FormData> {
+/**
+ * FormData a médiafájllal — natívan File-lal, weben letöltött blobbal. A `fields`
+ * extra szöveges mezőket tesz a formba (pl. `projectId`, `kind`) → a worker ebből
+ * építi a projekt-rendezett Storage-kulcsot (`<projectId>/<kind>/<fájl>`).
+ */
+export async function mediaFormData(
+  uri: string,
+  name?: string,
+  fields?: Record<string, string>
+): Promise<FormData> {
   const form = new FormData();
   const fileName = name ?? uri.split('/').pop()?.split('?')[0] ?? 'media';
   if (Platform.OS === 'web') {
@@ -19,6 +27,13 @@ export async function mediaFormData(uri: string, name?: string): Promise<FormDat
     form.append('media', blob, fileName);
   } else {
     form.append('media', new File(uri) as unknown as Blob, fileName);
+  }
+  if (fields) {
+    for (const [key, value] of Object.entries(fields)) {
+      if (value) {
+        form.append(key, value);
+      }
+    }
   }
   return form;
 }

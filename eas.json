@@ -26,6 +26,14 @@
         "simulator": true
       }
     },
+    "development-sim": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "distribution": "store",
       "environment": "production",

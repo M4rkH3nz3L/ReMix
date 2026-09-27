@@ -3,6 +3,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { videoFill } from '@/components/preview/videoFill';
 import { activeTransition, type ActiveTransition } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 
@@ -60,7 +61,7 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
         {toVideo ? (
           <VideoView
             player={player}
-            style={StyleSheet.absoluteFill}
+            style={videoFill}
             contentFit="contain"
             nativeControls={false}
           />

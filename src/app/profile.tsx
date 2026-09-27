@@ -19,7 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip, PrimaryButton } from '@/components/ui/controls';
-import { palette } from '@/constants/editor';
+import { COVER_ASPECT, palette } from '@/constants/editor';
 import { setLanguage } from '@/i18n';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type CacheReport, cacheReport, clearCaches, formatBytes } from '@/lib/cacheManager';
@@ -48,11 +48,27 @@ import {
 import { AI_CAPABILITIES, generatePersona } from '@/lib/aiPersona';
 import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
 import { AvatarSvg } from '@/components/AvatarSvg';
+import { StorageCard } from '@/components/profile/StorageCard';
+import { WalletCard } from '@/components/profile/WalletCard';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { activateProDev, billingClientAvailable, deactivateProDev, restorePurchases } from '@/lib/billing';
 import { syncMyPostsAvatar } from '@/lib/feed';
 import { reachableMediaUrl } from '@/lib/mediaUrl';
-import { type AccountProfile, fetchProfile, pickAndUploadProfileImage, saveProfile } from '@/lib/profile';
+import {
+  type AccountProfile,
+  emptyProfile,
+  fetchProfile,
+  pickAndUploadProfileImage,
+  pickProfileImageLocal,
+  saveProfile,
+  uploadProfileImage,
+} from '@/lib/profile';
+import { CoverPhotoEditor } from '@/components/CoverPhotoEditor';
+import { CreatorTypePicker, TagEditor } from '@/components/profile/CreatorControls';
+import { SocialLinksEditor } from '@/components/profile/SocialLinksEditor';
+import { ShowcaseEditor } from '@/components/profile/ShowcaseEditor';
+import { CollapsibleCard } from '@/components/ui/CollapsibleCard';
+import { SUGGESTED_INTERESTS, SUGGESTED_LANGUAGES, SUGGESTED_SKILLS } from '@/lib/creatorProfile';
 import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -124,16 +140,7 @@ export default function ProfileScreen() {
 
   // configured=false esetén nincs mit tölteni → azonnal false (nem villog a spinner)
   const [loading, setLoading] = useState(configured);
-  const [profile, setProfile] = useState<AccountProfile>({
-    username: '',
-    fullName: '',
-    phone: '',
-    birthday: '',
-    country: '',
-    city: '',
-    avatarUrl: '',
-    coverUrl: '',
-  });
+  const [profile, setProfile] = useState<AccountProfile>(() => emptyProfile());
   const [savingProfile, setSavingProfile] = useState(false);
   const [providers, setProviders] = useState<AiProvider[]>([]);
   // 🤖 feladat → provider hozzárendelések (a „AI-modellek feladatonként" mátrixhoz)
@@ -204,6 +211,9 @@ export default function ProfileScreen() {
   // — személyes adatok —
   const setField = (key: keyof AccountProfile, value: string) =>
     setProfile((prev) => ({ ...prev, [key]: value }));
+  // — tömb-mezők (creator-típusok, készségek, érdeklődés, nyelvek) —
+  const setArr = (key: 'creatorTypes' | 'skills' | 'interests' | 'languages', value: string[]) =>
+    setProfile((prev) => ({ ...prev, [key]: value }));
 
   const nameError = profile.fullName.length > 0 && !isValidFullName(profile.fullName);
   const usernameError = profile.username.length > 0 && !isValidUsername(profile.username);
@@ -240,10 +250,56 @@ export default function ProfileScreen() {
     }
   };
 
+  // a szekció-kártyák közös „Mentés" gombja (mindegyik a TELJES profilt menti)
+  const renderSaveButton = () => (
+    <View style={{ marginTop: 12 }}>
+      {savingProfile ? (
+        <View style={styles.busyBox}>
+          <ActivityIndicator color={palette.text} />
+        </View>
+      ) : (
+        <PrimaryButton
+          icon="checkmark"
+          label={t('common.save')}
+          disabled={!profileValid}
+          onPress={() => {
+            void onSaveProfile();
+          }}
+        />
+      )}
+    </View>
+  );
+
+  // időzóna automatikus kitöltése az eszközről (Intl; ha nincs, csendben kihagyjuk)
+  const detectTimezone = () => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) {
+        setField('timezone', tz);
+      }
+    } catch {
+      /* Intl/timeZone nem elérhető — marad a kézi bevitel */
+    }
+  };
+
   // 🖼️ profil-/borítókép: választás + feltöltés → azonnal mentjük a profilhoz
   const [imgBusy, setImgBusy] = useState(false);
+  // a borítóhoz kiválasztott NYERS kép — ha van, nyitva az igazító-modal
+  const [coverDraftUri, setCoverDraftUri] = useState<string | null>(null);
   const onPickProfileImage = async (kind: 'avatar' | 'cover') => {
     if (imgBusy) {
+      return;
+    }
+    // borító: előbb kiválasztás, majd igazító-modal — a feltöltés a „Kész" után
+    if (kind === 'cover') {
+      try {
+        const local = await pickProfileImageLocal();
+        if (local) {
+          setCoverDraftUri(local);
+        }
+      } catch (e) {
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+      }
       return;
     }
     setImgBusy(true);
@@ -252,16 +308,30 @@ export default function ProfileScreen() {
       if (!url) {
         return; // a felhasználó mégse választott
       }
-      const next: AccountProfile = {
-        ...profile,
-        [kind === 'avatar' ? 'avatarUrl' : 'coverUrl']: url,
-      };
+      const next: AccountProfile = { ...profile, avatarUrl: url };
       setProfile(next);
       await saveProfile(next);
       // a profilkép változását a KORÁBBI posztokra is átvezetjük (denormalizált feed-avatar)
-      if (kind === 'avatar') {
-        void syncMyPostsAvatar(url);
-      }
+      void syncMyPostsAvatar(url);
+    } catch (e) {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  // a borító-igazító „Kész" után: a bevágott képet feltöltjük + mentjük
+  const commitCover = async (croppedUri: string) => {
+    if (imgBusy) {
+      return;
+    }
+    setImgBusy(true);
+    try {
+      const url = await uploadProfileImage(croppedUri);
+      const next: AccountProfile = { ...profile, coverUrl: url };
+      setProfile(next);
+      await saveProfile(next);
+      setCoverDraftUri(null); // csak sikeres mentés után zárjuk
     } catch (e) {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
@@ -517,9 +587,15 @@ export default function ProfileScreen() {
             </Pressable>
           ) : null}
 
-          {/* — Csatorna megjelenése: profil- és borítókép — */}
-          <Text style={styles.sectionTitle}>{t('profile.appearanceSection')}</Text>
-          <View style={styles.card}>
+          {/* ═══ PROFIL-SZERKESZTŐ: összecsukható szekciók ═══ */}
+
+          {/* — 👤 Identitás: kép/borító + username + név + bio — */}
+          <CollapsibleCard
+            icon="person-circle-outline"
+            title={t('profile.identitySection')}
+            subtitle={t('profile.identityHint')}
+            defaultOpen
+          >
             <View style={styles.coverWrap}>
               <Pressable
                 onPress={() => onPickProfileImage('cover')}
@@ -570,11 +646,7 @@ export default function ProfileScreen() {
             <Text style={styles.sectionHint}>
               {imgBusy ? t('profile.imageUploading') : t('profile.appearanceHint')}
             </Text>
-          </View>
 
-          {/* — Személyes adatok — */}
-          <Text style={styles.sectionTitle}>{t('profile.personalSection')}</Text>
-          <View style={styles.card}>
             {/* 🔑 EGYEDI felhasználónév (login-handle) — ezzel is be lehet lépni; NEM a display name */}
             <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
             <TextInput
@@ -601,6 +673,27 @@ export default function ProfileScreen() {
             />
             {nameError ? <Text style={styles.error}>{t('auth.nameHint')}</Text> : null}
 
+            <Text style={styles.fieldLabel}>{t('creatorProfile.bioLabel')}</Text>
+            <TextInput
+              value={profile.bio}
+              onChangeText={(v) => setField('bio', v)}
+              placeholder={t('creatorProfile.bioPlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, styles.inputArea]}
+              multiline
+              maxLength={500}
+            />
+            <Text style={styles.counter}>{`${profile.bio.length}/500`}</Text>
+
+            {renderSaveButton()}
+          </CollapsibleCard>
+
+          {/* — 🔒 Személyes adatok (alapból privát mezők) — */}
+          <CollapsibleCard
+            icon="lock-closed-outline"
+            title={t('profile.personalSection')}
+            subtitle={t('profile.personalHint')}
+          >
             <Text style={styles.fieldLabel}>{t('auth.phoneLabel')}</Text>
             <TextInput
               value={profile.phone}
@@ -621,9 +714,7 @@ export default function ProfileScreen() {
               style={[styles.input, birthdayError && styles.inputError]}
               autoCapitalize="none"
             />
-            {birthdayError ? (
-              <Text style={styles.error}>{t('auth.birthdayInvalid')}</Text>
-            ) : null}
+            {birthdayError ? <Text style={styles.error}>{t('auth.birthdayInvalid')}</Text> : null}
 
             <Text style={styles.fieldLabel}>{t('auth.locationLabel')}</Text>
             <TextInput
@@ -641,23 +732,112 @@ export default function ProfileScreen() {
               style={styles.input}
             />
 
-            <View style={{ marginTop: 12 }}>
-              {savingProfile ? (
-                <View style={styles.busyBox}>
-                  <ActivityIndicator color={palette.text} />
-                </View>
-              ) : (
-                <PrimaryButton
-                  icon="checkmark"
-                  label={t('common.save')}
-                  disabled={!profileValid}
-                  onPress={() => {
-                    void onSaveProfile();
-                  }}
-                />
-              )}
+            <Text style={styles.fieldLabel}>{t('profile.languagesLabel')}</Text>
+            <TagEditor
+              value={profile.languages}
+              onChange={(v) => setArr('languages', v)}
+              suggestions={SUGGESTED_LANGUAGES}
+              placeholder={t('profile.languagesPlaceholder')}
+            />
+
+            <Text style={styles.fieldLabel}>{t('profile.timezoneLabel')}</Text>
+            <View style={styles.tzRow}>
+              <TextInput
+                value={profile.timezone}
+                onChangeText={(v) => setField('timezone', v)}
+                placeholder={t('profile.timezonePlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={[styles.input, { flex: 1 }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable onPress={detectTimezone} style={styles.tzAuto} accessibilityRole="button">
+                <Ionicons name="navigate" size={15} color={palette.accent} />
+                <Text style={styles.tzAutoText}>{t('profile.timezoneAuto')}</Text>
+              </Pressable>
             </View>
-          </View>
+
+            {renderSaveButton()}
+          </CollapsibleCard>
+
+          {/* — 🎨 Creator: mutasd be magad — */}
+          <CollapsibleCard
+            icon="color-palette-outline"
+            title={t('creatorProfile.section')}
+            subtitle={t('creatorProfile.sectionHint')}
+          >
+            <Text style={styles.fieldLabel}>{t('creatorProfile.typesLabel')}</Text>
+            <CreatorTypePicker value={profile.creatorTypes} onChange={(v) => setArr('creatorTypes', v)} />
+
+            <Text style={styles.fieldLabel}>{t('creatorProfile.skillsLabel')}</Text>
+            <TagEditor
+              value={profile.skills}
+              onChange={(v) => setArr('skills', v)}
+              suggestions={SUGGESTED_SKILLS}
+              placeholder={t('creatorProfile.skillsPlaceholder')}
+            />
+
+            <Text style={styles.fieldLabel}>{t('creatorProfile.interestsLabel')}</Text>
+            <TagEditor
+              value={profile.interests}
+              onChange={(v) => setArr('interests', v)}
+              suggestions={SUGGESTED_INTERESTS}
+              placeholder={t('creatorProfile.interestsPlaceholder')}
+            />
+
+            <Text style={styles.fieldLabel}>{t('creatorProfile.aboutLabel')}</Text>
+            <TextInput
+              value={profile.aboutMe}
+              onChangeText={(v) => setField('aboutMe', v)}
+              placeholder={t('creatorProfile.aboutPlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, styles.inputArea]}
+              multiline
+            />
+
+            <Text style={styles.fieldLabel}>{t('creatorProfile.whatLabel')}</Text>
+            <TextInput
+              value={profile.whatIMake}
+              onChangeText={(v) => setField('whatIMake', v)}
+              placeholder={t('creatorProfile.whatPlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, styles.inputArea]}
+              multiline
+            />
+
+            <Text style={styles.fieldLabel}>{t('creatorProfile.workingLabel')}</Text>
+            <TextInput
+              value={profile.workingOn}
+              onChangeText={(v) => setField('workingOn', v)}
+              placeholder={t('creatorProfile.workingPlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={styles.input}
+            />
+
+            {renderSaveButton()}
+          </CollapsibleCard>
+
+          {/* — 🔗 Social linkek — */}
+          {userId ? (
+            <CollapsibleCard
+              icon="link-outline"
+              title={t('profile.socialSection')}
+              subtitle={t('profile.socialHint')}
+            >
+              <SocialLinksEditor userId={userId} />
+            </CollapsibleCard>
+          ) : null}
+
+          {/* — 🖼️ Showcase (portfólió) — */}
+          {userId ? (
+            <CollapsibleCard
+              icon="albums-outline"
+              title={t('profile.showcaseSection')}
+              subtitle={t('profile.showcaseHint')}
+            >
+              <ShowcaseEditor userId={userId} />
+            </CollapsibleCard>
+          ) : null}
 
           {/* — Nyelv — */}
           <Text style={styles.sectionTitle}>{t('profile.languageSection')}</Text>
@@ -763,6 +943,12 @@ export default function ProfileScreen() {
               </Pressable>
             ) : null}
           </View>
+
+          {/* — Koin-pénztárca (vétel / Pro / küldés / kiváltás) — */}
+          <WalletCard />
+
+          {/* — Tárhely + külső tárhelyek — */}
+          <StorageCard />
 
           {/* — AI-modellek — */}
           <Text style={styles.sectionTitle}>{t('profile.aiSection')}</Text>
@@ -1095,6 +1281,14 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* 🖼️ borító-igazító: húzd a képet a kívánt kivágáshoz, majd Kész */}
+      <CoverPhotoEditor
+        uri={coverDraftUri}
+        busy={imgBusy}
+        onCancel={() => setCoverDraftUri(null)}
+        onConfirm={commitCover}
+      />
     </SafeAreaView>
   );
 }
@@ -1161,7 +1355,9 @@ const styles = StyleSheet.create({
   fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
   // 🖼️ csatorna-megjelenés: borító-banner + átfedő avatar
   coverWrap: {
-    height: 132,
+    // szabványos FB borító-arány (COVER_ASPECT) — teljes szélesség, a magasság
+    // az arányból; a vágó és a megjelenítés ugyanezt az arányt használja
+    aspectRatio: COVER_ASPECT,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: palette.surfaceHigh,
@@ -1183,15 +1379,15 @@ const styles = StyleSheet.create({
   coverBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   avatarEdit: { position: 'absolute', left: 12, bottom: 10 },
   avatarImg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     borderWidth: 2,
     borderColor: palette.surface,
     backgroundColor: palette.accentSoft,
   },
   avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: palette.text, fontSize: 26, fontWeight: '800' },
+  avatarInitial: { color: palette.text, fontSize: 34, fontWeight: '800' },
   avatarCam: {
     position: 'absolute',
     right: -2,
@@ -1249,6 +1445,19 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 15,
   },
+  inputArea: { minHeight: 92, paddingTop: 12, textAlignVertical: 'top' },
+  counter: { color: palette.textDim, fontSize: 11, textAlign: 'right', marginTop: -2 },
+  tzRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tzAuto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: palette.accentSoft,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  tzAutoText: { color: palette.accent, fontSize: 13, fontWeight: '700' },
   inputError: { borderColor: palette.danger },
   error: { color: palette.danger, fontSize: 12, fontWeight: '600' },
   hint: { color: palette.textDim, fontSize: 11 },

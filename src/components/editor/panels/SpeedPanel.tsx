@@ -4,6 +4,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { palette, speedPresets } from '@/constants/editor';
+import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { captureFrame } from '@/lib/captureFrame';
 import { buildFreezePlan } from '@/lib/freeze';
 import { makeId } from '@/lib/id';
@@ -262,6 +263,20 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
               onPress={() => updateClip(clip.id, { deReverb: !clip.deReverb })}
             />
           </View>
+        ) : null}
+        {/* 🎬→🎧 a videó hangját külön hangklippé választja, és a közös Hang
+            Stúdióban nyitja (teljes fegyverzet); a lépés egy undo */}
+        {canDetachAudio(clip) ? (
+          <PrimaryButton
+            icon="mic-outline"
+            label={t('panels.speed.detachAudio')}
+            onPress={() => {
+              const { audioClip, commands } = detachAudioCommands(clip, t('panels.speed.detachedLabel'));
+              if (useEditorStore.getState().applyBatch(commands, 'user') > 0) {
+                useEditorStore.getState().openAudioStudio(audioClip.id);
+              }
+            }}
+          />
         ) : null}
         <View style={styles.row}>
           <Chip

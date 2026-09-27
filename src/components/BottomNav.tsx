@@ -36,9 +36,9 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
       return;
     }
     if (key === 'feed') {
-      router.replace('/feed');
-    } else if (key === 'studio') {
       router.replace('/');
+    } else if (key === 'studio') {
+      router.replace('/studio');
     } else if (key === 'chat') {
       router.replace('/inbox');
     } else if (myId) {

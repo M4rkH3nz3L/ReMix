@@ -11,10 +11,13 @@ import { requireSupabase, supabase } from '@/lib/supabase';
 export type PermissionKey =
   | 'post.moderate'
   | 'comment.moderate'
+  | 'message.moderate'
   | 'report.review'
   | 'post.feature'
+  | 'shop.moderate'
   | 'project.moderate'
   | 'user.manage'
+  | 'user.suspend'
   | 'role.manage';
 
 export interface AppPermission {
@@ -172,6 +175,15 @@ export async function assignRole(userId: string, role: string): Promise<void> {
 export async function moderatePostGlobal(postId: string, status: 'ok' | 'removed'): Promise<void> {
   const sb = requireSupabase();
   const { error } = await sb.rpc('moderate_post', { p_post: postId, p_status: status });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Fiók tiltása/feloldása (RPC): a `user.suspend` birtokosa. Tiltva a user nem tud belépni. */
+export async function setUserSuspended(userId: string, suspended: boolean): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('admin_set_user_suspended', { p_user: userId, p_suspended: suspended });
   if (error) {
     throw new Error(error.message);
   }

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import { makeId } from '@/lib/id';
-import { reachableMediaUrl } from '@/lib/mediaUrl';
+import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
 import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
 import { renderAndUploadWeb, renderProjectVersion, uploadMedia } from '@/lib/render';
@@ -151,12 +151,84 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
   return rows.map((r) => toPost(r, liked, saved));
 }
 
+/** Keresés eredménye: illeszkedő posztok + a belőlük kinyert egyedi alkotók. */
+export interface SearchResults {
+  posts: FeedPost[];
+  creators: Creator[];
+}
+
+/**
+ * 🔎 Keresés a nyilvános feedben: cím / alkotó-username / megjelenített név
+ * (ilike), plusz hashtag-egyezés (a `#tag` és a sima szó is). A találatokból
+ * kinyerjük az egyedi alkotókat is (a kereső „Alkotók" szekciójához). Csak
+ * publikus + moderált (`ok`) posztok — az RLS is ezt engedi kijelentkezve is.
+ */
+export async function searchFeed(query: string, limit = 40): Promise<SearchResults> {
+  const q = query.trim();
+  if (!q) {
+    return { posts: [], creators: [] };
+  }
+  const sb = requireSupabase();
+  // ilike-biztos minta: a `%`, `_`, `\` speciális karaktereket kiöljük
+  const safe = q.replace(/[%_\\]/g, ' ').trim();
+  const like = `%${safe}%`;
+  const tag = safe.replace(/^#+/, '').toLowerCase();
+
+  const base = () =>
+    sb.from('posts').select(POST_COLUMNS).eq('moderation_status', 'ok').eq('visibility', 'public');
+
+  // szöveges találat: cím / egyedi username / megjelenített név
+  const textReq = base()
+    .or(`title.ilike.${like},creator_username.ilike.${like},creator_name.ilike.${like}`)
+    .order('promoted', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  // hashtag-találat (best-effort: pontos tömb-elem egyezés) — a `#tag`-et is elkapja
+  const tagReq = tag
+    ? base().contains('hashtags', [tag]).order('created_at', { ascending: false }).limit(limit)
+    : Promise.resolve({ data: [] as PostRow[], error: null });
+
+  const [textRes, tagRes] = await Promise.all([textReq, tagReq]);
+  if (textRes.error) {
+    throw new Error(textRes.error.message);
+  }
+  // a hashtag-ág hibája NEM végzetes (a szöveges találat így is megjön)
+  const merged = new Map<string, PostRow>();
+  ((textRes.data ?? []) as PostRow[]).forEach((r) => merged.set(r.id, r));
+  ((tagRes.data ?? []) as PostRow[]).forEach((r) => {
+    if (!merged.has(r.id)) {
+      merged.set(r.id, r);
+    }
+  });
+  const rows = [...merged.values()];
+  const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
+  const posts = rows.map((r) => toPost(r, liked, saved));
+
+  // egyedi alkotók a találatokból (első előfordulás sorrendjében)
+  const creatorMap = new Map<string, Creator>();
+  posts.forEach((p) => {
+    if (!creatorMap.has(p.creator.id)) {
+      creatorMap.set(p.creator.id, p.creator);
+    }
+  });
+  return { posts, creators: [...creatorMap.values()] };
+}
+
 /** Egy csatorna: az alkotó posztjai + statisztika + követem-e. */
 export interface ChannelData {
   userId: string;
   creator: Creator | null;
   /** 🖼️ borítókép (banner) URL — a csatorna-fejlécben; hiányában gradient-placeholder */
   coverUri?: string;
+  // 🎨 Creator réteg (publikus mezők a public_profile-ból)
+  bio?: string;
+  aboutMe?: string;
+  whatIMake?: string;
+  workingOn?: string;
+  creatorTypes?: string[];
+  skills?: string[];
+  interests?: string[];
+  languages?: string[];
   posts: FeedPost[];
   followers: number;
   following: number;
@@ -199,7 +271,20 @@ export async function getChannel(userId: string): Promise<ChannelData> {
   // születésnap — nem szivárognak). Így poszt nélküli csatorna is helyes fejlécet kap.
   const { data: profRows } = await sb.rpc('public_profile', { p_user: userId });
   const prof = (Array.isArray(profRows) ? profRows[0] : profRows) as
-    | { full_name: string | null; username: string | null; avatar_url: string | null; cover_url: string | null }
+    | {
+        full_name: string | null;
+        username: string | null;
+        avatar_url: string | null;
+        cover_url: string | null;
+        bio?: string | null;
+        about_me?: string | null;
+        what_i_make?: string | null;
+        working_on?: string | null;
+        creator_types?: string[] | null;
+        skills?: string[] | null;
+        interests?: string[] | null;
+        languages?: string[] | null;
+      }
     | undefined;
   const emailHandle = me === userId ? (useAuth.getState().user?.email?.split('@')[0] ?? null) : null;
   // az EGYEDI username a profiles-ból (public_profile); csak fallback a poszt/email
@@ -216,6 +301,14 @@ export async function getChannel(userId: string): Promise<ChannelData> {
     userId,
     creator,
     coverUri,
+    bio: prof?.bio ?? undefined,
+    aboutMe: prof?.about_me ?? undefined,
+    whatIMake: prof?.what_i_make ?? undefined,
+    workingOn: prof?.working_on ?? undefined,
+    creatorTypes: prof?.creator_types ?? undefined,
+    skills: prof?.skills ?? undefined,
+    interests: prof?.interests ?? undefined,
+    languages: prof?.languages ?? undefined,
     posts,
     followers: s.followers ?? 0,
     following: s.following ?? 0,
@@ -328,8 +421,15 @@ export async function publishRenderedProject(
     updated = { ...updated, rendered };
     await saveProject(updated);
   }
-  if (!rendered.url) {
-    const url = await uploadMedia(rendered.uri, `${project.id}.mp4`);
+  // ⚠️ A cache-elt `rendered.url` SZÁRMAZHAT egy korábbi (lokális) munkamenetből —
+  // az a JELENLEGI (prod) kliensnek 404. Ezért ha nincs url VAGY loopback/lokális,
+  // a videót ÚJRA feltöltjük a mostani (prod) tárba, projekt-mappába (<id>/video/…).
+  if (!rendered.url || isLoopbackUrl(rendered.url)) {
+    const url = await uploadMedia(rendered.uri, {
+      projectId: project.id,
+      kind: 'video',
+      name: `${project.id}.mp4`,
+    });
     rendered = { ...rendered, url };
     updated = { ...updated, rendered };
     await saveProject(updated);

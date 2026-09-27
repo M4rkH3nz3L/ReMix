@@ -1,6 +1,6 @@
 import { applyCommand } from '@/lib/commands';
-import { projectDuration } from '@/lib/projectUtils';
-import type { Project } from '@/types/project';
+import { projectDuration, projectMediaBytes } from '@/lib/projectUtils';
+import type { Asset, Project } from '@/types/project';
 
 const mkProject = (clipDuration: number): Project =>
   ({
@@ -62,5 +62,38 @@ describe('projectDuration — memoizált hossz', () => {
       clips: [{ id: 'c2', kind: 'video', start: 3, duration: 5 } as never],
     });
     expect(projectDuration(next!)).toBe(8);
+  });
+});
+
+describe('projectMediaBytes', () => {
+  const ast = (over: Partial<Asset>): Asset => ({
+    id: 'a',
+    kind: 'video',
+    uri: 'file:///x.mp4',
+    provider: 'local',
+    ...over,
+  });
+  const withAssets = (assets: Asset[]): Project =>
+    ({ ...mkProject(1), assets } as unknown as Project);
+
+  it('az ismert asset.size-okat összegzi', () => {
+    const p = withAssets([
+      ast({ uri: 'file:///a.mp4', size: 100 }),
+      ast({ uri: 'file:///b.mp4', size: 250 }),
+    ]);
+    expect(projectMediaBytes(p)).toBe(350);
+  });
+
+  it('a size nélküli asseteket 0-nak veszi', () => {
+    const p = withAssets([ast({ uri: 'file:///a.mp4', size: 100 }), ast({ uri: 'file:///b.mp4' })]);
+    expect(projectMediaBytes(p)).toBe(100);
+  });
+
+  it('uri szerint deduplikál (nem számol duplán)', () => {
+    const p = withAssets([
+      ast({ uri: 'file:///a.mp4', size: 100 }),
+      ast({ uri: 'file:///a.mp4', size: 100 }),
+    ]);
+    expect(projectMediaBytes(p)).toBe(100);
   });
 });

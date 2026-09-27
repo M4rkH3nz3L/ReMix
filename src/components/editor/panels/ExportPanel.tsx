@@ -37,6 +37,7 @@ import {
 import type { ExportPlatform, PostTarget, RenderSettings } from '@/lib/render';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
+import type { PostVisibility } from '@/types/social';
 import { useEditorStore } from '@/store/editorStore';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { pullProject, pushProject } from '@/lib/cloudSync';
@@ -215,9 +216,23 @@ export function ExportPanel() {
     ).finally(() => setRenderStatus(null));
   };
 
-  // 📱 Megosztás a FEEDBE: render (ha kell) → publikus feltöltés → poszt a
-  // renderelt videóval. A renderelt változat a projekten marad (újramegosztáshoz).
+  // 📱 Megosztás a FEEDBE: előbb a LÁTHATÓSÁG (ki láthatja) — TikTok-modell:
+  // Nyilvános / Követők / Privát —, majd render (ha kell) → feltöltés → poszt.
   const shareToFeed = () => {
+    if (renderStatus) {
+      return;
+    }
+    Alert.alert(t('feed.visibilityTitle'), t('feed.visibilityPrompt'), [
+      { text: t('feed.visPublic'), onPress: () => doShareToFeed('public') },
+      { text: t('feed.visFollowers'), onPress: () => doShareToFeed('followers') },
+      { text: t('feed.visPrivate'), onPress: () => doShareToFeed('private') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  // a választott láthatósággal renderel + posztol. A renderelt változat a
+  // projekten marad (újramegosztáshoz).
+  const doShareToFeed = (visibility: PostVisibility) => {
     if (renderStatus) {
       return;
     }
@@ -225,11 +240,11 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withProgress(t('feed.rendering'), (report) =>
-          publishRenderedProject(project, report).then((res) => {
+          publishRenderedProject(project, report, { visibility }).then((res) => {
             useEditorStore.getState().setRendered(res.project.rendered);
             Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
               { text: t('common.ok') },
-              { text: t('nav.feed'), onPress: () => router.push('/feed') },
+              { text: t('nav.feed'), onPress: () => router.push('/') },
             ]);
           })
         ),

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ProjectEvent } from '@/lib/commands';
 import { makeId } from '@/lib/id';
-import { migrateProject, projectDuration } from '@/lib/projectUtils';
+import { migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
 import type { Project, ProjectMeta } from '@/types/project';
 
 const INDEX_KEY = 'vided.projects.v1';
@@ -28,6 +28,7 @@ function metaOf(project: Project): ProjectMeta {
   return {
     id: project.id,
     name: project.name,
+    kind: projectKind(project),
     aspectRatio: project.aspectRatio,
     duration: projectDuration(project),
     clipCount: project.tracks.reduce((n, t) => n + t.clips.length, 0),

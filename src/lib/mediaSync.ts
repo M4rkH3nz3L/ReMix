@@ -2,7 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { reachableMediaUrl } from '@/lib/mediaUrl';
-import { uploadMedia } from '@/lib/render';
+import { uploadMediaResult } from '@/lib/render';
 import { findMissingMedia, type RelinkPair } from '@/lib/videdFile';
 import type { Asset, Project } from '@/types/project';
 
@@ -83,8 +83,13 @@ export async function backupProjectMedia(
       continue;
     }
     try {
-      const remoteUrl = await uploadMedia(a.uri, a.name);
-      assets.push({ ...a, remoteUrl });
+      const { url: remoteUrl, size } = await uploadMediaResult(a.uri, {
+        projectId: project.id,
+        kind: 'media',
+        name: a.name,
+      });
+      // a szerver-mért bájt → asset.size (a per-projekt/kvóta elszámoláshoz)
+      assets.push({ ...a, remoteUrl, ...(size > 0 ? { size } : {}) });
       uploaded += 1;
       changed = true;
     } catch {

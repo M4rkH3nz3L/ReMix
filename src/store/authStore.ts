@@ -76,13 +76,25 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
     try {
       const { data } = await supabase.auth.getSession();
-      set({ session: data.session, user: data.session?.user ?? null });
+      let session = data.session;
+      // 🔄 A tárolt session SZÁRMAZHAT egy MÁSIK backendről (pl. DEV→PROD váltás után
+      // a lokális Supabase tokenje) — a prod ELUTASÍTJA, és az írások némán `anon`-ként
+      // futnának (RLS-hiba a megosztásnál). Ezért a szerveren validáljuk: érvénytelen
+      // auth (401/403) → kijelentkezés, hogy tiszta prod-session-nel lehessen belépni.
+      if (session) {
+        const { error } = await supabase.auth.getUser();
+        if (error && (error.status === 401 || error.status === 403)) {
+          await supabase.auth.signOut().catch(() => {});
+          session = null;
+        }
+      }
+      set({ session, user: session?.user ?? null });
       // 💳 Pro-szint szinkronja a bejelentkezett userhez (offline-cache + Supabase)
-      void useEntitlement.getState().syncFromUser(data.session?.user?.id ?? null);
+      void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
       void useRoles.getState().refresh(); // 🛡️ governance-jogok betöltése
       // már bejelentkezett user: aktuális eszköz frissítése (last_seen + adatok)
-      if (data.session?.user) {
-        void registerCurrentDevice(data.session.user.id);
+      if (session?.user) {
+        void registerCurrentDevice(session.user.id);
       }
     } catch {
       // best-effort; session nélkül indulunk (auth-képernyő)

@@ -14,11 +14,11 @@ import { fetchRead, readJson } from '@/lib/netRetry';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { renderCacheKey } from '@/lib/projectHash';
+import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { withFingerprints } from '@/lib/fingerprint';
-import { requireSupabase } from '@/lib/supabase';
-import { makeId } from '@/lib/id';
+import { useAuth } from '@/store/authStore';
 import type { Project, RenderedVersion } from '@/types/project';
 
 /**
@@ -126,6 +126,9 @@ export interface RenderSettings {
   channels?: 1 | 2;
   /** hang bitráta kbps (alap 192) */
   audioBitrateKbps?: number;
+  /** 🎧 HANG-ONLY export: a kész keverékből a worker ezt a formátumot vonja ki
+   *  (WAV/MP3/AAC/FLAC). Hiányzó = normál videó-kimenet. */
+  audioFormat?: 'wav' | 'mp3' | 'aac' | 'flac';
 }
 
 /**
@@ -352,36 +355,66 @@ export async function renderProjectVersion(
   };
 }
 
+/** Média-típus = mappanév a projekten belül a Storage-ban. */
+export type MediaKind = 'video' | 'poster' | 'media' | 'profile';
+
+/** Feltöltési cél: projekt-rendezett Storage-kulcs (`<projectId>/<kind>/<fájl>`). */
+export interface UploadTarget {
+  /** ha projekthez tartozik → a kulcs `<projectId>/<kind>/…` lesz */
+  projectId?: string;
+  /** média-típus (mappanév); alap: `media` */
+  kind?: MediaKind;
+  /** eredeti fájlnév (a kiterjesztéshez) */
+  name?: string;
+}
+
 /**
- * Egy helyi médiafájl (renderelt videó / borító) feltöltése a workeren át a
- * publikus Storage-ba → a publikus URL (a feed / cross-device lejátszáshoz).
+ * Egy helyi médiafájl (renderelt videó / borító / asset) feltöltése → a publikus
+ * URL (feed / cross-device lejátszáshoz). A fájl a projekt mappájába kerül:
+ * `<projectId>/<kind>/<fájl>`.
+ *
+ * MINDEN platform a worker `/media/upload`-ját használja: a SZERVER tölt (dev-ben
+ * a böngészhető `server/media` mappába, prodon service_role Supabase Storage-ba) →
+ * NINCS kliens-oldali Storage-RLS (az dobta a „new row violates row-level security
+ * policy"-t), és a fájl ott van a szerver mappájában. Weben az `uri` (blob:/http)
+ * blobként megy fel (`mediaFormData` intézi).
  */
-export async function uploadMedia(uri: string, name?: string): Promise<string> {
-  // 🌐 WEB: közvetlenül a kliens Supabase Storage-ába (a feed/avatar/borító a prod
-  // storage-ból szolgáljon, ne a worker lokális S3-jából — az prodon 404). Natívon
-  // marad a worker /media/upload út (az eszköz-fájlt tölti fel).
-  if (Platform.OS === 'web') {
-    const blob = await (await fetch(uri)).blob();
-    const ext = (name?.split('.').pop() || blob.type.split('/').pop() || 'bin').split('?')[0];
-    const contentType = blob.type || 'application/octet-stream';
-    return uploadBlobToStorage(blob, `media/${makeId('m')}.${ext}`, contentType);
-  }
+export async function uploadMedia(uri: string, target?: UploadTarget): Promise<string> {
+  return (await uploadMediaResult(uri, target)).url;
+}
+
+/**
+ * Mint a `uploadMedia`, de a publikus URL MELLETT a fájl bájt-méretét is visszaadja
+ * (a szerver a `/media/upload`-nál méri) — a média-szinkron ebből tölti az
+ * `asset.size`-t. Ha a MI tárhely-kvótánk betelne, a szerver 507-et ad → itt
+ * `StorageQuotaError`-t dobunk (a UI a bővítésre/törlésre irányít).
+ */
+export async function uploadMediaResult(
+  uri: string,
+  target?: UploadTarget
+): Promise<{ url: string; size: number }> {
   const base = cloudBaseUrl();
-  const form = await mediaFormData(uri, name);
+  const form = await mediaFormData(uri, target?.name, {
+    ...(target?.projectId ? { projectId: target.projectId } : {}),
+    kind: target?.kind ?? 'media',
+  });
   const res = await uploadFetch(`${base}/media/upload`, {
     method: 'POST',
     body: form,
     headers: await workerAuthHeaders(),
   });
+  if (res.status === 507) {
+    throw new StorageQuotaError();
+  }
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || tr('lib.render.uploadFailed'));
   }
-  const data = await readJson<{ url?: string }>(res, tr('lib.render.uploadFailed'));
+  const data = await readJson<{ url?: string; size?: number }>(res, tr('lib.render.uploadFailed'));
   if (!data.url) {
     throw new Error(tr('lib.render.uploadFailed'));
   }
-  return data.url;
+  return { url: data.url, size: Number(data.size ?? 0) };
 }
 
 /**
@@ -435,6 +468,12 @@ async function submitAndPollRender(
   form.append('uriMap', JSON.stringify(uriMap));
   if (settings) {
     form.append('settings', JSON.stringify(settings));
+  }
+  // 👤 A hívó azonosítója a felhő-sorhoz (schedules) + a kész értesítéshez. Prod-
+  // ban a worker a VERIFIKÁLT tokenből veszi; ez a dev (INSECURE_DEV) fallbackje.
+  const uid = useAuth.getState().user?.id;
+  if (uid) {
+    form.append('userId', uid);
   }
 
   const submit = await uploadFetch(`${base}/render`, {
@@ -513,6 +552,26 @@ async function renderCloud(
  * workeren mehet, a jogosultságot maga a szerver dönti el (a dev-worker ezt
  * `ALLOW_INSECURE_DEV`-vel átengedi). `cloudBaseUrl()` a worker címe.
  */
+/**
+ * 🎧 Hang-only export: a projektet a felhő-workerrel rendereli, majd a kész
+ * keverékből a kért formátumot (WAV/MP3/AAC/FLAC) vonja ki → letölthető URL.
+ * Pro (felhő-render). A master (loudnorm/alimiter) a hangban van; a videó-kép
+ * eldobódik. A `resolution`/`fps` a típus miatt kell, de az export hangra megy.
+ */
+export async function exportAudioFile(
+  project: Project,
+  format: NonNullable<RenderSettings['audioFormat']>,
+  onProgress?: (update: ProgressUpdate) => void,
+  signal?: AbortSignal
+): Promise<string> {
+  return renderCloudFileUrl(
+    project,
+    onProgress,
+    { resolution: 480, fps: project.fps ?? 30, quality: 'high', audioFormat: format },
+    signal
+  );
+}
+
 export async function renderCloudFileUrl(
   project: Project,
   onProgress?: (update: ProgressUpdate) => void,
@@ -525,26 +584,11 @@ export async function renderCloudFileUrl(
 }
 
 /**
- * 🌐 WEB: egy blob feltöltése KÖZVETLENÜL a kliens Supabase Storage-ába (`renders`
- * bucket, public). MIÉRT: eddig a worker a SAJÁT (lokális dev) S3-jába töltött, és a
- * prod-kliens azt a prod storage-ra írta át → ott nincs a fájl (404). Így a fájl
- * ugyanabba a Supabase-be kerül, amit a kliens/feed olvas (prodon = prod). A publikus
- * URL loopback-mentes (prod) vagy loopback (lokál) — a `reachableMediaUrl` kezeli.
- */
-async function uploadBlobToStorage(blob: Blob, path: string, contentType: string): Promise<string> {
-  const sb = requireSupabase();
-  const { error } = await sb.storage.from('renders').upload(path, blob, {
-    contentType,
-    upsert: true,
-  });
-  if (error) {
-    throw new Error(error.message);
-  }
-  return sb.storage.from('renders').getPublicUrl(path).data.publicUrl;
-}
-
-/**
- * 🌐 WEB: szerver-render → a kész MP4 feltöltése a kliens Supabase Storage-ába (feedhez).
+ * 🌐 WEB: szerver-render → a kész MP4 a SZERVER média-tárába (a böngészhető
+ * `server/media` mappa dev-ben, prodon service_role Supabase Storage). A worker a
+ * renderelt fájlt a `/render/:id/file`-en adja; ezt töltjük fel `/media/upload`-ra
+ * (`uploadMedia`) → a feed a szerver által adott, ELÉRHETŐ URL-t játssza. NINCS
+ * kliens-oldali Storage-írás → nincs RLS-hiba.
  */
 export async function renderAndUploadWeb(
   project: Project,
@@ -552,8 +596,11 @@ export async function renderAndUploadWeb(
   settings?: RenderSettings
 ): Promise<RenderedVersion> {
   const fileUrl = await renderCloudFileUrl(project, onProgress, settings);
-  const blob = await (await fetch(fileUrl)).blob();
-  const url = await uploadBlobToStorage(blob, `feed/${makeId('v')}.mp4`, 'video/mp4');
+  const url = await uploadMedia(fileUrl, {
+    projectId: project.id,
+    kind: 'video',
+    name: `${project.id}.mp4`,
+  });
   return {
     uri: url,
     url,

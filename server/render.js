@@ -12,7 +12,7 @@ const path = require('path');
 const { bgRemoveDir } = require('./bgremove');
 const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
-const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter } = require('./voicechain');
+const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, masterLra } = require('./voicechain');
 
 const FPS = 30;
 
@@ -172,6 +172,68 @@ function audioEncoderArgs(settings) {
     args.push('-ac', String(settings.channels));
   }
   return args;
+}
+
+// 🎧 HANG-ONLY export: a kész (kevert + masterelt) videóból kivont hang formátumai.
+// A kivonás egy KÜLÖN, egyszerű ffmpeg-menet (`-vn`) → a videó-filtergraph
+// érintetlen (biztonságos). Kulcs = `settings.audioFormat`.
+const AUDIO_FORMATS = {
+  wav: { ext: 'wav', codec: ['-c:a', 'pcm_s16le'] },
+  mp3: { ext: 'mp3', codec: ['-c:a', 'libmp3lame', '-q:a', '2'] },
+  aac: { ext: 'm4a', codec: ['-c:a', 'aac', '-b:a', '256k'] },
+  flac: { ext: 'flac', codec: ['-c:a', 'flac'] },
+};
+
+// 🎚️ MASTER 1. menet: a master-gráf (EQ+multiband) + loudnorm MÉRÉS (JSON a
+// stderr-en) → a mért Integrated/TP/LRA/thresh/offset.
+function measureLoudnorm(inFile, graphStr, I, TP, LRA) {
+  return new Promise((resolve, reject) => {
+    const fc = `${graphStr};[mst]loudnorm=I=${I}:TP=${TP}:LRA=${LRA}:print_format=json[a]`;
+    execFile(
+      'ffmpeg',
+      ['-hide_banner', '-nostats', '-i', inFile, '-filter_complex', fc, '-map', '[a]', '-f', 'null', '-'],
+      { timeout: 10 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 },
+      (_e, _o, stderr) => {
+        const m = /\{[\s\S]*?"input_i"[\s\S]*?\}/.exec(stderr || '');
+        if (!m) {
+          reject(new Error('loudnorm mérés sikertelen'));
+          return;
+        }
+        try {
+          resolve(JSON.parse(m[0]));
+        } catch {
+          reject(new Error('a mérés-JSON olvashatatlan'));
+        }
+      }
+    );
+  });
+}
+
+// 🎚️ MASTER 2. menet: EQ+multiband + loudnorm a MÉRT értékekkel (linear=true →
+// PONTOS cél-LUFS + true-peak plafon). A videó változatlan (-c:v copy).
+//
+// ⚠️ NINCS külön alimiter a loudnorm UTÁN: a live-teszt kimutatta, hogy a záró
+// limiter +1 LU-t adott (a csúcs-limitálás megemeli az integrált hangosságot). A
+// `loudnorm` maga true-peak-limitál a `TP`-re (linear mód clip esetén dinamikusra
+// vált), így a záró limiter redundáns volt ÉS rontotta a LUFS-pontosságot.
+// Mérés (48 kHz sztereó pink, cél −14): kimenet −14.00 LUFS · −2.25 dBTP.
+async function applyMaster(inFile, master, workDir, total, onProgress) {
+  const I = master.lufs;
+  const TP = master.truePeak;
+  const LRA = masterLra(master.dynamics);
+  const graphStr = masterGraph(master, 'mst');
+  const m = await measureLoudnorm(inFile, graphStr, I, TP, LRA);
+  const fc =
+    `${graphStr};[mst]loudnorm=I=${I}:TP=${TP}:LRA=${LRA}` +
+    `:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}` +
+    `:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true[a]`;
+  const out = path.join(workDir, `mastered${path.extname(inFile)}`);
+  await runFfmpegWithProgress(
+    ['-y', '-i', inFile, '-filter_complex', fc, '-map', '[a]', '-map', '0:v', '-c:v', 'copy', out],
+    total,
+    onProgress
+  );
+  return out;
 }
 
 /** filterId → drawbox szín/átlátszóság (az app előnézetének megfelelően) */
@@ -2319,6 +2381,13 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     speechLabels.push(label);
   }
 
+  // 🎚️ klip → sáv-típus térkép a sávonkénti mixer-gainhez (fader)
+  const clipTrackType = {};
+  for (const tr of project.tracks) {
+    for (const c of tr.clips) {
+      clipTrackType[c.id] = tr.type;
+    }
+  }
   for (const clip of audioClips) {
     if (!hasAnyVolume(clip)) {
       continue;
@@ -2329,14 +2398,20 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     const idx = addInput(['-i', clip.uri], `a|${clip.uri}`);
     const delayMs = Math.round(clip.start * 1000);
     const label = `aa${audioIdx++}`;
+    // 🎚️ a forráson belüli kezdet (trimIn) → atrim=start; a szegmens ennyitől
+    // szól `duration` hosszan (a fade-ek az asetpts után 0-tól számolnak)
+    const aTrimIn = clip.trimIn || 0;
+    // sávonkénti mixer-gain (fader) — a klip sávjának gainje (hiányzó = 1)
+    const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
     let chain =
-      `[${idx}:a]atrim=0:${clip.duration.toFixed(3)},asetpts=PTS-STARTPTS,` +
+      `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration).toFixed(3)},asetpts=PTS-STARTPTS,` +
       (clip.deReverb ? DEREVERB : '') +
       (clip.voiceEnhance ? VOICE_ENHANCE : '') +
       // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
       audioFxChain(clip.audioFx) +
       panFilter(clip.pan) +
-      volumeExpr(clip, 0);
+      volumeExpr(clip, 0) +
+      (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
     if (clip.fadeIn > 0) {
       chain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`;
     }
@@ -2420,7 +2495,27 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     outFile,
   ];
   await runFfmpegWithProgress(args, total, onProgress);
-  return outFile;
+
+  // 🎚️ MASTER (kétmenetes): EQ + multiband + loudnorm(mért, linear) + alimiter a
+  // kész keverékre. Hiba esetén a mester NÉLKÜLI kimenet marad (nem bukik a render).
+  let masteredFile = outFile;
+  if (project.audioMaster) {
+    masteredFile = await applyMaster(outFile, project.audioMaster, workDir, total, onProgress).catch(
+      (e) => {
+        console.error('Master hiba — a mester nélküli kimenet marad:', e.message);
+        return outFile;
+      }
+    );
+  }
+
+  // 🎧 hang-only export (WAV/MP3/AAC/FLAC): a (masterelt) MP4-ből KIVONÁS.
+  const fmt = AUDIO_FORMATS[settings.audioFormat];
+  if (fmt) {
+    const audioFile = path.join(workDir, `out.${fmt.ext}`);
+    await runFfmpegWithProgress(['-y', '-i', masteredFile, '-vn', ...fmt.codec, audioFile], total, onProgress);
+    return audioFile;
+  }
+  return masteredFile;
 }
 
 // az adjustChain a kép-dokumentum rasterizálójának is kell — ugyanaz a

@@ -1,0 +1,1101 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { type Href, router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Chip, PrimaryButton } from '@/components/ui/controls';
+import { aspectRatios, palette } from '@/constants/editor';
+import { gridColumns } from '@/constants/layout';
+import {
+  createProjectFromTemplate,
+  templateDescriptionKey,
+  templateNameKey,
+  templates,
+} from '@/constants/templates';
+import type { VideoTemplate } from '@/constants/templates';
+import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { useLayout } from '@/hooks/useLayout';
+import { listSharedWithMe, type SharedProject } from '@/lib/collab';
+import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
+import { makeId } from '@/lib/id';
+import {
+  createEmptyProject,
+  parseHashtags,
+  parseKeywords,
+  studioRoute,
+} from '@/lib/projectUtils';
+import { guardPro } from '@/store/paywallStore';
+import { withProgress } from '@/store/progressStore';
+import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
+import { formatBytes as formatStorageBytes, projectStorageMap } from '@/lib/storageQuota';
+import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
+import { isMyAccountDeleted, reactivateAccount } from '@/lib/account';
+import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
+import { formatTime } from '@/lib/time';
+import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
+import type { AspectRatio, Project, ProjectKind, ProjectMeta } from '@/types/project';
+
+/** 🎛️ A három stúdió = a projekt-fajták (az „Új projekt” választója ebből épül). */
+const STUDIO_KINDS: { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'video', icon: 'film-outline' },
+  { id: 'image', icon: 'image-outline' },
+  { id: 'audio', icon: 'musical-notes-outline' },
+];
+
+/** a projekt-fajta ikonja a lista-kártyákhoz (a videó a bélyegkép alá esik vissza) */
+const KIND_ICON: Record<ProjectKind, keyof typeof Ionicons.glyphMap> = {
+  video: 'videocam',
+  image: 'image',
+  audio: 'musical-notes',
+};
+
+/** projekt-bélyegkép a lista-sorokhoz (videónál az első klip kockája, cache-elve;
+ *  kép/hang projektnél a fajta-ikon — nincs videó-bélyegkép, amit kirakni) */
+const thumbCache = new Map<string, string | null>();
+function ProjectThumb({ id, kind }: { id: string; kind: ProjectKind }) {
+  const [uri, setUri] = useState<string | null>(thumbCache.get(id) ?? null);
+  useEffect(() => {
+    // csak videó-projektnél van értelme filmstrip-kockát keresni
+    if (kind !== 'video' || thumbCache.has(id)) {
+      return;
+    }
+    let alive = true;
+    loadProject(id)
+      .then(async (p) => {
+        const clip = p?.tracks
+          .find((t) => t.type === 'video')
+          ?.clips.find((c) => c.kind === 'video');
+        if (!clip || clip.kind !== 'video') {
+          return null;
+        }
+        const [thumb] = await getFilmstrip(clip.uri, [snapThumbTime(clip.trimIn + 0.5)]);
+        return thumb;
+      })
+      .then((thumb) => {
+        thumbCache.set(id, thumb ?? null);
+        if (alive) {
+          setUri(thumb ?? null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id, kind]);
+  if (kind === 'video' && uri) {
+    return <Image source={{ uri }} style={styles.cardThumb} contentFit="cover" />;
+  }
+  return (
+    <View style={styles.cardIcon}>
+      <Ionicons name={KIND_ICON[kind]} size={20} color={palette.accent} />
+    </View>
+  );
+}
+
+export default function ProjectsScreen() {
+  const [projects, setProjects] = useState<ProjectMeta[]>([]);
+  const [storageMap, setStorageMap] = useState<Record<string, number>>({});
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  // 🔎 SEO-meta — a projekt létrehozásakor kötelező (a cím = a projekt neve fent)
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoHashtags, setSeoHashtags] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState('');
+  const [aspect, setAspect] = useState<AspectRatio>('9:16');
+  // 🎛️ melyik stúdió: videó (idővonal), kép (réteg-fa) vagy hang (audio)
+  const [kind, setKind] = useState<ProjectKind>('video');
+  const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [shared, setShared] = useState<SharedProject[]>([]);
+  const { t } = useTranslation();
+  const L = useLayout();
+  // a lista-referencia a fülsáv „ugrás" műveleteihez (tetejére / sablonokhoz)
+  const listRef = useRef<FlatList<ProjectMeta>>(null);
+  // a kártya kívánt szélességéből számolt rács — iPaden 3–4 oszlop is lehet,
+  // a korábbi fix „640px → 2 oszlop" helyett (lásd @/constants/layout)
+  const columns = gridColumns(L.width, 340, 4);
+
+  const refresh = useCallback(() => {
+    // ⚡ fókuszkor csak a HELYI lista (olcsó); a felhő-visszatöltés egyszer, mountkor fut
+    listProjects().then(setProjects).catch(() => {});
+    // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
+    listSharedWithMe().then(setShared).catch(() => {});
+    // 🗄️ per-projekt MI-tárhely-használat (a MI tárolónkon foglalt pontos bájt)
+    projectStorageMap().then(setStorageMap).catch(() => {});
+  }, []);
+
+  useFocusEffect(refresh);
+
+  // 🗄️ EGYSZERI felhő-visszatöltés belépéskor (NEM minden fókuszkor — perf): a
+  // helyileg HIÁNYZÓ projekteket hozza vissza (újratelepítés/eszközváltás után).
+  useEffect(() => {
+    syncProjectsFromCloud()
+      .then((n) => {
+        if (n > 0) {
+          refresh();
+        }
+      })
+      .catch(() => {});
+  }, [refresh]);
+
+  // 🗑️ deaktivált fiók → helyreállítás-prompt belépés után (a tartalom addig rejtve)
+  useEffect(() => {
+    isMyAccountDeleted()
+      .then((d) => {
+        if (!d) {
+          return;
+        }
+        Alert.alert(t('gdpr.deactivatedTitle'), t('gdpr.deactivatedBody'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('gdpr.reactivate'),
+            onPress: () => reactivateAccount().then(refresh).catch(() => {}),
+          },
+        ]);
+      })
+      .catch(() => {});
+  }, [refresh, t]);
+
+  const resetCreateForm = () => {
+    setName('');
+    setSeoDescription('');
+    setSeoHashtags('');
+    setSeoKeywords('');
+    setKind('video');
+  };
+
+  // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve
+  const seoReady =
+    name.trim().length > 0 &&
+    seoDescription.trim().length > 0 &&
+    parseHashtags(seoHashtags).length > 0 &&
+    parseKeywords(seoKeywords).length > 0;
+
+  const create = async () => {
+    const title = name.trim();
+    const description = seoDescription.trim();
+    const hashtags = parseHashtags(seoHashtags);
+    const keywords = parseKeywords(seoKeywords);
+    // védőkorlát: a gomb tiltva van, míg mind ki nincs töltve
+    if (!title || !description || hashtags.length === 0 || keywords.length === 0) {
+      return;
+    }
+    // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
+    const project = createEmptyProject(
+      title,
+      aspect,
+      { title, description, hashtags, keywords },
+      kind
+    );
+    await saveProject(project);
+    backupProjectToCloud(project); // 🗄️ azonnal a userhez a felhőbe is (best-effort)
+    setCreating(false);
+    resetCreateForm();
+    // 🎛️ a fajtának megfelelő stúdióba nyitunk (videó → editor, kép/hang → saját)
+    router.push(studioRoute(kind, project.id) as Href);
+  };
+
+  const createFromTemplate = (template: VideoTemplate) => {
+    const project = createProjectFromTemplate(template);
+    saveProject(project)
+      .then(() => {
+        backupProjectToCloud(project); // 🗄️ felhő-backup (best-effort)
+        router.push(`/editor/${project.id}`);
+      })
+      .catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
+  };
+
+  const confirmDelete = (meta: ProjectMeta) => {
+    Alert.alert(t('home.deleteTitle'), t('home.deleteMessage', { name: meta.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          // „nincs projekt → nincs videó": helyi törlés + a projekthez tartozó
+          // feed-posztok törlése + a felhő-projekt törlése (a DB-trigger defenzíven
+          // szintén törli a posztokat, pl. még-nem-mentett felhő esetén is fedve).
+          deleteProject(meta.id)
+            .then(() => Promise.all([deletePostsForProject(meta.id), deleteCloudProject(meta.id)]))
+            .then(refresh)
+            .catch(() => {});
+        },
+      },
+    ]);
+  };
+
+  const duplicate = (meta: ProjectMeta) => {
+    loadProject(meta.id)
+      .then((p) => {
+        if (!p) {
+          return;
+        }
+        return saveProject({
+          ...p,
+          id: makeId('prj'),
+          name: `${p.name}${t('home.copySuffix')}`,
+          createdAt: new Date().toISOString(),
+          // 🔀 remix-lineage: az új projekt az eredetiből készült
+          remixOf: { projectId: p.id, name: p.name },
+        });
+      })
+      .then(refresh)
+      .catch(() => Alert.alert(t('common.error'), t('home.duplicateFailed')));
+  };
+
+  const startRename = (meta: ProjectMeta) => {
+    setRenaming(meta);
+    setRenameValue(meta.name);
+  };
+
+  const saveRename = () => {
+    const meta = renaming;
+    const nextName = renameValue.trim();
+    setRenaming(null);
+    if (!meta || !nextName || nextName === meta.name) {
+      return;
+    }
+    loadProject(meta.id)
+      .then((p) => (p ? saveProject({ ...p, name: nextName }) : undefined))
+      .then(refresh)
+      .catch(() => Alert.alert(t('common.error'), t('home.renameFailed')));
+  };
+
+  const shareToFeed = (meta: ProjectMeta) => {
+    loadProject(meta.id)
+      .then((p) => {
+        if (!p) {
+          return;
+        }
+        // render (ha kell) → feltöltés → posztolás; Pro-kapu a felhő-renderre
+        return guardPro(
+          () =>
+            withProgress(t('feed.rendering'), (report) => publishRenderedProject(p, report)).then(
+              (res) => {
+                if (res) {
+                  refresh();
+                  Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
+                    { text: t('common.ok') },
+                    { text: t('nav.feed'), onPress: () => router.push('/') },
+                  ]);
+                }
+              }
+            ),
+          (e) => Alert.alert(t('common.error'), e.message)
+        );
+      })
+      .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+  };
+
+  const projectMenu = (meta: ProjectMeta) => {
+    Alert.alert(meta.name, undefined, [
+      { text: t('feed.shareToFeed'), onPress: () => shareToFeed(meta) },
+      { text: t('common.rename'), onPress: () => startRename(meta) },
+      { text: t('common.duplicate'), onPress: () => duplicate(meta) },
+      { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },
+      { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(meta) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const importVided = () => {
+    pickAndParseVided()
+      .then((result) => {
+        if (!result) {
+          return;
+        }
+        const finish = (p: Project) => {
+          saveProject(p)
+            .then(() => {
+              refresh();
+              router.push(studioRoute(p.kind, p.id) as Href);
+            })
+            .catch(() => Alert.alert(t('common.import'), t('home.saveFailed')));
+        };
+        if (result.missing.length === 0) {
+          if (result.relinked > 0) {
+            Alert.alert(
+              t('home.importDoneTitle'),
+              t('home.importRelinked', { count: result.relinked })
+            );
+          }
+          finish(result.project);
+          return;
+        }
+        Alert.alert(
+          t('home.missingMediaTitle'),
+          t('home.missingMediaCount', { count: result.missing.length }) +
+            (result.relinked > 0
+              ? ' ' + t('home.missingMediaRelinkedNote', { count: result.relinked })
+              : '') +
+            '. ' +
+            t('home.missingMediaAsk'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.later'), onPress: () => finish(result.project) },
+            {
+              text: t('home.relink'),
+              onPress: () => {
+                relinkInteractive(result.project, result.missing).then(finish);
+              },
+            },
+          ]
+        );
+      })
+      .catch((err: Error) => Alert.alert(t('common.import'), err.message));
+  };
+
+  // 🤖 „AI eszközök": az AI a szerkesztőben él → a legutóbbi projektet nyitjuk
+  // meg egyből az AI-panellel; ha még nincs projekt, előbb létrehozunk egyet
+  const openAiTools = () => {
+    // az AI-panel a videó-editorban él → a legutóbbi VIDEÓ-projektet nyitjuk;
+    // ha csak kép/hang van (vagy semmi), az új-projekt lapot kínáljuk
+    const recent = projects.find((p) => (p.kind ?? 'video') === 'video');
+    if (recent) {
+      router.push(`/editor/${recent.id}?panel=assistant`);
+    } else {
+      setCreating(true);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <View style={styles.logoBadge}>
+          <Ionicons name="shuffle" size={20} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>{t('home.appName')}</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push('/profile')}
+          hitSlop={8}
+          style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('auth.account')}
+        >
+          <Ionicons name="person-circle-outline" size={20} color={palette.textDim} />
+          <Text style={styles.importLabel}>{t('auth.account')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/shop')}
+          hitSlop={8}
+          style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('shop.title')}
+        >
+          <Ionicons name="storefront-outline" size={20} color={palette.accent} />
+          <Text style={[styles.importLabel, { color: palette.accent }]}>{t('shop.title')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/schedules')}
+          hitSlop={8}
+          style={styles.importButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('schedules.title')}
+        >
+          <Ionicons name="layers-outline" size={20} color={palette.textDim} />
+          <Text style={styles.importLabel}>{t('nav.schedules')}</Text>
+        </Pressable>
+        <Pressable onPress={importVided} hitSlop={8} style={styles.importButton}>
+          <Ionicons name="download-outline" size={20} color={palette.textDim} />
+          <Text style={styles.importLabel}>{t('common.import')}</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.ctaWrap}>
+        <PrimaryButton icon="add" label={t('home.newProject')} onPress={() => setCreating(true)} />
+      </View>
+
+      <FlatList
+        ref={listRef}
+        data={projects}
+        key={columns}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? styles.listColumns : undefined}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={[styles.list, { padding: L.spacing.lg, paddingBottom: BOTTOM_NAV_HEIGHT + 32 }]}
+        ListHeaderComponent={
+          <>
+            {shared.length > 0 ? (
+              <View style={styles.sharedBlock}>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionLabel}>{t('collab.sharedWithMe')}</Text>
+                  <Text style={styles.sectionHint}>
+                    {t('home.projectCount', { count: shared.length })}
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.templatesRow}
+                >
+                  {shared.map((s) => (
+                    <Pressable
+                      key={`${s.ownerId}:${s.projectId}`}
+                      style={styles.sharedCard}
+                      onPress={() => router.push(`/collab/${s.projectId}?owner=${s.ownerId}`)}
+                    >
+                      <Ionicons name="people" size={18} color={palette.accent} />
+                      <Text style={styles.sharedName} numberOfLines={2}>
+                        {s.projectName ?? s.projectId}
+                      </Text>
+                      <Text style={styles.sharedRole}>{t(`collab.role.${s.role}`)}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+            {projects.length > 0 ? (
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionLabel}>{t('home.recentProjects')}</Text>
+                <Text style={styles.sectionHint}>
+                  {t('home.projectCount', { count: projects.length })}
+                </Text>
+              </View>
+            ) : null}
+          </>
+        }
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="film-outline" size={44} color={palette.border} />
+            <Text style={styles.emptyText}>
+              {t('home.emptyTitle')}
+              {'\n'}
+              {t('home.emptyHint')}
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.templatesBlock}>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionLabel}>{t('home.templates')}</Text>
+              <Text style={styles.sectionHint}>{t('common.all')}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.templatesRow}
+            >
+              {/* a felkapottak előre — később backend trend-adat rendezi */}
+              {[...templates]
+                .sort((a, b) => Number(b.trending ?? false) - Number(a.trending ?? false))
+                .map((template) => (
+                  <Pressable
+                    key={template.id}
+                    style={[styles.templateCard, { width: L.isCompact ? 132 : 168 }]}
+                    onPress={() => createFromTemplate(template)}
+                  >
+                    {template.trending ? (
+                      <View style={styles.trendBadge}>
+                        <Text style={styles.trendBadgeText}>{t('home.trend')}</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.templateEmoji}>{template.emoji}</Text>
+                    <Text style={styles.templateName} numberOfLines={1}>
+                      {t(templateNameKey(template.id))}
+                    </Text>
+                    <Text style={styles.templateDesc} numberOfLines={2}>
+                      {t(templateDescriptionKey(template.id))}
+                    </Text>
+                    <Text style={styles.templateMeta}>{template.aspectRatio}</Text>
+                  </Pressable>
+                ))}
+            </ScrollView>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const itemKind = item.kind ?? 'video';
+          return (
+            <Pressable
+              style={[styles.card, columns > 1 && styles.cardHalf]}
+              onPress={() => router.push(studioRoute(item.kind, item.id) as Href)}
+              onLongPress={() => projectMenu(item)}
+            >
+              <ProjectThumb id={item.id} kind={itemKind} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.cardMeta}>
+                  {t(`studio.kind.${itemKind}`)}
+                  {itemKind !== 'audio' ? ` · ${item.aspectRatio}` : ''}
+                  {itemKind !== 'image' ? ` · ${formatTime(item.duration)}` : ''}
+                  {itemKind === 'video'
+                    ? ` · ${t('home.clipCount', { count: item.clipCount })}`
+                    : ''}
+                  {storageMap[item.id] ? ` · ☁️ ${formatStorageBytes(storageMap[item.id])}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
+            </Pressable>
+          );
+        }}
+      />
+
+      <View style={styles.tabBar}>
+        {(
+          [
+            {
+              icon: 'albums',
+              label: t('home.tabProjects'),
+              active: true,
+              // aktív fül újra-koppintása → a lista tetejére (iOS-minta)
+              onPress: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+            },
+            {
+              icon: 'grid-outline',
+              label: t('home.tabTemplates'),
+              // a sablonok a lista alján (karusszel) → odagörgetünk, nem create-modal
+              onPress: () => listRef.current?.scrollToEnd({ animated: true }),
+            },
+            {
+              icon: 'sparkles-outline',
+              label: t('home.tabAiTools'),
+              onPress: openAiTools,
+            },
+          ] as const
+        ).map((tab) => (
+          <Pressable key={tab.label} style={styles.tabItem} onPress={tab.onPress}>
+            <Ionicons
+              name={tab.icon}
+              size={20}
+              color={'active' in tab && tab.active ? palette.accent : palette.textDim}
+            />
+            <Text
+              style={[
+                styles.tabLabel,
+                'active' in tab && tab.active ? styles.tabLabelActive : null,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Modal visible={creating} transparent animationType="slide">
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalGrabber} />
+            <Text style={styles.modalTitle}>{t('home.newProject')}</Text>
+            <ScrollView
+              style={{ maxHeight: Math.round(L.height * 0.5) }}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* 🎛️ a három stúdió: videó / kép / hang — ez határozza meg, melyik
+                  szerkesztő nyílik meg (ez a 3 együtt maga a Studio) */}
+              <Text style={styles.fieldLabel}>{t('studio.chooseKind')}</Text>
+              <View style={styles.kindRow}>
+                {STUDIO_KINDS.map((k) => {
+                  const active = kind === k.id;
+                  return (
+                    <Pressable
+                      key={k.id}
+                      style={[styles.kindTile, active && styles.kindTileActive]}
+                      onPress={() => setKind(k.id)}
+                    >
+                      <Ionicons
+                        name={k.icon}
+                        size={24}
+                        color={active ? palette.accent : palette.textDim}
+                      />
+                      <Text style={[styles.kindTileLabel, active && styles.kindTileLabelActive]}>
+                        {t(`studio.kind.${k.id}`)}
+                      </Text>
+                      <Text style={styles.kindTileDesc} numberOfLines={2}>
+                        {t(`studio.kindDesc.${k.id}`)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.fieldLabel}>{t('home.titleLabel')}</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t('home.projectNamePlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+                autoFocus
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.seoSectionTitle')}</Text>
+              <Text style={styles.seoHint}>{t('home.seoSectionHint')}</Text>
+
+              <Text style={styles.fieldLabel}>{t('home.descriptionLabel')}</Text>
+              <TextInput
+                value={seoDescription}
+                onChangeText={setSeoDescription}
+                placeholder={t('home.descriptionPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={[styles.input, styles.inputMultiline]}
+                multiline
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.hashtagsLabel')}</Text>
+              <TextInput
+                value={seoHashtags}
+                onChangeText={setSeoHashtags}
+                placeholder={t('home.hashtagsPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.fieldLabel}>{t('home.keywordsLabel')}</Text>
+              <TextInput
+                value={seoKeywords}
+                onChangeText={setSeoKeywords}
+                placeholder={t('home.keywordsPlaceholder')}
+                placeholderTextColor={palette.textDim}
+                style={styles.input}
+              />
+
+              {/* a hang-projektnek nincs képaránya — a választót elrejtjük */}
+              {kind !== 'audio' ? (
+                <>
+                  <Text style={styles.fieldLabel}>{t('home.aspectLabel')}</Text>
+                  <View style={styles.aspectRow}>
+                    {aspectRatios.map((option) => (
+                      <Chip
+                        key={option.id}
+                        label={t(option.label)}
+                        active={aspect === option.id}
+                        onPress={() => setAspect(option.id)}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </ScrollView>
+            <PrimaryButton
+              icon="checkmark"
+              label={t('common.create')}
+              disabled={!seoReady}
+              onPress={() => {
+                create().catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                setCreating(false);
+                resetCreateForm();
+              }}
+              style={styles.cancel}
+            >
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={renaming !== null} transparent animationType="slide">
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalGrabber} />
+            <Text style={styles.modalTitle}>{t('home.renameTitle')}</Text>
+            <TextInput
+              value={renameValue}
+              onChangeText={setRenameValue}
+              placeholder={t('home.projectNamePlaceholder')}
+              placeholderTextColor={palette.textDim}
+              style={styles.input}
+              autoFocus
+            />
+            <PrimaryButton icon="checkmark" label={t('common.save')} onPress={saveRename} />
+            <Pressable onPress={() => setRenaming(null)} style={styles.cancel}>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <BottomNav active="studio" />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: palette.bg,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  importButton: {
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: palette.surface,
+  },
+  importLabel: {
+    color: palette.textDim,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  feedButton: {
+    alignItems: 'center',
+    gap: 2,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: palette.accent,
+    shadowColor: palette.accent,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  feedLabel: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  title: {
+    color: palette.text,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  logoBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: palette.accent,
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  ctaWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionHint: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardThumb: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    backgroundColor: palette.surfaceHigh,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    backgroundColor: palette.surface,
+    paddingTop: 8,
+    paddingBottom: 4,
+    paddingHorizontal: 8,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  tabLabel: {
+    color: palette.textDim,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  tabLabelActive: {
+    color: palette.accent,
+  },
+  subtitle: {
+    color: palette.textDim,
+    fontSize: 13,
+    marginTop: 2,
+    letterSpacing: 0.2,
+  },
+  templatesBlock: {
+    paddingTop: 10,
+  },
+  sharedBlock: {
+    paddingBottom: 6,
+    marginBottom: 6,
+  },
+  sharedCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 12,
+    gap: 6,
+    width: 150,
+  },
+  sharedName: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  sharedRole: {
+    color: palette.accent,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionLabel: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  templatesRow: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  templateCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 14,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  templateEmoji: {
+    fontSize: 22,
+  },
+  templateName: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  templateDesc: {
+    color: palette.textDim,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  templateMeta: {
+    color: palette.accent,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  trendBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ff5c7226',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  trendBadgeText: {
+    color: palette.danger,
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  list: {
+    gap: 10,
+    flexGrow: 1,
+  },
+  listColumns: {
+    gap: 10,
+  },
+  cardHalf: {
+    flex: 1,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    color: palette.textDim,
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  cardIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: palette.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardName: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cardMeta: {
+    color: palette.textDim,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  footer: {
+    padding: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: '#000000aa',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: palette.border,
+    padding: 20,
+    paddingBottom: 34,
+    gap: 14,
+  },
+  modalGrabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.border,
+    marginBottom: 2,
+  },
+  modalTitle: {
+    color: palette.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  input: {
+    backgroundColor: palette.surfaceHigh,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    color: palette.text,
+    padding: 12,
+    fontSize: 15,
+  },
+  inputMultiline: {
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  modalScrollContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  fieldLabel: {
+    color: palette.textDim,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  seoHint: {
+    color: palette.textDim,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: -4,
+  },
+  aspectRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  kindRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  kindTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    backgroundColor: palette.surfaceHigh,
+  },
+  kindTileActive: {
+    borderColor: palette.accent,
+    backgroundColor: palette.accentSoft,
+  },
+  kindTileLabel: {
+    color: palette.textDim,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  kindTileLabelActive: {
+    color: palette.text,
+  },
+  kindTileDesc: {
+    color: palette.textDim,
+    fontSize: 10,
+    lineHeight: 13,
+    textAlign: 'center',
+  },
+  cancel: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  cancelText: {
+    color: palette.textDim,
+    fontSize: 13,
+  },
+});

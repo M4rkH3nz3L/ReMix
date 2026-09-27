@@ -24,6 +24,15 @@ function supabaseOrigin(): string | null {
 const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0)(:\d+)?/i;
 
 /**
+ * Igaz, ha az URL loopback-originre (127.0.0.1/localhost/0.0.0.0) mutat — vagyis
+ * egy KORÁBBI (lokális) munkamenetből származik, és a jelenlegi (prod) kliensnek
+ * NEM elérhető. A publikálás ilyenkor újratölti a videót a mostani tárba.
+ */
+export function isLoopbackUrl(url: string | null | undefined): boolean {
+  return !!url && LOOPBACK.test(url);
+}
+
+/**
  * A média-URL loopback-originjét a kliens elérhető Supabase-originjére írja.
  * `null`/üres → változatlanul visszaadja; nem-loopback (éles) URL → érintetlen.
  */

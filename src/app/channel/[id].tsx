@@ -17,8 +17,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { GiftSheet } from '@/components/GiftSheet';
+import { CreatorBadges, TagBadges } from '@/components/profile/CreatorControls';
 import { PrimaryButton } from '@/components/ui/controls';
-import { palette } from '@/constants/editor';
+import { VideoThumb } from '@/components/VideoThumb';
+import { COVER_ASPECT, palette } from '@/constants/editor';
 import {
   deletePost,
   getChannel,
@@ -56,6 +59,7 @@ export default function ChannelScreen() {
   const [budget, setBudget] = useState('50');
   const [cpv, setCpv] = useState('1');
   const [busy, setBusy] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
   const [remixFor, setRemixFor] = useState<FeedPost | null>(null);
   const [remixes, setRemixes] = useState<FeedPost[]>([]);
   const [remixLoading, setRemixLoading] = useState(false);
@@ -182,7 +186,7 @@ export default function ChannelScreen() {
       Alert.alert(post.title, undefined, buttons);
       return;
     }
-    if (post.remixable && post.projectSnapshot) {
+    if (post.remixable && post.videoUri) {
       Alert.alert(post.title, t('feed.remixPrompt'), [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -234,23 +238,30 @@ export default function ChannelScreen() {
   // ⚠️ NE a „Csatorna" (nav-címke) legyen a név, ha nincs creator — inkább a handle
   const displayName = data?.creator?.displayName || username;
 
+  // videóra koppintás → a csatorna videóit lapozó feed a megnyitott posztnál
+  const openInFeed = (post: FeedPost) => {
+    router.push(`/?channel=${id}&start=${post.id}`);
+  };
+
   const gridItem = ({ item }: { item: FeedPost }) => (
-    <Pressable style={styles.gridItem} onPress={() => openPost(item)}>
-      {item.posterUri ? (
-        <Image source={{ uri: item.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      ) : (
-        <View style={styles.gridPlaceholder}>
-          <Text style={styles.gridEmoji}>🎬</Text>
-          <Text style={styles.gridTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-        </View>
-      )}
+    <VideoThumb
+      style={styles.gridItem}
+      videoUri={item.videoUri}
+      posterUri={item.posterUri}
+      onPress={() => openInFeed(item)}
+      label={item.title}
+    >
       <View style={styles.gridViews}>
         <Ionicons name="play" size={11} color="#fff" />
         <Text style={styles.gridViewsText}>{compact(item.counts.views)}</Text>
       </View>
-    </Pressable>
+      {/* saját poszt → kezelés (kiemelés/statisztika/remix-mod/törlés) a sarok-gombbal */}
+      {data?.isMe ? (
+        <Pressable style={styles.gridManage} onPress={() => openPost(item)} hitSlop={8}>
+          <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
+        </Pressable>
+      ) : null}
+    </VideoThumb>
   );
 
   return (
@@ -298,6 +309,12 @@ export default function ChannelScreen() {
               </View>
               <Text style={styles.displayName}>{displayName}</Text>
               <Text style={styles.handle}>@{username}</Text>
+              {data?.creatorTypes?.length ? (
+                <View style={styles.creatorBadges}>
+                  <CreatorBadges types={data.creatorTypes} />
+                </View>
+              ) : null}
+              {data?.bio ? <Text style={styles.bio}>{data.bio}</Text> : null}
               <View style={styles.stats}>
                 <View style={styles.stat}>
                   <Text style={styles.statNum}>{compact(data?.postCount ?? 0)}</Text>
@@ -337,8 +354,20 @@ export default function ChannelScreen() {
                   <Pressable style={styles.msgBtn} onPress={onMessage} accessibilityLabel={t('chat.message')}>
                     <Ionicons name="chatbubble-outline" size={18} color={palette.text} />
                   </Pressable>
+                  <Pressable
+                    style={styles.msgBtn}
+                    onPress={() => setGiftOpen(true)}
+                    accessibilityLabel={t('wallet.gift.title')}
+                  >
+                    <Ionicons name="gift-outline" size={18} color={palette.accent2} />
+                  </Pressable>
                 </View>
               )}
+              {data?.skills?.length ? (
+                <View style={styles.skillsWrap}>
+                  <TagBadges tags={data.skills} max={12} />
+                </View>
+              ) : null}
             </View>
           }
           ListEmptyComponent={<Text style={styles.empty}>{t('channel.noPosts')}</Text>}
@@ -385,6 +414,14 @@ export default function ChannelScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 🎁 ajándék küldése ennek a creatornak (TikTok-modell) */}
+      <GiftSheet
+        visible={giftOpen}
+        toUsername={username}
+        toName={displayName}
+        onClose={() => setGiftOpen(false)}
+      />
 
       {/* — 🔀 remix-felügyelet modal (az eredeti tulaj moderálja a remixeket) — */}
       <Modal
@@ -452,7 +489,7 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', color: palette.text, fontSize: 16, fontWeight: '800' },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   profileHead: { alignItems: 'center', paddingVertical: 16, gap: 6 },
-  cover: { alignSelf: 'stretch', height: 120, borderRadius: 14, backgroundColor: palette.surfaceHigh },
+  cover: { alignSelf: 'stretch', aspectRatio: COVER_ASPECT, borderRadius: 14, backgroundColor: palette.surfaceHigh },
   coverPlaceholder: { borderWidth: 1, borderColor: palette.border },
   bigAvatar: {
     width: 88,
@@ -470,6 +507,9 @@ const styles = StyleSheet.create({
   bigAvatarText: { color: '#fff', fontSize: 40, fontWeight: '800' },
   displayName: { color: palette.text, fontSize: 18, fontWeight: '800', marginTop: 4 },
   handle: { color: palette.textDim, fontSize: 14 },
+  creatorBadges: { marginTop: 8, paddingHorizontal: 16 },
+  bio: { color: palette.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 6, paddingHorizontal: 24 },
+  skillsWrap: { marginTop: 14, paddingHorizontal: 16, alignItems: 'center' },
   stats: { flexDirection: 'row', gap: 28, marginTop: 12 },
   stat: { alignItems: 'center' },
   statNum: { color: palette.text, fontSize: 17, fontWeight: '800' },
@@ -516,9 +556,17 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  gridPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 6, gap: 4 },
-  gridEmoji: { fontSize: 22 },
-  gridTitle: { color: palette.textDim, fontSize: 10, textAlign: 'center' },
+  gridManage: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#00000088',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   gridViews: { position: 'absolute', left: 5, bottom: 5, flexDirection: 'row', alignItems: 'center', gap: 3 },
   gridViewsText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   empty: { color: palette.textDim, textAlign: 'center', paddingVertical: 40 },

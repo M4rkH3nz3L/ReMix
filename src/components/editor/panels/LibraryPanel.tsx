@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 
 import { PanelSection } from '@/components/ui/controls';
 import { palette, trackColors } from '@/constants/editor';
-import { isProRequiredError } from '@/lib/backend';
+import { isProRequiredError, renderServerUrl } from '@/lib/backend';
 import { makeId } from '@/lib/id';
 import { trackEnd, trackOf } from '@/lib/projectUtils';
 import { ensureProxy } from '@/lib/proxy';
@@ -218,6 +218,12 @@ export function LibraryPanel() {
         if (!project) {
           return;
         }
+        // A forrás durable worker-URL-je → `remoteUrl`. Így a média-szinkron NEM
+        // tölti fel a MI (kvótás) tárhelyünkre — a tartalom a user SAJÁT külső
+        // forrásán marad (nem terhel minket), a hiányzó fájl onnan áll vissza.
+        const remoteUrl = /^https?:\/\//i.test(resolved.uri)
+          ? resolved.uri
+          : `${renderServerUrl()}${entry.url}`;
         const asset = {
           id: makeId('ast'),
           kind: entry.kind,
@@ -226,6 +232,7 @@ export function LibraryPanel() {
           name: entry.name,
           duration: probedDuration,
           size: entry.size,
+          remoteUrl,
         };
         if (entry.kind === 'audio') {
           addClip(

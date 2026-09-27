@@ -15,8 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CollabPresence } from '@/components/editor/CollabPresence';
-import { HangStudio } from '@/components/editor/HangStudio';
-import { ImageStudio } from '@/components/editor/ImageStudio';
+import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
+import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { Timeline } from '@/components/editor/Timeline';
@@ -389,7 +389,8 @@ export default function EditorScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/');
+      // deep-linkkel/értesítésből nyitva nincs előzmény → a projektek listája (/studio)
+      router.replace('/studio');
     }
   };
 
@@ -477,12 +478,7 @@ export default function EditorScreen() {
         <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
           <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
         </Pressable>
-        <Pressable
-          onPress={() => project && router.push(`/player/${project.id}`)}
-          hitSlop={8}
-        >
-          <Ionicons name="play-circle-outline" size={24} color={palette.accent} />
-        </Pressable>
+        {/* ▶️ a play-gomb a PREVIEW-ra került (PreviewSurface onOpenPlayer) — innen kivéve */}
         {/* Az EGYETLEN Export belépő (az alsó Toolbarból kivéve — nincs duplikáció).
             TutorialTarget: a felület-vezető export-lépése ide mutat. */}
         <TutorialTarget id="toolbar.export">
@@ -553,7 +549,7 @@ export default function EditorScreen() {
         {collabBanner}
         <View style={styles.expandedBand}>
           <View style={styles.expandedCenter}>
-            <PreviewSurface mode="edit" />
+            <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
             <TransportBar />
           </View>
           {panelVisible ? (
@@ -570,7 +566,7 @@ export default function EditorScreen() {
     body = (
       <View style={styles.landscapeRow}>
         <View style={styles.landscapePreview}>
-          <PreviewSurface mode="edit" />
+          <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
         </View>
         <View style={styles.landscapeSide}>
           {header}
@@ -592,7 +588,7 @@ export default function EditorScreen() {
         {collabBanner}
         <View style={styles.expandedBand}>
           <View style={styles.expandedCenter}>
-            <PreviewSurface mode="edit" />
+            <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
             <TransportBar />
             <Timeline />
           </View>
@@ -607,7 +603,7 @@ export default function EditorScreen() {
         {header}
         {missingBanner}
         {collabBanner}
-        <PreviewSurface mode="edit" />
+        <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
         <TransportBar />
         {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
         {panelVisible ? <PanelHost /> : <Timeline />}
@@ -631,8 +627,8 @@ export default function EditorScreen() {
         {body}
         <AudioLayer />
       </KeyboardAvoidingView>
-      <ImageStudio />
-      <HangStudio />
+      <ImageStudioModal />
+      <AudioStudioModal />
       <RemixGraphModal
         visible={lineageOpen}
         onClose={() => setLineageOpen(false)}

@@ -56,4 +56,59 @@ async function getRenderJob(id) {
   };
 }
 
-module.exports = { queueEnabled, renderQueue, enqueueRender, getRenderJob, connection, QUEUE_NAME };
+/** Ahány render-worker-szál egyszerre dolgozik (a schedules-ETA ezzel skáláz). */
+function renderConcurrency() {
+  return Math.max(1, parseInt(process.env.RENDER_CONCURRENCY || '2', 10));
+}
+
+/** Egy BullMQ-job → a schedules-nézet nyers mezői (belső, nem exportált). */
+function jobFields(job, state) {
+  const d = job.data || {};
+  return {
+    id: job.id,
+    state, // 'active' | 'waiting' | 'completed' | 'failed'
+    progress: typeof job.progress === 'number' ? job.progress : 0, // 0-100
+    userId: d.userId ?? null,
+    projectId: d.projectId ?? null,
+    projectName: d.projectName ?? null,
+    durationSec: typeof d.durationSec === 'number' ? d.durationSec : 0,
+    enqueuedAt: job.timestamp ?? null,
+    startedAt: job.processedOn ?? null,
+    finishedAt: job.finishedOn ?? null,
+    failedReason: job.failedReason ?? null,
+  };
+}
+
+/**
+ * 📋 A render-sor pillanatképe a „Sor" (schedules) nézethez: az ÉPP futó
+ * (active) és a VÁRAKOZÓ (waiting, FIFO-sorrendben) jobok + nemrég kész/hibás
+ * jobok. A `waiting` a valós feldolgozási sorrend, így ebből számol pozíciót és
+ * ETA-t a hívó (index.js). A `completedLimit` a lezárt jobok visszamenő plafonja.
+ */
+async function listRenderJobs({ completedLimit = 25 } = {}) {
+  const q = renderQueue();
+  const [active, waiting, completed, failed] = await Promise.all([
+    q.getActive(0, 50),
+    q.getWaiting(0, 300),
+    q.getCompleted(0, completedLimit),
+    q.getFailed(0, completedLimit),
+  ]);
+  return {
+    concurrency: renderConcurrency(),
+    active: active.map((j) => jobFields(j, 'active')),
+    waiting: waiting.map((j) => jobFields(j, 'waiting')),
+    completed: completed.map((j) => jobFields(j, 'completed')),
+    failed: failed.map((j) => jobFields(j, 'failed')),
+  };
+}
+
+module.exports = {
+  queueEnabled,
+  renderQueue,
+  enqueueRender,
+  getRenderJob,
+  listRenderJobs,
+  renderConcurrency,
+  connection,
+  QUEUE_NAME,
+};

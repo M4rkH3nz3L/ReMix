@@ -47,7 +47,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | 🎤 Énekes | ~55% 🟡 | pitch-correction + harmónia terv-mag **kész** (`pitch.ts`); hátra: pitch-detektálás/render (worker) + comping + UI → **S-VOCAL** |
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
 | 🎮 Gamer | ~55% 🟡 | capture-terv + jel-alapú auto-highlight/montázs **mag kész** (`gameHighlights.ts`/`captureCenter.ts`); hátra: natív rögzítés + UI + stream → **S-GAMER** |
-| 💻 Developer | ~35% 🟠 | **nincs Code Studio** + API-doksi/SDK/embed → **S-CODE** + **E8** |
+| 💻 Developer | ~45% 🟠 | diff/patch **mag kész** (Git/diff + DIFF→APPROVE→APPLY — `codeDiff.ts`); hátra: code-editor/file-tree/terminal UI + API-doksi/SDK → **S-CODE** + **E8** |
 | 🎵 Zenész | ~40% 🟠 | időzítés-mag **kész** (bars/beats+tempo-map+quantize+loop — `musicTime.ts`); hátra: MIDI/piano-roll/hangszer/felvétel → **S-MUSIC** |
 
 ---
@@ -234,8 +234,8 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** nincs Code Studio; van viszont erős **AI Command Bus**, amit a MASTER kifejezetten újrahasznosíthatónak nevez erre.
 
-- [ ] ✚ **Minimum**: code-editor + syntax-highlight · file-tree/tabs/search · terminal · preview · **Git/diff** · snippets · extensions · env-variables. *(Nem teljes VS Code-klón első körben.)*
-- [ ] ✚ **AI-workflow**: Ask AI → READ workspace → UNDERSTAND → PLAN → EDIT → **DIFF → APPROVE** → RUN → TEST — a meglévő AI-command bus ([aiCommands.ts](../../src/lib/aiCommands.ts)) mintájára.
+- [ ] ✚ **Minimum**: code-editor + syntax-highlight · file-tree/tabs/search · terminal · preview · [x] ✅ **Git/diff** (mag) · snippets · extensions · env-variables. *(Nem teljes VS Code-klón első körben.)*
+- [x] ✅ **AI-workflow „DIFF → APPROVE → APPLY" magja** — [codeDiff.ts](../../src/lib/codeDiff.ts) (13 teszt, audit-zöld): sor-alapú LCS `diffLines` + `diffStats`, `formatUnifiedDiff`/`parseUnifiedDiff` (unified `@@`-hunk), `applyUnifiedDiff` (**horgony-illesztéssel** sor-szám-eltolódásra robusztus, konfliktus-jelzéssel; round-trip garancia diff→format→parse→apply). Az AI javaslata DIFF, amit a user JÓVÁHAGY → ez alkalmazza (az [aiCommands.ts](../../src/lib/aiCommands.ts) mintájára). *Hátra: code-editor + file-tree/terminal + a diff-approve UI.*
 
 ### S-GENAI — 🤖 AI Creator  ·  audit-★E1 + MASTER §12
 

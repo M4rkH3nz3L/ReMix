@@ -43,7 +43,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | 🎧 Producer | ~75% 🟢 | mixer-mag **kész** (channel/bus/send/sidechain/master + validáció/render-terv — `mixer.ts`); hátra: worker-render + automation-lane + UI → **S-PRODUCER** |
 | 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
 | 📸 Fotós | ~62% 🟡 | non-destruktív RAW-develop param-mag **kész** (detail+sync — `photoDevelop.ts`); hátra: RAW-dekódolás + retus-ecsetek + culling-UI → **S-PHOTO** |
-| 🎨 Designer | ~55% 🟡 | vektor-motor, layout-engine, komponens/design-system, vektor-export → **S-DESIGN** |
+| 🎨 Designer | ~62% 🟡 | layout-engine **mag kész** (auto-layout/align/distribute/grid/constraints — `layout.ts`); hátra: vektor-node-editing + komponens/design-system + vektor-export → **S-DESIGN** |
 | 🎤 Énekes | ~45% 🟡 | Vocal Studio (pitch/harmónia/comping) → **S-VOCAL** |
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
 | 🎮 Gamer | ~55% 🟡 | capture-terv + jel-alapú auto-highlight/montázs **mag kész** (`gameHighlights.ts`/`captureCenter.ts`); hátra: natív rögzítés + UI + stream → **S-GAMER** |
@@ -153,7 +153,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Vector engine (MASTER §4):** [ ] ✚ **SVG natív szerkesztés** · [ ] pen/node-editing · [ ] boolean/compound paths · [ ] path-operations · [ ] outline stroke · [ ] expand appearance · [ ] pattern-fill · [ ] vector masks. *(A Bézier-path + stroke/fill/gradient már megvan.)*
 
-**Layout engine (MASTER §4):** [ ] ✚ auto-layout · [ ] constraints/responsive resize · [ ] grids/columns/guides/rulers · [ ] spacing-tokens · [ ] alignment/distribution.
+**Layout engine (MASTER §4):** [x] ✅ **MAG kész** — [layout.ts](../../src/lib/layout.ts) (22 teszt, audit-zöld): **auto-layout** (`autoLayout` flex: direction/gap/padding/align/justify + stretch), **constraints/responsive resize** (`resizeWithConstraints`: start/end/stretch/center/scale tengelyenként), **grids/columns** (`gridColumns` margó+gutter, `snapToGrid`), **alignment/distribution** (`alignRects` 6 él, `distributeSpacing`/`distributeCenters`, `boundingBox`). *Hátra: guides/rulers UI + spacing-tokenek a design-systemből + a rétegekre kötés.*
 
 **Components + design system (MASTER §4):** [ ] ✚ Component (variants/properties/states/instances) · [ ] design-tokenek (colors/typography/spacing/radius/shadows). *(A Brand Kit → komponens-könyvtárrá bővítve — PM2/PM4.)*
 

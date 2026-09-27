@@ -155,11 +155,11 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Layout engine (MASTER §4):** [x] ✅ **MAG kész** — [layout.ts](../../src/lib/layout.ts) (22 teszt, audit-zöld): **auto-layout** (`autoLayout` flex: direction/gap/padding/align/justify + stretch), **constraints/responsive resize** (`resizeWithConstraints`: start/end/stretch/center/scale tengelyenként), **grids/columns** (`gridColumns` margó+gutter, `snapToGrid`), **alignment/distribution** (`alignRects` 6 él, `distributeSpacing`/`distributeCenters`, `boundingBox`). *Hátra: guides/rulers UI + spacing-tokenek a design-systemből + a rétegekre kötés.*
 
-**Components + design system (MASTER §4):** [ ] ✚ Component (variants/properties/states/instances) · [ ] design-tokenek (colors/typography/spacing/radius/shadows). *(A Brand Kit → komponens-könyvtárrá bővítve — PM2/PM4.)*
+**Components + design system (MASTER §4):** [x] ✅ **MAG kész** — [designSystem.ts](../../src/lib/designSystem.ts) (8 teszt, audit-zöld): `Component` (props/variants/instances → `resolveInstance` defaults←variant←overrides) + **design-tokenek** (colors/typography/spacing/radius/shadows + `resolveToken`). *(A Brand Kit → komponens-könyvtárrá bővíthető — PM2/PM4.)*
 
 **Figma-szerű collab (MASTER §4):** [ ] ✚ multiplayer-kurzor · [ ] comments/mentions/selections · [ ] version history · [ ] branch/duplicate · [ ] review mode. *(A video-collab-live [collabLive.ts](../../src/lib/collabLive.ts) átemelése a kép-stúdióba.)*
 
-**Export (MASTER §4 + audit ★):** [ ] ★✚ **SVG · PDF · WebP · AVIF** · [ ] transparent · [ ] @1x/@2x/@3x · [ ] **artboard/batch-export** több platform-méretre (a [variantPreview.ts](../../src/lib/variantPreview.ts) mintájára).
+**Export (MASTER §4 + audit ★):** [x] ★ **SVG-export mag** — [designSystem.ts](../../src/lib/designSystem.ts) `shapesToSvg` (rect/ellipse/text/path + viewBox + háttér + escape); [ ] PDF/WebP/AVIF *(worker)* · [ ] transparent · [ ] @1x/@2x/@3x · [ ] **artboard/batch-export** több platform-méretre (a [variantPreview.ts](../../src/lib/variantPreview.ts) mintájára).
 
 ### S-MUSIC — 🎵 Zenész  ·  audit-★E4 + MASTER §5
 

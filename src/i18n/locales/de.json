@@ -2434,6 +2434,11 @@
         "tts": "Text zu Sprache",
         "writeAssist": "KI-Schreibassistent",
         "pitchCorrect": "Tonhöhenkorrektur / Harmonie",
+        "genImage": "KI-Bildgenerierung",
+        "genVideo": "KI-Videogenerierung",
+        "genMusic": "KI-Musikgenerierung",
+        "voiceClone": "Stimmklon",
+        "aiAvatar": "KI-Avatar",
         "soundLibrary": "Sound-Bibliothek",
         "collab": "Projekt-Zusammenarbeit",
         "objectTrack": "Objektverfolgung"

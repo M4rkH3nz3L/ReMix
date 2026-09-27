@@ -2434,6 +2434,11 @@
         "tts": "Szöveg → beszéd",
         "writeAssist": "AI írás-asszisztens",
         "pitchCorrect": "Hangmagasság-korrekció / harmónia",
+        "genImage": "AI kép-generálás",
+        "genVideo": "AI videó-generálás",
+        "genMusic": "AI zene-generálás",
+        "voiceClone": "Hang-klón",
+        "aiAvatar": "AI avatar",
         "soundLibrary": "Hang-könyvtár",
         "collab": "Projekt-kollaboráció",
         "objectTrack": "Objektum-követés"

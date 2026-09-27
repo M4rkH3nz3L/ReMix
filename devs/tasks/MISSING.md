@@ -241,9 +241,9 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** kimagasló AI-**megértő/optimalizáló** réteg (auto-edit, átirat, vision-keresés, bgremove/upscale/sky/depth/face, TTS, hooks, story) + BYOK multi-modell ([aiProviders.ts](../../src/lib/aiProviders.ts)) — de **0 generatív média**. Az AI-creator a MASTER szerint **nem egy szerep a többi mellett, hanem az egész fölötti réteg**.
 
-**Generatív média (audit ★ — a nagy rés):** [ ] ★ **text→kép / kép→kép** (`genImage`) · [ ] ★ inpaint/outpaint/objektum-csere (a maszk-modellre) · [ ] ★ **text/kép→videó** (`genVideo`) · [ ] ★ **voice-clone** (a TTS bővítése — [tts.ts](../../src/lib/tts.ts)) · [ ] ★ **gen-zene** (`genMusic`, a [musicMatch.ts](../../src/lib/musicMatch.ts) mellé) · [ ] ★ AI-avatar/digital-human. Mind `cloud`+`pro` capability, provider-adapterrel.
+**Generatív média (audit ★ — a nagy rés):** [x] ✅ **MODELL+CAPABILITY kész** — [genMedia.ts](../../src/lib/genMedia.ts) (8 teszt, audit-zöld): `genImage` (text→kép/kép→kép/**inpaint/outpaint**) · `genVideo` (text/kép→videó) · `genMusic` · `voiceClone` (kötelező **hozzájárulás**-modell) · `aiAvatar` — mind `cloud`+`pro` capability (i18n en/hu/de) + `validateGenRequest` (bemenet-követelmények) + `buildGenPlan` (deklaratív job-terv a provider-adapternek). *Hátra: a tényleges inferencia-adapter bekötése (worker/BYOK) + generáló UI.*
 
-**AI-context (MASTER §12):** [ ] ✚ az AI ismeri: Roles/Skills/Preferences/Brand/Projects/Assets/History/AI-providers/Workflows → **Creator Memory** (PM4) + **Creative Graph** (PM1).
+**AI-context (MASTER §12):** [x] ✅ az AI ismeri: Roles/Skills/Preferences/Brand/Projects/Assets/History → **Creator Memory** (PM4, [creatorMemory.ts](../../src/lib/creatorMemory.ts) + `buildAiContext`) + **Creative Graph** (PM1, [creativeGraph.ts](../../src/lib/creativeGraph.ts)); a teljesítmény-visszacsatolás az E-Loop ([creatorLoop.ts](../../src/lib/creatorLoop.ts)).
 
 ---
 

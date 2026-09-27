@@ -41,6 +41,12 @@ export type CapabilityId =
   | 'tts' // szöveg → beszéd / Voice Studio
   | 'writeAssist' // ✍️ Writer Studio AI: rewrite/tone/summarize/expand/translate/outline
   | 'pitchCorrect' // 🎤 Vocal Studio: pitch-correction / harmónia-render (Rubber Band / world a workeren)
+  // ── 🤖 S-GENAI generatív média (mind cloud + Pro, provider-adapterrel) ──────
+  | 'genImage' // text→kép / kép→kép / inpaint / outpaint
+  | 'genVideo' // text/kép→videó
+  | 'genMusic' // generatív zene
+  | 'voiceClone' // hang-klón (a TTS bővítése; hozzájárulással)
+  | 'aiAvatar' // AI-avatar / digital-human
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
 /**
@@ -84,6 +90,11 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   tts: { where: 'cloud', pro: true, label: 'lib.capabilities.label.tts' },
   writeAssist: { where: 'cloud', pro: true, label: 'lib.capabilities.label.writeAssist' },
   pitchCorrect: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pitchCorrect' },
+  genImage: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genImage' },
+  genVideo: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genVideo' },
+  genMusic: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genMusic' },
+  voiceClone: { where: 'cloud', pro: true, label: 'lib.capabilities.label.voiceClone' },
+  aiAvatar: { where: 'cloud', pro: true, label: 'lib.capabilities.label.aiAvatar' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
   soundLibrary: { where: 'cloud', pro: false, label: 'lib.capabilities.label.soundLibrary' },
 };

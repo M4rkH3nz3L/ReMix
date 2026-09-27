@@ -273,7 +273,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** chat/DM/csoport KÉSZ ([chat.ts](../../src/lib/chat.ts), [inbox.tsx](../../src/app/inbox.tsx)).
 
-- [ ] ✚ a chat vezérelje a workspace-t: „küldd el Annának a tegnapi projektet", „nyisd meg a projektet", „készíts 30 mp-es verziót", „exportáld", „oszd meg a producerrel" → command bus.
+- [x] ✅ **MAG kész** — [chatCommands.ts](../../src/lib/chatCommands.ts) (11 teszt, audit-zöld): `parseChatCommand` a chat-üzenetet strukturált workspace-paranccsá alakítja (open/send/version/export/share/schedule/search), címzett- (magyar rag + angol to/with), idő- (tegnap/holnap/e heti), platform- és mp-hossz-kinyeréssel — magyar+angol. *Hátra: a parancsok bekötése a command bushoz (send/share/export a meglévő chat/collab/render fölött) + UI.*
 
 ### E-Planner — Creator Planner  ·  MASTER §21
 

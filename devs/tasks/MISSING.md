@@ -131,7 +131,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Média-management (MASTER §2 — P0!):** [ ] ✚ projekt-binek (Footage/Audio/Images/Graphics/Fonts/SFX/Exports/Proxies) · [ ] smart bins · [ ] tags/ratings/favorites/color-labels · [ ] metadata · [ ] duplicate + missing-media detektálás · [ ] relink (a `.ReMix` relink megvan — [videdFile.ts](../../src/lib/videdFile.ts)) · [ ] proxy-státusz/forrás-felbontás/codec/FPS/audio-channels/kamera-metaadat. *(→ a PM2 Asset Library projekt-scope-ú nézete.)*
 
-**NLE-luxus (audit ★):** [ ] ★ LUT-**import** klipre (ma csak .cube-export — [colorClient.ts](../../src/lib/colorClient.ts)) · [ ] ★ színkerekek (3-way) · [ ] ★ HSL hue-tartományok · [ ] ★ **átmenet-render** (a `TransitionOut` típus megvan, a vizuális render nem — README/Skia-fázis) · [ ] ★ XML/EDL/AAF · [ ] ★ batch render-sor.
+**NLE-luxus (audit ★):** [x] ★ LUT-**import** klipre — [lutImport.ts](../../src/lib/lutImport.ts) (`.cube` 1D/3D parse + validáció, 5 teszt) · [ ] ★ színkerekek (3-way) *(a `ClipAdjust.balance` modell megvan, UI hátra)* · [ ] ★ HSL hue-tartományok · [ ] ★ **átmenet-render** (a `TransitionOut` típus megvan, a vizuális render nem — README/Skia-fázis) · [x] ★ **EDL-export** — [edl.ts](../../src/lib/edl.ts) (CMX3600, 4 teszt); [ ] XML/AAF · [ ] ★ batch render-sor.
 
 ### S-PHOTO — 📸 Fotós  ·  audit-★E6 + MASTER §3
 

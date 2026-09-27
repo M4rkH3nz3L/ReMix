@@ -44,7 +44,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
 | 📸 Fotós | ~62% 🟡 | non-destruktív RAW-develop param-mag **kész** (detail+sync — `photoDevelop.ts`); hátra: RAW-dekódolás + retus-ecsetek + culling-UI → **S-PHOTO** |
 | 🎨 Designer | ~62% 🟡 | layout-engine **mag kész** (auto-layout/align/distribute/grid/constraints — `layout.ts`); hátra: vektor-node-editing + komponens/design-system + vektor-export → **S-DESIGN** |
-| 🎤 Énekes | ~45% 🟡 | Vocal Studio (pitch/harmónia/comping) → **S-VOCAL** |
+| 🎤 Énekes | ~55% 🟡 | pitch-correction + harmónia terv-mag **kész** (`pitch.ts`); hátra: pitch-detektálás/render (worker) + comping + UI → **S-VOCAL** |
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
 | 🎮 Gamer | ~55% 🟡 | capture-terv + jel-alapú auto-highlight/montázs **mag kész** (`gameHighlights.ts`/`captureCenter.ts`); hátra: natív rögzítés + UI + stream → **S-GAMER** |
 | 💻 Developer | ~35% 🟠 | **nincs Code Studio** + API-doksi/SDK/embed → **S-CODE** + **E8** |
@@ -178,8 +178,8 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 **Mai állapot:** Voice Enhance/de-reverb/de-esser/kompresszor/EQ/reverb/delay a workeren ([voicechain.js](../../server/voicechain.js)), élő felvétel. Vokál-specifikus eszköz nincs.
 
 - [ ] ✚ vocal recording + **takes/comping** (a felvétel ma egyklipes — [AudioStudioBody.tsx](../../src/components/studio/audio/AudioStudioBody.tsx)).
-- [ ] ✚ **pitch-visualization + pitch-correction** (`pitchCorrect` capability; Rubber Band / SoundTouch / world a workeren).
-- [ ] ✚ **timing-correction** · [ ] **harmony-generation** · [ ] doubles/adlibs · [ ] vocal-layering.
+- [x] ✅ **pitch-correction terv-mag + harmony-generation** — [pitch.ts](../../src/lib/pitch.ts) (19 teszt, audit-zöld): note↔freq↔MIDI, hangnév-parse, 9 skála + `snapMidiToScale`, `pitchCorrectionPlan` (auto-tune állítható `strength`-tel, unvoiced-átengedés), diatonikus `harmonize`/`harmonyLine` (terc/kvint/oktáv), `pitchCorrect` capability (cloud+pro, i18n en/hu/de). *Hátra: a pitch-DETEKTÁLÁS + a shift-RENDER a workeren (Rubber Band/world), pitch-visualization UI.*
+- [ ] ✚ **timing-correction** · [x] ✅ **harmony-generation** (mag — lásd fent) · [ ] doubles/adlibs · [ ] vocal-layering.
 - [x] noise-removal/de-reverb/de-esser/compressor/EQ/reverb/delay ([voicechain.js](../../server/voicechain.js)).
 - [ ] ✚ saturation · [ ] konvolúciós reverb (a mostani szintetikus `aecho` helyett).
 - [ ] ✚ **AI Vocal Assistant** — „Tisztítsd meg az éneket", „rádióhangzás", „duplázd meg a refrént", **hangkarakter-leírásból** vezérelve (nem konkrét élő előadó utánzása). A command buszra képződik.

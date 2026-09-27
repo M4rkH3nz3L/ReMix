@@ -2433,6 +2433,7 @@
         "colorAi": "AI color",
         "tts": "Text to speech",
         "writeAssist": "AI writing assistant",
+        "pitchCorrect": "Pitch correction / harmony",
         "soundLibrary": "Sound library",
         "collab": "Project collaboration",
         "objectTrack": "Object tracking"

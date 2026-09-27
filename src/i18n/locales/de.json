@@ -2433,6 +2433,7 @@
         "colorAi": "KI-Farbe",
         "tts": "Text zu Sprache",
         "writeAssist": "KI-Schreibassistent",
+        "pitchCorrect": "Tonhöhenkorrektur / Harmonie",
         "soundLibrary": "Sound-Bibliothek",
         "collab": "Projekt-Zusammenarbeit",
         "objectTrack": "Objektverfolgung"

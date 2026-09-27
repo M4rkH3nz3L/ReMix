@@ -2433,6 +2433,7 @@
         "colorAi": "AI szín",
         "tts": "Szöveg → beszéd",
         "writeAssist": "AI írás-asszisztens",
+        "pitchCorrect": "Hangmagasság-korrekció / harmónia",
         "soundLibrary": "Hang-könyvtár",
         "collab": "Projekt-kollaboráció",
         "objectTrack": "Objektum-követés"

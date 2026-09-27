@@ -40,7 +40,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | --- | --- | --- |
 | 🎬 Videós | ~85% ✅ | média-management, felvétel-luxus, LUT-import, átmenet-render → **S-VIDEO** + [VIDEO.md](./VIDEO.md) |
 | ✍️ Író | ~75% 🟢 | Writer Studio **mag kész** (Book→Chapter+bible+markdown+AI-context — `writingDoc.ts`); hátra: UI + worker → **S-WRITER** |
-| 🎧 Producer | ~60% 🟢 | mixer-busz, sidechain, automation, send → **S-PRODUCER** |
+| 🎧 Producer | ~75% 🟢 | mixer-mag **kész** (channel/bus/send/sidechain/master + validáció/render-terv — `mixer.ts`); hátra: worker-render + automation-lane + UI → **S-PRODUCER** |
 | 🤖 AI Creator | ~55% 🟡 | **0 generatív média** + Creator Memory → **S-GENAI** + **PM4/PM5** |
 | 📸 Fotós | ~55% 🟡 | RAW, retus (healing/clone), culling/batch → **S-PHOTO** |
 | 🎨 Designer | ~55% 🟡 | vektor-motor, layout-engine, komponens/design-system, vektor-export → **S-DESIGN** |
@@ -186,13 +186,13 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### S-PRODUCER — 🎧 Producer  ·  audit-★E7 + MASTER §7
 
-**Mai állapot:** bit-pontos **master** (kétmenetes loudnorm + multiband — [render.js](../../server/render.js), [audioMaster.ts](../../src/lib/audioMaster.ts)), Demucs stem-szeparáció ([stems.ts](../../src/lib/stems.ts)). A **mixer** a gyenge pont.
+**Mai állapot:** bit-pontos **master** (kétmenetes loudnorm + multiband — [render.js](../../server/render.js), [audioMaster.ts](../../src/lib/audioMaster.ts)), Demucs stem-szeparáció ([stems.ts](../../src/lib/stems.ts)). A **mixer-mag KÉSZ** — [mixer.ts](../../src/lib/mixer.ts) (18 teszt, audit-zöld): a routing-modell + validáció + render-terv.
 
-**Mixer + busz (MASTER §7):** [ ] ✚ csatorna: Volume/Pan/EQ/Compressor/FX/**Sends**/Automation/**Bus** · [ ] busz-rendszer (drum/vocal/music/FX/master) · [ ] **sidechain** (az `autoDuck` property megvan, a render nem).
+**Mixer + busz (MASTER §7):** [x] ✅ csatorna-strip: **Volume/Pan/EQ/Compressor/Sends/Sidechain/Bus-output** ([mixer.ts](../../src/lib/mixer.ts) `ChannelStrip` + immutábilis reducerek) · [x] ✅ **busz-rendszer** (drum/vocal/music/fx/group → master; többlépcsős, `resolveOutputChain`/`signalPath`) · [x] ✅ **sidechain** (`Sidechain` key-channel modell — az `autoDuck` valódi alapja; a render-terv hordozza) · **routing-validáció** (dangling output + **ciklus-detektálás** + hiányzó send-cél/sidechain-kulcs) + solo/mute-feloldás + `toRenderPlan` (busz-topo-rendezés a workerhez) + `mixerFromProject` bridge. *Hátra: a worker ffmpeg-filtergráf a render-tervből + FX-inzertek + UI.*
 
 **Automation (MASTER §7):** [ ] ✚ volume/pan/**plugin-paraméter**/send/mute/filter automation (a volume-keyframe már megvan).
 
-**Mastering (MASTER §7):** [x] LUFS/true-peak/limiter/compressor/EQ/loudness-meter/waveform/clipping-detektálás ([audioAnalyze.ts](../../src/lib/audioAnalyze.ts)) · [ ] ✚ **stereo-width** · [ ] parametrikus multiband + állítható crossover · [ ] parallel (NY) kompresszió.
+**Mastering (MASTER §7):** [x] LUFS/true-peak/limiter/compressor/EQ/loudness-meter/waveform/clipping-detektálás ([audioAnalyze.ts](../../src/lib/audioAnalyze.ts)) · [x] ✅ **stereo-width** + **parallel (NY) kompresszió** MODELLEZVE a [mixer.ts](../../src/lib/mixer.ts) `MasterBus`-ában (render-terv hordozza) · [ ] parametrikus multiband + állítható crossover. *Hátra: a worker-render bekötése a `MasterBus`-ból.*
 
 **Stem separation (MASTER §7 — „óriási feature"):** [x] Vocals/Drums/Bass/Other (Demucs, env-gated Pro — [stems.ts](../../src/lib/stems.ts)) · [ ] ✚ Guitar/Piano/FX stemek · [ ] stem-preview render nélkül · [ ] minden stem azonnal szerkeszthető sávként.
 

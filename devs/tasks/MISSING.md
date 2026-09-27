@@ -267,7 +267,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 **Mai állapot:** collab-mag KÉSZ (presence, kurzorok, parancs-szinkron, resync, collab-chat, gépel-jelző — [collabLive.ts](../../src/lib/collabLive.ts)).
 
 - [x] live-presence/cursor/selection · project-roles (owner/editor/viewer — [collab.ts](../../src/lib/collab.ts)).
-- [ ] ✚ reviewer/producer szerep · [ ] mentions · [ ] **timecode-/frame-/audio-/design-komment** · [ ] **approval-workflow** („@Anna ezt javítsd", „@Márk 01:32-nél túl hangos").
+- [x] ✅ **MAG kész** — [collabComments.ts](../../src/lib/collabComments.ts) (11 teszt, audit-zöld): reviewer/producer szerep (`ReviewRole`) · **mentions** (`extractMentions`) · **timecode/frame/audio/design komment** (`CommentAnchor` + `commentsInTimeRange`) · szálak (reply/resolve) · **approval-workflow** állapotgép (`requestReview`/`submitDecision` → draft/in-review/changes-requested/approved). *Hátra: a live-szinkron ([collabLive.ts](../../src/lib/collabLive.ts)) rákötése + UI (komment-pinek a timeline-on/vásznon).*
 
 ### E-ChatCmd — Chat → Creative Command Center  ·  MASTER §20
 

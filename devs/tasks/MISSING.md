@@ -294,8 +294,8 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot:** hiányzik (van coin-wallet/payout [wallet.ts](../../src/lib/wallet.ts) + shop).
 
-- [ ] ✚ invoices/clients/quotes/contracts/deliverables/payments/licenses/sponsorships/affiliate-links/digital-products/marketplace-income.
-- [ ] ✚ **Creator CRM**: Client → Projects/Files/Messages/Invoices/Deliverables.
+- [x] ✅ **MAG kész** (invoices/clients/quotes + pénzügy) — [business.ts](../../src/lib/business.ts) (6 teszt, audit-zöld): `Client` + `BusinessDoc` (quote/invoice, tételek, adókulcs, státusz) + származtatott pénzügy (`subtotal`/`taxAmount`/`docTotal`, `revenue`, `outstanding`, `clientRevenue`, `overdueDocs`). *Hátra: contracts/licenses/sponsorships/affiliate + a wallet/shop-bevétel bekötése + UI.*
+- [x] ✅ **Creator CRM**: `CRM { clients, docs }` + `docsByClient` — a Client → Invoices/Deliverables váz. *(Projects/Files/Messages a Workspace/chat fölött köthető.)*
 
 ### E-Market — Marketplace 2.0  ·  MASTER §24
 

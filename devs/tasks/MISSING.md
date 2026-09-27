@@ -48,7 +48,7 @@ ahol a `layer / transform / mask / keyframe / asset / version / command / AI-con
 | 🎙️ Podcaster | ~40% 🟠 | multitrack+remote, silence/filler-vágás, fejezet/audiogram/RSS → **S-PODCAST** |
 | 🎮 Gamer | ~40% 🟠 | Capture Center (screen/game/webcam), gaming-editor, stream → **S-GAMER** |
 | 💻 Developer | ~35% 🟠 | **nincs Code Studio** + API-doksi/SDK/embed → **S-CODE** + **E8** |
-| 🎵 Zenész | ~30% 🔴 | **nincs DAW** (MIDI/hangszer/piano-roll/loop) → **S-MUSIC** |
+| 🎵 Zenész | ~40% 🟠 | időzítés-mag **kész** (bars/beats+tempo-map+quantize+loop — `musicTime.ts`); hátra: MIDI/piano-roll/hangszer/felvétel → **S-MUSIC** |
 
 ---
 
@@ -165,7 +165,7 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 **Mai állapot (a legnagyobb szakadék):** hang-összeállítás megvan (multitrack, fade/volume/pan, beat-detektálás — [beats.ts](../../src/lib/beats.ts)), de **nincs DAW**. Nehéz DSP → worker ([AUDIO.md](./AUDIO.md)).
 
-**Timeline (MASTER §5):** [ ] ✚ bars/beats nézet · [ ] BPM/time-signature/tempo-map · [ ] markerek · [ ] **loop-régiók** · [ ] **quantization** (a beat-grid ma csak vizuális — [snapping.ts](../../src/lib/snapping.ts) bővítése).
+**Timeline (MASTER §5):** [x] ✅ **BPM/time-signature/tempo-map ↔ sec/bars-beats** + **bars/beats** + **loop-régiók** + **quantization** — [musicTime.ts](../../src/lib/musicTime.ts) (22 teszt, audit-zöld): `timeAtBeat`/`beatAtTime` (tempo-mapen integrálva), `beatToBarsBeats` (TICKS_PER_BEAT), `beatGridTimes`/`barGridTimes` rács, `quantizeBeat`/`quantizeTime` (subdivision + strength + **swing**), `loopFromBars`/`loopWrap`, `timingFromBeatGrid` bridge a detektált BPM-ből ([beats.ts](../../src/lib/beats.ts)). *Hátra: a rács/loop/quantize bekötése a timeline-UI-ba + a klip-vágások kvantálása.*
 
 **MIDI (MASTER §5):** [ ] ✚ MIDI-sávok · [ ] **piano roll** · [ ] note-editing/velocity · [ ] quantize/swing/transpose · [ ] scale-lock · [ ] chord-detection. *(Nagy tétel — saját RFC, ne csússzon be scope nélkül.)*
 

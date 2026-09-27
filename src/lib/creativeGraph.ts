@@ -203,10 +203,13 @@ export function descendants(g: CreativeGraph, nodeId: string, edgeType: EdgeType
 
 // ── Építés a workspace adataiból ──────────────────────────────────────────────
 
+/** A gráf-építéshez elég projekt-részhalmaz (a teljes `Project` is megfelel). */
+export type GraphProjectInput = Pick<Project, 'id' | 'name' | 'kind' | 'remixOf'>;
+
 export interface GraphInput {
   personId?: string;
   personName?: string;
-  projects?: Project[];
+  projects?: GraphProjectInput[];
   /** Asset Library assetjei (a `usage`-ből épülnek a project→asset élek). */
   assets?: LibraryAsset[];
   brands?: { id: string; name: string }[];

@@ -4,6 +4,7 @@ import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
 import { createImageDoc } from '@/lib/imageDoc';
+import { projectKindMeta } from '@/lib/projectKinds';
 import type {
   AdjustClip,
   AspectRatio,
@@ -28,14 +29,10 @@ export function projectKind(project: { kind?: ProjectKind }): ProjectKind {
  * megfelelő stúdióba (a videó a teljes `/editor`, a kép/hang a saját stúdiója).
  */
 export function studioRoute(kind: ProjectKind | undefined, id: string): string {
-  switch (kind ?? 'video') {
-    case 'image':
-      return `/studio/image/${id}`;
-    case 'audio':
-      return `/studio/audio/${id}`;
-    default:
-      return `/editor/${id}`;
-  }
+  const meta = projectKindMeta(kind);
+  // a KÉSZ stúdiók a saját útvonalukra; a stúdió-nélküli (CreativeDocument-
+  // bővítés) fajták a videó-editorra esnek vissza, amíg a stúdiójuk el nem készül
+  return meta.editable ? meta.route(id) : `/editor/${id}`;
 }
 
 const CANONICAL_TRACKS: { type: TrackType; name: string }[] = [

@@ -16,7 +16,22 @@ export type AspectRatio = '16:9' | '9:16' | '1:1';
  * A kép- és hang-projekt KIMENETE a videó-editorban is felhasználható médiaként.
  * Hiányzó érték = `video` (a séma-6 előtti, régi projektek mind videók).
  */
-export type ProjectKind = 'video' | 'image' | 'audio';
+export type ProjectKind =
+  // ── KÉSZ stúdiók (az „Új projekt" választója ezekből épül) ────────────────
+  | 'video'
+  | 'image'
+  | 'audio'
+  // ── CreativeDocument-bővítés (PM1 — MASTER §16, záró-szakasz): a `Project`
+  //    egy DOKUMENTUMTÍPUS a sok közül. Ezek ADAT-szinten léteznek (Workspace/
+  //    Creative Graph/Memory/⌘K hordozza és címkézi őket), de MÉG NINCS kész
+  //    szerkesztő-stúdiójuk → nem hozhatók létre UI-ból (lásd
+  //    `@/lib/projectKinds` `isEditableKind`/`CREATABLE_KINDS`). Additív union-
+  //    bővítés; migráció nem kell (a `kind` szabad string-mező, a régi
+  //    projektek `video`-ra esnek vissza). ──────────────────────────────────
+  | 'writing'
+  | 'code'
+  | 'music'
+  | 'design';
 
 /**
  * Sávok (full-plan F0.5): a tartalom-típusok kapnak sávot; a transition/filter/

@@ -2641,7 +2641,11 @@
     "kind": {
       "video": "Video",
       "image": "Bild",
-      "audio": "Audio"
+      "audio": "Audio",
+      "writing": "Text",
+      "code": "Code",
+      "music": "Musik",
+      "design": "Design"
     },
     "kindDesc": {
       "video": "Zeitleisten-Videoeditor",

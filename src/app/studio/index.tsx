@@ -48,21 +48,21 @@ import { isMyAccountDeleted, reactivateAccount } from '@/lib/account';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { formatTime } from '@/lib/time';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
+import { ALL_PROJECT_KINDS, PROJECT_KINDS, creatableKinds } from '@/lib/projectKinds';
 import type { AspectRatio, Project, ProjectKind, ProjectMeta } from '@/types/project';
 
-/** 🎛️ A három stúdió = a projekt-fajták (az „Új projekt” választója ebből épül). */
-const STUDIO_KINDS: { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'video', icon: 'film-outline' },
-  { id: 'image', icon: 'image-outline' },
-  { id: 'audio', icon: 'musical-notes-outline' },
-];
+/** 🎛️ Az „Új projekt” választója = a LÉTREHOZHATÓ (kész stúdiójú) fajták —
+ *  a katalógusból (`@/lib/projectKinds`), hogy sose kínáljon félkész stúdiót. */
+const STUDIO_KINDS: { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] = creatableKinds().map((m) => ({
+  id: m.id,
+  icon: `${m.icon}-outline` as keyof typeof Ionicons.glyphMap,
+}));
 
-/** a projekt-fajta ikonja a lista-kártyákhoz (a videó a bélyegkép alá esik vissza) */
-const KIND_ICON: Record<ProjectKind, keyof typeof Ionicons.glyphMap> = {
-  video: 'videocam',
-  image: 'image',
-  audio: 'musical-notes',
-};
+/** a projekt-fajta ikonja a lista-kártyákhoz (a videó a bélyegkép alá esik vissza) —
+ *  MINDEN fajtára (a CreativeDocument-bővítésre is), a katalógusból származtatva. */
+const KIND_ICON = Object.fromEntries(
+  ALL_PROJECT_KINDS.map((k) => [k, PROJECT_KINDS[k].icon as keyof typeof Ionicons.glyphMap])
+) as Record<ProjectKind, keyof typeof Ionicons.glyphMap>;
 
 /** projekt-bélyegkép a lista-sorokhoz (videónál az első klip kockája, cache-elve;
  *  kép/hang projektnél a fajta-ikon — nincs videó-bélyegkép, amit kirakni) */

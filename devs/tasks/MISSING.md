@@ -251,9 +251,9 @@ A 3. szakasz a **platform-mag** epikjei (P0 — ezek nyitnak meg mindenkit), a 4
 
 ### E-Templates — Template System 2.0 / Workflow Templates  ·  MASTER §17
 
-**Mai állapot:** videó-sablonok ([constants/templates.ts](../../src/constants/templates.ts)) + shop (template/LUT/SFX/font/preset). A **workflow-sablon** (pipeline) hiányzik.
+**Mai állapot:** videó-sablonok ([constants/templates.ts](../../src/constants/templates.ts)) + shop (template/LUT/SFX/font/preset). A **workflow-sablon MAG kész** — [workflowTemplate.ts](../../src/lib/workflowTemplate.ts) (9 teszt, audit-zöld).
 
-- [ ] ✚ **Workflow Template** — nem preset, hanem lánc. Pl. *YouTube Creator*: Footage → AI-Select → Transcript → Filler-Removal → Hook → Captions → B-roll → Color → Thumbnail → Export → Publish. Pl. *Podcast*: Record → Sync → Clean → Transcript → Chapters → Clips → Audiogram → Publish. *(A [workflow.ts](../../src/lib/workflow.ts) 10-lépcsős NLE-váz az alap.)*
+- [x] ✅ **Workflow Template** — nem preset, hanem LÁNC. Beépítve: *YouTube Creator* (Footage → AI-Select → Transcript → Filler-Removal → Hook → Captions → B-roll → Color → Thumbnail → Export → Publish) + *Podcast* (Record → Sync → Clean → Transcript → Chapters → Clips → Audiogram → Publish). Minden lépés opcionálisan egy **`CapabilityId`-hez kötött → a Pro/felhő-kapu a KATALÓGUSBÓL jön** (`templateProSteps`/`templateRequiresPro`). Futtatás: `startRun`/`advanceRun`/`markStep`/`skipStep`/`nextPendingStep`/`runProgress`/`isRunComplete`. *(A [workflow.ts](../../src/lib/workflow.ts) a per-projekt stage-követő; ez az újrahasználható sablon+futtatás.)* *Hátra: a lépés-`kind`-ok bekötése a tényleges műveletekhez (command bus) + UI.*
 
 ### E-Versions — Version Control (globális)  ·  MASTER §18
 

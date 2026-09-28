@@ -161,8 +161,23 @@ export default function FeedScreen() {
   // az inline ref MINDEN rendernél (pl. a 200 ms-es haladás-tick) újrafutna és
   // meghívná a `play()`-t → a kézzel szüneteltetett videó azonnal újraindulna
   // („kattintásra nem áll le"). Stabil ref → csak MOUNTkor indít, újrarendernél nem.
+  // 🌐 web: az AKTÍV poszt <video> eleme. NEM `querySelector('video')` — az a DOM
+  // ELSŐ videóját adná (lapozáskor a rossz/elavult elemet vezérelnénk, és az előző
+  // hangja átszivárogna). Ez mindig a JELENLEG aktív poszt eleme.
+  const activeVideoElRef = useRef<HTMLVideoElement | null>(null);
   const webVideoRef = useCallback((el: HTMLVideoElement | null) => {
     if (el) {
+      // új aktív videó mountol → az ELŐZŐT lezárjuk (hang is), nehogy tovább szóljon
+      const prev = activeVideoElRef.current;
+      if (prev && prev !== el) {
+        try {
+          prev.pause();
+          prev.currentTime = 0;
+        } catch {
+          /* a leváló elem már eldobható */
+        }
+      }
+      activeVideoElRef.current = el;
       el.muted = mutedRef.current;
       el.volume = volumeRef.current;
       void el.play?.().catch(() => {});
@@ -413,6 +428,11 @@ export default function FeedScreen() {
     const first = info.viewableItems[0]?.item as FeedPost | undefined;
     if (first) {
       setActiveTopId(first.id);
+      // 🔄 lapozás → a POSZTHOZ kötött UI azonnal nullázódik (haladás + hotspot-idő),
+      // hogy az új videó ne az előző poszt állapotával villanjon fel
+      setProgress(0);
+      setHotspotTime(0);
+      seekingRef.current = false;
       // a középre lapozott poszt az EREDETIRŐL induljon (0. lap) — így a videó és a
       // látszó lap sosem csúszik szét, ha a listát a windowing közben újra-mountolta
       setPageIndex((prev) => (prev[first.id] ? { ...prev, [first.id]: 0 } : prev));
@@ -441,7 +461,7 @@ export default function FeedScreen() {
     // nem indít). Itt csak a FÓKUSZ-váltásra reagálunk: elhagyva a feedet szünet,
     // visszatérve folytatás (a feed mountolva marad más képernyő alatt).
     if (Platform.OS === 'web') {
-      const v = document.querySelector('video');
+      const v = activeVideoElRef.current;
       if (v) {
         if (!uri || !isFocused) {
           v.pause();
@@ -460,6 +480,8 @@ export default function FeedScreen() {
     // `replaceAsync`. A `cancelled` őr: ha közben vált az aktív poszt / elveszik a
     // fókusz, a késve beérő betöltés NE indítson lejátszást a rossz videón.
     let cancelled = false;
+    // az ELŐZŐ videó AZONNAL álljon le (hang is) — ne szóljon az async betöltés alatt
+    player.pause();
     player
       .replaceAsync(uri)
       .then(() => {
@@ -480,7 +502,16 @@ export default function FeedScreen() {
     if (!activePost || hotspotsOf(activePost).length === 0) {
       return;
     }
-    const iv = setInterval(() => setHotspotTime(player.currentTime ?? 0), 250);
+    const iv = setInterval(() => {
+      // web: a tényleges lejátszó a <video> elem; natív: az expo-video player.
+      // (Korábban weben is a player.currentTime-t olvasta → mindig 0 → a hotspotok
+      // SOHA nem jelentek meg weben.)
+      const t =
+        Platform.OS === 'web'
+          ? activeVideoElRef.current?.currentTime ?? 0
+          : player.currentTime ?? 0;
+      setHotspotTime(t);
+    }, 250);
     return () => clearInterval(iv);
   }, [activePost, player]);
 
@@ -499,7 +530,7 @@ export default function FeedScreen() {
       let cur = 0;
       let dur = 0;
       if (Platform.OS === 'web') {
-        const v = document.querySelector('video');
+        const v = activeVideoElRef.current;
         cur = v?.currentTime ?? 0;
         dur = v && Number.isFinite(v.duration) ? v.duration : 0;
       } else {
@@ -539,7 +570,14 @@ export default function FeedScreen() {
     if (a.type === 'url') {
       Linking.openURL(a.url).catch(() => {});
     } else if (a.type === 'seek') {
-      player.currentTime = a.toTime;
+      if (Platform.OS === 'web') {
+        const v = activeVideoElRef.current;
+        if (v) {
+          v.currentTime = a.toTime;
+        }
+      } else {
+        player.currentTime = a.toTime;
+      }
     } else if (a.type === 'quiz') {
       Alert.alert(
         a.question,
@@ -564,7 +602,7 @@ export default function FeedScreen() {
     setVolumeOpen(false); // a hangerő-csúszkát a videóra koppintás bezárja
     if (post.id === activeId && post.videoUri) {
       if (Platform.OS === 'web') {
-        const v = document.querySelector('video');
+        const v = activeVideoElRef.current;
         if (v) {
           if (v.paused) {
             void v.play().catch(() => {});
@@ -601,14 +639,26 @@ export default function FeedScreen() {
   // csak akkor frissít, ha egy lapra „beállt" (mid-swipe villódzás nélkül, web is).
   const onPagerScroll = (topId: string, offsetX: number) => {
     const idx = pageFromScroll(offsetX, contentW);
-    if (idx !== null) {
-      setPageIndex((prev) => (prev[topId] === idx ? prev : { ...prev, [topId]: idx }));
+    if (idx === null || pageIndex[topId] === idx) {
+      return;
+    }
+    setPageIndex((prev) => ({ ...prev, [topId]: idx }));
+    // vízszintes lapváltás (eredeti ↔ remix) az aktív poszton → UI nullázása
+    if (topId === activeTopId) {
+      setProgress(0);
+      setHotspotTime(0);
+      seekingRef.current = false;
     }
   };
   // nyíl-gombos / programozott lapozás (a jelző-gombokhoz + a webes vezérléshez)
   const goToPage = (topId: string, idx: number) => {
     listRefs.current.get(topId)?.scrollToOffset({ offset: idx * contentW, animated: true });
     setPageIndex((prev) => ({ ...prev, [topId]: idx }));
+    if (topId === activeTopId) {
+      setProgress(0);
+      setHotspotTime(0);
+      seekingRef.current = false;
+    }
   };
 
   // a pulzáló glow-gyűrű stílusa (scale ki + elhalványul, loopban)
@@ -625,7 +675,7 @@ export default function FeedScreen() {
     const r = Math.max(0, Math.min(1, ratio));
     setProgress(r);
     if (Platform.OS === 'web') {
-      const v = document.querySelector('video');
+      const v = activeVideoElRef.current;
       if (v && Number.isFinite(v.duration)) {
         v.currentTime = r * v.duration;
       }
@@ -661,7 +711,7 @@ export default function FeedScreen() {
     mutedRef.current = m;
     setMuted(m);
     if (Platform.OS === 'web') {
-      const el = document.querySelector('video');
+      const el = activeVideoElRef.current;
       if (el) {
         el.volume = vol;
         el.muted = m;
@@ -834,7 +884,7 @@ export default function FeedScreen() {
             setMuted(nm);
             setVolumeOpen((o) => (nm ? o : true)); // hangosításkor nyíljon a csúszka
             if (Platform.OS === 'web') {
-              const v = document.querySelector('video');
+              const v = activeVideoElRef.current;
               if (v) {
                 v.muted = nm;
                 v.volume = volumeRef.current;

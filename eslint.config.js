@@ -5,8 +5,10 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    // a server/ Node-oldali CommonJS worker — nem az Expo-app lint-szabályai alá tartozik
-    ignores: ["dist/*", "server/**"],
+    // a server/ Node-oldali CommonJS worker és a supabase/functions Deno Edge
+    // Function-ök — más runtime (`Deno.*` globálisok, távoli `https://` importok),
+    // ezért nem az Expo-app lint/tsc szabályai alá tartoznak
+    ignores: ["dist/*", "server/**", "supabase/functions/**"],
   },
   {
     rules: {

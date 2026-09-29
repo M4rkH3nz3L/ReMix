@@ -243,7 +243,8 @@ viszi a friss számot), **RLS mindenhol** (moderáció/privacy a DB-ben), és **
 (`get_feed` keyset-lapozással + `get_for_you` hot-rank, a poszt+szerző+liked/saved
 egy körben). A videó/borító a `videos`/`posters` Storage-bucketbe tölt.
 A kliens-belépési pontok: **Feed** a kezdőképernyőn, **Közzététel** az editor
-fejlécében, `/auth` és `/profile` képernyők. Részletek: [SOCIAL-TODO.md](SOCIAL-TODO.md).
+fejlécében, `/auth` és `/profile` képernyők. Nyitott social-tételek: [MISSING.md](MISSING.md)
+(a régi `SOCIAL-TODO.md` beépítés után törölve — `git show 50d1c95^:SOCIAL-TODO.md`).
 
 Fizikai eszközön: a Supabase-t 0.0.0.0-ra kell kötni (`supabase/config.toml`), és az
 `EXPO_PUBLIC_SUPABASE_URL`-t a gép LAN-IP-jére állítani.

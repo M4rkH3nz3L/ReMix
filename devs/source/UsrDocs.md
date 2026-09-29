@@ -6,10 +6,10 @@ dokumentáció — hanem az, *amit meg kell építeni és meg kell írni* hozzá
 videós szakma best practice-eivel átszőve, a **rövid videó (short) készítők**
 mint fő célközönség szemével.
 
-- Funkció-forrás (hiteles): [STUDIO.md](STUDIO.md) + [src/lib/capabilities.ts](src/lib/capabilities.ts)
-- Meglévő interaktív tutorial (NE duplikáld): [src/lib/tutorial.ts](src/lib/tutorial.ts),
-  [src/components/tutorial/](src/components/tutorial/)
-- Architektúra: [README.md](README.md) · Sablonok: [src/constants/templates.ts](src/constants/templates.ts)
+- Funkció-forrás (hiteles): [STUDIO.md](../../STUDIO.md) + [src/lib/capabilities.ts](../../src/lib/capabilities.ts)
+- Meglévő interaktív tutorial (NE duplikáld): [src/lib/tutorial.ts](../../src/lib/tutorial.ts),
+  [src/components/tutorial/](../../src/components/tutorial/)
+- Architektúra: [README.md](../../README.md) · Sablonok: [src/constants/templates.ts](../../src/constants/templates.ts)
 
 ---
 
@@ -281,10 +281,10 @@ A doksinak **be kell mutatnia magukat a projekteket** is. Cikkvázlat
 |---|---|
 | Projektlista + gomb helye | [src/app/index.tsx](src/app/index.tsx) |
 | Szerkesztő „?" / tutorial belépő | [src/app/editor/[id].tsx:455](src/app/editor/[id].tsx#L455) |
-| Tutorial adat (minta a userDocs-hoz) | [src/lib/tutorial.ts](src/lib/tutorial.ts) |
-| Tutorial menü/overlay | [src/components/tutorial/](src/components/tutorial/) |
-| Funkció-leltár (SIMA/PRO) | [STUDIO.md](STUDIO.md) · [src/lib/capabilities.ts](src/lib/capabilities.ts) |
-| Sablonok | [src/constants/templates.ts](src/constants/templates.ts) |
+| Tutorial adat (minta a userDocs-hoz) | [src/lib/tutorial.ts](../../src/lib/tutorial.ts) |
+| Tutorial menü/overlay | [src/components/tutorial/](../../src/components/tutorial/) |
+| Funkció-leltár (SIMA/PRO) | [STUDIO.md](../../STUDIO.md) · [src/lib/capabilities.ts](../../src/lib/capabilities.ts) |
+| Sablonok | [src/constants/templates.ts](../../src/constants/templates.ts) |
 | Eszköztár (funkció-belépők) | [src/components/editor/Toolbar.tsx](src/components/editor/Toolbar.tsx) |
 | i18n | [src/i18n/locales](src/i18n/locales) |
 | Design-tokenek | [src/design](src/design) |

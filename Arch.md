@@ -32,7 +32,7 @@ A ReMix már *sok* dokumentumot hordoz. Ez a fájl a **capstone**: fölé rendel
 | [OPS.md](OPS.md) · [DEVOPS.md](DEVOPS.md) | Mit és hogyan üzemeltetünk | üzemeltetés |
 | [PROD.md](PROD.md) | Hogyan készül kiadható build, és mi kell hozzá | kiadás |
 | [AUDITBUGS.md](AUDITBUGS.md) · [TODO.md](TODO.md) | Nyitott adósság · go-live blokkolók | minőség |
-| [DESIGN-TODO.md](DESIGN-TODO.md) · [UIA.md](UIA.md) | Design-DNS · UI-anomáliák | UI |
+| [DESIGN-TODO.md](DESIGN-TODO.md) | Design-DNS (a `UIA.md` UI-anomália-lista mind-javítva → törölve) | UI |
 
 **Olvasási sorrend új fejlesztőnek:** README → **Arch.md (1–7. szakasz)** →
 AGENTS.md → a feature-hez tartozó doksi (pl. STUDIO.md).

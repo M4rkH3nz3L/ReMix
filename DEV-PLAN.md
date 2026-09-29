@@ -1,6 +1,8 @@
 # vided — DEV-PLAN (V1 „CapCut-killer” roadmap)
 
-> Részletes fázisterv: [devs/full-plan.md](devs/full-plan.md) · Funkciólista: [FUNC.md](FUNC.md) · Social build-terv: [SOCIAL-TODO.md](SOCIAL-TODO.md)
+> 🗂️ A korábbi kísérő-doksik (`devs/full-plan.md`, `FUNC.md`, `SOCIAL-TODO.md`)
+> beépítés után **törölve** (`1d2de8c`, `50d1c95`) — csak a git-történetben élnek
+> (`git show 1d2de8c^:devs/full-plan.md`). Az élő gyűjtő helyettük: [MISSING.md](MISSING.md).
 >
 > **Pozicionálás:** a vided nem CapCut-klón. CapCut: *„Edit videos easily.”* —
 > vided: **„Give me your footage. I'll help you make the video.”**

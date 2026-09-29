@@ -13,14 +13,15 @@ import { palette } from '@/constants/editor';
 import { addLayer, createImageDoc, layerLabel, removeLayer } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
-import { pickImage } from '@/lib/media';
+import { pickImage, pickSvg } from '@/lib/media';
+import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 const TOOLS: {
-  key: 'layers' | 'photo' | 'text' | 'shape' | 'adjust' | 'delete';
+  key: 'layers' | 'photo' | 'text' | 'shape' | 'svg' | 'adjust' | 'delete';
   icon: keyof typeof Ionicons.glyphMap;
   labelKey: string;
 }[] = [
@@ -28,6 +29,7 @@ const TOOLS: {
   { key: 'photo', icon: 'image-outline', labelKey: 'studio.imageTools.photo' },
   { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
   { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
+  { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
   { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
   { key: 'delete', icon: 'trash-outline', labelKey: 'studio.imageTools.delete' },
 ];
@@ -159,6 +161,40 @@ export function ImageStudioBody({
     setSelectedId(id);
   };
 
+  /**
+   * 📥 SVG-fájl importja rétegekké (`svgImport` mag): a `.svg`-t beolvassuk,
+   * ImageDoc-rétegekre bontjuk, és EGY köteg-műveletként (egy undo-lépés) a
+   * command-buson betesszük — a vászonon azonnal megjelennek.
+   */
+  const importSvg = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const svg = await pickSvg();
+      if (svg == null) {
+        return;
+      }
+      const { layers } = parseSvg(svg);
+      if (layers.length === 0) {
+        Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
+        return;
+      }
+      let next = doc;
+      for (const l of layers) {
+        next = addLayer(next, l);
+      }
+      commit(next, t('studio.image.undoImportSvg'));
+      setSelectedId(layers[layers.length - 1].id);
+      setSheet('layers');
+    } catch {
+      Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onTool = (key: (typeof TOOLS)[number]['key']) => {
     if (!doc) {
       return;
@@ -175,6 +211,9 @@ export function ImageStudioBody({
         break;
       case 'shape':
         add('shape');
+        break;
+      case 'svg':
+        void importSvg();
         break;
       case 'adjust':
         if (selectedLayer?.kind === 'photo') {

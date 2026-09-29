@@ -1,5 +1,6 @@
 /**
- * Social réteg adatmodellje (SOCIAL-TODO.md M0/M2/M4/M5).
+ * Social réteg adatmodellje (a törölt SOCIAL-TODO.md M0/M2/M4/M5 alapján; a
+ * nyitott tételek ma a MISSING.md-ben élnek).
  *
  * Elv: a poszt NEM önálló videórekord, hanem a Project Model egy NÉZETE — a
  * `projectId` (+ opcionálisan a hordozott `projectSnapshot`) teszi a feed

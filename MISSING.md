@@ -2,6 +2,15 @@
 
 > Az `.md` dokumentációkból (AUDITBUGS · TODO · DEV-PLAN · DESIGN-TODO · PRO · STUDIO · PROD · DEVOPS · OPS · MONEY · Arch · README · `devs/*`) összegyűjtött **nyitott / nem-kész** tételek, prioritás szerint. Forrás-hivatkozás `fájl:sor`.
 > **Fontos:** több forrás-md régebbi állapotot tükröz — az ebben a munkamenetben már megvalósított dolgokat lásd a **[Már kész](#-már-kész-ne-listázd-hiányként)** szakaszban; azok NEM hiányok.
+>
+> 🗂️ **ELHASZNÁLT FORRÁSOK (a lenti `fájl:sor` idézetek egy részéhez).** Az alábbi
+> `devs/*` forrás-specifikációk a beépítésük után **törölve lettek** a `1d2de8c`
+> commitban — az idézetek megtartják a nyomon követhetőséget, de a fájlok már csak
+> a git-történetben élnek: `ReMix.md` · `full-plan.md` · `PROJECT-LAYERS.md` ·
+> `SOCIAL.md` · `WORKER.md` · `VidEd.md` · `AI-INTEGRATIONS.md` ·
+> `CUSTOM-STORAGE.md` · `GTM-AND-UNIT-ECONOMICS.md`.
+> Előhívás: `git show 1d2de8c^:devs/<fájl>`. Ugyanígy a `FUNC.md` / `SOCIAL-TODO.md` /
+> `now.md` (`50d1c95`) és a `UIA.md` (mind-javítva, lásd a *Már kész* szakaszt).
 
 ---
 
@@ -130,6 +139,37 @@ Ezt a szemléletet a lenti 0. szekció bontja feladatokra; a többi (1–11) fej
 - [ ] **Editor-réteg refaktor (F0)**: klip `uri`→`assetId`; command-pattern a `mutateProject` helyett; sáv-bővítés (Zene/Voiceover/SFX külön); klip-property (rotation/opacity/blend) + event log. `full-plan.md (F0)`, `PROJECT-LAYERS.md`
 - [ ] **Creative Canvas (F6)**: crop/resize/perspektíva-crop · AI outpaint (16:9→9:16) · retouch · advanced tracking (mélység/okklúzió). `ReMix.md:114-121`
 
+### 5.b — Profi grafikai szerkesztő (vektor + kép) — 🟢 MAG KÉSZ, UI + interop hátra
+
+> A típusmodell (`PathPoint` bezier-fogókkal, `subpaths`+`fillRule`, `ShapeGradient` lin/rad/konikus, teljes `BlendMode`, `ClipMask`) MÁR profi volt; a rés a köré épülő PURE-CORE logika és az interop. Ebben a munkamenetben **6 új, expo-mentes, tesztelt mag** épült (`studio-social`, 2026-09-27) — a `design-layout-core`/`photo-develop-core` mellé:
+
+- [x] **Vektor-toll** `lib/vectorPath.ts` — bezier node add/insert/delete/move, fogó-drag (mirror/smooth/broken), node-típus váltás, de-Casteljau szegmens-osztás (alak-tartó), join/reverse, hit-test, SVG path `d` parse↔emit (+ ív→bezier). **31 teszt.**
+- [x] **SVG import** `lib/svgImport.ts` — rect/circle/ellipse/line/poly/path/text/g + fill/stroke/gradient/transform → `ImageDoc` rétegek. **21 teszt.** (Az EXPORT már megvolt: `designSystem.ts:shapesToSvg`.)
+- [x] **Non-destruktív adjustment-stack** `lib/adjustmentStack.ts` — stackelhető/átrendezhető/toggle korrekciós rétegek → `flatten` a meglévő `ClipAdjust`-ra + sorrendtartó `resolvePipeline` (jövőbeli több-menetes render). **16 teszt.**
+- [x] **Layer-effektek** `lib/layerEffects.ts` — drop/inner shadow, outer/inner glow, stroke, colorOverlay → CSS-filter (preview) + SVG `<filter>` (render-pontos) + le-map a `ShapeClip` primitívekre. **14 teszt.**
+- [x] **Pattern fill** `lib/patternFill.ts` — kép/alakzat csempe + tiling math + SVG `<pattern>` emit. **13 teszt.**
+- [x] **Rulers & guides** `lib/rulers.ts` — vonalzó-osztás (1-2-5·10ⁿ „szép" lépések) + húzható segédvonalak + snap-to-guide (a `snapping.ts` objektum-snapja mellé). **9 teszt.**
+
+- [ ] **UI-bekötés (hátra):** pen/node-eszköz az `ImageCanvas`-en (fogó-drag gesztusok, node-típus váltó) · effekt-panel · adjustment-stack panel · vonalzó-sáv + guide-drag · pattern-picker → mind a command-buszra (`updateLayer`).
+- [ ] **Meglévő magok bekötése:** boolean-parancsok (`boolean.ts`) + align/distribute (`layout.ts`) UI-ra kötése.
+
+### 5.c — PSD/AI kompatibilitás — STRATÉGIA (nem íróasztal-munka)
+
+> A bináris PSD és a PDF-alapú `.ai` NEM kliens-oldali parse (nagy, kockázatos, natív-függő). A projekt elve: a nehéz média-konverzió a **render-workeren** fut, env-kapuval (mint a Demucs/Whisper).
+
+- [ ] **SVG:** ✅ KÉSZ mindkét irány (import `svgImport.ts` · export `shapesToSvg`) — ez az elsődleges vektor-interop.
+- [ ] **PSD import:** worker-oldali konverzió (`ag-psd`/ImageMagick) → rétegenként PNG + geometria → `ImageDoc` `PhotoLayer`-ek (réteg-struktúra megőrizve, a nem-támogatott réteg-effektek raszterizálva). Env-kapu (`PSD_IMPORT`), Pro-funkció.
+- [ ] **AI (Illustrator):** az `.ai` PDF-kompatibilis → worker `pdf→svg` (pdf2svg/Inkscape) → a meglévő `svgImport.ts`. Env-kapu.
+- [ ] **Export PSD/PDF:** worker-oldali a réteg-fából (a render-lánc mintájára).
+
+### 5.d — Nagy dokumentumok optimalizálása — STRATÉGIA
+
+> A meglévő infrastruktúrára épül: `lib/virtualize.ts` (viewport-culling), `lib/lruCache.ts` (cache), `lib/proxy.ts` (proxy-média).
+
+- [ ] **Réteg-virtualizálás:** csak a viewportba eső rétegek rajzolása (`virtualize.ts` kiterjesztése az `ImageDoc`-ra).
+- [ ] **Raszter-csempe cache:** a nem-változó rétegek elő-raszterizálása + LRU-tárolása (`lruCache.ts`); csak a „dirty" rétegek újrarajzolása.
+- [ ] **Proxy-felbontás:** szerkesztés kis felbontású proxyn, bake teljes felbontáson (a `proxy.ts` mintájára) — a `## 🔵 9` perf-szakasszal közös.
+
 ---
 
 ## 🟢 6. Tárolás & file-providerek (custom storage)
@@ -216,7 +256,9 @@ Ezeket ebben a munkamenetben megvalósítottuk (`- [x]`), de a régebbi md-k mé
 - [x] **Videó-lejátszás fix** (nincs „árva" natív lejátszás) + idővonal-scrubber (minimap) vissza.
 - [x] **Interaktív tutorial** (18 lecke, 3 szint + lecke-választó).
 - [x] **DEV↔PROD config-guardok** — `lib/envConfig` (isLoopbackHost / resolvePublicUrl / isSecureForRelease) + **18 unit-teszt**; supabase.ts & backend.ts erre állítva. *(`00244c2`)*
-- [x] **UIA.md** összes anomáliája **javítva** (2026-09-11) — abból a fájlból nincs teendő. `UIA.md`
+- [x] **UI-anomáliák (a régi `UIA.md`)** — mind **javítva** (2026-09-11), ezért a fájl
+  elhasználtként **törölve**; előhívás: `git show HEAD~1:UIA.md` (vagy a törlő commit előtti állapot).
+- [x] **Profi grafikai szerkesztő — pure magok** (2026-09-27): vektor-toll (`vectorPath.ts`) · SVG import (`svgImport.ts`) · adjustment-stack (`adjustmentStack.ts`) · layer-effektek (`layerEffects.ts`) · pattern-fill (`patternFill.ts`) · rulers/guides (`rulers.ts`) — **6 mag / 104 új teszt**. Csak a UI-bekötés + PSD/AI-interop hátra (lásd *5.b–5.d*). A típusmodell már profi volt.
 
 ---
 

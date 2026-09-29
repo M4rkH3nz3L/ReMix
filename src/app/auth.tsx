@@ -26,10 +26,13 @@ import {
   isValidUsername,
   looksLikeEmail,
 } from '@/lib/accountValidation';
+import { isSendablePhone, isValidOtp, maskPhone, sanitizeOtpInput } from '@/lib/phoneAuth';
 import { isUsernameAvailable } from '@/lib/profile';
 import { useAuth } from '@/store/authStore';
 
 type Mode = 'signIn' | 'signUp';
+/** 📲 Regisztrációs csatorna: a fiók e-mailre VAGY telefonszámra jön létre. */
+type SignUpVia = 'email' | 'phone';
 
 /**
  * 🔐 Bejelentkezés / Regisztráció — az app első képernyője, amíg nincs session.
@@ -41,8 +44,15 @@ export default function AuthScreen() {
   const configured = useAuth((s) => s.configured);
   const signIn = useAuth((s) => s.signIn);
   const signUp = useAuth((s) => s.signUp);
+  const signUpWithPhone = useAuth((s) => s.signUpWithPhone);
+  const verifyPhoneOtp = useAuth((s) => s.verifyPhoneOtp);
+  const resendPhoneOtp = useAuth((s) => s.resendPhoneOtp);
 
   const [mode, setMode] = useState<Mode>('signIn');
+  const [signUpVia, setSignUpVia] = useState<SignUpVia>('email');
+  /** a beírt kód + a szám, amire az SMS elment (E.164) — ha van, az OTP-lap megy */
+  const [otpPhone, setOtpPhone] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // regisztrációs profil-mezők
@@ -59,25 +69,37 @@ export default function AuthScreen() {
   const [langOpen, setLangOpen] = useState(false);
 
   const isSignUp = mode === 'signUp';
+  /** 📲 telefonos regisztráció: a fiók a SZÁMRA jön létre, SMS-kóddal aktiválva */
+  const viaPhone = isSignUp && signUpVia === 'phone';
 
   // mező-hibák csak akkor látszanak, ha már írt bele (üresen ne piroskodjon)
   const nameError = isSignUp && fullName.length > 0 && !isValidFullName(fullName);
   const usernameError = isSignUp && username.length > 0 && !isValidUsername(username);
-  const phoneError = isSignUp && phone.length > 0 && !isValidPhone(phone);
+  // telefonos úton SZIGORÚBB: E.164-re normalizálható ÉS engedett országhívószám
+  // (SMS-pumping ellen — a Brevo-kredit valódi pénz)
+  const phoneError =
+    isSignUp &&
+    phone.length > 0 &&
+    (viaPhone ? !isSendablePhone(phone) : !isValidPhone(phone));
   const birthdayError =
     isSignUp && birthday.length > 0 && !isValidBirthday(birthday);
 
   const signUpFieldsValid =
     isValidFullName(fullName) &&
     isValidUsername(username) &&
-    isValidPhone(phone) &&
+    (viaPhone ? isSendablePhone(phone) : isValidPhone(phone)) &&
     isValidBirthday(birthday) &&
     isNonEmpty(country) &&
     isNonEmpty(city);
 
   // belépéskor az azonosító e-mail / felhasználónév / telefon (elég nem üresnek lennie);
-  // regisztrációkor az e-mail KÖTELEZŐ (a fiók arra jön létre)
-  const identifierValid = isSignUp ? looksLikeEmail(email) : email.trim().length > 0;
+  // e-mailes regisztrációkor az e-mail KÖTELEZŐ (a fiók arra jön létre) —
+  // telefonos úton viszont a SZÁM az azonosító, az e-mail elhagyható
+  const identifierValid = isSignUp
+    ? viaPhone
+      ? isSendablePhone(phone)
+      : looksLikeEmail(email)
+    : email.trim().length > 0;
 
   const canSubmit =
     configured &&
@@ -85,6 +107,46 @@ export default function AuthScreen() {
     identifierValid &&
     password.length >= 6 &&
     (!isSignUp || (signUpFieldsValid && accepted));
+
+  /** 📲 SMS-kód ellenőrzése → session (a guard tovább visz) */
+  const submitOtp = async () => {
+    if (!otpPhone || busy || !isValidOtp(otpCode)) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await verifyPhoneOtp(otpPhone, otpCode);
+      if (result.error) {
+        setError(result.error);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 📲 kód újraküldése (a Supabase rate-limitje alá esik) */
+  const resendOtp = async () => {
+    if (!otpPhone || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await resendPhoneOtp(otpPhone);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setOtpCode('');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!canSubmit) {
@@ -100,21 +162,21 @@ export default function AuthScreen() {
         setBusy(false);
         return;
       }
+      const profile = { fullName, username, phone, birthday, country, city };
       const result = isSignUp
-        ? await signUp(email.trim(), password, {
-            fullName,
-            username,
-            phone,
-            birthday,
-            country,
-            city,
-          })
+        ? viaPhone
+          ? await signUpWithPhone(phone, password, profile)
+          : await signUp(email.trim(), password, profile)
         : await signIn(email.trim(), password);
       if (result.error) {
         setError(result.error);
       } else if (result.needsEmailConfirm) {
         // regisztráció megerősítendő e-maillel — a session majd megerősítés után jön
         setEmailSent(true);
+      } else if (result.needsSmsOtp && result.phone) {
+        // 📲 elment az SMS — a normalizált E.164-számmal ellenőrzünk
+        setOtpPhone(result.phone);
+        setOtpCode('');
       }
       // siker (session): a guard reaktívan a projektekhez vált, itt nincs teendő
     } catch (e) {
@@ -128,6 +190,8 @@ export default function AuthScreen() {
     setMode(isSignUp ? 'signIn' : 'signUp');
     setError(null);
     setEmailSent(false);
+    setOtpPhone(null);
+    setOtpCode('');
   };
 
   return (
@@ -161,7 +225,54 @@ export default function AuthScreen() {
           <Text style={styles.appName}>{t('home.appName')}</Text>
         </View>
 
-        {emailSent ? (
+        {otpPhone ? (
+          /* 📲 SMS-kód lap — a telefonos regisztráció második lépése */
+          <View style={styles.card}>
+            <Ionicons name="chatbox-ellipses-outline" size={40} color={palette.accent} />
+            <Text style={styles.title}>{t('auth.smsCodeTitle')}</Text>
+            <Text style={styles.subtitle}>
+              {t('auth.smsCodeBody', { phone: maskPhone(otpPhone) })}
+            </Text>
+
+            <Text style={styles.fieldLabel}>{t('auth.smsCodeLabel')}</Text>
+            <TextInput
+              value={otpCode}
+              onChangeText={(v) => setOtpCode(sanitizeOtpInput(v))}
+              placeholder="123456"
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, styles.otpInput]}
+              keyboardType="number-pad"
+              autoComplete="sms-otp"
+              textContentType="oneTimeCode"
+              maxLength={6}
+              editable={!busy}
+              autoFocus
+            />
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <PrimaryButton
+              label={t('auth.smsVerifyAction')}
+              onPress={submitOtp}
+              disabled={busy || !isValidOtp(otpCode)}
+            />
+
+            <Pressable onPress={resendOtp} style={styles.switchRow} disabled={busy}>
+              <Text style={styles.switchAction}>{t('auth.smsResendAction')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setOtpPhone(null);
+                setOtpCode('');
+                setError(null);
+              }}
+              style={styles.switchRow}
+              disabled={busy}
+            >
+              <Text style={styles.switchAction}>{t('auth.smsChangeNumber')}</Text>
+            </Pressable>
+          </View>
+        ) : emailSent ? (
           <View style={styles.card}>
             <Ionicons name="mail-unread-outline" size={40} color={palette.accent} />
             <Text style={styles.title}>{t('auth.checkEmailTitle')}</Text>
@@ -181,6 +292,39 @@ export default function AuthScreen() {
 
             {isSignUp ? (
               <>
+                {/* 📲 Csatorna-váltó: a fiók e-mailre VAGY telefonszámra jön létre */}
+                <Text style={styles.fieldLabel}>{t('auth.viaLabel')}</Text>
+                <View style={styles.viaRow}>
+                  {(['email', 'phone'] as const).map((via) => (
+                    <Pressable
+                      key={via}
+                      onPress={() => {
+                        setSignUpVia(via);
+                        setError(null);
+                      }}
+                      disabled={busy}
+                      style={[styles.viaChip, signUpVia === via && styles.viaChipActive]}
+                    >
+                      <Ionicons
+                        name={via === 'email' ? 'mail-outline' : 'chatbox-ellipses-outline'}
+                        size={16}
+                        color={signUpVia === via ? palette.bg : palette.textDim}
+                      />
+                      <Text
+                        style={[
+                          styles.viaChipText,
+                          signUpVia === via && styles.viaChipTextActive,
+                        ]}
+                      >
+                        {t(via === 'email' ? 'auth.viaEmail' : 'auth.viaPhone')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.hint}>
+                  {t(viaPhone ? 'auth.viaPhoneHint' : 'auth.viaEmailHint')}
+                </Text>
+
                 <Text style={styles.fieldLabel}>{t('auth.nameLabel')}</Text>
                 <TextInput
                   value={fullName}
@@ -218,7 +362,11 @@ export default function AuthScreen() {
             ) : null}
 
             <Text style={styles.fieldLabel}>
-              {isSignUp ? t('auth.emailLabel') : t('auth.identifierLabel')}
+              {isSignUp
+                ? viaPhone
+                  ? t('auth.emailOptionalLabel')
+                  : t('auth.emailLabel')
+                : t('auth.identifierLabel')}
             </Text>
             <TextInput
               value={email}
@@ -479,6 +627,42 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: palette.danger,
+  },
+  /* 📲 regisztrációs csatorna-váltó (e-mail ↔ telefon) */
+  viaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  viaChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: palette.surfaceHigh,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingVertical: 10,
+  },
+  viaChipActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
+  },
+  viaChipText: {
+    color: palette.textDim,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  viaChipTextActive: {
+    color: palette.bg,
+  },
+  /* az SMS-kód mező: nagy, ritkított számjegyek */
+  otpInput: {
+    fontSize: 24,
+    letterSpacing: 8,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   locationRow: {
     flexDirection: 'row',

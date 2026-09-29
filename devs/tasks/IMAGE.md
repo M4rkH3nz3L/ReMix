@@ -1,6 +1,8 @@
 # 🖼️ ReMix Image Studio — fejlesztési terv
 
-> Forrás-vízió: [devs/source/IMAGE-EDITOR.md](../source/IMAGE-EDITOR.md) (= [devs/source/EDITORS.md](../source/EDITORS.md), azonos tartalom).
+> Forrás-vízió: [devs/source/EDITORS.md](../source/EDITORS.md). (A vele BÁJTRA AZONOS
+> `IMAGE-EDITOR.md` duplikátum törölve; a lenti „IMAGE-EDITOR.md §…" hivatkozások
+> ugyanennek a dokumentumnak a szakaszaira mutatnak.)
 > Cél-útvonal: `http://localhost:8081/studio/image/<projectId>` → [src/app/studio/image/[id].tsx](../../src/app/studio/image/%5Bid%5D.tsx)
 > Testvér-terv: [devs/tasks/AUDIO.md](./AUDIO.md) (ugyanez a minta a hangra).
 

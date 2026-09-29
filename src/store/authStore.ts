@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { SignUpProfile } from '@/lib/accountValidation';
 import { CONSENT_VERSION } from '@/constants/legal';
 import { registerCurrentDevice } from '@/lib/deviceInfo';
+import { isAllowedPhone, isValidOtp, normalizeE164 } from '@/lib/phoneAuth';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useRoles } from '@/store/roleStore';
@@ -26,6 +27,13 @@ export interface AuthResult {
   error?: string;
   /** regisztráció után: e-mail-megerősítés kell (nincs azonnali session) */
   needsEmailConfirm?: boolean;
+  /**
+   * 📲 Telefonos regisztráció után: SMS-ben kapott 6 jegyű kód kell
+   * (`verifyPhoneOtp`). A `phone` a NORMALIZÁLT E.164-szám — a UI ezt adja
+   * vissza az ellenőrzésnél, hogy ne a nyers beírt alak menjen.
+   */
+  needsSmsOtp?: boolean;
+  phone?: string;
 }
 
 interface AuthState {
@@ -46,6 +54,16 @@ interface AuthState {
   ) => Promise<AuthResult>;
   /** belépés e-maillel, felhasználónévvel VAGY telefonnal (azonosító → e-mail feloldás) */
   signIn: (identifier: string, password: string) => Promise<AuthResult>;
+  /** 📲 regisztráció TELEFONSZÁMMAL — SMS-OTP-t küld (Brevo hook) */
+  signUpWithPhone: (
+    phone: string,
+    password: string,
+    profile: SignUpProfile,
+  ) => Promise<AuthResult>;
+  /** 📲 az SMS-ben kapott 6 jegyű kód ellenőrzése → session */
+  verifyPhoneOtp: (phone: string, token: string) => Promise<AuthResult>;
+  /** 📲 OTP újraküldése (a Supabase rate-limit alá esik) */
+  resendPhoneOtp: (phone: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -178,6 +196,88 @@ export const useAuth = create<AuthState>((set, get) => ({
       void registerCurrentDevice(data.user.id);
     }
     return {};
+  },
+
+  signUpWithPhone: async (phone, password, profile) => {
+    if (!supabase) {
+      return { error: 'Supabase nincs konfigurálva.' };
+    }
+    // E.164 + országkód-kapu MÁR a hálózat előtt: az SMS valódi pénz (előre
+    // fizetett Brevo-kredit), a hook szerver-oldalon is ellenőrzi ugyanezt.
+    const e164 = normalizeE164(phone);
+    if (!e164) {
+      return { error: 'Érvénytelen telefonszám.' };
+    }
+    if (!isAllowedPhone(e164)) {
+      return { error: 'Ez az országhívószám nem támogatott SMS-regisztrációhoz.' };
+    }
+    const { data, error } = await supabase.auth.signUp({
+      phone: e164,
+      password,
+      options: {
+        data: {
+          full_name: profile.fullName.trim(),
+          username: profile.username.trim(),
+          phone: e164,
+          birthday: profile.birthday.trim(),
+          country: profile.country.trim(),
+          city: profile.city.trim(),
+          consent_version: CONSENT_VERSION,
+        },
+      },
+    });
+    if (error) {
+      return { error: messageOf(error) };
+    }
+    // telefonos úton alapból NINCS azonnali session → jön az SMS-kód
+    if (!data.session) {
+      return { needsSmsOtp: true, phone: e164 };
+    }
+    if (data.user) {
+      void registerCurrentDevice(data.user.id);
+    }
+    return {};
+  },
+
+  verifyPhoneOtp: async (phone, token) => {
+    if (!supabase) {
+      return { error: 'Supabase nincs konfigurálva.' };
+    }
+    const e164 = normalizeE164(phone);
+    if (!e164) {
+      return { error: 'Érvénytelen telefonszám.' };
+    }
+    const code = token.replace(/\D/g, '');
+    if (!isValidOtp(code)) {
+      return { error: 'A kód 6 számjegyből áll.' };
+    }
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: e164,
+      token: code,
+      type: 'sms',
+    });
+    if (error) {
+      return { error: messageOf(error) };
+    }
+    if (data.user) {
+      void registerCurrentDevice(data.user.id);
+    }
+    return {};
+  },
+
+  resendPhoneOtp: async (phone) => {
+    if (!supabase) {
+      return { error: 'Supabase nincs konfigurálva.' };
+    }
+    const e164 = normalizeE164(phone);
+    if (!e164 || !isAllowedPhone(e164)) {
+      return { error: 'Érvénytelen telefonszám.' };
+    }
+    const { error } = await supabase.auth.resend({ type: 'sms', phone: e164 });
+    if (error) {
+      return { error: messageOf(error) };
+    }
+    return { needsSmsOtp: true, phone: e164 };
   },
 
   signOut: async () => {

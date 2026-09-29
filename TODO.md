@@ -142,11 +142,12 @@ Deven end-to-end tesztelt (publikálás/engagement-számlálók/RLS/remix/follow
 - [ ] **Kommentek** — `post_comments` tábla + UI (a `src/types/social.ts` már
   modellezi: nested reply, mention, pin). Ma a komment-szám placeholder.
 - [ ] **For-You ranking** — ma „legújabb"; később engagement/hasonlóság-alapú
-  rangsor (SOCIAL.md M11).
+  rangsor (a törölt `devs/SOCIAL.md` M11 — `git show 1d2de8c^:devs/SOCIAL.md`).
 - [ ] **Moderáció / report** — a `moderation_status` mező kész; kell jelentés-flow
   + admin-eszköz + tartalom-szabályzat (a skálázáshoz).
-- [ ] **Chat / DM, letiltás, említések, közösségek** — a `devs/SOCIAL.md` teljes
-  víziója (Identity/Social/Chat/Notifications/AI-layer).
+- [ ] **Chat / DM, letiltás, említések, közösségek** — a törölt `devs/SOCIAL.md`
+  teljes víziója (Identity/Social/Chat/Notifications/AI-layer);
+  előhívás: `git show 1d2de8c^:devs/SOCIAL.md`.
 
 ## 📋 FUNKCIÓ-BACKLOG (roadmap-maradék — a PRO.md-ből)
 

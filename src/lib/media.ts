@@ -184,3 +184,18 @@ export async function pickSrt(): Promise<SrtCue[] | null> {
   const cues = parseSrt(content);
   return cues.length > 0 ? cues : [];
 }
+
+/** SVG-fájl kiválasztása és beolvasása (nyers XML-szöveg); null, ha elvetve. */
+export async function pickSvg(): Promise<string | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    // sok picker nem ad pontos MIME-t az SVG-re → szélesre nyitunk, a
+    // `parseSvg` úgyis tartalom alapján dolgozik
+    type: ['image/svg+xml', 'text/xml', 'application/xml', 'text/plain', 'application/octet-stream'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  return new File(result.assets[0].uri).text();
+}

@@ -41,11 +41,12 @@ const userStorage = require('./userStorage');
 const { notifyAvailable, sendNotification, inviteMember, adminClient } = require('./notify');
 const { payoutsConfigured, sendPayout } = require('./payouts');
 const { stemsConfigured, separateStems } = require('./stems');
-const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
+const { callerId, corsAllowlist, requireAuth, verifyToken, INSECURE_DEV } = require('./auth');
 // 🛡️ Security-réteg (devs/tasks/remix/): rate-limit (API4) + policy-leltár (API9).
 const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
 const { authenticated, routeInventory } = require('./security/authorization');
 const { mediaGuard } = require('./security/uploadPolicy');
+const { canAccessRenderJob } = require('./security/renderAuth');
 const {
   billingAvailable,
   activatePro,
@@ -100,6 +101,38 @@ function requirePro(req, res, next) {
 
 /** rövidítés: hitelesítés + szerver-hiteles Pro-ellenőrzés egy lépésben */
 const proOnly = [requireAuth, requirePro];
+
+/**
+ * 🎬 Render-job „puha" hitelesítés (BOLA-fix, devs/tasks/remix/07). A hívót a
+ * tokenből azonosítja — a token jöhet Authorization fejlécben (poll, natív
+ * letöltés), VAGY `?t=` query-paraméterben (a kész MP4 URL-je, amit pl.
+ * uploadMedia / a böngésző FETCH-el, ahol nem lehet fejlécet küldeni).
+ *
+ * SZÁNDÉKOSAN nem 401-ezik: a `jobs` map KÖZÖS (a /proxy, /collect is ide tesz,
+ * és a /render/:id-en pollozódik token nélkül). Ha nincs/érvénytelen a token,
+ * `req.user = null` és továbbenged — az ÉRDEMI döntést a handler ownership-
+ * ellenőrzése (`canAccessRenderJob`) hozza: TULAJDONOLT jobhoz kell az egyező
+ * token (idegen → 404), a tulajdonos-nélküli (proxy/collect) marad elérhető.
+ */
+function renderJobAuth(req, _res, next) {
+  const m = /^Bearer\s+(.+)$/i.exec((req.headers.authorization || '').trim());
+  const queryTok = typeof req.query.t === 'string' ? req.query.t.trim() : '';
+  const token = (m ? m[1].trim() : '') || queryTok;
+  if (!token) {
+    req.user = null;
+    next();
+    return;
+  }
+  verifyToken(token)
+    .then((result) => {
+      req.user = result.ok ? result.user : null;
+      next();
+    })
+    .catch(() => {
+      req.user = null;
+      next();
+    });
+}
 
 const DEV_BILLING = process.env.ALLOW_DEV_BILLING === '1';
 function devBillingGuard(_req, res, next) {
@@ -1577,7 +1610,11 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
   }
 
   const id = crypto.randomBytes(8).toString('hex');
-  jobs.set(id, { state: 'processing', progress: 0, dir: workDir });
+  // 👤 A jobhoz a HÍVÓT is eltároljuk (BOLA-fix): a /render ...proOnly mögött van,
+  // tehát req.user a verifikált tokenből jön; dev-ben (INSECURE_DEV) a body-fallback.
+  // Ezt MINDEN állapot-frissítésnél megőrizzük (a jobs.set teljes objektumot cserél).
+  const uid = req.user?.id || (INSECURE_DEV && req.body.userId ? String(req.body.userId).trim() : null) || null;
+  jobs.set(id, { state: 'processing', progress: 0, dir: workDir, userId: uid });
   res.json({ id });
 
   let settings = {};
@@ -1598,11 +1635,11 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
     settings
   )
     .then((file) => {
-      jobs.set(id, { state: 'done', file, dir: workDir });
+      jobs.set(id, { state: 'done', file, dir: workDir, userId: uid });
     })
     .catch((err) => {
       console.error(`[${id}] render hiba:`, err.message);
-      jobs.set(id, { state: 'error', error: err.message, dir: workDir });
+      jobs.set(id, { state: 'error', error: err.message, dir: workDir, userId: uid });
     });
 });
 
@@ -2168,16 +2205,27 @@ function workerView(w, uid) {
   };
 }
 
-app.get('/render/:id', async (req, res) => {
+// 🔒 BOLA-fix (07): a hívót a renderJobAuth azonosítja (token header/`?t=`), és
+// TULAJDONOLT jobhoz csak az egyező user fér — idegenre 404 (a job létezését se
+// szivárogtatjuk). Tulajdonos-nélküli (proxy/collect) jobnál nincs korlát.
+app.get('/render/:id', renderJobAuth, async (req, res) => {
   // a rövid (lokális) render a jobs-mapben van; a hosszú (felhő) a queue-ban
   const job = jobs.get(req.params.id);
   if (job) {
+    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+      res.status(404).json({ error: 'Ismeretlen job.' });
+      return;
+    }
     res.json({ state: job.state, error: job.error, progress: job.progress });
     return;
   }
   if (queueEnabled()) {
     const j = await getRenderJob(req.params.id).catch(() => null);
     if (j) {
+      if (!canAccessRenderJob(j.userId, req.user?.id)) {
+        res.status(404).json({ error: 'Ismeretlen job.' });
+        return;
+      }
       const state = j.state === 'completed' ? 'done' : j.state === 'failed' ? 'error' : 'processing';
       res.json({
         state,
@@ -2190,9 +2238,13 @@ app.get('/render/:id', async (req, res) => {
   res.status(404).json({ error: 'Ismeretlen job.' });
 });
 
-app.get('/render/:id/file', async (req, res) => {
+app.get('/render/:id/file', renderJobAuth, async (req, res) => {
   const job = jobs.get(req.params.id);
   if (job) {
+    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+      res.status(404).json({ error: 'Ismeretlen job.' });
+      return;
+    }
     if (job.state !== 'done') {
       res.status(404).json({ error: 'A render még nem készült el.' });
       return;
@@ -2202,11 +2254,17 @@ app.get('/render/:id/file', async (req, res) => {
   }
   if (queueEnabled()) {
     const j = await getRenderJob(req.params.id).catch(() => null);
-    if (j && j.state === 'completed' && j.returnvalue?.outKey) {
-      const url = publicUrl(j.returnvalue.outKey);
-      if (url) {
-        res.redirect(url);
+    if (j) {
+      if (!canAccessRenderJob(j.userId, req.user?.id)) {
+        res.status(404).json({ error: 'Ismeretlen job.' });
         return;
+      }
+      if (j.state === 'completed' && j.returnvalue?.outKey) {
+        const url = publicUrl(j.returnvalue.outKey);
+        if (url) {
+          res.redirect(url);
+          return;
+        }
       }
     }
   }

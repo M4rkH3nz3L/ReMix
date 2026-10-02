@@ -53,6 +53,7 @@ async function getRenderJob(id) {
     progress: typeof job.progress === 'number' ? job.progress : 0,
     returnvalue: job.returnvalue,
     failedReason: job.failedReason,
+    userId: job.data?.userId ?? null, // BOLA-ellenőrzéshez (/render/:id[/file])
   };
 }
 

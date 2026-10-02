@@ -16,7 +16,7 @@ import { projectDuration } from '@/lib/projectUtils';
 import { renderCacheKey } from '@/lib/projectHash';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
-import { workerAuthHeaders } from '@/lib/workerAuth';
+import { workerAuthHeaders, workerAuthToken } from '@/lib/workerAuth';
 import { withFingerprints } from '@/lib/fingerprint';
 import { useAuth } from '@/store/authStore';
 import type { Project, RenderedVersion } from '@/types/project';
@@ -502,7 +502,11 @@ async function submitAndPollRender(
     // média már fent van, a worker épp renderel, és egy pillanatnyi hálózat-
     // kimaradás (lift, wifi→LTE) eldobná az egész munkát. A `signal` átmegy,
     // így a ✕ gomb továbbra is azonnal megszakít.
-    const res = await fetchRead(`${base}/render/${id}`, { timeoutMs: 5000, signal });
+    const res = await fetchRead(`${base}/render/${id}`, {
+      timeoutMs: 5000,
+      signal,
+      headers: await workerAuthHeaders(), // 🔒 BOLA: a poll a saját jobhoz
+    });
     const status = await readJson<{ state?: string; error?: string; progress?: number }>(
       res,
       tr('lib.render.renderError')
@@ -543,7 +547,9 @@ async function renderCloud(
   } catch {
     // ha nem törölhető, a letöltés úgyis hibát ad
   }
-  return await File.downloadFileAsync(`${base}/render/${id}/file`, target);
+  return await File.downloadFileAsync(`${base}/render/${id}/file`, target, {
+    headers: await workerAuthHeaders(), // 🔒 BOLA: a saját render letöltése
+  });
 }
 
 /**
@@ -580,7 +586,10 @@ export async function renderCloudFileUrl(
 ): Promise<string> {
   const base = cloudBaseUrl();
   const id = await submitAndPollRender(base, project, onProgress, settings, signal);
-  return `${base}/render/${id}/file`;
+  // 🔒 BOLA (07): ezt a nyers URL-t a böngésző / uploadMedia FETCH-eli, ahol nem
+  // lehet fejlécet küldeni → a token `?t=` query-paraméterben megy.
+  const token = await workerAuthToken();
+  return `${base}/render/${id}/file${token ? `?t=${encodeURIComponent(token)}` : ''}`;
 }
 
 /**
@@ -785,7 +794,9 @@ export async function collectAndShareProject(
   onProgress?.({ phase: PHASE_PACKAGING, ratio: stages.ratioFor(PHASE_PACKAGING, 0) });
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-    const res = await fetchWithTimeout(`${base}/render/${submitBody.id}`, 5000);
+    const res = await fetchWithTimeout(`${base}/render/${submitBody.id}`, 5000, {
+      headers: await workerAuthHeaders(), // 🔒 BOLA: a saját job pollja
+    });
     const status = await readJson<{ state?: string; error?: string }>(
       res,
       tr('lib.render.renderError')
@@ -803,7 +814,8 @@ export async function collectAndShareProject(
       }
       const file = await File.downloadFileAsync(
         `${base}/render/${submitBody.id}/file`,
-        target
+        target,
+        { headers: await workerAuthHeaders() } // 🔒 BOLA: a saját .remix.zip letöltése
       );
       onProgress?.({ phase: tr('lib.render.phaseShare'), ratio: 1 });
       if (await Sharing.isAvailableAsync()) {

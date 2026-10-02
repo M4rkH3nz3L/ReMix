@@ -29,3 +29,22 @@ export async function workerAuthHeaders(): Promise<Record<string, string>> {
 export async function workerJsonHeaders(): Promise<Record<string, string>> {
   return { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) };
 }
+
+/**
+ * 🔐 A NYERS access-token (fejléc nélkül). Oda kell, ahol nem lehet fejlécet
+ * küldeni, de a hívás hitelesítése kötelező — pl. a kész render MP4 URL-je
+ * (`/render/:id/file`), amit a böngésző / `uploadMedia` közvetlenül FETCH-el: ott
+ * a token `?t=` query-paraméterként megy (render-BOLA, devs/tasks/remix/07).
+ * Üres string, ha nincs munkamenet.
+ */
+export async function workerAuthToken(): Promise<string> {
+  if (!supabase) {
+    return '';
+  }
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? '';
+  } catch {
+    return '';
+  }
+}

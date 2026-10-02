@@ -54,10 +54,14 @@ function bearerToken(req) {
  * A kérés hívójának verifikálása. Sikeres esetben `req.user = { id, email }`.
  * A `userId`-t INNEN kell venni, nem a body-ból.
  */
-async function verifyRequest(req) {
-  const token = bearerToken(req);
+/**
+ * Egy NYERS token verifikálása (forrástól függetlenül: Authorization-fejléc
+ * VAGY — pl. a render-letöltésnél, ahol nem lehet fejlécet küldeni — `?t=`
+ * query-token). Siker esetén `{ ok, user }`.
+ */
+async function verifyToken(token) {
   if (!token) {
-    return { ok: false, status: 401, error: 'Hiányzó Authorization: Bearer <token>.' };
+    return { ok: false, status: 401, error: 'Hiányzó token.' };
   }
   const client = verifierClient();
   if (!client) {
@@ -76,6 +80,14 @@ async function verifyRequest(req) {
   } catch (err) {
     return { ok: false, status: 401, error: `Token-verifikáció sikertelen: ${err.message}` };
   }
+}
+
+async function verifyRequest(req) {
+  const token = bearerToken(req);
+  if (!token) {
+    return { ok: false, status: 401, error: 'Hiányzó Authorization: Bearer <token>.' };
+  }
+  return verifyToken(token);
 }
 
 /**
@@ -144,4 +156,12 @@ function corsAllowlist() {
   };
 }
 
-module.exports = { authAvailable, requireAuth, verifyRequest, callerId, corsAllowlist, INSECURE_DEV };
+module.exports = {
+  authAvailable,
+  requireAuth,
+  verifyRequest,
+  verifyToken,
+  callerId,
+  corsAllowlist,
+  INSECURE_DEV,
+};

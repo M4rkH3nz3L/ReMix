@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -194,6 +197,317 @@ export default function AuthScreen() {
     setOtpCode('');
   };
 
+  // ── Swipe-pager: a belépés és a regisztráció KÉT vízszintes lap, amelyek között
+  //    swipe-pal (és a lenti linkkel / pontokkal) lehet váltani. A `mode` és a lap
+  //    pozíciója szinkronban: a swipe állítja a módot, a mód-váltás görgeti a lapot.
+  const { width } = useWindowDimensions();
+  const pagerRef = useRef<ScrollView | null>(null);
+
+  /** a megadott lapra görget (0 = belépés, 1 = regisztráció) */
+  const goToPage = useCallback(
+    (page: number) => {
+      if (width > 0) {
+        pagerRef.current?.scrollTo({ x: page * width, animated: true });
+      }
+    },
+    [width],
+  );
+
+  // a mód PROGRAMATIKUS váltásakor (switch-link, OTP-visszalépés) a pager odaugrik
+  useEffect(() => {
+    goToPage(isSignUp ? 1 : 0);
+  }, [isSignUp, goToPage]);
+
+  /** swipe vége → a látható laphoz igazítjuk a módot (ez vezérli a címet + submitet) */
+  const onPagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (width <= 0) {
+      return;
+    }
+    const page = Math.round(e.nativeEvent.contentOffset.x / width);
+    const next: Mode = page === 1 ? 'signUp' : 'signIn';
+    if (next !== mode) {
+      setMode(next);
+      setError(null);
+    }
+  };
+
+  // ── 1. LAP: BELÉPÉS ───────────────────────────────────────────────────────
+  const signInCard = (
+    <View style={styles.card}>
+      <Text style={styles.title}>{t('auth.signInTitle')}</Text>
+      <Text style={styles.subtitle}>{t('auth.signInSubtitle')}</Text>
+
+      <Text style={styles.fieldLabel}>{t('auth.identifierLabel')}</Text>
+      <TextInput
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('auth.identifierPlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={styles.input}
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="username"
+        autoComplete="username"
+        editable={!busy}
+      />
+
+      <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
+      <TextInput
+        value={password}
+        onChangeText={setPassword}
+        placeholder={t('auth.passwordPlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={styles.input}
+        secureTextEntry
+        autoCapitalize="none"
+        autoComplete="password"
+        textContentType="password"
+        editable={!busy}
+        onSubmitEditing={() => {
+          void submit();
+        }}
+      />
+      <Text style={styles.hint}>{t('auth.passwordHint')}</Text>
+
+      {error && !isSignUp ? <Text style={styles.error}>{error}</Text> : null}
+      {!configured ? <Text style={styles.error}>{t('auth.notConfigured')}</Text> : null}
+
+      <View style={styles.submitWrap}>
+        {busy && !isSignUp ? (
+          <View style={styles.busyBox}>
+            <ActivityIndicator color={palette.text} />
+          </View>
+        ) : (
+          <PrimaryButton
+            icon="log-in"
+            label={t('auth.signInAction')}
+            disabled={!canSubmit || isSignUp}
+            onPress={() => {
+              void submit();
+            }}
+          />
+        )}
+      </View>
+
+      <Pressable onPress={() => goToPage(1)} style={styles.switchRow} disabled={busy}>
+        <Text style={styles.switchText}>
+          {t('auth.noAccount')}{' '}
+          <Text style={styles.switchAction}>{t('auth.signUpAction')} ›</Text>
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  // ── 2. LAP: REGISZTRÁCIÓ ──────────────────────────────────────────────────
+  const signUpCard = (
+    <View style={styles.card}>
+      <Text style={styles.title}>{t('auth.signUpTitle')}</Text>
+      <Text style={styles.subtitle}>{t('auth.signUpSubtitle')}</Text>
+
+      {/* 📲 Csatorna-váltó: a fiók e-mailre VAGY telefonszámra jön létre */}
+      <Text style={styles.fieldLabel}>{t('auth.viaLabel')}</Text>
+      <View style={styles.viaRow}>
+        {(['email', 'phone'] as const).map((via) => (
+          <Pressable
+            key={via}
+            onPress={() => {
+              setSignUpVia(via);
+              setError(null);
+            }}
+            disabled={busy}
+            style={[styles.viaChip, signUpVia === via && styles.viaChipActive]}
+          >
+            <Ionicons
+              name={via === 'email' ? 'mail-outline' : 'chatbox-ellipses-outline'}
+              size={16}
+              color={signUpVia === via ? palette.bg : palette.textDim}
+            />
+            <Text style={[styles.viaChipText, signUpVia === via && styles.viaChipTextActive]}>
+              {t(via === 'email' ? 'auth.viaEmail' : 'auth.viaPhone')}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.hint}>{t(viaPhone ? 'auth.viaPhoneHint' : 'auth.viaEmailHint')}</Text>
+
+      <Text style={styles.fieldLabel}>{t('auth.nameLabel')}</Text>
+      <TextInput
+        value={fullName}
+        onChangeText={setFullName}
+        placeholder={t('auth.namePlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={[styles.input, nameError && styles.inputError]}
+        autoCapitalize="words"
+        autoCorrect={false}
+        textContentType="name"
+        autoComplete="name"
+        editable={!busy}
+      />
+      <Text style={nameError ? styles.error : styles.hint}>{t('auth.nameHint')}</Text>
+
+      <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
+      <TextInput
+        value={username}
+        onChangeText={setUsername}
+        placeholder={t('auth.usernamePlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={[styles.input, usernameError && styles.inputError]}
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="username"
+        autoComplete="username-new"
+        editable={!busy}
+      />
+      <Text style={usernameError ? styles.error : styles.hint}>{t('auth.usernameHint')}</Text>
+
+      <Text style={styles.fieldLabel}>
+        {viaPhone ? t('auth.emailOptionalLabel') : t('auth.emailLabel')}
+      </Text>
+      <TextInput
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('auth.emailPlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={styles.input}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        autoComplete="email"
+        editable={!busy}
+      />
+
+      <Text style={styles.fieldLabel}>{t('auth.phoneLabel')}</Text>
+      <TextInput
+        value={phone}
+        onChangeText={setPhone}
+        placeholder={t('auth.phonePlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={[styles.input, phoneError && styles.inputError]}
+        keyboardType="phone-pad"
+        autoCorrect={false}
+        textContentType="telephoneNumber"
+        autoComplete="tel"
+        editable={!busy}
+      />
+      {phoneError ? <Text style={styles.error}>{t('auth.phoneInvalid')}</Text> : null}
+
+      <Text style={styles.fieldLabel}>{t('auth.birthdayLabel')}</Text>
+      <TextInput
+        value={birthday}
+        onChangeText={setBirthday}
+        placeholder={t('auth.birthdayPlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={[styles.input, birthdayError && styles.inputError]}
+        autoCorrect={false}
+        autoCapitalize="none"
+        keyboardType="numbers-and-punctuation"
+        maxLength={10}
+        editable={!busy}
+      />
+      {birthdayError ? <Text style={styles.error}>{t('auth.birthdayInvalid')}</Text> : null}
+
+      <Text style={styles.fieldLabel}>{t('auth.locationLabel')}</Text>
+      <View style={styles.locationRow}>
+        <TextInput
+          value={country}
+          onChangeText={setCountry}
+          placeholder={t('auth.countryPlaceholder')}
+          placeholderTextColor={palette.textDim}
+          style={[styles.input, styles.locationInput]}
+          autoCapitalize="words"
+          autoCorrect={false}
+          textContentType="countryName"
+          editable={!busy}
+        />
+        <TextInput
+          value={city}
+          onChangeText={setCity}
+          placeholder={t('auth.cityPlaceholder')}
+          placeholderTextColor={palette.textDim}
+          style={[styles.input, styles.locationInput]}
+          autoCapitalize="words"
+          autoCorrect={false}
+          textContentType="addressCity"
+          editable={!busy}
+        />
+      </View>
+
+      <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
+      <TextInput
+        value={password}
+        onChangeText={setPassword}
+        placeholder={t('auth.passwordPlaceholder')}
+        placeholderTextColor={palette.textDim}
+        style={styles.input}
+        secureTextEntry
+        autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
+        editable={!busy}
+        onSubmitEditing={() => {
+          void submit();
+        }}
+      />
+      <Text style={styles.hint}>{t('auth.passwordHint')}</Text>
+
+      {error && isSignUp ? <Text style={styles.error}>{error}</Text> : null}
+      {!configured ? <Text style={styles.error}>{t('auth.notConfigured')}</Text> : null}
+
+      <Pressable
+        onPress={() => setAccepted((v) => !v)}
+        style={styles.consentRow}
+      >
+        <Ionicons
+          name={accepted ? 'checkbox' : 'square-outline'}
+          size={22}
+          color={accepted ? palette.accent : palette.border}
+        />
+        <Text style={styles.consentText}>
+          {t('auth.consentPrefix')}{' '}
+          <Text
+            style={styles.consentLink}
+            onPress={() => router.push('/legal?doc=terms')}
+          >
+            {t('auth.consentTerms')}
+          </Text>
+          {t('auth.consentAnd')}
+          <Text
+            style={styles.consentLink}
+            onPress={() => router.push('/legal?doc=privacy')}
+          >
+            {t('auth.consentPrivacy')}
+          </Text>
+          .
+        </Text>
+      </Pressable>
+
+      <View style={styles.submitWrap}>
+        {busy && isSignUp ? (
+          <View style={styles.busyBox}>
+            <ActivityIndicator color={palette.text} />
+          </View>
+        ) : (
+          <PrimaryButton
+            icon="person-add"
+            label={t('auth.signUpAction')}
+            disabled={!canSubmit || !isSignUp}
+            onPress={() => {
+              void submit();
+            }}
+          />
+        )}
+      </View>
+
+      <Pressable onPress={() => goToPage(0)} style={styles.switchRow} disabled={busy}>
+        <Text style={styles.switchText}>
+          <Text style={styles.switchAction}>‹ {t('auth.signInAction')}</Text>{' '}
+          {t('auth.haveAccount')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
@@ -213,11 +527,6 @@ export default function AuthScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
         <View style={styles.brand}>
           <View style={styles.logoBadge}>
             <Ionicons name="shuffle" size={26} color="#fff" />
@@ -227,6 +536,11 @@ export default function AuthScreen() {
 
         {otpPhone ? (
           /* 📲 SMS-kód lap — a telefonos regisztráció második lépése */
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.card}>
             <Ionicons name="chatbox-ellipses-outline" size={40} color={palette.accent} />
             <Text style={styles.title}>{t('auth.smsCodeTitle')}</Text>
@@ -272,7 +586,13 @@ export default function AuthScreen() {
               <Text style={styles.switchAction}>{t('auth.smsChangeNumber')}</Text>
             </Pressable>
           </View>
+          </ScrollView>
         ) : emailSent ? (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.card}>
             <Ionicons name="mail-unread-outline" size={40} color={palette.accent} />
             <Text style={styles.title}>{t('auth.checkEmailTitle')}</Text>
@@ -281,250 +601,51 @@ export default function AuthScreen() {
               <Text style={styles.switchAction}>{t('auth.backToSignIn')}</Text>
             </Pressable>
           </View>
+          </ScrollView>
         ) : (
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {isSignUp ? t('auth.signUpTitle') : t('auth.signInTitle')}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isSignUp ? t('auth.signUpSubtitle') : t('auth.signInSubtitle')}
-            </Text>
-
-            {isSignUp ? (
-              <>
-                {/* 📲 Csatorna-váltó: a fiók e-mailre VAGY telefonszámra jön létre */}
-                <Text style={styles.fieldLabel}>{t('auth.viaLabel')}</Text>
-                <View style={styles.viaRow}>
-                  {(['email', 'phone'] as const).map((via) => (
-                    <Pressable
-                      key={via}
-                      onPress={() => {
-                        setSignUpVia(via);
-                        setError(null);
-                      }}
-                      disabled={busy}
-                      style={[styles.viaChip, signUpVia === via && styles.viaChipActive]}
-                    >
-                      <Ionicons
-                        name={via === 'email' ? 'mail-outline' : 'chatbox-ellipses-outline'}
-                        size={16}
-                        color={signUpVia === via ? palette.bg : palette.textDim}
-                      />
-                      <Text
-                        style={[
-                          styles.viaChipText,
-                          signUpVia === via && styles.viaChipTextActive,
-                        ]}
-                      >
-                        {t(via === 'email' ? 'auth.viaEmail' : 'auth.viaPhone')}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={styles.hint}>
-                  {t(viaPhone ? 'auth.viaPhoneHint' : 'auth.viaEmailHint')}
-                </Text>
-
-                <Text style={styles.fieldLabel}>{t('auth.nameLabel')}</Text>
-                <TextInput
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder={t('auth.namePlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, nameError && styles.inputError]}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  textContentType="name"
-                  autoComplete="name"
-                  editable={!busy}
-                />
-                <Text style={nameError ? styles.error : styles.hint}>
-                  {t('auth.nameHint')}
-                </Text>
-
-                <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
-                <TextInput
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder={t('auth.usernamePlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, usernameError && styles.inputError]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType="username"
-                  autoComplete="username-new"
-                  editable={!busy}
-                />
-                <Text style={usernameError ? styles.error : styles.hint}>
-                  {t('auth.usernameHint')}
-                </Text>
-              </>
-            ) : null}
-
-            <Text style={styles.fieldLabel}>
-              {isSignUp
-                ? viaPhone
-                  ? t('auth.emailOptionalLabel')
-                  : t('auth.emailLabel')
-                : t('auth.identifierLabel')}
-            </Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder={isSignUp ? t('auth.emailPlaceholder') : t('auth.identifierPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={isSignUp ? 'email-address' : 'default'}
-              textContentType={isSignUp ? 'emailAddress' : 'username'}
-              autoComplete={isSignUp ? 'email' : 'username'}
-              editable={!busy}
-            />
-
-            {isSignUp ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('auth.phoneLabel')}</Text>
-                <TextInput
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder={t('auth.phonePlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, phoneError && styles.inputError]}
-                  keyboardType="phone-pad"
-                  autoCorrect={false}
-                  textContentType="telephoneNumber"
-                  autoComplete="tel"
-                  editable={!busy}
-                />
-                {phoneError ? (
-                  <Text style={styles.error}>{t('auth.phoneInvalid')}</Text>
-                ) : null}
-
-                <Text style={styles.fieldLabel}>{t('auth.birthdayLabel')}</Text>
-                <TextInput
-                  value={birthday}
-                  onChangeText={setBirthday}
-                  placeholder={t('auth.birthdayPlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={[styles.input, birthdayError && styles.inputError]}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={10}
-                  editable={!busy}
-                />
-                {birthdayError ? (
-                  <Text style={styles.error}>{t('auth.birthdayInvalid')}</Text>
-                ) : null}
-
-                <Text style={styles.fieldLabel}>{t('auth.locationLabel')}</Text>
-                <View style={styles.locationRow}>
-                  <TextInput
-                    value={country}
-                    onChangeText={setCountry}
-                    placeholder={t('auth.countryPlaceholder')}
-                    placeholderTextColor={palette.textDim}
-                    style={[styles.input, styles.locationInput]}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    textContentType="countryName"
-                    editable={!busy}
-                  />
-                  <TextInput
-                    value={city}
-                    onChangeText={setCity}
-                    placeholder={t('auth.cityPlaceholder')}
-                    placeholderTextColor={palette.textDim}
-                    style={[styles.input, styles.locationInput]}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    textContentType="addressCity"
-                    editable={!busy}
-                  />
-                </View>
-              </>
-            ) : null}
-
-            <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder={t('auth.passwordPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete={isSignUp ? 'new-password' : 'password'}
-              textContentType={isSignUp ? 'newPassword' : 'password'}
-              editable={!busy}
-              onSubmitEditing={() => {
-                void submit();
-              }}
-            />
-            <Text style={styles.hint}>{t('auth.passwordHint')}</Text>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {!configured ? <Text style={styles.error}>{t('auth.notConfigured')}</Text> : null}
-
-            {isSignUp ? (
-              <Pressable
-                onPress={() => setAccepted((v) => !v)}
-                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}
-              >
-                <Ionicons
-                  name={accepted ? 'checkbox' : 'square-outline'}
-                  size={22}
-                  color={accepted ? palette.accent : palette.border}
-                />
-                <Text style={{ flex: 1, color: palette.textDim, fontSize: 13, lineHeight: 18 }}>
-                  {t('auth.consentPrefix')}{' '}
-                  <Text
-                    style={{ color: palette.accent, fontWeight: '700' }}
-                    onPress={() => router.push('/legal?doc=terms')}
-                  >
-                    {t('auth.consentTerms')}
-                  </Text>
-                  {t('auth.consentAnd')}
-                  <Text
-                    style={{ color: palette.accent, fontWeight: '700' }}
-                    onPress={() => router.push('/legal?doc=privacy')}
-                  >
-                    {t('auth.consentPrivacy')}
-                  </Text>
-                  .
-                </Text>
+          <>
+            {/* lap-jelző pontok: koppintásra is vált, a swipe mellett */}
+            <View style={styles.dotsRow}>
+              <Pressable onPress={() => goToPage(0)} hitSlop={10}>
+                <View style={[styles.dot, !isSignUp && styles.dotActive]} />
               </Pressable>
-            ) : null}
-
-            <View style={styles.submitWrap}>
-              {busy ? (
-                <View style={styles.busyBox}>
-                  <ActivityIndicator color={palette.text} />
-                </View>
-              ) : (
-                <PrimaryButton
-                  icon={isSignUp ? 'person-add' : 'log-in'}
-                  label={isSignUp ? t('auth.signUpAction') : t('auth.signInAction')}
-                  disabled={!canSubmit}
-                  onPress={() => {
-                    void submit();
-                  }}
-                />
-              )}
+              <Pressable onPress={() => goToPage(1)} hitSlop={10}>
+                <View style={[styles.dot, isSignUp && styles.dotActive]} />
+              </Pressable>
             </View>
-
-            <Pressable onPress={switchMode} style={styles.switchRow} disabled={busy}>
-              <Text style={styles.switchText}>
-                {isSignUp ? t('auth.haveAccount') : t('auth.noAccount')}{' '}
-                <Text style={styles.switchAction}>
-                  {isSignUp ? t('auth.signInAction') : t('auth.signUpAction')}
-                </Text>
-              </Text>
-            </Pressable>
-          </View>
+            {/* 👉 SWIPE: a belépés és a regisztráció két vízszintes lap */}
+            <ScrollView
+              ref={pagerRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              onMomentumScrollEnd={onPagerScrollEnd}
+              style={styles.flex}
+            >
+              <View style={{ width }}>
+                <ScrollView
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  directionalLockEnabled
+                >
+                  {signInCard}
+                </ScrollView>
+              </View>
+              <View style={{ width }}>
+                <ScrollView
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  directionalLockEnabled
+                >
+                  {signUpCard}
+                </ScrollView>
+              </View>
+            </ScrollView>
+          </>
         )}
-        </ScrollView>
       </KeyboardAvoidingView>
 
       <LanguageSwitcher visible={langOpen} onClose={() => setLangOpen(false)} />
@@ -700,6 +821,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   switchAction: {
+    color: palette.accent,
+    fontWeight: '700',
+  },
+  // 👉 Swipe-pager lap-jelző pontok
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: palette.border,
+  },
+  dotActive: {
+    backgroundColor: palette.accent,
+    width: 22,
+  },
+  // 📜 GDPR-consent sor (korábban inline stílus volt)
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 10,
+  },
+  consentText: {
+    flex: 1,
+    color: palette.textDim,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  consentLink: {
     color: palette.accent,
     fontWeight: '700',
   },

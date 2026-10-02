@@ -133,4 +133,81 @@ async function assertSafeAiBaseUrl(rawUrl) {
   return { ok: true, url };
 }
 
-module.exports = { assertSafeAiBaseUrl, isPrivateAddress, hostAllowed };
+/**
+ * 🛡️ Általános SSRF-ellenőrzés USER-VEZÉRELT remote URL-ekhez (WebDAV/S3/import).
+ *
+ * Eltér az AI-úttól: itt NINCS host-allowlist (tetszőleges legitim hoszt kell
+ * működjön), ezért a védelem a séma- + a DNS-feloldás-utáni privát-IP-tiltás:
+ *   - csak http(s) (prod: csak https; dev + localhost: http is)
+ *   - a feloldott IP nem lehet loopback/privát/link-local/metadata (169.254.*)
+ *
+ * A hálózati hívás ELŐTT futtatandó. Siker: `{ ok:true, url }`, különben
+ * `{ ok:false, error }`.
+ */
+async function assertSafeUrl(rawUrl, { allowHttp = false } = {}) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return { ok: false, error: 'Érvénytelen URL.' };
+  }
+
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return { ok: false, error: `Nem engedett séma: ${url.protocol} (csak http/https).` };
+  }
+
+  const isLocal =
+    url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+
+  // http csak akkor, ha a hívó explicit engedi, vagy dev + localhost
+  if (url.protocol === 'http:' && !allowHttp && !(INSECURE_DEV && isLocal)) {
+    return { ok: false, error: 'A cím csak https lehet.' };
+  }
+
+  // dev + localhost → engedjük (lokális MinIO/NAS), DNS-ellenőrzés nélkül
+  if (INSECURE_DEV && isLocal) {
+    return { ok: true, url };
+  }
+
+  // DNS-feloldás → privát/metadata IP tiltása (literal IP esetén is helyes:
+  // a dns.lookup egy IP-re önmagát adja vissza)
+  try {
+    const records = await dns.lookup(url.hostname, { all: true });
+    if (records.length === 0) {
+      return { ok: false, error: 'A cím nem feloldható.' };
+    }
+    const bad = records.find((r) => isPrivateAddress(r.address));
+    if (bad) {
+      return { ok: false, error: `A cím belső hálózati címre mutat (${bad.address}).` };
+    }
+  } catch (err) {
+    return { ok: false, error: `A cím nem feloldható: ${err.message}` };
+  }
+
+  return { ok: true, url };
+}
+
+/**
+ * `assertSafeUrl` + `fetch` egy lépésben. SSRF-blokk esetén DOB (`err.ssrfBlocked`
+ * = true), így a hívó 400/502-t adhat. Megjegyzés: a feloldás és a fetch között
+ * marad egy szűk DNS-rebinding ablak — allowlist nélküli remote-fetchnél ez az
+ * iparági kompromisszum teljes IP-pinning nélkül; a privát-IP-tiltás a támadás
+ * 99%-át így is megfogja (metadata/loopback/LAN).
+ */
+async function safeFetch(rawUrl, init, opts) {
+  const check = await assertSafeUrl(rawUrl, opts);
+  if (!check.ok) {
+    const err = new Error(check.error);
+    err.ssrfBlocked = true;
+    throw err;
+  }
+  return fetch(rawUrl, init);
+}
+
+module.exports = {
+  assertSafeAiBaseUrl,
+  assertSafeUrl,
+  safeFetch,
+  isPrivateAddress,
+  hostAllowed,
+};

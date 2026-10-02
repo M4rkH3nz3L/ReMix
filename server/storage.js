@@ -4,6 +4,9 @@
 // server/storage.config.json-ból jönnek (gitignore-olva, lásd a .example fájlt).
 const fs = require('fs');
 const path = require('path');
+// 🛡️ SSRF: a baseUrl/endpoint USER-VEZÉRELT → minden remote fetch a privát-IP-t
+// (loopback/LAN/felhő-metadata 169.254.*) tiltó safeFetch/assertSafeUrl mögött.
+const { safeFetch, assertSafeUrl } = require('./ssrf');
 
 const CONFIG_FILE = path.join(__dirname, 'storage.config.json');
 
@@ -60,7 +63,7 @@ const PROPFIND_BODY =
 
 /** egy WebDAV-mappa tartalma (Depth: 1) */
 async function davListDir(source, rel) {
-  const res = await fetch(davUrl(source, rel), {
+  const res = await safeFetch(davUrl(source, rel), {
     method: 'PROPFIND',
     headers: { Depth: '1', 'Content-Type': 'application/xml', ...davAuthHeader(source) },
     body: PROPFIND_BODY,
@@ -147,7 +150,7 @@ async function davStream(source, rel, res) {
     res.status(400).json({ error: 'Érvénytelen út.' });
     return;
   }
-  const upstream = await fetch(davUrl(source, rel), {
+  const upstream = await safeFetch(davUrl(source, rel), {
     headers: davAuthHeader(source),
     signal: AbortSignal.timeout(10 * 60 * 1000),
   });
@@ -168,6 +171,20 @@ async function davStream(source, rel, res) {
 }
 
 // ---------------------------------------------------------------- S3
+
+/** S3 egyedi endpoint (MinIO/R2/B2/Wasabi) SSRF-ellenőrzése; AWS-alap (nincs
+ * endpoint) → no-op. A kliens-SDK a request előtt ide fut. */
+async function assertS3Endpoint(source) {
+  if (!source.endpoint) {
+    return;
+  }
+  const check = await assertSafeUrl(source.endpoint);
+  if (!check.ok) {
+    const err = new Error(`Tiltott S3-endpoint: ${check.error}`);
+    err.ssrfBlocked = true;
+    throw err;
+  }
+}
 
 /** lusta kliens-létrehozás forrásonként (az SDK csak S3-forrásnál töltődik be) */
 const s3Clients = new Map();
@@ -192,6 +209,7 @@ function s3Client(source) {
 }
 
 async function s3ListMedia(source) {
+  await assertS3Endpoint(source);
   const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
   const client = s3Client(source);
   const prefix = (source.prefix ?? '').replace(/^\/+/, '');
@@ -228,6 +246,7 @@ async function s3ListMedia(source) {
 }
 
 async function s3Stream(source, key, res) {
+  await assertS3Endpoint(source);
   const { GetObjectCommand } = require('@aws-sdk/client-s3');
   const client = s3Client(source);
   const obj = await client.send(
@@ -247,7 +266,7 @@ async function s3Stream(source, key, res) {
 /** MKCOL a szülő-mappára (best-effort) — sok WebDAV-szerver nem hoz létre auto-dirt. */
 async function davMkcol(source, rel) {
   try {
-    await fetch(davUrl(source, rel), {
+    await safeFetch(davUrl(source, rel), {
       method: 'MKCOL',
       headers: davAuthHeader(source),
       signal: AbortSignal.timeout(10000),
@@ -264,7 +283,7 @@ async function davUpload(source, rel, localPath, contentType) {
     await davMkcol(source, parent);
   }
   const body = fs.readFileSync(localPath);
-  const res = await fetch(davUrl(source, rel), {
+  const res = await safeFetch(davUrl(source, rel), {
     method: 'PUT',
     headers: { 'Content-Type': contentType || 'application/octet-stream', ...davAuthHeader(source) },
     body,
@@ -277,6 +296,7 @@ async function davUpload(source, rel, localPath, contentType) {
 
 /** Helyi fájl feltöltése S3-ra a `key` alá. */
 async function s3Upload(source, key, localPath, contentType) {
+  await assertS3Endpoint(source);
   const { PutObjectCommand } = require('@aws-sdk/client-s3');
   const client = s3Client(source);
   await client.send(

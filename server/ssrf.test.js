@@ -1,4 +1,10 @@
-const { assertSafeAiBaseUrl, hostAllowed, isPrivateAddress } = require('./ssrf');
+const {
+  assertSafeAiBaseUrl,
+  assertSafeUrl,
+  safeFetch,
+  hostAllowed,
+  isPrivateAddress,
+} = require('./ssrf');
 
 describe('ssrf — BYOK AI-végpont védelem', () => {
   describe('isPrivateAddress', () => {
@@ -65,6 +71,64 @@ describe('ssrf — BYOK AI-végpont védelem', () => {
     ])('ENGEDI: %s (%s)', async (url) => {
       const r = await assertSafeAiBaseUrl(url);
       expect(r.ok).toBe(true);
+    });
+  });
+
+  // 04 — általános remote-fetch (WebDAV/S3/import): NINCS host-allowlist, de a
+  // privát/metadata IP és a nem-http(s) séma tiltott. Determinisztikus: literal
+  // IP / localhost (nem függ hálózati DNS-től).
+  describe('assertSafeUrl — user-vezérelt remote URL', () => {
+    it.each([
+      ['http://169.254.169.254/latest/meta-data/', 'felhő-metaadat'],
+      ['https://169.254.169.254/', 'metaadat https'],
+      ['https://10.0.0.5:9000/bucket', 'belső 10/8 (MinIO)'],
+      ['https://192.168.1.10/dav', 'belső 192.168 (NAS)'],
+      ['https://172.20.0.1/', 'belső 172.16/12'],
+      ['https://127.0.0.1:8787/', 'loopback IP'],
+      ['https://localhost/dav', 'localhost név (→127.0.0.1)'],
+      ['file:///etc/passwd', 'file séma'],
+      ['ftp://10.0.0.1/x', 'ftp séma'],
+      ['http://8.8.8.8/x', 'publikus IP, de HTTP (prod: csak https)'],
+      ['nem-url', 'érvénytelen URL'],
+    ])('BLOKKOLJA: %s (%s)', async (url) => {
+      const r = await assertSafeUrl(url);
+      expect(r.ok).toBe(false);
+      expect(typeof r.error).toBe('string');
+    });
+
+    it.each([
+      ['https://8.8.8.8/bucket/file.mp4', 'publikus IP https'],
+      ['https://1.1.1.1/dav/clip.mov', 'publikus IP https (2)'],
+    ])('ENGEDI: %s (%s)', async (url) => {
+      const r = await assertSafeUrl(url);
+      expect(r.ok).toBe(true);
+    });
+
+    it('allowHttp:true esetén a publikus HTTP is átmegy', async () => {
+      const r = await assertSafeUrl('http://8.8.8.8/x', { allowHttp: true });
+      expect(r.ok).toBe(true);
+    });
+  });
+
+  describe('safeFetch — assert + fetch', () => {
+    const realFetch = global.fetch;
+    afterEach(() => {
+      global.fetch = realFetch;
+    });
+
+    it('SSRF-blokknál DOB (ssrfBlocked) és NEM hív fetch-et', async () => {
+      global.fetch = jest.fn();
+      await expect(safeFetch('http://169.254.169.254/')).rejects.toMatchObject({
+        ssrfBlocked: true,
+      });
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('engedett URL-nél meghívja a fetch-et', async () => {
+      global.fetch = jest.fn(async () => ({ ok: true, status: 200 }));
+      const res = await safeFetch('https://8.8.8.8/file.mp4', { method: 'GET' });
+      expect(res.ok).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith('https://8.8.8.8/file.mp4', { method: 'GET' });
     });
   });
 });

@@ -42,6 +42,9 @@ const { notifyAvailable, sendNotification, inviteMember, adminClient } = require
 const { payoutsConfigured, sendPayout } = require('./payouts');
 const { stemsConfigured, separateStems } = require('./stems');
 const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
+// 🛡️ Security-réteg (devs/tasks/remix/): rate-limit (API4) + policy-leltár (API9).
+const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
+const { authenticated, routeInventory } = require('./security/authorization');
 const {
   billingAvailable,
   activatePro,
@@ -136,6 +139,14 @@ if (MEDIA_LOCAL_DIR) {
   console.log(`média-tár (lokális): ${MEDIA_LOCAL_DIR} → /m`);
 }
 
+// 🧱 Globális rate-limit (OWASP API4): a worker PUBLIKUS compute-API, limit nélkül
+// DoS-/költség-attack felület. A `/m` statikus média-stream fölötte van (nincs
+// blanket-limit a feed-lejátszásra); minden MÁS endpoint erre az IP-/user-kulcsú
+// limitre ül. Dev-ben (ALLOW_INSECURE_DEV) és RL_DISABLED=1 esetén no-op. A drága
+// osztályokra (ai/render) szigorúbb per-endpoint limit a terv következő lépése
+// (devs/tasks/remix/03).
+app.use(rateLimit('default'));
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, _file, cb) => {
@@ -181,6 +192,17 @@ app.get('/health', async (_req, res) => {
     // feed-média tár: prod Supabase Storage (service_role) VAGY S3 — projekt-mappákba tölt
     storage: mediaStoreEnabled(),
     cloudRenderMinSec: parseInt(process.env.CLOUD_RENDER_MIN_SEC || '15', 10),
+  });
+});
+
+// 📋 Route-/policy-leltár (OWASP API9): a security-réteg által regisztrált
+// endpointok + a rate-limit osztály-konfig. Hitelesítés mögött (nem publikus).
+// A per-route policy-cutover a devs/tasks/remix/01 szerint bővül majd.
+app.get('/health/routes', authenticated(), (_req, res) => {
+  res.json({
+    ok: true,
+    rateLimit: { enabled: !(process.env.RL_DISABLED === '1' || INSECURE_DEV), classes: RL_DEFAULTS },
+    inventory: routeInventory(),
   });
 });
 

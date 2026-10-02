@@ -4,7 +4,7 @@ import { describeCommand } from '@/lib/commands';
 import type { EditorCommand, ProjectEvent } from '@/lib/commands';
 import type { MemoryCategory } from '@/lib/creatorMemory';
 import { makeId } from '@/lib/id';
-import { projectDuration } from '@/lib/projectUtils';
+import { clipEnd, findClip, projectDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import type { Clip, Project, TextClip } from '@/types/project';
 
@@ -161,13 +161,102 @@ const PATCHABLE_FIELDS = new Set([
   'adjust',
 ]);
 
+const VALID_ASPECTS: ReadonlySet<string> = new Set(['16:9', '9:16', '1:1']);
+const VALID_TEXT_TRACKS: ReadonlySet<string> = new Set(['text', 'captions', 'overlay']);
+
+/** Egy AI-parancs ellenőrzésének eredménye. */
+export type AiCommandCheck = { ok: true } | { ok: false; reason: string };
+
 /**
- * AI-parancsok → validált EditorCommand-ok. Az ismeretlen mezők kiszűrődnek,
- * az új szövegklipek teljes klipekké egészülnek ki.
+ * 🔒 AI ≠ authorization boundary (devs/tasks/remix/06). Az AI által GENERÁLT
+ * parancsot determinisztikusan ellenőrizzük a VALÓDI projekt-állapot ellen,
+ * MIELŐTT a command-bus végrehajtaná — így egy hallucinált cél (nem létező klip),
+ * határon kívüli vágás, érvénytelen képarány vagy ismeretlen/privilegizált
+ * parancstípus nem jut el a mutációig. (A parancs-típusok amúgy is fix allowlist:
+ * destruktív művelet — pl. „projekt törlése" — nincs is az AiCommand unionban.)
  */
-export function toEditorCommands(commands: AiCommand[], aiReason?: string): EditorCommand[] {
+export function validateAiCommand(cmd: AiCommand, project: Project): AiCommandCheck {
+  switch (cmd.type) {
+    case 'UPDATE_CLIP': {
+      if (!cmd.clipId) {
+        return { ok: false, reason: 'UPDATE_CLIP: hiányzó clipId' };
+      }
+      if (!findClip(project, cmd.clipId)) {
+        return { ok: false, reason: `UPDATE_CLIP: nincs ilyen klip (${cmd.clipId})` };
+      }
+      const fields = cmd.patch
+        ? Object.keys(cmd.patch).filter((k) => PATCHABLE_FIELDS.has(k))
+        : [];
+      if (fields.length === 0) {
+        return { ok: false, reason: 'UPDATE_CLIP: nincs engedélyezett mező a patch-ben' };
+      }
+      return { ok: true };
+    }
+    case 'REMOVE_CLIP':
+      if (!cmd.clipId) {
+        return { ok: false, reason: 'REMOVE_CLIP: hiányzó clipId' };
+      }
+      if (!findClip(project, cmd.clipId)) {
+        return { ok: false, reason: `REMOVE_CLIP: nincs ilyen klip (${cmd.clipId})` };
+      }
+      return { ok: true };
+    case 'SPLIT_CLIP': {
+      if (!cmd.clipId || typeof cmd.time !== 'number') {
+        return { ok: false, reason: 'SPLIT_CLIP: hiányzó clipId/time' };
+      }
+      const found = findClip(project, cmd.clipId);
+      if (!found) {
+        return { ok: false, reason: `SPLIT_CLIP: nincs ilyen klip (${cmd.clipId})` };
+      }
+      if (cmd.time <= found.clip.start || cmd.time >= clipEnd(found.clip)) {
+        return { ok: false, reason: 'SPLIT_CLIP: a vágási idő a klip határain kívül esik' };
+      }
+      return { ok: true };
+    }
+    case 'ADD_TEXT_CLIPS':
+      if (!cmd.trackType || !VALID_TEXT_TRACKS.has(cmd.trackType)) {
+        return { ok: false, reason: 'ADD_TEXT_CLIPS: érvénytelen trackType' };
+      }
+      if (!cmd.clips || cmd.clips.length === 0) {
+        return { ok: false, reason: 'ADD_TEXT_CLIPS: nincs hozzáadandó klip' };
+      }
+      return { ok: true };
+    case 'SET_ASPECT':
+      if (!cmd.aspectRatio || !VALID_ASPECTS.has(cmd.aspectRatio)) {
+        return { ok: false, reason: 'SET_ASPECT: érvénytelen képarány' };
+      }
+      return { ok: true };
+    case 'RENAME_PROJECT': {
+      const name = (cmd.name ?? '').trim();
+      if (name.length === 0 || name.length > 100) {
+        return { ok: false, reason: 'RENAME_PROJECT: érvénytelen név (1–100 karakter)' };
+      }
+      return { ok: true };
+    }
+    default:
+      // runtime-ban érkezhet ismeretlen/privilegizált típus (a hálózati adat nem
+      // típus-ellenőrzött) — ezt határozottan elutasítjuk
+      return { ok: false, reason: `Ismeretlen vagy nem engedélyezett parancstípus` };
+  }
+}
+
+/**
+ * AI-parancsok → validált EditorCommand-ok. Minden parancs ELŐBB átmegy a
+ * `validateAiCommand` determinisztikus ellenőrzésén a valódi `project` ellen
+ * (AI ≠ authorization boundary); az elbukók kimaradnak. Az ismeretlen patch-mezők
+ * kiszűrődnek, az új szövegklipek teljes klipekké egészülnek ki.
+ */
+export function toEditorCommands(
+  commands: AiCommand[],
+  project: Project,
+  aiReason?: string
+): EditorCommand[] {
   const result: EditorCommand[] = [];
   for (const cmd of commands) {
+    // 🔒 a valódi projekt-állapot elleni kapu — hallucinált/jogosulatlan cél nem jut tovább
+    if (!validateAiCommand(cmd, project).ok) {
+      continue;
+    }
     switch (cmd.type) {
       case 'UPDATE_CLIP': {
         if (!cmd.clipId || !cmd.patch) {

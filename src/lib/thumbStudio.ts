@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { aiConfigForTask } from '@/lib/aiProviders';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Project, VideoClip } from '@/types/project';
 
 /**
@@ -70,7 +71,9 @@ export async function fetchThumbHeadlines(summary: string): Promise<string[] | n
     const aiConfig = await aiConfigForTask('thumbHeadlines');
     const res = await uploadFetch(`${renderServerUrl()}/ai/thumbheadlines`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // 🔐 06: a /ai/thumbheadlines mostantól authenticated — a bejelentkezett
+      // felhasználó Supabase-tokenje (a többi AI-hívás az aiFetch-en át már küldi)
+      headers: { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) },
       body: JSON.stringify({ summary, aiConfig }),
     });
     if (!res.ok) {

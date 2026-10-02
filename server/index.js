@@ -45,6 +45,7 @@ const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth')
 // 🛡️ Security-réteg (devs/tasks/remix/): rate-limit (API4) + policy-leltár (API9).
 const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
 const { authenticated, routeInventory } = require('./security/authorization');
+const { mediaGuard } = require('./security/uploadPolicy');
 const {
   billingAvailable,
   activatePro,
@@ -255,7 +256,7 @@ app.get('/tts/:id/:name', (req, res) => {
 
 // 🙂 Arc-detektálás egy képkockán (UltraFace, CPU) — a dobozok a megadott
 // vászon-arányra normalizálva jönnek (a tracker/pozicionálás nyelvén).
-app.post('/faces', upload.any(), ...proOnly, (req, res) => {
+app.post('/faces', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -285,7 +286,7 @@ app.post('/faces', upload.any(), ...proOnly, (req, res) => {
 });
 
 // 🏆 Best-shot pontozás (P0-1): forrás-időpontok vizuális minősége az Auto Edithez
-app.post('/shotscore', upload.any(), (req, res) => {
+app.post('/shotscore', upload.any(), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -322,7 +323,7 @@ app.get('/sky/presets', (_req, res) => {
   res.json({ presets: listSkies() });
 });
 
-app.post('/sky', upload.any(), ...proOnly, (req, res) => {
+app.post('/sky', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   const preset = String(req.body.preset ?? 'sunset');
   if (!file) {
@@ -349,7 +350,7 @@ app.post('/sky', upload.any(), ...proOnly, (req, res) => {
 });
 
 // 🔍 Upscale / Enhance (CC V2): fotó felnagyítása szuper-felbontással
-app.post('/upscale', upload.any(), ...proOnly, (req, res) => {
+app.post('/upscale', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -656,7 +657,7 @@ app.post('/ai/captionstudio', express.json({ limit: '1mb' }), (req, res) => {
  * A teljes hangot dolgozzuk fel (nem szeletet): így az előnézet bárhová
  * tekerhető, és a kliens fájlonként+beállításonként cache-eli.
  */
-app.post('/voice/preview', upload.any(), (req, res) => {
+app.post('/voice/preview', upload.any(), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -722,7 +723,7 @@ app.post('/imagedoc', upload.any(), (req, res) => {
     });
 });
 
-app.post('/color/stats', upload.any(), (req, res) => {
+app.post('/color/stats', upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -745,7 +746,7 @@ app.post('/color/stats', upload.any(), (req, res) => {
 });
 
 // 🎨 Színpipetta: pixel-szín a médiakockán a (x,y) vászon-normalizált ponton
-app.post('/color/pixel', upload.any(), (req, res) => {
+app.post('/color/pixel', upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -791,7 +792,7 @@ app.post('/color/lut-export', express.json({ limit: '256kb' }), (req, res) => {
 });
 
 // 🩻 Videoszkóp: egy médiakocka waveform/parade/vectorscope/histogram képe PNG-ben
-app.post('/color/scope', upload.any(), (req, res) => {
+app.post('/color/scope', upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -834,7 +835,7 @@ app.post('/text/bake', express.json({ limit: '256kb' }), (req, res) => {
 
 // 🪄 AI background removal (P1 v1, fotón): u2net CPU-n → téma-kivágás
 // átlátszó háttérrel (md5-cache) — a kliens overlay-képként használja.
-app.post('/bgremove', upload.any(), ...proOnly, (req, res) => {
+app.post('/bgremove', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -910,7 +911,7 @@ app.get('/stickers3d/:id.png', (req, res) => {
 // lokálisan CPU-n) → fg/mid/bg parallax-rétegek. Md5 szerint cache-elt — a
 // rétegeket a render közvetlenül az assets/depth mappából olvassa, az app az
 // előnézethez a GET útvonalon éri el.
-app.post('/depth/parallax', upload.any(), (req, res) => {
+app.post('/depth/parallax', upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -940,7 +941,7 @@ app.post('/depth/parallax', upload.any(), (req, res) => {
 });
 
 // 🌫️/🎬 depth-extrák: portré-blur + rack-focus változatok (közös mélység-cache)
-app.post('/depth/focus', upload.any(), (req, res) => {
+app.post('/depth/focus', upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -1077,7 +1078,7 @@ app.post('/captions', upload.any(), ...proOnly, (req, res) => {
 
 // Hullámforma az idővonalhoz: hangfájl → mono 8 kHz PCM → csúcslista.
 // A kliens lemezre cache-eli, egy fájl csak egyszer jön fel.
-app.post('/waveform', upload.any(), (req, res) => {
+app.post('/waveform', upload.any(), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1230,7 +1231,7 @@ app.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
 // 🎚️ Hang-analízis (AUDIO-MASTER Analyze): egy feltöltött hangon az ffmpeg
 // `loudnorm` MÉRŐ-menete (print_format=json) → Integrated LUFS / True Peak / LRA,
 // + egy `showspectrumpic` spektrum-kép (best-effort, a média-tárba).
-app.post('/audio/analyze', upload.any(), requireAuth, async (req, res) => {
+app.post('/audio/analyze', upload.any(), requireAuth, mediaGuard('audio'), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });
@@ -1773,7 +1774,7 @@ app.post('/vision/query', express.json({ limit: '1mb' }), (req, res) => {
 
 // Thumbnail Studio (Creative Canvas): a legjobb borítókép-kockák kiválasztása
 // (élesség+kontraszt pontozás) — a válasz base64 JPEG-ek listája.
-app.post('/thumbnails', upload.any(), (req, res) => {
+app.post('/thumbnails', upload.any(), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1803,7 +1804,7 @@ app.post('/thumbnails', upload.any(), (req, res) => {
 
 // Auto Reframe (P0-7): a téma középpont-útja a szakaszon (mozgás-centroid) —
 // forrás-normalizált pontok + forrás-méret; a kliens fordít crop-kulcskockákra.
-app.post('/reframe', upload.any(), ...proOnly, (req, res) => {
+app.post('/reframe', upload.any(), ...proOnly, mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });

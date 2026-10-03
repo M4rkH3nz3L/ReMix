@@ -187,6 +187,7 @@
     "passwordLabel": "Jelszó",
     "passwordPlaceholder": "A jelszavad",
     "passwordHint": "Legalább 6 karakter.",
+    "passwordHintStrong": "Legalább 12 karakter.",
     "nameLabel": "Teljes név",
     "namePlaceholder": "Kiss Anna",
     "nameHint": "Legalább két szó és 2 nagybetű.",

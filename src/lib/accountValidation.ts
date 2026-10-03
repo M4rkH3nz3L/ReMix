@@ -84,6 +84,18 @@ export function isNonEmpty(value: string): boolean {
   return value.trim().length > 0;
 }
 
+/** Az ÚJ (regisztrációs) jelszó minimum-erőssége. */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * Erős jelszó a REGISZTRÁCIÓHOZ (devs/tasks/remix/08): legalább 12 karakter.
+ * (A belépésnél szándékosan NEM ezt használjuk — a meglévő fiókok rövidebb
+ * jelszavát nem zárjuk ki; a breached-check + komplexitás szerver-oldali bővítés.)
+ */
+export function isStrongPassword(value: string): boolean {
+  return value.length >= MIN_PASSWORD_LENGTH;
+}
+
 /**
  * Felhasználónév: betűvel kezdődik, 3–20 karakter hosszú, csak [a-zA-Z0-9_].
  * (A tényleges EGYEDISÉGET a DB unique-indexe kényszeríti ki.)

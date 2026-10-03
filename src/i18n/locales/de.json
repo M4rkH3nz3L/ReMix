@@ -187,6 +187,7 @@
     "passwordLabel": "Passwort",
     "passwordPlaceholder": "Dein Passwort",
     "passwordHint": "Mindestens 6 Zeichen.",
+    "passwordHintStrong": "Mindestens 12 Zeichen.",
     "nameLabel": "Vollständiger Name",
     "namePlaceholder": "Max Mustermann",
     "nameHint": "Mindestens zwei Wörter und 2 Großbuchstaben.",

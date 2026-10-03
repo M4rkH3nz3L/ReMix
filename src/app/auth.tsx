@@ -28,6 +28,7 @@ import {
   isValidFullName,
   isValidPhone,
   isValidUsername,
+  isStrongPassword,
   looksLikeEmail,
 } from '@/lib/accountValidation';
 import { isSendablePhone, isValidOtp, maskPhone, sanitizeOtpInput } from '@/lib/phoneAuth';
@@ -109,7 +110,9 @@ export default function AuthScreen() {
     configured &&
     !busy &&
     identifierValid &&
-    password.length >= 6 &&
+    // 🔒 08: regisztrációnál erős jelszó (12+); belépésnél marad a régi minimum
+    // (a meglévő, rövidebb jelszavú fiókokat nem zárjuk ki)
+    (isSignUp ? isStrongPassword(password) : password.length >= 6) &&
     (!isSignUp || (signUpFieldsValid && accepted));
 
   /** 📲 SMS-kód ellenőrzése → session (a guard tovább visz) */
@@ -450,7 +453,7 @@ export default function AuthScreen() {
           void submit();
         }}
       />
-      <Text style={styles.hint}>{t('auth.passwordHint')}</Text>
+      <Text style={styles.hint}>{t('auth.passwordHintStrong')}</Text>
 
       {error && isSignUp ? <Text style={styles.error}>{error}</Text> : null}
       {!configured ? <Text style={styles.error}>{t('auth.notConfigured')}</Text> : null}

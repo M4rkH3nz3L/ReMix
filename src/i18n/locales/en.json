@@ -187,6 +187,7 @@
     "passwordLabel": "Password",
     "passwordPlaceholder": "Your password",
     "passwordHint": "At least 6 characters.",
+    "passwordHintStrong": "At least 12 characters.",
     "nameLabel": "Full name",
     "namePlaceholder": "Jane Doe",
     "nameHint": "At least two words and 2 uppercase letters.",

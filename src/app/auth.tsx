@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -528,9 +529,12 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.brand}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="shuffle" size={26} color="#fff" />
-          </View>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logoBadge}
+            contentFit="cover"
+            accessibilityLabel={t('home.appName')}
+          />
           <Text style={styles.appName}>{t('home.appName')}</Text>
         </View>
 

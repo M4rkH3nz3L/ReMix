@@ -65,6 +65,8 @@ interface AuthState {
   verifyPhoneOtp: (phone: string, token: string) => Promise<AuthResult>;
   /** 📲 OTP újraküldése (a Supabase rate-limit alá esik) */
   resendPhoneOtp: (phone: string) => Promise<AuthResult>;
+  /** ✉️ e-mail-megerősítő link újraküldése (a Supabase rate-limit alá esik) */
+  resendEmailConfirm: (email: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -315,6 +317,21 @@ export const useAuth = create<AuthState>((set, get) => ({
       return { error: messageOf(error) };
     }
     return { needsSmsOtp: true, phone: e164 };
+  },
+
+  resendEmailConfirm: async (email) => {
+    if (!supabase) {
+      return { error: t('auth.errors.notConfigured') };
+    }
+    const addr = email.trim();
+    if (!addr.includes('@')) {
+      return { error: t('auth.errors.invalidEmail') };
+    }
+    const { error } = await supabase.auth.resend({ type: 'signup', email: addr });
+    if (error) {
+      return { error: messageOf(error) };
+    }
+    return { needsEmailConfirm: true };
   },
 
   signOut: async () => {

@@ -52,6 +52,7 @@ export default function AuthScreen() {
   const signUpWithPhone = useAuth((s) => s.signUpWithPhone);
   const verifyPhoneOtp = useAuth((s) => s.verifyPhoneOtp);
   const resendPhoneOtp = useAuth((s) => s.resendPhoneOtp);
+  const resendEmailConfirm = useAuth((s) => s.resendEmailConfirm);
 
   const [mode, setMode] = useState<Mode>('signIn');
   const [signUpVia, setSignUpVia] = useState<SignUpVia>('email');
@@ -70,6 +71,7 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false); // 📜 GDPR: feltételek + adatkezelés elfogadva
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
@@ -147,6 +149,28 @@ export default function AuthScreen() {
         setError(result.error);
       } else {
         setOtpCode('');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** ✉️ e-mail-megerősítő link újraküldése a „nézd meg a postaládád" képernyőről */
+  const resendEmail = async () => {
+    if (busy || !email.trim()) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await resendEmailConfirm(email.trim());
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setNotice(t('auth.resendEmailSent'));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -604,6 +628,11 @@ export default function AuthScreen() {
             <Ionicons name="mail-unread-outline" size={40} color={palette.accent} />
             <Text style={styles.title}>{t('auth.checkEmailTitle')}</Text>
             <Text style={styles.subtitle}>{t('auth.checkEmailBody', { email: email.trim() })}</Text>
+            {notice ? <Text style={styles.hint}>{notice}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Pressable onPress={resendEmail} style={styles.switchRow} disabled={busy}>
+              <Text style={styles.switchAction}>{t('auth.resendEmail')}</Text>
+            </Pressable>
             <Pressable onPress={switchMode} style={styles.switchRow}>
               <Text style={styles.switchAction}>{t('auth.backToSignIn')}</Text>
             </Pressable>

@@ -181,6 +181,7 @@
     "errors": {
       "unknown": "Something went wrong. Please try again.",
       "notConfigured": "Sign-in isn't configured.",
+      "invalidEmail": "Enter a valid email address.",
       "userNotFound": "No such user (email, username or phone).",
       "invalidPhone": "Invalid phone number.",
       "phoneCountryUnsupported": "This country code isn't supported for SMS sign-up.",
@@ -227,6 +228,8 @@
     "checkEmailTitle": "Check your email",
     "checkEmailBody": "We sent a confirmation link to {{email}}. Confirm it, then sign in.",
     "backToSignIn": "Back to sign in",
+    "resendEmail": "Resend confirmation email",
+    "resendEmailSent": "Confirmation email sent — check your inbox.",
     "viaLabel": "Sign up with",
     "viaEmail": "Email",
     "viaPhone": "Phone",

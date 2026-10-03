@@ -181,6 +181,7 @@
     "errors": {
       "unknown": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "notConfigured": "Die Anmeldung ist nicht konfiguriert.",
+      "invalidEmail": "Gib eine gültige E-Mail-Adresse ein.",
       "userNotFound": "Kein solcher Benutzer (E-Mail, Benutzername oder Telefon).",
       "invalidPhone": "Ungültige Telefonnummer.",
       "phoneCountryUnsupported": "Diese Ländervorwahl wird für die SMS-Registrierung nicht unterstützt.",
@@ -227,6 +228,8 @@
     "checkEmailTitle": "Prüfe deine E-Mails",
     "checkEmailBody": "Wir haben einen Bestätigungslink an {{email}} gesendet. Bestätige ihn und melde dich dann an.",
     "backToSignIn": "Zurück zur Anmeldung",
+    "resendEmail": "Bestätigungs-E-Mail erneut senden",
+    "resendEmailSent": "Bestätigungs-E-Mail gesendet — prüfe dein Postfach.",
     "viaLabel": "Registrieren mit",
     "viaEmail": "E-Mail",
     "viaPhone": "Telefon",

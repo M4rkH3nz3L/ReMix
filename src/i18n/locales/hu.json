@@ -181,6 +181,7 @@
     "errors": {
       "unknown": "Valami hiba történt. Próbáld újra.",
       "notConfigured": "A bejelentkezés nincs konfigurálva.",
+      "invalidEmail": "Adj meg egy érvényes e-mail-címet.",
       "userNotFound": "Nincs ilyen felhasználó (e-mail, felhasználónév vagy telefon).",
       "invalidPhone": "Érvénytelen telefonszám.",
       "phoneCountryUnsupported": "Ez az országhívószám nem támogatott SMS-regisztrációhoz.",
@@ -227,6 +228,8 @@
     "checkEmailTitle": "Nézd meg az e-mailed",
     "checkEmailBody": "Megerősítő linket küldtünk ide: {{email}}. Erősítsd meg, majd jelentkezz be.",
     "backToSignIn": "Vissza a bejelentkezéshez",
+    "resendEmail": "Megerősítő e-mail újraküldése",
+    "resendEmailSent": "Megerősítő e-mail elküldve — nézd meg a postaládád.",
     "viaLabel": "Regisztráció ezzel",
     "viaEmail": "E-mail",
     "viaPhone": "Telefon",

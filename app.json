@@ -129,7 +129,8 @@
           "cameraPermission": "A ReMix a kamerádat használja az élő közvetítéshez.",
           "microphonePermission": "A ReMix a mikrofonodat használja az élő közvetítéshez."
         }
-      ]
+      ],
+      "./plugins/withWeakLet"
     ],
     "experiments": {
       "typedRoutes": true,

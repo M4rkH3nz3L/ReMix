@@ -227,9 +227,9 @@ export default function LiveStudioScreen() {
     setStarting(true);
     try {
       const session = await startLive(title);
-      // Fázis A/B híd: a meglévő élő-szobába megyünk (egy-kamera publish). A több-
-      // forrás scene-kompozíció a Fázis B (data-channel + nézői PreviewSurface).
-      router.replace(`/live/${session.id}`);
+      // 🎥 a room megkapja a live-projekt id-jét → a host betölti a live-docot és
+      // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).
+      router.replace(`/live/${session.id}?project=${id}`);
     } catch (e) {
       setStarting(false);
       Alert.alert(t('live.error', { defaultValue: 'Live' }), String((e as Error)?.message ?? e));

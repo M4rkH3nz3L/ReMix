@@ -1,3 +1,4 @@
+import type { ScenePayload } from '@/lib/liveComposite';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -185,6 +186,8 @@ export interface LiveChat {
 export interface LiveRoom {
   sendChat: (text: string) => void;
   sendReaction: (emoji: string) => void;
+  /** 🎥 a host a jelenet-állapotot broadcastolja (Fázis B kompozíció). */
+  sendScene: (payload: ScenePayload) => void;
   stop: () => void;
 }
 
@@ -195,10 +198,14 @@ export function openLiveRoom(
     onChat: (m: LiveChat) => void;
     onReaction: (emoji: string) => void;
     onViewers: (count: number) => void;
+    /** 🎥 a host jelenet-állapota (a néző ebből rendereli a kompozíciót). */
+    onScene?: (payload: ScenePayload) => void;
+    /** új néző csatlakozott — a host ilyenkor újra-broadcastolja a jelenetet. */
+    onViewerJoin?: () => void;
   },
 ): LiveRoom {
   if (!supabase) {
-    return { sendChat: () => {}, sendReaction: () => {}, stop: () => {} };
+    return { sendChat: () => {}, sendReaction: () => {}, sendScene: () => {}, stop: () => {} };
   }
   const channel = supabase.channel(`live:${sessionId}`, {
     config: { presence: { key: self.id }, broadcast: { self: true } },
@@ -214,8 +221,14 @@ export function openLiveRoom(
     .on('broadcast', { event: 'reaction' }, ({ payload }) =>
       handlers.onReaction((payload as { emoji: string }).emoji),
     )
+    .on('broadcast', { event: 'scene' }, ({ payload }) =>
+      handlers.onScene?.(payload as ScenePayload),
+    )
     .on('presence', { event: 'sync' }, readViewers)
-    .on('presence', { event: 'join' }, readViewers)
+    .on('presence', { event: 'join' }, () => {
+      readViewers();
+      handlers.onViewerJoin?.();
+    })
     .on('presence', { event: 'leave' }, readViewers)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -236,6 +249,9 @@ export function openLiveRoom(
     },
     sendReaction: (emoji) => {
       void channel.send({ type: 'broadcast', event: 'reaction', payload: { emoji } });
+    },
+    sendScene: (payload) => {
+      void channel.send({ type: 'broadcast', event: 'scene', payload });
     },
     stop: () => {
       void supabase!.removeChannel(channel);

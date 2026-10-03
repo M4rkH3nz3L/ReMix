@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom, VideoTrack, isTrackReference, useTracks } from '@livekit/react-native';
+import { LiveKitRoom } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Track } from 'livekit-client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +20,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LiveComposite } from '@/components/live/LiveComposite';
 import { palette } from '@/constants/editor';
+import { encodeScenePayload, type ScenePayload } from '@/lib/liveComposite';
 import {
   bumpViewerPeak,
   buildLiveSelf,
@@ -33,34 +34,12 @@ import {
   type LiveRoom,
   type LiveSession,
 } from '@/lib/live';
+import { setActiveScene } from '@/lib/liveDoc';
 import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
+import { loadProject } from '@/lib/storage';
+import type { LiveDoc } from '@/types/live';
 
 const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
-
-/**
- * A LiveKit-szoba videó-színpada: a kamera-trackeket rendereli (a host a sajátját
- * látja, a néző a host remote streamjét). A <LiveKitRoom>-on BELÜL kell lennie.
- */
-function LiveStage({ hostAvatar }: { hostAvatar: string | null }) {
-  const tracks = useTracks([Track.Source.Camera]);
-  const cam = tracks.find((tr) => isTrackReference(tr));
-  if (cam) {
-    return <VideoTrack trackRef={cam} style={StyleSheet.absoluteFill} objectFit="cover" />;
-  }
-  // még nincs videó-track (kapcsolódás / host nem publikál) → host-avatar placeholder
-  return (
-    <View style={styles.viewerStage}>
-      {hostAvatar ? (
-        <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
-      ) : (
-        <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
-          <Ionicons name="person" size={48} color={palette.textDim} />
-        </View>
-      )}
-      <ActivityIndicator color="#fff" />
-    </View>
-  );
-}
 
 /** Egy felúszó reakció-emoji (2 mp alatt felfelé + elhalványul). Az `x` drift az
  * esemény-handlerben készül (nem renderben), hogy ne hívjunk impure fn-t render közben. */
@@ -86,7 +65,7 @@ function FloatingHeart({ emoji, x, onDone }: { emoji: string; x: number; onDone:
 
 export default function LiveRoomScreen() {
   const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, project: projectParam } = useLocalSearchParams<{ id: string; project?: string }>();
   const [session, setSession] = useState<LiveSession | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [viewers, setViewers] = useState(1);
@@ -96,8 +75,13 @@ export default function LiveRoomScreen() {
   const [, requestCam] = useCameraPermissions();
   const [, requestMic] = useMicrophonePermissions();
   const [lk, setLk] = useState<{ token: string; url: string } | null>(null);
+  // 🎥 a renderelendő jelenet-állapot (host: a saját live-docából; néző: a broadcastból)
+  const [scene, setScene] = useState<ScenePayload | null>(null);
+  // 🎥 host: a jelenet-lista az élő váltóhoz (a live-docból)
+  const [hostScenes, setHostScenes] = useState<{ id: string; name: string }[]>([]);
 
   const roomRef = useRef<LiveRoom | null>(null);
+  const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
   const endedRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
@@ -109,6 +93,30 @@ export default function LiveRoomScreen() {
     const x = (Math.random() - 0.5) * 60;
     setFloats((prev) => [...prev.slice(-24), { id: fid, emoji, x }]);
   }, []);
+
+  // 🎥 a host kiküldi az aktív jelenetet (saját render + broadcast a nézőknek)
+  const broadcastScene = useCallback(() => {
+    const doc = liveDocRef.current;
+    if (!doc) {
+      return;
+    }
+    const payload = encodeScenePayload(doc);
+    setScene(payload);
+    roomRef.current?.sendScene(payload);
+  }, []);
+
+  // 🎥 a host élőben jelenetet vált → újra-broadcast
+  const switchScene = useCallback(
+    (sceneId: string) => {
+      const doc = liveDocRef.current;
+      if (!doc) {
+        return;
+      }
+      liveDocRef.current = setActiveScene(doc, sceneId);
+      broadcastScene();
+    },
+    [broadcastScene],
+  );
 
   // session betöltése + realtime room nyitása
   useEffect(() => {
@@ -138,6 +146,18 @@ export default function LiveRoomScreen() {
             void bumpViewerPeak(liveId, count);
           }
         },
+        // 🎥 néző: a host jelenet-állapotát rendereli; host a sajátját (lentebb)
+        onScene: (payload) => {
+          if (s.hostId !== self.id) {
+            setScene(payload);
+          }
+        },
+        // új néző → a host újra-broadcastolja a jelenetet (késői csatlakozó is kapja)
+        onViewerJoin: () => {
+          if (s.hostId === self.id) {
+            broadcastScene();
+          }
+        },
       });
 
       // 🔴 LiveKit videó: a WebRTC-globálok + szerep-token (host = publish).
@@ -146,6 +166,15 @@ export default function LiveRoomScreen() {
       if (publish) {
         await requestCam();
         await requestMic();
+        // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast
+        if (projectParam) {
+          const proj = await loadProject(String(projectParam)).catch(() => null);
+          if (active && proj?.live) {
+            liveDocRef.current = proj.live;
+            setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
+            broadcastScene();
+          }
+        }
       }
       const tok = await fetchLiveToken(liveId, publish, self.name, self.id).catch(() => null);
       if (active && tok) {
@@ -157,7 +186,7 @@ export default function LiveRoomScreen() {
       roomRef.current?.stop();
       roomRef.current = null;
     };
-  }, [id, addFloat]);
+  }, [id, projectParam, addFloat, broadcastScene]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -225,7 +254,7 @@ export default function LiveRoomScreen() {
       {lk ? (
         <View style={StyleSheet.absoluteFill}>
           <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={isHost} video={isHost}>
-            <LiveStage hostAvatar={session.hostAvatar} />
+            <LiveComposite payload={scene} hostAvatar={session.hostAvatar} />
           </LiveKitRoom>
         </View>
       ) : (
@@ -276,6 +305,31 @@ export default function LiveRoomScreen() {
         <Text style={styles.liveTitle} numberOfLines={2}>
           {session.title}
         </Text>
+
+        {/* 🎥 host: élő jelenet-váltó (OBS-szerű), ha több jelenet van */}
+        {isHost && hostScenes.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sceneSwitchRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            {hostScenes.map((sc) => {
+              const on = sc.id === scene?.sceneId;
+              return (
+                <Pressable
+                  key={sc.id}
+                  onPress={() => switchScene(sc.id)}
+                  style={[styles.sceneSwitchChip, on && styles.sceneSwitchChipOn]}
+                >
+                  <Text style={[styles.sceneSwitchText, on && styles.sceneSwitchTextOn]} numberOfLines={1}>
+                    {sc.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
 
         <View style={{ flex: 1 }} />
 
@@ -371,6 +425,20 @@ const styles = StyleSheet.create({
   },
   closeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   liveTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 10, textShadowColor: '#000', textShadowRadius: 6 },
+
+  sceneSwitchRow: { gap: 8, paddingVertical: 10 },
+  sceneSwitchChip: {
+    backgroundColor: '#00000066',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#ffffff22',
+    maxWidth: 160,
+  },
+  sceneSwitchChipOn: { backgroundColor: palette.accent, borderColor: palette.accent },
+  sceneSwitchText: { color: '#ffffffcc', fontSize: 13, fontWeight: '700' },
+  sceneSwitchTextOn: { color: '#fff' },
 
   chatScroll: { maxHeight: 220 },
   chatContent: { gap: 6, paddingVertical: 8 },

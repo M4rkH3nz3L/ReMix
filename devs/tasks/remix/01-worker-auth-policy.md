@@ -21,7 +21,10 @@
 > **Egyetlen valódi rés volt — a `/notify` címzett-authz — és JAVÍTVA** ([10] §3B,
 > `canNotify`: self / közös projekt / follow-él; pure `notifyPolicy.decideNotify` + teszt).
 > A megmaradt P0 tehát **nem** az objektum-szintű authz (az megvan), hanem a lenti
-> 🔴 **NYITOTT compute-endpointok** deklaratív policy mögé zárása.
+> 🔴 **NYITOTT compute-endpointok** deklaratív policy mögé zárása — **ez 2026-10-03-án
+> MEGTÖRTÉNT** (lásd §1 alatti „Lezárva" sor): mind a 20 nyitott compute-végpont
+> `requireAuth` + `rateLimit` mögé került, a kliens-oldali auth az `uploadFetch`
+> központi injektálásával megoldva.
 
 ---
 
@@ -45,7 +48,20 @@ A [server/index.js](../../../server/index.js) route-térképe (2026-09-30, `stud
 | --- | --- | --- |
 | `...proOnly` (auth+pro) | `/youtube`, `/tts`, `/faces`, `/sky`, `/upscale`, `/ai/translate`, `/ai/highlights`, `/ai/story`, `/bgremove`, `/ai/autoedit`, `/captions`, `/audio/stems`, `/render`, `/track`, `/reframe` | 🟢 védve |
 | `requireAuth` | `/notify`, `/invite`, `/billing/*`, `/shop/credits/grant`, `/media/upload`, `/audio/analyze`, `/storage/*`, `/wallet/payout`, `/render/queue` | 🟡 authelt, de **objektum-szintű authz hiányos** |
-| **NYITOTT (semmi)** | `/shotscore`, `/ai/hooks`, `/ai/probe`, `/ai/thumbheadlines`, `/thumbnails/compose`, `/ai/captionstudio`, `/voice/preview`, `/imagedoc`, `/color/stats`, `/color/pixel`, `/color/lut-export`, `/color/scope`, `/text/bake`, `/depth/parallax`, `/depth/focus`, `/ai/assist`, `/waveform`, `/scenes`, `/beats`, `/vision/index`, `/vision/query`, `/thumbnails`, `/silence`, `/proxy`, `/collect`, `/library`, `/music`, `/stickers3d` | 🔴 **auth nélkül CPU/GPU/FFmpeg/AI-t indít** |
+| **NYITOTT (semmi)** | *(lásd lent — a compute-részt lezártuk)* | 🔴→🟢 |
+
+> **✅ Lezárva (2026-10-03).** A nyitott **compute-endpointok mind `AUTHENTICATED` +
+> `rateLimit` mögé kerültek** (`server/index.js`): `/shotscore`, `/thumbnails/compose`,
+> `/voice/preview`, `/imagedoc`, `/color/{stats,pixel,lut-export,scope}`, `/text/bake`,
+> `/depth/{parallax,focus}`, `/waveform`, `/scenes`, `/beats`, `/vision/{index,query}`,
+> `/thumbnails`, `/silence` → `rateLimit('analysis')`; a nehéz `/proxy`, `/collect` →
+> `rateLimit('render')`. *(Az `/ai/*` már korábban `authenticated()`/`proOnly` volt.)*
+> **Kliens:** az `src/lib/upload.ts` `uploadFetch` mostantól **központilag** beszúrja a
+> Supabase-JWT-t MINDEN worker-híváshoz (worker-only helper → nincs token-leak); a két
+> raw-JSON hívás (`/text/bake`, `/color/lut-export`) `workerJsonHeaders()`-t használ.
+> **Szándékosan PUBLIC marad:** `/health`, `/tts/voices`, `/sky/presets`, `/stickers3d`,
+> `/library`, `/music` (+ `:id/file` capability-URL-ek), a signolt `/billing/revenuecat`
+> webhook és az OAuth-callback. **Verifikálva:** `npm run audit` zöld (86 suite / 976 teszt).
 
 Már megvan (alap): [server/auth.js](../../../server/auth.js) exportál `requireAuth`, `verifyRequest`, `callerId`, `corsAllowlist`, `INSECURE_DEV`; a `requirePro` az [index.js:76](../../../server/index.js#L76)-ban van, `proOnly` az [index.js:98](../../../server/index.js#L98)-ban.
 

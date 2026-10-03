@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -69,19 +70,28 @@ function LiveCanvas({
   doc,
   width,
   aspect,
+  maxHeight,
   selectedId,
   onSelect,
 }: {
   doc: LiveDoc;
   width: number;
   aspect: number;
+  maxHeight: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
   const scene = getActiveScene(doc);
-  const height = width / aspect;
+  // a 9:16 vászon túl magas lenne teljes szélességen → ha kell, a magasságra
+  // korlátozzuk és a szélességet arányosan csökkentjük (középre igazítva).
+  let w = width;
+  let height = w / aspect;
+  if (height > maxHeight) {
+    height = maxHeight;
+    w = height * aspect;
+  }
   return (
-    <View style={[styles.canvas, { width, height }]}>
+    <View style={[styles.canvas, { width: w, height }]}>
       {scene &&
         sortedSources(scene).map((src) => {
           const t = src.transform;
@@ -93,9 +103,9 @@ function LiveCanvas({
               style={[
                 styles.srcBox,
                 {
-                  left: t.x * width,
+                  left: t.x * w,
                   top: t.y * height,
-                  width: Math.max(28, t.w * width),
+                  width: Math.max(28, t.w * w),
                   height: Math.max(22, t.h * height),
                   opacity: src.visible ? 1 : 0.35,
                   borderColor: selected ? palette.accent : '#ffffff55',
@@ -132,6 +142,7 @@ const LAYOUT_PRESETS: { key: string; icon: keyof typeof Ionicons.glyphMap; t: Pa
 
 export default function LiveStudioScreen() {
   const { t } = useTranslation();
+  const { height: winH } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const project = useEditorStore((s) => s.project);
   const [loadError, setLoadError] = useState(false);
@@ -255,6 +266,7 @@ export default function LiveStudioScreen() {
               doc={live}
               width={canvasW}
               aspect={aspect}
+              maxHeight={winH * 0.42}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />

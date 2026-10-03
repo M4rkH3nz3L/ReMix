@@ -124,6 +124,7 @@ export default function ProfileScreen() {
   const email = useAuth((s) => s.user?.email ?? '');
   const userId = useAuth((s) => s.user?.id ?? null);
   const signOut = useAuth((s) => s.signOut);
+  const signOutOtherSessions = useAuth((s) => s.signOutOtherSessions);
   // 💳 Pro-állapot reaktívan (aktiválás után azonnal frissül a szekció)
   const isPro = useEntitlement((s) => s.isPro());
   // 🛡️ admin-belépő: csak szerep-/user-kezelő jog birtokosának látszik
@@ -532,6 +533,23 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: () => {
           void signOut();
+        },
+      },
+    ]);
+  };
+
+  const onSignOutOthers = () => {
+    Alert.alert(t('auth.signOutOthers'), t('auth.signOutOthersConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('auth.signOutOthers'),
+        style: 'destructive',
+        onPress: async () => {
+          const result = await signOutOtherSessions();
+          Alert.alert(
+            t('auth.signOutOthers'),
+            result.error ?? t('auth.signOutOthersDone'),
+          );
         },
       },
     ]);
@@ -1092,6 +1110,10 @@ export default function ProfileScreen() {
             <Pressable onPress={() => router.push('/mfa')} style={styles.signOutBtn}>
               <Ionicons name="shield-checkmark-outline" size={18} color={palette.text} />
               <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.mfaEntry')}</Text>
+            </Pressable>
+            <Pressable onPress={onSignOutOthers} style={styles.signOutBtn}>
+              <Ionicons name="phone-portrait-outline" size={18} color={palette.text} />
+              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.signOutOthers')}</Text>
             </Pressable>
             <Pressable onPress={onSignOut} style={styles.signOutBtn}>
               <Ionicons name="log-out-outline" size={18} color={palette.danger} />

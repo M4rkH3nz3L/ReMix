@@ -66,7 +66,10 @@ A `resolve_login_email()` / `username_available()` köré:
 - [ ] Password-reset + login throttling (`auth` rate-limit osztály).
 
 ### 🟦 Fázis B — Enumeration
-- [ ] `resolve_login_email()` / `username_available()` constant-time + uniform error + audit.
+- [x] **Egységes login-hiba** (uniform error): az ismeretlen felhasználónév/telefon
+      ugyanazt a „hibás belépés" üzenetet adja, mint a rossz jelszó (`authStore.signIn`
+      → `invalidCredentials`) — nem szivárog a fiók léte. *(Hátra: valódi constant-time
+      időzítés + CAPTCHA.)*
 - [ ] CAPTCHA a signup/login-on (abuse-protection).
 
 ### 🟦 Fázis C — MFA & session
@@ -77,7 +80,9 @@ A `resolve_login_email()` / `username_available()` köré:
       userekre** → a belépés csak verifikált TOTP-faktornál kér kódot. i18n en/hu/de.
       ⚠️ **ÉLES előtt:** (1) a Supabase-projektben MFA engedélyezése, (2) valódi
       authenticator-appal eszköz-teszt. *(Hátra: admin/moderator-hoz KÖTELEZŐVÉ tenni.)*
-- [ ] Session/device-lista + revoke-all + egyedi revoke.
+- [x] **Többi munkamenet kiléptetése** (revoke-all-others): `signOutOtherSessions`
+      (`supabase.auth.signOut scope:'others'` + a többi `user_devices`-sor törlése) +
+      gomb a profil account-szekciójában. *(Hátra: teljes eszköz-lista UI + per-eszköz revoke.)*
 - [ ] Gyanús-login detektálás → security-event.
 
 ---

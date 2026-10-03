@@ -4,7 +4,7 @@ import { create } from 'zustand';
 
 import type { SignUpProfile } from '@/lib/accountValidation';
 import { CONSENT_VERSION } from '@/constants/legal';
-import { registerCurrentDevice } from '@/lib/deviceInfo';
+import { getInstallId, registerCurrentDevice } from '@/lib/deviceInfo';
 import { loginNeedsMfa, verifyLoginTotp } from '@/lib/mfa';
 import { isAllowedPhone, isValidOtp, normalizeE164 } from '@/lib/phoneAuth';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
@@ -74,6 +74,8 @@ interface AuthState {
   resendEmailConfirm: (email: string) => Promise<AuthResult>;
   /** 🔐 a login-kori TOTP-challenge teljesítése (needsMfa után) */
   verifyMfaLogin: (code: string) => Promise<AuthResult>;
+  /** 🔐 az ÖSSZES TÖBBI munkamenet kiléptetése (ezt az eszközt megtartva) */
+  signOutOtherSessions: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -239,7 +241,10 @@ export const useAuth = create<AuthState>((set, get) => ({
         return { error: messageOf(resolved.error) };
       }
       if (!resolved.data) {
-        return { error: t('auth.errors.userNotFound') };
+        // 🛡️ Enumeration-védelem (08 §B): ismeretlen felhasználónév/telefon ne
+        // legyen megkülönböztethető a rossz jelszótól — EGYSÉGES „hibás belépés"
+        // üzenet (a nyers „nincs ilyen user" elárulná, hogy létezik-e a fiók).
+        return { error: t('auth.errors.invalidCredentials') };
       }
       email = resolved.data as string;
     }
@@ -375,6 +380,29 @@ export const useAuth = create<AuthState>((set, get) => ({
     const uid = get().user?.id;
     if (uid) {
       void registerCurrentDevice(uid);
+    }
+    return {};
+  },
+
+  signOutOtherSessions: async () => {
+    if (!supabase) {
+      return { error: t('auth.errors.notConfigured') };
+    }
+    // a Supabase szerver-oldalon visszavonja a TÖBBI eszköz refresh-tokenjeit
+    // (ez az eszköz bejelentkezve marad)
+    const { error } = await supabase.auth.signOut({ scope: 'others' });
+    if (error) {
+      return { error: messageOf(error) };
+    }
+    // a többi eszköz sorának takarítása a user_devices-ből (best-effort)
+    try {
+      const uid = get().user?.id;
+      const fingerprint = await getInstallId();
+      if (uid) {
+        await supabase.from('user_devices').delete().eq('user_id', uid).neq('fingerprint', fingerprint);
+      }
+    } catch {
+      // best-effort; a token-visszavonás a lényeg, a telemetria-sor másodlagos
     }
     return {};
   },

@@ -29,6 +29,7 @@ import {
   type AppRole,
   type UserWithRole,
 } from '@/lib/roles';
+import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
 import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
 
@@ -50,6 +51,7 @@ export default function AdminScreen() {
   const [pairs, setPairs] = useState<Set<string>>(new Set()); // `${role}|${perm}`
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [appeals, setAppeals] = useState<AppealRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSlug, setNewSlug] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -65,13 +67,15 @@ export default function AdminScreen() {
       listRolePermissions(),
       canUser ? listUsersWithRoles() : Promise.resolve([]),
       canReview ? listOpenReports() : Promise.resolve([]),
+      canReview ? listOpenAppeals() : Promise.resolve([]),
     ])
-      .then(([r, p, rp, u, rep]) => {
+      .then(([r, p, rp, u, rep, app]) => {
         setRoles(r);
         setPerms(p);
         setPairs(new Set(rp.map((x) => key(x.role, x.permission))));
         setUsers(u);
         setReports(rep as ReportRow[]);
+        setAppeals(app as AppealRow[]);
       })
       .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
@@ -162,6 +166,14 @@ export default function AdminScreen() {
     moderatePostGlobal(rep.postId, 'removed')
       .then(() => doResolve(rep.id, 'resolved'))
       .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+  };
+  // 🟡 fellebbezés elbírálása: granted → a poszt visszaáll, denied → marad removed
+  const doResolveAppeal = (app: AppealRow, decision: 'granted' | 'denied') => {
+    setAppeals((prev) => prev.filter((a) => a.id !== app.id));
+    resolveAppeal(app.id, app.postId, decision).catch((e: unknown) => {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+      load();
+    });
   };
 
   if (!canRole && !canUser && !canReview) {
@@ -305,6 +317,40 @@ export default function AdminScreen() {
                         onPress={() => doResolve(rep.id, 'dismissed')}
                       >
                         <Text style={styles.reportBtnTextDim}>{t('admin.reportDismiss')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              {/* — 🟡 Fellebbezések (report.review): eltávolított poszt visszaállítása — */}
+              <Text style={styles.section}>{t('admin.appeals')}</Text>
+              {appeals.length === 0 ? (
+                <Text style={styles.dim}>{t('admin.noAppeals')}</Text>
+              ) : (
+                appeals.map((app) => (
+                  <View key={app.id} style={styles.roleCard}>
+                    <Text style={styles.roleTitle} numberOfLines={1}>
+                      {app.postTitle || app.postId.slice(0, 8)}
+                    </Text>
+                    {app.postDescription ? (
+                      <Text style={styles.permDesc} numberOfLines={2}>
+                        {app.postDescription}
+                      </Text>
+                    ) : null}
+                    {app.note ? <Text style={styles.permDesc}>{`"${app.note}"`}</Text> : null}
+                    <View style={styles.reportActions}>
+                      <Pressable
+                        style={[styles.reportBtn, styles.reportResolve]}
+                        onPress={() => doResolveAppeal(app, 'granted')}
+                      >
+                        <Text style={styles.reportBtnText}>{t('admin.appealGrant')}</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.reportBtn, styles.reportDismiss]}
+                        onPress={() => doResolveAppeal(app, 'denied')}
+                      >
+                        <Text style={styles.reportBtnTextDim}>{t('admin.appealDeny')}</Text>
                       </Pressable>
                     </View>
                   </View>

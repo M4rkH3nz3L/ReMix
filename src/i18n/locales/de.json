@@ -3169,7 +3169,11 @@
     "noReports": "Keine offenen Meldungen.",
     "reportRemove": "Beitrag entfernen",
     "reportResolve": "Erledigt",
-    "reportDismiss": "Ablehnen"
+    "reportDismiss": "Ablehnen",
+    "appeals": "Einsprüche",
+    "noAppeals": "Keine offenen Einsprüche.",
+    "appealGrant": "Wiederherstellen",
+    "appealDeny": "Ablehnen"
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",

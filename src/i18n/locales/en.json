@@ -3169,7 +3169,11 @@
     "noReports": "No open reports.",
     "reportRemove": "Remove post",
     "reportResolve": "Resolve",
-    "reportDismiss": "Dismiss"
+    "reportDismiss": "Dismiss",
+    "appeals": "Appeals",
+    "noAppeals": "No open appeals.",
+    "appealGrant": "Reinstate",
+    "appealDeny": "Deny"
   },
   "legal": {
     "privacyTitle": "Privacy Policy",

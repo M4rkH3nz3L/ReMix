@@ -3169,7 +3169,11 @@
     "noReports": "Nincs nyitott bejelentés.",
     "reportRemove": "Poszt eltávolítása",
     "reportResolve": "Kezelve",
-    "reportDismiss": "Elutasít"
+    "reportDismiss": "Elutasít",
+    "appeals": "Fellebbezések",
+    "noAppeals": "Nincs nyitott fellebbezés.",
+    "appealGrant": "Visszaállít",
+    "appealDeny": "Elutasít"
   },
   "legal": {
     "privacyTitle": "Adatkezelési tájékoztató",

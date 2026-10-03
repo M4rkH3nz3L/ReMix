@@ -39,6 +39,7 @@ A P0/P1 után a ReMix biztonságos alap. A **professzionális platform** szintje
 
 ### 2.3 Trust & safety pipeline
 - **Moderation-queue** kiterjesztése ([10](./10-messaging-moderation.md)) a teljes tartalom-típusra (poszt/komment/DM/asset); **appeals**-folyamat.
+  - [x] **Appeals — moderátor-oldal kész:** `content_appeals` tábla + RLS (owner-insert csak removed posztra; `report.review` select/update) + scoped moderator-read a fellebbezett posztra; `src/lib/appeals.ts` (submit/list/resolve, granted→`moderate_post 'ok'`); admin-queue szekció grant/deny-nal (`20261003170000`). *(Hátra: owner-oldali „fellebbezés" gomb a removed poszton — a kész `submitAppeal`-t hívja; feed/player-integráció v. removal-notification kell hozzá.)*
 - **Creator-verification** (identitás/badge — a [creator-profile-architecture] fölé).
 - **Legal-request-handling** (takedown, adatkiadás) dokumentált folyamat ([14](./14-security-baseline-docs.md) INCIDENT-RESPONSE-szal összhangban).
 

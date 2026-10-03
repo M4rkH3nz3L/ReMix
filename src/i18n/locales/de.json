@@ -3122,6 +3122,7 @@
     "leave": "Verlassen",
     "ended": "Dieses Live ist beendet.",
     "videoSoon": "Live-Videostream kommt bald — Chat & Reaktionen sind live.",
+    "connecting": "Verbinde…",
     "chatPlaceholder": "Sag etwas…"
   },
   "channel": {

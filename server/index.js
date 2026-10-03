@@ -46,6 +46,13 @@ const { callerId, corsAllowlist, requireAuth, verifyToken, INSECURE_DEV } = requ
 const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
 const { authenticated, routeInventory } = require('./security/authorization');
 const { mediaGuard } = require('./security/uploadPolicy');
+
+// 🔴 LiveKit (élő videó) — token-mintázás a host/néző szerepéhez. A key/secret
+// env-ből; lokális dev: `livekit-server --dev` → devkey/secret, ws://<host>:7880.
+const { AccessToken } = require('livekit-server-sdk');
+const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
+const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
+const LIVEKIT_API_SECRET = (process.env.LIVEKIT_API_SECRET || '').trim();
 const { canAccessRenderJob } = require('./security/renderAuth');
 const { securityHeaders } = require('./security/securityHeaders');
 const { securityEvent } = require('./security/auditLog');
@@ -575,6 +582,38 @@ app.post('/invite', express.json({ limit: '32kb' }), requireAuth, rateLimit('mes
       console.error('Invite hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
+});
+
+// 🔴 LiveKit access-token az élő-roomhoz. A `room` a live_sessions id-ja, az
+// identity a verifikált user. A host (`publish: true`) kamerát/mikrofont ad; a
+// néző csak feliratkozik. ⚠️ A `publish` szerepet most a kliens állítja (a betöltött
+// sessionből); PROD-on a workernek a host-ownershipet a prod live_sessions ellen
+// kéne verifikálnia (a dev-worker lokál-DB-re mutat) — lásd [[hosted-supabase-prod]].
+app.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimit('messaging'), async (req, res) => {
+  if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    res.status(503).json({ error: 'LiveKit nincs konfigurálva (LIVEKIT_API_KEY / LIVEKIT_API_SECRET).' });
+    return;
+  }
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  const room = String(req.body?.room || '').trim();
+  if (!room) {
+    res.status(400).json({ error: 'room kötelező.' });
+    return;
+  }
+  const publish = req.body?.publish === true;
+  const name = String(req.body?.name || uid).slice(0, 80);
+  try {
+    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: uid, name, ttl: '2h' });
+    at.addGrant({ roomJoin: true, room, canPublish: publish, canSubscribe: true, canPublishData: true });
+    const token = await at.toJwt();
+    res.json({ token, url: LIVEKIT_URL });
+  } catch (err) {
+    res.status(500).json({ error: `Token-hiba: ${err.message}` });
+  }
 });
 
 // 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat

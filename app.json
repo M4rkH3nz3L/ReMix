@@ -121,7 +121,15 @@
         }
       ],
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "A ReMix a kamerádat használja az élő közvetítéshez.",
+          "microphonePermission": "A ReMix a mikrofonodat használja az élő közvetítéshez."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

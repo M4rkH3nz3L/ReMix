@@ -3122,6 +3122,7 @@
     "leave": "Kilépés",
     "ended": "Ez az élő véget ért.",
     "videoSoon": "Az élő videó-stream hamarosan — a chat és a reakciók már élnek.",
+    "connecting": "Kapcsolódás…",
     "chatPlaceholder": "Írj valamit…"
   },
   "channel": {

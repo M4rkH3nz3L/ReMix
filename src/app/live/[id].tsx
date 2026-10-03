@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { LiveKitRoom, VideoTrack, isTrackReference, useTracks } from '@livekit/react-native';
+import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Track } from 'livekit-client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,8 +33,34 @@ import {
   type LiveRoom,
   type LiveSession,
 } from '@/lib/live';
+import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
 
 const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
+
+/**
+ * A LiveKit-szoba videó-színpada: a kamera-trackeket rendereli (a host a sajátját
+ * látja, a néző a host remote streamjét). A <LiveKitRoom>-on BELÜL kell lennie.
+ */
+function LiveStage({ hostAvatar }: { hostAvatar: string | null }) {
+  const tracks = useTracks([Track.Source.Camera]);
+  const cam = tracks.find((tr) => isTrackReference(tr));
+  if (cam) {
+    return <VideoTrack trackRef={cam} style={StyleSheet.absoluteFill} objectFit="cover" />;
+  }
+  // még nincs videó-track (kapcsolódás / host nem publikál) → host-avatar placeholder
+  return (
+    <View style={styles.viewerStage}>
+      {hostAvatar ? (
+        <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
+      ) : (
+        <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
+          <Ionicons name="person" size={48} color={palette.textDim} />
+        </View>
+      )}
+      <ActivityIndicator color="#fff" />
+    </View>
+  );
+}
 
 /** Egy felúszó reakció-emoji (2 mp alatt felfelé + elhalványul). Az `x` drift az
  * esemény-handlerben készül (nem renderben), hogy ne hívjunk impure fn-t render közben. */
@@ -65,7 +93,9 @@ export default function LiveRoomScreen() {
   const [chat, setChat] = useState<LiveChat[]>([]);
   const [text, setText] = useState('');
   const [floats, setFloats] = useState<{ id: string; emoji: string; x: number }[]>([]);
-  const [camPerm, requestCam] = useCameraPermissions();
+  const [, requestCam] = useCameraPermissions();
+  const [, requestMic] = useMicrophonePermissions();
+  const [lk, setLk] = useState<{ token: string; url: string } | null>(null);
 
   const roomRef = useRef<LiveRoom | null>(null);
   const endedRef = useRef(false);
@@ -109,6 +139,18 @@ export default function LiveRoomScreen() {
           }
         },
       });
+
+      // 🔴 LiveKit videó: a WebRTC-globálok + szerep-token (host = publish).
+      ensureLiveKit();
+      const publish = s.hostId === self.id;
+      if (publish) {
+        await requestCam();
+        await requestMic();
+      }
+      const tok = await fetchLiveToken(liveId, publish, self.name).catch(() => null);
+      if (active && tok) {
+        setLk(tok);
+      }
     })();
     return () => {
       active = false;
@@ -116,13 +158,6 @@ export default function LiveRoomScreen() {
       roomRef.current = null;
     };
   }, [id, addFloat]);
-
-  // host: kamera-engedély kérése belépéskor
-  useEffect(() => {
-    if (isHost && camPerm && !camPerm.granted && camPerm.canAskAgain) {
-      void requestCam();
-    }
-  }, [isHost, camPerm, requestCam]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -186,9 +221,13 @@ export default function LiveRoomScreen() {
 
   return (
     <View style={styles.container}>
-      {/* háttér: host → kamera, néző → gradiens + host-avatar (a videó-stream providert igényel) */}
-      {isHost && camPerm?.granted ? (
-        <CameraView style={StyleSheet.absoluteFill} facing="front" />
+      {/* háttér: LiveKit videó (host → saját kamera-publish, néző → host remote stream) */}
+      {lk ? (
+        <View style={StyleSheet.absoluteFill}>
+          <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={isHost} video={isHost}>
+            <LiveStage hostAvatar={session.hostAvatar} />
+          </LiveKitRoom>
+        </View>
       ) : (
         <LinearGradient colors={['#1a1030', '#0c0d12']} style={StyleSheet.absoluteFill}>
           <View style={styles.viewerStage}>
@@ -199,7 +238,7 @@ export default function LiveRoomScreen() {
                 <Ionicons name="person" size={48} color={palette.textDim} />
               </View>
             )}
-            {!isHost ? <Text style={styles.viewerNote}>{t('live.videoSoon')}</Text> : null}
+            <Text style={styles.viewerNote}>{t('live.connecting')}</Text>
           </View>
         </LinearGradient>
       )}

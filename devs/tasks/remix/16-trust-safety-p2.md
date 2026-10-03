@@ -42,6 +42,27 @@ A P0/P1 után a ReMix biztonságos alap. A **professzionális platform** szintje
 - **Creator-verification** (identitás/badge — a [creator-profile-architecture] fölé).
 - **Legal-request-handling** (takedown, adatkiadás) dokumentált folyamat ([14](./14-security-baseline-docs.md) INCIDENT-RESPONSE-szal összhangban).
 
+### 2.4 DM E2E-titkosítás — stratégia (P2, csak ha a threat-model indokolja)
+**Döntés:** az E2E alapból **NEM kell** — a DM ma `messages` táblában, service_role-lal
+írt, RLS-sel és moderációval ([10](./10-messaging-moderation.md)) védve; a platform a
+tartalomhoz fér (ez a moderáció/legal-request előfeltétele is). E2E bevezetése
+**kizárja a szerver-oldali moderációt** a titkosított csatornán → ütközik a trust &
+safety céllal. Ezért E2E **csak** egy dedikált, opt-in „titkos csevegés" módra, ha
+jogszabály/piac megköveteli.
+**Ha mégis kell (vázlat):**
+- **Kulcsmodell:** eszközönkénti identitás-kulcspár (a privát kulcs az eszközön,
+  `expo-secure-store`; a publikus a `user_devices`-hoz kötve); üzenet-kulcs X25519
+  (ECDH) + a tartalom XChaCha20-Poly1305. Könyvtár: `libsodium` (natív, dev-build —
+  illik a [NATIVE.md] vonalba).
+- **Multi-device:** sender-key / per-eszköz re-encrypt; a `user_devices` már hordozza
+  az eszköz-leltárt (kulcs-rotációhoz + „többi munkamenet kiléptetése"-hez, 08).
+- **Hatás a meglévőkre:** a `messages.body` titkosított blob lesz → a szerver-oldali
+  moderáció (DM-report tartalom) CSAK a feladó/címzett kliens-oldali report-jával megy
+  (a kliens dekódol + csatol); a worker-push csak metaadatot lát.
+- **Backup/elvesztés:** opcionális, jelszóból származtatott kulcs-escrow (külön döntés,
+  GDPR-hatással).
+**Kész, ha:** dokumentált döntés (bevezetjük-e); ha igen, külön epik a fenti vázlatból.
+
 ---
 
 ## 3. Feladatok (nagy blokkok — a fázisban tovább bontandók)

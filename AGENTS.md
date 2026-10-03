@@ -24,4 +24,6 @@ Interaktív videószerkesztő; architektúra és állapot a README.md-ben.
   A `react-hooks/immutability` és `react-hooks/refs` szabályok szándékosan
   kikapcsolva — Reanimated shared value-k és expo-video/audio player-mutációk
   miatt. Új teszt: `src/**/*.test.ts` (kliens) vagy `server/**/*.test.js` (worker).
-- A nyitott technikai adósság és a go-live blokkolók: `AUDITBUGS.md`.
+- A nyitott technikai adósság és a go-live blokkolók (security + production
+  readiness): `devs/tasks/remix/` (számozott fejlesztési terv, forrás:
+  `devs/source/remix.md`).

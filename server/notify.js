@@ -8,6 +8,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const { Expo } = require('expo-server-sdk');
 
+const { decideNotify } = require('./security/notifyPolicy');
+
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
 const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
@@ -172,4 +174,55 @@ async function inviteMember(input) {
   return { status: 'pending', email };
 }
 
-module.exports = { adminClient, notifyAvailable, sendNotification, inviteMember };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 🔐 Küldhet-e `callerId` értesítést `recipientId`-nek? Igen, ha saját maga,
+ * VAGY közös projektjük van (owner↔member bármely irányban), VAGY van follow-él
+ * köztük bármely irányban. A döntés a pure `decideNotify`; az adatot a
+ * service_role klienssel kérdezzük (RLS-t kerül). Az id-ket UUID-ra validáljuk,
+ * mert a `recipientId` a kérés törzséből jön → ne mehessen PostgREST `.or()`
+ * filter-injection.
+ */
+async function canNotify(callerId, recipientId) {
+  if (!callerId || !recipientId) {
+    return false;
+  }
+  if (callerId === recipientId) {
+    return true;
+  }
+  if (!UUID_RE.test(callerId) || !UUID_RE.test(recipientId)) {
+    return false;
+  }
+  const sb = adminClient();
+  if (!sb) {
+    return false;
+  }
+  // közös projekt: owner↔member kapcsolat bármely irányban
+  const proj = await sb
+    .from('project_members')
+    .select('project_id')
+    .or(
+      `and(owner_id.eq.${callerId},member_id.eq.${recipientId}),` +
+        `and(owner_id.eq.${recipientId},member_id.eq.${callerId})`
+    )
+    .limit(1);
+  const shareProject = !proj.error && Array.isArray(proj.data) && proj.data.length > 0;
+
+  let followEdge = false;
+  if (!shareProject) {
+    const fol = await sb
+      .from('follows')
+      .select('follower_id')
+      .or(
+        `and(follower_id.eq.${callerId},following_id.eq.${recipientId}),` +
+          `and(follower_id.eq.${recipientId},following_id.eq.${callerId})`
+      )
+      .limit(1);
+    followEdge = !fol.error && Array.isArray(fol.data) && fol.data.length > 0;
+  }
+
+  return decideNotify({ callerId, recipientId, shareProject, followEdge });
+}
+
+module.exports = { adminClient, notifyAvailable, sendNotification, inviteMember, canNotify };

@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { TextClip } from '@/types/project';
 
 export interface BakedText {
@@ -35,7 +36,7 @@ export async function bakeTextToImage(clip: TextClip, aspect: number): Promise<B
   try {
     const res = await fetch(`${base}/text/bake`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await workerJsonHeaders(),
       body: JSON.stringify({ clip, canvas }),
     });
     if (!res.ok) {

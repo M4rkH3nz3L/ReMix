@@ -395,7 +395,7 @@ app.post('/faces', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => 
 });
 
 // 🏆 Best-shot pontozás (P0-1): forrás-időpontok vizuális minősége az Auto Edithez
-app.post('/shotscore', upload.any(), mediaGuard('video'), (req, res) => {
+app.post('/shotscore', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -730,7 +730,7 @@ app.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authenticate
 });
 
 // 🎬 headline ráégetése a kiválasztott borítóra (Chromium-raszter + overlay)
-app.post('/thumbnails/compose', upload.any(), (req, res) => {
+app.post('/thumbnails/compose', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   const file = (req.files ?? [])[0];
   const headline = String(req.body.headline ?? '').trim();
   if (!file || !headline) {
@@ -779,7 +779,7 @@ app.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticated({
  * A teljes hangot dolgozzuk fel (nem szeletet): így az előnézet bárhová
  * tekerhető, és a kliens fájlonként+beállításonként cache-eli.
  */
-app.post('/voice/preview', upload.any(), mediaGuard('audio'), (req, res) => {
+app.post('/voice/preview', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -814,7 +814,7 @@ app.post('/voice/preview', upload.any(), mediaGuard('audio'), (req, res) => {
  * → PNG. A formákat/feliratokat ugyanaz a generátor rajzolja, mint az
  * idővonalon, így a kép és a videó megjelenése garantáltan egyezik.
  */
-app.post('/imagedoc', upload.any(), (req, res) => {
+app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   let doc;
   let uriMap;
   try {
@@ -845,7 +845,7 @@ app.post('/imagedoc', upload.any(), (req, res) => {
     });
 });
 
-app.post('/color/stats', upload.any(), mediaGuard('image'), (req, res) => {
+app.post('/color/stats', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -868,7 +868,7 @@ app.post('/color/stats', upload.any(), mediaGuard('image'), (req, res) => {
 });
 
 // 🎨 Színpipetta: pixel-szín a médiakockán a (x,y) vászon-normalizált ponton
-app.post('/color/pixel', upload.any(), mediaGuard('image'), (req, res) => {
+app.post('/color/pixel', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -896,7 +896,7 @@ app.post('/color/pixel', upload.any(), mediaGuard('image'), (req, res) => {
 // curves + HSL), a worker egy identitás-rácsot átfuttat a szín-láncon és .cube
 // 3D LUT-ot ad vissza. (Importált LUT-ot itt nem sütünk be — az a kliensen már
 // megvan; a vignettát kihagyjuk, mert pozíciófüggő.)
-app.post('/color/lut-export', express.json({ limit: '256kb' }), (req, res) => {
+app.post('/color/lut-export', express.json({ limit: '256kb' }), requireAuth, rateLimit('analysis'), (req, res) => {
   const clip = {
     grade: typeof req.body.grade === 'string' ? req.body.grade : undefined,
     strength: Number.isFinite(Number(req.body.strength)) ? Number(req.body.strength) : undefined,
@@ -914,7 +914,7 @@ app.post('/color/lut-export', express.json({ limit: '256kb' }), (req, res) => {
 });
 
 // 🩻 Videoszkóp: egy médiakocka waveform/parade/vectorscope/histogram képe PNG-ben
-app.post('/color/scope', upload.any(), mediaGuard('image'), (req, res) => {
+app.post('/color/scope', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -939,7 +939,7 @@ app.post('/color/scope', upload.any(), mediaGuard('image'), (req, res) => {
 
 // 🔁 Text → Shape: egy szövegklip a teljes stílusával átlátszó PNG-vé sütve,
 // hogy forma-klip kép-kitöltéseként tovább animálható legyen (kép + w/h).
-app.post('/text/bake', express.json({ limit: '256kb' }), (req, res) => {
+app.post('/text/bake', express.json({ limit: '256kb' }), requireAuth, rateLimit('analysis'), (req, res) => {
   const clip = req.body.clip;
   const canvas = req.body.canvas;
   if (!clip || typeof clip.text !== 'string' || !canvas || !canvas.w || !canvas.h) {
@@ -1033,7 +1033,7 @@ app.get('/stickers3d/:id.png', (req, res) => {
 // lokálisan CPU-n) → fg/mid/bg parallax-rétegek. Md5 szerint cache-elt — a
 // rétegeket a render közvetlenül az assets/depth mappából olvassa, az app az
 // előnézethez a GET útvonalon éri el.
-app.post('/depth/parallax', upload.any(), mediaGuard('image'), (req, res) => {
+app.post('/depth/parallax', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -1063,7 +1063,7 @@ app.post('/depth/parallax', upload.any(), mediaGuard('image'), (req, res) => {
 });
 
 // 🌫️/🎬 depth-extrák: portré-blur + rack-focus változatok (közös mélység-cache)
-app.post('/depth/focus', upload.any(), mediaGuard('image'), (req, res) => {
+app.post('/depth/focus', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -1200,7 +1200,7 @@ app.post('/captions', upload.any(), ...proOnly, (req, res) => {
 
 // Hullámforma az idővonalhoz: hangfájl → mono 8 kHz PCM → csúcslista.
 // A kliens lemezre cache-eli, egy fájl csak egyszer jön fel.
-app.post('/waveform', upload.any(), mediaGuard('audio'), (req, res) => {
+app.post('/waveform', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1735,7 +1735,7 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
 // Jelenet-detektálás (Editor AI, szemantikus index): FFmpeg scene-score —
 // a válasz a FORRÁS-időben értett jelenetváltás-időpontok listája + a fájl
 // hossza. A küszöb (threshold, 0-1) a body-ban felülírható.
-app.post('/scenes', upload.any(), (req, res) => {
+app.post('/scenes', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1791,7 +1791,7 @@ app.post('/scenes', upload.any(), (req, res) => {
 
 // Beat-analízis (P0-2 Beat Sync): BPM + beat/downbeat-rács + energia-görbe a
 // FORRÁS-időben. Függőség nélküli onset/autokorrelációs elemzés (beats.js).
-app.post('/beats', upload.any(), (req, res) => {
+app.post('/beats', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1849,7 +1849,7 @@ app.post('/track', upload.any(), ...proOnly, (req, res) => {
 // Smart Search (P0-8): jelenet-keyframe-ek vision-címkézése — a kliens küldi
 // a forrás-időpontokat, a válasz időpontonként magyar leírás + címkék
 // (tartalom-hash lemez-cache-sel; a modell letöltése: ollama pull qwen2.5vl:7b).
-app.post('/vision/index', upload.any(), (req, res) => {
+app.post('/vision/index', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1884,7 +1884,7 @@ app.post('/vision/index', upload.any(), (req, res) => {
 
 // Smart Search lekérdezés: query + dokumentumok → hasonlóság-pontok
 // (nomic-embed-text a lokális Ollamában).
-app.post('/vision/query', express.json({ limit: '1mb' }), (req, res) => {
+app.post('/vision/query', express.json({ limit: '1mb' }), requireAuth, rateLimit('analysis'), (req, res) => {
   const { query, docs } = req.body ?? {};
   if (!query || !Array.isArray(docs) || docs.length === 0) {
     res.status(400).json({ error: 'Hiányzó lekérdezés vagy dokumentumok.' });
@@ -1900,7 +1900,7 @@ app.post('/vision/query', express.json({ limit: '1mb' }), (req, res) => {
 
 // Thumbnail Studio (Creative Canvas): a legjobb borítókép-kockák kiválasztása
 // (élesség+kontraszt pontozás) — a válasz base64 JPEG-ek listája.
-app.post('/thumbnails', upload.any(), mediaGuard('video'), (req, res) => {
+app.post('/thumbnails', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -1959,7 +1959,7 @@ app.post('/reframe', upload.any(), ...proOnly, mediaGuard('video'), (req, res) =
 // Csend-detektálás (Editor AI cut-listák): FFmpeg silencedetect — a válasz a
 // FORRÁS-időben értett csend-intervallumok listája + a fájl hossza. Hang
 // nélküli fájlra üres lista jön (nem hiba).
-app.post('/silence', upload.any(), (req, res) => {
+app.post('/silence', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -2019,7 +2019,7 @@ app.post('/silence', upload.any(), (req, res) => {
 // dekódolható munka-példány készül — az app előnézete ezt játssza, a render
 // az eredetivel fut. Ha a forrás eleve ≤1280 px, {skip:true} a válasz.
 // Állapot/letöltés a közös job-végpontokon (/render/:id).
-app.post('/proxy', upload.any(), (req, res) => {
+app.post('/proxy', upload.any(), requireAuth, rateLimit('render'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -2077,7 +2077,7 @@ app.post('/proxy', upload.any(), (req, res) => {
 // Collect Project: projekt + minden média egy zip-archívumban (átadás/archívum).
 // A médiafájlok a media/ mappába kerülnek, a projekt uri-jai relatív útra
 // íródnak át; állapot/letöltés a közös job-végpontokon (/render/:id).
-app.post('/collect', upload.any(), (req, res) => {
+app.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, res) => {
   let project;
   let uriMap;
   try {

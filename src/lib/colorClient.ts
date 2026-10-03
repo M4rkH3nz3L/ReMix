@@ -5,6 +5,7 @@ import { mediaFormData, uploadFetch } from '@/lib/upload';
 import type { ColorStats } from '@/lib/colorAuto';
 import { ensureCloud } from '@/lib/backend';
 import { renderServerUrl } from '@/lib/render';
+import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { ClipAdjust, GradeId } from '@/types/project';
 
 /**
@@ -111,7 +112,7 @@ export async function exportLutCube(
   try {
     const res = await fetch(`${base}/color/lut-export`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await workerJsonHeaders(),
       body: JSON.stringify({ adjust, grade, strength, size }),
     });
     if (!res.ok) {

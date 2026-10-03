@@ -37,6 +37,53 @@ jobs:
       - name: Worker syntax-ellenőrzés
         run: for f in server/*.js; do node -c "$f" || exit 1; done
 
+  security:
+    name: Security-kapu (dependency · secret-scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # a secret-scanhez a teljes history kell
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Függőségek (kliens)
+        run: npm ci
+
+      - name: Függőségek (worker)
+        run: npm ci
+        working-directory: server
+
+      # 🔴 KAPU: KRITIKUS sérülékenység → a build bukik. Ma 0 critical (a meglévő
+      # 19 high/moderate tranzitív vuln külön triage) — ez a JÖVŐBELI kritikusokat fogja.
+      - name: npm audit — kritikus-kapu (kliens)
+        run: npm audit --audit-level=critical --omit=dev
+
+      - name: npm audit — kritikus-kapu (worker)
+        run: npm audit --audit-level=critical
+        working-directory: server
+
+      # ℹ️ INFORMATÍV: a teljes high/moderate lista — NEM blokkol (a tranzitív
+      # expo-függőségek triage-a + frissítése külön feladat, devs/tasks/remix/28).
+      - name: npm audit — teljes jelentés (nem blokkoló)
+        run: npm audit || true
+
+      - name: npm audit worker — teljes jelentés (nem blokkoló)
+        run: npm audit || true
+        working-directory: server
+
+      # 🔑 Secret-scan (gitleaks). EGYELŐRE nem blokkoló: a teljes git-history
+      # átvizsgálása + az esetleges találatok kulcs-rotációja után tehető
+      # kötelezővé (devs/tasks/remix/12 + 27; a DB-jelszó-rotáció amúgy is teendő).
+      - name: Secret-scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   doctor:
     name: Expo-doctor (nem blokkoló)
     runs-on: ubuntu-latest

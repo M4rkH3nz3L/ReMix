@@ -1,7 +1,7 @@
 # 🛡️ ReMix — Production & Security fejlesztési terv (index)
 
 > **Forrás-audit:** [devs/source/remix.md](../../source/remix.md) — a `main` statikus kód-auditja (struktúra, worker-API, Supabase/RLS, auth, billing, storage, AI, CI/CD, security).
-> **Testvér-tervek (funkcionális):** [VIDEO.md](../VIDEO.md) · [AUDIO.md](../AUDIO.md) · [IMAGE.md](../IMAGE.md) · [PROD.md](../PROD.md) · [MISSING.md](../MISSING.md).
+> **Testvér-tervek (funkcionális):** [VIDEO.md](../VIDEO.md) · [AUDIO.md](../AUDIO.md) · [IMAGE.md](../IMAGE.md) · [NATIVE.md](../NATIVE.md) · [PROD.md](../PROD.md) · [MISSING.md](../MISSING.md).
 > **Ez a mappa:** a security + production-readiness backlog **feladatokra bontva, számozott fájlokban**. Minden fájl egy önálló, szállítható epik: kontextus → jelenlegi állapot (bizonyítékkal) → megoldás → feladatlista → „Kész, ha” → teszt.
 
 ---

@@ -1,4 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js';
+import { t } from 'i18next';
 import { create } from 'zustand';
 
 import type { SignUpProfile } from '@/lib/accountValidation';
@@ -67,12 +68,48 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-/** Supabase-hiba → rövid, felhasználónak mutatható üzenet. */
-function messageOf(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message: unknown }).message);
+/**
+ * Supabase-hiba → rövid, LOKALIZÁLT, felhasználónak mutatható üzenet.
+ * Elsődlegesen a stabil `error.code` alapján képez i18n-kulcsra (gotrue),
+ * tartalékként a nyers `message` tartalmára illeszt; ha egyiket sem ismeri
+ * fel, a nyers szerver-üzenetet adja (hogy ne nyeljük el az infót).
+ */
+const AUTH_ERROR_KEY_BY_CODE: Record<string, string> = {
+  invalid_credentials: 'auth.errors.invalidCredentials',
+  email_not_confirmed: 'auth.errors.emailNotConfirmed',
+  email_exists: 'auth.errors.userAlreadyExists',
+  user_already_exists: 'auth.errors.userAlreadyExists',
+  phone_exists: 'auth.errors.phoneExists',
+  weak_password: 'auth.errors.weakPassword',
+  over_request_rate_limit: 'auth.errors.rateLimit',
+  over_email_send_rate_limit: 'auth.errors.rateLimit',
+  over_sms_send_rate_limit: 'auth.errors.rateLimit',
+  otp_expired: 'auth.errors.otpExpired',
+  user_not_found: 'auth.errors.userNotFound',
+};
+
+function keyByMessage(raw: string): string | undefined {
+  const m = raw.toLowerCase();
+  if (m.includes('invalid login credentials')) return 'auth.errors.invalidCredentials';
+  if (m.includes('email not confirmed')) return 'auth.errors.emailNotConfirmed';
+  if (m.includes('already registered') || m.includes('already exists')) {
+    return 'auth.errors.userAlreadyExists';
   }
-  return 'Ismeretlen hiba';
+  if (m.includes('rate limit')) return 'auth.errors.rateLimit';
+  if (m.includes('weak password')) return 'auth.errors.weakPassword';
+  return undefined;
+}
+
+function messageOf(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const e = error as { code?: unknown; message?: unknown };
+    const code = typeof e.code === 'string' ? e.code : undefined;
+    const raw = typeof e.message === 'string' ? e.message : '';
+    const key = (code ? AUTH_ERROR_KEY_BY_CODE[code] : undefined) ?? keyByMessage(raw);
+    if (key) return t(key);
+    if (raw) return raw;
+  }
+  return t('auth.errors.unknown');
 }
 
 let subscribed = false;
@@ -132,7 +169,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signUp: async (email, password, profile) => {
     if (!supabase) {
-      return { error: 'Supabase nincs konfigurálva.' };
+      return { error: t('auth.errors.notConfigured') };
     }
     // A profil-mezők user-metadataként mennek; a profiles-sort belőlük az
     // auth.users trigger (handle_new_user) hozza létre — e-mail-megerősítés
@@ -170,7 +207,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signIn: async (identifier, password) => {
     if (!supabase) {
-      return { error: 'Supabase nincs konfigurálva.' };
+      return { error: t('auth.errors.notConfigured') };
     }
     // e-mail → közvetlen; felhasználónév/telefon → e-mailre feloldás (RPC, belépés
     // előtt fut, anon szerepként). A profiles owner-only RLS-t a definer kerüli meg.
@@ -181,7 +218,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         return { error: messageOf(resolved.error) };
       }
       if (!resolved.data) {
-        return { error: 'Nincs ilyen felhasználó (e-mail, felhasználónév vagy telefon).' };
+        return { error: t('auth.errors.userNotFound') };
       }
       email = resolved.data as string;
     }
@@ -200,16 +237,16 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signUpWithPhone: async (phone, password, profile) => {
     if (!supabase) {
-      return { error: 'Supabase nincs konfigurálva.' };
+      return { error: t('auth.errors.notConfigured') };
     }
     // E.164 + országkód-kapu MÁR a hálózat előtt: az SMS valódi pénz (előre
     // fizetett Brevo-kredit), a hook szerver-oldalon is ellenőrzi ugyanezt.
     const e164 = normalizeE164(phone);
     if (!e164) {
-      return { error: 'Érvénytelen telefonszám.' };
+      return { error: t('auth.errors.invalidPhone') };
     }
     if (!isAllowedPhone(e164)) {
-      return { error: 'Ez az országhívószám nem támogatott SMS-regisztrációhoz.' };
+      return { error: t('auth.errors.phoneCountryUnsupported') };
     }
     const { data, error } = await supabase.auth.signUp({
       phone: e164,
@@ -241,15 +278,15 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   verifyPhoneOtp: async (phone, token) => {
     if (!supabase) {
-      return { error: 'Supabase nincs konfigurálva.' };
+      return { error: t('auth.errors.notConfigured') };
     }
     const e164 = normalizeE164(phone);
     if (!e164) {
-      return { error: 'Érvénytelen telefonszám.' };
+      return { error: t('auth.errors.invalidPhone') };
     }
     const code = token.replace(/\D/g, '');
     if (!isValidOtp(code)) {
-      return { error: 'A kód 6 számjegyből áll.' };
+      return { error: t('auth.errors.otpLength') };
     }
     const { data, error } = await supabase.auth.verifyOtp({
       phone: e164,
@@ -267,11 +304,11 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   resendPhoneOtp: async (phone) => {
     if (!supabase) {
-      return { error: 'Supabase nincs konfigurálva.' };
+      return { error: t('auth.errors.notConfigured') };
     }
     const e164 = normalizeE164(phone);
     if (!e164 || !isAllowedPhone(e164)) {
-      return { error: 'Érvénytelen telefonszám.' };
+      return { error: t('auth.errors.invalidPhone') };
     }
     const { error } = await supabase.auth.resend({ type: 'sms', phone: e164 });
     if (error) {

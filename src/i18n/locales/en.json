@@ -178,6 +178,21 @@
     "subtitle": "Choose the app language"
   },
   "auth": {
+    "errors": {
+      "unknown": "Something went wrong. Please try again.",
+      "notConfigured": "Sign-in isn't configured.",
+      "userNotFound": "No such user (email, username or phone).",
+      "invalidPhone": "Invalid phone number.",
+      "phoneCountryUnsupported": "This country code isn't supported for SMS sign-up.",
+      "otpLength": "The code is 6 digits.",
+      "invalidCredentials": "Invalid email/username or password.",
+      "emailNotConfirmed": "Your email isn't confirmed yet. Check your inbox.",
+      "userAlreadyExists": "This account already exists. Try signing in.",
+      "phoneExists": "This phone number is already registered.",
+      "weakPassword": "Password is too weak.",
+      "rateLimit": "Too many attempts. Please wait a bit and try again.",
+      "otpExpired": "The code has expired. Request a new one."
+    },
     "signInTitle": "Welcome back",
     "signInSubtitle": "Sign in to access your projects.",
     "signUpTitle": "Create account",

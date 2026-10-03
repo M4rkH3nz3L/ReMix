@@ -178,6 +178,21 @@
     "subtitle": "Válaszd ki az alkalmazás nyelvét"
   },
   "auth": {
+    "errors": {
+      "unknown": "Valami hiba történt. Próbáld újra.",
+      "notConfigured": "A bejelentkezés nincs konfigurálva.",
+      "userNotFound": "Nincs ilyen felhasználó (e-mail, felhasználónév vagy telefon).",
+      "invalidPhone": "Érvénytelen telefonszám.",
+      "phoneCountryUnsupported": "Ez az országhívószám nem támogatott SMS-regisztrációhoz.",
+      "otpLength": "A kód 6 számjegyből áll.",
+      "invalidCredentials": "Hibás e-mail/felhasználónév vagy jelszó.",
+      "emailNotConfirmed": "Az e-mail-címed még nincs megerősítve. Nézd meg a postaládád.",
+      "userAlreadyExists": "Ez a fiók már létezik. Próbálj belépni.",
+      "phoneExists": "Ez a telefonszám már regisztrálva van.",
+      "weakPassword": "A jelszó túl gyenge.",
+      "rateLimit": "Túl sok próbálkozás. Várj egy kicsit, és próbáld újra.",
+      "otpExpired": "A kód lejárt. Kérj újat."
+    },
     "signInTitle": "Üdv újra",
     "signInSubtitle": "Jelentkezz be a projektjeidhez.",
     "signUpTitle": "Fiók létrehozása",

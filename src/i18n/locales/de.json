@@ -178,6 +178,21 @@
     "subtitle": "App-Sprache wählen"
   },
   "auth": {
+    "errors": {
+      "unknown": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      "notConfigured": "Die Anmeldung ist nicht konfiguriert.",
+      "userNotFound": "Kein solcher Benutzer (E-Mail, Benutzername oder Telefon).",
+      "invalidPhone": "Ungültige Telefonnummer.",
+      "phoneCountryUnsupported": "Diese Ländervorwahl wird für die SMS-Registrierung nicht unterstützt.",
+      "otpLength": "Der Code besteht aus 6 Ziffern.",
+      "invalidCredentials": "Ungültige E-Mail/Benutzername oder Passwort.",
+      "emailNotConfirmed": "Deine E-Mail ist noch nicht bestätigt. Prüfe dein Postfach.",
+      "userAlreadyExists": "Dieses Konto existiert bereits. Versuche dich anzumelden.",
+      "phoneExists": "Diese Telefonnummer ist bereits registriert.",
+      "weakPassword": "Das Passwort ist zu schwach.",
+      "rateLimit": "Zu viele Versuche. Bitte warte kurz und versuche es erneut.",
+      "otpExpired": "Der Code ist abgelaufen. Fordere einen neuen an."
+    },
     "signInTitle": "Willkommen zurück",
     "signInSubtitle": "Melde dich an, um auf deine Projekte zuzugreifen.",
     "signUpTitle": "Konto erstellen",

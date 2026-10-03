@@ -3115,7 +3115,14 @@
     "goLive": "Go live",
     "comingSoon": "Live streaming is coming soon.",
     "nowTitle": "Live now",
-    "empty": "No one is live right now. Follow creators to get notified when they go live."
+    "empty": "No one is live right now. Follow creators to get notified when they go live.",
+    "defaultTitle": "Live",
+    "titlePlaceholder": "What's your live about?",
+    "endLive": "End",
+    "leave": "Leave",
+    "ended": "This live has ended.",
+    "videoSoon": "Live video stream coming soon — chat & reactions are live.",
+    "chatPlaceholder": "Say something…"
   },
   "channel": {
     "posts": "Posts",

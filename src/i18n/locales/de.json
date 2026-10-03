@@ -3115,7 +3115,14 @@
     "goLive": "Live gehen",
     "comingSoon": "Live-Streaming kommt bald.",
     "nowTitle": "Jetzt live",
-    "empty": "Gerade ist niemand live. Folge Creators, um benachrichtigt zu werden, wenn sie live gehen."
+    "empty": "Gerade ist niemand live. Folge Creators, um benachrichtigt zu werden, wenn sie live gehen.",
+    "defaultTitle": "Live",
+    "titlePlaceholder": "Worum geht's in deinem Live?",
+    "endLive": "Beenden",
+    "leave": "Verlassen",
+    "ended": "Dieses Live ist beendet.",
+    "videoSoon": "Live-Videostream kommt bald — Chat & Reaktionen sind live.",
+    "chatPlaceholder": "Sag etwas…"
   },
   "channel": {
     "posts": "Beiträge",

@@ -3115,7 +3115,14 @@
     "goLive": "Élő indítása",
     "comingSoon": "Az élő közvetítés hamarosan érkezik.",
     "nowTitle": "Most élőben",
-    "empty": "Most senki sincs élőben. Kövess alkotókat, hogy értesülj, amikor élőben lesznek."
+    "empty": "Most senki sincs élőben. Kövess alkotókat, hogy értesülj, amikor élőben lesznek.",
+    "defaultTitle": "Élő",
+    "titlePlaceholder": "Miről szól az élő?",
+    "endLive": "Befejezés",
+    "leave": "Kilépés",
+    "ended": "Ez az élő véget ért.",
+    "videoSoon": "Az élő videó-stream hamarosan — a chat és a reakciók már élnek.",
+    "chatPlaceholder": "Írj valamit…"
   },
   "channel": {
     "posts": "Posztok",

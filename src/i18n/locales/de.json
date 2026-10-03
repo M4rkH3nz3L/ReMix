@@ -2533,6 +2533,7 @@
       "upsertImageDoc_one": "Bilddokument: {{name}} ({{count}} Ebene)",
       "upsertImageDoc_other": "Bilddokument: {{name}} ({{count}} Ebenen)",
       "removeImageDoc": "Bilddokument gelöscht",
+      "setLiveDoc": "Live-Produktion aktualisiert ({{scenes}} Szene(n))",
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",
       "relinkUri": "Medien neu verknüpft: {{file}}",
@@ -2713,7 +2714,8 @@
       "writing": "Text",
       "code": "Code",
       "music": "Musik",
-      "design": "Design"
+      "design": "Design",
+      "live": "Live"
     },
     "kindDesc": {
       "video": "Zeitleisten-Videoeditor",

@@ -1,6 +1,7 @@
 import { t as tr } from 'i18next';
 
 import { findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
+import type { LiveDoc } from '@/types/live';
 import type {
   AspectRatio,
   Asset,
@@ -61,7 +62,14 @@ export type EditorCommand =
    * réteg-szerkesztés is undo-zható, ugyanúgy, mint bármi más.
    */
   | { type: 'UPSERT_IMAGE_DOC'; doc: ImageDoc; label?: string }
-  | { type: 'REMOVE_IMAGE_DOC'; docId: string };
+  | { type: 'REMOVE_IMAGE_DOC'; docId: string }
+  /**
+   * 🎥 Live-produkció dokumentum beírása (létrehozás ÉS módosítás). A jelenet-/
+   * forrás-/cél-műveletek pure függvények (`liveDoc.ts`), az eredményt EZ a
+   * parancs teszi a `project.live`-ba — így a live-szerkesztés is undo-zható
+   * (mint `UPSERT_IMAGE_DOC`), és élőben a data-channelre broadcastolható.
+   */
+  | { type: 'SET_LIVE_DOC'; doc: LiveDoc; label?: string };
 
 export type EventActor = 'user' | 'ai' | 'system' | 'remote';
 
@@ -235,6 +243,13 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, imageDocs: next.length > 0 ? next : undefined };
     }
 
+    case 'SET_LIVE_DOC': {
+      if (JSON.stringify(project.live ?? null) === JSON.stringify(cmd.doc)) {
+        return null; // semmi nem változott — ne szemetelje a history-t
+      }
+      return { ...project, live: cmd.doc };
+    }
+
     case 'SET_MARKERS': {
       const next = [...cmd.markers].sort((a, b) => a.time - b.time);
       const prev = project.markers ?? [];
@@ -404,6 +419,14 @@ export function describeCommand(cmd: EditorCommand): string {
       );
     case 'REMOVE_IMAGE_DOC':
       return tr('lib.commands.removeImageDoc');
+    case 'SET_LIVE_DOC':
+      return (
+        cmd.label ??
+        tr('lib.commands.setLiveDoc', {
+          scenes: cmd.doc.scenes.length,
+          defaultValue: `Live: ${cmd.doc.scenes.length} scene(s)`,
+        })
+      );
     case 'REPLACE_TRACKS':
       return cmd.label ?? tr('lib.commands.replaceTracks', { count: cmd.tracks.length });
     case 'RELINK_URI':

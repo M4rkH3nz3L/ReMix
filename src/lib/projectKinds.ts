@@ -35,6 +35,10 @@ export const PROJECT_KINDS: Record<ProjectKind, ProjectKindMeta> = {
   code: { id: 'code', emoji: '💻', icon: 'code-slash', label: 'studio.kind.code', editable: false, route: (id) => `/studio/code/${id}` },
   music: { id: 'music', emoji: '🎵', icon: 'musical-note', label: 'studio.kind.music', editable: false, route: (id) => `/studio/music/${id}` },
   design: { id: 'design', emoji: '🎨', icon: 'color-palette', label: 'studio.kind.design', editable: false, route: (id) => `/studio/design/${id}` },
+  // ── 🎥 Live Studio — van stúdiója (/live/studio/[id]), de a Live-hubból
+  //    („Go live") jön létre, ezért `editable: false` → kimarad a generikus
+  //    „Új projekt" választóból (creatableKinds). A route a lista-megnyitáshoz él.
+  live: { id: 'live', emoji: '🎥', icon: 'radio', label: 'studio.kind.live', editable: false, route: (id) => `/live/studio/${id}` },
 };
 
 /** Minden fajta, definíciós sorrendben. */

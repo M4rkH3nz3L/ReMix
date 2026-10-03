@@ -4,6 +4,7 @@ import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
 import { createImageDoc } from '@/lib/imageDoc';
+import { createLiveDoc } from '@/lib/liveDoc';
 import { projectKindMeta } from '@/lib/projectKinds';
 import type {
   AdjustClip,
@@ -79,6 +80,9 @@ export function createEmptyProject(
     ...(kind === 'image'
       ? { imageDocs: [createImageDoc(name, aspectRatio, () => makeId('lyr'))] }
       : {}),
+    // 🎥 a live-stúdió a scene/forrás-grafet szerkeszti → egy kiinduló live-doc
+    // (Main jelenet + kamera + ReMix-cél); a Live-hub a „Go live"-nál ezt hozza.
+    ...(kind === 'live' ? { live: createLiveDoc(name, () => makeId('live')) } : {}),
     createdAt: now,
     updatedAt: now,
     schemaVersion: 6,

@@ -51,7 +51,11 @@ A messaging-alap erős: DM, project-chat, group-chat, members, last-read, realti
 ### 🟦 Fázis B — Attachment & throttling
 - [ ] Attachment `mediaUpload()` + privát bucket + signed-URL.
 - [ ] Link-preview worker-oldalon SSRF-safe.
-- [ ] `messaging` rate-limit + új-DM burst-limit; `/notify` címzett-authz.
+- [x] **`/notify` címzett-authz — KÉSZ** (2026-10-03): `canNotify` csak akkor enged
+      (self / közös projekt / follow-él), nincs tetszőleges-címzett notification;
+      pure döntés `server/security/notifyPolicy.js` + teszt. `messaging` rate-limit
+      bekötve `/notify` + `/invite` elé.
+- [ ] új-DM burst-limit (spam) — hátra.
 
 ### 🟦 Fázis C — Moderation
 - [ ] Moderation-queue UI (moderator/admin) + műveletek + audit.

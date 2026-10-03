@@ -4,6 +4,25 @@
 > **Testvér:** [00-README](./00-README.md) · ráépül: [02](./02-upload-security.md), [03](./03-rate-limiting.md), [06](./06-ai-endpoint-security.md), [07](./07-render-authorization.md).
 > **Érintett kód:** [server/index.js](../../../server/index.js) · [server/auth.js](../../../server/auth.js) · [server/notify.js](../../../server/notify.js) · új: `server/security/authorization.js`.
 
+> **✅ Authz-audit verdikt (2026-10-03, `studio-social`, fájlról-fájlra verifikálva).**
+> A ReMix objektum-szintű authorizationja **jelen van és kétrétegű** (egy külső
+> review tévesen „hiányzónak" vélte, mert nem látta a kódot):
+> 1. **Supabase RLS a teljes user-adaton** — 27 tábla, mind owner/membership-
+>    scopeolt; írás `SECURITY DEFINER`/`service_role` függvényeken át. A **remix-
+>    határ bizonyítottan védett**: `posts_update/delete_own` (creator-kötött) +
+>    `project_role()` **owner-kötött** (`where owner_id = p_owner`) + `project_members`
+>    **FK → `cloud_projects(user_id, project_id)`** ⇒ B megnézheti/remixelheti A
+>    posztját, de A eredetijét **nem** módosíthatja/törölheti, és nem is tud magának
+>    tagságot adni idegen projekthez.
+> 2. **Worker = compute** (nem projekt-CRUD): `requireAuth` + `canAccessRenderJob`
+>    (render-BOLA, [07]) + `/invite` owner-kötött & FK-biztos + storage **dupla-
+>    scopeolt** (`.eq(user_id).eq(id)`) + billing dev-route `devBillingGuard`-dal 403.
+>
+> **Egyetlen valódi rés volt — a `/notify` címzett-authz — és JAVÍTVA** ([10] §3B,
+> `canNotify`: self / közös projekt / follow-él; pure `notifyPolicy.decideNotify` + teszt).
+> A megmaradt P0 tehát **nem** az objektum-szintű authz (az megvan), hanem a lenti
+> 🔴 **NYITOTT compute-endpointok** deklaratív policy mögé zárása.
+
 ---
 
 ## 0. Kontextus & cél

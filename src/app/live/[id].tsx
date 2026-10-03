@@ -1,9 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom } from '@livekit/react-native';
-import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -20,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LiveComposite } from '@/components/live/LiveComposite';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { palette } from '@/constants/editor';
 import { encodeScenePayload, type ScenePayload } from '@/lib/liveComposite';
 import {
@@ -32,12 +29,18 @@ import {
   openLiveRoom,
   type LiveChat,
   type LiveRoom,
+  type LiveSelf,
   type LiveSession,
 } from '@/lib/live';
 import { setActiveScene } from '@/lib/liveDoc';
-import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
 import { loadProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
+
+// 🔴 A WebRTC-videó réteg LAZY (külön modul: @/components/live/LiveVideoStage) →
+// az expo-router INDULÁSI route-validációja NEM tölti be a natív WebRTC-modult,
+// így egy WebRTC nélküli build sem dönti el az egész appot (csak a tényleges
+// belépéskor derül ki — azt az ErrorBoundary kezeli barátságos panellel).
+const LiveVideoStage = lazy(() => import('@/components/live/LiveVideoStage'));
 
 const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
 
@@ -63,6 +66,24 @@ function FloatingHeart({ emoji, x, onDone }: { emoji: string; x: number; onDone:
   );
 }
 
+/** A videó betöltése/kapcsolódása alatti placeholder (host-avatar + „kapcsolódás"). */
+function ConnectingStage({ hostAvatar, note }: { hostAvatar: string | null; note: string }) {
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.connectingBg]}>
+      <View style={styles.viewerStage}>
+        {hostAvatar ? (
+          <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
+        ) : (
+          <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
+            <Ionicons name="person" size={48} color={palette.textDim} />
+          </View>
+        )}
+        <Text style={styles.viewerNote}>{note}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function LiveRoomScreen() {
   const { t } = useTranslation();
   const { id, project: projectParam } = useLocalSearchParams<{ id: string; project?: string }>();
@@ -72,9 +93,8 @@ export default function LiveRoomScreen() {
   const [chat, setChat] = useState<LiveChat[]>([]);
   const [text, setText] = useState('');
   const [floats, setFloats] = useState<{ id: string; emoji: string; x: number }[]>([]);
-  const [, requestCam] = useCameraPermissions();
-  const [, requestMic] = useMicrophonePermissions();
-  const [lk, setLk] = useState<{ token: string; url: string } | null>(null);
+  // 🔴 a saját identitás (a videó-token-szerzéshez a LiveVideoStage-ben)
+  const [self, setSelf] = useState<LiveSelf | null>(null);
   // 🎥 a renderelendő jelenet-állapot (host: a saját live-docából; néző: a broadcastból)
   const [scene, setScene] = useState<ScenePayload | null>(null);
   // 🎥 host: a jelenet-lista az élő váltóhoz (a live-docból)
@@ -136,6 +156,7 @@ export default function LiveRoomScreen() {
       if (!active || !self) {
         return;
       }
+      setSelf(self); // → a LiveVideoStage ebből szerzi a videó-tokent (lazy)
       roomRef.current = openLiveRoom(liveId, self, {
         onChat: (m) => setChat((prev) => [...prev.slice(-80), m]),
         onReaction: (emoji) => addFloat(emoji),
@@ -160,25 +181,15 @@ export default function LiveRoomScreen() {
         },
       });
 
-      // 🔴 LiveKit videó: a WebRTC-globálok + szerep-token (host = publish).
-      ensureLiveKit();
-      const publish = s.hostId === self.id;
-      if (publish) {
-        await requestCam();
-        await requestMic();
-        // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast
-        if (projectParam) {
-          const proj = await loadProject(String(projectParam)).catch(() => null);
-          if (active && proj?.live) {
-            liveDocRef.current = proj.live;
-            setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
-            broadcastScene();
-          }
+      // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast.
+      // (A videó-token + WebRTC-kapcsolat a lazy LiveVideoStage-ben fut.)
+      if (s.hostId === self.id && projectParam) {
+        const proj = await loadProject(String(projectParam)).catch(() => null);
+        if (active && proj?.live) {
+          liveDocRef.current = proj.live;
+          setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
+          broadcastScene();
         }
-      }
-      const tok = await fetchLiveToken(liveId, publish, self.name, self.id).catch(() => null);
-      if (active && tok) {
-        setLk(tok);
       }
     })();
     return () => {
@@ -250,27 +261,27 @@ export default function LiveRoomScreen() {
 
   return (
     <View style={styles.container}>
-      {/* háttér: LiveKit videó (host → saját kamera-publish, néző → host remote stream) */}
-      {lk ? (
-        <View style={StyleSheet.absoluteFill}>
-          <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={isHost} video={isHost}>
-            <LiveComposite payload={scene} hostAvatar={session.hostAvatar} />
-          </LiveKitRoom>
-        </View>
-      ) : (
-        <LinearGradient colors={['#1a1030', '#0c0d12']} style={StyleSheet.absoluteFill}>
-          <View style={styles.viewerStage}>
-            {session.hostAvatar ? (
-              <Image source={{ uri: session.hostAvatar }} style={styles.viewerAvatar} />
-            ) : (
-              <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
-                <Ionicons name="person" size={48} color={palette.textDim} />
-              </View>
-            )}
-            <Text style={styles.viewerNote}>{t('live.connecting')}</Text>
-          </View>
-        </LinearGradient>
-      )}
+      {/* háttér: a WEBRTC-videó LAZY rétege (host → kamera-publish, néző → remote),
+          Suspense (betöltés) + ErrorBoundary (hiányzó natív modul = barátságos panel,
+          nem app-crash). A kompozíciót a `scene` jelenet-állapot hajtja. */}
+      <View style={StyleSheet.absoluteFill}>
+        {self ? (
+          <ErrorBoundary>
+            <Suspense fallback={<ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />}>
+              <LiveVideoStage
+                liveId={String(id)}
+                publish={isHost}
+                name={self.name}
+                userId={self.id}
+                hostAvatar={session.hostAvatar}
+                scene={scene}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        ) : (
+          <ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />
+        )}
+      </View>
 
       {/* felúszó reakciók */}
       <View pointerEvents="none" style={styles.floatLayer}>
@@ -384,6 +395,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   endedText: { color: palette.textDim, fontSize: 16, fontWeight: '700' },
 
+  connectingBg: { backgroundColor: '#140c24' },
   viewerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   viewerAvatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: palette.surface },
   viewerAvatarFallback: { alignItems: 'center', justifyContent: 'center' },

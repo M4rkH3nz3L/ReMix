@@ -195,3 +195,54 @@ npx eas-cli build --profile production --platform ios       # App Store (Xcode 2
 **Kész, ha (a terv egésze):** egy tipikus több-klipes, zenés rövidvideó
 **internet nélkül, a telefonon, ingyen** renderel MP4-be, az iOS-sel egyező
 eredménnyel; a fejlett FX/4K/AI pedig a felhő-render (Pro) sajátja marad.
+
+---
+
+## 7. 🧪 Teszt-napló — EAS Android development build (2026-10-03)
+
+**Build:** EAS `development` profil, Android APK (318 MB, dev-client),
+`versionCode=1`, cloud keystore. Build-id `05ddb3ce-…`. Telepítve + hajtva az
+`emulator-5554`-en (API 36, ~2.5 GB RAM), a JS a lokális Metróból.
+
+### ✅ Ami működik (verifikálva)
+- Az APK **települ és elindul**; a dev-client rákötődik a Metróra és
+  lebundle-ozza a JS-t (2508 modul), `Running "main" … fabric:true`.
+- **Hálózat OK:** az app eléri a **prod Supabase**-t (a login hiba-válasz
+  visszaért → a networking + env-bekötés rendben).
+- **Auth-hibakezelés OK:** rossz jelszóra tiszta piros „Invalid login
+  credentials" üzenet, nincs crash.
+- Login-UI korrektül renderel (logó, mezők, Sign in, Sign up).
+
+### 🐞 Talált hibák / megfigyelések
+1. **[közepes – env/workflow] Hideg-start ANR.** Első indításkor a
+   `remix://expo-development-client/?url=http://localhost:8081` deep-linkre a
+   dev launcher **„Remix isn't responding"** ANR-t dobott, a launcher ~49s
+   alatt jelent meg. **Megoldás a tesztben:** `10.0.2.2:8081`-re kötve ~6s
+   alatt mountolt. Közrejátszik az emulátor szűk RAM-ja (~1 GB szabad). →
+   *Teendő:* emulátorhoz több RAM; a dev-doksiban `10.0.2.2:8081`-t ajánljunk
+   `localhost` helyett; valós eszközön újraellenőrizni (nem feltétlen app-hiba).
+2. **[alacsony – dev-only, nem app-bug] expo-router state-update warning.**
+   Látható piros LogBox-toast: *„Can't perform a React state update on a
+   component that hasn't mounted yet…"*. Stack: `expo-router/build/fork/
+   useLinking.native.js:127` → `ExpoRoot.js:135` (ContextNavigator). **Könyvtár-
+   szintű**, a **deep-link indítás** (dev-client initial URL) async `.then()`
+   setState-je váltja ki a navigátor mountja ELŐTT; `warnAboutUpdateOnNotYet
+   MountedFiberInDEV` → **csak DEV-buildben** jelenik meg, **prod-ban nem**. →
+   *Teendő:* normál (nem deep-link) indításnál ellenőrizni, hogy eltűnik-e;
+   ha zavaró, expo-router verzió-követés. Nem go-live blokkoló.
+3. **[alacsony – i18n] Nem lokalizált auth-hiba.** Az „Invalid login
+   credentials" a nyers Supabase angol string, nem megy át az i18next-en. →
+   *Teendő:* a gyakori Supabase auth-hibákat i18n-kulcsokra képezni.
+4. **[alacsony – tech-debt] Elavult style-prop warningok.** `"shadow*"` és
+   `"textShadow*"` deprecated → `boxShadow` / `textShadow`. → *Teendő:* migrálás.
+5. **[kozmetikai] A beállítás-fogaskerék átfed a „Language" chip-pel** a jobb
+   felső sarokban (z-index/pozíció). → *Teendő:* elrendezés-igazítás.
+
+### ⛔ Amit NEM sikerült tesztelni (a render-motor valódi próbája)
+A **Level 2 eszközön-render** (a doksi fő tárgya) futtatásához be kell lépni →
+editor → export. A `users.json` teszt-userek a **lokális** Supabase-hez
+készültek (`127.0.0.1:54421`), ez a build viszont a **prod** Supabase-re mutat
+→ velük nem lehet belépni, új prod-fiókot pedig szándékosan nem hozunk létre.
+**A render-motor on-device tesztje tehát még NYITOTT.** → *Következő lépéshez
+kell egy prod teszt-fiók, VAGY a buildet a lokális Supabase-re + futó
+render-workerre állítani, majd egy valódi projekt exportját lefuttatni.*

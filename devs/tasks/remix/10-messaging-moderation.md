@@ -50,6 +50,11 @@ A messaging-alap erős: DM, project-chat, group-chat, members, last-read, realti
       **+ feed/komment-láthatóság szűrése** (`viewer_blocks` helper + `posts_select` /
       `comments_select`, `20261003150000`). A blokkolt user posztja/kommentje **nem
       látszik** a blokkoló feedjében (kétirányú).
+- [x] **Audit-fix (`20261003180000`):** (a) a **némítás (mute) ténylegesen bekötve** —
+      az `on_message_insert` notify-trigger kihagyja a némított tagokat (eddig a tábla
+      létezett, de a trigger ignorálta); (b) a **block KÉTIRÁNYÚ a DM-küldésnél** — a
+      `messages_not_from_blocked` mostantól bármely irányú blokknál tilt (a blokkoló
+      sem DM-elhet a blokkoltnak).
 - [x] Message-report: `reports` kiterjesztve `message` célra (`150000`) + kliens
       `reportMessage()` (`src/lib/reports.ts`). *(Hátra: a moderation-queue UI
       message-preview-je — [16].)*

@@ -1353,7 +1353,7 @@ app.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
 // 🎚️ Hang-analízis (AUDIO-MASTER Analyze): egy feltöltött hangon az ffmpeg
 // `loudnorm` MÉRŐ-menete (print_format=json) → Integrated LUFS / True Peak / LRA,
 // + egy `showspectrumpic` spektrum-kép (best-effort, a média-tárba).
-app.post('/audio/analyze', upload.any(), requireAuth, mediaGuard('audio'), async (req, res) => {
+app.post('/audio/analyze', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });

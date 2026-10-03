@@ -28,13 +28,22 @@ export interface LiveToken {
   url: string;
 }
 
-/** Szerep-token a worker `/live/token`-jéről. `publish=true` a hostnak. */
-export async function fetchLiveToken(room: string, publish: boolean, name: string): Promise<LiveToken> {
+/**
+ * Szerep-token a worker `/live/token`-jéről. `publish=true` a hostnak.
+ * A `userId` csak a lokális `ALLOW_INSECURE_DEV` fallbackhez kell (ott a worker
+ * nem tudja a prod-tokent verifikálni); prod-ban a verifikált tokenből jön a hívó.
+ */
+export async function fetchLiveToken(
+  room: string,
+  publish: boolean,
+  name: string,
+  userId?: string | null
+): Promise<LiveToken> {
   const base = cloudBaseUrl();
   const res = await fetch(`${base}/live/token`, {
     method: 'POST',
     headers: await workerJsonHeaders(),
-    body: JSON.stringify({ room, publish, name }),
+    body: JSON.stringify({ room, publish, name, userId: userId ?? undefined }),
   });
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string };

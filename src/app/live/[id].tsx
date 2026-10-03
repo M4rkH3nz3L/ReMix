@@ -147,7 +147,7 @@ export default function LiveRoomScreen() {
         await requestCam();
         await requestMic();
       }
-      const tok = await fetchLiveToken(liveId, publish, self.name).catch(() => null);
+      const tok = await fetchLiveToken(liveId, publish, self.name, self.id).catch(() => null);
       if (active && tok) {
         setLk(tok);
       }

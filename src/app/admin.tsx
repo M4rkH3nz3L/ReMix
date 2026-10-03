@@ -279,6 +279,12 @@ export default function AdminScreen() {
                       <Text style={styles.roleSlug}>· {rep.targetType}</Text>
                     </Text>
                     {rep.note ? <Text style={styles.permDesc}>{rep.note}</Text> : null}
+                    {rep.targetType === 'message' && rep.messageBody ? (
+                      <Text style={styles.permDesc} numberOfLines={4}>
+                        {rep.messageSender ? `${rep.messageSender}: ` : ''}
+                        {`"${rep.messageBody}"`}
+                      </Text>
+                    ) : null}
                     <View style={styles.reportActions}>
                       {rep.targetType === 'post' ? (
                         <Pressable

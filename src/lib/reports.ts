@@ -44,6 +44,10 @@ export interface ReportRow {
   postId: string | null;
   commentId: string | null;
   messageId: string | null;
+  /** a bejelentett üzenet szövege (csak message-reportnál, moderátor-olvasással) */
+  messageBody: string | null;
+  /** a bejelentett üzenet feladója (név vagy felhasználónév) */
+  messageSender: string | null;
   reason: string;
   note: string | null;
   status: 'open' | 'resolved' | 'dismissed';
@@ -56,6 +60,7 @@ interface RawReport {
   post_id: string | null;
   comment_id: string | null;
   message_id: string | null;
+  message: { body: string; sender_username: string | null; sender_name: string | null } | null;
   reason: string;
   note: string | null;
   status: 'open' | 'resolved' | 'dismissed';
@@ -67,19 +72,24 @@ export async function listOpenReports(limit = 100): Promise<ReportRow[]> {
   const sb = requireSupabase();
   const { data, error } = await sb
     .from('reports')
-    .select('id, target_type, post_id, comment_id, message_id, reason, note, status, created_at')
+    .select(
+      'id, target_type, post_id, comment_id, message_id, reason, note, status, created_at, ' +
+        'message:messages(body, sender_username, sender_name)',
+    )
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) {
     throw new Error(error.message);
   }
-  return ((data ?? []) as RawReport[]).map((r) => ({
+  return ((data ?? []) as unknown as RawReport[]).map((r) => ({
     id: r.id,
     targetType: r.target_type,
     postId: r.post_id,
     commentId: r.comment_id,
     messageId: r.message_id,
+    messageBody: r.message?.body ?? null,
+    messageSender: r.message?.sender_name ?? r.message?.sender_username ?? null,
     reason: r.reason,
     note: r.note,
     status: r.status,

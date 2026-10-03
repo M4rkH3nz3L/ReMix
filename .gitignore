@@ -44,6 +44,8 @@ example
 # generated native folders
 /ios
 /android
+# natív modulok Gradle build-kimenete (nem verziózzuk)
+modules/*/android/build/
 server/models/
 server/storage.config.json
 

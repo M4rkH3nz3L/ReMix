@@ -128,13 +128,8 @@ const RC_REVOKE = new Set(['EXPIRATION', 'REFUND']);
  * user-id-nk (a kliens `Purchases.logIn(userId)`-vel köti). `expiration_at_ms`
  * a hiteles lejárat.
  */
-async function handleRevenueCatEvent(body) {
-  const ev = (body && body.event) || {};
-  const uid = ev.app_user_id;
-  if (!uid) {
-    throw new Error('app_user_id hiányzik az eseményből.');
-  }
-  const type = ev.type;
+/** A tényleges entitlement-logika (VÁLTOZATLAN) — kredit / Pro-grant / revoke. */
+async function processRevenueCatEvent(ev, uid, type) {
   // 🪙 Shop kredit-csomag (consumable): a product_id `credits_<n>` alakú → n kredit
   const creditMatch = /^credits_(\d+)$/.exec(String(ev.product_id || ''));
   if (creditMatch && (type === 'NON_RENEWING_PURCHASE' || type === 'INITIAL_PURCHASE')) {
@@ -156,6 +151,69 @@ async function handleRevenueCatEvent(body) {
     });
   }
   return { ignored: type || 'unknown' };
+}
+
+/**
+ * 🔁 Idempotencia (devs/tasks/remix/11): feldolgoztuk-e MÁR ezt az esemény-id-t?
+ * BEST-EFFORT — a `sb` injektálható (tesztelhető); bármilyen hiba / hiányzó tábla
+ * esetén `false` (a legitim eseményt SOHA nem blokkoljuk a dedup miatt).
+ */
+async function webhookEventSeen(sb, id) {
+  if (!sb || !id) {
+    return false;
+  }
+  try {
+    const { data } = await sb
+      .from('billing_webhook_events')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
+/** Egy feldolgozott esemény-id rögzítése (SIKER UTÁN). Best-effort, sosem dob. */
+async function recordWebhookEvent(sb, id, type) {
+  if (!sb || !id) {
+    return;
+  }
+  try {
+    await sb.from('billing_webhook_events').insert({ id, type: type || null });
+  } catch {
+    /* best-effort: ha nincs tábla / ütközés, a feldolgozás már megtörtént */
+  }
+}
+
+/**
+ * RevenueCat webhook-esemény feldolgozása. A `body.event.app_user_id` a mi
+ * user-id-nk (a kliens `Purchases.logIn(userId)`-vel köti). `expiration_at_ms`
+ * a hiteles lejárat.
+ *
+ * 🔁 Idempotens (11): a RevenueCat RETRY-olhatja ugyanazt az eseményt — a már
+ * feldolgozott `event.id`-t kihagyjuk (nincs dupla Pro/kredit). A rögzítés SIKER
+ * UTÁN történik: ha a grant elhasal, az esemény NEM lesz „feldolgozott"-ként
+ * megjelölve, így a retry újra megpróbálja (pénz-út: inkább újra, mint elveszett).
+ * A dedup teljesen best-effort → ha a tábla nincs/hibázik, a régi viselkedés megy.
+ */
+async function handleRevenueCatEvent(body) {
+  const ev = (body && body.event) || {};
+  const uid = ev.app_user_id;
+  if (!uid) {
+    throw new Error('app_user_id hiányzik az eseményből.');
+  }
+  const type = ev.type;
+  const sb = adminClient();
+  const eventId = ev.id ? String(ev.id) : null;
+  if (eventId && (await webhookEventSeen(sb, eventId))) {
+    return { duplicate: true, id: eventId };
+  }
+  const result = await processRevenueCatEvent(ev, uid, type);
+  if (eventId) {
+    await recordWebhookEvent(sb, eventId, type);
+  }
+  return result;
 }
 
 /**
@@ -199,5 +257,7 @@ module.exports = {
   deactivatePro,
   grantCredits,
   handleRevenueCatEvent,
+  webhookEventSeen,
+  recordWebhookEvent,
   isPro,
 };

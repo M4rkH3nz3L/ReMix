@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Localization from 'expo-localization';
+import { t } from 'i18next';
 import { Dimensions, PixelRatio, Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
@@ -161,10 +162,38 @@ export async function registerCurrentDevice(userId: string): Promise<void> {
   }
   try {
     const info = await collectDeviceInfo();
+    // 🛡️ ÚJ eszköz? (account-takeover-jelzés): a felvétel ELŐTT nézzük meg, van-e
+    // már sor ehhez az eszközhöz. Ha nincs → új belépés egy ismeretlen eszközről.
+    const { data: existing } = await supabase
+      .from('user_devices')
+      .select('fingerprint')
+      .eq('user_id', userId)
+      .eq('fingerprint', info.fingerprint)
+      .maybeSingle();
+    const isNewDevice = !existing;
+
     await supabase.from('user_devices').upsert(
       { user_id: userId, ...info, last_seen: new Date().toISOString() },
       { onConflict: 'user_id,fingerprint' },
     );
+
+    if (isNewDevice) {
+      // 🔔 biztonsági önértesítés (RLS: notifications_insert_own — a saját sorát írja,
+      // nem kell service_role). Best-effort; a regisztrációt nem blokkolja.
+      const label =
+        info.device_name || info.model_name || info.product_name || info.platform;
+      void supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type: 'system',
+          title: t('auth.newDeviceTitle'),
+          body: t('auth.newDeviceBody', { device: label, platform: info.platform }),
+          route: '/devices',
+          data: { fingerprint: info.fingerprint, platform: info.platform },
+        })
+        .then(undefined, () => {});
+    }
   } catch {
     // best-effort telemetria; a bejelentkezést nem blokkolja
   }

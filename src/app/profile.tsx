@@ -1111,8 +1111,12 @@ export default function ProfileScreen() {
               <Ionicons name="shield-checkmark-outline" size={18} color={palette.text} />
               <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.mfaEntry')}</Text>
             </Pressable>
-            <Pressable onPress={onSignOutOthers} style={styles.signOutBtn}>
+            <Pressable onPress={() => router.push('/devices')} style={styles.signOutBtn}>
               <Ionicons name="phone-portrait-outline" size={18} color={palette.text} />
+              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.devicesTitle')}</Text>
+            </Pressable>
+            <Pressable onPress={onSignOutOthers} style={styles.signOutBtn}>
+              <Ionicons name="log-out-outline" size={18} color={palette.text} />
               <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.signOutOthers')}</Text>
             </Pressable>
             <Pressable onPress={onSignOut} style={styles.signOutBtn}>

@@ -81,9 +81,15 @@ A `resolve_login_email()` / `username_available()` köré:
       ⚠️ **ÉLES előtt:** (1) a Supabase-projektben MFA engedélyezése, (2) valódi
       authenticator-appal eszköz-teszt. *(Hátra: admin/moderator-hoz KÖTELEZŐVÉ tenni.)*
 - [x] **Többi munkamenet kiléptetése** (revoke-all-others): `signOutOtherSessions`
-      (`supabase.auth.signOut scope:'others'` + a többi `user_devices`-sor törlése) +
-      gomb a profil account-szekciójában. *(Hátra: teljes eszköz-lista UI + per-eszköz revoke.)*
-- [ ] Gyanús-login detektálás → security-event.
+      (`supabase.auth.signOut scope:'others'` + a többi `user_devices`-sor törlése).
+- [x] **Eszköz-lista UI** (`src/app/devices.tsx` + `src/lib/devices.ts`): bejelentkezett
+      eszközök (platform/OS/app-verzió/utoljára-látva), jelenlegi-eszköz jelölés,
+      telemetria-sor törlése, bulk „többi kiléptetése". *(⚠️ Per-eszköz SESSION-revoke a
+      kliensről nem támogatott a Supabase-nél — csak a bulk `scope:'others'`; igazi
+      per-session kill worker + GoTrue-admin kell, az korlátozott.)*
+- [x] **Gyanús-login (lite)** → biztonsági önértesítés: ÚJ eszközről való belépéskor
+      `registerCurrentDevice` észleli az ismeretlen `fingerprint`-et és „Új belépés"
+      notification-t ír (RLS: own-insert). *(Hátra: ország/IP-alapú anomália + audit-log-event.)*
 
 ---
 

@@ -25,6 +25,7 @@ import {
   type TotpEnrollment,
 } from '@/lib/mfa';
 import { isValidOtp, sanitizeOtpInput } from '@/lib/phoneAuth';
+import { can } from '@/store/roleStore';
 
 /**
  * 🔐 Kétlépcsős hitelesítés (TOTP) beállítása/kezelése. Additív: a login-oldali
@@ -70,6 +71,8 @@ export default function MfaScreen() {
   }, []);
 
   const verified = (factors ?? []).find((f) => f.status === 'verified');
+  // 🛡️ privilegizált szerep (moderátor/admin) → a 2FA nyomatékosan ajánlott
+  const privileged = can('report.review') || can('user.manage') || can('role.manage');
 
   const startEnroll = async () => {
     setBusy(true);
@@ -139,6 +142,9 @@ export default function MfaScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.subtitle}>{t('auth.mfaManageSubtitle')}</Text>
+        {privileged && factors != null && !verified ? (
+          <Text style={styles.warn}>{`⚠️ ${t('auth.mfaRecommended')}`}</Text>
+        ) : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -202,6 +208,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
   subtitle: { color: palette.textDim, fontSize: 14, lineHeight: 20 },
   notice: { color: palette.accent, fontSize: 14 },
+  warn: { color: palette.accent, fontSize: 14, fontWeight: '700', lineHeight: 20 },
   error: { color: palette.danger, fontSize: 14 },
   loading: { marginTop: 24 },
   card: {

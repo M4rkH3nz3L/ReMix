@@ -249,6 +249,7 @@
     "signOutOthers": "Andere Geräte abmelden",
     "signOutOthersConfirm": "Alle anderen Geräte abmelden? Dieses Gerät bleibt angemeldet.",
     "signOutOthersDone": "Alle anderen Geräte wurden abgemeldet.",
+    "mfaRecommended": "Als Moderator/Admin wird die Aktivierung von 2FA dringend empfohlen.",
     "viaLabel": "Registrieren mit",
     "viaEmail": "E-Mail",
     "viaPhone": "Telefon",

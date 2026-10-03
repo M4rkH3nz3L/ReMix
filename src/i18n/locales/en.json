@@ -249,6 +249,7 @@
     "signOutOthers": "Sign out other devices",
     "signOutOthersConfirm": "Sign out of all other devices? This device stays signed in.",
     "signOutOthersDone": "Signed out of all other devices.",
+    "mfaRecommended": "As a moderator/admin, turning on 2FA is strongly recommended.",
     "viaLabel": "Sign up with",
     "viaEmail": "Email",
     "viaPhone": "Phone",

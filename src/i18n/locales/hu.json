@@ -249,6 +249,7 @@
     "signOutOthers": "Többi eszköz kiléptetése",
     "signOutOthersConfirm": "Kilépteted az összes többi eszközt? Ez az eszköz bejelentkezve marad.",
     "signOutOthersDone": "Az összes többi eszköz kiléptetve.",
+    "mfaRecommended": "Moderátorként/adminként a 2FA bekapcsolása nyomatékosan ajánlott.",
     "viaLabel": "Regisztráció ezzel",
     "viaEmail": "E-mail",
     "viaPhone": "Telefon",

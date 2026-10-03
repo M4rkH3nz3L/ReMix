@@ -21,6 +21,15 @@ import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
  * Maga a token-szerzés + kamera/mikrofon-engedély is itt fut (host = publish). A
  * jelenet-állapotot (`scene`) a szülő adja (host: saját live-docból; néző: broadcast).
  */
+export interface LiveVideoStageProps {
+  liveId: string;
+  publish: boolean;
+  name: string;
+  userId: string;
+  hostAvatar: string | null;
+  scene: ScenePayload | null;
+}
+
 export default function LiveVideoStage({
   liveId,
   publish,
@@ -28,14 +37,7 @@ export default function LiveVideoStage({
   userId,
   hostAvatar,
   scene,
-}: {
-  liveId: string;
-  publish: boolean;
-  name: string;
-  userId: string;
-  hostAvatar: string | null;
-  scene: ScenePayload | null;
-}) {
+}: LiveVideoStageProps) {
   const { t } = useTranslation();
   const [, requestCam] = useCameraPermissions();
   const [, requestMic] = useMicrophonePermissions();

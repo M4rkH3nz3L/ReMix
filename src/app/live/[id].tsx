@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -35,12 +35,22 @@ import {
 import { setActiveScene } from '@/lib/liveDoc';
 import { loadProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
+// type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
+import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
 
 // 🔴 A WebRTC-videó réteg LAZY (külön modul: @/components/live/LiveVideoStage) →
 // az expo-router INDULÁSI route-validációja NEM tölti be a natív WebRTC-modult,
-// így egy WebRTC nélküli build sem dönti el az egész appot (csak a tényleges
-// belépéskor derül ki — azt az ErrorBoundary kezeli barátságos panellel).
-const LiveVideoStage = lazy(() => import('@/components/live/LiveVideoStage'));
+// így egy WebRTC nélküli build sem dönti el az egész appot. Ha a modul nem
+// tölthető (hiányzó natív WebRTC → részleges/üres modul), fallback-komponensre
+// esünk (barátságos „frissítsd az appot" üzenet), nem dob érvénytelen-elem hibát.
+const LiveVideoStage = lazy(() =>
+  import('@/components/live/LiveVideoStage').then(
+    (m) => ({
+      default: (m as { default?: ComponentType<LiveVideoStageProps> }).default ?? LiveVideoUnavailable,
+    }),
+    () => ({ default: LiveVideoUnavailable }),
+  ),
+);
 
 const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
 
@@ -79,6 +89,27 @@ function ConnectingStage({ hostAvatar, note }: { hostAvatar: string | null; note
           </View>
         )}
         <Text style={styles.viewerNote}>{note}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** Fallback, ha a natív WebRTC-modul hiányzik (régi build) → a videó nem tölthető. */
+function LiveVideoUnavailable({ hostAvatar }: LiveVideoStageProps) {
+  const { t } = useTranslation();
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.connectingBg]}>
+      <View style={styles.viewerStage}>
+        {hostAvatar ? (
+          <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
+        ) : (
+          <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
+            <Ionicons name="videocam-off" size={44} color={palette.textDim} />
+          </View>
+        )}
+        <Text style={styles.viewerNote}>
+          {t('live.videoUnavailable', { defaultValue: 'Live video needs the latest app build.' })}
+        </Text>
       </View>
     </View>
   );

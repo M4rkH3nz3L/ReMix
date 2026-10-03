@@ -208,6 +208,7 @@ export default function AuthScreen() {
     }
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       // 🔑 regisztrációnál előbb a felhasználónév-foglaltság (beszédes hiba a
       // nyers DB-unique-violation helyett); a DB-index amúgy is véd
@@ -252,6 +253,7 @@ export default function AuthScreen() {
     setOtpCode('');
     setMfaChallenge(false);
     setMfaCode('');
+    setNotice(null);
   };
 
   // ── Swipe-pager: a belépés és a regisztráció KÉT vízszintes lap, amelyek között

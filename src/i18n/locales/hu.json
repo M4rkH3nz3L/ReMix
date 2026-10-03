@@ -182,6 +182,7 @@
       "unknown": "Valami hiba történt. Próbáld újra.",
       "notConfigured": "A bejelentkezés nincs konfigurálva.",
       "invalidEmail": "Adj meg egy érvényes e-mail-címet.",
+      "mfaInvalidCode": "Érvénytelen vagy lejárt kód. Próbáld újra.",
       "userNotFound": "Nincs ilyen felhasználó (e-mail, felhasználónév vagy telefon).",
       "invalidPhone": "Érvénytelen telefonszám.",
       "phoneCountryUnsupported": "Ez az országhívószám nem támogatott SMS-regisztrációhoz.",

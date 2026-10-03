@@ -97,6 +97,7 @@ const AUTH_ERROR_KEY_BY_CODE: Record<string, string> = {
   over_sms_send_rate_limit: 'auth.errors.rateLimit',
   otp_expired: 'auth.errors.otpExpired',
   user_not_found: 'auth.errors.userNotFound',
+  mfa_verification_failed: 'auth.errors.mfaInvalidCode',
 };
 
 function keyByMessage(raw: string): string | undefined {
@@ -108,6 +109,9 @@ function keyByMessage(raw: string): string | undefined {
   }
   if (m.includes('rate limit')) return 'auth.errors.rateLimit';
   if (m.includes('weak password')) return 'auth.errors.weakPassword';
+  if (m.includes('totp') || m.includes('invalid code') || m.includes('mfa')) {
+    return 'auth.errors.mfaInvalidCode';
+  }
   return undefined;
 }
 
@@ -174,13 +178,19 @@ export const useAuth = create<AuthState>((set, get) => ({
     // változás-figyelő (login/logout/token-refresh) — csak egyszer iratkozunk fel
     if (!subscribed) {
       subscribed = true;
-      supabase.auth.onAuthStateChange((_event, session) => {
+      supabase.auth.onAuthStateChange((event, session) => {
         set({ session, user: session?.user ?? null });
-        // 🔐 MFA-függőség újraszámolása auth-váltáskor (logout → false)
-        if (session) {
-          void loginNeedsMfa().then((p) => set({ mfaPending: p }));
-        } else {
+        // 🔐 MFA-függőség frissítése auth-váltáskor. FRISS BELÉPÉSKOR (SIGNED_IN)
+        // PESSZIMISTA: amíg az AAL-szint ki nem derül, mfaPending=true → a guard nem
+        // engedi be az appot MFA előtt (race-mentes, nincs „bevillanás"). Token-
+        // frissítésnél NEM rántjuk ki a bent lévő usert, csak finomhangolunk.
+        if (!session) {
           set({ mfaPending: false });
+        } else {
+          if (event === 'SIGNED_IN') {
+            set({ mfaPending: true });
+          }
+          void loginNeedsMfa().then((p) => set({ mfaPending: p }));
         }
         // 💳 minden auth-váltásnál újraszinkron: login → user szintje, logout → Free
         void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
@@ -373,7 +383,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       await verifyLoginTotp(code);
     } catch (e) {
-      return { error: e instanceof Error ? e.message : String(e) };
+      return { error: messageOf(e) };
     }
     // sikeres TOTP → a session aal2, a belépés befejezve
     set({ mfaPending: await loginNeedsMfa() });

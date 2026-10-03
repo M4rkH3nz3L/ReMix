@@ -182,6 +182,7 @@
       "unknown": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "notConfigured": "Die Anmeldung ist nicht konfiguriert.",
       "invalidEmail": "Gib eine gültige E-Mail-Adresse ein.",
+      "mfaInvalidCode": "Ungültiger oder abgelaufener Code. Versuche es erneut.",
       "userNotFound": "Kein solcher Benutzer (E-Mail, Benutzername oder Telefon).",
       "invalidPhone": "Ungültige Telefonnummer.",
       "phoneCountryUnsupported": "Diese Ländervorwahl wird für die SMS-Registrierung nicht unterstützt.",

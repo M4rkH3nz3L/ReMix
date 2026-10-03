@@ -41,7 +41,10 @@ export default function RootLayout() {
   // 🔐 session betöltése — amíg nem kész, nem tudjuk, be van-e jelentkezve a user
   const hydrateAuth = useAuth((s) => s.hydrate);
   const authHydrated = useAuth((s) => s.hydrated);
-  const authed = useAuth((s) => s.session != null);
+  // 🔐 belépett = van session ÉS nincs függő MFA (mfaPending). A mfaPending nélkül a
+  // guard egy verifikált-TOTP usert már AAL1-en beengedne → MFA-bypass. (Faktor nélküli
+  // usernél mfaPending mindig false → a viselkedés változatlan.)
+  const authed = useAuth((s) => s.session != null && !s.mfaPending);
   const userId = useAuth((s) => s.user?.id ?? null);
   useEffect(() => {
     void hydrateAuth();

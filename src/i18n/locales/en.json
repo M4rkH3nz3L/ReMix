@@ -182,6 +182,7 @@
       "unknown": "Something went wrong. Please try again.",
       "notConfigured": "Sign-in isn't configured.",
       "invalidEmail": "Enter a valid email address.",
+      "mfaInvalidCode": "Invalid or expired code. Try again.",
       "userNotFound": "No such user (email, username or phone).",
       "invalidPhone": "Invalid phone number.",
       "phoneCountryUnsupported": "This country code isn't supported for SMS sign-up.",

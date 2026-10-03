@@ -33,7 +33,7 @@ import {
   toggleSourceVisible,
   updateSource,
 } from '@/lib/liveDoc';
-import { loadEvents, loadProject } from '@/lib/storage';
+import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { LiveDoc, LivePlatform, LiveSource, LiveSourceKind, LiveTransform } from '@/types/live';
 
@@ -226,6 +226,12 @@ export default function LiveStudioScreen() {
     const title = (titleDraft.trim() || live.title).slice(0, 120);
     setStarting(true);
     try {
+      // 💾 a Studio-szerkesztések a store-ban élnek (nincs külön autosave-hook) →
+      // mentjük, hogy a room a FRISS live-docot töltse (jelenetek/források/célok).
+      const current = useEditorStore.getState().project;
+      if (current) {
+        await saveProject(current);
+      }
       const session = await startLive(title);
       // 🎥 a room megkapja a live-projekt id-jét → a host betölti a live-docot és
       // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).

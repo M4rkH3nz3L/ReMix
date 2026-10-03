@@ -47,6 +47,8 @@ const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
 const { authenticated, routeInventory } = require('./security/authorization');
 const { mediaGuard } = require('./security/uploadPolicy');
 const { canAccessRenderJob } = require('./security/renderAuth');
+const { securityHeaders } = require('./security/securityHeaders');
+const { securityEvent } = require('./security/auditLog');
 const {
   billingAvailable,
   activatePro,
@@ -161,6 +163,11 @@ app.use((req, _res, next) => {
 // végpontok bármely weboldalról hívhatók voltak. A natív app nem küld Origin-t,
 // így az érintetlen; a böngészős dev-előnézethez a CORS_ORIGINS env kell.
 app.use(corsAllowlist());
+
+// 🧢 Security-fejlécek minden válaszra (nosniff / frame-options / HSTS / …) +
+// az Express-ujjlenyomat (X-Powered-By) eltávolítása. (devs/tasks/remix/14)
+app.disable('x-powered-by');
+app.use(securityHeaders());
 
 // 🗂️ LOKÁLIS média-tár statikus szolgálása (dev): a renderelt/feltöltött fájlok a
 // böngészhető `server/media` mappából (MEDIA_LOCAL_DIR) — a feed innen játssza a
@@ -2205,6 +2212,16 @@ function workerView(w, uid) {
   };
 }
 
+// idegen render-jobra: biztonsági-esemény naplózása (14) + 404 (nincs szivárgás)
+function denyRenderJob(req, res, ownerId) {
+  securityEvent('render.denied', {
+    actor: req.user?.id ?? null,
+    target: req.params.id,
+    meta: { owner: ownerId ?? null },
+  });
+  res.status(404).json({ error: 'Ismeretlen job.' });
+}
+
 // 🔒 BOLA-fix (07): a hívót a renderJobAuth azonosítja (token header/`?t=`), és
 // TULAJDONOLT jobhoz csak az egyező user fér — idegenre 404 (a job létezését se
 // szivárogtatjuk). Tulajdonos-nélküli (proxy/collect) jobnál nincs korlát.
@@ -2213,7 +2230,7 @@ app.get('/render/:id', renderJobAuth, async (req, res) => {
   const job = jobs.get(req.params.id);
   if (job) {
     if (!canAccessRenderJob(job.userId, req.user?.id)) {
-      res.status(404).json({ error: 'Ismeretlen job.' });
+      denyRenderJob(req, res, job.userId);
       return;
     }
     res.json({ state: job.state, error: job.error, progress: job.progress });
@@ -2223,7 +2240,7 @@ app.get('/render/:id', renderJobAuth, async (req, res) => {
     const j = await getRenderJob(req.params.id).catch(() => null);
     if (j) {
       if (!canAccessRenderJob(j.userId, req.user?.id)) {
-        res.status(404).json({ error: 'Ismeretlen job.' });
+        denyRenderJob(req, res, j.userId);
         return;
       }
       const state = j.state === 'completed' ? 'done' : j.state === 'failed' ? 'error' : 'processing';
@@ -2242,7 +2259,7 @@ app.get('/render/:id/file', renderJobAuth, async (req, res) => {
   const job = jobs.get(req.params.id);
   if (job) {
     if (!canAccessRenderJob(job.userId, req.user?.id)) {
-      res.status(404).json({ error: 'Ismeretlen job.' });
+      denyRenderJob(req, res, job.userId);
       return;
     }
     if (job.state !== 'done') {
@@ -2256,7 +2273,7 @@ app.get('/render/:id/file', renderJobAuth, async (req, res) => {
     const j = await getRenderJob(req.params.id).catch(() => null);
     if (j) {
       if (!canAccessRenderJob(j.userId, req.user?.id)) {
-        res.status(404).json({ error: 'Ismeretlen job.' });
+        denyRenderJob(req, res, j.userId);
         return;
       }
       if (j.state === 'completed' && j.returnvalue?.outKey) {

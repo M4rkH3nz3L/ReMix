@@ -152,6 +152,7 @@ export default function RootLayout() {
               <Stack.Screen name="command" />
               <Stack.Screen name="live" />
               <Stack.Screen name="live/[id]" />
+              <Stack.Screen name="live/studio/[id]" />
               <Stack.Screen name="channel/[id]" />
               <Stack.Screen name="inbox" />
               <Stack.Screen name="chat/[id]" />

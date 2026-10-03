@@ -16,7 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
-import { listLiveNow, startLive, subscribeLiveList, type LiveSession } from '@/lib/live';
+import { listLiveNow, subscribeLiveList, type LiveSession } from '@/lib/live';
+import { createEmptyProject } from '@/lib/projectUtils';
+import { saveProject } from '@/lib/storage';
 
 /**
  * 🔴 Élő-képernyő (hub) — a feed felső sorának ÉLŐ-ikonja nyitja. Valódi
@@ -52,11 +54,16 @@ export default function LiveScreen() {
     }
     setBusy(true);
     try {
-      const session = await startLive(title.trim() || t('live.defaultTitle'));
+      // 🎥 a „Go live" ELŐSZÖR a Live Studiót (OBS-szerű kompozitort) nyitja —
+      // ott épül fel az adás (jelenetek/források/célok), és onnan megy adásba a
+      // „Start streaming" (LIVE.md Fázis A). Egy `kind: 'live'` projekt hordozza.
+      const name = title.trim() || t('live.defaultTitle');
+      const project = createEmptyProject(name, '9:16', undefined, 'live');
+      await saveProject(project);
       setTitle('');
-      router.push(`/live/${session.id}`);
+      router.push(`/live/studio/${project.id}`);
     } catch {
-      // a startLive dob, ha már van aktív élő / nincs session — csendben
+      // mentés/létrehozás hiba — csendben (a gomb újra aktív)
     } finally {
       setBusy(false);
     }

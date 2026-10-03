@@ -70,7 +70,16 @@ A `resolve_login_email()` / `username_available()` köré:
       ugyanazt a „hibás belépés" üzenetet adja, mint a rossz jelszó (`authStore.signIn`
       → `invalidCredentials`) — nem szivárog a fiók léte. *(Hátra: valódi constant-time
       időzítés + CAPTCHA.)*
-- [ ] CAPTCHA a signup/login-on (abuse-protection).
+- [ ] **CAPTCHA a signup/login-on** — *felmérve (2026-10-03): külső függőség.* Kell:
+      (1) a Supabase-projektben CAPTCHA engedélyezése (hCaptcha v. Cloudflare Turnstile,
+      site+secret kulcs), (2) RN CAPTCHA-widget (webview-alapú) a token megszerzéséhez,
+      (3) a `captchaToken` átadása a `signUp`/`signIn` `options`-ében. Kulcsok + widget
+      nélkül nem építhető (a vakon bekötött token holt kód lenne) → go-live config-függő.
+- [ ] **constant-time `resolve_login_email`** — *felmérve: alacsony prioritás.* A fő
+      enumeration-szivárgás (az üzenet-megkülönböztetés) már javítva (Fázis B, uniform
+      error); a timing-alapú vektor gyengébb, és a `messaging`/`auth` rate-limit fedi.
+      Valódi constant-time SQL-ben mesterséges delay-t igényelne (fragilis) → csak ha a
+      threat-model külön indokolja.
 
 ### 🟦 Fázis C — MFA & session
 - [x] **TOTP-MFA alap kész** (client): `src/lib/mfa.ts` (enroll/confirm/list/remove +

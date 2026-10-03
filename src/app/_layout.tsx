@@ -136,6 +136,7 @@ export default function RootLayout() {
               <Stack.Screen name="index" />
               <Stack.Screen name="studio/index" />
               <Stack.Screen name="profile" />
+              <Stack.Screen name="mfa" />
               <Stack.Screen name="admin" />
               <Stack.Screen name="editor/[id]" />
               <Stack.Screen name="studio/image/[id]" />

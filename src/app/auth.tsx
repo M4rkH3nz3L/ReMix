@@ -53,12 +53,15 @@ export default function AuthScreen() {
   const verifyPhoneOtp = useAuth((s) => s.verifyPhoneOtp);
   const resendPhoneOtp = useAuth((s) => s.resendPhoneOtp);
   const resendEmailConfirm = useAuth((s) => s.resendEmailConfirm);
+  const verifyMfaLogin = useAuth((s) => s.verifyMfaLogin);
 
   const [mode, setMode] = useState<Mode>('signIn');
   const [signUpVia, setSignUpVia] = useState<SignUpVia>('email');
   /** a beírt kód + a szám, amire az SMS elment (E.164) — ha van, az OTP-lap megy */
   const [otpPhone, setOtpPhone] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState('');
+  const [mfaChallenge, setMfaChallenge] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // regisztrációs profil-mezők
@@ -179,6 +182,26 @@ export default function AuthScreen() {
     }
   };
 
+  /** 🔐 a login-kori TOTP-kód ellenőrzése (needsMfa után) */
+  const submitMfa = async () => {
+    if (busy || !isValidOtp(mfaCode)) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await verifyMfaLogin(mfaCode);
+      if (result.error) {
+        setError(result.error);
+      }
+      // siker: a guard reaktívan a projektekhez vált (mfaPending=false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
     if (!canSubmit) {
       return;
@@ -208,6 +231,10 @@ export default function AuthScreen() {
         // 📲 elment az SMS — a normalizált E.164-számmal ellenőrzünk
         setOtpPhone(result.phone);
         setOtpCode('');
+      } else if (result.needsMfa) {
+        // 🔐 jelszó OK, de kell a TOTP-kód → MFA-challenge képernyő
+        setMfaChallenge(true);
+        setMfaCode('');
       }
       // siker (session): a guard reaktívan a projektekhez vált, itt nincs teendő
     } catch (e) {
@@ -223,6 +250,8 @@ export default function AuthScreen() {
     setEmailSent(false);
     setOtpPhone(null);
     setOtpCode('');
+    setMfaChallenge(false);
+    setMfaCode('');
   };
 
   // ── Swipe-pager: a belépés és a regisztráció KÉT vízszintes lap, amelyek között
@@ -565,7 +594,51 @@ export default function AuthScreen() {
           <Text style={styles.appName}>{t('home.appName')}</Text>
         </View>
 
-        {otpPhone ? (
+        {mfaChallenge ? (
+          /* 🔐 MFA — a jelszó utáni TOTP-kód (kétlépcsős belépés) */
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+          <View style={styles.card}>
+            <Ionicons name="shield-checkmark-outline" size={40} color={palette.accent} />
+            <Text style={styles.title}>{t('auth.mfaTitle')}</Text>
+            <Text style={styles.subtitle}>{t('auth.mfaBody')}</Text>
+            <Text style={styles.fieldLabel}>{t('auth.mfaLabel')}</Text>
+            <TextInput
+              value={mfaCode}
+              onChangeText={(v) => setMfaCode(sanitizeOtpInput(v))}
+              placeholder="123456"
+              placeholderTextColor={palette.textDim}
+              style={[styles.input, styles.otpInput]}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              maxLength={6}
+              editable={!busy}
+              autoFocus
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <PrimaryButton
+              label={t('auth.mfaVerifyAction')}
+              onPress={submitMfa}
+              disabled={busy || !isValidOtp(mfaCode)}
+            />
+            <Pressable
+              onPress={() => {
+                setMfaChallenge(false);
+                setMfaCode('');
+                setError(null);
+                void useAuth.getState().signOut();
+              }}
+              style={styles.switchRow}
+              disabled={busy}
+            >
+              <Text style={styles.switchAction}>{t('auth.backToSignIn')}</Text>
+            </Pressable>
+          </View>
+          </ScrollView>
+        ) : otpPhone ? (
           /* 📲 SMS-kód lap — a telefonos regisztráció második lépése */
           <ScrollView
             contentContainerStyle={styles.scrollContent}

@@ -1089,6 +1089,10 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>{t('profile.accountSection')}</Text>
           <View style={styles.card}>
             <Text style={styles.emailText}>{t('auth.signedInAs', { email })}</Text>
+            <Pressable onPress={() => router.push('/mfa')} style={styles.signOutBtn}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={palette.text} />
+              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.mfaEntry')}</Text>
+            </Pressable>
             <Pressable onPress={onSignOut} style={styles.signOutBtn}>
               <Ionicons name="log-out-outline" size={18} color={palette.danger} />
               <Text style={styles.signOutText}>{t('auth.signOut')}</Text>

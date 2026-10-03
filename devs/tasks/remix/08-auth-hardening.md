@@ -59,6 +59,9 @@ A `resolve_login_email()` / `username_available()` köré:
 ## 3. Feladatok
 ### 🟦 Fázis A — Config-hardening
 - [ ] `config.toml`: password-length 12, requirements, `secure_password_change=true`, prod-profilon `enable_confirmations=true`.
+- [x] **E-mail-megerősítő link újraküldése** — `resendEmailConfirm` (authStore) + „Resend"
+      gomb a check-email képernyőn (`supabase.auth.resend type:'signup'`). *(A prod-oldali
+      `enable_confirmations=true` bekapcsolása továbbra is launch-config-döntés — §6.)*
 - [ ] Re-authentication érzékeny műveletekhez (jelszóváltás, email-csere, account-törlés, payout).
 - [ ] Password-reset + login throttling (`auth` rate-limit osztály).
 
@@ -67,7 +70,13 @@ A `resolve_login_email()` / `username_available()` köré:
 - [ ] CAPTCHA a signup/login-on (abuse-protection).
 
 ### 🟦 Fázis C — MFA & session
-- [ ] TOTP-MFA (kötelező admin/moderator-hoz).
+- [x] **TOTP-MFA alap kész** (client): `src/lib/mfa.ts` (enroll/confirm/list/remove +
+      `loginNeedsMfa`/`verifyLoginTotp`), beállító-képernyő `src/app/mfa.tsx` (profil →
+      „Kétlépcsős hitelesítés"), és a **login-enforcement** az `authStore.mfaPending`-en át
+      (`isAuthed = session && !mfaPending`) — **opt-in, nulla hatású a faktor nélküli
+      userekre** → a belépés csak verifikált TOTP-faktornál kér kódot. i18n en/hu/de.
+      ⚠️ **ÉLES előtt:** (1) a Supabase-projektben MFA engedélyezése, (2) valódi
+      authenticator-appal eszköz-teszt. *(Hátra: admin/moderator-hoz KÖTELEZŐVÉ tenni.)*
 - [ ] Session/device-lista + revoke-all + egyedi revoke.
 - [ ] Gyanús-login detektálás → security-event.
 

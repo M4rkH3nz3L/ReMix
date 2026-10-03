@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import type { SignUpProfile } from '@/lib/accountValidation';
 import { CONSENT_VERSION } from '@/constants/legal';
 import { registerCurrentDevice } from '@/lib/deviceInfo';
+import { loginNeedsMfa, verifyLoginTotp } from '@/lib/mfa';
 import { isAllowedPhone, isValidOtp, normalizeE164 } from '@/lib/phoneAuth';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -35,6 +36,8 @@ export interface AuthResult {
    */
   needsSmsOtp?: boolean;
   phone?: string;
+  /** 🔐 a jelszó stimmelt, de a befejezéshez TOTP-kód kell (MFA) */
+  needsMfa?: boolean;
 }
 
 interface AuthState {
@@ -44,6 +47,8 @@ interface AuthState {
   hydrated: boolean;
   /** van-e beállított Supabase-backend (config) */
   configured: boolean;
+  /** 🔐 van session, de MFA (TOTP) még nincs teljesítve → még nem beléptetett */
+  mfaPending: boolean;
   /** be van-e jelentkezve (nem-reaktív döntésekhez is) */
   isAuthed: () => boolean;
   /** app-indításkor egyszer: session betöltése + változás-figyelő */
@@ -67,6 +72,8 @@ interface AuthState {
   resendPhoneOtp: (phone: string) => Promise<AuthResult>;
   /** ✉️ e-mail-megerősítő link újraküldése (a Supabase rate-limit alá esik) */
   resendEmailConfirm: (email: string) => Promise<AuthResult>;
+  /** 🔐 a login-kori TOTP-challenge teljesítése (needsMfa után) */
+  verifyMfaLogin: (code: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -121,8 +128,11 @@ export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   hydrated: false,
   configured: hasSupabaseConfig(),
+  mfaPending: false,
 
-  isAuthed: () => get().session != null,
+  // 🔐 belépett = van session ÉS nincs függő MFA. MFA-faktor nélküli usernél a
+  // mfaPending sosem lesz true → a viselkedés a korábbival azonos.
+  isAuthed: () => get().session != null && !get().mfaPending,
 
   hydrate: async () => {
     if (!supabase) {
@@ -146,6 +156,9 @@ export const useAuth = create<AuthState>((set, get) => ({
         }
       }
       set({ session, user: session?.user ?? null });
+      // 🔐 app-újraindításkor: ha a tárolt session aal1, de MFA kell (félbehagyott
+      // belépés) → függőben marad, a guard nem enged tovább a TOTP-ig
+      set({ mfaPending: session ? await loginNeedsMfa() : false });
       // 💳 Pro-szint szinkronja a bejelentkezett userhez (offline-cache + Supabase)
       void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
       void useRoles.getState().refresh(); // 🛡️ governance-jogok betöltése
@@ -161,6 +174,12 @@ export const useAuth = create<AuthState>((set, get) => ({
       subscribed = true;
       supabase.auth.onAuthStateChange((_event, session) => {
         set({ session, user: session?.user ?? null });
+        // 🔐 MFA-függőség újraszámolása auth-váltáskor (logout → false)
+        if (session) {
+          void loginNeedsMfa().then((p) => set({ mfaPending: p }));
+        } else {
+          set({ mfaPending: false });
+        }
         // 💳 minden auth-váltásnál újraszinkron: login → user szintje, logout → Free
         void useEntitlement.getState().syncFromUser(session?.user?.id ?? null);
         void useRoles.getState().refresh(); // 🛡️ jogok újratöltése auth-váltáskor
@@ -230,6 +249,14 @@ export const useAuth = create<AuthState>((set, get) => ({
     });
     if (error) {
       return { error: messageOf(error) };
+    }
+    // 🔐 MFA: ha a usernek van verifikált TOTP-faktora, a session még csak aal1 →
+    // a belépés a TOTP-challenge teljesítéséig FÜGGŐBEN marad (a guard nem enged
+    // tovább). MFA-faktor nélkül `pending` mindig false → a flow a korábbival azonos.
+    const pending = await loginNeedsMfa();
+    set({ mfaPending: pending });
+    if (pending) {
+      return { needsMfa: true };
     }
     if (data.user) {
       void registerCurrentDevice(data.user.id);
@@ -332,6 +359,24 @@ export const useAuth = create<AuthState>((set, get) => ({
       return { error: messageOf(error) };
     }
     return { needsEmailConfirm: true };
+  },
+
+  verifyMfaLogin: async (code) => {
+    if (!supabase) {
+      return { error: t('auth.errors.notConfigured') };
+    }
+    try {
+      await verifyLoginTotp(code);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
+    // sikeres TOTP → a session aal2, a belépés befejezve
+    set({ mfaPending: await loginNeedsMfa() });
+    const uid = get().user?.id;
+    if (uid) {
+      void registerCurrentDevice(uid);
+    }
+    return {};
   },
 
   signOut: async () => {

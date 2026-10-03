@@ -31,11 +31,19 @@ export async function reportComment(commentId: string, reason: ReportReason, not
   await insertReport({ target_type: 'comment', comment_id: commentId, reason, note: note ?? null });
 }
 
+/** DM / chat-üzenet bejelentése (messaging-safety, devs/tasks/remix/10). */
+export async function reportMessage(messageId: string, reason: ReportReason, note?: string): Promise<void> {
+  await insertReport({ target_type: 'message', message_id: messageId, reason, note: note ?? null });
+}
+
+export type ReportTarget = 'post' | 'comment' | 'message';
+
 export interface ReportRow {
   id: string;
-  targetType: 'post' | 'comment';
+  targetType: ReportTarget;
   postId: string | null;
   commentId: string | null;
+  messageId: string | null;
   reason: string;
   note: string | null;
   status: 'open' | 'resolved' | 'dismissed';
@@ -44,9 +52,10 @@ export interface ReportRow {
 
 interface RawReport {
   id: string;
-  target_type: 'post' | 'comment';
+  target_type: ReportTarget;
   post_id: string | null;
   comment_id: string | null;
+  message_id: string | null;
   reason: string;
   note: string | null;
   status: 'open' | 'resolved' | 'dismissed';
@@ -58,7 +67,7 @@ export async function listOpenReports(limit = 100): Promise<ReportRow[]> {
   const sb = requireSupabase();
   const { data, error } = await sb
     .from('reports')
-    .select('id, target_type, post_id, comment_id, reason, note, status, created_at')
+    .select('id, target_type, post_id, comment_id, message_id, reason, note, status, created_at')
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -70,6 +79,7 @@ export async function listOpenReports(limit = 100): Promise<ReportRow[]> {
     targetType: r.target_type,
     postId: r.post_id,
     commentId: r.comment_id,
+    messageId: r.message_id,
     reason: r.reason,
     note: r.note,
     status: r.status,

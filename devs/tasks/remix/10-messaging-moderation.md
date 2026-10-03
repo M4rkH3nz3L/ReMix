@@ -44,9 +44,15 @@ A messaging-alap erős: DM, project-chat, group-chat, members, last-read, realti
 
 ## 3. Feladatok
 ### 🟦 Fázis A — Safety primitívek
-- [ ] `user_blocks` + `conversation_mutes` táblák + RLS + migráció.
-- [ ] Block/mute bekötése: DM-küldés tiltás, feed/comment/DM szűrés blokkoltra.
-- [ ] Message/conversation report (reports-minta) + kliens-UI.
+- [x] `user_blocks` + `conversation_mutes` táblák + RLS + migráció (`20261003140000`),
+      kliens data-layer: `src/lib/blocks.ts`.
+- [x] Block/mute bekötése: DM-küldés tiltás (restrictive messages-policy, `140000`)
+      **+ feed/komment-láthatóság szűrése** (`viewer_blocks` helper + `posts_select` /
+      `comments_select`, `20261003150000`). A blokkolt user posztja/kommentje **nem
+      látszik** a blokkoló feedjében (kétirányú).
+- [x] Message-report: `reports` kiterjesztve `message` célra (`150000`) + kliens
+      `reportMessage()` (`src/lib/reports.ts`). *(Hátra: a moderation-queue UI
+      message-preview-je — [16].)*
 
 ### 🟦 Fázis B — Attachment & throttling
 - [ ] Attachment `mediaUpload()` + privát bucket + signed-URL.

@@ -1,6 +1,6 @@
 # 🧩 ReMix — Alkotói hiánypótlás (MISSING)
 
-> Forrás: a 2026-09-27-i **profi-creator audit** (11 alkotótípus) + a **Creator OS-vízió** [devs/source/MASTER.md](../source/MASTER.md) (28 szekció).
+> Forrás: a 2026-09-27-i **profi-creator audit** (11 alkotótípus) + a **Creator OS-vízió** (`MASTER.md`, 28 szekció; a nyers forrás a doksi-konszolidációkor törölve — git-historyban elérhető).
 > Testvér-tervek: [devs/tasks/VIDEO.md](./VIDEO.md) · [devs/tasks/AUDIO.md](./AUDIO.md) · [devs/tasks/IMAGE.md](./IMAGE.md) · [devs/tasks/PROD.md](./PROD.md).
 > Ez a doksi a **keresztmetszeti hiányok teljes backlogja**: a platform-mag (Creator OS) + minden alkotói stúdió + a közös rendszerek — mind a **valódi app-architektúrához** kötve (command bus, capability-katalógus, projekt-modell, worker). A per-stúdiós összhangosítás a testvér-tervekben él; ez a **új-képesség** gazda-lista.
 
@@ -398,7 +398,7 @@ Előbb a **platform-mag** (PM1 Workspace/CreativeDocument → PM2 Asset Library 
 
 ## 9. Kapcsolódó dokumentumok
 
-- [devs/source/MASTER.md](../source/MASTER.md) — a Creator OS-vízió (ennek a doksinak a forrása)
+- **Creator OS-vízió** (`MASTER.md` — ennek a doksinak a forrása; a nyers forrás a doksi-konszolidációkor törölve, git-historyban elérhető)
 - [devs/tasks/VIDEO.md](./VIDEO.md) · [devs/tasks/AUDIO.md](./AUDIO.md) · [devs/tasks/IMAGE.md](./IMAGE.md) — per-stúdió összhangosítás
 - [devs/tasks/PROD.md](./PROD.md) — kiadási runbook (env, build, store)
 - [src/lib/capabilities.ts](../../src/lib/capabilities.ts) — a képesség-katalógus (minden új funkció ide egy sorral)

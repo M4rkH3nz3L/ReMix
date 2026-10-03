@@ -5,6 +5,11 @@ Mobil-first, érintőképernyőre tervezett videószerkesztő, amelyben a vágá
 szerkeszthetők. Az interaktivitás nem "sül bele" a videóba: JSON-metaadatként
 tárolódik, és a lejátszó overlay-ként értelmezi.
 
+> A videószerkesztő a **közös alkotó-mag** első stúdiója; a `studio-social` ágon a
+> ReMix **multi-stúdió creator platformmá** bővült (image/audio stúdiók, social
+> feed, alkotói gazdaság) — lásd a **„Túl a videó-editoron"** szakaszt lent és az
+> [Arch.md](Arch.md) capstone-t.
+
 Expo SDK 57 · React Native 0.86 · TypeScript · expo-router · zustand ·
 react-native-reanimated 4 · react-native-gesture-handler · expo-video · expo-audio
 
@@ -48,6 +53,38 @@ Minden használt natív modul Expo Go-kompatibilis, dev build nem kötelező.
   kvíz-modallal, progress-sávval
 - **Export**: hotspot-metaadat-JSON és teljes projekt-JSON megosztása
   (expo-sharing)
+
+## Túl a videó-editoron — a ReMix platform
+
+A videó-editor a **közös alkotó-mag** első stúdiója; a `studio-social` ágon a ReMix
+multi-stúdió creator platformmá nőtt. A részletes architektúra az [Arch.md](Arch.md)
+8–10. szakaszában, a fejlesztési tervek a [devs/tasks/](devs/tasks/) alatt.
+
+- **Három stúdió + Creator OS.** A `Project.kind` (`video`/`image`/`audio` —
+  [src/types/project.ts](src/types/project.ts)) mellett egy **platform-mag**
+  (CreativeDocument / Workspace) absztrahálja a közös `layer/track/asset/command/
+  version/AI-context` rétegeket. Az **audio-stúdió** teljes multi-track editor
+  (edit/record/TTS/mixer/master/analyze — audit-zöld). A további alkotótípusok
+  (writer/producer/music/gamer/photo/design/vocal/code) és a közös rendszerek
+  (planner/versions/workflow/analytics/retention) **tesztelt, expo-mentes magként**
+  készek; a UI/worker/natív bekötés a következő fázis. Backlog:
+  [devs/tasks/MISSING.md](devs/tasks/MISSING.md).
+- **Social réteg (Supabase).** Fiók = csatorna + TikTok-szerű feed; a poszt egy
+  **projekt nézete** (snapshot → egy koppintásos remix, lineage-gel); kedvelés/
+  mentés/követés/komment/értesítés, riport + moderáció, **üzenetek** (DM/csoport/
+  projekt-chat, realtime), 4-rétegű **alkotói profil** és **RBAC** (szerep/
+  jogosultság + admin-panel). Részletek lent + [Arch.md](Arch.md) 9. szakasz.
+- **Alkotói gazdaság.** **Shop-marketplace** (coin-alapú, sablon/asset-eladás,
+  atomikus vásárlás-RPC, 30% jutalék), **coin-wallet** (vétel/kifizetés, user↔user
+  transzfer, Pro=500 coin/hó, PayPal-payout) és **Pro-előfizetés**
+  (szerver-autoritatív, RevenueCat — a kliens sosem dönt Pro-ról).
+- **Auth & megfelelőség.** Supabase Auth (e-mail/felhasználónév/telefon + Brevo
+  **SMS-OTP**), signup-consent + GDPR-doksik, **tárhely-kvóta** (per-projekt
+  byte-ledger + user-kvóta) és **külső tár-providerek** (Drive/Dropbox/WebDAV/S3).
+- **🛡️ Production & security.** A go-live előtti hardening (auth-perimeter,
+  rate-limit, upload/SSRF, storage-RLS, render-BOLA, webhook, CI-security)
+  számozott, prioritált terve: [devs/tasks/remix/](devs/tasks/remix/) (belépő:
+  [00-README](devs/tasks/remix/00-README.md)).
 
 ## Architektúra
 
@@ -243,8 +280,8 @@ viszi a friss számot), **RLS mindenhol** (moderáció/privacy a DB-ben), és **
 (`get_feed` keyset-lapozással + `get_for_you` hot-rank, a poszt+szerző+liked/saved
 egy körben). A videó/borító a `videos`/`posters` Storage-bucketbe tölt.
 A kliens-belépési pontok: **Feed** a kezdőképernyőn, **Közzététel** az editor
-fejlécében, `/auth` és `/profile` képernyők. Nyitott social-tételek: [MISSING.md](MISSING.md)
-(a régi `SOCIAL-TODO.md` beépítés után törölve — `git show 50d1c95^:SOCIAL-TODO.md`).
+fejlécében, `/auth` és `/profile` képernyők. Nyitott social-tételek: [devs/tasks/MISSING.md](devs/tasks/MISSING.md); a
+production-hardening (moderáció, rate-limit, auth-perimeter): [devs/tasks/remix/](devs/tasks/remix/).
 
 Fizikai eszközön: a Supabase-t 0.0.0.0-ra kell kötni (`supabase/config.toml`), és az
 `EXPO_PUBLIC_SUPABASE_URL`-t a gép LAN-IP-jére állítani.
@@ -260,8 +297,11 @@ Fizikai eszközön: a Supabase-t 0.0.0.0-ra kell kötni (`supabase/config.toml`)
   együttszólás + ducking a Fázis 2 része.
 - **Átmenetek** (crossfade/wipe): a klipmodell kész rá (átfedés megengedett), a
   vizuális átmenet-render a Skia-réteggel együtt érkezik.
-- **Közösségi réteg** (fiókok, feltöltés, remix, felfedezés): Fázis 1-backend
-  (Node/NestJS + PostgreSQL + S3/CDN) — a kliens draft-modellje már ehhez igazodik.
+- **Közösségi réteg**: ✅ megvalósult **Supabase**-en (feed, fiók, remix, üzenetek,
+  profil — lásd fent); a production-hardening (auth-perimeter, moderáció, rate-limit,
+  storage-RLS) a [devs/tasks/remix/](devs/tasks/remix/) tervben.
+- **Production & security**: a nyilvános worker-API + storage perimeter go-live
+  előtti megerősítése (P0–P2, számozott): [devs/tasks/remix/](devs/tasks/remix/).
 
 ## Parancsok
 

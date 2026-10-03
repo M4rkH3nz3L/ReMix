@@ -19,23 +19,25 @@
 
 ## 0. Hol van ennek a helye a dokumentációban
 
-A ReMix már *sok* dokumentumot hordoz. Ez a fájl a **capstone**: fölé rendeli
-és összeköti őket, nem duplikálja.
+A ReMix dokumentumkészlete **2026-09-30-án konszolidálva** lett (a szétszórt
+gyökér-tervek és a nyers vízió-források kivezetve; a tartalom a lenti kanonikus
+helyekre került). Ez a fájl a **capstone**: fölé rendeli és összeköti őket, nem
+duplikálja.
 
 | Dokumentum | Kérdés, amire válaszol | Réteg |
 |---|---|---|
 | **Arch.md** *(ez)* | Hogyan épül fel a rendszer, és miért? | architektúra |
 | [README.md](README.md) | Mit tud az app, hogyan indítom? | belépő |
 | [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md) | Milyen szabályok kötnek kód írásakor? | konvenció |
-| [STUDIO.md](STUDIO.md) | Milyen szerkesztő-funkciók vannak + a Free/Pro kapu | feature (editor) |
-| [PRO.md](PRO.md) · [MONEY.md](MONEY.md) | Pro-roadmap · üzleti modell | termék |
-| [OPS.md](OPS.md) · [DEVOPS.md](DEVOPS.md) | Mit és hogyan üzemeltetünk | üzemeltetés |
-| [PROD.md](PROD.md) | Hogyan készül kiadható build, és mi kell hozzá | kiadás |
-| [AUDITBUGS.md](AUDITBUGS.md) · [TODO.md](TODO.md) | Nyitott adósság · go-live blokkolók | minőség |
-| [DESIGN-TODO.md](DESIGN-TODO.md) | Design-DNS (a `UIA.md` UI-anomália-lista mind-javítva → törölve) | UI |
+| [docs/hu/](docs/hu/) | Rétegenkénti, kód-alapú fejlesztői doksik + **ADR-ek** | architektúra (részletes) |
+| [devs/tasks/](devs/tasks/) | Stúdió- és platform-fejlesztési tervek (video/audio/image/MISSING) | feature-terv |
+| [devs/tasks/remix/](devs/tasks/remix/) | 🛡️ Security + production-readiness terv · **go-live blokkolók** | minőség / kiadás |
+| [ops/SERVER.md](ops/SERVER.md) | Mit és hogyan üzemeltetünk (deploy) | üzemeltetés |
+| [docs/hu/development/release.md](docs/hu/development/release.md) | Hogyan készül kiadható build | kiadás |
 
 **Olvasási sorrend új fejlesztőnek:** README → **Arch.md (1–7. szakasz)** →
-AGENTS.md → a feature-hez tartozó doksi (pl. STUDIO.md).
+AGENTS.md → a réteg-doksik ([docs/hu/](docs/hu/)) → a feature-hez tartozó terv
+([devs/tasks/](devs/tasks/)).
 
 ---
 
@@ -323,10 +325,16 @@ inkább a **dokumentáció** és a **kód-review** eszköze legyen. Így térké
 | **Editor** | [app/editor/[id].tsx](src/app/editor/[id].tsx) | [components/editor/](src/components/editor/), [preview/](src/components/preview/), [panels/](src/components/editor/panels/) | `commands`, `frames`, `keyframes`, `trimEdit`, `ripple`, `projectUtils` |
 | **AI-asszisztens** | AssistantPanel | AiActivity, AiProviderPicker | [ai.ts](src/lib/ai.ts), [aiCommands.ts](src/lib/aiCommands.ts), [aiProviders.ts](src/lib/aiProviders.ts) |
 | **Render/Export** | ExportPanel | ProgressOverlay | [render.ts](src/lib/render.ts), [nativeRender.ts](src/lib/nativeRender.ts), `*Client.ts` |
-| **Feed / Social** | [app/feed.tsx](src/app/feed.tsx), [channel/[id]](src/app/channel/[id].tsx) | BottomNav, NotificationBell | [feed.ts](src/lib/feed.ts), [supabase.ts](src/lib/supabase.ts), [types/social.ts](src/types/social.ts) |
+| **Feed / Social** | [app/index.tsx](src/app/index.tsx) (feed), [channel/[id]](src/app/channel/[id].tsx) | BottomNav, NotificationBell | [feed.ts](src/lib/feed.ts), [supabase.ts](src/lib/supabase.ts), [types/social.ts](src/types/social.ts) |
 | **Pro / Fizetés** | [PaywallSheet](src/components/PaywallSheet.tsx) | — | [billing.ts](src/lib/billing.ts), [subscription.ts](src/lib/subscription.ts), `entitlementStore` |
 | **Shop** | [app/shop.tsx](src/app/shop.tsx) | — | [shop.ts](src/lib/shop.ts) |
 | **Collab** | [app/collab/[id].tsx](src/app/collab/[id].tsx) | RemixGraphModal | [collab.ts](src/lib/collab.ts), `collabStore` |
+| **Stúdiók** (image/audio) | [app/studio/](src/app/studio/) | — | `kind` ([types/project.ts](src/types/project.ts)), audio-mag ([mixer.ts](src/lib/mixer.ts), [musicTime.ts](src/lib/musicTime.ts), [pitch.ts](src/lib/pitch.ts)), image-mag ([vectorPath.ts](src/lib/vectorPath.ts), [layerEffects.ts](src/lib/layerEffects.ts)) |
+| **Creator OS** (platform-mag) | Workspace | — | [workspace.ts](src/lib/workspace.ts), [versions.ts](src/lib/versions.ts), [planner.ts](src/lib/planner.ts), [workflowTemplate.ts](src/lib/workflowTemplate.ts), [analytics.ts](src/lib/analytics.ts), [creatorLoop.ts](src/lib/creatorLoop.ts) |
+| **Wallet / Coins** | [app/profile.tsx](src/app/profile.tsx) (WalletCard) | — | [wallet.ts](src/lib/wallet.ts), server `payouts.js`/`quota.js` |
+| **Auth / Profil** | [app/auth.tsx](src/app/auth.tsx), [app/profile.tsx](src/app/profile.tsx) | — | [supabase.ts](src/lib/supabase.ts), `resolve_login_email` RPC, Brevo SMS-OTP |
+| **RBAC / Admin** | [app/admin.tsx](src/app/admin.tsx) | — | [roles.ts](src/lib/roles.ts) + `roles`/`permissions` RLS |
+| **Tárhely-kvóta / providerek** | tár-választó | — | [storageProviders.ts](src/lib/storageProviders.ts), server `quota.js`/`userStorage.js` |
 
 **Ha új, önálló nagy feature jön** (nem az editor-magra épül), akkor érdemes a
 Meta-féle `features/<név>/{components,hooks,state,api,screens,types}` mintát
@@ -398,8 +406,20 @@ tükre signup-triggerrel), `posts` (a szerkeszthető projekt JSONB-ként utazik 
 egy koppintásos Remix), `follows/likes/saves/comments/notifications/reports`,
 **denormalizált számlálók triggerrel**, **feed-RPC-k** (`get_feed` keyset,
 `get_for_you` hot-rank), `subscriptions` (szerver-autoritatív), `shop_marketplace`
-(atomi vásárlás-RPC), `project_collaboration`, `cloud_projects`, `media` bucket.
-A kliens sosem self-grantol Pro-t/kreditet — csak szinkronizál.
+(atomi vásárlás-RPC), `coin_wallet` + `payouts` (vétel/kifizetés/transzfer),
+`roles`/`permissions` (RBAC + admin), `storage_quotas` (per-user/projekt byte-ledger)
++ `user_storage_providers` (Drive/Dropbox/WebDAV/S3), `project_collaboration`,
+`cloud_projects`, `messages` (DM/csoport/projekt-chat), `media` bucket. A kliens
+sosem self-grantol Pro-t/kreditet — csak szinkronizál.
+
+### 9.6 Production & security perimeter (folyamatban)
+
+A nyilvános worker-API + storage jelenlegi hardening-hiányai (auth-perimeter,
+rate-limit, upload/SSRF-policy, storage-RLS ownership, render-BOLA, webhook-
+idempotency, CI-security) **számozott, prioritált tervben** élnek:
+[devs/tasks/remix/](devs/tasks/remix/) (forrás-audit: [devs/source/remix.md](devs/source/remix.md),
+OWASP **ASVS 5.0 / MASVS / API Top-10** alapon). Ez a **go-live blokkolók**
+kanonikus helye (P0 → P1 → P2).
 
 ---
 
@@ -464,23 +484,31 @@ prioritált teendők:
    `PATCHABLE_FIELDS` whitelist a kliens–AI szerződése; ezt dokumentálni és
    verziózni kell (a séma bővítése ADR-t érdemel).
 
-**P1 — a hiányzó réteg-doksik (`docs/architecture/`)**
-4. Rétegenként egy rövid `.md`: `runtime` (New Arch/Hermes), `state`, `commands`,
-   `rendering` (a **preview↔render paritás** részletei), `ai`, `networking`
-   (router + kapu), `storage`, `collaboration`, `performance`.
+**P1 — a réteg-doksik (`docs/hu/architecture/`)** ✅ *megvalósult*
+4. Rétegenként egy `.md` a [docs/hu/](docs/hu/) alatt: `runtime`, `state`,
+   `commands`, `rendering` (a **preview↔render paritás**), `ai`, `networking`,
+   `storage`, `collaboration`, `performance` — mind kész, kód-horgonyokkal.
 5. **Diagram-fegyelem.** A jelen ASCII-diagramok jók belépőnek; a hosszú életű
    ábrákat érdemes forrásból generálni (pl. Mermaid), hogy ne rothadjanak el.
 
 **P2 — a rendszer „élővé" tétele**
 6. **Teljesítmény-költségvetés dokumentálva** (a Meta New-Arch-célja): mi fut a
    UI-szálon (gesztus/animáció), mi a JS-szálon, mi a workeren — és a határok
-   *miért* ott vannak (lásd 5–6. szakasz). Egy `performance.md` explicit budget-tel.
+   *miért* ott vannak (lásd 5–6. szakasz). ✅ [docs/hu/architecture/performance.md](docs/hu/architecture/performance.md).
 7. **Kontraktus-tesztek a worker↔kliens határra** (a `*Client.ts` és a
    `server/*.js` séma-egyezésére), hogy a felhő-verzióváltás ne törjön csendben.
-8. **Observability terv** (naplózás/metst a workeren, render-queue-egészség) — az
-   [OPS.md](OPS.md)/[DEVOPS.md](DEVOPS.md) kiegészítéseként.
+8. **Observability terv** (naplózás/metrika a workeren, render-queue-egészség) — az
+   [ops/SERVER.md](ops/SERVER.md) kiegészítéseként; a security-event/audit-log a
+   [devs/tasks/remix/14](devs/tasks/remix/14-security-baseline-docs.md) alatt.
 
-### Javasolt dokumentum-struktúra (Meta-minta)
+**🛡️ Production & security — a következő nagy lépés (go-live előtt kötelező)**
+9. **Security-baseline.** A kód-mag már pro-szintű; a **hiányzó réteg a
+   security-perimeter**: worker-auth/rate-limit/upload/SSRF-policy, storage-RLS
+   ownership, render-BOLA, webhook-hardening, CI-security. Számozott, prioritált
+   terv (P0→P2): [devs/tasks/remix/](devs/tasks/remix/) — belépő a
+   [00-README](devs/tasks/remix/00-README.md).
+
+### Dokumentum-struktúra (Meta-minta) — ✅ megvalósult a `docs/hu/` alatt
 
 ```
 docs/
@@ -502,17 +530,18 @@ docs/
     └── release.md            (EAS, worker deploy — DEVOPS.md-ből)
 ```
 
-> **Elv:** a `docs/architecture/*` a *miért* és a *hogyan együtt* — a
-> feature-listákat (STUDIO.md, PRO.md) és az ops-részleteket (OPS/DEVOPS) nem
-> ismételjük, csak linkeljük.
+> **Elv:** a `docs/hu/architecture/*` a *miért* és a *hogyan együtt* — a
+> feature-listákat/terveket ([devs/tasks/](devs/tasks/)) és az ops-részleteket
+> ([ops/SERVER.md](ops/SERVER.md)) nem ismételjük, csak linkeljük.
 
 ---
 
-## 13. ADR-index (javasolt)
+## 13. ADR-index — ✅ rögzítve
 
 Architecture Decision Record = *döntés + kontextus + a mérlegelt, elvetett
-alternatívák*. Az alábbiak **már megszülettek a kódban** — csak rögzíteni kell
-őket. Minta (a `command bus`-ra):
+alternatívák*. Az alábbi 10 döntés **rögzítve** van a
+[docs/hu/decisions/](docs/hu/decisions/) alatt (ADR-001 … ADR-010). Minta (a
+`command bus`-ra):
 
 > **ADR-001 — Minden szerkesztés command buson megy.**
 > **Döntés:** nevesített `EditorCommand` + pure `applyCommand` reducer; a

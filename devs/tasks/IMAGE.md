@@ -1,6 +1,6 @@
 # 🖼️ ReMix Image Studio — fejlesztési terv
 
-> Forrás-vízió: [devs/source/EDITORS.md](../source/EDITORS.md). (A vele BÁJTRA AZONOS
+> Forrás-vízió: **EDITORS** (közös editor-nyelv; a nyers forrás a doksi-konszolidációkor törölve — git-history). (A vele BÁJTRA AZONOS
 > `IMAGE-EDITOR.md` duplikátum törölve; a lenti „IMAGE-EDITOR.md §…" hivatkozások
 > ugyanennek a dokumentumnak a szakaszaira mutatnak.)
 > Cél-útvonal: `http://localhost:8081/studio/image/<projectId>` → [src/app/studio/image/[id].tsx](../../src/app/studio/image/%5Bid%5D.tsx)
@@ -14,8 +14,9 @@
 - **Fázis B — KÉSZ.** `ImageClip.docId` back-link; a videóból az `ImageStudioModal` nyílik (a sima képet `ImageDoc(PhotoLayer)`-be csomagolja, 1 undo: UPSERT_IMAGE_DOC+UPDATE_CLIP), Save = `renderImageDoc`→`updateClip(uri,docId)`. A desztruktív `ImageStudio.tsx` **törölve** (egy editor). Böngészőben verifikálva (project + scoped mód, 0 konzol-hiba).
 - **Fázis C — RÉSZBEN kész (on-device UI):** gazdag per-kind inspector — `ColorField` (minták + HEX bevitel), szöveg-tipográfia (félkövér/betűköz/sorköz/kontúr/árnyék + stílus-presetek), forma (kitöltés/forma-választó/blend/lekerekítés/keret + árnyék/ragyogás). Alakzat-hozzáadás (rect/ellipse/line/arrow/star). Opacitás minden rétegen.
 - **Fázis E — RÉSZBEN kész:** PNG-raszter export + megosztás; „kép → új videó" ReMix-cél (`insertIntoVideo`).
-- **DoD (A+B) TELJESÍTVE; `npm run audit` zöld (tsc + expo lint + jest 337).**
-- **Flag-elve (infra / nagy dedikált UI — lásd [AUDITBUGS.md](../../AUDITBUGS.md)):** Fázis D teljes AI (structural/select/generative — worker/model), és a nehéz C-darabok: RasterLayer rajz-réteg, SVG parser (`svgImport.ts`), toll/Bézier path-szerkesztő UI, boolean-művelet UI, maszk minden rétegen + clipping/gradient-maszk, GroupLayer, HSL/HSV picker + eyedropper, multi-select a vásznon; Fázis E többi formátum (JPEG/WebP/AVIF worker-param, SVG/PDF vektor-export).
+- **Fázis C — MAG-RÉTEG KÉSZ (expo-mentes lib-ek, UI-bekötés részben hátra):** a profi eszköztár PURE MAGJAI a `src/lib/`-ben, teszttel: `vectorPath.ts` (Bézier node-editing + SVG `d` parse↔emit, 31 teszt), `svgImport.ts` (`parseSvg` SVG → `ImageLayer`-ek, 21 teszt) — **UI-ban ÉLŐ** (`ImageStudioBody` „SVG" eszköz → `importSvg`), `layerEffects.ts` (14), `adjustmentStack.ts` (16), `patternFill.ts` (13), `rulers.ts` (9). A magok megvannak; a hozzájuk tartozó dedikált vászon-/panel-UI (toll-szerkesztő, boolean, ruler-overlay, effekt-panel, adjustment-stack UI) még hiányzik.
+- **DoD (A+B) TELJESÍTVE; `npm run audit` zöld (tsc + expo lint + jest).**
+- **Flag-elve (infra / nagy dedikált UI — lásd [devs/tasks/remix/](./remix/)):** Fázis D teljes AI (structural/select/generative — worker/model), és a MODELL-GAP + nagy-UI C-darabok: RasterLayer rajz-réteg (modell-gap), `vectorPath.ts` magra épülő toll/Bézier path-szerkesztő **UI** (a mag KÉSZ), boolean-művelet UI, maszk minden rétegen + clipping/gradient-maszk, GroupLayer, HSL/HSV picker + eyedropper, multi-select a vásznon; Fázis E többi formátum (JPEG/WebP/AVIF worker-param, SVG/PDF vektor-export). *(Az `svgImport.ts` SVG-parser MÁR nem flag-elt: kész és UI-ban él.)*
 
 ---
 
@@ -30,9 +31,9 @@
    - Rasterizálás: worker-Chromium raszter, tartalom-kulcsos cache — [src/lib/imageDocClient.ts](../../src/lib/imageDocClient.ts) `renderImageDoc`.
 2. **A jelenlegi „szerkesztő” egy STEPPER-panel**, nem vizuális editor: [src/components/editor/panels/ImageDocPanel.tsx](../../src/components/editor/panels/ImageDocPanel.tsx) — rétegek listája + gombok, közvetlen-manipuláció (húzás/méretezés a vásznon) nélkül.
 3. **A `/studio/image/[id]` képernyő placeholder-váz** — a vásznat kirajzolja a háttérszínnel, de minden eszköz `Alert('coming soon')`. Lásd [src/app/studio/image/[id].tsx](../../src/app/studio/image/%5Bid%5D.tsx).
-4. **A videó-editorban VAN egy „Kép Stúdió” modal — de DESZTRUKTÍV, és NEM a scene-graphon dolgozik**: [src/components/editor/ImageStudio.tsx](../../src/components/editor/ImageStudio.tsx). Egy kép-KLIP (`ImageClip`) fájlját forgatja/tükrözi/vágja/rajzolja on-device (`expo-image-manipulator`, [src/lib/imageEditor.ts](../../src/lib/imageEditor.ts)) → új PNG-t éget. A kijelölt képklipen az `openImageStudio(clipId)` nyitja.
+4. **A videó-editorban VAN egy „Kép Stúdió” modal — MÁRA a közös scene-graph stúdió**: [src/components/studio/image/ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx) (a régi, destruktív `src/components/editor/ImageStudio.tsx` **törölve**). A `scoped` módú `ImageStudioBody`-t nyitja a kiválasztott kép-klip RÉTEG-FÁJÁN; ha a klipnek még nincs dokumentuma, becsomagolja egy `ImageDoc`-ba (teljes-vásznas `PhotoLayer`), és a `docId`-t visszaírja a klipre. A kijelölt képklipen az `openImageStudio(clipId)` ([editorStore.ts:1361](../../src/store/editorStore.ts#L1361)) nyitja; a Modal az [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx#L630)-ből mountolva. Az on-device bake ([src/lib/imageEditor.ts](../../src/lib/imageEditor.ts), `expo-image-manipulator`) fallbacknek megmarad.
 
-**Két képszerkesztő él tehát párhuzamosan** (scene-graph panel ↔ destruktív bake-modal), és egyik sem az a vizuális, egységes editor, amit az IMAGE-EDITOR.md leír.
+> **⚠️ TÖRTÉNETI (Fázis A/B ELŐTTI állapot) — a 24–35. sorok a KIINDULÁST írják le; a mai állapot a fenti ✅ STÁTUSZ-blokkban.** A régi stepper-panel `ImageDocPanel.tsx` KÓDBAN még létezik és a `PanelHost`-ból mountolt, de a `/studio/image/[id]` és a videó-scoped út MÁR a vizuális `ImageStudioBody`-t használja.
 
 **Cél (a felhasználó kérése):**
 
@@ -50,7 +51,7 @@
 ## 1. Architektúra-döntések
 
 ### 1.1 Egyetlen komponens, két üzemmód
-Mint a hangnál: **egy** `ImageStudio` (scene-graph) komponens, `mode` propszal — a videóból és önállóan is UGYANAZ fut:
+Mint a hangnál: **egy** megosztott törzs — [ImageStudioBody.tsx](../../src/components/studio/image/ImageStudioBody.tsx) (scene-graph), `mode` propszal — a videóból ([ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx)) és önállóan (a `/studio/image/[id]` route-ból) is UGYANAZ fut:
 
 | mode | Mit szerkeszt | Belépés |
 | --- | --- | --- |
@@ -78,33 +79,33 @@ On-device szerkesztés + előnézet = **ingyen**. Worker-raszter HD-ben, generat
 ### 🟦 Fázis A — A placeholder → valódi vizuális scene-graph editor
 Cél: `/studio/image/[id]` egy közvetlen-manipulációs vászon-editor, a meglévő `imageDoc.ts` ops + command bus + rasterizáló újrahasználásával (a stepper-`ImageDocPanel` logikáját vizuálissá emelve, nem újraírva).
 
-- [ ] **Vászon + réteg-render** ([src/app/studio/image/[id].tsx](../../src/app/studio/image/%5Bid%5D.tsx) átírása): a `visibleLayers(doc)` rétegeit natívan kirajzolni (fill / photo / shape / text) — a videó-editor megjelenítőit újrahasználva ([src/components/preview/ShapeOverlay.tsx](../../src/components/preview/ShapeOverlay.tsx), szöveg/kép rétegek). Arány-tartó „fit” (mint a mai placeholder).
-- [ ] **Közvetlen manipuláció (IMAGE-EDITOR § 16 gesztusok)**: kijelölt réteg move / pinch-scale / rotate a vásznon (a videó-editor transform-gesztusai + [src/lib/snapping.ts](../../src/lib/snapping.ts) igazítás). Minden gesztus végén `updateLayer` → `UPSERT_IMAGE_DOC`. `double tap → reset`, `long press → kontextus-menü`.
-- [ ] **Réteg-panel** (IMAGE-EDITOR § 3): a `layerLabel` / `layerIcon` listája (fentről lefelé fordítva), láthatóság / zár / opacity / blend / sorrend (`reorderLayer`), duplikálás, törlés — a mai `ImageDocPanel` gombjai, de bottom-sheetben.
-- [ ] **Eszköz-sor + bottom-sheet** (IMAGE-EDITOR § 16): `Select · Draw · Shape · Text · Image · Adjust · Effects`. A `studio.imageTools.*` i18n kulcsok részben megvannak (layers/crop/adjust/text/shapes/draw).
-- [ ] **Adjust / Effects** (IMAGE-EDITOR § 5): a `PhotoLayer.adjust` (`ClipAdjust`) — a videó-editor teljes tónuslánca (brightness…curves/hsl/balance/vignette/LUT) MÁR a modellben; itt csak felület kell + on-device tint-előnézet ([src/lib/adjustPreview.ts](../../src/lib/adjustPreview.ts)).
-- [ ] **Mentés / raszter**: `renderImageDoc(doc)` → `doc.renderedUri`; a projekt-fajta `image` esetén ez a kimeneti PNG.
+- [x] **Vászon + réteg-render — KÉSZ**: az [ImageCanvas.tsx](../../src/components/studio/image/ImageCanvas.tsx) a látható rétegeket a timeline-előnézet komponenseivel rajzolja (render-paritás; adapter: [imageLayerClip.ts](../../src/lib/imageLayerClip.ts)), fotó = `PhotoLayerView`, fill = `FillLayerView`. Arány-tartó „fit".
+- [x] **Közvetlen manipuláció — KÉSZ**: kijelölt réteg move (húzás, reanimated) / scale (minden réteg) + rotate (csak fotó) a [SelectionFrame.tsx](../../src/components/studio/image/SelectionFrame.tsx)-en, `LivePatch` élő-előnézettel; gesztus végén `updateLayer` → `UPSERT_IMAGE_DOC` (EGY undo). *(double-tap reset / long-press kontextus-menü: még hátra.)*
+- [x] **Réteg-panel — KÉSZ**: [LayerPanel.tsx](../../src/components/studio/image/LayerPanel.tsx) bottom-sheet — lista + reorder/visibility/opacity/duplázás/törlés + per-kind inspector.
+- [x] **Eszköz-sor + bottom-sheet — KÉSZ (aktuális készlet)**: `Layers · Photo · Text · Shape · SVG · Adjust · Delete` az [ImageStudioBody.tsx](../../src/components/studio/image/ImageStudioBody.tsx)-ban (`studio.imageTools.*` kulcsok). *(A tervezett `Select · Draw · Effects` eszközök még hátra — C.)*
+- [x] **Adjust — KÉSZ**: [AdjustSheet.tsx](../../src/components/studio/image/AdjustSheet.tsx) — szűrő + fényerő/kontraszt/szaturáció/hőmérséklet a `PhotoLayer.adjust`-on (tint-előnézet: [adjustPreview.ts](../../src/lib/adjustPreview.ts)). *(A teljes tónuslánc — curves/hsl/balance/vignette/LUT — UI-ja + effekt-panel: C.)*
+- [x] **Mentés / raszter — KÉSZ**: `rasterize` = worker `renderImageDoc` → `captureRef` fallback; `image` projekt-fajtánál ez a kimeneti PNG (`doc.renderedUri`).
 
 ### 🟩 Fázis B — Videó ↔ Image Studio integráció (a desztruktív `ImageStudio` LECSERÉLÉSE)
 Cél: a videóból kiválasztott kép KÖZVETLENÜL a közös scene-graph stúdióban szerkeszthető; a régi bake-modal megszűnik (IMAGE-EDITOR § 15).
 
-- [ ] **Klip ↔ dokumentum back-link** (ma HIÁNYZIK): új `ImageClip.docId?` mező. Az `ImageDocPanel` raszter-beszúrás ma NEM köti vissza a klipet a forrás-dokumentumhoz — ezért az „újraszerkesztés” nem tudja, melyik doksit nyissa. A beszúráskor ([ImageDocPanel.tsx:136](../../src/components/editor/panels/ImageDocPanel.tsx#L136)) el kell tenni a `docId`-t a klipre.
-- [ ] **„Edit image” a videóból**: a kijelölt képklipen (`openImageStudio(clipId)`, [editorStore.ts:395](../../src/store/editorStore.ts#L395)) →
-  - ha a klipnek van `docId` → a közös `ImageStudio`-t nyitja **`scoped`** módban azzal a dokumentummal;
-  - ha nincs (sima importált kép) → **becsomagoljuk egy új `ImageDoc`-ba** (egyetlen `PhotoLayer`), rátesszük a `docId`-t, és azt szerkesztjük. Így minden kép non-destruktívan, réteg-fásan szerkeszthetővé válik.
-- [ ] **Visszaút (Save → videó)**: a szerkesztés után `renderImageDoc` → az új PNG-vel `updateClip(clipId, { uri, docId })`. Undo-zható, és a videó-timeline azonnal frissül.
-- [ ] **A desztruktív `ImageStudio.tsx` nyugdíjazása**: a rotate/flip/crop/draw MŰVELETEK megmaradnak, de scene-graph-műveletként (a geometriai transzformáció a réteg `transform`-ját/`rotation`-ját állítja, a rajz raszter-rétegként — lásd C fázis), nem új fájlba égetve. Az [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) `<ImageStudio />` mountját a közös komponens Modaljára cseréljük. **A cél: egy képszerkesztő maradjon.**
-- [ ] **Kompatibilitás**: a régi, `docId` nélküli képklipek továbbra is megnyithatók (becsomagolás úttal) — a `bakeImage` on-device út megmarad fallbacknek offline/Expo Go alatt.
+- [x] **Klip ↔ dokumentum back-link — KÉSZ**: az `ImageClip.docId?` mező él ([project.ts:583](../../src/types/project.ts#L583)). A `scoped` nyitáskor a becsomagolás EGY köteg-műveletben (`UPSERT_IMAGE_DOC` + `UPDATE_CLIP{docId}`) beköti a klipet a dokumentumhoz ([ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx)).
+- [x] **„Edit image” a videóból — KÉSZ**: a kijelölt képklipen (`openImageStudio(clipId)`, [editorStore.ts:1361](../../src/store/editorStore.ts#L1361)) az `ImageStudioModal` nyílik →
+  - ha a klipnek van `docId` → a közös `ImageStudioBody`-t nyitja **`scoped`** módban azzal a dokumentummal;
+  - ha nincs (sima importált kép) → **becsomagolja egy új `ImageDoc`-ba** (teljes-vásznas `PhotoLayer`, a klip szűrő/korrekció-örökségével), ráteszi a `docId`-t, és azt szerkeszti.
+- [x] **Visszaút (Save → videó) — KÉSZ**: a `rasterize` (worker `renderImageDoc` → `captureRef` fallback) után `updateClip(clipId, { uri, docId })` ([ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx) `saveScoped`). Undo-zható, a timeline azonnal frissül.
+- [x] **A desztruktív `ImageStudio.tsx` nyugdíjazása — KÉSZ**: a `src/components/editor/ImageStudio.tsx` **törölve**; az [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx#L630) most `<ImageStudioModal />`-t mountol. **Egy képszerkesztő maradt.** *(A geometriai műveletek most a réteg `transform`/`rotation`-ján; a raster-rétegű rajz még hátra — C.)*
+- [x] **Kompatibilitás — KÉSZ**: a `docId` nélküli régi képklipek becsomagolással nyílnak; a `bakeImage` on-device út (`imageEditor.ts`) fallbackként megmarad + a `rasterize` `captureRef` fallbackje offline/Expo Go alatt is ment.
 
 ### 🟨 Fázis C — A profi eszköztár kiépítése (IMAGE-EDITOR § 2, 4, 7, 8)
 A modell nagy része megvan; itt a hiányzó UI + a néhány modell-gap.
 
 - [ ] **Selection / Transform**: multi-select (`multiSelectIds` a store-ban), flip H/V, crop, szög-forgatás, arány-zár. (A perspektíva/skew/distort később — a `Tilt3D` már ad döntést.)
-- [ ] **Vector (nagyrészt KÉSZ a modellben)**: a `ShapeLayer` már hordoz `path` + Bézier `PathPoint` (h1/h2), `subpaths` + `fillRule` (**boolean műveletek: union/subtract/intersect/exclude**), `gradient` (linear/radial/conic), `stroke` cap/join/dash. Kell: a **toll/Bézier szerkesztő UI** + a boolean-műveletek felülete + alakzat-hozzáadás (rect/ellipse/line/star/polygon).
+- [ ] **Vector (modell + MAG KÉSZ; UI hátra)**: a `ShapeLayer` már hordoz `path` + Bézier `PathPoint` (h1/h2), `subpaths` + `fillRule` (**boolean műveletek: union/subtract/intersect/exclude**), `gradient` (linear/radial/conic), `stroke` cap/join/dash. A toll/Bézier **mag KÉSZ**: [src/lib/vectorPath.ts](../../src/lib/vectorPath.ts) (node-editing: drag/split/join/reverse/node-típus + SVG `d` parse↔emit, ív→bezier). Kell még: a **toll/Bézier szerkesztő UI** (a magra kötve) + a boolean-műveletek felülete. Alakzat-hozzáadás (rect/ellipse/line/arrow/star) az `ImageStudioBody`-ban ÉLŐ.
 - [ ] **Text (KÉSZ a modellben)**: a `TextLayer` a teljes `TextClip`-tipográfiát viszi (tracking/leading/stroke/shadow/gradient/curved `textPath`) — csak felület kell.
 - [ ] **Masks (részben KÉSZ)**: a `PhotoLayer.mask` (`ClipMask`: shape/polygon/feather/expand/invert) megvan. Kell: maszk MINDEN rétegtípuson + **clipping mask** (réteg maszkolja az alattát) + gradient-maszk UI.
 - [ ] **Pixel / raszter réteg (fő modell-gap — IMAGE-EDITOR § 1 „Pixel document”, § 2 Draw)**: új `RasterLayer` réteg-típus (ecset/radír/marker rajzolt PNG-je). A rajz on-device ([src/components/editor/ImageMarkupTool.tsx](../../src/components/editor/ImageMarkupTool.tsx) újrahasználása), az eredmény raszter-rétegként a scene-graphba → a Chromium-raszter komponálja. Így lesz **hybrid canvas** (pixel + vector, § 8).
-- [ ] **SVG import → scene graph (§ 7)**: SVG parser → `ShapeLayer` path-ok (ne bitmap!). A `subpaths`/`gradient`/`stroke` mezők már fogadják.
+- [x] **SVG import → scene graph (§ 7) — KÉSZ**: SVG parser → `ImageLayer` path-ok (ne bitmap!) — [src/lib/svgImport.ts](../../src/lib/svgImport.ts) `parseSvg` (21 teszt), UI-ban ÉLŐ (`ImageStudioBody` „SVG" eszköz → `importSvg`, egy köteg-undo). A `subpaths`/`gradient`/`stroke` mezők fogadják. *(A rokon `patternFill.ts`/`layerEffects.ts`/`adjustmentStack.ts`/`rulers.ts` magok is megvannak — UI-bekötés hátra.)*
 - [ ] **Color rendszer (§ 6)**: RGB/HEX/alpha + `ShapeGradient` (linear/radial/conic) megvan; HSL/HSV picker + eyedropper hozzáadása.
 
 ### 🟧 Fázis D — AI réteg (worker) — Pro (IMAGE-EDITOR § 10–14)
@@ -124,9 +125,9 @@ A modell nagy része megvan; itt a hiányzó UI + a néhány modell-gap.
 
 Mind opcionális/defaultos — a régi projektek változatlanul töltenek ([migrateProject](../../src/lib/projectUtils.ts#L137)).
 
-- [ ] `ImageClip.docId?: string` — a klip ↔ forrás-`ImageDoc` back-link (a „Edit image from video” alapja).
-- [ ] Új `RasterLayer` réteg-típus (`kind: 'raster'; uri; position; w; h; …`) — a pixel-dokumentum / rajz réteg.
-- [ ] Réteg-szintű `mask?` és `adjust?` MINDEN `ImageLayer`-en (ma csak `PhotoLayer`-en) + `blendMode?` az `ImageLayerBase`-en (ma csak `ShapeLayer`-en).
+- [x] `ImageClip.docId?: string` — a klip ↔ forrás-`ImageDoc` back-link (a „Edit image from video” alapja) — **KÉSZ** ([src/types/project.ts:583](../../src/types/project.ts#L583)).
+- [ ] Új `RasterLayer` réteg-típus (`kind: 'raster'; uri; position; w; h; …`) — a pixel-dokumentum / rajz réteg. (Ma az `ImageLayer` union: `FillLayer | PhotoLayer | ShapeLayer | TextLayer` — [project.ts:1182](../../src/types/project.ts#L1182).)
+- [ ] Réteg-szintű `mask?` és `adjust?` MINDEN `ImageLayer`-en (ma csak `PhotoLayer`-en) + `blendMode?` az `ImageLayerBase`-en (ma csak `ShapeLayer`-en). (Ellenőrizve: `ImageLayerBase` = id/name/hidden/opacity — nincs rajta `blendMode`/`mask`/`adjust`.)
 - [ ] (Opcionális) `GroupLayer` (§ 3 „Logo ├ Glow ├ Wordmark”) — réteg-csoport későbbre.
 
 ---
@@ -144,16 +145,16 @@ Mind opcionális/defaultos — a régi projektek változatlanul töltenek ([migr
 - [src/lib/adjustPreview.ts](../../src/lib/adjustPreview.ts) — tint-előnézet a korrekcióhoz.
 - [src/lib/snapping.ts](../../src/lib/snapping.ts) — igazítás a vásznon.
 
-**Új:**
-- `src/app/studio/image/[id].tsx` (valódi vizuális editor) + `src/components/studio/image/*` (Canvas, LayerPanel, tool bottom-sheetek, gesture-réteg).
-- `src/lib/svgImport.ts` (SVG → scene graph) + a `RasterLayer` rajz-integráció.
-- Worker-endpointok: AI select / generative fill / háttér-csere (a bgremove/depth mintára).
+**Új (KÉSZ, hacsak jelölve nincs):**
+- ✅ [src/app/studio/image/[id].tsx](../../src/app/studio/image/%5Bid%5D.tsx) (valódi vizuális editor, vékony burkoló) + `src/components/studio/image/*`: [ImageStudioBody.tsx](../../src/components/studio/image/ImageStudioBody.tsx) (megosztott törzs), [ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx) (scoped Modal), `ImageCanvas.tsx`, `LayerPanel.tsx`, `AdjustSheet.tsx`, `StudioSheet.tsx`, `PhotoLayerView.tsx`, `FillLayerView.tsx`, `SelectionFrame.tsx`, `ColorField.tsx`.
+- ✅ [src/lib/svgImport.ts](../../src/lib/svgImport.ts) (SVG → scene graph) + a rokon magok ([vectorPath.ts](../../src/lib/vectorPath.ts), [layerEffects.ts](../../src/lib/layerEffects.ts), [adjustmentStack.ts](../../src/lib/adjustmentStack.ts), [patternFill.ts](../../src/lib/patternFill.ts), [rulers.ts](../../src/lib/rulers.ts)) + [imageLayerClip.ts](../../src/lib/imageLayerClip.ts) (réteg↔clip render-adapter). ⏳ `RasterLayer` rajz-integráció még hátra.
+- ⏳ Worker-endpointok: AI select / generative fill / háttér-csere (a bgremove/depth mintára).
 
 **Módosítani:**
-- [src/types/project.ts](../../src/types/project.ts) — `ImageClip.docId`, `RasterLayer`, réteg-szintű `mask`/`adjust`/`blendMode`.
-- [src/store/editorStore.ts](../../src/store/editorStore.ts) — `openImageStudio` a közös scene-graph komponenshez köti (scoped mód + becsomagolás docId nélküli klipnél).
-- [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) — `<ImageStudio />` → közös scene-graph `ImageStudio` Modal.
-- [src/components/editor/panels/ImageDocPanel.tsx](../../src/components/editor/panels/ImageDocPanel.tsx) — raszter-beszúráskor a `docId` a klipre.
+- [src/types/project.ts](../../src/types/project.ts) — ✅ `ImageClip.docId` KÉSZ; ⏳ `RasterLayer` + réteg-szintű `mask`/`adjust`/`blendMode` még hátra.
+- ✅ [src/store/editorStore.ts](../../src/store/editorStore.ts) — `openImageStudio`/`closeImageStudio` + `imageStudioClipId` állapot KÉSZ; a becsomagolás (scoped mód, docId nélküli klip) az `ImageStudioModal`-ban történik.
+- ✅ [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx#L630) — `<ImageStudioModal />` mountolva (a régi `<ImageStudio />` törölve).
+- [src/components/editor/panels/ImageDocPanel.tsx](../../src/components/editor/panels/ImageDocPanel.tsx) — a régi stepper-panel; a scoped út MÁR nem ezt használja (a docId-t az `ImageStudioModal` kezeli). *(A panel raszter-beszúrás docId-kötése önmagában még nyitott, de a fő út lecserélve.)*
 - [src/lib/projectUtils.ts](../../src/lib/projectUtils.ts) — a `kind: 'image'` scaffold már seedeli az `imageDocs[0]`-t ([:83](../../src/lib/projectUtils.ts#L83)); a migráció a `docId`/új mezők miatt lép.
 
 ---
@@ -168,13 +169,13 @@ Mind opcionális/defaultos — a régi projektek változatlanul töltenek ([migr
 
 ---
 
-## 6. Definition of Done (A+B — a felhasználó fő kérése)
+## 6. Definition of Done (A+B — a felhasználó fő kérése) — ✅ TELJESÍTVE
 
-1. `/studio/image/[id]` valódi, vizuális, scene-graph editor: vászon + közvetlen-manipuláció (move/scale/rotate) + réteg-panel + adjust, minden művelet undo-zható.
-2. A videó-editorból egy kijelölt kép **ugyanezt** a scene-graph stúdiót nyitja (nem a desztruktív bake-modalt), és a Save non-destruktívan visszakerül a videó-projektbe.
-3. A `docId` back-link működik: egy videóba illesztett kép **újra** megnyitható a réteg-fájával; a sima importált kép becsomagolással szerkeszthető.
-4. A régi desztruktív `ImageStudio.tsx` megszűnt / a közös komponensre irányít — **egy** képszerkesztő maradt.
-5. `npm run audit` zöld (tsc + lint + jest).
+1. ✅ `/studio/image/[id]` valódi, vizuális, scene-graph editor: vászon + közvetlen-manipuláció (move/scale/rotate) + réteg-panel + adjust, minden művelet undo-zható.
+2. ✅ A videó-editorból egy kijelölt kép **ugyanezt** a scene-graph stúdiót nyitja (`ImageStudioModal`, nem a desztruktív bake-modalt), és a Save non-destruktívan visszakerül a videó-projektbe.
+3. ✅ A `docId` back-link működik: egy videóba illesztett kép **újra** megnyitható a réteg-fájával; a sima importált kép becsomagolással szerkeszthető.
+4. ✅ A régi desztruktív `ImageStudio.tsx` megszűnt (törölve); az editor-route a közös `ImageStudioModal`-t mountolja — **egy** képszerkesztő maradt.
+5. ✅ `npm run audit` zöld (tsc + lint + jest).
 
 ---
 
@@ -186,17 +187,17 @@ Mind opcionális/defaultos — a régi projektek változatlanul töltenek ([migr
 | § 2 Selection | `multiSelectIds` | lasso / magic / feather UI (C/D) |
 | § 2 Transform | `transform` / `rotation` / crop | perspektíva/skew (később) |
 | § 2 Draw | rajz-eszköz (`ImageMarkupTool`) | raszter-réteg integráció (C) |
-| § 2 Vector | `path` + Bézier `PathPoint`, `subpaths`+`fillRule` (**boolean!**) | toll/Bézier + boolean UI (C) |
+| § 2 Vector | `path` + Bézier `PathPoint`, `subpaths`+`fillRule` (**boolean!**) + `vectorPath.ts` mag KÉSZ | toll/Bézier + boolean **UI** (C) |
 | § 2 Text | teljes `TextLayer` tipográfia | csak felület (A/C) |
 | § 3 Layers (opacity/blend/visibility/lock) | `ImageLayerBase` + `BlendMode` | blend/mask minden rétegen (3.) |
 | § 4 Masks | `ClipMask` a `PhotoLayer`-en | clipping/gradient-maszk minden rétegen (C) |
 | § 5 Adjustments | teljes `ClipAdjust` (curves/hsl/balance/LUT) | csak felület (A) |
 | § 6 Color | RGB/HEX/alpha + `ShapeGradient` | HSL/HSV picker + eyedropper (C) |
-| § 7 SVG editor | a path/gradient mezők fogadják | SVG parser (C) |
+| § 7 SVG editor | a path/gradient mezők fogadják + `svgImport.ts` parser **KÉSZ** (UI-ban él) | dedikált SVG-szerkesztő UI (C) |
 | § 8 Pixel+Vector hybrid | vektor kész | pixel réteg (C) |
 | § 9 Közös dokumentummodell | `Project` egységes, stabil ID-k | — |
 | § 10 Command bus (AI-ready) | `UPSERT_IMAGE_DOC` + undo | szemantikus AI-parancsok (D) |
 | § 11–14 AI (structural/generative/select/fill) | — | worker/Pro (D) |
-| § 15 Export + „Edit from video” | worker-raszter, timeline-beszúrás | docId link + formátumok (B/E) |
+| § 15 Export + „Edit from video” | worker-raszter, timeline-beszúrás, **`ImageClip.docId` back-link KÉSZ** | további formátumok (E) |
 | § 16 Mobil UI + gesztusok | transform-gesztusok a videóban | vászon-editor UI (A) |
 | § 17 Közös editor-nyelv | közös `Project` + command bus | — |

@@ -1,6 +1,6 @@
 # 🎬 ReMix Video Editor — összhangosítási / fejlesztési terv
 
-> Forrás-vízió: [devs/source/EDITORS.md](../source/EDITORS.md) (§ 9 közös dokumentummodell, § 17 közös editor-nyelv).
+> Forrás-vízió: **EDITORS** — közös dokumentummodell (§9) + közös editor-nyelv (§17); a nyers forrás a doksi-konszolidációkor törölve (git-history).
 > Testvér-tervek: [devs/tasks/AUDIO.md](./AUDIO.md) · [devs/tasks/IMAGE.md](./IMAGE.md).
 > Cél-útvonal: `http://localhost:8081/editor/<projectId>` → [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)
 
@@ -10,13 +10,13 @@
 
 A videó-editor a legérettebb a három közül: **övé a command bus, az undo, a sáv/klip-modell, a lejátszó-óra, az előnézet-motor és a worker-render** — a hang- és képstúdió terve épp ezekre épül rá. A cél tehát NEM új funkció a videóba, hanem **összhang**: a videó-editor legyen a három-stúdiós rendszer **gazdája (hub)**, ne pedig saját, párhuzamos részszerkesztők tulajdonosa.
 
-**Ma két dolog lóg ki a közös modellből** (ezt a két testvér-terv is kimondja):
+**A közös modellbe illesztés MEGTÖRTÉNT** (a régi egyedi modálok lecserélve — lásd Fázis A):
 
-1. A videó-editor **saját, egyedi modálokat mountol** a hang- és képszerkesztéshez:
-   [src/app/editor/[id].tsx:629](../../src/app/editor/%5Bid%5D.tsx#L629) — `<ImageStudio />` + `<HangStudio />`.
-   - [src/components/editor/HangStudio.tsx](../../src/components/editor/HangStudio.tsx) — egyklipes hang-modal.
-   - [src/components/editor/ImageStudio.tsx](../../src/components/editor/ImageStudio.tsx) — **desztruktív** kép-bake modal (nem a scene-graphon dolgozik).
-   Ezeket a testvér-tervek a KÖZÖS `AudioStudio` / `ImageStudio` (scoped mód) javára szüntetik meg.
+1. A videó-editor **a KÖZÖS, scoped stúdió-modálokat mountolja** a hang- és képszerkesztéshez:
+   [src/app/editor/[id].tsx:630](../../src/app/editor/%5Bid%5D.tsx#L630) — `<ImageStudioModal />` + `<AudioStudioModal />`.
+   - [src/components/studio/audio/AudioStudioModal.tsx](../../src/components/studio/audio/AudioStudioModal.tsx) — a KÖZÖS `AudioStudioBody`-t futtatja Modalként, a jelenlegi videó-projekt hang-sávjain (scoped mód, `mode="scoped"`), ugyanazon a store-on → azonnal visszahat a timeline-ra + undo-zható.
+   - [src/components/studio/image/ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx) — a KÖZÖS `ImageStudioBody`-t futtatja a kép-klip RÉTEG-fáján (nem-destruktív scene-graph); ha a klipnek nincs `docId`-ja, teljes-vásznas fotó-réteggel `ImageDoc`-ba csomagolja, mentéskor visszaírja az `uri`+`docId`-t egy undo-lépésben.
+   A régi `HangStudio` / desztruktív `ImageStudio` ezekkel megszűnt (a testvér-tervek A/B fázisa szerint).
 2. A belépők **már léteznek, de szétszórva és inkonzisztensen**:
    - hang: a `mix` panel + „Open Sound Studio” gomb ([AudioPanel.tsx:495](../../src/components/editor/panels/AudioPanel.tsx#L495)) → `openAudioStudio(clipId)`;
    - kép: kijelölt képklip → `openImageStudio(clipId)`, ill. videó-kockából a Toolbar frame-grabje **rögtön a Kép Stúdióba** viszi ([Toolbar.tsx:556](../../src/components/editor/Toolbar.tsx#L556));
@@ -58,11 +58,11 @@ A megjelenítők (alakzat/szöveg/kép-réteg, korrekció-tint) és a worker (Ch
 ## 2. Fázisok (mi változzon a videó-editorban)
 
 ### 🟦 Fázis A — A saját modálok lecserélése delegálásra
-Cél: a videó-editor ne tartson fenn egyedi hang/kép modált.
+Cél: a videó-editor ne tartson fenn egyedi hang/kép modált. **Állapot: nagyrészt kész** — a mountok lecserélve, a régi modálok megszűntek; csak az `openStudio` egységes akció van hátra.
 
-- [ ] **A mountok cseréje** ([editor/[id].tsx:629-630](../../src/app/editor/%5Bid%5D.tsx#L629)): `<ImageStudio />` + `<HangStudio />` → a KÖZÖS `AudioStudio` / `ImageStudio` (scoped mód) Modaljai (a testvér-tervek A/B fázisa szállítja a komponenst).
-- [ ] **`HangStudio.tsx` és a desztruktív `ImageStudio.tsx` nyugdíjazása** (a logika a közös stúdióba költözik; a hasznos részek — waveform/preview, ill. crop/rotate/markup — ott élnek tovább, scene-graph-/nem-destruktív módon).
-- [ ] **Az `openStudio` egységes akció** bevezetése ([editorStore.ts](../../src/store/editorStore.ts)); a `imageStudioClipId`/`audioStudioClipId` egy közös `studioTarget` állapottá olvad.
+- [x] **A mountok cseréje** ([editor/[id].tsx:630](../../src/app/editor/%5Bid%5D.tsx#L630)): a régi `<ImageStudio />` + `<HangStudio />` helyett a KÖZÖS, scoped stúdió-Modalok mountolnak — [`<ImageStudioModal />`](../../src/components/studio/image/ImageStudioModal.tsx) + [`<AudioStudioModal />`](../../src/components/studio/audio/AudioStudioModal.tsx). Mindkettő a közös `*StudioBody`-t futtatja `mode="scoped"`-ban, ugyanazon a `useEditorStore`-on.
+- [x] **`HangStudio.tsx` és a desztruktív `ImageStudio.tsx` nyugdíjazása** — a fájlok megszűntek; a logika a közös stúdióba költözött (a bevált vezérlők a [studio/audio/primitives.tsx](../../src/components/studio/audio/primitives.tsx) / [ClipEditSheet.tsx](../../src/components/studio/audio/ClipEditSheet.tsx)-ben élnek tovább, a kép scene-graph-/nem-destruktív módon).
+- [ ] **Az `openStudio` egységes akció** bevezetése ([editorStore.ts](../../src/store/editorStore.ts)); a `imageStudioClipId`/`audioStudioClipId` ([editorStore.ts:394-400](../../src/store/editorStore.ts#L394)) egy közös `studioTarget` állapottá olvad. (Ma még két külön akció: `openImageStudio`/`openAudioStudio`.)
 
 ### 🟩 Fázis B — Egységes „Edit in Studio” belépők a kijelölésre
 Cél: a videóból kiválasztott bármi (hang, kép, videóklip-hang) EGY konzisztens gesztussal a megfelelő stúdióban nyíljon.
@@ -87,7 +87,7 @@ Cél: egy megjelenítő + egy worker, három szerkesztő.
 - [ ] **Undo egységessége**: a stúdió-szerkesztés a videó-editor `past/future` history-jába megy (egy közös verem) — nincs külön undo-sziget.
 
 ### 🟥 Fázis E — Egységes projekt/navigáció + export + asset round-trip
-- [ ] **Stúdió-váltó a projekten belül**: a videó-editorból közvetlen belépő a projekt hang- ill. kép-oldalára (scoped) — és fordítva a stúdiókból „vissza a videóba”. A home a `kind` szerint már routol (`studioRoute`, [index.tsx:206](../../src/app/index.tsx#L206)); ezt egészíti ki a projekten belüli váltás.
+- [ ] **Stúdió-váltó a projekten belül**: a videó-editorból közvetlen belépő a projekt hang- ill. kép-oldalára (scoped) — és fordítva a stúdiókból „vissza a videóba”. A stúdió-lista a `kind` szerint már routol ([`studioRoute`](../../src/lib/projectUtils.ts#L31) → `/studio/audio|image/<id>`, ill. stúdió nélküli fajta → `/editor/<id>`; használat: [studio/index.tsx:210](../../src/app/studio/index.tsx#L210)); ezt egészíti ki a projekten belüli váltás.
 - [ ] **Egy Export panel három kimenetre** ([src/components/editor/panels/ExportPanel.tsx](../../src/components/editor/panels/ExportPanel.tsx)): videó (MP4), kép-projekt (PNG/SVG/…), hang-projekt (WAV/MP3/…) — a fajta szerint ugyanaz a belépő, ugyanaz a worker-pipeline.
 - [ ] **Asset round-trip**: a kép-doc raszter már képklipként kerül be (`docId`-vel), a hang-projekt renderje asszet-ként a videóba (AUDIO.md § E) — a videó-editor mindkettőt „hivatkozott médiaként” kezelje (mint ma az `Asset`-eket).
 
@@ -105,7 +105,7 @@ Cél: egy megjelenítő + egy worker, három szerkesztő.
 ## 4. Érintett fájlok
 
 **Módosítani:**
-- [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) — a `<ImageStudio/>`/`<HangStudio/>` mountok cseréje a közös stúdiókra.
+- [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) — ✅ a mountok már a közös stúdiókra mutatnak ([`<ImageStudioModal />`](../../src/components/studio/image/ImageStudioModal.tsx) + [`<AudioStudioModal />`](../../src/components/studio/audio/AudioStudioModal.tsx), [:630](../../src/app/editor/%5Bid%5D.tsx#L630)).
 - [src/store/editorStore.ts](../../src/store/editorStore.ts) — `openStudio` egységesítés, `studioTarget`.
 - [src/components/editor/Toolbar.tsx](../../src/components/editor/Toolbar.tsx) — egységes „Edit in Studio” belépők (audio/image/video-klip-hang).
 - [src/components/editor/PanelHost.tsx](../../src/components/editor/PanelHost.tsx) — inline panel ↔ mély stúdió konzisztencia.
@@ -116,9 +116,9 @@ Cél: egy megjelenítő + egy worker, három szerkesztő.
 - [src/components/preview/](../../src/components/preview/) réteg-megjelenítők + [src/lib/adjustPreview.ts](../../src/lib/adjustPreview.ts).
 - [src/components/preview/AudioLayer.tsx](../../src/components/preview/AudioLayer.tsx) audio-preview hook.
 
-**Megszüntetni / átirányítani:**
-- [src/components/editor/HangStudio.tsx](../../src/components/editor/HangStudio.tsx) → közös `AudioStudio`.
-- [src/components/editor/ImageStudio.tsx](../../src/components/editor/ImageStudio.tsx) (desztruktív) → közös scene-graph `ImageStudio`.
+**Megszüntetve / átirányítva (✅ kész):**
+- `src/components/editor/HangStudio.tsx` → megszűnt; helyette a közös [src/components/studio/audio/AudioStudioModal.tsx](../../src/components/studio/audio/AudioStudioModal.tsx) (scoped `AudioStudioBody`).
+- `src/components/editor/ImageStudio.tsx` (desztruktív) → megszűnt; helyette a közös, scene-graph [src/components/studio/image/ImageStudioModal.tsx](../../src/components/studio/image/ImageStudioModal.tsx) (nem-destruktív `ImageStudioBody`).
 
 ---
 

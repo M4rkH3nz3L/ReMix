@@ -158,6 +158,11 @@ npx expo run:android            # lokális natív debug build (dev-client) → e
 ```
 - Dev-client build már telepítve az emulátoron (`com.h3nz3l.remix`), a natív modul
   CSAK itt töltődik be (Expo Go-ban `requireOptionalNativeModule` → `null`).
+- **Emulátorhoz a Metro-cím `10.0.2.2:8081`** (az emulátor→host alias), NE
+  `localhost` — az `adb reverse`-es `localhost` hideg-starton ANR-t adhat
+  (lásd §7/1). Deep-link indítás: `adb shell am start -a android.intent.action.VIEW
+  -d "remix://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081"`.
+  Az AVD-nek adj bőven RAM-ot (a tesztelt gépen ~1 GB szabad kevésnek bizonyult).
 
 ### 5.2 Telepíthető Android APK
 - [ ] **EAS development build** (dev-client, belső terjesztés):
@@ -213,30 +218,38 @@ eredménnyel; a fejlett FX/4K/AI pedig a felhő-render (Pro) sajátja marad.
   credentials" üzenet, nincs crash.
 - Login-UI korrektül renderel (logó, mezők, Sign in, Sign up).
 
-### 🐞 Talált hibák / megfigyelések
-1. **[közepes – env/workflow] Hideg-start ANR.** Első indításkor a
-   `remix://expo-development-client/?url=http://localhost:8081` deep-linkre a
-   dev launcher **„Remix isn't responding"** ANR-t dobott, a launcher ~49s
-   alatt jelent meg. **Megoldás a tesztben:** `10.0.2.2:8081`-re kötve ~6s
-   alatt mountolt. Közrejátszik az emulátor szűk RAM-ja (~1 GB szabad). →
-   *Teendő:* emulátorhoz több RAM; a dev-doksiban `10.0.2.2:8081`-t ajánljunk
-   `localhost` helyett; valós eszközön újraellenőrizni (nem feltétlen app-hiba).
-2. **[alacsony – dev-only, nem app-bug] expo-router state-update warning.**
-   Látható piros LogBox-toast: *„Can't perform a React state update on a
+### 🐞 Talált hibák / megfigyelések — állapot (feldolgozva 2026-10-03)
+1. **📝 DOKUMENTÁLVA [közepes – env/workflow] Hideg-start ANR.** Első indításkor
+   a `…/?url=http://localhost:8081` deep-linkre a dev launcher **„Remix isn't
+   responding"** ANR-t dobott (~49s), míg `10.0.2.2:8081`-re kötve ~6s alatt
+   mountolt; közrejátszik az emulátor szűk RAM-ja (~1 GB szabad). → *Megoldás:
+   a §5.1 dev-workflow mostantól `10.0.2.2:8081`-t ajánl `localhost` helyett +
+   emulátor-RAM-jegyzet. Nem app-hiba; valós eszközön újraellenőrizni.*
+2. **🔎 MONITOR [alacsony – dev-only, NEM app-bug] expo-router state-update
+   warning.** Piros LogBox-toast: *„Can't perform a React state update on a
    component that hasn't mounted yet…"*. Stack: `expo-router/build/fork/
-   useLinking.native.js:127` → `ExpoRoot.js:135` (ContextNavigator). **Könyvtár-
-   szintű**, a **deep-link indítás** (dev-client initial URL) async `.then()`
-   setState-je váltja ki a navigátor mountja ELŐTT; `warnAboutUpdateOnNotYet
-   MountedFiberInDEV` → **csak DEV-buildben** jelenik meg, **prod-ban nem**. →
-   *Teendő:* normál (nem deep-link) indításnál ellenőrizni, hogy eltűnik-e;
-   ha zavaró, expo-router verzió-követés. Nem go-live blokkoló.
-3. **[alacsony – i18n] Nem lokalizált auth-hiba.** Az „Invalid login
-   credentials" a nyers Supabase angol string, nem megy át az i18next-en. →
-   *Teendő:* a gyakori Supabase auth-hibákat i18n-kulcsokra képezni.
-4. **[alacsony – tech-debt] Elavult style-prop warningok.** `"shadow*"` és
-   `"textShadow*"` deprecated → `boxShadow` / `textShadow`. → *Teendő:* migrálás.
-5. **[kozmetikai] A beállítás-fogaskerék átfed a „Language" chip-pel** a jobb
-   felső sarokban (z-index/pozíció). → *Teendő:* elrendezés-igazítás.
+   useLinking.native.js:127` → `ExpoRoot.js:135` (ContextNavigator): a
+   **deep-link indítás** async `.then()` setState-je a navigátor mountja ELŐTT.
+   `warnAboutUpdateOnNotYetMountedFiberInDEV` → **csak DEV-buildben**, prod-ban
+   NEM. → *Besorolás: könyvtár-szintű, nem javítandó app-oldalról; expo-router
+   verzió-követésre figyelni. Nem go-live blokkoló.*
+3. **✅ JAVÍTVA [i18n] Nem lokalizált auth-hiba.** A `messageOf` (authStore.ts)
+   mostantól a Supabase `error.code`-ból (ill. tartalékként a `message`-ből)
+   képez **i18n-kulcsra** (`auth.errors.*`), és a 12 korábban hardcode-olt
+   magyar auth-string is i18n-kulcsra cserélve, mindhárom nyelven (en/hu/de).
+   → *Verifikálva: `npm run audit` zöld (85 suite / 971 teszt). Device-reteszt
+   lent.*
+4. **⏸ HALASZTVA [tech-debt] Elavult style-prop warningok.** A `"shadow*"` /
+   `"textShadow*"` deprecation a **`react-native-web` (WEB-only)** figyelmeztetése
+   — **natív** iOS/Androidon a `shadowColor/Offset/Opacity/Radius` továbbra is
+   standard (Android `elevation`-nal). 56 `shadow*` + 23 `textShadow*` használat
+   10 fájlban → a `boxShadow`/`textShadow`-ra migrálás **tömeges és vizuálisan
+   kockázatos**; webes zajért nem éri meg elkapkodni. → *Külön feladat: web+natív
+   vizuális-regressziós ellenőrzéssel, nem most.*
+5. **❌ NEM app-bug [kozmetikai] „Fogaskerék a Language chip-nél".** Az
+   `auth.tsx`-ben **nincs** settings/fogaskerék ikon (csak a `language-outline`
+   chip) — az átfedő elem az **Expo dev-client lebegő dev-menü gombja**, ami
+   kizárólag dev-buildben látszik, **prod-ban nincs**. → *Nincs teendő.*
 
 ### ⛔ Amit NEM sikerült tesztelni (a render-motor valódi próbája)
 A **Level 2 eszközön-render** (a doksi fő tárgya) futtatásához be kell lépni →

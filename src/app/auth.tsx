@@ -829,14 +829,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
     paddingVertical: 10,
   },
   dot: {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: 4,
-    backgroundColor: palette.border,
+    marginHorizontal: 4, // `gap` helyett (RNW-kompatibilis)
+    flexShrink: 0, // fix méret flex-sorban (ne zsugorodjon 0-ra)
+    backgroundColor: 'rgba(255,255,255,0.28)', // látható inaktív a sötét háttéren
   },
   dotActive: {
     backgroundColor: palette.accent,

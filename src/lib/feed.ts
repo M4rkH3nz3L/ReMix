@@ -397,6 +397,25 @@ export async function publishPost(
 }
 
 /**
+ * 📼 Live VOD megosztása a feedbe (D158). Az adás után a LiveKit Egress által S3-ba
+ * rögzített MP4-ből rendes, **remixelhető** feed-poszt lesz: a poszt `video_url`-je a
+ * VOD-é, a remix a megszokott módon importálja a videót. A `project` a `kind:'live'`
+ * projekt (a cím/leírás/hashtag innen jön). A tényleges felvételhez a worker-en
+ * `EGRESS_VOD=1` + S3 kell (különben az egress nem ad vissza `vodUrl`-t).
+ */
+export async function publishLiveVod(
+  project: Project,
+  vodUrl: string,
+  opts?: { visibility?: PostVisibility; posterUrl?: string | null }
+): Promise<FeedPost> {
+  return publishPost(project, {
+    videoUrl: vodUrl,
+    posterUrl: opts?.posterUrl ?? null,
+    visibility: opts?.visibility,
+  });
+}
+
+/**
  * 🎞️ A projekt RENDERELT videójának megosztása a feedbe. Ha még nincs renderelt
  * változat → renderel + a projektre menti; ha még nincs feltöltve → feltölti a
  * publikus Storage-ba; majd posztol a valódi `video_url`-lel. Az így elkészült

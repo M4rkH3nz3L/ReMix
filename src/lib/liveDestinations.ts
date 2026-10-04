@@ -135,6 +135,8 @@ export async function hasEnabledTargets(): Promise<boolean> {
 export interface EgressStart {
   egressId: string;
   destinations: { id: string; platform: LivePlatform; label: string }[];
+  /** 📼 D158: a VOD publikus URL-je (ha az egress S3-ba is rögzít), vagy null. */
+  vodUrl?: string | null;
 }
 
 /**

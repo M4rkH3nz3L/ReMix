@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="hu">
+  <!--
+    🎥 LIVE.md Fázis E/168 — Egress web-layout template (scene-pontos kompozitor).
+    A LiveKit Room Composite Egress ezt a lapot tölti be headless Chrome-ban:
+    `?url=<ws>&token=<egress-token>&layout=<név>`. A felvevő a konzol
+    `START_RECORDING` / `END_RECORDING` üzenetére indít/zár (hivatalos protokoll).
+
+    EGY jelenet-modell, KÉT renderelő: az in-app néző a React `LiveComposite`-tal,
+    az egress UGYANEBBŐL a `ScenePayload`-ból (a host a LiveKit data-channelen
+    broadcastolja, `topic='scene'`). A %-matek a `src/lib/liveComposite.ts`
+    `compositeLayers` (látható + z-rend) + `layerPercentBox` (0–1 → %) tükre.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReMix Live — egress layout</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      #stage {
+        position: absolute;
+        inset: 0;
+        background: #000;
+      }
+      .layer {
+        position: absolute;
+        overflow: hidden;
+      }
+      .layer video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: #000;
+      }
+      .layer.text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: -apple-system, Roboto, Arial, sans-serif;
+        font-weight: 800;
+        text-align: center;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+      }
+      .layer img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
+    <script>
+      (function () {
+        const LK = window.LivekitClient || window.LiveKitClient;
+        const stage = document.getElementById('stage');
+        const q = new URLSearchParams(window.location.search);
+        const url = q.get('url');
+        const token = q.get('token');
+
+        // a legfrissebb jelenet (a host data-channel broadcastjából); default: üres
+        let scene = { sceneId: '', layers: [] };
+        let started = false;
+        // forrás-kind → a hozzá tartozó VideoTrack (camera/screen) elemei
+        const videoEls = {}; // { camera: <video>, screen: <video> }
+
+        function signalStart() {
+          if (!started) {
+            started = true;
+            // 📣 a felvevőnek: a nézet kész → kezdődhet a felvétel
+            console.log('START_RECORDING');
+          }
+        }
+
+        /** A látható rétegek z-rendben (compositeLayers tükre). */
+        function visibleLayers() {
+          return (scene.layers || [])
+            .filter((l) => l.v)
+            .sort((a, b) => a.t.z - b.t.z);
+        }
+
+        /** 0–1 transzform → CSS %-doboz (layerPercentBox tükre) + z-index + forgatás. */
+        function applyBox(el, l) {
+          el.style.left = l.t.x * 100 + '%';
+          el.style.top = l.t.y * 100 + '%';
+          el.style.width = l.t.w * 100 + '%';
+          el.style.height = l.t.h * 100 + '%';
+          el.style.zIndex = String(Math.round((l.t.z || 0) * 100) + 100);
+          el.style.transform = l.t.r ? 'rotate(' + l.t.r + 'deg)' : '';
+        }
+
+        /** A teljes jelenet újrarajzolása (video-trackeket újrahasznosítja). */
+        function render() {
+          // töröljük a nem-video rétegeket; a video-elemeket megtartjuk (reattach drága)
+          Array.from(stage.querySelectorAll('.layer:not(.keep)')).forEach((n) => n.remove());
+          for (const l of visibleLayers()) {
+            if (l.kind === 'camera' || l.kind === 'screen') {
+              const v = videoEls[l.kind];
+              if (v && v.parentElement) {
+                applyBox(v.parentElement, l);
+                v.parentElement.style.display = 'block';
+              }
+              continue;
+            }
+            const box = document.createElement('div');
+            box.className = 'layer ' + l.kind;
+            applyBox(box, l);
+            if (l.kind === 'text') {
+              box.textContent = l.text || '';
+              box.style.fontSize = Math.max(14, l.t.h * 40) + 'vh';
+            } else if (l.kind === 'image' || l.kind === 'logo') {
+              if (l.uri) {
+                const img = document.createElement('img');
+                img.src = l.uri;
+                box.appendChild(img);
+              }
+            } else if (l.kind === 'shape') {
+              box.style.background = l.color || 'rgba(255,255,255,0.12)';
+            }
+            stage.appendChild(box);
+          }
+          // a nem használt video-réteget elrejtjük
+          for (const kind of Object.keys(videoEls)) {
+            const hasLayer = visibleLayers().some((l) => l.kind === kind);
+            const v = videoEls[kind];
+            if (v && v.parentElement) {
+              v.parentElement.style.display = hasLayer ? 'block' : 'none';
+            }
+          }
+        }
+
+        function ensureVideoHolder(kind) {
+          if (videoEls[kind]) {
+            return videoEls[kind];
+          }
+          const box = document.createElement('div');
+          box.className = 'layer keep';
+          box.style.display = 'none';
+          const v = document.createElement('video');
+          v.autoplay = true;
+          v.muted = true;
+          v.playsInline = true;
+          box.appendChild(v);
+          stage.appendChild(box);
+          videoEls[kind] = v;
+          return v;
+        }
+
+        function attachTrack(track, source) {
+          const kind = source === LK.Track.Source.ScreenShare ? 'screen' : 'camera';
+          const v = ensureVideoHolder(kind);
+          track.attach(v);
+          render();
+        }
+
+        async function main() {
+          if (!LK || !url || !token) {
+            console.log('START_RECORDING'); // ne akadjon be a felvevő, ha hibás a konfig
+            return;
+          }
+          const room = new LK.Room({ adaptiveStream: false, dynacast: false });
+
+          room.on(LK.RoomEvent.TrackSubscribed, (track, pub) => {
+            if (track.kind === 'video') {
+              attachTrack(track, pub.source);
+            }
+          });
+          room.on(LK.RoomEvent.TrackUnsubscribed, () => render());
+          room.on(LK.RoomEvent.DataReceived, (payload, _p, _kind, topic) => {
+            if (topic && topic !== 'scene') {
+              return;
+            }
+            try {
+              const text = new TextDecoder().decode(payload);
+              const next = JSON.parse(text);
+              if (next && Array.isArray(next.layers)) {
+                scene = next;
+                render();
+              }
+            } catch (_e) {
+              /* rossz payload → ignoráljuk */
+            }
+          });
+          room.on(LK.RoomEvent.Disconnected, () => {
+            // 📣 a felvevőnek: vége a menetnek → felvétel lezárása
+            console.log('END_RECORDING');
+          });
+
+          await room.connect(url, token, { autoSubscribe: true });
+          // induló render + jelzés a felvevőnek
+          render();
+          signalStart();
+        }
+
+        main().catch(() => {
+          // hiba esetén is jelezzünk, hogy a felvevő ne függjön be örökre
+          console.log('START_RECORDING');
+        });
+      })();
+    </script>
+  </body>
+</html>

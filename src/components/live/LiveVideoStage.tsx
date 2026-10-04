@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LiveKitRoom, useLocalParticipant } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
@@ -56,6 +56,41 @@ function ScreenShareControl({ wantScreen }: { wantScreen: boolean }) {
       p.catch(() => {});
     }
   }, [localParticipant, wantScreen]);
+  return null;
+}
+
+/**
+ * 📡 168 — a host a jelenet-állapotot a LiveKit **data-channelen** is broadcastolja
+ * (`topic='scene'`), hogy az **egress web-layout template** (egy rejtett LiveKit-
+ * résztvevő a szerveroldali kompozitorban) UGYANAZT a `ScenePayload`-ot lássa, mint
+ * az in-app nézők (akik a Supabase-realtime-on kapják). EGY modell, két renderelő.
+ * Azonnal publikál változáskor + 3 mp-es heartbeat, hogy a KÉSŐBB csatlakozó egress
+ * is megkapja a legfrissebb jelenetet. Best-effort (hiba nem dönti el a room-ot).
+ */
+function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
+  const { localParticipant } = useLocalParticipant();
+  const sceneRef = useRef<ScenePayload | null>(scene);
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene]);
+  useEffect(() => {
+    const send = () => {
+      const p = localParticipant;
+      const s = sceneRef.current;
+      if (!p || !s || typeof TextEncoder === 'undefined') {
+        return;
+      }
+      try {
+        const bytes = new TextEncoder().encode(JSON.stringify(s));
+        void p.publishData(bytes, { reliable: true, topic: 'scene' });
+      } catch {
+        // best-effort — az in-app nézők úgyis a Supabase-realtime-on kapják a jelenetet
+      }
+    };
+    send();
+    const timer = setInterval(send, 3000);
+    return () => clearInterval(timer);
+  }, [localParticipant, scene]);
   return null;
 }
 
@@ -114,6 +149,7 @@ export default function LiveVideoStage({
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />
         {publish && <MicControl muted={micMuted ?? false} />}
         {publish && <ScreenShareControl wantScreen={scene ? sceneHasVisible(scene, 'screen') : false} />}
+        {publish && <SceneDataPublisher scene={scene} />}
       </LiveKitRoom>
     </View>
   );

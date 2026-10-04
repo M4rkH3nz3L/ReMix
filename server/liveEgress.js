@@ -4,7 +4,15 @@
 // küldi broadcast-csatornán). A tényleges egress LiveKit Cloud-ot vagy self-host
 // egress-szolgáltatást igényel (a lokális `livekit-server --dev` NEM tud egresst)
 // — enélkül 503-at ad vissza, nem omlik össze.
-const { EgressClient, RoomServiceClient, StreamOutput, StreamProtocol } = require('livekit-server-sdk');
+const {
+  EgressClient,
+  RoomServiceClient,
+  StreamOutput,
+  StreamProtocol,
+  EncodedFileOutput,
+  EncodedFileType,
+  S3Upload,
+} = require('livekit-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { decryptStreamKey } = require('./liveCrypto');
 
@@ -56,6 +64,53 @@ function getAdmin() {
 function rtmpTarget(rtmpUrl, streamKey) {
   const base = String(rtmpUrl).replace(/\/+$/, '');
   return streamKey ? `${base}/${streamKey}` : base;
+}
+
+// 📼 D158 — VOD az adás után. Ha az `EGRESS_VOD=1` + S3 konfigurált, az egress a
+// stream MELLÉ egy MP4-et is ír az S3-ba (`live-vod/{room}.mp4`); az adás végén a
+// kliens ebből csinál feed-posztot (publishLiveVod). A bizonyított stream-utat nem
+// érinti: VOD nélkül az output marad a sima StreamOutput.
+function vodEnabled() {
+  return (
+    process.env.EGRESS_VOD === '1' &&
+    !!(process.env.S3_ACCESS_KEY || '').trim() &&
+    !!(process.env.S3_SECRET_KEY || '').trim() &&
+    !!(process.env.S3_BUCKET || '').trim()
+  );
+}
+
+/** Az adott szoba VOD-jának S3-kulcsa (determinisztikus, a kliens is kiszámolja). */
+function vodKey(room) {
+  return `live-vod/${room}.mp4`;
+}
+
+/** A VOD publikus URL-je (S3_PUBLIC_BASE), ha VOD aktív — különben null. */
+function vodUrl(room) {
+  if (!vodEnabled()) {
+    return null;
+  }
+  const base = (process.env.S3_PUBLIC_BASE || '').replace(/\/+$/, '');
+  return base ? `${base}/${vodKey(room)}` : null;
+}
+
+/** EncodedFileOutput az S3-ba (MP4), vagy null, ha a VOD nincs bekapcsolva. */
+function buildVodOutput(room) {
+  if (!vodEnabled()) {
+    return null;
+  }
+  const s3 = new S3Upload({
+    accessKey: (process.env.S3_ACCESS_KEY || '').trim(),
+    secret: (process.env.S3_SECRET_KEY || '').trim(),
+    bucket: (process.env.S3_BUCKET || '').trim(),
+    region: (process.env.S3_REGION || 'us-east-1').trim(),
+    endpoint: (process.env.S3_ENDPOINT || '').trim() || undefined,
+    forcePathStyle: !!(process.env.S3_ENDPOINT || '').trim(),
+  });
+  return new EncodedFileOutput({
+    fileType: EncodedFileType.MP4,
+    filepath: vodKey(room),
+    output: { case: 's3', value: s3 },
+  });
 }
 
 // 💰 F3 — költségkontroll. A szerveroldali egress valós pénz (komponálás+enkódolás)
@@ -228,7 +283,10 @@ async function startEgress({ room, userId }) {
   } catch (e) {
     return { ok: false, status: 500, error: `Stream-kulcs dekódolási hiba: ${e.message}` };
   }
-  const output = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
+  const streamOutput = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
+  // 📼 D158: ha a VOD aktív, a stream MELLÉ egy S3-MP4 fájl is készül (EncodedOutputs)
+  const fileOutput = buildVodOutput(room);
+  const output = fileOutput ? { stream: streamOutput, file: fileOutput } : streamOutput;
   try {
     // 🔑 a room LÉTEZZEN az egress előtt — a kliens-trigger a host csatlakozása
     // ELŐTT is futhat (race → „room does not exist" 404). A createRoom idempotens:
@@ -237,7 +295,15 @@ async function startEgress({ room, userId }) {
     if (rc) {
       await rc.createRoom({ name: room, emptyTimeout: 300 }).catch(() => {});
     }
-    const info = await client.startRoomCompositeEgress(room, output, { layout: 'grid' });
+    // 🎥 168: scene-pontos kompozitor az egresshez. Ha az EGRESS_LAYOUT_URL be van
+    // állítva (a worker `/live/egress-layout` route-ja, headless Chrome-ból elérhető
+    // URL), a saját web-layout template rendereli a jelenetet (kamera+overlay a host
+    // data-channel scene-állapotából) — különben a LiveKit beépített `grid` a fallback.
+    const layoutUrl = (process.env.EGRESS_LAYOUT_URL || '').trim();
+    const composite = layoutUrl
+      ? { layout: 'remix', customBaseUrl: layoutUrl }
+      : { layout: 'grid' };
+    const info = await client.startRoomCompositeEgress(room, output, composite);
     // 💰 F3: felvesszük a tracking-táblába (best-effort) a limit + max-hossz méréséhez
     await recordEgress(sb, {
       egressId: info.egressId,
@@ -249,6 +315,7 @@ async function startEgress({ room, userId }) {
       ok: true,
       egressId: info.egressId,
       destinations: dests.map((d) => ({ id: d.id, platform: d.platform, label: d.label })),
+      vodUrl: vodUrl(room), // 📼 D158: a VOD publikus URL-je (vagy null, ha nincs VOD)
     };
   } catch (e) {
     return { ok: false, status: 502, error: `Egress-indítás hiba: ${e.message}` };

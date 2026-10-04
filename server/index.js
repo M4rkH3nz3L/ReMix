@@ -664,7 +664,7 @@ app.post('/live/egress/start', express.json({ limit: '4kb' }), ...proOnly, rateL
     res.status(result.status || 500).json({ error: result.error });
     return;
   }
-  res.json({ egressId: result.egressId, destinations: result.destinations });
+  res.json({ egressId: result.egressId, destinations: result.destinations, vodUrl: result.vodUrl ?? null });
 });
 
 app.post('/live/egress/stop', express.json({ limit: '2kb' }), ...proOnly, async (req, res) => {
@@ -730,6 +730,15 @@ app.post('/live/destinations/set-key', express.json({ limit: '2kb' }), requireAu
     return;
   }
   res.json({ ok: true, encrypted: encryptionEnabled() });
+});
+
+// 🎥 LIVE.md 168 — Egress web-layout template (scene-pontos kompozitor). A LiveKit
+// Egress headless Chrome-ja tölti be `?url=&token=&layout=`-szal; PUBLIKUS GET (az
+// egress nem app-auth-al jön, a LiveKit-token a query-ben van). A lap maga ártalmatlan:
+// érvényes token nélkül nem tud a szobához csatlakozni. Az env `EGRESS_LAYOUT_URL`
+// erre a route-ra mutasson (lásd liveEgress.js — enélkül grid-layout a fallback).
+app.get('/live/egress-layout', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'egressLayout.html'));
 });
 
 // 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat

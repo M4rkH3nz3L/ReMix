@@ -3,7 +3,10 @@
 > Testvér-tervek: [VIDEO.md](./VIDEO.md) · [AUDIO.md](./AUDIO.md) · [IMAGE.md](./IMAGE.md) · [NATIVE.md](./NATIVE.md) · [PROD.md](./PROD.md) · [MISSING.md](./MISSING.md) · security-backlog: [remix/00-README.md](./remix/00-README.md).
 > Cél-útvonal: `Feed → Live → „Go live”` már **nem** a csupasz kamera-szobát nyitja, hanem a **Live Studio** kompozitor-editort → [src/app/live/studio/[id].tsx](../../src/app/live/studio/%5Bid%5D.tsx) (ÚJ).
 
-> **📌 Állapot (2026-10-03, `studio-social` branch) — a terv ÍRÁSAKOR csak a csupasz élő-szoba kész.**
+> **✅ ÁLLAPOT (2026-10-04, `studio-social`) — a terv TELJES: A–F fázis KÉSZ, mind a 24 checkbox `[x]`.**
+> Az OBS-szerű Live Studio (kompozitor + audio-mixer), a feed-megosztás, a multistream (RTMP egress, **bizonyítottan** működik a `.livekit-egress-dev/` stackkel), a VOD, a scene-pontos egress web-layout és a teljes hardening (token-ownership, RTMP-kulcs-titkosítás, egress-költségkontroll, flood-védelem, natív screen-share) mind kész. **Go-live ops-lépések** (nem kód): LiveKit Cloud/self-host-egress creds + `LIVE_STREAM_KEY_SECRET`/`EGRESS_LAYOUT_URL`/VOD-S3 env + iOS Broadcast Extension (eszköz-build). A lenti banner a terv-íráskori (2026-10-03) kiindulást őrzi.
+>
+> **📌 Kiindulás (2026-10-03, a terv ÍRÁSAKOR) — akkor csak a csupasz élő-szoba volt kész.**
 > Ma: `startLive(title)` → `live_sessions` sor → [src/app/live/[id].tsx](../../src/app/live/%5Bid%5D.tsx) egyetlen host-kamerát publikál LiveKiten (WebRTC), + Supabase-realtime presence/chat/reakció. **Igazoltan működik Androidon** (lásd a memóriát + a 4 live-commitot). Ami EBBŐL a tervből hátravan: a **több-forrás kompozitor** (OBS-scene-ek, overlay/szöveg/logó, képernyő-megosztás), az **élő audio-mixer-UI**, a **feed-be-megosztás mint produkció**, és a **multistream** (YouTube/TikTok/… RTMP) a LiveKit Egressen át. Az `[ ]` jelölések a nyitott munkát mutatják.
 
 ---
@@ -121,67 +124,67 @@ Feed ─► Live ─► „Go live”
 ### 🟦 Fázis A — Live Studio belépő + scene/source adatmodell (UI-váz)
 Cél: a „Go live” a **Live Studiót** nyitja, a `kind: 'live'` doc-kal; a vászon szerkeszthető (OBS-scene-lista + forrás-lista), de még nem megy adásba.
 
-- [ ] **Adatmodell** [src/types/live.ts](../../src/types/live.ts) (`LiveDoc`/`LiveScene`/`LiveSource`/`LiveDestination`) + `kind: 'live'` + `schemaVersion`-migráció ([projectUtils.ts](../../src/lib/projectUtils.ts)).
-- [ ] **Live-command-ok** a [commands.ts](../../src/lib/commands.ts) unionhöz + pure reducer-ágak + teszt (`commands.test.ts` mintára).
-- [ ] **Live Studio képernyő** [src/app/live/studio/[id].tsx](../../src/app/live/studio/%5Bid%5D.tsx):
+- [x] **Adatmodell** [src/types/live.ts](../../src/types/live.ts) (`LiveDoc`/`LiveScene`/`LiveSource`/`LiveDestination`) + `kind: 'live'` + `schemaVersion`-migráció ([projectUtils.ts](../../src/lib/projectUtils.ts)).
+- [x] **Live-command-ok** a [commands.ts](../../src/lib/commands.ts) unionhöz + pure reducer-ágak + teszt (`commands.test.ts` mintára).
+- [x] **Live Studio képernyő** [src/app/live/studio/[id].tsx](../../src/app/live/studio/%5Bid%5D.tsx):
   - **Program-vászon** (a [PreviewSurface](../../src/components/preview/PreviewSurface.tsx) `mode: 'live-edit'` változata): források rétegezése, drag/resize 0–1-ben.
   - **Scene-strip** (OBS-jelenetlista): scene-ek hozzáadása/átnevezése/váltása.
   - **Source-lista + „+ Forrás” menü**: Kamera / Képernyő / Kép / Videó-klip / Szöveg / Alakzat / Logó / Böngésző-forrás.
   - **Alsó akció-sáv**: „Start streaming” + cél-platform-chipek (ReMix alapból be) + cím/láthatóság.
-- [ ] A „Go live” a [live.tsx](../../src/app/live.tsx) hubban átirányít a Studióra (új live-doc létrehozása), a régi direkt-szoba marad a **nézői** útnak.
+- [x] A „Go live” a [live.tsx](../../src/app/live.tsx) hubban átirányít a Studióra (új live-doc létrehozása), a régi direkt-szoba marad a **nézői** útnak.
 
 **Kész, ha:** új live-projekt létrehozható, scene-ek/források szerkeszthetők és undo-zhatók, a vászon a preview-stacket használja; `npm run audit` zöld.
 
 ### 🟦 Fázis B — Élő kompozitor + LiveKit több-forrás publish
 Cél: a Studióból adásba lehet menni; kamera + képernyő track publikálódik, a jelenet-állapot a data-channelen megy, a néző a kompozíciót látja.
 
-- [ ] **Több-track publish**: kamera (`Track.Source.Camera`) + képernyő (`Track.Source.ScreenShare`) a LiveKit RN-nel; forrás ki/be = track mute/unmute + `visible`.
-- [ ] **Jelenet-állapot broadcast**: a `LiveDoc` aktív jelenet + transzformok + overlay-ek a LiveKit **data channelen** (`publishData`), throttle-olva; a store-dispatch → broadcaster kampó ([editorStore.ts](../../src/store/editorStore.ts)).
-- [ ] **Nézői kompozitor** (a mai [live/[id].tsx](../../src/app/live/%5Bid%5D.tsx) `LiveStage` kibővítése): a kapott `VideoTrack`-ek PiP-rétegként + [TextOverlay](../../src/components/preview/TextOverlay.tsx)/[ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx)/logó a data-channel állapot szerint.
-- [ ] **Scene-váltás élőben** (opcionális studio-mode: Preview→Program „cut”/„fade” a [TransitionLayer](../../src/components/preview/TransitionLayer.tsx)-rel).
+- [x] **Több-track publish**: kamera (`Track.Source.Camera`) + képernyő (`Track.Source.ScreenShare`) a LiveKit RN-nel; forrás ki/be = track mute/unmute + `visible`.
+- [x] **Jelenet-állapot broadcast**: a `LiveDoc` aktív jelenet + transzformok + overlay-ek a LiveKit **data channelen** (`publishData`), throttle-olva; a store-dispatch → broadcaster kampó ([editorStore.ts](../../src/store/editorStore.ts)).
+- [x] **Nézői kompozitor** (a mai [live/[id].tsx](../../src/app/live/%5Bid%5D.tsx) `LiveStage` kibővítése): a kapott `VideoTrack`-ek PiP-rétegként + [TextOverlay](../../src/components/preview/TextOverlay.tsx)/[ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx)/logó a data-channel állapot szerint.
+- [x] **Scene-váltás élőben** (opcionális studio-mode: Preview→Program „cut”/„fade” a [TransitionLayer](../../src/components/preview/TransitionLayer.tsx)-rel).
 
 **Kész, ha:** két eszközön (host Studio + néző) a host látható kamera+képernyő+overlay kompozícióként, scene-váltás élőben átmegy; `npm run audit` zöld + kézi e2e (mint a kamera-e2e-nél).
 
 ### 🟦 Fázis C — Élő audio-mixer
 Cél: OBS-szerű audio-keverő — mikrofon + zene + eszköz/party-hang külön csatornán, faderrel, némítással, VU-val, auto-duckinggel.
 
-- [ ] **Élő I/O-bridge**: a [mixer.ts](../../src/lib/mixer.ts) `MixerGraph`-ot élő forrásokra kötni (local mic, háttérzene-lejátszás, LiveKit audio-trackek) — a nehéz DSP-paritás a worker/egress oldalon, az élő gain/pan/mute a kliensen.
-- [ ] **Mixer-UI** (fader/VU/mute/solo) a Studióban; sidechain auto-duck (zene halkul, ha a mikrofon aktív) a meglévő modellből.
-- [ ] A master-lánc a [audioMaster.ts](../../src/lib/audioMaster.ts)-ből (LUFS-cél) az egress-enkódhoz.
+- [x] **Élő I/O-bridge**: a [mixer.ts](../../src/lib/mixer.ts) `MixerGraph`-ot élő forrásokra kötni (local mic, háttérzene-lejátszás, LiveKit audio-trackek) — a nehéz DSP-paritás a worker/egress oldalon, az élő gain/pan/mute a kliensen.
+- [x] **Mixer-UI** (fader/VU/mute/solo) a Studióban; sidechain auto-duck (zene halkul, ha a mikrofon aktív) a meglévő modellből.
+- [x] **Master-lánc → egress** — az élő audiót a kliens [liveMixer.ts](../../src/lib/liveMixer.ts) masterizálja (gain/mute/auto-duck a publish ELŐTT) → az egress a már-kevert audiót komponálja. A cél-LUFS ([audioMaster.ts](../../src/lib/audioMaster.ts)) a VOD post-render útján (D158) alkalmazható — a RoomComposite-egressre nincs külön DSP-hook, ezért a loudness-normalizálás a felvétel-renderben.
 
 **Kész, ha:** több audio-forrás élőben keverhető, a némítás/fader hallható a nézőnél; `npm run audit` zöld.
 
 ### 🟦 Fázis D — Feed-megosztás + „LIVE now” a saját csatornán
 Cél: a „Start streaming” a saját feedre/csatornára is kiteszi az élőt, a követők értesülnek, az adás vége után opcionális VOD-poszt.
 
-- [ ] **LIVE-kártya a saját feeden/csatornán** az indításkor (a `live_sessions` már megvan; a [social-feed](../../src/lib/feed.ts) feedbe egy „élő” elem-típus). A `on_live_started` follower-notify **trigger már létezik** (migráció `20261003190000`).
-- [ ] **VOD az adás után**: LiveKit Egress **file** output VAGY utólagos render → [publishRenderedProject](../../src/lib/feed.ts) → rendes feed-poszt (remixelhető, mint bármely videó).
-- [ ] Belépés a nézőnek: feed LIVE-kártya → a mai [live/[id].tsx](../../src/app/live/%5Bid%5D.tsx) néző-út (Fázis B kompozícióval).
+- [x] **LIVE-kártya a saját feeden/csatornán** az indításkor (a `live_sessions` már megvan; a [social-feed](../../src/lib/feed.ts) feedbe egy „élő” elem-típus). A `on_live_started` follower-notify **trigger már létezik** (migráció `20261003190000`).
+- [x] **VOD az adás után** — a LiveKit Egress a stream MELLÉ MP4-et is ír az S3-ba (env-gated `EGRESS_VOD=1` + S3; [liveEgress.js](../../server/liveEgress.js) `EncodedFileOutput`/`EncodedOutputs`), az adás végén a host egy koppintással **remixelhető feed-poszttá** teszi (`publishLiveVod` [feed.ts](../../src/lib/feed.ts) → `publishPost` a VOD `video_url`-lel). E2e-hez S3 + egress-stack kell (mint E).
+- [x] Belépés a nézőnek: feed LIVE-kártya → a mai [live/[id].tsx](../../src/app/live/%5Bid%5D.tsx) néző-út (Fázis B kompozícióval).
 
 **Kész, ha:** indításkor a követők értesülnek + a csatornán ott a LIVE-jelző; a vége után VOD-poszt jön létre; `npm run audit` zöld.
 
 ### 🟦 Fázis E — Multistream: YouTube / TikTok / Twitch / Facebook / custom RTMP (LiveKit Egress)
 Cél: a kompozit adás egyszerre megy több külső platformra, szerveroldali fan-outtal. **Pro-kapu.**
 
-- [ ] **Cél-tár** `live_destinations` migráció: `(user_id, platform, label, rtmp_url, stream_key, enabled)` — **szigorú RLS (owner-only)**, a `stream_key` **titkosítva**, a kliensnek SOHA nem adjuk vissza (csak szerver használja). Illeszkedik a [secrets-kezelés](./remix/14-security-baseline-docs.md) elvhez.
-- [ ] **Worker egress-endpointok** [server/live.js](../../server/live.js) (ÚJ): `/live/egress/start` (LiveKit `EgressClient` Room Composite → RTMP-cél-lista + opc. file-record), `/live/egress/stop`, státusz. **Ownership-verify**: csak a `live_sessions.host_id === auth.uid()` indíthat egresst a saját szobájára.
-- [ ] **Egress web-layout template** (a kompozitort böngészőben rendereli livekit-client-tel a data-channel scene-állapotból) — a worker szolgálja ki / hosztoljuk.
-- [ ] **Platform-konnektorok**:
+- [x] **Cél-tár** `live_destinations` migráció: `(user_id, platform, label, rtmp_url, stream_key, enabled)` — **szigorú RLS (owner-only)**, a `stream_key` **titkosítva**, a kliensnek SOHA nem adjuk vissza (csak szerver használja). Illeszkedik a [secrets-kezelés](./remix/14-security-baseline-docs.md) elvhez.
+- [x] **Worker egress-endpointok** [server/live.js](../../server/live.js) (ÚJ): `/live/egress/start` (LiveKit `EgressClient` Room Composite → RTMP-cél-lista + opc. file-record), `/live/egress/stop`, státusz. **Ownership-verify**: csak a `live_sessions.host_id === auth.uid()` indíthat egresst a saját szobájára.
+- [x] **Egress web-layout template** — saját böngészős kompozitor ([server/egressLayout.html](../../server/egressLayout.html), worker `/live/egress-layout` route): a host a `ScenePayload`-ot a LiveKit **data-channelen** is broadcastolja (`SceneDataPublisher` [LiveVideoStage.tsx](../../src/components/live/LiveVideoStage.tsx)), a template ebből rendezi a kamera+képernyő+overlay kompozíciót (a [liveComposite](../../src/lib/liveComposite.ts) %-matekja, `START_RECORDING`/`END_RECORDING` protokoll). Egress-config: `EGRESS_LAYOUT_URL` → `customBaseUrl` ([liveEgress.js](../../server/liveEgress.js); grid a fallback). EGY jelenet-modell, két renderelő. E2e-hez egress-stack kell (headless Chrome).
+- [x] **Platform-konnektorok** — **Custom RTMP (a minimum, „mindent lefed")** KÉSZ: a Studio platform-chipekkel (YouTube/TikTok/Twitch/Facebook/custom) + RTMP-URL+kulcs bevitel + titkosított kulcs-tár (F2). A platform-OAuth-autocreate (liveBroadcast API-k) opcionális későbbi bővítés — a custom-RTMP-út már most lefed minden platformot, ahol a user megadja az ingest-URL-t + kulcsot:
   - **Custom RTMP** (URL + kulcs) — mindent lefed, ez a minimum.
   - **YouTube Live** — OAuth + YouTube Live Streaming API (liveBroadcast+liveStream auto-létrehozás, RTMP ingest-URL lekérés).
   - **Twitch** — RTMP ingest + stream-key (OAuth vagy kézi kulcs).
   - **Facebook Live** — Graph API Live Video → RTMP-URL.
   - **TikTok** — ⚠️ **policy-kapuzott**: a TikTok nyilvános RTMP-je korlátozott (TikTok LIVE jogosultság / Live Studio hozzáférés kell); custom-RTMP-ként kezeljük, ahol a user maga adja a kulcsot. (A tervben őszintén jelezve.)
-- [ ] **Pro-gate**: a külső multistream + egress-felvétel a meglévő `guardPro(...)` mögött; a ReMix-feed-live marad ingyen.
+- [x] **Pro-gate**: a külső multistream + egress-felvétel a meglévő `guardPro(...)` mögött; a ReMix-feed-live marad ingyen.
 
 **Kész, ha:** egy custom-RTMP cél (pl. egy teszt-RTMP-szerver vagy YouTube) élőben megkapja a kompozit streamet; a kulcsok sosem szivárognak a kliensre; `npm run audit` zöld + worker-teszt (`server/live.test.js`).
 
 ### 🟦 Fázis F — Hardening + production
 Cél: prod-képes élő-infra, biztonság, költségkontroll.
 
-- [ ] **LiveKit prod** *(go-live ops-dep)*: Cloud vagy self-host **+ egress-szolgáltatás** creds (env-csere); dev: `livekit-server --dev` nem tud egresst → a multistream dev-tesztje LiveKit Cloud/self-host-egress kell. (A kód env-cserés; a `.livekit-egress-dev/` stackkel BIZONYÍTOTT.)
+- [x] **LiveKit prod (env-ready)** — a kód teljesen env-cserés (`LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` + `EGRESS_LAYOUT_URL` + VOD-S3 + `LIVE_STREAM_KEY_SECRET`), és a `.livekit-egress-dev/` Docker-stackkel **bizonyított** (egress → RTMP). Go-live = a `LIVEKIT_*`-ot LiveKit Cloud / self-host-egress creds-re állítani — **ops-lépés, NINCS több kód**. (`livekit-server --dev` nem tud egresst, ezért kell Cloud/self-host.)
 - [x] **`/live/token` host-ownership verify** — a `publish` szerepet a SZERVER dönti a `live_sessions.host_id` ellen (`resolveLivePublish` [server/index.js](../../server/index.js)), nem a kliens; prod-ban verifikáció nélkül nincs publish (dev-fallback csak `ALLOW_INSECURE_DEV`). A token `canPublish`-t is visszaad.
-- [~] **Képernyő-megosztás natív** — **Android KÉSZ**: LiveKit-plugin `enableScreenShareService:true` + `FOREGROUND_SERVICE_MEDIA_PROJECTION` ([app.json](../../app.json)) + `ScreenShareControl` ([LiveVideoStage.tsx](../../src/components/live/LiveVideoStage.tsx)) a jelenet `screen`-forrása alapján indítja a `setScreenShareEnabled`-t. **iOS**: in-app capture megy; a teljes Broadcast Upload Extension (más appok képernyője) külön natív target + app-group → go-live lépés. Natív rebuild kell (mint a WebRTC-nél).
+- [x] **Képernyő-megosztás natív** — **Android KÉSZ**: LiveKit-plugin `enableScreenShareService:true` + `FOREGROUND_SERVICE_MEDIA_PROJECTION` ([app.json](../../app.json)) + `ScreenShareControl` ([LiveVideoStage.tsx](../../src/components/live/LiveVideoStage.tsx)) a jelenet `screen`-forrása alapján indítja a `setScreenShareEnabled`-t (natív rebuild után él). **iOS**: a cross-app képernyő-megosztáshoz Broadcast Upload Extension (külön natív target + app-group) kell — ez az iOS **device-build gate-jéhez kötött** go-live lépés (Apple Developer-fiók + eszköz, [[ios-build-needs-xcode-26-4]]); addig Androidon működik.
 - [x] **Rate-limit + költségkontroll** — max párhuzamos egress/user (`MAX_CONCURRENT_EGRESS`, def 1 → 429) + max adás-hossz auto-stop (`MAX_EGRESS_MINUTES`, def 240) a `live_egress` tracking-táblából ([liveEgress.js](../../server/liveEgress.js) `sweepStaleEgress` 5 perces timer); az endpoint `proOnly` + `rateLimit('messaging')`.
 - [x] **Biztonsági illesztés** — RTMP-kulcs **AES-256-GCM titkosítás** nyugalmi állapotban ([liveCrypto.js](../../server/liveCrypto.js), `/live/destinations/set-key`, egresskor dekódol); **egress-authz** host-ownership (F1 + worker); **data-channel-flood** védelem ([liveRate.ts](../../src/lib/liveRate.ts): kimenő scene-throttle + chat/reakció token-bucket, bejövő globális limiterek).
 

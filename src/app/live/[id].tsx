@@ -4,6 +4,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState, type Componen
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -33,10 +34,12 @@ import {
   type LiveSelf,
   type LiveSession,
 } from '@/lib/live';
+import { publishLiveVod } from '@/lib/feed';
 import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
 import { setActiveScene } from '@/lib/liveDoc';
 import { loadProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
+import type { Project } from '@/types/project';
 // type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
 import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
 
@@ -151,6 +154,8 @@ export default function LiveRoomScreen() {
   const roomRef = useRef<LiveRoom | null>(null);
   const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
   const egressIdRef = useRef<string | null>(null); // host: a futó multistream-egress (Pro)
+  const vodUrlRef = useRef<string | null>(null); // host: a felvett VOD URL-je (D158, ha van)
+  const liveProjRef = useRef<Project | null>(null); // host: a live-produkció projektje (VOD-poszthoz)
   const endedRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
@@ -236,6 +241,7 @@ export default function LiveRoomScreen() {
         const proj = await loadProject(String(projectParam)).catch(() => null);
         if (active && proj?.live) {
           liveDocRef.current = proj.live;
+          liveProjRef.current = proj; // VOD-poszthoz (D158)
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
           setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
           broadcastScene();
@@ -246,6 +252,7 @@ export default function LiveRoomScreen() {
             .then((r) => {
               if (r && active) {
                 egressIdRef.current = r.egressId;
+                vodUrlRef.current = r.vodUrl ?? null; // 📼 D158: felvett VOD (ha van)
               }
             })
             .catch(() => {});
@@ -285,6 +292,31 @@ export default function LiveRoomScreen() {
         egressIdRef.current = null;
       }
       await endLive(session.id).catch(() => {});
+      // 📼 D158: ha készült felvétel (VOD), felajánljuk a feedre megosztást (opcionális)
+      const vod = vodUrlRef.current;
+      const proj = liveProjRef.current;
+      if (vod && proj) {
+        vodUrlRef.current = null;
+        Alert.alert(
+          t('live.vodTitle', { defaultValue: 'Felvétel kész' }),
+          t('live.vodBody', { defaultValue: 'Megosztod az élő adás felvételét a feedre?' }),
+          [
+            {
+              text: t('common.notNow', { defaultValue: 'Most nem' }),
+              style: 'cancel',
+              onPress: () => router.back(),
+            },
+            {
+              text: t('live.vodShare', { defaultValue: 'Megosztás' }),
+              onPress: () => {
+                void publishLiveVod(proj, vod).catch(() => {});
+                router.back();
+              },
+            },
+          ],
+        );
+        return; // a navigációt az Alert-gombok végzik
+      }
     }
     router.back();
   };

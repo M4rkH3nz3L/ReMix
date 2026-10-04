@@ -2,8 +2,21 @@ import { useFonts } from 'expo-font';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+// 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
+// (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
+// a fogyasztó-komponensek mountja ELŐTT futhat le indításkor → React:
+// „Can't perform a React state update on a component that hasn't mounted yet".
+// A frissítés HELYES (async auth-callback a normál minta); a warning viszont
+// minden induláskor FELNYITJA a teljes LogBox-ot és blokkolja a navigációt. A
+// LogBox amúgy is csak dev-ben él, de a __DEV__-guard explicit. Prod-ot nem érint.
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    "Can't perform a React state update on a component that hasn't mounted yet",
+  ]);
+}
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PaywallSheet } from '@/components/PaywallSheet';

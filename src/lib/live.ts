@@ -202,12 +202,18 @@ export async function getLive(id: string): Promise<LiveSession | null> {
 }
 
 /** Realtime-figyelő a „most élőben" listához (insert/update → újratöltés). */
+// egyedi csatorna-név feliratkozásonként — TÖBB fogyasztó is lehet (pl. a Live-hub
+// ÉS a feed LiveNowStrip-je). Fix névnél a 2. feliratkozó a már subscribe-olt
+// csatornát kapná vissza → „cannot add postgres_changes callbacks after subscribe()".
+let liveListSeq = 0;
+
 export function subscribeLiveList(onChange: () => void): () => void {
   if (!supabase) {
     return () => {};
   }
+  liveListSeq += 1;
   const ch = supabase
-    .channel('live-list')
+    .channel(`live-list-${liveListSeq}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'live_sessions' }, () => onChange())
     .subscribe();
   return () => {

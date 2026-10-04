@@ -1,4 +1,5 @@
 import { cloudBaseUrl } from '@/lib/backend';
+import { myUserId } from '@/lib/live';
 import { requireSupabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { LivePlatform } from '@/types/live';
@@ -64,9 +65,14 @@ export async function addDestination(input: {
   enabled?: boolean;
 }): Promise<LiveDestinationRow> {
   const sb = requireSupabase();
+  const uid = myUserId();
+  if (!uid) {
+    throw new Error('Nincs bejelentkezve.');
+  }
   const { data, error } = await sb
     .from('live_destinations')
     .insert({
+      user_id: uid, // kötelező az RLS-hez (auth.uid() = user_id)
       platform: input.platform,
       label: input.label.trim() || input.platform,
       rtmp_url: input.rtmpUrl.trim(),

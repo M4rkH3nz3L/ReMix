@@ -44,14 +44,20 @@ import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
 // így egy WebRTC nélküli build sem dönti el az egész appot. Ha a modul nem
 // tölthető (hiányzó natív WebRTC → részleges/üres modul), fallback-komponensre
 // esünk (barátságos „frissítsd az appot" üzenet), nem dob érvénytelen-elem hibát.
-const LiveVideoStage = lazy(() =>
-  import('@/components/live/LiveVideoStage').then(
-    (m) => ({
-      default: (m as { default?: ComponentType<LiveVideoStageProps> }).default ?? LiveVideoUnavailable,
-    }),
-    () => ({ default: LiveVideoUnavailable }),
-  ),
-);
+const LiveVideoStage = lazy(async () => {
+  try {
+    const m = (await import('@/components/live/LiveVideoStage')) as {
+      default?: ComponentType<LiveVideoStageProps>;
+    } | undefined;
+    if (m && typeof m.default === 'function') {
+      return { default: m.default };
+    }
+  } catch {
+    // a natív WebRTC-modul hiányzik (régi build) → fallback (lentebb)
+  }
+  // MINDIG valid komponenst adunk vissza (sosem `undefined` → nincs „invalid element type")
+  return { default: LiveVideoUnavailable };
+});
 
 const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
 

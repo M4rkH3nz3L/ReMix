@@ -69,6 +69,8 @@ export async function addDestination(input: {
   if (!uid) {
     throw new Error('Nincs bejelentkezve.');
   }
+  // 🔐 F2: a sort kulcs NÉLKÜL szúrjuk be (a nyers kulcs sosem a kliens-írható
+  // úton tárolódik). A kulcsot utána a worker titkosítja + írja (`setDestinationKey`).
   const { data, error } = await sb
     .from('live_destinations')
     .insert({
@@ -76,7 +78,7 @@ export async function addDestination(input: {
       platform: input.platform,
       label: input.label.trim() || input.platform,
       rtmp_url: input.rtmpUrl.trim(),
-      stream_key: input.streamKey.trim(),
+      stream_key: '',
       enabled: input.enabled ?? true,
     })
     .select('id, platform, label, rtmp_url, stream_key, enabled')
@@ -84,7 +86,29 @@ export async function addDestination(input: {
   if (error) {
     throw new Error(error.message);
   }
-  return mapDest(data as RawDest);
+  const row = mapDest(data as RawDest);
+  const key = input.streamKey.trim();
+  if (key) {
+    await setDestinationKey(row.id, key);
+    row.hasKey = true;
+  }
+  return row;
+}
+
+/**
+ * 🔐 F2: a nyers RTMP stream-kulcs beállítása a workeren keresztül (TLS → AES-GCM
+ * titkosítás nyugalmi állapotban). A kliens sosem ír/olvas nyers kulcsot a DB-be.
+ */
+export async function setDestinationKey(destinationId: string, streamKey: string): Promise<void> {
+  const res = await fetch(`${cloudBaseUrl()}/live/destinations/set-key`, {
+    method: 'POST',
+    headers: await workerJsonHeaders(),
+    body: JSON.stringify({ destinationId, streamKey }),
+  });
+  if (!res.ok) {
+    const e = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(e.error || `Kulcs-mentési hiba (${res.status})`);
+  }
 }
 
 export async function setDestinationEnabled(id: string, enabled: boolean): Promise<void> {

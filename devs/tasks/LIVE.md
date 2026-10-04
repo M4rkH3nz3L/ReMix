@@ -179,13 +179,13 @@ Cél: a kompozit adás egyszerre megy több külső platformra, szerveroldali fa
 ### 🟦 Fázis F — Hardening + production
 Cél: prod-képes élő-infra, biztonság, költségkontroll.
 
-- [ ] **LiveKit prod**: Cloud vagy self-host **+ egress-szolgáltatás** creds (env-csere); dev: `livekit-server --dev` nem tud egresst → a multistream dev-tesztje LiveKit Cloud/self-host-egress kell.
-- [ ] **`/live/token` host-ownership verify** (a mai dev-fallback helyett prod-ban a `publish` szerepet a `live_sessions.host_id` ellen döntjük — ez a meglévő live-TODO is).
-- [ ] **Képernyő-megosztás natív**: iOS Broadcast Upload Extension config-plugin (LiveKit screen-share), Android MediaProjection permission; natív rebuild (mint a WebRTC-nél).
-- [ ] **Rate-limit + költségkontroll**: egress-indítás rate-class ([remix/03-rate-limiting.md](./remix/03-rate-limiting.md)), max párhuzamos egress/felhasználó, max adás-hossz, Pro-kvóta.
-- [ ] **Biztonsági illesztés**: RTMP-kulcs titkosítás, egress-authz, data-channel-flood védelem — bekötés a [remix/](./remix/00-README.md) security-backlogba.
+- [ ] **LiveKit prod** *(go-live ops-dep)*: Cloud vagy self-host **+ egress-szolgáltatás** creds (env-csere); dev: `livekit-server --dev` nem tud egresst → a multistream dev-tesztje LiveKit Cloud/self-host-egress kell. (A kód env-cserés; a `.livekit-egress-dev/` stackkel BIZONYÍTOTT.)
+- [x] **`/live/token` host-ownership verify** — a `publish` szerepet a SZERVER dönti a `live_sessions.host_id` ellen (`resolveLivePublish` [server/index.js](../../server/index.js)), nem a kliens; prod-ban verifikáció nélkül nincs publish (dev-fallback csak `ALLOW_INSECURE_DEV`). A token `canPublish`-t is visszaad.
+- [~] **Képernyő-megosztás natív** — **Android KÉSZ**: LiveKit-plugin `enableScreenShareService:true` + `FOREGROUND_SERVICE_MEDIA_PROJECTION` ([app.json](../../app.json)) + `ScreenShareControl` ([LiveVideoStage.tsx](../../src/components/live/LiveVideoStage.tsx)) a jelenet `screen`-forrása alapján indítja a `setScreenShareEnabled`-t. **iOS**: in-app capture megy; a teljes Broadcast Upload Extension (más appok képernyője) külön natív target + app-group → go-live lépés. Natív rebuild kell (mint a WebRTC-nél).
+- [x] **Rate-limit + költségkontroll** — max párhuzamos egress/user (`MAX_CONCURRENT_EGRESS`, def 1 → 429) + max adás-hossz auto-stop (`MAX_EGRESS_MINUTES`, def 240) a `live_egress` tracking-táblából ([liveEgress.js](../../server/liveEgress.js) `sweepStaleEgress` 5 perces timer); az endpoint `proOnly` + `rateLimit('messaging')`.
+- [x] **Biztonsági illesztés** — RTMP-kulcs **AES-256-GCM titkosítás** nyugalmi állapotban ([liveCrypto.js](../../server/liveCrypto.js), `/live/destinations/set-key`, egresskor dekódol); **egress-authz** host-ownership (F1 + worker); **data-channel-flood** védelem ([liveRate.ts](../../src/lib/liveRate.ts): kimenő scene-throttle + chat/reakció token-bucket, bejövő globális limiterek).
 
-**Kész, ha:** prod LiveKit+egress creds-szel egy valós YouTube/Twitch adás végigmegy; a kulcsok titkosítva; rate-limit + Pro-kvóta aktív.
+**Kész, ha:** prod LiveKit+egress creds-szel egy valós YouTube/Twitch adás végigmegy; a kulcsok titkosítva ✅; rate-limit + költségkontroll aktív ✅. **Hátralévő go-live:** LiveKit Cloud/self-host prod-creds + `LIVE_STREAM_KEY_SECRET` env + `live_egress` migráció prod-push + iOS Broadcast Extension + natív rebuild (Android screen-share).
 
 ---
 

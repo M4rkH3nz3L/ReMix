@@ -51,6 +51,7 @@ const { mediaGuard } = require('./security/uploadPolicy');
 // env-ből; lokális dev: `livekit-server --dev` → devkey/secret, ws://<host>:7880.
 const { AccessToken } = require('livekit-server-sdk');
 const { startEgress, stopEgress } = require('./liveEgress');
+const { encryptStreamKey, encryptionEnabled } = require('./liveCrypto');
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
 const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
 const LIVEKIT_API_SECRET = (process.env.LIVEKIT_API_SECRET || '').trim();
@@ -587,9 +588,35 @@ app.post('/invite', express.json({ limit: '32kb' }), requireAuth, rateLimit('mes
 
 // 🔴 LiveKit access-token az élő-roomhoz. A `room` a live_sessions id-ja, az
 // identity a verifikált user. A host (`publish: true`) kamerát/mikrofont ad; a
-// néző csak feliratkozik. ⚠️ A `publish` szerepet most a kliens állítja (a betöltött
-// sessionből); PROD-on a workernek a host-ownershipet a prod live_sessions ellen
-// kéne verifikálnia (a dev-worker lokál-DB-re mutat) — lásd [[hosted-supabase-prod]].
+// néző csak feliratkozik.
+//
+// 🔐 F1 — a `publish` szerepet a SZERVER dönti a `live_sessions.host_id` ellen,
+// NEM a kliens: aki publish-t kér de nem a szoba hostja, az néző-tokent kap
+// (canPublish:false). Így egy elfogott/hamisított kérés sem tud idegen szobába
+// publikálni. Dev-ben (ALLOW_INSECURE_DEV, nincs service_role) a kliens-kérés
+// marad (lokál-fejlesztés) — lásd [[hosted-supabase-prod]].
+async function resolveLivePublish(room, uid, requested) {
+  if (!requested) {
+    return false;
+  }
+  const sb = adminClient();
+  if (!sb) {
+    // Nincs service_role → nem tudunk verifikálni. Dev-ben bízunk a kliensben,
+    // prod-ban viszont NEM adunk publish-t verifikáció nélkül.
+    return INSECURE_DEV;
+  }
+  const { data, error } = await sb
+    .from('live_sessions')
+    .select('host_id')
+    .eq('id', room)
+    .maybeSingle();
+  if (error || !data) {
+    // Ismeretlen szoba: dev-ben átengedjük (lokál session nincs a DB-ben), prod-ban nem.
+    return INSECURE_DEV;
+  }
+  return data.host_id === uid;
+}
+
 app.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimit('messaging'), async (req, res) => {
   if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
     res.status(503).json({ error: 'LiveKit nincs konfigurálva (LIVEKIT_API_KEY / LIVEKIT_API_SECRET).' });
@@ -605,13 +632,14 @@ app.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimit('
     res.status(400).json({ error: 'room kötelező.' });
     return;
   }
-  const publish = req.body?.publish === true;
   const name = String(req.body?.name || uid).slice(0, 80);
   try {
+    // 🔐 F1: a publish szerepet a host-ownership dönti (server-authoritative)
+    const canPublish = await resolveLivePublish(room, uid, req.body?.publish === true);
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: uid, name, ttl: '2h' });
-    at.addGrant({ roomJoin: true, room, canPublish: publish, canSubscribe: true, canPublishData: true });
+    at.addGrant({ roomJoin: true, room, canPublish, canSubscribe: true, canPublishData: true });
     const token = await at.toJwt();
-    res.json({ token, url: LIVEKIT_URL });
+    res.json({ token, url: LIVEKIT_URL, canPublish });
   } catch (err) {
     res.status(500).json({ error: `Token-hiba: ${err.message}` });
   }
@@ -651,6 +679,57 @@ app.post('/live/egress/stop', express.json({ limit: '2kb' }), ...proOnly, async 
     return;
   }
   res.json({ ok: true });
+});
+
+// 🔐 F2 — RTMP stream-kulcs beállítása TITKOSÍTVA. A kliens a cél-sort kulcs
+// NÉLKÜL szúrja be (RLS), majd a nyers kulcsot CSAK ide POST-olja (TLS); a worker
+// a saját secretjével titkosítja és service_role-lal írja a `stream_key`-be. Így a
+// nyers kulcs sosem a kliens-írható úton tárolódik, és nyugalmi állapotban rejtjelezett.
+// Nem Pro-only: a cél beállítása ingyenes, csak a tényleges multistream (egress) Pro.
+app.post('/live/destinations/set-key', express.json({ limit: '2kb' }), requireAuth, rateLimit('messaging'), async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  const destinationId = String(req.body?.destinationId || '').trim();
+  const streamKey = String(req.body?.streamKey || '').trim();
+  if (!destinationId || !streamKey) {
+    res.status(400).json({ error: 'destinationId és streamKey kötelező.' });
+    return;
+  }
+  if (streamKey.length > 512) {
+    res.status(400).json({ error: 'Túl hosszú stream-kulcs.' });
+    return;
+  }
+  const sb = adminClient();
+  if (!sb) {
+    res.status(503).json({ error: 'Nincs service_role konfigurálva a kulcs-tároláshoz.' });
+    return;
+  }
+  // 🔐 ownership: csak a cél tulajdonosa állíthat kulcsot
+  const { data: dest, error: readErr } = await sb
+    .from('live_destinations')
+    .select('user_id')
+    .eq('id', destinationId)
+    .maybeSingle();
+  if (readErr) {
+    res.status(500).json({ error: readErr.message });
+    return;
+  }
+  if (!dest || dest.user_id !== uid) {
+    res.status(403).json({ error: 'Nem a te célod.' });
+    return;
+  }
+  const { error: updErr } = await sb
+    .from('live_destinations')
+    .update({ stream_key: encryptStreamKey(streamKey) })
+    .eq('id', destinationId);
+  if (updErr) {
+    res.status(500).json({ error: updErr.message });
+    return;
+  }
+  res.json({ ok: true, encrypted: encryptionEnabled() });
 });
 
 // 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat
@@ -2733,6 +2812,13 @@ setInterval(() => {
   libraryCache = null;
   mediaLibCache = null;
 }, 30 * 1000).unref();
+
+// 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
+// Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
+const { sweepStaleEgress } = require('./liveEgress');
+setInterval(() => {
+  sweepStaleEgress().catch(() => {});
+}, 5 * 60 * 1000).unref();
 
 app.listen(PORT, () => {
   console.log(`vided render worker: http://localhost:${PORT}`);

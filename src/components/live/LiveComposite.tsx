@@ -11,7 +11,8 @@ import { compositeLayers, layerPercentBox, type SceneLayer, type ScenePayload } 
  * jelenet-állapot (`ScenePayload`) rétegeit rajzolja: kamera/képernyő = a kapott
  * `VideoTrack`, szöveg/alakzat/logó/kép = egyszerű overlay, 0–1 transzform → %.
  * Ugyanez fut a hostnál (saját track) és a nézőnél (remote track) — EGY modell,
- * két renderelő. A képernyő-forrás tényleges capture-je a Fázis F (natív).
+ * két renderelő. A képernyő-forrás natív capture-jét a `ScreenShareControl`
+ * indítja (F5), amikor a jelenetben látható `screen` forrás van.
  */
 export function LiveComposite({
   payload,

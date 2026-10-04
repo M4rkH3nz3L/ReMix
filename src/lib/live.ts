@@ -1,4 +1,5 @@
 import type { ScenePayload } from '@/lib/liveComposite';
+import { createRateLimiter, createTrailingThrottle } from '@/lib/liveRate';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -264,14 +265,30 @@ export function openLiveRoom(
     handlers.onViewers(Object.keys(state).length);
   };
 
+  // 🛡️ F4 — BEJÖVŐ flood-védelem: globális token-bucket esemény-típusonként, hogy
+  // egy rosszindulatú/hibás peer ne áraszthassa el a renderert/UI-t. A többletet
+  // eldobjuk; a jelenet teljes-állapot (a legfrissebb úgyis felülír), a chat/reakció
+  // bőséges limittel megy (burst + fenntartott ráta).
+  const inScene = createRateLimiter(12, 10); // ~10 jelenet/mp, 12 burst
+  const inChat = createRateLimiter(15, 8); // chat: 8/mp, 15 burst
+  const inReaction = createRateLimiter(25, 15); // reakció (csak animáció): 15/mp, 25 burst
+
   channel
-    .on('broadcast', { event: 'chat' }, ({ payload }) => handlers.onChat(payload as LiveChat))
-    .on('broadcast', { event: 'reaction' }, ({ payload }) =>
-      handlers.onReaction((payload as { emoji: string }).emoji),
-    )
-    .on('broadcast', { event: 'scene' }, ({ payload }) =>
-      handlers.onScene?.(payload as ScenePayload),
-    )
+    .on('broadcast', { event: 'chat' }, ({ payload }) => {
+      if (inChat.allow()) {
+        handlers.onChat(payload as LiveChat);
+      }
+    })
+    .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+      if (inReaction.allow()) {
+        handlers.onReaction((payload as { emoji: string }).emoji);
+      }
+    })
+    .on('broadcast', { event: 'scene' }, ({ payload }) => {
+      if (inScene.allow()) {
+        handlers.onScene?.(payload as ScenePayload);
+      }
+    })
     .on('presence', { event: 'sync' }, readViewers)
     .on('presence', { event: 'join' }, () => {
       readViewers();
@@ -284,8 +301,20 @@ export function openLiveRoom(
       }
     });
 
+  // 🛡️ F4 — KIMENŐ védelem. A jelenet-állapotot throttle-öljük (gyors drag ne
+  // árasszon; trailing → a legfrissebb snapshot megy ~10×/mp-ig). A chat/reakció
+  // token-bucket (burst + ráta), a többletet csendben eldobjuk.
+  const sceneThrottle = createTrailingThrottle<ScenePayload>(100, (payload) => {
+    void channel.send({ type: 'broadcast', event: 'scene', payload });
+  });
+  const outChat = createRateLimiter(3, 1); // 1 chat/mp, 3 burst
+  const outReaction = createRateLimiter(6, 3); // 3 reakció/mp, 6 burst
+
   return {
     sendChat: (text) => {
+      if (!outChat.allow()) {
+        return;
+      }
       const msg: LiveChat = {
         id: self.id,
         name: self.name,
@@ -296,12 +325,16 @@ export function openLiveRoom(
       void channel.send({ type: 'broadcast', event: 'chat', payload: msg });
     },
     sendReaction: (emoji) => {
+      if (!outReaction.allow()) {
+        return;
+      }
       void channel.send({ type: 'broadcast', event: 'reaction', payload: { emoji } });
     },
     sendScene: (payload) => {
-      void channel.send({ type: 'broadcast', event: 'scene', payload });
+      sceneThrottle.push(payload);
     },
     stop: () => {
+      sceneThrottle.stop();
       void supabase!.removeChannel(channel);
     },
   };

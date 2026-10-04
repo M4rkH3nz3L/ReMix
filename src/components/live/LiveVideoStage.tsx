@@ -8,7 +8,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { LiveComposite } from '@/components/live/LiveComposite';
 import { palette } from '@/constants/editor';
-import type { ScenePayload } from '@/lib/liveComposite';
+import { sceneHasVisible, type ScenePayload } from '@/lib/liveComposite';
 import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
 
 /**
@@ -38,6 +38,24 @@ function MicControl({ muted }: { muted: boolean }) {
   useEffect(() => {
     void localParticipant?.setMicrophoneEnabled(!muted);
   }, [localParticipant, muted]);
+  return null;
+}
+
+/**
+ * 🖥️ F5 — natív képernyő-megosztás. Ha a host aktív jelenetében LÁTHATÓ `screen`
+ * forrás van, elindítjuk a natív capture-t (Android: MediaProjection + foreground
+ * service a LiveKit-pluginból; iOS: in-app RPScreenRecorder — a teljes Broadcast
+ * Upload Extension külön natív target, go-live lépés). A hibát (pl. a user megszakítja
+ * az OS-promptot) elnyeljük, hogy ne dőljön el a room.
+ */
+function ScreenShareControl({ wantScreen }: { wantScreen: boolean }) {
+  const { localParticipant } = useLocalParticipant();
+  useEffect(() => {
+    const p = localParticipant?.setScreenShareEnabled(wantScreen);
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {});
+    }
+  }, [localParticipant, wantScreen]);
   return null;
 }
 
@@ -95,6 +113,7 @@ export default function LiveVideoStage({
       <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={publish} video={publish}>
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />
         {publish && <MicControl muted={micMuted ?? false} />}
+        {publish && <ScreenShareControl wantScreen={scene ? sceneHasVisible(scene, 'screen') : false} />}
       </LiveKitRoom>
     </View>
   );

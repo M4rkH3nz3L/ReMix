@@ -6,6 +6,7 @@
 // — enélkül 503-at ad vissza, nem omlik össze.
 const { EgressClient, RoomServiceClient, StreamOutput, StreamProtocol } = require('livekit-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
+const { decryptStreamKey } = require('./liveCrypto');
 
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
 const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
@@ -57,6 +58,113 @@ function rtmpTarget(rtmpUrl, streamKey) {
   return streamKey ? `${base}/${streamKey}` : base;
 }
 
+// 💰 F3 — költségkontroll. A szerveroldali egress valós pénz (komponálás+enkódolás)
+// → max párhuzamos egress/user + max adás-hossz (auto-stop). A `live_egress` tábla
+// a futó adásokat követi (service_role írja); best-effort: ha a tábla még nincs
+// (migráció előtt), a korlátozás „megenged" degradál, az egress nem törik el.
+function intEnv(name, def) {
+  const n = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(n) && n > 0 ? n : def;
+}
+const MAX_CONCURRENT_EGRESS = () => intEnv('MAX_CONCURRENT_EGRESS', 1);
+const MAX_EGRESS_MINUTES = () => intEnv('MAX_EGRESS_MINUTES', 240);
+
+/** A user aktív egress-einek száma. `-1`, ha nem elérhető (tábla hiányzik). */
+async function countActiveEgress(sb, userId) {
+  if (!sb) {
+    return -1;
+  }
+  const { count, error } = await sb
+    .from('live_egress')
+    .select('egress_id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  if (error) {
+    return -1;
+  }
+  return count ?? 0;
+}
+
+async function recordEgress(sb, row) {
+  if (!sb) {
+    return;
+  }
+  const { error } = await sb.from('live_egress').insert({
+    egress_id: row.egressId,
+    user_id: row.userId,
+    room: row.room,
+    destinations: row.destinations,
+    status: 'active',
+  });
+  if (error) {
+    console.warn(`[liveEgress] tracking-insert nem sikerült (best-effort): ${error.message}`);
+  }
+}
+
+async function markEgressStopped(sb, egressId, nowIso) {
+  if (!sb) {
+    return;
+  }
+  await sb
+    .from('live_egress')
+    .update({ status: 'stopped', stopped_at: nowIso })
+    .eq('egress_id', egressId);
+}
+
+/** A `maxMinutes`-nél régebbi, még „active" egresseket leállítja + jelöli (lejárt). */
+async function stopStale(sb, client, rows, nowIso) {
+  for (const r of rows ?? []) {
+    try {
+      await client.stopEgress(r.egress_id);
+    } catch {
+      // lehet, hogy LiveKit-oldalon már nincs — a jelölés akkor is kell
+    }
+    await markEgressStopped(sb, r.egress_id, nowIso);
+  }
+  return (rows ?? []).length;
+}
+
+/** Egy user lejárt (túl hosszú) egresseinek lezárása indítás előtt. */
+async function sweepUserStale(sb, client, userId, maxMinutes, nowMs) {
+  if (!sb || !client) {
+    return 0;
+  }
+  const cutoff = new Date(nowMs - maxMinutes * 60000).toISOString();
+  const { data, error } = await sb
+    .from('live_egress')
+    .select('egress_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .lt('started_at', cutoff);
+  if (error) {
+    return 0;
+  }
+  return stopStale(sb, client, data, new Date(nowMs).toISOString());
+}
+
+/** GLOBÁLIS söprés (periodikus timer hívja) — minden lejárt egresst leállít. */
+async function sweepStaleEgress(nowMs = Date.now()) {
+  const sb = getAdmin();
+  const client = getEgressClient();
+  if (!sb || !client) {
+    return { swept: 0 };
+  }
+  const cutoff = new Date(nowMs - MAX_EGRESS_MINUTES() * 60000).toISOString();
+  const { data, error } = await sb
+    .from('live_egress')
+    .select('egress_id')
+    .eq('status', 'active')
+    .lt('started_at', cutoff);
+  if (error) {
+    return { swept: 0 };
+  }
+  const swept = await stopStale(sb, client, data, new Date(nowMs).toISOString());
+  if (swept > 0) {
+    console.log(`[liveEgress] auto-stop: ${swept} lejárt egress (> ${MAX_EGRESS_MINUTES()} perc) leállítva.`);
+  }
+  return { swept };
+}
+
 /**
  * Egress indítása a `userId` ENGEDÉLYEZETT céljaira. A `room` a LiveKit-szoba neve
  * (= a live_session id, mert a token room-ja az). Siker: `{ ok, egressId, destinations }`.
@@ -98,7 +206,28 @@ async function startEgress({ room, userId }) {
   if (dests.length === 0) {
     return { ok: false, status: 400, error: 'Nincs engedélyezett, beállított RTMP-cél.' };
   }
-  const urls = dests.map((d) => rtmpTarget(d.rtmp_url, d.stream_key));
+  // 💰 F3: indítás előtt söpörjük a user lejárt (túl hosszú) adásait, majd a
+  // párhuzamos-limit. A `-1` (tábla hiányzik) „megenged" degradál.
+  const nowMs = Date.now();
+  await sweepUserStale(sb, client, userId, MAX_EGRESS_MINUTES(), nowMs);
+  const active = await countActiveEgress(sb, userId);
+  const max = MAX_CONCURRENT_EGRESS();
+  if (active >= 0 && active >= max) {
+    return {
+      ok: false,
+      status: 429,
+      error: `Már fut ${active} élő multistream (max ${max}). Állítsd le az előzőt az új indításhoz.`,
+    };
+  }
+  // 🔐 F2: a tárolt kulcs titkosított (enc:v1:…) — CSAK itt, az egress-indításkor
+  // fejtjük vissza (service_role + szerver-secret). Hibás/dekódolhatatlan kulcsot
+  // kihagyunk, nehogy egy sérült cél megfogja az egész adást.
+  let urls;
+  try {
+    urls = dests.map((d) => rtmpTarget(d.rtmp_url, decryptStreamKey(d.stream_key)));
+  } catch (e) {
+    return { ok: false, status: 500, error: `Stream-kulcs dekódolási hiba: ${e.message}` };
+  }
   const output = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
   try {
     // 🔑 a room LÉTEZZEN az egress előtt — a kliens-trigger a host csatlakozása
@@ -109,6 +238,13 @@ async function startEgress({ room, userId }) {
       await rc.createRoom({ name: room, emptyTimeout: 300 }).catch(() => {});
     }
     const info = await client.startRoomCompositeEgress(room, output, { layout: 'grid' });
+    // 💰 F3: felvesszük a tracking-táblába (best-effort) a limit + max-hossz méréséhez
+    await recordEgress(sb, {
+      egressId: info.egressId,
+      userId,
+      room,
+      destinations: dests.length,
+    });
     return {
       ok: true,
       egressId: info.egressId,
@@ -126,6 +262,7 @@ async function stopEgress(egressId) {
   }
   try {
     await client.stopEgress(egressId);
+    await markEgressStopped(getAdmin(), egressId, new Date().toISOString()); // best-effort tracking
     return { ok: true };
   } catch (e) {
     return { ok: false, status: 502, error: `Egress-leállítás hiba: ${e.message}` };
@@ -137,4 +274,14 @@ function egressConfigured() {
   return !!getEgressClient() && !!getAdmin();
 }
 
-module.exports = { startEgress, stopEgress, egressConfigured };
+module.exports = {
+  startEgress,
+  stopEgress,
+  egressConfigured,
+  sweepStaleEgress,
+  // tesztekhez exportált tiszta-ish segédek:
+  countActiveEgress,
+  sweepUserStale,
+  stopStale,
+  intEnv,
+};

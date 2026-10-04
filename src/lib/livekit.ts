@@ -26,6 +26,9 @@ export function ensureLiveKit(): void {
 export interface LiveToken {
   token: string;
   url: string;
+  /** A szerver által VERIFIKÁLT publish-szerep (host-ownership, F1). A kliens
+   *  `publish`-kérése csak javaslat — ha nem a szoba hostja, ez `false`. */
+  canPublish?: boolean;
 }
 
 /**
@@ -53,5 +56,5 @@ export async function fetchLiveToken(
   if (!data.token || !data.url) {
     throw new Error('Hiányos LiveKit token-válasz.');
   }
-  return { token: data.token, url: data.url };
+  return { token: data.token, url: data.url, canPublish: data.canPublish };
 }

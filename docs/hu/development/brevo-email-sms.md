@@ -1,7 +1,6 @@
 # 📧📲 Brevo — e-mail (SMTP) és SMS-OTP beállítás
 
-> Ez a **működő** üzemeltetési leírás. A nyers forrás-beszélgetés a
-> [devs/source/BREVO.md](../../../devs/source/BREVO.md)-ben van; az alábbi
+> Ez a **működő** üzemeltetési leírás (ez a kanonikus Brevo-doksi); az alábbi
 > kód-oldal **már megvan a repóban**, csak a fiók-oldali kulcsok kellenek.
 
 A ReMix-fiók **kétféle csatornán** hozható létre:

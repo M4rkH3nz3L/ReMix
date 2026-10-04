@@ -1,12 +1,12 @@
 # Kiadás (release)
 
-> Forrás: [eas.json](../../../eas.json) · [PROD.md](../../../PROD.md) ·
-> [DEVOPS.md](../../../DEVOPS.md) · [OPS.md](../../../OPS.md) + a kód.
-> ↑ [docs/hu index](../README.md)
+> Forrás: [eas.json](../../../eas.json) · [ops/SERVER.md](../../../ops/SERVER.md)
+> (üzembe helyezés) · [devs/tasks/remix/](../../../devs/tasks/remix/)
+> (production-readiness terv) + a kód. ↑ [docs/hu index](../README.md)
 >
 > Ez a doksi az **architektúra** felől nézi a kiadást (mi kell, és miért); a
-> részletes go-live checklistet a [PROD.md](../../../PROD.md) és a
-> [TODO.md](../../../TODO.md) tartalmazza — **azt itt nem duplikáljuk**.
+> részletes go-live checklistet a [devs/tasks/remix/](../../../devs/tasks/remix/)
+> security + production terv tartalmazza — **azt itt nem duplikáljuk**.
 
 ## 1. Kliens — EAS build
 
@@ -65,9 +65,11 @@ Release buildben a sima HTTP tiltott (`assertSecureUrl`) → a worker/Supabase
 
 RevenueCat account/kulcsok + webhook ([server/billing.js](../../../server/billing.js)),
 `subscriptions` szerver-autoritatív; a kliens csak szinkronizál (nincs self-grant).
-Részletek: [PRO.md](../../../PRO.md) · [MONEY.md](../../../MONEY.md).
+Webhook-hardening (idempotency/replay): [devs/tasks/remix/11-billing-webhook-hardening.md](../../../devs/tasks/remix/11-billing-webhook-hardening.md);
+a capability-kapu (on-device ingyen · felhő = Pro): [Arch.md](../../../Arch.md) 9. szakasz.
 
 ## 6. Go-live blokkolók
 
-A production-kritikus tételek élő listája: [TODO.md](../../../TODO.md) +
-[AUDITBUGS.md](../../../AUDITBUGS.md). Ezt itt szándékosan **nem** ismételjük.
+A production-kritikus tételek élő listája: [devs/tasks/remix/](../../../devs/tasks/remix/)
+(security + production-readiness terv; a [00-README](../../../devs/tasks/remix/00-README.md)
+a belépő, prioritás- és sorrend-mátrixszal). Ezt itt szándékosan **nem** ismételjük.

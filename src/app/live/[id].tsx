@@ -130,6 +130,8 @@ export default function LiveRoomScreen() {
   const [scene, setScene] = useState<ScenePayload | null>(null);
   // 🎥 host: a jelenet-lista az élő váltóhoz (a live-docból)
   const [hostScenes, setHostScenes] = useState<{ id: string; name: string }[]>([]);
+  // 🎚️ host: mikrofon némítva (az élő mic-kontroll; a mixer kezdőértékéből)
+  const [micMuted, setMicMuted] = useState(false);
 
   const roomRef = useRef<LiveRoom | null>(null);
   const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
@@ -219,6 +221,7 @@ export default function LiveRoomScreen() {
         if (active && proj?.live) {
           liveDocRef.current = proj.live;
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
+          setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
           broadcastScene();
         }
       }
@@ -306,6 +309,7 @@ export default function LiveRoomScreen() {
                 userId={self.id}
                 hostAvatar={session.hostAvatar}
                 scene={scene}
+                micMuted={micMuted}
               />
             </Suspense>
           </ErrorBoundary>
@@ -339,6 +343,16 @@ export default function LiveRoomScreen() {
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.viewerCount}>{viewers}</Text>
           </View>
+          {/* 🎚️ host: élő mikrofon-némítás (LiveKit) */}
+          {isHost && (
+            <Pressable
+              onPress={() => setMicMuted((v) => !v)}
+              hitSlop={8}
+              style={[styles.micBtn, micMuted && styles.micBtnOff]}
+            >
+              <Ionicons name={micMuted ? 'mic-off' : 'mic'} size={18} color="#fff" />
+            </Pressable>
+          )}
           <Pressable onPress={onEndOrLeave} hitSlop={10} style={styles.closeBtn}>
             <Text style={styles.closeText}>{isHost ? t('live.endLive') : t('live.leave')}</Text>
           </Pressable>
@@ -459,6 +473,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   viewerCount: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  micBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: '#00000066',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtnOff: { backgroundColor: palette.danger },
   closeBtn: {
     marginLeft: 'auto',
     backgroundColor: palette.danger,

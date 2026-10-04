@@ -33,9 +33,34 @@ import {
   toggleSourceVisible,
   updateSource,
 } from '@/lib/liveDoc';
+import {
+  MAX_DB,
+  MIN_DB,
+  setChannelGainDb,
+  setMasterGainDb,
+  toggleAutoDuck,
+  toggleMute as mixerToggleMute,
+  toggleSolo as mixerToggleSolo,
+} from '@/lib/liveMixer';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import type { LiveDoc, LivePlatform, LiveSource, LiveSourceKind, LiveTransform } from '@/types/live';
+import type {
+  LiveChannelId,
+  LiveDoc,
+  LiveMixer,
+  LivePlatform,
+  LiveSource,
+  LiveSourceKind,
+  LiveTransform,
+} from '@/types/live';
+
+const CHANNEL_ICON: Record<LiveChannelId, keyof typeof Ionicons.glyphMap> = {
+  mic: 'mic',
+  music: 'musical-notes',
+  media: 'film',
+  system: 'phone-portrait',
+};
+const GAIN_STEP = 3; // dB
 
 const SOURCE_ICON: Record<LiveSourceKind, keyof typeof Ionicons.glyphMap> = {
   camera: 'videocam',
@@ -176,6 +201,16 @@ export default function LiveStudioScreen() {
   const commit = useCallback((next: LiveDoc, label?: string) => {
     useEditorStore.getState().dispatch({ type: 'SET_LIVE_DOC', doc: next, label });
   }, []);
+
+  // 🎚️ mixer-mutáció → új LiveDoc → SET_LIVE_DOC (undo-zható)
+  const commitMixer = useCallback(
+    (nextMixer: LiveMixer) => {
+      if (live) {
+        commit({ ...live, mixer: nextMixer }, 'mixer');
+      }
+    },
+    [live, commit],
+  );
 
   const scene = useMemo(() => (live ? getActiveScene(live) : undefined), [live]);
   const selected: LiveSource | null = useMemo(
@@ -424,6 +459,63 @@ export default function LiveStudioScreen() {
           ))}
         </View>
         <Text style={styles.hint}>{t('live.studio.destHint', { defaultValue: 'ReMix feed is always on. External platforms are Pro (multistream).' })}</Text>
+
+        {/* 🎚️ audio-mixer */}
+        {live.mixer && (
+          <>
+            <View style={styles.rowBetween}>
+              <Text style={styles.sectionLabel}>{t('live.studio.mixer', { defaultValue: 'Audio mixer' })}</Text>
+              <Pressable
+                onPress={() => commitMixer(toggleAutoDuck(live.mixer!))}
+                style={[styles.duckChip, live.mixer.autoDuck && styles.duckChipOn]}
+                hitSlop={6}
+              >
+                <Ionicons name="trending-down" size={13} color={live.mixer.autoDuck ? '#fff' : palette.textDim} />
+                <Text style={[styles.duckText, live.mixer.autoDuck && styles.duckTextOn]}>Auto-duck</Text>
+              </Pressable>
+            </View>
+
+            {live.mixer.channels.map((ch) => {
+              const level = (ch.gainDb - MIN_DB) / (MAX_DB - MIN_DB); // 0..1 a sáv-vizualizációhoz
+              return (
+                <View key={ch.id} style={styles.mixRow}>
+                  <Ionicons name={CHANNEL_ICON[ch.id]} size={16} color={palette.textDim} />
+                  <Text style={styles.mixLabel}>{ch.label}</Text>
+                  <View style={styles.mixBarTrack}>
+                    <View style={[styles.mixBarFill, { width: `${Math.max(0, Math.min(1, level)) * 100}%` }, ch.mute && styles.mixBarMuted]} />
+                  </View>
+                  <Pressable onPress={() => commitMixer(setChannelGainDb(live.mixer!, ch.id, ch.gainDb - GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
+                    <Ionicons name="remove" size={16} color={palette.text} />
+                  </Pressable>
+                  <Text style={styles.mixDb}>{ch.gainDb > 0 ? `+${ch.gainDb}` : ch.gainDb}</Text>
+                  <Pressable onPress={() => commitMixer(setChannelGainDb(live.mixer!, ch.id, ch.gainDb + GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
+                    <Ionicons name="add" size={16} color={palette.text} />
+                  </Pressable>
+                  <Pressable onPress={() => commitMixer(mixerToggleMute(live.mixer!, ch.id))} hitSlop={6} style={[styles.msBtn, ch.mute && styles.mBtnOn]}>
+                    <Text style={[styles.msText, ch.mute && styles.msTextOn]}>M</Text>
+                  </Pressable>
+                  <Pressable onPress={() => commitMixer(mixerToggleSolo(live.mixer!, ch.id))} hitSlop={6} style={[styles.msBtn, ch.solo && styles.sBtnOn]}>
+                    <Text style={[styles.msText, ch.solo && styles.msTextOn]}>S</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+
+            <View style={styles.mixRow}>
+              <Ionicons name="options" size={16} color={palette.accent} />
+              <Text style={[styles.mixLabel, { color: palette.accent }]}>Master</Text>
+              <View style={{ flex: 1 }} />
+              <Pressable onPress={() => commitMixer(setMasterGainDb(live.mixer!, live.mixer!.masterGainDb - GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
+                <Ionicons name="remove" size={16} color={palette.text} />
+              </Pressable>
+              <Text style={styles.mixDb}>{live.mixer!.masterGainDb > 0 ? `+${live.mixer!.masterGainDb}` : live.mixer!.masterGainDb}</Text>
+              <Pressable onPress={() => commitMixer(setMasterGainDb(live.mixer!, live.mixer!.masterGainDb + GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
+                <Ionicons name="add" size={16} color={palette.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.hint}>{t('live.studio.mixerHint', { defaultValue: 'Mic mute is live. Music/media/system mixing lands with native audio (soon).' })}</Text>
+          </>
+        )}
       </ScrollView>
 
       {/* akció-sáv */}
@@ -559,6 +651,55 @@ const styles = StyleSheet.create({
   destChipTextOn: { color: palette.accent },
   destPro: { color: palette.textDim, fontSize: 10, fontWeight: '800' },
   hint: { color: palette.textDim, fontSize: 12, lineHeight: 17 },
+
+  duckChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: palette.surface,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  duckChipOn: { backgroundColor: palette.accent, borderColor: palette.accent },
+  duckText: { color: palette.textDim, fontSize: 12, fontWeight: '800' },
+  duckTextOn: { color: '#fff' },
+  mixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: palette.surface,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  mixLabel: { color: palette.text, fontSize: 13, fontWeight: '700', width: 58 },
+  mixBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: palette.bg, overflow: 'hidden' },
+  mixBarFill: { height: 6, borderRadius: 3, backgroundColor: palette.accent },
+  mixBarMuted: { backgroundColor: palette.textDim },
+  mixStep: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mixDb: { color: palette.text, fontSize: 12, fontWeight: '800', width: 32, textAlign: 'center' },
+  msBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mBtnOn: { backgroundColor: palette.danger },
+  sBtnOn: { backgroundColor: '#f0a022' },
+  msText: { color: palette.textDim, fontSize: 12, fontWeight: '900' },
+  msTextOn: { color: '#fff' },
 
   actionBar: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
   startBtn: {

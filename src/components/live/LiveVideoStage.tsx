@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom } from '@livekit/react-native';
+import { LiveKitRoom, useLocalParticipant } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
@@ -28,6 +28,17 @@ export interface LiveVideoStageProps {
   userId: string;
   hostAvatar: string | null;
   scene: ScenePayload | null;
+  /** 🎚️ a host mikrofonja némítva (az élő audio-mixerből; csak publish esetén él). */
+  micMuted?: boolean;
+}
+
+/** A host mikrofon-némítás alkalmazása a LiveKitre (a <LiveKitRoom>-on BELÜL). */
+function MicControl({ muted }: { muted: boolean }) {
+  const { localParticipant } = useLocalParticipant();
+  useEffect(() => {
+    void localParticipant?.setMicrophoneEnabled(!muted);
+  }, [localParticipant, muted]);
+  return null;
 }
 
 export default function LiveVideoStage({
@@ -37,6 +48,7 @@ export default function LiveVideoStage({
   userId,
   hostAvatar,
   scene,
+  micMuted,
 }: LiveVideoStageProps) {
   const { t } = useTranslation();
   const [, requestCam] = useCameraPermissions();
@@ -82,6 +94,7 @@ export default function LiveVideoStage({
     <View style={StyleSheet.absoluteFill}>
       <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={publish} video={publish}>
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />
+        {publish && <MicControl muted={micMuted ?? false} />}
       </LiveKitRoom>
     </View>
   );

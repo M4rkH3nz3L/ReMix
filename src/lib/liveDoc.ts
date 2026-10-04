@@ -1,3 +1,4 @@
+import { createLiveMixer } from '@/lib/liveMixer';
 import type {
   LiveDestination,
   LiveDoc,
@@ -104,6 +105,7 @@ export function createLiveDoc(
     scenes: [scene],
     activeSceneId: scene.id,
     destinations: [remix],
+    mixer: createLiveMixer(),
   };
 }
 

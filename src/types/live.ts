@@ -91,6 +91,31 @@ export interface LiveDestination {
   rtmpUrl?: string;
 }
 
+// ── 🎚️ Élő audio-mixer (Fázis C) ─────────────────────────────────────────────
+// Önálló, egyszerű modell (NEM a nehéz mixer.ts `MixerGraph` — azt a nem-élő
+// hang-stúdió használja). A types→lib ciklus elkerülése végett itt él; a tiszta
+// műveletek a `src/lib/liveMixer.ts`-ben (ami a mixer.ts dB-utiljait használja).
+
+/** Élő audio-csatorna fajtája. */
+export type LiveChannelId = 'mic' | 'music' | 'media' | 'system';
+
+export interface LiveMixerChannel {
+  id: LiveChannelId;
+  label: string;
+  /** erősítés dB-ben (−60..+6; a `mute`/`solo` felülírja az effektív értéket). */
+  gainDb: number;
+  mute: boolean;
+  solo: boolean;
+}
+
+export interface LiveMixer {
+  channels: LiveMixerChannel[];
+  /** master erősítés dB-ben. */
+  masterGainDb: number;
+  /** auto-duck: a zene halkul, amíg a mikrofon aktív (sidechain). */
+  autoDuck: boolean;
+}
+
 export type LiveVisibility = 'public' | 'followers' | 'unlisted';
 
 /** A teljes live-produkció dokumentum (a `project.live`-on él). */
@@ -103,6 +128,6 @@ export interface LiveDoc {
   activeSceneId: string;
   /** adás-célok (ReMix-feed alapból + külső platformok). */
   destinations: LiveDestination[];
-  // 🎚️ élő audio-mixer (reuse mixer.ts `MixerGraph`) — a Fázis C köti be
-  // (`mixer?: MixerGraph`); a types→lib ciklus elkerülése végett itt még nincs.
+  /** 🎚️ élő audio-mixer (mikrofon/zene/média/rendszer-hang + master + auto-duck). */
+  mixer?: LiveMixer;
 }

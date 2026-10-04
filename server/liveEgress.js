@@ -4,7 +4,7 @@
 // küldi broadcast-csatornán). A tényleges egress LiveKit Cloud-ot vagy self-host
 // egress-szolgáltatást igényel (a lokális `livekit-server --dev` NEM tud egresst)
 // — enélkül 503-at ad vissza, nem omlik össze.
-const { EgressClient, StreamOutput, StreamProtocol } = require('livekit-server-sdk');
+const { EgressClient, RoomServiceClient, StreamOutput, StreamProtocol } = require('livekit-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
 
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
@@ -27,6 +27,17 @@ function getEgressClient() {
     egressClient = new EgressClient(egressHttpUrl(), LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
   }
   return egressClient;
+}
+
+let roomClient = null;
+function getRoomClient() {
+  if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) {
+    return null;
+  }
+  if (!roomClient) {
+    roomClient = new RoomServiceClient(egressHttpUrl(), LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+  }
+  return roomClient;
 }
 
 let admin = null;
@@ -90,6 +101,13 @@ async function startEgress({ room, userId }) {
   const urls = dests.map((d) => rtmpTarget(d.rtmp_url, d.stream_key));
   const output = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
   try {
+    // 🔑 a room LÉTEZZEN az egress előtt — a kliens-trigger a host csatlakozása
+    // ELŐTT is futhat (race → „room does not exist" 404). A createRoom idempotens:
+    // ha már van, nem gond; az egress így bevárja a hostot az (üres) szobában.
+    const rc = getRoomClient();
+    if (rc) {
+      await rc.createRoom({ name: room, emptyTimeout: 300 }).catch(() => {});
+    }
     const info = await client.startRoomCompositeEgress(room, output, { layout: 'grid' });
     return {
       ok: true,

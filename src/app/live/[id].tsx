@@ -7,6 +7,7 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
+  NativeModules,
   Platform,
   Pressable,
   ScrollView,
@@ -44,6 +45,13 @@ import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
 // így egy WebRTC nélküli build sem dönti el az egész appot. Ha a modul nem
 // tölthető (hiányzó natív WebRTC → részleges/üres modul), fallback-komponensre
 // esünk (barátságos „frissítsd az appot" üzenet), nem dob érvénytelen-elem hibát.
+// 🔑 Van-e BELINKELVE a natív WebRTC-modul? (@livekit/react-native-webrtc a
+// `NativeModules.WebRTCModule`-t nézi, és annak hiányában a modul-TETEJÉN dob —
+// amit a lazy try/catch sem kap el, mert a Metro module-init-throw megkerüli.)
+// Ezért ELŐRE ellenőrizzük (ez NEM importálja az @livekit-et), és csak akkor
+// próbáljuk betölteni a videó-réteget, ha a WebRTC tényleg jelen van.
+const WEBRTC_AVAILABLE = !!NativeModules.WebRTCModule;
+
 const LiveVideoStage = lazy(async () => {
   try {
     const m = (await import('@/components/live/LiveVideoStage')) as {
@@ -325,7 +333,20 @@ export default function LiveRoomScreen() {
           Suspense (betöltés) + ErrorBoundary (hiányzó natív modul = barátságos panel,
           nem app-crash). A kompozíciót a `scene` jelenet-állapot hajtja. */}
       <View style={StyleSheet.absoluteFill}>
-        {self ? (
+        {!self ? (
+          <ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />
+        ) : !WEBRTC_AVAILABLE ? (
+          // nincs natív WebRTC (régi build) → meg SEM próbáljuk importálni a videó-
+          // réteget (az @livekit a modul-tetején dobna) → barátságos üzenet
+          <LiveVideoUnavailable
+            liveId={String(id)}
+            publish={isHost}
+            name={self.name}
+            userId={self.id}
+            hostAvatar={session.hostAvatar}
+            scene={scene}
+          />
+        ) : (
           <ErrorBoundary>
             <Suspense fallback={<ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />}>
               <LiveVideoStage
@@ -339,8 +360,6 @@ export default function LiveRoomScreen() {
               />
             </Suspense>
           </ErrorBoundary>
-        ) : (
-          <ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />
         )}
       </View>
 

@@ -25,6 +25,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { CommentSheet } from '@/components/CommentSheet';
 import { GiftSheet } from '@/components/GiftSheet';
+import { LiveNowStrip } from '@/components/live/LiveNowStrip';
 import { showError } from '@/components/ui/errorAlert';
 import { haptics } from '@/design';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
@@ -1113,10 +1114,10 @@ export default function FeedScreen() {
               <View style={{ width: 26 }} />
             </View>
           ) : (
-            // 🖥️ a felső sort a KÖZÉPRE igazított videó-oszlophoz kötjük (contentW) —
-            // különben weben (isWideWeb) az ikonok a böngésző két távoli szélére
-            // kerülnének (a rail/felirat is az oszlophoz igazodik), és nem látszanának
-            // a tabok mellett.
+            <>
+            {/* 🖥️ a felső sort a KÖZÉPRE igazított videó-oszlophoz kötjük (contentW) —
+                különben weben (isWideWeb) az ikonok a böngésző két távoli szélére
+                kerülnének (a rail/felirat is az oszlophoz igazodik). */}
             <View style={[styles.topRow, { width: contentW }]}>
               {/* 🔴 bal: ÉLŐ — a mód-váltóval egy vonalban (külön route) */}
               <Pressable
@@ -1155,6 +1156,11 @@ export default function FeedScreen() {
                 <Ionicons name="search" size={24} color="#fff" />
               </Pressable>
             </View>
+            {/* 🔴 LIVE now — a követett hostok élő adásai (üresen nem renderel) */}
+            <View style={{ width: contentW }}>
+              <LiveNowStrip />
+            </View>
+            </>
           )}
         </SafeAreaView>
       ) : null}

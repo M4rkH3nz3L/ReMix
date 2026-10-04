@@ -32,6 +32,7 @@ import {
   type ChannelData,
 } from '@/lib/feed';
 import { openDm } from '@/lib/chat';
+import { getLiveByHost, type LiveSession } from '@/lib/live';
 import { InsufficientCreditsError } from '@/lib/shop';
 import {
   creatorTotals,
@@ -63,11 +64,16 @@ export default function ChannelScreen() {
   const [remixFor, setRemixFor] = useState<FeedPost | null>(null);
   const [remixes, setRemixes] = useState<FeedPost[]>([]);
   const [remixLoading, setRemixLoading] = useState(false);
+  const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
 
   const load = useCallback(() => {
     if (!id) {
       return;
     }
+    // 🔴 él-e épp a csatorna tulajdonosa? (LIVE-jelző + tap-to-watch)
+    getLiveByHost(id)
+      .then(setLiveSession)
+      .catch(() => {});
     getChannel(id)
       .then((d) => {
         setData(d);
@@ -309,6 +315,15 @@ export default function ChannelScreen() {
               </View>
               <Text style={styles.displayName}>{displayName}</Text>
               <Text style={styles.handle}>@{username}</Text>
+              {liveSession ? (
+                <Pressable style={styles.liveBanner} onPress={() => router.push(`/live/${liveSession.id}`)}>
+                  <View style={styles.liveBannerDot} />
+                  <Ionicons name="radio" size={15} color="#fff" />
+                  <Text style={styles.liveBannerText} numberOfLines={1}>
+                    {t('channel.liveNow', { defaultValue: 'LIVE now — tap to watch' })}
+                  </Text>
+                </Pressable>
+              ) : null}
               {data?.creatorTypes?.length ? (
                 <View style={styles.creatorBadges}>
                   <CreatorBadges types={data.creatorTypes} />
@@ -507,6 +522,18 @@ const styles = StyleSheet.create({
   bigAvatarText: { color: '#fff', fontSize: 40, fontWeight: '800' },
   displayName: { color: palette.text, fontSize: 18, fontWeight: '800', marginTop: 4 },
   handle: { color: palette.textDim, fontSize: 14 },
+  liveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: palette.danger,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  liveBannerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
+  liveBannerText: { color: '#fff', fontSize: 13, fontWeight: '800', flexShrink: 1 },
   creatorBadges: { marginTop: 8, paddingHorizontal: 16 },
   bio: { color: palette.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 6, paddingHorizontal: 24 },
   skillsWrap: { marginTop: 14, paddingHorizontal: 16, alignItems: 'center' },

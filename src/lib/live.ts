@@ -145,6 +145,48 @@ export async function listLiveNow(limit = 50): Promise<LiveSession[]> {
   return ((data ?? []) as RawLive[]).map(mapLive);
 }
 
+/** A KÖVETETT hostok élő adásai (a feed „LIVE now" sávjához). */
+export async function listLiveFollowing(limit = 20): Promise<LiveSession[]> {
+  const sb = requireSupabase();
+  const uid = myUserId();
+  if (!uid) {
+    return [];
+  }
+  const { data: fData } = await sb.from('follows').select('following_id').eq('follower_id', uid);
+  const ids = [...new Set((fData ?? []).map((r: { following_id: string }) => r.following_id))];
+  if (ids.length === 0) {
+    return [];
+  }
+  const { data, error } = await sb
+    .from('live_sessions')
+    .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
+    .eq('status', 'live')
+    .in('host_id', ids)
+    .order('started_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as RawLive[]).map(mapLive);
+}
+
+/** Egy host AKTUÁLIS élő session-je (a csatorna LIVE-jelzőjéhez), vagy null. */
+export async function getLiveByHost(hostId: string): Promise<LiveSession | null> {
+  const sb = requireSupabase();
+  const { data, error } = await sb
+    .from('live_sessions')
+    .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
+    .eq('host_id', hostId)
+    .eq('status', 'live')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    return null;
+  }
+  return data ? mapLive(data as RawLive) : null;
+}
+
 /** Egy élő session lekérése id alapján (a room-belépéshez). */
 export async function getLive(id: string): Promise<LiveSession | null> {
   const sb = requireSupabase();

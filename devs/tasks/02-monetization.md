@@ -48,7 +48,8 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 - [ ] ⬜ Coupon + creator-code + campaign + expiry + usage-limit + attribution + fraud-prevention.
 
 ### 2.10 Anti-abuse / rate limiting — 🔴 P0
-- [ ] ⬜ IP/user/endpoint rate-limit (security-backlog `03`) + AI/render/upload/storage abuse-védelem + **bot-detection**.
+- [x] ✅ **Rate-limit mag KÉSZ**: [server/security/rateLimit.js](../../server/security/rateLimit.js) (kulcs-hierarchia + endpoint-osztályok) + **36 `rateLimit()` hívás** az [index.js](../../server/index.js)-ben + teszt (`rateLimit.test.js`). (Az audit `main`-je elavult volt.)
+- [ ] 🟡 Hátra: dedikált AI/render/upload/storage **költség-abuse** finomhangolás (kvóta-kötés → §2.2) + **bot-detection**.
 
 ## 3. Kész, ha
 A feature-ök a **tier** szerint nyílnak (nem `if pro`); a drága erőforrás **mért + kvótázott +

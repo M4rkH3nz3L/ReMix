@@ -19,7 +19,7 @@ média, gyenge eszköz). Cél: 60 Hz-es, akadásmentes szerkesztés + minimális
 - [ ] ⬜ Selector-subscription (szűk store-szeletek) + imperatív scroll + **memoized** ruler/beat-markers/gaps.
 
 ### 2.2 projectDuration cache — P1
-- [ ] ⬜ `WeakMap<Project, duration>` vagy strukturális invalidáció (a gyakori újraszámolás ellen).
+- [x] ✅ MÁR KÉSZ: `WeakMap<Project, number>` memoizáció ([projectUtils.ts](../../src/lib/projectUtils.ts) `durationCache`) — a command-bus új objektumot ad → automatikus invalidáció. Tesztelt (`projectUtils.test.ts`). (Az audit `main`-je elavult volt.)
 
 ### 2.3 Auto-version optimalizáció — P1
 - [ ] ⬜ A throttle **előtti** felesleges storage-read megszüntetése.

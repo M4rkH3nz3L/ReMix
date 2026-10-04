@@ -50,6 +50,7 @@ const { mediaGuard } = require('./security/uploadPolicy');
 // 🔴 LiveKit (élő videó) — token-mintázás a host/néző szerepéhez. A key/secret
 // env-ből; lokális dev: `livekit-server --dev` → devkey/secret, ws://<host>:7880.
 const { AccessToken } = require('livekit-server-sdk');
+const { startEgress, stopEgress } = require('./liveEgress');
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
 const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
 const LIVEKIT_API_SECRET = (process.env.LIVEKIT_API_SECRET || '').trim();
@@ -614,6 +615,42 @@ app.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimit('
   } catch (err) {
     res.status(500).json({ error: `Token-hiba: ${err.message}` });
   }
+});
+
+// 🎥 Multistream EGRESS (LIVE.md Fázis E) — a host adása a külső RTMP-céljaira
+// (LiveKit Egress, RoomComposite → fan-out). PRO-only. A host-ownershipet és a
+// cél-kulcsokat a worker ellenőrzi/olvassa (service_role); a kliens kulcsot nem küld.
+app.post('/live/egress/start', express.json({ limit: '4kb' }), ...proOnly, rateLimit('messaging'), async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  if (!uid) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  const room = String(req.body?.room || '').trim();
+  if (!room) {
+    res.status(400).json({ error: 'room kötelező.' });
+    return;
+  }
+  const result = await startEgress({ room, userId: uid });
+  if (!result.ok) {
+    res.status(result.status || 500).json({ error: result.error });
+    return;
+  }
+  res.json({ egressId: result.egressId, destinations: result.destinations });
+});
+
+app.post('/live/egress/stop', express.json({ limit: '2kb' }), ...proOnly, async (req, res) => {
+  const egressId = String(req.body?.egressId || '').trim();
+  if (!egressId) {
+    res.status(400).json({ error: 'egressId kötelező.' });
+    return;
+  }
+  const result = await stopEgress(egressId);
+  if (!result.ok) {
+    res.status(result.status || 500).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 // 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat

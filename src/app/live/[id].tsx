@@ -32,6 +32,7 @@ import {
   type LiveSelf,
   type LiveSession,
 } from '@/lib/live';
+import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
 import { setActiveScene } from '@/lib/liveDoc';
 import { loadProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
@@ -135,6 +136,7 @@ export default function LiveRoomScreen() {
 
   const roomRef = useRef<LiveRoom | null>(null);
   const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
+  const egressIdRef = useRef<string | null>(null); // host: a futó multistream-egress (Pro)
   const endedRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
@@ -223,6 +225,16 @@ export default function LiveRoomScreen() {
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
           setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
           broadcastScene();
+          // 🎥 multistream (Pro): ha van engedélyezett RTMP-cél → egress indítása
+          // (a ReMix-feed mindig megy; nem-Pro / nincs egress-infra esetén csendben kimarad)
+          hasEnabledTargets()
+            .then((has) => (has && active ? startLiveEgress(liveId) : null))
+            .then((r) => {
+              if (r && active) {
+                egressIdRef.current = r.egressId;
+              }
+            })
+            .catch(() => {});
         }
       }
     })();
@@ -254,6 +266,10 @@ export default function LiveRoomScreen() {
   const onEndOrLeave = async () => {
     if (isHost && session && !endedRef.current) {
       endedRef.current = true;
+      if (egressIdRef.current) {
+        void stopLiveEgress(egressIdRef.current); // 🎥 multistream leállítása
+        egressIdRef.current = null;
+      }
       await endLive(session.id).catch(() => {});
     }
     router.back();
@@ -264,6 +280,10 @@ export default function LiveRoomScreen() {
     return () => {
       if (isHost && session && !endedRef.current) {
         endedRef.current = true;
+        if (egressIdRef.current) {
+          void stopLiveEgress(egressIdRef.current);
+          egressIdRef.current = null;
+        }
         void endLive(session.id).catch(() => {});
       }
     };

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,6 +43,13 @@ import {
   toggleMute as mixerToggleMute,
   toggleSolo as mixerToggleSolo,
 } from '@/lib/liveMixer';
+import {
+  addDestination as addRtmpDestination,
+  listDestinations,
+  removeDestination as removeRtmpDestination,
+  setDestinationEnabled,
+  type LiveDestinationRow,
+} from '@/lib/liveDestinations';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type {
@@ -176,6 +184,18 @@ export default function LiveStudioScreen() {
   const [titleDraft, setTitleDraft] = useState('');
   const [adding, setAdding] = useState(false);
   const [starting, setStarting] = useState(false);
+  // 🎥 multistream RTMP-célok (live_destinations) + „Add RTMP" modal
+  const [dests, setDests] = useState<LiveDestinationRow[]>([]);
+  const [rtmpOpen, setRtmpOpen] = useState(false);
+  const [rtmpLabel, setRtmpLabel] = useState('');
+  const [rtmpUrl, setRtmpUrl] = useState('');
+  const [rtmpKey, setRtmpKey] = useState('');
+
+  const loadDests = useCallback(() => {
+    listDestinations()
+      .then(setDests)
+      .catch(() => {});
+  }, []);
 
   // a projekt betöltése a közös store-ba (mint a többi stúdió-route)
   useEffect(() => {
@@ -191,10 +211,11 @@ export default function LiveStudioScreen() {
         setTitleDraft(loaded.live?.title ?? loaded.name);
       })
       .catch(() => active && setLoadError(true));
+    loadDests();
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, loadDests]);
 
   const live = project?.live ?? null;
 
@@ -516,6 +537,44 @@ export default function LiveStudioScreen() {
             <Text style={styles.hint}>{t('live.studio.mixerHint', { defaultValue: 'Mic mute is live. Music/media/system mixing lands with native audio (soon).' })}</Text>
           </>
         )}
+
+        {/* 🎥 Multistream RTMP-célok (Pro) — a tényleges ingest-URL + kulcs */}
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionLabel}>{t('live.studio.multistream', { defaultValue: 'Multistream (Pro)' })}</Text>
+          <Pressable onPress={() => setRtmpOpen(true)} style={styles.addSourceBtn} hitSlop={8}>
+            <Ionicons name="add" size={16} color={palette.accent} />
+            <Text style={styles.addSourceText}>RTMP</Text>
+          </Pressable>
+        </View>
+        {dests.length === 0 ? (
+          <Text style={styles.hint}>
+            {t('live.studio.noRtmp', { defaultValue: 'Add a YouTube/TikTok/Twitch/custom RTMP target to multistream. ReMix feed is always on.' })}
+          </Text>
+        ) : (
+          dests.map((d) => (
+            <View key={d.id} style={styles.destManageRow}>
+              <Pressable
+                onPress={() => {
+                  setDestinationEnabled(d.id, !d.enabled).then(loadDests).catch(() => {});
+                }}
+                hitSlop={6}
+              >
+                <Ionicons
+                  name={d.enabled ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={20}
+                  color={d.enabled ? palette.accent : palette.textDim}
+                />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.destManageLabel} numberOfLines={1}>{d.label}</Text>
+                <Text style={styles.destManageUrl} numberOfLines={1}>{d.rtmpUrl} · {d.hasKey ? '•••• key' : t('live.studio.noKey', { defaultValue: 'no key' })}</Text>
+              </View>
+              <Pressable onPress={() => removeRtmpDestination(d.id).then(loadDests).catch(() => {})} hitSlop={6}>
+                <Ionicons name="trash-outline" size={17} color={palette.danger} />
+              </Pressable>
+            </View>
+          ))
+        )}
       </ScrollView>
 
       {/* akció-sáv */}
@@ -531,6 +590,70 @@ export default function LiveStudioScreen() {
           )}
         </Pressable>
       </View>
+
+      {/* 🎥 Add RTMP target modal */}
+      <Modal visible={rtmpOpen} transparent animationType="slide" onRequestClose={() => setRtmpOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setRtmpOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{t('live.studio.addRtmp', { defaultValue: 'Add RTMP target' })}</Text>
+            <TextInput
+              value={rtmpLabel}
+              onChangeText={setRtmpLabel}
+              placeholder={t('live.studio.rtmpLabel', { defaultValue: 'Label (e.g. YouTube)' })}
+              placeholderTextColor={palette.textDim}
+              style={styles.modalInput}
+            />
+            <TextInput
+              value={rtmpUrl}
+              onChangeText={setRtmpUrl}
+              placeholder="rtmp://a.rtmp.youtube.com/live2"
+              placeholderTextColor={palette.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.modalInput}
+            />
+            <TextInput
+              value={rtmpKey}
+              onChangeText={setRtmpKey}
+              placeholder={t('live.studio.rtmpKey', { defaultValue: 'Stream key' })}
+              placeholderTextColor={palette.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              style={styles.modalInput}
+            />
+            <Text style={styles.modalHint}>{t('live.studio.rtmpHint', { defaultValue: 'Stored encrypted & owner-only; never leaves the server. Needs Pro + LiveKit egress to stream.' })}</Text>
+            <View style={styles.modalRow}>
+              <Pressable style={[styles.modalBtn]} onPress={() => setRtmpOpen(false)}>
+                <Text style={styles.modalBtnText}>{t('common.cancel')}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnPrimary, (!rtmpUrl.trim() || !rtmpKey.trim()) && styles.startBtnDisabled]}
+                disabled={!rtmpUrl.trim() || !rtmpKey.trim()}
+                onPress={() => {
+                  addRtmpDestination({
+                    platform: 'custom',
+                    label: rtmpLabel.trim() || 'RTMP',
+                    rtmpUrl: rtmpUrl.trim(),
+                    streamKey: rtmpKey.trim(),
+                    enabled: true,
+                  })
+                    .then(() => {
+                      setRtmpLabel('');
+                      setRtmpUrl('');
+                      setRtmpKey('');
+                      setRtmpOpen(false);
+                      loadDests();
+                    })
+                    .catch((e) => Alert.alert(t('common.error'), String(e?.message ?? e)));
+                }}
+              >
+                <Text style={[styles.modalBtnText, styles.modalBtnTextPrimary]}>{t('common.add', { defaultValue: 'Add' })}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -700,6 +823,50 @@ const styles = StyleSheet.create({
   sBtnOn: { backgroundColor: '#f0a022' },
   msText: { color: palette.textDim, fontSize: 12, fontWeight: '900' },
   msTextOn: { color: '#fff' },
+
+  destManageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: palette.surface,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  destManageLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  destManageUrl: { color: palette.textDim, fontSize: 11, marginTop: 1 },
+
+  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: palette.bg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 18,
+    gap: 10,
+    borderTopWidth: 1,
+    borderColor: palette.border,
+  },
+  modalTitle: { color: palette.text, fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  modalInput: {
+    backgroundColor: palette.surface,
+    borderRadius: 10,
+    color: palette.text,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  modalHint: { color: palette.textDim, fontSize: 11, lineHeight: 16 },
+  modalRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  modalBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+  },
+  modalBtnPrimary: { backgroundColor: palette.accent },
+  modalBtnText: { color: palette.text, fontSize: 15, fontWeight: '700' },
+  modalBtnTextPrimary: { color: '#fff', fontWeight: '800' },
 
   actionBar: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
   startBtn: {

@@ -95,6 +95,21 @@ function atempoChain(speed) {
 }
 
 /**
+ * ⏪ Egy szegmens forrás-ablaka (mp). Normál: előre, `trimIn + skip*speed`-től.
+ * Reversed (audit §6.3): a klip forrás-szakaszát HÁTULRÓL — a szegmens-ablak
+ * tükrözve, konzisztensen a kliens `sourceTimeAt`-tal (preview==render parity).
+ * A tényleges megfordítást a hívó `reverse`/`areverse` filtere adja az ablakon belül.
+ */
+function segSourceWindow(clip, seg) {
+  if (clip.reversed) {
+    const srcStart = clip.trimIn + (clip.duration - seg.skip - seg.duration) * clip.speed;
+    return { srcStart, srcEnd: srcStart + seg.duration * clip.speed };
+  }
+  const srcStart = clip.trimIn + seg.skip * clip.speed;
+  return { srcStart, srcEnd: srcStart + seg.duration * clip.speed };
+}
+
+/**
  * 🛡️ Csak HELYI fájl kerülhet az FFmpeg bemenetére. Az FFmpeg a `-i`-n (és a
  * `lut3d`-ben) érti a `http(s)://`, `file://`, `pipe:`, `concat:` stb. sémákat —
  * egy séma-előtagos érték így belső HTTP-kérést indítana a workerről, vagy
@@ -1481,10 +1496,10 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     } else if (seg.kind === 'video') {
       const clip = seg.clip;
       const idx = addInput(['-i', clip.uri], `v|${clip.uri}`);
-      const srcStart = clip.trimIn + seg.skip * clip.speed;
-      const srcEnd = srcStart + seg.duration * clip.speed;
+      const { srcStart, srcEnd } = segSourceWindow(clip, seg);
       const decode =
         `[${idx}:v]trim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
+        (clip.reversed ? 'reverse,' : '') + // ⏪ a trimmelt ablak megfordítása
         `setpts=(PTS-STARTPTS)/${clip.speed},` +
         motionChain(clip, seg.duration) +
         stabilizeChain(clip);
@@ -2366,12 +2381,12 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       continue;
     }
     const idx = addInput(['-i', clip.uri], `v|${clip.uri}`);
-    const srcStart = clip.trimIn + seg.skip * clip.speed;
-    const srcEnd = srcStart + seg.duration * clip.speed;
+    const { srcStart, srcEnd } = segSourceWindow(clip, seg);
     const delayMs = Math.round((clip.start + seg.skip) * 1000);
     const label = `av${audioIdx++}`;
     graph.push(
       `[${idx}:a]atrim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
+        (clip.reversed ? 'areverse,' : '') + // ⏪ a trimmelt hang-ablak megfordítása
         `asetpts=PTS-STARTPTS,${atempoChain(clip.speed)},` +
         (clip.deReverb ? DEREVERB : '') +
         (clip.voiceEnhance ? VOICE_ENHANCE : '') +
@@ -2520,4 +2535,4 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
 
 // az adjustChain a kép-dokumentum rasterizálójának is kell — ugyanaz a
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
-module.exports = { renderProject, projectDuration, adjustChain, gradeChain };
+module.exports = { renderProject, projectDuration, adjustChain, gradeChain, segSourceWindow };

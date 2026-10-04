@@ -131,6 +131,17 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
         />
       </PanelSection>
 
+      {/* ⏪ Irány: fordított lejátszás (a klip a forrást visszafelé játssza). */}
+      <PanelSection title={t('panels.speed.directionTitle', { defaultValue: 'Irány' })}>
+        <View style={styles.row}>
+          <Chip
+            label={t('panels.speed.reverse', { defaultValue: '⏪ Visszafelé' })}
+            active={clip.reversed === true}
+            onPress={() => updateClip(clip.id, { reversed: clip.reversed ? undefined : true })}
+          />
+        </View>
+      </PanelSection>
+
       <PanelSection title={t('panels.speed.rampSectionTitle')}>
         <View style={styles.row}>
           {SPEED_RAMP_PRESETS.map((preset) => (

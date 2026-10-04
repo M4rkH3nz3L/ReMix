@@ -515,6 +515,13 @@ export interface VideoClip extends ClipBase {
   sourceDuration: number;
   /** 0.1–10 */
   speed: number;
+  /**
+   * ⏪ Fordított lejátszás (audit §6.3): a klip a forrást visszafelé játssza. A
+   * `sourceTimeAt` tükrözi (az idővonal-hossz változatlan); a renderben FFmpeg
+   * `reverse`/`areverse` filter. Hiányzó = normál irány. (A freeze-frame külön
+   * mechanizmus: `@/lib/freeze` `buildFreezePlan` — állókocka kép-klipként.)
+   */
+  reversed?: boolean;
   /** 0–1 */
   volume: number;
   /** Voice Studio: zajszűrés + kompresszor + loudness a renderben (hiányzó = ki) */

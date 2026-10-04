@@ -393,9 +393,17 @@ export function activeAdjustClips(project: Project, t: number): AdjustClip[] {
   return clipsAt<AdjustClip>(track, t).sort((a, b) => a.start - b.start);
 }
 
-/** Idővonal-idő → forrásfájl-idő egy videóklipen belül. */
+/**
+ * Idővonal-idő → forrásfájl-idő egy videóklipen belül.
+ * ⏪ `reversed`: a trimmelt forrás-szakasz visszafelé (a végéről az elejére).
+ */
 export function sourceTimeAt(clip: VideoClip, t: number): number {
-  return clip.trimIn + (t - clip.start) * clip.speed;
+  const local = t - clip.start;
+  if (clip.reversed) {
+    // t=start → az UTOLSÓ használt kocka (trimIn + hossz*speed); t=end → trimIn
+    return clip.trimIn + (clip.duration - local) * clip.speed;
+  }
+  return clip.trimIn + local * clip.speed;
 }
 
 /** Klip kettévágása a t időpontban; null, ha t nem esik szigorúan a klip belsejébe. */

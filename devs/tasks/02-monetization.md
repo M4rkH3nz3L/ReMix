@@ -19,8 +19,8 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 ## 2. Feladatlista
 
 ### 2.1 Tier-modell `Free/Basic/Pro/Ultra` — P1
-- [ ] ⬜ **Capability → minTier** réteg (`capability.minTier`, nem `if pro`); a gate-ek átírása.
-- [ ] 🟡 Entitlement-mapping a 4 tierre (az `entitlementStore` + a server-subscription kiegészítése).
+- [x] ✅ **Capability → minTier** réteg KÉSZ: [src/lib/tiers.ts](../../src/lib/tiers.ts) (Tier-sorrend + `tierMeetsMin`/`isPaidTier`/`asTier`) + [capabilities.ts](../../src/lib/capabilities.ts) `minTier` (a `local ⇒ free` type-invariáns megmaradt) + `capabilityAllowed(cap, tier)` + `entitlementStore.allows(cap)`/`effectiveTier()`. A `capabilityRequiresPro`/`isPro` backward-compat (viselkedés változatlan). Teszt: `tiers.test.ts` + `capabilities.test.ts` (11). A hívók `allows()`-ra migrálása inkrementális (a mai binding is helyes marad).
+- [ ] 🟡 Entitlement-mapping a 4 tierre: a **kliens kész** (`effectiveTier` 4-tier + lejárat), a **server-oldal** (DB-tier-enum basic/ultra + billing/IAP-termékek) hátra → §2.4.
 
 ### 2.2 Usage metering — P1
 - [ ] ⬜ `usage_counters` tábla: AI-token/credit, render-minutes, storage-GB, export-count, cloud-processing.

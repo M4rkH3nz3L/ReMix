@@ -14,6 +14,8 @@
 
 import { t as tr } from 'i18next';
 
+import { isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
+
 export type Where = 'local' | 'cloud';
 
 export type CapabilityId =
@@ -50,70 +52,89 @@ export type CapabilityId =
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
 /**
- * A `where`/`pro` kombináció TÍPUS-SZINTEN kódolja a szigorú üzleti szabályt:
- * ami az ESZKÖZÖN fut (`where: 'local'`), az KÖTELEZŐEN ingyenes (`pro: false`)
- * — on-device funkciót soha nem kapuzunk Pro mögé. Felhő-funkció (`'cloud'`)
- * lehet Pro, vagy — ritkán, szándékosan — ingyenes (pl. `soundLibrary`).
+ * A `where`/`minTier` kombináció TÍPUS-SZINTEN kódolja a szigorú üzleti szabályt:
+ * ami az ESZKÖZÖN fut (`where: 'local'`), az KÖTELEZŐEN ingyenes (`minTier: 'free'`)
+ * — on-device funkciót soha nem kapuzunk fizetős szint mögé. Felhő-funkció (`'cloud'`)
+ * bármely szintet kérhet (`free` is — pl. `soundLibrary`, `cloudSync`).
  *
- * Következmény: egy `{ where: 'local', pro: true }` sor FORDÍTÁSI HIBÁT ad, így
+ * Következmény: egy `{ where: 'local', minTier: 'pro' }` sor FORDÍTÁSI HIBÁT ad, így
  * a szabály minden `tsc --noEmit` futásnál automatikusan auditálva van.
+ *
+ * Az audit §2.1: a kapuzás `capability.minTier` ellen megy (Free/Basic/Pro/Ultra),
+ * nem `if pro`. A mai (free/pro) viselkedés változatlan — a jelenlegi Pro-képességek
+ * `minTier: 'pro'`-k; a `basic`/`ultra` besorolás additív (a billing-bekötés hátra, §2.4).
  */
 type CapabilityMeta =
-  | { where: 'local'; pro: false; label: string }
-  | { where: 'cloud'; pro: boolean; label: string };
+  | { where: 'local'; minTier: 'free'; label: string }
+  | { where: 'cloud'; minTier: Tier; label: string };
 
 export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
-  localRender: { where: 'local', pro: false, label: 'lib.capabilities.label.localRender' },
-  screenRecord: { where: 'local', pro: false, label: 'lib.capabilities.label.screenRecord' },
+  localRender: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.localRender' },
+  screenRecord: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.screenRecord' },
 
-  cloudRender: { where: 'cloud', pro: true, label: 'lib.capabilities.label.cloudRender' },
-  autoCaption: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoCaption' },
-  urlImport: { where: 'cloud', pro: true, label: 'lib.capabilities.label.urlImport' },
-  autoEdit: { where: 'cloud', pro: true, label: 'lib.capabilities.label.autoEdit' },
-  storyAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.storyAnalyze' },
-  pacingAnalyze: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pacingAnalyze' },
-  qualityScan: { where: 'cloud', pro: true, label: 'lib.capabilities.label.qualityScan' },
+  cloudRender: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.cloudRender' },
+  autoCaption: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.autoCaption' },
+  urlImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.urlImport' },
+  autoEdit: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.autoEdit' },
+  storyAnalyze: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.storyAnalyze' },
+  pacingAnalyze: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.pacingAnalyze' },
+  qualityScan: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.qualityScan' },
   // 🗄️ HIBRID adat-biztonság: a projekt-TERV (kis JSON, média nélkül) DB-mentése és
   // a kollaboráció INGYENES — hogy a projektek SOHA ne vesszenek el (userhez kötve),
   // és bárki megoszthasson/meghívhasson. A Pro-érték a NEHÉZ felhő marad: média-
   // felhősync, HD/felhő-render, AI. (Lásd MONEY.md — ezt frissíteni kell.)
-  cloudSync: { where: 'cloud', pro: false, label: 'lib.capabilities.label.cloudSync' },
-  collab: { where: 'cloud', pro: false, label: 'lib.capabilities.label.collab' },
-  bgRemove: { where: 'cloud', pro: true, label: 'lib.capabilities.label.bgRemove' },
-  depth3d: { where: 'cloud', pro: true, label: 'lib.capabilities.label.depth3d' },
-  faceTools: { where: 'cloud', pro: true, label: 'lib.capabilities.label.faceTools' },
-  reframe: { where: 'cloud', pro: true, label: 'lib.capabilities.label.reframe' },
-  objectTrack: { where: 'cloud', pro: true, label: 'lib.capabilities.label.objectTrack' },
-  upscale: { where: 'cloud', pro: true, label: 'lib.capabilities.label.upscale' },
-  skyReplace: { where: 'cloud', pro: true, label: 'lib.capabilities.label.skyReplace' },
-  colorAi: { where: 'cloud', pro: true, label: 'lib.capabilities.label.colorAi' },
-  tts: { where: 'cloud', pro: true, label: 'lib.capabilities.label.tts' },
-  writeAssist: { where: 'cloud', pro: true, label: 'lib.capabilities.label.writeAssist' },
-  pitchCorrect: { where: 'cloud', pro: true, label: 'lib.capabilities.label.pitchCorrect' },
-  genImage: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genImage' },
-  genVideo: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genVideo' },
-  genMusic: { where: 'cloud', pro: true, label: 'lib.capabilities.label.genMusic' },
-  voiceClone: { where: 'cloud', pro: true, label: 'lib.capabilities.label.voiceClone' },
-  aiAvatar: { where: 'cloud', pro: true, label: 'lib.capabilities.label.aiAvatar' },
+  cloudSync: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.cloudSync' },
+  collab: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.collab' },
+  bgRemove: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.bgRemove' },
+  depth3d: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.depth3d' },
+  faceTools: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.faceTools' },
+  reframe: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.reframe' },
+  objectTrack: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.objectTrack' },
+  upscale: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.upscale' },
+  skyReplace: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.skyReplace' },
+  colorAi: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.colorAi' },
+  tts: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.tts' },
+  writeAssist: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.writeAssist' },
+  pitchCorrect: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.pitchCorrect' },
+  genImage: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.genImage' },
+  genVideo: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.genVideo' },
+  genMusic: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.genMusic' },
+  voiceClone: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.voiceClone' },
+  aiAvatar: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.aiAvatar' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
-  soundLibrary: { where: 'cloud', pro: false, label: 'lib.capabilities.label.soundLibrary' },
+  soundLibrary: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.soundLibrary' },
 };
 
 export function capabilityWhere(cap: CapabilityId): Where {
   return CAPABILITIES[cap].where;
 }
 
+/** A művelethez szükséges MINIMÁLIS előfizetési szint (audit §2.1). */
+export function capabilityMinTier(cap: CapabilityId): Tier {
+  return CAPABILITIES[cap].minTier;
+}
+
+/** Engedélyezett-e a művelet az adott user-szinten (rangsor szerint, tier-pontos gate). */
+export function capabilityAllowed(cap: CapabilityId, userTier: Tier): boolean {
+  return tierMeetsMin(userTier, capabilityMinTier(cap));
+}
+
+/**
+ * Fizetős-e a képesség (bármi a free fölött). Backward-compat név: a mai rendszerben a
+ * fizetős szint = Pro, ezért a viselkedés változatlan; a hívók (paywall/backend-router)
+ * módosítás nélkül működnek. Az ÚJ, szint-pontos kapuzáshoz a `capabilityAllowed` megy.
+ */
 export function capabilityRequiresPro(cap: CapabilityId): boolean {
-  return CAPABILITIES[cap].pro;
+  return isPaidTier(capabilityMinTier(cap));
 }
 
 export function capabilityLabel(cap: CapabilityId): string {
   return tr(CAPABILITIES[cap].label);
 }
 
-/** A Pro-only képességek listája — a paywall „mit kapsz" felsorolásához. */
-export function proCapabilities(): CapabilityMeta['label'][] {
+/** A fizetős képességek listája — a paywall „mit kapsz" felsorolásához. */
+export function proCapabilities(): string[] {
   return Object.values(CAPABILITIES)
-    .filter((c) => c.pro)
+    .filter((c) => isPaidTier(c.minTier))
     .map((c) => tr(c.label));
 }

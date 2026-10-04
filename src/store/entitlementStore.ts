@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { capabilityAllowed, type CapabilityId } from '@/lib/capabilities';
 import { fetchMySubscription } from '@/lib/subscription';
+import { asTier, isPaidTier, tierMeetsMin, tierRank, type Tier } from '@/lib/tiers';
 
 /**
  * 💳 Entitlement-store — a Free / Pro szint EGYETLEN kliens-oldali forrása.
@@ -18,7 +20,7 @@ import { fetchMySubscription } from '@/lib/subscription';
  * `setTier` csak OPTIMISTA azonnali visszajelzés a szerver-válaszból.
  */
 
-export type Tier = 'free' | 'pro';
+export type { Tier };
 
 /** Per-user AsyncStorage-kulcs (v2: a v1 device-szintű volt, ez userenkénti). */
 function cacheKey(userId: string | null): string {
@@ -43,7 +45,12 @@ interface EntitlementState extends Persisted {
   userId: string | null;
   /** lefutott-e már az induló betöltés (guard-döntés előtt kell) */
   hydrated: boolean;
-  /** aktív-e most a Pro (szint + lejárat figyelembevételével) */
+  /** a TÉNYLEGESEN aktív szint (lejárat + dev-override figyelembevételével). A gate-ek
+   *  ezt használják a `capability.minTier` ellen (audit §2.1). */
+  effectiveTier: () => Tier;
+  /** engedélyezett-e a művelet az aktuális szinten (tier-pontos kapu). */
+  allows: (cap: CapabilityId) => boolean;
+  /** aktív-e most legalább a Pro (szint + lejárat figyelembevételével) — backward-compat. */
   isPro: () => boolean;
   /** app-indításkor egyszer: csak jelzi, hogy készen állunk (a valós szintet a
    *  `syncFromUser` hozza, amint az auth eldőlt) */
@@ -70,7 +77,7 @@ async function loadCache(userId: string | null): Promise<Persisted> {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Persisted>;
       return {
-        tier: p.tier === 'pro' ? 'pro' : 'free',
+        tier: asTier(p.tier),
         proUntil: typeof p.proUntil === 'string' ? p.proUntil : null,
         devPro: p.devPro === true,
       };
@@ -88,20 +95,28 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
   userId: null,
   hydrated: false,
 
-  isPro: () => {
+  effectiveTier: () => {
     const { tier, proUntil, devPro } = get();
     if (devPro) {
-      return true; // 🧪 dev-override (a szerver-szinkron sem kapcsolja ki)
+      // 🧪 dev-override: legalább Pro (de egy magasabb valós szintet nem ránt le)
+      return tierRank(tier) >= tierRank('pro') ? tier : 'pro';
     }
-    if (tier !== 'pro') {
-      return false;
+    if (!isPaidTier(tier)) {
+      return 'free';
     }
     if (proUntil == null) {
-      return true; // lejárat nélküli (promó/örökös)
+      return tier; // lejárat nélküli (promó/örökös)
     }
     const until = Date.parse(proUntil);
-    return Number.isNaN(until) ? true : until > Date.now();
+    if (Number.isNaN(until)) {
+      return tier;
+    }
+    return until > Date.now() ? tier : 'free'; // lejárt → vissza Free-re
   },
+
+  allows: (cap) => capabilityAllowed(cap, get().effectiveTier()),
+
+  isPro: () => tierMeetsMin(get().effectiveTier(), 'pro'),
 
   hydrate: async () => {
     // A valós szintet a syncFromUser hozza, amint az auth-store eldöntötte, ki
@@ -135,7 +150,7 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
       // 🧪 a dev-override-ot a szerver-állapot NEM kapcsolja ki (túléli a szinkront)
       const devPro = get().devPro === true;
       const next: Persisted = sub
-        ? { tier: sub.tier, proUntil: sub.tier === 'pro' ? sub.proUntil : null, devPro }
+        ? { tier: sub.tier, proUntil: isPaidTier(sub.tier) ? sub.proUntil : null, devPro }
         : { tier: 'free', proUntil: null, devPro };
       set(next);
       persist(userId, next);
@@ -147,7 +162,7 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
   setTier: (tier, proUntil = null) => {
     const next: Persisted = {
       tier,
-      proUntil: tier === 'pro' ? proUntil : null,
+      proUntil: isPaidTier(tier) ? proUntil : null,
       devPro: get().devPro === true,
     };
     set(next);

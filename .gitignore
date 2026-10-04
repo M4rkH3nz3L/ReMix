@@ -74,3 +74,7 @@ server/assets/stickers3d/cache/
 
 # szórvány AI-képek a repó gyökerében
 /ChatGPT Image*.png
+.livekit-egress-dev/
+
+# worker-env backup (lokál Supabase creds mentése) — SOHA ne kerüljön gitbe
+server/.env.bak*

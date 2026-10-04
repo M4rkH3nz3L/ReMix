@@ -1,0 +1,50 @@
+# 🎨 07. Image Studio — P1 (pure core erős, UI-bekötés hiányos)
+
+> **Forrás:** [audit](../source/audit-2026-10-main.md) §7, §14. · **Testvér:** [06-video-editor](./06-video-editor.md) (render-parity), [09-native](./09-native-rendering.md) (worker).
+> **Érintett kód:** [src/lib/vectorPath.ts](../../src/lib/vectorPath.ts) · [src/lib/adjustmentStack.ts](../../src/lib/adjustmentStack.ts) · [src/lib/layerEffects.ts](../../src/lib/layerEffects.ts) · [src/lib/patternFill.ts](../../src/lib/patternFill.ts) · [src/lib/rulers.ts](../../src/lib/rulers.ts) · [src/lib/layout.ts](../../src/lib/layout.ts) · [src/lib/svgImport.ts](../../src/lib/svgImport.ts) · [src/app/studio/image/[id].tsx](../../src/app/studio/image/).
+
+---
+
+## 0. Kontextus & cél
+Itt a repo a legjellemzőbb: a **pure core már jelentős**, de a **felhasználói felület** sok
+helyen nincs bekötve (`CORE KÉSZ / UI HIÁNYZIK`). Cél: a meglévő magokat profi szerkesztő-UI-vá
+bekötni + a worker-interop (PSD/PDF) + render-parity.
+
+## 1. Jelenlegi állapot (bizonyíték)
+- Magok kész + teszteltek: vectorPath (bezier node-edit), adjustmentStack, layerEffects,
+  patternFill, rulers/guides, layout (autoLayout/align/distribute), svgImport/export.
+- A legtöbb **UI nincs rákötve**; PSD-import + PDF/PSD/AI-export hiányzik.
+
+## 2. Feladatlista
+
+### 2.1 Vector pen UI — P1 (🖼️ UI-MISSING)
+- [ ] 🖼️ Pen-tool + node-selection + handle-drag + smooth/broken/mirror + node-conversion a `vectorPath` mag fölé.
+
+### 2.2 Effects panel UI — P1
+- [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).
+
+### 2.3 Adjustment stack UI — P1
+- [ ] 🖼️ Az `adjustmentStack` mag vezérlő-UI-ja (stack szerkesztés + élő előnézet).
+
+### 2.4 Rulers / guides UI — P1
+- [ ] 🖼️ `rulers` mag → vonalzó + húzható guide-ok + snap.
+
+### 2.5 Pattern picker — P1
+- [ ] 🖼️ `patternFill` mag → minta-választó + paraméterek.
+
+### 2.6 Boolean operations UI — P1
+- [ ] 🖼️ Union/subtract/intersect/exclude/divide UI (a path/shape mag fölé).
+
+### 2.7 Align / distribute UI — P1
+- [ ] 🖼️ A `layout` mag (align/distribute/grid) vezérlő-UI-ja.
+
+### 2.8 PSD import — P1 (🔌 BACKEND-MISSING)
+- [ ] 🔌 Worker: `PSD → layers → raster/vector-approx → ImageDoc`.
+
+### 2.9 Illustrator/PDF + PSD export — P1
+- [ ] ⬜ PDF-export + PSD-export + AI-kompatibilis export-workflow (worker).
+
+## 3. Kész, ha
+Az Image Studio-ban a felhasználó **tollal rajzol + node-okat szerkeszt**, adjustment/effects/
+pattern/guide-okat alkalmaz UI-ból, boolean + align/distribute műveleteket végez, PSD-t importál
+és PDF/PSD-t exportál — és az előnézet egyezik a renderrel.

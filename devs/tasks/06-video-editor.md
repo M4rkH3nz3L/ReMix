@@ -36,7 +36,9 @@ Klipenként **sorrendfüggő** effekt-lánc (`clip.effects[]`) — nem egyetlen 
 meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek változatlanok.
 - [x] ✅ **Mag + modell + teszt**: `VideoClip/ImageClip.effects?: VideoEffect[]` ([project.ts](../../src/types/project.ts)) + [src/lib/videoEffects.ts](../../src/lib/videoEffects.ts) (katalógus: blur/sharpen/vignette/grain/grayscale/sepia/invert + immutábilis add/remove/**move(reorder)**/toggle/setAmount/resolve + `effectFilterString`/`effectChainFilters` FFmpeg-leképezés). Teszt: `videoEffects.test.ts` (11) — oper-ek + filter-string. A szerkesztés `UPDATE_CLIP` patch-csel (undo-zható).
 - [x] ✅ **Render-bekötés**: [render.js](../../server/render.js) `effectChainFx` (a kliens `effectFilterString`-gel AZONOS filter-stringek — külön tesztelt: `render.test.js`) az `appearanceChain` UTÁN, mind a 4 render-helyen, **guardolva** (üres lánc = a megjelenés-lánc bitre változatlan → zéró regresszió). ⚠️ Runtime-verify: a vizuális kimenet élő ffmpeg-gel (itt nincs render-worker).
-- [ ] ⬜ **UI**: effects-panel (hozzáadás katalógusból + reorder + ki/be + amount-csúszka).
+- [x] ✅ **UI**: [FilterPanel](../../src/components/editor/panels/FilterPanel.tsx) „🎛️ Effekt-lánc" szekció — hozzáadás a katalógusból (`+ Blur`…) + lánc-lista ↑/↓ átrendezéssel, név-koppintásra ki/be (`⦸`), ✕ törlés, parametrikus effektekhez amount-Stepper. A tesztelt `videoEffects` oper-eit (`addEffect`/`moveEffect`/`toggleEffect`/`setEffectAmount`/`removeEffect`) hívja `UPDATE_CLIP`-en.
+
+**Kész:** az effect-chain mag + render + UI kész (audit zöld 98/1102). A vizuális render-kimenet élő ffmpeg-gel verifikálandó (a filter-stringek viszont kliens==worker tesztelve).
 
 ### 2.6 Transform — P1
 - [x] ✅ **crop + perspektíva** MÁR KÉSZ (`VideoClip.crop`, a render perspektíva-filtere / 3D-tilt). (Az audit `main`-je elavult.)

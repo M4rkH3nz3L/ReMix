@@ -40,8 +40,8 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
   - [x] Modell: `CanvasTransform.anchorX/Y` (pivot 0–1) + `skewX/Y` (fok) — additív, backward-compat.
   - [x] Pure mag + teszt: [src/lib/canvasTransform.ts](../../src/lib/canvasTransform.ts) (`transformOrigin`, `skewTransformEntries`, `shearPoint`/`skewUnitCorners` a render sarok-warpjához), `canvasTransform.test.ts` (12).
   - [x] Preview: [PreviewSurface](../../src/components/preview/PreviewSurface.tsx) `transformOrigin` + RN-skew (guardolva → mai klip változatlan).
-  - [ ] ⬜ Render: FFmpeg skew a perspektíva-sarok-warppal (`skewUnitCorners`) + anchor-pivot (guardolt, runtime-verify).
-  - [ ] ⬜ UI: transform-panel anchor/skew vezérlők.
+  - [x] UI: [PrecisionPanel](../../src/components/editor/panels/PrecisionPanel.tsx) „appearance" szekció — skewX/Y + pivot (anchor) X/Y Stepperek. **Preview-ben teljesen használható.**
+  - [ ] ⬜ Render (futtatás-verify follow-up): FFmpeg skew a perspektíva-sarok-warppal (a tesztelt `skewUnitCorners` geometriával) + anchor-pivot a rotate-hoz. A `tiltChain`-mintára, guardolva (4 alkalmazási hely + padding) — élő ffmpeg kell a verifikációhoz, ezért külön, óvatos lépés (a bizonyított tilt-rendert nem kockáztatom vakon).
 
 ### 2.7 Profi audio UI — P1
 - [ ] 🖼️ Audio-mixer core kész → UI: **EQ/compressor/limiter/pan/normalize/noise-hum/sidechain/automation**.

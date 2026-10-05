@@ -327,6 +327,88 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
               })
             }
           />
+          {/* ⬛ Nyírás (skew) X/Y — audit §6.6 */}
+          <Stepper
+            label={t('panels.precision.skewX', { defaultValue: 'Nyírás X' })}
+            value={`${clip.transform?.skewX ?? 0}°`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  skewX: clamp((clip.transform?.skewX ?? 0) - 5, -45, 45) || undefined,
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  skewX: clamp((clip.transform?.skewX ?? 0) + 5, -45, 45) || undefined,
+                },
+              })
+            }
+          />
+          <Stepper
+            label={t('panels.precision.skewY', { defaultValue: 'Nyírás Y' })}
+            value={`${clip.transform?.skewY ?? 0}°`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  skewY: clamp((clip.transform?.skewY ?? 0) - 5, -45, 45) || undefined,
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  skewY: clamp((clip.transform?.skewY ?? 0) + 5, -45, 45) || undefined,
+                },
+              })
+            }
+          />
+          {/* ⚓ Pivot (anchor) X/Y — a forgatás/méretezés középpontja, audit §6.6 */}
+          <Stepper
+            label={t('panels.precision.anchorX', { defaultValue: 'Pivot X' })}
+            value={`${Math.round((clip.transform?.anchorX ?? 0.5) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  anchorX: clamp((clip.transform?.anchorX ?? 0.5) - 0.1, 0, 1),
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  anchorX: clamp((clip.transform?.anchorX ?? 0.5) + 0.1, 0, 1),
+                },
+              })
+            }
+          />
+          <Stepper
+            label={t('panels.precision.anchorY', { defaultValue: 'Pivot Y' })}
+            value={`${Math.round((clip.transform?.anchorY ?? 0.5) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  anchorY: clamp((clip.transform?.anchorY ?? 0.5) - 0.1, 0, 1),
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  anchorY: clamp((clip.transform?.anchorY ?? 0.5) + 0.1, 0, 1),
+                },
+              })
+            }
+          />
           <Stepper
             label={t('panels.precision.opacity')}
             value={`${Math.round((clip.opacity ?? 1) * 100)}%`}

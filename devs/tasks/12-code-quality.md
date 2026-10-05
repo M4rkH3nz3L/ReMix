@@ -24,19 +24,20 @@ Store**, tipizált hálózat, determinisztikus állapot.
 - [ ] 🟡 `netRetry.ts` VAN → ⬜ **egységes policy** minden kritikus path-on: exponential-backoff + jitter + idempotency + max-attempts + Retry-After.
 
 ### 2.3 Render cancellation — P1
-- [ ] ⬜ `AbortSignal` a local-renderben: `Cancel → AbortController → FFmpeg kill → temp-cleanup → UI-reset`.
+- [x] ✅ MÁR KÉSZ (natív): [nativeRender.ts](../../src/lib/nativeRender.ts) `signal?: AbortSignal` — `signal.aborted` ellenőrzés + `abort`-listener → `cancelledError()`; a hívás azonnal elengedhető. (Az audit `main`-je elavult volt.) Hátra: a felhő-render-queue job-cancel + temp-cleanup végigvezetése.
 
 ### 2.4 UI rollback — P1
 - [ ] ⬜ Optimistic-update **rollback**: like/save/follow/shop-purchase hibánál visszaáll.
 
 ### 2.5 Async race protection — P1
-- [ ] 🟡 Generation-token + alive-guard + request-cancellation + **stale-response reject** (a részben kezelt helyek egységesítése).
+- [x] ✅ **Közös util KÉSZ**: [src/lib/asyncGuard.ts](../../src/lib/asyncGuard.ts) — `createGenerationGuard` (token: csak a legfrissebb válasz megy át) + `createAliveGuard` (unmount után eldob) + `latestOnly` (stale → `StaleResponseError`). Teszt: `asyncGuard.test.ts` (8). Első adopter: [search.tsx](../../src/app/search.tsx) (a korábbi ad-hoc `seqRef` lecserélve a közös utilra).
+- [ ] 🟡 Hátra: a többi ad-hoc race-kezelés (más async-betöltő képernyők) migrálása a közös utilra — inkrementális.
 
 ### 2.6 Timer cleanup — P1
 - [ ] ⬜ CameraRecorder + editor-timeoutok + polling + background-listeners takarítása unmountkor.
 
 ### 2.7 Cache limits — P1
-- [ ] ⬜ Globális **LRU + max-bytes + max-items + TTL** (a nem-korlátos cache-ek ellen).
+- [x] ✅ MÁR KÉSZ: [src/lib/lruCache.ts](../../src/lib/lruCache.ts) (LRU + méret/elem-limit) + teszt (`lruCache.test.ts`) + **6 fogyasztó** (thumbnails/cutlist/visionSearch/beats/transcripts/voiceProxy). (Az audit `main`-je elavult volt.) Hátra: a maradék nem-korlátos cache-ek átállítása + TTL-opció ahol kell.
 
 ### 2.8 Event log size — P1
 - [ ] ⬜ A teljes `clips[]` snapshot eventként veszélyes → **patch-events + snapshot-compaction + checkpoint + pruning**.

@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { VideoThumb } from '@/components/VideoThumb';
 import { palette } from '@/constants/editor';
+import { createGenerationGuard } from '@/lib/asyncGuard';
 import { searchFeed, type SearchResults } from '@/lib/feed';
 import type { Creator, FeedPost } from '@/types/social';
 
@@ -39,18 +40,19 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>(EMPTY);
   const [loading, setLoading] = useState(false);
-  // a késve beérő válaszokat eldobjuk (a legutolsó lekérés győz)
-  const seqRef = useRef(0);
+  // a késve beérő válaszokat eldobjuk (a legutolsó lekérés győz) — közös util (§12.5)
+  const guardRef = useRef(createGenerationGuard());
 
   // debounce-olt keresés. Minden állapot-írás a késleltetett callbackben történik
   // (nem az effekt törzsében szinkron) — így nincs kaszkádoló újrarender. Üres
   // lekérdezésnél 0 ms-mal azonnal ürítünk; egyébként 300 ms után keresünk.
   useEffect(() => {
     const q = query.trim();
-    const seq = ++seqRef.current;
+    const token = guardRef.current.begin();
+    const guard = guardRef.current;
     const timer = setTimeout(
       () => {
-        if (seq !== seqRef.current) {
+        if (!guard.isCurrent(token)) {
           return;
         }
         if (!q) {
@@ -61,17 +63,17 @@ export default function SearchScreen() {
         setLoading(true);
         searchFeed(q)
           .then((r) => {
-            if (seq === seqRef.current) {
+            if (guard.isCurrent(token)) {
               setResults(r);
             }
           })
           .catch(() => {
-            if (seq === seqRef.current) {
+            if (guard.isCurrent(token)) {
               setResults(EMPTY);
             }
           })
           .finally(() => {
-            if (seq === seqRef.current) {
+            if (guard.isCurrent(token)) {
               setLoading(false);
             }
           });

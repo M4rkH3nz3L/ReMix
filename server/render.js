@@ -978,6 +978,49 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     );
   };
 
+  // ⬛ Nyírás (skew/shear) — audit §6.6. KÜLÖN pass (a tiltChain-t NEM érinti → a
+  // bizonyított tilt-render változatlan). A kliens `shearPoint`-jával azonos matek:
+  //   us = u + v·tan(skewX),  vs = v + u·tan(skewY)   (centrált egységnégyzet u,v∈{-1,1})
+  // majd a tiltChain-nel AZONOS perspektíva-filter + sarok-konvenció. Guardolt: skew
+  // nélkül üres → nincs pass. ⚠️ Élő ffmpeg-gel verifikálandó (runtime-verify).
+  const hasSkew = (clip) => {
+    const t = clip.transform;
+    return !!t && (((t.skewX ?? 0) !== 0) || ((t.skewY ?? 0) !== 0));
+  };
+  const skewPad = (clip) => {
+    const t = clip.transform ?? {};
+    const tx = Math.abs(Math.tan((Math.max(-45, Math.min(45, t.skewX ?? 0)) * Math.PI) / 180));
+    const ty = Math.abs(Math.tan((Math.max(-45, Math.min(45, t.skewY ?? 0)) * Math.PI) / 180));
+    return 1 + Math.max(tx, ty); // hogy a nyírt sarok beférjen a paddelt keretbe
+  };
+  const skewChain = (clip) => {
+    if (!hasSkew(clip)) {
+      return '';
+    }
+    const t = clip.transform;
+    const tx = Math.tan((Math.max(-45, Math.min(45, t.skewX ?? 0)) * Math.PI) / 180);
+    const ty = Math.tan((Math.max(-45, Math.min(45, t.skewY ?? 0)) * Math.PI) / 180);
+    const PAD = skewPad(clip);
+    const g = 2 * PAD;
+    const n = (v) => v.toFixed(6);
+    // centrált sarok (u,v) → nyírva → paddelt keret-pozíció (perspektíva-divide nincs: affin)
+    const pt = (u, v) => ({
+      x: `W/2+W*${n((u + v * tx) / g)}`,
+      y: `H/2+H*${n((v + u * ty) / g)}`,
+    });
+    const tl = pt(-1, -1);
+    const tr = pt(1, -1);
+    const bl = pt(-1, 1);
+    const br = pt(1, 1);
+    return (
+      `,format=yuva444p,` +
+      `pad=trunc(iw*${PAD.toFixed(4)}/2)*2:trunc(ih*${PAD.toFixed(4)}/2)*2:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0,` +
+      `perspective=x0='${tl.x}':y0='${tl.y}':x1='${tr.x}':y1='${tr.y}':` +
+      `x2='${bl.x}':y2='${bl.y}':x3='${br.x}':y3='${br.y}':sense=destination,` +
+      `format=rgba`
+    );
+  };
+
   /** green screen (P0-10): a kulcs-szín átlátszóvá válik + opcionális spill-suppression */
   const chromaChain = (clip) => {
     const c = clip.chromaKey;
@@ -1321,8 +1364,9 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       4
     );
     const tiltGrow = hasTilt(clip) ? TILT_PAD : 1;
-    const padW = Math.ceil((W * maxScale * tiltGrow) / 2) * 2 + 2;
-    const padH = Math.ceil((H * maxScale * tiltGrow) / 2) * 2 + 2;
+    const skewGrow = hasSkew(clip) ? skewPad(clip) : 1; // ⬛ a nyírt tartalom se vágódjon le
+    const padW = Math.ceil((W * maxScale * tiltGrow * skewGrow) / 2) * 2 + 2;
+    const padH = Math.ceil((H * maxScale * tiltGrow * skewGrow) / 2) * 2 + 2;
     const S = kfChannelExpr(k.scale, base.scale ?? 1, T);
     const OX = `(${kfChannelExpr(k.x, base.x ?? 0, T)})*${W}`;
     const OY = `(${kfChannelExpr(k.y, base.y ?? 0, T)})*${H}`;
@@ -1512,7 +1556,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         const fit =
           `scale=${W}:${H}:force_original_aspect_ratio=decrease,setsar=1` +
           appearanceChain(clip, seg.skip) +
-          tiltChain(clip);
+          tiltChain(clip) +
+          skewChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`${decode}split[kA${i}][kB${i}]`);
@@ -1532,7 +1577,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
           `crop=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1` +
           appearanceChain(clip, seg.skip) +
-          tiltChain(clip);
+          tiltChain(clip) +
+          skewChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`${decode}split[preA${i}][preB${i}]`);
@@ -1630,7 +1676,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
           `crop=${W}:${H},setsar=1` +
           appearanceChain(clip, seg.skip) +
-          tiltChain(clip);
+          tiltChain(clip) +
+          skewChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`[${idx}:v]fps=${FPS},split[kA${i}][kB${i}]`);
@@ -1650,7 +1697,8 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
           `crop=${boxW}:${boxH},setsar=1` +
           appearanceChain(clip, seg.skip) +
-          tiltChain(clip);
+          tiltChain(clip) +
+          skewChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`[${idx}:v]fps=${FPS},split[preA${i}][preB${i}]`);

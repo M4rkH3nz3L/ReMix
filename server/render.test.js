@@ -1,6 +1,6 @@
 // ⏪ Reverse render-matek (audit §6.3) — a szegmens forrás-ablaka normál vs reversed.
 // Konzisztens a kliens projectUtils.sourceTimeAt-tal (preview==render parity).
-const { segSourceWindow } = require('./render');
+const { segSourceWindow, effectFilterStr, effectChainFx } = require('./render');
 
 // klip: trimIn=1, duration=4 (idővonal), speed=1 → forrás-szakasz [1, 5]
 const clip = (over = {}) => ({ trimIn: 1, duration: 4, speed: 1, ...over });
@@ -43,5 +43,40 @@ describe('segSourceWindow — reversed (tükrözött ablak)', () => {
       const w = segSourceWindow(clip({ reversed: true }), { skip, duration: 1 });
       expect(w.srcEnd - w.srcStart).toBeCloseTo(1);
     }
+  });
+});
+
+// 🎛️ Effekt-lánc render (audit §6.5) — AZONOS filter-stringek a kliens
+// src/lib/videoEffects.ts-sel (preview/UI == render konzisztencia).
+describe('effectFilterStr — a kliens effectFilterString tükre', () => {
+  test('parametrikus effektek', () => {
+    expect(effectFilterStr({ type: 'blur', amount: 0.5 })).toBe('gblur=sigma=10.00');
+    expect(effectFilterStr({ type: 'grain', amount: 1 })).toBe('noise=alls=40:allf=t+u');
+    expect(effectFilterStr({ type: 'vignette', amount: 0 })).toBe('vignette=a=0.100');
+  });
+  test('fix effektek', () => {
+    expect(effectFilterStr({ type: 'grayscale' })).toBe('hue=s=0');
+    expect(effectFilterStr({ type: 'invert' })).toBe('negate');
+    expect(effectFilterStr({ type: 'sepia' })).toContain('colorchannelmixer=');
+  });
+  test('amount clamp', () => {
+    expect(effectFilterStr({ type: 'blur', amount: 5 })).toBe('gblur=sigma=20.00');
+  });
+});
+
+describe('effectChainFx — guardolt lánc-füzér', () => {
+  test('nincs effekt → üres (a render-lánc változatlan)', () => {
+    expect(effectChainFx({})).toBe('');
+    expect(effectChainFx({ effects: [] })).toBe('');
+  });
+  test('engedélyezettek sorrendben, vezető vesszővel; tiltott kimarad', () => {
+    const clip = {
+      effects: [
+        { id: 'a', type: 'grayscale' },
+        { id: 'b', type: 'invert', enabled: false },
+        { id: 'c', type: 'blur', amount: 0.5 },
+      ],
+    };
+    expect(effectChainFx(clip)).toBe(',hue=s=0,gblur=sigma=10.00');
   });
 });

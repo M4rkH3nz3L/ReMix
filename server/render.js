@@ -109,6 +109,40 @@ function segSourceWindow(clip, seg) {
   return { srcStart, srcEnd: srcStart + seg.duration * clip.speed };
 }
 
+// 🎛️ Effekt-lánc (audit §6.5) — egy effekt FFmpeg-filtere. AZONOS a kliens
+// src/lib/videoEffects.ts `effectFilterString`-jével (preview/UI == render konzisztencia);
+// a kettő külön tesztelt. Vesszőtlen (a filtergraph-ban láncolható).
+function effectFilterStr(effect) {
+  const a = Math.max(0, Math.min(1, effect.amount == null ? 0.5 : effect.amount));
+  switch (effect.type) {
+    case 'blur':
+      return `gblur=sigma=${(a * 20).toFixed(2)}`;
+    case 'sharpen':
+      return `unsharp=5:5:${(a * 2).toFixed(3)}:5:5:0`;
+    case 'vignette':
+      return `vignette=a=${(0.1 + a * 1.1).toFixed(3)}`;
+    case 'grain':
+      return `noise=alls=${Math.round(a * 40)}:allf=t+u`;
+    case 'grayscale':
+      return `hue=s=0`;
+    case 'sepia':
+      return `colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131`;
+    case 'invert':
+      return `negate`;
+    default:
+      return '';
+  }
+}
+
+/** A klip engedélyezett effekt-lánca FFmpeg-füzérként (vezető vesszővel), üres ha nincs. */
+function effectChainFx(clip) {
+  const parts = (clip.effects || [])
+    .filter((e) => e && e.enabled !== false)
+    .map(effectFilterStr)
+    .filter(Boolean);
+  return parts.length ? ',' + parts.join(',') : '';
+}
+
 /**
  * 🛡️ Csak HELYI fájl kerülhet az FFmpeg bemenetére. Az FFmpeg a `-i`-n (és a
  * `lut3d`-ben) érti a `http(s)://`, `file://`, `pipe:`, `concat:` stb. sémákat —
@@ -1556,6 +1590,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
         const fit =
           `scale=${W}:${H}:force_original_aspect_ratio=decrease,setsar=1` +
           appearanceChain(clip, seg.skip) +
+          effectChainFx(clip) +
           tiltChain(clip) +
           skewChain(clip);
         let baseLabel;
@@ -1577,6 +1612,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
           `crop=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1` +
           appearanceChain(clip, seg.skip) +
+          effectChainFx(clip) +
           tiltChain(clip) +
           skewChain(clip);
         let baseLabel;
@@ -1676,6 +1712,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
           `crop=${W}:${H},setsar=1` +
           appearanceChain(clip, seg.skip) +
+          effectChainFx(clip) +
           tiltChain(clip) +
           skewChain(clip);
         let baseLabel;
@@ -1697,6 +1734,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
           `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
           `crop=${boxW}:${boxH},setsar=1` +
           appearanceChain(clip, seg.skip) +
+          effectChainFx(clip) +
           tiltChain(clip) +
           skewChain(clip);
         let baseLabel;
@@ -2583,4 +2621,12 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
 
 // az adjustChain a kép-dokumentum rasterizálójának is kell — ugyanaz a
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
-module.exports = { renderProject, projectDuration, adjustChain, gradeChain, segSourceWindow };
+module.exports = {
+  renderProject,
+  projectDuration,
+  adjustChain,
+  gradeChain,
+  segSourceWindow,
+  effectFilterStr,
+  effectChainFx,
+};

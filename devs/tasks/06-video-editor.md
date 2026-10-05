@@ -35,7 +35,7 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
 Klipenként **sorrendfüggő** effekt-lánc (`clip.effects[]`) — nem egyetlen filter. Additív: a
 meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek változatlanok.
 - [x] ✅ **Mag + modell + teszt**: `VideoClip/ImageClip.effects?: VideoEffect[]` ([project.ts](../../src/types/project.ts)) + [src/lib/videoEffects.ts](../../src/lib/videoEffects.ts) (katalógus: blur/sharpen/vignette/grain/grayscale/sepia/invert + immutábilis add/remove/**move(reorder)**/toggle/setAmount/resolve + `effectFilterString`/`effectChainFilters` FFmpeg-leképezés). Teszt: `videoEffects.test.ts` (11) — oper-ek + filter-string. A szerkesztés `UPDATE_CLIP` patch-csel (undo-zható).
-- [ ] ⬜ **Render-bekötés**: a resolved lánc-filterek (`effectChainFilters`) az `appearanceChain` UTÁN, guardolva (üres lánc = változatlan) — runtime-verify élő ffmpeg-gel.
+- [x] ✅ **Render-bekötés**: [render.js](../../server/render.js) `effectChainFx` (a kliens `effectFilterString`-gel AZONOS filter-stringek — külön tesztelt: `render.test.js`) az `appearanceChain` UTÁN, mind a 4 render-helyen, **guardolva** (üres lánc = a megjelenés-lánc bitre változatlan → zéró regresszió). ⚠️ Runtime-verify: a vizuális kimenet élő ffmpeg-gel (itt nincs render-worker).
 - [ ] ⬜ **UI**: effects-panel (hozzáadás katalógusból + reorder + ki/be + amount-csúszka).
 
 ### 2.6 Transform — P1

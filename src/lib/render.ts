@@ -19,6 +19,7 @@ import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders, workerAuthToken } from '@/lib/workerAuth';
 import { withFingerprints } from '@/lib/fingerprint';
 import { useAuth } from '@/store/authStore';
+import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, RenderedVersion } from '@/types/project';
 
 /**
@@ -475,6 +476,9 @@ async function submitAndPollRender(
   if (uid) {
     form.append('userId', uid);
   }
+  // 💠 §2.6: a user szintje a render-sor PRIORITÁSÁHOZ (Ultra>Pro>Basic>Free). Csak
+  // sorrend, nem biztonsági — a worker a `tierJobPriority`-vel számol belőle.
+  form.append('tier', useEntitlement.getState().effectiveTier());
 
   const submit = await uploadFetch(`${base}/render`, {
     method: 'POST',

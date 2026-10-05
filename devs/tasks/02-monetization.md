@@ -37,7 +37,7 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 - [ ] ⬜ Credit-wallet + **consumable IAP** + transaction-ledger + overage + refund + **idempotency**.
 
 ### 2.6 Queue priority — P1
-- [ ] ⬜ BullMQ **tier-prioritás** (`Ultra > Pro > Basic > Free`) a render-queue-ban ([server/queue.js](../../server/queue.js)).
+- [x] ✅ **Tier-prioritás a render-sorban**: [server/queue.js](../../server/queue.js) `tierJobPriority` (`Ultra=1 > Pro=2 > Basic=3 > Free=4`; BullMQ-ban kisebb = előbb fut) az `enqueueRender` `priority`-jében; a kliens a user szintjét ([render.ts](../../src/lib/render.ts) `effectiveTier`) küldi a `/render` formban (csak sorrend, nem biztonsági — a render Pro-kapu mögött). Teszt: `queue.test.js` (2) — rangsor + fallback. A tényleges Pro↔Ultra differenciálás a 4-tier billing-bekötéssel (§2.4) teljesedik ki; addig egységes FIFO.
 
 ### 2.7 Marketplace asset upload — P1
 - [ ] 🟡 Asset **upload + preview + metadata**; 🔌 **moderation + copyright-report + takedown + versioning**.

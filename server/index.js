@@ -1852,6 +1852,9 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
         projectId: project.id ?? null,
         projectName,
         durationSec: Math.round(totalDuration),
+        // 💠 §2.6: a kliens küldte szint CSAK a sor-prioritáshoz (nem biztonsági;
+        // a render Pro-kapu mögött van). A tényleges tier-forrás a 4-tier bekötéskor (§2.4).
+        tier: typeof req.body?.tier === 'string' ? req.body.tier : undefined,
       });
     })()
       .then(() => res.json({ id, mode: 'cloud' }))

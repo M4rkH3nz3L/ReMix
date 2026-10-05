@@ -29,10 +29,31 @@ function renderQueue() {
   return queue;
 }
 
+/**
+ * 💠 Tier → BullMQ job-prioritás (audit §2.6). BullMQ-ban a KISEBB szám fut ELŐBB
+ * → Ultra a leggyorsabb, Free a leglassabb (`Ultra > Pro > Basic > Free`). Ismeretlen
+ * → free. A tier CSAK a SORRENDET befolyásolja (nem biztonsági; a felhő-render amúgy
+ * is Pro-kapu mögött van) — a tényleges tier-differenciálás a 4-tier billing-bekötéssel
+ * (§2.4) teljesedik ki; addig minden render-job egységes prioritást kap (FIFO).
+ */
+function tierJobPriority(tier) {
+  switch (tier) {
+    case 'ultra':
+      return 1;
+    case 'pro':
+      return 2;
+    case 'basic':
+      return 3;
+    default:
+      return 4; // free / ismeretlen
+  }
+}
+
 /** Sorba tesz egy render-jobot a megadott id-vel; visszaadja a job id-t. */
 async function enqueueRender(jobId, payload) {
   await renderQueue().add('render', payload, {
     jobId,
+    priority: tierJobPriority(payload && payload.tier), // 💠 tier-alapú sorrend (§2.6)
     attempts: 2,
     backoff: { type: 'fixed', delay: 3000 },
     removeOnComplete: { age: 3600, count: 200 },
@@ -107,6 +128,7 @@ module.exports = {
   queueEnabled,
   renderQueue,
   enqueueRender,
+  tierJobPriority,
   getRenderJob,
   listRenderJobs,
   renderConcurrency,

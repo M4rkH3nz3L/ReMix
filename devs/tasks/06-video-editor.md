@@ -31,8 +31,12 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
 ### 2.4 Animated masks — P1
 - [ ] 🎞️ Animált geometria (expansion/contraction) + **tracking-integráció** + render-parity.
 
-### 2.5 Effect chain — P1
-- [ ] ⬜ Klipenként **sorrendfüggő** effekt-lánc (`Effect 1→2→3→Transition`) — nem egyetlen filter.
+### 2.5 Effect chain — P1 (folyamatban, több-commit)
+Klipenként **sorrendfüggő** effekt-lánc (`clip.effects[]`) — nem egyetlen filter. Additív: a
+meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek változatlanok.
+- [x] ✅ **Mag + modell + teszt**: `VideoClip/ImageClip.effects?: VideoEffect[]` ([project.ts](../../src/types/project.ts)) + [src/lib/videoEffects.ts](../../src/lib/videoEffects.ts) (katalógus: blur/sharpen/vignette/grain/grayscale/sepia/invert + immutábilis add/remove/**move(reorder)**/toggle/setAmount/resolve + `effectFilterString`/`effectChainFilters` FFmpeg-leképezés). Teszt: `videoEffects.test.ts` (11) — oper-ek + filter-string. A szerkesztés `UPDATE_CLIP` patch-csel (undo-zható).
+- [ ] ⬜ **Render-bekötés**: a resolved lánc-filterek (`effectChainFilters`) az `appearanceChain` UTÁN, guardolva (üres lánc = változatlan) — runtime-verify élő ffmpeg-gel.
+- [ ] ⬜ **UI**: effects-panel (hozzáadás katalógusból + reorder + ki/be + amount-csúszka).
 
 ### 2.6 Transform — P1
 - [x] ✅ **crop + perspektíva** MÁR KÉSZ (`VideoClip.crop`, a render perspektíva-filtere / 3D-tilt). (Az audit `main`-je elavult.)

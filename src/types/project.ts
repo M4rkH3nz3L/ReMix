@@ -548,6 +548,8 @@ export interface VideoClip extends ClipBase {
   /** Voice Studio: visszhang-csökkentés (szobahang) — a renderben */
   deReverb?: boolean;
   filterId: FilterId;
+  /** 🎛️ effekt-lánc (audit §6.5) — a megjelenés-lánc UTÁN, sorrend-függő (additív) */
+  effects?: VideoEffect[];
   /** a szűrő erőssége 0–1 (hiányzó = 1) */
   filterIntensity?: number;
   /** áttűnés feketéből/feketébe a klip szélein (mp, hiányzó = 0) */
@@ -596,6 +598,8 @@ export interface ImageClip extends ClipBase {
    */
   docId?: string;
   filterId: FilterId;
+  /** 🎛️ effekt-lánc (audit §6.5) — a megjelenés-lánc UTÁN, sorrend-függő (additív) */
+  effects?: VideoEffect[];
   /** a szűrő erőssége 0–1 (hiányzó = 1) */
   filterIntensity?: number;
   /** áttűnés feketéből/feketébe a klip szélein (mp, hiányzó = 0) */
@@ -655,6 +659,29 @@ export interface CanvasTransform {
    */
   skewX?: number;
   skewY?: number;
+}
+
+/**
+ * 🎛️ Effekt-lánc (audit §6.5): rendezhető, sorrend-függő effektek a klipen. A
+ * `type` a katalógusból ([lib/videoEffects.ts](../lib/videoEffects.ts)), az `amount`
+ * 0–1 a parametrikus effektekhez, `enabled` hiányzó/true = aktív. A lánc a meglévő
+ * megjelenés (filter/adjust/lut) UTÁN fut — additív, hiányzó/üres = nincs hatás.
+ */
+export type VideoEffectType =
+  | 'blur'
+  | 'sharpen'
+  | 'vignette'
+  | 'grain'
+  | 'grayscale'
+  | 'sepia'
+  | 'invert';
+export interface VideoEffect {
+  id: string;
+  type: VideoEffectType;
+  /** 0–1 a parametrikus effektekhez (blur/sharpen/vignette/grain); fixnél nincs hatása. */
+  amount?: number;
+  /** hiányzó = aktív; `false` = átmenetileg kikapcsolva (a láncban marad). */
+  enabled?: boolean;
 }
 
 /**

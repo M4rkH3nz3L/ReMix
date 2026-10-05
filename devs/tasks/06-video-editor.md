@@ -19,17 +19,18 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
 ## 2. Feladatlista
 
 ### 2.1 Keyframe rendszer — P1
-- [ ] 🎞️ Rotation + opacity channel + **Bézier-interpoláció a teljes render-pipeline-ban** + preview/render parity.
+- [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): `KEYFRAME_CHANNELS = scale/x/y/**rotation**/**opacity**/volume` ([keyframes.ts](../../src/lib/keyframes.ts)) + **Bézier-easing** (`bezierEase` + `PRESET_BEZIER`; a render finom lineáris al-kulcskockákra „süti" → parity). A render a rotation/opacity-csatornát per-frame alkalmazza (`appearanceChain` rotate-kf + geq-alfa). Hátra: csak további csatornák (pl. per-effekt amount-kf) ha kell.
 
 ### 2.2 Profi color grading — P1
-- [ ] 🎞️ RGB curves + HSL + **3-way color wheels** + scopes-workflow + **LUT teljes alkalmazási pipeline** + render-parity.
+- [x] ~ **Nagyrészt KÉSZ**: RGB **curves** (ToneCurveEditor) + **HSL** (`hue`/`hslSaturation`/`hslLuminance`) + **tone** (highlights/shadows/whites/blacks) + temperature/tint/vibrance/saturation + **scopes** (ScopesView) + **LUT** import/export + apply (grade-pipeline a renderben). (Az audit `main`-je elavult.)
+- [ ] ⬜ Hátra: dedikált **3-way color wheels** UI (shadows/mids/highlights színkerék → a meglévő adjust-mezőkre képezve) — kozmetikai, az alatta lévő grading már megvan.
 
 ### 2.3 Freeze frame + reverse — P1
 - [x] ✅ **Freeze-frame** — MÁR KÉSZ (`@/lib/freeze.ts` `buildFreezePlan` + a SpeedPanel „Freeze" gombja: a lejátszófejnél állókockát szúr be kép-klipként, a hang tovább szól).
 - [x] ✅ **Reverse** — a klip visszafelé játssza a forrást: `VideoClip.reversed` mező + `sourceTimeAt` tükrözés (preview) + SpeedPanel „⏪ Visszafelé" kapcsoló + worker-render `reverse`/`areverse` filter (`render.js` `segSourceWindow`, `clip.reversed`-re guardolva → normál klip bitre változatlan filter-lánc = zéró regresszió). Teszt: `projectUtils.test.ts` (sourceTimeAt reverse) + `render.test.js` (segSourceWindow tükör-ablak). ⚠️ Export-FFmpeg runtime-verify (live worker) + a transition/pip render-path-ok reverse-fallbackje a követő lépés.
 
 ### 2.4 Animated masks — P1
-- [ ] 🎞️ Animált geometria (expansion/contraction) + **tracking-integráció** + render-parity.
+- [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): animált maszk-geometria kulcskockákkal (rotoszkóp — `maskAnim` `addMaskKeyframe`/`sampleMaskAt`/`maskKeyframeTimes`) + **tracking** (`trackMaskToSubject`/`trackMaskToFace` a FilterPanel-ben) + expand/feather/opacity + render-parity. Hátra: finomítás ha kell.
 
 ### 2.5 Effect chain — P1 (folyamatban, több-commit)
 Klipenként **sorrendfüggő** effekt-lánc (`clip.effects[]`) — nem egyetlen filter. Additív: a

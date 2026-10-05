@@ -35,7 +35,13 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
 - [ ] ⬜ Klipenként **sorrendfüggő** effekt-lánc (`Effect 1→2→3→Transition`) — nem egyetlen filter.
 
 ### 2.6 Transform — P1
-- [ ] 🟡 Hiány: **anchor-point + crop + skew + perspective** transform.
+- [x] ✅ **crop + perspektíva** MÁR KÉSZ (`VideoClip.crop`, a render perspektíva-filtere / 3D-tilt). (Az audit `main`-je elavult.)
+- [~] 🟡 **anchor-point + skew** — folyamatban (több-commit):
+  - [x] Modell: `CanvasTransform.anchorX/Y` (pivot 0–1) + `skewX/Y` (fok) — additív, backward-compat.
+  - [x] Pure mag + teszt: [src/lib/canvasTransform.ts](../../src/lib/canvasTransform.ts) (`transformOrigin`, `skewTransformEntries`, `shearPoint`/`skewUnitCorners` a render sarok-warpjához), `canvasTransform.test.ts` (12).
+  - [x] Preview: [PreviewSurface](../../src/components/preview/PreviewSurface.tsx) `transformOrigin` + RN-skew (guardolva → mai klip változatlan).
+  - [ ] ⬜ Render: FFmpeg skew a perspektíva-sarok-warppal (`skewUnitCorners`) + anchor-pivot (guardolt, runtime-verify).
+  - [ ] ⬜ UI: transform-panel anchor/skew vezérlők.
 
 ### 2.7 Profi audio UI — P1
 - [ ] 🖼️ Audio-mixer core kész → UI: **EQ/compressor/limiter/pan/normalize/noise-hum/sidechain/automation**.

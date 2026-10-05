@@ -641,6 +641,20 @@ export interface CanvasTransform {
   y: number;
   /** fokban (hiányzó = 0) */
   rotation?: number;
+  /**
+   * ⚓ Rögzítési pont (pivot) a forgatáshoz/méretezéshez, 0–1 a klip-dobozon
+   * (0=bal/fent, 1=jobb/lent). Hiányzó = 0.5 (közép) — a mai viselkedés. A
+   * preview `transformOrigin`-ként, a render a forgatás-középpont eltolásaként
+   * alkalmazza. (audit §6.6)
+   */
+  anchorX?: number;
+  anchorY?: number;
+  /**
+   * ⬛ Nyírás (skew/shear) fokban (hiányzó = 0). A preview RN `skewX`/`skewY`,
+   * a render a meglévő perspektíva-filter 4-sarok-warpjával (paritás). (audit §6.6)
+   */
+  skewX?: number;
+  skewY?: number;
 }
 
 /**

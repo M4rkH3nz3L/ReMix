@@ -31,6 +31,7 @@ import {
   shiftPositionKeyframes,
 } from '@/lib/keyframes';
 import { adjustTintLayers } from '@/lib/adjustPreview';
+import { skewTransformEntries, transformOrigin } from '@/lib/canvasTransform';
 import { pathBounds, polylinePoints, simplifyPath, toBoxSpace } from '@/lib/draw';
 import { addMaskKeyframe, hasMaskTrack, sampleMaskAt } from '@/lib/maskAnim';
 import { maskFromStroke } from '@/lib/maskEdit';
@@ -546,11 +547,18 @@ export function PreviewSurface({ mode, onHotspotPress, onOpenPlayer }: Props) {
   const tiltRotX = visualForTransform?.tilt3d?.rotX ?? 0;
   const tiltRotY = visualForTransform?.tilt3d?.rotY ?? 0;
   const hasTilt = tiltRotX !== 0 || tiltRotY !== 0;
+  // ⚓⬛ anchor (pivot) + skew (audit §6.6) — a worklet-en KÍVÜL számoljuk (statikus,
+  // nem gesztus-függő), a worklet csak elkapja. Anchor hiányzó = közép, skew = 0 → a
+  // mai klipek transformja változatlan.
+  const originStr = transformOrigin(committed);
+  const skewEntries = skewTransformEntries(committed);
   const transformStyle = useAnimatedStyle(() => ({
+    transformOrigin: originStr,
     transform: [
       { translateX: committed.x * boxW + gestureDX.value },
       { translateY: committed.y * boxH + gestureDY.value },
       { scale: committed.scale * gestureScale.value },
+      ...skewEntries,
       ...(hasTilt
         ? [
             { perspective: Math.max(boxH, 1) * 1.2 },

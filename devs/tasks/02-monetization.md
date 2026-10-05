@@ -23,11 +23,12 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 - [ ] 🟡 Entitlement-mapping a 4 tierre: a **kliens kész** (`effectiveTier` 4-tier + lejárat), a **server-oldal** (DB-tier-enum basic/ultra + billing/IAP-termékek) hátra → §2.4.
 
 ### 2.2 Usage metering — P1
-- [ ] ⬜ `usage_counters` tábla: AI-token/credit, render-minutes, storage-GB, export-count, cloud-processing.
-- [ ] ⬜ Worker-oldali mérés + beírás minden drága endpointon; havi aggregáció.
+- [x] ✅ **Mérés-mag + kvóták + teszt**: [src/lib/usageMeter.ts](../../src/lib/usageMeter.ts) — metrikák (aiTokens/renderMinutes/exports/cloudJobs; a **storage KÜLÖN** rendszer: [storageQuota.ts](../../src/lib/storageQuota.ts)) + `TIER_QUOTAS` (free/basic/pro/ultra, -1=korlátlan, a [tiers.ts](../../src/lib/tiers.ts)-hez kötve) + `addUsage`/`remaining`/`canUse`/`isOverQuota`/`usageRatio`. Teszt: `usageMeter.test.ts` (10) — kvóta-monotonitás + gate + arány. A hiteles logika, amit a kliens (soft-warn) és a worker (hard-enforce) is használ.
+- [ ] ⬜ **Hátra**: `usage_counters` tábla (server-authoritatív) + worker-oldali `addUsage` beírás a drága endpointokon (ai/tts/render/egress) + a gate (`canUse`) bekötése hívás előtt.
 
 ### 2.3 Havi quota reset — P1
-- [ ] ⬜ **pg_cron** havi reset + expired-entitlement cleanup + failed-payment kezelés.
+- [x] ✅ **Reset-logika + teszt**: `usageMeter.resetIfNewPeriod`/`periodKey`/`isNewPeriod` (UTC `YYYY-MM`, determinisztikus) — a havi nullázás hiteles magja.
+- [ ] ⬜ **Hátra**: **pg_cron** (server-oldali havi reset a `usage_counters`-re, ugyanezzel a logikával) + expired-entitlement cleanup + failed-payment kezelés.
 
 ### 2.4 Basic / Ultra csomagok — P1
 - [ ] ⬜ Tényleges entitlement-táblázat (local/cloud-render, AI-limit, storage, priority-queue, AI-advanced).

@@ -22,7 +22,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [ ] 🟡 Upload + lifecycle + teljes provider-abstrakció + **prod-hardening** (timeout/retry/reconnect).
 
 ### 2.2 Asset state machine — P1
-- [ ] ⬜ Explicit `External → Cached → Imported` + **cache-eviction / offline / stale / invalidated**.
+- [x] ✅ **Állapotgép-mag + teszt**: [src/lib/assetState.ts](../../src/lib/assetState.ts) — `AssetState` (`external/cached/imported/stale/invalidated`) + `assetStateOf` (a valós Asset-mezőkből: provider + localAvailable + remoteChanged + invalidated) + `nextState`/`canTransition` átmenet-tábla (download/import/evict/invalidate/remoteChanged/refresh) + `isLocallyAvailable`/`needsFetch`. Teszt: `assetState.test.ts` (8) — fő életciklus + eviction/stale/invalidation + tiltott átmenetek.
+- [ ] ⬜ **Hátra**: bekötés a [storageProviders.ts](../../src/lib/storageProviders.ts)-be (letöltés/eviction a `nextState` mentén) + UI-jelző (☁️ external / ✓ cached) + offline-cache-politika.
 
 ### 2.3 Drive / Dropbox / OneDrive / S3 — P1
 - [ ] ✅ Drive/Dropbox/WebDAV/S3 megvan → ⬜ **OneDrive adapter** hozzáadása (a meglévő provider-interfészre).

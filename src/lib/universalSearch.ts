@@ -331,12 +331,111 @@ export function scoreDoc(doc: SearchDoc, terms: string[]): number {
   return Math.round((coverage + titleBoost + phraseBoost) * 1000) / 1000;
 }
 
+// ── typo-tolerancia (fuzzy) ──────────────────────────────────────────────────
+
+/**
+ * Korlátos Levenshtein-táv (`> max` esetén korán `max+1`-gyel kilép → gyors).
+ * On-device, allokáció-takarékos (két sor), így hosszú korpuszon is futhat.
+ */
+function editDistance(a: string, b: string, max: number): number {
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > max) {
+    return max + 1;
+  }
+  let prev = new Array<number>(lb + 1);
+  let cur = new Array<number>(lb + 1);
+  for (let j = 0; j <= lb; j++) {
+    prev[j] = j;
+  }
+  for (let i = 1; i <= la; i++) {
+    cur[0] = i;
+    let rowMin = cur[0];
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (cur[j] < rowMin) {
+        rowMin = cur[j];
+      }
+    }
+    if (rowMin > max) {
+      return max + 1; // ebben a sorban már mind > max → a végeredmény is az lesz
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[lb];
+}
+
+/** Egy token hossz-függő megengedett hibaszáma (rövidre 0 → ne adjon zajt). */
+function allowedEdits(len: number): number {
+  return len <= 3 ? 0 : len <= 5 ? 1 : 2;
+}
+
+/** A `term` legjobb fuzzy-illeszkedése a tokenek közé: 0 (nincs) … 0.9 (közeli). */
+function bestFuzzy(term: string, tokens: string[]): number {
+  const allowed = allowedEdits(term.length);
+  if (allowed === 0) {
+    return 0;
+  }
+  let best = 0;
+  for (const w of tokens) {
+    if (Math.abs(w.length - term.length) > allowed) {
+      continue;
+    }
+    const d = editDistance(term, w, allowed);
+    if (d <= allowed) {
+      const wt = 1 - d / (term.length + 1);
+      if (wt > best) {
+        best = wt;
+      }
+    }
+  }
+  // a fuzzy SOSEM ér annyit, mint a pontos egyezés → exact mindig előrébb rangsorol
+  return best > 0 ? Math.min(0.9, best) : 0;
+}
+
+function tokensOf(s: string): string[] {
+  return s.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * A `scoreDoc` typo-toleráns változata: a pontos substring-egyezés teljes súlyú
+ * (azonos a `scoreDoc`-kal), a nem-pontos tokenek fuzzy-illeszkedése részleges
+ * kreditet kap. Így a fuzzy mindig SZUPERHALMAZ: ahol van pontos találat, az
+ * eredmény a `scoreDoc`-éval egyezik, a típushibák viszont nem esnek ki.
+ */
+export function scoreDocFuzzy(doc: SearchDoc, terms: string[]): number {
+  if (terms.length === 0) {
+    return 1;
+  }
+  const hay = normalizeText(haystack(doc));
+  const title = normalizeText(doc.title);
+  const hayTokens = tokensOf(hay);
+  const titleTokens = tokensOf(title);
+  let matched = 0;
+  let titleMatched = 0;
+  for (const t of terms) {
+    matched += hay.includes(t) ? 1 : bestFuzzy(t, hayTokens);
+    titleMatched += title.includes(t) ? 1 : bestFuzzy(t, titleTokens);
+  }
+  const coverage = matched / terms.length;
+  const titleBoost = (titleMatched / terms.length) * 0.5;
+  const phraseBoost = title.includes(terms.join(' ')) ? 0.3 : 0;
+  return Math.round((coverage + titleBoost + phraseBoost) * 1000) / 1000;
+}
+
 export interface SearchOptions {
   /** az idő-szűrők feloldásához (ISO). */
   now?: string;
   limit?: number;
   /** csak ezekre a scope-okra (a lekérdezésből detektált scope-ok fölé). */
   scopes?: SearchScope[];
+  /**
+   * typo-tolerancia: ha a PONTOS keresés 0 találatot ad, egy fuzzy-körrel újrapróbál
+   * (`true`/undefined = engedélyezett fallback; `false` = kikapcsolva). A pontos
+   * találatos lekérdezések viselkedése változatlan.
+   */
+  fuzzy?: boolean;
 }
 
 /**
@@ -350,25 +449,37 @@ export function search(docs: SearchDoc[], query: string, opts: SearchOptions = {
   const range = parsed.timeHints.length ? resolveTimeRange(parsed.timeHints, opts.now ?? new Date().toISOString()) : null;
   const limit = opts.limit ?? 30;
 
-  const results: SearchResult[] = [];
-  for (const doc of docs) {
-    if (scopes.size > 0 && !scopes.has(doc.scope)) {
-      continue;
+  // egy kör: a (scope/status/idő) szűrőkön átment dokumentumok pontozva a megadott
+  // scorer-rel (a fuzzy-fallback ugyanazt a szűrést használja, más pontozással).
+  const run = (scorer: (doc: SearchDoc, terms: string[]) => number): SearchResult[] => {
+    const out: SearchResult[] = [];
+    for (const doc of docs) {
+      if (scopes.size > 0 && !scopes.has(doc.scope)) {
+        continue;
+      }
+      if (parsed.status === 'unfinished' && !isUnfinished(doc)) {
+        continue;
+      }
+      if (parsed.status === 'published' && isUnfinished(doc)) {
+        continue;
+      }
+      if (range && !inRange(doc, range)) {
+        continue;
+      }
+      const score = scorer(doc, parsed.terms);
+      if (parsed.terms.length > 0 && score <= 0) {
+        continue;
+      }
+      out.push({ ...doc, score });
     }
-    if (parsed.status === 'unfinished' && !isUnfinished(doc)) {
-      continue;
-    }
-    if (parsed.status === 'published' && isUnfinished(doc)) {
-      continue;
-    }
-    if (range && !inRange(doc, range)) {
-      continue;
-    }
-    const score = scoreDoc(doc, parsed.terms);
-    if (parsed.terms.length > 0 && score <= 0) {
-      continue;
-    }
-    results.push({ ...doc, score });
+    return out;
+  };
+
+  let results = run(scoreDoc);
+  // typo-tolerancia: ha a PONTOS keresésnek nincs találata (de volt keresőszó),
+  // egy fuzzy-körrel újrapróbálunk — a pontos-találatos lekérdezések érintetlenek.
+  if (results.length === 0 && parsed.terms.length > 0 && opts.fuzzy !== false) {
+    results = run(scoreDocFuzzy);
   }
 
   results.sort((a, b) => {
@@ -378,6 +489,60 @@ export function search(docs: SearchDoc[], query: string, opts: SearchOptions = {
     return (docTime(b) ?? '').localeCompare(docTime(a) ?? '');
   });
   return results.slice(0, limit);
+}
+
+export interface SuggestOptions {
+  limit?: number;
+}
+
+/**
+ * ⌨️ Autocomplete: a `prefix`-hez illő javaslatok (cím-találatok + kulcsszavak),
+ * rangsorolva: cím-prefix > kulcsszó-prefix > tartalmazás > fuzzy-prefix. Üres/
+ * rövid prefix → nincs javaslat. A visszatérés deduplikált javaslat-szövegek listája.
+ */
+export function suggest(docs: SearchDoc[], prefix: string, opts: SuggestOptions = {}): string[] {
+  const q = normalizeText(prefix).trim();
+  if (q.length < 1) {
+    return [];
+  }
+  const limit = opts.limit ?? 8;
+  const best = new Map<string, number>(); // javaslat-szöveg → legjobb pontszám
+  const bump = (text: string, s: number): void => {
+    if (!text) {
+      return;
+    }
+    const cur = best.get(text);
+    if (cur == null || s > cur) {
+      best.set(text, s);
+    }
+  };
+  const fuzzyPrefix = (n: string): boolean => {
+    const allowed = allowedEdits(q.length);
+    return allowed > 0 && editDistance(q, n.slice(0, q.length), allowed) <= allowed;
+  };
+  for (const doc of docs) {
+    const title = doc.title ?? '';
+    const nTitle = normalizeText(title);
+    if (nTitle.startsWith(q)) {
+      bump(title, 4);
+    } else if (nTitle.includes(q)) {
+      bump(title, 2);
+    } else if (fuzzyPrefix(nTitle)) {
+      bump(title, 1);
+    }
+    for (const kw of doc.keywords ?? []) {
+      const nk = normalizeText(kw);
+      if (nk.startsWith(q)) {
+        bump(kw, 3);
+      } else if (nk.includes(q)) {
+        bump(kw, 1.5);
+      }
+    }
+  }
+  return [...best.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([text]) => text);
 }
 
 /** Scope-onként csoportosított találatok (a ⌘K szekciós megjelenítéséhez). */

@@ -13,6 +13,7 @@ import {
   groupByScope,
   parseQuery,
   search,
+  suggest,
   type SearchDoc,
   type SearchResult,
   type SearchScope,
@@ -91,6 +92,12 @@ export default function CommandPaletteScreen() {
   const parsed = useMemo(() => parseQuery(query), [query]);
   const results = useMemo(() => search(docs, query, { now }), [docs, query, now]);
   const groups = useMemo(() => groupByScope(results), [results]);
+  // „did-you-mean" / autocomplete: ha van keresőszó, de nincs (pontos) találat,
+  // a `suggest` mag ad típushiba-toleráns javaslatokat (tappolva beírja).
+  const suggestions = useMemo(
+    () => (parsed.terms.length > 0 && results.length === 0 ? suggest(docs, query, { limit: 6 }) : []),
+    [parsed.terms.length, results.length, docs, query]
+  );
 
   const onSelect = (r: SearchResult) => {
     if (r.scope === 'project') {
@@ -145,6 +152,26 @@ export default function CommandPaletteScreen() {
           ))}
           {parsed.terms.map((t) => (
             <Chip key={`q-${t}`} icon="text" label={t} tone="dim" />
+          ))}
+        </View>
+      )}
+
+      {/* did-you-mean / autocomplete javaslatok (tappolva beírja) */}
+      {suggestions.length > 0 && (
+        <View style={styles.chips} testID="cmdk-suggestions">
+          <Text style={styles.suggestLabel}>Erre gondoltál?</Text>
+          {suggestions.map((s) => (
+            <Pressable
+              key={`sug-${s}`}
+              style={styles.suggestChip}
+              onPress={() => setQuery(s)}
+              testID={`cmdk-suggest-${s}`}
+            >
+              <Ionicons name="return-down-forward" size={12} color={palette.accent} />
+              <Text style={styles.suggestText} numberOfLines={1}>
+                {s}
+              </Text>
+            </Pressable>
           ))}
         </View>
       )}
@@ -207,6 +234,19 @@ const styles = StyleSheet.create({
   chipAccent: { backgroundColor: palette.accentSoft },
   chipDim: { backgroundColor: palette.surfaceHigh },
   chipText: { fontSize: 12, fontWeight: '600' },
+  suggestLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', alignSelf: 'center', marginRight: 2 },
+  suggestChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    maxWidth: 180,
+  },
+  suggestText: { color: palette.accent, fontSize: 12, fontWeight: '600' },
   section: { color: palette.textDim, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   rowIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },

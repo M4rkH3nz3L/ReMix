@@ -34,7 +34,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🟡 Like/save van → ⬜ **folders/collections/playlists** + creator-follow-preferences + personalized notifications.
 
 ### 2.5 Full search — P1
-- [ ] 🟡 Universal-search core → ⬜ user/post/template/hashtag search + **hashtag-oldalak** + ranking/filters/autocomplete/typo-tolerance.
+- [x] ✅ **Typo-tolerancia + autocomplete KÉSZ (2026-10-06)**: [universalSearch.ts](../../src/lib/universalSearch.ts) — korlátos Levenshtein (`editDistance` + `bestFuzzy`, hossz-függő hibaküszöb) → `scoreDocFuzzy` (a pontos egyezés szuperhalmaza, a fuzzy max 0.9 → exact mindig nyer) + a `search` **fuzzy-fallback**ja (csak ha a pontos keresés 0 találatot ad → a meglévő viselkedés változatlan) + `suggest` autocomplete (cím/kulcsszó-prefix + fuzzy-prefix, rangsorolva). **Bekötve** a ⌘K-palettába ([command.tsx](../../src/app/command.tsx): a fallback automatikus, a `suggest` „Erre gondoltál?" chipekként). Teszt: `universalSearch.test.ts` (+10: fuzzy-score + fallback + suggest).
+- [ ] 🟡 Hátra: user/post/template/**hashtag search + hashtag-oldalak** + explicit filters + a feed-oldali (server) kereső typo-toleranciája (ma `searchFeed` ilike).
 
 ### 2.6 Template marketplace — P1
 - [ ] ⬜ Template publish/preview/version + attribution + remix-count + analytics + marketplace-ranking (összeér [02](./02-monetization.md) §2.7-tel).

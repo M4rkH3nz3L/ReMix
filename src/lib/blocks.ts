@@ -25,6 +25,40 @@ export function isMuted(myMutedConvIds: readonly string[], conversationId: strin
   return !!conversationId && myMutedConvIds.includes(conversationId);
 }
 
+/**
+ * A blokkolt szerzők elemeit elrejti — a block kiterjesztése a FEED/KOMMENT szintre
+ * (kliens-oldali szűrés; a szerver-RLS a messaging-et már védi). Üres blokk-lista →
+ * változatlan (ugyanaz a sorrend). Genericus: a hívó adja az „ki a szerző" függvényt.
+ */
+export function filterBlocked<T>(
+  items: readonly T[],
+  getAuthorId: (item: T) => string,
+  blockedIds: readonly string[],
+): T[] {
+  if (blockedIds.length === 0) {
+    return [...items];
+  }
+  const set = new Set(blockedIds);
+  return items.filter((item) => !set.has(getAuthorId(item)));
+}
+
+/**
+ * „Restrict" (lágy tiltás, Instagram-stílus): ha a tartalom tulajdonosa KORLÁTOZ egy
+ * szerzőt, annak kommentje CSAK a saját maga + a tulajdonos számára látszik (a többi
+ * nézőnek rejtve, amíg a tulaj nem hagyja jóvá). A nem-korlátozott szerzőt mindenki látja.
+ */
+export function isCommentVisible(
+  commentAuthorId: string,
+  viewerId: string | null,
+  ownerId: string,
+  restrictedIds: readonly string[],
+): boolean {
+  if (!restrictedIds.includes(commentAuthorId)) {
+    return true;
+  }
+  return viewerId === commentAuthorId || viewerId === ownerId;
+}
+
 // ── Supabase CRUD ────────────────────────────────────────────────────────────
 
 export async function blockUser(otherId: string): Promise<void> {

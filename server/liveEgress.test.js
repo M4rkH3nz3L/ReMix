@@ -1,5 +1,5 @@
 // 💰 F3 — egress költségkontroll segédeinek tesztjei (liveEgress.js).
-const { countActiveEgress, sweepUserStale, stopStale, intEnv } = require('./liveEgress');
+const { countActiveEgress, sweepUserStale, stopStale, intEnv, egressMinutes } = require('./liveEgress');
 
 /** Láncolható + thenable Supabase-builder mock, ami `result`-ra oldódik. */
 function mockSb(result) {
@@ -10,6 +10,18 @@ function mockSb(result) {
   builder.then = (onFulfilled) => onFulfilled(result);
   return { from: jest.fn(() => builder), _builder: builder };
 }
+
+describe('egressMinutes (renderMinutes-könyveléshez)', () => {
+  test('két ISO-időpont perc-különbsége', () => {
+    expect(egressMinutes('2026-10-06T12:00:00Z', '2026-10-06T12:30:00Z')).toBe(30);
+    expect(egressMinutes('2026-10-06T12:00:00Z', '2026-10-06T12:00:45Z')).toBeCloseTo(0.75);
+  });
+  test('rossz / fordított / nulla input → 0', () => {
+    expect(egressMinutes('rossz', '2026-10-06T12:30:00Z')).toBe(0);
+    expect(egressMinutes('2026-10-06T12:30:00Z', '2026-10-06T12:00:00Z')).toBe(0); // fordított
+    expect(egressMinutes('2026-10-06T12:00:00Z', '2026-10-06T12:00:00Z')).toBe(0); // azonos
+  });
+});
 
 describe('intEnv', () => {
   test('parse-olja a pozitív egészet', () => {

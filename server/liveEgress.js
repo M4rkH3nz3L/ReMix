@@ -15,6 +15,7 @@ const {
 } = require('livekit-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { decryptStreamKey } = require('./liveCrypto');
+const { trackUsage } = require('./usage');
 
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
 const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
@@ -156,14 +157,37 @@ async function recordEgress(sb, row) {
   }
 }
 
+/** A multistream-egress perchossza két ISO-időpontból (nem-negatív; rossz input → 0). */
+function egressMinutes(startedAtIso, stoppedAtIso) {
+  const start = Date.parse(startedAtIso);
+  const stop = Date.parse(stoppedAtIso);
+  if (!Number.isFinite(start) || !Number.isFinite(stop) || stop <= start) {
+    return 0;
+  }
+  return (stop - start) / 60000;
+}
+
 async function markEgressStopped(sb, egressId, nowIso) {
   if (!sb) {
     return;
   }
-  await sb
+  // Csak az AKTÍV sort zárjuk (idempotens): ha a user-stop és a stale-sweep is
+  // meghívja, csak az első active→stopped átmenet ad vissza sort → nincs dupla mérés.
+  const { data } = await sb
     .from('live_egress')
     .update({ status: 'stopped', stopped_at: nowIso })
-    .eq('egress_id', egressId);
+    .eq('egress_id', egressId)
+    .eq('status', 'active')
+    .select('user_id, started_at')
+    .maybeSingle();
+  // 📊 §2.2: a multistream felhő-perceit a `renderMinutes` kvótába könyveljük
+  // (best-effort, a bizonyított /render-mintát követve; a trackUsage kerekít).
+  if (data && data.user_id && data.started_at) {
+    const minutes = egressMinutes(data.started_at, nowIso);
+    if (minutes > 0) {
+      void trackUsage(data.user_id, 'renderMinutes', minutes);
+    }
+  }
 }
 
 /** A `maxMinutes`-nél régebbi, még „active" egresseket leállítja + jelöli (lejárt). */
@@ -347,6 +371,7 @@ module.exports = {
   egressConfigured,
   sweepStaleEgress,
   // tesztekhez exportált tiszta-ish segédek:
+  egressMinutes,
   countActiveEgress,
   sweepUserStale,
   stopStale,

@@ -45,7 +45,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 
 ### 2.7 Remix Graph — P1
 - [x] ~ **Graph-mag kész**: [src/lib/creativeGraph.ts](../../src/lib/creativeGraph.ts) — `lineage` (ancestry, ciklus-védett) + `descendants` + `remixOf`-élek a projekt-modellből, tesztelt ([[code-diff-core]] szomszéd: [[versions-core]]). (Az audit `main`-je elavult.)
-- [ ] ⬜ **Hátra**: a graph **vizualizáció-UI** (fa-nézet) + poszt-szintű remix-lánc (a feed `remix_of_post_id`-ből) + attribution-badge.
+- [x] ✅ **Poszt-szintű remix-lineage MAG KÉSZ (2026-10-06)**: [src/lib/remixGraph.ts](../../src/lib/remixGraph.ts) — a feed `remixOfId` (= `remix_of_post_id`) linkekből `buildRemixGraph` (gyökerek + gyerek-élek; a halmazon kívüli szülő gyökér) + `ancestorChain`/`remixDepth` + `descendants`/`descendantCount`/`directRemixCount` + `attribution` (eredeti mű + alkotó + mélység a badge-hez). **Minden bejárás ciklus-biztos** (köröző/önhurkos adat nem végtelen ciklus). Teszt: `remixGraph.test.ts` (6). (Külön a `creativeGraph.ts` AI-kontextus-gráftól.)
+- [ ] 🖼️ **Hátra**: a graph **vizualizáció-UI** (fa-nézet) + az `attribution`-badge megjelenítése a poszton.
 
 ### 2.8 Feed media pipeline — P1
 - [ ] 🟡 Metaadat-oldal kész → 🎞️/🔌 **render→upload→poster→thumbnails→CDN→transcoding→moderation→publish** teljes prod-pipeline.

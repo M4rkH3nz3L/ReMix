@@ -26,7 +26,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🔌 DB-report-rendszer van → **admin UX**: reports/user/post/comment-moderáció + removal/ban/mute/**appeal** (security-backlog `10`).
 
 ### 2.3 For You ranking v2 — P1 (nagy)
-- [ ] ⬜ Jel-gyűjtés: watch-time/completion/rewatch/likes/saves/shares/follows; affinity (creator/topic); negative-feedback; trending; freshness; diversity → ranker.
+- [x] ✅ **Ranker-mag + teszt**: [src/lib/feedRanking.ts](../../src/lib/feedRanking.ts) — `scorePost` (súlyozott engagement + completion + creator-/topic-affinity + exponenciális **freshness**-csökkenés half-life-fal + negatív-jel-büntetés) + `rankBy` (csökkenő pontszám, stabil) + `applyDiversity` (nem klaszterez egy alkotót). Teszt: `feedRanking.test.ts` (9). A hiteles scoring, amit a server-ranking/kliens használ. (A mai feed csak `promoted`+`created_at`.)
+- [ ] ⬜ **Hátra**: jel-GYŰJTÉS (watch-time/completion/rewatch/affinity → a `PostSignals` feltöltése) + a server-oldali feed-lekérdezés átállítása a `scorePost`-ra + trending.
 
 ### 2.4 Collections / Library — P1
 - [ ] 🟡 Like/save van → ⬜ **folders/collections/playlists** + creator-follow-preferences + personalized notifications.
@@ -38,7 +39,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] ⬜ Template publish/preview/version + attribution + remix-count + analytics + marketplace-ranking (összeér [02](./02-monetization.md) §2.7-tel).
 
 ### 2.7 Remix Graph — P1
-- [ ] 🟡 Remix működik → ⬜ **ancestry/descendants/chain** + graph-vizualizáció + attribution.
+- [x] ~ **Graph-mag kész**: [src/lib/creativeGraph.ts](../../src/lib/creativeGraph.ts) — `lineage` (ancestry, ciklus-védett) + `descendants` + `remixOf`-élek a projekt-modellből, tesztelt ([[code-diff-core]] szomszéd: [[versions-core]]). (Az audit `main`-je elavult.)
+- [ ] ⬜ **Hátra**: a graph **vizualizáció-UI** (fa-nézet) + poszt-szintű remix-lánc (a feed `remix_of_post_id`-ből) + attribution-badge.
 
 ### 2.8 Feed media pipeline — P1
 - [ ] 🟡 Metaadat-oldal kész → 🎞️/🔌 **render→upload→poster→thumbnails→CDN→transcoding→moderation→publish** teljes prod-pipeline.

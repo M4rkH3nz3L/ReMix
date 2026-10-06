@@ -27,7 +27,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 
 ### 2.3 For You ranking v2 — P1 (nagy)
 - [x] ✅ **Ranker-mag + teszt**: [src/lib/feedRanking.ts](../../src/lib/feedRanking.ts) — `scorePost` (súlyozott engagement + completion + creator-/topic-affinity + exponenciális **freshness**-csökkenés half-life-fal + negatív-jel-büntetés) + `rankBy` (csökkenő pontszám, stabil) + `applyDiversity` (nem klaszterez egy alkotót). Teszt: `feedRanking.test.ts` (9). A hiteles scoring, amit a server-ranking/kliens használ. (A mai feed csak `promoted`+`created_at`.)
-- [ ] ⬜ **Hátra**: jel-GYŰJTÉS (watch-time/completion/rewatch/affinity → a `PostSignals` feltöltése) + a server-oldali feed-lekérdezés átállítása a `scorePost`-ra + trending.
+- [x] ✅ **BEKÖTVE (kliens)**: [feed.ts](../../src/lib/feed.ts) `rankForYou` — a `listFeed('foryou')` mostantól **rangsorol** (nem kronológikus): `postSignals` (engagement + frissesség az elérhető adatokból) → `rankBy` + `applyDiversity`; a `promoted` posztok elöl. A `latest`/`following` időrendi marad. Teszt: `feed.test.ts` (3) — promoted-first + engagement-rangsor + diverzitás.
+- [ ] ⬜ **Hátra**: a hiányzó jelek GYŰJTÉSE (watch-time/completion/rewatch/affinity → a `PostSignals` feltöltése) + a ranking server-oldalra költöztetése (globális, nem csak a lap) + trending.
 
 ### 2.4 Collections / Library — P1
 - [ ] 🟡 Like/save van → ⬜ **folders/collections/playlists** + creator-follow-preferences + personalized notifications.

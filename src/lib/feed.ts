@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import { applyDiversity, rankBy, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
@@ -113,7 +114,35 @@ async function viewerEngagement(postIds: string[]): Promise<{ liked: Set<string>
   return { liked, saved };
 }
 
-/** A feed (foryou/latest = legújabb publikus; following = a követettjeim). */
+/** FeedPost → ranking-jelek az ELÉRHETŐ adatokból (engagement + frissesség). A
+ *  watch-time/affinitás jelek a server-oldali ranking bekötésekor jönnek majd. */
+function postSignals(post: FeedPost, nowMs: number): PostSignals {
+  const c = post.counts;
+  return {
+    likes: c.likes,
+    comments: c.comments,
+    saves: c.saves,
+    remixes: c.remixes,
+    views: c.views,
+    ageHours: Math.max(0, (nowMs - Date.parse(post.createdAt)) / 3_600_000),
+  };
+}
+
+/**
+ * 🎯 A For-You feed rangsorolása a kliensen (audit §4.3 bekötés): engagement +
+ * frissesség-pontszám ([feedRanking.ts](./feedRanking.ts)) + diverzitás (ne klaszterezzen
+ * egy alkotó). A **promoted** (megfizetett) posztok elöl maradnak. Így a „For You" már
+ * nem tisztán kronológikus. (A `latest`/`following` mód változatlanul időrendi.)
+ */
+export function rankForYou(posts: FeedPost[], nowMs = Date.now()): FeedPost[] {
+  const promoted = posts.filter((p) => p.promoted);
+  const rest = posts.filter((p) => !p.promoted);
+  const ranked = rankBy(rest, (p) => postSignals(p, nowMs));
+  const diverse = applyDiversity(ranked, (p) => p.creator.id);
+  return [...promoted, ...diverse];
+}
+
+/** A feed (foryou = rangsorolt; latest = legújabb publikus; following = a követettjeim). */
 export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<FeedPost[]> {
   const sb = requireSupabase();
   let creatorIds: string[] | null = null;
@@ -148,7 +177,10 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
   }
   const rows = (data ?? []) as PostRow[];
   const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
-  return rows.map((r) => toPost(r, liked, saved));
+  const posts = rows.map((r) => toPost(r, liked, saved));
+  // 🎯 §4.3: a For-You módot a kliensen rangsoroljuk (engagement+frissesség+diverzitás);
+  // a latest/following időrendi marad.
+  return mode === 'foryou' ? rankForYou(posts) : posts;
 }
 
 /** Keresés eredménye: illeszkedő posztok + a belőlük kinyert egyedi alkotók. */

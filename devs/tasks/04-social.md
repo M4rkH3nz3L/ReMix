@@ -64,7 +64,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 
 ### 2.10 Creator Studio — P1 (kritikus)
 - [x] ~ **Analitika-magok KÉSZ**: a TARTALOM-teljesítmény [analytics.ts](../../src/lib/analytics.ts) (`summarize`/`breakdownBy`/`topPerformers`/`whyItWorked`/retention/engagement; [[analytics-core]]) + a CSATORNA-szint [src/lib/creatorAnalytics.ts](../../src/lib/creatorAnalytics.ts) (2026-10-06): `remixAnalytics` (totalRemixes/remixRate/remixedShare/topRemixed a saját posztokból) + `followerGrowth` (nettó + napi ráta + legjobb felfutás egy pillanatkép-sorozatból, determinisztikus). Teszt: `creatorAnalytics.test.ts` (7).
-- [ ] 🖼️🔌 Hátra: a **dashboard-UI** (a magok köré) + content/post-management + **drafts** + a follower-pillanatképek + revenue-sorozat gyűjtése (perzisztencia).
+- [x] ~ **Alap-összesítő MÁR megjelenik** (verify-first): a csatorna ([channel/[id].tsx](../../src/app/channel/)) mutatja a `▶ views · ♥ likes · 🔀 remixes` stripet ([promotion.ts](../../src/lib/promotion.ts) `creatorTotals`).
+- [ ] 🖼️🔌 Hátra: dedikált **dashboard-UI** a mélyebb magokra (`creatorAnalytics` remix-ráta/followerGrowth, `analytics.summarize`) + content/post-management + **drafts** + a follower-pillanatképek/revenue-sorozat gyűjtése (perzisztencia).
 
 ## 3. Kész, ha
 A feed valódi **jelek** alapján rangsorol; a keresés user/post/template/hashtag fölött megy

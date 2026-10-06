@@ -47,7 +47,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🖼️🔌 Hátra: trending-tagek a hashtag-oldalon (`trendingHashtags`) + user/template search + explicit filters + a feed-oldali (server) kereső typo-toleranciája.
 
 ### 2.6 Template marketplace — P1
-- [ ] ⬜ Template publish/preview/version + attribution + remix-count + analytics + marketplace-ranking (összeér [02](./02-monetization.md) §2.7-tel).
+- [x] ✅ **Marketplace-ranking mag KÉSZ (2026-10-06)**: [src/lib/marketplaceRank.ts](../../src/lib/marketplaceRank.ts) — `bayesianRating` (a kevés-szavazatú tétel a globális átlag felé húzva → 5★/1-review nem ver 4.8★/500-at) + `marketplaceScore` (letöltés-SEBESSÉG × minőség-szorzó × frissesség; a minőség sosem nullázza a sebességet → új tétel is látszik) + `rankListings`. A shop-adatból (`downloads`/`rating`) dolgozik; a `feedRanking` engagement-alapjától külön. Teszt: `marketplaceRank.test.ts` (7).
+- [ ] 🖼️🔌 Hátra: template publish/preview/**version** (semver) + attribution (a `remixGraph`-ból) + a ranking bekötése a shop-listázásba (UI).
 
 ### 2.7 Remix Graph — P1
 - [x] ~ **Graph-mag kész**: [src/lib/creativeGraph.ts](../../src/lib/creativeGraph.ts) — `lineage` (ancestry, ciklus-védett) + `descendants` + `remixOf`-élek a projekt-modellből, tesztelt ([[code-diff-core]] szomszéd: [[versions-core]]). (Az audit `main`-je elavult.)

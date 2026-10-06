@@ -59,6 +59,16 @@ describe('capabilities — minTier-alapú kapuzás (audit §2.1)', () => {
     expect(capabilityAllowed('autoEdit', 'pro')).toBe(true);
   });
 
+  test('backend-gate EKVIVALENCIA: capabilityAllowed(cap, tier) = a régi (!requiresPro || isPro)', () => {
+    // a migráció (ensureCloud/canUseCloud → allowsNow) zéró-regressziós bizonyítéka:
+    for (const cap of ALL) {
+      // free user (isPro=false): régi "allowed" = !requiresPro
+      expect(capabilityAllowed(cap, 'free')).toBe(!capabilityRequiresPro(cap));
+      // pro user (isPro=true): régi "allowed" = true (minden)
+      expect(capabilityAllowed(cap, 'pro')).toBe(true);
+    }
+  });
+
   test('proCapabilities a fizetős képességeket adja (nem üres)', () => {
     const list = proCapabilities();
     expect(Array.isArray(list)).toBe(true);

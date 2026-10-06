@@ -1,13 +1,9 @@
 import Constants from 'expo-constants';
 import { t as tr } from 'i18next';
 
-import {
-  capabilityLabel,
-  capabilityRequiresPro,
-  type CapabilityId,
-} from '@/lib/capabilities';
+import { capabilityLabel, type CapabilityId } from '@/lib/capabilities';
 import { isSecureForRelease } from '@/lib/envConfig';
-import { isProNow } from '@/store/entitlementStore';
+import { allowsNow } from '@/store/entitlementStore';
 
 /**
  * 🔀 Backend-router — a worker-címek és a felhő-kapu EGYETLEN forrása.
@@ -104,7 +100,9 @@ export function isProRequiredError(e: unknown): e is ProRequiredError {
  *   const res = await fetch(`${base}/captions`, …);
  */
 export function ensureCloud(cap: CapabilityId): string {
-  if (capabilityRequiresPro(cap) && !isProNow()) {
+  // 💠 tier-pontos kapu (audit §2.1): a művelet `minTier`-je ellen (a mai free/pro-
+  // capekre bitre ekvivalens a korábbi `requiresPro && !isPro`-val; basic/ultra-kész).
+  if (!allowsNow(cap)) {
     throw new ProRequiredError(cap);
   }
   return cloudBaseUrl();
@@ -112,5 +110,5 @@ export function ensureCloud(cap: CapabilityId): string {
 
 /** Igaz, ha a képesség MOST elérhető a felhasználónak (nem dob, csak kérdez). */
 export function canUseCloud(cap: CapabilityId): boolean {
-  return !capabilityRequiresPro(cap) || isProNow();
+  return allowsNow(cap);
 }

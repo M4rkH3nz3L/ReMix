@@ -19,7 +19,7 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 ## 2. Feladatlista
 
 ### 2.1 Tier-modell `Free/Basic/Pro/Ultra` — P1
-- [x] ✅ **Capability → minTier** réteg KÉSZ: [src/lib/tiers.ts](../../src/lib/tiers.ts) (Tier-sorrend + `tierMeetsMin`/`isPaidTier`/`asTier`) + [capabilities.ts](../../src/lib/capabilities.ts) `minTier` (a `local ⇒ free` type-invariáns megmaradt) + `capabilityAllowed(cap, tier)` + `entitlementStore.allows(cap)`/`effectiveTier()`. A `capabilityRequiresPro`/`isPro` backward-compat (viselkedés változatlan). Teszt: `tiers.test.ts` + `capabilities.test.ts` (11). A hívók `allows()`-ra migrálása inkrementális (a mai binding is helyes marad).
+- [x] ✅ **Capability → minTier** réteg KÉSZ + **BEKÖTVE**: [src/lib/tiers.ts](../../src/lib/tiers.ts) (Tier-sorrend + `tierMeetsMin`/`isPaidTier`/`asTier`) + [capabilities.ts](../../src/lib/capabilities.ts) `minTier` (a `local ⇒ free` type-invariáns megmaradt) + `capabilityAllowed(cap, tier)` + `entitlementStore.allows(cap)`/`effectiveTier()`/`allowsNow(cap)`. A **backend-gate** ([backend.ts](../../src/lib/backend.ts) `ensureCloud`/`canUseCloud`) a tier-pontos `allowsNow`-t használja (a `requiresPro && !isPro` helyett) — **ekvivalencia-teszttel bizonyítva zéró regresszió** a free/pro-capekre, és jövő-biztos basic/ultra-ra. Teszt: `tiers.test.ts` + `capabilities.test.ts` (12).
 - [ ] 🟡 Entitlement-mapping a 4 tierre: a **kliens kész** (`effectiveTier` 4-tier + lejárat), a **server-oldal** (DB-tier-enum basic/ultra + billing/IAP-termékek) hátra → §2.4.
 
 ### 2.2 Usage metering — P1

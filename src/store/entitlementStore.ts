@@ -182,3 +182,9 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
 export function isProNow(): boolean {
   return useEntitlement.getState().isPro();
 }
+
+/** Nem-reaktív pillanatkép: engedélyezett-e a művelet az AKTUÁLIS szinten
+ *  (tier-pontos kapu, `capability.minTier` ellen). A backend-gate ezt használja. */
+export function allowsNow(cap: CapabilityId): boolean {
+  return useEntitlement.getState().allows(cap);
+}

@@ -46,16 +46,20 @@ export const DEFAULT_WEIGHTS: RankWeights = {
   negativePenalty: 2,
 };
 
-/** Súlyozott engagement-ráta: az interakciók / megtekintés (a ritkább = értékesebb). */
-export function engagementScore(s: PostSignals): number {
-  const views = Math.max(1, s.views ?? 0);
-  const weighted =
+/** Nyers, súlyozott interakció-összeg (nézettséggel NEM osztva) — a ritkább = értékesebb. */
+export function weightedEngagement(s: PostSignals): number {
+  return (
     (s.likes ?? 0) * 1 +
     (s.comments ?? 0) * 2 +
     (s.saves ?? 0) * 3 +
     (s.shares ?? 0) * 4 +
-    (s.remixes ?? 0) * 5;
-  return weighted / views;
+    (s.remixes ?? 0) * 5
+  );
+}
+
+/** Súlyozott engagement-RÁTA: a nyers interakció-összeg / megtekintés. */
+export function engagementScore(s: PostSignals): number {
+  return weightedEngagement(s) / Math.max(1, s.views ?? 0);
 }
 
 /** Frissesség-szorzó: exponenciális csökkenés (half-life). 1.0 frissen, →0 régen. */
@@ -82,6 +86,37 @@ export function scorePost(s: PostSignals, w: RankWeights = DEFAULT_WEIGHTS): num
 export function rankBy<T>(items: T[], signalsOf: (item: T) => PostSignals, w?: RankWeights): T[] {
   return items
     .map((item, i) => ({ item, i, score: scorePost(signalsOf(item), w) }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map((x) => x.item);
+}
+
+// ── Trending (felkapott) — engagement-SEBESSÉG, nem személyre szabott ────────
+
+export interface TrendingWeights {
+  /** idő-súly kitevő: nagyobb = gyorsabban „öregszik" a poszt (Reddit/HN-stílus). */
+  gravity: number;
+  /** óra-eltolás a nevezőben (a frissen született poszt se osszon ~0-val). */
+  offsetHours: number;
+}
+
+export const DEFAULT_TRENDING: TrendingWeights = { gravity: 1.5, offsetHours: 2 };
+
+/**
+ * „Felkapott" pontszám: a NYERS súlyozott engagement az életkorral csökkentve
+ * (`weightedEngagement / (ageHours + offset)^gravity`). A `scorePost`-tal szemben
+ * NEM személyre szabott és nem a rátát nézi, hanem a VOLUMEN-SEBESSÉGET — a most
+ * gyorsan gyűjtő posztokat hozza előre (globális felfedezés/trending).
+ */
+export function trendingScore(s: PostSignals, w: TrendingWeights = DEFAULT_TRENDING): number {
+  const age = Math.max(0, s.ageHours ?? 0);
+  const denom = Math.pow(age + Math.max(0.0001, w.offsetHours), w.gravity);
+  return weightedEngagement(s) / denom;
+}
+
+/** Elemek rangsorolása csökkenő trending-pontszám szerint (stabil). */
+export function rankTrending<T>(items: T[], signalsOf: (item: T) => PostSignals, w?: TrendingWeights): T[] {
+  return items
+    .map((item, i) => ({ item, i, score: trendingScore(signalsOf(item), w) }))
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .map((x) => x.item);
 }

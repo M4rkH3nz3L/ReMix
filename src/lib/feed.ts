@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { applyDiversity, rankBy, type PostSignals } from '@/lib/feedRanking';
+import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
@@ -142,6 +142,19 @@ export function rankForYou(posts: FeedPost[], nowMs = Date.now()): FeedPost[] {
   return [...promoted, ...diverse];
 }
 
+/**
+ * 🔥 Trending feed (audit §4.3): a GLOBÁLISAN felkapott posztok — engagement-SEBESSÉG
+ * ([feedRanking.ts](./feedRanking.ts) `rankTrending`: nyers engagement / kor^gravity),
+ * nem személyre szabott. A promoted elöl, a többi trending-sorrendben + diverzitás.
+ */
+export function rankTrendingFeed(posts: FeedPost[], nowMs = Date.now()): FeedPost[] {
+  const promoted = posts.filter((p) => p.promoted);
+  const rest = posts.filter((p) => !p.promoted);
+  const ranked = rankTrending(rest, (p) => postSignals(p, nowMs));
+  const diverse = applyDiversity(ranked, (p) => p.creator.id);
+  return [...promoted, ...diverse];
+}
+
 /** A feed (foryou = rangsorolt; latest = legújabb publikus; following = a követettjeim). */
 export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<FeedPost[]> {
   const sb = requireSupabase();
@@ -178,9 +191,15 @@ export async function listFeed(mode: FeedMode = 'foryou', limit = 50): Promise<F
   const rows = (data ?? []) as PostRow[];
   const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
   const posts = rows.map((r) => toPost(r, liked, saved));
-  // 🎯 §4.3: a For-You módot a kliensen rangsoroljuk (engagement+frissesség+diverzitás);
-  // a latest/following időrendi marad.
-  return mode === 'foryou' ? rankForYou(posts) : posts;
+  // 🎯 §4.3: a For-You-t engagement+frissesség+diverzitással, a trending-et
+  // engagement-SEBESSÉGgel rangsoroljuk a kliensen; a latest/following időrendi marad.
+  if (mode === 'foryou') {
+    return rankForYou(posts);
+  }
+  if (mode === 'trending') {
+    return rankTrendingFeed(posts);
+  }
+  return posts;
 }
 
 /** Keresés eredménye: illeszkedő posztok + a belőlük kinyert egyedi alkotók. */

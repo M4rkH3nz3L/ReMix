@@ -1,4 +1,4 @@
-import { rankForYou } from '@/lib/feed';
+import { rankForYou, rankTrendingFeed } from '@/lib/feed';
 import type { FeedPost } from '@/types/social';
 
 const NOW = Date.parse('2026-10-06T12:00:00Z');
@@ -50,5 +50,25 @@ describe('rankForYou — For-You rangsor (audit §4.3 bekötés)', () => {
     // a 3. X helyett Y-t húz előre
     expect(ids.slice(0, 3)).toEqual(['x1', 'x2', 'y1']);
     expect(ids[3]).toBe('x3');
+  });
+});
+
+describe('rankTrendingFeed — felkapott (engagement-sebesség)', () => {
+  const eng = (likes: number) => ({ likes, comments: 0, saves: 0, views: 1000, remixes: 0 });
+
+  it('a frissen gyűjtő poszt megelőzi a régi-nagyot (sebesség, nem össz-volumen)', () => {
+    const posts = [
+      post({ id: 'old-big', creatorId: 'c1', createdAt: '2026-09-26T12:00:00Z', counts: eng(5000) }), // 10 napja
+      post({ id: 'viral', creatorId: 'c2', createdAt: '2026-10-06T10:00:00Z', counts: eng(400) }), // 2 órája
+    ];
+    expect(rankTrendingFeed(posts, NOW).map((p) => p.id)).toEqual(['viral', 'old-big']);
+  });
+
+  it('a promoted elöl marad', () => {
+    const posts = [
+      post({ id: 'viral', creatorId: 'c1', createdAt: '2026-10-06T10:00:00Z', counts: eng(400) }),
+      post({ id: 'promo', creatorId: 'c2', promoted: true, createdAt: '2026-09-01T00:00:00Z', counts: eng(1) }),
+    ];
+    expect(rankTrendingFeed(posts, NOW)[0].id).toBe('promo');
   });
 });

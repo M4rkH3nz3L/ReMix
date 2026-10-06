@@ -4,7 +4,10 @@ import {
   engagementScore,
   freshnessFactor,
   rankBy,
+  rankTrending,
   scorePost,
+  trendingScore,
+  weightedEngagement,
   type PostSignals,
 } from '@/lib/feedRanking';
 
@@ -56,6 +59,42 @@ describe('rankBy', () => {
       { id: 'c', s: { views: 100, likes: 40, ageHours: 1 } },
     ];
     expect(rankBy(posts, (p) => p.s).map((p) => p.id)).toEqual(['b', 'c', 'a']);
+  });
+});
+
+describe('weightedEngagement', () => {
+  it('nyers súlyozott összeg, nézettséggel NEM osztva', () => {
+    expect(weightedEngagement({ likes: 1, comments: 1, saves: 1, shares: 1, remixes: 1 })).toBe(15);
+    expect(weightedEngagement({ likes: 10, views: 1000 })).toBe(10); // a view nem számít bele
+  });
+});
+
+describe('trendingScore (felkapott — engagement-sebesség)', () => {
+  it('azonos engagement: a frissebb jóval előrébb', () => {
+    const fresh = trendingScore({ likes: 100, ageHours: 1 });
+    const old = trendingScore({ likes: 100, ageHours: 48 });
+    expect(fresh).toBeGreaterThan(old);
+    expect(fresh).toBeGreaterThan(old * 10); // a gravity drámai esést ad
+  });
+  it('azonos kor: a több engagement előrébb', () => {
+    expect(trendingScore({ likes: 200, ageHours: 5 })).toBeGreaterThan(trendingScore({ likes: 50, ageHours: 5 }));
+  });
+  it('nincs engagement → 0', () => {
+    expect(trendingScore({ ageHours: 3 })).toBe(0);
+  });
+  it('frissen (ageHours 0) sem oszt ~0-val (offset véd)', () => {
+    expect(Number.isFinite(trendingScore({ likes: 10, ageHours: 0 }))).toBe(true);
+  });
+});
+
+describe('rankTrending', () => {
+  it('a sebesség szerint rangsorol (régi-nagy mögé a friss-közepes)', () => {
+    const posts = [
+      { id: 'viral', s: { likes: 500, ageHours: 2 } },
+      { id: 'old-big', s: { likes: 5000, ageHours: 240 } },
+      { id: 'slow', s: { likes: 20, ageHours: 2 } },
+    ];
+    expect(rankTrending(posts, (p) => p.s).map((p) => p.id)).toEqual(['viral', 'slow', 'old-big']);
   });
 });
 

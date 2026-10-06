@@ -11,8 +11,8 @@
 
 import type { AspectRatio, Track } from '@/types/project';
 
-/** Feed-módok (M3). A ranker az M11-ben jön — most heurisztikus. */
-export type FeedMode = 'foryou' | 'following' | 'latest';
+/** Feed-módok (M3). `foryou` = személyre szabott ranker, `trending` = globális felkapott. */
+export type FeedMode = 'foryou' | 'following' | 'latest' | 'trending';
 
 /** Poszt-láthatóság (TikTok-modell): mindenki / a követők / csak az alkotó. */
 export type PostVisibility = 'public' | 'followers' | 'private';

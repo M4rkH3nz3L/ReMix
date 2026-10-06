@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 
 import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
+import { finiteNum, mapValid, str } from '@/lib/parseGuards';
+import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
 import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
@@ -598,6 +600,60 @@ export async function recordView(postId: string): Promise<void> {
     () => {},
     () => {}
   );
+}
+
+/**
+ * 👁️ A néző SAJÁT nézési eseménye (watched/duration ms) a `post_view_events`-be —
+ * a For-You ranking VALÓS jeleihez ([viewSignals.ts](./viewSignals.ts) aggregálja).
+ * Csak hitelesített néző (RLS: viewer_id = auth.uid()); best-effort (a hiba nem
+ * zavarja a lejátszást, és forgalom-érzékeny → elnyeljük).
+ */
+export async function recordViewEvent(postId: string, watchedMs: number, durationMs: number): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+  const uid = useAuth.getState().user?.id;
+  if (!uid) {
+    return;
+  }
+  await supabase
+    .from('post_view_events')
+    .insert({
+      post_id: postId,
+      viewer_id: uid,
+      watched_ms: Math.max(0, Math.round(watchedMs)),
+      duration_ms: Math.max(0, Math.round(durationMs)),
+    })
+    .then(
+      () => {},
+      () => {}
+    );
+}
+
+/** Egy poszt nézési eseményei (a TULAJ analitikájához; a `viewSignals` aggregálja). */
+export async function fetchViewEvents(postId: string): Promise<ViewEvent[]> {
+  if (!supabase) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('post_view_events')
+    .select('post_id, viewer_id, watched_ms, duration_ms')
+    .eq('post_id', postId);
+  if (error) {
+    return [];
+  }
+  return mapValid(data, (o) => {
+    const pid = str(o.post_id);
+    if (!pid) {
+      return null;
+    }
+    return {
+      postId: pid,
+      viewerId: str(o.viewer_id),
+      watchedMs: finiteNum(o.watched_ms) ?? 0,
+      durationMs: finiteNum(o.duration_ms) ?? 0,
+    };
+  });
 }
 
 /**

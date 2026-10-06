@@ -55,7 +55,8 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 - [ ] 🖼️ Audio-mixer core kész → UI: **EQ/compressor/limiter/pan/normalize/noise-hum/sidechain/automation**.
 
 ### 2.8 GIF — P1
-- [ ] ⬜ GIF import + animált preview + timeline + render.
+- [x] ✅ **GIF-időzítés mag KÉSZ (2026-10-06)**: [src/lib/gifTiming.ts](../../src/lib/gifTiming.ts) — a master-óra playheadjéből (AGENTS.md: minden réteg a playheadből számol) `frameIndexAt` (a megjelenítendő kocka a változó kocka-késleltetésekből, loop-aware: loop=true ciklus, loop=false az utolsó kockán áll) + `gifDuration` + `loopCountAt`; a 0/negatív/NaN késleltetés a GIF-konvenció szerint 100 ms. Teszt: `gifTiming.test.ts` (7).
+- [ ] 🔌🖼️ Hátra: a GIF **dekódolás** (natív, kocka-késleltetések kinyerése) + import + a preview-réteg a `frameIndexAt`-tel + timeline + render (ffmpeg).
 
 ### 2.9 Proxy / performance engine — P1
 - [ ] 🟡 Proxy-alap van → ⬜ **background proxy-generálás + lifecycle + render-cache + invalidation + size-mgmt + storage-policy**.

@@ -49,7 +49,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🟡 Metaadat-oldal kész → 🎞️/🔌 **render→upload→poster→thumbnails→CDN→transcoding→moderation→publish** teljes prod-pipeline.
 
 ### 2.9 Multi-platform publishing — P1
-- [ ] ⬜ TikTok/IG/YouTube/FB + aspect/title/desc/hashtags/thumbnail/**scheduling/OAuth/status/retry**. (A Live-multistream RTMP-útja ehhez mintát ad.)
+- [x] ✅ **Platform-adapter mag KÉSZ (2026-10-06)**: [src/lib/publishTargets.ts](../../src/lib/publishTargets.ts) — `PLATFORM_SPECS` (TikTok/IG/YouTube/FB: cím/leírás-limit, hashtag-plafon, ajánlott aspect, short-form max hossz) + `normalizeHashtag(s)` (vezető-#/érvénytelen-karakter szűrés + case-insensitive dedup) + `adaptForPlatform` (a posztot a platform szabályaihoz igazítja: cím külön mezőbe VAGY a leírás elejére, hashtagek a leírás végére a limit megtartásával, **kemény** szöveg-vágás + figyelmeztetés; aspect/hossz csak warn) + `adaptAll`. Így a feltöltés ELŐTT látszik, mi megy fel + mit vágott. Teszt: `publishTargets.test.ts` (13).
+- [ ] 🔌 Hátra: **scheduling + OAuth + feltöltés + státusz/retry** per platform (backend; a Live-multistream RTMP-útja mintát ad) + a preview-UI a variánsokra/figyelmeztetésekre.
 
 ### 2.10 Creator Studio — P1 (kritikus)
 - [ ] ⬜ Content/post-management + **drafts** + analytics (views/retention/engagement/follower-growth/revenue/remix-analytics).

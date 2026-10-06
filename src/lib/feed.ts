@@ -296,6 +296,28 @@ export async function listPostsByHashtag(tag: string, limit = 50): Promise<FeedP
   return rows.map((r) => toPost(r, liked, saved));
 }
 
+/**
+ * Posztok id-halmaz alapján (a kollekció-oldalhoz), a BEMENETI sorrendet megőrizve.
+ * Az RLS a láthatóságot érvényesíti; a moderált-ki posztok kiesnek.
+ */
+export async function listPostsByIds(ids: string[]): Promise<FeedPost[]> {
+  if (!supabase || ids.length === 0) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('posts')
+    .select(POST_COLUMNS)
+    .in('id', ids)
+    .eq('moderation_status', 'ok');
+  if (error) {
+    throw new Error(error.message);
+  }
+  const rows = (data ?? []) as PostRow[];
+  const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
+  const byId = new Map(rows.map((r) => [r.id, toPost(r, liked, saved)]));
+  return ids.map((id) => byId.get(id)).filter((p): p is FeedPost => !!p);
+}
+
 /** Egy csatorna: az alkotó posztjai + statisztika + követem-e. */
 export interface ChannelData {
   userId: string;

@@ -363,10 +363,16 @@ export default function ChannelScreen() {
                 </View>
               ) : null}
               {data?.isMe ? (
-                <Pressable style={styles.editBtn} onPress={() => router.push('/profile')}>
-                  <Ionicons name="settings-outline" size={16} color={palette.text} />
-                  <Text style={styles.editBtnText}>{t('channel.editProfile')}</Text>
-                </Pressable>
+                <View style={styles.actionRow}>
+                  <Pressable style={styles.editBtn} onPress={() => router.push('/profile')}>
+                    <Ionicons name="settings-outline" size={16} color={palette.text} />
+                    <Text style={styles.editBtnText}>{t('channel.editProfile')}</Text>
+                  </Pressable>
+                  <Pressable style={styles.editBtn} onPress={() => router.push('/collections')}>
+                    <Ionicons name="folder-outline" size={16} color={palette.text} />
+                    <Text style={styles.editBtnText}>{t('collections.title')}</Text>
+                  </Pressable>
+                </View>
               ) : (
                 <View style={styles.actionRow}>
                   <Pressable

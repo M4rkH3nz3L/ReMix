@@ -121,6 +121,21 @@ export async function removeFromCollection(collectionId: string, postId: string)
   }
 }
 
+/** Mely (saját) kollekciók tartalmazzák ezt a posztot — a kollekció-választó pipáihoz. */
+export async function collectionIdsWithPost(postId: string): Promise<string[]> {
+  if (!supabase) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('post_collection_items')
+    .select('collection_id')
+    .eq('post_id', postId);
+  if (error) {
+    return [];
+  }
+  return mapValid(data, (o) => str(o.collection_id));
+}
+
 /** Egy kollekció poszt-id-jai (a hashtag-/mappa-oldalhoz). */
 export async function listCollectionPostIds(collectionId: string): Promise<string[]> {
   if (!supabase) {

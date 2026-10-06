@@ -23,6 +23,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { CollectionSheet } from '@/components/CollectionSheet';
 import { CommentSheet } from '@/components/CommentSheet';
 import { GiftSheet } from '@/components/GiftSheet';
 import { LiveNowStrip } from '@/components/live/LiveNowStrip';
@@ -82,6 +83,7 @@ export default function FeedScreen() {
   const [busy, setBusy] = useState(false);
   const [commentFor, setCommentFor] = useState<FeedPost | null>(null);
   const [giftFor, setGiftFor] = useState<FeedPost | null>(null);
+  const [collectionFor, setCollectionFor] = useState<FeedPost | null>(null);
   // 🛡️ globális poszt-moderátor jog → „eltávolítás a feedből" gomb bármely poszton
   const canModeratePost = useRoles((s) => s.permissions.includes('post.moderate'));
   // 📌 a FÜGGŐLEGESEN középre lapozott TOP-poszt; a vízszintes remix-lapozó EHHEZ
@@ -931,7 +933,12 @@ export default function FeedScreen() {
           </View>
           <Text style={styles.railCount}>{compact(sub.counts.comments)}</Text>
         </Pressable>
-        <Pressable style={styles.railBtn} onPress={() => onSave(sub)}>
+        <Pressable
+          style={styles.railBtn}
+          onPress={() => onSave(sub)}
+          onLongPress={() => setCollectionFor(sub)}
+          delayLongPress={300}
+        >
           <Ionicons
             name={sub.viewerSaved ? 'bookmark' : 'bookmark-outline'}
             size={30}
@@ -1227,6 +1234,9 @@ export default function FeedScreen() {
         postId={giftFor?.id ?? null}
         onClose={() => setGiftFor(null)}
       />
+
+      {/* 📁 kollekció-választó (a mentés-gomb hosszú-nyomására) */}
+      <CollectionSheet postId={collectionFor?.id ?? null} onClose={() => setCollectionFor(null)} />
 
       {/* 💬 komment-lap (a komment-gomb nyitja) */}
       <CommentSheet

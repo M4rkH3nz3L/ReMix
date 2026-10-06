@@ -3111,6 +3111,14 @@
     "noResults": "Nincs találat erre: „{{q}}”.",
     "clear": "Törlés"
   },
+  "collections": {
+    "title": "Gyűjtemények",
+    "empty": "Még nincs gyűjtemény.",
+    "newPlaceholder": "Új gyűjtemény…",
+    "count": "{{n}} videó",
+    "addTo": "Hozzáadás gyűjteményhez",
+    "done": "Kész"
+  },
   "live": {
     "title": "Élő",
     "heroTitle": "Menj élőben a követőidnek",

@@ -3111,6 +3111,14 @@
     "noResults": "Nichts gefunden für „{{q}}“.",
     "clear": "Löschen"
   },
+  "collections": {
+    "title": "Sammlungen",
+    "empty": "Noch keine Sammlungen.",
+    "newPlaceholder": "Neue Sammlung…",
+    "count": "{{n}} Videos",
+    "addTo": "Zur Sammlung hinzufügen",
+    "done": "Fertig"
+  },
   "live": {
     "title": "Live",
     "heroTitle": "Geh live für deine Follower",

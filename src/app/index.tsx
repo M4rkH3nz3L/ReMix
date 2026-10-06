@@ -1150,6 +1150,12 @@ export default function FeedScreen() {
                     {t('feed.forYou')}
                   </Text>
                 </Pressable>
+                <Text style={styles.modeSep}>|</Text>
+                <Pressable onPress={() => changeMode('trending')}>
+                  <Text style={[styles.modeText, mode === 'trending' && styles.modeActive]}>
+                    {t('feed.trending')}
+                  </Text>
+                </Pressable>
               </View>
 
               {/* 🔎 jobb: KERESŐ — a mód-váltóval egy vonalban (külön route) */}

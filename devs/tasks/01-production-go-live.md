@@ -52,7 +52,8 @@ menni az `upload → render → publish` úton **production** környezetben, mon
 - [ ] ⬜ **upload → render → publish** teljes pipeline prod-verifikáció (1 valódi videó végig).
 - [ ] ⬜ **Crash + error monitoring** (Sentry vagy ekviv.) kliens + worker.
 - [ ] ⬜ **Rate-limiting** minden compute-endpointon (security-backlog `03`) + **cost-observability** ([13](./13-documentation.md) §13.5).
-- [ ] ⬜ **Client/worker contract-tesztek** ([13](./13-documentation.md) §13.4) a CI-ben.
+- [x] ✅ **Client/worker contract-tesztek — alap KÉSZ (2026-10-06)**: [src/lib/contract.test.ts](../../src/lib/contract.test.ts) a kliens-jest projektben importálja MINDKÉT oldalt (TS + worker-JS) és egyenlőséget állít a drift-veszélyes mirror-ökre: **TIER_QUOTAS / USAGE_METRICS / periodKey / remaining+canUse / isUnlimited** ([usageMeter.ts](../../src/lib/usageMeter.ts) ⇄ [server/usage.js](../../server/usage.js)) + **effekt-filterek** ([videoEffects.ts](../../src/lib/videoEffects.ts) `effectFilterString`/`effectChainFilters` ⇄ [server/render.js](../../server/render.js) `effectFilterStr`/`effectChainFx`), minden típus×amount-ra. **Mellékhozam:** kiszúrt + javított egy latens null-amount default-divergenciát (worker fix 0.5 → per-típus `EFFECT_DEFAULT_AMOUNT`, a kliens `VIDEO_EFFECTS`-hez kötve). Már a `npm run audit`-ban fut (CI). Teszt: `contract.test.ts` (9).
+- [ ] ⬜ Hátra: további mirror-ök bekötése (pl. `/render` form-kontraktus [render.ts](../../src/lib/render.ts) ⇄ worker, `canvasTransform` skew ⇄ render skewChain, keyframe-easing) + a 3 jest-projekt összevonása egy CI-gate-be.
 
 ## 3. Kész, ha
 Egy friss eszközön a store-build (vagy internal-distribution) appból **bejelentkezés → projekt

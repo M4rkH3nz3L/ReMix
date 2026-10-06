@@ -109,11 +109,26 @@ function segSourceWindow(clip, seg) {
   return { srcStart, srcEnd: srcStart + seg.duration * clip.speed };
 }
 
+// Per-típus alap-amount — AZONOS a kliens VIDEO_EFFECTS `defaultAmount`-jával
+// (videoEffects.ts). Így a null-amount VÉDELMI ág is preview==render (a klip
+// rendesen explicit amountot kap az addEffect-ben, de ha valahol hiányzik, a
+// kettő akkor is egyezik). A contract-teszt (src/lib/contract.test.ts) zárolja.
+const EFFECT_DEFAULT_AMOUNT = {
+  blur: 0.4,
+  sharpen: 0.5,
+  vignette: 0.5,
+  grain: 0.3,
+  grayscale: 1,
+  sepia: 1,
+  invert: 1,
+};
+
 // 🎛️ Effekt-lánc (audit §6.5) — egy effekt FFmpeg-filtere. AZONOS a kliens
 // src/lib/videoEffects.ts `effectFilterString`-jével (preview/UI == render konzisztencia);
 // a kettő külön tesztelt. Vesszőtlen (a filtergraph-ban láncolható).
 function effectFilterStr(effect) {
-  const a = Math.max(0, Math.min(1, effect.amount == null ? 0.5 : effect.amount));
+  const dflt = EFFECT_DEFAULT_AMOUNT[effect.type] == null ? 0.5 : EFFECT_DEFAULT_AMOUNT[effect.type];
+  const a = Math.max(0, Math.min(1, effect.amount == null ? dflt : effect.amount));
   switch (effect.type) {
     case 'blur':
       return `gblur=sigma=${(a * 20).toFixed(2)}`;
@@ -2629,4 +2644,5 @@ module.exports = {
   segSourceWindow,
   effectFilterStr,
   effectChainFx,
+  EFFECT_DEFAULT_AMOUNT,
 };

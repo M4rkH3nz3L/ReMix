@@ -39,7 +39,7 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 - [x] ✅ **Render-bekötés**: [render.js](../../server/render.js) `effectChainFx` (a kliens `effectFilterString`-gel AZONOS filter-stringek — külön tesztelt: `render.test.js`) az `appearanceChain` UTÁN, mind a 4 render-helyen, **guardolva** (üres lánc = a megjelenés-lánc bitre változatlan → zéró regresszió). ⚠️ Runtime-verify: a vizuális kimenet élő ffmpeg-gel (itt nincs render-worker).
 - [x] ✅ **UI**: [FilterPanel](../../src/components/editor/panels/FilterPanel.tsx) „🎛️ Effekt-lánc" szekció — hozzáadás a katalógusból (`+ Blur`…) + lánc-lista ↑/↓ átrendezéssel, név-koppintásra ki/be (`⦸`), ✕ törlés, parametrikus effektekhez amount-Stepper. A tesztelt `videoEffects` oper-eit (`addEffect`/`moveEffect`/`toggleEffect`/`setEffectAmount`/`removeEffect`) hívja `UPDATE_CLIP`-en.
 
-**Kész:** az effect-chain mag + render + UI kész (audit zöld 98/1102). A vizuális render-kimenet élő ffmpeg-gel verifikálandó (a filter-stringek viszont kliens==worker tesztelve).
+**Kész:** az effect-chain mag + render + UI kész. A filter-stringek kliens==worker **contract-teszttel bizonyítva** ([src/lib/contract.test.ts](../../src/lib/contract.test.ts) — minden típus×amount + a null-amount védelmi ág; a worker null-default fix 0.5-ről per-típus `EFFECT_DEFAULT_AMOUNT`-ra igazítva, a kliens `VIDEO_EFFECTS`-hez kötve). A vizuális render-kimenet továbbra is élő ffmpeg-gel verifikálandó.
 
 ### 2.6 Transform — P1
 - [x] ✅ **crop + perspektíva** MÁR KÉSZ (`VideoClip.crop`, a render perspektíva-filtere / 3D-tilt). (Az audit `main`-je elavult.)

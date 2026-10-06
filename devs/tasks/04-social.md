@@ -54,7 +54,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🔌 Hátra: **scheduling + OAuth + feltöltés + státusz/retry** per platform (backend; a Live-multistream RTMP-útja mintát ad) + a preview-UI a variánsokra/figyelmeztetésekre.
 
 ### 2.10 Creator Studio — P1 (kritikus)
-- [ ] ⬜ Content/post-management + **drafts** + analytics (views/retention/engagement/follower-growth/revenue/remix-analytics).
+- [x] ~ **Analitika-magok KÉSZ**: a TARTALOM-teljesítmény [analytics.ts](../../src/lib/analytics.ts) (`summarize`/`breakdownBy`/`topPerformers`/`whyItWorked`/retention/engagement; [[analytics-core]]) + a CSATORNA-szint [src/lib/creatorAnalytics.ts](../../src/lib/creatorAnalytics.ts) (2026-10-06): `remixAnalytics` (totalRemixes/remixRate/remixedShare/topRemixed a saját posztokból) + `followerGrowth` (nettó + napi ráta + legjobb felfutás egy pillanatkép-sorozatból, determinisztikus). Teszt: `creatorAnalytics.test.ts` (7).
+- [ ] 🖼️🔌 Hátra: a **dashboard-UI** (a magok köré) + content/post-management + **drafts** + a follower-pillanatképek + revenue-sorozat gyűjtése (perzisztencia).
 
 ## 3. Kész, ha
 A feed valódi **jelek** alapján rangsorol; a keresés user/post/template/hashtag fölött megy

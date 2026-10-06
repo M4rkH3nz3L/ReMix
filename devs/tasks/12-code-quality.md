@@ -18,7 +18,8 @@ Store**, tipizált hálózat, determinisztikus állapot.
 ## 2. Feladatlista
 
 ### 2.1 HTTP response validation — P1
-- [ ] 🟡 `await res.json() as T` → **unknown → schema-validation → typed** minden kliens-worker híváson (a `parseGuards` kiterjesztése).
+- [x] ~ **Toolkit kibővítve + első adopter**: [parseGuards.ts](../../src/lib/parseGuards.ts) a `str`/`boolOr`/`strList`/**`asRecord`** narrowerekkel (a meglévő `finiteNum`/`timeList`/… mellé) → `const o = asRecord(await res.json()); str(o?.name)` a `… as T` helyett. Teszt: `parseGuards.test.ts` (+5). Első bekötés: [aiHealth.ts](../../src/lib/aiHealth.ts) (`boolOr(asRecord(...)?.ok)`).
+- [ ] ⬜ **Hátra**: a maradék ~20 fájl `res.json() as T` castjainak inkrementális migrálása a guardokra (biztonsági/kritikus path-ok elöl: billing, externalStorage, colorClient).
 
 ### 2.2 Retry / backoff egységesítés — P1
 - [ ] 🟡 `netRetry.ts` VAN → ⬜ **egységes policy** minden kritikus path-on: exponential-backoff + jitter + idempotency + max-attempts + Retry-After.

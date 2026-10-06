@@ -1,4 +1,15 @@
-import { finiteNum, finiteTime, mapValid, rangeList, timeList, unitNum } from '@/lib/parseGuards';
+import {
+  asRecord,
+  boolOr,
+  finiteNum,
+  finiteTime,
+  mapValid,
+  rangeList,
+  str,
+  strList,
+  timeList,
+  unitNum,
+} from '@/lib/parseGuards';
 
 describe('parseGuards — a worker válasza és a projekt közötti ellenőrzőpont', () => {
   describe('finiteNum', () => {
@@ -101,5 +112,45 @@ describe('parseGuards — a worker válasza és a projekt közötti ellenőrzőp
     it('nem tömb bemenet → üres lista', () => {
       expect(mapValid(null, () => 1)).toEqual([]);
     });
+  });
+});
+
+describe('str / boolOr / strList / asRecord (audit §12.1)', () => {
+  it('str: csak stringet enged át', () => {
+    expect(str('x')).toBe('x');
+    expect(str(5)).toBeNull();
+    expect(str(null)).toBeNull();
+    expect(str(undefined)).toBeNull();
+    expect(str({})).toBeNull();
+  });
+
+  it('boolOr: bool átmegy, más → fallback', () => {
+    expect(boolOr(true)).toBe(true);
+    expect(boolOr(false)).toBe(false);
+    expect(boolOr('true')).toBe(false); // nem bool → default
+    expect(boolOr(undefined, true)).toBe(true);
+  });
+
+  it('strList: a nem-string elemek kiesnek', () => {
+    expect(strList(['a', 1, 'b', null, 'c'])).toEqual(['a', 'b', 'c']);
+    expect(strList('nem tömb')).toEqual([]);
+    expect(strList(null)).toEqual([]);
+  });
+
+  it('asRecord: plain object vagy null (tömb/primitív/null → null)', () => {
+    expect(asRecord({ a: 1 })).toEqual({ a: 1 });
+    expect(asRecord([])).toBeNull();
+    expect(asRecord(null)).toBeNull();
+    expect(asRecord('x')).toBeNull();
+    expect(asRecord(5)).toBeNull();
+  });
+
+  it('tipikus res.json() minta: asRecord + str/finiteNum biztonságosan', () => {
+    const raw: unknown = { name: 'Anna', age: 30, extra: [1, 2] };
+    const o = asRecord(raw);
+    expect(str(o?.name)).toBe('Anna');
+    expect(finiteNum(o?.age)).toBe(30);
+    expect(str(o?.missing)).toBeNull(); // hiányzó mező nem robban
+    expect(asRecord(null)?.name).toBeUndefined(); // null-safe
   });
 });

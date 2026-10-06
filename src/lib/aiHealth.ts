@@ -1,6 +1,7 @@
 import { AI_PROBE_TIMEOUT_MS, aiFetch } from '@/lib/aiFetch';
 import { AI_PROVIDER_KINDS, type AiProvider } from '@/lib/aiProviders';
 import { cloudBaseUrl } from '@/lib/backend';
+import { asRecord, boolOr } from '@/lib/parseGuards';
 
 /**
  * 🟢 Provider-health (kliens): elérhető-e a modell? A hívást a WORKER végzi
@@ -28,8 +29,8 @@ export async function probeProvider(p: AiProvider): Promise<boolean> {
     if (!res.ok) {
       return false;
     }
-    const body = (await res.json()) as { ok?: boolean };
-    return !!body.ok;
+    // 🛡️ §12.1: a válasz tipizálása guard-dal (nem `as {...}` vakon)
+    return boolOr(asRecord(await res.json())?.ok);
   } catch {
     return false;
   }

@@ -29,6 +29,32 @@ export function unitNum(v: unknown): number | null {
   return n === null ? null : Math.min(1, Math.max(0, n));
 }
 
+/** string vagy `null` — a number/null/undefined/objektum kiesik */
+export function str(v: unknown): string | null {
+  return typeof v === 'string' ? v : null;
+}
+
+/** boolean vagy a megadott alapérték (a bool nem „esik ki", csak default-ol) */
+export function boolOr(v: unknown, fallback = false): boolean {
+  return typeof v === 'boolean' ? v : fallback;
+}
+
+/** string-lista: a nem-string elemek kiesnek (üres tömb, ha nem tömb) */
+export function strList(v: unknown): string[] {
+  return (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string');
+}
+
+/**
+ * Objektum-narrower: plain object vagy `null` (tömb/null/primitív → null). A
+ * `res.json()` BIZTONSÁGOS tipizálásához (a `… as SomeType` helyett, audit §12.1):
+ *   `const o = asRecord(await res.json()); const name = str(o?.name);`
+ */
+export function asRecord(v: unknown): Record<string, unknown> | null {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
 function asArray(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
 }

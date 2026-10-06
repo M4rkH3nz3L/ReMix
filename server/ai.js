@@ -6,6 +6,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod');
 const { z } = require('zod');
 const { assertSafeAiBaseUrl } = require('./ssrf');
+const { trackUsage, aiUsageContext, aiTokenCount } = require('./usage');
 
 const MODEL = process.env.AI_MODEL || 'claude-opus-4-8';
 
@@ -197,7 +198,7 @@ async function runAnthropic(system, userContent, schema, cfg) {
   if (!response.parsed_output) {
     throw new Error('A modell válasza nem volt értelmezhető.');
   }
-  return response.parsed_output;
+  return { data: response.parsed_output, tokens: aiTokenCount(response) };
 }
 
 async function runLocal(system, userContent, schema) {
@@ -235,7 +236,7 @@ async function runLocal(system, userContent, schema) {
   if (!parsed.success) {
     throw new Error('A lokális modell válasza nem felelt meg a sémának.');
   }
-  return parsed.data;
+  return { data: parsed.data, tokens: aiTokenCount(reply) };
 }
 
 /**
@@ -315,7 +316,7 @@ async function runOpenAICompatible(system, userContent, schema, cfg) {
   if (!parsed.success) {
     throw new Error('Az AI válasza nem felelt meg a sémának.');
   }
-  return parsed.data;
+  return { data: parsed.data, tokens: aiTokenCount(data) };
 }
 
 /**
@@ -324,17 +325,29 @@ async function runOpenAICompatible(system, userContent, schema, cfg) {
  *   a felhasználó saját modellje megy, különben a worker env-providere.
  */
 async function runStructured(system, userContent, schema, aiConfig) {
+  // 🔑 BYOK: a felhasználó SAJÁT kulcsa/végpontja → az ő költsége → NEM a mi
+  // kvótánkba mérjük (ez a BYOK lényege).
   if (aiConfig) {
-    return aiConfig.provider === 'anthropic'
-      ? runAnthropic(system, userContent, schema, aiConfig)
-      : runOpenAICompatible(system, userContent, schema, aiConfig);
+    const r =
+      aiConfig.provider === 'anthropic'
+        ? await runAnthropic(system, userContent, schema, aiConfig)
+        : await runOpenAICompatible(system, userContent, schema, aiConfig);
+    return r.data;
   }
   const provider = await aiProvider();
   if (provider === 'anthropic') {
-    return runAnthropic(system, userContent, schema);
+    // ☁️ env Anthropic = a MI felhő-token-költségünk → meterelünk (valós usage).
+    const r = await runAnthropic(system, userContent, schema);
+    const store = aiUsageContext.getStore();
+    if (store && store.uid && r.tokens > 0) {
+      void trackUsage(store.uid, 'aiTokens', r.tokens);
+    }
+    return r.data;
   }
   if (provider === 'local') {
-    return runLocal(system, userContent, schema);
+    // 🖥️ lokális Ollama = ingyenes (on-device-elvű) inferencia → NEM meterelünk.
+    const r = await runLocal(system, userContent, schema);
+    return r.data;
   }
   throw new Error(
     `Nincs elérhető AI: állíts be ANTHROPIC_API_KEY-t, indítsd el az Ollamát ` +

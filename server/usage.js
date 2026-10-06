@@ -7,6 +7,7 @@
 // UTÁN könyvel. REDIS/DB nélkül (vagy a tábla hiányában) BEST-EFFORT „megenged"
 // degradál — a rate-limit (security/rateLimit.js) a második védvonal.
 const { createClient } = require('@supabase/supabase-js');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -47,6 +48,41 @@ function remaining(used, quota, metric) {
 /** Belefér-e még `amount` (a már felhasznált `used` fölött). */
 function canUse(used, quota, metric, amount = 1) {
   return remaining(used, quota, metric) >= amount;
+}
+
+/**
+ * 📊 AI-token metering kontextus. A middleware (`aiMeter`) a verifikált hívó
+ * uid-ját teszi ide a kérés idejére; a provider-független `runStructured`
+ * (server/ai.js) innen olvassa — így a 9 AI-funkció aláírása változatlan marad,
+ * koncurrencia-biztosan (minden kérés külön async-context). Üres store → nincs
+ * könyvelés (pl. BYOK vagy lokális provider, amit nem a mi kvótánkba mérünk).
+ */
+const aiUsageContext = new AsyncLocalStorage();
+
+/**
+ * A különféle provider-válaszokból a felhasznált tokenek (input+output).
+ * Anthropic: `usage.input_tokens/output_tokens`; OpenAI-kompat.: `usage.total_tokens`
+ * vagy `prompt_tokens+completion_tokens`; Ollama: `prompt_eval_count+eval_count`.
+ * Ismeretlen alak → 0 (a metering best-effort, sosem dob).
+ */
+function aiTokenCount(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return 0;
+  }
+  const u = raw.usage && typeof raw.usage === 'object' ? raw.usage : raw;
+  if (typeof u.input_tokens === 'number' || typeof u.output_tokens === 'number') {
+    return (u.input_tokens || 0) + (u.output_tokens || 0); // Anthropic
+  }
+  if (typeof u.total_tokens === 'number') {
+    return u.total_tokens; // OpenAI
+  }
+  if (typeof u.prompt_tokens === 'number' || typeof u.completion_tokens === 'number') {
+    return (u.prompt_tokens || 0) + (u.completion_tokens || 0); // OpenAI (részletes)
+  }
+  if (typeof raw.prompt_eval_count === 'number' || typeof raw.eval_count === 'number') {
+    return (raw.prompt_eval_count || 0) + (raw.eval_count || 0); // Ollama
+  }
+  return 0;
 }
 
 let admin = null;
@@ -148,4 +184,6 @@ module.exports = {
   enforceQuota,
   trackUsage,
   userTier,
+  aiUsageContext,
+  aiTokenCount,
 };

@@ -52,3 +52,37 @@ describe('enforceQuota — DB nélkül best-effort MEGENGED', () => {
     await expect(usage.trackUsage('u1', 'aiTokens', -5)).resolves.toBeUndefined(); // negatív → no-op
   });
 });
+
+describe('aiTokenCount — provider-válaszból a felhasznált tokenek', () => {
+  test('Anthropic: usage.input_tokens + output_tokens', () => {
+    expect(usage.aiTokenCount({ usage: { input_tokens: 1200, output_tokens: 800 } })).toBe(2000);
+  });
+  test('OpenAI: usage.total_tokens', () => {
+    expect(usage.aiTokenCount({ usage: { total_tokens: 1500, prompt_tokens: 1000, completion_tokens: 500 } })).toBe(1500);
+  });
+  test('OpenAI részletes (total nélkül): prompt + completion', () => {
+    expect(usage.aiTokenCount({ usage: { prompt_tokens: 900, completion_tokens: 350 } })).toBe(1250);
+  });
+  test('Ollama: top-level prompt_eval_count + eval_count', () => {
+    expect(usage.aiTokenCount({ prompt_eval_count: 640, eval_count: 210 })).toBe(850);
+  });
+  test('ismeretlen / hiányzó alak → 0 (sosem dob)', () => {
+    expect(usage.aiTokenCount(null)).toBe(0);
+    expect(usage.aiTokenCount({})).toBe(0);
+    expect(usage.aiTokenCount({ foo: 'bar' })).toBe(0);
+    expect(usage.aiTokenCount('nem objektum')).toBe(0);
+  });
+  test('részleges Anthropic-mező is számít (csak output_tokens)', () => {
+    expect(usage.aiTokenCount({ usage: { output_tokens: 42 } })).toBe(42);
+  });
+});
+
+describe('aiUsageContext — AsyncLocalStorage a hívó uid-jához', () => {
+  test('store a run() scope-ban látható, kívül üres', () => {
+    expect(usage.aiUsageContext.getStore()).toBeUndefined();
+    usage.aiUsageContext.run({ uid: 'u42' }, () => {
+      expect(usage.aiUsageContext.getStore()).toEqual({ uid: 'u42' });
+    });
+    expect(usage.aiUsageContext.getStore()).toBeUndefined();
+  });
+});

@@ -17,10 +17,11 @@ determinisztikus konfliktus-feloldás (ma last-write-wins).
 ## 2. Feladatlista
 
 ### 2.1 Clip locking — P1
-- [ ] ⬜ Lock-owner + **TTL + heartbeat** + release + **stale-lock recovery**; a szerkesztés a lock ellen ellenőriz.
+- [x] ✅ **Zár-mag + teszt**: [src/lib/clipLock.ts](../../src/lib/clipLock.ts) — `ClipLock` (owner + `acquiredAt`/`heartbeatAt`) + `LOCK_TTL_MS` + `isStale`/`isLockedByOther`/`canEdit` + `acquireLock` (szabad/elavult/saját → megszerezhető, más élő → null) + `heartbeat` + `LockMap` (`withLock`/`releaseLock`/`pruneStale` — stale-recovery). Teszt: `clipLock.test.ts` (10). A szerkesztés `canEdit` ellen ellenőriz.
+- [ ] ⬜ **Hátra**: a zárak realtime-broadcastja (a collab-csatornán) + a UI-jelző (ki szerkeszti) + az `acquireLock`/`heartbeat` bekötése az `editorStore` szerkesztés-flowjába.
 
 ### 2.2 Timeline comments — P1
-- [ ] ⬜ `project/track/clip/timestamp/author/resolved` modell + UI (pin a timeline-ra) + resolve-flow.
+- [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): [src/lib/collabComments.ts](../../src/lib/collabComments.ts) — `Comment` (**anchor**-horgony a timeline-ra + `authorId` + `resolved` + `mentions` + `parentId` szálak) + `addComment`/`resolveComment`/`reopenComment`/`removeComment` + `roots`/`replies` + `extractMentions`. Tesztelt (`collabComments.test.ts`) + UI ([CommentSheet.tsx](../../src/components/CommentSheet.tsx)).
 
 ### 2.3 Review mode — P1
 - [ ] ⬜ Reviewer-szerep + **approve / request-changes / reject** + revision-lánc.
@@ -32,7 +33,8 @@ determinisztikus konfliktus-feloldás (ma last-write-wins).
 - [ ] ⬜ **Operation-log** + konfliktus-feloldás + deterministic merge + revision-id + optimistic-op + rollback + replay (a last-write-wins kiváltása).
 
 ### 2.6 Finom RBAC — P1
-- [ ] 🟡 `OWNER/EDITOR/COMMENTER/VIEWER` + külön project/asset/chat/export/invite permissions (a meglévő RBAC-ra építve).
+- [x] ~ **Nagyrészt kész**: projekt-tag-szerepek [collab.ts](../../src/lib/collab.ts) `CollabRole = owner/editor/viewer` (meghívás + szerep-váltás, owner-védett) + globális governance-RBAC [roles.ts](../../src/lib/roles.ts) (app_permissions/app_roles/user_roles RPC) + content-scoped ownership ([[rbac-roles-permissions]]). (Az audit `main`-je elavult.)
+- [ ] ⬜ **Hátra**: a 4. `commenter` szerep + finomabb per-erőforrás permissions (asset/chat/export külön).
 
 ## 3. Kész, ha
 Két (vagy több) user egyszerre szerkeszt: a klip-zár megakadályozza az ütközést, a kommentek a

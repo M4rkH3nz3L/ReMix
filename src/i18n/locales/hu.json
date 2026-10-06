@@ -3119,6 +3119,13 @@
     "addTo": "Hozzáadás gyűjteményhez",
     "done": "Kész"
   },
+  "dashboard": {
+    "title": "Alkotói irányítópult",
+    "remixRate": "Remix-arány",
+    "remixedShare": "Remixelt posztok",
+    "topRemixed": "Legtöbbet remixelt",
+    "empty": "Még nincs poszt."
+  },
   "live": {
     "title": "Élő",
     "heroTitle": "Menj élőben a követőidnek",

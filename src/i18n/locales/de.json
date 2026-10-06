@@ -3119,6 +3119,13 @@
     "addTo": "Zur Sammlung hinzufügen",
     "done": "Fertig"
   },
+  "dashboard": {
+    "title": "Creator-Dashboard",
+    "remixRate": "Remix-Rate",
+    "remixedShare": "Remixte Beiträge",
+    "topRemixed": "Am meisten remixt",
+    "empty": "Noch keine Beiträge."
+  },
   "live": {
     "title": "Live",
     "heroTitle": "Geh live für deine Follower",

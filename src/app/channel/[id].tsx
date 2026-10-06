@@ -372,6 +372,10 @@ export default function ChannelScreen() {
                     <Ionicons name="folder-outline" size={16} color={palette.text} />
                     <Text style={styles.editBtnText}>{t('collections.title')}</Text>
                   </Pressable>
+                  <Pressable style={styles.editBtn} onPress={() => router.push('/dashboard')}>
+                    <Ionicons name="stats-chart-outline" size={16} color={palette.text} />
+                    <Text style={styles.editBtnText}>{t('dashboard.title')}</Text>
+                  </Pressable>
                 </View>
               ) : (
                 <View style={styles.actionRow}>

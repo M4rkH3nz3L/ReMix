@@ -3119,6 +3119,13 @@
     "addTo": "Add to collection",
     "done": "Done"
   },
+  "dashboard": {
+    "title": "Creator dashboard",
+    "remixRate": "Remix rate",
+    "remixedShare": "Posts remixed",
+    "topRemixed": "Most remixed",
+    "empty": "No posts yet."
+  },
   "live": {
     "title": "Live",
     "heroTitle": "Go live to your followers",

@@ -1017,7 +1017,11 @@ export default function FeedScreen() {
           </Text>
           {sub.hashtags.length > 0 ? (
             <Text style={styles.tags} numberOfLines={1}>
-              {sub.hashtags.map((h) => `#${h}`).join(' ')}
+              {sub.hashtags.map((h, i) => (
+                <Text key={h} onPress={() => router.push(`/hashtag/${encodeURIComponent(h)}`)}>
+                  {i > 0 ? ' ' : ''}#{h}
+                </Text>
+              ))}
             </Text>
           ) : null}
           {sub.remixOfCreator ? (

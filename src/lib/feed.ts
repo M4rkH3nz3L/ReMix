@@ -267,6 +267,35 @@ export async function searchFeed(query: string, limit = 40): Promise<SearchResul
   return { posts, creators: [...creatorMap.values()] };
 }
 
+/**
+ * #️⃣ Egy hashtag posztjai (a hashtag-oldalhoz) — publikus + moderált, legújabb elöl.
+ * A `tag` vezető `#`-je + kis/nagybetűje nem számít (a tárolt tagek normalizáltak).
+ */
+export async function listPostsByHashtag(tag: string, limit = 50): Promise<FeedPost[]> {
+  if (!supabase) {
+    return [];
+  }
+  const norm = (tag ?? '').replace(/^#+/, '').trim().toLowerCase();
+  if (!norm) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('posts')
+    .select(POST_COLUMNS)
+    .eq('moderation_status', 'ok')
+    .eq('visibility', 'public')
+    .contains('hashtags', [norm])
+    .order('promoted', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  const rows = (data ?? []) as PostRow[];
+  const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
+  return rows.map((r) => toPost(r, liked, saved));
+}
+
 /** Egy csatorna: az alkotó posztjai + statisztika + követem-e. */
 export interface ChannelData {
   userId: string;

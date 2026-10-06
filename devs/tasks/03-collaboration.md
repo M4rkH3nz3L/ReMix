@@ -24,10 +24,12 @@ determinisztikus konfliktus-feloldás (ma last-write-wins).
 - [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): [src/lib/collabComments.ts](../../src/lib/collabComments.ts) — `Comment` (**anchor**-horgony a timeline-ra + `authorId` + `resolved` + `mentions` + `parentId` szálak) + `addComment`/`resolveComment`/`reopenComment`/`removeComment` + `roots`/`replies` + `extractMentions`. Tesztelt (`collabComments.test.ts`) + UI ([CommentSheet.tsx](../../src/components/CommentSheet.tsx)).
 
 ### 2.3 Review mode — P1
-- [ ] ⬜ Reviewer-szerep + **approve / request-changes / reject** + revision-lánc.
+- [x] ~ **Nagyrészt kész**: a verzió-státuszgép [src/lib/versions.ts](../../src/lib/versions.ts) (`draft → review → approved → published → archived` + `canTransition`/`nextStatuses`) lefedi a review-flowt (approve = review→approved, **request-changes** = review→draft, reject = →archived); tesztelt + lineage/compare ([[versions-core]]). (Az audit `main`-je elavult.)
+- [ ] ⬜ Hátra: dedikált **reviewer-szerep** + review-UI (jóváhagy/változtatás-kér gombok) a collab-nézetben.
 
 ### 2.4 Shared media synchronization — P1
-- [ ] 🔌 Asset-upload + **shared asset-id** + cloud-asset + **checksum** + download/upload/conflict/offline állapot (lásd [08](./08-storage.md) §8.2).
+- [x] ~ **Nagyrészt kész**: [src/lib/mediaSync.ts](../../src/lib/mediaSync.ts) — `mediaRemoteMap` (shared remote-URL) + `needsBackup` (checksum/hash) + `backupProjectMedia` (upload) + `restoreMissingMedia` (download/relink). (Az audit `main`-je elavult.)
+- [ ] ⬜ Hátra: explicit download/upload/**conflict/offline** állapotok — a [08 §2.2 asset-state-machine](./08-storage.md) (`assetState.ts`) bekötésével.
 
 ### 2.5 CRDT / OT — P1 (nagy)
 - [ ] ⬜ **Operation-log** + konfliktus-feloldás + deterministic merge + revision-id + optimistic-op + rollback + replay (a last-write-wins kiváltása).

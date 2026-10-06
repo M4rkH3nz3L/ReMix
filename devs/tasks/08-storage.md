@@ -35,7 +35,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [ ] 🟡 A `videdFile.ts` `.remix`-et ad → **egységesíteni** a doksit + konvenciót a hivatalos `.ReMix`/`.remix` formátumra ([13](./13-documentation.md)).
 
 ### 2.6 External file versioning — P1
-- [ ] ⬜ `Remote changed → Use new / Keep current / Compare` flow (konfliktus-UI).
+- [x] ✅ **Konfliktus-detektáló mag KÉSZ (2026-10-06)**: [src/lib/fileConflict.ts](../../src/lib/fileConflict.ts) — 3-utas összevetés (lokális · távoli · közös ŐS) → `syncState` (`in-sync`/`local-only`/`remote-only`/`local-ahead`/`remote-ahead`/`conflict`/`absent`; base NÉLKÜL az eltérés KONFLIKTUS, nem találgat irányt → nincs csendes felülírás) + `resolutionActions` (a `Use new / Keep current / Compare` gombok állapotonként) + `needsAttention`/`isAutoResolvable`. Teszt: `fileConflict.test.ts` (12).
+- [ ] 🖼️🔌 Hátra: a bázis-hash tárolása + a flow bekötése (mediaSync/storageProviders a `syncState` köré) + a konfliktus-UI (a `resolutionActions` gombjaival).
 
 ### 2.7 Collaborative storage permissions — P1
 - [ ] ⬜ project / personal / shared storage + **asset-level** permissions (összeér [03](./03-collaboration.md) §2.4-gyel).

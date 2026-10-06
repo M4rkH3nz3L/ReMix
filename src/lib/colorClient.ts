@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
+import { asRecord, finiteNum, str } from '@/lib/parseGuards';
 import type { ColorStats } from '@/lib/colorAuto';
 import { ensureCloud } from '@/lib/backend';
 import { renderServerUrl } from '@/lib/render';
@@ -24,8 +25,9 @@ export async function fetchColorStats(
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as ColorStats;
-    return typeof body.lumaMean === 'number' ? body : null;
+    // 🛡️ §12.1: a válasz objektum-e + a kulcs-mező véges szám-e (null-body sem omlik)
+    const body = asRecord(await res.json());
+    return body && finiteNum(body.lumaMean) !== null ? (body as unknown as ColorStats) : null;
   } catch {
     return null;
   }
@@ -56,8 +58,8 @@ export async function fetchPixelColor(
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as { color?: string };
-    return typeof body.color === 'string' ? body.color : null;
+    const body = asRecord(await res.json());
+    return str(body?.color);
   } catch {
     return null;
   }
@@ -89,8 +91,9 @@ export async function fetchScope(
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as { pngBase64?: string };
-    return typeof body.pngBase64 === 'string' ? `data:image/png;base64,${body.pngBase64}` : null;
+    const body = asRecord(await res.json());
+    const b64 = str(body?.pngBase64);
+    return b64 ? `data:image/png;base64,${b64}` : null;
   } catch {
     return null;
   }

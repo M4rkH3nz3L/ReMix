@@ -2,6 +2,7 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
+import { asRecord, str } from '@/lib/parseGuards';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -177,8 +178,8 @@ export async function activateProDev(days = 30): Promise<boolean> {
       body: JSON.stringify({ userId, days }),
     });
     if (res.ok) {
-      const data = (await res.json()) as { proUntil?: string | null };
-      useEntitlement.getState().setTier('pro', data.proUntil ?? null);
+      const data = asRecord(await res.json());
+      useEntitlement.getState().setTier('pro', str(data?.proUntil));
     }
   } catch {
     // a worker nem elérhető — a dev-override marad az aktív Pro-forrás

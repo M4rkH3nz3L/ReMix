@@ -2,6 +2,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { cloudBaseUrl } from '@/lib/backend';
+import { asRecord, boolOr, finiteTime, mapValid, str } from '@/lib/parseGuards';
 import type { StorageEntry } from '@/lib/storageProviders';
 import { workerAuthHeaders, workerJsonHeaders } from '@/lib/workerAuth';
 
@@ -41,8 +42,64 @@ export const EXTERNAL_PROVIDERS: {
 ];
 
 async function readError(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({}));
-  return (body as { error?: string }).error || fallback;
+  const body = asRecord(await res.json().catch(() => null));
+  return str(body?.error) || fallback;
+}
+
+// 🛡️ §12.1: a worker-válaszok TARTALOM-validálása (az alak-ellenőrzés + `as T` cast
+// helyett). A hibás elem kiesik, a jó megmarad; null/nem-objektum válasz sem omlik.
+
+/** Egy bekötött szolgáltató a /storage/connected válaszból (id+type kötelező). */
+function parseProvider(o: Record<string, unknown>): ConnectedProvider | null {
+  const id = str(o.id);
+  const type = str(o.type);
+  if (!id || !type) {
+    return null;
+  }
+  return {
+    id,
+    label: str(o.label) ?? '',
+    type: type as ExternalProviderType,
+    status: str(o.status) ?? '',
+    isDefault: boolOr(o.isDefault, false),
+  };
+}
+
+/** A /storage/connected válaszából a bekötött források (null/hibás alak → []). */
+export function parseConnectedProviders(raw: unknown): ConnectedProvider[] {
+  const o = asRecord(raw);
+  return o ? mapValid(o.providers, parseProvider) : [];
+}
+
+/** Egy tárhely-bejegyzés (id/name/url/kind kötelező; duration/size/path opcionális). */
+function parseEntry(o: Record<string, unknown>): StorageEntry | null {
+  const id = str(o.id);
+  const name = str(o.name);
+  const url = str(o.url);
+  const kind = str(o.kind);
+  if (!id || !name || !url || (kind !== 'video' && kind !== 'image' && kind !== 'audio')) {
+    return null;
+  }
+  const entry: StorageEntry = { id, name, url, kind };
+  const duration = finiteTime(o.duration);
+  if (duration !== null) {
+    entry.duration = duration;
+  }
+  const size = finiteTime(o.size);
+  if (size !== null) {
+    entry.size = size;
+  }
+  const path = str(o.path);
+  if (path) {
+    entry.path = path;
+  }
+  return entry;
+}
+
+/** A /storage/:id/list válaszából a tárolt fájlok (null/hibás alak → []). */
+export function parseStorageEntries(raw: unknown): StorageEntry[] {
+  const o = asRecord(raw);
+  return o ? mapValid(o.entries, parseEntry) : [];
 }
 
 /** A user bekötött külső forrásai (a profil-kezeléshez). */
@@ -53,8 +110,7 @@ export async function fetchConnectedProviders(): Promise<ConnectedProvider[]> {
   if (!res.ok) {
     return [];
   }
-  const body = (await res.json()) as { providers?: ConnectedProvider[] };
-  return body.providers ?? [];
+  return parseConnectedProviders(await res.json().catch(() => null));
 }
 
 /**
@@ -69,11 +125,12 @@ export async function connectOAuthProvider(provider: 'gdrive' | 'dropbox'): Prom
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ returnUrl }),
   });
-  const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-  if (!res.ok || !body.url) {
-    throw new Error(body.error || 'oauth_start_failed');
+  const body = asRecord(await res.json().catch(() => null));
+  const url = str(body?.url);
+  if (!res.ok || !url) {
+    throw new Error(str(body?.error) || 'oauth_start_failed');
   }
-  const result = await WebBrowser.openAuthSessionAsync(body.url, returnUrl);
+  const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
   return result.type === 'success';
 }
 
@@ -124,9 +181,9 @@ export async function listProviderFiles(id: string): Promise<StorageEntry[]> {
   const res = await fetch(`${cloudBaseUrl()}/storage/${encodeURIComponent(id)}/list`, {
     headers: await workerAuthHeaders(),
   });
-  const body = (await res.json().catch(() => ({}))) as { entries?: StorageEntry[]; error?: string };
+  const raw = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(body.error || 'list_failed');
+    throw new Error(str(asRecord(raw)?.error) || 'list_failed');
   }
-  return body.entries ?? [];
+  return parseStorageEntries(raw);
 }

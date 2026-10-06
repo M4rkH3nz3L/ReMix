@@ -19,7 +19,8 @@ Store**, tipizált hálózat, determinisztikus állapot.
 
 ### 2.1 HTTP response validation — P1
 - [x] ~ **Toolkit kibővítve + első adopter**: [parseGuards.ts](../../src/lib/parseGuards.ts) a `str`/`boolOr`/`strList`/**`asRecord`** narrowerekkel (a meglévő `finiteNum`/`timeList`/… mellé) → `const o = asRecord(await res.json()); str(o?.name)` a `… as T` helyett. Teszt: `parseGuards.test.ts` (+5). Első bekötés: [aiHealth.ts](../../src/lib/aiHealth.ts) (`boolOr(asRecord(...)?.ok)`).
-- [ ] ⬜ **Hátra**: a maradék ~20 fájl `res.json() as T` castjainak inkrementális migrálása a guardokra (biztonsági/kritikus path-ok elöl: billing, externalStorage, colorClient).
+- [x] ✅ **Kritikus kliensek migrálva (2026-10-06)**: [billing.ts](../../src/lib/billing.ts) (`proUntil` → `str(asRecord(...))`), [colorClient.ts](../../src/lib/colorClient.ts) (stats/pixel/scope → `asRecord`+`finiteNum`/`str`, nem a try/catch-re bízva a null-derefet), [externalStorage.ts](../../src/lib/externalStorage.ts) — kiemelt **pure** `parseConnectedProviders` + `parseStorageEntries` (`mapValid` elemenkénti validálással: hibás elem kiesik, null-body sem omlik) + a `readError`/OAuth-start hardening. Teszt: `externalStorage.test.ts` (7 — hibás/hiányos elem kiesik, null → []).
+- [ ] 🟡 **Hátra**: a maradék fájlok `res.json() as T` castjainak inkrementális migrálása (feed/chat/other clients).
 
 ### 2.2 Retry / backoff egységesítés — P1
 - [ ] 🟡 `netRetry.ts` VAN → ⬜ **egységes policy** minden kritikus path-on: exponential-backoff + jitter + idempotency + max-attempts + Retry-After.

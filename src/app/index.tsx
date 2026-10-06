@@ -42,6 +42,7 @@ import {
   toggleSave,
 } from '@/lib/feed';
 import { pageFromScroll, remixPages, resolveActiveId, visibleRemixes } from '@/lib/feedPager';
+import { runOptimistic } from '@/lib/optimistic';
 import { REPORT_REASONS, reportPost } from '@/lib/reports';
 import type { FeedMode, FeedPost } from '@/types/social';
 import { moderatePostGlobal } from '@/lib/roles';
@@ -284,10 +285,13 @@ export default function FeedScreen() {
       viewerLiked: on,
       counts: { ...p.counts, likes: p.counts.likes + (on ? 1 : -1) },
     });
-    patch(post.id, apply(liked)); // optimista: azonnali visszajelzés
-    // ⚠️ VISSZAGÖRGETÉS hibánál: enélkül az UI a szerverrel ELLENTÉTES állapotot
-    // mutatott a következő frissítésig (a felhasználó azt hitte, lájkolt)
-    toggleLike(post.id, liked).catch(() => patch(post.id, apply(!liked)));
+    // ⚡ §12.4: optimista (azonnali visszajelzés) + VISSZAGÖRGETÉS hibánál a közös
+    // helperrel — enélkül az UI a szerverrel ELLENTÉTES állapotot mutatna.
+    void runOptimistic({
+      apply: () => patch(post.id, apply(liked)),
+      rollback: () => patch(post.id, apply(!liked)),
+      commit: () => toggleLike(post.id, liked),
+    });
   };
 
   // ❤️ középső szív-pop lejátszása (dupla-tap vizuális visszajelzése)
@@ -346,9 +350,12 @@ export default function FeedScreen() {
       viewerSaved: on,
       counts: { ...p.counts, saves: p.counts.saves + (on ? 1 : -1) },
     });
-    patch(post.id, apply(saved));
-    // visszagörgetés hibánál (lásd onLike)
-    toggleSave(post.id, saved).catch(() => patch(post.id, apply(!saved)));
+    // optimista + visszagörgetés hibánál (lásd onLike)
+    void runOptimistic({
+      apply: () => patch(post.id, apply(saved)),
+      rollback: () => patch(post.id, apply(!saved)),
+      commit: () => toggleSave(post.id, saved),
+    });
   };
 
   const onRemix = (post: FeedPost) => {

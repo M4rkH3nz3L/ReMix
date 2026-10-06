@@ -33,6 +33,7 @@ import {
 } from '@/lib/feed';
 import { openDm } from '@/lib/chat';
 import { getLiveByHost, type LiveSession } from '@/lib/live';
+import { runOptimistic } from '@/lib/optimistic';
 import { InsufficientCreditsError } from '@/lib/shop';
 import {
   creatorTotals,
@@ -96,9 +97,19 @@ export default function ChannelScreen() {
       return;
     }
     const next = !following;
-    setFollowing(next);
-    setFollowers((n) => n + (next ? 1 : -1));
-    toggleFollow(id, next).catch(() => {});
+    // ⚡ §12.4: optimista követés-váltás + VISSZAGÖRGETÉS hibánál (korábban a
+    // `.catch(() => {})` elnyelte a hibát → a UI tévesen „követed"-et mutatott).
+    void runOptimistic({
+      apply: () => {
+        setFollowing(next);
+        setFollowers((n) => n + (next ? 1 : -1));
+      },
+      rollback: () => {
+        setFollowing(!next);
+        setFollowers((n) => n + (next ? -1 : 1));
+      },
+      commit: () => toggleFollow(id, next),
+    });
   };
 
   // 💬 közvetlen üzenet a csatorna tulajának (DM megnyitás/létrehozás)

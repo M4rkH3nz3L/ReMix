@@ -34,7 +34,9 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🔌 **Hátra**: a nézési események GYŰJTÉSE (lejátszó-instrumentálás + tárolás; prod-migráció) + affinity-jel + a ranking server-oldalra költöztetése.
 
 ### 2.4 Collections / Library — P1
-- [ ] 🟡 Like/save van → ⬜ **folders/collections/playlists** + creator-follow-preferences + personalized notifications.
+- [x] ✅ **Kód-komplett vertikum (2026-10-06)**: `folders/collections/playlists` a mentett posztokra — migráció [20261006130000_post_collections.sql](../../supabase/migrations/20261006130000_post_collections.sql) (`post_collections` owner + `post_collection_items`, owner-only RLS, kaszkád) + kliens [postCollections.ts](../../src/lib/postCollections.ts) (`normalizeCollectionName` pure + `parseCollections` §12.1-guard + CRUD). Teszt: `postCollections.test.ts` (6). Audit zöld.
+- [ ] ⏳ **Prod-push FÜGGŐBEN**: a migráció push a DB-kapcsolaton lóg ebből a környezetből (a management-API megy, a migráció-apply direct DB-connection `db.<ref>:5432` nem; IPv6/pooler-jelszó kérdés). Re-push kell működő CLI-sessionnel (`supabase login` / pooler `--db-url` DB-jelszóval) — mint az `usage_counters`-nél.
+- [ ] 🖼️ Hátra: collections-UI (a mentés-flow-ba) + creator-follow-preferences + personalized notifications.
 
 ### 2.5 Full search — P1
 - [x] ✅ **Typo-tolerancia + autocomplete KÉSZ (2026-10-06)**: [universalSearch.ts](../../src/lib/universalSearch.ts) — korlátos Levenshtein (`editDistance` + `bestFuzzy`, hossz-függő hibaküszöb) → `scoreDocFuzzy` (a pontos egyezés szuperhalmaza, a fuzzy max 0.9 → exact mindig nyer) + a `search` **fuzzy-fallback**ja (csak ha a pontos keresés 0 találatot ad → a meglévő viselkedés változatlan) + `suggest` autocomplete (cím/kulcsszó-prefix + fuzzy-prefix, rangsorolva). **Bekötve** a ⌘K-palettába ([command.tsx](../../src/app/command.tsx): a fallback automatikus, a `suggest` „Erre gondoltál?" chipekként). Teszt: `universalSearch.test.ts` (+10: fuzzy-score + fallback + suggest).

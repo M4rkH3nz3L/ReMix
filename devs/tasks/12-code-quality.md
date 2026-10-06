@@ -23,7 +23,9 @@ Store**, tipizált hálózat, determinisztikus állapot.
 - [ ] 🟡 **Hátra**: a maradék fájlok `res.json() as T` castjainak inkrementális migrálása (feed/chat/other clients).
 
 ### 2.2 Retry / backoff egységesítés — P1
-- [ ] 🟡 `netRetry.ts` VAN → ⬜ **egységes policy** minden kritikus path-on: exponential-backoff + jitter + idempotency + max-attempts + Retry-After.
+- [x] ✅ **Policy KÉSZ + tesztelt (verify-first, az audit elavult)**: [netRetry.ts](../../src/lib/netRetry.ts) — exponential-backoff **cappel** (`MAX_DELAY_MS`) + **full jitter** (`base*(0.5+random*0.5)`, thundering-herd ellen) + `Retry-After` (sec ÉS HTTP-dátum, felső korláttal) + `isRetryableStatus` (408/425/429/5xx) + abort-tudatos + `attempts` (max-attempts) + **idempotencia-tudatos** (`retryRead` CSAK olvasásra; a docstring kimondja, hogy a nem-idempotens POST-ot nem szabad). Teszt: `netRetry.test.ts`.
+- [x] ~ **Adopció a kritikus pathokon (szándékosan SZELEKTÍV)**: `render.ts` a status-pollt (`/render/:id`) + `/music`-ot `fetchRead`-del retry-zi, a job-**submitet** (POST) szándékosan NEM (kettős-submit ellen); `schedules`/`stickers3d`/`tts` is adoptál. A health-**probe** (`aiHealth.ts`) szándékosan fail-fast (egy indikátor ne lógjon 12 mp-et, ha a provider tényleg le van).
+- [ ] 🟡 Hátra: a maradék idempotens olvasó-pathok eseti felmérése (nem minden read-et érdemes retry-zni).
 
 ### 2.3 Render cancellation — P1
 - [x] ✅ MÁR KÉSZ (natív): [nativeRender.ts](../../src/lib/nativeRender.ts) `signal?: AbortSignal` — `signal.aborted` ellenőrzés + `abort`-listener → `cancelledError()`; a hívás azonnal elengedhető. (Az audit `main`-je elavult volt.) Hátra: a felhő-render-queue job-cancel + temp-cleanup végigvezetése.

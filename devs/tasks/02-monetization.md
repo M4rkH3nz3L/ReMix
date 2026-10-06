@@ -25,7 +25,8 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 ### 2.2 Usage metering — P1
 - [x] ✅ **Mérés-mag + kvóták + teszt**: [src/lib/usageMeter.ts](../../src/lib/usageMeter.ts) — metrikák (aiTokens/renderMinutes/exports/cloudJobs; a **storage KÜLÖN** rendszer: [storageQuota.ts](../../src/lib/storageQuota.ts)) + `TIER_QUOTAS` (free/basic/pro/ultra, -1=korlátlan, a [tiers.ts](../../src/lib/tiers.ts)-hez kötve) + `addUsage`/`remaining`/`canUse`/`isOverQuota`/`usageRatio`. Teszt: `usageMeter.test.ts` (10) — kvóta-monotonitás + gate + arány. A hiteles logika, amit a kliens (soft-warn) és a worker (hard-enforce) is használ.
 - [x] ✅ **VERTIKUM e2e (kód-komplett)**: `usage_counters` tábla + `increment_usage` RPC ([migráció](../../supabase/migrations/20261006120000_usage_counters.sql), owner-only RLS read) + worker [server/usage.js](../../server/usage.js) (`enforceQuota` gate + `trackUsage` könyvelés + `userTier` a subscriptionből, DB nélkül best-effort) + **bekötve a `/tts`-be** (429 túllépéskor) + kliens-olvasás [usageClient.ts](../../src/lib/usageClient.ts) (`fetchMyUsage`/`usageStatus`/`nearQuota` soft-warn). Teszt: `usage.test.js` (9) + `usageClient.test.ts` (6).
-- [ ] ⬜ **Hátra**: a migráció **prod-push** (engedéllyel) + a gate kiterjesztése a többi drága endpointra (ai/render/egress → renderMinutes/aiTokens) + UI-warn-banner a `nearQuota`-ból.
+- [x] ✅ **Migráció LIVE + BIZONYÍTOTT prodon (2026-10-06)**: `usage_counters` tábla + `increment_usage` RPC pushed (rctzpbzkpaqdldtueeub) + verifikálva (atomikus növelés 100+50=150, teszt-sorok törölve).
+- [ ] ⬜ **Hátra**: a gate kiterjesztése a többi drága endpointra (ai/render/egress → renderMinutes/aiTokens) + UI-warn-banner a `nearQuota`-ból.
 
 ### 2.3 Havi quota reset — P1
 - [x] ✅ **Reset-logika + teszt**: `usageMeter.resetIfNewPeriod`/`periodKey`/`isNewPeriod` (UTC `YYYY-MM`, determinisztikus) — a havi nullázás hiteles magja.

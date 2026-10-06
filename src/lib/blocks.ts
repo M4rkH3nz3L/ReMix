@@ -102,6 +102,51 @@ export async function listMyBlockedIds(): Promise<string[]> {
   return (data ?? []).map((r) => r.blocked_id as string);
 }
 
+// ── Restrict (lágy tiltás) CRUD ──────────────────────────────────────────────
+
+/** Korlátozom ezt a usert: a kommentjei csak neki + nekem látszanak (`isCommentVisible`). */
+export async function restrictUser(otherId: string): Promise<void> {
+  const sb = requireSupabase();
+  const me = currentUserId();
+  if (!me) {
+    throw new Error('Nincs bejelentkezve.');
+  }
+  if (me === otherId) {
+    throw new Error('Magadat nem korlátozhatod.');
+  }
+  const { error } = await sb
+    .from('restricted_users')
+    .insert({ restricter_id: me, restricted_id: otherId });
+  if (error && !/duplicate|unique|conflict/i.test(error.message)) {
+    throw new Error(error.message);
+  }
+}
+
+export async function unrestrictUser(otherId: string): Promise<void> {
+  const sb = requireSupabase();
+  const me = currentUserId();
+  if (!me) {
+    throw new Error('Nincs bejelentkezve.');
+  }
+  const { error } = await sb
+    .from('restricted_users')
+    .delete()
+    .eq('restricter_id', me)
+    .eq('restricted_id', otherId);
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** A saját korlátozott user-id-im (a komment-szűréshez `isCommentVisible`-lel). */
+export async function listMyRestrictedIds(): Promise<string[]> {
+  if (!supabase) {
+    return [];
+  }
+  const { data } = await supabase.from('restricted_users').select('restricted_id');
+  return (data ?? []).map((r) => r.restricted_id as string);
+}
+
 export async function muteConversation(conversationId: string): Promise<void> {
   const sb = requireSupabase();
   const me = currentUserId();

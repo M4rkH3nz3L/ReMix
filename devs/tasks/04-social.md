@@ -21,7 +21,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 
 ### 2.1 Block / mute / restrict / mentions / communities — P1
 - [x] ✅ **Block/mute + feed/komment-szint + restrict MAG KÉSZ**: [blocks.ts](../../src/lib/blocks.ts) `isBlockedByMe`/`isMuted` (messaging, RLS-enforcement) **kiegészítve**: `filterBlocked` (a blokkolt szerzők elemeit elrejti feed/komment-szinten, kliens-oldalon) + `isCommentVisible` (**restrict** = lágy tiltás: a korlátozott szerző kommentje csak neki + a tulajnak látszik). `@mention`-kinyerés [collabComments.ts](../../src/lib/collabComments.ts) `extractMentions`. Teszt: `blocks.test.ts` (+4).
-- [ ] 🖼️🔌 Hátra: a `filterBlocked`/restrict bekötése a feed/komment-lekérésbe + `restrict`-perzisztencia (tábla) + community + community-moderation.
+- [x] ✅ **Restrict-perzisztencia kód-komplett (2026-10-06)**: migráció [20261006140000_restricted_users.sql](../../supabase/migrations/20261006140000_restricted_users.sql) (`restricted_users` owner-only RLS, a `user_blocks`-mintát követve) + [blocks.ts](../../src/lib/blocks.ts) CRUD (`restrictUser`/`unrestrictUser`/`listMyRestrictedIds`) a kész `isCommentVisible` maghoz. ⏳ **prod-push a batch-ben függőben**.
+- [ ] 🖼️🔌 Hátra: a `filterBlocked`/`isCommentVisible` bekötése a feed/komment-lekérésbe (UI) + community + community-moderation.
 
 ### 2.2 Moderation UI — P1
 - [ ] 🔌 DB-report-rendszer van → **admin UX**: reports/user/post/comment-moderáció + removal/ban/mute/**appeal** (security-backlog `10`).

@@ -29,7 +29,7 @@ Store**, tipizált hálózat, determinisztikus állapot.
 
 ### 2.4 UI rollback — P1
 - [x] ✅ **Közös helper + bekötés KÉSZ (2026-10-06)**: [src/lib/optimistic.ts](../../src/lib/optimistic.ts) `runOptimistic` (apply azonnal → commit → hibánál rollback + onError; sosem dob, `true/false` a sikerre). Teszt: `optimistic.test.ts` (4 — sorrend + rollback + fire-and-forget). **Bekötve:** a feed like/save ([index.tsx](../../src/app/index.tsx) — az ad-hoc `catch`-ek egységesítve) + **javítva a csatorna-követés bugja** ([channel/[id].tsx](../../src/app/channel/)): a `toggleFollow(...).catch(() => {})` elnyelte a hibát rollback nélkül → a UI tévesen „követed"-et + rossz követő-számot mutatott; most visszagörget.
-- [ ] 🟡 Hátra: shop-purchase optimista kredit-levonás rollbackja + a maradék ad-hoc optimista helyek migrálása a `runOptimistic`-ra.
+- [ ] 🟡 Hátra: a maradék ad-hoc optimista helyek migrálása a `runOptimistic`-ra. (A shop-purchase NEM optimista — `onBuy` confirm-after: előbb `purchaseItem`, sikerkor `refreshBalance` → nincs hibás-állapot, rollback nem kell.)
 
 ### 2.5 Async race protection — P1
 - [x] ✅ **Közös util KÉSZ**: [src/lib/asyncGuard.ts](../../src/lib/asyncGuard.ts) — `createGenerationGuard` (token: csak a legfrissebb válasz megy át) + `createAliveGuard` (unmount után eldob) + `latestOnly` (stale → `StaleResponseError`). Teszt: `asyncGuard.test.ts` (8). Első adopter: [search.tsx](../../src/app/search.tsx) (a korábbi ad-hoc `seqRef` lecserélve a közös utilra).

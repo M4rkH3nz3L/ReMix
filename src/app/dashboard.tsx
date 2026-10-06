@@ -33,13 +33,14 @@ export default function DashboardScreen() {
   const guardRef = useRef(createGenerationGuard());
 
   useEffect(() => {
-    if (!me) {
-      return;
-    }
     const guard = guardRef.current;
     const token = guard.begin();
     const timer = setTimeout(() => {
       if (!guard.isCurrent(token)) {
+        return;
+      }
+      if (!me) {
+        setLoading(false); // kijelentkezve nincs mit tölteni → empty-state (nem végtelen spinner)
         return;
       }
       setLoading(true);

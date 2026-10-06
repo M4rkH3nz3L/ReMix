@@ -29,6 +29,7 @@ import {
 import type { FeedPost } from '@/types/social';
 import { useRoles } from '@/store/roleStore';
 import { REPORT_REASONS, reportComment } from '@/lib/reports';
+import { listMyRestrictedIds, restrictUser, unrestrictUser } from '@/lib/blocks';
 
 /** Rövid relatív idő (pl. „3p", „2ó", „5n") — nincs külső függőség. */
 function ago(iso: string): string {
@@ -54,6 +55,8 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // 🚧 restrict (lágy tiltás): a poszt-tulaj korlátozott kommentelői (blocks.ts)
+  const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
 
   const me = currentUserId();
   const isPostOwner = !!post && me === post.creator.id;
@@ -107,6 +110,42 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
     });
     return unsub;
   }, [post?.id, me]);
+
+  // a poszt-tulaj korlátozott-listájának betöltése (a setState a .then-ben → nincs
+  // szinkron setState az effekt törzsében)
+  useEffect(() => {
+    if (!post || !isPostOwner) {
+      return;
+    }
+    listMyRestrictedIds()
+      .then((ids) => setRestrictedIds(new Set(ids)))
+      .catch(() => {});
+  }, [post, isPostOwner]);
+
+  const onToggleRestrict = (c: PostComment) => {
+    const isR = restrictedIds.has(c.authorId);
+    setRestrictedIds((prev) => {
+      const next = new Set(prev);
+      if (isR) {
+        next.delete(c.authorId);
+      } else {
+        next.add(c.authorId);
+      }
+      return next;
+    });
+    const op = isR ? unrestrictUser(c.authorId) : restrictUser(c.authorId);
+    op.catch(() => {
+      setRestrictedIds((prev) => {
+        const next = new Set(prev);
+        if (isR) {
+          next.add(c.authorId);
+        } else {
+          next.delete(c.authorId);
+        }
+        return next;
+      });
+    });
+  };
 
   const onSend = () => {
     const body = text.trim();
@@ -177,6 +216,15 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
           </Text>
           <Text style={styles.body}>{item.body}</Text>
         </View>
+        {isPostOwner && me !== item.authorId ? (
+          <Pressable onPress={() => onToggleRestrict(item)} hitSlop={8} style={styles.del}>
+            <Ionicons
+              name={restrictedIds.has(item.authorId) ? 'person-remove' : 'person-remove-outline'}
+              size={15}
+              color={restrictedIds.has(item.authorId) ? palette.accent2 : palette.textDim}
+            />
+          </Pressable>
+        ) : null}
         {me && me !== item.authorId ? (
           <Pressable onPress={() => onReport(item)} hitSlop={8} style={styles.del}>
             <Ionicons name="flag-outline" size={15} color={palette.textDim} />

@@ -34,19 +34,23 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 - [ ] ⬜ Tényleges entitlement-táblázat (local/cloud-render, AI-limit, storage, priority-queue, AI-advanced).
 
 ### 2.5 AI credit top-up — P1
-- [ ] ⬜ Credit-wallet + **consumable IAP** + transaction-ledger + overage + refund + **idempotency**.
+- [x] ~ **Credit-wallet KÉSZ** ([src/lib/wallet.ts](../../src/lib/wallet.ts): coin-vásárlás/cashout/transfer + `subscribeProWithCredits` + `creditHistory` ledger + PayPal payout; [[coin-wallet-payouts]]). (Az audit `main`-je elavult.)
+- [ ] ⬜ Hátra: dedikált **AI-credit consumable IAP** termék + overage/refund + idempotency-hardening a top-upra.
 
 ### 2.6 Queue priority — P1
 - [x] ✅ **Tier-prioritás a render-sorban**: [server/queue.js](../../server/queue.js) `tierJobPriority` (`Ultra=1 > Pro=2 > Basic=3 > Free=4`; BullMQ-ban kisebb = előbb fut) az `enqueueRender` `priority`-jében; a kliens a user szintjét ([render.ts](../../src/lib/render.ts) `effectiveTier`) küldi a `/render` formban (csak sorrend, nem biztonsági — a render Pro-kapu mögött). Teszt: `queue.test.js` (2) — rangsor + fallback. A tényleges Pro↔Ultra differenciálás a 4-tier billing-bekötéssel (§2.4) teljesedik ki; addig egységes FIFO.
 
 ### 2.7 Marketplace asset upload — P1
-- [ ] 🟡 Asset **upload + preview + metadata**; 🔌 **moderation + copyright-report + takedown + versioning**.
+- [x] ~ **Alap KÉSZ**: [src/lib/marketplace.ts](../../src/lib/marketplace.ts) + [src/lib/shop.ts](../../src/lib/shop.ts) (listázás/vásárlás, atomikus purchase-RPC, RLS-gated payload, 30% fee; [[shop-marketplace-architecture]]). (Az audit `main`-je elavult.)
+- [ ] 🔌 Hátra: asset-**moderation + copyright-report + takedown + versioning**.
 
 ### 2.8 Creator payout — P1
-- [ ] 🟡 Payout-adatmodell kész; ⬜ valódi **Stripe Connect** (vagy alternatíva) + **KYC + tax + payout-status + failed + fraud**.
+- [x] ~ **Payout-modell + kérés KÉSZ**: [wallet.ts](../../src/lib/wallet.ts) (`requestPayout`/`fetchPayoutAccount`/`setPayoutAccount`) + [server/payouts.js](../../server/payouts.js) (PayPal Payouts; [[coin-wallet-payouts]]).
+- [ ] ⬜ Hátra: KYC + tax + payout-status-UI + failed-payout + fraud (vagy Stripe Connect, ha kell).
 
 ### 2.9 Promotion / influencer codes — P1
-- [ ] ⬜ Coupon + creator-code + campaign + expiry + usage-limit + attribution + fraud-prevention.
+- [x] ✅ **Kupon-mag + teszt**: [src/lib/coupons.ts](../../src/lib/coupons.ts) — `normalizeCode` + `couponStatus` (disabled/notStarted/expired/exhausted/tierLocked/valid: időablak + `maxRedemptions` + `minTier`) + `applyDiscount`/`discountAmount` (percent/amount, nem-negatív) + `couponReward` (credits/proDays). Teszt: `coupons.test.ts` (10). A hiteles validáció+számítás, amit a kliens (azonnali visszajelzés) és a worker (atomikus beváltás) is használ.
+- [ ] ⬜ Hátra: `coupons` tábla + atomikus **redeem-RPC** (usage-count növelés + grant) + creator-code-attribution + anti-fraud.
 
 ### 2.10 Anti-abuse / rate limiting — 🔴 P0
 - [x] ✅ **Rate-limit mag KÉSZ**: [server/security/rateLimit.js](../../server/security/rateLimit.js) (kulcs-hierarchia + endpoint-osztályok) + **36 `rateLimit()` hívás** az [index.js](../../server/index.js)-ben + teszt (`rateLimit.test.js`). (Az audit `main`-je elavult volt.)

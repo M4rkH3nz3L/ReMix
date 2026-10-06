@@ -37,6 +37,7 @@ import {
   listFeed,
   listRemixesOf,
   recordView,
+  recordViewEvent,
   remixFromPost,
   toggleFollow,
   toggleLike,
@@ -450,7 +451,10 @@ export default function FeedScreen() {
     }
   }).current;
 
-  // 👁️ megtekintés rögzítése az AKTÍV posztra (eredeti VAGY remix) — poszttonként egyszer
+  // 👁️ megtekintés rögzítése az AKTÍV posztra (eredeti VAGY remix) — poszttonként egyszer.
+  // A poszt ELHAGYÁSAKOR (cleanup) a végignézést is rögzítjük (watched/duration) a
+  // For-You ranking valós jeleihez (viewSignals). A `player.currentTime` a néző-pozíció
+  // (weben a videó-elemé); best-effort — csak hitelesített nézőre megy be (RLS).
   useEffect(() => {
     if (!activeId) {
       return;
@@ -459,7 +463,19 @@ export default function FeedScreen() {
       viewedRef.current.add(activeId);
       recordView(activeId);
     }
-  }, [activeId]);
+    const leavingId = activeId;
+    return () => {
+      const post = findPost(leavingId);
+      const durSec = post?.durationSec ?? 0;
+      const watchedSec =
+        Platform.OS === 'web'
+          ? activeVideoElRef.current?.currentTime ?? 0
+          : player.currentTime ?? 0;
+      if (durSec > 0 && watchedSec > 0) {
+        void recordViewEvent(leavingId, watchedSec * 1000, durSec * 1000);
+      }
+    };
+  }, [activeId, findPost, player]);
 
   // az aktív poszt videójának lejátszása (ha van renderelt URL).
   // ⚠️ Csak FÓKUSZBAN: a feedből `push`-sal megyünk a szerkesztőbe/csatornára/

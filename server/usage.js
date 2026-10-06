@@ -96,6 +96,28 @@ async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) 
   return { ok: rem >= amount, remaining: rem };
 }
 
+/**
+ * A user AKTUÁLIS tier-je a `subscriptions`-ből (aktív period figyelembevételével).
+ * Hiba/nincs/lejárt → `free`. Ma free/pro; a basic/ultra a billing-bekötéssel jön —
+ * a kvóta-logika már kész rá. (A kvóta ENFORCE-hoz a HITELES, server-oldali tier kell.)
+ */
+async function userTier(userId, now = new Date()) {
+  const sb = getAdmin();
+  if (!sb || !userId) {
+    return 'free';
+  }
+  const { data } = await sb
+    .from('subscriptions')
+    .select('tier, current_period_end, status')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!data || data.status !== 'active' || !TIER_QUOTAS[data.tier]) {
+    return 'free';
+  }
+  const end = data.current_period_end ? Date.parse(data.current_period_end) : NaN;
+  return Number.isNaN(end) || end > now.getTime() ? data.tier : 'free';
+}
+
 /** Fogyasztás könyvelése a hívás UTÁN (best-effort, atomikus upsert-increment). */
 async function trackUsage(userId, metric, amount, now = new Date()) {
   const sb = getAdmin();
@@ -125,4 +147,5 @@ module.exports = {
   getUsage,
   enforceQuota,
   trackUsage,
+  userTier,
 };

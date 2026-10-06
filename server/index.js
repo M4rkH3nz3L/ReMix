@@ -52,6 +52,7 @@ const { mediaGuard } = require('./security/uploadPolicy');
 const { AccessToken } = require('livekit-server-sdk');
 const { startEgress, stopEgress } = require('./liveEgress');
 const { encryptStreamKey, encryptionEnabled } = require('./liveCrypto');
+const { enforceQuota, trackUsage, userTier } = require('./usage');
 const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
 const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
 const LIVEKIT_API_SECRET = (process.env.LIVEKIT_API_SECRET || '').trim();
@@ -357,8 +358,18 @@ app.post('/tts', express.json({ limit: '256kb' }), ...proOnly, async (req, res) 
     return;
   }
   try {
+    // 📊 §2.2: havi kvóta-gate a `cloudJobs` metrikára (a hiteles tier a subscriptionből).
+    // DB/tábla nélkül best-effort megenged; a könyvelés a siker után (best-effort).
+    const uid = callerId(req, req.body?.userId);
+    const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', 1);
+    if (!gate.ok) {
+      res.status(429).json({ error: `Elérted a havi felhő-job kvótád. Hátralévő: ${gate.remaining}.` });
+      return;
+    }
     const { text, voice } = req.body || {};
-    res.json(await synthesize(text, voice));
+    const result = await synthesize(text, voice);
+    void trackUsage(uid, 'cloudJobs', 1);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

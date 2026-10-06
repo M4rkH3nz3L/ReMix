@@ -1839,7 +1839,17 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
     // értesítés célja. A projekt-név és -hossz a listázáshoz/ETA-hoz kell.
     const uid = req.user?.id || (req.body.userId ? String(req.body.userId).trim() : '') || null;
     const projectName = (project.seo?.title || project.name || '').slice(0, 200) || null;
+    // 📊 §2.2: a felhő-render havi perc-kvóta-gate (a hiteles tier a subscriptionből;
+    // DB/service_role nélkül best-effort megenged → nincs regresszió). A könyvelés
+    // (trackUsage) az enqueue UTÁN, hogy csak a ténylegesen sorba tett jobot számoljuk.
+    const minutes = Math.max(1, Math.ceil(totalDuration / 60));
     (async () => {
+      const rGate = await enforceQuota(uid, await userTier(uid), 'renderMinutes', minutes);
+      if (!rGate.ok) {
+        const qErr = new Error(`Elérted a havi render-perc kvótád (hátralévő: ${rGate.remaining} perc).`);
+        qErr.status = 429;
+        throw qErr;
+      }
       const localToKey = new Map();
       for (const f of req.files ?? []) {
         const key = `${id}/in/${path.basename(f.path)}`;
@@ -1867,11 +1877,13 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
         // a render Pro-kapu mögött van). A tényleges tier-forrás a 4-tier bekötéskor (§2.4).
         tier: typeof req.body?.tier === 'string' ? req.body.tier : undefined,
       });
+      // 📊 §2.2: sikeres sorba tétel után könyveljük a render-perceket (atomikus RPC).
+      void trackUsage(uid, 'renderMinutes', minutes);
     })()
       .then(() => res.json({ id, mode: 'cloud' }))
       .catch((err) => {
         console.error('render enqueue hiba:', err.message);
-        res.status(500).json({ error: err.message });
+        res.status(err.status || 500).json({ error: err.message });
       });
     return;
   }

@@ -269,6 +269,29 @@ function migrateToV3(project: Project): Project {
   };
 }
 
+/**
+ * 🎚️ Melyik klip-fajtát fogadhat egy sáv — a MOVE_CLIP (sávok közti mozgatás)
+ * kompatibilitás-guardja. A kanonikus modell: a kép-sávok (video/pip) videót és
+ * képet; a hang-sávok (music/voiceover/sfx) hangot; a szöveg/felirat szöveget;
+ * az overlay a matricát (shape/kép); a többi a saját fajtáját. Pure → tesztelhető.
+ */
+const TRACK_HOSTS: Record<TrackType, Clip['kind'][]> = {
+  video: ['video', 'image'],
+  pip: ['video', 'image'],
+  adjust: ['adjust'],
+  text: ['text'],
+  captions: ['text'],
+  overlay: ['shape', 'image'],
+  interactive: ['interactive'],
+  music: ['audio'],
+  voiceover: ['audio'],
+  sfx: ['audio'],
+};
+
+export function canHostClip(trackType: TrackType, kind: Clip['kind']): boolean {
+  return TRACK_HOSTS[trackType]?.includes(kind) ?? false;
+}
+
 export function trackOf(project: Project, type: TrackType): Track {
   const found = project.tracks.find((t) => t.type === type);
   if (!found) {

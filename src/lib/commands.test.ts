@@ -1,4 +1,5 @@
 import { applyCommand, describeCommand, type EditorCommand } from '@/lib/commands';
+import { canHostClip } from '@/lib/projectUtils';
 import { masterPreset } from '@/lib/audioMaster';
 import { createImageDoc } from '@/lib/imageDoc';
 import { createLiveDoc } from '@/lib/liveDoc';
@@ -170,6 +171,49 @@ describe('applyCommand — SPLIT_CLIP', () => {
   it('null, ha a vágás a klip szélére esik (túl rövid rész)', () => {
     const p = makeProject({ tracks: [track('video', [videoClip('a', 0, 10)])] });
     expect(applyCommand(p, { type: 'SPLIT_CLIP', clipId: 'a', time: 0 })).toBeNull();
+  });
+});
+
+describe('applyCommand — MOVE_CLIP', () => {
+  it('kompatibilis sávra mozgat (music → voiceover) új kezdettel', () => {
+    const p = makeProject({ tracks: [track('music', [audioClip('a', 0, 10)]), track('voiceover')] });
+    const next = expectChanged(p, applyCommand(p, { type: 'MOVE_CLIP', clipId: 'a', toTrackType: 'voiceover', start: 3 }));
+    expect(clipsOf(next, 'music')).toHaveLength(0);
+    expect(clipsOf(next, 'voiceover').map((c) => c.id)).toEqual(['a']);
+    expect(clipsOf(next, 'voiceover')[0].start).toBe(3);
+  });
+  it('ugyanazon a sávon új kezdet', () => {
+    const p = makeProject({ tracks: [track('video', [videoClip('a', 0, 10)])] });
+    const next = expectChanged(p, applyCommand(p, { type: 'MOVE_CLIP', clipId: 'a', toTrackType: 'video', start: 5 }));
+    expect(clipsOf(next, 'video').map((c) => c.id)).toEqual(['a']);
+    expect(clipsOf(next, 'video')[0].start).toBe(5);
+  });
+  it('null: inkompatibilis cél (videó klip → text sáv)', () => {
+    const p = makeProject({ tracks: [track('video', [videoClip('a')]), track('text')] });
+    expect(applyCommand(p, { type: 'MOVE_CLIP', clipId: 'a', toTrackType: 'text', start: 0 })).toBeNull();
+  });
+  it('null: ismeretlen klip', () => {
+    const p = makeProject();
+    expect(applyCommand(p, { type: 'MOVE_CLIP', clipId: 'nincs', toTrackType: 'video', start: 0 })).toBeNull();
+  });
+  it('null: ugyanott (azonos sáv + azonos kezdet)', () => {
+    const p = makeProject({ tracks: [track('video', [videoClip('a', 2, 10)])] });
+    expect(applyCommand(p, { type: 'MOVE_CLIP', clipId: 'a', toTrackType: 'video', start: 2 })).toBeNull();
+  });
+});
+
+describe('canHostClip — sáv ↔ klip-fajta kompatibilitás', () => {
+  it('a kanonikus párosítás', () => {
+    expect(canHostClip('video', 'video')).toBe(true);
+    expect(canHostClip('video', 'image')).toBe(true);
+    expect(canHostClip('pip', 'video')).toBe(true);
+    expect(canHostClip('voiceover', 'audio')).toBe(true);
+    expect(canHostClip('text', 'text')).toBe(true);
+    expect(canHostClip('overlay', 'shape')).toBe(true);
+    // inkompatibilis
+    expect(canHostClip('video', 'audio')).toBe(false);
+    expect(canHostClip('text', 'video')).toBe(false);
+    expect(canHostClip('music', 'text')).toBe(false);
   });
 });
 

@@ -233,6 +233,26 @@ describe('core-guard — zárolt sáv a magban is no-op (§2.2)', () => {
   });
 });
 
+describe('moveClip — frame-snap + sávok közti mozgatás (§2.3)', () => {
+  it('kompatibilis sávra mozgat + a kezdet frame-re ül', () => {
+    load([track('video', [videoClip('a', 0, 5)]), track('pip')]);
+    const ok = store().moveClip('a', 'pip', 1.017); // 30 fps → a legközelebbi frame-re
+    expect(ok).toBe(true);
+    expect(clipsOf('video')).toHaveLength(0);
+    const moved = clipsOf('pip');
+    expect(moved.map((c) => c.id)).toEqual(['a']);
+    const frames = moved[0].start * 30;
+    expect(Math.abs(frames - Math.round(frames))).toBeLessThan(1e-6); // frame-rácson
+  });
+
+  it('zárolt cél-sávra nem mozgat (core-guard)', () => {
+    load([track('video', [videoClip('a', 0, 5)]), track('pip')]);
+    store().toggleTrackFlag('pip', 'lock');
+    expect(store().moveClip('a', 'pip', 1)).toBe(false);
+    expect(clipsOf('video')).toHaveLength(1);
+  });
+});
+
 describe('dev-warn a néma no-op parancsnál (§2.2)', () => {
   it('a no-op parancs dev-warnt ad (a debugoláshoz)', () => {
     load([track('video')]);

@@ -6,10 +6,11 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 2 teljes · 🟡 0 mag kész · ⬜ 8 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 2 teljes · 🟡 1 mag kész · ⬜ 7 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
-> (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál.
+> (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
+> parancs + `canHostClip` guard + `store.moveClip` (frame-snap) tesztelve — hátra a húzás-gesztus (🖼️).
 > Az **editor-mag a platform legfontosabb rétege** — minden stúdió (video/image/audio/live) és az AI is
 > a command-buson+store-on keresztül dolgozik. A mag **funkcionálisan ~70–80%**, de a maradék 20–30% nem
 > „még egy feature", hanem **megbízhatóság**: a reducer+store **tesztelve**, a szerkesztés **sosem veszít
@@ -88,13 +89,15 @@ epik (06/07/03/05) erre a magra épít. Egy tesztelt, megbízható mag a **legjo
 ### 2.3 Klip sávok közötti mozgatása (MOVE_CLIP) — P1 (hiányzó alap-művelet)
 Ma a klip csak **időben** tolható a SAJÁT sávján (`nudgeClipsBy` megtartja a sáv-típust); egy NLE-ben a klip
 **másik (kompatibilis) sávra** is húzható kell legyen.
-- [ ] ⬜ **Command**: `MOVE_CLIP { clipId, toTrackType, start }` a [commands.ts](../../src/lib/commands.ts)-ben
-  — kiveszi a klipet a jelenlegi sávról, beteszi a célsávra, frame-re illesztett `start`-tal (undo-zható).
-- [ ] ⬜ **Kompatibilitás-guard** ([projectUtils.ts](../../src/lib/projectUtils.ts)): egy `canHostClip(trackType, clip.kind)`
-  pure függvény (pl. `video|pip ↔ video/image`, `music|voiceover|sfx ↔ audio`, `text ↔ text`); inkompatibilis
-  célon no-op. Teszt a §2.1 reducer-tesztbe.
+- [x] ✅ **Command**: `MOVE_CLIP { clipId, toTrackType, start }` a [commands.ts](../../src/lib/commands.ts)-ben
+  — kiveszi a klipet a forrás-sávról, beteszi a cél-sávra (undo-zható). No-op, ha ismeretlen klip, inkompatibilis
+  cél, vagy ugyanott maradna. A `store.moveClip` frame-re illeszti a `start`-ot (mint a `splitClipAt`), és a
+  core-guard automatikusan tiltja a zárolt forrás/cél sávot (a `touchedTrackTypes` MOVE_CLIP-ága).
+- [x] ✅ **Kompatibilitás-guard** ([projectUtils.ts](../../src/lib/projectUtils.ts)): `canHostClip(trackType, kind)`
+  pure függvény (`video|pip ↔ video/image`, `music|voiceover|sfx ↔ audio`, `text|captions ↔ text`,
+  `overlay ↔ shape/image`, `adjust/interactive ↔ saját`); inkompatibilis célon no-op. Tesztelve (§2.1 + canHostClip-blokk).
 - [ ] 🖼️ **Gesztus** ([TimelineClip.tsx](../../src/components/editor/TimelineClip.tsx)): függőleges húzás a
-  szomszédos kompatibilis sávra (vizuális drop-highlight), elengedéskor `MOVE_CLIP`. A zárolt cél-sáv tiltott.
+  szomszédos kompatibilis sávra (vizuális drop-highlight), elengedéskor `store.moveClip`. A zárolt cél-sáv tiltott. **(HÁTRA — UI)**
 
 ### 2.4 Klip-vágólap (cut/copy/paste egész klip) — P1
 Ma csak **stílus**-vágólap van (`copyStyle`/`pasteStyle`); a **klip** maga nem másolható/vágható ki a

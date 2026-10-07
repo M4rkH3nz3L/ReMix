@@ -1,6 +1,6 @@
 import { t as tr } from 'i18next';
 
-import { findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
+import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type {
   AspectRatio,
@@ -28,6 +28,8 @@ export type EditorCommand =
   | { type: 'ADD_CLIPS'; trackType: TrackType; clips: Clip[] }
   | { type: 'UPDATE_CLIP'; clipId: string; patch: Partial<Clip> }
   | { type: 'REMOVE_CLIP'; clipId: string }
+  /** klip másik (kompatibilis) sávra mozgatása + új kezdet (frame-illesztett a hívónál) */
+  | { type: 'MOVE_CLIP'; clipId: string; toTrackType: TrackType; start: number }
   | { type: 'SPLIT_CLIP'; clipId: string; time: number }
   | { type: 'SET_ASPECT'; aspectRatio: AspectRatio }
   | { type: 'SET_FPS'; fps: number }
@@ -135,6 +137,37 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
           ...track,
           clips: track.clips.filter((c) => c.id !== cmd.clipId),
         })),
+      };
+    }
+
+    case 'MOVE_CLIP': {
+      const found = findClip(project, cmd.clipId);
+      if (!found) {
+        return null;
+      }
+      // inkompatibilis cél-sáv VAGY nem létező sáv → no-op
+      if (!canHostClip(cmd.toTrackType, found.clip.kind) ||
+        !project.tracks.some((t) => t.type === cmd.toTrackType)) {
+        return null;
+      }
+      // no-op: ugyanazon a sávon, ugyanarra a kezdetre
+      if (found.track.type === cmd.toTrackType && found.clip.start === cmd.start) {
+        return null;
+      }
+      const moved = { ...found.clip, start: cmd.start } as Clip;
+      return {
+        ...project,
+        tracks: project.tracks.map((track) => {
+          // a cél-sáv: kivesszük (ha ugyanaz) + betesszük az új kezdettel
+          if (track.type === cmd.toTrackType) {
+            return { ...track, clips: [...track.clips.filter((c) => c.id !== cmd.clipId), moved] };
+          }
+          // a forrás-sáv (más, mint a cél): kivesszük
+          if (track.id === found.track.id) {
+            return { ...track, clips: track.clips.filter((c) => c.id !== cmd.clipId) };
+          }
+          return track;
+        }),
       };
     }
 
@@ -375,6 +408,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.updateClip', { keys: Object.keys(cmd.patch).join(', ') });
     case 'REMOVE_CLIP':
       return tr('lib.commands.removeClip');
+    case 'MOVE_CLIP':
+      return tr('lib.commands.moveClip', { trackType: cmd.toTrackType, defaultValue: `Move clip → ${cmd.toTrackType}` });
     case 'SPLIT_CLIP':
       return tr('lib.commands.splitClip', { time: cmd.time.toFixed(2) });
     case 'SET_ASPECT':

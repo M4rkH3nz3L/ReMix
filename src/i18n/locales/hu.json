@@ -2528,6 +2528,7 @@
       "addClips_other": "{{count}} klip hozzáadva ({{trackType}} sáv)",
       "updateClip": "klip módosítva: {{keys}}",
       "removeClip": "klip törölve",
+      "moveClip": "klip áthelyezve → {{trackType}}",
       "splitClip": "klip kettévágva {{time}} mp-nél",
       "setAspect": "képarány: {{aspectRatio}}",
       "renameProject": "projekt átnevezve: {{name}}",

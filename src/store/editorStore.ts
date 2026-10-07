@@ -288,6 +288,8 @@ interface EditorState {
   updateClip: (clipId: string, patch: Partial<Clip>) => void;
   removeClip: (clipId: string) => void;
   splitClipAt: (clipId: string, time: number) => boolean;
+  /** klip másik (kompatibilis) sávra mozgatása + frame-illesztett új kezdet */
+  moveClip: (clipId: string, toTrackType: TrackType, start: number) => boolean;
   selectClip: (clipId: string | null) => void;
   /** 🔒 collab klip-zár: identitás + zár-műveletek (broadcast + térkép-frissítés) */
   setCollabSelf: (self: { id: string; name?: string } | null) => void;
@@ -499,6 +501,11 @@ function touchedTrackTypes(project: Project, cmd: EditorCommand): TrackType[] {
     case 'SPLIT_CLIP': {
       const t = findClip(project, cmd.clipId)?.track.type;
       return t ? [t] : [];
+    }
+    case 'MOVE_CLIP': {
+      // a mozgatás a FORRÁS és a CÉL sávot is érinti — bármelyik zárolt → tiltott
+      const from = findClip(project, cmd.clipId)?.track.type;
+      return from ? [from, cmd.toTrackType] : [cmd.toTrackType];
     }
     default:
       return [];
@@ -727,6 +734,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 🎞️ a vágás a projekt frame-rácsára ül (fél kocka csúszás már látszik)
     const snapped = snapToFrame(time, projectFps(get().project));
     return get().dispatch({ type: 'SPLIT_CLIP', clipId, time: snapped });
+  },
+
+  moveClip: (clipId, toTrackType, start) => {
+    // 🎞️ a cél-kezdet a frame-rácsra ül (mint a split); 0 alá nem
+    const snapped = Math.max(0, snapToFrame(start, projectFps(get().project)));
+    return get().dispatch({ type: 'MOVE_CLIP', clipId, toTrackType, start: snapped });
   },
 
   selectClip: (clipId) => {

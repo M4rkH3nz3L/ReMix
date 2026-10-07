@@ -2528,6 +2528,7 @@
       "addClips_other": "{{count}} clips added ({{trackType}} track)",
       "updateClip": "clip modified: {{keys}}",
       "removeClip": "clip deleted",
+      "moveClip": "clip moved → {{trackType}}",
       "splitClip": "clip split at {{time}} s",
       "setAspect": "aspect ratio: {{aspectRatio}}",
       "renameProject": "project renamed: {{name}}",

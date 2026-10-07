@@ -2528,6 +2528,7 @@
       "addClips_other": "{{count}} Clips hinzugefügt ({{trackType}}-Spur)",
       "updateClip": "Clip geändert: {{keys}}",
       "removeClip": "Clip gelöscht",
+      "moveClip": "Clip verschoben → {{trackType}}",
       "splitClip": "Clip bei {{time}} s geteilt",
       "setAspect": "Seitenverhältnis: {{aspectRatio}}",
       "renameProject": "Projekt umbenannt: {{name}}",

@@ -2724,6 +2724,10 @@
   "asset": {
     "state": { "imported": "auf Gerät", "cached": "geladen", "external": "in Cloud", "stale": "veraltet", "invalidated": "ungültig" }
   },
+  "sync": {
+    "state": { "inSync": "gesichert", "localOnly": "nicht gesichert", "remoteOnly": "nur Cloud", "localAhead": "lokale Änderung", "remoteAhead": "Cloud-Änderung", "conflict": "Konflikt", "absent": "keine" },
+    "action": { "none": "—", "upload": "Hochladen", "download": "Herunterladen", "use-remote": "Cloud nutzen", "keep-local": "Lokal behalten", "compare": "Vergleichen" }
+  },
   "usage": {
     "nearQuota": "{{names}} erreicht bald das Monatskontingent ({{pct}}%).",
     "upgrade": "Pro",

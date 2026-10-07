@@ -116,3 +116,54 @@ export function needsAttention(state: SyncState): boolean {
 export function isAutoResolvable(state: SyncState): boolean {
   return state === 'local-only' || state === 'remote-only' || state === 'local-ahead' || state === 'in-sync';
 }
+
+// ── UI: megjelenítés (badge + akció-címke) ──────────────────────────────────
+
+/**
+ * Egy Asset DURVA sync-állapota a valós mezőkből (hash nélkül, UI-jelzőhöz): helyi
+ * másolat (uri nem http) + felhő-másolat (remoteUrl) jelenlétéből. Hash/base nélkül a
+ * divergenciát nem tudjuk — két meglévő változatot `in-sync`-nek (biztonságos default)
+ * veszünk; a valódi konfliktus-detektálás a sync-folyam base-hash-ével jön.
+ */
+export function assetSyncState(asset: { uri?: string; remoteUrl?: string | null }): SyncState {
+  const uriIsHttp = !!asset.uri && /^https?:\/\//i.test(asset.uri);
+  const local = !!asset.uri && !uriIsHttp;
+  // felhő-oldal: a backup-URL VAGY egy stream-uri (http) is távoli forrás
+  const remote = !!asset.remoteUrl || uriIsHttp;
+  if (local && remote) {
+    return 'in-sync';
+  }
+  if (local) {
+    return 'local-only';
+  }
+  if (remote) {
+    return 'remote-only';
+  }
+  return 'absent';
+}
+
+export interface SyncBadge {
+  icon: string;
+  labelKey: string;
+  tone: 'ok' | 'dim' | 'warn';
+}
+
+const SYNC_BADGES: Record<SyncState, SyncBadge> = {
+  'in-sync': { icon: 'cloud-done-outline', labelKey: 'sync.state.inSync', tone: 'ok' },
+  'local-only': { icon: 'cloud-upload-outline', labelKey: 'sync.state.localOnly', tone: 'warn' },
+  'remote-only': { icon: 'cloud-download-outline', labelKey: 'sync.state.remoteOnly', tone: 'dim' },
+  'local-ahead': { icon: 'cloud-upload-outline', labelKey: 'sync.state.localAhead', tone: 'warn' },
+  'remote-ahead': { icon: 'cloud-download-outline', labelKey: 'sync.state.remoteAhead', tone: 'warn' },
+  conflict: { icon: 'git-compare-outline', labelKey: 'sync.state.conflict', tone: 'warn' },
+  absent: { icon: 'help-outline', labelKey: 'sync.state.absent', tone: 'dim' },
+};
+
+/** A sync-állapot UI-jelzője (ikon + i18n-címke + tone). */
+export function syncStateBadge(state: SyncState): SyncBadge {
+  return SYNC_BADGES[state];
+}
+
+/** Egy feloldási akció i18n-címke-kulcsa (a `resolutionActions` gombjaihoz). */
+export function syncActionLabelKey(action: SyncAction): string {
+  return `sync.action.${action}`;
+}

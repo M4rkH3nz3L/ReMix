@@ -1,9 +1,13 @@
 import {
+  assetSyncState,
   isAutoResolvable,
   needsAttention,
   resolutionActions,
+  syncActionLabelKey,
   syncState,
+  syncStateBadge,
   type FileVersion,
+  type SyncState,
 } from '@/lib/fileConflict';
 
 const v = (hash: string | null, exists?: boolean): FileVersion => ({ hash, ...(exists === undefined ? {} : { exists }) });
@@ -70,5 +74,31 @@ describe('needsAttention / isAutoResolvable', () => {
     expect(isAutoResolvable('local-only')).toBe(true);
     expect(isAutoResolvable('remote-ahead')).toBe(false); // ez user-döntés
     expect(isAutoResolvable('conflict')).toBe(false);
+  });
+});
+
+describe('UI: assetSyncState + badge + akció-címke', () => {
+  it('assetSyncState a valós mezőkből (hash nélkül)', () => {
+    expect(assetSyncState({ uri: 'file:///a.mp4', remoteUrl: 'https://cdn/a.mp4' })).toBe('in-sync');
+    expect(assetSyncState({ uri: 'file:///a.mp4' })).toBe('local-only'); // nincs felhő-másolat
+    expect(assetSyncState({ uri: 'https://cdn/a.mp4' })).toBe('remote-only'); // csak stream
+    expect(assetSyncState({})).toBe('absent');
+  });
+
+  it('syncStateBadge: minden állapotra ikon + i18n-kulcs + tone; a local-only figyelmeztet', () => {
+    const states: SyncState[] = ['in-sync', 'local-only', 'remote-only', 'local-ahead', 'remote-ahead', 'conflict', 'absent'];
+    for (const s of states) {
+      const b = syncStateBadge(s);
+      expect(b.labelKey.startsWith('sync.state.')).toBe(true);
+      expect(b.icon.length).toBeGreaterThan(0);
+      expect(['ok', 'dim', 'warn']).toContain(b.tone);
+    }
+    expect(syncStateBadge('local-only').tone).toBe('warn'); // nincs mentve → figyelem
+    expect(syncStateBadge('in-sync').tone).toBe('ok');
+  });
+
+  it('syncActionLabelKey', () => {
+    expect(syncActionLabelKey('use-remote')).toBe('sync.action.use-remote');
+    expect(syncActionLabelKey('keep-local')).toBe('sync.action.keep-local');
   });
 });

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
 import { assetDisplayState, assetStateBadge } from '@/lib/assetState';
+import { assetSyncState, syncStateBadge } from '@/lib/fileConflict';
 import { projectKind } from '@/lib/projectUtils';
 import { assetInUse, pickSourceAsset, supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import { formatBytes } from '@/lib/storageQuota';
@@ -86,6 +87,10 @@ export function SourceSheet({
             const badge = assetStateBadge(assetDisplayState(a));
             const badgeColor =
               badge.tone === 'ok' ? palette.accent : badge.tone === 'warn' ? '#f5a623' : palette.textDim;
+            // 🔀 §8.6: backup-dimenzió — a helyi (eszközön készült) forrás fel van-e
+            // töltve a felhőbe? A `local-only` = még NINCS mentve → figyelmeztetés.
+            const notBackedUp = assetSyncState(a) === 'local-only';
+            const syncBadge = notBackedUp ? syncStateBadge('local-only') : null;
             return (
               <View key={a.id} style={styles.item}>
                 <Ionicons name={KIND_ICON[a.kind]} size={16} color={palette.accent} />
@@ -100,6 +105,12 @@ export function SourceSheet({
                       · {meta(a)}
                       {used ? ` · ${t('source.inUse')}` : ''}
                     </Text>
+                    {syncBadge ? (
+                      <>
+                        <Ionicons name={syncBadge.icon as keyof typeof Ionicons.glyphMap} size={11} color="#f5a623" />
+                        <Text style={[styles.itemMeta, { color: '#f5a623' }]}>{t(syncBadge.labelKey)}</Text>
+                      </>
+                    ) : null}
                   </View>
                 </View>
                 {onInsert ? (

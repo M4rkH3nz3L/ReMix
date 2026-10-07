@@ -43,7 +43,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 
 ### 2.6 External file versioning — P1
 - [x] ✅ **Konfliktus-detektáló mag KÉSZ (2026-10-06)**: [src/lib/fileConflict.ts](../../src/lib/fileConflict.ts) — 3-utas összevetés (lokális · távoli · közös ŐS) → `syncState` (`in-sync`/`local-only`/`remote-only`/`local-ahead`/`remote-ahead`/`conflict`/`absent`; base NÉLKÜL az eltérés KONFLIKTUS, nem találgat irányt → nincs csendes felülírás) + `resolutionActions` (a `Use new / Keep current / Compare` gombok állapotonként) + `needsAttention`/`isAutoResolvable`. Teszt: `fileConflict.test.ts` (12).
-- [ ] 🖼️🔌 Hátra: a bázis-hash tárolása + a flow bekötése (mediaSync/storageProviders a `syncState` köré) + a konfliktus-UI (a `resolutionActions` gombjaival).
+- [x] ✅ **Sync-állapot UI-jelző + akció-címkék KÉSZ (2026-10-07)**: [fileConflict.ts](../../src/lib/fileConflict.ts) `assetSyncState` (a valós uri+remoteUrl-ből) + `syncStateBadge` (ikon/i18n/tone) + `syncActionLabelKey` (a §8.6 gombokhoz); a forrás-mappa ([SourceSheet](../../src/components/SourceSheet.tsx)) a helyi, még-nem-mentett forrásokat **„nincs mentve"** figyelmeztetéssel jelzi (backup-dimenzió, a §2.2 availability-badge mellett). i18n `sync.*`. Teszt: `fileConflict.test.ts` (+3). Audit zöld (123 suite / 1332 teszt).
+- [ ] 🔌 Hátra: a **bázis-hash tárolása** (az Asseten, mentéskor) + a letöltés/feltöltés-IO + a `syncState` VALÓS hash-alapú számítása (mediaSync/storageProviders) + az interaktív „Use new / Keep current / Compare" feloldó-UI (a `resolutionActions`-re kötve) — ez a sync-folyam integráció.
 
 ### 2.7 Collaborative storage permissions — P1
 - [ ] ⬜ project / personal / shared storage + **asset-level** permissions (összeér [03](./03-collaboration.md) §2.4-gyel).

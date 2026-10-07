@@ -2724,6 +2724,10 @@
   "asset": {
     "state": { "imported": "eszközön", "cached": "letöltve", "external": "felhőben", "stale": "elavult", "invalidated": "érvénytelen" }
   },
+  "sync": {
+    "state": { "inSync": "mentve", "localOnly": "nincs mentve", "remoteOnly": "csak felhőben", "localAhead": "helyi változás", "remoteAhead": "felhő-változás", "conflict": "ütközés", "absent": "nincs" },
+    "action": { "none": "—", "upload": "Feltöltés", "download": "Letöltés", "use-remote": "A felhőé legyen", "keep-local": "A helyié legyen", "compare": "Összevetés" }
+  },
   "usage": {
     "nearQuota": "{{names}} közel a havi kvótához ({{pct}}%).",
     "upgrade": "Pro",

@@ -6,7 +6,7 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 3 mag kész · ⬜ 3 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 5 teljes · 🟡 3 mag kész · ⬜ 2 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
 > (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
@@ -157,11 +157,12 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   fájl progress + részleges retry + a maradékra kézi relink (a `relinkMissing` mag megvan), hogy egy fájl
   bukása ne buktassa a többit.
 
-### 2.9 Integrációs „arany-út" smoke-teszt — P1 (lezáró)
-- [ ] ⬜ **`src/store/editorStore.integration.test.ts`** (headless, RN-render nélkül): a teljes mag-hurok egy
-  tesztben — `loadProject` → `ADD_CLIP` → `splitClipAt` → `MOVE_CLIP` → trim (ripple) → `undo`×N → `redo`×N →
-  (serialize→`saveProject` mock→`loadProject`) → az állapot bitre azonos. Ez a mag **regressziós pajzsa** minden
-  további epikhez — ha egy jövőbeli változás eltöri az alap-hurkot, ez elbukik.
+### 2.9 Integrációs „arany-út" smoke-teszt — P1 (lezáró) ✅ KÉSZ (2026-10-08)
+- [x] ✅ **`src/store/editorStore.integration.test.ts`** (headless, RN-render nélkül): a teljes mag-hurok egy
+  tesztben — `loadProject` → `addClip` → `splitClipAt` → `MOVE_CLIP` → **ripple-trim** (`rippleResize`) →
+  `undo`×4 → `redo`×4 (az „arany" állapot **bitre azonos**) → (`saveProjectAndEvents` → `loadProject`) → a
+  TARTALOM bitre azonos + az eseménynapló (4 esemény) túléli. Ez a mag **regressziós pajzsa** — ha egy jövőbeli
+  változás eltöri az alap-hurkot (reducer / store-invariáns / undo-redo / atomi mentés), ez elbukik.
 
 ### 2.10 Core billentyű/gesztus-teljesség + help — P2
 - [ ] ⬜ **Egységes alap-parancskészlet**: space (play/pause), J/K/L (shuttle), I/O (range), S (split a

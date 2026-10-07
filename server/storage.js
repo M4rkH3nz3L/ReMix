@@ -7,6 +7,8 @@ const path = require('path');
 // 🛡️ SSRF: a baseUrl/endpoint USER-VEZÉRELT → minden remote fetch a privát-IP-t
 // (loopback/LAN/felhő-metadata 169.254.*) tiltó safeFetch/assertSafeUrl mögött.
 const { safeFetch, assertSafeUrl } = require('./ssrf');
+// 🛡️ §2.4 hardening: timeout + retry a WebDAV-olvasásokon, az SSRF-védett safeFetch-en át
+const { fetchRetry } = require('./netFetch');
 
 const CONFIG_FILE = path.join(__dirname, 'storage.config.json');
 
@@ -63,12 +65,16 @@ const PROPFIND_BODY =
 
 /** egy WebDAV-mappa tartalma (Depth: 1) */
 async function davListDir(source, rel) {
-  const res = await safeFetch(davUrl(source, rel), {
-    method: 'PROPFIND',
-    headers: { Depth: '1', 'Content-Type': 'application/xml', ...davAuthHeader(source) },
-    body: PROPFIND_BODY,
-    signal: AbortSignal.timeout(10000),
-  });
+  // idempotens PROPFIND (read-only) → SSRF-védett safeFetch + timeout(10s) + retry átmeneti hibára
+  const res = await fetchRetry(
+    davUrl(source, rel),
+    {
+      method: 'PROPFIND',
+      headers: { Depth: '1', 'Content-Type': 'application/xml', ...davAuthHeader(source) },
+      body: PROPFIND_BODY,
+    },
+    { fetchImpl: safeFetch, idempotent: true, timeoutMs: 10000 }
+  );
   if (!res.ok && res.status !== 207) {
     throw new Error(`WebDAV lista hiba (${res.status})`);
   }
@@ -195,8 +201,19 @@ function s3Client(source) {
     return cached;
   }
   const { S3Client } = require('@aws-sdk/client-s3');
+  // 🛡️ §2.4 hardening: socket/connect-timeout (a default SDK nem tesz → beragadhat);
+  // guardolt import, ha nincs a handler, a SDK-default marad.
+  let requestHandler;
+  try {
+    const { NodeHttpHandler } = require('@smithy/node-http-handler');
+    requestHandler = new NodeHttpHandler({ connectionTimeout: 10000, socketTimeout: 60000 });
+  } catch {
+    requestHandler = undefined;
+  }
   const client = new S3Client({
     region: source.region ?? 'us-east-1',
+    maxAttempts: 3, // átmeneti hiba → újrapróbálás (SDK retry)
+    ...(requestHandler ? { requestHandler } : {}),
     // S3-kompatibilis tárak (MinIO/R2/B2/Wasabi): endpoint + path-style
     ...(source.endpoint ? { endpoint: source.endpoint, forcePathStyle: true } : {}),
     credentials: {

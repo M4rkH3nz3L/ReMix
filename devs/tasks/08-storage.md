@@ -5,10 +5,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 3 mag kész · ⬜ 3 nyitva — Σ 8 tétel.
+> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 4 mag kész · ⬜ 2 nyitva — Σ 8 tétel.
 > **R2 = élő platform-tár** + provider-IO timeout/retry (§2.1) · **forrás-mappa** (§2.8) · **OneDrive-adapter**
-> (§2.3) KÉSZ. Az **asset-állapotgép** (§2.2: mag+UI+letöltés/eviction) és a **fájl-konfliktus** (§2.6: mag+jelző)
-> jól állnak — a mélyebb folyamok (uri→assetId, base-hash) + WebDAV-hardening + .ReMix-doksi + collab-jogok hátra.
+> (§2.3) KÉSZ; az **asset-állapotgép** (§2.2), a **fájl-konfliktus** (§2.6) és a **WebDAV/S3-hardening** (§2.4)
+> magja/alapja kész. Hátra: a mélyebb folyamok (uri→assetId, base-hash) + .ReMix-doksi (§2.5) + collab-jogok (§2.7).
 
 ## 0. Kontextus & cél
 Fontos audit-jegyzet: a repo **már tartalmaz** `StorageProvider` interfészt + külső-storage
@@ -38,7 +38,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [x] ✅ **OneDrive adapter KÉSZ (2026-10-07)**: Microsoft Graph-alapú provider ([userStorage.js](../../server/userStorage.js) `onedriveListMedia`/`onedriveStream`/`onedriveUpload` + OAuth-config, a Drive/Dropbox-mintára) bekötve mindhárom switchbe (list/stream/upload); kliens-oldalon connect-gomb + `OAuthProviderType` ([externalStorage.ts](../../src/lib/externalStorage.ts), [StorageCard](../../src/components/profile/StorageCard.tsx)). **Env-kapuzott** (`MS_OAUTH_CLIENT_ID/SECRET` — kulcs nélkül beszédes hiba). Audit zöld (124/1339). Élesítés: Azure-app-kulcsok (mint a Drive/Dropbox — a live-OAuth integrációs, nem unit-teszt).
 
 ### 2.4 WebDAV / NAS hardening — P1
-- [ ] 🟡 Alap kész → ⬜ credentials-lifecycle + reconnect + timeout + version-detect + offline-handling.
+- [x] ✅ **Timeout + retry (reconnect) KÉSZ (2026-10-07)**: a WebDAV PROPFIND-olvasás a §2.1-es `netFetch`-en át (az SSRF-védett `safeFetch`-et `fetchImpl`-ként injektálva → 10s timeout + retry átmeneti hibára, a privát-IP/NAS-védelem megmarad); az S3-kliensen ([storage.js](../../server/storage.js)) socket/connect-timeout (`NodeHttpHandler`, guardolt import → fallback a SDK-defaultra) + `maxAttempts: 3`. Audit zöld (124/1339).
+- [ ] ⬜ Hátra: credentials-lifecycle (token-frissítés/újra-bejelentkezés) + version-detect (ETag/Last-Modified) + offline-handling (a §2.6 base-hash-sel összeér).
 
 ### 2.5 `.ReMix` projektfájl egységesítés — P1 (doksi)
 - [ ] 🟡 A `videdFile.ts` `.remix`-et ad → **egységesíteni** a doksit + konvenciót a hivatalos `.ReMix`/`.remix` formátumra ([13](./13-documentation.md)).

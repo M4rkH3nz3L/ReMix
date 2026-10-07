@@ -11,6 +11,11 @@ const ACCESS = process.env.S3_ACCESS_KEY || '';
 const SECRET = process.env.S3_SECRET_KEY || '';
 // a publikus letöltő-URL bázisa (Supabase: .../storage/v1/object/public)
 const PUBLIC_BASE = process.env.S3_PUBLIC_BASE || '';
+// a publikus URL STÍLUSA:
+//  'bucket' (alap, Supabase): `${PUBLIC_BASE}/${BUCKET}/${key}` — a bucket az útban van
+//  'domain' (Cloudflare R2 / r2.dev): `${PUBLIC_BASE}/${key}` — a domain MÁR a buckethez
+//    van kötve, ezért a bucket-nevet NEM szabad az útba tenni
+const PUBLIC_STYLE = (process.env.S3_PUBLIC_STYLE || 'bucket').trim().toLowerCase();
 
 function s3Enabled() {
   return Boolean(ENDPOINT && ACCESS && SECRET);
@@ -52,7 +57,12 @@ async function downloadFile(key, localPath) {
 }
 
 function publicUrl(key) {
-  return PUBLIC_BASE ? `${PUBLIC_BASE}/${BUCKET}/${key}` : '';
+  if (!PUBLIC_BASE) {
+    return '';
+  }
+  return PUBLIC_STYLE === 'domain'
+    ? `${PUBLIC_BASE}/${key}` // R2: a domain a buckethez kötve → nincs bucket-szegmens
+    : `${PUBLIC_BASE}/${BUCKET}/${key}`; // Supabase: .../object/public/<bucket>/<key>
 }
 
 module.exports = { s3Enabled, uploadFile, downloadFile, publicUrl, BUCKET };

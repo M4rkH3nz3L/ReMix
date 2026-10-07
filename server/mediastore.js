@@ -37,6 +37,19 @@ function mediaStoreEnabled() {
  * építi (`${req.protocol}://${req.get('host')}`), vagy a `MEDIA_PUBLIC_BASE` env.
  */
 async function uploadMedia(key, localPath, contentType, publicBase) {
+  // 0) EXPLICIT R2/S3 BACKEND (prod): ha a `STORAGE_BACKEND=r2` (vagy `s3`) be van
+  // állítva, az S3-út az ELSŐDLEGES — megelőzi a Supabase service_role-t (ami
+  // egyébként mindig nyerne, mert a notify/billing miatt úgyis bekötött). Így lesz
+  // a Cloudflare R2 a ReMix saját, éles tárhelye MINDEN user-fájlhoz.
+  const backend = (process.env.STORAGE_BACKEND || '').trim().toLowerCase();
+  if (backend === 'r2' || backend === 's3') {
+    if (!s3.s3Enabled()) {
+      throw new Error('STORAGE_BACKEND=' + backend + ', de az S3_* kulcsok hiányoznak (S3_ENDPOINT/S3_ACCESS_KEY/S3_SECRET_KEY).');
+    }
+    await s3.uploadFile(key, localPath, contentType);
+    return s3.publicUrl(key);
+  }
+
   // 1) LOKÁLIS DISK (dev): a server mappába másol → a /m statikus úton szolgál.
   if (localEnabled()) {
     const dest = path.join(LOCAL_DIR, key);

@@ -38,6 +38,7 @@ Jelmagyarázat: ✅ kész · 🚧 vázlat, kitöltésre vár
 | [ADR-008](decisions/ADR-008-nondestructive-proxy.md) | Proxy nem-destruktív | ✅ |
 | [ADR-009](decisions/ADR-009-backend-router.md) | Egyetlen backend-router | ✅ |
 | [ADR-010](decisions/ADR-010-byok-ai-routing.md) | BYOK task-alapú AI-provider routing | ✅ |
+| [ADR-011](decisions/ADR-011-fixed-canonical-tracks.md) | Fix kanonikus sávmodell (nem szabad több-lane) | ✅ |
 | **development/** | | |
 | [coding-standards.md](development/coding-standards.md) | Kódolási szabályok (AGENTS.md-ből) | ✅ |
 | [testing.md](development/testing.md) | Tesztelés, `npm run audit` | ✅ |

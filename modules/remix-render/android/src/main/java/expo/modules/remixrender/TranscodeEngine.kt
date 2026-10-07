@@ -35,6 +35,7 @@ object TranscodeEngine {
     canvasWidth: Int,
     canvasHeight: Int,
     fps: Int,
+    speed: Double,
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -43,6 +44,7 @@ object TranscodeEngine {
       if (durationSec > 0.0) ((inSec + durationSec) * 1_000_000.0).toLong() else Long.MAX_VALUE
     val canvasW = evenDim(canvasWidth)
     val canvasH = evenDim(canvasHeight)
+    val playbackSpeed = if (speed > 0.0) speed else 1.0
 
     val extractor = MediaExtractor()
     extractor.setDataSource(srcPath)
@@ -83,6 +85,15 @@ object TranscodeEngine {
     var muxer: MediaMuxer? = null
 
     try {
+      // Sebesség-váltásnál a hangot külön decode→resample→AAC ágon hozzuk időbe
+      // (a videó-codecek előtt, hogy ne fusson egyszerre túl sok codec). speed==1 → sima copy.
+      val reencodeAudio = playbackSpeed != 1.0
+      val encodedAudio = if (reencodeAudio && audioTrack >= 0 && audioFormat != null) {
+        AudioSpeedEncoder.encode(srcPath, audioTrack, startUs, endUs, playbackSpeed)
+      } else {
+        null
+      }
+
       // ── enkóder (cél-vászon) + GL input-surface ──
       val outFormat = MediaFormat.createVideoFormat(VIDEO_MIME, canvasW, canvasH)
       outFormat.setInteger(
@@ -160,7 +171,8 @@ object TranscodeEngine {
               outputSurface.awaitNewImage()
               outputSurface.drawImage()
               if (firstPtsUs < 0L) firstPtsUs = ptsUs
-              inputSurface.setPresentationTime((ptsUs - firstPtsUs) * 1000L)
+              val outPtsUs = ((ptsUs - firstPtsUs).toDouble() / playbackSpeed).toLong()
+              inputSurface.setPresentationTime(outPtsUs * 1000L)
               inputSurface.swapBuffers()
               if (spanUs > 0L) {
                 val p = ((ptsUs - startUs).toDouble() / spanUs).coerceIn(0.0, 0.98)
@@ -182,11 +194,24 @@ object TranscodeEngine {
         if (encIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
           if (muxerStarted) throw RuntimeException("az enkóder-formátum kétszer változott")
           muxVideoTrack = muxer.addTrack(encoder.outputFormat)
-          if (audioTrack >= 0 && audioFormat != null) {
+          if (reencodeAudio) {
+            if (encodedAudio != null) muxAudioTrack = muxer.addTrack(encodedAudio.format)
+          } else if (audioTrack >= 0 && audioFormat != null) {
             muxAudioTrack = muxer.addTrack(audioFormat)
           }
           muxer.start()
           muxerStarted = true
+          // a (sebesség-korrigált) hang-csomagokat azonnal kiírjuk
+          if (reencodeAudio && encodedAudio != null && muxAudioTrack >= 0) {
+            val audioInfo = MediaCodec.BufferInfo()
+            for (pkt in encodedAudio.packets) {
+              audioInfo.offset = 0
+              audioInfo.size = pkt.data.size
+              audioInfo.presentationTimeUs = pkt.ptsUs
+              audioInfo.flags = pkt.flags
+              muxer.writeSampleData(muxAudioTrack, ByteBuffer.wrap(pkt.data), audioInfo)
+            }
+          }
         } else if (encIndex >= 0) {
           val encBuf = encoder.getOutputBuffer(encIndex)!!
           if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
@@ -203,8 +228,8 @@ object TranscodeEngine {
         }
       }
 
-      // ── hang-sáv változatlan átmásolása (trim + PTS-illesztés a videóhoz) ──
-      if (audioTrack >= 0 && audioFormat != null && muxAudioTrack >= 0) {
+      // ── hang-sáv változatlan átmásolása (csak speed==1; a resample-elt már kint van) ──
+      if (!reencodeAudio && audioTrack >= 0 && audioFormat != null && muxAudioTrack >= 0) {
         copyAudio(srcPath, audioTrack, startUs, endUs, if (firstPtsUs >= 0L) firstPtsUs else startUs, muxer, muxAudioTrack, audioFormat)
       }
 

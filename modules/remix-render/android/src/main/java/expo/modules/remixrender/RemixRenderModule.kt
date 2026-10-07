@@ -72,19 +72,23 @@ class RemixRenderModule : Module() {
     val filter = seg.optString("filter", "none")
     val progress = { p: Double -> sendEvent("onProgress", mapOf("progress" to p)) }
 
-    // Fázis A (remux) a gyors, veszteségmentes út: ha nincs sebesség/szűrő, próbáljuk;
-    // képarány-eltérésnél a Fázis B transzkódra váltunk (vászon-skálázás).
-    if (speed == 1.0 && filter == "none") {
+    val fps = plan.optInt("fps", 30)
+
+    // Szűrő egyelőre a Fázis B3 / felhő.
+    if (filter != "none") {
+      throw IllegalStateException("Szűrő egyelőre a felhő-renderre esik (Android Fázis B3 készül).")
+    }
+
+    // speed==1: gyors, veszteségmentes remux (A); képarány-eltérésnél transzkód (B1).
+    if (speed == 1.0) {
       return try {
         "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, outFile, progress)
       } catch (_: AspectMismatchException) {
-        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, plan.optInt("fps", 30), outFile, progress)
+        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, outFile, progress)
       }
     }
 
-    // Sebesség/szűrő → a Fázis B2/B3 feladata; addig tiszta hibával a felhőre.
-    throw IllegalStateException(
-      "Sebesség/szűrő egyelőre a felhő-renderre esik (Android Fázis B2/B3 készül)."
-    )
+    // speed != 1: transzkód sebességgel (B2) — remux itt nem opció.
+    return "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, outFile, progress)
   }
 }

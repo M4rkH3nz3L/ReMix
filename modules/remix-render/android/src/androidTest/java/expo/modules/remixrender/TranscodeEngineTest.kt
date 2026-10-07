@@ -41,6 +41,7 @@ class TranscodeEngineTest {
       320,
       180,
       30,
+      1.0,
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 
@@ -78,6 +79,64 @@ class TranscodeEngineTest {
       assertTrue(
         "a videó hossza ~1s (mért: ${videoDurUs}us)",
         videoDurUs in 700_000L..1_400_000L,
+      )
+    } finally {
+      ex.release()
+    }
+  }
+
+  @Test
+  fun speedsUpClipWithResampledAudio() {
+    val inst = InstrumentationRegistry.getInstrumentation()
+    val cache = inst.targetContext.cacheDir
+
+    val src = File(cache, "speed_src.mp4")
+    inst.context.assets.open("remux_sample.mp4").use { input ->
+      src.outputStream().use { output -> input.copyTo(output) }
+    }
+    val outFile = File(cache, "speed_out.mp4")
+    if (outFile.exists()) outFile.delete()
+
+    // 1s forrás-tartomány 2× sebességgel → ~0.5s kimenet, 240×240 vászon (identitás-skála)
+    val progress = ArrayList<Double>()
+    val resultPath = TranscodeEngine.transcode(
+      src.absolutePath,
+      1.0,
+      1.0,
+      240,
+      240,
+      30,
+      2.0,
+      outFile.absolutePath,
+    ) { p -> progress.add(p) }
+
+    val result = File(resultPath)
+    assertTrue("a kimeneti fájl létrejött és nem üres", result.exists() && result.length() > 0)
+
+    val ex = MediaExtractor()
+    try {
+      ex.setDataSource(result.absolutePath)
+      var hasVideo = false
+      var hasAudio = false
+      var videoDurUs = 0L
+      for (i in 0 until ex.trackCount) {
+        val fmt = ex.getTrackFormat(i)
+        val mime = fmt.getString(MediaFormat.KEY_MIME) ?: continue
+        if (mime.startsWith("video/")) {
+          hasVideo = true
+          if (fmt.containsKey(MediaFormat.KEY_DURATION)) {
+            videoDurUs = fmt.getLong(MediaFormat.KEY_DURATION)
+          }
+        }
+        if (mime.startsWith("audio/")) {
+          hasAudio = true
+        }
+      }
+      assertTrue("a kimenet tartalmaz videósávot", hasVideo)
+      assertTrue("a kimenet tartalmaz (újramintázott) hangsávot", hasAudio)
+      assertTrue(
+        "2× sebességnél a hossz ~0.5s (mért: ${videoDurUs}us)",
+        videoDurUs in 300_000L..750_000L,
       )
     } finally {
       ex.release()

@@ -467,10 +467,19 @@ export default function FeedScreen() {
     return () => {
       const post = findPost(leavingId);
       const durSec = post?.durationSec ?? 0;
-      const watchedSec =
-        Platform.OS === 'web'
-          ? activeVideoElRef.current?.currentTime ?? 0
-          : player.currentTime ?? 0;
+      // ⚠️ A cleanup a poszt ELHAGYÁSAKOR fut — ekkorra az expo-video player már
+      // felszabadulhatott (unmount/fast-refresh), és egy released shared object
+      // bármely property-je ERR_USING_RELEASED_SHARED_OBJECT-et dob. Best-effort:
+      // ha nem olvasható a pozíció, csendben kihagyjuk a végignézés-jel rögzítését.
+      let watchedSec = 0;
+      try {
+        watchedSec =
+          Platform.OS === 'web'
+            ? activeVideoElRef.current?.currentTime ?? 0
+            : player.currentTime ?? 0;
+      } catch {
+        return;
+      }
       if (durSec > 0 && watchedSec > 0) {
         void recordViewEvent(leavingId, watchedSec * 1000, durSec * 1000);
       }

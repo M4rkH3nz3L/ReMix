@@ -36,7 +36,12 @@ export interface LiveVideoStageProps {
 function MicControl({ muted }: { muted: boolean }) {
   const { localParticipant } = useLocalParticipant();
   useEffect(() => {
-    void localParticipant?.setMicrophoneEnabled(!muted);
+    // Ugyanaz a race, mint a SceneDataPublisher-ben: a setMicrophoneEnabled aszinkron,
+    // és a room (még nem / már nem) kész állapotában elutasíthat → kezeljük a rejectiont.
+    const p = localParticipant?.setMicrophoneEnabled(!muted);
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {});
+    }
   }, [localParticipant, muted]);
   return null;
 }
@@ -82,7 +87,14 @@ function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
       }
       try {
         const bytes = new TextEncoder().encode(JSON.stringify(s));
-        void p.publishData(bytes, { reliable: true, topic: 'scene' });
+        // A publishData ASZINKRON: ha a room épp (még nem / már nem) kapcsolódik — pl.
+        // „PC manager is closed" belépéskor vagy teardownkor —, a Promise ELUTASÍT. A
+        // sync try/catch ezt NEM fogja el → a rejectiont külön kell kezelni (best-effort),
+        // mint a ScreenShareControl-ban, különben „Uncaught (in promise)".
+        const pub = p.publishData(bytes, { reliable: true, topic: 'scene' });
+        if (pub && typeof pub.catch === 'function') {
+          pub.catch(() => {});
+        }
       } catch {
         // best-effort — az in-app nézők úgyis a Supabase-realtime-on kapják a jelenetet
       }
@@ -107,22 +119,48 @@ export default function LiveVideoStage({
   const [, requestCam] = useCameraPermissions();
   const [, requestMic] = useMicrophonePermissions();
   const [lk, setLk] = useState<{ token: string; url: string } | null>(null);
+  // 🔁 a token-szerzés ÚJRAPRÓBÁL (capped backoff), ahogy az OBS is folyamatosan
+  // próbál csatlakozni: ha a worker épp nem elérhető (dev-stack indul, hálózat
+  // pislákol), a „Kapcsolódás…" NEM ragad be némán — amint a `/live/token` válaszol,
+  // belépünk a szobába. Pár sikertelen próba után „Újracsatlakozás…"-ra váltunk.
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    const attemptFetch = async () => {
+      if (!active) {
+        return;
+      }
+      const tok = await fetchLiveToken(liveId, publish, name, userId).catch(() => null);
+      if (!active) {
+        return;
+      }
+      if (tok) {
+        setRetrying(false);
+        setLk(tok);
+        return;
+      }
+      attempt += 1;
+      setRetrying(attempt >= 2);
+      // 1s → 2s → 4s → … → max 8s; folyamatosan próbál, amíg a stage mountolva van
+      const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      timer = setTimeout(attemptFetch, backoff);
+    };
     (async () => {
       ensureLiveKit();
       if (publish) {
         await requestCam();
         await requestMic();
       }
-      const tok = await fetchLiveToken(liveId, publish, name, userId).catch(() => null);
-      if (active && tok) {
-        setLk(tok);
-      }
+      await attemptFetch();
     })();
     return () => {
       active = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
     };
   }, [liveId, publish, name, userId, requestCam, requestMic]);
 
@@ -137,7 +175,7 @@ export default function LiveVideoStage({
               <Ionicons name="person" size={48} color={palette.textDim} />
             </View>
           )}
-          <Text style={styles.note}>{t('live.connecting')}</Text>
+          <Text style={styles.note}>{t(retrying ? 'live.reconnecting' : 'live.connecting')}</Text>
         </View>
       </LinearGradient>
     );

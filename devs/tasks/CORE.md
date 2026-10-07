@@ -6,9 +6,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 1 teljes · 🟡 0 mag kész · ⬜ 9 nyitva — Σ 10 tétel.
-> **§2.1 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt** —
-> `commands.test.ts` + `editorStore.test.ts`, 69 teszt, a `npm run audit` futtatja.
+> **📊 Haladás (2026-10-08):** ✅ 2 teljes · 🟡 0 mag kész · ⬜ 8 nyitva — Σ 10 tétel.
+> **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
+> (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
+> (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál.
 > Az **editor-mag a platform legfontosabb rétege** — minden stúdió (video/image/audio/live) és az AI is
 > a command-buson+store-on keresztül dolgozik. A mag **funkcionálisan ~70–80%**, de a maradék 20–30% nem
 > „még egy feature", hanem **megbízhatóság**: a reducer+store **tesztelve**, a szerkesztés **sosem veszít
@@ -74,15 +75,15 @@ epik (06/07/03/05) erre a magra épít. Egy tesztelt, megbízható mag a **legjo
 - [x] ✅ **Teszthorog**: a mag expo-mentes → a `jest` közvetlenül importálja; az `audit` (`npm run audit`) futtatja
   (69 teszt / 2 suite). A mag minden ágát regressziós teszt védi.
 
-### 2.2 Command-eredmény + core-guardok — P0
-Ma a `applyCommand` `null`-t ad vissza érvénytelen/no-op esetén, **ok nélkül** → a UI nem tudja, miért nem
-történt semmi, és a védelem (zárolt sáv, üres sáv) csak a UI-ban van, nem a magban.
-- [ ] ⬜ **Guard a mag szintjén**: a zárolt sávra / nem létező sávra írás a reducerben is no-op legyen
-  (ma a `lockedTracks` session-állapot a store-ban van — a command-réteg nem ismeri; az AI/remote megkerülheti).
-  Döntés: a zár-ellenőrzés a `dispatch`-ben (store) maradjon, de **minden** író-út (user+ai+remote) átmenjen rajta.
-- [ ] ⬜ **Fejlesztői jelzés**: `applyCommand` `null` ágán dev-only `console.warn(describeCommand + ok)` (prodban
-  néma) — a néma no-op ma nehezen debugolható. (Az API marad `Project | null`, nem törünk hívót.)
-- [ ] ⬜ **Teszt**: zárolt-sáv-írás elutasítva; az AI-köteg (`actor:'ai'`) ugyanúgy validálva, mint a user-é.
+### 2.2 Command-eredmény + core-guardok — P0 ✅ KÉSZ (2026-10-08)
+- [x] ✅ **Guard a mag szintjén**: a zárolt sávot érintő parancs a `dispatch`/`applyBatch`-ben no-op —
+  minden lokális író-út (user+ai) ezen megy át, így az AI/programozott hívó sem kerülheti meg a sáv-védelmet.
+  A `touchedTrackTypes()` pure segéd adja a parancs érintett sávjait; a `'remote'` collab-visszajátszás
+  **kivétel** (a társ edítje authoritatív, a lokális zár nem blokkolhatja → nincs állapot-széthúzás).
+- [x] ✅ **Fejlesztői jelzés**: a `dispatch` `null`-ágán dev-only `console.warn(describeCommand)` (prodban
+  `__DEV__`-guard mögött néma). Az API maradt `Project | null` / `boolean` — nem tört hívót.
+- [x] ✅ **Teszt**: zárolt-sáv ADD_CLIP/UPDATE_CLIP elutasítva (user); az AI-köteg zárolt parancsa kimarad,
+  a többi fut; a `'remote'` NEM blokkolt; a dev-warn spy-val igazolt (editorStore.test.ts, §2.2 blokk).
 
 ### 2.3 Klip sávok közötti mozgatása (MOVE_CLIP) — P1 (hiányzó alap-művelet)
 Ma a klip csak **időben** tolható a SAJÁT sávján (`nudgeClipsBy` megtartja a sáv-típust); egy NLE-ben a klip

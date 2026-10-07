@@ -18,7 +18,7 @@ import {
   type LockBroadcast,
   type LockMap,
 } from '@/lib/clipLock';
-import { applyCommand } from '@/lib/commands';
+import { applyCommand, describeCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
 import { projectFps, snapToFrame } from '@/lib/frames';
@@ -481,6 +481,30 @@ const SESSION_RESET = {
   pickTarget: null,
 };
 
+/**
+ * 🔒 Egy command által ÉRINTETT sáv-típus(ok) — a core-guardhoz (zárolt sáv).
+ * Üres tömb = a parancs nem sáv-scope-os (pl. SET_FPS, markerek) → sosem blokkolt.
+ */
+function touchedTrackTypes(project: Project, cmd: EditorCommand): TrackType[] {
+  switch (cmd.type) {
+    case 'ADD_CLIP':
+    case 'ADD_CLIPS':
+    case 'REPLACE_TRACK_CLIPS':
+    case 'SET_TRACK_GAIN':
+      return [cmd.trackType];
+    case 'REPLACE_TRACKS':
+      return cmd.tracks.map((t) => t.trackType);
+    case 'UPDATE_CLIP':
+    case 'REMOVE_CLIP':
+    case 'SPLIT_CLIP': {
+      const t = findClip(project, cmd.clipId)?.track.type;
+      return t ? [t] : [];
+    }
+    default:
+      return [];
+  }
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   project: null,
   selectedClipId: null,
@@ -551,12 +575,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   dispatch: (command, actor = 'user') => {
-    const { project, past, events } = get();
+    const { project, past, events, lockedTracks } = get();
     if (!project) {
       return false;
     }
+    // 🔒 core-guard: a zárolt sávra írás a MAGBAN is no-op — így az AI (actor:'ai')
+    // és a programozott hívók sem kerülhetik meg a sáv-védelmet (eddig csak a UI tiltotta).
+    // A 'remote' collab-visszajátszás kivétel: a társ-szerkesztő edítje authoritatív,
+    // a saját lokális sáv-zárunk nem blokkolhatja (különben széthúzna a közös állapot).
+    if (actor !== 'remote' && lockedTracks.length > 0) {
+      const touched = touchedTrackTypes(project, command);
+      if (touched.some((t) => lockedTracks.includes(t))) {
+        return false;
+      }
+    }
     const next = applyCommand(project, command);
     if (next === null) {
+      // 🪧 dev-only jelzés: a néma no-op (semmi nem változott) eddig nehezen volt
+      // debugolható. Prodban néma (az API továbbra is sima `false`).
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn(`[editor] no-op parancs (semmi nem változott): ${describeCommand(command)}`);
+      }
       return false;
     }
     // 📉 a naplóba a KÖNNYÍTETT változat megy (a teljes klip-tömbök mérve 1,2 MB-ot
@@ -583,13 +622,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   applyBatch: (commands, actor = 'ai') => {
-    const { project, past, events } = get();
+    const { project, past, events, lockedTracks } = get();
     if (!project) {
       return 0;
     }
     let cur = project;
     const batchEvents: ProjectEvent[] = [];
     for (const command of commands) {
+      // 🔒 core-guard: a zárolt sávot érintő parancsot kihagyjuk (user+ai); a 'remote' kivétel
+      if (
+        actor !== 'remote' &&
+        lockedTracks.length > 0 &&
+        touchedTrackTypes(cur, command).some((t) => lockedTracks.includes(t))
+      ) {
+        continue;
+      }
       const next = applyCommand(cur, command);
       if (next !== null) {
         cur = next;

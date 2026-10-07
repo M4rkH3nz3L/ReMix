@@ -1,5 +1,5 @@
 import { useEditorStore } from '@/store/editorStore';
-import type { Clip, Project, TextClip, Track, TrackType, VideoClip } from '@/types/project';
+import type { AudioClip, Clip, Project, TextClip, Track, TrackType, VideoClip } from '@/types/project';
 
 /**
  * 🧱 CORE §2.1 — a command-bus STORE-invariánsainak regressziós pajzsa: a
@@ -29,6 +29,13 @@ function textClip(id: string, start = 0, duration = 5): TextClip {
   };
 }
 
+function audioClip(id: string, start = 0, duration = 5): AudioClip {
+  return {
+    id, kind: 'audio', start, duration,
+    uri: `file:///audio-${id}.m4a`, label: id, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported',
+  };
+}
+
 function makeProject(tracks: Track[]): Project {
   return {
     id: 'p1', name: 'Teszt', aspectRatio: '9:16', fps: 30,
@@ -46,7 +53,15 @@ function clipsOf(type: TrackType): Clip[] {
   return store().project!.tracks.find((t) => t.type === type)!.clips;
 }
 
-afterEach(() => store().closeProject());
+// a dev-warn (no-op parancs) elnyomása + a §2.2 assertje ugyanezen a spy-on
+let warnSpy: ReturnType<typeof jest.spyOn>;
+beforeEach(() => {
+  warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+});
+afterEach(() => {
+  store().closeProject();
+  warnSpy.mockRestore();
+});
 
 describe('dispatch', () => {
   it('érvényes command: igaz + dirty + event + past', () => {
@@ -175,5 +190,54 @@ describe('nudgeClipsBy — csoport-clamp', () => {
     load([track('video', [videoClip('a', 1, 5)])]);
     store().nudgeClipsBy(['a'], 3);
     expect(clipsOf('video')[0].start).toBeCloseTo(4);
+  });
+});
+
+describe('core-guard — zárolt sáv a magban is no-op (§2.2)', () => {
+  it('user: zárolt sávra ADD_CLIP → false, nincs változás', () => {
+    load([track('video', [videoClip('a')])]);
+    store().toggleTrackFlag('video', 'lock');
+    expect(store().lockedTracks).toContain('video');
+    const ok = store().dispatch({ type: 'ADD_CLIP', trackType: 'video', clip: videoClip('b', 5) });
+    expect(ok).toBe(false);
+    expect(clipsOf('video').map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('AI-köteg: a zárolt sávot érintő parancs kimarad, a többi fut', () => {
+    load([track('video', [videoClip('a')]), track('music')]);
+    store().toggleTrackFlag('video', 'lock');
+    const n = store().applyBatch(
+      [
+        { type: 'ADD_CLIP', trackType: 'video', clip: videoClip('b', 5) }, // zárolt → kimarad
+        { type: 'ADD_CLIP', trackType: 'music', clip: audioClip('m') }, // engedett
+      ],
+      'ai'
+    );
+    expect(n).toBe(1);
+    expect(clipsOf('video')).toHaveLength(1);
+    expect(clipsOf('music')).toHaveLength(1);
+  });
+
+  it("remote: a lokális sáv-zár NEM blokkol (collab authoritatív)", () => {
+    load([track('video', [videoClip('a')])]);
+    store().toggleTrackFlag('video', 'lock');
+    const ok = store().dispatch({ type: 'ADD_CLIP', trackType: 'video', clip: videoClip('b', 5) }, 'remote');
+    expect(ok).toBe(true);
+    expect(clipsOf('video')).toHaveLength(2);
+  });
+
+  it('UPDATE_CLIP a zárolt sáv klipjén is no-op (a klip sávját nézi)', () => {
+    load([track('text', [textClip('t1')])]);
+    store().toggleTrackFlag('text', 'lock');
+    expect(store().dispatch({ type: 'UPDATE_CLIP', clipId: 't1', patch: { color: '#000' } })).toBe(false);
+  });
+});
+
+describe('dev-warn a néma no-op parancsnál (§2.2)', () => {
+  it('a no-op parancs dev-warnt ad (a debugoláshoz)', () => {
+    load([track('video')]);
+    warnSpy.mockClear();
+    store().dispatch({ type: 'SET_ASPECT', aspectRatio: '9:16' }); // azonos → no-op
+    expect(warnSpy).toHaveBeenCalled();
   });
 });

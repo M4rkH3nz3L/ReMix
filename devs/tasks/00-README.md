@@ -69,8 +69,14 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 
 ## 2. Audit-összkép és a feladatfájlok
 
+> **🧱 A mag előbb van:** az [CORE.md](./CORE.md) az **Editor-mag (alapfunkció)** 100%-ra vitele — a
+> command-bus + store **tesztelése**, a hiányzó alap-műveletek (klip sávok közti mozgatása, klip-vágólap),
+> a lejátszás-parity és a „soha ne vessz el munka" mentés. **Minden stúdió és az AI erre a magra épül**
+> (audit §19 `Editor core ~70–80%`) → ez a legjobb ár/érték a tervben, érdemes elöl kezdeni.
+
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
+| 🧱 | **Editor-mag (alapfunkció)** | 🔴 **P0/P1** | **[CORE.md](./CORE.md)** |
 | 01 | Production / Go-Live | 🔴 P0 | [01-production-go-live.md](./01-production-go-live.md) |
 | 02 | Monetizáció | 🔴 P0 / 🟠 P1 | [02-monetization.md](./02-monetization.md) |
 | 03 | Collaboration | 🟠 P1 | [03-collaboration.md](./03-collaboration.md) |
@@ -95,7 +101,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 ## 3. Becsült készültség (audit §19 — NEM hivatalos pontszám)
 
 ```text
-Editor core (alapfunkció)   ████████░░  ~70–80%
+Editor core (alapfunkció)   █████████░  ~90%     → CORE.md 8/10: a MAG bizonyítottan kész (teszt + guard + atomi mentés + crash-recovery + arany-út), már csak UI-remainderek
 Profi NLE                   █████░░░░░  ~45–60%
 Image editor (UI)           █████░░░░░  ~45–60%   (pure core magasabb)
 Audio editor                █████░░░░░  ~40–55%
@@ -107,17 +113,18 @@ Monetization                ███░░░░░░░  ~30–40%
 Production readiness        ███░░░░░░░  ~30–40%
 ```
 
-### 📊 Feladat-haladás (2026-10-07 — a TODO-tételek élő státusza)
+### 📊 Feladat-haladás (2026-10-08 — a TODO-tételek élő státusza)
 
 > Minden §2-fájl a tetején egy `📊 Haladás` sorral jelzi, hol tartunk. Legenda:
 > ✅ **teljes** (kész + integrált) · 🟡 **mag kész** (a pure-core/logika kész, a következő réteg —
 > UI/backend/render — hátra) · ⬜ **nyitva** (nincs elkezdve).
 >
-> ✅ **Garancia (2026-10-07):** a teljes kódbázis `npm run audit` **ZÖLD** — tsc + expo lint +
-> jest **121 suite / 1313 teszt**. Amit a fájlok ✅/~-ként jelölnek, az bizonyítottan fordul + tesztelt.
+> ✅ **Garancia (2026-10-08):** a teljes kódbázis `npm run audit` **ZÖLD** — tsc + expo lint +
+> jest **128 suite / 1442 teszt**. Amit a fájlok ✅/~-ként jelölnek, az bizonyítottan fordul + tesztelt.
 
 | # | Terület | ✅ teljes | 🟡 mag kész | ⬜ nyitva | Σ |
 | - | --- | :-: | :-: | :-: | :-: |
+| 🧱 | **Editor-mag (CORE.md)** | 5 | 3 | 2 | 10 |
 | 01 | Production / Go-Live | 0 | 2 | 5 | 7 |
 | 02 | Monetizáció | 2 | 7 | 1 | 10 |
 | 03 | Collaboration | 2 | 3 | 1 | 6 |
@@ -131,16 +138,21 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 11 | Performance | 1 | 0 | 4 | 5 |
 | 12 | Code quality | 0 | 7 | 2 | 9 |
 | 13 | Documentation | 0 | 1 | 5 | 6 |
-| **Σ** | **(13 epik)** | **15** | **48** | **41** | **104** |
+| **Σ** | **(CORE + 13 epik)** | **20** | **51** | **43** | **114** |
 
-**Olvasat:** a 106 tételből **15 teljes**, **47 „mag kész"** (a logika megvan, csak a következő réteg —
-UI/backend/render — hiányzik) és **44 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
-**02 §2.2** (export-politika + banner), **03 §2.1** (clip-lock realtime), **04 §2.2** (moderation-admin-UX),
-**04 §2.8** (feed-poster-generálás R2-be). A 2026-10-07-i session hozott: **R2 = élő platform-tár**
-(08 §2.1 / 01 §2.1), **projekt forrás-mappa** minden stúdióban (08 §2.8, 06 §2.10), a kép-editor
-**Új dokumentum + vászon-kezelés** (07), a **kliens↔worker skew+easing contract-mirror** (01 §2.7),
-és a **usage-metering vertikum lezárva** (02 §2.2: export-politika — felhő=mért, on-device=ingyen+vízjel —
-+ nearQuota-banner). A launch-kritikus maradék: **01** (prod-worker/EAS/RC/monitoring) + **02** §2.4 + **04** §2.2/§2.8.
+**Olvasat:** a 114 tételből **20 teljes**, **51 „mag kész"** (a logika megvan, csak a következő réteg —
+UI/backend/render — hiányzik) és **43 nyitva**.
+
+**2026-10-08-i session:** (1) **Editor-mag (CORE.md) 8/10** — a platform legfontosabb rétege a ~70–80%-ról
+**~90%-ra**: a command-bus + store **tesztelt** (§2.1), core-guardok (§2.2), **MOVE_CLIP** (§2.3), **klip-vágólap**
+(§2.4), sáv-modell **ADR-011** (§2.5), **frame-scrub + A/V-sync** (§2.6), **mentés-robusztusság** (atomi mentés +
+crash-recovery, §2.7, P0), és a **lezáró arany-út integrációs teszt** (§2.9); hátra csak UI-remainderek (§2.8/§2.10
++ gesztus/gapless/„Mentés most"). (2) **Android natív render-motor A–E TELJES** (09 §2.2): remux + GL-transzkód
+(skálázás/sebesség/szűrő) + multi-segment kompozit + hang-mix + valódi cancel + HEVC/bitráta, 10 emulátor-teszttel.
+
+A 2026-10-07-i session hozta: **R2 = élő platform-tár** (08 §2.1 / 01 §2.1), **projekt forrás-mappa** (08 §2.8,
+06 §2.10), a kép-editor **Új dokumentum + vászon** (07), a **skew+easing contract-mirror** (01 §2.7), és a
+**usage-metering vertikum** (02 §2.2). A launch-kritikus maradék: **01** (prod-worker/EAS/RC/monitoring) + **02** §2.4 + **04** §2.2/§2.8.
 
 ---
 

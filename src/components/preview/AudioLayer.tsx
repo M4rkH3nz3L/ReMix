@@ -2,6 +2,7 @@ import { useAudioPlayer } from 'expo-audio';
 import { useIsFocused } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
+import { shouldResync, sourceTimeOf } from '@/lib/avSync';
 import { sampleChannel } from '@/lib/keyframes';
 import { clipsAt } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
@@ -154,8 +155,8 @@ function VideoVoice() {
     if (!uri || !clip) {
       return;
     }
-    // a proxy a TELJES forrás hangja, ezért a forrás-időre kell tekerni
-    const sourceTime = clip.trimIn + (playhead - clip.start);
+    // a proxy a TELJES forrás hangja, ezért a forrás-időre kell tekerni (egységes seek-pont)
+    const sourceTime = sourceTimeOf(clip, playhead);
     try {
       player.volume =
         clamp(
@@ -165,12 +166,15 @@ function VideoVoice() {
         ) * masterVolume;
       if (isPlaying) {
         if (!player.playing) {
-          player.seekTo(Math.max(0, sourceTime)).catch(() => {});
+          player.seekTo(sourceTime).catch(() => {});
           player.play();
+        } else if (shouldResync(sourceTime, player.currentTime)) {
+          // 🎚️ A/V-drift-korrekció: a natív hang elcsúszott a mestéróra playheadjétől → vissza
+          player.seekTo(sourceTime).catch(() => {});
         }
       } else {
         player.pause();
-        player.seekTo(Math.max(0, sourceTime)).catch(() => {});
+        player.seekTo(sourceTime).catch(() => {});
       }
     } catch {
       // a lejátszó még nem áll készen
@@ -267,8 +271,8 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     try {
       player.replace(playUri);
       const state = useEditorStore.getState();
-      // forrás-idő = trimIn + a klip-eleji offset (a klip a forráson belül vág)
-      player.seekTo(Math.max(0, (clip.trimIn ?? 0) + state.playhead - clip.start)).catch(() => {});
+      // forrás-idő = trimIn + a klip-eleji offset (egységes seek-pont, avSync)
+      player.seekTo(sourceTimeOf(clip, state.playhead)).catch(() => {});
       if (state.isPlaying) {
         player.play();
       }
@@ -303,9 +307,13 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
         player.volume = vol;
         lastVolRef.current = vol;
       }
+      const sourceTime = sourceTimeOf(clip, playhead);
       if (!isPlaying) {
-        // álló óránál a forrás-időre tekerünk (trimIn + klip-offset)
-        player.seekTo(Math.max(0, (clip.trimIn ?? 0) + t)).catch(() => {});
+        // álló óránál a forrás-időre tekerünk (egységes seek-pont)
+        player.seekTo(sourceTime).catch(() => {});
+      } else if (player.playing && shouldResync(sourceTime, player.currentTime)) {
+        // 🎚️ A/V-drift-korrekció lejátszás közben (a jank miatti elcsúszás behúzása)
+        player.seekTo(sourceTime).catch(() => {});
       }
     } catch {}
   }, [player, playhead, isPlaying, clip, audible, masterVolume, trackGain]);

@@ -419,7 +419,8 @@ export function Timeline() {
     const x = e.nativeEvent.contentOffset.x;
     lastScrollX.current = x;
     if (scrubbing.current && !isPlaying) {
-      setPlayhead(x / pps);
+      // 🎞️ a scrub a frame-rácsra ül (fél-kocka csúszás már látszik — §2.6 parity)
+      setPlayhead(x / pps, true);
     }
     // 🪟 virtualizációs ablak: CHUNKOLT frissítés (csak fél viewportnyi elmozdulás
     // után) és CSAK sok klipnél — így a rövid projekt „nulla re-render" viselkedése

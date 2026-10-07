@@ -303,6 +303,24 @@ describe('klip-vágólap — copy/cut/paste (§2.4)', () => {
   });
 });
 
+describe('setPlayhead — opcionális frame-snap + clamp (§2.6)', () => {
+  it('snap:true → a frame-rácsra ül; snap nélkül folytonos', () => {
+    load([track('video', [videoClip('a', 0, 10)])]);
+    store().setPlayhead(1.017, true);
+    const f = store().playhead * 30;
+    expect(Math.abs(f - Math.round(f))).toBeLessThan(1e-6); // frame-rácson
+    store().setPlayhead(1.017); // folytonos (lejátszó-óra útja)
+    expect(store().playhead).toBeCloseTo(1.017);
+  });
+  it('0 .. projekthossz közé vág', () => {
+    load([track('video', [videoClip('a', 0, 10)])]);
+    store().setPlayhead(999);
+    expect(store().playhead).toBeCloseTo(10);
+    store().setPlayhead(-5);
+    expect(store().playhead).toBe(0);
+  });
+});
+
 describe('dev-warn a néma no-op parancsnál (§2.2)', () => {
   it('a no-op parancs dev-warnt ad (a debugoláshoz)', () => {
     load([track('video')]);

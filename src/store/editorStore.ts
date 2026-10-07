@@ -422,7 +422,8 @@ interface EditorState {
   setMultiSelectMode: (on: boolean) => void;
   /** minden kijelölt klip azonosítója (elsődleges + a többi) */
   allSelectedIds: () => string[];
-  setPlayhead: (t: number) => void;
+  /** a lejátszófej beállítása; `snap:true` → a projekt frame-rácsára ül (scrub/koppintás) */
+  setPlayhead: (t: number, snap?: boolean) => void;
   setPlaying: (playing: boolean) => void;
   setLoop: (loop: boolean) => void;
   setBeatGrid: (beatTimes: number[], downbeatTimes: number[]) => void;
@@ -1514,10 +1515,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return selectedClipId ? [selectedClipId, ...multiSelectIds] : [];
   },
 
-  setPlayhead: (t) => {
+  setPlayhead: (t, snap) => {
     const { project } = get();
     const max = project ? Math.max(projectDuration(project), 0) : 0;
-    set({ playhead: clamp(t, 0, Math.max(max, 0)) });
+    const clamped = clamp(t, 0, Math.max(max, 0));
+    // 🎞️ scrub/koppintáskor a frame-rácsra ül (fél-kocka csúszás már látszik); a
+    // lejátszó-óra snap NÉLKÜL hívja (folytonos lejátszás, nem ugrál kockánként)
+    set({ playhead: snap ? snapToFrame(clamped, projectFps(project)) : clamped });
   },
 
   setPlaying: (playing) => set({ isPlaying: playing }),

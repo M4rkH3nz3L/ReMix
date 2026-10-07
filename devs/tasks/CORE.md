@@ -6,7 +6,7 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 1 mag kész · ⬜ 5 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 2 mag kész · ⬜ 4 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
 > (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
@@ -123,14 +123,16 @@ A `CANONICAL_TRACKS` **fix** készlet (type-onként EGY sáv). A döntés rögz�
 
 ### 2.6 Lejátszás-parity: frame-pontos scrub + A/V-sync — P1
 A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-szinkron frame-pontos legyen.
-- [ ] ⬜ **Frame-pontos scrub**: a playhead húzása/koppintása a `snapToFrame`-re üljön (ma a `setPlayhead`
-  folytonos) — fél-kocka csúszás már látszik; a `setPlayhead` opcionális `snap` flaggel vagy a hívó-oldali
-  illesztéssel. (A split már frame-re ül — a scrub is kövesse.)
-- [ ] ⬜ **A/V-drift teszt + egységes seek-pont**: az [AudioLayer](../../src/components/preview/AudioLayer.tsx)
-  több `seekTo` hívása egy közös szinkron-pontból (a playheadből számolt cél) — a drift-korrekció küszöbe
-  tesztelt (headless időzítés-teszt a sync-matekra, RN-render nélkül).
+- [x] ✅ **Frame-pontos scrub**: a `setPlayhead(t, snap?)` opcionális `snap`-pel a projekt frame-rácsára ül;
+  a lejátszó-óra snap NÉLKÜL hívja (folytonos), az idővonal-scrub ([Timeline](../../src/components/editor/Timeline.tsx))
+  `snap:true`-val. (A split már frame-re ült — a scrub most követi.) Tesztelve (editorStore.test.ts §2.6).
+- [x] ✅ **A/V-drift teszt + egységes seek-pont**: [avSync.ts](../../src/lib/avSync.ts) pure mag
+  (`sourceTimeOf` közös seek-pont + `shouldResync` küszöb) — headless teszttel (avSync.test.ts); az
+  [AudioLayer](../../src/components/preview/AudioLayer.tsx) mindhárom seek-ága EBBŐL számol, és lejátszás
+  közben a `shouldResync(…, player.currentTime)` > ¼ mp drift behúzza a szinkront. (⚠️ a lejátszás-közbeni
+  drift-korrekció valós eszközön finomhangolandó — a küszöb konzervatív.)
 - [ ] ⬜ **Klip-határ gapless**: a vágott klipek határán az előnézet ne „kattanjon" (a következő klip előre-
-  betöltése a playheadből). A render-oldali határ a [06](./06-video-editor.md) parity-jéhez igazítva.
+  betöltése a playheadből). **(HÁTRA — preview-preload, eszköz-verifikált.)**
 
 ### 2.7 Mentés-robusztusság — „soha ne vessz el munka" — P0
 - [ ] ⬜ **Atomi mentés**: a projekt + event-napló ma külön `saveProject`/`saveEvents` (Promise.all — az egyik

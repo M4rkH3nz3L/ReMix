@@ -74,21 +74,25 @@ class RemixRenderModule : Module() {
 
     val fps = plan.optInt("fps", 30)
 
-    // Szűrő egyelőre a Fázis B3 / felhő.
-    if (filter != "none") {
-      throw IllegalStateException("Szűrő egyelőre a felhő-renderre esik (Android Fázis B3 készül).")
+    // Szűrő feloldása (a worker FILTERS-tükre); ismeretlen szűrő → felhő.
+    val preset = FilterPresets.get(filter)
+    if (filter != "none" && preset == null) {
+      throw IllegalStateException("Ismeretlen szűrő ($filter) — a felhő-renderre esik.")
     }
+    val filterRgb = preset?.rgb ?: -1
+    val filterOpacity = preset?.opacity ?: 0f
 
-    // speed==1: gyors, veszteségmentes remux (A); képarány-eltérésnél transzkód (B1).
-    if (speed == 1.0) {
+    // speed==1 ÉS nincs szűrő: gyors, veszteségmentes remux (A); képarány-eltérésnél transzkód (B1).
+    if (speed == 1.0 && preset == null) {
       return try {
         "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, outFile, progress)
       } catch (_: AspectMismatchException) {
-        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, outFile, progress)
+        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, -1, 0f, outFile, progress)
       }
     }
 
-    // speed != 1: transzkód sebességgel (B2) — remux itt nem opció.
-    return "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, outFile, progress)
+    // sebesség és/vagy szűrő → transzkód (B1/B2/B3); remux itt nem opció.
+    return "file://" +
+      TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, filterRgb, filterOpacity, outFile, progress)
   }
 }

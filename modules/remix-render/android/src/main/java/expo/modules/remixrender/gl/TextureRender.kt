@@ -39,10 +39,26 @@ class TextureRender {
   private var uSTMatrixHandle = 0
   private var aPositionHandle = 0
   private var aTextureHandle = 0
+  private var uFilterColorHandle = 0
+  private var uFilterOpacityHandle = 0
+
+  // szín-overlay szűrő (filterId) — opacity=0 → nincs hatás
+  private var filterR = 0f
+  private var filterG = 0f
+  private var filterB = 0f
+  private var filterOpacity = 0f
 
   init {
     Matrix.setIdentityM(mvpMatrix, 0)
     Matrix.setIdentityM(stMatrix, 0)
+  }
+
+  /** Szín-overlay szűrő (filterId → rgb + opacity); opacity=0 → nincs hatás. */
+  fun setFilter(rgb: Int, opacity: Float) {
+    filterR = ((rgb shr 16) and 0xFF) / 255f
+    filterG = ((rgb shr 8) and 0xFF) / 255f
+    filterB = (rgb and 0xFF) / 255f
+    filterOpacity = opacity.coerceIn(0f, 1f)
   }
 
   /** Aspect-fill skála a forrás (display) és a cél-vászon méretéből. */
@@ -77,6 +93,8 @@ class TextureRender {
 
     GLES20.glUniformMatrix4fv(uMVPMatrixHandle, 1, false, mvpMatrix, 0)
     GLES20.glUniformMatrix4fv(uSTMatrixHandle, 1, false, stMatrix, 0)
+    GLES20.glUniform3f(uFilterColorHandle, filterR, filterG, filterB)
+    GLES20.glUniform1f(uFilterOpacityHandle, filterOpacity)
     GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
     checkGlError("glDrawArrays")
     GLES20.glFinish()
@@ -89,6 +107,8 @@ class TextureRender {
     aTextureHandle = GLES20.glGetAttribLocation(program, "aTextureCoord")
     uMVPMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix")
     uSTMatrixHandle = GLES20.glGetUniformLocation(program, "uSTMatrix")
+    uFilterColorHandle = GLES20.glGetUniformLocation(program, "uFilterColor")
+    uFilterOpacityHandle = GLES20.glGetUniformLocation(program, "uFilterOpacity")
 
     val textures = IntArray(1)
     GLES20.glGenTextures(1, textures, 0)
@@ -161,8 +181,11 @@ class TextureRender {
         "precision mediump float;\n" +
         "varying vec2 vTextureCoord;\n" +
         "uniform samplerExternalOES sTexture;\n" +
+        "uniform vec3 uFilterColor;\n" +
+        "uniform float uFilterOpacity;\n" +
         "void main() {\n" +
-        "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n" +
+        "  vec4 c = texture2D(sTexture, vTextureCoord);\n" +
+        "  gl_FragColor = vec4(mix(c.rgb, uFilterColor, uFilterOpacity), c.a);\n" +
         "}\n"
   }
 }

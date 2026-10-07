@@ -1,7 +1,9 @@
 package expo.modules.remixrender
 
+import android.graphics.Color
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -42,6 +44,8 @@ class TranscodeEngineTest {
       180,
       30,
       1.0,
+      -1,
+      0f,
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 
@@ -107,6 +111,8 @@ class TranscodeEngineTest {
       240,
       30,
       2.0,
+      -1,
+      0f,
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 
@@ -140,6 +146,64 @@ class TranscodeEngineTest {
       )
     } finally {
       ex.release()
+    }
+  }
+
+  @Test
+  fun appliesColorFilterDesaturates() {
+    val inst = InstrumentationRegistry.getInstrumentation()
+    val cache = inst.targetContext.cacheDir
+    val src = File(cache, "filter_src.mp4")
+    inst.context.assets.open("remux_sample.mp4").use { input ->
+      src.outputStream().use { output -> input.copyTo(output) }
+    }
+
+    // ugyanaz a klip szűrő nélkül és „mono" (0x808080 @0.45) szűrővel
+    val plain = File(cache, "filter_plain.mp4")
+    if (plain.exists()) plain.delete()
+    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, -1, 0f, plain.absolutePath) {}
+
+    val mono = File(cache, "filter_mono.mp4")
+    if (mono.exists()) mono.delete()
+    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, 0x808080, 0.45f, mono.absolutePath) {}
+
+    val plainSpread = avgChannelSpread(plain.absolutePath)
+    val monoSpread = avgChannelSpread(mono.absolutePath)
+    // a szürke-overlay a csatorna-szórást (szín-eltérést) érdemben csökkenti
+    assertTrue(
+      "a mono szűrő csökkenti a szín-szórást (plain=$plainSpread, mono=$monoSpread)",
+      monoSpread in 1.0..(plainSpread * 0.85),
+    )
+  }
+
+  /** Az első képkocka átlagos csatorna-szórása (max-min RGB) — a „színesség" mértéke. */
+  private fun avgChannelSpread(path: String): Double {
+    val mmr = MediaMetadataRetriever()
+    try {
+      mmr.setDataSource(path)
+      val bmp = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        ?: return 0.0
+      var sum = 0.0
+      var count = 0
+      val step = 8
+      var y = 0
+      while (y < bmp.height) {
+        var x = 0
+        while (x < bmp.width) {
+          val p = bmp.getPixel(x, y)
+          val r = Color.red(p)
+          val g = Color.green(p)
+          val b = Color.blue(p)
+          sum += (maxOf(r, g, b) - minOf(r, g, b)).toDouble()
+          count++
+          x += step
+        }
+        y += step
+      }
+      bmp.recycle()
+      return if (count > 0) sum / count else 0.0
+    } finally {
+      mmr.release()
     }
   }
 }

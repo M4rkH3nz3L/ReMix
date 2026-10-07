@@ -36,6 +36,8 @@ object TranscodeEngine {
     canvasHeight: Int,
     fps: Int,
     speed: Double,
+    filterRgb: Int,
+    filterOpacity: Float,
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -112,6 +114,9 @@ object TranscodeEngine {
       // ── dekóder → GL output-surface (az enkóder kontextusában jön létre) ──
       outputSurface = OutputSurface()
       outputSurface.setAspectFill(dispW, dispH, canvasW, canvasH)
+      if (filterRgb >= 0 && filterOpacity > 0f) {
+        outputSurface.setFilter(filterRgb, filterOpacity)
+      }
       val decoderMime = vFmt.getString(MediaFormat.KEY_MIME)!!
       decoder = MediaCodec.createDecoderByType(decoderMime)
       decoder.configure(vFmt, outputSurface.surface, null, 0)

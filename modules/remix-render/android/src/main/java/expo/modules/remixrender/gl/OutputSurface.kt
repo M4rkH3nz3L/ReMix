@@ -36,6 +36,8 @@ class OutputSurface : SurfaceTexture.OnFrameAvailableListener {
   fun setAspectFill(srcW: Int, srcH: Int, dstW: Int, dstH: Int) =
     textureRender.setAspectFill(srcW, srcH, dstW, dstH)
 
+  fun setFilter(rgb: Int, opacity: Float) = textureRender.setFilter(rgb, opacity)
+
   /** Blokkol, amíg egy új dekódolt képkocka megérkezik, majd a textúrába tölti. */
   fun awaitNewImage() {
     synchronized(frameSyncObject) {

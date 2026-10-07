@@ -6,7 +6,7 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 3 teljes · 🟡 1 mag kész · ⬜ 6 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 1 mag kész · ⬜ 5 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
 > (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
@@ -111,15 +111,15 @@ lejátszófejhez vagy másik projektbe. (A `duplicate` megvan — ugyanarra a s�
 - [x] ✅ **Teszt**: copy→paste új id-kkal + a forrás változatlan + frame-illesztés; cut = eltűnik + beilleszthető
   (a relatív rend marad); inkompatibilis sáv → 0; a vágólap túléli a projekt-váltást (editorStore.test.ts §2.4).
 
-### 2.5 Sáv-modell: extra lane-ek döntése — P1
-A `CANONICAL_TRACKS` **fix** készlet (type-onként EGY sáv) — nincs 2. videó-/hang-sáv, átnevezés, átrendezés.
-Egy komoly NLE-ben a több-lane alap. **Döntés kell** (ADR, lásd [13](./13-documentation.md)):
-- [ ] ⬜ **(A) Több-lane bevezetése**: a sáv-azonosítás `type`-ról `trackId`-ra (a `ADD_CLIP`/`MOVE_CLIP`/
-  `REPLACE_TRACK*` `trackId`-t kapjon, a `type` meta marad a rétegezéshez) + sáv-add/remove/rename command.
-  **Nagy, lánc-széles változás** → ha ide megyünk, külön epik-részlépés, a §2.3 MOVE-ra építve. **VAGY**
-- [ ] ⬜ **(B) A fix modell FORMÁLIS kiírása**: ha a termék-döntés a fix kanonikus sávok mellett marad (egyszerűbb
-  mobil-UX), akkor ezt ADR-ben rögzítjük, és a `pip`/`overlay` sávok adják a „több vizuális réteget". Ez zárja
-  a tételt kód nélkül. **Alapértelmezett ajánlás: (B)** a launchig, (A) a desktop-shell ([09](./09-native-rendering.md)) után.
+### 2.5 Sáv-modell: extra lane-ek döntése — P1 ✅ KÉSZ (2026-10-08) — döntés: (B)
+A `CANONICAL_TRACKS` **fix** készlet (type-onként EGY sáv). A döntés rögzítve:
+**[ADR-011 — Fix kanonikus sávmodell](../../DOCS/HU/decisions/ADR-011-fixed-canonical-tracks.md)**.
+- [x] ✅ **(B) A fix modell FORMÁLIS kiírása** — ADR-011: a fix kanonikus sávok maradnak (mobil-UX +
+  lánc-stabilitás); a „több vizuális réteget" a `pip`/`overlay`/`adjust` adja, a sávok közti mozgatást a
+  §2.3 `MOVE_CLIP` + `canHostClip`. A sáv-azonosítás a parancsokban `trackType` marad (nem `trackId`).
+- [ ] ⬜ ~~**(A) Több-lane most**~~ — ELVETVE (ADR-011): nagy, lánc-széles `type→trackId` refaktor, amit a
+  mobil-UX nem indokol; ha később előjön a termék-igény (desktop-shell, [09](./09-native-rendering.md) után),
+  külön epik-ként, a `MOVE_CLIP`-re építve, új ADR-rel.
 
 ### 2.6 Lejátszás-parity: frame-pontos scrub + A/V-sync — P1
 A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-szinkron frame-pontos legyen.

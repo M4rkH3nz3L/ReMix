@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
-import { assetDisplayState, assetStateBadge } from '@/lib/assetState';
+import { assetDisplayState, assetStateBadge, canDownload } from '@/lib/assetState';
 import { assetSyncState, syncStateBadge } from '@/lib/fileConflict';
+import { makeId } from '@/lib/id';
+import { downloadToCache } from '@/lib/media';
+import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { projectKind } from '@/lib/projectUtils';
 import { assetInUse, pickSourceAsset, supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import { formatBytes } from '@/lib/storageQuota';
@@ -35,6 +39,7 @@ export function SourceSheet({
 }) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  const [downloading, setDownloading] = useState<string | null>(null);
   if (!project) {
     return null;
   }
@@ -49,6 +54,28 @@ export function SourceSheet({
         }
       })
       .catch(() => {});
+  };
+
+  // 🡇 §2.2: külső (felhő) forrás letöltése HELYI másolatként a binbe (ADD_ASSET).
+  // A klipek nyers uri-t hivatkoznak (uri→assetId refaktor hátra), ezért nem az eredetit
+  // írjuk át, hanem egy használható helyi másolatot adunk hozzá; az eltávolítás = remove.
+  const downloadAsset = (a: Asset) => {
+    if (downloading) {
+      return;
+    }
+    const url = reachableMediaUrl(a.uri) ?? a.uri;
+    setDownloading(a.id);
+    downloadToCache(url, a.name)
+      .then((local) => {
+        if (local) {
+          useEditorStore.getState().dispatch(
+            { type: 'ADD_ASSET', asset: { id: makeId('ast'), kind: a.kind, uri: local, provider: 'local', name: a.name } },
+            'user'
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDownloading(null));
   };
 
   const meta = (a: Asset): string => {
@@ -113,6 +140,22 @@ export function SourceSheet({
                     ) : null}
                   </View>
                 </View>
+                {canDownload(assetDisplayState(a)) ? (
+                  <Pressable
+                    onPress={() => downloadAsset(a)}
+                    disabled={!!downloading}
+                    hitSlop={8}
+                    style={styles.itemAction}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('source.download')}
+                  >
+                    {downloading === a.id ? (
+                      <ActivityIndicator size="small" color={palette.accent} />
+                    ) : (
+                      <Ionicons name="cloud-download-outline" size={20} color={palette.accent} />
+                    )}
+                  </Pressable>
+                ) : null}
                 {onInsert ? (
                   <Pressable
                     onPress={() => onInsert(a)}

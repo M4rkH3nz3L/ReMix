@@ -109,3 +109,14 @@ const BADGES: Record<AssetState, AssetBadge> = {
 export function assetStateBadge(state: AssetState): AssetBadge {
   return BADGES[state];
 }
+
+/** Felkínálható-e „letöltés helyi másolatba" — a külső, nem helyben lévő forrásra. */
+export function canDownload(state: AssetState): boolean {
+  return state === 'external' || state === 'stale' || state === 'invalidated';
+}
+
+/** Felkínálható-e „eltávolítás a cache-ből" — a külső forrás letöltött másolatára
+ *  (a device-saját `imported`-ot NEM, mert annak nincs távoli visszaállítása). */
+export function canEvict(state: AssetState): boolean {
+  return state === 'cached';
+}

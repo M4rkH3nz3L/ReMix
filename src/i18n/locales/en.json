@@ -2738,6 +2738,7 @@
     "hint": "The project's source media. Import supported files and use them from here in the editor.",
     "empty": "No sources yet. Import with the buttons above.",
     "insert": "Insert into editor",
+    "download": "Download a local copy",
     "inUse": "in use"
   },
   "studio": {

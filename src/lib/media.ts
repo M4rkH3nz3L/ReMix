@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
@@ -37,6 +38,38 @@ function persistToLibrary(uri: string): string {
     return target.uri;
   } catch {
     return uri;
+  }
+}
+
+/**
+ * 🡇 Egy ABSZOLÚT http(s) URL letöltése a média-mappába → a helyi uri (offline-cache).
+ * A külső (felhő) forrás helyi másolatához (08-storage §2.2). Weben / nem-http uri-nál
+ * null (nincs natív FS). Hiba vagy nem-ok válasz → null. A hívó a kapott uri-ból ad
+ * egy helyi `Asset`-et a projekt forrás-mappájába.
+ */
+export async function downloadToCache(url: string, name?: string): Promise<string | null> {
+  if (Platform.OS === 'web' || !/^https?:\/\//i.test(url)) {
+    return null;
+  }
+  try {
+    const dir = new Directory(Paths.document, 'media');
+    if (!dir.exists) {
+      dir.create();
+    }
+    const res = await fetch(url);
+    if (!res.ok) {
+      return null;
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const base = (name || url.split('/').pop() || 'media').split('?')[0];
+    const target = new File(dir, `${Date.now().toString(36)}_${base}`);
+    if (!target.exists) {
+      target.create();
+    }
+    target.write(buf);
+    return target.uri;
+  } catch {
+    return null;
   }
 }
 

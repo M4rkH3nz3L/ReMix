@@ -2738,6 +2738,7 @@
     "hint": "A projekt forrásai. Importálj támogatott fájlokat, és innen használd fel őket a szerkesztőben.",
     "empty": "Még nincs forrás. Importálj a fenti gombokkal.",
     "insert": "Beszúrás a szerkesztőbe",
+    "download": "Letöltés helyi másolatba",
     "inUse": "használatban"
   },
   "studio": {

@@ -3,6 +3,8 @@ import {
   assetLocallyAvailable,
   assetStateBadge,
   assetStateOf,
+  canDownload,
+  canEvict,
   canTransition,
   isLocallyAvailable,
   needsFetch,
@@ -98,5 +100,16 @@ describe('UI megjelenítés-állapot + badge', () => {
     expect(assetStateBadge('external').tone).toBe('dim');
     expect(assetStateBadge('imported').tone).toBe('ok');
     expect(assetStateBadge('stale').tone).toBe('warn');
+  });
+
+  it('canDownload a külső/nem-helyi forrásra; canEvict csak a cached-re', () => {
+    expect(canDownload('external')).toBe(true);
+    expect(canDownload('stale')).toBe(true);
+    expect(canDownload('invalidated')).toBe(true);
+    expect(canDownload('cached')).toBe(false);
+    expect(canDownload('imported')).toBe(false);
+    expect(canEvict('cached')).toBe(true);
+    expect(canEvict('imported')).toBe(false); // device-saját → nincs mit visszatölteni
+    expect(canEvict('external')).toBe(false);
   });
 });

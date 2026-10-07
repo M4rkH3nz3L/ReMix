@@ -2738,6 +2738,7 @@
     "hint": "Die Quellmedien des Projekts. Importiere unterstützte Dateien und nutze sie hier im Editor.",
     "empty": "Noch keine Quellen. Importiere mit den Schaltflächen oben.",
     "insert": "In den Editor einfügen",
+    "download": "Lokale Kopie herunterladen",
     "inUse": "in Verwendung"
   },
   "studio": {

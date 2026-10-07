@@ -69,8 +69,9 @@ object RemuxEngine {
             val srcAspect = dispW.toDouble() / dispH.toDouble()
             val planAspect = planWidth.toDouble() / planHeight.toDouble()
             if (abs(srcAspect - planAspect) > 0.02) {
-              throw IllegalStateException(
-                "A klip képaránya eltér a vászonétól — a skálázáshoz felhő-render kell (Pro)."
+              // nem remuxolható — a hívó a transzkódra (Fázis B) vált
+              throw AspectMismatchException(
+                "A klip képaránya ($dispW×$dispH) eltér a vászonétól ($planWidth×$planHeight) — skálázás kell."
               )
             }
           }

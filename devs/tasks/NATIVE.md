@@ -20,7 +20,7 @@
 | **Development Build alap** | 🟢 kész | `expo-dev-client` dep, `eas.json` profilok, `android/` + `ios/` prebuild, `app.json` plugins/permissions |
 | **Natív render modul (váz)** | 🟡 részben | [modules/remix-render/](../../modules/remix-render/) — `RemixRender` Expo-module |
 | **iOS render (AVFoundation)** | 🟢 v1 | [RemixRenderModule.swift](../../modules/remix-render/ios/RemixRenderModule.swift) — multi-szegmens vágás+sebesség, aspect-fill vászon, hang-mix, H.264 MP4, progressz |
-| **Android render (MediaCodec)** | 🟡 **Fázis A kész** (remux vágással) | [RemuxEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemuxEngine.kt) — veszteségmentes trim (MediaExtractor→MediaMuxer), emulátor-teszttel verifikálva; vászon-skálázás/sebesség/szűrő/hang-mix → Fázis B–C |
+| **Android render (MediaCodec)** | 🟡 **Fázis A + B1 kész** | remux ([RemuxEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemuxEngine.kt)) + **GL-transzkód/skálázás** ([TranscodeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/TranscodeEngine.kt): decode→GL→encode), mindkettő emulátor-teszttel verifikálva; sebesség/szűrő → B2–B3, hang-mix/multi-segment → C |
 | **JS-híd / terv-fordító** | 🟢 kész | [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) — `buildRenderPlan`, `renderLocal`, `requireOptionalNativeModule('RemixRender')` |
 | **Render-orkesztrátor + router** | 🟢 kész | [src/lib/render.ts](../../src/lib/render.ts) + [src/lib/backend.ts](../../src/lib/backend.ts) — local vs cloud döntés |
 | **Felhő-render (Level 3)** | 🟢 kész | `server/render-worker.js` + FFmpeg (BullMQ queue) |
@@ -110,13 +110,16 @@ transzkódolási kényszer (speed=1, filter=none, a klip képaránya = vászon).
 - **Kész, ha:** egy helyi klip vágott exportja MP4-et ad, lejátszható, hang szinkron. ✅
 
 ### Fázis B — Single-clip **transzkód** (vászon + sebesség + szűrő)
-- [ ] Decode→GL→encode pipeline: a forrást a `renderSize` vászonra rajzolja
-      (aspect-fill transform, a `preferredTransform`/rotáció kezelésével — az iOS
-      `aspectFillTransform` párja GL-shaderben).
-- [ ] `speed`: a PTS-skálázás a kódolt frame-ek időbélyegén (a hang `atempo`-szerű
-      újramintázása PCM-ben).
-- [ ] `filter` v1: a már meglévő `filterId`-k közül a GL-ben olcsón megoldhatók
-      (brightness/contrast/saturation/LUT) — a bonyolultak maradnak a felhőben.
+**B1 — vászon-skálázás + hang-copy + pontos vágás ✅ KÉSZ (2026-10-07)**
+- [x] Decode→GL→encode pipeline: MediaCodec dekóder → [OutputSurface](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/gl/OutputSurface.kt)
+      (SurfaceTexture) → GL [TextureRender](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/gl/TextureRender.kt)
+      (aspect-fill + st-mátrix/rotáció) → [InputSurface](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/gl/InputSurface.kt) → enkóder.
+- [x] Pontos vágás (újrakódolás → nincs keyframe-kényszer), a hangsáv változatlan átmásolása, PTS-illesztés.
+- [x] A modul remuxot próbál (A), képarány-eltérésnél a transzkódra vált (B1).
+- [x] **Verifikálva:** [TranscodeEngineTest.kt](../../modules/remix-render/android/src/androidTest/java/expo/modules/remixrender/TranscodeEngineTest.kt)
+      — 240×240 → **320×180** aspect-fill az emulátoron, helyes méret + hangsáv + ~1s (`connectedDebugAndroidTest` zöld, 2/0/0).
+- [ ] **B2 — `speed`:** PTS-skálázás a kódolt frame-eken + a hang `atempo`-szerű újramintázása (PCM).
+- [ ] **B3 — `filter` v1:** a GL-ben olcsón megoldható `filterId`-k (brightness/contrast/saturation/LUT) a fragment-shaderben; a bonyolultak a felhőben.
 - **Kész, ha:** 9:16 vászon + 2× sebesség + egy alap szűrő helyben renderel.
 
 ### Fázis C — **Multi-segment** összefűzés + hang-mix (iOS-paritás)

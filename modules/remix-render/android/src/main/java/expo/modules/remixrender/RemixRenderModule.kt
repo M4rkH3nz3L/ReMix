@@ -49,31 +49,42 @@ class RemixRenderModule : Module() {
     val seg = video.getJSONObject(0)
     val extraAudio = audio != null && audio.length() > 0
 
-    // Fázis A jogosultság: egy klip, nincs transzkódolási kényszer.
-    val remuxable = single &&
+    // Egyelőre csak az egy-klipes eset megy helyben (A/B); a több szegmens, külön
+    // hang-sáv, egyedi hangerő és a vízjel a Fázis C / felhő sajátja.
+    val singleClipLocal = single &&
       !extraAudio &&
-      seg.optDouble("speed", 1.0) == 1.0 &&
       seg.optDouble("volume", 1.0) == 1.0 &&
-      seg.optString("filter", "none") == "none" &&
       !plan.optBoolean("watermark", false)
-
-    if (!remuxable) {
+    if (!singleClipLocal) {
       throw IllegalStateException(
-        "Az Android eszközön-render jelenleg egy klip vágását (remux) támogatja — " +
-          "vászon-skálázás, sebesség, szűrő, több sáv, hang-mix és vízjel a " +
-          "felhő-renderre esik (Pro)."
+        "Az Android eszközön-render jelenleg egy klipet támogat (vágás + vászon-" +
+          "skálázás) — több sáv, hang-mix, egyedi hangerő és vízjel a felhő-renderre esik (Pro)."
       )
     }
 
-    val result = RemuxEngine.remuxTrim(
-      toPath(seg.getString("uri")),
-      seg.optDouble("inSec", 0.0),
-      seg.optDouble("durationSec", 0.0),
-      plan.optInt("width", 0),
-      plan.optInt("height", 0),
-      File(toPath(outputPath)).absolutePath,
-    ) { progress -> sendEvent("onProgress", mapOf("progress" to progress)) }
+    val src = toPath(seg.getString("uri"))
+    val outFile = File(toPath(outputPath)).absolutePath
+    val inSec = seg.optDouble("inSec", 0.0)
+    val durationSec = seg.optDouble("durationSec", 0.0)
+    val planW = plan.optInt("width", 0)
+    val planH = plan.optInt("height", 0)
+    val speed = seg.optDouble("speed", 1.0)
+    val filter = seg.optString("filter", "none")
+    val progress = { p: Double -> sendEvent("onProgress", mapOf("progress" to p)) }
 
-    return "file://" + result
+    // Fázis A (remux) a gyors, veszteségmentes út: ha nincs sebesség/szűrő, próbáljuk;
+    // képarány-eltérésnél a Fázis B transzkódra váltunk (vászon-skálázás).
+    if (speed == 1.0 && filter == "none") {
+      return try {
+        "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, outFile, progress)
+      } catch (_: AspectMismatchException) {
+        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, plan.optInt("fps", 30), outFile, progress)
+      }
+    }
+
+    // Sebesség/szűrő → a Fázis B2/B3 feladata; addig tiszta hibával a felhőre.
+    throw IllegalStateException(
+      "Sebesség/szűrő egyelőre a felhő-renderre esik (Android Fázis B2/B3 készül)."
+    )
   }
 }

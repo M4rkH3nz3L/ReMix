@@ -810,6 +810,12 @@
       "grade": "Grade",
       "compound": "🧱 Compound"
     },
+    "recovery": {
+      "title": "Nicht gespeicherte Arbeit",
+      "message": "Die vorherige Sitzung wurde nicht fertig gespeichert. Den letzten (nicht gespeicherten) Stand wiederherstellen?",
+      "restore": "Wiederherstellen",
+      "discard": "Verwerfen"
+    },
     "toolbar": {
       "newTextDefault": "Neuer Text",
       "cannotSplitTitle": "Hier nicht trennbar",

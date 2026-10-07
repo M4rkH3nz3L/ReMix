@@ -6,7 +6,7 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 2 mag kész · ⬜ 4 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 4 teljes · 🟡 3 mag kész · ⬜ 3 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
 > (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
@@ -134,17 +134,20 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
 - [ ] ⬜ **Klip-határ gapless**: a vágott klipek határán az előnézet ne „kattanjon" (a következő klip előre-
   betöltése a playheadből). **(HÁTRA — preview-preload, eszköz-verifikált.)**
 
-### 2.7 Mentés-robusztusság — „soha ne vessz el munka" — P0
-- [ ] ⬜ **Atomi mentés**: a projekt + event-napló ma külön `saveProject`/`saveEvents` (Promise.all — az egyik
-  bukhat, a másik sikerülhet → inkonzisztens). Egy mentés-tranzakció (`storage.ts`), ami vagy MINDKETTŐT, vagy
-  SEMMIT ír; bukásra a meglévő backoff.
-- [ ] ⬜ **Crash-recovery snapshot**: minden autosave-nél (vagy N módosításonként) egy **külön recovery-kulcsra**
-  írt pillanatkép; a szerkesztő indulásakor, ha a recovery frissebb a mentettnél → „Nem mentett munka
-  visszaállítása?" ajánlat. Ma csak az AsyncStorage-főkulcs van (félbeszakadt írás → adatvesztés).
-- [ ] ⬜ **„Mentés most" + „Mentés másként / duplikálás"**: explicit mentés-gomb (az autosave mellé) +
-  `duplicateProject(id)` (új id, friss `createdAt`, név „… másolat") a [storage.ts](../../src/lib/storage.ts)-ben.
-- [ ] ⬜ **Látható limitek**: a `HISTORY_LIMIT`(50)/`EVENT_LIMIT`(300) nyírás ma néma — a history-UI jelezze, hogy
-  a legrégebbi lépések elévültek (ne tűnjön „elveszett" visszavonásnak); nagy projekt (AsyncStorage-méret) figyelmeztetés.
+### 2.7 Mentés-robusztusság — „soha ne vessz el munka" — P0 🟡 mag KÉSZ (2026-10-08)
+- [x] ✅ **Atomi mentés**: `saveProjectAndEvents(project, events)` ([storage.ts](../../src/lib/storage.ts)) —
+  projekt + index + event-napló EGY `multiSet`-ben (vagy mind, vagy semmi). Az autosave + a kilépő-mentés
+  ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) ezt hívja a korábbi `Promise.all([saveProject, saveEvents])`
+  helyett. Tesztelve (storage.test.ts: a multiSet bukásakor SEMMI nem íródik).
+- [x] ✅ **Crash-recovery snapshot**: `writeRecovery`/`readRecovery`/`clearRecovery` külön kulcson; az autosave a
+  FŐ mentés ELŐTT ír recovery-t, sikerkor törli, bukáskor marad. A szerkesztő indulásakor `recoveryIsFresher`
+  (pure, tesztelt) → ha a recovery frissebb a mentettnél, **„Nem mentett munka visszaállítása?"** Alert
+  (`editor.recovery.*`, hu/en/de) → `restoreProject`. Tesztelve (round-trip + freshness).
+- [x] 🟡 **„Mentés másként / duplikálás"**: `duplicateProject(id, copyLabel)` ([storage.ts](../../src/lib/storage.ts))
+  KÉSZ + tesztelt (új id, friss dátumok, „… másolat", a forrás érintetlen). **Hátra:** a UI-belépő (projekt-
+  menü) + az explicit „Mentés most" gomb (az atomi mentést azonnal hívná). **(🖼️ UI)**
+- [x] 🟡 **Látható limitek**: `estimateProjectBytes` + `isProjectTooLarge` (`PROJECT_SIZE_WARN_BYTES` ~2 MB)
+  pure + tesztelt. **Hátra:** a history-UI „legrégebbi lépés elévült" jelzése + a méret-figyelmeztető banner. **(🖼️ UI)**
 
 ### 2.8 Betöltés/helyreállítás UX — P1
 - [ ] ⬜ **Üres-projekt / első-indítás állapot**: ma a `missing` egy boolean; egy üres idővonalhoz vezetett

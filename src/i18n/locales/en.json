@@ -810,6 +810,12 @@
       "grade": "Grade",
       "compound": "🧱 Compound"
     },
+    "recovery": {
+      "title": "Unsaved work",
+      "message": "The previous session didn't finish saving. Restore the latest (unsaved) state?",
+      "restore": "Restore",
+      "discard": "Discard"
+    },
     "toolbar": {
       "newTextDefault": "New text",
       "cannotSplitTitle": "Can't split here",

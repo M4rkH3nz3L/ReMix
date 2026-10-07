@@ -810,6 +810,12 @@
       "grade": "Grade",
       "compound": "🧱 Compound"
     },
+    "recovery": {
+      "title": "Nem mentett munka",
+      "message": "Az előző munkamenet nem fejeződött be mentéssel. Visszaállítod a legutóbbi (nem mentett) állapotot?",
+      "restore": "Visszaállítás",
+      "discard": "Elvetés"
+    },
     "toolbar": {
       "newTextDefault": "Új szöveg",
       "cannotSplitTitle": "Nem vágható itt",

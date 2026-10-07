@@ -11,6 +11,8 @@ const eventsKey = (id: string) => `vided.events.v1.${id}`;
 const versionsKey = (id: string) => `vided.versions.v1.${id}`;
 /** ⚡ az utolsó AUTO-verzió időbélyege külön, apró kulcson (olcsó throttle-döntés) */
 const lastAutoKey = (id: string) => `vided.versions.lastauto.v1.${id}`;
+/** 🛟 crash-recovery pillanatkép külön kulcson (a félbeszakadt/bukott mentés ellen) */
+const recoveryKey = (id: string) => `vided.recovery.v1.${id}`;
 
 /** 🕓 Projekt-verzió (pillanatkép): a projekt TELJES állapota egy néven, on-device. */
 export interface ProjectVersion {
@@ -136,7 +138,49 @@ export async function deleteProject(id: string): Promise<void> {
     eventsKey(id),
     versionsKey(id),
     lastAutoKey(id),
+    recoveryKey(id),
   ]);
+}
+
+/**
+ * ⚛️ ATOMI mentés: a projekt + az index + az eseménynapló EGYETLEN `multiSet`-ben
+ * (vagy MINDHÁROM, vagy SEMMI). A korábbi `Promise.all([saveProject, saveEvents])`
+ * félig sikerülhetett (projekt ment, event nem → inkonzisztens history). Ezt váltja.
+ */
+export async function saveProjectAndEvents(
+  project: Project,
+  events: ProjectEvent[]
+): Promise<void> {
+  const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
+  const metas = await listProjects();
+  const nextIndex = [metaOf(stamped), ...metas.filter((m) => m.id !== stamped.id)];
+  await AsyncStorage.multiSet([
+    [projectKey(stamped.id), JSON.stringify(stamped)],
+    [INDEX_KEY, JSON.stringify(nextIndex)],
+    [eventsKey(stamped.id), JSON.stringify(events)],
+  ]);
+}
+
+/**
+ * 🧬 Projekt-duplikálás („Mentés másként"): új id, friss dátumok, „… másolat" név.
+ * A duplikátum friss — nem viszi át a forrás event-history-ját (tiszta lappal indul).
+ * @returns az új projekt, vagy null, ha a forrás nem olvasható.
+ */
+export async function duplicateProject(id: string, copyLabel = 'másolat'): Promise<Project | null> {
+  const src = await loadProject(id);
+  if (!src) {
+    return null;
+  }
+  const now = new Date().toISOString();
+  const copy: Project = {
+    ...src,
+    id: makeId('prj'),
+    name: `${src.name} ${copyLabel}`.trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await saveProject(copy);
+  return copy;
 }
 
 /** 🕓 A projekt mentett verziói (külön kulcson, mint az események). */
@@ -217,4 +261,84 @@ export async function loadEvents(projectId: string): Promise<ProjectEvent[]> {
   } catch {
     return [];
   }
+}
+
+// ── 🛟 Crash-recovery (félbeszakadt/bukott mentés elleni védelem) ─────────────
+
+/** A recovery-pillanatkép: a legutóbbi szerkesztői állapot a FŐ mentéstől külön kulcson. */
+export interface RecoverySnapshot {
+  /** ISO időbélyeg — a pillanatkép készítésének ideje */
+  at: string;
+  project: Project;
+  events: ProjectEvent[];
+}
+
+/**
+ * Recovery-pillanatkép írása (az autosave hívja a FŐ mentés ELŐTT). Ha a fő mentés
+ * elhasal vagy az app meghal, ez a kulcs őrzi a legutóbbi állapotot. Best-effort.
+ */
+export async function writeRecovery(project: Project, events: ProjectEvent[]): Promise<void> {
+  const snap: RecoverySnapshot = { at: new Date().toISOString(), project, events };
+  try {
+    await AsyncStorage.setItem(recoveryKey(project.id), JSON.stringify(snap));
+  } catch {
+    // best-effort — a recovery hiánya nem buktathatja a szerkesztést
+  }
+}
+
+export async function readRecovery(id: string): Promise<RecoverySnapshot | null> {
+  const raw = await AsyncStorage.getItem(recoveryKey(id));
+  if (!raw) {
+    return null;
+  }
+  try {
+    const snap = JSON.parse(raw) as RecoverySnapshot;
+    if (!snap || !snap.project || typeof snap.at !== 'string') {
+      return null;
+    }
+    return { at: snap.at, project: migrateProject(snap.project), events: snap.events ?? [] };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearRecovery(id: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(recoveryKey(id));
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Van-e NEM MENTETT munka: a recovery-pillanatkép frissebb-e a mentett projektnél.
+ * Pure → a szerkesztő-indításkori „visszaállítod?" ajánlat döntése tesztelhető.
+ */
+export function recoveryIsFresher(recoveryAt: string, savedUpdatedAt: string | undefined): boolean {
+  if (!savedUpdatedAt) {
+    return true;
+  }
+  return recoveryAt.localeCompare(savedUpdatedAt) > 0;
+}
+
+// ── 📏 Látható limitek (figyelmeztetés nagy projektnél) ───────────────────────
+
+/**
+ * Egy AsyncStorage-érték fölött figyelmeztetünk: az Android (SQLite) alap-kurzor-
+ * korlátja ~2 MB környékén kezd bukni. E fölött a mentés kockázatos → jelezzük.
+ */
+export const PROJECT_SIZE_WARN_BYTES = 2 * 1024 * 1024;
+
+/** A szerializált projekt becsült mérete bájtban (az AsyncStorage-írás nagysága). */
+export function estimateProjectBytes(project: Project): number {
+  try {
+    return JSON.stringify(project).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Igaz, ha a projekt a figyelmeztetési méret fölött van (a mentés kockázatos). */
+export function isProjectTooLarge(project: Project): boolean {
+  return estimateProjectBytes(project) > PROJECT_SIZE_WARN_BYTES;
 }

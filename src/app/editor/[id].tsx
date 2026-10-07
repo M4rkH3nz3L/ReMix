@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -31,7 +32,17 @@ import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
-import { loadEvents, loadProject, recordAutoVersion, saveEvents, saveProject } from '@/lib/storage';
+import {
+  clearRecovery,
+  loadEvents,
+  loadProject,
+  readRecovery,
+  recordAutoVersion,
+  recoveryIsFresher,
+  saveProject,
+  saveProjectAndEvents,
+  writeRecovery,
+} from '@/lib/storage';
 import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
@@ -201,6 +212,32 @@ export default function EditorScreen() {
         };
         if (loaded) {
           useEditorStore.getState().loadProject(loaded, events);
+          // 🛟 crash-recovery: ha van a mentettnél FRISSEBB pillanatkép (az előző
+          // munkamenet nem fejezte be a mentést), felajánljuk a visszaállítást
+          void readRecovery(id).then((rec) => {
+            if (!alive || !rec || !recoveryIsFresher(rec.at, loaded.updatedAt)) {
+              return;
+            }
+            if (useEditorStore.getState().project?.id !== id) {
+              return;
+            }
+            Alert.alert(t('editor.recovery.title'), t('editor.recovery.message'), [
+              {
+                text: t('editor.recovery.discard'),
+                style: 'cancel',
+                onPress: () => void clearRecovery(id),
+              },
+              {
+                text: t('editor.recovery.restore'),
+                onPress: () => {
+                  if (useEditorStore.getState().project?.id === id) {
+                    useEditorStore.getState().restoreProject(rec.project);
+                  }
+                  void clearRecovery(id);
+                },
+              },
+            ]);
+          });
           // hiányzó média felismerése + automatikus visszaállítás a szerverről
           if (Platform.OS !== 'web') {
             void recoverMissingMedia(loaded);
@@ -250,7 +287,7 @@ export default function EditorScreen() {
         visionTimerRef.current = null;
       }
     };
-  }, [id]);
+  }, [id, t]);
 
   // 🗄️ Adatbiztonság: a szerkesztőből kilépve a projekt + a MÉDIA a szerverre kerül
   // (best-effort, idempotens — asset-enként egyszer tölt). Így eszközváltás vagy
@@ -336,11 +373,16 @@ export default function EditorScreen() {
         return;
       }
       const snap = state.project;
-      Promise.all([saveProject(snap), saveEvents(snap.id, state.events)])
+      // 🛟 a FŐ (atomi) mentés ELŐTT recovery-pillanatkép — ha a mentés elhasal vagy
+      // az app meghal, a legutóbbi állapot megmarad, és a következő indításkor felajánljuk
+      writeRecovery(snap, state.events);
+      // ⚛️ ATOMI: projekt + index + események egy írásban (vagy mind, vagy semmi)
+      saveProjectAndEvents(snap, state.events)
         .then(() => {
           state.markSaved();
           setSaveFailed(false);
           setSaveAttempt(0);
+          clearRecovery(snap.id); // a munka biztonságban → a recovery-kulcs törölhető
           // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
           recordAutoVersion(snap).catch(() => {});
           // 🗄️ INGYENES felhő-backup (best-effort) — a projekt userhez mentve, ne vesszen el
@@ -348,7 +390,7 @@ export default function EditorScreen() {
         })
         .catch(() => {
           setSaveFailed(true);
-          setSaveAttempt((n) => n + 1); // ← ez indítja az újrapróbálkozást
+          setSaveAttempt((n) => n + 1); // ← újrapróbálkozás; a recovery MARAD (nem mentett munka)
         });
     }, delay);
     return () => clearTimeout(timer);
@@ -359,9 +401,10 @@ export default function EditorScreen() {
     return () => {
       const state = useEditorStore.getState();
       if (state.project && state.dirty) {
-        saveProject(state.project).catch(() => {});
-        saveEvents(state.project.id, state.events).catch(() => {});
-        backupProjectToCloud(state.project);
+        const p = state.project;
+        writeRecovery(p, state.events);
+        saveProjectAndEvents(p, state.events).then(() => clearRecovery(p.id)).catch(() => {});
+        backupProjectToCloud(p);
       }
       state.setPlaying(false);
       state.closeProject();

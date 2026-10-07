@@ -75,3 +75,37 @@ export function isLocallyAvailable(state: AssetState): boolean {
 export function needsFetch(state: AssetState): boolean {
   return state === 'external' || state === 'stale' || state === 'invalidated';
 }
+
+// ── UI: megjelenítés-állapot + jelző (badge) ────────────────────────────────
+
+/** Helyben elérhető-e az asset a valós uri alapján (nem http(s) stream → helyi fájl). */
+export function assetLocallyAvailable(asset: Pick<Asset, 'uri'>): boolean {
+  return !/^https?:\/\//i.test(asset.uri || '');
+}
+
+/** Az asset SZINKRON megjelenítés-állapota a provider + uri-ból (a UI-jelzőhöz). */
+export function assetDisplayState(asset: Pick<Asset, 'provider' | 'uri'>): AssetState {
+  return assetStateOf(asset, { localAvailable: assetLocallyAvailable(asset) });
+}
+
+export interface AssetBadge {
+  /** Ionicons glyph-név */
+  icon: string;
+  /** i18n-kulcs (`asset.state.*`) */
+  labelKey: string;
+  /** szín-hangulat a UI-nak */
+  tone: 'ok' | 'dim' | 'warn';
+}
+
+const BADGES: Record<AssetState, AssetBadge> = {
+  imported: { icon: 'checkmark-circle', labelKey: 'asset.state.imported', tone: 'ok' },
+  cached: { icon: 'checkmark-circle-outline', labelKey: 'asset.state.cached', tone: 'ok' },
+  external: { icon: 'cloud-outline', labelKey: 'asset.state.external', tone: 'dim' },
+  stale: { icon: 'warning-outline', labelKey: 'asset.state.stale', tone: 'warn' },
+  invalidated: { icon: 'close-circle-outline', labelKey: 'asset.state.invalidated', tone: 'warn' },
+};
+
+/** Az állapothoz tartozó UI-jelző (ikon + i18n-címke + szín-hangulat). */
+export function assetStateBadge(state: AssetState): AssetBadge {
+  return BADGES[state];
+}

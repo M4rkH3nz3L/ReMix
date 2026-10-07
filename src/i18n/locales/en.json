@@ -2721,6 +2721,9 @@
       "starting": "Starting…"
     }
   },
+  "asset": {
+    "state": { "imported": "on device", "cached": "downloaded", "external": "in cloud", "stale": "stale", "invalidated": "invalid" }
+  },
   "usage": {
     "nearQuota": "{{names}} nearing your monthly quota ({{pct}}%).",
     "upgrade": "Pro",

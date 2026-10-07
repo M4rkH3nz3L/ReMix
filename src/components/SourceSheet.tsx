@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
+import { assetDisplayState, assetStateBadge } from '@/lib/assetState';
 import { projectKind } from '@/lib/projectUtils';
 import { assetInUse, pickSourceAsset, supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import { formatBytes } from '@/lib/storageQuota';
@@ -81,6 +82,10 @@ export function SourceSheet({
         <View style={styles.list}>
           {assets.map((a) => {
             const used = assetInUse(project, a);
+            // 🗄️ §8.2: a tárolás-állapot jelzője (☁️ external / ✓ cached/imported / ⚠️ stale)
+            const badge = assetStateBadge(assetDisplayState(a));
+            const badgeColor =
+              badge.tone === 'ok' ? palette.accent : badge.tone === 'warn' ? '#f5a623' : palette.textDim;
             return (
               <View key={a.id} style={styles.item}>
                 <Ionicons name={KIND_ICON[a.kind]} size={16} color={palette.accent} />
@@ -88,10 +93,14 @@ export function SourceSheet({
                   <Text style={styles.itemName} numberOfLines={1}>
                     {a.name ?? a.kind}
                   </Text>
-                  <Text style={styles.itemMeta} numberOfLines={1}>
-                    {meta(a)}
-                    {used ? ` · ${t('source.inUse')}` : ''}
-                  </Text>
+                  <View style={styles.metaRow}>
+                    <Ionicons name={badge.icon as keyof typeof Ionicons.glyphMap} size={11} color={badgeColor} />
+                    <Text style={[styles.itemMeta, { color: badgeColor }]}>{t(badge.labelKey)}</Text>
+                    <Text style={styles.itemMeta} numberOfLines={1}>
+                      · {meta(a)}
+                      {used ? ` · ${t('source.inUse')}` : ''}
+                    </Text>
+                  </View>
                 </View>
                 {onInsert ? (
                   <Pressable
@@ -153,6 +162,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   itemName: { color: palette.text, fontSize: 14, fontWeight: '600' },
-  itemMeta: { color: palette.textDim, fontSize: 11, marginTop: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  itemMeta: { color: palette.textDim, fontSize: 11 },
   itemAction: { padding: 2 },
 });

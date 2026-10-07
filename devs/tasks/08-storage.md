@@ -29,7 +29,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 
 ### 2.2 Asset state machine — P1
 - [x] ✅ **Állapotgép-mag + teszt**: [src/lib/assetState.ts](../../src/lib/assetState.ts) — `AssetState` (`external/cached/imported/stale/invalidated`) + `assetStateOf` (a valós Asset-mezőkből: provider + localAvailable + remoteChanged + invalidated) + `nextState`/`canTransition` átmenet-tábla (download/import/evict/invalidate/remoteChanged/refresh) + `isLocallyAvailable`/`needsFetch`. Teszt: `assetState.test.ts` (8) — fő életciklus + eviction/stale/invalidation + tiltott átmenetek.
-- [ ] ⬜ **Hátra**: bekötés a [storageProviders.ts](../../src/lib/storageProviders.ts)-be (letöltés/eviction a `nextState` mentén) + UI-jelző (☁️ external / ✓ cached) + offline-cache-politika.
+- [x] ✅ **UI-állapotjelző KÉSZ (2026-10-07)**: a SZINKRON megjelenítés-állapot ([assetState.ts](../../src/lib/assetState.ts) `assetDisplayState` a provider+uri-ból + `assetStateBadge` → ikon/i18n/tone: **☁️ external / ✓ cached/imported / ⚠️ stale**) a projekt forrás-mappájában ([SourceSheet](../../src/components/SourceSheet.tsx)) minden assetnél látszik. Teszt: `assetState.test.ts` (+3 — localAvailable/displayState/badge). Audit zöld (123 suite / 1329 teszt).
+- [ ] ⬜ Hátra: a letöltés/eviction-**FOLYAM** bekötése a [storageProviders.ts](../../src/lib/storageProviders.ts)-be a `nextState` mentén (tényleges download/evict) + offline-cache-politika — a mag + a jelző már kész.
 
 ### 2.3 Drive / Dropbox / OneDrive / S3 — P1
 - [ ] ✅ Drive/Dropbox/WebDAV/S3 megvan → ⬜ **OneDrive adapter** hozzáadása (a meglévő provider-interfészre).

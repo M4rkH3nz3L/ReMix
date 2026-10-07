@@ -2721,6 +2721,9 @@
       "starting": "Indítás…"
     }
   },
+  "asset": {
+    "state": { "imported": "eszközön", "cached": "letöltve", "external": "felhőben", "stale": "elavult", "invalidated": "érvénytelen" }
+  },
   "usage": {
     "nearQuota": "{{names}} közel a havi kvótához ({{pct}}%).",
     "upgrade": "Pro",

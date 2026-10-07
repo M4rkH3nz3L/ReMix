@@ -2721,6 +2721,9 @@
       "starting": "Wird gestartet…"
     }
   },
+  "asset": {
+    "state": { "imported": "auf Gerät", "cached": "geladen", "external": "in Cloud", "stale": "veraltet", "invalidated": "ungültig" }
+  },
   "usage": {
     "nearQuota": "{{names}} erreicht bald das Monatskontingent ({{pct}}%).",
     "upgrade": "Pro",

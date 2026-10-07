@@ -1,4 +1,7 @@
 import {
+  assetDisplayState,
+  assetLocallyAvailable,
+  assetStateBadge,
   assetStateOf,
   canTransition,
   isLocallyAvailable,
@@ -66,5 +69,34 @@ describe('helperek', () => {
     expect(needsFetch('invalidated')).toBe(true);
     expect(needsFetch('cached')).toBe(false);
     expect(needsFetch('imported')).toBe(false);
+  });
+});
+
+describe('UI megjelenítés-állapot + badge', () => {
+  it('assetLocallyAvailable: helyi uri igen, http stream nem', () => {
+    expect(assetLocallyAvailable({ uri: 'file:///x/a.mp4' })).toBe(true);
+    expect(assetLocallyAvailable({ uri: '/data/a.mov' })).toBe(true);
+    expect(assetLocallyAvailable({ uri: 'https://cdn/a.mp4' })).toBe(false);
+    expect(assetLocallyAvailable({ uri: 'http://x/a.mp4' })).toBe(false);
+  });
+
+  it('assetDisplayState: local→imported, remote+helyi→cached, remote+http→external', () => {
+    expect(assetDisplayState({ provider: 'local', uri: 'file:///a.mp4' })).toBe('imported');
+    expect(assetDisplayState({ provider: 'remote', uri: 'file:///a.mp4' })).toBe('cached');
+    expect(assetDisplayState({ provider: 'remote', uri: 'https://cdn/a.mp4' })).toBe('external');
+    expect(assetDisplayState({ provider: 'library', uri: 'https://cdn/a.mp4' })).toBe('external');
+  });
+
+  it('assetStateBadge: minden állapotra ikon + i18n-kulcs + tone', () => {
+    const states: AssetState[] = ['imported', 'cached', 'external', 'stale', 'invalidated'];
+    for (const s of states) {
+      const b = assetStateBadge(s);
+      expect(b.labelKey).toBe(`asset.state.${s}`);
+      expect(b.icon.length).toBeGreaterThan(0);
+      expect(['ok', 'dim', 'warn']).toContain(b.tone);
+    }
+    expect(assetStateBadge('external').tone).toBe('dim');
+    expect(assetStateBadge('imported').tone).toBe('ok');
+    expect(assetStateBadge('stale').tone).toBe('warn');
   });
 });

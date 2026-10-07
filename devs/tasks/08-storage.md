@@ -5,10 +5,11 @@
 
 ---
 
-> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 4 mag kész · ⬜ 2 nyitva — Σ 8 tétel.
-> **R2 = élő platform-tár** + provider-IO timeout/retry (§2.1) · **forrás-mappa** (§2.8) · **OneDrive-adapter**
-> (§2.3) KÉSZ; az **asset-állapotgép** (§2.2), a **fájl-konfliktus** (§2.6) és a **WebDAV/S3-hardening** (§2.4)
-> magja/alapja kész. Hátra: a mélyebb folyamok (uri→assetId, base-hash) + .ReMix-doksi (§2.5) + collab-jogok (§2.7).
+> **📊 Haladás (2026-10-07):** ✅ 3 teljes · 🟡 4 mag kész · ⬜ 1 nyitva — Σ 8 tétel.
+> KÉSZ: **R2 = élő platform-tár** + provider-IO timeout/retry (§2.1) · **forrás-mappa** (§2.8) ·
+> **OneDrive-adapter** (§2.3) · **`.remix`-konvenció** (§2.5). Mag/alap kész: asset-állapotgép (§2.2),
+> fájl-konfliktus (§2.6), WebDAV/S3-hardening (§2.4). Nyitva: **collab-tárhely-jogok** (§2.7) + a mélyebb
+> folyamok (uri→assetId, base-hash).
 
 ## 0. Kontextus & cél
 Fontos audit-jegyzet: a repo **már tartalmaz** `StorageProvider` interfészt + külső-storage
@@ -18,7 +19,7 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 ## 1. Jelenlegi állapot (bizonyíték)
 - `storageProviders.ts` LÉTEZIK; Google Drive / Dropbox / WebDAV / S3 adapter VAN.
 - Per-projekt byte-ledger + user-kvóta + aktív-cél-választó VAN (prod-migrációk élnek).
-- `videdFile.ts` már **`.remix`** fájlt ad (a doksi helyenként `.vided`-et említ).
+- `videdFile.ts` **`.remix`** fájlt ad; a konvenció a kódban/doksiban egységesítve (§2.5 — 2026-10-07).
 - Hiány: explicit asset-state-machine, external-file-versioning, **OneDrive adapter**, collab-permissions.
 
 ## 2. Feladatlista
@@ -42,7 +43,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [ ] ⬜ Hátra: credentials-lifecycle (token-frissítés/újra-bejelentkezés) + version-detect (ETag/Last-Modified) + offline-handling (a §2.6 base-hash-sel összeér).
 
 ### 2.5 `.ReMix` projektfájl egységesítés — P1 (doksi)
-- [ ] 🟡 A `videdFile.ts` `.remix`-et ad → **egységesíteni** a doksit + konvenciót a hivatalos `.ReMix`/`.remix` formátumra ([13](./13-documentation.md)).
+- [x] ✅ **Konvenció egységesítve `.remix`-re (2026-10-07)**: a user-facing szöveg (`home.projectFileNote` hu/en/de), a worker collect-zip belső fájlneve (`project.vided`→`project.remix`, [index.js](../../server/index.js)) és a kommentek ([videdFile.ts](../../src/lib/videdFile.ts)/[fingerprint.ts](../../src/lib/fingerprint.ts)/[render.ts](../../src/lib/render.ts)) mind `.remix`. A `parseVided` elfogadja a `.remix`-et, a régi `.vided`-et és a nyers JSON-t is (a picker `*/*`). A `format: 'vided-project'` **belső parse-azonosító marad** (régi fájlok kompatibilitása). Audit zöld (124/1339).
+- [ ] ⬜ Opcionális (kozmetikai): a belső azonosítók átnevezése (`videdFile.ts`/`shareVidedFile`/`pickAndParseVided`/`lib.videdFile.*` → `remix*`) — nagy churn, kevés érték; a `format`-ID back-compat miatt marad.
 
 ### 2.6 External file versioning — P1
 - [x] ✅ **Konfliktus-detektáló mag KÉSZ (2026-10-06)**: [src/lib/fileConflict.ts](../../src/lib/fileConflict.ts) — 3-utas összevetés (lokális · távoli · közös ŐS) → `syncState` (`in-sync`/`local-only`/`remote-only`/`local-ahead`/`remote-ahead`/`conflict`/`absent`; base NÉLKÜL az eltérés KONFLIKTUS, nem találgat irányt → nincs csendes felülírás) + `resolutionActions` (a `Use new / Keep current / Compare` gombok állapotonként) + `needsAttention`/`isAutoResolvable`. Teszt: `fileConflict.test.ts` (12).

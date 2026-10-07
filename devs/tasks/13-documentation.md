@@ -28,7 +28,7 @@ observability**) az, ami a nagy kódbázist karbantarthatóvá + üzletileg ská
 - [ ] 🟡 ADR 001–010 van → minden új architektúra-döntéshez **új ADR** (a Live/egress/VOD-döntések visszamenőleg is).
 
 ### 2.2 Architecture docs sync — P2
-- [ ] 🟡 A rétegdoksit a **kódhoz igazítani** (`.vided`→`.remix`, StorageProvider-valóság, retry-infra, stb.).
+- [ ] 🟡 A rétegdoksit a **kódhoz igazítani** (StorageProvider-valóság, retry-infra, stb.). A `.vided`→`.remix` konvenció-egységesítés KÉSZ (2026-10-07, lásd [08](./08-storage.md) §2.5).
 
 ### 2.3 Architecture diagrams — P2
 - [ ] ⬜ **Mermaid**: `Mobile → API → Supabase → Queue → Workers → Storage/CDN`, külön editor/AI/collab/render/storage.

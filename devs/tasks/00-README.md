@@ -125,16 +125,16 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 05 | AI (Creator OS) | 1 | 0 | 10 | 11 |
 | 06 | Video Editor (NLE) | 4 | 4 | 3 | 11 |
 | 07 | Image Studio | 0 | 9 | 0 | 9 |
-| 08 | Storage / Asset | 2 | 4 | 2 | 8 |
+| 08 | Storage / Asset | 3 | 4 | 1 | 8 |
 | 09 | Native / Rendering | 0 | 0 | 6 | 6 |
 | 10 | Brand / UI | 0 | 2 | 6 | 8 |
 | 11 | Performance | 1 | 0 | 4 | 5 |
 | 12 | Code quality | 0 | 7 | 2 | 9 |
 | 13 | Documentation | 0 | 1 | 5 | 6 |
-| **Σ** | **(13 epik)** | **14** | **47** | **45** | **106** |
+| **Σ** | **(13 epik)** | **15** | **47** | **44** | **106** |
 
-**Olvasat:** a 106 tételből **14 teljes**, **47 „mag kész"** (a logika megvan, csak a következő réteg —
-UI/backend/render — hiányzik) és **45 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
+**Olvasat:** a 106 tételből **15 teljes**, **47 „mag kész"** (a logika megvan, csak a következő réteg —
+UI/backend/render — hiányzik) és **44 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
 **02 §2.2** (export-politika + banner), **03 §2.1** (clip-lock realtime), **04 §2.2** (moderation-admin-UX),
 **04 §2.8** (feed-poster-generálás R2-be). A 2026-10-07-i session hozott: **R2 = élő platform-tár**
 (08 §2.1 / 01 §2.1), **projekt forrás-mappa** minden stúdióban (08 §2.8, 06 §2.10), a kép-editor

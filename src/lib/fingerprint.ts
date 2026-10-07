@@ -5,7 +5,7 @@ import type { Asset, Project } from '@/types/project';
 
 /**
  * File identity (full-plan F2): a médiafájlok tartalom-alapú azonosítója
- * (md5 + méret) — az asset-registry-ben utazik a .vided exporttal, így másik
+ * (md5 + méret) — az asset-registry-ben utazik a .remix exporttal, így másik
  * eszközön a hiányzó média név helyett TARTALOM szerint ismerhető fel
  * (autoRelink a videdFile.ts-ben).
  */

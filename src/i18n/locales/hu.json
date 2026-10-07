@@ -1574,7 +1574,7 @@
       "shareRemixFile": ".remix projektfájl megosztása",
       "collectZip": "Collect — csomag a médiával (zip)",
       "collectPackaging": "Collect — csomagolás",
-      "projectFileNote": "A .vided fájl a projekt + asset-referenciák (média nélkül) — a főképernyő import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect a workeren csomagol mindent egyetlen zip-be (project.vided + media/) — átadáshoz, archiváláshoz.",
+      "projectFileNote": "A .remix fájl a projekt + asset-referenciák (média nélkül) — a főképernyő import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect a workeren csomagol mindent egyetlen zip-be (project.remix + media/) — átadáshoz, archiváláshoz.",
       "cloudTitle": "Felhő-mentés",
       "cloudBackupBtn": "☁️ Mentés a felhőbe",
       "cloudRestoreBtn": "☁️ Visszaállítás a felhőből",

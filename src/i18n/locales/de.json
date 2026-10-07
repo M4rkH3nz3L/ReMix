@@ -1574,7 +1574,7 @@
       "shareRemixFile": ".remix-Projektdatei teilen",
       "collectZip": "Collect — Paket mit Medien (zip)",
       "collectPackaging": "Collect — Verpacken",
-      "projectFileNote": "Die .vided-Datei ist das Projekt + Asset-Referenzen (ohne Medien) — stell sie mit der Import-Taste auf dem Startbildschirm wieder her, fehlende Medien werden neu verknüpft. Collect packt auf dem Worker alles in ein einziges Zip (project.vided + media/) — zur Übergabe und Archivierung.",
+      "projectFileNote": "Die .remix-Datei ist das Projekt + Asset-Referenzen (ohne Medien) — stell sie mit der Import-Taste auf dem Startbildschirm wieder her, fehlende Medien werden neu verknüpft. Collect packt auf dem Worker alles in ein einziges Zip (project.remix + media/) — zur Übergabe und Archivierung.",
       "cloudTitle": "Cloud-Backup",
       "cloudBackupBtn": "☁️ In die Cloud sichern",
       "cloudRestoreBtn": "☁️ Aus der Cloud wiederherstellen",

@@ -772,7 +772,7 @@ export async function collectAndShareProject(
     [PHASE_DOWNLOAD, 0.1],
   ]);
   onProgress?.({ phase: PHASE_UPLOAD, ratio: 0 });
-  // md5+méret identitás az archívumba — a kicsomagolt project.vided
+  // md5+méret identitás az archívumba — a kicsomagolt project.remix
   // tartalom szerint is újracsatolható marad
   const stamped = await withFingerprints(project);
   const form = new FormData();

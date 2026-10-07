@@ -11,7 +11,7 @@ import { migrateProject, relinkUri } from '@/lib/projectUtils';
 import type { Clip, Project } from '@/types/project';
 
 /**
- * `.vided` projektfájl (full-plan F2): a projekt + asset-referenciák, nyers
+ * `.remix` projektfájl (full-plan F2): a projekt + asset-referenciák, nyers
  * média NÉLKÜL — átadható, verziózott formátum. Az import validál, migrál
  * (régi sémák is jönnek), a hiányzó médiát felismeri és felajánlja az
  * újracsatolást (Relink). A médiával együtt csomagolt archívumot a worker
@@ -31,7 +31,7 @@ function safeName(name: string): string {
   return name.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'projekt';
 }
 
-/** `.vided` fájl megosztása (projekt + asset-referenciák, média nélkül). */
+/** `.remix` fájl megosztása (projekt + asset-referenciák, média nélkül). */
 export async function shareVidedFile(project: Project): Promise<void> {
   const payload: VidedFileV1 = {
     format: VIDED_FORMAT,
@@ -51,7 +51,7 @@ export async function shareVidedFile(project: Project): Promise<void> {
   }
 }
 
-/** Elfogadja a `.vided` borítékot ÉS a korábbi nyers projekt-JSON-t is. */
+/** Elfogadja a `.remix` borítékot (régi `.vided`-et is) ÉS a nyers projekt-JSON-t is. */
 function parseVided(text: string): Project {
   let parsed: unknown;
   try {
@@ -216,7 +216,7 @@ export async function autoRelink(
 }
 
 /**
- * `.vided` (vagy projekt-JSON) kiválasztása és beolvasása. Új projekt-azonosítót
+ * `.remix` (régi `.vided` vagy nyers projekt-JSON) kiválasztása és beolvasása. Új projekt-azonosítót
  * kap (nem ír felül meglévőt); a mentés a hívó dolga — így a relink még a
  * mentés előtt lefuthat.
  */

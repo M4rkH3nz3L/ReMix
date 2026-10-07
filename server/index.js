@@ -2345,7 +2345,7 @@ app.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, res) 
     }
   }
   fs.writeFileSync(
-    path.join(workDir, 'project.vided'),
+    path.join(workDir, 'project.remix'),
     JSON.stringify(
       {
         format: 'vided-project',
@@ -2366,7 +2366,7 @@ app.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, res) 
   const out = path.join(workDir, 'collect.zip');
   execFile(
     'zip',
-    ['-r', '-q', out, 'project.vided', 'media'],
+    ['-r', '-q', out, 'project.remix', 'media'],
     { cwd: workDir, timeout: 10 * 60 * 1000 },
     (err) => {
       if (err) {

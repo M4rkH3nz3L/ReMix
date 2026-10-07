@@ -8,7 +8,6 @@ import type {
   AudioClip,
   Clip,
   Project,
-  TextClip,
   Track,
   TrackType,
   VideoClip,
@@ -57,14 +56,6 @@ function audioClip(id: string, start = 0, duration = 10): AudioClip {
   return {
     id, kind: 'audio', start, duration,
     uri: `file:///audio-${id}.m4a`, label: id, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported',
-  };
-}
-
-function textClip(id: string, start = 0, duration = 5): TextClip {
-  return {
-    id, kind: 'text', start, duration,
-    text: 'Hello', color: '#fff', backgroundColor: null, fontSize: 7,
-    fontWeight: 'normal', position: { x: 0.5, y: 0.5 }, animation: 'none',
   };
 }
 

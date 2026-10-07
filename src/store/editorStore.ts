@@ -25,7 +25,7 @@ import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
 import { buildPreComposePlan } from '@/lib/preCompose';
-import { findClip, projectDuration } from '@/lib/projectUtils';
+import { canHostClip, findClip, projectDuration } from '@/lib/projectUtils';
 import { buildDeleteRangePlan } from '@/lib/rangeEdit';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { buildRollEdit, buildSlideEdit, buildSlipEdit } from '@/lib/trimEdit';
@@ -164,6 +164,12 @@ interface EditorState {
   multiSelectMode: boolean;
   /** 📋 stílus-vágólap: a másolt megjelenés + a klip fajtája (csak azonosra megy) */
   styleClipboard: { kind: Clip['kind']; style: Partial<Clip> } | null;
+  /**
+   * 📋 KLIP-vágólap (egész klip cut/copy/paste) — a `styleClipboard`-hoz hasonlóan
+   * SZÁNDÉKOSAN nincs a SESSION_RESET-ben: projektek KÖZT is átvihető (a másolt
+   * klipeket egy másik projektben is be lehet illeszteni). Azonos fajtájú klipek.
+   */
+  clipClipboard: { kind: Clip['kind']; clips: Clip[] } | null;
   /**
    * 🎚️ Sáv-monitorozás — SZÁNDÉKOSAN session-szintű: NEM kerül a projektbe és
    * NEM hat a renderre. Így a némítás sosem lesz „miért hiányzik a zene az
@@ -304,6 +310,14 @@ interface EditorState {
   selectClips: (ids: string[]) => void;
   copyStyle: () => boolean;
   pasteStyle: () => number;
+  /** 📋 a kijelölt klip(ek) a KLIP-vágólapra (egész klip, nem csak stílus) — @returns darabszám */
+  copyClips: () => number;
+  /** 📋 a kijelölt klip(ek) kivágása: vágólapra + törlés a sávjukról — @returns darabszám */
+  cutClips: () => number;
+  /** 📋 a vágólap klipjei a cél-sávra a megadott időnél (új id-k, frame-illesztve) — @returns beillesztett darab */
+  pasteClipsAt: (trackType: TrackType, time: number) => number;
+  /** van-e a cél-sávra illeszthető klip a vágólapon (a UI Beilleszt-gombjához) */
+  canPasteTo: (trackType: TrackType) => boolean;
   toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse' | 'hidden') => void;
   /** sáv-magasság léptetése: 1× → 1.6× → 2.4× → 1× */
   cycleTrackHeight: (type: TrackType) => void;
@@ -518,6 +532,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipLocks: {} as LockMap,
   collabSelf: null,
   styleClipboard: null,
+  clipClipboard: null,
   playhead: 0,
   isPlaying: false,
   loop: false,
@@ -885,6 +900,86 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       'user'
     );
     return changed;
+  },
+
+  // ── 📋 klip-vágólap (egész klip cut/copy/paste; projektek közt is) ─────────
+  copyClips: () => {
+    const { project } = get();
+    const ids = get().allSelectedIds();
+    if (!project || ids.length === 0) {
+      return 0;
+    }
+    const clips = ids
+      .map((id) => findClip(project, id)?.clip)
+      .filter((c): c is Clip => !!c)
+      .map((c) => ({ ...c })); // a forrás-projekttől független másolat
+    if (clips.length === 0) {
+      return 0;
+    }
+    set({ clipClipboard: { kind: clips[0].kind, clips } });
+    return clips.length;
+  },
+
+  cutClips: () => {
+    const n = get().copyClips();
+    if (n === 0) {
+      return 0;
+    }
+    const { project } = get();
+    if (!project) {
+      return 0;
+    }
+    const ids = new Set(get().allSelectedIds());
+    // a kijelölt klipek eltávolítása a sávjukról EGY undo-lépésben (nem ripple)
+    const tracks = project.tracks
+      .filter((tk) => tk.clips.some((c) => ids.has(c.id)))
+      .map((tk) => ({ trackType: tk.type, clips: tk.clips.filter((c) => !ids.has(c.id)) }));
+    const ok = get().dispatch({
+      type: 'REPLACE_TRACKS',
+      tracks,
+      label: tr('store.editor.cutClips', { count: n, defaultValue: `Cut ${n} clip(s)` }),
+    });
+    if (ok) {
+      set({ selectedClipId: null, multiSelectIds: [], multiSelectMode: false, activePanel: null });
+    }
+    return ok ? n : 0;
+  },
+
+  pasteClipsAt: (trackType, time) => {
+    const { clipClipboard, project } = get();
+    if (!clipClipboard || !project) {
+      return 0;
+    }
+    const compatible = clipClipboard.clips.filter((c) => canHostClip(trackType, c.kind));
+    if (compatible.length === 0) {
+      return 0;
+    }
+    const minStart = Math.min(...compatible.map((c) => c.start));
+    const base = Math.max(0, snapToFrame(time, projectFps(project)));
+    // a horgony (legkorábbi klip) a frame-illesztett `base`-re ül; a többi a saját
+    // relatív távolságát tartja (a `base` frame-pontossága nem rontható el kerekítéssel)
+    const pasted = compatible.map(
+      (c) =>
+        ({
+          ...c,
+          id: makeId('clip'),
+          start: Math.max(0, base + (c.start - minStart)),
+        }) as Clip
+    );
+    const ok = get().dispatch({ type: 'ADD_CLIPS', trackType, clips: pasted });
+    if (ok) {
+      set({
+        selectedClipId: pasted[0].id,
+        multiSelectIds: pasted.slice(1).map((c) => c.id),
+        multiSelectMode: pasted.length > 1,
+      });
+    }
+    return ok ? pasted.length : 0;
+  },
+
+  canPasteTo: (trackType) => {
+    const cb = get().clipClipboard;
+    return !!cb && cb.clips.some((c) => canHostClip(trackType, c.kind));
   },
 
   toggleTrackFlag: (type, flag) => {

@@ -54,6 +54,9 @@ export function Toolbar() {
   const canPasteStyle = Boolean(
     styleClipboard && selected && styleClipboard.kind === selected.kind
   );
+  // 📋 klip-vágólap (egész klip) — a Beilleszt a vágólap tartalmára jelenik meg
+  const clipClipboard = useEditorStore((s) => s.clipClipboard);
+  const canPasteClips = Boolean(clipClipboard);
   // 🎬 a kijelölt klip a pip-sávon van-e? (a „Keret" gomb csak ott jelenik meg)
   const onPipTrack = useEditorStore(
     (s) =>
@@ -354,6 +357,38 @@ export function Toolbar() {
     );
   };
 
+  // 📋 klip-vágólap (egész klip cut/copy/paste; §2.4)
+  const copyClipsAction = () => {
+    if (useEditorStore.getState().copyClips() > 0) {
+      haptics.selection();
+    }
+  };
+  const cutClipsAction = () => {
+    if (useEditorStore.getState().cutClips() > 0) {
+      haptics.impact();
+    }
+  };
+  const pasteClipsAction = () => {
+    const state = useEditorStore.getState();
+    const { project, playhead, clipClipboard: cb } = state;
+    if (!project || !cb) {
+      return;
+    }
+    // cél-sáv: a kijelölt klip sávja; ha nincs kijelölés, a vágólap fajtájához illő alap
+    const selectedTrack = selected ? findClip(project, selected.id)?.track.type : undefined;
+    const fallback: Record<Clip['kind'], TrackType> = {
+      video: 'video', image: 'video', audio: 'music', text: 'text',
+      shape: 'overlay', adjust: 'adjust', interactive: 'interactive',
+    };
+    const trackType = selectedTrack ?? fallback[cb.kind];
+    const n = state.pasteClipsAt(trackType, playhead);
+    if (n > 0) {
+      haptics.snap();
+    } else {
+      Alert.alert(t('editor.toolbar.styleAlertTitle'), t('editor.toolbar.nothingToPaste'));
+    }
+  };
+
   const remove = () => {
     const state = useEditorStore.getState();
     const { project } = state;
@@ -550,6 +585,11 @@ export function Toolbar() {
               label={multiSelectIds.length > 0 ? t('editor.toolbar.duplicateCount', { count: batchCount }) : t('common.duplicate')}
               onPress={duplicate}
             />
+            <ToolButton icon="albums-outline" label={t('editor.toolbar.copyClip')} onPress={copyClipsAction} />
+            <ToolButton icon="cut-outline" label={t('editor.toolbar.cutClip')} onPress={cutClipsAction} />
+            {canPasteClips ? (
+              <ToolButton icon="clipboard-outline" label={t('editor.toolbar.pasteClip')} onPress={pasteClipsAction} />
+            ) : null}
             <ToolButton
               icon="timer-outline"
               label={t('editor.toolbar.precision')}

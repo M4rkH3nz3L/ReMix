@@ -6,7 +6,7 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 2 teljes · 🟡 1 mag kész · ⬜ 7 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 3 teljes · 🟡 1 mag kész · ⬜ 6 nyitva — Σ 10 tétel.
 > **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
 > (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
 > (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
@@ -102,12 +102,14 @@ Ma a klip csak **időben** tolható a SAJÁT sávján (`nudgeClipsBy` megtartja 
 ### 2.4 Klip-vágólap (cut/copy/paste egész klip) — P1
 Ma csak **stílus**-vágólap van (`copyStyle`/`pasteStyle`); a **klip** maga nem másolható/vágható ki a
 lejátszófejhez vagy másik projektbe. (A `duplicate` megvan — ugyanarra a sávra, offszettel.)
-- [ ] ⬜ **Store**: `copyClips()` / `cutClips()` (a kijelölésből egy modul-szintű clipboardba, új id-kkal a
-  beillesztéskor) + `pasteClipsAt(trackType, time)` → `ADD_CLIPS` a frame-illesztett playheadnél. A `cut`
-  = copy + `rippleDelete`/`removeClip`. Projektek közt is működjön (a clipboard a store-on kívül, modul-szint).
-- [ ] 🖼️ **UI** ([Toolbar.tsx](../../src/components/editor/Toolbar.tsx)): Másol/Kivág/Beilleszt gombok a
-  duplikálás mellé; a Beilleszt a playheadnél, a kijelölt (vagy a klip saját) sávra.
-- [ ] ⬜ **Teszt**: copy→paste új id-kkal, a forrás változatlan; cut = eltűnik + beilleszthető; frame-illesztés.
+- [x] ✅ **Store**: `copyClips()` / `cutClips()` + `pasteClipsAt(trackType, time)` → `ADD_CLIPS` a
+  frame-illesztett playheadnél (új id-k, a horgony a playheadre, a relatív rend marad). A `cut` = copy +
+  a kijelöltek eltávolítása EGY undo-lépésben. A `clipClipboard` a store-state-ben (mint a `styleClipboard`),
+  SZÁNDÉKOSAN a SESSION_RESET-en kívül → **projektek közt is** beilleszthető. `canPasteTo(trackType)` a UI-hoz.
+- [x] 🖼️ **UI** ([Toolbar.tsx](../../src/components/editor/Toolbar.tsx)): Másol/Kivág/Beilleszt gombok a
+  duplikálás mellé; a Beilleszt a playheadnél, a kijelölt klip sávjára (vagy a vágólap fajtájához illő alapra).
+- [x] ✅ **Teszt**: copy→paste új id-kkal + a forrás változatlan + frame-illesztés; cut = eltűnik + beilleszthető
+  (a relatív rend marad); inkompatibilis sáv → 0; a vágólap túléli a projekt-váltást (editorStore.test.ts §2.4).
 
 ### 2.5 Sáv-modell: extra lane-ek döntése — P1
 A `CANONICAL_TRACKS` **fix** készlet (type-onként EGY sáv) — nincs 2. videó-/hang-sáv, átnevezés, átrendezés.

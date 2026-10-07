@@ -57,6 +57,8 @@ function clipsOf(type: TrackType): Clip[] {
 let warnSpy: ReturnType<typeof jest.spyOn>;
 beforeEach(() => {
   warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  // a klip-vágólap SZÁNDÉKOSAN túléli a projekt-váltást → tesztek közt kézzel nullázzuk
+  useEditorStore.setState({ clipClipboard: null, styleClipboard: null });
 });
 afterEach(() => {
   store().closeProject();
@@ -249,6 +251,54 @@ describe('moveClip — frame-snap + sávok közti mozgatás (§2.3)', () => {
     load([track('video', [videoClip('a', 0, 5)]), track('pip')]);
     store().toggleTrackFlag('pip', 'lock');
     expect(store().moveClip('a', 'pip', 1)).toBe(false);
+    expect(clipsOf('video')).toHaveLength(1);
+  });
+});
+
+describe('klip-vágólap — copy/cut/paste (§2.4)', () => {
+  it('copy → paste: új id, a forrás változatlan, frame-illesztve', () => {
+    load([track('video', [videoClip('a', 0, 4)])]);
+    store().selectClip('a');
+    expect(store().copyClips()).toBe(1);
+    expect(clipsOf('video').map((c) => c.id)).toEqual(['a']); // forrás változatlan
+
+    const n = store().pasteClipsAt('video', 10.017);
+    expect(n).toBe(1);
+    const clips = clipsOf('video');
+    expect(clips).toHaveLength(2);
+    const pasted = clips.find((c) => c.id !== 'a')!;
+    expect(pasted.id).not.toBe('a'); // ÚJ id
+    const frames = pasted.start * 30;
+    expect(Math.abs(frames - Math.round(frames))).toBeLessThan(1e-6); // frame-rácson
+  });
+
+  it('cut: a klipek eltűnnek + beilleszthetők, a relatív rend marad', () => {
+    load([track('video', [videoClip('a', 0, 4), videoClip('b', 5, 4)])]);
+    store().selectClips(['a', 'b']);
+    expect(store().cutClips()).toBe(2);
+    expect(clipsOf('video')).toHaveLength(0); // eltűntek
+
+    expect(store().pasteClipsAt('video', 0)).toBe(2);
+    const starts = clipsOf('video').map((c) => c.start).sort((x, y) => x - y);
+    expect(starts[1] - starts[0]).toBeCloseTo(5); // az 5s távolság megmaradt
+  });
+
+  it('inkompatibilis sávra: 0 (canPasteTo false)', () => {
+    load([track('video', [videoClip('a')]), track('music')]);
+    store().selectClip('a');
+    store().copyClips();
+    expect(store().canPasteTo('music')).toBe(false);
+    expect(store().pasteClipsAt('music', 0)).toBe(0);
+    expect(store().canPasteTo('video')).toBe(true);
+  });
+
+  it('a vágólap túléli a projekt-váltást (cross-project)', () => {
+    load([track('video', [videoClip('a', 0, 4)])]);
+    store().selectClip('a');
+    store().copyClips();
+    load([track('video')]); // ÚJ projekt
+    expect(store().canPasteTo('video')).toBe(true); // a vágólap megmaradt
+    expect(store().pasteClipsAt('video', 0)).toBe(1);
     expect(clipsOf('video')).toHaveLength(1);
   });
 });

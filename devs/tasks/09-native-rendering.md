@@ -1,7 +1,7 @@
 # ⚙️ 09. Native / Rendering — P3 (platform-expanzió)
 
 > **Forrás:** [audit](../source/audit-2026-10-main.md) §9. · **Testvér:** [06-video-editor](./06-video-editor.md) (render-parity), [05-ai](./05-ai.md) (on-device-AI), [01-production](./01-production-go-live.md) (worker).
-> **Érintett kód:** `devs/tasks/NATIVE.md` (git-history, natív render-motor terv) · `modules/remix-render/` (natív modul) · [src/components/preview/](../../src/components/preview/) · [server/](../../server/) (ONNX/vision).
+> **Érintett kód:** [NATIVE.md](./NATIVE.md) (**élő** natív render-motor terv + fázisok A–E) · `modules/remix-render/` (natív modul) · [src/components/preview/](../../src/components/preview/) · [server/](../../server/) (ONNX/vision).
 
 ---
 
@@ -23,8 +23,12 @@ Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a pr
 ### 2.1 Skia render backend — P3
 - [ ] ⬜ Skia-alapú text/shape/preview-pipeline a Chromium helyett (mobil-perf + parity).
 
-### 2.2 Native FFmpeg — P2/P3
-- [ ] ⬜ Mobil **natív FFmpeg** (vagy MediaCodec/AVFoundation) a valódi on-device local-renderhez.
+### 2.2 Native FFmpeg / on-device render-motor — P2/P3
+- [x] ~ **iOS AVFoundation v1 KÉSZ** + **Android trivial-copy** (1 változatlan klip) — a részletes
+  fázisterv (A–E) + a kész/hátra az **[NATIVE.md](./NATIVE.md)**-ben (a render-motor külön, élő todo-ja).
+- [ ] 🔴 **Android MediaCodec-motor** (a #1 tech-hiány): Fázis A (remux vágással) → B (transzkód: vászon/speed/filter)
+  → C (multi-segment + hang-mix, iOS-paritás) → D (cancel/robusztus) → E (codec). Emulátoron verifikálható.
+- [ ] ⬜ iOS: valódi cancel + fejlett effektek beégetése (paritás).
 
 ### 2.3 On-device ONNX — P2/P3
 - [ ] ⬜ Mobil ONNX-runtime (szegmentálás/mélység/upscale on-device) — lásd [05](./05-ai.md) §2.9.

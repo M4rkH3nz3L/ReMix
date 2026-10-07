@@ -5,10 +5,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-07):** ✅ 1 teljes · 🟡 3 mag kész · ⬜ 4 nyitva — Σ 8 tétel.
-> **Cloudflare R2 = a platform ÉLŐ média-tárhelye** (§2.1 R2-út kész+tesztelve; a prod-hardening hátra) +
-> a **projekt forrás-mappa KÉSZ** (§2.8, minden stúdióban). Az **asset-állapotgép** (§2.2) és a
-> **fájl-konfliktus** (§2.6) magja kész — a bekötésük + UI, az OneDrive-adapter és a prod-hardening hátra.
+> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 3 mag kész · ⬜ 3 nyitva — Σ 8 tétel.
+> **R2 = élő platform-tár** + provider-IO timeout/retry (§2.1) · **forrás-mappa** (§2.8) · **OneDrive-adapter**
+> (§2.3) KÉSZ. Az **asset-állapotgép** (§2.2: mag+UI+letöltés/eviction) és a **fájl-konfliktus** (§2.6: mag+jelző)
+> jól állnak — a mélyebb folyamok (uri→assetId, base-hash) + WebDAV-hardening + .ReMix-doksi + collab-jogok hátra.
 
 ## 0. Kontextus & cél
 Fontos audit-jegyzet: a repo **már tartalmaz** `StorageProvider` interfészt + külső-storage
@@ -35,7 +35,7 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [ ] 🔌 Hátra: a HELYBEN-transzformáló state-gép-folyam (external→cached UGYANAZON asseten, **klip-propagációval**) — ez a **uri→assetId** refaktoron múlik ([06](./06-video-editor.md) §2.10); + offline-cache-politika (auto-evict hely-nyomásra).
 
 ### 2.3 Drive / Dropbox / OneDrive / S3 — P1
-- [ ] ✅ Drive/Dropbox/WebDAV/S3 megvan → ⬜ **OneDrive adapter** hozzáadása (a meglévő provider-interfészre).
+- [x] ✅ **OneDrive adapter KÉSZ (2026-10-07)**: Microsoft Graph-alapú provider ([userStorage.js](../../server/userStorage.js) `onedriveListMedia`/`onedriveStream`/`onedriveUpload` + OAuth-config, a Drive/Dropbox-mintára) bekötve mindhárom switchbe (list/stream/upload); kliens-oldalon connect-gomb + `OAuthProviderType` ([externalStorage.ts](../../src/lib/externalStorage.ts), [StorageCard](../../src/components/profile/StorageCard.tsx)). **Env-kapuzott** (`MS_OAUTH_CLIENT_ID/SECRET` — kulcs nélkül beszédes hiba). Audit zöld (124/1339). Élesítés: Azure-app-kulcsok (mint a Drive/Dropbox — a live-OAuth integrációs, nem unit-teszt).
 
 ### 2.4 WebDAV / NAS hardening — P1
 - [ ] 🟡 Alap kész → ⬜ credentials-lifecycle + reconnect + timeout + version-detect + offline-handling.

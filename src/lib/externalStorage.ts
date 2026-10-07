@@ -17,7 +17,10 @@ import { workerAuthHeaders, workerJsonHeaders } from '@/lib/workerAuth';
  * fekvő média NEM terheli a kvótánkat (lásd `@/lib/storageQuota`).
  */
 
-export type ExternalProviderType = 'gdrive' | 'dropbox' | 'webdav' | 's3';
+export type ExternalProviderType = 'gdrive' | 'dropbox' | 'onedrive' | 'webdav' | 's3';
+
+/** A böngészős (OAuth) bekötésű szolgáltatók — a többi kézi (webdav/s3). */
+export type OAuthProviderType = 'gdrive' | 'dropbox' | 'onedrive';
 
 export interface ConnectedProvider {
   id: string;
@@ -37,6 +40,7 @@ export const EXTERNAL_PROVIDERS: {
 }[] = [
   { type: 'gdrive', label: 'Google Drive', oauth: true, icon: 'logo-google' },
   { type: 'dropbox', label: 'Dropbox', oauth: true, icon: 'logo-dropbox' },
+  { type: 'onedrive', label: 'OneDrive', oauth: true, icon: 'logo-microsoft' },
   { type: 'webdav', label: 'WebDAV / NAS', oauth: false, icon: 'server-outline' },
   { type: 's3', label: 'S3 / MinIO / R2', oauth: false, icon: 'cloud-outline' },
 ];
@@ -118,7 +122,7 @@ export async function fetchConnectedProviders(): Promise<ConnectedProvider[]> {
  * amit böngészőben megnyitunk; a callback a workeren tárolja a tokent. `true`, ha
  * a folyamat sikeresen visszatért.
  */
-export async function connectOAuthProvider(provider: 'gdrive' | 'dropbox'): Promise<boolean> {
+export async function connectOAuthProvider(provider: OAuthProviderType): Promise<boolean> {
   const returnUrl = Linking.createURL('storage/connected');
   const res = await fetch(`${cloudBaseUrl()}/storage/oauth/${provider}/start`, {
     method: 'POST',

@@ -18,6 +18,7 @@ import { palette } from '@/constants/editor';
 import {
   type ConnectedProvider,
   type ExternalProviderType,
+  type OAuthProviderType,
   EXTERNAL_PROVIDERS,
   connectManualProvider,
   connectOAuthProvider,
@@ -124,7 +125,7 @@ export function StorageCard() {
     }
   };
 
-  const onConnectOAuth = async (provider: 'gdrive' | 'dropbox') => {
+  const onConnectOAuth = async (provider: OAuthProviderType) => {
     if (busy) {
       return;
     }
@@ -209,7 +210,7 @@ export function StorageCard() {
 
   const startConnect = (type: ExternalProviderType, oauth: boolean) => {
     if (oauth) {
-      onConnectOAuth(type as 'gdrive' | 'dropbox');
+      onConnectOAuth(type as OAuthProviderType);
     } else {
       setManualType(type as 'webdav' | 's3');
       setManualLabel('');

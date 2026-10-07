@@ -45,34 +45,31 @@ class RemixRenderModule : Module() {
       throw IllegalArgumentException("Nincs helyi videóklip az eszközön-renderhez.")
     }
 
-    val single = video.length() == 1
-    val seg = video.getJSONObject(0)
-    val extraAudio = audio != null && audio.length() > 0
-
-    // Egyelőre csak az egy-klipes eset megy helyben (A/B); a több szegmens, külön
-    // hang-sáv, egyedi hangerő és a vízjel a Fázis C / felhő sajátja.
-    val singleClipLocal = single &&
-      !extraAudio &&
-      seg.optDouble("volume", 1.0) == 1.0 &&
-      !plan.optBoolean("watermark", false)
-    if (!singleClipLocal) {
-      throw IllegalStateException(
-        "Az Android eszközön-render jelenleg egy klipet támogat (vágás + vászon-" +
-          "skálázás) — több sáv, hang-mix, egyedi hangerő és vízjel a felhő-renderre esik (Pro)."
-      )
+    if (plan.optBoolean("watermark", false)) {
+      throw IllegalStateException("A vízjel beégetése jelenleg a felhő-renderre esik.")
     }
 
-    val src = toPath(seg.getString("uri"))
     val outFile = File(toPath(outputPath)).absolutePath
-    val inSec = seg.optDouble("inSec", 0.0)
-    val durationSec = seg.optDouble("durationSec", 0.0)
     val planW = plan.optInt("width", 0)
     val planH = plan.optInt("height", 0)
-    val speed = seg.optDouble("speed", 1.0)
-    val filter = seg.optString("filter", "none")
+    val fps = plan.optInt("fps", 30)
     val progress = { p: Double -> sendEvent("onProgress", mapOf("progress" to p)) }
 
-    val fps = plan.optInt("fps", 30)
+    val seg = video.getJSONObject(0)
+    val extraAudio = audio != null && audio.length() > 0
+    val multi = video.length() > 1
+
+    // Multi-segment / külön hang-sáv / egyedi hangerő → kompozit (Fázis C).
+    if (multi || extraAudio || seg.optDouble("volume", 1.0) != 1.0) {
+      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, outFile, progress)
+    }
+
+    // ── egy klip, nincs külön hang, teljes hangerő → A/B gyors út ──
+    val src = toPath(seg.getString("uri"))
+    val inSec = seg.optDouble("inSec", 0.0)
+    val durationSec = seg.optDouble("durationSec", 0.0)
+    val speed = seg.optDouble("speed", 1.0)
+    val filter = seg.optString("filter", "none")
 
     // Szűrő feloldása (a worker FILTERS-tükre); ismeretlen szűrő → felhő.
     val preset = FilterPresets.get(filter)

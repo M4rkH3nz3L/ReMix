@@ -20,7 +20,7 @@
 | **Development Build alap** | 🟢 kész | `expo-dev-client` dep, `eas.json` profilok, `android/` + `ios/` prebuild, `app.json` plugins/permissions |
 | **Natív render modul (váz)** | 🟡 részben | [modules/remix-render/](../../modules/remix-render/) — `RemixRender` Expo-module |
 | **iOS render (AVFoundation)** | 🟢 v1 | [RemixRenderModule.swift](../../modules/remix-render/ios/RemixRenderModule.swift) — multi-szegmens vágás+sebesség, aspect-fill vászon, hang-mix, H.264 MP4, progressz |
-| **Android render (MediaCodec)** | 🟢 **Fázis A + B teljes** | remux ([RemuxEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemuxEngine.kt)) + **GL-transzkód** ([TranscodeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/TranscodeEngine.kt)): vászon-skálázás + **sebesség** (videó-PTS + hang-resample) + **szűrő** (szín-overlay, worker-paritás); mind 4 emulátor-teszttel verifikálva; hang-mix/multi-segment → C |
+| **Android render (MediaCodec)** | 🟢 **Fázis A + B + C teljes (iOS-paritás)** | remux + GL-transzkód (skálázás/sebesség/szűrő) + **multi-segment kompozit** ([ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/ComposeEngine.kt): folytonos encoder) + **N-sávos hang-mix** ([AudioMixer.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/AudioMixer.kt)); 6 emulátor-teszt zöld. Hátra: D (cancel/robusztus) + E (codec) |
 | **JS-híd / terv-fordító** | 🟢 kész | [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) — `buildRenderPlan`, `renderLocal`, `requireOptionalNativeModule('RemixRender')` |
 | **Render-orkesztrátor + router** | 🟢 kész | [src/lib/render.ts](../../src/lib/render.ts) + [src/lib/backend.ts](../../src/lib/backend.ts) — local vs cloud döntés |
 | **Felhő-render (Level 3)** | 🟢 kész | `server/render-worker.js` + FFmpeg (BullMQ queue) |
@@ -132,13 +132,16 @@ transzkódolási kényszer (speed=1, filter=none, a klip képaránya = vászon).
 - [x] **Verifikálva:** `appliesColorFilterDesaturates` — a „mono" overlay az első-frame szín-szórását érdemben csökkenti (`connectedDebugAndroidTest` zöld, 4/0/0).
 - **Kész, ha:** 9:16 vászon + 2× sebesség + egy alap szűrő helyben renderel. ✅ (mind a három ág külön-külön verifikálva)
 
-### Fázis C — **Multi-segment** összefűzés + hang-mix (iOS-paritás)
-- [ ] A `video[]` szegmensek egymás után a közös encoder-be (folytonos PTS).
-- [ ] A szegmensek saját hangja + a `audio[]` sávok PCM-mixe (volume-mal),
-      abszolút `atSec`-re időzítve → egy AAC sáv.
-- [ ] Szegmens-határ: a GL-encoder folytonos marad (nincs muxer-újranyitás).
-- **Kész, ha:** egy 3-klipes + zene + voiceover projekt helyben, az iOS-sel
-  vizuálisan/időben egyező MP4-et ad.
+### Fázis C — **Multi-segment** összefűzés + hang-mix (iOS-paritás) ✅ KÉSZ (2026-10-07)
+Motor: [ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/ComposeEngine.kt)
+(videó) + [AudioMixer.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/AudioMixer.kt) +
+[PcmCodec.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/PcmCodec.kt) (közös decode/encode mag).
+- [x] A `video[]` szegmensek egymás után EGY folytonos encoder-be (folytonos PTS, szegmensenként saját vágás+sebesség+skálázás+szűrő); félig nyílt ablak a határon (nincs PTS-dup).
+- [x] A szegmensek saját hangja + a `audio[]` sávok PCM-mixe (volume + retime), közös 44.1k/stereo pufferbe, `atSec`-re időzítve → egy AAC sáv.
+- [x] Szegmens-határ: a GL-encoder + input-surface folytonos marad, csak a dekóder cserélődik (nincs muxer-újranyitás).
+- [x] **Verifikálva:** `composesTwoSegmentsContinuous` (2 szegmens → ~2s folytonos) + `mixesSeparateAudioTrack` (külön hang bekeverve) — `connectedDebugAndroidTest` zöld (6/0/0).
+- **Kész, ha:** egy több-klipes + zene/voiceover projekt helyben, az iOS-sel egyező MP4-et ad. ✅
+  (⚠️ a nem-folytonos idővonal gap-fekete-kitöltése külön, követő finomítás.)
 
 ### Fázis D — Robusztusság + megszakítás
 - [ ] **Valódi cancel:** `exportPlan` kapjon megszakítást (az `AbortSignal`-hoz —

@@ -41,6 +41,7 @@ class RemuxEngineTest {
       1.0,
       240,
       240,
+      { false },
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 

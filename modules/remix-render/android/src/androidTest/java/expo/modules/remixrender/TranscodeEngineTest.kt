@@ -7,6 +7,7 @@ import android.media.MediaMetadataRetriever
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,6 +47,7 @@ class TranscodeEngineTest {
       1.0,
       -1,
       0f,
+      { false },
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 
@@ -113,6 +115,7 @@ class TranscodeEngineTest {
       2.0,
       -1,
       0f,
+      { false },
       outFile.absolutePath,
     ) { p -> progress.add(p) }
 
@@ -161,11 +164,11 @@ class TranscodeEngineTest {
     // ugyanaz a klip szűrő nélkül és „mono" (0x808080 @0.45) szűrővel
     val plain = File(cache, "filter_plain.mp4")
     if (plain.exists()) plain.delete()
-    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, -1, 0f, plain.absolutePath) {}
+    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, -1, 0f, { false }, plain.absolutePath) {}
 
     val mono = File(cache, "filter_mono.mp4")
     if (mono.exists()) mono.delete()
-    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, 0x808080, 0.45f, mono.absolutePath) {}
+    TranscodeEngine.transcode(src.absolutePath, 1.0, 1.0, 240, 240, 30, 1.0, 0x808080, 0.45f, { false }, mono.absolutePath) {}
 
     val plainSpread = avgChannelSpread(plain.absolutePath)
     val monoSpread = avgChannelSpread(mono.absolutePath)
@@ -174,6 +177,69 @@ class TranscodeEngineTest {
       "a mono szűrő csökkenti a szín-szórást (plain=$plainSpread, mono=$monoSpread)",
       monoSpread in 1.0..(plainSpread * 0.85),
     )
+  }
+
+  @Test
+  fun cancelAbortsRenderAndDeletesOutput() {
+    val inst = InstrumentationRegistry.getInstrumentation()
+    val cache = inst.targetContext.cacheDir
+    val src = File(cache, "cancel_src.mp4")
+    inst.context.assets.open("remux_sample.mp4").use { input ->
+      src.outputStream().use { output -> input.copyTo(output) }
+    }
+    val out = File(cache, "cancel_out.mp4")
+    if (out.exists()) out.delete()
+
+    // a megszakítás-jel az első progressznél igazra vált → a motor-loop kilép
+    var cancel = false
+    var cancelled = false
+    try {
+      TranscodeEngine.transcode(
+        src.absolutePath,
+        0.0,
+        2.0,
+        320,
+        180,
+        30,
+        1.0,
+        -1,
+        0f,
+        { cancel },
+        out.absolutePath,
+      ) { _ -> cancel = true }
+    } catch (e: RenderCancelledException) {
+      cancelled = true
+    }
+
+    assertTrue("megszakításkor RenderCancelledException-t dob", cancelled)
+    assertFalse("a részfájl törlődött (nem marad szemét)", out.exists())
+  }
+
+  @Test
+  fun invalidSourceThrowsCleanlyWithoutGarbage() {
+    val cache = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
+    val out = File(cache, "invalid_out.mp4")
+    if (out.exists()) out.delete()
+    var threw = false
+    try {
+      TranscodeEngine.transcode(
+        "/nem/letezik/forras.mp4",
+        0.0,
+        1.0,
+        320,
+        180,
+        30,
+        1.0,
+        -1,
+        0f,
+        { false },
+        out.absolutePath,
+      ) {}
+    } catch (e: Exception) {
+      threw = true // tiszta kivétel (nem crash) → a hívó a felhő-renderre esik
+    }
+    assertTrue("hibás forrás tiszta kivételt dob", threw)
+    assertFalse("hibánál sem marad részfájl", out.exists())
   }
 
   /** Az első képkocka átlagos csatorna-szórása (max-min RGB) — a „színesség" mértéke. */

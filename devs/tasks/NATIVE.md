@@ -20,7 +20,7 @@
 | **Development Build alap** | 🟢 kész | `expo-dev-client` dep, `eas.json` profilok, `android/` + `ios/` prebuild, `app.json` plugins/permissions |
 | **Natív render modul (váz)** | 🟡 részben | [modules/remix-render/](../../modules/remix-render/) — `RemixRender` Expo-module |
 | **iOS render (AVFoundation)** | 🟢 v1 | [RemixRenderModule.swift](../../modules/remix-render/ios/RemixRenderModule.swift) — multi-szegmens vágás+sebesség, aspect-fill vászon, hang-mix, H.264 MP4, progressz |
-| **Android render (MediaCodec)** | 🟢 **Fázis A + B + C teljes (iOS-paritás)** | remux + GL-transzkód (skálázás/sebesség/szűrő) + **multi-segment kompozit** ([ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/ComposeEngine.kt): folytonos encoder) + **N-sávos hang-mix** ([AudioMixer.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/AudioMixer.kt)); 6 emulátor-teszt zöld. Hátra: D (cancel/robusztus) + E (codec) |
+| **Android render (MediaCodec)** | 🟢 **Fázis A + B + C + D teljes (iOS-paritás)** | remux + GL-transzkód (skálázás/sebesség/szűrő) + **multi-segment kompozit** ([ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/ComposeEngine.kt)) + **N-sávos hang-mix** ([AudioMixer.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/AudioMixer.kt)) + **valódi cancel/robusztusság**; 8 emulátor-teszt zöld. Hátra: D-foreground-service + E (codec/HEVC) |
 | **JS-híd / terv-fordító** | 🟢 kész | [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) — `buildRenderPlan`, `renderLocal`, `requireOptionalNativeModule('RemixRender')` |
 | **Render-orkesztrátor + router** | 🟢 kész | [src/lib/render.ts](../../src/lib/render.ts) + [src/lib/backend.ts](../../src/lib/backend.ts) — local vs cloud döntés |
 | **Felhő-render (Level 3)** | 🟢 kész | `server/render-worker.js` + FFmpeg (BullMQ queue) |
@@ -143,14 +143,18 @@ Motor: [ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/
 - **Kész, ha:** egy több-klipes + zene/voiceover projekt helyben, az iOS-sel egyező MP4-et ad. ✅
   (⚠️ a nem-folytonos idővonal gap-fekete-kitöltése külön, követő finomítás.)
 
-### Fázis D — Robusztusság + megszakítás
-- [ ] **Valódi cancel:** `exportPlan` kapjon megszakítást (az `AbortSignal`-hoz —
-      ma a JS csak elengedi a hívást, a kódolás tovább fut, lásd `nativeRender.ts`
-      figyelmeztetés). Natív oldali flag → a decode/encode loop kilép, részfájl törlés.
-- [ ] Hibakezelés: sérült/variábilis-fps forrás, HDR/10-bit → tiszta hiba + cloud-fallback.
-- [ ] `FOREGROUND_SERVICE_MEDIA_PLAYBACK` már engedélyezett — hosszú export ne haljon
-      meg háttérben (foreground service a render idejére).
-- **Kész, ha:** a ✕ ténylegesen megszakít, a hibás forrás nem crashel, hosszú render túléli a háttért.
+### Fázis D — Robusztusság + megszakítás ✅ (cancel + hibakezelés KÉSZ, 2026-10-07; foreground halasztva)
+- [x] **Valódi cancel:** a modul `cancel()` AsyncFunction-je egy `@Volatile` flaget állít,
+      amit a motor-loopok (Remux/Transcode/Compose) minden iterációnál figyelnek →
+      [RenderCancelledException](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RenderCancelledException.kt),
+      a részfájl törlődik. A JS `renderLocal` az `AbortSignal` abortjakor meghívja a `Native.cancel()`-t
+      ([nativeRender.ts](../../src/lib/nativeRender.ts)) — a kódolás tényleg leáll, nem csak a hívás.
+- [x] Hibakezelés: minden motor `try/catch` → tiszta kivétel + részfájl-törlés → a JS a felhő-renderre esik;
+      a `setDataSource` hibája sem szivárogtat extractort.
+- [x] **Verifikálva:** `cancelAbortsRenderAndDeletesOutput` + `invalidSourceThrowsCleanlyWithoutGarbage` (`connectedDebugAndroidTest` zöld, 8/0/0).
+- [ ] ⬜ **Halasztva:** `FOREGROUND_SERVICE_MEDIA_PLAYBACK` foreground-service a hosszú háttér-renderhez
+      (valós eszközön tesztelhető igazán; a permission már deklarált, a tipikus rövid render a process-ben elfut).
+- **Kész, ha:** a ✕ ténylegesen megszakít ✅, a hibás forrás nem crashel ✅; a háttér-túlélés (foreground) hátra.
 
 ### Fázis E — Codec/minőség
 - [ ] H.265 (HEVC) opció, ha az eszköz enkódere támogatja (kisebb fájl); fallback H.264.

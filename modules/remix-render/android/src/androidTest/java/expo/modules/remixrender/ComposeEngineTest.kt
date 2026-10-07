@@ -68,7 +68,7 @@ class ComposeEngineTest {
     val video = JSONArray()
       .put(vseg(src.absolutePath, 0.0, 0.0, 1.0)) // [0..1s]
       .put(vseg(src.absolutePath, 1.0, 1.0, 1.0)) // [1..2s] forrás-ablak 1..2s
-    val resultPath = ComposeEngine.compose(video, null, 240, 240, 30, out.absolutePath) {}
+    val resultPath = ComposeEngine.compose(video, null, 240, 240, 30, { false }, out.absolutePath) {}
 
     val (hasVideo, hasAudio, durUs) = probe(File(resultPath).absolutePath)
     assertTrue("a kimenet létrejött", File(resultPath).exists() && File(resultPath).length() > 0)
@@ -92,7 +92,7 @@ class ComposeEngineTest {
         .put("durationSec", 1.0)
         .put("volume", 0.5),
     )
-    val resultPath = ComposeEngine.compose(video, audio, 240, 240, 30, out.absolutePath) {}
+    val resultPath = ComposeEngine.compose(video, audio, 240, 240, 30, { false }, out.absolutePath) {}
 
     val (hasVideo, hasAudio, durUs) = probe(File(resultPath).absolutePath)
     assertTrue("a kimenet létrejött", File(resultPath).exists() && File(resultPath).length() > 0)

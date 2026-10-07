@@ -42,6 +42,7 @@ object ComposeEngine {
     canvasWidth: Int,
     canvasHeight: Int,
     fps: Int,
+    isCancelled: () -> Boolean = { false },
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -160,7 +161,8 @@ object ComposeEngine {
 
       // ── szegmensek dekódolása sorban, folytonos PTS-sel ──
       for (seg in segs) {
-        decodeSegment(seg, canvasW, canvasH, firstAtUs, outputSurface, inputSurface, totalDurUs, onProgress) {
+        if (isCancelled()) throw RenderCancelledException()
+        decodeSegment(seg, canvasW, canvasH, firstAtUs, outputSurface, inputSurface, totalDurUs, isCancelled, onProgress) {
           drainEncoder(false)
         }
       }
@@ -191,6 +193,7 @@ object ComposeEngine {
     outputSurface: OutputSurface,
     inputSurface: InputSurface,
     totalDurUs: Long,
+    isCancelled: () -> Boolean,
     onProgress: (Double) -> Unit,
     pump: () -> Unit,
   ) {
@@ -227,6 +230,7 @@ object ComposeEngine {
     var outputDone = false
     try {
       while (!outputDone) {
+        if (isCancelled()) throw RenderCancelledException()
         if (!inputDone) {
           val inIndex = decoder.dequeueInputBuffer(TIMEOUT_US)
           if (inIndex >= 0) {

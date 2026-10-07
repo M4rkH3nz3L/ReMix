@@ -38,6 +38,7 @@ object TranscodeEngine {
     speed: Double,
     filterRgb: Int,
     filterOpacity: Float,
+    isCancelled: () -> Boolean = { false },
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -49,7 +50,12 @@ object TranscodeEngine {
     val playbackSpeed = if (speed > 0.0) speed else 1.0
 
     val extractor = MediaExtractor()
-    extractor.setDataSource(srcPath)
+    try {
+      extractor.setDataSource(srcPath)
+    } catch (e: Exception) {
+      extractor.release()
+      throw e
+    }
     var videoTrack = -1
     var audioTrack = -1
     var videoFormat: MediaFormat? = null
@@ -140,6 +146,7 @@ object TranscodeEngine {
       onProgress(0.02)
 
       while (!encoderOutputDone) {
+        if (isCancelled()) throw RenderCancelledException()
         // 1) dekóder etetése a video-sávból a [.., endUs] tartományig
         if (!decoderInputDone) {
           val inIndex = decoder.dequeueInputBuffer(TIMEOUT_US)

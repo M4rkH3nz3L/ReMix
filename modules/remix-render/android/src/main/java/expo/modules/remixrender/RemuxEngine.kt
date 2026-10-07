@@ -34,6 +34,7 @@ object RemuxEngine {
     durationSec: Double,
     planWidth: Int,
     planHeight: Int,
+    isCancelled: () -> Boolean = { false },
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -42,7 +43,12 @@ object RemuxEngine {
       if (durationSec > 0.0) ((inSec + durationSec) * 1_000_000.0).toLong() else Long.MAX_VALUE
 
     val extractor = MediaExtractor()
-    extractor.setDataSource(srcPath)
+    try {
+      extractor.setDataSource(srcPath)
+    } catch (e: Exception) {
+      extractor.release()
+      throw e
+    }
     val out = File(outputPath)
     var muxer: MediaMuxer? = null
     try {
@@ -110,6 +116,7 @@ object RemuxEngine {
       onProgress(0.02)
 
       while (true) {
+        if (isCancelled()) throw RenderCancelledException()
         val sampleTime = extractor.sampleTime
         if (sampleTime < 0L) break // EOS
         if (endUs != Long.MAX_VALUE && sampleTime > endUs) break

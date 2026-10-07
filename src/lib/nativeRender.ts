@@ -29,6 +29,8 @@ interface NativeProgressEvent {
 interface RemixRenderModule {
   /** A render-tervet (JSON) MP4-re rendereli; a kész fájl URI-ját adja vissza. */
   exportPlan(planJson: string, outputPath: string): Promise<string>;
+  /** A futó render megszakítása — a natív loop kilép + a részfájlt törli. */
+  cancel(): Promise<void>;
   addListener(
     event: 'onProgress',
     listener: (e: NativeProgressEvent) => void
@@ -179,12 +181,10 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
  * Eszközön-render: a projekt → MP4 a telefonon, szerver nélkül. A kész fájl
  * `File`-ját adja vissza (a cache-ben). Nincs natív modul → dob.
  *
- * ⚠️ MEGSZAKÍTÁS — őszinte korlát: a natív modul felülete `exportPlan(plan, out)`,
- * NINCS benne cancel. A háttérben futó kódolást tehát nem tudjuk ténylegesen
- * leállítani. Amit a `signal` megtesz: azonnal elengedi a hívást — a
- * folyamat-jelző eltűnik, a részeredményt eldobjuk, nem kerül megosztásra vagy a
- * Fotókba. Ez lényegesen jobb a korábbi állapotnál, ahol a ✕ gomb LÁTSZOTT, de
- * semmit nem csinált. Valódi megszakításhoz a natív modult kell bővíteni.
+ * MEGSZAKÍTÁS (Fázis D): a natív modulnak van `cancel()`-je — az `AbortSignal`
+ * abortjára meghívjuk, mire a natív decode/encode loop a következő iterációnál
+ * kilép és a részfájlt törli (nem csak a JS-hívást engedjük el). Az iOS-oldal
+ * valódi `cancelExport`-ja külön, követő lépés.
  */
 export async function renderLocal(
   project: Project,
@@ -221,13 +221,22 @@ export async function renderLocal(
       return new File(await exporting);
     }
     if (signal.aborted) {
+      Native.cancel().catch(() => {});
       throw cancelledError();
     }
-    // versenyeztetés: amelyik előbb — a kész render vagy a megszakítás
+    // versenyeztetés: amelyik előbb — a kész render vagy a megszakítás.
+    // Abortkor a natív `cancel()` ténylegesen leállítja a kódolást.
     const outUri = await Promise.race([
       exporting,
       new Promise<never>((_, reject) => {
-        signal.addEventListener('abort', () => reject(cancelledError()), { once: true });
+        signal.addEventListener(
+          'abort',
+          () => {
+            Native.cancel().catch(() => {});
+            reject(cancelledError());
+          },
+          { once: true }
+        );
       }),
     ]);
     return new File(outUri);

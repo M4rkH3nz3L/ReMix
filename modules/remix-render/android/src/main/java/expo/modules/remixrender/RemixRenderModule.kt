@@ -20,17 +20,30 @@ import java.io.File
  * hibával a felhő-render (Pro) felé esik.
  */
 class RemixRenderModule : Module() {
+  // A folyamatban lévő render megszakítás-jele (a JS `cancel()` állítja, a motor-loopok figyelik).
+  @Volatile
+  private var cancelRequested = false
+
   override fun definition() = ModuleDefinition {
     Name("RemixRender")
 
     Events("onProgress")
 
     AsyncFunction("exportPlan") { planJson: String, outputPath: String, promise: Promise ->
+      cancelRequested = false
       try {
         promise.resolve(render(planJson, outputPath))
+      } catch (e: RenderCancelledException) {
+        promise.reject("ERR_RENDER_CANCELLED", e.message ?: "megszakítva", e)
       } catch (e: Exception) {
         promise.reject("ERR_RENDER", e.message ?: "render hiba", e)
       }
+    }
+
+    // A futó render megszakítása — a natív decode/encode loop a következő
+    // iterációnál kilép, a részfájlt törli. (Az `exportPlan` indításkor nullázza.)
+    AsyncFunction("cancel") {
+      cancelRequested = true
     }
   }
 
@@ -54,6 +67,7 @@ class RemixRenderModule : Module() {
     val planH = plan.optInt("height", 0)
     val fps = plan.optInt("fps", 30)
     val progress = { p: Double -> sendEvent("onProgress", mapOf("progress" to p)) }
+    val isCancelled = { cancelRequested }
 
     val seg = video.getJSONObject(0)
     val extraAudio = audio != null && audio.length() > 0
@@ -61,7 +75,7 @@ class RemixRenderModule : Module() {
 
     // Multi-segment / külön hang-sáv / egyedi hangerő → kompozit (Fázis C).
     if (multi || extraAudio || seg.optDouble("volume", 1.0) != 1.0) {
-      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, outFile, progress)
+      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, isCancelled, outFile, progress)
     }
 
     // ── egy klip, nincs külön hang, teljes hangerő → A/B gyors út ──
@@ -82,14 +96,14 @@ class RemixRenderModule : Module() {
     // speed==1 ÉS nincs szűrő: gyors, veszteségmentes remux (A); képarány-eltérésnél transzkód (B1).
     if (speed == 1.0 && preset == null) {
       return try {
-        "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, outFile, progress)
+        "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, isCancelled, outFile, progress)
       } catch (_: AspectMismatchException) {
-        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, -1, 0f, outFile, progress)
+        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, -1, 0f, isCancelled, outFile, progress)
       }
     }
 
     // sebesség és/vagy szűrő → transzkód (B1/B2/B3); remux itt nem opció.
     return "file://" +
-      TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, filterRgb, filterOpacity, outFile, progress)
+      TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, filterRgb, filterOpacity, isCancelled, outFile, progress)
   }
 }

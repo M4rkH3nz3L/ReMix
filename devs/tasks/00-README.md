@@ -126,12 +126,12 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 06 | Video Editor (NLE) | 4 | 4 | 3 | 11 |
 | 07 | Image Studio | 0 | 9 | 0 | 9 |
 | 08 | Storage / Asset | 3 | 4 | 1 | 8 |
-| 09 | Native / Rendering | 0 | 0 | 6 | 6 |
+| 09 | Native / Rendering | 0 | 1 | 3 | 4 |
 | 10 | Brand / UI | 0 | 2 | 6 | 8 |
 | 11 | Performance | 1 | 0 | 4 | 5 |
 | 12 | Code quality | 0 | 7 | 2 | 9 |
 | 13 | Documentation | 0 | 1 | 5 | 6 |
-| **Σ** | **(13 epik)** | **15** | **47** | **44** | **106** |
+| **Σ** | **(13 epik)** | **15** | **48** | **41** | **104** |
 
 **Olvasat:** a 106 tételből **15 teljes**, **47 „mag kész"** (a logika megvan, csak a következő réteg —
 UI/backend/render — hiányzik) és **44 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),

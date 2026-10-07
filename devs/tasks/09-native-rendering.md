@@ -5,9 +5,11 @@
 
 ---
 
-> **📊 Haladás (2026-10-06):** ✅ 0 · 🟡 0 · ⬜ 6 nyitva — Σ 6 tétel. **P3 platform-expanzió —
-> nincs launch-blokkoló.** Az iOS AVFoundation-render v1 kész (a natív-motor körben); itt minden
-> tétel nyitva (Skia / natív-FFmpeg / on-device-ONNX / desktop-shell / generatív / watchOS).
+> **📊 Haladás (2026-10-07):** ✅ 0 · 🟡 1 · ⬜ 3 nyitva — Σ 4 tétel. **P3 platform-expanzió —
+> nincs launch-blokkoló.** A natív render-motor (§2.2) 🟡: iOS AVFoundation v1 kész + **Android
+> Fázis A (remux vágással)** megírva — részletek: [NATIVE.md](./NATIVE.md). A többi nyitva
+> (Skia / on-device-ONNX / generatív). **Céleszközök: Android telefon+tablet, iPhone+iPad** —
+> desktop és watchOS **kivéve** (nincs termék-igény).
 
 ## 0. Kontextus & cél
 Platform-expanzió: a mobil-preview/render hosszú távú motorja + a desktop + a generatív AI.
@@ -33,14 +35,8 @@ Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a pr
 ### 2.3 On-device ONNX — P2/P3
 - [ ] ⬜ Mobil ONNX-runtime (szegmentálás/mélység/upscale on-device) — lásd [05](./05-ai.md) §2.9.
 
-### 2.4 Desktop shell — P3
-- [ ] ⬜ Tauri/Electron (vagy natív) — „telefonon és gépen ugyanaz az editor".
-
 ### 2.5 AI avatar / voice-clone / video-gen — P2/P3
 - [ ] ⬜ Generatív feature-ök; **voice-clone kötelező:** consent + identity-verification + abuse-prevention + watermark/provenance.
-
-### 2.6 watchOS — opcionális
-- [ ] ⬜ Nem launch-blokkoló; csak ha van rá termék-igény.
 
 ## 3. Kész, ha
 A mobil-preview Skia-motoron fut (parity-vel), a local-render natív pipeline-on megy, az on-device

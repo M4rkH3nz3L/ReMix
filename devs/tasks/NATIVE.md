@@ -20,7 +20,7 @@
 | **Development Build alap** | 🟢 kész | `expo-dev-client` dep, `eas.json` profilok, `android/` + `ios/` prebuild, `app.json` plugins/permissions |
 | **Natív render modul (váz)** | 🟡 részben | [modules/remix-render/](../../modules/remix-render/) — `RemixRender` Expo-module |
 | **iOS render (AVFoundation)** | 🟢 v1 | [RemixRenderModule.swift](../../modules/remix-render/ios/RemixRenderModule.swift) — multi-szegmens vágás+sebesség, aspect-fill vászon, hang-mix, H.264 MP4, progressz |
-| **Android render (MediaCodec)** | 🔴 **csak triviális copy** | [RemixRenderModule.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemixRenderModule.kt) — 1 klip, vágás/sebesség/szűrő nélkül → minden más a felhőre esik |
+| **Android render (MediaCodec)** | 🟡 **Fázis A kész** (remux vágással) | [RemuxEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemuxEngine.kt) — veszteségmentes trim (MediaExtractor→MediaMuxer), emulátor-teszttel verifikálva; vászon-skálázás/sebesség/szűrő/hang-mix → Fázis B–C |
 | **JS-híd / terv-fordító** | 🟢 kész | [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) — `buildRenderPlan`, `renderLocal`, `requireOptionalNativeModule('RemixRender')` |
 | **Render-orkesztrátor + router** | 🟢 kész | [src/lib/render.ts](../../src/lib/render.ts) + [src/lib/backend.ts](../../src/lib/backend.ts) — local vs cloud döntés |
 | **Felhő-render (Level 3)** | 🟢 kész | `server/render-worker.js` + FFmpeg (BullMQ queue) |
@@ -94,14 +94,20 @@ Technológia: **MediaExtractor → MediaCodec (decode) → OpenGL ES (vászon/sk
 szűrő) → MediaCodec (encode) → MediaMuxer**, az audio külön `MediaCodec` decode →
 PCM mix → AAC encode ágon.
 
-### Fázis A — Single-clip **remux vágással** (gyors győzelem) 🎯 ELSŐ
+### Fázis A — Single-clip **remux vágással** (gyors győzelem) 🎯 ✅ KÉSZ (2026-10-07)
 Cél: a mai „byte-copy" helyett valódi, veszteségmentes vágás, ha nincs
-transzkódolási kényszer (speed=1, filter=none, a klip mérete = vászon).
-- [ ] `MediaExtractor` + `MediaMuxer`: a kijelölt `[inSec, inSec+durationSec]`
-      tartomány átmuxolása (video+audio sáv), legközelebbi keyframe-hez igazítva.
-- [ ] Progressz a kimuxolt minták arányából (`onProgress`).
-- [ ] Ha a klip mérete ≠ vászon VAGY forgatott → NEM remux, tovább a Fázis B-re.
-- **Kész, ha:** egy helyi klip vágott exportja MP4-et ad, lejátszható, hang szinkron.
+transzkódolási kényszer (speed=1, filter=none, a klip képaránya = vászon).
+**Motor:** [RemuxEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/RemuxEngine.kt)
+(Expo-független → tesztelhető), a modul csak a jogosultságot dönti el + delegál.
+- [x] `MediaExtractor` + `MediaMuxer`: a kijelölt `[inSec, inSec+durationSec]`
+      tartomány átmuxolása (video+audio sáv), `SEEK_TO_PREVIOUS_SYNC` keyframe-igazítás, PTS 0-ra tolva.
+- [x] Progressz a kimuxolt minták arányából (`onProgress`).
+- [x] Ha a klip képaránya ≠ vászon → NEM remux, kivétel → felhő (Fázis B, ha majd skáláz).
+- [x] **Verifikálva:** instrumentált teszt az emulátoron
+      ([RemuxEngineTest.kt](../../android/app/src/androidTest/java/com/h3nz3l/remix/RemuxEngineTest.kt))
+      — valódi 240×240 h264+aac MP4 `[1.0–2.0s]` vágása, a kimenet újra megnyitható,
+      videó+hang sáv megvan, hossz ~1s, progressz 1.0 (`connectedDebugAndroidTest` zöld, 1/0/0).
+- **Kész, ha:** egy helyi klip vágott exportja MP4-et ad, lejátszható, hang szinkron. ✅
 
 ### Fázis B — Single-clip **transzkód** (vászon + sebesség + szűrő)
 - [ ] Decode→GL→encode pipeline: a forrást a `renderSize` vászonra rajzolja

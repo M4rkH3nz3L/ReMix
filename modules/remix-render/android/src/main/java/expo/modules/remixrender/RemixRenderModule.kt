@@ -9,11 +9,15 @@ import java.io.File
 /**
  * Eszközön futó render Androidon — az iOS AVFoundation-motor párja.
  *
- * v1: az egyszerű, egy-videós esetet KORREKTEN kezeli (a helyi klip átmásolása
- * a kimenetre), az összetett projekteket pedig egyértelmű üzenettel a felhő-
- * render (Pro) felé irányítja. A teljes Android-kompozitálás (MediaCodec +
- * MediaMuxer, több sáv + sebesség + vászon) külön, követő lépés — a JS-oldal
- * és a Pro-modell attól függetlenül már kész.
+ * Fázis A (ez a réteg): **single-clip remux vágással** — a tényleges mux-logika a
+ * [RemuxEngine]-ben van (Expo-függetlenül, hogy instrumentált teszttel is fusson).
+ * Ez a modul csak a render-terv jogosultságát dönti el, és delegál: egyetlen helyi
+ * videóklip, sebesség=1, nincs szűrő/vízjel/külön hang-sáv, és a klip képaránya a
+ * vászonéval egyezik → veszteségmentes remux a `[inSec, inSec+durationSec]`-re.
+ *
+ * Minden más eset (vászon-skálázás, sebesség, szűrő, több szegmens, hang-mix,
+ * vízjel) átkódolást igényel → az a Fázis B–C (decode→GL→encode), addig tiszta
+ * hibával a felhő-render (Pro) felé esik.
  */
 class RemixRenderModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -30,8 +34,8 @@ class RemixRenderModule : Module() {
     }
   }
 
-  private fun toFile(uri: String): File =
-    if (uri.startsWith("file://")) File(uri.removePrefix("file://")) else File(uri)
+  private fun toPath(uri: String): String =
+    if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
 
   private fun render(planJson: String, outputPath: String): String {
     val plan = JSONObject(planJson)
@@ -43,27 +47,33 @@ class RemixRenderModule : Module() {
 
     val single = video.length() == 1
     val seg = video.getJSONObject(0)
-    val trivial = single &&
-      (audio == null || audio.length() == 0) &&
-      seg.optDouble("speed", 1.0) == 1.0 &&
-      seg.optDouble("inSec", 0.0) == 0.0 &&
-      seg.optString("filter", "none") == "none"
+    val extraAudio = audio != null && audio.length() > 0
 
-    if (!trivial) {
+    // Fázis A jogosultság: egy klip, nincs transzkódolási kényszer.
+    val remuxable = single &&
+      !extraAudio &&
+      seg.optDouble("speed", 1.0) == 1.0 &&
+      seg.optDouble("volume", 1.0) == 1.0 &&
+      seg.optString("filter", "none") == "none" &&
+      !plan.optBoolean("watermark", false)
+
+    if (!remuxable) {
       throw IllegalStateException(
-        "Az Android eszközön-render most csak egyszerű vágást támogat — " +
-          "összetett projekthez használd a felhő-rendert (Pro)."
+        "Az Android eszközön-render jelenleg egy klip vágását (remux) támogatja — " +
+          "vászon-skálázás, sebesség, szűrő, több sáv, hang-mix és vízjel a " +
+          "felhő-renderre esik (Pro)."
       )
     }
 
-    // triviális eset: a forrás átmásolása a kimenetre
-    sendEvent("onProgress", mapOf("progress" to 0.1))
-    val src = toFile(seg.getString("uri"))
-    val out = toFile(outputPath)
-    out.parentFile?.mkdirs()
-    if (out.exists()) out.delete()
-    src.copyTo(out, overwrite = true)
-    sendEvent("onProgress", mapOf("progress" to 1.0))
-    return "file://" + out.absolutePath
+    val result = RemuxEngine.remuxTrim(
+      toPath(seg.getString("uri")),
+      seg.optDouble("inSec", 0.0),
+      seg.optDouble("durationSec", 0.0),
+      plan.optInt("width", 0),
+      plan.optInt("height", 0),
+      File(toPath(outputPath)).absolutePath,
+    ) { progress -> sendEvent("onProgress", mapOf("progress" to progress)) }
+
+    return "file://" + result
   }
 }

@@ -16,8 +16,15 @@ android {
     minSdkVersion safeExtGet("minSdkVersion", 24)
     compileSdkVersion safeExtGet("compileSdkVersion", 34)
     targetSdkVersion safeExtGet("targetSdkVersion", 34)
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
   lintOptions {
     abortOnError false
   }
+}
+
+dependencies {
+  // On-device (emulátor/eszköz) teszt a Fázis A remux-motorhoz (RemuxEngineTest).
+  androidTestImplementation "androidx.test.ext:junit:1.1.5"
+  androidTestImplementation "androidx.test:runner:1.5.2"
 }

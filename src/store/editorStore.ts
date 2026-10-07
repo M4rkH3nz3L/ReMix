@@ -8,6 +8,16 @@ import {
   extractStyle,
   styleTransferPatch,
 } from '@/lib/batchEdit';
+import {
+  acquireLock,
+  applyLockBroadcast,
+  editableByMe,
+  pruneStale,
+  releaseLock,
+  withLock,
+  type LockBroadcast,
+  type LockMap,
+} from '@/lib/clipLock';
 import { applyCommand } from '@/lib/commands';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
@@ -121,6 +131,13 @@ export function setLiveBroadcaster(fn: ((commands: EditorCommand[]) => void) | n
   liveBroadcaster = fn;
 }
 
+// 🔒 klip-zár broadcastja (collab) — a collab-store állítja be a csatorna nyitásakor.
+// Ugyanaz a laza csatolás, mint a liveBroadcaster (a store nem ismeri a hálót).
+let lockBroadcaster: ((msg: LockBroadcast) => void) | null = null;
+export function setLockBroadcaster(fn: ((msg: LockBroadcast) => void) | null): void {
+  lockBroadcaster = fn;
+}
+
 /** a sáv-kapcsolók state-kulcsai — mind `TrackType[]`-et tárol */
 type TrackFlagKey =
   | 'mutedTracks'
@@ -132,6 +149,10 @@ type TrackFlagKey =
 interface EditorState {
   project: Project | null;
   selectedClipId: string | null;
+  /** 🔒 élő klip-zárak (collab): clipId → zár. A realtime-broadcast tölti; a UI jelzi. */
+  clipLocks: LockMap;
+  /** a saját collab-identitás (a zár-tulajhoz); null = nincs élő collab */
+  collabSelf: { id: string; name?: string } | null;
   /**
    * 🧩 Több-kijelölés: az elsődleges klipen FELÜL kijelölt klipek. Az
    * `selectedClipId` marad a „főszereplő" (a panelek azt szerkesztik) — a
@@ -268,6 +289,13 @@ interface EditorState {
   removeClip: (clipId: string) => void;
   splitClipAt: (clipId: string, time: number) => boolean;
   selectClip: (clipId: string | null) => void;
+  /** 🔒 collab klip-zár: identitás + zár-műveletek (broadcast + térkép-frissítés) */
+  setCollabSelf: (self: { id: string; name?: string } | null) => void;
+  applyRemoteLock: (msg: LockBroadcast) => void;
+  acquireClipLock: (clipId: string) => void;
+  releaseClipLock: (clipId: string) => void;
+  pruneClipLocks: () => void;
+  canEditClip: (clipId: string) => boolean;
   toggleMultiSelect: (clipId: string) => void;
   /** 🔎 több klip együttes kijelölése (pl. AI smart-select találatokból); az első
    *  lesz az elsődleges, a többi (azonos fajtájú) a köteg */
@@ -456,6 +484,8 @@ const SESSION_RESET = {
 export const useEditorStore = create<EditorState>((set, get) => ({
   project: null,
   selectedClipId: null,
+  clipLocks: {} as LockMap,
+  collabSelf: null,
   styleClipboard: null,
   playhead: 0,
   isPlaying: false,
@@ -662,6 +692,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       multiSelectMode: false,
       activePanel: clipId || standalone ? activePanel : null,
     });
+  },
+
+  // ── 🔒 collab klip-zár (realtime) ─────────────────────────────────────────
+  setCollabSelf: (self) => set({ collabSelf: self, clipLocks: self ? get().clipLocks : {} }),
+
+  applyRemoteLock: (msg) =>
+    set((s) => ({ clipLocks: applyLockBroadcast(s.clipLocks, msg, Date.now()) })),
+
+  acquireClipLock: (clipId) => {
+    const self = get().collabSelf;
+    if (!self) {
+      return; // nincs élő collab → nincs zárolás
+    }
+    const now = Date.now();
+    const next = acquireLock(get().clipLocks[clipId], clipId, self.id, now, self.name);
+    if (!next) {
+      return; // más tartja (élő) → nem szerezhető meg
+    }
+    set((s) => ({ clipLocks: withLock(pruneStale(s.clipLocks, now), next) }));
+    lockBroadcaster?.({ type: 'set', clipId, ownerId: self.id, lock: next });
+  },
+
+  releaseClipLock: (clipId) => {
+    const self = get().collabSelf;
+    if (!self) {
+      return;
+    }
+    set((s) => ({ clipLocks: releaseLock(s.clipLocks, clipId, self.id) }));
+    lockBroadcaster?.({ type: 'release', clipId, ownerId: self.id });
+  },
+
+  pruneClipLocks: () => set((s) => ({ clipLocks: pruneStale(s.clipLocks, Date.now()) })),
+
+  canEditClip: (clipId) => {
+    const self = get().collabSelf;
+    if (!self) {
+      return true; // nincs collab → nincs zár-korlát
+    }
+    return editableByMe(get().clipLocks, clipId, self.id, Date.now());
   },
 
   toggleMultiSelect: (clipId) => {

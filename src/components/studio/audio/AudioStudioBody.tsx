@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { SourceSheet } from '@/components/SourceSheet';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
@@ -21,7 +22,7 @@ import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, TrackType } from '@/types/project';
+import type { Asset, AudioClip, TrackType } from '@/types/project';
 
 const PX_PER_SEC = 56;
 const LANE_H = 70;
@@ -63,6 +64,7 @@ export function AudioStudioBody({
   const [mastering, setMastering] = useState(false);
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
+  const [source, setSource] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -124,6 +126,30 @@ export function AudioStudioBody({
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>
     useEditorStore.getState().toggleTrackFlag(type, flag);
 
+  // 🗂️ forrás-mappából a sávra: a HANG-forrás klipként a 'music' sávon, a playheadnél
+  const insertSource = (asset: Asset) => {
+    if (asset.kind !== 'audio') {
+      return;
+    }
+    const dur = asset.duration || 5;
+    const clip: AudioClip = {
+      kind: 'audio',
+      id: makeId('clip'),
+      start: snapToFrame(playhead, fps),
+      duration: dur,
+      trimIn: 0,
+      sourceDuration: dur,
+      uri: asset.uri,
+      label: asset.name ?? t('studio.kind.audio'),
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      source: 'imported',
+    };
+    useEditorStore.getState().addClip('music', clip, asset);
+    setSource(false);
+  };
+
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
@@ -139,6 +165,15 @@ export function AudioStudioBody({
             {title}
           </Text>
         </View>
+        <Pressable
+          onPress={() => setSource(true)}
+          hitSlop={10}
+          style={styles.srcBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('source.title')}
+        >
+          <Ionicons name="folder-open-outline" size={15} color={palette.textDim} />
+        </Pressable>
         {mode === 'scoped' ? (
           <Pressable onPress={onExit} hitSlop={10} style={styles.exportBtn}>
             <Ionicons name="checkmark" size={16} color="#fff" />
@@ -286,6 +321,7 @@ export function AudioStudioBody({
         />
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
+      {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
     </View>
   );
 }
@@ -316,6 +352,14 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#05060a' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   topBtn: { padding: 2 },
+  srcBtn: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    backgroundColor: palette.surface,
+  },
   titleWrap: { flex: 1, gap: 2 },
   kindTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   kindTagText: { color: palette.accent, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },

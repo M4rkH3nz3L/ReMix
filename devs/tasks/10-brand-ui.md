@@ -5,6 +5,10 @@
 
 ---
 
+> **📊 Haladás (2026-10-06):** ✅ 0 teljes · 🟡 2 mag kész (token/logo részleges) · ⬜ 6 nyitva — Σ 8 tétel.
+> Design-tokenek + logo-assetek megvannak (részleges fedés); az **egységes komponens-készlet** (§2.2),
+> a **loading/error/empty-rendszer** (§2.6), a motion-skála és az **a11y** nyitva.
+
 ## 0. Kontextus & cél
 A brand + UI részben kész (design-tokenek + logo-assetek), de nincs **egységes component-library**,
 nincs **állapot-rendszer** (loading/error/empty), nincs **motion-rendszer**, és az accessibility

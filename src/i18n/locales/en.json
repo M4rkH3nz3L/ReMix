@@ -507,6 +507,21 @@
     "projectNamePlaceholder": "Project name",
     "titleLabel": "Title",
     "aspectLabel": "Aspect ratio",
+    "canvasLabel": "Canvas size",
+    "canvasSize": "{{width}} × {{height}} px",
+    "widthLabel": "Width",
+    "heightLabel": "Height",
+    "swapDims": "Swap dimensions",
+    "formatLabel": "Document type",
+    "formatRaster": "Pixel (PNG)",
+    "formatVector": "Vector (SVG)",
+    "backgroundLabel": "Background",
+    "bgTransparent": "Transparent",
+    "bgHexPlaceholder": "Custom color (#RRGGBB)",
+    "audioMasterLabel": "Audio target (master)",
+    "audioMasterHint": "Default loudness and peak for the output; fine-tune later in Master.",
+    "sourceLabel": "Source folder",
+    "sourceHint": "Import supported files into the project's source folder — these are what you'll work from in the editor.",
     "seoSectionTitle": "SEO — for discovery",
     "seoSectionHint": "For the TikTok/Reels caption and YouTube search — all required.",
     "descriptionLabel": "Description",
@@ -2520,6 +2535,7 @@
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "particles off",
       "addAsset": "asset registered: {{name}}",
+      "removeAsset": "source removed",
       "replaceTrackClips_one": "{{trackType}} track rebuilt ({{count}} clip)",
       "replaceTrackClips_other": "{{trackType}} track rebuilt ({{count}} clips)",
       "setMarkers_one": "markers ({{count}})",
@@ -2705,6 +2721,18 @@
       "starting": "Starting…"
     }
   },
+  "usage": {
+    "nearQuota": "{{names}} nearing your monthly quota ({{pct}}%).",
+    "upgrade": "Pro",
+    "metric": { "aiTokens": "AI tokens", "renderMinutes": "render minutes", "exports": "exports", "cloudJobs": "cloud jobs" }
+  },
+  "source": {
+    "title": "Source folder",
+    "hint": "The project's source media. Import supported files and use them from here in the editor.",
+    "empty": "No sources yet. Import with the buttons above.",
+    "insert": "Insert into editor",
+    "inUse": "in use"
+  },
   "studio": {
     "chooseKind": "What are you creating?",
     "kind": {
@@ -2777,6 +2805,8 @@
       "exportedBody": "The rendered PNG was saved to the project.",
       "exportShare": "Share / Download (PNG)",
       "exportToVideo": "Insert into new video",
+      "canvasTitle": "Canvas settings",
+      "undoCanvas": "Edit canvas",
       "videoName": "{{name}} (video)",
       "undoAddPhoto": "Add photo layer",
       "undoAddLayer": "Add layer",
@@ -3141,6 +3171,7 @@
     "ended": "This live has ended.",
     "videoSoon": "Live video stream coming soon — chat & reactions are live.",
     "connecting": "Connecting…",
+    "reconnecting": "Reconnecting…",
     "chatPlaceholder": "Say something…"
   },
   "channel": {
@@ -3195,6 +3226,11 @@
     "reports": "Reports",
     "noReports": "No open reports.",
     "reportRemove": "Remove post",
+    "reportRemoveComment": "Delete comment",
+    "suspend": "Suspend account",
+    "unsuspend": "Unsuspend",
+    "suspendTitle": "Suspend account",
+    "suspendConfirm": "Suspend {{name}}'s account? They won't be able to sign in until you unsuspend.",
     "reportResolve": "Resolve",
     "reportDismiss": "Dismiss",
     "appeals": "Appeals",

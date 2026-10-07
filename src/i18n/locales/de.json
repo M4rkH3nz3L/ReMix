@@ -507,6 +507,21 @@
     "projectNamePlaceholder": "Projektname",
     "titleLabel": "Titel",
     "aspectLabel": "Seitenverhältnis",
+    "canvasLabel": "Leinwandgröße",
+    "canvasSize": "{{width}} × {{height}} px",
+    "widthLabel": "Breite",
+    "heightLabel": "Höhe",
+    "swapDims": "Maße tauschen",
+    "formatLabel": "Dokumenttyp",
+    "formatRaster": "Pixel (PNG)",
+    "formatVector": "Vektor (SVG)",
+    "backgroundLabel": "Hintergrund",
+    "bgTransparent": "Transparent",
+    "bgHexPlaceholder": "Eigene Farbe (#RRGGBB)",
+    "audioMasterLabel": "Audio-Ziel (Master)",
+    "audioMasterHint": "Standard-Lautheit und Pegel für die Ausgabe; später im Master feinjustierbar.",
+    "sourceLabel": "Quellordner",
+    "sourceHint": "Importiere unterstützte Dateien in den Quellordner des Projekts — damit arbeitest du im Editor.",
     "seoSectionTitle": "SEO — für die Auffindbarkeit",
     "seoSectionHint": "Für die TikTok/Reels-Beschriftung und die YouTube-Suche — alle Pflicht.",
     "descriptionLabel": "Beschreibung",
@@ -2520,6 +2535,7 @@
       "beatSyncSuffix": " (Beat-Sync)",
       "particlesOff": "Partikel aus",
       "addAsset": "Asset registriert: {{name}}",
+      "removeAsset": "Quelle entfernt",
       "replaceTrackClips_one": "{{trackType}}-Spur neu aufgebaut ({{count}} Clip)",
       "replaceTrackClips_other": "{{trackType}}-Spur neu aufgebaut ({{count}} Clips)",
       "setMarkers_one": "Marker ({{count}})",
@@ -2705,6 +2721,18 @@
       "starting": "Wird gestartet…"
     }
   },
+  "usage": {
+    "nearQuota": "{{names}} erreicht bald das Monatskontingent ({{pct}}%).",
+    "upgrade": "Pro",
+    "metric": { "aiTokens": "KI-Tokens", "renderMinutes": "Render-Minuten", "exports": "Exporte", "cloudJobs": "Cloud-Jobs" }
+  },
+  "source": {
+    "title": "Quellordner",
+    "hint": "Die Quellmedien des Projekts. Importiere unterstützte Dateien und nutze sie hier im Editor.",
+    "empty": "Noch keine Quellen. Importiere mit den Schaltflächen oben.",
+    "insert": "In den Editor einfügen",
+    "inUse": "in Verwendung"
+  },
   "studio": {
     "chooseKind": "Was möchtest du erstellen?",
     "kind": {
@@ -2777,6 +2805,8 @@
       "exportedBody": "Das gerenderte PNG wurde im Projekt gespeichert.",
       "exportShare": "Teilen / Herunterladen (PNG)",
       "exportToVideo": "In neues Video einfügen",
+      "canvasTitle": "Leinwand-Einstellungen",
+      "undoCanvas": "Leinwand ändern",
       "videoName": "{{name}} (Video)",
       "undoAddPhoto": "Foto-Ebene hinzufügen",
       "undoAddLayer": "Ebene hinzufügen",
@@ -3141,6 +3171,7 @@
     "ended": "Dieses Live ist beendet.",
     "videoSoon": "Live-Videostream kommt bald — Chat & Reaktionen sind live.",
     "connecting": "Verbinde…",
+    "reconnecting": "Verbinde erneut…",
     "chatPlaceholder": "Sag etwas…"
   },
   "channel": {
@@ -3195,6 +3226,11 @@
     "reports": "Meldungen",
     "noReports": "Keine offenen Meldungen.",
     "reportRemove": "Beitrag entfernen",
+    "reportRemoveComment": "Kommentar löschen",
+    "suspend": "Konto sperren",
+    "unsuspend": "Sperre aufheben",
+    "suspendTitle": "Konto sperren",
+    "suspendConfirm": "Konto von {{name}} sperren? Anmeldung erst nach Aufhebung möglich.",
     "reportResolve": "Erledigt",
     "reportDismiss": "Ablehnen",
     "appeals": "Einsprüche",

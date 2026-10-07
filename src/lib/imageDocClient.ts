@@ -15,7 +15,7 @@ import type { ImageDoc } from '@/types/project';
  * új fájl születik, és a régi képklip nem íródik felül a hátad mögött.
  */
 function contentKey(doc: ImageDoc): string {
-  const src = JSON.stringify({ a: doc.aspectRatio, l: doc.layers });
+  const src = JSON.stringify({ a: doc.aspectRatio, w: doc.width, h: doc.height, f: doc.format, l: doc.layers });
   let h = 5381;
   for (let i = 0; i < src.length; i++) {
     h = ((h << 5) + h + src.charCodeAt(i)) >>> 0;
@@ -25,7 +25,9 @@ function contentKey(doc: ImageDoc): string {
 
 export async function renderImageDoc(
   doc: ImageDoc,
-  height = 1280
+  // a vászon-magasság: a létrehozáskor választott `doc.height`, egyébként az alap.
+  // (a szerver a szélességet az aspectRatióból számolja, és 2160-ra sapkázza)
+  height = doc.height ?? 1280
 ): Promise<string | null> {
   if (Platform.OS === 'web') {
     return null;

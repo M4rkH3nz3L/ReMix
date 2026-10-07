@@ -1,3 +1,4 @@
+import type { LockBroadcast } from '@/lib/clipLock';
 import type { EditorCommand } from '@/lib/commands';
 import { supabase } from '@/lib/supabase';
 
@@ -33,11 +34,15 @@ export interface LiveHandlers {
   onCommands: (commands: EditorCommand[]) => void;
   onPresence: (participants: LiveParticipant[]) => void;
   onCursor?: (id: string, playhead: number) => void;
+  /** 🔒 klip-zár esemény (más szerkesztő zárolt/feloldott egy klipet) */
+  onLock?: (msg: LockBroadcast) => void;
 }
 
 export interface LiveChannel {
   broadcast: (commands: EditorCommand[]) => void;
   sendCursor: (playhead: number) => void;
+  /** 🔒 saját klip-zár/feloldás broadcastja a többieknek */
+  sendLock: (msg: LockBroadcast) => void;
   stop: () => void;
 }
 
@@ -64,7 +69,7 @@ export function openLiveChannel(
 ): LiveChannel {
   const sb = supabase;
   if (!sb) {
-    return { broadcast: () => {}, sendCursor: () => {}, stop: () => {} };
+    return { broadcast: () => {}, sendCursor: () => {}, sendLock: () => {}, stop: () => {} };
   }
   const channel = sb.channel(topic, {
     config: { presence: { key: self.id }, broadcast: { self: false } },
@@ -101,6 +106,12 @@ export function openLiveChannel(
         handlers.onCursor?.(payload.id, payload.playhead);
       }
     })
+    .on('broadcast', { event: 'lock' }, ({ payload }) => {
+      const msg = payload?.lock as LockBroadcast | undefined;
+      if (msg && (msg.type === 'set' || msg.type === 'release') && typeof msg.clipId === 'string') {
+        handlers.onLock?.(msg);
+      }
+    })
     .on('presence', { event: 'sync' }, readPresence)
     .on('presence', { event: 'join' }, readPresence)
     .on('presence', { event: 'leave' }, readPresence)
@@ -116,6 +127,9 @@ export function openLiveChannel(
     },
     sendCursor: (playhead) => {
       void channel.send({ type: 'broadcast', event: 'cursor', payload: { id: self.id, playhead } });
+    },
+    sendLock: (msg) => {
+      void channel.send({ type: 'broadcast', event: 'lock', payload: { lock: msg } });
     },
     stop: () => {
       void sb.removeChannel(channel);

@@ -32,6 +32,20 @@ function canvasSize(aspectRatio, height) {
   return { w: W, h: H };
 }
 
+/** páros px-re kerekített, [16, 4096] közé zárt méret (a kép-editor szabad W×H-ja) */
+function evenClamp(n) {
+  return Math.round(Math.max(16, Math.min(4096, Number(n) || 0)) / 2) * 2;
+}
+
+/** a vászon mérete: ha a doc EXPLICIT width×height-ot hordoz, AZ a mérvadó
+ *  (szabad méret, kép-editor); különben a régi arány+magasság út. */
+function docCanvas(doc, height) {
+  if (doc.width && doc.height) {
+    return { w: evenClamp(doc.width), h: evenClamp(doc.height) };
+  }
+  return canvasSize(doc.aspectRatio, height);
+}
+
 /** a réteg rajzolódik-e (a klienssel AZONOS szabály — lásd imageDoc.ts) */
 function isVisible(layer) {
   return !layer.hidden && (layer.opacity ?? 1) > 0.001;
@@ -63,7 +77,7 @@ function fillAsShape(layer) {
  * @returns {Promise<string>} a kész PNG útvonala
  */
 async function renderImageDoc(doc, height, workDir) {
-  const canvas = canvasSize(doc.aspectRatio, height);
+  const canvas = docCanvas(doc, height);
   const layers = (doc.layers ?? []).filter(isVisible);
   if (layers.length === 0) {
     throw new Error('A dokumentumnak nincs látható rétege.');

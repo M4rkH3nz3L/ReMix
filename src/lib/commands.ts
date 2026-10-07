@@ -34,6 +34,7 @@ export type EditorCommand =
   | { type: 'RENAME_PROJECT'; name: string }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
+  | { type: 'REMOVE_ASSET'; assetId: string }
   /** teljes sáv-újraépítés egy undo-lépésben (pl. AI cut-lista alkalmazása) */
   | { type: 'REPLACE_TRACK_CLIPS'; trackType: TrackType; clips: Clip[] }
   /**
@@ -211,6 +212,13 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       };
     }
 
+    case 'REMOVE_ASSET':
+      // a forrás-mappából elvett asset (a hívó csak a NEM használtat kínálja törlésre)
+      if (!project.assets.some((a) => a.id === cmd.assetId)) {
+        return null;
+      }
+      return { ...project, assets: project.assets.filter((a) => a.id !== cmd.assetId) };
+
     case 'REPLACE_TRACK_CLIPS':
       if (!project.tracks.some((t) => t.type === cmd.trackType)) {
         return null;
@@ -386,6 +394,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.addAsset', { name: cmd.asset.name ?? cmd.asset.kind });
     case 'UPDATE_ASSET':
       return tr('lib.commands.updateAsset', { keys: Object.keys(cmd.patch).join(', ') });
+    case 'REMOVE_ASSET':
+      return tr('lib.commands.removeAsset');
     case 'REPLACE_TRACK_CLIPS':
       return tr('lib.commands.replaceTrackClips', {
         trackType: cmd.trackType,

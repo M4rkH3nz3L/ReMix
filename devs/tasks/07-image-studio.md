@@ -5,6 +5,12 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** 🟡 9 mag kész (pure-core KÉSZ + tesztelt, **UI hátra**) · ✅ 0 teljes · ⬜ 0 — Σ 9 tétel.
+> **ÚJ (2026-10-07):** profi „Új dokumentum" + vászon-kezelés landolt — szabad **W×H (px)** + presetek +
+> **Pixel/SVG** típus + **háttér** (a létrehozásnál ÉS a [CanvasSheet](../../src/components/studio/image/CanvasSheet.tsx)-ben), valamint a **projekt forrás-mappa** ([08](./08-storage.md) §2.8) a kép-editorban (kép→fotó-réteg). **Hátra marad** a 9 profi mag
+> (pen / effects / adjustment-stack / rulers / pattern / boolean / align / PSD / PDF) dedikált UI-ja
+> + a worker PSD/PDF-interop + az **SVG-export emitter** (a Vektor-típus ma raszterbe renderel).
+
 ## 0. Kontextus & cél
 Itt a repo a legjellemzőbb: a **pure core már jelentős**, de a **felhasználói felület** sok
 helyen nincs bekötve (`CORE KÉSZ / UI HIÁNYZIK`). Cél: a meglévő magokat profi szerkesztő-UI-vá

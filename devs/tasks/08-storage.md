@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** ✅ 1 teljes · 🟡 3 mag kész · ⬜ 4 nyitva — Σ 8 tétel.
+> **Cloudflare R2 = a platform ÉLŐ média-tárhelye** (§2.1 R2-út kész+tesztelve; a prod-hardening hátra) +
+> a **projekt forrás-mappa KÉSZ** (§2.8, minden stúdióban). Az **asset-állapotgép** (§2.2) és a
+> **fájl-konfliktus** (§2.6) magja kész — a bekötésük + UI, az OneDrive-adapter és a prod-hardening hátra.
+
 ## 0. Kontextus & cél
 Fontos audit-jegyzet: a repo **már tartalmaz** `StorageProvider` interfészt + külső-storage
 implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi hiány: az **asset-
@@ -19,7 +24,8 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 ## 2. Feladatlista
 
 ### 2.1 StorageProvider hardening — P1
-- [ ] 🟡 Upload + lifecycle + teljes provider-abstrakció + **prod-hardening** (timeout/retry/reconnect).
+- [x] ✅ **Cloudflare R2 = a platform ÉLŐ média-tárhelye (2026-10-07)**: a meglévő S3-adapter ([s3store.js](../../server/s3store.js)) az R2-t szolgálja ki — `STORAGE_BACKEND=r2` → az R2-út az ELSŐDLEGES (megelőzi a Supabase service_role-t, [mediastore.js](../../server/mediastore.js)) + `S3_PUBLIC_STYLE=domain` → publikus URL bucket-szegmens nélkül. **End-to-end tesztelve** (feltöltés + publikus GET 200 + S3 visszaolvasás a `remix` bucketbe). Setup: `devs/cloudflare-r2-setup-prompt.md`.
+- [ ] 🟡 Hátra: teljes provider-abstrakció **prod-hardening** (timeout/retry/reconnect) + prod **custom domain + CORS** (ma `r2.dev` dev-URL, rate-limitelt) + EU-jurisdiction, ha GDPR-residency kell.
 
 ### 2.2 Asset state machine — P1
 - [x] ✅ **Állapotgép-mag + teszt**: [src/lib/assetState.ts](../../src/lib/assetState.ts) — `AssetState` (`external/cached/imported/stale/invalidated`) + `assetStateOf` (a valós Asset-mezőkből: provider + localAvailable + remoteChanged + invalidated) + `nextState`/`canTransition` átmenet-tábla (download/import/evict/invalidate/remoteChanged/refresh) + `isLocallyAvailable`/`needsFetch`. Teszt: `assetState.test.ts` (8) — fő életciklus + eviction/stale/invalidation + tiltott átmenetek.
@@ -40,6 +46,10 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 
 ### 2.7 Collaborative storage permissions — P1
 - [ ] ⬜ project / personal / shared storage + **asset-level** permissions (összeér [03](./03-collaboration.md) §2.4-gyel).
+
+### 2.8 Projekt forrás-mappa (source bin) — P1
+- [x] ✅ **KÉSZ e2e (2026-10-07)**: a `project.assets` köré épült, MINDEN stúdióban egységes forrás-mappa. [src/lib/projectSource.ts](../../src/lib/projectSource.ts) (`supportedSourceKinds` fajtánként + `pickSourceAsset` picker→Asset + `assetInUse` törlés-véd + `sourceSummary`) + új **`REMOVE_ASSET`** command (undo) + közös [SourceSheet](../../src/components/SourceSheet.tsx) (böngészés + támogatott import + nem-használt törlése). **Bekötve: létrehozáskor** (New-Project űrlap, minden fajta) + **mindhárom editorban** (kép→fotó-réteg · hang→music-klip · videó→idővonal). Teszt: `projectSource.test.ts` (7). Audit zöld (121 suite / 1313 teszt).
+- [ ] 🟡 Hátra: a forrás-mappa feltöltése a projekt R2-tárába (backup) + nagy-bin virtualizáció + mappák/címkék.
 
 ## 3. Kész, ha
 Egy külső asset végigmegy az **External→Cached→Imported** állapotgépen (offline/stale kezeléssel),

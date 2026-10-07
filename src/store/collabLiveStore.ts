@@ -4,7 +4,7 @@ import { myMembership, pullSharedProject } from '@/lib/collab';
 import { openLiveChannel, type LiveChannel, type LiveParticipant } from '@/lib/collabLive';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
-import { setLiveBroadcaster, useEditorStore } from '@/store/editorStore';
+import { setLiveBroadcaster, setLockBroadcaster, useEditorStore } from '@/store/editorStore';
 
 /**
  * 👥 Élő kollaboráció store — a szerkesztő nyitja egy projektre. Ha a projekt
@@ -26,6 +26,9 @@ interface CollabLiveState {
 
 let channel: LiveChannel | null = null;
 const cursors = new Map<string, number>();
+// 🔒 klip-zár: a kijelölés-követő leiratkozás + a heartbeat/prune időzítő
+let lockUnsub: (() => void) | null = null;
+let lockTimer: ReturnType<typeof setInterval> | null = null;
 
 export const useCollabLive = create<CollabLiveState>((set, get) => ({
   active: false,
@@ -102,15 +105,56 @@ export const useCollabLive = create<CollabLiveState>((set, get) => ({
             participants: s.participants.map((p) => (p.id === id ? { ...p, playhead } : p)),
           }));
         },
+        // 🔒 távoli klip-zár esemény → a command-buson kívüli zár-térkép frissítése
+        onLock: (msg) => useEditorStore.getState().applyRemoteLock(msg),
       }
     );
-    // a saját szerkesztések innentől broadcastolódnak
+    // a saját szerkesztések + klip-zárak innentől broadcastolódnak
     setLiveBroadcaster((commands) => channel?.broadcast(commands));
+    setLockBroadcaster((msg) => channel?.sendLock(msg));
+    useEditorStore.getState().setCollabSelf({ id: me.id, name });
+    // 🔒 a KIJELÖLT klipre zárat kérünk (ki szerkeszti), a korábbit feloldjuk;
+    // ha más tartja (élő), az acquire no-op → a UI jelzi a zárat (nem lopunk).
+    let lockedClip: string | null = null;
+    const syncLock = (sel: string | null) => {
+      if (sel === lockedClip) {
+        return;
+      }
+      if (lockedClip) {
+        useEditorStore.getState().releaseClipLock(lockedClip);
+      }
+      lockedClip = sel;
+      if (sel) {
+        useEditorStore.getState().acquireClipLock(sel);
+      }
+    };
+    lockUnsub = useEditorStore.subscribe((state, prev) => {
+      if (state.selectedClipId !== prev.selectedClipId) {
+        syncLock(state.selectedClipId);
+      }
+    });
+    syncLock(useEditorStore.getState().selectedClipId);
+    // életjel + takarítás: a saját zár frissül (broadcast), az elavultak kiesnek
+    lockTimer = setInterval(() => {
+      const ed = useEditorStore.getState();
+      ed.pruneClipLocks();
+      if (lockedClip) {
+        ed.acquireClipLock(lockedClip); // heartbeat (acquiredAt marad, heartbeatAt frissül)
+      }
+    }, 10_000);
     set({ active: true, ownerId: membership.ownerId, projectId, participants: [] });
   },
 
   stop: () => {
     setLiveBroadcaster(null);
+    setLockBroadcaster(null);
+    lockUnsub?.();
+    lockUnsub = null;
+    if (lockTimer) {
+      clearInterval(lockTimer);
+      lockTimer = null;
+    }
+    useEditorStore.getState().setCollabSelf(null); // üríti a zár-térképet is
     channel?.stop();
     channel = null;
     cursors.clear();

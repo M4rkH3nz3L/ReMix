@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { Linking, Platform } from 'react-native';
 
 import { cloudBaseUrl, ensureCloud, renderServerUrl } from '@/lib/backend';
+import { exportPolicy } from '@/lib/exportPolicy';
 import {
   canRenderLocally,
   isNativeRenderAvailable,
@@ -257,11 +258,15 @@ export async function renderMp4(
   let out: File;
   if (canLocal) {
     onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: 0 });
+    // 🏷️ on-device = INGYEN (nem mért); a nem-fizető tier kimenetére ReMix-vízjel
+    // kerül (exportPolicy — a felhő-render ezzel szemben mért + tiszta).
+    const { watermark } = exportPolicy(useEntitlement.getState().effectiveTier(), 'local');
     out = await renderLocal(
       project,
       effective,
       (p) => onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p }),
-      opts?.signal // ✕ gomb: eddig NEM ment át ide, ezért hatástalan volt
+      opts?.signal, // ✕ gomb: eddig NEM ment át ide, ezért hatástalan volt
+      watermark
     );
   } else if (mode === 'local') {
     // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,

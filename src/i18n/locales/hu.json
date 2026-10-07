@@ -507,6 +507,21 @@
     "projectNamePlaceholder": "Projekt neve",
     "titleLabel": "Cím",
     "aspectLabel": "Képarány",
+    "canvasLabel": "Vászon mérete",
+    "canvasSize": "{{width}} × {{height}} px",
+    "widthLabel": "Szélesség",
+    "heightLabel": "Magasság",
+    "swapDims": "Méretek cseréje",
+    "formatLabel": "Dokumentum típusa",
+    "formatRaster": "Pixel (PNG)",
+    "formatVector": "Vektor (SVG)",
+    "backgroundLabel": "Háttér",
+    "bgTransparent": "Átlátszó",
+    "bgHexPlaceholder": "Egyedi szín (#RRGGBB)",
+    "audioMasterLabel": "Hang-cél (master)",
+    "audioMasterHint": "A kimenet alap hangosság- és csúcs-beállítása; később a Masterben finomítható.",
+    "sourceLabel": "Forrás-mappa",
+    "sourceHint": "Importálj támogatott fájlokat a projekt forrás-mappájába — ezekből dolgozol majd a szerkesztőben.",
     "seoSectionTitle": "SEO — a felfedezéshez",
     "seoSectionHint": "A TikTok/Reels felirathoz és a YouTube kereséshez — mindet meg kell adni.",
     "descriptionLabel": "Leírás",
@@ -2520,6 +2535,7 @@
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "részecskék kikapcsolva",
       "addAsset": "asset regisztrálva: {{name}}",
+      "removeAsset": "forrás eltávolítva",
       "replaceTrackClips_one": "{{trackType}} sáv újraépítve ({{count}} klip)",
       "replaceTrackClips_other": "{{trackType}} sáv újraépítve ({{count}} klip)",
       "setMarkers_one": "jelölők ({{count}})",
@@ -2705,6 +2721,18 @@
       "starting": "Indítás…"
     }
   },
+  "usage": {
+    "nearQuota": "{{names}} közel a havi kvótához ({{pct}}%).",
+    "upgrade": "Pro",
+    "metric": { "aiTokens": "AI-tokenek", "renderMinutes": "render-percek", "exports": "exportok", "cloudJobs": "felhő-feladatok" }
+  },
+  "source": {
+    "title": "Forrás-mappa",
+    "hint": "A projekt forrásai. Importálj támogatott fájlokat, és innen használd fel őket a szerkesztőben.",
+    "empty": "Még nincs forrás. Importálj a fenti gombokkal.",
+    "insert": "Beszúrás a szerkesztőbe",
+    "inUse": "használatban"
+  },
   "studio": {
     "chooseKind": "Mit készítesz?",
     "kind": {
@@ -2777,6 +2805,8 @@
       "exportedBody": "A kirenderelt PNG a projekthez lett mentve.",
       "exportShare": "Megosztás / Letöltés (PNG)",
       "exportToVideo": "Beszúrás új videóba",
+      "canvasTitle": "Vászon beállításai",
+      "undoCanvas": "Vászon módosítása",
       "videoName": "{{name}} (videó)",
       "undoAddPhoto": "Fotó-réteg hozzáadása",
       "undoAddLayer": "Réteg hozzáadása",
@@ -3141,6 +3171,7 @@
     "ended": "Ez az élő véget ért.",
     "videoSoon": "Az élő videó-stream hamarosan — a chat és a reakciók már élnek.",
     "connecting": "Kapcsolódás…",
+    "reconnecting": "Újracsatlakozás…",
     "chatPlaceholder": "Írj valamit…"
   },
   "channel": {
@@ -3195,6 +3226,11 @@
     "reports": "Bejelentések",
     "noReports": "Nincs nyitott bejelentés.",
     "reportRemove": "Poszt eltávolítása",
+    "reportRemoveComment": "Komment törlése",
+    "suspend": "Fiók felfüggesztése",
+    "unsuspend": "Felfüggesztés feloldása",
+    "suspendTitle": "Fiók felfüggesztése",
+    "suspendConfirm": "Biztosan felfüggeszted {{name}} fiókját? Nem fog tudni belépni, amíg fel nem oldod.",
     "reportResolve": "Kezelve",
     "reportDismiss": "Elutasít",
     "appeals": "Fellebbezések",

@@ -5,6 +5,7 @@ import { Alert, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { SourceSheet } from '@/components/SourceSheet';
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
@@ -19,7 +20,7 @@ import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
 import { clipEnd, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
-import type { Clip, TrackType } from '@/types/project';
+import type { Asset, Clip, TrackType } from '@/types/project';
 
 /**
  * Kontextusfüggő eszköztár: kijelölés nélkül a hozzáadás-műveletek, kijelölt
@@ -29,6 +30,7 @@ export function Toolbar() {
   const { t } = useTranslation();
   const selected = useEditorStore(selectSelectedClip);
   const [showCamera, setShowCamera] = useState(false);
+  const [showSource, setShowSource] = useState(false);
   const activePanel = useEditorStore((s) => s.activePanel);
   const setPanel = useEditorStore((s) => s.setPanel);
   const addClip = useEditorStore((s) => s.addClip);
@@ -169,6 +171,68 @@ export function Toolbar() {
       },
       { id: makeId('ast'), kind: 'image', uri: picked.uri, provider: 'local' }
     );
+  };
+
+  // 🗂️ forrás-mappából az idővonalra: a fajtának megfelelő klip (videó/kép a videó-
+  // sáv végére, hang a 'music' sávra a playheadnél). A meglévő asset nem duplikálódik.
+  const insertSource = (asset: Asset) => {
+    const { project, playhead } = useEditorStore.getState();
+    if (!project) {
+      return;
+    }
+    if (asset.kind === 'video') {
+      const duration = asset.duration && asset.duration > 0 ? asset.duration : 5;
+      addClip(
+        'video',
+        {
+          kind: 'video',
+          id: makeId('clip'),
+          start: trackEnd(trackOf(project, 'video')),
+          duration,
+          uri: asset.uri,
+          trimIn: 0,
+          sourceDuration: duration,
+          speed: 1,
+          volume: 1,
+          filterId: 'none',
+        },
+        asset
+      );
+    } else if (asset.kind === 'image') {
+      addClip(
+        'video',
+        {
+          kind: 'image',
+          id: makeId('clip'),
+          start: trackEnd(trackOf(project, 'video')),
+          duration: 4,
+          uri: asset.uri,
+          filterId: 'none',
+        },
+        asset
+      );
+    } else {
+      const duration = asset.duration && asset.duration > 0 ? asset.duration : 5;
+      addClip(
+        'music',
+        {
+          kind: 'audio',
+          id: makeId('clip'),
+          start: playhead,
+          duration,
+          trimIn: 0,
+          sourceDuration: duration,
+          uri: asset.uri,
+          label: asset.name ?? '',
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          source: 'imported',
+        },
+        asset
+      );
+    }
+    setShowSource(false);
   };
 
   const addText = () => {
@@ -626,6 +690,7 @@ export function Toolbar() {
               onPress={() => togglePanel('creatorPreset')}
             />
             <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
+            <ToolButton icon="folder-open-outline" label={t('source.title')} onPress={() => setShowSource(true)} />
             <TutorialTarget id="toolbar.addVideo" onLayout={rememberX('toolbar.addVideo')}>
               <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
             </TutorialTarget>
@@ -693,6 +758,9 @@ export function Toolbar() {
         </Animated.View>
       </ScrollView>
       <CameraRecorder visible={showCamera} onClose={() => setShowCamera(false)} />
+      {showSource ? (
+        <SourceSheet onInsert={insertSource} onClose={() => setShowSource(false)} />
+      ) : null}
     </View>
   );
 }

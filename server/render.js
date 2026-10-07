@@ -159,6 +159,50 @@ function effectChainFx(clip) {
 }
 
 /**
+ * 🖼️ Nyírás-matek (skew/shear) — a kliens `src/lib/canvasTransform.ts` `shearPoint`-jával
+ * BITRE AZONOS. A render `skewChain`-je ezt használja a sarok-vetítéshez; a contract-teszt
+ * (`src/lib/contract.test.ts`) a kliens-oldallal egyezésre köti → preview == export.
+ */
+function shearPoint(x, y, skewXDeg, skewYDeg) {
+  const DEG = Math.PI / 180;
+  return { x: x + y * Math.tan(skewXDeg * DEG), y: y + x * Math.tan(skewYDeg * DEG) };
+}
+
+/**
+ * 🎞️ Köbös-Bézier easing (a kliens `src/lib/keyframes.ts` `bezierEase`-ével BITRE AZONOS
+ * felezéses megoldás) — a kulcskocka-expander ezt „süti" finom lineáris al-pontokra.
+ */
+function bezierEaseNode(cp, p) {
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  const [x1, y1, x2, y2] = cp;
+  const bx = (u) => {
+    const v = 1 - u;
+    return 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u;
+  };
+  const by = (u) => {
+    const v = 1 - u;
+    return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u;
+  };
+  let lo = 0;
+  let hi = 1;
+  let u = p;
+  for (let i = 0; i < 24; i++) {
+    u = (lo + hi) / 2;
+    const x = bx(u);
+    if (Math.abs(x - p) < 1e-5) {
+      break;
+    }
+    if (x < p) {
+      lo = u;
+    } else {
+      hi = u;
+    }
+  }
+  return by(u);
+}
+
+/**
  * 🛡️ Csak HELYI fájl kerülhet az FFmpeg bemenetére. Az FFmpeg a `-i`-n (és a
  * `lut3d`-ben) érti a `http(s)://`, `file://`, `pipe:`, `concat:` stb. sémákat —
  * egy séma-előtagos érték így belső HTTP-kérést indítana a workerről, vagy
@@ -1047,16 +1091,17 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
       return '';
     }
     const t = clip.transform;
-    const tx = Math.tan((Math.max(-45, Math.min(45, t.skewX ?? 0)) * Math.PI) / 180);
-    const ty = Math.tan((Math.max(-45, Math.min(45, t.skewY ?? 0)) * Math.PI) / 180);
+    // a ±45° biztonsági clamp a workeré; a nyírás-matek a KÖZÖS `shearPoint` (== kliens)
+    const cx = Math.max(-45, Math.min(45, t.skewX ?? 0));
+    const cy = Math.max(-45, Math.min(45, t.skewY ?? 0));
     const PAD = skewPad(clip);
     const g = 2 * PAD;
     const n = (v) => v.toFixed(6);
     // centrált sarok (u,v) → nyírva → paddelt keret-pozíció (perspektíva-divide nincs: affin)
-    const pt = (u, v) => ({
-      x: `W/2+W*${n((u + v * tx) / g)}`,
-      y: `H/2+H*${n((v + u * ty) / g)}`,
-    });
+    const pt = (u, v) => {
+      const s = shearPoint(u, v, cx, cy);
+      return { x: `W/2+W*${n(s.x / g)}`, y: `H/2+H*${n(s.y / g)}` };
+    };
     const tl = pt(-1, -1);
     const tr = pt(1, -1);
     const bl = pt(-1, 1);
@@ -1324,21 +1369,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
   // felezéses megoldás) — az FFmpeg nem tud zárt alakban Bézier-időt visszafejteni,
   // ezért a bezier-szegmenst finom LINEÁRIS al-kulcskockákra „sütjük", és a
   // kész if-lánc ugyanazt a görbét reprodukálja (preview↔render paritás).
-  const bezierEaseNode = (cp, p) => {
-    if (p <= 0) return 0;
-    if (p >= 1) return 1;
-    const [x1, y1, x2, y2] = cp;
-    const bx = (u) => { const v = 1 - u; return 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u; };
-    const by = (u) => { const v = 1 - u; return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u; };
-    let lo = 0, hi = 1, u = p;
-    for (let i = 0; i < 24; i++) {
-      u = (lo + hi) / 2;
-      const x = bx(u);
-      if (Math.abs(x - p) < 1e-5) break;
-      if (x < p) lo = u; else hi = u;
-    }
-    return by(u);
-  };
+  // a bezier-easing a KÖZÖS top-level `bezierEaseNode` (== kliens bezierEase; contract-teszt köti)
   const BEZIER_STEPS = 16;
   const expandBezier = (kfs) => {
     if (!kfs || kfs.length < 2 || !kfs.some((k) => k.easing === 'bezier' && Array.isArray(k.bezier))) {
@@ -2645,4 +2676,6 @@ module.exports = {
   effectFilterStr,
   effectChainFx,
   EFFECT_DEFAULT_AMOUNT,
+  shearPoint,
+  bezierEaseNode,
 };

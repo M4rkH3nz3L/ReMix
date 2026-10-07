@@ -5,13 +5,20 @@
 
 ---
 
+> **📊 Haladás (2026-10-06):** ✅ 0 teljes · 🟡 1 mag kész · ⬜ 5 nyitva — Σ 6 tétel.
+> A kliens/worker **contract-teszt ALAP megvan** (§2.4 — a mirror-drift-zár, lásd
+> [01](./01-production-go-live.md) §2.7); az ADR-sync, az architektúra-diagramok (Mermaid),
+> a teljes séma-validáció és a **cost-dashboard** nyitva.
+
 ## 0. Kontextus & cél
 A mérnöki fegyelem (ADR + architektúra-sync + diagramok + **contract-tesztek** + **cost-
 observability**) az, ami a nagy kódbázist karbantarthatóvá + üzletileg skálázhatóvá teszi.
 
 ## 1. Jelenlegi állapot (bizonyíték)
 - ADR 001–010 + rétegdokumentáció létezik (git-history `docs/hu/`); sok doksi nincs a kóddal syncelve.
-- **Nincs:** architektúra-diagramok (Mermaid), kliens/worker contract-tesztek, cost-dashboard.
+- **Nincs:** architektúra-diagramok (Mermaid), cost-dashboard. A kliens/worker **contract-teszt
+  ALAP megvan** (mirror-drift-zár, 2026-10-06 — lásd [01](./01-production-go-live.md) §2.7); a
+  teljes séma-validáció hátra.
 - ⚠️ A `MISSING.md` nem végleges truth-source — több pontja elavult (StorageProvider, Drive/
   Dropbox/WebDAV/S3, `.remix`, retry-infra, SVG-import, LUT-core).
 
@@ -27,7 +34,8 @@ observability**) az, ami a nagy kódbázist karbantarthatóvá + üzletileg ská
 - [ ] ⬜ **Mermaid**: `Mobile → API → Supabase → Queue → Workers → Storage/CDN`, külön editor/AI/collab/render/storage.
 
 ### 2.4 Client/worker contract tests — P1 (fontos)
-- [ ] ⬜ `/request //response //error //status` **séma-validáció** (OpenAPI / JSON Schema) a CI-ben — a kliens és worker ne csússzon szét.
+- [x] ✅ **ALAP KÉSZ (2026-10-06)**: mirror-drift-zár [src/lib/contract.test.ts](../../src/lib/contract.test.ts) — a kliens-jest MINDKÉT oldalt importálja (TS + worker-JS) és egyenlőséget állít a drift-veszélyes tükrökre (`TIER_QUOTAS`/usage + effekt-filterek, minden típus×amount); fut a `npm run audit`-ban (CI). Kiszúrt+javított egy null-amount paritás-hibát. Részletek: [01](./01-production-go-live.md) §2.7.
+- [ ] 🟡 **Hátra**: `/request //response //error //status` teljes **séma-validáció** (OpenAPI / JSON Schema) a CI-ben + a maradék mirror-ök bekötése (render-form, `canvasTransform` skew, keyframe-easing).
 
 ### 2.5 Cost observability — P1
 - [ ] ⬜ Dashboard: `revenue − (render + storage + AI + bandwidth) = margin`; forrás: R2/S3 + Supabase + Redis + AI + render + CDN + RevenueCat.

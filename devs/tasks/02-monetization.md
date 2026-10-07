@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 7 mag kész · ⬜ 1 nyitva — Σ 10 tétel.
+> A **usage-metering vertikum KÉSZ** (§2.2): tier-kvóta a tts/render/8×ai-on + egress-perc +
+> **export-politika** (felhő = mért, on-device = ingyen + free-tier vízjel) + **nearQuota UI-banner**.
+> Hátra a server/billing-bekötés (Basic/Ultra tier §2.4, moderation, KYC, pg_cron-reset).
+
 ## 0. Kontextus & cél
 Ma a rendszer lényegében **Pro-gatingre** épül (`if pro`). A fenntartható monetizációhoz
 **tier-modell** (`capability.minTier`), **usage-metering + kvóta**, és valódi **marketplace +
@@ -29,7 +34,8 @@ payout** kell. Cél: a feature-ök a tier-hez kötöttek, a drága erőforrások
 - [x] ✅ **`/render` felhő-ág gate (2026-10-06)**: a `renderMinutes` kvóta-gate a felhő-render enqueue ELŐTT (a hiteles tier `userTier`-rel; `minutes = ceil(totalDuration/60)`; 429 + hátralévő perc túllépéskor), a könyvelés (`trackUsage`) a sikeres sorba tétel UTÁN. A `/render` a `proOnly` mögött van → prodban mindig verifikált Pro-hívó (300 perc/hó), dev-ben best-effort — a `/tts`-mintát tükrözi.
 - [x] ✅ **AI-token gate — mind a 8 `/ai/*` generálós endpoint (2026-10-06)**: `aiMeter` middleware ([index.js](../../server/index.js), a `/ai/hooks|translate|highlights|story|thumbheadlines|captionstudio|assist|autoedit`-en) gate-el az `aiTokens` metrikára. **Helyes költség-szemantika:** csak az **env Anthropic** (a mi felhő-költségünk) mérődik — a **BYOK** (user saját kulcsa) és a **lokális Ollama** (ingyenes on-device-elvű inferencia) KIMARAD. A könyvelés a **valós token-számmal** (`response.usage`), a provider-független [runStructured](../../server/ai.js)-ben, `AsyncLocalStorage` (uid) átadással — így a 9 AI-funkció aláírása változatlan, koncurrencia-biztosan. Teszt: `aiTokenCount` (6) + ALS-scope (1) a `usage.test.js`-ben + izolált ALS-átterjedés+konkurrencia-proof (scratchpad). Audit zöld (107 suite / 1182 teszt).
 - [x] ✅ **Egress → `renderMinutes` mérés (2026-10-06)**: a Live-multistream (LiveKit egress) felhő-perceit a `renderMinutes` kvótába könyveli — [liveEgress.js](../../server/liveEgress.js) `markEgressStopped` (a user-stop ÉS a stale-sweep közös chokepointja) kiszámolja a `started_at → stopped_at` percet (`egressMinutes`) és `trackUsage`-el. **Idempotens**: csak az `active→stopped` átmenet mér (a `.eq('status','active')` guard → nincs dupla-számolás a stop+sweep versenynél). Teszt: `liveEgress.test.js` (+2 `egressMinutes`). Ezzel MINDEN drága felhő-erőforrás mért: `/tts`(cloudJobs) · `/render`+egress(renderMinutes) · 8×`/ai/*`(aiTokens).
-- [ ] ⬜ **Hátra**: `exports` metrika bekötése (helyi render/letöltés számlálása) + UI-warn-banner a `nearQuota`-ból.
+- [x] ✅ **`exports` metrika + export-politika + UI-warn-banner KÉSZ (2026-10-07)**: EGY forrás a szabályra ([src/lib/exportPolicy.ts](../../src/lib/exportPolicy.ts)) — **csak a FELHŐ-render export mért** (`exports` +1 a `/render` felhő-ágon, [index.js](../../server/index.js), a `renderMinutes` mellé), az **on-device INGYEN + nem mért**, és a nem-fizető tier on-device kimenetére **ReMix-vízjel** kerül (a render-tervbe: [nativeRender.ts](../../src/lib/nativeRender.ts) `watermark`, [render.ts](../../src/lib/render.ts) a politikából állítja). Soft-warn **[UsageBanner](../../src/components/UsageBanner.tsx)** a `nearQuota`-ból (80%-nál figyelmeztet + Pro-ra terel), a Studio-képernyőn. Teszt: `exportPolicy.test.ts` (2) + `nativeRender.test.ts` (+1 vízjel). Audit: 122 suite / 1319 teszt zöld.
+- [ ] ⬜ Opcionális: az `exports` kvóta ENFORCE (gate) a felhő-render előtt (ma csak könyvelés; a `/render` Pro-only → Pro=korlátlan, a basic-tier bekötéskor lesz éles) + a vízjel tényleges natív kompozitálása (a natív render-motor ma stub — [09](./09-native-rendering.md) §2.2).
 
 ### 2.3 Havi quota reset — P1
 - [x] ✅ **Reset-logika + teszt**: `usageMeter.resetIfNewPeriod`/`periodKey`/`isNewPeriod` (UTC `YYYY-MM`, determinisztikus) — a havi nullázás hiteles magja.

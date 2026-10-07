@@ -107,6 +107,40 @@ Monetization                ███░░░░░░░  ~30–40%
 Production readiness        ███░░░░░░░  ~30–40%
 ```
 
+### 📊 Feladat-haladás (2026-10-07 — a TODO-tételek élő státusza)
+
+> Minden §2-fájl a tetején egy `📊 Haladás` sorral jelzi, hol tartunk. Legenda:
+> ✅ **teljes** (kész + integrált) · 🟡 **mag kész** (a pure-core/logika kész, a következő réteg —
+> UI/backend/render — hátra) · ⬜ **nyitva** (nincs elkezdve).
+>
+> ✅ **Garancia (2026-10-07):** a teljes kódbázis `npm run audit` **ZÖLD** — tsc + expo lint +
+> jest **121 suite / 1313 teszt**. Amit a fájlok ✅/~-ként jelölnek, az bizonyítottan fordul + tesztelt.
+
+| # | Terület | ✅ teljes | 🟡 mag kész | ⬜ nyitva | Σ |
+| - | --- | :-: | :-: | :-: | :-: |
+| 01 | Production / Go-Live | 0 | 2 | 5 | 7 |
+| 02 | Monetizáció | 2 | 7 | 1 | 10 |
+| 03 | Collaboration | 2 | 3 | 1 | 6 |
+| 04 | Social | 2 | 7 | 1 | 10 |
+| 05 | AI (Creator OS) | 1 | 0 | 10 | 11 |
+| 06 | Video Editor (NLE) | 4 | 4 | 3 | 11 |
+| 07 | Image Studio | 0 | 9 | 0 | 9 |
+| 08 | Storage / Asset | 1 | 3 | 4 | 8 |
+| 09 | Native / Rendering | 0 | 0 | 6 | 6 |
+| 10 | Brand / UI | 0 | 2 | 6 | 8 |
+| 11 | Performance | 1 | 0 | 4 | 5 |
+| 12 | Code quality | 0 | 7 | 2 | 9 |
+| 13 | Documentation | 0 | 1 | 5 | 6 |
+| **Σ** | **(13 epik)** | **13** | **45** | **48** | **106** |
+
+**Olvasat:** a 106 tételből **13 teljes**, **45 „mag kész"** (a logika megvan, csak a következő réteg —
+UI/backend/render — hiányzik) és **48 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
+**02 §2.2** (export-politika + banner), **03 §2.1** (clip-lock realtime), **04 §2.2** (moderation-admin-UX). A 2026-10-07-i session hozott: **R2 = élő platform-tár**
+(08 §2.1 / 01 §2.1), **projekt forrás-mappa** minden stúdióban (08 §2.8, 06 §2.10), a kép-editor
+**Új dokumentum + vászon-kezelés** (07), a **kliens↔worker skew+easing contract-mirror** (01 §2.7),
+és a **usage-metering vertikum lezárva** (02 §2.2: export-politika — felhő=mért, on-device=ingyen+vízjel —
++ nearQuota-banner). A launch-kritikus maradék: **01** (prod-worker/EAS/RC/monitoring) + **02** §2.4 + **04** §2.2/§2.8.
+
 ---
 
 ## 4. Prioritás-modell (go-live sorrend)

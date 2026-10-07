@@ -5,6 +5,10 @@
 
 ---
 
+> **📊 Haladás (2026-10-06):** ✅ 0 · 🟡 0 · ⬜ 6 nyitva — Σ 6 tétel. **P3 platform-expanzió —
+> nincs launch-blokkoló.** Az iOS AVFoundation-render v1 kész (a natív-motor körben); itt minden
+> tétel nyitva (Skia / natív-FFmpeg / on-device-ONNX / desktop-shell / generatív / watchOS).
+
 ## 0. Kontextus & cél
 Platform-expanzió: a mobil-preview/render hosszú távú motorja + a desktop + a generatív AI.
 Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a profi NLE-élmény alapja.

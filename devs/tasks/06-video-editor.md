@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** ✅ 4 teljes · 🟡 4 mag kész · ⬜ 3 nyitva — Σ 11 tétel.
+> Keyframe / color / animated-mask / **effect-chain** / freeze+reverse kész (preview↔render parity;
+> a vizuális kimenet élő-ffmpeg-gel verifikálandó) + a **projekt forrás-mappa** a Toolbaron (§2.10).
+> Hátra: profi **audio-UI** (§2.7), GIF-dekód+render (§2.8), proxy-engine (§2.9) és a teljes **uri→assetId** refaktor (§2.10).
+
 ## 0. Kontextus & cél
 Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok mag kész, de a
 **preview↔render parity** + a professzionális effekt/szín/mask/transform réteg hiányos. Vezérelv:
@@ -62,7 +67,8 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 - [ ] 🟡 Proxy-alap van → ⬜ **background proxy-generálás + lifecycle + render-cache + invalidation + size-mgmt + storage-policy**.
 
 ### 2.10 Editor architecture refactor — P1 (alap)
-- [ ] ⬜ **`uri → assetId`** + minden mutáció a **Command Bus**-on (collab/undo/AI/cloud-sync alapja — lásd [12](./12-code-quality.md)).
+- [x] ~ **Projekt forrás-mappa (asset-bin) KÉSZ (2026-10-07)** — részlépés az asset-architektúra felé: a `project.assets` köré egységes forrás-bin ([projectSource.ts](../../src/lib/projectSource.ts) + [SourceSheet](../../src/components/SourceSheet.tsx)), a videó-editor Toolbarján is (forrás→idővonal), minden mutáció a **command-buson** (`ADD_ASSET`/`REMOVE_ASSET`). Lásd [08](./08-storage.md) §2.8.
+- [ ] ⬜ Hátra: a teljes **`uri → assetId`** átállás (a klipek asset-id-t hivatkozzanak, ne nyers uri-t) — a collab/undo/AI/cloud-sync alapja (lásd [12](./12-code-quality.md)).
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

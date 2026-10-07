@@ -23,8 +23,10 @@ import {
   listRolePermissions,
   listRoles,
   listUsersWithRoles,
+  moderateCommentGlobal,
   moderatePostGlobal,
   setRolePermission,
+  setUserSuspended,
   type AppPermission,
   type AppRole,
   type UserWithRole,
@@ -45,6 +47,7 @@ export default function AdminScreen() {
   const canRole = useRoles((s) => s.permissions.includes('role.manage'));
   const canUser = useRoles((s) => s.permissions.includes('user.manage'));
   const canReview = useRoles((s) => s.permissions.includes('report.review'));
+  const canSuspend = useRoles((s) => s.permissions.includes('user.suspend'));
 
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [perms, setPerms] = useState<AppPermission[]>([]);
@@ -145,6 +148,13 @@ export default function AdminScreen() {
               .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
           },
         })),
+        // 🚫 fiók-tiltás/feloldás (csak `user.suspend` birtokosnak)
+        ...(canSuspend
+          ? [
+              { text: t('admin.suspend'), style: 'destructive' as const, onPress: () => doSuspend(u, true) },
+              { text: t('admin.unsuspend'), onPress: () => doSuspend(u, false) },
+            ]
+          : []),
         { text: t('common.cancel'), style: 'cancel' as const },
       ]
     );
@@ -166,6 +176,30 @@ export default function AdminScreen() {
     moderatePostGlobal(rep.postId, 'removed')
       .then(() => doResolve(rep.id, 'resolved'))
       .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+  };
+  // 🚩 komment-bejelentés kezelése: a komment törlése (comment.moderate) + lezárás
+  const doRemoveReportedComment = (rep: ReportRow) => {
+    if (!rep.commentId) {
+      return;
+    }
+    moderateCommentGlobal(rep.commentId)
+      .then(() => doResolve(rep.id, 'resolved'))
+      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+  };
+  // 🚫 fiók-felfüggesztés (user.suspend): a tiltott user nem tud belépni
+  const doSuspend = (u: UserWithRole, suspended: boolean) => {
+    const run = () =>
+      setUserSuspended(u.id, suspended).catch((e: unknown) =>
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+      );
+    if (suspended) {
+      Alert.alert(t('admin.suspendTitle'), t('admin.suspendConfirm', { name: u.name }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('admin.suspend'), style: 'destructive', onPress: run },
+      ]);
+    } else {
+      run();
+    }
   };
   // 🟡 fellebbezés elbírálása: granted → a poszt visszaáll, denied → marad removed
   const doResolveAppeal = (app: AppealRow, decision: 'granted' | 'denied') => {
@@ -304,6 +338,14 @@ export default function AdminScreen() {
                           onPress={() => doRemoveReported(rep)}
                         >
                           <Text style={styles.reportBtnText}>{t('admin.reportRemove')}</Text>
+                        </Pressable>
+                      ) : null}
+                      {rep.targetType === 'comment' ? (
+                        <Pressable
+                          style={[styles.reportBtn, styles.reportRemove]}
+                          onPress={() => doRemoveReportedComment(rep)}
+                        >
+                          <Text style={styles.reportBtnText}>{t('admin.reportRemoveComment')}</Text>
                         </Pressable>
                       ) : null}
                       <Pressable

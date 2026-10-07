@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** ✅ 0 teljes · 🟡 2 mag kész · ⬜ 5 nyitva — Σ 7 tétel.
+> Jórészt **go-live infra** (prod-fiókok + deploy kell): a **prod média-tár = Cloudflare R2 ÉLŐ**
+> (§2.1, tesztelve) + a kliens/worker contract-teszt ALAP (§2.7). Hátra a Supabase-hardening,
+> prod-worker-image, EAS store-build, RevenueCat-prod, push, monitoring + rate-limit + a tár prod-domainje.
+
 ## 0. Kontextus & cél
 A ReMix publikus **mobil app + nyilvános worker-API** lesz. A go-live nem feature-kérdés,
 hanem **infrastruktúra + biztonság + üzemeltethetőség**. Cél: egy felhasználó végig tud
@@ -23,7 +28,8 @@ menni az `upload → render → publish` úton **production** környezetben, mon
 - [ ] 🟡 Prod projekt + migration-push véglegesítés + **prod RLS-validáció** (minden táblára).
 - [ ] ⬜ **Backup + restore-teszt** (PITR / napi dump + bizonyított visszaállítás).
 - [ ] ⬜ Prod **domain** + prod **secrets** (rotált DB-jelszó, service-role csak a workeren).
-- [ ] 🟡 Prod **Storage** bucket-policy path-alapú (nem bucket-szintű) — lásd security-backlog `05`.
+- [x] ✅ **Prod média-tár = Cloudflare R2 ÉLŐ (2026-10-07)**: a platform saját média-tárhelye az R2 (S3-adapter → R2, `STORAGE_BACKEND=r2`), end-to-end tesztelve. Részletek: [08](./08-storage.md) §2.1 + `devs/cloudflare-r2-setup-prompt.md`.
+- [ ] 🟡 Hátra a tárhoz: prod **custom domain + CORS** (ma `r2.dev` dev-URL) + a Supabase-Storage bucket-policy path-alapú (ahol maradt) — security-backlog `05`.
 
 ### 2.2 Production render worker — P0
 - [ ] 🟡 **Prod Docker image**: FFmpeg + Whisper + Chromium (egress) + ONNX-runtime, pinned verziók.
@@ -53,7 +59,8 @@ menni az `upload → render → publish` úton **production** környezetben, mon
 - [ ] ⬜ **Crash + error monitoring** (Sentry vagy ekviv.) kliens + worker.
 - [ ] ⬜ **Rate-limiting** minden compute-endpointon (security-backlog `03`) + **cost-observability** ([13](./13-documentation.md) §13.5).
 - [x] ✅ **Client/worker contract-tesztek — alap KÉSZ (2026-10-06)**: [src/lib/contract.test.ts](../../src/lib/contract.test.ts) a kliens-jest projektben importálja MINDKÉT oldalt (TS + worker-JS) és egyenlőséget állít a drift-veszélyes mirror-ökre: **TIER_QUOTAS / USAGE_METRICS / periodKey / remaining+canUse / isUnlimited** ([usageMeter.ts](../../src/lib/usageMeter.ts) ⇄ [server/usage.js](../../server/usage.js)) + **effekt-filterek** ([videoEffects.ts](../../src/lib/videoEffects.ts) `effectFilterString`/`effectChainFilters` ⇄ [server/render.js](../../server/render.js) `effectFilterStr`/`effectChainFx`), minden típus×amount-ra. **Mellékhozam:** kiszúrt + javított egy latens null-amount default-divergenciát (worker fix 0.5 → per-típus `EFFECT_DEFAULT_AMOUNT`, a kliens `VIDEO_EFFECTS`-hez kötve). Már a `npm run audit`-ban fut (CI). Teszt: `contract.test.ts` (9).
-- [ ] ⬜ Hátra: további mirror-ök bekötése (pl. `/render` form-kontraktus [render.ts](../../src/lib/render.ts) ⇄ worker, `canvasTransform` skew ⇄ render skewChain, keyframe-easing) + a 3 jest-projekt összevonása egy CI-gate-be.
+- [x] ✅ **Mirror-bővítés: skew + keyframe-easing KÉSZ (2026-10-07)**: a worker [render.js](../../server/render.js) nyírás-matekja (`shearPoint`) és köbös-Bézier easingje (`bezierEaseNode`) mostantól **exportált, top-level KÖZÖS** függvények (a belső duplikált matek megszűnt — egy forrás), és a [contract.test.ts](../../src/lib/contract.test.ts) **bitre köti** a kliens [canvasTransform.ts](../../src/lib/canvasTransform.ts) `shearPoint`/`skewUnitCorners` + [keyframes.ts](../../src/lib/keyframes.ts) `bezierEase`/`PRESET_BEZIER`-hez (preview == export). Teszt: `contract.test.ts` (+3). **Audit: 121 suite / 1316 teszt zöld.**
+- [ ] ⬜ Hátra: a `/render` **form-kontraktus** ([render.ts](../../src/lib/render.ts) mezői ⇄ worker-parser) + a 3 jest-projekt egy CI-gate-be vonása.
 
 ## 3. Kész, ha
 Egy friss eszközön a store-build (vagy internal-distribution) appból **bejelentkezés → projekt

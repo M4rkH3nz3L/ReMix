@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { haptics, motion } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -18,6 +19,7 @@ import { getProxyUriSync } from '@/lib/proxy';
 import { maxVideoDuration } from '@/lib/projectUtils';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { clamp, formatTime } from '@/lib/time';
+import { colorForUser } from '@/lib/collabLive';
 import { SNAP_FACTOR, useEditorStore } from '@/store/editorStore';
 import type { Clip, TrackType, VideoClip } from '@/types/project';
 import type { TFunction } from 'i18next';
@@ -90,6 +92,12 @@ function TimelineClipInner({
   // 🎯 fókusz mód: ha van kijelölés és ez NEM az, halványabb (kiemeli az aktívat)
   const focusMode = useEditorStore((s) => s.focusMode);
   const hasSelection = useEditorStore((s) => s.selectedClipId != null);
+  // 🔒 collab: ezt a klipet MÁS szerkeszti-e épp? A tulaj-egyezést nézzük (tiszta,
+  // render-biztos) — az elavult zárakat a collab-store prune-időzítője (10 mp) kiveszi
+  // a térképből, így egy JELENLÉVŐ más-tulajú zár „élő" (nem kell render-beli idő).
+  const clipLock = useEditorStore((s) => s.clipLocks[clip.id]);
+  const collabSelfId = useEditorStore((s) => s.collabSelf?.id ?? null);
+  const lockedByOther = !!collabSelfId && !!clipLock && clipLock.ownerId !== collabSelfId;
   const dimmed = focusMode && hasSelection && !selected && !multiSelected;
 
   // 🔍 clip-edge preview: trim közben a szélen lévő képkocka + időkód lebeg
@@ -413,6 +421,19 @@ function TimelineClipInner({
         {clip.kind === 'audio' ? (
           <ClipWaveform clip={clip} widthPx={baseWidth} heightPx={height - 8} color={color} />
         ) : null}
+        {lockedByOther ? (
+          <View
+            style={[styles.lockBadge, { backgroundColor: colorForUser(clipLock!.ownerId) }]}
+            accessibilityLabel={clipLock?.ownerName ?? 'locked'}
+          >
+            <Ionicons name="lock-closed" size={9} color="#fff" />
+            {clipLock?.ownerName ? (
+              <Text style={styles.lockBadgeText} numberOfLines={1}>
+                {clipLock.ownerName}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <Text
           numberOfLines={1}
           style={[
@@ -506,6 +527,24 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: '70%',
+    borderRadius: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    zIndex: 2,
+  },
+  lockBadgeText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: '800',
   },
   labelChip: {
     alignSelf: 'flex-start',

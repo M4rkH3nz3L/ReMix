@@ -111,3 +111,67 @@ export function pruneStale(map: LockMap, now: number, ttl = LOCK_TTL_MS): LockMa
   }
   return next;
 }
+
+// ── realtime-session: a zárak broadcast-összefésülése ───────────────────────
+
+/** Egy zár-esemény a collab-csatornán: beírás (acquire/heartbeat) vagy feloldás. */
+export interface LockBroadcast {
+  type: 'set' | 'release';
+  clipId: string;
+  ownerId: string;
+  /** `set` esetén a teljes zár */
+  lock?: ClipLock;
+}
+
+/**
+ * Egy BEJÖVŐ zár-esemény alkalmazása a térképre — determinisztikus, ütközés-feloldással.
+ * Előbb a stale-eket takarítja. `release`: a tulaj feloldja. `set`: beírja a távoli zárat,
+ * KIVÉVE ha ütközik egy ÉLŐ, MÁS tulajú, KORÁBBAN (vagy egyszerre) szerzett zárral
+ * (first-come-wins) → két egyidejű szerzésnél MINDEN kliens ugyanazt a győztest látja.
+ */
+export function applyLockBroadcast(
+  map: LockMap,
+  msg: LockBroadcast,
+  now: number,
+  ttl = LOCK_TTL_MS,
+): LockMap {
+  const pruned = pruneStale(map, now, ttl);
+  if (msg.type === 'release') {
+    return releaseLock(pruned, msg.clipId, msg.ownerId);
+  }
+  const incoming = msg.lock;
+  if (!incoming) {
+    return pruned;
+  }
+  const existing = pruned[incoming.clipId];
+  if (
+    existing &&
+    existing.ownerId !== incoming.ownerId &&
+    !isStale(existing, now, ttl) &&
+    existing.acquiredAt <= incoming.acquiredAt
+  ) {
+    return pruned; // a korábbi, élő, más tulajú zár nyer (determinisztikus, echo-biztos)
+  }
+  return withLock(pruned, incoming);
+}
+
+/** Szerkeszthetem-e a klipet a térkép szerint (nincs zár / sajátom / elavult). */
+export function editableByMe(
+  map: LockMap,
+  clipId: string,
+  userId: string,
+  now: number,
+  ttl = LOCK_TTL_MS,
+): boolean {
+  return canEdit(map[clipId], userId, now, ttl);
+}
+
+/** A MÁSOK által tartott ÉLŐ zárak (UI: „ki szerkeszti most"). */
+export function locksByOthers(
+  map: LockMap,
+  userId: string,
+  now: number,
+  ttl = LOCK_TTL_MS,
+): ClipLock[] {
+  return Object.values(map).filter((l) => l.ownerId !== userId && !isStale(l, now, ttl));
+}

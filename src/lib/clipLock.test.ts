@@ -1,10 +1,13 @@
 import {
   acquireLock,
+  applyLockBroadcast,
   canEdit,
+  editableByMe,
   heartbeat,
   isLockedByOther,
   isStale,
   LOCK_TTL_MS,
+  locksByOthers,
   lockOf,
   pruneStale,
   releaseLock,
@@ -93,5 +96,44 @@ describe('LockMap — térkép-kezelés', () => {
     const pruned = pruneStale(map, T0 + LOCK_TTL_MS + 1);
     expect(lockOf(pruned, 'c1')).toBeUndefined();
     expect(lockOf(pruned, 'c2')).toBeDefined();
+  });
+});
+
+describe('clipLock — realtime session (broadcast-merge)', () => {
+  it('applyLockBroadcast: set beírja a távoli zárat', () => {
+    const lock = mk({ clipId: 'c1', ownerId: 'bob' });
+    const map = applyLockBroadcast({}, { type: 'set', clipId: 'c1', ownerId: 'bob', lock }, T0);
+    expect(lockOf(map, 'c1')?.ownerId).toBe('bob');
+  });
+
+  it('applyLockBroadcast: release a tulajtól feloldja, mástól nem', () => {
+    const start = withLock({}, mk({ clipId: 'c1', ownerId: 'bob' }));
+    expect(lockOf(applyLockBroadcast(start, { type: 'release', clipId: 'c1', ownerId: 'eve' }, T0), 'c1')).toBeDefined();
+    expect(lockOf(applyLockBroadcast(start, { type: 'release', clipId: 'c1', ownerId: 'bob' }, T0), 'c1')).toBeUndefined();
+  });
+
+  it('ütközés: a KORÁBBAN szerzett élő zár nyer (first-come-wins, determinisztikus)', () => {
+    const early = withLock({}, mk({ clipId: 'c1', ownerId: 'alice', acquiredAt: T0, heartbeatAt: T0 }));
+    const late = mk({ clipId: 'c1', ownerId: 'bob', acquiredAt: T0 + 50, heartbeatAt: T0 + 50 });
+    // a később érkező bob-zár NEM írja felül az élő, korábbi alice-zárat
+    const merged = applyLockBroadcast(early, { type: 'set', clipId: 'c1', ownerId: 'bob', lock: late }, T0 + 60);
+    expect(lockOf(merged, 'c1')?.ownerId).toBe('alice');
+  });
+
+  it('ütközés: ha a meglévő ELAVULT, a távoli zár megszerzi', () => {
+    const stale = withLock({}, mk({ clipId: 'c1', ownerId: 'alice', heartbeatAt: T0 }));
+    const fresh = mk({ clipId: 'c1', ownerId: 'bob', acquiredAt: T0 + 2 * LOCK_TTL_MS, heartbeatAt: T0 + 2 * LOCK_TTL_MS });
+    const merged = applyLockBroadcast(stale, { type: 'set', clipId: 'c1', ownerId: 'bob', lock: fresh }, T0 + 2 * LOCK_TTL_MS);
+    expect(lockOf(merged, 'c1')?.ownerId).toBe('bob');
+  });
+
+  it('editableByMe + locksByOthers', () => {
+    const map = withLock({}, mk({ clipId: 'c1', ownerId: 'bob', heartbeatAt: T0 }));
+    expect(editableByMe(map, 'c1', 'alice', T0)).toBe(false); // bob él → alice nem
+    expect(editableByMe(map, 'c1', 'bob', T0)).toBe(true); // sajátom
+    expect(editableByMe(map, 'c2', 'alice', T0)).toBe(true); // nincs zár
+    expect(locksByOthers(map, 'alice', T0).map((l) => l.ownerId)).toEqual(['bob']);
+    expect(locksByOthers(map, 'bob', T0)).toEqual([]); // a sajátom nem „másé"
+    expect(locksByOthers(map, 'alice', T0 + LOCK_TTL_MS + 1)).toEqual([]); // elavult
   });
 });

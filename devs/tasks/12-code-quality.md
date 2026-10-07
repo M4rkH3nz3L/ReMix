@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-06):** ✅ 0 teljes · 🟡 7 mag kész · ⬜ 2 nyitva — Σ 9 tétel.
+> A robusztussági magok **nagyrészt kész + bekötve** (validáció / retry / cancel / rollback / race /
+> cache / event-log — sok csak inkrementális adopció-farokkal); hátra a **timer-cleanup** (§2.6)
+> és a **nagy-fájl-szétbontás** (§2.9).
+
 ## 0. Kontextus & cél
 A kódbázis nagy és gyors fejlődésű — a robusztusság (validáció, retry, cancellation, race-védelem,
 cache-limitek, event-log-méret) a production-stabilitás alapja. Vezérelv: **UI → Command → Pure →

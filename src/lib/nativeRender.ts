@@ -93,6 +93,8 @@ interface RenderPlan {
   background: string;
   video: PlanVideoSegment[];
   audio: PlanAudioSegment[];
+  /** 🏷️ ReMix-vízjel a kimenetre (ingyen on-device, nem-fizető tier — `exportPolicy`) */
+  watermark?: boolean;
 }
 
 const AUDIO_TRACKS = new Set(['music', 'voiceover', 'sfx']);
@@ -120,7 +122,11 @@ function outputSize(project: Project, shortSide: number): { width: number; heigh
  * fájl-alapú (nem http-stream) videó/hang-klipeket veszi — a felhő-forrásokat
  * (URL-import stream) az eszközön-render kihagyja, azok a felhő-render sajátjai.
  */
-export function buildRenderPlan(project: Project, settings: RenderSettings): RenderPlan {
+export function buildRenderPlan(
+  project: Project,
+  settings: RenderSettings,
+  watermark = false
+): RenderPlan {
   const { width, height } = outputSize(project, settings.resolution);
   const video: PlanVideoSegment[] = [];
   const audio: PlanAudioSegment[] = [];
@@ -153,7 +159,15 @@ export function buildRenderPlan(project: Project, settings: RenderSettings): Ren
   video.sort((a, b) => a.atSec - b.atSec);
   audio.sort((a, b) => a.atSec - b.atSec);
 
-  return { width, height, fps: settings.fps, background: '#000000', video, audio };
+  return {
+    width,
+    height,
+    fps: settings.fps,
+    background: '#000000',
+    video,
+    audio,
+    ...(watermark ? { watermark: true } : {}),
+  };
 }
 
 /** Igaz, ha a projekt eszközön is renderelhető (van legalább egy helyi videó). */
@@ -176,12 +190,13 @@ export async function renderLocal(
   project: Project,
   settings: RenderSettings,
   onProgress?: (progress: number) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  watermark = false
 ): Promise<File> {
   if (!Native) {
     throw new LocalRenderUnavailableError();
   }
-  const plan = buildRenderPlan(project, settings);
+  const plan = buildRenderPlan(project, settings, watermark);
 
   const dir = new Directory(Paths.cache, 'render');
   if (!dir.exists) {

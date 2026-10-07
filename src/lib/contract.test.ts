@@ -23,6 +23,8 @@ import {
   type UsageCounters,
   type UsageMetric,
 } from '@/lib/usageMeter';
+import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
+import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
 import {
   VIDEO_EFFECTS,
   VIDEO_EFFECT_TYPES,
@@ -119,5 +121,72 @@ describe('contract: effekt-filterek (videoEffects.ts ⇄ server/render.js)', () 
       { id: 'd', type: 'vignette', amount: 0.25 },
     ];
     expect(workerRender.effectChainFx({ effects })).toBe(effectChainFilters(effects));
+  });
+});
+
+describe('contract: skew-nyírás (canvasTransform.ts ⇄ server/render.js)', () => {
+  it('shearPoint bitre azonos minden (x,y,skewX,skewY) mintára', () => {
+    const pts: [number, number][] = [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+      [0, 0],
+      [0.5, 0.25],
+    ];
+    const skews: [number, number][] = [
+      [0, 0],
+      [10, 0],
+      [0, 15],
+      [30, -20],
+      [45, 45],
+      [-45, -30],
+    ];
+    for (const [x, y] of pts) {
+      for (const [sx, sy] of skews) {
+        const w = workerRender.shearPoint(x, y, sx, sy);
+        const c = shearPoint(x, y, sx, sy);
+        expect(w.x).toBeCloseTo(c.x, 12);
+        expect(w.y).toBeCloseTo(c.y, 12);
+      }
+    }
+  });
+
+  it('a worker shearPoint az egységnégyzet sarkain == a kliens skewUnitCorners', () => {
+    for (const [sx, sy] of [
+      [12, 0],
+      [0, 20],
+      [25, -15],
+    ] as [number, number][]) {
+      const corners = skewUnitCorners(sx, sy); // [tl, tr, br, bl]
+      const expected = (
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ] as [number, number][]
+      ).map(([x, y]) => workerRender.shearPoint(x, y, sx, sy));
+      corners.forEach((c, i) => {
+        expect(c.x).toBeCloseTo(expected[i].x, 12);
+        expect(c.y).toBeCloseTo(expected[i].y, 12);
+      });
+    }
+  });
+});
+
+describe('contract: keyframe bezier-easing (keyframes.ts ⇄ server/render.js)', () => {
+  it('bezierEaseNode azonos a bezierEase-szel minden preset-görbe × p-re', () => {
+    const ps = [0, 0.1, 0.25, 0.5, 0.5001, 0.75, 0.9, 1];
+    for (const cp of Object.values(PRESET_BEZIER)) {
+      for (const p of ps) {
+        expect(workerRender.bezierEaseNode(cp, p)).toBe(bezierEase(cp, p));
+      }
+    }
+    // egyedi (nem-preset) görbére is azonos a felezéses megoldás
+    const custom: [number, number, number, number] = [0.2, 0.8, 0.3, 0.9];
+    for (const p of ps) {
+      expect(workerRender.bezierEaseNode(custom, p)).toBe(bezierEase(custom, p));
+    }
   });
 });

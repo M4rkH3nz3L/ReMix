@@ -1241,6 +1241,13 @@ export interface ImageDoc {
   name: string;
   /** ugyanaz az arány-készlet, mint a projekté */
   aspectRatio: AspectRatio;
+  /** 🖼️ vászon pixel-mérete (opcionális; hiányzó = a renderer az aspectRatio +
+   *  alap-felbontásból számol). Megadva EZ a mérvadó (szabad W×H, nem a 3 arány).
+   *  A létrehozáskor a kép-editor „Új dokumentum” mezői töltik. */
+  width?: number;
+  height?: number;
+  /** 🖼️ dokumentum-típus: 'raster' (PNG-kimenet) vagy 'vector' (SVG). Hiányzó = raster. */
+  format?: 'raster' | 'vector';
   /** ALULRÓL FÖLFELÉ: a lista első eleme van leghátul */
   layers: ImageLayer[];
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */

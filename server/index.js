@@ -1916,6 +1916,9 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
       });
       // 📊 §2.2: sikeres sorba tétel után könyveljük a render-perceket (atomikus RPC).
       void trackUsage(uid, 'renderMinutes', minutes);
+      // 📊 §2.2: CSAK a FELHŐ-render számít `exports`-nak (az on-device ingyen + vízjeles,
+      // az nem jön ide). Egy felhő-export = +1 a havi exports-kvótába. (exportPolicy)
+      void trackUsage(uid, 'exports', 1);
     })()
       .then(() => res.json({ id, mode: 'cloud' }))
       .catch((err) => {

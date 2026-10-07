@@ -6,10 +6,13 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
+import { SourceSheet } from '@/components/SourceSheet';
 import { AdjustSheet } from '@/components/studio/image/AdjustSheet';
+import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { palette } from '@/constants/editor';
+import { effectiveCanvas } from '@/lib/canvasPresets';
 import { addLayer, createImageDoc, layerLabel, removeLayer } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
@@ -18,7 +21,7 @@ import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
+import type { Asset, ImageClip, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 const TOOLS: {
   key: 'layers' | 'photo' | 'text' | 'shape' | 'svg' | 'adjust' | 'delete';
@@ -57,7 +60,7 @@ export function ImageStudioBody({
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'layers' | 'adjust' | null>(null);
+  const [sheet, setSheet] = useState<'layers' | 'adjust' | 'canvas' | 'source' | null>(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const canvasRef = useRef<View>(null);
@@ -91,7 +94,13 @@ export function ImageStudioBody({
     }
     const s = useEditorStore.getState();
     if (s.project && !(s.project.imageDocs && s.project.imageDocs.length > 0)) {
-      const nd = createImageDoc(s.project.name, s.project.aspectRatio, () => makeId('lyr'));
+      // a fallback-doc is EXPLICIT vászonméretet kap (a projekt arányából) → a
+      // dokumentumnak mindig van W×H-ja, amit a vászon-lap megmutat/szerkeszt
+      const size = effectiveCanvas({ aspectRatio: s.project.aspectRatio });
+      const nd = createImageDoc(s.project.name, s.project.aspectRatio, () => makeId('lyr'), {
+        width: size.width,
+        height: size.height,
+      });
       s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: nd });
     }
   }, [mode]);
@@ -159,6 +168,25 @@ export function ImageStudioBody({
             };
     commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
     setSelectedId(id);
+  };
+
+  // 🗂️ forrás-mappából a vászonra: a KÉP-forrás egy fotó-rétegként kerül be
+  const insertSource = (asset: Asset) => {
+    if (!doc || asset.kind !== 'image') {
+      return;
+    }
+    const l: PhotoLayer = {
+      kind: 'photo',
+      id: makeId('lyr'),
+      uri: asset.uri,
+      position: { x: 0.5, y: 0.5 },
+      w: 0.7,
+      h: 0.5,
+      fit: 'cover',
+    };
+    commit(addLayer(doc, l), t('studio.image.undoAddPhoto'));
+    setSelectedId(l.id);
+    setSheet(null);
   };
 
   /**
@@ -337,6 +365,32 @@ export function ImageStudioBody({
             {title}
           </Text>
         </View>
+        {doc ? (
+          <Pressable
+            onPress={() => setSheet('source')}
+            hitSlop={8}
+            style={styles.canvasBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('source.title')}
+          >
+            <Ionicons name="folder-open-outline" size={15} color={palette.textDim} />
+          </Pressable>
+        ) : null}
+        {doc ? (
+          <Pressable
+            onPress={() => setSheet('canvas')}
+            hitSlop={8}
+            style={styles.canvasBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('studio.image.canvasTitle')}
+          >
+            <Ionicons name="resize-outline" size={14} color={palette.textDim} />
+            <Text style={styles.canvasBtnText}>
+              {effectiveCanvas(doc).width}×{effectiveCanvas(doc).height}
+              {doc.format === 'vector' ? ' · SVG' : ''}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={mode === 'scoped' ? saveScoped : openExportMenu}
           hitSlop={10}
@@ -430,6 +484,12 @@ export function ImageStudioBody({
       {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (
         <AdjustSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
+      {sheet === 'canvas' && doc ? (
+        <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'source' ? (
+        <SourceSheet onInsert={insertSource} onClose={() => setSheet(null)} />
+      ) : null}
     </View>
   );
 }
@@ -454,6 +514,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exportText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  canvasBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    backgroundColor: palette.surface,
+  },
+  canvasBtnText: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   statusRow: {
     flexDirection: 'row',

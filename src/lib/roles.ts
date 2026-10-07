@@ -180,6 +180,19 @@ export async function moderatePostGlobal(postId: string, status: 'ok' | 'removed
   }
 }
 
+/**
+ * Bármely komment törlése moderátorként. A `post_comments` delete-RLS a `comment.moderate`
+ * jog birtokosának engedi BÁRMELY komment törlését (a szerző/poszt-tulaj mellett) — lásd
+ * `20260917030000_rbac_roles_permissions.sql`. Jog nélkül az RLS visszautasít.
+ */
+export async function moderateCommentGlobal(commentId: string): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.from('post_comments').delete().eq('id', commentId);
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 /** Fiók tiltása/feloldása (RPC): a `user.suspend` birtokosa. Tiltva a user nem tud belépni. */
 export async function setUserSuspended(userId: string, suspended: boolean): Promise<void> {
   const sb = requireSupabase();

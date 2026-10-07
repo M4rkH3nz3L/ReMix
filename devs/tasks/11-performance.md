@@ -5,6 +5,10 @@
 
 ---
 
+> **📊 Haladás (2026-10-06):** ✅ 1 teljes · 🟡 0 · ⬜ 4 nyitva — Σ 5 tétel.
+> A **projectDuration-cache** (§2.2) kész; a timeline-60Hz-reconciliation, az auto-version,
+> a player-write-csökkentés és a lusta-modal-mount **mérés-vezérelt** — nyitva.
+
 ## 0. Kontextus & cél
 A timeline + preview + auto-version a legérzékenyebb teljesítmény-pontok (hosszú timeline, 4K
 média, gyenge eszköz). Cél: 60 Hz-es, akadásmentes szerkesztés + minimális felesleges munka.

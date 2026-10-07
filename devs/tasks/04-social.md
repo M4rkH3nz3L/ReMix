@@ -5,6 +5,11 @@
 
 ---
 
+> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 7 mag kész · ⬜ 1 nyitva — Σ 10 tétel.
+> collections + restrict + view-ranking + trending + hashtag + remix-lineage + creator-dashboard +
+> **moderation-admin-UX** (§2.2: report/poszt/komment/suspend/appeal) mind **e2e**. Hátra:
+> feed-media prod-pipeline (§2.8) + a ranking server-oldalra költöztetése + a mélyebb magok UI-ja.
+
 ## 0. Kontextus & cél
 A social-core működik (feed, komment, like/save, follow, remix, DM, group-chat, notifications).
 A **platform-szintű** réteg hiányzik: moderáció-UI, valódi recommendation-engine, keresés,
@@ -26,7 +31,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🔌 Hátra: server-oldali komment-visibility-policy (`isCommentVisible` enforcement nem-tulaj nézőkre) + community + community-moderation.
 
 ### 2.2 Moderation UI — P1
-- [ ] 🔌 DB-report-rendszer van → **admin UX**: reports/user/post/comment-moderáció + removal/ban/mute/**appeal** (security-backlog `10`).
+- [x] ✅ **Admin moderation-UX KÉSZ e2e (2026-10-07)**: az [admin.tsx](../../src/app/admin.tsx) panel (RBAC-gated) — report-review (poszt+komment+üzenet), **poszt-eltávolítás** (`moderate_post`), **komment-törlés** ([moderateCommentGlobal](../../src/lib/roles.ts) a `comment.moderate` delete-RLS-en át), **fiók-felfüggesztés** (`setUserSuspended` → GoTrue `banned_until`, `user.suspend`-gated, önmagad-tiltás tiltva), szerep→jog mátrix + user-szerep kiosztás, és **appeal**-elbírálás (grant/deny → poszt vissza/removed). A komment-moderáció + suspend MA lett a UI-ba kötve (a backend/RLS/RPC korábban is megvolt). Audit zöld (122 suite / 1324 teszt).
+- [ ] 🟡 Hátra: üzenet-moderáció removal-akció (a report látszik, de a message-törlés hátra) + moderációs audit-log-UI (ki mit moderált) + community/community-moderation (lásd §2.1).
 
 ### 2.3 For You ranking v2 — P1 (nagy)
 - [x] ✅ **Ranker-mag + teszt**: [src/lib/feedRanking.ts](../../src/lib/feedRanking.ts) — `scorePost` (súlyozott engagement + completion + creator-/topic-affinity + exponenciális **freshness**-csökkenés half-life-fal + negatív-jel-büntetés) + `rankBy` (csökkenő pontszám, stabil) + `applyDiversity` (nem klaszterez egy alkotót). Teszt: `feedRanking.test.ts` (9). A hiteles scoring, amit a server-ranking/kliens használ. (A mai feed csak `promoted`+`created_at`.)

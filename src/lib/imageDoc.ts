@@ -14,30 +14,88 @@ import type { AspectRatio, ImageDoc, ImageLayer } from '@/types/project';
  * teszi be, tehát az undo automatikusan működik.
  */
 
+/** 🎨 induló háttér: konkrét szín (hex), vagy `'transparent'` (alfa, nincs fill-réteg). */
+export type ImageDocBackground = string | 'transparent';
+
 export function createImageDoc(
   name: string,
   aspectRatio: AspectRatio,
-  makeId: () => string
+  makeId: () => string,
+  opts?: {
+    width?: number;
+    height?: number;
+    background?: ImageDocBackground;
+    format?: 'raster' | 'vector';
+  }
 ): ImageDoc {
+  const bg = opts?.background;
   return {
     id: makeId(),
     name,
     aspectRatio,
-    // induláskor egy sötét háttér, hogy a vászon ne legyen áttetsző-üres
-    layers: [
-      {
-        kind: 'fill',
-        id: makeId(),
-        name: tr('lib.imageDoc.defaultBackgroundName'),
-        fill: '#12121a',
-      },
-    ],
+    ...(opts?.width ? { width: Math.round(opts.width) } : {}),
+    ...(opts?.height ? { height: Math.round(opts.height) } : {}),
+    ...(opts?.format ? { format: opts.format } : {}),
+    // Háttér: a megadott szín, egyébként az alap sötét (hogy a vászon ne legyen
+    // áttetsző-üres). `'transparent'` → NINCS fill-réteg → alfás (PNG) kimenet.
+    layers:
+      bg === 'transparent'
+        ? []
+        : [
+            {
+              kind: 'fill',
+              id: makeId(),
+              name: tr('lib.imageDoc.defaultBackgroundName'),
+              fill: bg || '#12121a',
+            },
+          ],
   };
 }
 
 /** új réteg LEGFELÜLRE (a felhasználó azt várja, hogy amit hozzáad, azt látja) */
 export function addLayer(doc: ImageDoc, layer: ImageLayer): ImageDoc {
   return { ...doc, layers: [...doc.layers, layer], renderedUri: undefined };
+}
+
+/**
+ * 🎨 A vászon HÁTTERE = a legalsó (0.) réteg, ha az `fill`. `docBackground` ezt
+ * olvassa ki (szín vagy `'transparent'`, ha nincs háttér-fill), `setBackground`
+ * pedig beállítja: szín → a meglévő háttér-fillt átfesti vagy újat szúr legalulra;
+ * `'transparent'` → a háttér-fillt eltávolítja (alfás kimenet). A rajz-rétegek
+ * érintetlenek maradnak.
+ */
+export function docBackground(doc: ImageDoc): ImageDocBackground {
+  const bottom = doc.layers[0];
+  return bottom && bottom.kind === 'fill' ? bottom.fill : 'transparent';
+}
+
+export function setBackground(
+  doc: ImageDoc,
+  background: ImageDocBackground,
+  makeId: () => string
+): ImageDoc {
+  const bottom = doc.layers[0];
+  const hasBgFill = !!bottom && bottom.kind === 'fill';
+  if (background === 'transparent') {
+    return hasBgFill
+      ? { ...doc, layers: doc.layers.slice(1), renderedUri: undefined }
+      : doc;
+  }
+  if (hasBgFill) {
+    const layers = doc.layers.map((l, i) =>
+      i === 0 && l.kind === 'fill'
+        ? { ...l, fill: background, fillGradient: undefined, gradient: undefined }
+        : l
+    );
+    return { ...doc, layers, renderedUri: undefined };
+  }
+  const fill: ImageLayer = {
+    kind: 'fill',
+    id: makeId(),
+    name: tr('lib.imageDoc.defaultBackgroundName'),
+    fill: background,
+  };
+  return { ...doc, layers: [fill, ...doc.layers], renderedUri: undefined };
 }
 
 export function removeLayer(doc: ImageDoc, id: string): ImageDoc {

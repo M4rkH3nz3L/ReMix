@@ -29,6 +29,7 @@ import {
 } from '@/constants/templates';
 import type { VideoTemplate } from '@/constants/templates';
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
+import { UsageBanner } from '@/components/UsageBanner';
 import { useLayout } from '@/hooks/useLayout';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
 import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
@@ -38,7 +39,11 @@ import {
   parseHashtags,
   parseKeywords,
   studioRoute,
+  type CreateProjectConfig,
 } from '@/lib/projectUtils';
+import { AUDIO_MASTER_TARGETS } from '@/lib/audioMaster';
+import { BG_SWATCHES, CANVAS_PRESETS, clampDim, isHexColor, nearestAspect } from '@/lib/canvasPresets';
+import { pickSourceAsset, supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
@@ -49,7 +54,10 @@ import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { formatTime } from '@/lib/time';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
 import { ALL_PROJECT_KINDS, PROJECT_KINDS, creatableKinds } from '@/lib/projectKinds';
-import type { AspectRatio, Project, ProjectKind, ProjectMeta } from '@/types/project';
+import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
+
+/** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
+const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
 
 /** 🎛️ Az „Új projekt” választója = a LÉTREHOZHATÓ (kész stúdiójú) fajták —
  *  a katalógusból (`@/lib/projectKinds`), hogy sose kínáljon félkész stúdiót. */
@@ -119,6 +127,15 @@ export default function ProjectsScreen() {
   const [aspect, setAspect] = useState<AspectRatio>('9:16');
   // 🎛️ melyik stúdió: videó (idővonal), kép (réteg-fa) vagy hang (audio)
   const [kind, setKind] = useState<ProjectKind>('video');
+  // 🖼️ kép-projekt: szabad vászon W×H (px, string az inputhoz) + formátum + háttér
+  const [imgW, setImgW] = useState<string>('1080');
+  const [imgH, setImgH] = useState<string>('1080');
+  const [imgFormat, setImgFormat] = useState<'raster' | 'vector'>('raster');
+  const [bg, setBg] = useState<string>(BG_SWATCHES[0]);
+  // 🎚️ hang-projekt: a master-cél (az alap hangosság/plafon preset)
+  const [audioTarget, setAudioTarget] = useState<AudioMasterTarget>('music');
+  // 🗂️ a projekt FORRÁS-mappája — a létrehozáskor hozzáadott támogatott fájlok
+  const [sources, setSources] = useState<Asset[]>([]);
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [shared, setShared] = useState<SharedProject[]>([]);
@@ -177,6 +194,23 @@ export default function ProjectsScreen() {
     setSeoHashtags('');
     setSeoKeywords('');
     setKind('video');
+    setImgW('1080');
+    setImgH('1080');
+    setImgFormat('raster');
+    setBg(BG_SWATCHES[0]);
+    setAudioTarget('music');
+    setSources([]);
+  };
+
+  // 🗂️ egy támogatott forrás-fájl hozzáadása a leendő projekt forrás-mappájához
+  const addSource = (sk: SourceKind) => {
+    pickSourceAsset(sk)
+      .then((asset) => {
+        if (asset) {
+          setSources((prev) => [...prev, asset]);
+        }
+      })
+      .catch(() => {});
   };
 
   // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve
@@ -195,13 +229,34 @@ export default function ProjectsScreen() {
     if (!title || !description || hashtags.length === 0 || keywords.length === 0) {
       return;
     }
+    // 🎛️ fajta-specifikus induló-beállítások: kép → szabad W×H + formátum + háttér, hang → master-cél
+    const config: CreateProjectConfig = {};
+    // a projekt-szintű aspectRatio: képnél a megadott W×H-ból a legközelebbi enum
+    let projectAspect = aspect;
+    if (kind === 'image') {
+      const w = clampDim(imgW);
+      const h = clampDim(imgH);
+      projectAspect = nearestAspect(w, h);
+      config.image = {
+        width: w,
+        height: h,
+        format: imgFormat,
+        // érvénytelen hex → essen vissza az alap sötétre (a 'transparent' átmegy)
+        background: bg === 'transparent' || isHexColor(bg) ? bg : BG_SWATCHES[0],
+      };
+    } else if (kind === 'audio') {
+      config.audioMasterTarget = audioTarget;
+    }
     // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
-    const project = createEmptyProject(
+    const base = createEmptyProject(
       title,
-      aspect,
+      projectAspect,
       { title, description, hashtags, keywords },
-      kind
+      kind,
+      config
     );
+    // 🗂️ a létrehozáskor hozzáadott források a projekt forrás-mappájába (assets)
+    const project = sources.length > 0 ? { ...base, assets: sources } : base;
     await saveProject(project);
     backupProjectToCloud(project); // 🗄️ azonnal a userhez a felhőbe is (best-effort)
     setCreating(false);
@@ -376,12 +431,13 @@ export default function ProjectsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <View style={styles.logoBadge}>
-          <Ionicons name="shuffle" size={20} color="#fff" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{t('home.appName')}</Text>
-        </View>
+        <Image
+          source={require('../../../assets/images/icon.png')}
+          style={styles.logoBadge}
+          contentFit="cover"
+          accessibilityLabel={t('home.appName')}
+        />
+        <View style={{ flex: 1 }} />
         <Pressable
           onPress={() => router.push('/profile')}
           hitSlop={8}
@@ -417,6 +473,8 @@ export default function ProjectsScreen() {
           <Text style={styles.importLabel}>{t('common.import')}</Text>
         </Pressable>
       </View>
+
+      <UsageBanner />
 
       <View style={styles.ctaWrap}>
         <PrimaryButton icon="add" label={t('home.newProject')} onPress={() => setCreating(true)} />
@@ -673,8 +731,8 @@ export default function ProjectsScreen() {
                 style={styles.input}
               />
 
-              {/* a hang-projektnek nincs képaránya — a választót elrejtjük */}
-              {kind !== 'audio' ? (
+              {/* a képaránya CSAK a videónak van (a kép szabad W×H-t kap, a hangnak semmi) */}
+              {kind === 'video' ? (
                 <>
                   <Text style={styles.fieldLabel}>{t('home.aspectLabel')}</Text>
                   <View style={styles.aspectRow}>
@@ -688,6 +746,170 @@ export default function ProjectsScreen() {
                     ))}
                   </View>
                 </>
+              ) : null}
+
+              {/* 🖼️ KÉP-projekt: dokumentum-típus + szabad vászon W×H + háttér (kép-editor) */}
+              {kind === 'image' ? (
+                <>
+                  <Text style={styles.fieldLabel}>{t('home.formatLabel')}</Text>
+                  <View style={styles.aspectRow}>
+                    <Chip
+                      label={t('home.formatRaster')}
+                      active={imgFormat === 'raster'}
+                      onPress={() => setImgFormat('raster')}
+                    />
+                    <Chip
+                      label={t('home.formatVector')}
+                      active={imgFormat === 'vector'}
+                      onPress={() => setImgFormat('vector')}
+                    />
+                  </View>
+
+                  <Text style={styles.fieldLabel}>{t('home.canvasLabel')}</Text>
+                  <View style={styles.aspectRow}>
+                    {CANVAS_PRESETS.map((p) => (
+                      <Chip
+                        key={p.label}
+                        label={p.label}
+                        active={clampDim(imgW) === p.w && clampDim(imgH) === p.h}
+                        onPress={() => {
+                          setImgW(String(p.w));
+                          setImgH(String(p.h));
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.dimRow}>
+                    <View style={styles.dimField}>
+                      <Text style={styles.dimLabel}>{t('home.widthLabel')}</Text>
+                      <TextInput
+                        value={imgW}
+                        onChangeText={(v) => setImgW(v.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        style={styles.input}
+                        placeholder="1080"
+                        placeholderTextColor={palette.textDim}
+                      />
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setImgW(imgH);
+                        setImgH(imgW);
+                      }}
+                      style={styles.swapBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('home.swapDims')}
+                    >
+                      <Ionicons name="swap-horizontal" size={18} color={palette.accent} />
+                    </Pressable>
+                    <View style={styles.dimField}>
+                      <Text style={styles.dimLabel}>{t('home.heightLabel')}</Text>
+                      <TextInput
+                        value={imgH}
+                        onChangeText={(v) => setImgH(v.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        style={styles.input}
+                        placeholder="1080"
+                        placeholderTextColor={palette.textDim}
+                      />
+                    </View>
+                  </View>
+                  <Text style={styles.seoHint}>
+                    {t('home.canvasSize', { width: clampDim(imgW), height: clampDim(imgH) })}
+                  </Text>
+
+                  <Text style={styles.fieldLabel}>{t('home.backgroundLabel')}</Text>
+                  <View style={styles.bgRow}>
+                    {BG_SWATCHES.map((c) => (
+                      <Pressable
+                        key={c}
+                        onPress={() => setBg(c)}
+                        accessibilityRole="button"
+                        accessibilityLabel={c}
+                        style={[
+                          styles.swatch,
+                          { backgroundColor: c },
+                          bg === c && styles.swatchActive,
+                        ]}
+                      />
+                    ))}
+                    <Pressable
+                      onPress={() => setBg('transparent')}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('home.bgTransparent')}
+                      style={[
+                        styles.swatch,
+                        styles.swatchTransparent,
+                        bg === 'transparent' && styles.swatchActive,
+                      ]}
+                    >
+                      <Ionicons name="ban-outline" size={18} color={palette.textDim} />
+                    </Pressable>
+                  </View>
+                  <TextInput
+                    value={bg === 'transparent' ? '' : bg}
+                    onChangeText={setBg}
+                    placeholder={t('home.bgHexPlaceholder')}
+                    placeholderTextColor={palette.textDim}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : null}
+
+              {/* 🎚️ HANG-projekt: master-cél (az alap hangosság/plafon preset) */}
+              {kind === 'audio' ? (
+                <>
+                  <Text style={styles.fieldLabel}>{t('home.audioMasterLabel')}</Text>
+                  <Text style={styles.seoHint}>{t('home.audioMasterHint')}</Text>
+                  <View style={styles.aspectRow}>
+                    {AUDIO_TARGETS.map((tg) => (
+                      <Chip
+                        key={tg}
+                        label={t(`studio.master.target.${tg}`)}
+                        active={audioTarget === tg}
+                        onPress={() => setAudioTarget(tg)}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : null}
+
+              {/* 🗂️ FORRÁS-MAPPA — minden fajtánál: a támogatott fájlok importja már itt */}
+              <Text style={styles.fieldLabel}>{t('home.sourceLabel')}</Text>
+              <Text style={styles.seoHint}>{t('home.sourceHint')}</Text>
+              <View style={styles.aspectRow}>
+                {supportedSourceKinds(kind).map((sk) => (
+                  <Pressable key={sk} style={styles.sourceBtn} onPress={() => addSource(sk)}>
+                    <Ionicons name="add" size={14} color={palette.accent} />
+                    <Text style={styles.sourceBtnText}>{t(`studio.kind.${sk}`)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {sources.length > 0 ? (
+                <View style={styles.sourceList}>
+                  {sources.map((a) => (
+                    <View key={a.id} style={styles.sourceItem}>
+                      <Ionicons
+                        name={a.kind === 'video' ? 'videocam' : a.kind === 'audio' ? 'musical-notes' : 'image'}
+                        size={14}
+                        color={palette.textDim}
+                      />
+                      <Text style={styles.sourceItemName} numberOfLines={1}>
+                        {a.name}
+                      </Text>
+                      <Pressable
+                        onPress={() => setSources((prev) => prev.filter((x) => x.id !== a.id))}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.delete')}
+                      >
+                        <Ionicons name="close" size={16} color={palette.textDim} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
               ) : null}
             </ScrollView>
             <PrimaryButton
@@ -784,16 +1006,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
-  title: {
-    color: palette.text,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
   logoBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
+    width: 52,
+    height: 52,
+    borderRadius: 15,
     backgroundColor: palette.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1057,6 +1273,76 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  bgRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    alignItems: 'center',
+  },
+  dimRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  dimField: {
+    flex: 1,
+    gap: 4,
+  },
+  dimLabel: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  swapBtn: {
+    width: 42,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 1,
+  },
+  swatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  swatchActive: {
+    borderWidth: 3,
+    borderColor: palette.accent,
+  },
+  swatchTransparent: {
+    backgroundColor: palette.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: palette.surfaceHigh,
+  },
+  sourceBtnText: { color: palette.text, fontSize: 13, fontWeight: '700' },
+  sourceList: { gap: 6, marginTop: 2 },
+  sourceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: palette.surfaceHigh,
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  sourceItemName: { flex: 1, color: palette.text, fontSize: 13 },
   kindRow: {
     flexDirection: 'row',
     gap: 8,

@@ -3,13 +3,15 @@ import { t as tr } from 'i18next';
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
-import { createImageDoc } from '@/lib/imageDoc';
+import { masterPreset } from '@/lib/audioMaster';
+import { createImageDoc, type ImageDocBackground } from '@/lib/imageDoc';
 import { createLiveDoc } from '@/lib/liveDoc';
 import { projectKindMeta } from '@/lib/projectKinds';
 import type {
   AdjustClip,
   AspectRatio,
   Asset,
+  AudioMasterTarget,
   Clip,
   ImageClip,
   Project,
@@ -19,6 +21,20 @@ import type {
   TrackType,
   VideoClip,
 } from '@/types/project';
+
+/**
+ * 🎛️ Fajta-specifikus létrehozási beállítások (az „Új projekt” űrlapból):
+ * kép → vászonméret + háttér; hang → master-cél (az alap hangosság/plafon preset).
+ */
+export interface CreateProjectConfig {
+  image?: {
+    width?: number;
+    height?: number;
+    background?: ImageDocBackground;
+    format?: 'raster' | 'vector';
+  };
+  audioMasterTarget?: AudioMasterTarget;
+}
 
 /** A projekt fajtája, alapértelmezéssel (a régi, kind nélküli projektek videók). */
 export function projectKind(project: { kind?: ProjectKind }): ProjectKind {
@@ -53,7 +69,8 @@ export function createEmptyProject(
   name: string,
   aspectRatio: AspectRatio,
   seo?: ProjectSeo,
-  kind: ProjectKind = 'video'
+  kind: ProjectKind = 'video',
+  config?: CreateProjectConfig
 ): Project {
   const now = new Date().toISOString();
   return {
@@ -76,9 +93,15 @@ export function createEmptyProject(
     })),
     assets: [],
     // 🎨 a képstúdió a réteg-fát szerkeszti → egy üres kép-dokumentum előre,
-    // hogy a stúdiónak legyen mivel indulnia (a kirasterizált PNG lesz a média)
+    // hogy a stúdiónak legyen mivel indulnia (a kirasterizált PNG lesz a média).
+    // A vászonméret + háttér a létrehozó-űrlapból (config.image).
     ...(kind === 'image'
-      ? { imageDocs: [createImageDoc(name, aspectRatio, () => makeId('lyr'))] }
+      ? { imageDocs: [createImageDoc(name, aspectRatio, () => makeId('lyr'), config?.image)] }
+      : {}),
+    // 🎚️ a hang-projekt alap master-célja (az első beállítás): a loudness/plafon
+    // preset a cél szerint (podcast/zene/social/videó) — a MasterSheet később módosítja.
+    ...(kind === 'audio' && config?.audioMasterTarget
+      ? { audioMaster: masterPreset(config.audioMasterTarget) }
       : {}),
     // 🎥 a live-stúdió a scene/forrás-grafet szerkeszti → egy kiinduló live-doc
     // (Main jelenet + kamera + ReMix-cél); a Live-hub a „Go live"-nál ezt hozza.

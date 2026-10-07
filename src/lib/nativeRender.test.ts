@@ -78,6 +78,12 @@ describe('FREE eszközön-render — korlátlan hossz', () => {
     expect(plan.video[0].durationSec).toBe(300);
   });
 
+  it('a vízjel-zászló a render-tervbe kerül (on-device nem-fizető export)', () => {
+    const p = projectWithClips([videoClip('a', 0, 10)]);
+    expect(buildRenderPlan(p, DEFAULT_SETTINGS).watermark).toBeUndefined(); // alap: nincs
+    expect(buildRenderPlan(p, DEFAULT_SETTINGS, true).watermark).toBe(true); // exportPolicy → vízjel
+  });
+
   it('a hosszú, alap-beállítású projekt ESZKÖZÖN renderelhető (nincs Pro-kényszer)', () => {
     const clips = [videoClip('a', 0, 90), videoClip('b', 90, 90)];
     const project = projectWithClips(clips);

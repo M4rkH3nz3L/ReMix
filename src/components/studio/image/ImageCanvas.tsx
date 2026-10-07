@@ -43,7 +43,8 @@ export function ImageCanvas({
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
 
-  const av = aspectValue(doc.aspectRatio);
+  // a szabad W×H a mérvadó (kép-editor); különben a 3-arányos enum
+  const av = doc.width && doc.height ? doc.width / doc.height : aspectValue(doc.aspectRatio);
   const fit =
     container.w > 0 && container.h > 0
       ? container.w / container.h > av

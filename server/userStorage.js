@@ -11,6 +11,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const { adminClient } = require('./notify');
+const { fetchWithTimeout, fetchRetry } = require('./netFetch');
 const {
   mediaKind,
   davListMedia,
@@ -168,7 +169,8 @@ async function exchangeCode(provider, code, redirectUri) {
     client_secret: p.clientSecret(),
     redirect_uri: redirectUri,
   });
-  const res = await fetch(p.tokenUrl, {
+  // token-csere: NEM idempotens (nincs retry), de időkorláttal (ne lógjon be)
+  const res = await fetchWithTimeout(p.tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -215,7 +217,8 @@ async function ensureAccessToken(source) {
     client_id: p.clientId(),
     client_secret: p.clientSecret(),
   });
-  const res = await fetch(p.tokenUrl, {
+  // token-csere: NEM idempotens (nincs retry), de időkorláttal (ne lógjon be)
+  const res = await fetchWithTimeout(p.tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -256,7 +259,8 @@ async function gdriveListMedia(source) {
       pageSize: '200',
       orderBy: 'modifiedTime desc',
     }).toString();
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  // listázás: idempotens GET → időkorlát + retry átmeneti hibára
+  const res = await fetchRetry(url, { headers: { Authorization: `Bearer ${token}` } });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error?.message || `Drive lista hiba (${res.status})`);
@@ -301,11 +305,16 @@ async function gdriveStream(source, fileId, res) {
 async function dropboxListMedia(source) {
   const token = await ensureAccessToken(source);
   const entries = [];
-  let res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: '', recursive: true, limit: 500 }),
-  });
+  // listázás: read-only POST → idempotensként kezeljük (időkorlát + retry)
+  let res = await fetchRetry(
+    'https://api.dropboxapi.com/2/files/list_folder',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '', recursive: true, limit: 500 }),
+    },
+    { idempotent: true }
+  );
   let data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error_summary || `Dropbox lista hiba (${res.status})`);
@@ -331,11 +340,15 @@ async function dropboxListMedia(source) {
   };
   collect(data.entries);
   while (data.has_more && entries.length < 200) {
-    res = await fetch('https://api.dropboxapi.com/2/files/list_folder/continue', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cursor: data.cursor }),
-    });
+    res = await fetchRetry(
+      'https://api.dropboxapi.com/2/files/list_folder/continue',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cursor: data.cursor }),
+      },
+      { idempotent: true }
+    );
     data = await res.json().catch(() => ({}));
     if (!res.ok) {
       break;

@@ -121,7 +121,7 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 01 | Production / Go-Live | 0 | 2 | 5 | 7 |
 | 02 | Monetizáció | 2 | 7 | 1 | 10 |
 | 03 | Collaboration | 2 | 3 | 1 | 6 |
-| 04 | Social | 2 | 7 | 1 | 10 |
+| 04 | Social | 2 | 8 | 0 | 10 |
 | 05 | AI (Creator OS) | 1 | 0 | 10 | 11 |
 | 06 | Video Editor (NLE) | 4 | 4 | 3 | 11 |
 | 07 | Image Studio | 0 | 9 | 0 | 9 |
@@ -131,11 +131,12 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 11 | Performance | 1 | 0 | 4 | 5 |
 | 12 | Code quality | 0 | 7 | 2 | 9 |
 | 13 | Documentation | 0 | 1 | 5 | 6 |
-| **Σ** | **(13 epik)** | **13** | **45** | **48** | **106** |
+| **Σ** | **(13 epik)** | **13** | **46** | **47** | **106** |
 
-**Olvasat:** a 106 tételből **13 teljes**, **45 „mag kész"** (a logika megvan, csak a következő réteg —
-UI/backend/render — hiányzik) és **48 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
-**02 §2.2** (export-politika + banner), **03 §2.1** (clip-lock realtime), **04 §2.2** (moderation-admin-UX). A 2026-10-07-i session hozott: **R2 = élő platform-tár**
+**Olvasat:** a 106 tételből **13 teljes**, **46 „mag kész"** (a logika megvan, csak a következő réteg —
+UI/backend/render — hiányzik) és **47 nyitva**. A 2026-10-07-i session lezárta: **01 §2.7** (contract-mirror),
+**02 §2.2** (export-politika + banner), **03 §2.1** (clip-lock realtime), **04 §2.2** (moderation-admin-UX),
+**04 §2.8** (feed-poster-generálás R2-be). A 2026-10-07-i session hozott: **R2 = élő platform-tár**
 (08 §2.1 / 01 §2.1), **projekt forrás-mappa** minden stúdióban (08 §2.8, 06 §2.10), a kép-editor
 **Új dokumentum + vászon-kezelés** (07), a **kliens↔worker skew+easing contract-mirror** (01 §2.7),
 és a **usage-metering vertikum lezárva** (02 §2.2: export-politika — felhő=mért, on-device=ingyen+vízjel —

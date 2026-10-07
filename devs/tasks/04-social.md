@@ -5,10 +5,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 7 mag kész · ⬜ 1 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-07):** ✅ 2 teljes · 🟡 8 mag kész · ⬜ 0 nyitva — Σ 10 tétel.
 > collections + restrict + view-ranking + trending + hashtag + remix-lineage + creator-dashboard +
-> **moderation-admin-UX** (§2.2: report/poszt/komment/suspend/appeal) mind **e2e**. Hátra:
-> feed-media prod-pipeline (§2.8) + a ranking server-oldalra költöztetése + a mélyebb magok UI-ja.
+> **moderation-admin-UX** (§2.2) + **feed-poster-generálás** (§2.8, R2) mind e2e. Hátra: a §2.8 worker/infra
+> maradéka (transcoding/thumbnails/CDN-domain), a ranking server-oldalra költöztetése, a mélyebb magok UI-ja.
 
 ## 0. Kontextus & cél
 A social-core működik (feed, komment, like/save, follow, remix, DM, group-chat, notifications).
@@ -66,7 +66,8 @@ template-marketplace, remix-graph, multi-platform publishing, Creator Studio.
 - [ ] 🖼️ **Hátra**: a graph **vizualizáció-UI** (fa-nézet a `remixGraph`-ból) — a sima badge-en túl.
 
 ### 2.8 Feed media pipeline — P1
-- [ ] 🟡 Metaadat-oldal kész → 🎞️/🔌 **render→upload→poster→thumbnails→CDN→transcoding→moderation→publish** teljes prod-pipeline.
+- [x] ✅ **Borítókép (poster) generálás publikáláskor KÉSZ (2026-10-07)**: a feed-videó a kész MP4 reprezentatív kockájából ([feedMedia.ts](../../src/lib/feedMedia.ts) `posterFrameTime` ~10%, min 0.5 mp, nem a legvég) posztert generál (`getFilmstrip`) és feltölti (`<id>/poster/…`, az **R2-be**), ha még nincs — best-effort (weben null, hibánál kimarad; a publikálást sosem buktatja). A `render→upload(R2)→poster→publish` lánc innentől teljes. Teszt: `feedMedia.test.ts` (2). Audit zöld (123 suite / 1326 teszt).
+- [ ] 🔌 Hátra (worker/infra): ffmpeg-oldali poszter-fallback (szerver-render), több-méretű **thumbnails**, **transcoding** (HLS/több-bitráta), prod **CDN-domain** (ma `r2.dev` dev-URL); a moderation a §2.2-ben már kész.
 
 ### 2.9 Multi-platform publishing — P1
 - [x] ✅ **Platform-adapter mag KÉSZ (2026-10-06)**: [src/lib/publishTargets.ts](../../src/lib/publishTargets.ts) — `PLATFORM_SPECS` (TikTok/IG/YouTube/FB: cím/leírás-limit, hashtag-plafon, ajánlott aspect, short-form max hossz) + `normalizeHashtag(s)` (vezető-#/érvénytelen-karakter szűrés + case-insensitive dedup) + `adaptForPlatform` (a posztot a platform szabályaihoz igazítja: cím külön mezőbe VAGY a leírás elejére, hashtagek a leírás végére a limit megtartásával, **kemény** szöveg-vágás + figyelmeztetés; aspect/hossz csak warn) + `adaptAll`. Így a feltöltés ELŐTT látszik, mi megy fel + mit vágott. Teszt: `publishTargets.test.ts` (13).

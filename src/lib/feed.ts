@@ -6,8 +6,10 @@ import { finiteNum, mapValid, str } from '@/lib/parseGuards';
 import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
+import { needsPoster, posterFrameTime } from '@/lib/feedMedia';
 import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
 import { renderAndUploadWeb, renderProjectVersion, uploadMedia } from '@/lib/render';
+import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -556,6 +558,30 @@ export async function publishRenderedProject(
     rendered = { ...rendered, url };
     updated = { ...updated, rendered };
     await saveProject(updated);
+  }
+
+  // 🖼️ §2.8: borítókép a feed-rácshoz — ha nincs poster, a kész videó egy
+  // reprezentatív kockájából generálunk egyet és feltöltjük (<id>/poster/…).
+  // Best-effort: a getFilmstrip weben null-t ad, hibánál csendesen kimarad — a
+  // publikálást SOHA nem buktatja. (A ffmpeg-transcoding + több-thumbnail a worker/infra.)
+  if (needsPoster(rendered)) {
+    try {
+      const [poster] = await getFilmstrip(rendered.uri, [
+        snapThumbTime(posterFrameTime(rendered.durationSec)),
+      ]);
+      if (poster) {
+        const posterUrl = await uploadMedia(poster, {
+          projectId: project.id,
+          kind: 'poster',
+          name: `${project.id}.jpg`,
+        });
+        rendered = { ...rendered, posterUrl };
+        updated = { ...updated, rendered };
+        await saveProject(updated);
+      }
+    } catch {
+      // best-effort — poster nélkül is publikálható
+    }
   }
 
   const post = await publishPost(updated, {

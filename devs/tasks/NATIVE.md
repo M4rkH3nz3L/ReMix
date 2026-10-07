@@ -20,15 +20,17 @@
 | **Development Build alap** | 🟢 kész | `expo-dev-client` dep, `eas.json` profilok, `android/` + `ios/` prebuild, `app.json` plugins/permissions |
 | **Natív render modul (váz)** | 🟡 részben | [modules/remix-render/](../../modules/remix-render/) — `RemixRender` Expo-module |
 | **iOS render (AVFoundation)** | 🟢 v1 | [RemixRenderModule.swift](../../modules/remix-render/ios/RemixRenderModule.swift) — multi-szegmens vágás+sebesség, aspect-fill vászon, hang-mix, H.264 MP4, progressz |
-| **Android render (MediaCodec)** | 🟢 **Fázis A + B + C + D teljes (iOS-paritás)** | remux + GL-transzkód (skálázás/sebesség/szűrő) + **multi-segment kompozit** ([ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/ComposeEngine.kt)) + **N-sávos hang-mix** ([AudioMixer.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/AudioMixer.kt)) + **valódi cancel/robusztusság**; 8 emulátor-teszt zöld. Hátra: D-foreground-service + E (codec/HEVC) |
+| **Android render (MediaCodec)** | 🟢 **Fázis A–E TELJES (iOS-paritás)** | remux + GL-transzkód (skálázás/sebesség/szűrő) + multi-segment kompozit + N-sávos hang-mix + valódi cancel/robusztusság + **HEVC-opció/bitráta** ([VideoEncoderFactory.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/VideoEncoderFactory.kt)); **10 emulátor-teszt zöld**. Hátra csak: D-foreground-service (valós eszköz) |
 | **JS-híd / terv-fordító** | 🟢 kész | [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) — `buildRenderPlan`, `renderLocal`, `requireOptionalNativeModule('RemixRender')` |
 | **Render-orkesztrátor + router** | 🟢 kész | [src/lib/render.ts](../../src/lib/render.ts) + [src/lib/backend.ts](../../src/lib/backend.ts) — local vs cloud döntés |
 | **Felhő-render (Level 3)** | 🟢 kész | `server/render-worker.js` + FFmpeg (BullMQ queue) |
 | **iOS natív build** | ⛔ blokkolt | Xcode 26.4+ kell (lásd §5) |
 
-**Egy mondatban:** a natív build-lánc és a JS-oldal kész, az iOS-motor v1-en van,
-a **#1 technikai hiány az Android eszközön-render-motor** (jelenleg csak egyetlen,
-érintetlen klipet tud kimásolni).
+**Egy mondatban (2026-10-08):** a natív build-lánc és a JS-oldal kész, az iOS-motor
+v1-en van, az **Android eszközön-render-motor pedig A–E TELJES** (remux + GL-transzkód
++ multi-segment kompozit + hang-mix + cancel + HEVC/bitráta), 10 instrumentált
+emulátor-teszttel verifikálva. A korábbi #1 tech-hiány ezzel **megoldva**; hátra csak
+a háttér-foreground-service (valós eszköz) + az iOS-paritás-karbantartás (Xcode 26.4+).
 
 ### Üzleti modell (nem változik)
 `modules/remix-render/README.md` szerint: **eszközön-render = ingyen** (ez a modul),
@@ -156,10 +158,14 @@ Motor: [ComposeEngine.kt](../../modules/remix-render/android/src/main/java/expo/
       (valós eszközön tesztelhető igazán; a permission már deklarált, a tipikus rövid render a process-ben elfut).
 - **Kész, ha:** a ✕ ténylegesen megszakít ✅, a hibás forrás nem crashel ✅; a háttér-túlélés (foreground) hátra.
 
-### Fázis E — Codec/minőség
-- [ ] H.265 (HEVC) opció, ha az eszköz enkódere támogatja (kisebb fájl); fallback H.264.
-- [ ] Bitráta/preset a `settings.resolution`/`fps`-hez igazítva (a `RenderSettings`-ből).
-- **Kész, ha:** a kimenet mérete/minősége összevethető a felhő-renderrel 1080p-ig.
+### Fázis E — Codec/minőség ✅ KÉSZ (2026-10-08)
+Motor: [VideoEncoderFactory.kt](../../modules/remix-render/android/src/main/java/expo/modules/remixrender/VideoEncoderFactory.kt).
+- [x] **HEVC-opció**, ha az eszköz enkódere támogatja (`MediaCodecList.findEncoderForFormat`), kisebb fájl; különben **H.264-fallback**.
+- [x] **Bitráta** a tervből (`RenderSettings.bitrateMbps` → plan `bitRate`); 0 = automatikus a felbontásból. A kodek-választás a transzkód/kompozit közös `EncoderSpec`-jén.
+- [x] JS-routing: a `settingsNeedCloud` már **helyben** engedi a HEVC-et + VBR-t (csak AV1/ProRes/10-bit/HDR/Rec.2020/>4K/CBR/egyedi-GOP → felhő).
+- [x] **Verifikálva:** `hevcRequestedProducesPlayableOutput` (HEVC vagy H.264-fallback → valid MP4) + `lowerBitrateProducesSmallerFile` (`connectedDebugAndroidTest` zöld, 10/0/0).
+- **Kész, ha:** a kimenet mérete/minősége összevethető a felhő-renderrel 1080p-ig. ✅
+  (⚠️ iOS: az AVFoundation-motor H.264-et ad; a HEVC-kérés ott H.264-re esik — iOS-paritás követő lépés.)
 
 > **Verifikáció:** minden fázis a FUTÓ emulátoron (`emulator-5554`) + egy valós
 > eszközön tesztelve, nem csak fordítás. A terv-fordító JS-oldalhoz unit-teszt

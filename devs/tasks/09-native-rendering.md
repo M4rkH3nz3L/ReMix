@@ -7,7 +7,7 @@
 
 > **📊 Haladás (2026-10-07):** ✅ 0 · 🟡 1 · ⬜ 3 nyitva — Σ 4 tétel. **P3 platform-expanzió —
 > nincs launch-blokkoló.** A natív render-motor (§2.2) 🟡: iOS AVFoundation v1 kész + **Android
-> Fázis A + B + C + D teljes (iOS-paritás)** (remux + GL-transzkód + multi-segment kompozit + hang-mix + valódi cancel, 8 emulátor-teszt) — részletek: [NATIVE.md](./NATIVE.md). A többi nyitva
+> Fázis A–E TELJES (iOS-paritás)** (remux + GL-transzkód + multi-segment kompozit + hang-mix + valódi cancel + HEVC/bitráta, 10 emulátor-teszt) — részletek: [NATIVE.md](./NATIVE.md). A többi nyitva
 > (Skia / on-device-ONNX / generatív). **Céleszközök: Android telefon+tablet, iPhone+iPad** —
 > desktop és watchOS **kivéve** (nincs termék-igény).
 
@@ -26,9 +26,9 @@ Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a pr
 - [ ] ⬜ Skia-alapú text/shape/preview-pipeline a Chromium helyett (mobil-perf + parity).
 
 ### 2.2 Native FFmpeg / on-device render-motor — P2/P3
-- [x] ~ **iOS AVFoundation v1 KÉSZ** + **Android Fázis A + B + C + D KÉSZ (iOS-paritás)** — részletek + a hátralévő: **[NATIVE.md](./NATIVE.md)**.
-- [x] ~ **Android MediaCodec-motor — A (remux) + B (GL-transzkód: skálázás/sebesség/szűrő) + C (multi-segment kompozit + hang-mix) + D (valódi cancel + robusztusság) KÉSZ**,
-  8 instrumentált emulátor-teszttel verifikálva. **Hátra:** D-foreground-service → E (codec/HEVC).
+- [x] ~ **iOS AVFoundation v1 KÉSZ** + **Android Fázis A–E TELJES (iOS-paritás)** — részletek + a hátralévő: **[NATIVE.md](./NATIVE.md)**.
+- [x] ~ **Android MediaCodec-motor — A (remux) + B (GL-transzkód: skálázás/sebesség/szűrő) + C (multi-segment kompozit + hang-mix) + D (valódi cancel + robusztusság) + E (HEVC-opció + bitráta) TELJES**,
+  10 instrumentált emulátor-teszttel verifikálva. **Hátra csak:** D-foreground-service (valós eszköz) + iOS-paritás-karbantartás (Xcode 26.4+).
 - [ ] ⬜ iOS: valódi cancel + fejlett effektek beégetése (paritás).
 
 ### 2.3 On-device ONNX — P2/P3

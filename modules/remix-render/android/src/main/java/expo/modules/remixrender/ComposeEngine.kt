@@ -1,7 +1,6 @@
 package expo.modules.remixrender
 
 import android.media.MediaCodec
-import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -23,7 +22,6 @@ import java.nio.ByteBuffer
  */
 object ComposeEngine {
   private const val TIMEOUT_US = 10_000L
-  private const val VIDEO_MIME = "video/avc"
 
   private class VSeg(
     val uri: String,
@@ -36,6 +34,7 @@ object ComposeEngine {
     val filterOpacity: Float,
   )
 
+  /** Rövidített hívás H.264 / automatikus bitrátával. */
   fun compose(
     video: JSONArray,
     audio: JSONArray?,
@@ -43,6 +42,18 @@ object ComposeEngine {
     canvasHeight: Int,
     fps: Int,
     isCancelled: () -> Boolean = { false },
+    outputPath: String,
+    onProgress: (Double) -> Unit,
+  ): String = compose(video, audio, canvasWidth, canvasHeight, fps, EncoderSpec(), isCancelled, outputPath, onProgress)
+
+  fun compose(
+    video: JSONArray,
+    audio: JSONArray?,
+    canvasWidth: Int,
+    canvasHeight: Int,
+    fps: Int,
+    enc: EncoderSpec,
+    isCancelled: () -> Boolean,
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -103,13 +114,7 @@ object ComposeEngine {
     var outputSurface: OutputSurface? = null
     var muxer: MediaMuxer? = null
     try {
-      val outFormat = MediaFormat.createVideoFormat(VIDEO_MIME, canvasW, canvasH)
-      outFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-      outFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitRateFor(canvasW, canvasH))
-      outFormat.setInteger(MediaFormat.KEY_FRAME_RATE, if (fps > 0) fps else 30)
-      outFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-      encoder = MediaCodec.createEncoderByType(VIDEO_MIME)
-      encoder.configure(outFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+      encoder = VideoEncoderFactory.createConfigured(canvasW, canvasH, fps, enc).codec
       inputSurface = InputSurface(encoder.createInputSurface())
       inputSurface.makeCurrent()
       encoder.start()
@@ -342,6 +347,5 @@ object ComposeEngine {
   }
 
   private fun toPath(uri: String): String = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
-  private fun bitRateFor(w: Int, h: Int): Int = (w.toLong() * h.toLong() * 4L).toInt().coerceIn(2_000_000, 24_000_000)
   private fun evenDim(n: Int): Int = if (n % 2 == 0) n else n + 1
 }

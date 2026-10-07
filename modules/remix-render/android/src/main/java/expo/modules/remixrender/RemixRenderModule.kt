@@ -68,6 +68,8 @@ class RemixRenderModule : Module() {
     val fps = plan.optInt("fps", 30)
     val progress = { p: Double -> sendEvent("onProgress", mapOf("progress" to p)) }
     val isCancelled = { cancelRequested }
+    // Fázis E: a cél-kodek (h264/hevc) + bitráta a render-tervből (RenderSettings).
+    val enc = EncoderSpec(plan.optString("codec", "h264"), plan.optInt("bitRate", 0))
 
     val seg = video.getJSONObject(0)
     val extraAudio = audio != null && audio.length() > 0
@@ -75,7 +77,7 @@ class RemixRenderModule : Module() {
 
     // Multi-segment / külön hang-sáv / egyedi hangerő → kompozit (Fázis C).
     if (multi || extraAudio || seg.optDouble("volume", 1.0) != 1.0) {
-      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, isCancelled, outFile, progress)
+      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, enc, isCancelled, outFile, progress)
     }
 
     // ── egy klip, nincs külön hang, teljes hangerő → A/B gyors út ──
@@ -98,12 +100,12 @@ class RemixRenderModule : Module() {
       return try {
         "file://" + RemuxEngine.remuxTrim(src, inSec, durationSec, planW, planH, isCancelled, outFile, progress)
       } catch (_: AspectMismatchException) {
-        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, -1, 0f, isCancelled, outFile, progress)
+        "file://" + TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, 1.0, -1, 0f, enc, isCancelled, outFile, progress)
       }
     }
 
     // sebesség és/vagy szűrő → transzkód (B1/B2/B3); remux itt nem opció.
     return "file://" +
-      TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, filterRgb, filterOpacity, isCancelled, outFile, progress)
+      TranscodeEngine.transcode(src, inSec, durationSec, planW, planH, fps, speed, filterRgb, filterOpacity, enc, isCancelled, outFile, progress)
   }
 }

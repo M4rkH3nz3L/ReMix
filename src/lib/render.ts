@@ -172,17 +172,17 @@ export const PLATFORM_PRESETS: Record<
 };
 
 export function settingsNeedCloud(s: RenderSettings): boolean {
-  // Az eszközön futó (natív) render csak H.264 CRF-et tud, felbontásból/fps-ből.
-  // Minden tényleges pro encode-kontroll (más kodek, cél-bitráta, egyedi GOP,
-  // 10-bit, HDR, Rec.2020, >4K) a felhő-workerre kerül — hogy a UI ne ígérjen
-  // olyat, amit a lokális út elnyel.
+  // Az eszközön futó (natív) render H.264/HEVC-et tud, cél-bitrátával (CRF vagy
+  // VBR), 8-bit Rec.709, max 4K (Fázis A–E). Minden ezen túli pro-kontroll
+  // (AV1/ProRes, 10-bit, HDR, Rec.2020, >4K, CBR, egyedi GOP) a felhő-workerre
+  // kerül — hogy a UI ne ígérjen olyat, amit a lokális út elnyel.
   return (
-    (s.codec !== undefined && s.codec !== 'h264') ||
+    (s.codec !== undefined && s.codec !== 'h264' && s.codec !== 'hevc') ||
     s.resolution > 2160 ||
     s.bitDepth === 10 ||
     s.hdr === true ||
     s.colorSpace === 'rec2020' ||
-    (s.bitrateMode !== undefined && s.bitrateMode !== 'crf') ||
+    s.bitrateMode === 'cbr' ||
     (s.gop !== undefined && s.gop > 0)
   );
 }

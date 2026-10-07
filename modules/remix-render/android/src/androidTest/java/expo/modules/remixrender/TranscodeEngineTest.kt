@@ -242,6 +242,65 @@ class TranscodeEngineTest {
     assertFalse("hibánál sem marad részfájl", out.exists())
   }
 
+  @Test
+  fun hevcRequestedProducesPlayableOutput() {
+    val inst = InstrumentationRegistry.getInstrumentation()
+    val cache = inst.targetContext.cacheDir
+    val src = File(cache, "hevc_src.mp4")
+    inst.context.assets.open("remux_sample.mp4").use { input ->
+      src.outputStream().use { output -> input.copyTo(output) }
+    }
+    val out = File(cache, "hevc_out.mp4")
+    if (out.exists()) out.delete()
+
+    // HEVC-t kérünk; ha az emulátoron nincs HEVC-enkóder → H.264-fallback. Mindkét
+    // esetben valid, újra-megnyitható MP4 (a lényeg: a kodek-választás nem tör el).
+    TranscodeEngine.transcode(
+      src.absolutePath, 0.0, 1.0, 240, 240, 30, 1.0, -1, 0f, EncoderSpec("hevc", 0), { false }, out.absolutePath,
+    ) {}
+
+    assertTrue("a kimenet létrejött", out.exists() && out.length() > 0)
+    val ex = MediaExtractor()
+    try {
+      ex.setDataSource(out.absolutePath)
+      var mime: String? = null
+      for (i in 0 until ex.trackCount) {
+        val m = ex.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
+        if (m.startsWith("video/")) mime = m
+      }
+      assertTrue("van videósáv h264/hevc kodekkel (lett: $mime)", mime == "video/hevc" || mime == "video/avc")
+    } finally {
+      ex.release()
+    }
+  }
+
+  @Test
+  fun lowerBitrateProducesSmallerFile() {
+    val inst = InstrumentationRegistry.getInstrumentation()
+    val cache = inst.targetContext.cacheDir
+    val src = File(cache, "br_src.mp4")
+    inst.context.assets.open("remux_sample.mp4").use { input ->
+      src.outputStream().use { output -> input.copyTo(output) }
+    }
+    val hi = File(cache, "br_hi.mp4")
+    val lo = File(cache, "br_lo.mp4")
+    if (hi.exists()) hi.delete()
+    if (lo.exists()) lo.delete()
+
+    TranscodeEngine.transcode(
+      src.absolutePath, 0.0, 2.0, 320, 240, 30, 1.0, -1, 0f, EncoderSpec("h264", 12_000_000), { false }, hi.absolutePath,
+    ) {}
+    TranscodeEngine.transcode(
+      src.absolutePath, 0.0, 2.0, 320, 240, 30, 1.0, -1, 0f, EncoderSpec("h264", 500_000), { false }, lo.absolutePath,
+    ) {}
+
+    assertTrue("mindkét kimenet létrejött", hi.length() > 0 && lo.length() > 0)
+    assertTrue(
+      "az alacsonyabb bitráta kisebb fájlt ad (hi=${hi.length()}, lo=${lo.length()})",
+      lo.length() < hi.length(),
+    )
+  }
+
   /** Az első képkocka átlagos csatorna-szórása (max-min RGB) — a „színesség" mértéke. */
   private fun avgChannelSpread(path: String): Double {
     val mmr = MediaMetadataRetriever()

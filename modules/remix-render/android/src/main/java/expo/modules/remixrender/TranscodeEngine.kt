@@ -1,7 +1,6 @@
 package expo.modules.remixrender
 
 import android.media.MediaCodec
-import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -25,9 +24,8 @@ import kotlin.math.min
  */
 object TranscodeEngine {
   private const val TIMEOUT_US = 10_000L
-  private const val VIDEO_MIME = "video/avc"
 
-  /** @return a kész kimeneti fájl abszolút elérési útja (file:// nélkül). */
+  /** Rövidített hívás H.264 / automatikus bitrátával (a kodek-választás nélkül). */
   fun transcode(
     srcPath: String,
     inSec: Double,
@@ -39,6 +37,25 @@ object TranscodeEngine {
     filterRgb: Int,
     filterOpacity: Float,
     isCancelled: () -> Boolean = { false },
+    outputPath: String,
+    onProgress: (Double) -> Unit,
+  ): String = transcode(
+    srcPath, inSec, durationSec, canvasWidth, canvasHeight, fps, speed, filterRgb, filterOpacity,
+    EncoderSpec(), isCancelled, outputPath, onProgress,
+  )
+
+  fun transcode(
+    srcPath: String,
+    inSec: Double,
+    durationSec: Double,
+    canvasWidth: Int,
+    canvasHeight: Int,
+    fps: Int,
+    speed: Double,
+    filterRgb: Int,
+    filterOpacity: Float,
+    enc: EncoderSpec,
+    isCancelled: () -> Boolean,
     outputPath: String,
     onProgress: (Double) -> Unit,
   ): String {
@@ -102,17 +119,8 @@ object TranscodeEngine {
         null
       }
 
-      // ── enkóder (cél-vászon) + GL input-surface ──
-      val outFormat = MediaFormat.createVideoFormat(VIDEO_MIME, canvasW, canvasH)
-      outFormat.setInteger(
-        MediaFormat.KEY_COLOR_FORMAT,
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
-      )
-      outFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitRateFor(canvasW, canvasH))
-      outFormat.setInteger(MediaFormat.KEY_FRAME_RATE, if (fps > 0) fps else 30)
-      outFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-      encoder = MediaCodec.createEncoderByType(VIDEO_MIME)
-      encoder.configure(outFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+      // ── enkóder (cél-vászon, kodek a RenderSettings-ből) + GL input-surface ──
+      encoder = VideoEncoderFactory.createConfigured(canvasW, canvasH, fps, enc).codec
       inputSurface = InputSurface(encoder.createInputSurface())
       inputSurface.makeCurrent()
       encoder.start()
@@ -311,8 +319,6 @@ object TranscodeEngine {
       ex.release()
     }
   }
-
-  private fun bitRateFor(w: Int, h: Int): Int = (w.toLong() * h.toLong() * 4L).toInt().coerceIn(2_000_000, 24_000_000)
 
   private fun evenDim(n: Int): Int = if (n % 2 == 0) n else n + 1
 }

@@ -97,6 +97,10 @@ interface RenderPlan {
   audio: PlanAudioSegment[];
   /** 🏷️ ReMix-vízjel a kimenetre (ingyen on-device, nem-fizető tier — `exportPolicy`) */
   watermark?: boolean;
+  /** 🎞️ cél-kodek (Fázis E): 'hevc' → kisebb fájl, ha az eszköz bírja; alap h264 */
+  codec?: string;
+  /** cél-bitráta bit/s-ben (0/hiányzó = automatikus a felbontásból) */
+  bitRate?: number;
 }
 
 const AUDIO_TRACKS = new Set(['music', 'voiceover', 'sfx']);
@@ -169,6 +173,10 @@ export function buildRenderPlan(
     video,
     audio,
     ...(watermark ? { watermark: true } : {}),
+    ...(settings.codec === 'hevc' ? { codec: 'hevc' } : {}),
+    ...(settings.bitrateMbps && settings.bitrateMbps > 0
+      ? { bitRate: Math.round(settings.bitrateMbps * 1_000_000) }
+      : {}),
   };
 }
 

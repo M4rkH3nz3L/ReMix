@@ -96,3 +96,27 @@ describe('FREE eszközön-render — korlátlan hossz', () => {
     expect(settingsNeedCloud(DEFAULT_SETTINGS)).toBe(false);
   });
 });
+
+describe('buildRenderPlan — az ASSET a forrás-igazság (ADR-012 Fázis 2b)', () => {
+  it('a klip ELAVULT uri-cache-e helyett az asset frissebb uri-ját teszi a tervbe', () => {
+    const project = projectWithClips([
+      { ...videoClip('a', 0, 10), uri: 'file:///stale.mp4', assetId: 'ast1' } as VideoClip,
+    ]);
+    project.assets = [
+      { id: 'ast1', kind: 'video', uri: 'file:///fresh.mp4', provider: 'local' },
+    ];
+    const plan = buildRenderPlan(project, DEFAULT_SETTINGS);
+    expect(plan.video).toHaveLength(1);
+    expect(plan.video[0].uri).toBe('file:///fresh.mp4');
+  });
+
+  it('ha az asset http-forrásra mutat, a klip kimarad az eszközön-render tervből', () => {
+    const project = projectWithClips([
+      { ...videoClip('a', 0, 10), uri: 'file:///local.mp4', assetId: 'ast1' } as VideoClip,
+    ]);
+    project.assets = [
+      { id: 'ast1', kind: 'video', uri: 'https://cdn/stream.m3u8', provider: 'remote' },
+    ];
+    expect(buildRenderPlan(project, DEFAULT_SETTINGS).video).toHaveLength(0);
+  });
+});

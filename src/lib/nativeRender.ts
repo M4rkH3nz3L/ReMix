@@ -2,6 +2,7 @@ import { requireOptionalNativeModule } from 'expo';
 import { Directory, File, Paths } from 'expo-file-system';
 import { t as tr } from 'i18next';
 
+import { resolveClipUri } from '@/lib/assetResolve';
 import type { RenderSettings } from '@/lib/render';
 import type { Project } from '@/types/project';
 
@@ -139,9 +140,13 @@ export function buildRenderPlan(
 
   for (const track of project.tracks) {
     for (const clip of track.clips) {
-      if (clip.kind === 'video' && !clip.uri.startsWith('http')) {
+      // 🔗 az asset a forrás-igazság (ADR-012): a feloldott URI-t vesszük (a
+      // http-guard is ezt nézi). Ma megegyezik a klip uri-cache-ével, relink
+      // után (Fázis 3) viszont az asset frissebb uri-ja érvényesül itt is.
+      const uri = resolveClipUri(project, clip);
+      if (clip.kind === 'video' && uri && !uri.startsWith('http')) {
         video.push({
-          uri: clip.uri,
+          uri,
           atSec: clip.start,
           inSec: clip.trimIn ?? 0,
           durationSec: clip.duration,
@@ -149,9 +154,9 @@ export function buildRenderPlan(
           volume: clip.volume ?? 1,
           filter: clip.filterId ?? 'none',
         });
-      } else if (clip.kind === 'audio' && AUDIO_TRACKS.has(track.type) && !clip.uri.startsWith('http')) {
+      } else if (clip.kind === 'audio' && AUDIO_TRACKS.has(track.type) && uri && !uri.startsWith('http')) {
         audio.push({
-          uri: clip.uri,
+          uri,
           atSec: clip.start,
           inSec: (clip as { trimIn?: number }).trimIn ?? 0,
           durationSec: clip.duration,

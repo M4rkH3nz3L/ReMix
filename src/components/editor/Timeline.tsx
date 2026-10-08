@@ -611,7 +611,15 @@ export function Timeline() {
       {/* 🔎 insight-sáv: egyszerre EGY nézet (story / pacing) — kevés chrome. A
           térkép (minimap) NEM fül többé: állandó scrubber-csík közvetlenül az
           idővonal fölött (lásd lentebb). */}
-      <View style={styles.insightTabs}>
+      {/* ↔️ a vezérlők EGY sorban: ha nem fér ki (keskeny kijelző), VÍZSZINTESEN
+          GÖRGETHETŐ — a Snap/Region SOHA nem törik külön új sorba. Normál kijelzőn
+          a `minWidth:100%` + a trim `marginLeft:auto` ugyanúgy jobbra igazít. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.insightTabsBar}
+        contentContainerStyle={styles.insightTabs}
+      >
         {(['story', 'pacing'] as const).map((k) => (
           <Pressable
             key={k}
@@ -701,7 +709,7 @@ export function Timeline() {
             <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
       {insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
       {/* 🗺️ állandó scrubber KÖZVETLENÜL az idővonal fölött: az egész projekt
           kicsinyített térképe — koppintás/húzás a lejátszófejet mozgatja végig,
@@ -1229,14 +1237,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  // a vízszintes ScrollView kerete (fix magasság, nem nő a vezérlőkkel)
+  insightTabsBar: {
+    flexGrow: 0,
+    marginHorizontal: 8,
+    marginBottom: 3,
+  },
+  // a görgethető TARTALOM: egy sor; minWidth:100% → ha kifér, a trim marginLeft:auto-ja
+  // jobbra igazít (mint eddig); ha nem fér ki, görgethető (nem tör új sorba)
   insightTabs: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    rowGap: 4,
     gap: 6,
-    marginHorizontal: 8,
-    marginBottom: 3,
+    minWidth: '100%',
   },
   iconBtn: {
     alignItems: 'center',

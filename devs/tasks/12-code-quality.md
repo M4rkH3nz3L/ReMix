@@ -25,7 +25,12 @@ Store**, tipizált hálózat, determinisztikus állapot.
 ### 2.1 HTTP response validation — P1
 - [x] ~ **Toolkit kibővítve + első adopter**: [parseGuards.ts](../../src/lib/parseGuards.ts) a `str`/`boolOr`/`strList`/**`asRecord`** narrowerekkel (a meglévő `finiteNum`/`timeList`/… mellé) → `const o = asRecord(await res.json()); str(o?.name)` a `… as T` helyett. Teszt: `parseGuards.test.ts` (+5). Első bekötés: [aiHealth.ts](../../src/lib/aiHealth.ts) (`boolOr(asRecord(...)?.ok)`).
 - [x] ✅ **Kritikus kliensek migrálva (2026-10-06)**: [billing.ts](../../src/lib/billing.ts) (`proUntil` → `str(asRecord(...))`), [colorClient.ts](../../src/lib/colorClient.ts) (stats/pixel/scope → `asRecord`+`finiteNum`/`str`, nem a try/catch-re bízva a null-derefet), [externalStorage.ts](../../src/lib/externalStorage.ts) — kiemelt **pure** `parseConnectedProviders` + `parseStorageEntries` (`mapValid` elemenkénti validálással: hibás elem kiesik, null-body sem omlik) + a `readError`/OAuth-start hardening. Teszt: `externalStorage.test.ts` (7 — hibás/hiányos elem kiesik, null → []).
-- [ ] 🟡 **Hátra**: a maradék fájlok `res.json() as T` castjainak inkrementális migrálása (feed/chat/other clients).
+- [x] ~ **Verify-first audit (2026-10-08): a crash-kockázat lényegében lezárva.** Végignézve a maradék `res.json() as T`
+  castok: a worker-array-kliensek **MIND runtime-guardoltak** a cast UTÁN — `Array.isArray(body.x) ? … : null` + `try/catch`
+  (faceClient, track, stickers3d, visionSearch, beats, highlightsClient), a strukturált válaszok teljes elem-validálással
+  (storyClient: `filter`+`Number.isFinite`+`KINDS.includes`), a geometriát-matekba-vivők `finiteNum`/`unitNum`/`mapValid`-dal
+  (reframeClient). A nevesített **feed/chat** a Supabase-SDK-t használja, nem nyers `fetch`+`json`-t → nincs cast-crash-út.
+  A megmaradt castok tehát **type-lie-ek runtime-guard mögött** (kozmetikai `asRecord`-átírás, nem bug) → **inkrementális, nem P1**.
 
 ### 2.2 Retry / backoff egységesítés — P1
 - [x] ✅ **Policy KÉSZ + tesztelt (verify-first, az audit elavult)**: [netRetry.ts](../../src/lib/netRetry.ts) — exponential-backoff **cappel** (`MAX_DELAY_MS`) + **full jitter** (`base*(0.5+random*0.5)`, thundering-herd ellen) + `Retry-After` (sec ÉS HTTP-dátum, felső korláttal) + `isRetryableStatus` (408/425/429/5xx) + abort-tudatos + `attempts` (max-attempts) + **idempotencia-tudatos** (`retryRead` CSAK olvasásra; a docstring kimondja, hogy a nem-idempotens POST-ot nem szabad). Teszt: `netRetry.test.ts`.

@@ -136,9 +136,9 @@ Production readiness        ███░░░░░░░  ~30–40%
 | 09 | Native / Rendering | 0 | 1 | 3 | 4 |
 | 10 | Brand / UI | 0 | 2 | 6 | 8 |
 | 11 | Performance | 1 | 0 | 4 | 5 |
-| 12 | Code quality | 0 | 7 | 2 | 9 |
+| 12 | Code quality | 1 | 7 | 1 | 9 |
 | 13 | Documentation | 0 | 1 | 5 | 6 |
-| **Σ** | **(CORE + 13 epik)** | **20** | **51** | **43** | **114** |
+| **Σ** | **(CORE + 13 epik)** | **21** | **51** | **42** | **114** |
 
 **Olvasat:** a 114 tételből **20 teljes**, **51 „mag kész"** (a logika megvan, csak a következő réteg —
 UI/backend/render — hiányzik) és **43 nyitva**.

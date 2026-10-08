@@ -1,6 +1,7 @@
 import { t as tr } from 'i18next';
 
 import { MIN_CLIP_DURATION } from '@/constants/editor';
+import { ensureClipAssets } from '@/lib/assetResolve';
 import { makeId } from '@/lib/id';
 import { splitKeyframes } from '@/lib/keyframes';
 import { masterPreset } from '@/lib/audioMaster';
@@ -197,6 +198,10 @@ export function migrateProject(project: Project): Project {
     // v5 → v6: projekt-fajta (kind) — a régi, kind nélküli projektek videók
     next = { ...next, kind: next.kind ?? 'video', schemaVersion: 6 };
   }
+  // 🔗 verzió-független backfill (ADR-012): a séma-migráció utáni úton (preset/AI/
+  // hang-leválasztás) assetId NÉLKÜL hozzáadott media-klipek is kapjanak asset-linket.
+  // Determinisztikus id (assetIdForUri) → idempotens + round-trip- és collab-stabil.
+  next = ensureClipAssets(next);
   return next;
 }
 

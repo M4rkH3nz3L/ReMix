@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { ensureClipAssets } from '@/lib/assetResolve';
 import * as storage from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, Project, Track, TrackType, VideoClip } from '@/types/project';
@@ -80,11 +81,15 @@ describe('CORE §2.9 — arany-út: a teljes mag-hurok egy tesztben', () => {
     for (let i = 0; i < steps; i++) store().redo();
     expect(fingerprint(store().project!)).toBe(edited);
 
-    // 7) szerializálás → ATOMI mentés → újratöltés → bitre azonos tartalom
+    // 7) szerializálás → ATOMI mentés → újratöltés → bitre azonos tartalom.
+    //    A betöltés az ADR-012 szerint backfilleli az asset-linkeket (determinisztikus
+    //    id), ezért a reload a backfill-normalizált állapottal egyezik (nem a nyers,
+    //    linkeletlen memóriabelivel) — a szerkesztés egy bitje sem vész el, csak az
+    //    asset-registry normalizálódik.
     await storage.saveProjectAndEvents(store().project!, store().events);
     const reloaded = await storage.loadProject('golden');
     expect(reloaded).not.toBeNull();
-    expect(fingerprint(reloaded!)).toBe(edited);
+    expect(fingerprint(reloaded!)).toBe(fingerprint(ensureClipAssets(store().project!)));
 
     // az eseménynapló is túléli a mentés→újratöltést (4 esemény)
     const reloadedEvents = await storage.loadEvents('golden');

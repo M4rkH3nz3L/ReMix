@@ -1,4 +1,3 @@
-import { makeId } from '@/lib/id';
 import type { Asset, Clip, Project } from '@/types/project';
 
 /**
@@ -20,6 +19,23 @@ function isMediaClip(clip: Clip): clip is Clip & { uri: string; kind: 'video' | 
 
 function clipUriOf(clip: Clip): string | undefined {
   return 'uri' in clip ? (clip as { uri?: string }).uri : undefined;
+}
+
+/**
+ * Determinisztikus, tartalom-címzett asset-id a backfillhez (ADR-012): a SAME uri
+ * → SAME id minden kliensen és minden betöltésnél. Enélkül a `makeId` (véletlen)
+ * eltörné a bitre-azonos mentés→újratöltés round-tripet és collab-divergenciát
+ * okozna. Két 32-bites FNV-1a hash (~64 bit) a névtér-ütközés ellen.
+ */
+export function assetIdForUri(uri: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = (0x811c9dc5 ^ uri.length) >>> 0;
+  for (let i = 0; i < uri.length; i++) {
+    const c = uri.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ (c + 0x9e), 0x01000193);
+  }
+  return `ast_${(h1 >>> 0).toString(36)}${(h2 >>> 0).toString(36)}`;
 }
 
 /**
@@ -84,9 +100,9 @@ export function relinkAsset(project: Project, assetId: string, newUri: string): 
  * Betöltéskori backfill: minden media-klip, aminek nincs `assetId`-je, kapjon
  * assetet (uri szerint find-or-create) + linket. **Idempotens** — ha már minden
  * media-klip linkelt, az EREDETI projekt-referenciát adja vissza (nincs fölös
- * re-render / churn). Lokális, egyszer-futó normalizálás (mint a séma-migrációk),
- * ezért a `makeId` itt collab-biztos: nem replayelt command, hanem a betöltő
- * kliens lokális lépése.
+ * re-render / churn). A backfill `assetIdForUri`-t használ (determinisztikus,
+ * tartalom-címzett), így kétszer betöltve ugyanazt az id-t adja (round-trip) és
+ * kliensek közt sem divergál.
  */
 export function ensureClipAssets(project: Project): Project {
   const assets = [...project.assets];
@@ -107,7 +123,7 @@ export function ensureClipAssets(project: Project): Project {
       let asset = byUri.get(clip.uri);
       if (!asset) {
         asset = {
-          id: makeId('ast'),
+          id: assetIdForUri(clip.uri),
           kind: clip.kind,
           uri: clip.uri,
           provider: 'local',

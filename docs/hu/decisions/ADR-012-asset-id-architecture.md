@@ -2,7 +2,7 @@
 
 > ↑ [docs/hu index](../README.md) · [architecture/state.md](../architecture/state.md)
 
-- **Státusz:** Elfogadva, fokozatos bevezetés (2026-10-08) — Fázis 1 kész
+- **Státusz:** Elfogadva, fokozatos bevezetés (2026-10-08) — Fázis 1 + 2a kész (mag + determinisztikus backfill bekötve)
 - **Horgony:** [assetResolve.ts](../../../src/lib/assetResolve.ts) (`assetForClip`/`resolveClipUri`/`relinkAsset`/`ensureClipAssets`) ·
   [projectUtils.ts](../../../src/lib/projectUtils.ts) (`migrateToV2` asset-registry) · [06-video-editor §2.10](../../../devs/tasks/06-video-editor.md) · [12-code-quality](../../../devs/tasks/12-code-quality.md)
 
@@ -32,24 +32,30 @@ backward-compatible**:
    - `relinkAsset(project, assetId, newUri)` — **egy hívás → minden rá hivatkozó
      klip** (az asset uri-ja + a linkelt klipek uri-cache-e szinkronban).
    - `ensureClipAssets(project)` — idempotens backfill: a linkeletlen media-klipek
-     `assetId`-t kapnak (uri szerint find-or-create). **Definiált + tesztelt, de még NEM
-     bekötve** — lásd a determinizmus-megkötést lent.
-2. **Fázis 2 (következő):** (a) `ensureClipAssets` bekötése **determinisztikus,
-   tartalom-címzett asset-id-vel** (lásd lent); (b) a fogyasztók (preview/pip/audio/
-   render-plan/proxy, `findMissingMedia`) a `resolveClipUri`-ra állnak → a klip `uri`-ja
-   már csak cache.
-3. **Fázis 3:** a relink/cloud-sync/collab az asset-registryre épül
+     `assetId`-t kapnak (uri szerint find-or-create), **determinisztikus** `assetIdForUri`-vel.
+2. **Fázis 2a (KÉSZ):** `ensureClipAssets` **bekötve a `migrateProject` végére** (verzió-
+   független, minden betöltéskor fut), `assetIdForUri` determinisztikus id-vel → a séma-
+   migráció utáni utakon (preset/AI/hang-leválasztás) assetId nélkül hozzáadott klipek is
+   linkelnek, a round-trip + collab determinizmus sértése nélkül (az arany-út teszt igazolja).
+4. **Fázis 2b (következő):** a fogyasztók (preview/pip/audio/render-plan/proxy,
+   `findMissingMedia`) a `resolveClipUri`-ra állnak → a klip `uri`-ja már csak cache.
+5. **Fázis 3:** a relink/cloud-sync/collab az asset-registryre épül
    (`relinkAsset` + asset-id-alapú upload); a klip `uri` elhagyható (vagy csak cache).
 
-### Determinizmus-megkötés (miért nincs még bekötve a backfill)
+### Determinizmus-megkötés (miért tartalom-címzett a backfill id-je)
 A backfill/ingest **nem használhat `makeId` (véletlen) asset-id-t** sem a betöltő
 úton (`migrateProject`), sem a reducerben: ugyanazt a (linkeletlen) projektet kétszer
-betöltve eltérő asset-id-t adna → (a) elromlik a **bitre-azonos mentés→újratöltés**
+betöltve eltérő asset-id-t adna → (a) elromlana a **bitre-azonos mentés→újratöltés**
 round-trip (a `CORE §2.9` arany-út tesztje ezt ki is szúrta), (b) **collab-divergencia**
-(a replay más id-t adna kliensenként). A Fázis 2 ezért **determinisztikus, tartalom-címzett
-id-t** vezet be a backfillhez (pl. `ast_<hash(uri)>`), ami kliensek közt is egyezik.
-A parancs-épített assetek id-je továbbra is a **command-építéskor** rögzül és a commandban
+(a replay más id-t adna kliensenként). Ezért a backfill a **determinisztikus, tartalom-címzett
+`assetIdForUri`-t** használja (`ast_<FNV-1a(uri)>`), ami kliensek közt is egyezik. A
+parancs-épített assetek id-je továbbra is a **command-építéskor** rögzül és a commandban
 utazik (az `ADD_CLIP { asset }` már így működik), nem a reducerben.
+
+> ⚠️ **Fázis 3 collab-él:** ha két kliens UGYANARRA az uri-ra párhuzamosan hoz létre
+> assetet KÜLÖNBÖZŐ úton (pl. forrás-bin `makeId`-s asset vs. backfill `assetIdForUri`),
+> két asset keletkezhet egy fájlra. A registry collab-sync tervezésekor (Fázis 3) ez
+> merge-stratégiát kíván; egyetlen kliensen a `byUri` dedup ezt már most kizárja.
 
 ## Miért
 - **Egy forrás, egy relink:** egy médiafájl újracsatolása/felhő-feltöltése egy

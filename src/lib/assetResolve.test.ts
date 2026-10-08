@@ -1,5 +1,6 @@
 import {
   assetForClip,
+  assetIdForUri,
   ensureClipAssets,
   relinkAsset,
   resolveClipUri,
@@ -99,7 +100,30 @@ describe('relinkAsset — egy hívás → minden rá hivatkozó klip', () => {
   });
 });
 
+describe('assetIdForUri — determinisztikus, tartalom-címzett id (ADR-012)', () => {
+  it('ugyanaz az uri → ugyanaz az id (round-trip + collab determinizmus)', () => {
+    expect(assetIdForUri('file:///a.mp4')).toBe(assetIdForUri('file:///a.mp4'));
+  });
+
+  it('eltérő uri → eltérő id', () => {
+    expect(assetIdForUri('file:///a.mp4')).not.toBe(assetIdForUri('file:///b.mp4'));
+    expect(assetIdForUri('file:///a.mp4')).not.toBe(assetIdForUri('file:///a.mp5'));
+  });
+
+  it('`ast_` prefixszel kezdődik', () => {
+    expect(assetIdForUri('file:///a.mp4')).toMatch(/^ast_/);
+  });
+});
+
 describe('ensureClipAssets — betöltéskori backfill (idempotens)', () => {
+  it('a backfillelt asset-id determinisztikus (kétszer futtatva ugyanaz)', () => {
+    const mk = () => withClips([vClip('c', { uri: 'file:///det.mp4' })]);
+    const a = ensureClipAssets(mk()).assets[0].id;
+    const b = ensureClipAssets(mk()).assets[0].id;
+    expect(a).toBe(b);
+    expect(a).toBe(assetIdForUri('file:///det.mp4'));
+  });
+
   it('a linkeletlen media-klipeknek assetet ad + linkeli', () => {
     const p = withClips([vClip('c', { uri: 'file:///a.mp4' })]);
     const next = ensureClipAssets(p);

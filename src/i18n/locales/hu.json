@@ -895,7 +895,8 @@
       "newMarkerTitle": "Új jelölő",
       "newMarkerMessage": "A lejátszófejnél ({{time}}). A jelölők a vonalzón látszanak, a klip-húzás rájuk snappel, és a projekttel mentődnek.",
       "frameBack": "Egy kockát vissza",
-      "frameFwd": "Egy kockát előre"
+      "frameFwd": "Egy kockát előre",
+      "fullscreen": "Teljes nézet"
     },
     "track": {
       "video": "Videó / kép",

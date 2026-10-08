@@ -895,7 +895,8 @@
       "newMarkerTitle": "New marker",
       "newMarkerMessage": "At the playhead ({{time}}). Markers show on the ruler, clips snap to them when dragged, and they save with the project.",
       "frameBack": "One frame back",
-      "frameFwd": "One frame forward"
+      "frameFwd": "One frame forward",
+      "fullscreen": "Full view"
     },
     "track": {
       "video": "Video / image",

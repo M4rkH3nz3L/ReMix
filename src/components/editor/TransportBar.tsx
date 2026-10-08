@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +28,8 @@ export function nextMarkerColor(current?: string): string {
 
 export function TransportBar() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const projectId = useEditorStore((s) => s.project?.id);
   const [historyOpen, setHistoryOpen] = useState(false);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
@@ -222,6 +225,18 @@ export function TransportBar() {
           color={nearMarker ? palette.accent2 : palette.textDim}
         />
       </Pressable>
+      {/* 🖥️ teljes nézet: a projekt megnyitása a teljes lejátszóban (a preview külön play-gombja helyett) */}
+      {projectId ? (
+        <Pressable
+          onPress={() => router.push(`/player/${projectId}`)}
+          hitSlop={6}
+          style={styles.side}
+          accessibilityRole="button"
+          accessibilityLabel={t('editor.transportBar.fullscreen')}
+        >
+          <Ionicons name="expand-outline" size={18} color={palette.textDim} />
+        </Pressable>
+      ) : null}
       {/* 🎬 részlet-előnézet: a playhead körüli pár mp valódi renderje */}
       <DetailPreview />
       <Pressable onPress={() => setLoop(!loop)} hitSlop={6} style={styles.side}>

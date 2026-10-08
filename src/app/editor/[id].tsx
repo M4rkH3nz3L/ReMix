@@ -598,7 +598,7 @@ export default function EditorScreen() {
             </View>
           ) : null}
           <View style={styles.expandedCenter}>
-            <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
+            <PreviewSurface mode="edit" />
             <TransportBar />
           </View>
           {panelVisible ? (
@@ -615,7 +615,7 @@ export default function EditorScreen() {
     body = (
       <View style={styles.landscapeRow}>
         <View style={styles.landscapePreview}>
-          <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
+          <PreviewSurface mode="edit" />
         </View>
         <View style={styles.landscapeSide}>
           {header}
@@ -642,7 +642,7 @@ export default function EditorScreen() {
             </View>
           ) : null}
           <View style={styles.expandedCenter}>
-            <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
+            <PreviewSurface mode="edit" />
             <TransportBar />
             <Timeline />
           </View>
@@ -657,7 +657,7 @@ export default function EditorScreen() {
         {header}
         {missingBanner}
         {collabBanner}
-        <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
+        <PreviewSurface mode="edit" />
         <TransportBar />
         {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
         {panelVisible ? <PanelHost /> : <Timeline />}

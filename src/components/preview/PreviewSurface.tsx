@@ -72,15 +72,13 @@ const LIGHTING_TINTS: Record<string, { color: string; opacity: number }> = {
 interface Props {
   mode: 'edit' | 'play';
   onHotspotPress?: (clip: InteractiveClip) => void;
-  /** ▶️ szerkesztésben: a projekt megnyitása a teljes lejátszóban (play-gomb a preview-n) */
-  onOpenPlayer?: () => void;
 }
 
 /**
  * Az előnézet: a playhead alatti videó/kép klip + a szöveg- és hotspot-overlay-ek.
  * A videólejátszó a rAF-órához szinkronizál (forráscsere, seek, drift-korrekció).
  */
-export function PreviewSurface({ mode, onHotspotPress, onOpenPlayer }: Props) {
+export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const masterVolume = useEditorStore((s) => s.masterVolume);
@@ -1059,19 +1057,8 @@ export function PreviewSurface({ mode, onHotspotPress, onOpenPlayer }: Props) {
         </View>
       ) : null}
 
-      {/* ▶️ play a preview-n: a projekt megnyitása a teljes lejátszóban (a felső menü
-          play-gombja innen került ide). Csak szerkesztésben, ha épp nem játszik. */}
-      {mode === 'edit' && onOpenPlayer && project && !isPlaying ? (
-        <Pressable
-          onPress={onOpenPlayer}
-          style={styles.playOverlay}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Play"
-        >
-          <Ionicons name="play" size={30} color="#fff" style={{ marginLeft: 3 }} />
-        </Pressable>
-      ) : null}
+      {/* ℹ️ A lejátszás az alsó TransportBar play-gombján megy; a teljes nézetet a
+          TransportBar „teljes nézet" gombja nyitja — a preview-n NINCS külön play. */}
     </View>
   );
 }
@@ -1086,20 +1073,6 @@ const styles = StyleSheet.create({
   canvas: {
     backgroundColor: '#05060a',
     overflow: 'hidden',
-  },
-  playOverlay: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    marginLeft: -32,
-    marginTop: -32,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: palette.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.92,
   },
   safeToggle: {
     position: 'absolute',

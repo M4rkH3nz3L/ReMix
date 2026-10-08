@@ -895,7 +895,8 @@
       "newMarkerTitle": "Neuer Marker",
       "newMarkerMessage": "Am Abspielkopf ({{time}}). Marker erscheinen auf dem Lineal, Clips rasten beim Ziehen daran ein und werden mit dem Projekt gespeichert.",
       "frameBack": "Ein Bild zurück",
-      "frameFwd": "Ein Bild vor"
+      "frameFwd": "Ein Bild vor",
+      "fullscreen": "Vollansicht"
     },
     "track": {
       "video": "Video / Bild",

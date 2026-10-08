@@ -86,6 +86,15 @@ export function assetInUse(project: Project, asset: Asset): boolean {
   return false;
 }
 
+/** forrás-fajtánkénti darabszám (a forrás-mappa szűrő-chipjeihez). */
+export function countSourceKinds(assets: Asset[]): Record<SourceKind, number> {
+  return {
+    video: assets.filter((a) => a.kind === 'video').length,
+    image: assets.filter((a) => a.kind === 'image').length,
+    audio: assets.filter((a) => a.kind === 'audio').length,
+  };
+}
+
 /** rövid, determinisztikus összegző a forrás-mappáról (pl. „2 videó · 3 kép"). */
 export function sourceSummary(assets: Asset[], label: (kind: SourceKind) => string): string {
   const counts = KIND_ORDER.map((k) => ({ k, n: assets.filter((a) => a.kind === k).length })).filter(

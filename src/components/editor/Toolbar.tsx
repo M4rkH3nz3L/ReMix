@@ -179,62 +179,8 @@ export function Toolbar() {
   // 🗂️ forrás-mappából az idővonalra: a fajtának megfelelő klip (videó/kép a videó-
   // sáv végére, hang a 'music' sávra a playheadnél). A meglévő asset nem duplikálódik.
   const insertSource = (asset: Asset) => {
-    const { project, playhead } = useEditorStore.getState();
-    if (!project) {
-      return;
-    }
-    if (asset.kind === 'video') {
-      const duration = asset.duration && asset.duration > 0 ? asset.duration : 5;
-      addClip(
-        'video',
-        {
-          kind: 'video',
-          id: makeId('clip'),
-          start: trackEnd(trackOf(project, 'video')),
-          duration,
-          uri: asset.uri,
-          trimIn: 0,
-          sourceDuration: duration,
-          speed: 1,
-          volume: 1,
-          filterId: 'none',
-        },
-        asset
-      );
-    } else if (asset.kind === 'image') {
-      addClip(
-        'video',
-        {
-          kind: 'image',
-          id: makeId('clip'),
-          start: trackEnd(trackOf(project, 'video')),
-          duration: 4,
-          uri: asset.uri,
-          filterId: 'none',
-        },
-        asset
-      );
-    } else {
-      const duration = asset.duration && asset.duration > 0 ? asset.duration : 5;
-      addClip(
-        'music',
-        {
-          kind: 'audio',
-          id: makeId('clip'),
-          start: playhead,
-          duration,
-          trimIn: 0,
-          sourceDuration: duration,
-          uri: asset.uri,
-          label: asset.name ?? '',
-          volume: 1,
-          fadeIn: 0,
-          fadeOut: 0,
-          source: 'imported',
-        },
-        asset
-      );
-    }
+    // a forrás→timeline beszúrás közös magja (Toolbar + dokkolt forrás-panel + §2.2 drag)
+    useEditorStore.getState().insertSourceAsset(asset);
     setShowSource(false);
   };
 

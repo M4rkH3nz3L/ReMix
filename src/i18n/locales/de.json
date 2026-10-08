@@ -2750,7 +2750,8 @@
     "empty": "Noch keine Quellen. Importiere mit den Schaltflächen oben.",
     "insert": "In den Editor einfügen",
     "download": "Lokale Kopie herunterladen",
-    "inUse": "in Verwendung"
+    "inUse": "in Verwendung",
+    "filterAll": "Alle"
   },
   "studio": {
     "chooseKind": "Was möchtest du erstellen?",

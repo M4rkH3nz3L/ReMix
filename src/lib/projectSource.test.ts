@@ -1,4 +1,4 @@
-import { assetFromPicked, assetInUse, sourceSummary, supportedSourceKinds } from '@/lib/projectSource';
+import { assetFromPicked, assetInUse, countSourceKinds, sourceSummary, supportedSourceKinds } from '@/lib/projectSource';
 import type { Asset, Project } from '@/types/project';
 
 describe('supportedSourceKinds', () => {
@@ -45,5 +45,16 @@ describe('sourceSummary', () => {
       { id: '3', kind: 'image', uri: 'c', provider: 'local' },
     ] as Asset[];
     expect(sourceSummary(assets, (k) => k)).toBe('1 video · 2 image');
+  });
+});
+
+describe('countSourceKinds — fajtánkénti darabszám (szűrő-chipek)', () => {
+  const mk = (kind: Asset['kind'], id: string): Asset =>
+    ({ id, kind, uri: `file:///${id}`, provider: 'local' });
+  it('fajtánként számol; üres listára nulla', () => {
+    expect(countSourceKinds([mk('video', 'a'), mk('video', 'b'), mk('image', 'c'), mk('audio', 'd')])).toEqual({
+      video: 2, image: 1, audio: 1,
+    });
+    expect(countSourceKinds([])).toEqual({ video: 0, image: 0, audio: 0 });
   });
 });

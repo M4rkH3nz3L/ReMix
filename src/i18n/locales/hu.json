@@ -2750,7 +2750,8 @@
     "empty": "Még nincs forrás. Importálj a fenti gombokkal.",
     "insert": "Beszúrás a szerkesztőbe",
     "download": "Letöltés helyi másolatba",
-    "inUse": "használatban"
+    "inUse": "használatban",
+    "filterAll": "Mind"
   },
   "studio": {
     "chooseKind": "Mit készítesz?",

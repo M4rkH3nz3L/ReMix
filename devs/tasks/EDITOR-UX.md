@@ -12,7 +12,8 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 0 · 🟡 0 · ⬜ 7 nyitva — Σ 7 tétel. **Az editor-MAG kész + tesztelt**
+> **📊 Haladás (2026-10-08):** ✅ 1 · 🟡 0 · ⬜ 6 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa).
+> **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
 
@@ -42,16 +43,18 @@ láthatatlanok. Ez a terv ezt a három hiányt zárja, a MEGLÉVŐ reszponzív r
 > Státusz-tagek a [00-README](./00-README.md) §1 szerint. **Sorrend-ajánlás:** §2.1 (forrás-mappa — a fő kérés) →
 > §2.2 (drag-to-timeline) → §2.3 (mentés-UX) → a többi.
 
-### 2.1 Látható forrás-mappa (állandó forrás-bin) — P1 🎯 (a fő kérés)
-A forrás-bin tartalma legyen **folyamatosan látható**, ne csak modal sheetként.
-- [ ] ⬜ **`SourceBin` kiszervezés:** a lista + badge-ek + import/insert/remove/download (ma a `SourceSheet`-ben) egy
-  újrahasznosítható, elrendezés-mentes `SourceBin` komponensbe; a `SourceSheet` ezt tölti be (sheet-wrapper marad a telefonhoz).
-- [ ] 🖼️ **Dokkolt forrás-panel a meglévő reszponzív layouton:** `expanded` + `medium`-fekvő → a `SourceBin` mint
-  **állandó oldal-oszlop** (a dokkolt inspector mintájára; új `sourceBinWidth` az `EditorMetrics`-be). `compact`
-  (telefon-álló) → a `SourceBin` egy könnyen elérhető **fül/alsó-csík**, vagy a meglévő sheet, de egy kézre-eső „Forrás" gomb.
-- [ ] 🖼️ **MIND a forrásfájl látszik** (video+kép+hang) — a SourceBin szűrő-chipekkel (típus szerint) + „in use" jelzéssel;
-  üres-bin → „Importálj médiát" CTA (összeér a §2.5 onboarding-gal).
-- **Kész, ha:** iPad-en/fekvőben a forrás-mappa állandóan látszik a timeline mellett; telefonon egy koppintás elérni; mind a 3 fajta látszik.
+### 2.1 Látható forrás-mappa (állandó forrás-bin) — P1 🎯 ✅ KÉSZ (2026-10-08)
+- [x] ✅ **`SourceBin` kiszervezés:** a lista + badge-ek + import/insert/remove/download egy elrendezés-mentes
+  [SourceBin](../../src/components/SourceBin.tsx)-be (`compact`/`scroll` propok); a [SourceSheet](../../src/components/SourceSheet.tsx)
+  már csak vékony sheet-keret, ami a SourceBin-t tölti (egy kód minden elrendezéshez).
+- [x] ✅ **Dokkolt forrás-panel a meglévő reszponzív layouton:** új `sourceBinWidth` az [EditorMetrics](../../src/constants/layout.ts)-ben
+  (expanded 300 / medium 240 / compact 0); az [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) `expanded` (iPad-fekvő/desktop)
+  + `medium-álló` (iPad-álló) sávjában a SourceBin **állandó bal oszlop** a preview mellett. `compact` (telefon-álló): marad a
+  sheet (nincs hely dokknak), a Toolbar „Forrás" gombjáról egy koppintás.
+- [x] ✅ **MIND a forrásfájl látszik** (video+kép+hang) — típus-szűrő chipek (`countSourceKinds` pure + teszt) darabszámmal
+  + „in use" jelzés; üres-bin → import-CTA. A forrás→timeline beszúrás közös magja: `store.insertSourceAsset` (`buildSourceClip`
+  pure + teszt), amit a Toolbar ÉS a dokkolt panel is hív.
+- **Kész, ha:** iPad-en/fekvőben a forrás-mappa állandóan látszik a timeline mellett ✅; telefonon egy koppintás ✅; mind a 3 fajta látszik + szűrhető ✅.
 
 ### 2.2 Drag-and-drop: forrásból a timeline-ra + sávok közt — P1
 - [ ] 🖼️ **Forrás → timeline húzás:** a `SourceBin` egy elemét a timeline-ra húzva `ADD_CLIP` a drop-pozíciónál, a

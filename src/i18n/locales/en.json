@@ -2750,7 +2750,8 @@
     "empty": "No sources yet. Import with the buttons above.",
     "insert": "Insert into editor",
     "download": "Download a local copy",
-    "inUse": "in use"
+    "inUse": "in use",
+    "filterAll": "All"
   },
   "studio": {
     "chooseKind": "What are you creating?",

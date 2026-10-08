@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CollabPresence } from '@/components/editor/CollabPresence';
+import { SourceBin } from '@/components/SourceBin';
 import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
 import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { PanelHost } from '@/components/editor/PanelHost';
@@ -591,6 +592,11 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         <View style={styles.expandedBand}>
+          {L.editor.sourceBinWidth > 0 ? (
+            <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
+              <SourceBin compact scroll onInsert={(a) => useEditorStore.getState().insertSourceAsset(a)} />
+            </View>
+          ) : null}
           <View style={styles.expandedCenter}>
             <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
             <TransportBar />
@@ -630,6 +636,11 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         <View style={styles.expandedBand}>
+          {L.editor.sourceBinWidth > 0 ? (
+            <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
+              <SourceBin compact scroll onInsert={(a) => useEditorStore.getState().insertSourceAsset(a)} />
+            </View>
+          ) : null}
           <View style={styles.expandedCenter}>
             <PreviewSurface mode="edit" onOpenPlayer={() => project && router.push(`/player/${project.id}`)} />
             <TransportBar />
@@ -761,6 +772,11 @@ const styles = StyleSheet.create({
   },
   expandedCenter: {
     flex: 1,
+  },
+  // 🗂️ mindig-látható dokkolt forrás-mappa (bal oszlop, tablet/fekvő)
+  sourceDock: {
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: palette.border,
   },
   landscapePreview: {
     flex: 1,

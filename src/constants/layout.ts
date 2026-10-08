@@ -87,6 +87,8 @@ export interface EditorMetrics {
   trackScale: number;
   /** a toolbar-gombok minimális szélessége */
   toolButtonMinWidth: number;
+  /** 🗂️ a mindig-látható dokkolt FORRÁS-mappa oszlopa (0 = nincs dokk → sheetből nyílik) */
+  sourceBinWidth: number;
 }
 
 const EDITOR: Record<SizeClass, EditorMetrics> = {
@@ -96,6 +98,7 @@ const EDITOR: Record<SizeClass, EditorMetrics> = {
     trackHeaderWidth: 0,
     trackScale: 1,
     toolButtonMinWidth: 60,
+    sourceBinWidth: 0, // telefon-álló: a forrás-mappa a sheetből (nincs hely dokknak)
   },
   medium: {
     railWidth: 68,
@@ -103,6 +106,7 @@ const EDITOR: Record<SizeClass, EditorMetrics> = {
     trackHeaderWidth: 112,
     trackScale: 1.12,
     toolButtonMinWidth: 72,
+    sourceBinWidth: 240, // telefon-fekvő / iPad-álló: keskeny dokkolt forrás-oszlop
   },
   expanded: {
     railWidth: 76,
@@ -110,6 +114,7 @@ const EDITOR: Record<SizeClass, EditorMetrics> = {
     trackHeaderWidth: 132,
     trackScale: 1.25,
     toolButtonMinWidth: 84,
+    sourceBinWidth: 300, // iPad-fekvő / desktop: teljes dokkolt forrás-mappa
   },
 };
 

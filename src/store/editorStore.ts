@@ -25,7 +25,8 @@ import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
 import { buildPreComposePlan } from '@/lib/preCompose';
-import { canHostClip, findClip, projectDuration } from '@/lib/projectUtils';
+import { canHostClip, findClip, projectDuration, trackEnd, trackOf } from '@/lib/projectUtils';
+import { buildSourceClip } from '@/lib/sourceInsert';
 import { buildDeleteRangePlan } from '@/lib/rangeEdit';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
 import { buildRollEdit, buildSlideEdit, buildSlipEdit } from '@/lib/trimEdit';
@@ -291,6 +292,8 @@ interface EditorState {
   /** több command EGY undo-lépésként (pl. teljes AI-köteg → egy visszavonás, #57) */
   applyBatch: (commands: EditorCommand[], actor?: EventActor) => number;
   addClip: (trackType: TrackType, clip: Clip, asset?: Asset) => void;
+  /** 🗂️→🎬 a forrás-mappa egy assetét klipként a timeline-ra (opcionális `atSec` drop-pozíció) → az új klip id-je */
+  insertSourceAsset: (asset: Asset, atSec?: number) => string | null;
   updateClip: (clipId: string, patch: Partial<Clip>) => void;
   removeClip: (clipId: string) => void;
   splitClipAt: (clipId: string, time: number) => boolean;
@@ -694,6 +697,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (get().dispatch({ type: 'ADD_CLIP', trackType, clip, asset })) {
       set({ selectedClipId: clip.id });
     }
+  },
+
+  insertSourceAsset: (asset, atSec) => {
+    const { project, playhead } = get();
+    if (!project) {
+      return null;
+    }
+    // alap-pozíció (a korábbi Toolbar-insert viselkedése): videó/kép a video-sáv
+    // végére, hang a lejátszófejnél; az `atSec` (pl. a drop-pozíció) felülírja
+    const defaultStart = asset.kind === 'audio' ? playhead : trackEnd(trackOf(project, 'video'));
+    const built = buildSourceClip(asset, atSec ?? defaultStart, () => makeId('clip'));
+    if (!built) {
+      return null;
+    }
+    get().addClip(built.trackType, built.clip, asset);
+    return built.clip.id;
   },
 
   updateClip: (clipId, patch) => {

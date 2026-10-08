@@ -1005,7 +1005,11 @@
     "saveNow": "Jetzt speichern",
     "saveAsCopy": "Als Kopie speichern",
     "copySuffix": "Kopie",
-    "sizeWarning": "Dieses Projekt ist groß — das Speichern kann langsamer sein. Erwäge es zu komprimieren oder aufzuteilen."
+    "sizeWarning": "Dieses Projekt ist groß — das Speichern kann langsamer sein. Erwäge es zu komprimieren oder aufzuteilen.",
+    "emptyTitle": "Los geht's! Dieses Projekt ist noch leer.",
+    "emptyHintDocked": "Wähle ein Element aus dem Quellordner oder importiere ein neues — es landet direkt auf der Timeline.",
+    "emptyHintSheet": "Öffne den Quellordner und tippe auf ein Element, um es hinzuzufügen.",
+    "emptyCta": "Quelle"
   },
   "panels": {
     "adjust": {

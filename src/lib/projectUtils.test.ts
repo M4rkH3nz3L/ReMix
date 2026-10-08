@@ -1,5 +1,11 @@
 import { applyCommand } from '@/lib/commands';
-import { maxVideoDuration, projectDuration, projectMediaBytes, sourceTimeAt } from '@/lib/projectUtils';
+import {
+  isProjectEmpty,
+  maxVideoDuration,
+  projectDuration,
+  projectMediaBytes,
+  sourceTimeAt,
+} from '@/lib/projectUtils';
 import type { Asset, Project, VideoClip } from '@/types/project';
 
 /** VideoClip-fixture a source-idő tesztekhez. */
@@ -77,6 +83,35 @@ describe('projectDuration — memoizált hossz', () => {
       clips: [{ id: 'c2', kind: 'video', start: 3, duration: 5 } as never],
     });
     expect(projectDuration(next!)).toBe(8);
+  });
+});
+
+describe('isProjectEmpty — onboarding-kapu (EDITOR-UX §2.5)', () => {
+  it('false, ha van legalább egy klip bármelyik sávon', () => {
+    expect(isProjectEmpty(mkProject(4))).toBe(false);
+  });
+
+  it('true, ha minden sáv üres', () => {
+    const empty = {
+      ...mkProject(1),
+      tracks: [
+        { id: 't1', type: 'video', name: 'v', clips: [] },
+        { id: 't2', type: 'captions', name: 'f', clips: [] },
+      ],
+    } as unknown as Project;
+    expect(isProjectEmpty(empty)).toBe(true);
+  });
+
+  it('true, ha egyáltalán nincs sáv', () => {
+    const noTracks = { ...mkProject(1), tracks: [] } as unknown as Project;
+    expect(isProjectEmpty(noTracks)).toBe(true);
+  });
+
+  it('a klip eltávolítása után újra üres (command bus → friss állapot)', () => {
+    const p = mkProject(4);
+    const next = applyCommand(p, { type: 'REMOVE_CLIP', clipId: 'c1' });
+    expect(next).not.toBeNull();
+    expect(isProjectEmpty(next!)).toBe(true);
   });
 });
 

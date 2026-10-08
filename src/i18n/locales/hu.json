@@ -1005,7 +1005,11 @@
     "saveNow": "Mentés most",
     "saveAsCopy": "Mentés másként (másolat)",
     "copySuffix": "másolat",
-    "sizeWarning": "Ez a projekt nagy — a mentés lassabb lehet. Fontold meg a tömörítést vagy a részekre bontást."
+    "sizeWarning": "Ez a projekt nagy — a mentés lassabb lehet. Fontold meg a tömörítést vagy a részekre bontást.",
+    "emptyTitle": "Kezdjük el! A projekt még üres.",
+    "emptyHintDocked": "Válassz egy elemet a forrás-mappából, vagy importálj újat — rögtön az idővonalra kerül.",
+    "emptyHintSheet": "Nyisd meg a forrás-mappát, és koppints egy elemre a hozzáadáshoz.",
+    "emptyCta": "Forrás"
   },
   "panels": {
     "adjust": {

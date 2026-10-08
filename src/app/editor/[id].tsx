@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CollabPresence } from '@/components/editor/CollabPresence';
 import { SourceBin } from '@/components/SourceBin';
+import { SourceSheet } from '@/components/SourceSheet';
 import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
 import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { PanelHost } from '@/components/editor/PanelHost';
@@ -32,6 +33,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
+import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
 import {
   clearRecovery,
@@ -69,6 +71,8 @@ export default function EditorScreen() {
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
+  // 🗂️ üres-állapot onboarding → forrás-sheet megnyitása (telefonon, ahol nincs dokk)
+  const [showSource, setShowSource] = useState(false);
   const [collab, setCollab] = useState<{ ownerId: string; role: CollabRole } | null>(null);
   /** 🔍 a vision-index előmelegítő időzítője — projektváltáskor törlendő */
   const visionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -634,6 +638,34 @@ export default function EditorScreen() {
       </Pressable>
     ) : null;
 
+  // 🎬 üres projekt → a fekete vászon helyett a forrás-mappához vezető onboarding.
+  // Tableten a forrás-dokk látszik (odamutatunk); telefonon a kártya megnyitja a sheetet.
+  const sourceDocked = L.editor.sourceBinWidth > 0;
+  const emptyHint =
+    project && isProjectEmpty(project) ? (
+      <Pressable
+        style={styles.emptyHint}
+        onPress={sourceDocked ? undefined : () => setShowSource(true)}
+        accessibilityRole={sourceDocked ? undefined : 'button'}
+      >
+        <Ionicons name="film-outline" size={22} color={palette.accent} />
+        <View style={styles.emptyHintBody}>
+          <Text style={styles.emptyHintTitle}>{t('editorScreen.emptyTitle')}</Text>
+          <Text style={styles.emptyHintText}>
+            {sourceDocked ? t('editorScreen.emptyHintDocked') : t('editorScreen.emptyHintSheet')}
+          </Text>
+        </View>
+        {sourceDocked ? (
+          <Ionicons name="arrow-back" size={18} color={palette.textDim} />
+        ) : (
+          <View style={styles.emptyHintCta}>
+            <Ionicons name="add" size={16} color="#fff" />
+            <Text style={styles.emptyHintCtaText}>{t('editorScreen.emptyCta')}</Text>
+          </View>
+        )}
+      </Pressable>
+    ) : null;
+
   /**
    * Három elrendezés, méret-osztály szerint (lásd `@/constants/layout`):
    *
@@ -655,6 +687,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {emptyHint}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
@@ -686,6 +719,7 @@ export default function EditorScreen() {
           {missingBanner}
           {collabBanner}
           {sizeBanner}
+          {emptyHint}
           <TransportBar />
           <View style={styles.landscapeSideBody}>
             {panelVisible ? <PanelHost /> : <Timeline />}
@@ -701,6 +735,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {emptyHint}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
@@ -724,6 +759,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {emptyHint}
         <PreviewSurface mode="edit" />
         <TransportBar />
         {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
@@ -755,6 +791,15 @@ export default function EditorScreen() {
         onClose={() => setLineageOpen(false)}
         project={project}
       />
+      {showSource ? (
+        <SourceSheet
+          onInsert={(a) => {
+            useEditorStore.getState().insertSourceAsset(a);
+            setShowSource(false);
+          }}
+          onClose={() => setShowSource(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -913,6 +958,48 @@ const styles = StyleSheet.create({
     color: palette.warning,
     fontSize: 12,
     fontWeight: '600',
+  },
+  emptyHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: `${palette.accent}55`,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  emptyHintBody: {
+    flex: 1,
+    gap: 2,
+  },
+  emptyHintTitle: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  emptyHintText: {
+    color: palette.textDim,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  emptyHintCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: palette.accent,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  emptyHintCtaText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   missing: {
     flex: 1,

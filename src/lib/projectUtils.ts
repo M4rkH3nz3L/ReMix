@@ -357,6 +357,15 @@ export function projectDuration(project: Project): number {
   return value;
 }
 
+/**
+ * Üres-e a projekt (egyetlen klip sincs egyetlen sávon sem).
+ * A szerkesztő ebből dönti el, hogy a fekete vászon helyett onboardingot
+ * mutasson, ami a forrás-binhez vezet (EDITOR-UX §2.5).
+ */
+export function isProjectEmpty(project: Project): boolean {
+  return project.tracks.every((t) => t.clips.length === 0);
+}
+
 /** A t időpontban aktív klipek egy sávon (start ≤ t < vég). */
 export function clipsAt<T extends Clip>(track: Track, t: number): T[] {
   return track.clips.filter((c) => c.start <= t && t < clipEnd(c)) as T[];

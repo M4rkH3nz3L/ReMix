@@ -1005,7 +1005,11 @@
     "saveNow": "Save now",
     "saveAsCopy": "Save as a copy",
     "copySuffix": "copy",
-    "sizeWarning": "This project is large — saving may be slower. Consider compressing or splitting it up."
+    "sizeWarning": "This project is large — saving may be slower. Consider compressing or splitting it up.",
+    "emptyTitle": "Let's start! This project is still empty.",
+    "emptyHintDocked": "Pick an item from the source folder or import a new one — it drops straight onto the timeline.",
+    "emptyHintSheet": "Open the source folder and tap an item to add it.",
+    "emptyCta": "Source"
   },
   "panels": {
     "adjust": {

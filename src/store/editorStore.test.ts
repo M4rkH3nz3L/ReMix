@@ -253,6 +253,21 @@ describe('moveClip — frame-snap + sávok közti mozgatás (§2.3)', () => {
     expect(store().moveClip('a', 'pip', 1)).toBe(false);
     expect(clipsOf('video')).toHaveLength(1);
   });
+
+  it('moveSelectedClipToNextTrack: a kijelölt videó klip video → pip, a kezdet marad (§2.2)', () => {
+    load([track('video', [videoClip('a', 3, 5)]), track('pip')]);
+    store().selectClip('a');
+    expect(store().moveSelectedClipToNextTrack()).toBe('pip');
+    expect(clipsOf('video')).toHaveLength(0);
+    const moved = clipsOf('pip');
+    expect(moved.map((c) => c.id)).toEqual(['a']);
+    expect(moved[0].start).toBeCloseTo(3);
+  });
+
+  it('moveSelectedClipToNextTrack: null kijelölés nélkül', () => {
+    load([track('video', [videoClip('a')]), track('pip')]);
+    expect(store().moveSelectedClipToNextTrack()).toBeNull();
+  });
 });
 
 describe('klip-vágólap — copy/cut/paste (§2.4)', () => {

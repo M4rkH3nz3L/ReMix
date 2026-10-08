@@ -846,6 +846,7 @@
       "copyClip": "Kopieren",
       "cutClip": "Ausschneiden",
       "pasteClip": "Einfügen",
+      "moveTrack": "Spur wechseln",
       "styleCopiedTitle": "Stil kopiert",
       "styleCopiedMessage": "{{style}}\n\nWähle einen anderen Clip (oder mehrere mit dem „Mehr”-Button) und füge ein — der Look wird übernommen, das Timing bleibt.",
       "pasteStyle": "Stil einfügen",

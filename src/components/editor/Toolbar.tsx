@@ -17,7 +17,7 @@ import { makeId } from '@/lib/id';
 import { pickImage, pickVideo } from '@/lib/media';
 import { ensureProxy } from '@/lib/proxy';
 import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
-import { clipEnd, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
+import { clipEnd, compatibleTracksFor, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
 import type { Asset, Clip, TrackType } from '@/types/project';
@@ -57,6 +57,8 @@ export function Toolbar() {
   // 📋 klip-vágólap (egész klip) — a Beilleszt a vágólap tartalmára jelenik meg
   const clipClipboard = useEditorStore((s) => s.clipClipboard);
   const canPasteClips = Boolean(clipClipboard);
+  // ↕️ sávváltás: csak ha a klip fajtájához több kompatibilis sáv van (pl. video↔pip)
+  const canMoveTrack = Boolean(selected && compatibleTracksFor(selected.kind).length >= 2);
   // 🎬 a kijelölt klip a pip-sávon van-e? (a „Keret" gomb csak ott jelenik meg)
   const onPipTrack = useEditorStore(
     (s) =>
@@ -335,6 +337,13 @@ export function Toolbar() {
     }
   };
 
+  // ↕️ a kijelölt klip a következő kompatibilis sávra (video↔pip, music→voiceover→sfx…)
+  const moveToNextTrack = () => {
+    if (useEditorStore.getState().moveSelectedClipToNextTrack()) {
+      haptics.snap();
+    }
+  };
+
   const remove = () => {
     const state = useEditorStore.getState();
     const { project } = state;
@@ -535,6 +544,9 @@ export function Toolbar() {
             <ToolButton icon="cut-outline" label={t('editor.toolbar.cutClip')} onPress={cutClipsAction} />
             {canPasteClips ? (
               <ToolButton icon="clipboard-outline" label={t('editor.toolbar.pasteClip')} onPress={pasteClipsAction} />
+            ) : null}
+            {canMoveTrack ? (
+              <ToolButton icon="swap-vertical-outline" label={t('editor.toolbar.moveTrack')} onPress={moveToNextTrack} />
             ) : null}
             <ToolButton
               icon="timer-outline"

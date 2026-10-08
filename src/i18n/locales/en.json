@@ -846,6 +846,7 @@
       "copyClip": "Copy",
       "cutClip": "Cut",
       "pasteClip": "Paste",
+      "moveTrack": "Move track",
       "styleCopiedTitle": "Style copied",
       "styleCopiedMessage": "{{style}}\n\nSelect another clip (or more with the „Multi” button) and paste — the look is applied, the timing stays.",
       "pasteStyle": "Paste style",

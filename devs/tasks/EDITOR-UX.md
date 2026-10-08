@@ -12,7 +12,8 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 1 · 🟡 0 · ⬜ 6 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa).
+> **📊 Haladás (2026-10-08):** ✅ 1 · 🟡 1 · ⬜ 5 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
+> **§2.2 mag kész** (sávváltás-gomb — a klip kompatibilis sávra lépése; a húzás-gesztus 🖼️ device hátra).
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -56,12 +57,17 @@ láthatatlanok. Ez a terv ezt a három hiányt zárja, a MEGLÉVŐ reszponzív r
   pure + teszt), amit a Toolbar ÉS a dokkolt panel is hív.
 - **Kész, ha:** iPad-en/fekvőben a forrás-mappa állandóan látszik a timeline mellett ✅; telefonon egy koppintás ✅; mind a 3 fajta látszik + szűrhető ✅.
 
-### 2.2 Drag-and-drop: forrásból a timeline-ra + sávok közt — P1
-- [ ] 🖼️ **Forrás → timeline húzás:** a `SourceBin` egy elemét a timeline-ra húzva `ADD_CLIP` a drop-pozíciónál, a
-  **kompatibilis sávra** (`canHostClip`, CORE §2.3), frame-illesztve; vizuális drop-highlight. Ma csak koppintásos insert.
-- [ ] 🖼️ **Klip sávok-közti húzása (MOVE_CLIP gesztus):** a [TimelineClip](../../src/components/editor/TimelineClip.tsx)
-  függőleges húzása a szomszédos kompatibilis sávra → `store.moveClip` (a mag + guard CORE §2.3-ban KÉSZ); zárolt cél tiltott.
-- **Kész, ha:** médiát a forrás-mappából húzással is a timeline-ra lehet tenni, és a klip húzással másik sávra mozgatható.
+### 2.2 Drag-and-drop: forrásból a timeline-ra + sávok közt — P1 🟡 (sávváltás KÉSZ, húzás hátra)
+- [x] ✅ **Klip sávok közti mozgatása — GOMBBAL (verifikálható):** a Toolbar **„Sávváltás"** gombja a kijelölt klipet a
+  **következő kompatibilis sávra** lépteti (`store.moveSelectedClipToNextTrack` → `moveClip`, a kezdetet megtartva); csak
+  akkor látszik, ha a klip fajtájához ≥2 kompatibilis sáv van (`compatibleTracksFor` pure + teszt: video↔pip,
+  music→voiceover→sfx, text↔captions). A core-guard a zárolt cél-sávot tiltja. **Ez adja a funkciót** a húzás-gesztus nélkül is.
+- [ ] 🖼️ **Klip sávok-közti HÚZÁSA (MOVE_CLIP gesztus):** a [TimelineClip](../../src/components/editor/TimelineClip.tsx)
+  `movePan`-je `translationY`-t is figyeljen → a szomszédos kompatibilis sávra; timeline-szintű sáv-geometria kell (a klip ma
+  csak a saját sávját ismeri) → **device-verifikált gesztus-munka (login mögött itt nem látszik).**
+- [ ] 🖼️ **Forrás → timeline HÚZÁS:** a `SourceBin` elemét a timeline-ra húzva `ADD_CLIP` a drop-pozíciónál
+  (`insertSourceAsset(asset, atSec)` KÉSZ hozzá) — RN cross-komponens DnD, **device-verifikált.** (A koppintásos insert a dokkolt panelen már megy.)
+- **Kész, ha:** a klip másik sávra tehető (gombbal ✅ + húzással 🖼️), és forrás húzással is a timeline-ra kerül (🖼️).
 
 ### 2.3 Mentés-UX láthatóvá tétele (CORE §2.7 remainderek) — P1
 A mentés-mag kész; a felhasználó lássa + vezérelhesse.

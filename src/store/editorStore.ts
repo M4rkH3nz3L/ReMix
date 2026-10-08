@@ -25,7 +25,7 @@ import { projectFps, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { setProxyConfig } from '@/lib/proxy';
 import { buildPreComposePlan } from '@/lib/preCompose';
-import { canHostClip, findClip, projectDuration, trackEnd, trackOf } from '@/lib/projectUtils';
+import { canHostClip, compatibleTracksFor, findClip, projectDuration, trackEnd, trackOf } from '@/lib/projectUtils';
 import { buildSourceClip } from '@/lib/sourceInsert';
 import { buildDeleteRangePlan } from '@/lib/rangeEdit';
 import { buildRippleDeletePlan, buildRippleResizePlan } from '@/lib/ripple';
@@ -299,6 +299,8 @@ interface EditorState {
   splitClipAt: (clipId: string, time: number) => boolean;
   /** klip másik (kompatibilis) sávra mozgatása + frame-illesztett új kezdet */
   moveClip: (clipId: string, toTrackType: TrackType, start: number) => boolean;
+  /** a kijelölt klipet a KÖVETKEZŐ kompatibilis sávra lépteti (a kezdetét megtartva) → a cél-sáv típusa vagy null */
+  moveSelectedClipToNextTrack: () => TrackType | null;
   selectClip: (clipId: string | null) => void;
   /** 🔒 collab klip-zár: identitás + zár-műveletek (broadcast + térkép-frissítés) */
   setCollabSelf: (self: { id: string; name?: string } | null) => void;
@@ -775,6 +777,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // 🎞️ a cél-kezdet a frame-rácsra ül (mint a split); 0 alá nem
     const snapped = Math.max(0, snapToFrame(start, projectFps(get().project)));
     return get().dispatch({ type: 'MOVE_CLIP', clipId, toTrackType, start: snapped });
+  },
+
+  moveSelectedClipToNextTrack: () => {
+    const { project, selectedClipId } = get();
+    if (!project || !selectedClipId) {
+      return null;
+    }
+    const found = findClip(project, selectedClipId);
+    if (!found) {
+      return null;
+    }
+    // a klip-fajtát fogadó sávok körbe-léptetve; a klip a saját kezdetén marad
+    const compat = compatibleTracksFor(found.clip.kind);
+    if (compat.length < 2) {
+      return null; // nincs másik kompatibilis sáv
+    }
+    const next = compat[(compat.indexOf(found.track.type) + 1) % compat.length];
+    if (next === found.track.type) {
+      return null;
+    }
+    return get().moveClip(selectedClipId, next, found.clip.start) ? next : null;
   },
 
   selectClip: (clipId) => {

@@ -1,5 +1,5 @@
 import { applyCommand, describeCommand, type EditorCommand } from '@/lib/commands';
-import { canHostClip } from '@/lib/projectUtils';
+import { canHostClip, compatibleTracksFor } from '@/lib/projectUtils';
 import { masterPreset } from '@/lib/audioMaster';
 import { createImageDoc } from '@/lib/imageDoc';
 import { createLiveDoc } from '@/lib/liveDoc';
@@ -205,6 +205,13 @@ describe('canHostClip — sáv ↔ klip-fajta kompatibilitás', () => {
     expect(canHostClip('video', 'audio')).toBe(false);
     expect(canHostClip('text', 'video')).toBe(false);
     expect(canHostClip('music', 'text')).toBe(false);
+  });
+  it('compatibleTracksFor: a fajtát fogadó sávok kanonikus sorrendben', () => {
+    expect(compatibleTracksFor('video')).toEqual(['video', 'pip']);
+    expect(compatibleTracksFor('image')).toEqual(['video', 'pip', 'overlay']); // kép-matrica az overlay-re is
+    expect(compatibleTracksFor('audio')).toEqual(['music', 'voiceover', 'sfx']);
+    expect(compatibleTracksFor('text')).toEqual(['text', 'captions']);
+    expect(compatibleTracksFor('adjust')).toEqual(['adjust']);
   });
 });
 

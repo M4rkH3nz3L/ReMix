@@ -292,6 +292,15 @@ export function canHostClip(trackType: TrackType, kind: Clip['kind']): boolean {
   return TRACK_HOSTS[trackType]?.includes(kind) ?? false;
 }
 
+/**
+ * Egy klip-fajtát fogadó sávok a KANONIKUS sorrendben (a „sávváltás" + a sávok-
+ * közti mozgatás ehhez igazodik). Pl. videó → [video, pip]; hang → [music,
+ * voiceover, sfx]; szöveg → [text, captions].
+ */
+export function compatibleTracksFor(kind: Clip['kind']): TrackType[] {
+  return CANONICAL_TRACKS.map((t) => t.type).filter((type) => canHostClip(type, kind));
+}
+
 export function trackOf(project: Project, type: TrackType): Track {
   const found = project.tracks.find((t) => t.type === type);
   if (!found) {

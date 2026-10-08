@@ -846,6 +846,7 @@
       "copyClip": "Másol",
       "cutClip": "Kivág",
       "pasteClip": "Beilleszt",
+      "moveTrack": "Sávváltás",
       "styleCopiedTitle": "Stílus másolva",
       "styleCopiedMessage": "{{style}}\n\nJelölj ki másik klipet (vagy többet a „Több” gombbal), és illeszd be — a megjelenés átveszi, az időzítés marad.",
       "pasteStyle": "Stílus beilleszt",

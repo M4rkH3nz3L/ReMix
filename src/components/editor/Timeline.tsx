@@ -390,6 +390,18 @@ export function Timeline() {
   useEffect(() => {
     ppsRef.current = pps;
   }, [pps]);
+  // 🧹 a scrub-vég időzítő lebontáskor is törlődjön: a web-pointer effekt cleanupja
+  // csak a listenereket szedi le, a natív scrub-ág pedig gesztus-handlerben indítja —
+  // így egyik útvonal sem takarítaná unmountkor a még függő időzítőt.
+  useEffect(
+    () => () => {
+      if (scrubEndTimer.current) {
+        clearTimeout(scrubEndTimer.current);
+        scrubEndTimer.current = null;
+      }
+    },
+    []
+  );
   useEffect(
     () =>
       useEditorStore.subscribe((s, prev) => {

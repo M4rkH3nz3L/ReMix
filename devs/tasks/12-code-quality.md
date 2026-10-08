@@ -5,10 +5,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-06):** ✅ 0 teljes · 🟡 7 mag kész · ⬜ 2 nyitva — Σ 9 tétel.
+> **📊 Haladás (2026-10-08):** ✅ 1 teljes · 🟡 7 mag kész · ⬜ 1 nyitva — Σ 9 tétel.
 > A robusztussági magok **nagyrészt kész + bekötve** (validáció / retry / cancel / rollback / race /
-> cache / event-log — sok csak inkrementális adopció-farokkal); hátra a **timer-cleanup** (§2.6)
-> és a **nagy-fájl-szétbontás** (§2.9).
+> cache / event-log — sok csak inkrementális adopció-farokkal); a **timer-cleanup** (§2.6) **KÉSZ**
+> (teljes audit + 1 pótolt hiány); hátra a **nagy-fájl-szétbontás** (§2.9).
 
 ## 0. Kontextus & cél
 A kódbázis nagy és gyors fejlődésű — a robusztusság (validáció, retry, cancellation, race-védelem,
@@ -43,8 +43,19 @@ Store**, tipizált hálózat, determinisztikus állapot.
 - [x] ✅ **Közös util KÉSZ**: [src/lib/asyncGuard.ts](../../src/lib/asyncGuard.ts) — `createGenerationGuard` (token: csak a legfrissebb válasz megy át) + `createAliveGuard` (unmount után eldob) + `latestOnly` (stale → `StaleResponseError`). Teszt: `asyncGuard.test.ts` (8). Első adopter: [search.tsx](../../src/app/search.tsx) (a korábbi ad-hoc `seqRef` lecserélve a közös utilra).
 - [ ] 🟡 Hátra: a többi ad-hoc race-kezelés (más async-betöltő képernyők) migrálása a közös utilra — inkrementális.
 
-### 2.6 Timer cleanup — P1
-- [ ] ⬜ CameraRecorder + editor-timeoutok + polling + background-listeners takarítása unmountkor.
+### 2.6 Timer cleanup — P1 ✅ KÉSZ (2026-10-08, verify-first)
+- [x] ✅ **Teljes timer/listener-audit:** végignézve MINDEN `setInterval`/`setTimeout`/listener/`requestAnimationFrame`
+  a `src/app` + `src/components` + `src/hooks` alatt. **Nagyrészt már tiszta volt** (unmount-cleanupból `clear*`):
+  CameraRecorder (timer + 3-2-1 countdown), AiCharacterPicker, MulticamPanel, AiActivity, ProgressOverlay, LiveVideoStage
+  (3 mp-es polling-interval + reconnect-backoff), feed-polling ([index.tsx](../../src/app/index.tsx) ×2), schedules,
+  [usePlaybackClock](../../src/hooks/usePlaybackClock.ts) (rAF → `cancelAnimationFrame`), editor cursor-broadcast +
+  vision-prewarm timer, [Timeline](../../src/components/editor/Timeline.tsx) store-subscribe + web-pointer listenerek,
+  PreviewSurface/PipLayer player-listenerek (`sub.remove`), [media.ts](../../src/lib/media.ts) audio-probe (idempotens
+  `finish` → `sub` + `player` release). Az `AppState` ([supabase.ts](../../src/lib/supabase.ts)) modul-szintű, app-élettartamú → nincs cleanup-igény.
+- [x] ✅ **Egyetlen pótolt hiány:** a `Timeline` `scrubEndTimer`-je eddig csak a scrub-handlerekben törlődött (a web-pointer
+  effekt cleanupja csak a listenereket szedte le, a natív scrub-ág gesztus-handlerben indít), **unmountkor nem** → dedikált
+  unmount-cleanup effekt pótolva. (A callback csak egy ref-et állított — így setState-after-unmount nem fenyegetett —, de így
+  függő időzítő sem marad.)
 
 ### 2.7 Cache limits — P1
 - [x] ✅ MÁR KÉSZ: [src/lib/lruCache.ts](../../src/lib/lruCache.ts) (LRU + méret/elem-limit) + teszt (`lruCache.test.ts`) + **6 fogyasztó** (thumbnails/cutlist/visionSearch/beats/transcripts/voiceProxy). (Az audit `main`-je elavult volt.) Hátra: a maradék nem-korlátos cache-ek átállítása + TTL-opció ahol kell.

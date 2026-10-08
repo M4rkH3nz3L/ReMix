@@ -12,8 +12,9 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 1 · 🟡 1 · ⬜ 5 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
-> **§2.2 mag kész** (sávváltás-gomb — a klip kompatibilis sávra lépése; a húzás-gesztus 🖼️ device hátra).
+> **📊 Haladás (2026-10-08):** ✅ 2 · 🟡 1 · ⬜ 4 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
+> **§2.2 mag kész** (sávváltás-gomb — a klip kompatibilis sávra lépése; a húzás-gesztus 🖼️ device hátra);
+> **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü „Mentés most"/„Mentés másként" + méret-banner).
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -69,12 +70,16 @@ láthatatlanok. Ez a terv ezt a három hiányt zárja, a MEGLÉVŐ reszponzív r
   (`insertSourceAsset(asset, atSec)` KÉSZ hozzá) — RN cross-komponens DnD, **device-verifikált.** (A koppintásos insert a dokkolt panelen már megy.)
 - **Kész, ha:** a klip másik sávra tehető (gombbal ✅ + húzással 🖼️), és forrás húzással is a timeline-ra kerül (🖼️).
 
-### 2.3 Mentés-UX láthatóvá tétele (CORE §2.7 remainderek) — P1
+### 2.3 Mentés-UX láthatóvá tétele (CORE §2.7 remainderek) — P1 ✅ KÉSZ (2026-10-08)
 A mentés-mag kész; a felhasználó lássa + vezérelhesse.
-- [ ] 🖼️ **Mentés-állapot + „Mentés most":** a fejlécben mentve / „mentés…" / „bukott" jelző (a `dirty`/`saveFailed`
-  állapotból) + explicit „Mentés most" gomb (azonnali `saveProjectAndEvents`).
-- [ ] 🖼️ **„Mentés másként / duplikálás" belépő:** a projekt-menüben `duplicateProject` (CORE §2.7, KÉSZ) hívása.
-- [ ] 🖼️ **Méret/elévülés jelzés:** `isProjectTooLarge` → finom figyelmeztető banner; a history-limit elévülésének jelzése.
+- [x] ✅ **Mentés-állapot + „Mentés most":** a fejlécben mentve / „mentés…" / „bukott" jelző (a `dirty`/`saveFailed`
+  állapotból, [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) + a **⋯ projekt-menü** „Mentés most" tétele (azonnali
+  `saveProjectAndEvents` + `markSaved` + `clearRecovery`).
+- [x] ✅ **„Mentés másként / duplikálás" belépő:** a ⋯ projekt-menü „Mentés másként (másolat)" tétele a jelenlegi mentése
+  után `duplicateProject`-et hív (CORE §2.7, KÉSZ) és a MÁSOLATRA navigál (`router.replace`).
+- [x] ✅ **Méret-jelzés:** `isProjectTooLarge` → finom amber figyelmeztető banner (mind a 4 elrendezés-sávban), a bannerre
+  koppintva nyílik a ⋯ projekt-menü (ott duplikálható/szétszedhető). *(history-limit-elévülés jelzése külön, nem kritikus.)*
+- **Kész, ha:** a mentés-állapot látszik ✅, „Mentés most" + „Mentés másként" a ⋯-menüből elérhető ✅, nagy projekt bannert kap ✅.
 
 ### 2.4 Toolbar + panel-ergonómia — P2
 - [ ] ⬜ **Toolbar tabletre:** a kontextuális [Toolbar](../../src/components/editor/Toolbar.tsx) (807 sor, sok gomb) `expanded`-en

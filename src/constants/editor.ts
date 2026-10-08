@@ -18,6 +18,7 @@ export const palette = {
   accent2: '#ff5ca8',
   accentSoft: '#7c5cff2e',
   danger: '#ff5c72',
+  warning: '#f5a623',
   ok: '#2ecc8f',
 } as const;
 

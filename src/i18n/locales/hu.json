@@ -1000,7 +1000,12 @@
     "rail_export": "Export",
     "saveFailed": "Nincs elmentve — újrapróbálom",
     "saved": "Mentve",
-    "saving": "Mentés…"
+    "saving": "Mentés…",
+    "projectMenuTitle": "Projekt",
+    "saveNow": "Mentés most",
+    "saveAsCopy": "Mentés másként (másolat)",
+    "copySuffix": "másolat",
+    "sizeWarning": "Ez a projekt nagy — a mentés lassabb lehet. Fontold meg a tömörítést vagy a részekre bontást."
   },
   "panels": {
     "adjust": {

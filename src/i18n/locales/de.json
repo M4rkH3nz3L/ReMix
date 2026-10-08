@@ -1000,7 +1000,12 @@
     "rail_export": "Export",
     "saveFailed": "Nicht gespeichert — erneuter Versuch",
     "saved": "Gespeichert",
-    "saving": "Speichern…"
+    "saving": "Speichern…",
+    "projectMenuTitle": "Projekt",
+    "saveNow": "Jetzt speichern",
+    "saveAsCopy": "Als Kopie speichern",
+    "copySuffix": "Kopie",
+    "sizeWarning": "Dieses Projekt ist groß — das Speichern kann langsamer sein. Erwäge es zu komprimieren oder aufzuteilen."
   },
   "panels": {
     "adjust": {

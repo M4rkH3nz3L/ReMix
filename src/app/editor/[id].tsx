@@ -35,6 +35,8 @@ import { myMembership, type CollabRole } from '@/lib/collab';
 import { prewarmProxies } from '@/lib/proxy';
 import {
   clearRecovery,
+  duplicateProject,
+  isProjectTooLarge,
   loadEvents,
   loadProject,
   readRecovery,
@@ -451,6 +453,49 @@ export default function EditorScreen() {
     );
   }
 
+  // 💾 explicit „Mentés most" — az autosave mellé (az atomi mentést AZONNAL hívja)
+  const saveNow = () => {
+    const state = useEditorStore.getState();
+    if (!state.project) {
+      return;
+    }
+    const p = state.project;
+    writeRecovery(p, state.events);
+    saveProjectAndEvents(p, state.events)
+      .then(() => {
+        state.markSaved();
+        setSaveFailed(false);
+        setSaveAttempt(0);
+        clearRecovery(p.id);
+      })
+      .catch(() => setSaveFailed(true));
+  };
+
+  // 🧬 „Mentés másként" — a jelenlegi mentése után egy MÁSOLAT, és ugrás rá
+  const saveAsCopy = () => {
+    const state = useEditorStore.getState();
+    if (!state.project) {
+      return;
+    }
+    const p = state.project;
+    saveProjectAndEvents(p, state.events)
+      .then(() => duplicateProject(p.id, t('editorScreen.copySuffix')))
+      .then((copy) => {
+        if (copy) {
+          router.replace(`/editor/${copy.id}`);
+        }
+      })
+      .catch(() => {});
+  };
+
+  const openProjectMenu = () => {
+    Alert.alert(t('editorScreen.projectMenuTitle'), undefined, [
+      { text: t('editorScreen.saveNow'), onPress: saveNow },
+      { text: t('editorScreen.saveAsCopy'), onPress: saveAsCopy },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const header = (
     <View style={styles.header}>
       <Pressable onPress={goBack} hitSlop={8}>
@@ -522,6 +567,15 @@ export default function EditorScreen() {
         <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
           <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
         </Pressable>
+        {/* ⋯ projekt-menü: Mentés most / Mentés másként (másolat) */}
+        <Pressable
+          onPress={openProjectMenu}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('editorScreen.projectMenuTitle')}
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={palette.textDim} />
+        </Pressable>
         {/* ▶️ a play-gomb a PREVIEW-ra került (PreviewSurface onOpenPlayer) — innen kivéve */}
         {/* Az EGYETLEN Export belépő (az alsó Toolbarból kivéve — nincs duplikáció).
             TutorialTarget: a felület-vezető export-lépése ide mutat. */}
@@ -571,6 +625,15 @@ export default function EditorScreen() {
       </Pressable>
     ) : null;
 
+  // 📦 túl nagy projekt → a mentés lassulhat; a ⋯-menüből duplikálható/szétszedhető
+  const sizeBanner =
+    project && isProjectTooLarge(project) ? (
+      <Pressable style={styles.sizeBanner} onPress={openProjectMenu}>
+        <Ionicons name="archive-outline" size={16} color={palette.warning} />
+        <Text style={styles.sizeBannerText}>{t('editorScreen.sizeWarning')}</Text>
+      </Pressable>
+    ) : null;
+
   /**
    * Három elrendezés, méret-osztály szerint (lásd `@/constants/layout`):
    *
@@ -591,6 +654,7 @@ export default function EditorScreen() {
         {header}
         {missingBanner}
         {collabBanner}
+        {sizeBanner}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
@@ -620,7 +684,8 @@ export default function EditorScreen() {
         <View style={styles.landscapeSide}>
           {header}
           {missingBanner}
-        {collabBanner}
+          {collabBanner}
+          {sizeBanner}
           <TransportBar />
           <View style={styles.landscapeSideBody}>
             {panelVisible ? <PanelHost /> : <Timeline />}
@@ -635,6 +700,7 @@ export default function EditorScreen() {
         {header}
         {missingBanner}
         {collabBanner}
+        {sizeBanner}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
@@ -657,6 +723,7 @@ export default function EditorScreen() {
         {header}
         {missingBanner}
         {collabBanner}
+        {sizeBanner}
         <PreviewSurface mode="edit" />
         <TransportBar />
         {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
@@ -825,6 +892,25 @@ const styles = StyleSheet.create({
   collabBannerText: {
     flex: 1,
     color: palette.textDim,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sizeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: `${palette.warning}1a`,
+    borderWidth: 1,
+    borderColor: `${palette.warning}55`,
+    borderRadius: 10,
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  sizeBannerText: {
+    flex: 1,
+    color: palette.warning,
     fontSize: 12,
     fontWeight: '600',
   },

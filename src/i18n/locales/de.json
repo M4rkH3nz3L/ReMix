@@ -2605,6 +2605,7 @@
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",
       "relinkUri": "Medien neu verknüpft: {{file}}",
+      "relinkAsset": "Quell-Asset neu verknüpft",
       "updateAsset": "Medien-Metadaten: {{keys}}",
       "setFps": "Bildrate: {{fps}} fps"
     },

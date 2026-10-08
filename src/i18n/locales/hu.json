@@ -2605,6 +2605,7 @@
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",
       "relinkUri": "média újracsatolva: {{file}}",
+      "relinkAsset": "forrás-asset újracsatolva",
       "updateAsset": "Média-metaadat: {{keys}}",
       "setFps": "Frame-ráta: {{fps}} fps"
     },

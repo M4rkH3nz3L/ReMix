@@ -76,8 +76,11 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   **determinisztikus, tartalom-címzett** `assetIdForUri`-vel (`ast_<FNV-1a(uri)>`) → minden betöltéskor linkelnek a
   séma-migráció utáni utakon (preset/AI/hang) hozzáadott klipek is, a round-trip + collab determinizmus sértése nélkül
   (az arany-út teszt igazolja: a reload a backfill-normalizált állapottal egyezik).
+- [x] ~ **`RELINK_ASSET` parancs a buson (2026-10-08):** a [commands.ts](../../src/lib/commands.ts) `RELINK_ASSET { assetId, newUri }`
+  (undo-zható, event-logolt) a `relinkAsset`-et hívja — az asset-centrikus relink bus-primitívje (mint a `MOVE_CLIP`), a relink-UI
+  Fázis 3-ban erre vált. Teszt: `commands.test.ts` (reducer + describe-minta).
 - [ ] ⬜ **Fázis 2b–3:** a fogyasztók (`resolveClipUri`: preview/pip/audio/render-plan/`findMissingMedia`) átállítása →
-  a klip `uri` már csak cache; majd a relink/cloud-sync/collab az asset-registryre (`relinkAsset`).
+  a klip `uri` már csak cache; majd a relink-UI + cloud-sync a `RELINK_ASSET`/asset-registryre.
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

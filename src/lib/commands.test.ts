@@ -381,6 +381,24 @@ describe('applyCommand — RELINK_URI', () => {
   });
 });
 
+describe('applyCommand — RELINK_ASSET (asset-centrikus, ADR-012)', () => {
+  it('az asset uri-ját cseréli + a rá hivatkozó klipet is; null ha ismeretlen/azonos', () => {
+    const p = makeProject({
+      tracks: [track('video', [{ ...videoClip('a'), assetId: 'ast' } as VideoClip])],
+      assets: [asset('ast', 'file:///clip-a.mp4')],
+    });
+    const next = expectChanged(
+      p,
+      applyCommand(p, { type: 'RELINK_ASSET', assetId: 'ast', newUri: 'file:///new.mp4' })
+    );
+    expect(next.assets[0].uri).toBe('file:///new.mp4');
+    expect((clipsOf(next, 'video')[0] as VideoClip).uri).toBe('file:///new.mp4');
+    // ismeretlen asset → null; azonos uri → null
+    expect(applyCommand(p, { type: 'RELINK_ASSET', assetId: 'nincs', newUri: 'file:///y.mp4' })).toBeNull();
+    expect(applyCommand(p, { type: 'RELINK_ASSET', assetId: 'ast', newUri: 'file:///clip-a.mp4' })).toBeNull();
+  });
+});
+
 describe('describeCommand — minden parancs ad nem-üres címkét', () => {
   const samples: EditorCommand[] = [
     { type: 'ADD_CLIP', trackType: 'video', clip: videoClip('a') },
@@ -397,6 +415,7 @@ describe('describeCommand — minden parancs ad nem-üres címkét', () => {
     { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: [] },
     { type: 'REPLACE_TRACKS', tracks: [{ trackType: 'video', clips: [] }] },
     { type: 'RELINK_URI', oldUri: 'a', newUri: 'b' },
+    { type: 'RELINK_ASSET', assetId: 'ast', newUri: 'b' },
     { type: 'SET_PARTICLES', particles: { preset: 'confetti', beatSync: true } },
     { type: 'SET_PARTICLES', particles: null },
     { type: 'SET_MARKERS', markers: [] },

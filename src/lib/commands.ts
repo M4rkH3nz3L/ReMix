@@ -1,5 +1,6 @@
 import { t as tr } from 'i18next';
 
+import { relinkAsset } from '@/lib/assetResolve';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type {
@@ -50,6 +51,7 @@ export type EditorCommand =
       label?: string;
     }
   | { type: 'RELINK_URI'; oldUri: string; newUri: string }
+  | { type: 'RELINK_ASSET'; assetId: string; newUri: string }
   /** ✨ projekt-szintű részecske-réteg be/ki (null = kikapcsol) */
   | { type: 'SET_PARTICLES'; particles: ParticlesConfig | null }
   /** 🔖 a marker-lista cseréje (hozzáadás/törlés/átnevezés egy lépésben) */
@@ -382,6 +384,13 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       }
       return relinkUri(project, cmd.oldUri, cmd.newUri);
     }
+
+    case 'RELINK_ASSET': {
+      // asset-centrikus relink (ADR-012): egy asset uri-cseréje → minden rá
+      // hivatkozó klip követi. Nincs változás (ismeretlen asset / azonos uri) → null.
+      const next = relinkAsset(project, cmd.assetId, cmd.newUri);
+      return next === project ? null : next;
+    }
   }
 }
 
@@ -425,6 +434,8 @@ export function describeCommand(cmd: EditorCommand): string {
             beatSync: cmd.particles.beatSync ? tr('lib.commands.beatSyncSuffix') : '',
           })
         : tr('lib.commands.particlesOff');
+    case 'RELINK_ASSET':
+      return tr('lib.commands.relinkAsset', { defaultValue: 'Relink asset' });
     case 'ADD_ASSET':
       return tr('lib.commands.addAsset', { name: cmd.asset.name ?? cmd.asset.kind });
     case 'UPDATE_ASSET':

@@ -2605,6 +2605,7 @@
       "replaceTracks_one": "{{count}} track rebuilt",
       "replaceTracks_other": "{{count}} tracks rebuilt",
       "relinkUri": "media relinked: {{file}}",
+      "relinkAsset": "source asset relinked",
       "updateAsset": "Media metadata: {{keys}}",
       "setFps": "Frame rate: {{fps}} fps"
     },

@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { t as tr } from 'i18next';
 import { Alert, Platform } from 'react-native';
 
+import { resolveClipUri } from '@/lib/assetResolve';
 import { fingerprintFile, withFingerprints } from '@/lib/fingerprint';
 import { makeId } from '@/lib/id';
 import { pickAudio, pickImage, pickVideo } from '@/lib/media';
@@ -106,10 +107,13 @@ export function findMissingMedia(project: Project): MissingMedia[] {
     }
   };
   for (const clip of mediaClips(project)) {
+    // 🔗 a feloldott (asseten át) URI-t ellenőrizzük (ADR-012): relink után
+    // (Fázis 3) az asset frissebb uri-ja számít, nem a klip elavult cache-e.
+    const uri = resolveClipUri(project, clip) ?? clip.uri;
     check(
-      clip.uri,
+      uri,
       clip.kind,
-      'label' in clip && clip.label ? clip.label : (clip.uri.split('/').pop() ?? clip.uri)
+      'label' in clip && clip.label ? clip.label : (uri.split('/').pop() ?? uri)
     );
   }
   // kép-kitöltésű formák (logó / AI-kivágás / 3D objektum / vízjel) is médiák

@@ -12,9 +12,9 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 2 · 🟡 1 · ⬜ 4 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
-> **§2.2 mag kész** (sávváltás-gomb — a klip kompatibilis sávra lépése; a húzás-gesztus 🖼️ device hátra);
-> **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü „Mentés most"/„Mentés másként" + méret-banner).
+> **📊 Haladás (2026-10-08):** ✅ 3 · 🟡 2 · ⬜ 2 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
+> **§2.2 mag kész** (sávváltás-gomb; húzás-gesztus 🖼️ device); **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü + méret-banner);
+> **§2.5 üres-állapot KÉSZ** (onboarding-kártya a fekete vászon helyett; granuláris recovery 🖼️ device).
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -86,10 +86,14 @@ A mentés-mag kész; a felhasználó lássa + vezérelhesse.
   ne csak vízszintes scroll legyen — csoportosított, kétsoros vagy oldal-rail elrendezés a nagyobb kijelzőn; nagyobb érintő-célok.
 - [ ] ⬜ **Panel ↔ timeline átmenet:** `compact`-on a panel teljesen elfedi a timeline-t — egy „vissza a timeline-hoz" gyorsgomb + a kijelölés megtartása.
 
-### 2.5 Üres-állapot + onboarding (CORE §2.8) — P1
-- [ ] ⬜ **Üres-projekt állapot:** üres timeline → a forrás-mappára mutató onboarding („adj hozzá médiát a forrás-binből"),
-  ne üres fekete vásznon ragadjon a felhasználó. (A `SourceBin` üres-CTA-jával közös.)
-- [ ] ⬜ **Granuláris média-helyreállítás:** a `recoverMissingMedia` per-fájl progress + részleges retry + a maradékra kézi relink.
+### 2.5 Üres-állapot + onboarding (CORE §2.8) — P1 🟡 (üres-állapot KÉSZ, granuláris recovery device hátra)
+- [x] ✅ **Üres-projekt állapot (2026-10-08):** `isProjectEmpty` pure + teszt ([projectUtils.ts](../../src/lib/projectUtils.ts)) →
+  üres timeline esetén a fekete vászon helyett **onboarding-kártya** ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx),
+  mind a 4 elrendezés-sávban): tableten a dokkolt forrás-mappára mutat (←), telefonon megnyitja a forrás-sheetet (CTA).
+- [ ] 🖼️ **Granuláris média-helyreállítás:** a bulk felhő-restore ([mediaSync.restoreMissingMedia](../../src/lib/mediaSync.ts),
+  betöltéskor) + auto-content-relink + kézi picker (`relinkMissing`) **MEGVAN**; a per-fájl progress + részleges retry a
+  `restoreMissingMedia` progress-callback refaktorát kéri + valós hiányzó-fájl tesztet → **device-verifikált remainder.**
+- **Kész, ha:** üres projekt nem ragad fekete vásznon ✅; a hiányzó média visszaáll (bulk ✅, per-fájl progress 🖼️).
 
 ### 2.6 Lejátszás-parity UI (CORE §2.6 remainder) — P2
 - [ ] ⬜ **Klip-határ gapless előnézet:** a vágott klipek határán ne „kattanjon" (következő klip előre-betöltése a playheadből).

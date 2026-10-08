@@ -130,6 +130,9 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
   }
 
   const docked = variant === 'docked';
+  // Telefon-állóban a panel ELFEDI az idővonalat → explicit „vissza a timeline-hoz"
+  // affordancia (a bezárás megtartja a kijelölést — `setPanel(null)` nem törli). §2.4
+  const backToTimeline = !docked && L.isCompact;
   // lapként: állóban a képernyő ~38%-a (az előnézet kiférjen), fekvőben több.
   // dokkoltan a magasságot a szülő oszlop adja (flex), nincs korlát.
   const sheetMaxHeight = L.isLandscape
@@ -160,15 +163,28 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
         <Pressable
           onPress={() => setPanel(null)}
           hitSlop={12}
-          style={styles.closeButton}
+          style={backToTimeline ? styles.backButton : styles.closeButton}
           accessibilityRole="button"
-          accessibilityLabel={t('editor.panelHost.closePanel')}
+          accessibilityLabel={
+            backToTimeline
+              ? t('editor.panelHost.backToTimeline')
+              : t('editor.panelHost.closePanel')
+          }
         >
-          <Ionicons
-            name={docked ? 'close' : 'chevron-down'}
-            size={20}
-            color={palette.textDim}
-          />
+          {backToTimeline ? (
+            <>
+              <Ionicons name="chevron-down" size={16} color={palette.accent} />
+              <Text style={styles.backButtonText}>
+                {t('editor.panelHost.backToTimeline')}
+              </Text>
+            </>
+          ) : (
+            <Ionicons
+              name={docked ? 'close' : 'chevron-down'}
+              size={20}
+              color={palette.textDim}
+            />
+          )}
         </Pressable>
       </View>
       <ScrollView
@@ -209,6 +225,20 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: palette.accentSoft,
+  },
+  backButtonText: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '700',
   },
   grabber: {
     alignSelf: 'center',

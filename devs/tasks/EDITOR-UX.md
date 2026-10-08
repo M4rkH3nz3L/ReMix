@@ -12,10 +12,12 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 4 · 🟡 2 · ⬜ 1 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
+> **📊 Haladás (2026-10-08):** ✅ 5 · 🟡 2 · ⬜ 0 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
 > **§2.2 mag kész** (sávváltás-gomb; húzás-gesztus 🖼️ device); **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü + méret-banner);
 > **§2.5 üres-állapot KÉSZ** (onboarding-kártya; granuláris recovery 🖼️ device); **§2.7 KÉSZ** (egységes keymap-mag + teszt
-> + web-bekötés + help-overlay). Nyitva: §2.4 (toolbar-ergonómia, P2) · §2.6 (gapless, P2) · §2.2/§2.5 device-remainderek.
+> + web-bekötés + help-overlay); **§2.4 panel↔timeline KÉSZ** (vissza-gomb, kijelölés-megtartás; toolbar-rail 🖼️ vizuális).
+> **Hátralévő:** §2.6 gapless-előnézet (P2, lejátszómotor) · a 🖼️-remainderek (húzás-gesztus, granuláris recovery, toolbar-rail) —
+> mind **eszközön/vizuálisan verifikálandó** (a szerkesztő a prod-login mögött van, itt headless nem nyílik meg).
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -82,10 +84,13 @@ A mentés-mag kész; a felhasználó lássa + vezérelhesse.
   koppintva nyílik a ⋯ projekt-menü (ott duplikálható/szétszedhető). *(history-limit-elévülés jelzése külön, nem kritikus.)*
 - **Kész, ha:** a mentés-állapot látszik ✅, „Mentés most" + „Mentés másként" a ⋯-menüből elérhető ✅, nagy projekt bannert kap ✅.
 
-### 2.4 Toolbar + panel-ergonómia — P2
-- [ ] ⬜ **Toolbar tabletre:** a kontextuális [Toolbar](../../src/components/editor/Toolbar.tsx) (807 sor, sok gomb) `expanded`-en
-  ne csak vízszintes scroll legyen — csoportosított, kétsoros vagy oldal-rail elrendezés a nagyobb kijelzőn; nagyobb érintő-célok.
-- [ ] ⬜ **Panel ↔ timeline átmenet:** `compact`-on a panel teljesen elfedi a timeline-t — egy „vissza a timeline-hoz" gyorsgomb + a kijelölés megtartása.
+### 2.4 Toolbar + panel-ergonómia — P2 🟡 (panel↔timeline KÉSZ; toolbar-rail vizuális remainder)
+- [ ] 🖼️ **Toolbar tabletre:** a **nagyobb érintő-célok KÉSZ** — a [ToolButton](../../src/components/ui/controls.tsx) már
+  méret-osztályhoz igazodik (`L.editor.toolButtonMinWidth` + 44pt `L.touchMin` + 20/23 ikon). A csoportosított / kétsoros /
+  oldal-rail elrendezés `expanded`-en **vizuális iterációt kér** (row-magasság, wrap vs. rail, csoportok) → device/vizuális remainder.
+- [x] ✅ **Panel ↔ timeline átmenet (2026-10-08):** telefon-állóban (ahol a panel ELFEDI az idővonalat) a
+  [PanelHost](../../src/components/editor/PanelHost.tsx) fejlécében explicit **„⌄ Idővonal"** vissza-gomb (`!docked && L.isCompact`);
+  a bezárás `setPanel(null)` → a **kijelölés megmarad** (nem a deselect-út fut). Tableten/dokkoltan marad a sima „bezárás".
 
 ### 2.5 Üres-állapot + onboarding (CORE §2.8) — P1 🟡 (üres-állapot KÉSZ, granuláris recovery device hátra)
 - [x] ✅ **Üres-projekt állapot (2026-10-08):** `isProjectEmpty` pure + teszt ([projectUtils.ts](../../src/lib/projectUtils.ts)) →

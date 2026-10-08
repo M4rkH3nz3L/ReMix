@@ -5,6 +5,7 @@ import {
   projectDuration,
   projectMediaBytes,
   sourceTimeAt,
+  upcomingVisualClip,
 } from '@/lib/projectUtils';
 import type { Asset, Project, VideoClip } from '@/types/project';
 
@@ -112,6 +113,54 @@ describe('isProjectEmpty — onboarding-kapu (EDITOR-UX §2.5)', () => {
     const next = applyCommand(p, { type: 'REMOVE_CLIP', clipId: 'c1' });
     expect(next).not.toBeNull();
     expect(isProjectEmpty(next!)).toBe(true);
+  });
+});
+
+describe('upcomingVisualClip — gapless-előtöltés (EDITOR-UX §2.6)', () => {
+  // videó-sáv: c1 [0,5), c2 [5,10), c3 [20,25)
+  const multi = (): Project =>
+    ({
+      ...mkProject(1),
+      tracks: [
+        {
+          id: 't1',
+          type: 'video',
+          name: 'v',
+          clips: [
+            { id: 'c1', kind: 'video', start: 0, duration: 5, uri: 'a' },
+            { id: 'c2', kind: 'video', start: 5, duration: 5, uri: 'b' },
+            { id: 'c3', kind: 'image', start: 20, duration: 5, uri: 'c' },
+          ],
+        },
+      ],
+    }) as unknown as Project;
+
+  it('null, ha a következő klip még az ablakon kívül van', () => {
+    // t=3, c2 kezdete 5 > 3+1 → még ne töltsük elő
+    expect(upcomingVisualClip(multi(), 3, 1)).toBeNull();
+  });
+
+  it('a soron következő klipet adja, ha a lookahead-ablakba lóg', () => {
+    expect(upcomingVisualClip(multi(), 4.5, 1)?.id).toBe('c2');
+    expect(upcomingVisualClip(multi(), 3, 3)?.id).toBe('c2');
+  });
+
+  it('a LEGKÖZELEBBI jövőbeli klipet választja (nem a távolabbit)', () => {
+    // t=3, nagy ablak: c2 (5) van közelebb, nem c3 (20)
+    expect(upcomingVisualClip(multi(), 3, 100)?.id).toBe('c2');
+  });
+
+  it('kép-klipet is előtölt (image a videó-sávon)', () => {
+    expect(upcomingVisualClip(multi(), 17, 5)?.id).toBe('c3');
+  });
+
+  it('null a már aktív / épp most kezdődő klipre (start ≤ t)', () => {
+    // t=5 épp a c2 kezdete → az nem „jövőbeli"; c3 túl messze
+    expect(upcomingVisualClip(multi(), 5, 1)).toBeNull();
+  });
+
+  it('null az utolsó klip után', () => {
+    expect(upcomingVisualClip(multi(), 30, 10)).toBeNull();
   });
 });
 

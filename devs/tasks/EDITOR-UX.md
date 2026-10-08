@@ -16,8 +16,10 @@
 > **§2.2 mag kész** (sávváltás-gomb; húzás-gesztus 🖼️ device); **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü + méret-banner);
 > **§2.5 üres-állapot KÉSZ** (onboarding-kártya; granuláris recovery 🖼️ device); **§2.7 KÉSZ** (egységes keymap-mag + teszt
 > + web-bekötés + help-overlay); **§2.4 panel↔timeline KÉSZ** (vissza-gomb, kijelölés-megtartás; toolbar-rail 🖼️ vizuális).
-> **Hátralévő:** §2.6 gapless-előnézet (P2, lejátszómotor) · a 🖼️-remainderek (húzás-gesztus, granuláris recovery, toolbar-rail) —
-> mind **eszközön/vizuálisan verifikálandó** (a szerkesztő a prod-login mögött van, itt headless nem nyílik meg).
+> **§2.6 előtöltés-mag KÉSZ** (`upcomingVisualClip` + teszt; double-buffer-wiring 🖼️ device). **Minden tesztelhető/logikai
+> mag kész + audit-zöld (1475 teszt).** A maradék KIZÁRÓLAG 🖼️ eszközön/vizuálisan verifikálandó munka (húzás-gesztusok,
+> granuláris recovery per-fájl progress, toolbar-rail elrendezés, gapless double-buffer) — a szerkesztő a prod-login mögött
+> van, headless/emulátoron itt nem nyílik meg, ezért ezek on-device iterációt kérnek.
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -101,8 +103,12 @@ A mentés-mag kész; a felhasználó lássa + vezérelhesse.
   `restoreMissingMedia` progress-callback refaktorát kéri + valós hiányzó-fájl tesztet → **device-verifikált remainder.**
 - **Kész, ha:** üres projekt nem ragad fekete vásznon ✅; a hiányzó média visszaáll (bulk ✅, per-fájl progress 🖼️).
 
-### 2.6 Lejátszás-parity UI (CORE §2.6 remainder) — P2
-- [ ] ⬜ **Klip-határ gapless előnézet:** a vágott klipek határán ne „kattanjon" (következő klip előre-betöltése a playheadből).
+### 2.6 Lejátszás-parity UI (CORE §2.6 remainder) — P2 🟡 (előtöltés-mag KÉSZ, double-buffer device)
+- [ ] 🖼️ **Klip-határ gapless előnézet:** a „mit töltsünk előre" döntés tiszta mag KÉSZ + teszt
+  (`upcomingVisualClip(project, t, lookaheadSec)` [projectUtils.ts](../../src/lib/projectUtils.ts) — a videó-sáv soron
+  következő, lookahead-ablakba lógó klipje). A tényleges **double-buffer** (második, előre-bufferelt expo-video player +
+  klip-határon váltás) a [PreviewSurface](../../src/components/preview/PreviewSurface.tsx)-ben **eszközön verifikálandó**
+  (a lejátszás a fő funkció — vizuális ellenőrzés nélkül a `replaceAsync`-váltás átírása regresszió-kockázat).
 
 ### 2.7 Billentyű/gesztus-teljesség + help (CORE §2.10) — P2 ✅ KÉSZ (2026-10-08)
 - [x] ✅ **Egységes parancskészlet:** pure `resolveShortcut` mag + teszt ([editorKeymap.ts](../../src/lib/editorKeymap.ts),

@@ -381,6 +381,34 @@ export function activeVisualClip(project: Project, t: number): Clip | null {
   return active.reduce((a, b) => (b.start >= a.start ? b : a));
 }
 
+/**
+ * A playheadnél SOON-következő vizuális klip (gapless-előnézethez, EDITOR-UX §2.6):
+ * a videó-sávon a legközelebbi, `t` UTÁN kezdődő video/kép klip, ha a `lookaheadSec`
+ * ablakba esik. A preview egy második, előre-bufferelt playerrel így a klip-határon
+ * kattanás nélkül válthat (a tényleges double-buffer a preview-rétegben, eszközön).
+ * `null`, ha nincs ilyen, vagy még túl messze van (akkor ne foglaljunk playert).
+ */
+export function upcomingVisualClip(
+  project: Project,
+  t: number,
+  lookaheadSec = 1
+): VideoClip | ImageClip | null {
+  const track = trackOf(project, 'video');
+  let best: VideoClip | ImageClip | null = null;
+  for (const c of track.clips) {
+    if (c.kind !== 'video' && c.kind !== 'image') {
+      continue;
+    }
+    if (c.start <= t || c.start > t + lookaheadSec) {
+      continue; // már (majdnem) aktív, vagy még túl messze
+    }
+    if (!best || c.start < best.start) {
+      best = c;
+    }
+  }
+  return best;
+}
+
 /** A t-nél épp folyó átmenet (kimenő A klip utolsó `d` mp-ében) — az előnézethez. */
 export interface ActiveTransition {
   from: VideoClip | ImageClip;

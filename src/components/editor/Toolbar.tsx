@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 
 import { SourceSheet } from '@/components/SourceSheet';
 import { CameraRecorder } from '@/components/editor/CameraRecorder';
+import { HelpOverlay } from '@/components/editor/HelpOverlay';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { ToolButton } from '@/components/ui/controls';
@@ -31,6 +32,7 @@ export function Toolbar() {
   const selected = useEditorStore(selectSelectedClip);
   const [showCamera, setShowCamera] = useState(false);
   const [showSource, setShowSource] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const activePanel = useEditorStore((s) => s.activePanel);
   const setPanel = useEditorStore((s) => s.setPanel);
   const addClip = useEditorStore((s) => s.addClip);
@@ -749,6 +751,7 @@ export function Toolbar() {
               onPress={() => togglePanel('library')}
             />
             <ToolButton icon="scan-outline" label="Hotspot" onPress={addHotspot} />
+            <ToolButton icon="help-circle-outline" label={t('editor.toolbar.help')} onPress={() => setShowHelp(true)} />
             {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
                 egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
           </>
@@ -759,6 +762,7 @@ export function Toolbar() {
       {showSource ? (
         <SourceSheet onInsert={insertSource} onClose={() => setShowSource(false)} />
       ) : null}
+      {showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} /> : null}
     </View>
   );
 }

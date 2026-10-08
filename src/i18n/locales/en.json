@@ -885,7 +885,37 @@
       "precompose": "Pre-compose",
       "multicam": "Multicam",
       "creatorPreset": "Preset",
-      "workflow": "Workflow"
+      "workflow": "Workflow",
+      "help": "Help"
+    },
+    "help": {
+      "title": "Help — gestures & keyboard",
+      "gestureSection": "Gestures",
+      "keyboardSection": "Keyboard (web / external keyboard)",
+      "gesture": {
+        "tapSelect": "Tap a clip: select it",
+        "dragMove": "Drag a clip: move it along the timeline",
+        "dragTrim": "Drag a clip edge: trim (in/out point)",
+        "pinchZoom": "Pinch the timeline: zoom in / out",
+        "longPressMulti": "Long-press: multi-select"
+      },
+      "shortcut": {
+        "playPause": "Play / pause",
+        "jogBack": "Jog back",
+        "stop": "Stop",
+        "jogForward": "Play forward",
+        "frameBack": "One frame back",
+        "frameForward": "One frame forward",
+        "setIn": "Set in-point",
+        "setOut": "Set out-point",
+        "split": "Split at playhead",
+        "delete": "Delete",
+        "undo": "Undo",
+        "redo": "Redo",
+        "copy": "Copy clip",
+        "cut": "Cut clip",
+        "paste": "Paste"
+      }
     },
     "transportBar": {
       "markerTitle": "Marker",

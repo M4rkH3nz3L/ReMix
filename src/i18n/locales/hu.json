@@ -885,7 +885,37 @@
       "precompose": "Pre-compose",
       "multicam": "Multicam",
       "creatorPreset": "Preset",
-      "workflow": "Workflow"
+      "workflow": "Workflow",
+      "help": "Súgó"
+    },
+    "help": {
+      "title": "Súgó — gesztusok és billentyűk",
+      "gestureSection": "Gesztusok",
+      "keyboardSection": "Billentyűk (web / külső billentyűzet)",
+      "gesture": {
+        "tapSelect": "Koppintás egy klipre: kijelölés",
+        "dragMove": "Klip húzása: áthelyezés az idővonalon",
+        "dragTrim": "A klip szélének húzása: trimmelés (be/ki-pont)",
+        "pinchZoom": "Csípés az idővonalon: nagyítás / kicsinyítés",
+        "longPressMulti": "Hosszú nyomás: többszörös kijelölés"
+      },
+      "shortcut": {
+        "playPause": "Lejátszás / szünet",
+        "jogBack": "Léptetés vissza",
+        "stop": "Megállás",
+        "jogForward": "Lejátszás előre",
+        "frameBack": "Egy frame vissza",
+        "frameForward": "Egy frame előre",
+        "setIn": "Be-pont",
+        "setOut": "Ki-pont",
+        "split": "Vágás a lejátszófejnél",
+        "delete": "Törlés",
+        "undo": "Visszavonás",
+        "redo": "Mégis",
+        "copy": "Klip másolása",
+        "cut": "Klip kivágása",
+        "paste": "Beillesztés"
+      }
     },
     "transportBar": {
       "markerTitle": "Jelölő",

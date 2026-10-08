@@ -12,9 +12,10 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 3 · 🟡 2 · ⬜ 2 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
+> **📊 Haladás (2026-10-08):** ✅ 4 · 🟡 2 · ⬜ 1 nyitva — Σ 7 tétel. **§2.1 KÉSZ** (látható forrás-mappa);
 > **§2.2 mag kész** (sávváltás-gomb; húzás-gesztus 🖼️ device); **§2.3 KÉSZ** (mentés-UX: ⋯ projekt-menü + méret-banner);
-> **§2.5 üres-állapot KÉSZ** (onboarding-kártya a fekete vászon helyett; granuláris recovery 🖼️ device).
+> **§2.5 üres-állapot KÉSZ** (onboarding-kártya; granuláris recovery 🖼️ device); **§2.7 KÉSZ** (egységes keymap-mag + teszt
+> + web-bekötés + help-overlay). Nyitva: §2.4 (toolbar-ergonómia, P2) · §2.6 (gapless, P2) · §2.2/§2.5 device-remainderek.
 > **Az editor-MAG kész + tesztelt**
 > ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
@@ -98,9 +99,14 @@ A mentés-mag kész; a felhasználó lássa + vezérelhesse.
 ### 2.6 Lejátszás-parity UI (CORE §2.6 remainder) — P2
 - [ ] ⬜ **Klip-határ gapless előnézet:** a vágott klipek határán ne „kattanjon" (következő klip előre-betöltése a playheadből).
 
-### 2.7 Billentyű/gesztus-teljesség + help (CORE §2.10) — P2
-- [ ] ⬜ **Egységes parancskészlet:** space/J-K-L/I-O/S/⌫/⌘Z-⇧⌘Z/⌘C-X-V (klip-vágólap, CORE §2.4)/←→ (frame-léptetés).
-- [ ] 🖼️ **Help-overlay:** „?" a Toolbaron → gesztus/billentyű-térkép (a profi vágó-módok felfedezhetősége).
+### 2.7 Billentyű/gesztus-teljesség + help (CORE §2.10) — P2 ✅ KÉSZ (2026-10-08)
+- [x] ✅ **Egységes parancskészlet:** pure `resolveShortcut` mag + teszt ([editorKeymap.ts](../../src/lib/editorKeymap.ts),
+  14 eset): space/J-K-L/I-O/S/⌫/⌘Z-⇧⌘Z-Ctrl+Y/⌘C-X-V/←→; szövegmezőben + Alt-kombónál nem sül el. A bekötés
+  ([useEditorKeyboard.ts](../../src/hooks/useEditorKeyboard.ts)) a feloldott akciót a store-on futtatja (a billentyű = a gomb:
+  split/paste a Toolbar-logikát tükrözi), **web/tablet-billentyűzeten** (natíven no-op, ott a gesztus+help vezet).
+- [x] ✅ **Help-overlay:** a Toolbar **„Súgó" (?)** gombja → [HelpOverlay](../../src/components/editor/HelpOverlay.tsx)
+  (StudioSheet): gesztus-térkép + a `SHORTCUT_HINTS` magból épülő billentyű-lista (garantáltan szinkronban a `resolveShortcut`-tal).
+- **Kész, ha:** a parancskészlet egy helyen definiált + tesztelt ✅; a „?"-ből előjön a gesztus/billentyű-térkép ✅.
 
 ## 3. Kész, ha
 1. A **forrás-mappa láthatóvá válik**: iPad-en/fekvőben állandó oldal-oszlop a timeline mellett, telefonon egy koppintás;

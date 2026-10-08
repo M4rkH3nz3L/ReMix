@@ -885,7 +885,37 @@
       "precompose": "Vorkomp.",
       "multicam": "Multicam",
       "creatorPreset": "Preset",
-      "workflow": "Workflow"
+      "workflow": "Workflow",
+      "help": "Hilfe"
+    },
+    "help": {
+      "title": "Hilfe — Gesten & Tastatur",
+      "gestureSection": "Gesten",
+      "keyboardSection": "Tastatur (Web / externe Tastatur)",
+      "gesture": {
+        "tapSelect": "Auf einen Clip tippen: auswählen",
+        "dragMove": "Clip ziehen: auf der Timeline verschieben",
+        "dragTrim": "Clip-Rand ziehen: trimmen (In-/Out-Punkt)",
+        "pinchZoom": "Timeline zusammenziehen: zoomen",
+        "longPressMulti": "Lang drücken: Mehrfachauswahl"
+      },
+      "shortcut": {
+        "playPause": "Wiedergabe / Pause",
+        "jogBack": "Zurück joggen",
+        "stop": "Stopp",
+        "jogForward": "Vorwärts abspielen",
+        "frameBack": "Ein Frame zurück",
+        "frameForward": "Ein Frame vor",
+        "setIn": "In-Punkt setzen",
+        "setOut": "Out-Punkt setzen",
+        "split": "Am Abspielkopf teilen",
+        "delete": "Löschen",
+        "undo": "Rückgängig",
+        "redo": "Wiederholen",
+        "copy": "Clip kopieren",
+        "cut": "Clip ausschneiden",
+        "paste": "Einfügen"
+      }
     },
     "transportBar": {
       "markerTitle": "Marker",

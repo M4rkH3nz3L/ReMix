@@ -68,7 +68,12 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 
 ### 2.10 Editor architecture refactor — P1 (alap)
 - [x] ~ **Projekt forrás-mappa (asset-bin) KÉSZ (2026-10-07)** — részlépés az asset-architektúra felé: a `project.assets` köré egységes forrás-bin ([projectSource.ts](../../src/lib/projectSource.ts) + [SourceSheet](../../src/components/SourceSheet.tsx)), a videó-editor Toolbarján is (forrás→idővonal), minden mutáció a **command-buson** (`ADD_ASSET`/`REMOVE_ASSET`). Lásd [08](./08-storage.md) §2.8.
-- [ ] ⬜ Hátra: a teljes **`uri → assetId`** átállás (a klipek asset-id-t hivatkozzanak, ne nyers uri-t) — a collab/undo/AI/cloud-sync alapja (lásd [12](./12-code-quality.md)).
+- [~] 🟡 **`uri → assetId` — Fázis 1 KÉSZ (2026-10-08, [ADR-012](../../docs/hu/decisions/ADR-012-asset-id-architecture.md)):**
+  pure mag + 13 teszt [assetResolve.ts](../../src/lib/assetResolve.ts) — `assetForClip` / `resolveClipUri` (az asset a
+  forrás-igazság, visszaesés a klip uri-cache-ére) / `relinkAsset` (egy hívás → minden rá hivatkozó klip) / `ensureClipAssets`
+  (idempotens backfill). A klip `uri` átmenetileg feloldott cache marad → a preview/render változatlan.
+- [ ] ⬜ **Fázis 2–3:** a backfill bekötése **determinisztikus, tartalom-címzett asset-id-vel** (a round-trip + collab
+  determinizmusa miatt — az arany-út teszt ezt kiszúrta), majd a fogyasztók (`resolveClipUri`) + a relink/cloud-sync átállítása.
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

@@ -9,11 +9,13 @@ import { captureRef } from 'react-native-view-shot';
 import { SourceSheet } from '@/components/SourceSheet';
 import { AdjustSheet } from '@/components/studio/image/AdjustSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
+import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
+import { canBoolean } from '@/lib/imageBoolean';
 import { addLayer, createImageDoc, layerLabel, removeLayer } from '@/lib/imageDoc';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { renderImageDoc } from '@/lib/imageDocClient';
@@ -26,7 +28,7 @@ import { useEditorStore } from '@/store/editorStore';
 import type { Asset, ImageClip, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 const TOOLS: {
-  key: 'layers' | 'photo' | 'text' | 'shape' | 'svg' | 'adjust' | 'align' | 'delete';
+  key: 'layers' | 'photo' | 'text' | 'shape' | 'svg' | 'adjust' | 'align' | 'boolean' | 'delete';
   icon: keyof typeof Ionicons.glyphMap;
   labelKey: string;
 }[] = [
@@ -37,6 +39,7 @@ const TOOLS: {
   { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
   { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
   { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
+  { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
   { key: 'delete', icon: 'trash-outline', labelKey: 'studio.imageTools.delete' },
 ];
 
@@ -63,7 +66,7 @@ export function ImageStudioBody({
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'layers' | 'adjust' | 'align' | 'canvas' | 'source' | null>(null);
+  const [sheet, setSheet] = useState<'layers' | 'adjust' | 'align' | 'boolean' | 'canvas' | 'source' | null>(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const canvasRef = useRef<View>(null);
@@ -258,6 +261,13 @@ export function ImageStudioBody({
           setSheet('align');
         } else {
           Alert.alert(t('studio.image.align.needLayerTitle'), t('studio.image.align.needLayerBody'));
+        }
+        break;
+      case 'boolean':
+        if (canBoolean(doc, effectiveSelectedId)) {
+          setSheet('boolean');
+        } else {
+          Alert.alert(t('studio.image.boolean.needTitle'), t('studio.image.boolean.needBody'));
         }
         break;
       case 'delete':
@@ -496,6 +506,15 @@ export function ImageStudioBody({
       ) : null}
       {sheet === 'align' && doc && selectedLayer && canAlignLayer(selectedLayer) ? (
         <AlignSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'boolean' && doc && effectiveSelectedId && canBoolean(doc, effectiveSelectedId) ? (
+        <BooleanSheet
+          doc={doc}
+          selectedId={effectiveSelectedId}
+          commit={commit}
+          onResult={setSelectedId}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
       {sheet === 'canvas' && doc ? (
         <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />

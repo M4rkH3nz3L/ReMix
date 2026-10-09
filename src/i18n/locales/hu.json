@@ -2833,7 +2833,8 @@
       "delete": "Törlés",
       "draw": "Rajz",
       "svg": "SVG",
-      "align": "Igazítás"
+      "align": "Igazítás",
+      "boolean": "Boolean"
     },
     "image": {
       "layersTitle": "Rétegek",
@@ -2883,6 +2884,17 @@
         "distributeNeed": "Legalább 3 pozícionált réteg kell az elosztáshoz.",
         "distH": "Vízszintes",
         "distV": "Függőleges"
+      },
+      "boolean": {
+        "title": "Boolean-kombináció",
+        "hint": "A kijelölt formát a legközelebbi másik formával kombinálja (egy path-formává olvad).",
+        "union": "Egyesítés",
+        "subtract": "Kivonás",
+        "intersect": "Metszet",
+        "exclude": "Kizárás",
+        "empty": "Nincs értelmes eredmény (a formák nem fedik egymást?).",
+        "needTitle": "Két forma kell",
+        "needBody": "A boolean-hoz egy kijelölt forma + még egy forma kell a vásznon."
       },
       "renderFailTitle": "Renderelés sikertelen",
       "renderFailBody": "Nem sikerült kirenderelni a képet. Ellenőrizd a render-szervert, és próbáld újra.",

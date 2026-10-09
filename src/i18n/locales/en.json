@@ -2833,7 +2833,8 @@
       "delete": "Delete",
       "draw": "Draw",
       "svg": "SVG",
-      "align": "Align"
+      "align": "Align",
+      "boolean": "Boolean"
     },
     "image": {
       "layersTitle": "Layers",
@@ -2883,6 +2884,17 @@
         "distributeNeed": "At least 3 positioned layers are needed to distribute.",
         "distH": "Horizontal",
         "distV": "Vertical"
+      },
+      "boolean": {
+        "title": "Boolean combine",
+        "hint": "Combine the selected shape with the nearest other shape (merges into one path shape).",
+        "union": "Union",
+        "subtract": "Subtract",
+        "intersect": "Intersect",
+        "exclude": "Exclude",
+        "empty": "No meaningful result (do the shapes overlap?).",
+        "needTitle": "Two shapes needed",
+        "needBody": "Boolean needs a selected shape plus one more shape on the canvas."
       },
       "renderFailTitle": "Render failed",
       "renderFailBody": "Couldn't render the image. Check the render server and try again.",

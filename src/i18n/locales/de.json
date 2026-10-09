@@ -2833,7 +2833,8 @@
       "delete": "Löschen",
       "draw": "Zeichnen",
       "svg": "SVG",
-      "align": "Ausrichten"
+      "align": "Ausrichten",
+      "boolean": "Boolean"
     },
     "image": {
       "layersTitle": "Ebenen",
@@ -2883,6 +2884,17 @@
         "distributeNeed": "Zum Verteilen sind mindestens 3 positionierte Ebenen nötig.",
         "distH": "Horizontal",
         "distV": "Vertikal"
+      },
+      "boolean": {
+        "title": "Boolean kombinieren",
+        "hint": "Kombiniert die gewählte Form mit der nächsten anderen Form (zu einer Pfad-Form).",
+        "union": "Vereinigen",
+        "subtract": "Subtrahieren",
+        "intersect": "Schnittmenge",
+        "exclude": "Ausschließen",
+        "empty": "Kein sinnvolles Ergebnis (überlappen die Formen?).",
+        "needTitle": "Zwei Formen nötig",
+        "needBody": "Boolean braucht eine gewählte Form plus eine weitere Form auf dem Canvas."
       },
       "renderFailTitle": "Rendern fehlgeschlagen",
       "renderFailBody": "Das Bild konnte nicht gerendert werden. Prüfe den Render-Server und versuche es erneut.",

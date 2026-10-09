@@ -38,8 +38,12 @@ bekötni + a worker-interop (PSD/PDF) + render-parity.
 ### 2.5 Pattern picker — P1
 - [ ] 🖼️ `patternFill` mag → minta-választó + paraméterek.
 
-### 2.6 Boolean operations UI — P1
-- [ ] 🖼️ Union/subtract/intersect/exclude/divide UI (a path/shape mag fölé).
+### 2.6 Boolean operations UI — P1 ✅ KÉSZ (2026-10-10)
+- [x] ✅ **Union/subtract/intersect/exclude UI** — [BooleanSheet](../../src/components/studio/image/BooleanSheet.tsx) +
+  [imageBoolean.ts](../../src/lib/imageBoolean.ts) (`booleanCombineInDoc`/`canBoolean`) a kész `boolean` mag (`booleanShapes`)
+  fölött. A kijelölt formát a **legközelebbi másik formával** kombinálja (nincs szükség többszörös kijelölésre), az eredmény EGY
+  **path-forma** (`subpaths`+`fillRule`), amit a subpaths-tudatos `ShapeOverlay` rendereli (preview == video-preview). 6 teszt.
+- [ ] ⬜ Hátra: `divide` op + a többszörös kijelölés (tetszőleges 2 forma kombinálása, nem csak a szomszéd).
 
 ### 2.7 Align / distribute UI — P1 🟡 (align-to-canvas KÉSZ + élőben verifikálva, distribute hátra)
 - [x] ✅ **Align-to-canvas KÉSZ (2026-10-09, emulátoron verifikálva):** új „Igazítás" tool → [AlignSheet](../../src/components/studio/image/AlignSheet.tsx)

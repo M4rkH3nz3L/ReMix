@@ -1,4 +1,11 @@
-import { alignLayerInDoc, alignLayerToCanvas, canAlignLayer, layerRect } from '@/lib/imageLayerLayout';
+import {
+  alignLayerInDoc,
+  alignLayerToCanvas,
+  canAlignLayer,
+  distributeLayersInDoc,
+  layerRect,
+  positionedLayerCount,
+} from '@/lib/imageLayerLayout';
 import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 const photo = (over: Partial<PhotoLayer> = {}): PhotoLayer =>
@@ -74,5 +81,31 @@ describe('alignLayerInDoc / canAlignLayer', () => {
     expect(canAlignLayer(photo())).toBe(true);
     expect(canAlignLayer(fill())).toBe(false);
     expect(canAlignLayer(null)).toBe(false);
+  });
+});
+
+describe('distributeLayersInDoc / positionedLayerCount (07 §2.7)', () => {
+  it('positionedLayerCount: csak a pozícionált rétegeket számolja (fill kimarad)', () => {
+    expect(positionedLayerCount(doc([photo({ id: 'a' }), fill(), photo({ id: 'b' })]))).toBe(2);
+  });
+
+  it('3 réteg vízszintes elosztása → egyenlő rések (a szélsők maradnak)', () => {
+    const d = doc([
+      photo({ id: 'a', position: { x: 0.1, y: 0.5 }, w: 0.1, h: 0.1 }),
+      photo({ id: 'b', position: { x: 0.15, y: 0.5 }, w: 0.1, h: 0.1 }), // közel az 'a'-hoz
+      photo({ id: 'c', position: { x: 0.9, y: 0.5 }, w: 0.1, h: 0.1 }),
+    ]);
+    const next = distributeLayersInDoc(d, 'horizontal');
+    const xs = (next.layers as PhotoLayer[]).map((l) => l.position.x);
+    // a szélsők (0.1 és 0.9) maradnak, a középső kiegyenlítődik
+    expect(xs[0]).toBeCloseTo(0.1);
+    expect(xs[2]).toBeCloseTo(0.9);
+    expect(xs[1]).toBeGreaterThan(0.15); // elmozdult a középre
+    expect(next.renderedUri).toBeUndefined();
+  });
+
+  it('<3 pozícionált réteg → no-op (ugyanaz a referencia)', () => {
+    const d = doc([photo({ id: 'a' }), photo({ id: 'b' })]);
+    expect(distributeLayersInDoc(d, 'horizontal')).toBe(d);
   });
 });

@@ -2877,7 +2877,12 @@
         "vcenter": "Mitte",
         "bottom": "Unten",
         "needLayerTitle": "Ebene auswählen",
-        "needLayerBody": "Ausrichten gilt für eine positionierbare Ebene (Foto / Form / Text) — wähle zuerst eine aus."
+        "needLayerBody": "Ausrichten gilt für eine positionierbare Ebene (Foto / Form / Text) — wähle zuerst eine aus.",
+        "distribute": "Verteilen",
+        "distributeHint": "Gleiche Abstände zwischen allen Ebenen.",
+        "distributeNeed": "Zum Verteilen sind mindestens 3 positionierte Ebenen nötig.",
+        "distH": "Horizontal",
+        "distV": "Vertikal"
       },
       "renderFailTitle": "Rendern fehlgeschlagen",
       "renderFailBody": "Das Bild konnte nicht gerendert werden. Prüfe den Render-Server und versuche es erneut.",

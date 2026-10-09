@@ -46,7 +46,10 @@ bekötni + a worker-interop (PSD/PDF) + render-parity.
   (bal/közép/jobb · fent/közép/lent), a tiszta `layout.alignRects` + a réteg↔Rect adapter [imageLayerLayout.ts](../../src/lib/imageLayerLayout.ts)
   (`layerRect`/`alignLayerToCanvas`/`alignLayerInDoc`/`canAlignLayer`) fölött, a `commit`→`UPSERT_IMAGE_DOC` buson (undo). **11 teszt.**
   Csak pozícionálható rétegre (fotó/forma/szöveg); a tool letiltva kijelölés nélkül. On-device: a forma a vászon bal szélére ugrott.
-- [ ] ⬜ Hátra: **distribute** (egyenlő rés / közép) több réteg közt → kell a **többszörös kijelölés** a kép-editorban + a `grid`-elrendezés UI.
+- [x] ✅ **Distribute KÉSZ (2026-10-10):** az AlignSheet „Elosztás" szekciója (vízszintes/függőleges) az ÖSSZES pozícionált
+  réteg között egyenlő réseket oszt (`distributeLayersInDoc` a `layout.distributeSpacing` fölött, kijelölés nélkül, ≥3 réteg;
+  a szélsők maradnak). +3 teszt. A gomb letiltva <3 rétegnél.
+- [ ] ⬜ Hátra: distribute/align a KIJELÖLT rétegek közt (→ **többszörös kijelölés** a kép-editorban) + a `grid`-elrendezés UI.
 
 ### 2.8 PSD import — P1 (🔌 BACKEND-MISSING)
 - [ ] 🔌 Worker: `PSD → layers → raster/vector-approx → ImageDoc`.

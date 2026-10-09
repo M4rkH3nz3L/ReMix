@@ -2877,7 +2877,12 @@
         "vcenter": "Közép",
         "bottom": "Lent",
         "needLayerTitle": "Jelölj ki egy réteget",
-        "needLayerBody": "Az igazítás pozícionálható rétegre hat (fotó / forma / szöveg) — előbb jelölj ki egyet."
+        "needLayerBody": "Az igazítás pozícionálható rétegre hat (fotó / forma / szöveg) — előbb jelölj ki egyet.",
+        "distribute": "Elosztás",
+        "distributeHint": "Egyenlő rések az összes réteg között.",
+        "distributeNeed": "Legalább 3 pozícionált réteg kell az elosztáshoz.",
+        "distH": "Vízszintes",
+        "distV": "Függőleges"
       },
       "renderFailTitle": "Renderelés sikertelen",
       "renderFailBody": "Nem sikerült kirenderelni a képet. Ellenőrizd a render-szervert, és próbáld újra.",

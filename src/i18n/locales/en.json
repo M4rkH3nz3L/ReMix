@@ -2877,7 +2877,12 @@
         "vcenter": "Middle",
         "bottom": "Bottom",
         "needLayerTitle": "Select a layer",
-        "needLayerBody": "Align works on a positionable layer (photo / shape / text) — select one first."
+        "needLayerBody": "Align works on a positionable layer (photo / shape / text) — select one first.",
+        "distribute": "Distribute",
+        "distributeHint": "Equal spacing between all layers.",
+        "distributeNeed": "At least 3 positioned layers are needed to distribute.",
+        "distH": "Horizontal",
+        "distV": "Vertical"
       },
       "renderFailTitle": "Render failed",
       "renderFailBody": "Couldn't render the image. Check the render server and try again.",

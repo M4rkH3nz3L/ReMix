@@ -1,4 +1,4 @@
-import { alignRects, type AlignEdge, type Rect } from '@/lib/layout';
+import { alignRects, type AlignEdge, type Axis, distributeSpacing, type Rect } from '@/lib/layout';
 import type { ImageDoc, ImageLayer } from '@/types/project';
 
 /**
@@ -65,4 +65,40 @@ export function alignLayerInDoc(doc: ImageDoc, layerId: string, edge: AlignEdge)
 /** Igazítható-e a réteg (van pozíciója) — a UI gomb-engedélyezéshez. */
 export function canAlignLayer(layer: ImageLayer | null): boolean {
   return !!layer && layerRect(layer) !== null;
+}
+
+/** Hány pozícionálható (igazítható/elosztható) réteg van a dokumentumban. */
+export function positionedLayerCount(doc: ImageDoc): number {
+  return doc.layers.reduce((n, l) => (layerRect(l) ? n + 1 : n), 0);
+}
+
+/**
+ * Egyenletes RÉS-elosztás az ÖSSZES pozícionált réteg között (a szélsők maradnak,
+ * a köztes rések kiegyenlítődnek — `layout.distributeSpacing`). Kijelölés nélkül
+ * működik; <3 pozícionált réteg esetén no-op (az eredeti doc-referencia).
+ */
+export function distributeLayersInDoc(doc: ImageDoc, axis: Axis): ImageDoc {
+  const positioned = doc.layers.filter((l) => layerRect(l) !== null);
+  if (positioned.length < 3) {
+    return doc;
+  }
+  const distributed = distributeSpacing(positioned.map((l) => layerRect(l)!), axis);
+  const byId = new Map<string, Rect>();
+  positioned.forEach((l, i) => byId.set(l.id, distributed[i]));
+  let changed = false;
+  const layers = doc.layers.map((l) => {
+    const r = byId.get(l.id);
+    if (!r) {
+      return l;
+    }
+    const nx = r.x + r.width / 2;
+    const ny = r.y + r.height / 2;
+    const p = (l as { position: { x: number; y: number } }).position;
+    if (Math.abs(p.x - nx) < 1e-6 && Math.abs(p.y - ny) < 1e-6) {
+      return l;
+    }
+    changed = true;
+    return { ...l, position: { x: nx, y: ny } } as ImageLayer;
+  });
+  return changed ? { ...doc, layers, renderedUri: undefined } : doc;
 }

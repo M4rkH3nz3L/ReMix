@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
-import { alignLayerInDoc } from '@/lib/imageLayerLayout';
-import type { AlignEdge } from '@/lib/layout';
+import { alignLayerInDoc, distributeLayersInDoc, positionedLayerCount } from '@/lib/imageLayerLayout';
+import type { AlignEdge, Axis } from '@/lib/layout';
 import type { ImageDoc, ImageLayer } from '@/types/project';
 
 const ROWS: { titleKey: string; items: { edge: AlignEdge; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] }[] = [
@@ -50,6 +50,14 @@ export function AlignSheet({
       commit(next, t('studio.image.align.title'));
     }
   };
+  // 📐 elosztás az ÖSSZES pozícionált réteg között (kijelölés nélkül; ≥3 kell)
+  const canDistribute = positionedLayerCount(doc) >= 3;
+  const distribute = (axis: Axis) => {
+    const next = distributeLayersInDoc(doc, axis);
+    if (next !== doc) {
+      commit(next, t('studio.image.align.distribute'));
+    }
+  };
   return (
     <StudioSheet title={t('studio.image.align.title')} icon="magnet" onClose={onClose}>
       <Text style={styles.hint}>{t('studio.image.align.hint')}</Text>
@@ -72,6 +80,44 @@ export function AlignSheet({
           </View>
         </View>
       ))}
+
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>{t('studio.image.align.distribute')}</Text>
+        <Text style={[styles.hint, styles.distHint]}>
+          {canDistribute ? t('studio.image.align.distributeHint') : t('studio.image.align.distributeNeed')}
+        </Text>
+        <View style={styles.row}>
+          <Pressable
+            style={[styles.btn, !canDistribute && styles.btnDisabled]}
+            disabled={!canDistribute}
+            onPress={() => distribute('horizontal')}
+            accessibilityRole="button"
+            accessibilityLabel={t('studio.image.align.distH')}
+          >
+            <Ionicons name="reorder-two-outline" size={22} color={canDistribute ? palette.text : palette.textDim} />
+            <Text style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
+              {t('studio.image.align.distH')}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.btn, !canDistribute && styles.btnDisabled]}
+            disabled={!canDistribute}
+            onPress={() => distribute('vertical')}
+            accessibilityRole="button"
+            accessibilityLabel={t('studio.image.align.distV')}
+          >
+            <Ionicons
+              name="reorder-four-outline"
+              size={22}
+              color={canDistribute ? palette.text : palette.textDim}
+              style={{ transform: [{ rotate: '90deg' }] }}
+            />
+            <Text style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
+              {t('studio.image.align.distV')}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
     </StudioSheet>
   );
 }
@@ -114,5 +160,12 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 11,
     fontWeight: '600',
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  distHint: {
+    paddingHorizontal: 0,
+    marginBottom: 8,
   },
 });

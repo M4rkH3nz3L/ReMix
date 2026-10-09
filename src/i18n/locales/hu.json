@@ -2834,7 +2834,17 @@
       "draw": "Rajz",
       "svg": "SVG",
       "align": "Igazítás",
-      "boolean": "Boolean"
+      "boolean": "Boolean",
+      "rotate": "Forgatás",
+      "forward": "Előre",
+      "back": "Hátra",
+      "duplicate": "Duplikálás"
+    },
+    "imageGroups": {
+      "add": "Hozzáadás",
+      "arrange": "Rendezés",
+      "style": "Stílus",
+      "layer": "Réteg"
     },
     "image": {
       "layersTitle": "Rétegek",
@@ -2910,6 +2920,16 @@
       "undoImportSvg": "SVG importálása",
       "svgFailTitle": "SVG import",
       "svgFailBody": "Nem sikerült beolvasni ezt az SVG-t. Próbálj egyszerű SVG-fájlt.",
+      "undoOrder": "Réteg-sorrend",
+      "undoRotate": "Forgatás 90°",
+      "shapes": {
+        "title": "Forma hozzáadása",
+        "rectangle": "Téglalap",
+        "ellipse": "Ellipszis",
+        "line": "Vonal",
+        "arrow": "Nyíl",
+        "star": "Csillag"
+      },
       "undoDuplicate": "Réteg duplázása",
       "undoDelete": "Réteg törlése",
       "undoVisibility": "Réteg ki/be",

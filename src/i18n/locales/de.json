@@ -2834,7 +2834,17 @@
       "draw": "Zeichnen",
       "svg": "SVG",
       "align": "Ausrichten",
-      "boolean": "Boolean"
+      "boolean": "Boolean",
+      "rotate": "Drehen",
+      "forward": "Vor",
+      "back": "Zurück",
+      "duplicate": "Duplizieren"
+    },
+    "imageGroups": {
+      "add": "Hinzufügen",
+      "arrange": "Anordnen",
+      "style": "Stil",
+      "layer": "Ebene"
     },
     "image": {
       "layersTitle": "Ebenen",
@@ -2910,6 +2920,16 @@
       "undoImportSvg": "SVG importieren",
       "svgFailTitle": "SVG-Import",
       "svgFailBody": "Diese SVG konnte nicht gelesen werden. Versuche eine einfache SVG-Datei.",
+      "undoOrder": "Ebenen-Reihenfolge",
+      "undoRotate": "Um 90° drehen",
+      "shapes": {
+        "title": "Form hinzufügen",
+        "rectangle": "Rechteck",
+        "ellipse": "Ellipse",
+        "line": "Linie",
+        "arrow": "Pfeil",
+        "star": "Stern"
+      },
       "undoDuplicate": "Ebene duplizieren",
       "undoDelete": "Ebene löschen",
       "undoVisibility": "Ebene umschalten",

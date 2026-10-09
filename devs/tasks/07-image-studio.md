@@ -21,6 +21,13 @@ bekötni + a worker-interop (PSD/PDF) + render-parity.
   patternFill, rulers/guides, layout (autoLayout/align/distribute), svgImport/export.
 - A legtöbb **UI nincs rákötve**; PSD-import + PDF/PSD/AI-export hiányzik.
 
+### 2.0 Telefon-optimalizált eszköztár + több tool — P1 ✅ KÉSZ (2026-10-10, user-feedback, on-device verifikálva)
+A lapos 9-elemű sor helyett **csoportosított, vízszintesen görgethető** eszköztár ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)):
+**ADD** (Photo/Text/Shape/SVG) · **ARRANGE** (Align/Boolean/Rotate/Forward/Back) · **STYLE** (Adjust) · **LAYER** (Layers/Duplicate/Delete) —
+kategória-címkékkel + elválasztókkal, 60pt touch-célokkal. Felszínre hozva a kész magok: **réteg-sorrend** (`reorderLayer` előre/hátra),
+**duplikálás** (`duplicateLayer`), **forgatás 90°** (rotation). ÚJ **[ShapePickerSheet](../../src/components/studio/image/ShapePickerSheet.tsx)**:
+a Shape már **5 formát** ad (téglalap/ellipszis/vonal/nyíl/csillag), nem csak téglalapot. Mind élőben verifikálva az emulátoron.
+
 ## 2. Feladatlista
 
 ### 2.1 Vector pen UI — P1 (🖼️ UI-MISSING)

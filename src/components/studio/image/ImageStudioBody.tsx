@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { SourceSheet } from '@/components/SourceSheet';
@@ -13,10 +13,19 @@ import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
+import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
 import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
-import { addLayer, createImageDoc, layerLabel, removeLayer } from '@/lib/imageDoc';
+import {
+  addLayer,
+  createImageDoc,
+  duplicateLayer,
+  layerLabel,
+  removeLayer,
+  reorderLayer,
+  updateLayer,
+} from '@/lib/imageDoc';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
@@ -25,22 +34,66 @@ import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import type { Asset, ImageClip, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
+import type { Asset, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 
-const TOOLS: {
-  key: 'layers' | 'photo' | 'text' | 'shape' | 'svg' | 'adjust' | 'align' | 'boolean' | 'delete';
+type ToolKey =
+  | 'layers'
+  | 'photo'
+  | 'text'
+  | 'shape'
+  | 'svg'
+  | 'adjust'
+  | 'align'
+  | 'boolean'
+  | 'forward'
+  | 'back'
+  | 'rotate'
+  | 'duplicate'
+  | 'delete';
+
+interface Tool {
+  key: ToolKey;
   icon: keyof typeof Ionicons.glyphMap;
   labelKey: string;
-}[] = [
-  { key: 'layers', icon: 'layers-outline', labelKey: 'studio.imageTools.layers' },
-  { key: 'photo', icon: 'image-outline', labelKey: 'studio.imageTools.photo' },
-  { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
-  { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
-  { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
-  { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
-  { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
-  { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
-  { key: 'delete', icon: 'trash-outline', labelKey: 'studio.imageTools.delete' },
+}
+
+/**
+ * 📱 Telefon-optimalizált, CSOPORTOSÍTOTT eszköztár (vízszintesen görgethető) —
+ * a lapos 9-elemű sor helyett kategóriák (Hozzáadás / Rendezés / Stílus / Réteg),
+ * így a teljes eszközkészlet kézre esik a kis kijelzőn is.
+ */
+const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
+  {
+    labelKey: 'studio.imageGroups.add',
+    tools: [
+      { key: 'photo', icon: 'image-outline', labelKey: 'studio.imageTools.photo' },
+      { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
+      { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
+      { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
+    ],
+  },
+  {
+    labelKey: 'studio.imageGroups.arrange',
+    tools: [
+      { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
+      { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
+      { key: 'rotate', icon: 'refresh-outline', labelKey: 'studio.imageTools.rotate' },
+      { key: 'forward', icon: 'chevron-up-outline', labelKey: 'studio.imageTools.forward' },
+      { key: 'back', icon: 'chevron-down-outline', labelKey: 'studio.imageTools.back' },
+    ],
+  },
+  {
+    labelKey: 'studio.imageGroups.style',
+    tools: [{ key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' }],
+  },
+  {
+    labelKey: 'studio.imageGroups.layer',
+    tools: [
+      { key: 'layers', icon: 'layers-outline', labelKey: 'studio.imageTools.layers' },
+      { key: 'duplicate', icon: 'copy-outline', labelKey: 'studio.imageTools.duplicate' },
+      { key: 'delete', icon: 'trash-outline', labelKey: 'studio.imageTools.delete' },
+    ],
+  },
 ];
 
 /**
@@ -66,7 +119,9 @@ export function ImageStudioBody({
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'layers' | 'adjust' | 'align' | 'boolean' | 'canvas' | 'source' | null>(null);
+  const [sheet, setSheet] = useState<
+    'layers' | 'adjust' | 'align' | 'boolean' | 'shapePicker' | 'canvas' | 'source' | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const canvasRef = useRef<View>(null);
@@ -176,6 +231,24 @@ export function ImageStudioBody({
     setSelectedId(id);
   };
 
+  // 🔷 a KIVÁLASZTOTT formatípus hozzáadása (nem csak téglalap) — alap-méret + fill
+  const addShapeType = (shape: Exclude<ShapeLayer['shape'], 'path'>) => {
+    if (!doc) {
+      return;
+    }
+    const id = makeId('lyr');
+    const base = { kind: 'shape' as const, id, position: { x: 0.5, y: 0.5 }, fill: '#ff2d95' };
+    const l: ShapeLayer =
+      shape === 'line'
+        ? ({ ...base, shape: 'line', w: 0.6, h: 0.02, fill: '#ffffff', strokeWidth: 0.012 } as ShapeLayer)
+        : shape === 'rectangle'
+          ? ({ ...base, shape: 'rectangle', w: 0.4, h: 0.28, cornerRadius: 0.12 } as ShapeLayer)
+          : ({ ...base, shape, w: 0.4, h: 0.4 } as ShapeLayer);
+    commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
+    setSelectedId(id);
+    setSheet(null);
+  };
+
   // 🗂️ forrás-mappából a vászonra: a KÉP-forrás egy fotó-rétegként kerül be
   const insertSource = (asset: Asset) => {
     if (!doc || asset.kind !== 'image') {
@@ -229,7 +302,7 @@ export function ImageStudioBody({
     }
   };
 
-  const onTool = (key: (typeof TOOLS)[number]['key']) => {
+  const onTool = (key: ToolKey) => {
     if (!doc) {
       return;
     }
@@ -244,7 +317,7 @@ export function ImageStudioBody({
         add('text');
         break;
       case 'shape':
-        add('shape');
+        setSheet('shapePicker'); // 🔷 forma-TÍPUS választó (nem csak téglalap)
         break;
       case 'svg':
         void importSvg();
@@ -270,12 +343,54 @@ export function ImageStudioBody({
           Alert.alert(t('studio.image.boolean.needTitle'), t('studio.image.boolean.needBody'));
         }
         break;
+      case 'duplicate':
+        if (selectedLayer) {
+          commit(duplicateLayer(doc, selectedLayer.id, () => makeId('lyr')), t('studio.image.undoDuplicate'));
+        }
+        break;
+      case 'forward':
+        if (selectedLayer) {
+          commit(reorderLayer(doc, selectedLayer.id, 1), t('studio.image.undoOrder'));
+        }
+        break;
+      case 'back':
+        if (selectedLayer) {
+          commit(reorderLayer(doc, selectedLayer.id, -1), t('studio.image.undoOrder'));
+        }
+        break;
+      case 'rotate':
+        if (selectedLayer && selectedLayer.kind !== 'fill') {
+          const rot = (((selectedLayer as { rotation?: number }).rotation ?? 0) + 90) % 360;
+          commit(updateLayer(doc, selectedLayer.id, { rotation: rot } as Partial<ImageLayer>), t('studio.image.undoRotate'));
+        }
+        break;
       case 'delete':
         if (selectedLayer) {
           commit(removeLayer(doc, selectedLayer.id), t('studio.image.undoDelete'));
           setSelectedId(null);
         }
         break;
+    }
+  };
+
+  // melyik eszköz legyen letiltva (kijelölés/réteg-fajta szerint)
+  const toolDisabled = (key: ToolKey): boolean => {
+    switch (key) {
+      case 'delete':
+      case 'duplicate':
+      case 'forward':
+      case 'back':
+        return !selectedLayer;
+      case 'rotate':
+        return !selectedLayer || selectedLayer.kind === 'fill';
+      case 'adjust':
+        return selectedLayer?.kind !== 'photo';
+      case 'align':
+        return !canAlignLayer(selectedLayer);
+      case 'boolean':
+        return !canBoolean(doc, effectiveSelectedId);
+      default:
+        return false;
     }
   };
 
@@ -462,29 +577,47 @@ export function ImageStudioBody({
         </Text>
       </View>
 
-      {/* eszköz-sor */}
-      <View style={styles.toolBar}>
-        {TOOLS.map((tool) => {
-          const disabled =
-            (tool.key === 'delete' && !selectedLayer) ||
-            (tool.key === 'adjust' && selectedLayer?.kind !== 'photo');
-          const danger = tool.key === 'delete';
-          const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
-          return (
-            <Pressable
-              key={tool.key}
-              style={styles.tool}
-              onPress={() => onTool(tool.key)}
-              disabled={disabled}
-            >
-              <Ionicons name={tool.icon} size={22} color={color} />
-              <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}>
-                {t(tool.labelKey)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.toolBar}
+        contentContainerStyle={styles.toolBarContent}
+      >
+        {TOOL_GROUPS.map((group, gi) => (
+          <View key={group.labelKey} style={styles.toolGroupRow}>
+            <View style={styles.toolGroup}>
+              <Text style={styles.groupLabel}>{t(group.labelKey)}</Text>
+              <View style={styles.groupTools}>
+                {group.tools.map((tool) => {
+                  const disabled = toolDisabled(tool.key);
+                  const danger = tool.key === 'delete';
+                  const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
+                  return (
+                    <Pressable
+                      key={tool.key}
+                      style={styles.tool}
+                      onPress={() => onTool(tool.key)}
+                      disabled={disabled}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(tool.labelKey)}
+                    >
+                      <Ionicons name={tool.icon} size={22} color={color} />
+                      <Text
+                        style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}
+                        numberOfLines={1}
+                      >
+                        {t(tool.labelKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            {gi < TOOL_GROUPS.length - 1 ? <View style={styles.groupDivider} /> : null}
+          </View>
+        ))}
+      </ScrollView>
 
       {sheet === 'layers' && doc ? (
         <LayerPanel
@@ -515,6 +648,9 @@ export function ImageStudioBody({
           onResult={setSelectedId}
           onClose={() => setSheet(null)}
         />
+      ) : null}
+      {sheet === 'shapePicker' && doc ? (
+        <ShapePickerSheet onPick={addShapeType} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'canvas' && doc ? (
         <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />
@@ -568,13 +704,43 @@ const styles = StyleSheet.create({
   },
   statusText: { flex: 1, color: palette.textDim, fontSize: 11, fontWeight: '600' },
   toolBar: {
-    flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: palette.border,
     backgroundColor: palette.surface,
-    paddingTop: 10,
-    paddingBottom: 6,
+    flexGrow: 0,
   },
-  tool: { flex: 1, alignItems: 'center', gap: 4 },
+  toolBarContent: {
+    alignItems: 'flex-start',
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 8,
+  },
+  toolGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  toolGroup: {
+    paddingHorizontal: 6,
+  },
+  groupLabel: {
+    color: palette.textDim,
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginLeft: 6,
+    marginBottom: 2,
+    opacity: 0.7,
+  },
+  groupTools: {
+    flexDirection: 'row',
+  },
+  groupDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: palette.border,
+    marginVertical: 4,
+    marginHorizontal: 2,
+  },
+  tool: { width: 60, alignItems: 'center', gap: 4, paddingVertical: 2 },
   toolLabel: { fontSize: 10, fontWeight: '600' },
 });

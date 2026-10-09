@@ -2834,7 +2834,17 @@
       "draw": "Draw",
       "svg": "SVG",
       "align": "Align",
-      "boolean": "Boolean"
+      "boolean": "Boolean",
+      "rotate": "Rotate",
+      "forward": "Forward",
+      "back": "Back",
+      "duplicate": "Duplicate"
+    },
+    "imageGroups": {
+      "add": "Add",
+      "arrange": "Arrange",
+      "style": "Style",
+      "layer": "Layer"
     },
     "image": {
       "layersTitle": "Layers",
@@ -2910,6 +2920,16 @@
       "undoImportSvg": "Import SVG",
       "svgFailTitle": "SVG import",
       "svgFailBody": "Couldn't read this SVG. Try a plain SVG file.",
+      "undoOrder": "Layer order",
+      "undoRotate": "Rotate 90°",
+      "shapes": {
+        "title": "Add a shape",
+        "rectangle": "Rectangle",
+        "ellipse": "Ellipse",
+        "line": "Line",
+        "arrow": "Arrow",
+        "star": "Star"
+      },
       "undoDuplicate": "Duplicate layer",
       "undoDelete": "Delete layer",
       "undoVisibility": "Toggle layer",

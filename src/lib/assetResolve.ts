@@ -126,9 +126,11 @@ export function flattenClipUris(project: Project): Project {
 }
 
 /**
- * Betöltéskori backfill: minden media-klip, aminek nincs `assetId`-je, kapjon
- * assetet (uri szerint find-or-create) + linket. **Idempotens** — ha már minden
- * media-klip linkelt, az EREDETI projekt-referenciát adja vissza (nincs fölös
+ * Betöltéskori backfill: minden media-klip, aminek nincs `assetId`-je VAGY
+ * `dangling` (nem létező assetre mutat — pl. a forrás-asset `REMOVE_ASSET`-tel
+ * törölve), kapjon érvényes assetet (uri szerint find-or-create) + linket.
+ * **Idempotens** — ha már minden media-klip érvényesen linkelt, az EREDETI
+ * projekt-referenciát adja vissza (nincs fölös
  * re-render / churn). A backfill `assetIdForUri`-t használ (determinisztikus,
  * tartalom-címzett), így kétszer betöltve ugyanazt az id-t adja (round-trip) és
  * kliensek közt sem divergál.
@@ -146,7 +148,14 @@ export function ensureClipAssets(project: Project): Project {
   const tracks = project.tracks.map((track) => {
     let trackChanged = false;
     const clips = track.clips.map((clip) => {
-      if (!isMediaClip(clip) || (clip as { assetId?: string }).assetId) {
+      if (!isMediaClip(clip)) {
+        return clip;
+      }
+      // Már ÉRVÉNYESEN linkelt (az assetId létező assetre mutat) → békén hagyjuk.
+      // A DANGLING assetId-t (pl. a forrás-asset REMOVE_ASSET-tel törölve) viszont
+      // újralinkeljük uri szerint — különben a klip tartósan árva maradna.
+      const existingId = (clip as { assetId?: string }).assetId;
+      if (existingId && assets.some((a) => a.id === existingId)) {
         return clip;
       }
       let asset = byUri.get(clip.uri);

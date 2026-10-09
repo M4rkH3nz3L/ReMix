@@ -116,6 +116,41 @@ describe('assetIdForUri — determinisztikus, tartalom-címzett id (ADR-012)', (
   });
 });
 
+describe('adversariális él-esetek — dangling assetId / orphan (ADR-012 robusztusság)', () => {
+  it('resolveClipUri: DANGLING assetId → visszaesés uri-egyezésre', () => {
+    // a klip assetId-je nem létező assetre mutat, de a uri-ja egy másik assetre illik
+    const p = withClips([vClip('c', { assetId: 'törölt', uri: 'file:///a.mp4' })], [asset('ast1', 'file:///a.mp4')]);
+    expect(resolveClipUri(p, p.tracks[0].clips[0])).toBe('file:///a.mp4');
+    expect(assetForClip(p, p.tracks[0].clips[0])?.id).toBe('ast1');
+  });
+
+  it('resolveClipUri: DANGLING assetId + nincs uri-egyezés → a klip saját uri-ja (nem omlik)', () => {
+    const p = withClips([vClip('c', { assetId: 'törölt', uri: 'file:///only.mp4' })], []);
+    expect(resolveClipUri(p, p.tracks[0].clips[0])).toBe('file:///only.mp4');
+  });
+
+  it('ensureClipAssets REPAIRELI a dangling assetId-t (orphan a REMOVE_ASSET után) uri szerint', () => {
+    // c1 érvényesen linkelt (ast1), c2 ugyanazt a forrást használja, de dangling (az asset törölve)
+    const p = withClips(
+      [vClip('c1', { assetId: 'ast1', uri: 'file:///a.mp4' }), vClip('c2', { assetId: 'törölt', uri: 'file:///a.mp4' })],
+      [asset('ast1', 'file:///a.mp4')]
+    );
+    const next = ensureClipAssets(p);
+    const clips = next.tracks[0].clips as unknown as { id: string; assetId: string }[];
+    // a dangling c2 a MEGLÉVŐ ast1-re linkel (uri-egyezés, nem új asset)
+    expect(next.assets).toHaveLength(1);
+    expect(clips.find((c) => c.id === 'c2')?.assetId).toBe('ast1');
+  });
+
+  it('ensureClipAssets: dangling assetId + nincs uri-egyező asset → ÚJ (determinisztikus) asset', () => {
+    const p = withClips([vClip('c', { assetId: 'törölt', uri: 'file:///orphan.mp4' })], []);
+    const next = ensureClipAssets(p);
+    expect(next.assets).toHaveLength(1);
+    expect((next.tracks[0].clips[0] as unknown as { assetId: string }).assetId).toBe(next.assets[0].id);
+    expect(next.assets[0].id).not.toBe('törölt');
+  });
+});
+
 describe('flattenClipUris — felhő-render előtti uri-lapítás (ADR-012)', () => {
   it('a media-klip uri-ját az asset feloldott uri-jára írja (desync → flatten)', () => {
     const p = withClips([vClip('c', { assetId: 'ast1', uri: 'file:///stale.mp4' })], [

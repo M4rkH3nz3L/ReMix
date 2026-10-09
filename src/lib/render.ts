@@ -3,6 +3,7 @@ import { t as tr } from 'i18next';
 import * as Sharing from 'expo-sharing';
 import { Linking, Platform } from 'react-native';
 
+import { flattenClipUris } from '@/lib/assetResolve';
 import { cloudBaseUrl, ensureCloud, renderServerUrl } from '@/lib/backend';
 import { exportPolicy } from '@/lib/exportPolicy';
 import {
@@ -453,9 +454,14 @@ async function submitAndPollRender(
     throw new Error(tr('lib.render.workerUnreachable', { base }));
   }
 
+  // 🔗 ADR-012: a felhő-feltöltés előtt a klip-uri-kat a FELOLDOTT (asseten át)
+  // uri-ra lapítjuk, hogy a `uriMap` kulcsai (mediaUris) ÉS a szerializált
+  // `clip.uri` (amit a worker párosít) egyezzenek. Ma no-op; relink után a worker
+  // így szerver-módosítás nélkül a helyes fájlt kapja.
+  const flat = flattenClipUris(project);
   const form = new FormData();
   const uriMap: Record<string, string> = {};
-  const uris = mediaUris(project);
+  const uris = mediaUris(flat);
   for (let i = 0; i < uris.length; i++) {
     const uri = uris[i];
     const field = `f${i}`;
@@ -470,7 +476,7 @@ async function submitAndPollRender(
       unit: tr('lib.render.unitFile'),
     });
   }
-  form.append('project', JSON.stringify(project));
+  form.append('project', JSON.stringify(flat));
   form.append('uriMap', JSON.stringify(uriMap));
   if (settings) {
     form.append('settings', JSON.stringify(settings));
@@ -774,7 +780,9 @@ export async function collectAndShareProject(
   onProgress?.({ phase: PHASE_UPLOAD, ratio: 0 });
   // md5+méret identitás az archívumba — a kicsomagolt project.remix
   // tartalom szerint is újracsatolható marad
-  const stamped = await withFingerprints(project);
+  // 🔗 ADR-012: a .remix csomag előtt is a feloldott (asseten át) uri-kra lapítunk,
+  // hogy a feltöltött fájlok ÉS a szerializált projekt klip-uri-jai egyezzenek.
+  const stamped = flattenClipUris(await withFingerprints(project));
   const form = new FormData();
   const uriMap: Record<string, string> = {};
   mediaUris(stamped)

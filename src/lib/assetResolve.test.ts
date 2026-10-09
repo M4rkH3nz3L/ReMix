@@ -2,6 +2,7 @@ import {
   assetForClip,
   assetIdForUri,
   ensureClipAssets,
+  flattenClipUris,
   relinkAsset,
   resolveClipUri,
 } from '@/lib/assetResolve';
@@ -112,6 +113,26 @@ describe('assetIdForUri — determinisztikus, tartalom-címzett id (ADR-012)', (
 
   it('`ast_` prefixszel kezdődik', () => {
     expect(assetIdForUri('file:///a.mp4')).toMatch(/^ast_/);
+  });
+});
+
+describe('flattenClipUris — felhő-render előtti uri-lapítás (ADR-012)', () => {
+  it('a media-klip uri-ját az asset feloldott uri-jára írja (desync → flatten)', () => {
+    const p = withClips([vClip('c', { assetId: 'ast1', uri: 'file:///stale.mp4' })], [
+      asset('ast1', 'file:///fresh.mp4'),
+    ]);
+    const flat = flattenClipUris(p);
+    expect((flat.tracks[0].clips[0] as unknown as { uri: string }).uri).toBe('file:///fresh.mp4');
+  });
+
+  it('idempotens: szinkronban lévő projektre UGYANAZT a referenciát adja (no-op)', () => {
+    const p = withClips([vClip('c', { assetId: 'ast1', uri: 'file:///a.mp4' })], [asset('ast1', 'file:///a.mp4')]);
+    expect(flattenClipUris(p)).toBe(p);
+  });
+
+  it('nem-media klipet nem érint', () => {
+    const p = withClips([textClip('t')]);
+    expect(flattenClipUris(p)).toBe(p);
   });
 });
 

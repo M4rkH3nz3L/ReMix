@@ -79,14 +79,16 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 - [x] ~ **`RELINK_ASSET` parancs a buson (2026-10-08):** a [commands.ts](../../src/lib/commands.ts) `RELINK_ASSET { assetId, newUri }`
   (undo-zható, event-logolt) a `relinkAsset`-et hívja — az asset-centrikus relink bus-primitívje (mint a `MOVE_CLIP`), a relink-UI
   Fázis 3-ban erre vált. Teszt: `commands.test.ts` (reducer + describe-minta).
-- [~] 🟡 **Fázis 2b folyamatban (2026-10-08):** a **nem-hot-path fogyasztók** a `resolveClipUri`-ra álltak — a feloldott
-  (asseten át) URI-t használják (a klip `uri` már csak cache): **on-device render-plan** ([nativeRender.ts](../../src/lib/nativeRender.ts)
-  `buildRenderPlan`, a http-guard is a feloldottat nézi) + **hiányzó-média detektálás** ([videdFile.ts](../../src/lib/videdFile.ts)
-  `findMissingMedia`). Ma viselkedés-semleges (`asset.uri == clip.uri`), relink után (Fázis 3) az asset frissebb uri-ja érvényesül.
-  Teszt: `nativeRender.test.ts` + `videdFile.test.ts` (elavult klip-uri → asset uri; asset-http → kimarad/elérhető).
+- [~] 🟡 **Fázis 2b folyamatban (2026-10-08):** a **nem-hot-path + a felhő-render fogyasztók** a `resolveClipUri`-ra álltak
+  (a klip `uri` már csak cache): **on-device render-plan** ([nativeRender.ts](../../src/lib/nativeRender.ts) `buildRenderPlan`,
+  a http-guard is a feloldottat nézi) + **hiányzó-média detektálás** ([videdFile.ts](../../src/lib/videdFile.ts) `findMissingMedia`)
+  + **felhő-render feltöltés** ([render.ts](../../src/lib/render.ts) `submitAndPollRender` + `collectAndShareProject`):
+  `flattenClipUris` a feltöltés ELŐTT a feloldott uri-kra lapít → a `uriMap` ÉS a szerializált `clip.uri` egyezik, a worker
+  **szerver-módosítás nélkül** a helyes fájlt kapja. Ma viselkedés-semleges (`asset.uri == clip.uri`); relink után (Fázis 3)
+  az asset friss uri-ja érvényesül. Teszt: `nativeRender.test.ts` + `videdFile.test.ts` + `assetResolve.test.ts` (flatten/resolve/relink).
 - [ ] ⬜ **Fázis 2b maradék / 3:** a **per-frame preview/pip/audio** (device-verifikált, perf-óvatos: ne `assets.find`
-  kockánként) + a **cloud-render** (`render.ts` `mediaUris` **kliens+szerver együtt** — a worker is `clip.uri`-t olvas) +
-  a relink-UI/cloud-sync a `RELINK_ASSET`/asset-registryre (ekkor a `relinkAsset` már NEM szinkronizálja a klip `uri`-t).
+  kockánként → egyszer-feloldás a klip-váltáskor) + a relink-UI/cloud-sync a `RELINK_ASSET`/asset-registryre (ekkor a
+  `relinkAsset` már NEM szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság).
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

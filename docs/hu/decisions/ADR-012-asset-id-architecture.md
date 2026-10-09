@@ -37,10 +37,12 @@ backward-compatible**:
    független, minden betöltéskor fut), `assetIdForUri` determinisztikus id-vel → a séma-
    migráció utáni utakon (preset/AI/hang-leválasztás) assetId nélkül hozzáadott klipek is
    linkelnek, a round-trip + collab determinizmus sértése nélkül (az arany-út teszt igazolja).
-4. **Fázis 2b (következő):** a fogyasztók (preview/pip/audio/render-plan/proxy,
-   `findMissingMedia`) a `resolveClipUri`-ra állnak → a klip `uri`-ja már csak cache.
-5. **Fázis 3:** a relink/cloud-sync/collab az asset-registryre épül
-   (`relinkAsset` + asset-id-alapú upload); a klip `uri` elhagyható (vagy csak cache).
+4. **Fázis 2b (folyamatban):** a fogyasztók a `resolveClipUri`-ra állnak → a klip `uri` már csak cache.
+   **Kész:** on-device render-plan (`buildRenderPlan`), hiányzó-média (`findMissingMedia`), és a **felhő-render
+   feltöltés** (`flattenClipUris` a feltöltés előtt → a worker a feloldott uri-t kapja, **szerver-módosítás nélkül**).
+   **Hátra:** a per-frame preview/pip/audio (device-verifikált, perf-óvatos: egyszer-feloldás klip-váltáskor, ne kockánként).
+5. **Fázis 3:** a relink-UI/cloud-sync a `RELINK_ASSET`/asset-registryre vált, és a `relinkAsset` **már NEM**
+   szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
 
 ### Determinizmus-megkötés (miért tartalom-címzett a backfill id-je)
 A backfill/ingest **nem használhat `makeId` (véletlen) asset-id-t** sem a betöltő

@@ -97,6 +97,35 @@ export function relinkAsset(project: Project, assetId: string, newUri: string): 
 }
 
 /**
+ * A projekt minden media-klipjének `uri`-ját a FELOLDOTT (asseten át) uri-ra írja
+ * (ADR-012). A **felhő-render előtt** hívandó: a worker a szerializált `clip.uri`-t
+ * olvassa és a `uriMap`-pel párosítja a feltöltött fájlokhoz — ezért a kettőnek
+ * egyeznie kell. Ma no-op (`asset.uri == clip.uri`); relink után (Fázis 3) a stale
+ * klip-uri-t az asset friss uri-jára lapítja, így a worker a HELYES fájlt kapja,
+ * **szerver-módosítás nélkül**. Idempotens: nincs változás → az eredeti projekt-ref.
+ */
+export function flattenClipUris(project: Project): Project {
+  let changed = false;
+  const tracks = project.tracks.map((track) => {
+    let trackChanged = false;
+    const clips = track.clips.map((clip) => {
+      if (!isMediaClip(clip)) {
+        return clip;
+      }
+      const resolved = resolveClipUri(project, clip);
+      if (resolved && resolved !== clip.uri) {
+        trackChanged = true;
+        changed = true;
+        return { ...clip, uri: resolved } as Clip;
+      }
+      return clip;
+    });
+    return trackChanged ? { ...track, clips } : track;
+  });
+  return changed ? { ...project, tracks } : project;
+}
+
+/**
  * Betöltéskori backfill: minden media-klip, aminek nincs `assetId`-je, kapjon
  * assetet (uri szerint find-or-create) + linket. **Idempotens** — ha már minden
  * media-klip linkelt, az EREDETI projekt-referenciát adja vissza (nincs fölös

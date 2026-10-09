@@ -50,7 +50,7 @@ import {
   writeRecovery,
 } from '@/lib/storage';
 import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
-import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs } from '@/lib/videdFile';
+import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs, relinkCommandsFor } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
 import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
@@ -319,17 +319,19 @@ export default function EditorScreen() {
     setRelinking(true);
     try {
       const auto = await findAutoRelinkPairs(state.project, missingMedia);
-      for (const pair of auto) {
-        state.dispatch({ type: 'RELINK_URI', oldUri: pair.oldUri, newUri: pair.newUri }, 'system');
+      // 🔗 ADR-012: a média-relink asset-centrikus (RELINK_ASSET), a shape-imageUri RELINK_URI
+      for (const cmd of relinkCommandsFor(state.project, auto)) {
+        state.dispatch(cmd, 'system');
       }
       let current = useEditorStore.getState().project;
       let remaining = current ? findMissingMedia(current) : [];
       if (remaining.length > 0) {
         const manual = await pickRelinkPairs(remaining);
-        for (const pair of manual) {
-          useEditorStore
-            .getState()
-            .dispatch({ type: 'RELINK_URI', oldUri: pair.oldUri, newUri: pair.newUri }, 'user');
+        const proj = useEditorStore.getState().project;
+        if (proj) {
+          for (const cmd of relinkCommandsFor(proj, manual)) {
+            useEditorStore.getState().dispatch(cmd, 'user');
+          }
         }
         current = useEditorStore.getState().project;
         remaining = current ? findMissingMedia(current) : [];

@@ -41,8 +41,10 @@ backward-compatible**:
    **Kész:** on-device render-plan (`buildRenderPlan`), hiányzó-média (`findMissingMedia`), és a **felhő-render
    feltöltés** (`flattenClipUris` a feltöltés előtt → a worker a feloldott uri-t kapja, **szerver-módosítás nélkül**).
    **Hátra:** a per-frame preview/pip/audio (device-verifikált, perf-óvatos: egyszer-feloldás klip-váltáskor, ne kockánként).
-5. **Fázis 3:** a relink-UI/cloud-sync a `RELINK_ASSET`/asset-registryre vált, és a `relinkAsset` **már NEM**
-   szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
+5. **Fázis 3 (folyamatban):** a **relink-UI KÉSZ** — az editor `relinkMissing` a `relinkCommandsFor`-ral a média-relinket
+   `RELINK_ASSET`-re viszi (a `shape.imageUri` + nem-asset uri marad `RELINK_URI`). **Hátra a flip:** a per-frame preview
+   (az utolsó `clip.uri`-olvasó) `resolveClipUri`-ra állítása után a `relinkAsset` már NEM szinkronizálja a klip `uri`-t →
+   az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
 
 ### Determinizmus-megkötés (miért tartalom-címzett a backfill id-je)
 A backfill/ingest **nem használhat `makeId` (véletlen) asset-id-t** sem a betöltő

@@ -5,6 +5,7 @@ import { t as tr } from 'i18next';
 import { Alert, Platform } from 'react-native';
 
 import { resolveClipUri } from '@/lib/assetResolve';
+import type { EditorCommand } from '@/lib/commands';
 import { fingerprintFile, withFingerprints } from '@/lib/fingerprint';
 import { makeId } from '@/lib/id';
 import { pickAudio, pickImage, pickVideo } from '@/lib/media';
@@ -125,6 +126,32 @@ export function findMissingMedia(project: Project): MissingMedia[] {
     }
   }
   return [...seen.values()];
+}
+
+/**
+ * Relink-párokból a megfelelő command-bus parancsok (ADR-012 Fázis 3 felé).
+ * A média-asseteket az **asset-centrikus** `RELINK_ASSET`-re viszi (az asset a
+ * forrás-igazság → egy parancs minden rá hivatkozó klipet frissít), a `shape`
+ * logó/vízjel `imageUri`-kat (amik NEM asset-linkeltek) és a nem-asset uri-kat
+ * a klip-uri-t átíró `RELINK_URI`-n hagyja. Ma viselkedés-semleges; a Fázis-3
+ * flip (a klip-uri elhagyása) után ez az út lesz a helyes.
+ */
+export function relinkCommandsFor(project: Project, pairs: RelinkPair[]): EditorCommand[] {
+  const shapeUris = new Set<string>();
+  for (const track of project.tracks) {
+    for (const clip of track.clips) {
+      if (clip.kind === 'shape' && clip.imageUri) {
+        shapeUris.add(clip.imageUri);
+      }
+    }
+  }
+  return pairs.map((pair) => {
+    const asset = project.assets.find((a) => a.uri === pair.oldUri);
+    if (asset && !shapeUris.has(pair.oldUri)) {
+      return { type: 'RELINK_ASSET', assetId: asset.id, newUri: pair.newUri };
+    }
+    return { type: 'RELINK_URI', oldUri: pair.oldUri, newUri: pair.newUri };
+  });
 }
 
 export interface RelinkPair {

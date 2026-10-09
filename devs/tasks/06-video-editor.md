@@ -86,9 +86,13 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   `flattenClipUris` a feltöltés ELŐTT a feloldott uri-kra lapít → a `uriMap` ÉS a szerializált `clip.uri` egyezik, a worker
   **szerver-módosítás nélkül** a helyes fájlt kapja. Ma viselkedés-semleges (`asset.uri == clip.uri`); relink után (Fázis 3)
   az asset friss uri-ja érvényesül. Teszt: `nativeRender.test.ts` + `videdFile.test.ts` + `assetResolve.test.ts` (flatten/resolve/relink).
-- [ ] ⬜ **Fázis 2b maradék / 3:** a **per-frame preview/pip/audio** (device-verifikált, perf-óvatos: ne `assets.find`
-  kockánként → egyszer-feloldás a klip-váltáskor) + a relink-UI/cloud-sync a `RELINK_ASSET`/asset-registryre (ekkor a
-  `relinkAsset` már NEM szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság).
+- [~] 🟡 **Fázis 3 relink-UI KÉSZ (2026-10-08):** az editor `relinkMissing` a `relinkCommandsFor`-t
+  ([videdFile.ts](../../src/lib/videdFile.ts)) használja: a média-relink **asset-centrikus** (`RELINK_ASSET` → egy parancs
+  minden rá hivatkozó klipet frissít), a `shape.imageUri` logó/vízjel + a nem-asset uri a klip-uri-t átíró `RELINK_URI`-n marad.
+  Teszt: `videdFile.test.ts` (media→RELINK_ASSET, shape/nem-asset→RELINK_URI).
+- [ ] ⬜ **Fázis 3 flip (device után):** a **per-frame preview/pip/audio** `resolveClipUri`-ra állítása (device-verifikált,
+  perf-óvatos: egyszer-feloldás klip-váltáskor) — ez az UTOLSÓ `clip.uri`-olvasó fogyasztó; utána a `relinkAsset` már NEM
+  szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

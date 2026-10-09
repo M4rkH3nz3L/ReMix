@@ -1,5 +1,5 @@
-import { findMissingMedia } from '@/lib/videdFile';
-import type { Asset, Project, VideoClip } from '@/types/project';
+import { findMissingMedia, relinkCommandsFor } from '@/lib/videdFile';
+import type { Asset, Clip, Project, VideoClip } from '@/types/project';
 
 /**
  * A jest(-expo) környezetben nincs valódi fájlrendszer: a `new File(uri).exists`
@@ -47,5 +47,39 @@ describe('findMissingMedia — a feloldott (asset) uri-t ellenőrzi (ADR-012)', 
       { id: 'ast1', kind: 'video', uri: 'https://cdn/stream.m3u8', provider: 'remote' },
     ]);
     expect(findMissingMedia(p)).toHaveLength(0);
+  });
+});
+
+describe('relinkCommandsFor — media→RELINK_ASSET, shape→RELINK_URI (ADR-012 Fázis 3)', () => {
+  const withTracks = (clips: Clip[], assets: Asset[]): Project =>
+    ({
+      id: 'p',
+      name: 't',
+      aspectRatio: '9:16',
+      tracks: [{ id: 't1', type: 'video', name: 'v', clips }],
+      assets,
+      schemaVersion: 6,
+    }) as unknown as Project;
+
+  it('media-assetre mutató uri → asset-centrikus RELINK_ASSET', () => {
+    const p = withTracks([vClip({ assetId: 'ast1', uri: 'file:///old.mp4' })], [
+      { id: 'ast1', kind: 'video', uri: 'file:///old.mp4', provider: 'local' },
+    ]);
+    const cmds = relinkCommandsFor(p, [{ oldUri: 'file:///old.mp4', newUri: 'file:///new.mp4' }]);
+    expect(cmds).toEqual([{ type: 'RELINK_ASSET', assetId: 'ast1', newUri: 'file:///new.mp4' }]);
+  });
+
+  it('nem-asset uri (nincs találat) → RELINK_URI', () => {
+    const p = withTracks([], []);
+    const cmds = relinkCommandsFor(p, [{ oldUri: 'file:///x.png', newUri: 'file:///y.png' }]);
+    expect(cmds).toEqual([{ type: 'RELINK_URI', oldUri: 'file:///x.png', newUri: 'file:///y.png' }]);
+  });
+
+  it('ha a uri-t shape.imageUri is használja → RELINK_URI (az nem asset-linkelt)', () => {
+    const shape = { id: 's', kind: 'shape', start: 0, duration: 2, imageUri: 'file:///logo.png' } as unknown as Clip;
+    const p = withTracks([shape], [{ id: 'ast1', kind: 'image', uri: 'file:///logo.png', provider: 'local' }]);
+    const cmds = relinkCommandsFor(p, [{ oldUri: 'file:///logo.png', newUri: 'file:///logo2.png' }]);
+    // még ha van is azonos uri-jú asset, a shape-involvement miatt a klip-uri-t átíró RELINK_URI megy
+    expect(cmds[0].type).toBe('RELINK_URI');
   });
 });

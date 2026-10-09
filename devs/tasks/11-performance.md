@@ -5,9 +5,9 @@
 
 ---
 
-> **📊 Haladás (2026-10-06):** ✅ 1 teljes · 🟡 0 · ⬜ 4 nyitva — Σ 5 tétel.
-> A **projectDuration-cache** (§2.2) kész; a timeline-60Hz-reconciliation, az auto-version,
-> a player-write-csökkentés és a lusta-modal-mount **mérés-vezérelt** — nyitva.
+> **📊 Haladás (2026-10-08):** ✅ 2 teljes · 🟡 0 · ⬜ 3 nyitva — Σ 5 tétel.
+> A **projectDuration-cache** (§2.2) és az **auto-version olcsó-throttle** (§2.3, verify-first) kész; a
+> timeline-60Hz-reconciliation, a player-write-csökkentés és a lusta-modal-mount **mérés/device-vezérelt** — nyitva.
 
 ## 0. Kontextus & cél
 A timeline + preview + auto-version a legérzékenyebb teljesítmény-pontok (hosszú timeline, 4K
@@ -26,7 +26,10 @@ média, gyenge eszköz). Cél: 60 Hz-es, akadásmentes szerkesztés + minimális
 - [x] ✅ MÁR KÉSZ: `WeakMap<Project, number>` memoizáció ([projectUtils.ts](../../src/lib/projectUtils.ts) `durationCache`) — a command-bus új objektumot ad → automatikus invalidáció. Tesztelt (`projectUtils.test.ts`). (Az audit `main`-je elavult volt.)
 
 ### 2.3 Auto-version optimalizáció — P1
-- [ ] ⬜ A throttle **előtti** felesleges storage-read megszüntetése.
+- [x] ✅ MÁR KÉSZ (verify-first, 2026-10-08): a `recordAutoVersion` ([storage.ts](../../src/lib/storage.ts)) a throttle-t egy
+  **olcsó időbélyeg-kulccsal** (`lastAutoKey`) dönti el a drága `loadVersions` ELŐTT — korábban minden autosave-nél beolvasta +
+  JSON-parse-olta a TELJES verzió-listát (max 20 pillanatkép, több MB), most csak ha tényleg verziót ír. A régi (kulcs nélküli)
+  adatra is helyesen esik vissza.
 
 ### 2.4 Preview player writes — P1
 - [ ] ⬜ A per-frame player/audio-state írás csökkentése (iPhone/Android, hosszú timeline, 4K).

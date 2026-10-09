@@ -146,8 +146,14 @@ async function renderImageDoc(doc, height, workDir) {
       }
       inputs.push('-i', png);
       prepared = `p${idx}`;
+      // 🔄 réteg-forgatás (kép-stúdió) a forma/szöveg PNG-n — a fotó-ág mintája;
+      // a fill (teljes vászon) nem forog, csak az elhelyezett (position) rétegek
+      const rot =
+        layer.kind !== 'fill' && layer.rotation
+          ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
+          : '';
       filters.push(
-        `[${idx}:v]format=rgba,colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+        `[${idx}:v]format=rgba${rot},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
     }

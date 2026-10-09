@@ -743,6 +743,12 @@ export interface TextClip extends ClipBase {
   fontFamily?: string;
   /** középpont, 0–1 normalizálva */
   position: { x: number; y: number };
+  /**
+   * 🔄 Forgatás fokban a KÖZÉPPONT körül (hiányzó = 0). A KÉP-STÚDIÓ szöveg-réteg
+   * forgatása használja; az előnézet a szöveg-blokk wrap-transformjával, a kép-doc
+   * render a szöveg-PNG elforgatásával érvényesíti.
+   */
+  rotation?: number;
   animation: TextAnimation;
   /** hiányzó érték = 'plain' (régebbi mentett projektek) */
   stylePreset?: TextStylePreset;
@@ -898,6 +904,12 @@ export interface ShapeClip extends ClipBase {
   /** méret a vászon arányában (0–1) */
   w: number;
   h: number;
+  /**
+   * 🔄 Forgatás fokban a KÖZÉPPONT körül (hiányzó = 0). A KÉP-STÚDIÓ réteg-
+   * forgatása használja (a videó-klip a `transform.rotation`-t); az előnézet a
+   * wrap-transformmal, a kép-doc render a forma-PNG elforgatásával érvényesíti.
+   */
+  rotation?: number;
   /** kitöltő szín (hex) — gradiens esetén a tartalék */
   fill: string;
   /**

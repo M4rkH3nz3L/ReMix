@@ -28,6 +28,15 @@ kategória-címkékkel + elválasztókkal, 60pt touch-célokkal. Felszínre hozv
 **duplikálás** (`duplicateLayer`), **forgatás 90°** (rotation). ÚJ **[ShapePickerSheet](../../src/components/studio/image/ShapePickerSheet.tsx)**:
 a Shape már **5 formát** ad (téglalap/ellipszis/vonal/nyíl/csillag), nem csak téglalapot. Mind élőben verifikálva az emulátoron.
 
+### 2.0b Valódi FORGATÁS minden rétegre (preview + worker render-parity) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+A „Forgatás" eddig csak a `rotation`-t ÍRTA, de a forma/szöveg se az előnézetben, se a renderben nem forgott (néma no-op). Mostantól **valódi, végponttól-végpontig**
+forgatás a fotó/forma/szöveg rétegeken (a háttér-fill nem forog): `ShapeClip`/`TextClip` kap közvetlen `rotation?` mezőt
+([types](../../src/types/project.ts)); az előnézet a [ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx) wrap-transformjával + a
+[TextOverlay](../../src/components/preview/TextOverlay.tsx) szöveg-blokk-transformjával forgat a KÖZÉPPONT körül; a
+[SelectionFrame](../../src/components/studio/image/SelectionFrame.tsx) forgató-fogója (eddig csak fotó) minden nem-fill rétegre kinyílt (gesztus-forgatás);
+a worker kép-doc kompozitora ([server/imagedoc.js](../../server/imagedoc.js)) a forma/szöveg PNG-t a bizonyított fotó-rotate mintával forgatja (render-parity).
+On-device: a cián csillag + a pink téglalap a forgató-fogóval láthatóan elfordult.
+
 ## 2. Feladatlista
 
 ### 2.1 Vector pen UI — P1 (🖼️ UI-MISSING)

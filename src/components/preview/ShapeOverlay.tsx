@@ -123,8 +123,15 @@ export function ShapeOverlay({
       }
     });
 
+  // 🔄 réteg-forgatás (kép-stúdió) a KÖZÉPPONT körül — a wrap transformOrigin
+  // alapból a közép, így a left/top center-pozícióval egybeesik (render-paritás)
+  const rotDeg = clip.rotation ?? 0;
   const dragStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dragX.value }, { translateY: dragY.value }],
+    transform: [
+      { translateX: dragX.value },
+      { translateY: dragY.value },
+      { rotate: `${rotDeg}deg` },
+    ],
   }));
 
   // 🎯 animált pozíció/méret a lejátszófejnél (követés/kulcskocka); kf nélkül a statikus érték

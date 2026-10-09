@@ -18,9 +18,10 @@ interface FrameData {
 
 /**
  * 🎯 Kijelölő-keret a vászon aktív rétegén — közvetlen KÉZI méretezés (sarok-fogó,
- * minden réteg-fajta) és FORGATÁS (fej-fogó, csak fotó; forma/szöveg statikus
- * forgatást a render nem éget be, ezért ott nincs). A gesztus alatt `onLive`
- * élőben rajzol; a végén `onCommit` egyetlen undo-lépésként rögzít.
+ * minden réteg-fajta) és FORGATÁS (fej-fogó) a fotó/forma/szöveg rétegeken (a
+ * háttér-fill nem forog). A `rotation`-t az előnézet (wrap-transform) és a kép-doc
+ * render (PNG-forgatás) egyformán érvényesíti. A gesztus alatt `onLive` élőben
+ * rajzol; a végén `onCommit` egyetlen undo-lépésként rögzít.
  *
  * A gesztus-kezelők a `dataRef`-ből olvasnak (a PanResponder EGYSZER jön létre,
  * a záródó változók elavulnának) — ugyanaz a minta, mint a hang-stúdió Sliderében.
@@ -93,7 +94,7 @@ export function SelectionFrame({
         pending.current = {};
         const d = dataRef.current;
         rotState.current = {
-          startRot: d && d.layer.kind === 'photo' ? d.layer.rotation ?? 0 : 0,
+          startRot: d && d.layer.kind !== 'fill' ? d.layer.rotation ?? 0 : 0,
         };
         frameRef.current?.measureInWindow?.((x, y, w, h) => {
           rotState.current.center = { x: x + w / 2, y: y + h / 2 };
@@ -133,19 +134,22 @@ export function SelectionFrame({
   let halfW: number;
   let halfH: number;
   let rot = 0;
-  const canRotate = layer.kind === 'photo';
+  // 🔄 forgatható minden réteg a háttér (fill) KIVÉTELÉVEL — a shape/text már
+  // ugyanúgy honorálja a `rotation`-t az előnézetben és a render-ben, mint a fotó
+  const canRotate = layer.kind !== 'fill';
   if (layer.kind === 'photo' || layer.kind === 'shape') {
     cx = layer.position.x * box.w;
     cy = layer.position.y * box.h;
     halfW = (layer.w * box.w) / 2;
     halfH = (layer.h * box.h) / 2;
-    rot = layer.kind === 'photo' ? layer.rotation ?? 0 : 0;
+    rot = layer.rotation ?? 0;
   } else if (layer.kind === 'text') {
     cx = layer.position.x * box.w;
     cy = layer.position.y * box.h;
     const fontPx = (layer.fontSize / 100) * box.h;
     halfH = Math.max(16, fontPx * 0.8);
     halfW = Math.max(48, box.w * 0.34);
+    rot = layer.rotation ?? 0;
   } else {
     return null; // fill: háttér, nincs kerete
   }

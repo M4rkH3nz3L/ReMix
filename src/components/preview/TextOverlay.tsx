@@ -309,6 +309,8 @@ export function TextOverlay({
                   ? ([{ translateY: -clip.baselineShift * fontSize }] as const)
                   : []),
                 { scale: anim.scale },
+                // 🔄 réteg-forgatás (kép-stúdió) a szöveg-blokk közepe körül
+                ...(clip.rotation ? ([{ rotate: `${clip.rotation}deg` }] as const) : []),
                 // 3D döntés (közelítés — a pontos anyag/extrúzió a renderben)
                 ...(clip.text3d
                   ? ([

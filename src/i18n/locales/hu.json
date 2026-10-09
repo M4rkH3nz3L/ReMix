@@ -2832,7 +2832,8 @@
       "fill": "Háttér",
       "delete": "Törlés",
       "draw": "Rajz",
-      "svg": "SVG"
+      "svg": "SVG",
+      "align": "Igazítás"
     },
     "image": {
       "layersTitle": "Rétegek",
@@ -2864,6 +2865,20 @@
       "selected": "Kijelölve: {{name}}",
       "needPhotoTitle": "Válassz fotót",
       "needPhotoBody": "A korrekció fotó-rétegre hat — előbb jelölj ki egyet.",
+      "align": {
+        "title": "Igazítás a vászonhoz",
+        "hint": "A kijelölt réteg igazítása a vászon széleihez vagy közepéhez.",
+        "horizontal": "Vízszintes",
+        "vertical": "Függőleges",
+        "left": "Bal",
+        "hcenter": "Közép",
+        "right": "Jobb",
+        "top": "Fent",
+        "vcenter": "Közép",
+        "bottom": "Lent",
+        "needLayerTitle": "Jelölj ki egy réteget",
+        "needLayerBody": "Az igazítás pozícionálható rétegre hat (fotó / forma / szöveg) — előbb jelölj ki egyet."
+      },
       "renderFailTitle": "Renderelés sikertelen",
       "renderFailBody": "Nem sikerült kirenderelni a képet. Ellenőrizd a render-szervert, és próbáld újra.",
       "exportedTitle": "Kép exportálva",

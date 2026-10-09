@@ -2832,7 +2832,8 @@
       "fill": "Hintergrund",
       "delete": "Löschen",
       "draw": "Zeichnen",
-      "svg": "SVG"
+      "svg": "SVG",
+      "align": "Ausrichten"
     },
     "image": {
       "layersTitle": "Ebenen",
@@ -2864,6 +2865,20 @@
       "selected": "Ausgewählt: {{name}}",
       "needPhotoTitle": "Foto auswählen",
       "needPhotoBody": "Korrekturen gelten für eine Foto-Ebene — wähle zuerst eine aus.",
+      "align": {
+        "title": "Am Canvas ausrichten",
+        "hint": "Die gewählte Ebene an den Canvas-Rändern oder der Mitte ausrichten.",
+        "horizontal": "Horizontal",
+        "vertical": "Vertikal",
+        "left": "Links",
+        "hcenter": "Mitte",
+        "right": "Rechts",
+        "top": "Oben",
+        "vcenter": "Mitte",
+        "bottom": "Unten",
+        "needLayerTitle": "Ebene auswählen",
+        "needLayerBody": "Ausrichten gilt für eine positionierbare Ebene (Foto / Form / Text) — wähle zuerst eine aus."
+      },
       "renderFailTitle": "Rendern fehlgeschlagen",
       "renderFailBody": "Das Bild konnte nicht gerendert werden. Prüfe den Render-Server und versuche es erneut.",
       "exportedTitle": "Bild exportiert",

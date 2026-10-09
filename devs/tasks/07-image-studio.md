@@ -41,8 +41,12 @@ bekötni + a worker-interop (PSD/PDF) + render-parity.
 ### 2.6 Boolean operations UI — P1
 - [ ] 🖼️ Union/subtract/intersect/exclude/divide UI (a path/shape mag fölé).
 
-### 2.7 Align / distribute UI — P1
-- [ ] 🖼️ A `layout` mag (align/distribute/grid) vezérlő-UI-ja.
+### 2.7 Align / distribute UI — P1 🟡 (align-to-canvas KÉSZ + élőben verifikálva, distribute hátra)
+- [x] ✅ **Align-to-canvas KÉSZ (2026-10-09, emulátoron verifikálva):** új „Igazítás" tool → [AlignSheet](../../src/components/studio/image/AlignSheet.tsx)
+  (bal/közép/jobb · fent/közép/lent), a tiszta `layout.alignRects` + a réteg↔Rect adapter [imageLayerLayout.ts](../../src/lib/imageLayerLayout.ts)
+  (`layerRect`/`alignLayerToCanvas`/`alignLayerInDoc`/`canAlignLayer`) fölött, a `commit`→`UPSERT_IMAGE_DOC` buson (undo). **11 teszt.**
+  Csak pozícionálható rétegre (fotó/forma/szöveg); a tool letiltva kijelölés nélkül. On-device: a forma a vászon bal szélére ugrott.
+- [ ] ⬜ Hátra: **distribute** (egyenlő rés / közép) több réteg közt → kell a **többszörös kijelölés** a kép-editorban + a `grid`-elrendezés UI.
 
 ### 2.8 PSD import — P1 (🔌 BACKEND-MISSING)
 - [ ] 🔌 Worker: `PSD → layers → raster/vector-approx → ImageDoc`.

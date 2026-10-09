@@ -2832,7 +2832,8 @@
       "fill": "Fill",
       "delete": "Delete",
       "draw": "Draw",
-      "svg": "SVG"
+      "svg": "SVG",
+      "align": "Align"
     },
     "image": {
       "layersTitle": "Layers",
@@ -2864,6 +2865,20 @@
       "selected": "Selected: {{name}}",
       "needPhotoTitle": "Select a photo",
       "needPhotoBody": "Corrections apply to a photo layer — select one first.",
+      "align": {
+        "title": "Align to canvas",
+        "hint": "Align the selected layer to the canvas edges or center.",
+        "horizontal": "Horizontal",
+        "vertical": "Vertical",
+        "left": "Left",
+        "hcenter": "Center",
+        "right": "Right",
+        "top": "Top",
+        "vcenter": "Middle",
+        "bottom": "Bottom",
+        "needLayerTitle": "Select a layer",
+        "needLayerBody": "Align works on a positionable layer (photo / shape / text) — select one first."
+      },
       "renderFailTitle": "Render failed",
       "renderFailBody": "Couldn't render the image. Check the render server and try again.",
       "exportedTitle": "Image exported",

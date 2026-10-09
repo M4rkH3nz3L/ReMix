@@ -37,7 +37,10 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
     ROSSZ volt minden trim-úton (az ELŐRE-logika futott). Javítva + `sourceTimeAt`-invariánssal tesztelve (`projectUtils.test.ts`):
     **split** (`splitClip`: a 2. fél tartja a `trimIn`-t), **bal/jobb-él trim** (új pure `trimClipLeft`/`trimClipRight`:
     reversednél a bal él a felső forrás-boundot, a jobb a `trimIn`-t mozgatja, + helyes clampok), **ripple-resize**
-    (`buildRippleResizePlan` a `trimClipRight`-on át állítja a `trimIn`-t is), és a **TimelineClip él-preview**. Előre: zéró változás.
+    (`buildRippleResizePlan`), a **TimelineClip él-preview**, valamint a **roll + slide** profi trim-módok
+    ([trimEdit.ts](../../src/lib/trimEdit.ts): a szomszéd-klipek jobb/bal-éle is a `trimClip*`-on át, reverse-tudatos clampekkel).
+    A teljes klaszter `sourceTimeAt`-él-tartalom-invariánssal tesztelve. Előre lejátszott klipekre **zéró változás**;
+    a freeze+capture (`captureFrame` `sourceTimeAt`) eleve helyes volt.
 
 ### 2.4 Animated masks — P1
 - [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): animált maszk-geometria kulcskockákkal (rotoszkóp — `maskAnim` `addMaskKeyframe`/`sampleMaskAt`/`maskKeyframeTimes`) + **tracking** (`trackMaskToSubject`/`trackMaskToFace` a FilterPanel-ben) + expand/feather/opacity + render-parity. Hátra: finomítás ha kell.

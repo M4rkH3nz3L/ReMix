@@ -1,5 +1,5 @@
 import { MIN_CLIP_DURATION } from '@/constants/editor';
-import { maxVideoDuration } from '@/lib/projectUtils';
+import { maxVideoDuration, trimClipLeft, trimClipRight } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import type { Clip, Track, VideoClip } from '@/types/project';
 
@@ -20,6 +20,25 @@ import type { Clip, Track, VideoClip } from '@/types/project';
  */
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * ⏪ Reverse-tudatos trim-korlátok a KÖZÖS `d`-hez (roll/slide: a szomszéd trimje
+ * a mozgatott éllel azonos `d`-vel mozdul, ezért a `d`-t kell előre clampelni; a
+ * `trimClipLeft/Right` ugyanezt alkalmazza, de klipenként külön — itt egyeztetjük).
+ */
+const maxRightExtend = (c: VideoClip): number =>
+  c.reversed ? c.trimIn / c.speed : maxVideoDuration(c) - c.duration;
+const minLeftDelta = (c: VideoClip): number =>
+  c.reversed ? c.duration - maxVideoDuration(c) : -c.trimIn / c.speed;
+
+/** egy trim-patch numerikus mezőit ezredmp-re kerekíti */
+const roundPatch = <T extends Record<string, number>>(p: T): T => {
+  const out = {} as Record<string, number>;
+  for (const k in p) {
+    out[k] = round(p[k]);
+  }
+  return out as T;
+};
 
 /** két klip „érintkezik", ha a rés kisebb ennél (mp) */
 const TOUCH_EPS = 0.05;
@@ -55,23 +74,23 @@ export function buildRollEdit(
     }
     let d = clamp(deltaSec, MIN_CLIP_DURATION - c.duration, next.duration - MIN_CLIP_DURATION);
     if (c.kind === 'video') {
-      d = Math.min(d, maxVideoDuration(c) - c.duration); // c forrás-vége
+      d = Math.min(d, maxRightExtend(c)); // c jobb-éle (reverse-tudatos)
     }
     if (next.kind === 'video') {
-      d = Math.max(d, -next.trimIn / next.speed); // next forrás-eleje
+      d = Math.max(d, minLeftDelta(next)); // next bal-éle (reverse-tudatos)
     }
     if (Math.abs(d) < MIN_DELTA) {
       return null;
     }
-    const newC = { ...c, duration: round(c.duration + d) } as Clip;
-    const newNext = {
-      ...next,
-      start: round(next.start + d),
-      duration: round(next.duration - d),
-    } as Clip;
-    if (newNext.kind === 'video' && next.kind === 'video') {
-      newNext.trimIn = round(next.trimIn + d * next.speed);
-    }
+    // c jobb-trimje, next bal-trimje — a reverse-helyes forrás-ablakot a trimClip* adja
+    const newC =
+      c.kind === 'video'
+        ? ({ ...c, ...roundPatch(trimClipRight(c, c.duration + d)) } as Clip)
+        : ({ ...c, duration: round(c.duration + d) } as Clip);
+    const newNext =
+      next.kind === 'video'
+        ? ({ ...next, ...roundPatch(trimClipLeft(next, d)) } as Clip)
+        : ({ ...next, start: round(next.start + d), duration: round(next.duration - d) } as Clip);
     return track.clips.map((x) => (x.id === c.id ? newC : x.id === next.id ? newNext : x));
   }
 
@@ -81,19 +100,22 @@ export function buildRollEdit(
   }
   let d = clamp(deltaSec, MIN_CLIP_DURATION - prev.duration, c.duration - MIN_CLIP_DURATION);
   if (prev.kind === 'video') {
-    d = Math.min(d, maxVideoDuration(prev) - prev.duration); // prev forrás-vége
+    d = Math.min(d, maxRightExtend(prev)); // prev jobb-éle (reverse-tudatos)
   }
   if (c.kind === 'video') {
-    d = Math.max(d, -c.trimIn / c.speed); // c forrás-eleje
+    d = Math.max(d, minLeftDelta(c)); // c bal-éle (reverse-tudatos)
   }
   if (Math.abs(d) < MIN_DELTA) {
     return null;
   }
-  const newPrev = { ...prev, duration: round(prev.duration + d) } as Clip;
-  const newC = { ...c, start: round(c.start + d), duration: round(c.duration - d) } as Clip;
-  if (newC.kind === 'video' && c.kind === 'video') {
-    newC.trimIn = round(c.trimIn + d * c.speed);
-  }
+  const newPrev =
+    prev.kind === 'video'
+      ? ({ ...prev, ...roundPatch(trimClipRight(prev, prev.duration + d)) } as Clip)
+      : ({ ...prev, duration: round(prev.duration + d) } as Clip);
+  const newC =
+    c.kind === 'video'
+      ? ({ ...c, ...roundPatch(trimClipLeft(c, d)) } as Clip)
+      : ({ ...c, start: round(c.start + d), duration: round(c.duration - d) } as Clip);
   return track.clips.map((x) => (x.id === prev.id ? newPrev : x.id === c.id ? newC : x));
 }
 
@@ -135,7 +157,7 @@ export function buildSlideEdit(track: Track, clipId: string, deltaSec: number): 
   if (touchingPrev) {
     d = Math.max(d, MIN_CLIP_DURATION - prev.duration);
     if (prev.kind === 'video') {
-      d = Math.min(d, maxVideoDuration(prev) - prev.duration);
+      d = Math.min(d, maxRightExtend(prev)); // prev jobb-éle (reverse-tudatos)
     }
   } else {
     d = Math.max(d, -c.start); // szomszéd nélkül csak a 0 a korlát
@@ -143,7 +165,7 @@ export function buildSlideEdit(track: Track, clipId: string, deltaSec: number): 
   if (touchingNext) {
     d = Math.min(d, next.duration - MIN_CLIP_DURATION);
     if (next.kind === 'video') {
-      d = Math.max(d, -next.trimIn / next.speed);
+      d = Math.max(d, minLeftDelta(next)); // next bal-éle (reverse-tudatos)
     }
   }
   if (Math.abs(d) < MIN_DELTA) {
@@ -152,17 +174,19 @@ export function buildSlideEdit(track: Track, clipId: string, deltaSec: number): 
 
   return track.clips.map((x) => {
     if (x.id === c.id) {
-      return { ...x, start: round(x.start + d) } as Clip;
+      return { ...x, start: round(x.start + d) } as Clip; // a mozgatott klip ablaka változatlan
     }
     if (touchingPrev && x.id === prev.id) {
-      return { ...x, duration: round(x.duration + d) } as Clip;
+      // prev jobb-trimje (reverse-tudatos trimIn is)
+      return x.kind === 'video'
+        ? ({ ...x, ...roundPatch(trimClipRight(x, x.duration + d)) } as Clip)
+        : ({ ...x, duration: round(x.duration + d) } as Clip);
     }
     if (touchingNext && x.id === next.id) {
-      const n = { ...x, start: round(x.start + d), duration: round(x.duration - d) } as Clip;
-      if (n.kind === 'video' && x.kind === 'video') {
-        n.trimIn = round(x.trimIn + d * x.speed);
-      }
-      return n;
+      // next bal-trimje (reverse-tudatos)
+      return x.kind === 'video'
+        ? ({ ...x, ...roundPatch(trimClipLeft(x, d)) } as Clip)
+        : ({ ...x, start: round(x.start + d), duration: round(x.duration - d) } as Clip);
     }
     return x;
   });

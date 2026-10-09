@@ -1,3 +1,4 @@
+import { sourceTimeAt } from '@/lib/projectUtils';
 import { buildRollEdit, buildSlideEdit, buildSlipEdit } from '@/lib/trimEdit';
 import type { Clip, Track, VideoClip } from '@/types/project';
 
@@ -165,5 +166,32 @@ describe('trimEdit — profi vágó-műveletek', () => {
     const t = track([vid({ id: 'a', start: 0, duration: 5 })]);
     expect(buildRollEdit(t, 'nincs', 'right', 1)).toBeNull();
     expect(buildSlideEdit(t, 'nincs', 1)).toBeNull();
+  });
+});
+
+describe('trimEdit ⏪ REVERSED — a külső élek tartalma fix (roll/slide bug-klaszter)', () => {
+  const rev = (o: Parameters<typeof vid>[0]): VideoClip => ({ ...vid(o), reversed: true });
+
+  it('ROLL right: a bal (c) és a jobb (next) reversed klip KÜLSŐ éleinek tartalma változatlan', () => {
+    const c = rev({ id: 'c', start: 0, duration: 10, trimIn: 5 });
+    const next = rev({ id: 'n', start: 10, duration: 10, trimIn: 5 });
+    const out = buildRollEdit(track([c, next]), 'c', 'right', 3);
+    const nc = byId(out, 'c');
+    const nn = byId(out, 'n');
+    expect(sourceTimeAt(nc, 0)).toBeCloseTo(sourceTimeAt(c, 0)); // c bal éle fix
+    expect(sourceTimeAt(nn, 20)).toBeCloseTo(sourceTimeAt(next, 20)); // next jobb éle fix
+    // (a közös cut NEM folytonos: két független klip közti vágás — a külső élek a lényeg)
+    expect(nc.duration + nn.duration).toBeCloseTo(c.duration + next.duration); // együttes hossz állandó
+  });
+
+  it('SLIDE: a reversed szomszédok (prev jobb-éle, next bal-éle) KÜLSŐ tartalma változatlan', () => {
+    const prev = rev({ id: 'p', start: 0, duration: 10, trimIn: 5 });
+    const c = rev({ id: 'c', start: 10, duration: 6, trimIn: 5 });
+    const next = rev({ id: 'n', start: 16, duration: 10, trimIn: 5 });
+    const out = buildSlideEdit(track([prev, c, next]), 'c', 2); // c jobbra 2 mp
+    const np = byId(out, 'p');
+    const nn = byId(out, 'n');
+    expect(sourceTimeAt(np, 0)).toBeCloseTo(sourceTimeAt(prev, 0)); // prev bal éle fix
+    expect(sourceTimeAt(nn, 26)).toBeCloseTo(sourceTimeAt(next, 26)); // next jobb éle fix
   });
 });

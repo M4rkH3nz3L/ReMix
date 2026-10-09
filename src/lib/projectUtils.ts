@@ -516,8 +516,15 @@ export function splitClip(clip: Clip, t: number): [Clip, Clip] | null {
     start: t,
     duration: clip.duration - offset,
   };
-  if (clip.kind === 'video' && second.kind === 'video') {
-    second.trimIn = clip.trimIn + offset * clip.speed;
+  if (clip.kind === 'video' && first.kind === 'video' && second.kind === 'video') {
+    if (clip.reversed) {
+      // ⏪ reversed: a klip a [trimIn, trimIn + duration*speed] forrás-szakaszt
+      // játssza VISSZAFELÉ (lásd sourceTimeAt). Vágáskor a MÁSODIK (időben későbbi)
+      // fél éri el a trimIn-t (változatlan), az ELSŐ fél a felső szakaszt kapja.
+      first.trimIn = clip.trimIn + (clip.duration - offset) * clip.speed;
+    } else {
+      second.trimIn = clip.trimIn + offset * clip.speed;
+    }
   }
   if (
     (clip.kind === 'video' || clip.kind === 'image') &&

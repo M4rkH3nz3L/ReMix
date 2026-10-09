@@ -33,6 +33,9 @@ Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok
 ### 2.3 Freeze frame + reverse — P1
 - [x] ✅ **Freeze-frame** — MÁR KÉSZ (`@/lib/freeze.ts` `buildFreezePlan` + a SpeedPanel „Freeze" gombja: a lejátszófejnél állókockát szúr be kép-klipként, a hang tovább szól).
 - [x] ✅ **Reverse** — a klip visszafelé játssza a forrást: `VideoClip.reversed` mező + `sourceTimeAt` tükrözés (preview) + SpeedPanel „⏪ Visszafelé" kapcsoló + worker-render `reverse`/`areverse` filter (`render.js` `segSourceWindow`, `clip.reversed`-re guardolva → normál klip bitre változatlan filter-lánc = zéró regresszió). Teszt: `projectUtils.test.ts` (sourceTimeAt reverse) + `render.test.js` (segSourceWindow tükör-ablak). ⚠️ Export-FFmpeg runtime-verify (live worker) + a transition/pip render-path-ok reverse-fallbackje a követő lépés.
+  - [x] 🐛 **Javítva (2026-10-08, adversariális teszt találta):** a `splitClip` a reversed klip `trimIn`-jét rosszul számolta
+    (az ELŐRE-logikát alkalmazta) → a két fél rossz forrás-ablakot kapott. Most reversednél a MÁSODIK fél tartja a `trimIn`-t,
+    az ELSŐ kapja a `trimIn + (duration-offset)*speed` felső szakaszt; a `sourceTimeAt` határ-folytonosság tesztelve (`projectUtils.test.ts`).
 
 ### 2.4 Animated masks — P1
 - [x] ✅ MÁR KÉSZ (az audit `main`-je elavult): animált maszk-geometria kulcskockákkal (rotoszkóp — `maskAnim` `addMaskKeyframe`/`sampleMaskAt`/`maskKeyframeTimes`) + **tracking** (`trackMaskToSubject`/`trackMaskToFace` a FilterPanel-ben) + expand/feather/opacity + render-parity. Hátra: finomítás ha kell.

@@ -5,6 +5,7 @@ import {
   projectDuration,
   projectMediaBytes,
   sourceTimeAt,
+  splitClip,
   upcomingVisualClip,
 } from '@/lib/projectUtils';
 import type { Asset, Project, VideoClip } from '@/types/project';
@@ -113,6 +114,43 @@ describe('isProjectEmpty — onboarding-kapu (EDITOR-UX §2.5)', () => {
     const next = applyCommand(p, { type: 'REMOVE_CLIP', clipId: 'c1' });
     expect(next).not.toBeNull();
     expect(isProjectEmpty(next!)).toBe(true);
+  });
+});
+
+describe('splitClip — trimIn a vágásnál (előre ÉS reversed, forrás-ablak folytonosság)', () => {
+  // start=0, dur=10, trimIn=2, speed=1 → forrás-szakasz [2,12]
+  const base = (over: Partial<VideoClip>): VideoClip =>
+    mkVideo({ id: 'c', start: 0, duration: 10, trimIn: 2, sourceDuration: 20, speed: 1, ...over });
+
+  it('ELŐRE: a két fél a [2,12] szakaszt összefüggően fedi (first [2,6], second [6,12])', () => {
+    const [first, second] = splitClip(base({}), 4) as [VideoClip, VideoClip];
+    expect(first.trimIn).toBe(2); // változatlan
+    expect(second.trimIn).toBe(6); // 2 + 4*1
+    // határ-folytonosság: a vágásnál (t=4) mindkét fél ugyanazt a forrás-időt adja
+    expect(sourceTimeAt(first, 4)).toBeCloseTo(sourceTimeAt(base({}), 4));
+    expect(sourceTimeAt(second, 4)).toBeCloseTo(sourceTimeAt(base({}), 4));
+  });
+
+  it('⏪ REVERSED: a MÁSODIK fél éri el a trimIn-t (first.trimIn=8, second.trimIn=2)', () => {
+    const clip = base({ reversed: true });
+    const [first, second] = splitClip(clip, 4) as [VideoClip, VideoClip];
+    // a bug előtt: first.trimIn=2, second.trimIn=6 (rossz forrás-ablak)
+    expect(first.trimIn).toBe(8); // 2 + (10-4)*1
+    expect(second.trimIn).toBe(2); // változatlan (a reversed vég éri el a trimIn-t)
+    // a reversed klip végpontjai + a határ-folytonosság helyesek
+    expect(sourceTimeAt(first, 0)).toBeCloseTo(sourceTimeAt(clip, 0)); // t=0 → 12
+    expect(sourceTimeAt(second, 10)).toBeCloseTo(sourceTimeAt(clip, 10)); // t=10 → 2
+    expect(sourceTimeAt(first, 4)).toBeCloseTo(sourceTimeAt(clip, 4)); // határ → 8
+    expect(sourceTimeAt(second, 4)).toBeCloseTo(sourceTimeAt(clip, 4)); // határ → 8
+  });
+
+  it('⏪ REVERSED + speed=2: a trimIn-ofszetek a sebességgel skálázódnak', () => {
+    const clip = base({ reversed: true, speed: 2 });
+    const [first, second] = splitClip(clip, 4) as [VideoClip, VideoClip];
+    expect(first.trimIn).toBe(2 + (10 - 4) * 2); // 14
+    expect(second.trimIn).toBe(2);
+    expect(sourceTimeAt(first, 4)).toBeCloseTo(sourceTimeAt(clip, 4));
+    expect(sourceTimeAt(second, 4)).toBeCloseTo(sourceTimeAt(clip, 4));
   });
 });
 

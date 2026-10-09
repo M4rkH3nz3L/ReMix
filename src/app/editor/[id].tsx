@@ -36,6 +36,7 @@ import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
+import { canCloudBackupMedia, projectMediaSafety } from '@/lib/storagePolicy';
 import {
   clearRecovery,
   duplicateProject,
@@ -58,6 +59,8 @@ import { indexProjectVision } from '@/lib/visionSearch';
 import { useChat } from '@/store/chatStore';
 import { useCollabLive } from '@/store/collabLiveStore';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { usePaywall } from '@/store/paywallStore';
 import { useTutorial } from '@/store/tutorialStore';
 
 const AUTOSAVE_MS = 800;
@@ -67,6 +70,7 @@ export default function EditorScreen() {
   const { id, panel } = useLocalSearchParams<{ id: string; panel?: string }>();
   const project = useEditorStore((s) => s.project);
   const dirty = useEditorStore((s) => s.dirty);
+  const tier = useEntitlement((s) => s.effectiveTier());
   const panelVisible = useEditorStore(selectPanelVisible);
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
@@ -642,6 +646,21 @@ export default function EditorScreen() {
       </Pressable>
     ) : null;
 
+  // 🗄️ ADR-013: FREE usernél a média CSAK az eszközön van (nincs auto felhő-mentés) →
+  // proaktív adatvesztés-figyelmeztetés + Pro-ajánlat. (Pro usernél a média R2-n van.)
+  const storageAtRisk =
+    !!project && !canCloudBackupMedia(tier) && projectMediaSafety(project).atRisk;
+  const storageSafetyBanner = storageAtRisk ? (
+    <Pressable
+      style={styles.storageBanner}
+      onPress={() => usePaywall.getState().open('mediaBackup')}
+    >
+      <Ionicons name="cloud-offline-outline" size={16} color={palette.warning} />
+      <Text style={styles.storageBannerText}>{t('editorScreen.freeMediaLocalWarning')}</Text>
+      <Ionicons name="chevron-forward" size={14} color={palette.textDim} />
+    </Pressable>
+  ) : null;
+
   // 🎬 üres projekt → a fekete vászon helyett a forrás-mappához vezető onboarding.
   // Tableten a forrás-dokk látszik (odamutatunk); telefonon a kártya megnyitja a sheetet.
   const sourceDocked = L.editor.sourceBinWidth > 0;
@@ -691,6 +710,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {storageSafetyBanner}
         {emptyHint}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
@@ -723,6 +743,7 @@ export default function EditorScreen() {
           {missingBanner}
           {collabBanner}
           {sizeBanner}
+          {storageSafetyBanner}
           {emptyHint}
           <TransportBar />
           <View style={styles.landscapeSideBody}>
@@ -739,6 +760,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {storageSafetyBanner}
         {emptyHint}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
@@ -763,6 +785,7 @@ export default function EditorScreen() {
         {missingBanner}
         {collabBanner}
         {sizeBanner}
+        {storageSafetyBanner}
         {emptyHint}
         <PreviewSurface mode="edit" />
         <TransportBar />
@@ -960,6 +983,25 @@ const styles = StyleSheet.create({
   sizeBannerText: {
     flex: 1,
     color: palette.warning,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  storageBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: `${palette.warning}14`,
+    borderWidth: 1,
+    borderColor: `${palette.warning}44`,
+    borderRadius: 10,
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  storageBannerText: {
+    flex: 1,
+    color: palette.text,
     fontSize: 12,
     fontWeight: '600',
   },

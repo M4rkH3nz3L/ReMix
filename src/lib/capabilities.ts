@@ -31,6 +31,7 @@ export type CapabilityId =
   | 'pacingAnalyze' // AI tempó-elemzés (beszéd/csend/vágás-jelek → lassú szakaszok)
   | 'qualityScan' // felvétel-minőség ellenőrzés (homályos / alul-túlexponált kockák)
   | 'cloudSync' // projekt felhő-mentés/visszaállítás (cloud-tárhely)
+  | 'mediaBackup' // MÉDIA auto-backup a MI R2-tárunkba (Pro); free = a média az eszközön marad (ADR-013)
   | 'collab' // projekt-kollaboráció: tagok meghívása + szerepkörök (megosztott felhő-projekt)
   | 'bgRemove' // háttér-eltávolítás
   | 'depth3d' // mélység / 3D / parallax
@@ -84,6 +85,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   // és bárki megoszthasson/meghívhasson. A Pro-érték a NEHÉZ felhő marad: média-
   // felhősync, HD/felhő-render, AI. (Lásd MONEY.md — ezt frissíteni kell.)
   cloudSync: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.cloudSync' },
+  mediaBackup: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.mediaBackup' },
   collab: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.collab' },
   bgRemove: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.depth3d' },

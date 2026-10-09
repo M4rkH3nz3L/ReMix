@@ -58,6 +58,17 @@ implementációkat — ezért a régi MISSING.md ezen része elavult. A valódi 
 - [x] ✅ **KÉSZ e2e (2026-10-07)**: a `project.assets` köré épült, MINDEN stúdióban egységes forrás-mappa. [src/lib/projectSource.ts](../../src/lib/projectSource.ts) (`supportedSourceKinds` fajtánként + `pickSourceAsset` picker→Asset + `assetInUse` törlés-véd + `sourceSummary`) + új **`REMOVE_ASSET`** command (undo) + közös [SourceSheet](../../src/components/SourceSheet.tsx) (böngészés + támogatott import + nem-használt törlése). **Bekötve: létrehozáskor** (New-Project űrlap, minden fajta) + **mindhárom editorban** (kép→fotó-réteg · hang→music-klip · videó→idővonal). Teszt: `projectSource.test.ts` (7). Audit zöld (121 suite / 1313 teszt).
 - [ ] 🟡 Hátra: a forrás-mappa feltöltése a projekt R2-tárába (backup) + nagy-bin virtualizáció + mappák/címkék.
 
+### 2.9 Free vs Fizetős tárhely-politika — P1 ✅ KÉSZ (2026-10-09, [ADR-013](../../docs/hu/decisions/ADR-013-storage-tiers-free-local-pro-r2.md))
+- [x] ✅ **Free = a média az ESZKÖZÖN marad** (nincs auto R2-backup): [storagePolicy.ts](../../src/lib/storagePolicy.ts)
+  `canCloudBackupMedia(tier)` + a [cloudSync](../../src/lib/cloudSync.ts) `backupProjectToCloud` **gateli** a `backupProjectMedia`-t
+  (a projekt-TERV JSON továbbra is mentődik — adatbiztonság). Új `mediaBackup` capability (`minTier: 'pro'`).
+- [x] ✅ **Free-user PROAKTÍV tájékoztatás**: `projectMediaSafety(project).atRisk` → a szerkesztőben adatvesztés-banner
+  („a média csak az eszközön van, törléskor elveszik — Pro-val felhő-mentés"), a `mediaBackup` paywallra kötve. i18n `editorScreen.freeMediaLocalWarning`.
+- [x] ✅ **Fizetős R2-használat KÖVETÉSE + beárazás-alap**: a mérés szerver-hiteles volt (`storage_objects`/`storage_usage`
+  + `wouldExceed`/`record_storage_object_for`), a profil [StorageCard](../../src/components/profile/StorageCard.tsx) mutatja
+  (used/quota + boost); új pure `storageBillingBasis(usedBytes, includedBytes, coinPerGBMonth)` → a díjköteles overage
+  (determinisztikus, tesztelt — a tényleges egységár a termék döntése). Teszt: `storagePolicy.test.ts` (10).
+
 ## 3. Kész, ha
 Egy külső asset végigmegy az **External→Cached→Imported** állapotgépen (offline/stale kezeléssel),
 a remote-változás verziózottan feloldható, az OneDrive is elérhető a provider-interfészen, és a

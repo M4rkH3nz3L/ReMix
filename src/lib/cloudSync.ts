@@ -1,9 +1,11 @@
 import { ensureCloud } from '@/lib/backend';
 import { backupProjectMedia, mediaRemoteMap } from '@/lib/mediaSync';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
+import { canCloudBackupMedia } from '@/lib/storagePolicy';
 import { listProjects, saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, ProjectMeta } from '@/types/project';
 
 /**
@@ -93,7 +95,13 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
     } catch {
       // nincs korábbi másolat / offline → minden helyi asset feltölthető
     }
-    const { project: backed } = await backupProjectMedia(project, known);
+    // 🗄️ ADR-013: a MÉDIA auto-backup a MI R2-tárunkba FIZETŐS (Pro+). Free usernél
+    // a média az ESZKÖZÖN marad (nincs felhő-másolat) — csak a projekt-TERV (JSON)
+    // mentődik alább (adatbiztonság). A free-usert a szerkesztő bannere tájékoztatja.
+    let backed = project;
+    if (canCloudBackupMedia(useEntitlement.getState().effectiveTier())) {
+      backed = (await backupProjectMedia(project, known)).project;
+    }
     await supabase.from('cloud_projects').upsert(
       { user_id: uid, project_id: backed.id, name: backed.name, data: backed },
       { onConflict: 'user_id,project_id' }

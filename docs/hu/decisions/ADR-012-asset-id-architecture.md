@@ -2,7 +2,7 @@
 
 > ↑ [docs/hu index](../README.md) · [architecture/state.md](../architecture/state.md)
 
-- **Státusz:** Elfogadva, fokozatos bevezetés (2026-10-08) — Fázis 1 + 2a kész (mag + determinisztikus backfill bekötve)
+- **Státusz:** Elfogadva (2026-10-08) — Fázis 1 + 2a + 2b kész (mag + backfill + MINDEN fogyasztó a resolveClipUri-n); Fázis 3 opcionális/device-gated
 - **Horgony:** [assetResolve.ts](../../../src/lib/assetResolve.ts) (`assetForClip`/`resolveClipUri`/`relinkAsset`/`ensureClipAssets`) ·
   [projectUtils.ts](../../../src/lib/projectUtils.ts) (`migrateToV2` asset-registry) · [06-video-editor §2.10](../../../devs/tasks/06-video-editor.md) · [12-code-quality](../../../devs/tasks/12-code-quality.md)
 
@@ -37,14 +37,14 @@ backward-compatible**:
    független, minden betöltéskor fut), `assetIdForUri` determinisztikus id-vel → a séma-
    migráció utáni utakon (preset/AI/hang-leválasztás) assetId nélkül hozzáadott klipek is
    linkelnek, a round-trip + collab determinizmus sértése nélkül (az arany-út teszt igazolja).
-4. **Fázis 2b (folyamatban):** a fogyasztók a `resolveClipUri`-ra állnak → a klip `uri` már csak cache.
-   **Kész:** on-device render-plan (`buildRenderPlan`), hiányzó-média (`findMissingMedia`), és a **felhő-render
-   feltöltés** (`flattenClipUris` a feltöltés előtt → a worker a feloldott uri-t kapja, **szerver-módosítás nélkül**).
-   **Hátra:** a per-frame preview/pip/audio (device-verifikált, perf-óvatos: egyszer-feloldás klip-váltáskor, ne kockánként).
-5. **Fázis 3 (folyamatban):** a **relink-UI KÉSZ** — az editor `relinkMissing` a `relinkCommandsFor`-ral a média-relinket
-   `RELINK_ASSET`-re viszi (a `shape.imageUri` + nem-asset uri marad `RELINK_URI`). **Hátra a flip:** a per-frame preview
-   (az utolsó `clip.uri`-olvasó) `resolveClipUri`-ra állítása után a `relinkAsset` már NEM szinkronizálja a klip `uri`-t →
-   az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
+4. **Fázis 2b (KÉSZ): MINDEN fogyasztó a `resolveClipUri`-ra áll** → a klip `uri` már csak szinkronizált cache:
+   on-device render-plan (`buildRenderPlan`), hiányzó-média (`findMissingMedia`), **felhő-render feltöltés**
+   (`flattenClipUris` a feltöltés előtt → a worker a feloldott uri-t kapja, **szerver-módosítás nélkül**), és a
+   **per-frame preview** (`PreviewSurface`/`PipLayer`/`AudioLayer`/`TransitionLayer`, **memoizált** feloldás klip-váltáskor).
+   A relink-UI (`relinkCommandsFor`) a média-relinket `RELINK_ASSET`-re viszi (a `shape.imageUri` + nem-asset uri marad `RELINK_URI`).
+5. **Fázis 3 (opcionális, device-gated):** a „kizárólagos igazság" flip — a `relinkAsset` már NE szinkronizálja a klip `uri`-t,
+   és a `clip.uri` elhagyása. **Nem szükséges:** a szinkronizált cache helyes + biztonságos end-state (minden OLVASÓ az asseten
+   át megy); a flip csak a redundanciát törölné, és a stale-clip.uri melletti lejátszás helyességét ESZKÖZÖN kell igazolni.
 
 ### Determinizmus-megkötés (miért tartalom-címzett a backfill id-je)
 A backfill/ingest **nem használhat `makeId` (véletlen) asset-id-t** sem a betöltő

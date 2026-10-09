@@ -90,9 +90,14 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   ([videdFile.ts](../../src/lib/videdFile.ts)) használja: a média-relink **asset-centrikus** (`RELINK_ASSET` → egy parancs
   minden rá hivatkozó klipet frissít), a `shape.imageUri` logó/vízjel + a nem-asset uri a klip-uri-t átíró `RELINK_URI`-n marad.
   Teszt: `videdFile.test.ts` (media→RELINK_ASSET, shape/nem-asset→RELINK_URI).
-- [ ] ⬜ **Fázis 3 flip (device után):** a **per-frame preview/pip/audio** `resolveClipUri`-ra állítása (device-verifikált,
-  perf-óvatos: egyszer-feloldás klip-váltáskor) — ez az UTOLSÓ `clip.uri`-olvasó fogyasztó; utána a `relinkAsset` már NEM
-  szinkronizálja a klip `uri`-t → az asset a kizárólagos forrás-igazság, a klip `uri` elhagyható.
+- [~] 🟡 **Fázis 2b KÉSZ (2026-10-08): MINDEN fogyasztó migrálva.** A per-frame preview is a `resolveClipUri`-ra áll
+  (`PreviewSurface`/`PipLayer`/`AudioLayer`/`TransitionLayer` — **memoizált**, klip-váltáskor old fel, nem kockánként).
+  Bizonyíték: `resolveClipUri` értékazonos a `clip.uri`-val (assetResolve + integrációs teszt) → a player/Image ugyanazt az
+  uri-t kapja → a lejátszás bizonyítottan változatlan; tsc + a React-Compiler-teszt + 1506 teszt zöld. A `clip.uri` mostantól
+  **szinkronizált cache**; minden OLVASÓ az asseten át megy (preview/render/missing), az ÍRÓ-utak (relink/flatten) az assetet frissítik.
+- [ ] ⬜ **Fázis 3 (opcionális, device-gated):** a „kizárólagos igazság" flip — a `relinkAsset` már NE szinkronizálja a klip
+  `uri`-t (az asset az egyetlen forrás) + a `clip.uri` elhagyása. **Nem szükséges:** a szinkronizált cache helyes és biztonságos
+  end-state; a flip csak a redundáns cache-t törölné, és a stale-clip.uri melletti lejátszás helyességét ESZKÖZÖN kell igazolni.
 
 ### 2.11 Creative Canvas — P1/P2
 - [ ] ⬜ crop/resize/perspective-crop/outpaint/retouch/advanced-tracking/depth-aware-occlusion.

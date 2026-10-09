@@ -1,7 +1,8 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useIsFocused } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { resolveClipUri } from '@/lib/assetResolve';
 import { shouldResync, sourceTimeOf } from '@/lib/avSync';
 import { sampleChannel } from '@/lib/keyframes';
 import { clipsAt } from '@/lib/projectUtils';
@@ -80,6 +81,11 @@ function VideoVoice() {
       ) as VideoClip | undefined)
     : undefined;
 
+  // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
+  const resolvedUri = useMemo(
+    () => (project && clip ? (resolveClipUri(project, clip) ?? clip.uri) : null),
+    [project, clip]
+  );
   const eligible = Boolean(
     clip &&
       clip.speed === 1 &&
@@ -88,14 +94,14 @@ function VideoVoice() {
   );
   const opts = clip ? { voiceEnhance: clip.voiceEnhance, deReverb: clip.deReverb } : null;
   const key = clip && eligible
-    ? `${clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`
+    ? `${resolvedUri ?? clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`
     : '';
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
   // A dep-lista CSAK primitíveket tartalmaz (a `clip`/`opts` objektum minden
   // renderben új referencia lenne), így őszinte lehet — nem kell elnémítani a
   // hook-szabályt, és a React Compiler nem hagyja ki emiatt a komponenst.
-  const srcUri = eligible && clip ? clip.uri : null;
+  const srcUri = eligible && clip ? (resolvedUri ?? clip.uri) : null;
   const enhance = clip?.voiceEnhance ?? false;
   const deReverb = clip?.deReverb ?? false;
   useEffect(() => {
@@ -115,7 +121,7 @@ function VideoVoice() {
 
   const uri =
     clip && opts && eligible
-      ? (getVoiceProxySync(clip.uri, opts) ??
+      ? (getVoiceProxySync(resolvedUri ?? clip.uri, opts) ??
         (fetched?.key === key ? fetched.uri : null))
       : null;
 
@@ -203,6 +209,12 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     : [];
   const clip = active.length > 0 ? active.reduce((a, b) => (b.start >= a.start ? b : a)) : null;
 
+  // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
+  const resolvedUri = useMemo(
+    () => (project && clip ? (resolveClipUri(project, clip) ?? clip.uri) : null),
+    [project, clip]
+  );
+
   const player = useAudioPlayer(null);
   const loadedUriRef = useRef<string | null>(null);
 
@@ -221,12 +233,12 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     : null;
   const needsProxy = voiceOpts ? needsVoiceProxy(voiceOpts) : false;
   const voiceKey = clip
-    ? `${clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`
+    ? `${resolvedUri ?? clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`
     : '';
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
   // csak primitív függőségek → őszinte dep-lista, elnémított hook-szabály nélkül
-  const voiceSrcUri = needsProxy && clip ? clip.uri : null;
+  const voiceSrcUri = needsProxy && clip ? (resolvedUri ?? clip.uri) : null;
   const voiceEnhance = clip?.voiceEnhance ?? false;
   const voiceDeReverb = clip?.deReverb ?? false;
   useEffect(() => {
@@ -249,10 +261,10 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
 
   const voiceUri =
     clip && voiceOpts && needsProxy
-      ? (getVoiceProxySync(clip.uri, voiceOpts) ??
+      ? (getVoiceProxySync(resolvedUri ?? clip.uri, voiceOpts) ??
         (fetched?.key === voiceKey ? fetched.uri : null))
       : null;
-  const playUri = voiceUri ?? clip?.uri ?? null;
+  const playUri = voiceUri ?? resolvedUri ?? clip?.uri ?? null;
 
   useEffect(() => {
     if (!clip) {

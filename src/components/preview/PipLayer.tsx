@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { videoFill } from '@/components/preview/videoFill';
 import { cssBlendMode, palette } from '@/constants/editor';
+import { resolveClipUri } from '@/lib/assetResolve';
 import { activePipClips, sourceTimeAt } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
@@ -185,19 +186,25 @@ function PipVideoClip({
 }) {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const playhead = useEditorStore((s) => s.playhead);
+  const project = useEditorStore((s) => s.project);
   const layout = usePipClipLayout(clip, box, editable);
   const player = useVideoPlayer(null);
   const loadedUri = useRef<string | null>(null);
 
+  // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
+  const srcUri = useMemo(
+    () => (project ? (resolveClipUri(project, clip) ?? clip.uri) : clip.uri),
+    [project, clip]
+  );
+
   // forráscsere + kezdő-seek
   useEffect(() => {
-    const uri = clip.uri;
-    if (loadedUri.current === uri) {
+    if (loadedUri.current === srcUri) {
       return;
     }
-    loadedUri.current = uri;
+    loadedUri.current = srcUri;
     player
-      .replaceAsync(uri)
+      .replaceAsync(srcUri)
       .then(() => {
         const st = useEditorStore.getState();
         player.currentTime = sourceTimeAt(clip, st.playhead);
@@ -206,7 +213,7 @@ function PipVideoClip({
         }
       })
       .catch(() => {});
-  }, [player, clip]);
+  }, [player, clip, srcUri]);
 
   // sebesség + hangerő
   useEffect(() => {
@@ -258,9 +265,14 @@ function PipImageClip({
   editable: boolean;
 }) {
   const layout = usePipClipLayout(clip, box, editable);
+  const project = useEditorStore((s) => s.project);
+  const srcUri = useMemo(
+    () => (project ? (resolveClipUri(project, clip) ?? clip.uri) : clip.uri),
+    [project, clip]
+  );
   return (
     <PipClipFrame layout={layout}>
-      <Image source={{ uri: clip.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      <Image source={{ uri: srcUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
     </PipClipFrame>
   );
 }

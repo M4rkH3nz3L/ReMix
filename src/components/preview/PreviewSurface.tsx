@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useIsFocused } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -30,6 +30,7 @@ import {
   setChannelKeyframe,
   shiftPositionKeyframes,
 } from '@/lib/keyframes';
+import { resolveClipUri } from '@/lib/assetResolve';
 import { adjustTintLayers } from '@/lib/adjustPreview';
 import { skewTransformEntries, transformOrigin } from '@/lib/canvasTransform';
 import { pathBounds, polylinePoints, simplifyPath, toBoxSpace } from '@/lib/draw';
@@ -160,6 +161,18 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const videoClip = visual?.kind === 'video' ? (visual as VideoClip) : null;
   const imageClip = visual?.kind === 'image' ? (visual as ImageClip) : null;
 
+  // 🔗 ADR-012: az asset a forrás-igazság → a feloldott (asseten át) uri-t vesszük.
+  // Memoizált: csak a projekt/aktív-klip váltásakor old fel (nem kockánként →
+  // nincs per-frame `assets.find`). Ma értékazonos a klip uri-cache-ével.
+  const videoSrcUri = useMemo(
+    () => (videoClip && project ? (resolveClipUri(project, videoClip) ?? videoClip.uri) : null),
+    [project, videoClip]
+  );
+  const imageSrcUri = useMemo(
+    () => (imageClip && project ? (resolveClipUri(project, imageClip) ?? imageClip.uri) : null),
+    [project, imageClip]
+  );
+
   // vászon-transzform gesztusok (kijelölt vizuális klipen)
   const gestureScale = useSharedValue(1);
   const gestureDX = useSharedValue(0);
@@ -171,14 +184,14 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
 
   // az előnézet a 720p vágási proxyt játssza, ha már elkészült — a klip
   // uri-ja (és így a render) mindig az eredeti marad
-  const playbackUri = videoClip ? (getProxyUriSync(videoClip.uri) ?? videoClip.uri) : null;
+  const playbackUri = videoSrcUri ? (getProxyUriSync(videoSrcUri) ?? videoSrcUri) : null;
 
   // háttérben elindítjuk a proxy-készítést a következő lejátszáshoz
   useEffect(() => {
-    if (videoClip) {
-      ensureProxy(videoClip.uri).catch(() => {});
+    if (videoSrcUri) {
+      ensureProxy(videoSrcUri).catch(() => {});
     }
-  }, [videoClip]);
+  }, [videoSrcUri]);
 
   // forráscsere, ha másik videófájl klipjére ér a lejátszófej
   useEffect(() => {
@@ -625,7 +638,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
                 />
               ) : imageClip ? (
                 <Image
-                  source={{ uri: imageClip.uri }}
+                  source={{ uri: imageSrcUri ?? imageClip.uri }}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
                   blurRadius={24}
@@ -651,7 +664,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               ) : imageClip ? (
                 <Image
                   // 🌫️ mélység-fókusznál a worker portré-blur változata megy
-                  source={{ uri: imageClip.depthFocus?.previewUri ?? imageClip.uri }}
+                  source={{ uri: imageClip.depthFocus?.previewUri ?? imageSrcUri ?? imageClip.uri }}
                   style={StyleSheet.absoluteFill}
                   contentFit={imageClip.backgroundFill === 'blur' ? 'contain' : 'cover'}
                 />

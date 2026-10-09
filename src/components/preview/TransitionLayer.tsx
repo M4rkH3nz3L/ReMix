@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { videoFill } from '@/components/preview/videoFill';
+import { resolveClipUri } from '@/lib/assetResolve';
 import { activeTransition, type ActiveTransition } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 
@@ -31,11 +32,22 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
   const toVideo = to.kind === 'video' ? to : null;
   const toImage = to.kind === 'image' ? to : null;
 
+  // 🔗 ADR-012: a bejövő klip feloldott (asseten át) forrás-uri-ja, memoizált
+  const project = useEditorStore((s) => s.project);
+  const toVideoUri = useMemo(
+    () => (project && toVideo ? (resolveClipUri(project, toVideo) ?? toVideo.uri) : null),
+    [project, toVideo]
+  );
+  const toImageUri = useMemo(
+    () => (project && toImage ? (resolveClipUri(project, toImage) ?? toImage.uri) : null),
+    [project, toImage]
+  );
+
   const player = useVideoPlayer(null);
   const loadedUri = useRef<string | null>(null);
 
   useEffect(() => {
-    const uri = toVideo?.uri ?? null;
+    const uri = toVideoUri;
     if (loadedUri.current === uri) {
       return;
     }
@@ -49,7 +61,7 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
         }
       })
       .catch(() => {});
-  }, [player, toVideo]);
+  }, [player, toVideo, toVideoUri]);
 
   const style = transitionStyle(type, progress, box);
   // fadeBlack/fadeWhite: a szín a transition KÖZEPÉN a legerősebb (fade-through)
@@ -67,7 +79,7 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
           />
         ) : toImage ? (
           <Image
-            source={{ uri: toImage.uri }}
+            source={{ uri: toImageUri ?? toImage.uri }}
             style={StyleSheet.absoluteFill}
             contentFit="contain"
           />

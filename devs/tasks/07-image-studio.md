@@ -37,6 +37,17 @@ forgatás a fotó/forma/szöveg rétegeken (a háttér-fill nem forog): `ShapeCl
 a worker kép-doc kompozitora ([server/imagedoc.js](../../server/imagedoc.js)) a forma/szöveg PNG-t a bizonyított fotó-rotate mintával forgatja (render-parity).
 On-device: a cián csillag + a pink téglalap a forgató-fogóval láthatóan elfordult.
 
+### 2.0c CROP / kivágás (interaktív, render-biztos) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+A legtöbbet hiányolt „szerkeszd a képet" alapművelet. Tiszta mag [imageCrop.ts](../../src/lib/imageCrop.ts)
+(`cropImageDoc`/`clampCropRect`/`aspectCropRect`/`moveCropRect`/`resizeCropCorner`, **14 teszt**): a kivágás egy
+NORMALIZÁLT téglalap → új vászon-pixelméret + minden réteg újraleképezve (pozíció a kivágás-origóhoz, méret/betűméret/
+vonalvastagság a kivágás arányával — az abszolút px-megjelenés marad; a kivágott régión kívüli tartalom a rétegen megmarad,
+csak a vászon vágja). Render-biztos: a kép-doc render normalizált koordinátákban dolgozik. Interaktív
+[CropOverlay](../../src/components/studio/image/CropOverlay.tsx) (PanResponder: test-mozgatás + 4 sarok, dim-maszk, harmadoló
+rács) a vásznon ([ImageCanvas](../../src/components/studio/image/ImageCanvas.tsx)), + a toolbar HELYETT crop-sáv arány-presetekkel
+(Szabad/1:1/4:5/16:9/9:16) + Mégse/Alkalmaz ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)).
+On-device bizonyítva: 1080×1080 → (16:9) 1080×608 → (1:1) 608×608, a tartalom helyesen újraformálva; egy Alkalmaz = egy undo-lépés.
+
 ## 2. Feladatlista
 
 ### 2.1 Vector pen UI — P1 (🖼️ UI-MISSING)

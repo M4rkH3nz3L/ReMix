@@ -3,10 +3,12 @@ import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
+import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { aspectValue, palette } from '@/constants/editor';
+import type { CropRect } from '@/lib/imageCrop';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { ImageDoc, ImageLayer } from '@/types/project';
@@ -29,6 +31,8 @@ export function ImageCanvas({
   commit,
   canvasRef,
   capturing,
+  cropRect,
+  onCropRectChange,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -39,6 +43,9 @@ export function ImageCanvas({
   canvasRef?: Ref<View>;
   /** raszterizálás alatt: a kijelölés-krómot (keret/kijelölő-szegély) elrejtjük */
   capturing?: boolean;
+  /** ✂️ kivágás-mód: ha megadva, a vásznon a kivágás-overlay jelenik meg (kijelölés nélkül) */
+  cropRect?: CropRect | null;
+  onCropRectChange?: (rect: CropRect) => void;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -113,7 +120,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -125,6 +132,11 @@ export function ImageCanvas({
                 commit(updateLayer(doc, selectedLayer.id, patch), 'transform');
               }}
             />
+          ) : null}
+
+          {/* ✂️ kivágás-overlay (a kijelölés helyett) */}
+          {!capturing && cropRect && onCropRectChange ? (
+            <CropOverlay box={fit} rect={cropRect} onChange={onCropRectChange} />
           ) : null}
         </View>
       ) : null}

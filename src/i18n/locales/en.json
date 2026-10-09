@@ -2922,6 +2922,11 @@
       "svgFailBody": "Couldn't read this SVG. Try a plain SVG file.",
       "undoOrder": "Layer order",
       "undoRotate": "Rotate 90°",
+      "undoCrop": "Crop",
+      "crop": {
+        "free": "Free",
+        "hint": "Drag the crop · pick a ratio"
+      },
       "shapes": {
         "title": "Add a shape",
         "rectangle": "Rectangle",

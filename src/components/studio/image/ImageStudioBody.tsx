@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { captureRef } from 'react-native-view-shot';
 
 import { SourceSheet } from '@/components/SourceSheet';
+import { Chip } from '@/components/ui/controls';
 import { AdjustSheet } from '@/components/studio/image/AdjustSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
@@ -17,6 +18,7 @@ import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
 import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
+import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import {
   addLayer,
   createImageDoc,
@@ -43,6 +45,7 @@ type ToolKey =
   | 'shape'
   | 'svg'
   | 'adjust'
+  | 'crop'
   | 'align'
   | 'boolean'
   | 'forward'
@@ -56,6 +59,18 @@ interface Tool {
   icon: keyof typeof Ionicons.glyphMap;
   labelKey: string;
 }
+
+/** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
+const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+
+/** kivágás-arány presetek (pixel-arány w:h; null = szabad/teljes) */
+const CROP_PRESETS: { label: string; labelKey?: string; ratio: number | null }[] = [
+  { label: '', labelKey: 'studio.image.crop.free', ratio: null },
+  { label: '1:1', ratio: 1 },
+  { label: '4:5', ratio: 4 / 5 },
+  { label: '16:9', ratio: 16 / 9 },
+  { label: '9:16', ratio: 9 / 16 },
+];
 
 /**
  * 📱 Telefon-optimalizált, CSOPORTOSÍTOTT eszköztár (vízszintesen görgethető) —
@@ -75,6 +90,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
   {
     labelKey: 'studio.imageGroups.arrange',
     tools: [
+      { key: 'crop', icon: 'crop-outline', labelKey: 'studio.imageTools.crop' },
       { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
       { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
       { key: 'rotate', icon: 'refresh-outline', labelKey: 'studio.imageTools.rotate' },
@@ -124,6 +140,7 @@ export function ImageStudioBody({
   >(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -329,6 +346,12 @@ export function ImageStudioBody({
           Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
         }
         break;
+      case 'crop':
+        // ✂️ kivágás-mód indítása (a kijelölés + lapok bezárva)
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(START_CROP);
+        break;
       case 'align':
         if (canAlignLayer(selectedLayer)) {
           setSheet('align');
@@ -392,6 +415,14 @@ export function ImageStudioBody({
       default:
         return false;
     }
+  };
+
+  // ✂️ a kivágás alkalmazása (egy undo-lépés) / elvetése
+  const applyCrop = () => {
+    if (doc && cropRect) {
+      commit(cropImageDoc(doc, cropRect), t('studio.image.undoCrop'));
+    }
+    setCropRect(null);
   };
 
   const exportImage = async () => {
@@ -556,6 +587,8 @@ export function ImageStudioBody({
           commit={commit}
           canvasRef={canvasRef}
           capturing={capturing}
+          cropRect={cropRect}
+          onCropRectChange={setCropRect}
         />
       ) : (
         <View style={styles.loading}>
@@ -571,13 +604,37 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {selectedLayer
-            ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-            : t('studio.image.tapToSelect')}
+          {cropRect
+            ? t('studio.image.crop.hint')
+            : selectedLayer
+              ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
+              : t('studio.image.tapToSelect')}
         </Text>
       </View>
 
-      {/* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */}
+      {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
+      {cropRect ? (
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cropPresets}>
+            {CROP_PRESETS.map((p) => (
+              <Chip
+                key={p.labelKey ?? p.label}
+                label={p.labelKey ? t(p.labelKey) : p.label}
+                active={false}
+                onPress={() => doc && setCropRect(aspectCropRect(doc, p.ratio))}
+              />
+            ))}
+          </ScrollView>
+          <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
+            <Ionicons name="checkmark" size={16} color="#fff" />
+            <Text style={styles.cropApplyText}>{t('common.apply')}</Text>
+          </Pressable>
+        </View>
+      ) : (
+      /* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -618,6 +675,7 @@ export function ImageStudioBody({
           </View>
         ))}
       </ScrollView>
+      )}
 
       {sheet === 'layers' && doc ? (
         <LayerPanel
@@ -743,4 +801,36 @@ const styles = StyleSheet.create({
   },
   tool: { width: 60, alignItems: 'center', gap: 4, paddingVertical: 2 },
   toolLabel: { fontSize: 10, fontWeight: '600' },
+  cropBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    backgroundColor: palette.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  cropBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropPresets: { alignItems: 'center', gap: 8, paddingHorizontal: 2 },
+  cropApply: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: palette.accent,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 40,
+    justifyContent: 'center',
+  },
+  cropApplyText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });

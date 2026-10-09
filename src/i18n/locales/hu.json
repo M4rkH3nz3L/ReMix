@@ -2922,6 +2922,11 @@
       "svgFailBody": "Nem sikerült beolvasni ezt az SVG-t. Próbálj egyszerű SVG-fájlt.",
       "undoOrder": "Réteg-sorrend",
       "undoRotate": "Forgatás 90°",
+      "undoCrop": "Kivágás",
+      "crop": {
+        "free": "Szabad",
+        "hint": "Húzd a kivágást · válassz arányt"
+      },
       "shapes": {
         "title": "Forma hozzáadása",
         "rectangle": "Téglalap",

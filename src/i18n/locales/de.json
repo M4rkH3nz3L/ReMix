@@ -2922,6 +2922,11 @@
       "svgFailBody": "Diese SVG konnte nicht gelesen werden. Versuche eine einfache SVG-Datei.",
       "undoOrder": "Ebenen-Reihenfolge",
       "undoRotate": "Um 90° drehen",
+      "undoCrop": "Zuschneiden",
+      "crop": {
+        "free": "Frei",
+        "hint": "Zuschnitt ziehen · Verhältnis wählen"
+      },
       "shapes": {
         "title": "Form hinzufügen",
         "rectangle": "Rechteck",

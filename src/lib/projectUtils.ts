@@ -544,6 +544,46 @@ export function maxVideoDuration(clip: VideoClip): number {
 }
 
 /**
+ * ◀️ Bal-él trim forrás-ablaka: a JOBB él tartalma fix, a bal él `deltaSec`-kel
+ * mozdul (>0 rövidít, <0 nyújt). A `deltaSec` már idővonal-clampelt; itt a
+ * FORRÁS-korlát + a reversed-tudatos `trimIn`. Előre a `trimIn` nő a kihagyott
+ * fronttal; ⏪ reversednél a jobb él a `trimIn`-t tartja (változatlan), a bal-trim
+ * csak a felső forrás-boundot (`trimIn + duration*speed`) mozgatja.
+ */
+export function trimClipLeft(
+  clip: VideoClip,
+  deltaSec: number
+): { start: number; duration: number; trimIn: number } {
+  if (clip.reversed) {
+    // nyújtáskor (deltaSec<0) nő a duration → a felső bound ≤ sourceDuration korlát
+    const minDelta = clip.duration - maxVideoDuration(clip);
+    const d = Math.max(deltaSec, minDelta);
+    return { start: clip.start + d, duration: clip.duration - d, trimIn: clip.trimIn };
+  }
+  const d = Math.max(deltaSec, -clip.trimIn / clip.speed);
+  return { start: clip.start + d, duration: clip.duration - d, trimIn: clip.trimIn + d * clip.speed };
+}
+
+/**
+ * ▶️ Jobb-él trim forrás-ablaka: a BAL él tartalma fix, az új hossz `nextDuration`
+ * (clampelve). Előre a `trimIn` fix, a hossz ≤ `maxVideoDuration`. ⏪ reversednél a
+ * bal él a felső forrás-boundot tartja → a `trimIn` együtt mozog:
+ * `newTrimIn = trimIn + (duration - d')*speed` (clamp: `newTrimIn ≥ 0`).
+ */
+export function trimClipRight(
+  clip: VideoClip,
+  nextDuration: number
+): { duration: number; trimIn: number } {
+  if (clip.reversed) {
+    const maxD = clip.duration + clip.trimIn / clip.speed; // newTrimIn = 0 határ
+    const d = Math.min(Math.max(nextDuration, MIN_CLIP_DURATION), maxD);
+    return { duration: d, trimIn: clip.trimIn + (clip.duration - d) * clip.speed };
+  }
+  const d = Math.min(Math.max(nextDuration, MIN_CLIP_DURATION), maxVideoDuration(clip));
+  return { duration: d, trimIn: clip.trimIn };
+}
+
+/**
  * Egy régi uri minden előfordulásának cseréje (klipek + kép-kitöltésű formák
  * imageUri-ja + asset-registry) — a logó/kivágás/vízjel rétegek is relinkelnek.
  */

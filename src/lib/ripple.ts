@@ -1,4 +1,5 @@
-import type { Clip, Project, TrackType } from '@/types/project';
+import { trimClipRight } from '@/lib/projectUtils';
+import type { Clip, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
  * ⏭️ Ripple szerkesztés — pure réteg.
@@ -140,9 +141,18 @@ export function buildRippleResizePlan(
   const ownerType = project.tracks.find((t) => t.clips.some((c) => c.id === clipId))!.type;
   const existing = tracks.find((t) => t.trackType === ownerType);
   const base = existing?.clips ?? project.tracks.find((t) => t.type === ownerType)!.clips;
-  const withResize = base.map((c) =>
-    c.id === clipId ? ({ ...c, duration: nextDuration } as Clip) : c
-  );
+  const withResize = base.map((c) => {
+    if (c.id !== clipId) {
+      return c;
+    }
+    // ⏪ reversed-tudatos: a videóklip jobb-trimje a trimIn-t is állítja (ADR/06 §2.3).
+    // A `nextDuration` már clampelt (a hívó trimClipRight-ja adta) → itt nem torzul a shift.
+    if (c.kind === 'video') {
+      const { duration, trimIn } = trimClipRight(c as VideoClip, nextDuration);
+      return { ...c, duration, trimIn } as Clip;
+    }
+    return { ...c, duration: nextDuration } as Clip;
+  });
   if (existing) {
     existing.clips = withResize;
   } else {

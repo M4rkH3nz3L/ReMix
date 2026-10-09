@@ -6,6 +6,8 @@ import {
   projectMediaBytes,
   sourceTimeAt,
   splitClip,
+  trimClipLeft,
+  trimClipRight,
   upcomingVisualClip,
 } from '@/lib/projectUtils';
 import type { Asset, Project, VideoClip } from '@/types/project';
@@ -151,6 +153,61 @@ describe('splitClip — trimIn a vágásnál (előre ÉS reversed, forrás-ablak
     expect(second.trimIn).toBe(2);
     expect(sourceTimeAt(first, 4)).toBeCloseTo(sourceTimeAt(clip, 4));
     expect(sourceTimeAt(second, 4)).toBeCloseTo(sourceTimeAt(clip, 4));
+  });
+});
+
+describe('trimClipLeft / trimClipRight — forrás-ablak (előre + reversed, él-tartalom fix)', () => {
+  const v = (over: Partial<VideoClip>): VideoClip =>
+    mkVideo({ id: 'c', start: 0, duration: 10, trimIn: 2, sourceDuration: 20, speed: 1, ...over });
+  const applyL = (c: VideoClip, p: { start: number; duration: number; trimIn: number }): VideoClip =>
+    ({ ...c, ...p });
+  const applyR = (c: VideoClip, p: { duration: number; trimIn: number }): VideoClip => ({ ...c, ...p });
+
+  it('bal-trim ELŐRE: a jobb él forrás-tartalma változatlan, trimIn nő', () => {
+    const c = v({});
+    const p = trimClipLeft(c, 3);
+    expect(p.trimIn).toBe(5); // 2 + 3*1
+    const n = applyL(c, p);
+    // a jobb él (idővonal t=10) ugyanazt a forrás-időt adja
+    expect(sourceTimeAt(n, 10)).toBeCloseTo(sourceTimeAt(c, 10));
+  });
+
+  it('⏪ bal-trim REVERSED: a trimIn VÁLTOZATLAN, a jobb él tartalma fix', () => {
+    const c = v({ reversed: true });
+    const p = trimClipLeft(c, 3);
+    expect(p.trimIn).toBe(2); // reversednél a jobb él tartja a trimIn-t
+    const n = applyL(c, p);
+    expect(sourceTimeAt(n, 10)).toBeCloseTo(sourceTimeAt(c, 10)); // t=10 → 2 mindkettőn
+  });
+
+  it('jobb-trim ELŐRE: a trimIn fix, a bal él tartalma változatlan', () => {
+    const c = v({});
+    const p = trimClipRight(c, 6);
+    expect(p.trimIn).toBe(2);
+    expect(p.duration).toBe(6);
+    const n = applyR(c, p);
+    expect(sourceTimeAt(n, 0)).toBeCloseTo(sourceTimeAt(c, 0)); // bal él t=0 → 2
+  });
+
+  it('⏪ jobb-trim REVERSED: a trimIn együtt mozog, a bal él (felső bound) fix', () => {
+    const c = v({ reversed: true });
+    const p = trimClipRight(c, 6);
+    expect(p.trimIn).toBe(6); // 2 + (10-6)*1
+    const n = applyR(c, p);
+    expect(sourceTimeAt(n, 0)).toBeCloseTo(sourceTimeAt(c, 0)); // bal él t=0 → 12 mindkettőn
+  });
+
+  it('⏪ reversed clampok: jobb-trim nem viszi 0 alá a trimIn-t; bal-trim nem lépi túl a forrást', () => {
+    // jobb-trim nyújtás: maxD = duration + trimIn/speed = 10 + 2 = 12 → trimIn 0-ra clampel
+    const r1 = trimClipRight(v({ reversed: true }), 20);
+    expect(r1.duration).toBe(12);
+    expect(r1.trimIn).toBe(0);
+    // bal-trim nyújtás: a felső bound ≤ sourceDuration (minDelta = duration - maxVideoDuration)
+    const c = v({ reversed: true, start: 10 }); // maxVideoDuration=(20-2)/1=18, minDelta=10-18=-8
+    const r2 = trimClipLeft(c, -10); // -8-ra clampel
+    expect(r2.start).toBe(2);
+    expect(r2.duration).toBe(18);
+    expect(r2.trimIn + r2.duration * c.speed).toBeCloseTo(c.sourceDuration); // felső bound = 20
   });
 });
 

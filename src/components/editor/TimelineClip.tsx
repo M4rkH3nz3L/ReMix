@@ -16,7 +16,7 @@ import { ClipFilmstrip } from '@/components/editor/ClipFilmstrip';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { MIN_CLIP_DURATION, SNAP_PX, palette, trackColors } from '@/constants/editor';
 import { getProxyUriSync } from '@/lib/proxy';
-import { maxVideoDuration } from '@/lib/projectUtils';
+import { sourceTimeAt, trimClipLeft, trimClipRight } from '@/lib/projectUtils';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { clamp, formatTime } from '@/lib/time';
 import { colorForUser } from '@/lib/collabLive';
@@ -226,15 +226,10 @@ function TimelineClipInner({
     // magnetikus bal él a célpontokhoz
     const rawStart = clip.start + dx / pps;
     const snappedStart = snapEdge(rawStart);
-    let deltaSec = clamp(snappedStart - clip.start, -clip.start, clip.duration - MIN_CLIP_DURATION);
+    const deltaSec = clamp(snappedStart - clip.start, -clip.start, clip.duration - MIN_CLIP_DURATION);
     if (clip.kind === 'video') {
-      // a forrásfájl elejénél tovább nem húzható vissza
-      deltaSec = Math.max(deltaSec, -clip.trimIn / clip.speed);
-      updateClip(clip.id, {
-        start: clip.start + deltaSec,
-        duration: clip.duration - deltaSec,
-        trimIn: clip.trimIn + deltaSec * clip.speed,
-      });
+      // ⏪ reversed-tudatos forrás-ablak (a trimClipLeft kezeli a forrás-clampet is)
+      updateClip(clip.id, trimClipLeft(clip, deltaSec));
       return;
     }
     updateClip(clip.id, {
@@ -252,27 +247,40 @@ function TimelineClipInner({
       state.rollEdit(clip.id, 'right', dx / pps);
       return;
     }
-    const max = clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
-    const snappedEnd = snapEdge(clip.start + clip.duration + dx / pps);
-    const duration = clamp(snappedEnd - clip.start, MIN_CLIP_DURATION, max);
+    const desired = snapEdge(clip.start + clip.duration + dx / pps) - clip.start;
+    // ⏪ reversed-tudatos forrás-ablak + clamp (a trimClipRight kezeli); a hossz
+    // ebből jön, a ripple is ezzel tolja a mögöttes klipeket.
+    const patch =
+      clip.kind === 'video'
+        ? trimClipRight(clip, desired)
+        : { duration: clamp(desired, MIN_CLIP_DURATION, Number.POSITIVE_INFINITY), trimIn: undefined };
     // ⏭️ ripple: a hossz-változás tolja a mögötte lévőket (minden sávon). Explicit
     // ripple trim-mód VAGY a globális ripple-kapcsoló bekapcsolja.
     const ripple = trimMode === 'ripple' || (trimMode === 'normal' && state.rippleMode);
-    if (ripple && state.rippleResize(clip.id, duration)) {
+    if (ripple && state.rippleResize(clip.id, patch.duration)) {
       return;
     }
-    updateClip(clip.id, { duration });
+    updateClip(
+      clip.id,
+      clip.kind === 'video' ? { duration: patch.duration, trimIn: patch.trimIn } : { duration: patch.duration }
+    );
   };
 
   // 🔍 clip-edge preview frissítése húzás közben (a forrás-időt frame-re kvantálva,
   // változatlan érték esetén nem renderel újra)
   const previewLeft = (dx: number) => {
-    let deltaSec = clamp(dx / pps, -clip.start, clip.duration - MIN_CLIP_DURATION);
+    const deltaSec = clamp(dx / pps, -clip.start, clip.duration - MIN_CLIP_DURATION);
+    let tlTime: number;
+    let srcTime: number;
     if (clip.kind === 'video') {
-      deltaSec = Math.max(deltaSec, -clip.trimIn / clip.speed);
+      // ⏪ reversed-tudatos: a feloldott él-forrásidő a trimClipLeft patch-ből
+      const p = trimClipLeft(clip, deltaSec);
+      tlTime = p.start;
+      srcTime = sourceTimeAt({ ...clip, ...p }, p.start);
+    } else {
+      tlTime = clip.start + deltaSec;
+      srcTime = 0;
     }
-    const tlTime = clip.start + deltaSec;
-    const srcTime = clip.kind === 'video' ? clip.trimIn + deltaSec * clip.speed : 0;
     // frame-nyi küszöb: húzás közben csak érdemi elmozdulásra renderel újra
     setEdge((prev) =>
       prev && prev.side === 'left' && Math.abs(prev.tlTime - tlTime) < 0.02
@@ -281,10 +289,17 @@ function TimelineClipInner({
     );
   };
   const previewRight = (dx: number) => {
-    const max = clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
-    const duration = clamp(clip.duration + dx / pps, MIN_CLIP_DURATION, max);
-    const tlTime = clip.start + duration;
-    const srcTime = clip.kind === 'video' ? clip.trimIn + duration * clip.speed : 0;
+    let tlTime: number;
+    let srcTime: number;
+    if (clip.kind === 'video') {
+      const p = trimClipRight(clip, clip.duration + dx / pps);
+      tlTime = clip.start + p.duration;
+      srcTime = sourceTimeAt({ ...clip, ...p }, tlTime);
+    } else {
+      const duration = clamp(clip.duration + dx / pps, MIN_CLIP_DURATION, Number.POSITIVE_INFINITY);
+      tlTime = clip.start + duration;
+      srcTime = 0;
+    }
     setEdge((prev) =>
       prev && prev.side === 'right' && Math.abs(prev.tlTime - tlTime) < 0.02
         ? prev

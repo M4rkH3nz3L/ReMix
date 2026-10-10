@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Rétegek",
       "crop": "Vágás",
+      "style": "Stílus",
       "adjust": "Korrekció",
       "text": "Szöveg",
       "shapes": "Formák",
@@ -2926,6 +2927,10 @@
       "undoRotate": "Forgatás 90°",
       "undoFlip": "Tükrözés",
       "undoCrop": "Kivágás",
+      "style": {
+        "needTitle": "Nincs kijelölt réteg",
+        "needBody": "Előbb koppints egy rétegre a vásznon vagy a réteg-listában."
+      },
       "crop": {
         "free": "Szabad",
         "hint": "Húzd a kivágást · válassz arányt"

@@ -20,9 +20,9 @@
 | — | Csoportosított görgethető eszköztár + ShapePicker (5 forma) | ✅ KÉSZ · on-device | §2.0 · main `4041822` |
 | 1 | **Valódi forgatás** minden rétegre (forma/szöveg is) — preview + worker | ✅ KÉSZ · on-device | §2.0b · `32da9c7` |
 | 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
-| 3 | **Tükrözés H/V** (flip — preview + worker) | 🚧 FOLYAMATBAN | §2.0d |
-| 4 | Réteg-inspector felszínre hozása (kijelölésre nyíló „Tulajdonságok" lap) | ⬜ HÁTRA | §2.0e |
-| 5 | **Toll / vektor pen** UI (a `vectorPath` mag fölé) | ⬜ HÁTRA | §2.1 |
+| 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
+| 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
+| 5 | **Toll / vektor pen** UI (a `vectorPath` mag fölé) | 🚧 KÖVETKEZŐ | §2.1 |
 | 6 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA | §2.2 |
 | 7 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
@@ -73,6 +73,14 @@ Photoshop-alap: a réteg vízszintes/függőleges tükrözése. `flipH?/flipV?` 
 [PhotoLayerView](../../src/components/studio/image/PhotoLayerView.tsx) (utóbbinál a forgatás+tükrözés+drag EGY transformba vonva,
 mert a külön `transform` felülírta volna a rotate-et); a worker a `hflip`/`vflip` filtert a rotate ELŐTT alkalmazza
 ([server/imagedoc.js](../../server/imagedoc.js)) → render-parity. Két tool az ARRANGE csoportban (Tükör ↔ / Tükör ↕), nem-fill rétegre.
+
+### 2.0e Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+A gazdag réteg-tulajdonságok eddig CSAK a „Layers" lap alján, a réteg-fa után voltak elérhetők (felfedezhetetlen). Most a vezérlők
+kiemelve a megosztott **[LayerInspector](../../src/components/studio/image/LayerInspector.tsx)** komponensbe (szöveg-stílus / fotó-illesztés+
+forgatás / forma kitöltés+blend+kontúr+árnyék+glow / háttér-szín / minden rétegnél átlátszóság), amit a
+[LayerPanel](../../src/components/studio/image/LayerPanel.tsx) ÉS az új **[LayerStyleSheet](../../src/components/studio/image/LayerStyleSheet.tsx)**
+is használ. Új „Stílus" eszköz a STYLE csoportban → a kijelölt rétegről EGY koppintásra megnyílik a teljes inspector (fejléc = réteg neve).
+On-device bizonyítva: a „Stílus" lap megnyílt a kijelölt formán (Fill/forma/blend/border/shadow/glow/opacity).
 
 ## 2. Feladatlista
 

@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Ebenen",
       "crop": "Zuschneiden",
+      "style": "Stil",
       "adjust": "Anpassen",
       "text": "Text",
       "shapes": "Formen",
@@ -2926,6 +2927,10 @@
       "undoRotate": "Um 90° drehen",
       "undoFlip": "Spiegeln",
       "undoCrop": "Zuschneiden",
+      "style": {
+        "needTitle": "Keine Ebene ausgewählt",
+        "needBody": "Tippe zuerst auf eine Ebene auf der Leinwand oder in der Ebenenliste."
+      },
       "crop": {
         "free": "Frei",
         "hint": "Zuschnitt ziehen · Verhältnis wählen"

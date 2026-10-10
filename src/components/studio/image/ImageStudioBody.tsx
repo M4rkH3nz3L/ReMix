@@ -14,6 +14,7 @@ import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
+import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
 import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
@@ -44,6 +45,7 @@ type ToolKey =
   | 'text'
   | 'shape'
   | 'svg'
+  | 'style'
   | 'adjust'
   | 'crop'
   | 'align'
@@ -104,7 +106,10 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
   },
   {
     labelKey: 'studio.imageGroups.style',
-    tools: [{ key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' }],
+    tools: [
+      { key: 'style', icon: 'options-outline', labelKey: 'studio.imageTools.style' },
+      { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
+    ],
   },
   {
     labelKey: 'studio.imageGroups.layer',
@@ -140,7 +145,7 @@ export function ImageStudioBody({
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<
-    'layers' | 'adjust' | 'align' | 'boolean' | 'shapePicker' | 'canvas' | 'source' | null
+    'layers' | 'style' | 'adjust' | 'align' | 'boolean' | 'shapePicker' | 'canvas' | 'source' | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -343,6 +348,14 @@ export function ImageStudioBody({
       case 'svg':
         void importSvg();
         break;
+      case 'style':
+        // 🎛️ a kijelölt réteg gazdag tulajdonság-lapja KÖZVETLENÜL (felfedezhetőség)
+        if (selectedLayer) {
+          setSheet('style');
+        } else {
+          Alert.alert(t('studio.image.style.needTitle'), t('studio.image.style.needBody'));
+        }
+        break;
       case 'adjust':
         if (selectedLayer?.kind === 'photo') {
           setSheet('adjust');
@@ -424,6 +437,8 @@ export function ImageStudioBody({
       case 'flipH':
       case 'flipV':
         return !selectedLayer || selectedLayer.kind === 'fill';
+      case 'style':
+        return !selectedLayer;
       case 'adjust':
         return selectedLayer?.kind !== 'photo';
       case 'align':
@@ -708,6 +723,19 @@ export function ImageStudioBody({
               setSheet('adjust');
             }
           }}
+        />
+      ) : null}
+      {sheet === 'style' && doc && selectedLayer ? (
+        <LayerStyleSheet
+          doc={doc}
+          layer={selectedLayer}
+          commit={commit}
+          onOpenAdjust={() => {
+            if (selectedLayer.kind === 'photo') {
+              setSheet('adjust');
+            }
+          }}
+          onClose={() => setSheet(null)}
         />
       ) : null}
       {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (

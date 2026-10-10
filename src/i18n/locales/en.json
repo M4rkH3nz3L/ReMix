@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Layers",
       "crop": "Crop",
+      "style": "Style",
       "adjust": "Adjust",
       "text": "Text",
       "shapes": "Shapes",
@@ -2926,6 +2927,10 @@
       "undoRotate": "Rotate 90°",
       "undoFlip": "Flip",
       "undoCrop": "Crop",
+      "style": {
+        "needTitle": "No layer selected",
+        "needBody": "Tap a layer on the canvas or in the layer list first."
+      },
       "crop": {
         "free": "Free",
         "hint": "Drag the crop · pick a ratio"

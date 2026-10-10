@@ -2,12 +2,12 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
 /**
  * 🪄 Varázspálca-overlay — a vászonra koppintva a (vászon-normalizált 0–1) pontot
  * jelenti; a hívó (ImageCanvas) megkeresi az alatta lévő fotó-réteget és a
- * dobozon belüli lokális koordinátát a Skia-szelekcióhoz.
+ * dobozon belüli lokális koordinátát a Skia-szelekcióhoz. A koppintás a vásznon
+ * belül esik → e.x/box.w már 0–1; a clampelést a JS-oldali `onTap` végzi (a Tap
+ * worklet-jéből nem hívhatunk sima JS-függvényt).
  */
 export function WandOverlay({
   box,
@@ -19,7 +19,7 @@ export function WandOverlay({
   const tap = Gesture.Tap()
     .maxDistance(16)
     .onEnd((e) => {
-      runOnJS(onTap)(clamp(e.x / box.w, 0, 1), clamp(e.y / box.h, 0, 1));
+      runOnJS(onTap)(e.x / box.w, e.y / box.h);
     });
   return (
     <GestureDetector gesture={tap}>

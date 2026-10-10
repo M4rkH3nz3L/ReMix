@@ -162,6 +162,30 @@ export function ShapeOverlay({
       : (clip.cornerRadius ?? 0) * Math.min(w, h);
   const borderWidth = ((clip.borderWidth ?? 0) / 100) * box.h;
 
+  // ✨ Effektek-előnézet: a worker CSS `filter: drop-shadow`-láncát `boxShadow`-val
+  // tükrözzük (RN 0.86 támogatja a több-árnyékos boxShadow-t). A ragyogás a NEM-path
+  // formákon eddig NEM látszott (csak a renderben) — a worker két drop-shadow-ja
+  // (0 0 r/2, 0 0 r) most a vásznon is megjelenik; a path-glow marad az SVG-ben
+  // (sziluett-pontos). Az árnyék a worker rgba(0,0,0,0.55) drop-shadow-ját adja.
+  const fxShadows: string[] = [];
+  if (clip.glow && clip.shape !== 'path') {
+    const glowPx = Math.max(2, (clip.glow.size / 100) * box.h);
+    const gc = clip.glow.color ?? '#ffffff';
+    fxShadows.push(
+      `0px 0px ${Math.round(glowPx * 0.5)}px ${gc}`,
+      `0px 0px ${Math.round(glowPx)}px ${gc}`
+    );
+  }
+  if (clip.shadow) {
+    const spread = Math.max(8, h * 0.18);
+    fxShadows.push(
+      `0px ${Math.round(spread * 0.4)}px ${Math.round(spread * 0.6)}px rgba(0,0,0,0.55)`
+    );
+  }
+  // a boxShadow a wrap lekerekítését követi → ellipszisen/lekerekített téglalapon
+  // ível a halo (a worker sziluettjét közelítve); nyíl/csillagon a befoglaló doboz
+  const boxShadow = fxShadows.length ? fxShadows.join(', ') : undefined;
+
   const baseStyle = {
     width: w,
     height: h,
@@ -182,8 +206,8 @@ export function ShapeOverlay({
             // valódi blend az előnézetben (RN új architektúra; CSS-névre fordítva)
             mixBlendMode: clip.blendMode ? cssBlendMode(clip.blendMode) : undefined,
           },
-          // árnyék-közelítés (a valódi, sziluett-követő drop-shadow a renderben)
-          clip.shadow ? styles.shadow : null,
+          // ✨ effektek (ragyogás + árnyék) a worker drop-shadow-láncát tükrözve
+          boxShadow ? { boxShadow, borderRadius: radius } : null,
           dragStyle,
           selected && editable ? styles.selected : null,
         ]}
@@ -308,13 +332,6 @@ const styles = StyleSheet.create({
   },
   wrap: {
     position: 'absolute',
-  },
-  shadow: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 6,
   },
   selected: {
     borderWidth: 1,

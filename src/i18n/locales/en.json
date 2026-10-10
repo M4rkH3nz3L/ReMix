@@ -2826,6 +2826,7 @@
       "crop": "Crop",
       "guides": "Guides",
       "style": "Style",
+      "fx": "Effects",
       "adjust": "Adjust",
       "text": "Text",
       "shapes": "Shapes",
@@ -2894,6 +2895,20 @@
       "selected": "Selected: {{name}}",
       "needPhotoTitle": "Select a photo",
       "needPhotoBody": "Corrections apply to a photo layer — select one first.",
+      "fx": {
+        "title": "Effects",
+        "glow": "Glow",
+        "glowOn": "Glow on",
+        "glowColor": "Glow color",
+        "glowSize": "Glow size",
+        "shadow": "Shadow",
+        "shadowOn": "Shadow on",
+        "stroke": "Stroke",
+        "strokeWidth": "Stroke width",
+        "strokeColor": "Stroke color",
+        "needTitle": "Select a shape",
+        "needBody": "Effects apply to a shape layer — select one first."
+      },
       "align": {
         "title": "Align to canvas",
         "hint": "Align the selected layer to the canvas edges or center.",

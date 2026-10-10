@@ -10,6 +10,7 @@ import { SourceSheet } from '@/components/SourceSheet';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
+import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
@@ -56,6 +57,7 @@ type ToolKey =
   | 'svg'
   | 'style'
   | 'adjust'
+  | 'fx'
   | 'crop'
   | 'guides'
   | 'align'
@@ -127,6 +129,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
     labelKey: 'studio.imageGroups.style',
     tools: [
       { key: 'style', icon: 'options-outline', labelKey: 'studio.imageTools.style' },
+      { key: 'fx', icon: 'sparkles-outline', labelKey: 'studio.imageTools.fx' },
       { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
     ],
   },
@@ -164,7 +167,16 @@ export function ImageStudioBody({
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<
-    'layers' | 'style' | 'adjust' | 'align' | 'boolean' | 'shapePicker' | 'canvas' | 'source' | null
+    | 'layers'
+    | 'style'
+    | 'adjust'
+    | 'fx'
+    | 'align'
+    | 'boolean'
+    | 'shapePicker'
+    | 'canvas'
+    | 'source'
+    | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -442,6 +454,14 @@ export function ImageStudioBody({
           setSheet('adjust');
         } else {
           Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
+        }
+        break;
+      case 'fx':
+        // ✨ réteg-effektek (ragyogás/árnyék/körvonal) — csak forma-rétegre
+        if (selectedLayer?.kind === 'shape') {
+          setSheet('fx');
+        } else {
+          Alert.alert(t('studio.image.fx.needTitle'), t('studio.image.fx.needBody'));
         }
         break;
       case 'crop':
@@ -1120,6 +1140,9 @@ export function ImageStudioBody({
       ) : null}
       {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (
         <AdjustStackSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (
+        <EffectsSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'align' && doc && selectedLayer && canAlignLayer(selectedLayer) ? (
         <AlignSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />

@@ -2826,6 +2826,7 @@
       "crop": "Vágás",
       "guides": "Segédvonalak",
       "style": "Stílus",
+      "fx": "Effektek",
       "adjust": "Korrekció",
       "text": "Szöveg",
       "shapes": "Formák",
@@ -2894,6 +2895,20 @@
       "selected": "Kijelölve: {{name}}",
       "needPhotoTitle": "Válassz fotót",
       "needPhotoBody": "A korrekció fotó-rétegre hat — előbb jelölj ki egyet.",
+      "fx": {
+        "title": "Effektek",
+        "glow": "Ragyogás",
+        "glowOn": "Ragyogás be",
+        "glowColor": "Ragyogás szín",
+        "glowSize": "Ragyogás méret",
+        "shadow": "Árnyék",
+        "shadowOn": "Árnyék be",
+        "stroke": "Körvonal",
+        "strokeWidth": "Körvonal vastagság",
+        "strokeColor": "Körvonal szín",
+        "needTitle": "Válassz formát",
+        "needBody": "Az effektek forma-rétegre hatnak — előbb jelölj ki egyet."
+      },
       "align": {
         "title": "Igazítás a vászonhoz",
         "hint": "A kijelölt réteg igazítása a vászon széleihez vagy közepéhez.",

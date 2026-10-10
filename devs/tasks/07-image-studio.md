@@ -28,8 +28,8 @@
 | 8 | **Varázspálca** (pixel-szín-szelekció, Skia) | ✅ KÉSZ · on-device (új Skia-build) | §2.1c |
 | 9 | **Ecset / raszter-festés** (Skia snapshot → fotó-réteg) | ✅ KÉSZ · on-device | §2.1d |
 | 10 | **Vonalzók & segédvonalak** (+ snap-mozgatás) | ✅ KÉSZ · on-device | §2.4 |
-| 11 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
-| 11 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
+| 11 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ✅ KÉSZ · on-device + worker-parity | §2.2 |
+| 12 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
 > [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).
@@ -144,8 +144,22 @@ teszt-fotón a PIROS régióra koppintva a Skia beolvasta a pixeleket, flood-fil
 került rá. (A `WandOverlay` Tap-worklet-jéből a `clamp` sima JS-függvényt nem lehetett hívni → nyers normalizált koordinátát ad, a JS
 clampel.) v1 egyszerűsítés: a koppintás a fotó-dobozt contain-fit-szerűen képezi a forrásra (cover-crop-eltolás elhanyagolva), MAX_DIM=900 skálázás.
 
-### 2.2 Effects panel UI — P1
-- [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).
+### 2.2 Effects panel UI — P1 ✅ KÉSZ (2026-10-10, on-device + worker verifikálva)
+- [x] ✅ **Dedikált „Effektek" lap (érintő-first):** új [EffectsSheet](../../src/components/studio/image/EffectsSheet.tsx)
+  a kijelölt **forma-rétegre** — szekciókba rendezve: **Ragyogás** (be/ki + **szín-paletta** + **méret** csúszka — eddig csak
+  fix-méretű toggle volt a Stílus-lapon), **Árnyék** (be/ki), **Körvonal/Stroke** (szélesség + szín). Új `fx` tool a Stílus-csoportban
+  (`sparkles-outline`), csak forma-rétegre nyílik. Minden vezérlő a MEGLÉVŐ, renderben is leképzett mezőkre hat
+  (`glow`/`shadow`/`borderWidth`+`borderColor`) → **nincs új modell-mező, garantált render-parity**.
+- [x] ✅ **Preview-parity fix (a valódi rés):** a ragyogás a nem-path formákon eddig CSAK a renderben látszott. Az
+  [ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx) mostantól **`boxShadow`-val** (RN 0.86 több-árnyék) tükrözi a worker
+  CSS `filter: drop-shadow`-láncát (glow: `0 0 r/2` + `0 0 r`, `r = size%·box.h`; árnyék: `rgba(0,0,0,0.55)`), + a wrap
+  `borderRadius`-ával az **ellipszis/lekerekített forma haló-ja ível** (a worker sziluettjét közelítve). A régi RN-elevation
+  `styles.shadow` leváltva.
+- [x] ✅ **Bizonyítva (cyan glow, 8% ellipszis):** on-device a haló tisztán megjelent a kör körül, íves formát követve; a
+  `/imagedoc` worker-render UGYANAZT a cyan-halót adta (512×512 PNG) → **előnézet ↔ render egyezik**. **1575 teszt zöld (139 suite).**
+- Megj.: a path-formák glow-ja marad az SVG-ben (sziluett-pontos); nyíl/csillagon a `boxShadow` a befoglaló dobozt követi (közelítő,
+  a worker ott drop-shadow-sziluettet ad). A gazdagabb `layerEffects` mag (inner-shadow/color-overlay/pattern-overlay stb.) külön,
+  későbbi iteráció — a v1 a render-biztos glow/shadow/stroke-ra fókuszál.
 
 ### 2.3 Adjustment-stack UI — P1 ✅ KÉSZ (2026-10-10, on-device + worker verifikálva)
 - [x] ✅ **Teljes non-destruktív KORREKCIÓS-VEREM UI (érintő-first):** új [AdjustStackSheet](../../src/components/studio/image/AdjustStackSheet.tsx)

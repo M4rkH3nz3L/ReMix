@@ -1222,6 +1222,33 @@ export interface FillLayer extends ImageLayerBase {
   gradient?: ShapeGradient;
 }
 
+/** 🎚️ non-destruktív korrekciós-verem (adjustment layers) fajtái */
+export type AdjustmentKind =
+  | 'exposure'
+  | 'contrast'
+  | 'whiteBalance'
+  | 'saturation'
+  | 'vibrance'
+  | 'hsl'
+  | 'curves'
+  | 'colorBalance'
+  | 'vignette'
+  | 'lut'
+  | 'custom';
+
+/** egy korrekciós réteg a veremben (a mag: `src/lib/adjustmentStack.ts`) */
+export interface AdjustmentLayer {
+  id: string;
+  kind: AdjustmentKind;
+  name: string;
+  /** ki/be — a kikapcsolt megmarad, de nem hat (non-destruktív) */
+  enabled: boolean;
+  /** 0…1 erősség (a hatás skálázása) */
+  amount: number;
+  /** a korrekció paraméterei (a ClipAdjust mezők részhalmaza) */
+  adjust: ClipAdjust;
+}
+
 /** fotó-réteg: a kép + a videóból ismert képjavítás/szűrő/maszk */
 export interface PhotoLayer extends ImageLayerBase {
   kind: 'photo';
@@ -1239,7 +1266,10 @@ export interface PhotoLayer extends ImageLayerBase {
   fit?: 'cover' | 'contain';
   filterId?: FilterId;
   filterIntensity?: number;
+  /** a render-input EGYETLEN korrekciója (a verem ebbe laposodik — `flattenAdjustments`) */
   adjust?: ClipAdjust;
+  /** 🎚️ non-destruktív korrekciós-verem (az UI forrás-igazsága; → `adjust`) */
+  adjustmentStack?: AdjustmentLayer[];
   mask?: ClipMask;
 }
 

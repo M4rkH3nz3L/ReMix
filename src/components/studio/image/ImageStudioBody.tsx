@@ -9,7 +9,7 @@ import { captureRef } from 'react-native-view-shot';
 import { SourceSheet } from '@/components/SourceSheet';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
-import { AdjustSheet } from '@/components/studio/image/AdjustSheet';
+import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
@@ -1119,7 +1119,7 @@ export function ImageStudioBody({
         />
       ) : null}
       {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (
-        <AdjustSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+        <AdjustStackSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'align' && doc && selectedLayer && canAlignLayer(selectedLayer) ? (
         <AlignSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />

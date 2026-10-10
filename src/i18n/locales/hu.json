@@ -2859,6 +2859,15 @@
       "correctionsTitle": "Korrekció",
       "adjustTitle": "Képjavítás",
       "adjustTone": "Tónus (PRO)",
+      "adjustStack": {
+        "title": "Korrekciók",
+        "add": "Korrekció hozzáadása",
+        "amount": "Erősség",
+        "empty": "Nincs korrekció. Adj hozzá egyet fent.",
+        "reset": "Mind törlése",
+        "base": "Alap",
+        "kind": { "exposure": "Expozíció", "contrast": "Kontraszt", "whiteBalance": "Fehéregyensúly", "tone": "Tónus", "saturation": "Telítettség", "vibrance": "Élénkség", "vignette": "Vignetta" }
+      },
       "filter": "Szűrő",
       "corrections": "Korrekció",
       "reset": "Alaphelyzet",

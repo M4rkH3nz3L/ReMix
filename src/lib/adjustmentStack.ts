@@ -1,6 +1,17 @@
-import type { ClipAdjust, CurvePoint, ClipLut, ToneCurves } from '@/types/project';
+import type {
+  AdjustmentKind,
+  AdjustmentLayer,
+  ClipAdjust,
+  CurvePoint,
+  ClipLut,
+  ToneCurves,
+} from '@/types/project';
 import { isIdentityCurve } from '@/lib/curves';
 import { makeId } from '@/lib/id';
+
+// a típusok a `types/project.ts`-ben élnek (a PhotoLayer.adjustmentStack mezőhöz) —
+// innen re-exportáljuk a visszafelé-kompatibilitásért
+export type { AdjustmentKind, AdjustmentLayer };
 
 /**
  * 🎚️ Non-destruktív adjustment-stack (Creative Canvas / Photo) — pure réteg.
@@ -17,31 +28,6 @@ import { makeId } from '@/lib/id';
  * teljes, sorrendtartó lánc a `resolvePipeline`-ból jön ki egy jövőbeli
  * több-menetes renderhez). Minden művelet ÚJ vermet ad vissza (command-busz).
  */
-
-export type AdjustmentKind =
-  | 'exposure'
-  | 'contrast'
-  | 'whiteBalance'
-  | 'saturation'
-  | 'vibrance'
-  | 'hsl'
-  | 'curves'
-  | 'colorBalance'
-  | 'vignette'
-  | 'lut'
-  | 'custom';
-
-export interface AdjustmentLayer {
-  id: string;
-  kind: AdjustmentKind;
-  name: string;
-  /** ki/be — a kikapcsolt megmarad, de nem hat (non-destruktív) */
-  enabled: boolean;
-  /** 0…1 erősség (a hatás skálázása; 0 = semleges, 1 = teljes) */
-  amount: number;
-  /** a korrekció paraméterei (a meglévő ClipAdjust mezők részhalmaza) */
-  adjust: ClipAdjust;
-}
 
 /** skalár mezők + tartományuk (a `ClipAdjust` doksijából). */
 const RANGES: Record<string, [number, number]> = {

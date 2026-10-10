@@ -147,13 +147,14 @@ clampel.) v1 egyszerűsítés: a koppintás a fotó-dobozt contain-fit-szerűen 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).
 
-### 2.3 Adjustment / tone UI — P1 🟡 (PRO-tónus-csúszkák KÉSZ+worker-verifikálva; teljes stack-UI hátra)
-- [x] ✅ **PRO tónus-korrekció (2026-10-10):** az [AdjustSheet](../../src/components/studio/image/AdjustSheet.tsx) „Tónus (PRO)"
-  szekciója — exposure / highlights / shadows / whites / blacks (−1…1) a fotó `adjust`-jára. A preview a
-  [adjustTintLayers](../../src/lib/adjustPreview.ts)-szel közelít (ezeket kezeli), a worker a `render.js` `adjustChain`-jével
-  PONTOSAN égeti be (eq/curves). **Worker-verifikálva** (a render-worker él): a teszt-fotó exposure=1+highlights=0.8-cal
-  renderelve láthatóan világosabb lett (HTTP 200). Render-parity ✓.
-- [ ] ⬜ Hátra: az `adjustmentStack` mag teljes STACK-UI-ja (több nem-destruktív korrekció-réteg + sorrend + amount).
+### 2.3 Adjustment-stack UI — P1 ✅ KÉSZ (2026-10-10, on-device + worker verifikálva)
+- [x] ✅ **Teljes non-destruktív KORREKCIÓS-VEREM UI (érintő-first):** új [AdjustStackSheet](../../src/components/studio/image/AdjustStackSheet.tsx)
+  a kész `adjustmentStack` mag fölött. Szűrő-sor (gyors preset) + „korrekció hozzáadása" chipek (Expozíció/Kontraszt/Fehéregyensúly/
+  **Tónus**[highlights/shadows/whites/blacks]/Telítettség/Élénkség/Vignetta) + **stack-kártyák**: ki/be, sorrend (↑/↓), duplázás, törlés,
+  **Erősség** (amount) + a réteg `adjust`-jában jelenlévő mezők csúszkái (mező-alapú render). A verem a `PhotoLayer.adjustmentStack`
+  forrás-igazság, minden változáskor `flattenAdjustments` → `adjust` (a render-lánc változatlan). A „Korrekció" tool ezt nyitja (a régi
+  AdjustSheet leváltva/törölve). **Modell:** `AdjustmentKind`/`AdjustmentLayer` a types-ba, `adjustmentStack.ts` re-exportál. On-device:
+  Exposure=0.90 → a fotó láthatóan világosodott; **worker render-parity** verifikálva (a `adjust` ugyanúgy ég be). **1575 teszt zöld.**
 
 ### 2.4 Rulers / guides UI — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
 - [x] ✅ Új „Segédvonalak" eszköz (ARRANGE) → [RulersOverlay](../../src/components/studio/image/RulersOverlay.tsx): felső/bal

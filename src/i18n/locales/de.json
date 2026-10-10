@@ -2859,6 +2859,15 @@
       "correctionsTitle": "Korrekturen",
       "adjustTitle": "Anpassen",
       "adjustTone": "Ton (PRO)",
+      "adjustStack": {
+        "title": "Korrekturen",
+        "add": "Korrektur hinzufügen",
+        "amount": "Stärke",
+        "empty": "Noch keine Korrekturen. Oben eine hinzufügen.",
+        "reset": "Alle löschen",
+        "base": "Basis",
+        "kind": { "exposure": "Belichtung", "contrast": "Kontrast", "whiteBalance": "Weißabgleich", "tone": "Ton", "saturation": "Sättigung", "vibrance": "Dynamik", "vignette": "Vignette" }
+      },
       "filter": "Filter",
       "corrections": "Korrekturen",
       "reset": "Zurücksetzen",

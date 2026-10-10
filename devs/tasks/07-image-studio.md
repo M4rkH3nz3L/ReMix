@@ -22,14 +22,15 @@
 | 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
 | 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
 | 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
-| 5 | **Toll / vektor pen** (v1 tap-rajz · v2 node-húzás · v3 bezier-görbék) | ✅ KÉSZ · on-device | §2.1 |
+| 5 | **Toll / vektor pen** (v1 rajz · v2 node-húzás · v3 bezier · v4 add/törlés) | ✅ KÉSZ · on-device | §2.1 |
 | 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | ✅ KÉSZ · on-device | §2.0f |
 | 7 | **Lasszó** (szabadkézi → zárt path-forma) | ✅ KÉSZ · on-device | §2.1b |
 | 8 | **Varázspálca** (pixel-szín-szelekció, Skia) | ✅ KÉSZ · on-device (új Skia-build) | §2.1c |
 | 9 | **Ecset / raszter-festés** (Skia snapshot → fotó-réteg) | ✅ KÉSZ · on-device | §2.1d |
 | 10 | **Vonalzók & segédvonalak** (+ snap-mozgatás) | ✅ KÉSZ · on-device | §2.4 |
 | 11 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ✅ KÉSZ · on-device + worker-parity | §2.2 |
-| 12 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
+| 12 | **Minta-kitöltés** (pattern: pöttyök/rács/csíkok/sakktábla) | ✅ KÉSZ · on-device + worker-parity | §2.5 |
+| 13 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
 > [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).
@@ -105,7 +106,7 @@ A Skia MÁR a dev-buildben van (varázspálca) → JS-reload elég. On-device bi
 
 ## 2. Feladatlista
 
-### 2.1 Vector pen UI — P1 🟡 (v1 KÉSZ + on-device verifikálva; bezier-handle/node-edit hátra)
+### 2.1 Vector pen UI — P1 ✅ KÉSZ (2026-10-10, v1–v4 on-device verifikálva; csak v5 broken-fogó hátra)
 - [x] ✅ **Toll v1 (2026-10-10):** új „Toll" eszköz az ADD csoportban → toll-mód: a vásznon koppintásra horgonypontok
   ([PenOverlay](../../src/components/studio/image/PenOverlay.tsx): élő polyline + node-pöttyök, az első node kiemelve),
   az ELSŐ pontra koppintva (vagy „Bezár") kitöltött path-forma, „Kész" nyitott vonal. A pontokból path-FORMA réteg a tiszta
@@ -178,8 +179,20 @@ clampel.) v1 egyszerűsítés: a koppintás a fotó-dobozt contain-fit-szerűen 
   (core-tesztelt) illeszkedik a guide-okra ([ImageCanvas](../../src/components/studio/image/ImageCanvas.tsx) `move`). On-device
   bizonyítva: vonalzók + a Thirds rácsa (3+3 guide) renderel. A snap a magban tesztelt + a move-handlerbe bekötve.
 
-### 2.5 Pattern picker — P1
-- [ ] 🖼️ `patternFill` mag → minta-választó + paraméterek.
+### 2.5 Pattern picker — P1 ✅ KÉSZ (2026-10-10, on-device + worker verifikálva)
+- [x] ✅ **Geometrikus minta-kitöltés forma-rétegre (érintő-first):** új [PatternSheet](../../src/components/studio/image/PatternSheet.tsx)
+  — preset-chipek (**pöttyök / rács / csíkok / sakktábla**) + minta-szín + opcionális háttér + **csempe-méret** + **forgatás** + átlátszóság.
+  A `pattern` FELÜLÍRJA a sima `fill`-t. Új `pattern` tool (⊞) a Stílus-csoportban, csak forma-rétegre.
+- [x] ✅ **Render-parity közös magból:** új tiszta [shapePattern.ts](../../src/lib/shapePattern.ts) — a preset→tile-primitívek
+  + SVG `<pattern>`-string. KÉT fogyasztó EGY magból: az **előnézet** ([ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx))
+  react-native-svg `<Pattern>`-t rajzol a primitívekből, a **worker** (`server/text-render.js` `shapePatternSvgDefJs`) a
+  SZÓ SZERINT azonos SVG-stringet injektálja (minden forma-geometriára: rect/ellipse = rx-es rect, nyíl/csillag = polygon, path = `d`).
+  A **CSS-div-út érintetlen** (nincs regresszió a sima/gradient/kép-kitöltésen). A mirror-t [contract-teszt](../../src/lib/shapePattern.contract.test.ts)
+  zárja (TS ⇄ worker JS **bitre egyezik**). **13 unit + 3 contract teszt.**
+- [x] ✅ **Bizonyítva:** on-device cyan pöttyök sötét háttéren, a kör sziluettjéhez vágva; a `/imagedoc` worker-render UGYANAZT
+  adta (608×608 PNG), + mind a 4 preset renderelt (ellipse/rect/star). **1591 teszt zöld (141 suite).**
+- Megj.: a nyers-SVG / kép-csempe (`patternFill.ts` `kind:'image'/'shapes'`) külön, későbbi iteráció — a v1 a render-biztos,
+  preset-alapú geometrikus mintákra fókuszál (a react-native-svg nem tud nyers SVG-stringet a fába parse-olni).
 
 ### 2.6 Boolean operations UI — P1 ✅ KÉSZ (2026-10-10)
 - [x] ✅ **Union/subtract/intersect/exclude UI** — [BooleanSheet](../../src/components/studio/image/BooleanSheet.tsx) +

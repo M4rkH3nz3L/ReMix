@@ -598,6 +598,75 @@ function pathDataJs(points, w, h, closed) {
   return d;
 }
 
+// 🧩 Forma-minta (shape pattern) — a kliens [src/lib/shapePattern.ts] TÜKRE.
+// A tile-geometriát és az SVG `<pattern>` stringet ADJA, hogy a worker-render
+// és az előnézet (react-native-svg) SZÓ SZERINT egyezzen (contract-teszt védi:
+// src/lib/shapePattern.contract.test.ts).
+const PATTERN_PRESETS = ['dots', 'grid', 'stripes', 'checker'];
+const patRound = (v) => Math.round(v * 1e3) / 1e3;
+const patClamp01 = (v) => Math.min(1, Math.max(0, v));
+
+/** egy csempe primitívjei px-ben (a `boxH` a doboz magassága). */
+function patternTileJs(p, boxH) {
+  const tile = Math.max(4, (p.size / 100) * boxH);
+  const fg = p.fg;
+  const prims = [];
+  switch (p.preset) {
+    case 'dots':
+      prims.push({ t: 'circle', cx: tile / 2, cy: tile / 2, r: tile * 0.22, fill: fg });
+      break;
+    case 'grid': {
+      const sw = Math.max(1, tile * 0.08);
+      prims.push({ t: 'line', x1: 0, y1: sw / 2, x2: tile, y2: sw / 2, stroke: fg, sw });
+      prims.push({ t: 'line', x1: sw / 2, y1: 0, x2: sw / 2, y2: tile, stroke: fg, sw });
+      break;
+    }
+    case 'stripes':
+      prims.push({ t: 'rect', x: 0, y: 0, w: tile / 2, h: tile, fill: fg });
+      break;
+    case 'checker': {
+      const hh = tile / 2;
+      prims.push({ t: 'rect', x: 0, y: 0, w: hh, h: hh, fill: fg });
+      prims.push({ t: 'rect', x: hh, y: hh, w: hh, h: hh, fill: fg });
+      break;
+    }
+  }
+  return { tile: patRound(tile), prims, bg: p.bg };
+}
+
+function patternPrimToSvgJs(pr) {
+  if (pr.t === 'rect')
+    return `<rect x="${patRound(pr.x)}" y="${patRound(pr.y)}" width="${patRound(
+      pr.w
+    )}" height="${patRound(pr.h)}" fill="${pr.fill}"/>`;
+  if (pr.t === 'circle')
+    return `<circle cx="${patRound(pr.cx)}" cy="${patRound(pr.cy)}" r="${patRound(
+      pr.r
+    )}" fill="${pr.fill}"/>`;
+  return `<line x1="${patRound(pr.x1)}" y1="${patRound(pr.y1)}" x2="${patRound(
+    pr.x2
+  )}" y2="${patRound(pr.y2)}" stroke="${pr.stroke}" stroke-width="${patRound(pr.sw)}"/>`;
+}
+
+/** teljes SVG `<pattern>` def (userSpaceOnUse) a `boxW`×`boxH` dobozhoz. */
+function shapePatternSvgDefJs(p, id, boxW, boxH) {
+  const { tile, prims, bg } = patternTileJs(p, boxH);
+  const rot = p.rotation
+    ? ` patternTransform="rotate(${patRound(p.rotation)} ${patRound(boxW / 2)} ${patRound(
+        boxH / 2
+      )})"`
+    : '';
+  const op = (p.opacity ?? 1) < 1 ? ` opacity="${patRound(patClamp01(p.opacity ?? 1))}"` : '';
+  const bgRect = bg ? `<rect x="0" y="0" width="${tile}" height="${tile}" fill="${bg}"/>` : '';
+  const body = bgRect + prims.map(patternPrimToSvgJs).join('');
+  const inner = op ? `<g${op}>${body}</g>` : body;
+  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${tile}" height="${tile}"${rot}>${inner}</pattern>`;
+}
+
+function isRenderableShapePatternJs(p) {
+  return !!p && (p.opacity ?? 1) > 0 && p.size > 0 && PATTERN_PRESETS.includes(p.preset);
+}
+
 /** 🌈 CSS gradient-string a fejlett gradientből (rect/ellipse/path-doboz + konikus). */
 function cssGradient(g) {
   const stops = (g.stops || [])
@@ -905,6 +974,40 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           : 0;
       const shadowCss = filters.length > 0 ? `filter:${filters.join(' ')};` : '';
       const usesWrap = shadowPad > 0;
+      // 🧩 minta-kitöltés — FELÜLÍRJA a sima fill-t. A formát inline SVG-vel
+      // rajzoljuk (téglalap/ellipszis = rx-es rect, nyíl/csillag = polygon,
+      // path = `d`), a pattern-def userSpaceOnUse-ban. Ugyanabból a magból
+      // ([shapePattern]) mint az előnézet → render-parity. A ragyogás/árnyék a
+      // wrapper CSS-filterén marad; a border opcionális stroke-ként ül a formán.
+      let patternSvg = '';
+      if (isRenderableShapePatternJs(clip.pattern)) {
+        const pid = `pat${i}`;
+        const def = shapePatternSvgDefJs(clip.pattern, pid, w, h);
+        const pFill = `url(#${pid})`;
+        const pStrokeW = clip.borderWidth ? borderWidth : 0;
+        const pStroke =
+          pStrokeW > 0
+            ? ` stroke="${clip.borderColor ?? '#ffffff'}" stroke-width="${pStrokeW}"`
+            : '';
+        let geo;
+        if (clip.shape === 'arrow' || clip.shape === 'star') {
+          const pts = (POLY_POINTS[clip.shape] || [])
+            .map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`)
+            .join(' ');
+          geo = `<polygon points="${pts}" fill="${pFill}"${pStroke}/>`;
+        } else if (
+          clip.shape === 'path' &&
+          (hasSubpaths || (Array.isArray(clip.points) && clip.points.length >= 2))
+        ) {
+          const d = hasSubpaths
+            ? clip.subpaths.map((sp) => pathDataJs(sp, w, h, true)).join(' ')
+            : pathDataJs(clip.points, w, h, Boolean(clip.closed));
+          geo = `<path d="${d}" fill="${pFill}"${pStroke}/>`;
+        } else {
+          geo = `<rect x="0" y="0" width="${w}" height="${h}" rx="${radius}" fill="${pFill}"${pStroke}/>`;
+        }
+        patternSvg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block"><defs>${def}</defs>${geo}</svg>`;
+      }
       // FONTOS: a szűrő a WRAPPERRE megy, nem a formára. A CSS-ben a
       // `clip-path` a `filter` UTÁN vág — ha ugyanazon az elemen van, a
       // clip-path levágja a formán túlnyúló ragyogást/kontúrt/árnyékot
@@ -918,14 +1021,14 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         <div id="s" style="
           position:absolute;left:${outlinePx}px;top:${outlinePx}px;
           width:${w}px;height:${h}px;
-          background:${pathSvg || polySvg ? 'transparent' : background};
-          ${backgroundExtra}
+          background:${pathSvg || polySvg || patternSvg ? 'transparent' : background};
+          ${patternSvg ? '' : backgroundExtra}
           border-radius:${radius}px;
-          ${clipPath}
-          ${border}
+          ${patternSvg ? '' : clipPath}
+          ${patternSvg ? '' : border}
           box-sizing:border-box;
           opacity:${clip.opacity ?? 1};
-        ">${pathSvg}${polySvg}</div>
+        ">${patternSvg || `${pathSvg}${polySvg}`}</div>
         </div>
         </div>
       </body></html>`;
@@ -991,4 +1094,8 @@ module.exports = {
   typographyCss,
   textStyleCss,
   presetCss,
+  // 🧩 forma-minta (a kliens src/lib/shapePattern.ts tükre — contract-tesztelt)
+  patternTileJs,
+  shapePatternSvgDefJs,
+  isRenderableShapePatternJs,
 };

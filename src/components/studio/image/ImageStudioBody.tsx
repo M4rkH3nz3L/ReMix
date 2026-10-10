@@ -11,6 +11,7 @@ import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
 import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
+import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
@@ -58,6 +59,7 @@ type ToolKey =
   | 'style'
   | 'adjust'
   | 'fx'
+  | 'pattern'
   | 'crop'
   | 'guides'
   | 'align'
@@ -130,6 +132,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
     tools: [
       { key: 'style', icon: 'options-outline', labelKey: 'studio.imageTools.style' },
       { key: 'fx', icon: 'sparkles-outline', labelKey: 'studio.imageTools.fx' },
+      { key: 'pattern', icon: 'grid-outline', labelKey: 'studio.imageTools.pattern' },
       { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
     ],
   },
@@ -171,6 +174,7 @@ export function ImageStudioBody({
     | 'style'
     | 'adjust'
     | 'fx'
+    | 'pattern'
     | 'align'
     | 'boolean'
     | 'shapePicker'
@@ -462,6 +466,14 @@ export function ImageStudioBody({
           setSheet('fx');
         } else {
           Alert.alert(t('studio.image.fx.needTitle'), t('studio.image.fx.needBody'));
+        }
+        break;
+      case 'pattern':
+        // 🧩 geometrikus csempe-minta — csak forma-rétegre
+        if (selectedLayer?.kind === 'shape') {
+          setSheet('pattern');
+        } else {
+          Alert.alert(t('studio.image.pattern.needTitle'), t('studio.image.pattern.needBody'));
         }
         break;
       case 'crop':
@@ -1143,6 +1155,9 @@ export function ImageStudioBody({
       ) : null}
       {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (
         <EffectsSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'pattern' && doc && selectedLayer?.kind === 'shape' ? (
+        <PatternSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'align' && doc && selectedLayer && canAlignLayer(selectedLayer) ? (
         <AlignSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />

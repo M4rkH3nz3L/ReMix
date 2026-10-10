@@ -4,9 +4,13 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import Svg, {
+  Circle,
   Defs,
+  G,
+  Line,
   LinearGradient as SvgGradient,
   Path,
+  Pattern,
   Polygon,
   RadialGradient as SvgRadial,
   Rect,
@@ -17,6 +21,7 @@ import { cssBlendMode, palette } from '@/constants/editor';
 import { pathData } from '@/lib/draw';
 import { angleToLinearPoints, sortedStops } from '@/lib/gradient';
 import { sampleChannel } from '@/lib/keyframes';
+import { isRenderableShapePattern, patternTile, type PatternPrim } from '@/lib/shapePattern';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip, ShapeGradient } from '@/types/project';
@@ -58,6 +63,96 @@ function polygonPoints(shape: 'arrow' | 'star', w: number, h: number): string {
   return POLYGONS[shape]
     .map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`)
     .join(' ');
+}
+
+/** egy csempe-primitív → react-native-svg elem (a worker SVG-stringjével AZONOS). */
+function PatternPrimEl({ pr }: { pr: PatternPrim }) {
+  switch (pr.t) {
+    case 'rect':
+      return <Rect x={pr.x} y={pr.y} width={pr.w} height={pr.h} fill={pr.fill} />;
+    case 'circle':
+      return <Circle cx={pr.cx} cy={pr.cy} r={pr.r} fill={pr.fill} />;
+    case 'line':
+      return <Line x1={pr.x1} y1={pr.y1} x2={pr.x2} y2={pr.y2} stroke={pr.stroke} strokeWidth={pr.sw} />;
+  }
+}
+
+/**
+ * 🧩 Minta-kitöltött forma — a [shapePattern] magból SVG `<Pattern>`-t épít, és a
+ * forma geometriáját (téglalap/ellipszis = rx-es rect, nyíl/csillag = polygon,
+ * path = d) `fill="url(#id)"`-del tölti ki. A worker UGYANEBBŐL a magból rakja
+ * össze az SVG-stringet → render-parity. A ragyogás/árnyék a wrap `boxShadow`-ján
+ * marad (nem itt), a border opcionális stroke-ként ül a formán.
+ */
+function PatternShape({
+  clip,
+  w,
+  h,
+  radius,
+  strokePx,
+}: {
+  clip: ShapeClip;
+  w: number;
+  h: number;
+  radius: number;
+  strokePx: number;
+}) {
+  const p = clip.pattern!;
+  const { tile, prims, bg } = patternTile(p, h);
+  const id = `pat-${clip.id}`;
+  const fillRef = `url(#${id})`;
+  const rot = p.rotation ? `rotate(${p.rotation} ${w / 2} ${h / 2})` : undefined;
+  const op = p.opacity ?? 1;
+  const hasBorder = (clip.borderWidth ?? 0) > 0;
+  const stroke = hasBorder ? clip.borderColor ?? '#ffffff' : undefined;
+  const sw = hasBorder ? strokePx : undefined;
+
+  // a forma geometriája
+  const closed = Boolean(clip.closed || clip.subpaths?.length);
+  const d =
+    clip.shape === 'path'
+      ? clip.subpaths?.length
+        ? clip.subpaths.map((sp) => pathData(sp, w, h, true)).join(' ')
+        : pathData(clip.points ?? [], w, h, clip.closed)
+      : null;
+
+  return (
+    <Svg width={w} height={h} style={styles.pathSvg}>
+      <Defs>
+        <Pattern id={id} patternUnits="userSpaceOnUse" width={tile} height={tile} patternTransform={rot}>
+          <G opacity={op}>
+            {bg ? <Rect x={0} y={0} width={tile} height={tile} fill={bg} /> : null}
+            {prims.map((pr, i) => (
+              <PatternPrimEl key={i} pr={pr} />
+            ))}
+          </G>
+        </Pattern>
+      </Defs>
+      {d ? (
+        <Path
+          d={d}
+          fillRule={clip.fillRule}
+          fill={closed ? fillRef : 'none'}
+          stroke={stroke}
+          strokeWidth={sw}
+          strokeLinejoin={clip.strokeJoin ?? 'round'}
+        />
+      ) : clip.shape === 'arrow' || clip.shape === 'star' ? (
+        <Polygon points={polygonPoints(clip.shape, w, h)} fill={fillRef} stroke={stroke} strokeWidth={sw} />
+      ) : (
+        <Rect
+          x={0}
+          y={0}
+          width={w}
+          height={h}
+          rx={radius}
+          fill={fillRef}
+          stroke={stroke}
+          strokeWidth={sw}
+        />
+      )}
+    </Svg>
+  );
 }
 
 interface Props {
@@ -212,7 +307,10 @@ export function ShapeOverlay({
           selected && editable ? styles.selected : null,
         ]}
       >
-        {clip.shape === 'path' && ((clip.points?.length ?? 0) >= 2 || clip.subpaths?.length) ? (
+        {isRenderableShapePattern(clip.pattern) ? (
+          // 🧩 minta-kitöltés — felülírja a sima fill-t, minden forma-típusra
+          <PatternShape clip={clip} w={w} h={h} radius={radius} strokePx={strokePx} />
+        ) : clip.shape === 'path' && ((clip.points?.length ?? 0) >= 2 || clip.subpaths?.length) ? (
           // ✏️ path / bezier / összetett (boolean) — a renderrel AZONOS `d`-ből
           <Svg width={w} height={h} style={styles.pathSvg}>
             {(() => {

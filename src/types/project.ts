@@ -874,6 +874,24 @@ export interface ShapeGradient {
   stops: GradientStop[];
 }
 
+/** 🧩 Geometrikus csempe-minta preset-jei (forma-kitöltés). */
+export type PatternPreset = 'dots' | 'grid' | 'stripes' | 'checker';
+
+/**
+ * 🧩 Forma-minta (shape pattern) — ismétlődő geometrikus kitöltés. A `size` a
+ * doboz MAGASSÁGÁNAK %-a (felbontás-független). A render-parity magja a
+ * [shapePattern](../lib/shapePattern.ts) (itt él a típus a körkörös import ellen,
+ * az `AdjustmentLayer` mintájára). Ha van, FELÜLÍRJA a sima `fill`-t.
+ */
+export interface ShapePattern {
+  preset: PatternPreset;
+  fg: string;
+  bg?: string;
+  size: number;
+  rotation?: number;
+  opacity?: number;
+}
+
 /**
  * ✏️ Path-horgonypont (Bézier). `x`/`y` a horgony (0…1 a klip-dobozban); `h1` a
  * BEJÖVŐ, `h2` a KIMENŐ Bézier-fogó abszolút normalizált pozíciója (nem relatív).
@@ -960,6 +978,12 @@ export interface ShapeClip extends ClipBase {
   gradient?: ShapeGradient;
   /** kép-kitöltés (logó/watermark, PNG/JPG/SVG) — felülírja a fill/gradienst */
   imageUri?: string;
+  /**
+   * 🧩 Geometrikus csempe-minta (pöttyök/rács/csíkok/sakktábla). Ha van,
+   * FELÜLÍRJA a sima `fill`-t. Render-parity: a worker az SVG `<pattern>`
+   * stringet, az előnézet UGYANAZOKAT a primitíveket (react-native-svg) rajzolja.
+   */
+  pattern?: ShapePattern;
   /** blend-mód a alatta lévő rétegekkel (hiányzó = normál rárakás) */
   blendMode?: BlendMode;
   borderColor?: string;

@@ -2827,6 +2827,7 @@
       "guides": "Guides",
       "style": "Style",
       "fx": "Effects",
+      "pattern": "Pattern",
       "adjust": "Adjust",
       "text": "Text",
       "shapes": "Shapes",
@@ -2908,6 +2909,20 @@
         "strokeColor": "Stroke color",
         "needTitle": "Select a shape",
         "needBody": "Effects apply to a shape layer — select one first."
+      },
+      "pattern": {
+        "title": "Pattern",
+        "preset": "Pattern type",
+        "none": "None",
+        "kind": { "dots": "Dots", "grid": "Grid", "stripes": "Stripes", "checker": "Checker" },
+        "fg": "Pattern color",
+        "bgOn": "Background on",
+        "bg": "Background color",
+        "size": "Tile size",
+        "rotation": "Rotation",
+        "opacity": "Opacity",
+        "needTitle": "Select a shape",
+        "needBody": "Pattern applies to a shape layer — select one first."
       },
       "align": {
         "title": "Align to canvas",

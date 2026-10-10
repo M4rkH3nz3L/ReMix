@@ -2827,6 +2827,7 @@
       "guides": "Segédvonalak",
       "style": "Stílus",
       "fx": "Effektek",
+      "pattern": "Minta",
       "adjust": "Korrekció",
       "text": "Szöveg",
       "shapes": "Formák",
@@ -2908,6 +2909,20 @@
         "strokeColor": "Körvonal szín",
         "needTitle": "Válassz formát",
         "needBody": "Az effektek forma-rétegre hatnak — előbb jelölj ki egyet."
+      },
+      "pattern": {
+        "title": "Minta",
+        "preset": "Minta-típus",
+        "none": "Nincs",
+        "kind": { "dots": "Pöttyök", "grid": "Rács", "stripes": "Csíkok", "checker": "Sakktábla" },
+        "fg": "Minta-szín",
+        "bgOn": "Háttér be",
+        "bg": "Háttér-szín",
+        "size": "Csempe-méret",
+        "rotation": "Forgatás",
+        "opacity": "Átlátszóság",
+        "needTitle": "Válassz formát",
+        "needBody": "A minta forma-rétegre hat — előbb jelölj ki egyet."
       },
       "align": {
         "title": "Igazítás a vászonhoz",

@@ -2934,6 +2934,15 @@
         "close": "Bezár",
         "editHint": "Húzd a pontokat a path szerkesztéséhez"
       },
+      "gradient": {
+        "title": "Gradiens",
+        "linear": "Lineáris",
+        "radial": "Radiális",
+        "conic": "Konikus",
+        "angle": "Szög",
+        "start": "Kezdő szín",
+        "end": "Záró szín"
+      },
       "style": {
         "needTitle": "Nincs kijelölt réteg",
         "needBody": "Előbb koppints egy rétegre a vásznon vagy a réteg-listában."

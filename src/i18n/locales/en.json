@@ -2934,6 +2934,15 @@
         "close": "Close",
         "editHint": "Drag the nodes to edit the path"
       },
+      "gradient": {
+        "title": "Gradient",
+        "linear": "Linear",
+        "radial": "Radial",
+        "conic": "Conic",
+        "angle": "Angle",
+        "start": "Start color",
+        "end": "End color"
+      },
       "style": {
         "needTitle": "No layer selected",
         "needBody": "Tap a layer on the canvas or in the layer list first."

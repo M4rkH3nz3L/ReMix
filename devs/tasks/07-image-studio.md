@@ -23,8 +23,8 @@
 | 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
 | 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
 | 5 | **Toll / vektor pen** (v1 tap-rajz → path-forma · v2 node-húzás) | ✅ KÉSZ · on-device | §2.1 (v3: bezier-handle hátra) |
-| 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | 🚧 KÖVETKEZŐ | §2.5b |
-| 7 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA | §2.2 |
+| 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | ✅ KÉSZ · on-device | §2.0f |
+| 7 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | 🚧 KÖVETKEZŐ | §2.2 |
 | 8 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
@@ -82,6 +82,14 @@ forgatás / forma kitöltés+blend+kontúr+árnyék+glow / háttér-szín / mind
 [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) ÉS az új **[LayerStyleSheet](../../src/components/studio/image/LayerStyleSheet.tsx)**
 is használ. Új „Stílus" eszköz a STYLE csoportban → a kijelölt rétegről EGY koppintásra megnyílik a teljes inspector (fejléc = réteg neve).
 On-device bizonyítva: a „Stílus" lap megnyílt a kijelölt formán (Fill/forma/blend/border/shadow/glow/opacity).
+
+### 2.0f Gradiens-kitöltés UI (forma + háttér) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+A modell (`gradient: ShapeGradient` multi-stop lineáris/radiális/konikus) + a render MÁR kész volt
+([ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx)/[FillLayerView](../../src/components/studio/image/FillLayerView.tsx)) —
+csak a picker-UI hiányzott. ÚJ **[GradientEditor](../../src/components/studio/image/GradientEditor.tsx)** a [LayerInspector](../../src/components/studio/image/LayerInspector.tsx)-ben
+(forma + háttér réteg): be/ki toggle (ki = vissza a tömör `fill`-hez), **6 gyors-preset** (valódi gradient-előnézettel),
+típus (lineáris/radiális/konikus), **szög-csúszka**, és a **kezdő/záró stop színe**. A `gradient` felülírja a tömör `fill`-t.
+On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a preset (lila→pink) is renderelt.
 
 ## 2. Feladatlista
 

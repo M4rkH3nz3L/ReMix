@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { Chip } from '@/components/ui/controls';
 import { Slider, ToggleRow } from '@/components/studio/audio/primitives';
 import { ColorField } from '@/components/studio/image/ColorField';
+import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { updateLayer } from '@/lib/imageDoc';
 import type {
@@ -188,6 +189,11 @@ export function LayerInspector({
             value={layer.fill}
             onChange={(fill) => commit(updateLayer<ShapeLayer>(doc, layer.id, { fill }))}
           />
+          <GradientEditor
+            gradient={layer.gradient}
+            baseColor={layer.fill}
+            onChange={(gradient) => commit(updateLayer<ShapeLayer>(doc, layer.id, { gradient }))}
+          />
           <View style={styles.chipRow}>
             {SHAPES.map((s) => (
               <Chip
@@ -261,11 +267,18 @@ export function LayerInspector({
       ) : null}
 
       {layer.kind === 'fill' ? (
-        <ColorField
-          label={t('studio.image.fill')}
-          value={layer.fill}
-          onChange={(fill) => commit(updateLayer<FillLayer>(doc, layer.id, { fill }))}
-        />
+        <>
+          <ColorField
+            label={t('studio.image.fill')}
+            value={layer.fill}
+            onChange={(fill) => commit(updateLayer<FillLayer>(doc, layer.id, { fill }))}
+          />
+          <GradientEditor
+            gradient={layer.gradient}
+            baseColor={layer.fill}
+            onChange={(gradient) => commit(updateLayer<FillLayer>(doc, layer.id, { gradient }))}
+          />
+        </>
       ) : null}
 
       <Slider

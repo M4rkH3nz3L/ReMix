@@ -2934,6 +2934,15 @@
         "close": "Schließen",
         "editHint": "Ziehe die Knoten, um den Pfad zu bearbeiten"
       },
+      "gradient": {
+        "title": "Verlauf",
+        "linear": "Linear",
+        "radial": "Radial",
+        "conic": "Konisch",
+        "angle": "Winkel",
+        "start": "Startfarbe",
+        "end": "Endfarbe"
+      },
       "style": {
         "needTitle": "Keine Ebene ausgewählt",
         "needBody": "Tippe zuerst auf eine Ebene auf der Leinwand oder in der Ebenenliste."

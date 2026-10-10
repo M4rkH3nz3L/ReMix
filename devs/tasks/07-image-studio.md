@@ -22,8 +22,8 @@
 | 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
 | 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
 | 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
-| 5 | **Toll / vektor pen** UI (a `vectorPath` mag fölé) | 🚧 KÖVETKEZŐ | §2.1 |
-| 6 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA | §2.2 |
+| 5 | **Toll / vektor pen** UI v1 (tap-rajz → path-forma) | ✅ KÉSZ · on-device | §2.1 (v2: node-edit hátra) |
+| 6 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | 🚧 KÖVETKEZŐ | §2.2 |
 | 7 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
@@ -84,8 +84,15 @@ On-device bizonyítva: a „Stílus" lap megnyílt a kijelölt formán (Fill/for
 
 ## 2. Feladatlista
 
-### 2.1 Vector pen UI — P1 (🖼️ UI-MISSING)
-- [ ] 🖼️ Pen-tool + node-selection + handle-drag + smooth/broken/mirror + node-conversion a `vectorPath` mag fölé.
+### 2.1 Vector pen UI — P1 🟡 (v1 KÉSZ + on-device verifikálva; bezier-handle/node-edit hátra)
+- [x] ✅ **Toll v1 (2026-10-10):** új „Toll" eszköz az ADD csoportban → toll-mód: a vásznon koppintásra horgonypontok
+  ([PenOverlay](../../src/components/studio/image/PenOverlay.tsx): élő polyline + node-pöttyök, az első node kiemelve),
+  az ELSŐ pontra koppintva (vagy „Bezár") kitöltött path-forma, „Kész" nyitott vonal. A pontokból path-FORMA réteg a tiszta
+  [penPath.ts](../../src/lib/penPath.ts) `pathShapeFromCanvasPoints` maggal (a `vectorPath.normalizeSubpaths` fölött: bbox→position/w/h
+  + lokális 0–1 pontok), **3 teszt**; a `ShapeOverlay` path-renderje (render-paritás). Toll-sáv (Mégse/Visszavon/Bezár/Kész) a toolbar
+  helyett. On-device bizonyítva: 3 pont → zárás az első node-on → kitöltött háromszög forma-rétegként (kijelölve).
+- [ ] ⬜ Hátra (v2): a lerakott/meglévő node-ok HÚZÁSA (`moveAnchor`), bezier-handle-húzás (`dragHandle`),
+  node-típus (smooth/broken/mirror, `setNodeType`), node-törlés/beszúrás egy path-szerkesztő módban.
 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).

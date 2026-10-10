@@ -20,6 +20,7 @@ import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
+import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import {
   addLayer,
   createImageDoc,
@@ -44,6 +45,7 @@ type ToolKey =
   | 'photo'
   | 'text'
   | 'shape'
+  | 'pen'
   | 'svg'
   | 'style'
   | 'adjust'
@@ -88,6 +90,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'photo', icon: 'image-outline', labelKey: 'studio.imageTools.photo' },
       { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
       { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
+      { key: 'pen', icon: 'pencil-outline', labelKey: 'studio.imageTools.pen' },
       { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
     ],
   },
@@ -150,6 +153,7 @@ export function ImageStudioBody({
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -345,6 +349,13 @@ export function ImageStudioBody({
       case 'shape':
         setSheet('shapePicker'); // 🔷 forma-TÍPUS választó (nem csak téglalap)
         break;
+      case 'pen':
+        // ✏️ toll-mód: üres path-szal indul (a kijelölés + lapok + crop bezárva)
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(null);
+        setPenPoints([]);
+        break;
       case 'svg':
         void importSvg();
         break;
@@ -456,6 +467,18 @@ export function ImageStudioBody({
       commit(cropImageDoc(doc, cropRect), t('studio.image.undoCrop'));
     }
     setCropRect(null);
+  };
+
+  // ✏️ a toll-path lezárása FORMA-réteggé (zárt = kitöltött, nyitott = vonal) / elvetése
+  const commitPen = (closed: boolean) => {
+    if (doc && penPoints && penPoints.length >= 2) {
+      const shape = pathShapeFromCanvasPoints(penPoints, closed, makeId('lyr'));
+      if (shape) {
+        commit(addLayer(doc, shape), t('studio.image.undoPen'));
+        setSelectedId(shape.id);
+      }
+    }
+    setPenPoints(null);
   };
 
   const exportImage = async () => {
@@ -622,6 +645,9 @@ export function ImageStudioBody({
           capturing={capturing}
           cropRect={cropRect}
           onCropRectChange={setCropRect}
+          penPoints={penPoints}
+          onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
+          onPenClose={() => commitPen(true)}
         />
       ) : (
         <View style={styles.loading}>
@@ -637,11 +663,13 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {cropRect
-            ? t('studio.image.crop.hint')
-            : selectedLayer
-              ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-              : t('studio.image.tapToSelect')}
+          {penPoints
+            ? t('studio.image.pen.hint')
+            : cropRect
+              ? t('studio.image.crop.hint')
+              : selectedLayer
+                ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
+                : t('studio.image.tapToSelect')}
         </Text>
       </View>
 
@@ -664,6 +692,43 @@ export function ImageStudioBody({
           <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.cropApplyText}>{t('common.apply')}</Text>
+          </Pressable>
+        </View>
+      ) : penPoints ? (
+        /* ✏️ toll-sáv (toll-módban a toolbar HELYETT) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
+            style={styles.cropBtn}
+            hitSlop={6}
+            disabled={!penPoints.length}
+          >
+            <Ionicons
+              name="arrow-undo-outline"
+              size={18}
+              color={penPoints.length ? palette.text : palette.border}
+            />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={() => commitPen(true)}
+            style={[styles.penClose, penPoints.length < 3 ? styles.penDisabled : null]}
+            hitSlop={6}
+            disabled={penPoints.length < 3}
+          >
+            <Text style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => commitPen(false)}
+            style={[styles.cropApply, penPoints.length < 2 ? styles.penDisabled : null]}
+            hitSlop={6}
+            disabled={penPoints.length < 2}
+          >
+            <Ionicons name="checkmark" size={16} color="#fff" />
+            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
           </Pressable>
         </View>
       ) : (
@@ -879,4 +944,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cropApplyText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  penClose: {
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  penCloseText: { color: palette.text, fontSize: 13, fontWeight: '700' },
+  penDisabled: { opacity: 0.4 },
 });

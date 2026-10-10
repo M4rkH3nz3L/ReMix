@@ -5,10 +5,12 @@ import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
+import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { aspectValue, palette } from '@/constants/editor';
 import type { CropRect } from '@/lib/imageCrop';
+import type { CanvasPoint } from '@/lib/penPath';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { ImageDoc, ImageLayer } from '@/types/project';
@@ -33,6 +35,9 @@ export function ImageCanvas({
   capturing,
   cropRect,
   onCropRectChange,
+  penPoints,
+  onPenAddPoint,
+  onPenClose,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -46,6 +51,10 @@ export function ImageCanvas({
   /** ✂️ kivágás-mód: ha megadva, a vásznon a kivágás-overlay jelenik meg (kijelölés nélkül) */
   cropRect?: CropRect | null;
   onCropRectChange?: (rect: CropRect) => void;
+  /** ✏️ toll-mód: ha megadva (nem null), a vásznon a toll-overlay jelenik meg */
+  penPoints?: CanvasPoint[] | null;
+  onPenAddPoint?: (p: CanvasPoint) => void;
+  onPenClose?: () => void;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -120,7 +129,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -137,6 +146,11 @@ export function ImageCanvas({
           {/* ✂️ kivágás-overlay (a kijelölés helyett) */}
           {!capturing && cropRect && onCropRectChange ? (
             <CropOverlay box={fit} rect={cropRect} onChange={onCropRectChange} />
+          ) : null}
+
+          {/* ✏️ toll-overlay (a kijelölés helyett) */}
+          {!capturing && penPoints && onPenAddPoint && onPenClose ? (
+            <PenOverlay box={fit} points={penPoints} onAddPoint={onPenAddPoint} onClosePath={onPenClose} />
           ) : null}
         </View>
       ) : null}

@@ -2829,6 +2829,7 @@
       "text": "Text",
       "shapes": "Formen",
       "shape": "Form",
+      "pen": "Stift",
       "photo": "Foto",
       "fill": "Hintergrund",
       "delete": "Löschen",
@@ -2927,6 +2928,11 @@
       "undoRotate": "Um 90° drehen",
       "undoFlip": "Spiegeln",
       "undoCrop": "Zuschneiden",
+      "undoPen": "Stift-Zeichnung",
+      "pen": {
+        "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
+        "close": "Schließen"
+      },
       "style": {
         "needTitle": "Keine Ebene ausgewählt",
         "needBody": "Tippe zuerst auf eine Ebene auf der Leinwand oder in der Ebenenliste."

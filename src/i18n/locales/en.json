@@ -2829,6 +2829,7 @@
       "text": "Text",
       "shapes": "Shapes",
       "shape": "Shape",
+      "pen": "Pen",
       "photo": "Photo",
       "fill": "Fill",
       "delete": "Delete",
@@ -2927,6 +2928,11 @@
       "undoRotate": "Rotate 90°",
       "undoFlip": "Flip",
       "undoCrop": "Crop",
+      "undoPen": "Pen drawing",
+      "pen": {
+        "hint": "Tap to add points · tap the first point to close",
+        "close": "Close"
+      },
       "style": {
         "needTitle": "No layer selected",
         "needBody": "Tap a layer on the canvas or in the layer list first."

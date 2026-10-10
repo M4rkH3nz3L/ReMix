@@ -115,6 +115,49 @@ export function AdjustSheet({
         onChange={(v) => setAdjust({ temperature: v })}
         format={(v) => v.toFixed(2)}
       />
+
+      {/* 🌞 Tónus (PRO) — a preview tint-tel közelít, a worker pontosan égeti be */}
+      <Text style={styles.section}>{t('studio.image.adjustTone')}</Text>
+      <Slider
+        label={t('panels.adjust.adjust_exposure')}
+        value={adjust.exposure ?? 0}
+        min={-1}
+        max={1}
+        onChange={(v) => setAdjust({ exposure: v })}
+        format={(v) => v.toFixed(2)}
+      />
+      <Slider
+        label={t('panels.adjust.adjust_highlights')}
+        value={adjust.highlights ?? 0}
+        min={-1}
+        max={1}
+        onChange={(v) => setAdjust({ highlights: v })}
+        format={(v) => v.toFixed(2)}
+      />
+      <Slider
+        label={t('panels.adjust.adjust_shadows')}
+        value={adjust.shadows ?? 0}
+        min={-1}
+        max={1}
+        onChange={(v) => setAdjust({ shadows: v })}
+        format={(v) => v.toFixed(2)}
+      />
+      <Slider
+        label={t('panels.adjust.adjust_whites')}
+        value={adjust.whites ?? 0}
+        min={-1}
+        max={1}
+        onChange={(v) => setAdjust({ whites: v })}
+        format={(v) => v.toFixed(2)}
+      />
+      <Slider
+        label={t('panels.adjust.adjust_blacks')}
+        value={adjust.blacks ?? 0}
+        min={-1}
+        max={1}
+        onChange={(v) => setAdjust({ blacks: v })}
+        format={(v) => v.toFixed(2)}
+      />
     </StudioSheet>
   );
 }

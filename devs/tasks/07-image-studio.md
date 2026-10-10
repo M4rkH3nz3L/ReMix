@@ -147,8 +147,13 @@ clampel.) v1 egyszerűsítés: a koppintás a fotó-dobozt contain-fit-szerűen 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).
 
-### 2.3 Adjustment stack UI — P1
-- [ ] 🖼️ Az `adjustmentStack` mag vezérlő-UI-ja (stack szerkesztés + élő előnézet).
+### 2.3 Adjustment / tone UI — P1 🟡 (PRO-tónus-csúszkák KÉSZ+worker-verifikálva; teljes stack-UI hátra)
+- [x] ✅ **PRO tónus-korrekció (2026-10-10):** az [AdjustSheet](../../src/components/studio/image/AdjustSheet.tsx) „Tónus (PRO)"
+  szekciója — exposure / highlights / shadows / whites / blacks (−1…1) a fotó `adjust`-jára. A preview a
+  [adjustTintLayers](../../src/lib/adjustPreview.ts)-szel közelít (ezeket kezeli), a worker a `render.js` `adjustChain`-jével
+  PONTOSAN égeti be (eq/curves). **Worker-verifikálva** (a render-worker él): a teszt-fotó exposure=1+highlights=0.8-cal
+  renderelve láthatóan világosabb lett (HTTP 200). Render-parity ✓.
+- [ ] ⬜ Hátra: az `adjustmentStack` mag teljes STACK-UI-ja (több nem-destruktív korrekció-réteg + sorrend + amount).
 
 ### 2.4 Rulers / guides UI — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
 - [x] ✅ Új „Segédvonalak" eszköz (ARRANGE) → [RulersOverlay](../../src/components/studio/image/RulersOverlay.tsx): felső/bal

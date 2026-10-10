@@ -22,9 +22,10 @@
 | 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
 | 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
 | 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
-| 5 | **Toll / vektor pen** UI v1 (tap-rajz → path-forma) | ✅ KÉSZ · on-device | §2.1 (v2: node-edit hátra) |
-| 6 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | 🚧 KÖVETKEZŐ | §2.2 |
-| 7 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
+| 5 | **Toll / vektor pen** (v1 tap-rajz → path-forma · v2 node-húzás) | ✅ KÉSZ · on-device | §2.1 (v3: bezier-handle hátra) |
+| 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | 🚧 KÖVETKEZŐ | §2.5b |
+| 7 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA | §2.2 |
+| 8 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
 > [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).

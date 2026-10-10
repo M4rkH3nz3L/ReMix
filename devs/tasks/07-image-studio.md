@@ -110,7 +110,12 @@ On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a p
   gombja `setNodeType`-pal bezier-fogókat hoz létre/töröl (az élek meggörbülnek); a kijelölt node-nál a h1/h2 **fogók húzhatók**
   (négyzet-pöttyök + összekötő vonal), `dragHandle` *mirrored* módban (a szemközti fogó tükrözve követ). Élő újraformálás + egy
   undo-lépés. On-device bizonyítva: a trapéz sarka Smooth-szal íves lett, a fogó húzásával a görbe átformálódott.
-- [ ] ⬜ Hátra (v4): node-törlés/beszúrás (`deleteAnchor`/`insertAnchor`) + broken-fogó mód.
+- [x] ✅ **Toll v4 — node törlés + beszúrás (2026-10-10):** a node-sáv **kuka**-gombja törli a kijelölt node-ot (`deleteAnchor`,
+  min. 2 pont); a path-ÉLRE koppintva ÚJ node jön létre a legközelebbi ponton (`nearestOnPath` + `insertAnchor`, görbe-tartó,
+  táv-küszöbbel) — a [PathEditOverlay](../../src/components/studio/image/PathEditOverlay.tsx) háttér-tap-je kezeli. On-device
+  bizonyítva: node törölve (blob csúcs eltűnt), majd él-koppintásra új node jelent meg. **A toll ezzel teljes vektor-szerkesztő
+  (rajz → node-mozgatás → bezier → add/del).**
+- [ ] ⬜ Hátra (v5): broken-fogó mód + több-subpath szerkesztés.
 
 ### 2.1b Lasszó (szabadkézi → zárt path-forma) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
 Új „Lasszó" eszköz az ADD csoportban → szabadkézi húzás a vásznon ([LassoOverlay](../../src/components/studio/image/LassoOverlay.tsx):

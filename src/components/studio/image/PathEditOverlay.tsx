@@ -23,6 +23,7 @@ export function PathEditOverlay({
   onCommit,
   onHandleLive,
   onHandleCommit,
+  onInsertNode,
 }: {
   box: { w: number; h: number };
   layer: ShapeLayer;
@@ -32,12 +33,35 @@ export function PathEditOverlay({
   onCommit: (index: number, x: number, y: number) => void;
   onHandleLive: (index: number, handle: HandleId, x: number, y: number) => void;
   onHandleCommit: (index: number, handle: HandleId, x: number, y: number) => void;
+  /** ✏️ v4: koppintás a path-ÉLRE → új node a legközelebbi ponton (lokális 0–1) */
+  onInsertNode: (x: number, y: number) => void;
 }) {
   const pts = layer.points ?? [];
   const toPx = (lx: number, ly: number) => ({
     x: (layer.position.x - layer.w / 2 + lx * layer.w) * box.w,
     y: (layer.position.y - layer.h / 2 + ly * layer.h) * box.h,
   });
+
+  // 🖐️ háttér-koppintás az él-beszúráshoz (a node/fogó-pöttyök FÖLÖTTE vannak)
+  const bgRef = useRef({ box, layer, onInsertNode });
+  bgRef.current = { box, layer, onInsertNode };
+  const tapRef = useRef({ x: 0, y: 0 });
+  const bgPan = useRef<PanResponderInstance | null>(null);
+  if (!bgPan.current) {
+    bgPan.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (Math.hypot(g.dx, g.dy) > 10) return; // húzás, nem koppintás
+        const d = bgRef.current;
+        const lx = (tapRef.current.x / d.box.w - (d.layer.position.x - d.layer.w / 2)) / Math.max(1e-6, d.layer.w);
+        const ly = (tapRef.current.y / d.box.h - (d.layer.position.y - d.layer.h / 2)) / Math.max(1e-6, d.layer.h);
+        d.onInsertNode(lx, ly);
+      },
+    });
+  }
 
   const sel = selectedNode != null ? pts[selectedNode] : null;
   const anchorPx = sel ? toPx(sel.x, sel.y) : null;
@@ -46,6 +70,9 @@ export function PathEditOverlay({
 
   return (
     <>
+      {/* 🖐️ háttér (él-beszúró koppintás) — LEGALUL, a pöttyök elfogják a sajátjukat */}
+      <View style={StyleSheet.absoluteFill} {...bgPan.current.panHandlers} />
+
       {/* bezier-fogó összekötő vonalak a kijelölt node-nál */}
       {anchorPx && (h1Px || h2Px) ? (
         <Svg width={box.w} height={box.h} style={StyleSheet.absoluteFill} pointerEvents="none">

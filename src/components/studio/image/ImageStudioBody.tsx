@@ -21,7 +21,7 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
-import { setNodeType } from '@/lib/vectorPath';
+import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
   createImageDoc,
@@ -534,6 +534,16 @@ export function ImageStudioBody({
       );
     }
   };
+  // ✏️ v4: a kijelölt node törlése (legalább 2 pont marad)
+  const deleteNode = () => {
+    if (doc && pathEditShape?.points && pathEditNode != null && pathEditShape.points.length > 2) {
+      commit(
+        updateLayer(doc, pathEditShape.id, { points: deleteAnchor(pathEditShape.points, pathEditNode) }),
+        'node-delete'
+      );
+      setPathEditNode(null);
+    }
+  };
 
   const exportImage = async () => {
     if (!doc || busy) {
@@ -802,6 +812,15 @@ export function ImageStudioBody({
             <Ionicons name="close" size={20} color={palette.text} />
           </Pressable>
           <View style={{ flex: 1 }} />
+          {/* ✏️ v4: a kijelölt node törlése */}
+          <Pressable
+            onPress={deleteNode}
+            style={[styles.cropBtn, pathEditNode == null ? styles.penDisabled : null]}
+            hitSlop={6}
+            disabled={pathEditNode == null}
+          >
+            <Ionicons name="trash-outline" size={18} color={palette.danger} />
+          </Pressable>
           {/* ✏️ v3: a kijelölt node görbévé / sarokká (bezier-fogók) */}
           <Pressable
             onPress={() => setNodeKind('smooth')}

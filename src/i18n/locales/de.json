@@ -2935,7 +2935,7 @@
       "pen": {
         "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
         "close": "Schließen",
-        "editHint": "Knoten antippen, dann Kurve/Ecke · ziehen zum Formen",
+        "editHint": "Knoten antippen (Kurve/Ecke/löschen) · Kante antippen = neuer Punkt",
         "smooth": "Kurve",
         "corner": "Ecke"
       },

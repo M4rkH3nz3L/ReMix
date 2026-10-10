@@ -15,7 +15,7 @@ import type { CropRect } from '@/lib/imageCrop';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
-import { dragHandle, type HandleId, moveAnchor } from '@/lib/vectorPath';
+import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
@@ -126,6 +126,16 @@ export function ImageCanvas({
       'handle'
     );
   };
+  // ✏️ v4: koppintás a path-ÉLRE → új node (csak ha elég közel a vonalhoz)
+  const onInsertNode = (x: number, y: number) => {
+    if (!pathEditShape?.points) return;
+    const hit = nearestOnPath(pathEditShape.points, !!pathEditShape.closed, x, y);
+    if (!hit || hit.dist > 0.05) return;
+    commit(
+      updateLayer(doc, pathEditShape.id, { points: insertAnchor(pathEditShape.points, x, y, !!pathEditShape.closed) }),
+      'node-insert'
+    );
+  };
 
   return (
     <View
@@ -217,6 +227,7 @@ export function ImageCanvas({
               onCommit={onNodeCommit}
               onHandleLive={onHandleLive}
               onHandleCommit={onHandleCommit}
+              onInsertNode={onInsertNode}
             />
           ) : null}
 

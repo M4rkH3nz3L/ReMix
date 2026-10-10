@@ -2935,7 +2935,7 @@
       "pen": {
         "hint": "Koppints pontokért · az első pontra a záráshoz",
         "close": "Bezár",
-        "editHint": "Koppints egy node-ra, majd Görbe/Sarok · húzd a mozgatáshoz",
+        "editHint": "Node-ra koppints (Görbe/Sarok/törlés) · az élre koppintva új pont",
         "smooth": "Görbe",
         "corner": "Sarok"
       },

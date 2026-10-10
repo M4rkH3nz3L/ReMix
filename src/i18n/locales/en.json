@@ -2935,7 +2935,7 @@
       "pen": {
         "hint": "Tap to add points · tap the first point to close",
         "close": "Close",
-        "editHint": "Tap a node, then Smooth/Corner · drag to reshape",
+        "editHint": "Tap a node (Smooth/Corner/delete) · tap the edge to add a point",
         "smooth": "Smooth",
         "corner": "Corner"
       },

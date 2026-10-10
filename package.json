@@ -11,6 +11,7 @@
     "@livekit/react-native-expo-plugin": "^1.0.3",
     "@livekit/react-native-webrtc": "^144.2.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@shopify/react-native-skia": "2.6.2",
     "@supabase/supabase-js": "^2.116.0",
     "expo": "~57.0.24",
     "expo-asset": "~57.0.17",

@@ -5,15 +5,17 @@ import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
+import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { aspectValue, palette } from '@/constants/editor';
 import type { CropRect } from '@/lib/imageCrop';
-import type { CanvasPoint } from '@/lib/penPath';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
-import type { ImageDoc, ImageLayer } from '@/types/project';
+import type { CanvasPoint } from '@/lib/penPath';
+import { moveAnchor } from '@/lib/vectorPath';
+import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
   return { ...layer, ...patch } as ImageLayer;
@@ -38,6 +40,7 @@ export function ImageCanvas({
   penPoints,
   onPenAddPoint,
   onPenClose,
+  pathEditId,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -55,6 +58,8 @@ export function ImageCanvas({
   penPoints?: CanvasPoint[] | null;
   onPenAddPoint?: (p: CanvasPoint) => void;
   onPenClose?: () => void;
+  /** ✏️ toll v2 node-szerkesztő mód: a megadott id-jű path-forma horgonypontjait húzhatja */
+  pathEditId?: string | null;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -73,6 +78,28 @@ export function ImageCanvas({
 
   const layers = visibleLayers(doc);
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
+
+  // ✏️ node-szerkesztő: a kijelölt path-forma (committed = a moveAnchor stabil alapja)
+  const rawPathEdit = pathEditId ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
+  const pathEditShape =
+    rawPathEdit && rawPathEdit.kind === 'shape' && rawPathEdit.shape === 'path' ? rawPathEdit : null;
+  // a dot-követéshez a vászon-rajzolással AZONOS élő-patchelt változat
+  const pathEditLive =
+    pathEditShape && live?.id === pathEditShape.id
+      ? (withLive(pathEditShape, live.patch) as ShapeLayer)
+      : pathEditShape;
+  const onNodeLive = (index: number, x: number, y: number) => {
+    if (!pathEditShape?.points) return;
+    setLive({ id: pathEditShape.id, patch: { points: moveAnchor(pathEditShape.points, index, x, y) } });
+  };
+  const onNodeCommit = (index: number, x: number, y: number) => {
+    if (!pathEditShape?.points) return;
+    setLive(null);
+    commit(
+      updateLayer(doc, pathEditShape.id, { points: moveAnchor(pathEditShape.points, index, x, y) }),
+      'node'
+    );
+  };
 
   return (
     <View
@@ -129,7 +156,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -151,6 +178,11 @@ export function ImageCanvas({
           {/* ✏️ toll-overlay (a kijelölés helyett) */}
           {!capturing && penPoints && onPenAddPoint && onPenClose ? (
             <PenOverlay box={fit} points={penPoints} onAddPoint={onPenAddPoint} onClosePath={onPenClose} />
+          ) : null}
+
+          {/* ✏️ node-szerkesztő overlay (toll v2) */}
+          {!capturing && pathEditLive ? (
+            <PathEditOverlay box={fit} layer={pathEditLive} onLive={onNodeLive} onCommit={onNodeCommit} />
           ) : null}
         </View>
       ) : null}

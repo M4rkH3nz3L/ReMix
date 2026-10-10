@@ -91,8 +91,12 @@ On-device bizonyítva: a „Stílus" lap megnyílt a kijelölt formán (Fill/for
   [penPath.ts](../../src/lib/penPath.ts) `pathShapeFromCanvasPoints` maggal (a `vectorPath.normalizeSubpaths` fölött: bbox→position/w/h
   + lokális 0–1 pontok), **3 teszt**; a `ShapeOverlay` path-renderje (render-paritás). Toll-sáv (Mégse/Visszavon/Bezár/Kész) a toolbar
   helyett. On-device bizonyítva: 3 pont → zárás az első node-on → kitöltött háromszög forma-rétegként (kijelölve).
-- [ ] ⬜ Hátra (v2): a lerakott/meglévő node-ok HÚZÁSA (`moveAnchor`), bezier-handle-húzás (`dragHandle`),
-  node-típus (smooth/broken/mirror, `setNodeType`), node-törlés/beszúrás egy path-szerkesztő módban.
+- [x] ✅ **Toll v2 — node-húzás (2026-10-10):** a kijelölt path-formán a „Toll" eszköz NODE-szerkesztő módba vált
+  ([PathEditOverlay](../../src/components/studio/image/PathEditOverlay.tsx)): a horgonypontok húzható pöttyök, húzás közben a path
+  ÉLŐBEN átformálódik (a `moveAnchor` mag + a `live`-patch minta, mint a SelectionFrame-ben; `LivePatch.points` bővítés), a végén
+  egy undo-lépés; node-sáv (Mégse/Kész). On-device bizonyítva: a háromszög alsó csúcsát elhúzva trapézzá formálódott.
+- [ ] ⬜ Hátra (v3): bezier-handle-húzás (`dragHandle`), node-típus (smooth/broken/mirror, `setNodeType`),
+  node-törlés/beszúrás (`deleteAnchor`/`insertAnchor`).
 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).

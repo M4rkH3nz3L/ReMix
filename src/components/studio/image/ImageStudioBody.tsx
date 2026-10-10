@@ -154,6 +154,7 @@ export function ImageStudioBody({
   const [capturing, setCapturing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
+  const [pathEditId, setPathEditId] = useState<string | null>(null);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -350,11 +351,23 @@ export function ImageStudioBody({
         setSheet('shapePicker'); // 🔷 forma-TÍPUS választó (nem csak téglalap)
         break;
       case 'pen':
-        // ✏️ toll-mód: üres path-szal indul (a kijelölés + lapok + crop bezárva)
-        setSheet(null);
-        setSelectedId(null);
-        setCropRect(null);
-        setPenPoints([]);
+        // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
+        if (
+          selectedLayer?.kind === 'shape' &&
+          selectedLayer.shape === 'path' &&
+          (selectedLayer.points?.length ?? 0) >= 2
+        ) {
+          setSheet(null);
+          setCropRect(null);
+          setPenPoints(null);
+          setPathEditId(selectedLayer.id);
+        } else {
+          setSheet(null);
+          setSelectedId(null);
+          setCropRect(null);
+          setPathEditId(null);
+          setPenPoints([]);
+        }
         break;
       case 'svg':
         void importSvg();
@@ -648,6 +661,7 @@ export function ImageStudioBody({
           penPoints={penPoints}
           onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
           onPenClose={() => commitPen(true)}
+          pathEditId={pathEditId}
         />
       ) : (
         <View style={styles.loading}>
@@ -663,13 +677,15 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {penPoints
-            ? t('studio.image.pen.hint')
-            : cropRect
-              ? t('studio.image.crop.hint')
-              : selectedLayer
-                ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-                : t('studio.image.tapToSelect')}
+          {pathEditId
+            ? t('studio.image.pen.editHint')
+            : penPoints
+              ? t('studio.image.pen.hint')
+              : cropRect
+                ? t('studio.image.crop.hint')
+                : selectedLayer
+                  ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
+                  : t('studio.image.tapToSelect')}
         </Text>
       </View>
 
@@ -727,6 +743,18 @@ export function ImageStudioBody({
             hitSlop={6}
             disabled={penPoints.length < 2}
           >
+            <Ionicons name="checkmark" size={16} color="#fff" />
+            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+          </Pressable>
+        </View>
+      ) : pathEditId ? (
+        /* ✏️ node-szerkesztő sáv (toll v2 — a toolbar HELYETT) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+          <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.cropApplyText}>{t('common.done')}</Text>
           </Pressable>

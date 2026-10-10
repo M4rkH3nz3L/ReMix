@@ -1,4 +1,4 @@
-import type { ShapeClip, ShapeLayer, TextClip, TextLayer } from '@/types/project';
+import type { PathPoint, ShapeClip, ShapeLayer, TextClip, TextLayer } from '@/types/project';
 
 /**
  * 🎯 Élő transzformáció-patch a kijelölő-keretről (méret/forgatás/betűméret). A
@@ -10,6 +10,8 @@ export interface LivePatch {
   h?: number;
   rotation?: number;
   fontSize?: number;
+  /** ✏️ path node-húzás élő előnézete (a toll v2 node-szerkesztője) */
+  points?: PathPoint[];
 }
 
 /**

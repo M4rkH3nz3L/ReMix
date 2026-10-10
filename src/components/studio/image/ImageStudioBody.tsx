@@ -21,6 +21,7 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
+import { setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
   createImageDoc,
@@ -155,6 +156,7 @@ export function ImageStudioBody({
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const [pathEditId, setPathEditId] = useState<string | null>(null);
+  const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -360,6 +362,7 @@ export function ImageStudioBody({
           setSheet(null);
           setCropRect(null);
           setPenPoints(null);
+          setPathEditNode(null);
           setPathEditId(selectedLayer.id);
         } else {
           setSheet(null);
@@ -492,6 +495,20 @@ export function ImageStudioBody({
       }
     }
     setPenPoints(null);
+  };
+
+  // ✏️ v3: a KIJELÖLT node típusa (görbe/sarok) — bezier-fogók létrehozása/törlése
+  const pe = pathEditId && doc ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
+  const pathEditShape = pe && pe.kind === 'shape' && pe.shape === 'path' ? pe : null;
+  const setNodeKind = (type: 'smooth' | 'corner') => {
+    if (doc && pathEditShape?.points && pathEditNode != null) {
+      commit(
+        updateLayer(doc, pathEditShape.id, {
+          points: setNodeType(pathEditShape.points, pathEditNode, type, !!pathEditShape.closed),
+        }),
+        type === 'corner' ? 'node-corner' : 'node-smooth'
+      );
+    }
   };
 
   const exportImage = async () => {
@@ -662,6 +679,8 @@ export function ImageStudioBody({
           onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
           onPenClose={() => commitPen(true)}
           pathEditId={pathEditId}
+          selectedNode={pathEditNode}
+          onSelectNode={setPathEditNode}
         />
       ) : (
         <View style={styles.loading}>
@@ -748,12 +767,29 @@ export function ImageStudioBody({
           </Pressable>
         </View>
       ) : pathEditId ? (
-        /* ✏️ node-szerkesztő sáv (toll v2 — a toolbar HELYETT) */
+        /* ✏️ node-szerkesztő sáv (toll v2/v3 — a toolbar HELYETT) */
         <View style={styles.cropBar}>
           <Pressable onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
             <Ionicons name="close" size={20} color={palette.text} />
           </Pressable>
           <View style={{ flex: 1 }} />
+          {/* ✏️ v3: a kijelölt node görbévé / sarokká (bezier-fogók) */}
+          <Pressable
+            onPress={() => setNodeKind('smooth')}
+            style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
+            hitSlop={6}
+            disabled={pathEditNode == null}
+          >
+            <Text style={styles.penCloseText}>{t('studio.image.pen.smooth')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setNodeKind('corner')}
+            style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
+            hitSlop={6}
+            disabled={pathEditNode == null}
+          >
+            <Text style={styles.penCloseText}>{t('studio.image.pen.corner')}</Text>
+          </Pressable>
           <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.cropApplyText}>{t('common.done')}</Text>

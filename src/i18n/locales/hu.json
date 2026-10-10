@@ -2932,7 +2932,9 @@
       "pen": {
         "hint": "Koppints pontokért · az első pontra a záráshoz",
         "close": "Bezár",
-        "editHint": "Húzd a pontokat a path szerkesztéséhez"
+        "editHint": "Koppints egy node-ra, majd Görbe/Sarok · húzd a mozgatáshoz",
+        "smooth": "Görbe",
+        "corner": "Sarok"
       },
       "gradient": {
         "title": "Gradiens",

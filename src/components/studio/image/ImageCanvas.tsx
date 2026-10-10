@@ -14,7 +14,7 @@ import type { CropRect } from '@/lib/imageCrop';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
-import { moveAnchor } from '@/lib/vectorPath';
+import { dragHandle, type HandleId, moveAnchor } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
@@ -41,6 +41,8 @@ export function ImageCanvas({
   onPenAddPoint,
   onPenClose,
   pathEditId,
+  selectedNode,
+  onSelectNode,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -60,6 +62,9 @@ export function ImageCanvas({
   onPenClose?: () => void;
   /** ✏️ toll v2 node-szerkesztő mód: a megadott id-jű path-forma horgonypontjait húzhatja */
   pathEditId?: string | null;
+  /** ✏️ toll v3: a kijelölt node indexe (ennél jelennek meg a bezier-fogók) */
+  selectedNode?: number | null;
+  onSelectNode?: (index: number) => void;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -98,6 +103,19 @@ export function ImageCanvas({
     commit(
       updateLayer(doc, pathEditShape.id, { points: moveAnchor(pathEditShape.points, index, x, y) }),
       'node'
+    );
+  };
+  // ✏️ v3: bezier-fogó húzása (tükrözött/szimmetrikus a szemközti fogóval)
+  const onHandleLive = (index: number, handle: HandleId, x: number, y: number) => {
+    if (!pathEditShape?.points) return;
+    setLive({ id: pathEditShape.id, patch: { points: dragHandle(pathEditShape.points, index, handle, x, y, 'mirrored') } });
+  };
+  const onHandleCommit = (index: number, handle: HandleId, x: number, y: number) => {
+    if (!pathEditShape?.points) return;
+    setLive(null);
+    commit(
+      updateLayer(doc, pathEditShape.id, { points: dragHandle(pathEditShape.points, index, handle, x, y, 'mirrored') }),
+      'handle'
     );
   };
 
@@ -180,9 +198,18 @@ export function ImageCanvas({
             <PenOverlay box={fit} points={penPoints} onAddPoint={onPenAddPoint} onClosePath={onPenClose} />
           ) : null}
 
-          {/* ✏️ node-szerkesztő overlay (toll v2) */}
+          {/* ✏️ node-szerkesztő overlay (toll v2 + v3 bezier) */}
           {!capturing && pathEditLive ? (
-            <PathEditOverlay box={fit} layer={pathEditLive} onLive={onNodeLive} onCommit={onNodeCommit} />
+            <PathEditOverlay
+              box={fit}
+              layer={pathEditLive}
+              selectedNode={selectedNode ?? null}
+              onSelectNode={onSelectNode ?? (() => {})}
+              onLive={onNodeLive}
+              onCommit={onNodeCommit}
+              onHandleLive={onHandleLive}
+              onHandleCommit={onHandleCommit}
+            />
           ) : null}
         </View>
       ) : null}

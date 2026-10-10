@@ -2932,7 +2932,9 @@
       "pen": {
         "hint": "Tap to add points · tap the first point to close",
         "close": "Close",
-        "editHint": "Drag the nodes to edit the path"
+        "editHint": "Tap a node, then Smooth/Corner · drag to reshape",
+        "smooth": "Smooth",
+        "corner": "Corner"
       },
       "gradient": {
         "title": "Gradient",

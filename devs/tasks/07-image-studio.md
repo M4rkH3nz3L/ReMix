@@ -104,8 +104,11 @@ On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a p
   ([PathEditOverlay](../../src/components/studio/image/PathEditOverlay.tsx)): a horgonypontok húzható pöttyök, húzás közben a path
   ÉLŐBEN átformálódik (a `moveAnchor` mag + a `live`-patch minta, mint a SelectionFrame-ben; `LivePatch.points` bővítés), a végén
   egy undo-lépés; node-sáv (Mégse/Kész). On-device bizonyítva: a háromszög alsó csúcsát elhúzva trapézzá formálódott.
-- [ ] ⬜ Hátra (v3): bezier-handle-húzás (`dragHandle`), node-típus (smooth/broken/mirror, `setNodeType`),
-  node-törlés/beszúrás (`deleteAnchor`/`insertAnchor`).
+- [x] ✅ **Toll v3 — bezier-görbék (2026-10-10):** node-módban a node KOPPINTÁSRA kijelölhető; a node-sáv „Görbe"/„Sarok"
+  gombja `setNodeType`-pal bezier-fogókat hoz létre/töröl (az élek meggörbülnek); a kijelölt node-nál a h1/h2 **fogók húzhatók**
+  (négyzet-pöttyök + összekötő vonal), `dragHandle` *mirrored* módban (a szemközti fogó tükrözve követ). Élő újraformálás + egy
+  undo-lépés. On-device bizonyítva: a trapéz sarka Smooth-szal íves lett, a fogó húzásával a görbe átformálódott.
+- [ ] ⬜ Hátra (v4): node-törlés/beszúrás (`deleteAnchor`/`insertAnchor`) + broken-fogó mód.
 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).

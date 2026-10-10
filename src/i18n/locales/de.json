@@ -2932,7 +2932,9 @@
       "pen": {
         "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
         "close": "Schließen",
-        "editHint": "Ziehe die Knoten, um den Pfad zu bearbeiten"
+        "editHint": "Knoten antippen, dann Kurve/Ecke · ziehen zum Formen",
+        "smooth": "Kurve",
+        "corner": "Ecke"
       },
       "gradient": {
         "title": "Verlauf",

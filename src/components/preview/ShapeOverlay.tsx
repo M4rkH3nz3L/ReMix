@@ -123,14 +123,19 @@ export function ShapeOverlay({
       }
     });
 
-  // 🔄 réteg-forgatás (kép-stúdió) a KÖZÉPPONT körül — a wrap transformOrigin
-  // alapból a közép, így a left/top center-pozícióval egybeesik (render-paritás)
+  // 🔄 réteg-forgatás + 🔁 tükrözés (kép-stúdió) a KÖZÉPPONT körül — a wrap
+  // transformOrigin alapból a közép, így a left/top center-pozícióval egybeesik.
+  // A tükrözés (scale) a forgatás ELŐTT (helyi tér) → a tömb VÉGÉN (RN: utolsó = legbelül).
   const rotDeg = clip.rotation ?? 0;
+  const sx = clip.flipH ? -1 : 1;
+  const sy = clip.flipV ? -1 : 1;
   const dragStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: dragX.value },
       { translateY: dragY.value },
       { rotate: `${rotDeg}deg` },
+      { scaleX: sx },
+      { scaleY: sy },
     ],
   }));
 

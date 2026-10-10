@@ -311,6 +311,9 @@ export function TextOverlay({
                 { scale: anim.scale },
                 // 🔄 réteg-forgatás (kép-stúdió) a szöveg-blokk közepe körül
                 ...(clip.rotation ? ([{ rotate: `${clip.rotation}deg` }] as const) : []),
+                // 🔁 tükrözés (a forgatás ELŐTT = a tömbben később)
+                ...(clip.flipH ? ([{ scaleX: -1 }] as const) : []),
+                ...(clip.flipV ? ([{ scaleY: -1 }] as const) : []),
                 // 3D döntés (közelítés — a pontos anyag/extrúzió a renderben)
                 ...(clip.text3d
                   ? ([

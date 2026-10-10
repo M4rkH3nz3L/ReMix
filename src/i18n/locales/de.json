@@ -2836,6 +2836,8 @@
       "align": "Ausrichten",
       "boolean": "Boolean",
       "rotate": "Drehen",
+      "flipH": "Spiegeln ↔",
+      "flipV": "Spiegeln ↕",
       "forward": "Vor",
       "back": "Zurück",
       "duplicate": "Duplizieren"
@@ -2922,6 +2924,7 @@
       "svgFailBody": "Diese SVG konnte nicht gelesen werden. Versuche eine einfache SVG-Datei.",
       "undoOrder": "Ebenen-Reihenfolge",
       "undoRotate": "Um 90° drehen",
+      "undoFlip": "Spiegeln",
       "undoCrop": "Zuschneiden",
       "crop": {
         "free": "Frei",

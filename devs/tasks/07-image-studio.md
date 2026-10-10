@@ -11,6 +11,24 @@
 > (pen / effects / adjustment-stack / rulers / pattern / boolean / align / PSD / PDF) dedikált UI-ja
 > + a worker PSD/PDF-interop + az **SVG-export emitter** (a Vektor-típus ma raszterbe renderel).
 
+## 📱 „Alap Photoshop, érintős felülettel" — roadmap-státusz (2026-10-10)
+> User-cél: *„olyan legyen mint az alap photoshop csak érintős felülettel!"* — a meglévő tiszta magokat
+> telefon-barát, valódi szerkesztő-élménnyé kötni, render-paritással. Haladás (sorban):
+
+| # | Képesség | Állapot | Hol |
+|---|----------|---------|-----|
+| — | Csoportosított görgethető eszköztár + ShapePicker (5 forma) | ✅ KÉSZ · on-device | §2.0 · main `4041822` |
+| 1 | **Valódi forgatás** minden rétegre (forma/szöveg is) — preview + worker | ✅ KÉSZ · on-device | §2.0b · `32da9c7` |
+| 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
+| 3 | **Tükrözés H/V** (flip — preview + worker) | 🚧 FOLYAMATBAN | §2.0d |
+| 4 | Réteg-inspector felszínre hozása (kijelölésre nyíló „Tulajdonságok" lap) | ⬜ HÁTRA | §2.0e |
+| 5 | **Toll / vektor pen** UI (a `vectorPath` mag fölé) | ⬜ HÁTRA | §2.1 |
+| 6 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA | §2.2 |
+| 7 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
+>
+> Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
+> [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).
+
 ## 0. Kontextus & cél
 Itt a repo a legjellemzőbb: a **pure core már jelentős**, de a **felhasználói felület** sok
 helyen nincs bekötve (`CORE KÉSZ / UI HIÁNYZIK`). Cél: a meglévő magokat profi szerkesztő-UI-vá
@@ -47,6 +65,14 @@ csak a vászon vágja). Render-biztos: a kép-doc render normalizált koordinát
 rács) a vásznon ([ImageCanvas](../../src/components/studio/image/ImageCanvas.tsx)), + a toolbar HELYETT crop-sáv arány-presetekkel
 (Szabad/1:1/4:5/16:9/9:16) + Mégse/Alkalmaz ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)).
 On-device bizonyítva: 1080×1080 → (16:9) 1080×608 → (1:1) 608×608, a tartalom helyesen újraformálva; egy Alkalmaz = egy undo-lépés.
+
+### 2.0d Tükrözés H/V (flip — preview + worker render-parity) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+Photoshop-alap: a réteg vízszintes/függőleges tükrözése. `flipH?/flipV?` mező a PhotoLayer / ShapeClip / TextClip típusokon
+([types](../../src/types/project.ts)); az előnézet `scaleX(-1)`/`scaleY(-1)` transformmal a FORGATÁS ELŐTT (helyi tér) —
+[ShapeOverlay](../../src/components/preview/ShapeOverlay.tsx) / [TextOverlay](../../src/components/preview/TextOverlay.tsx) /
+[PhotoLayerView](../../src/components/studio/image/PhotoLayerView.tsx) (utóbbinál a forgatás+tükrözés+drag EGY transformba vonva,
+mert a külön `transform` felülírta volna a rotate-et); a worker a `hflip`/`vflip` filtert a rotate ELŐTT alkalmazza
+([server/imagedoc.js](../../server/imagedoc.js)) → render-parity. Két tool az ARRANGE csoportban (Tükör ↔ / Tükör ↕), nem-fill rétegre.
 
 ## 2. Feladatlista
 

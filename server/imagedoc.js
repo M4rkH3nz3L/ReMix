@@ -130,12 +130,14 @@ async function renderImageDoc(doc, height, workDir) {
             `pad=${boxW}:${boxH}:(ow-iw)/2:(oh-ih)/2:color=black@0`
           : `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
             `crop=${boxW}:${boxH}`;
+      // 🔁 tükrözés a forgatás ELŐTT (helyi tér) — a preview scaleX/Y-nal egyezik
+      const flip = `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}`;
       const rotate = layer.rotation
         ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
         : '';
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${flip}${rotate}` +
           `,colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
@@ -146,14 +148,16 @@ async function renderImageDoc(doc, height, workDir) {
       }
       inputs.push('-i', png);
       prepared = `p${idx}`;
-      // 🔄 réteg-forgatás (kép-stúdió) a forma/szöveg PNG-n — a fotó-ág mintája;
-      // a fill (teljes vászon) nem forog, csak az elhelyezett (position) rétegek
+      // 🔄 forgatás + 🔁 tükrözés (kép-stúdió) a forma/szöveg PNG-n — a fotó-ág
+      // mintája; a fill (teljes vászon) nem forog/tükröződik, csak az elhelyezett rétegek
+      const flip =
+        layer.kind !== 'fill' ? `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}` : '';
       const rot =
         layer.kind !== 'fill' && layer.rotation
           ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
           : '';
       filters.push(
-        `[${idx}:v]format=rgba${rot},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+        `[${idx}:v]format=rgba${flip}${rot},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
     }

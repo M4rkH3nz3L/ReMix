@@ -2836,6 +2836,8 @@
       "align": "Igazítás",
       "boolean": "Boolean",
       "rotate": "Forgatás",
+      "flipH": "Tükör ↔",
+      "flipV": "Tükör ↕",
       "forward": "Előre",
       "back": "Hátra",
       "duplicate": "Duplikálás"
@@ -2922,6 +2924,7 @@
       "svgFailBody": "Nem sikerült beolvasni ezt az SVG-t. Próbálj egyszerű SVG-fájlt.",
       "undoOrder": "Réteg-sorrend",
       "undoRotate": "Forgatás 90°",
+      "undoFlip": "Tükrözés",
       "undoCrop": "Kivágás",
       "crop": {
         "free": "Szabad",

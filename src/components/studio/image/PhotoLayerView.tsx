@@ -53,8 +53,19 @@ export function PhotoLayerView({
     }
   });
 
+  // 🔄 forgatás + 🔁 tükrözés egy transformban (különben a dragStyle felülírná a
+  // rotate-et); a tükrözés a forgatás ELŐTT (helyi tér) → a tömb VÉGÉN
+  const rotDeg = layer.rotation ?? 0;
+  const sx = layer.flipH ? -1 : 1;
+  const sy = layer.flipV ? -1 : 1;
   const dragStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dragX.value }, { translateY: dragY.value }],
+    transform: [
+      { translateX: dragX.value },
+      { translateY: dragY.value },
+      { rotate: `${rotDeg}deg` },
+      { scaleX: sx },
+      { scaleY: sy },
+    ],
   }));
 
   const w = layer.w * box.w;
@@ -72,7 +83,6 @@ export function PhotoLayerView({
             width: w,
             height: h,
             opacity: layer.opacity ?? 1,
-            transform: [{ rotate: `${layer.rotation ?? 0}deg` }],
           },
           dragStyle,
           selected ? styles.selected : null,

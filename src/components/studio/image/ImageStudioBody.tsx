@@ -51,6 +51,8 @@ type ToolKey =
   | 'forward'
   | 'back'
   | 'rotate'
+  | 'flipH'
+  | 'flipV'
   | 'duplicate'
   | 'delete';
 
@@ -94,6 +96,8 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
       { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
       { key: 'rotate', icon: 'refresh-outline', labelKey: 'studio.imageTools.rotate' },
+      { key: 'flipH', icon: 'swap-horizontal-outline', labelKey: 'studio.imageTools.flipH' },
+      { key: 'flipV', icon: 'swap-vertical-outline', labelKey: 'studio.imageTools.flipV' },
       { key: 'forward', icon: 'chevron-up-outline', labelKey: 'studio.imageTools.forward' },
       { key: 'back', icon: 'chevron-down-outline', labelKey: 'studio.imageTools.back' },
     ],
@@ -387,6 +391,18 @@ export function ImageStudioBody({
           commit(updateLayer(doc, selectedLayer.id, { rotation: rot } as Partial<ImageLayer>), t('studio.image.undoRotate'));
         }
         break;
+      case 'flipH':
+        if (selectedLayer && selectedLayer.kind !== 'fill') {
+          const flipH = !(selectedLayer as { flipH?: boolean }).flipH;
+          commit(updateLayer(doc, selectedLayer.id, { flipH } as Partial<ImageLayer>), t('studio.image.undoFlip'));
+        }
+        break;
+      case 'flipV':
+        if (selectedLayer && selectedLayer.kind !== 'fill') {
+          const flipV = !(selectedLayer as { flipV?: boolean }).flipV;
+          commit(updateLayer(doc, selectedLayer.id, { flipV } as Partial<ImageLayer>), t('studio.image.undoFlip'));
+        }
+        break;
       case 'delete':
         if (selectedLayer) {
           commit(removeLayer(doc, selectedLayer.id), t('studio.image.undoDelete'));
@@ -405,6 +421,8 @@ export function ImageStudioBody({
       case 'back':
         return !selectedLayer;
       case 'rotate':
+      case 'flipH':
+      case 'flipV':
         return !selectedLayer || selectedLayer.kind === 'fill';
       case 'adjust':
         return selectedLayer?.kind !== 'photo';

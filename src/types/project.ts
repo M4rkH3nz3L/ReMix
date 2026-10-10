@@ -749,6 +749,9 @@ export interface TextClip extends ClipBase {
    * render a szöveg-PNG elforgatásával érvényesíti.
    */
   rotation?: number;
+  /** 🔁 tükrözés (kép-stúdió): vízszintes / függőleges */
+  flipH?: boolean;
+  flipV?: boolean;
   animation: TextAnimation;
   /** hiányzó érték = 'plain' (régebbi mentett projektek) */
   stylePreset?: TextStylePreset;
@@ -910,6 +913,9 @@ export interface ShapeClip extends ClipBase {
    * wrap-transformmal, a kép-doc render a forma-PNG elforgatásával érvényesíti.
    */
   rotation?: number;
+  /** 🔁 tükrözés (kép-stúdió): vízszintes / függőleges — a forgatás ELŐTT (helyi tér) */
+  flipH?: boolean;
+  flipV?: boolean;
   /** kitöltő szín (hex) — gradiens esetén a tartalék */
   fill: string;
   /**
@@ -1226,6 +1232,9 @@ export interface PhotoLayer extends ImageLayerBase {
   w: number;
   h: number;
   rotation?: number;
+  /** 🔁 tükrözés (kép-stúdió): vízszintes / függőleges */
+  flipH?: boolean;
+  flipV?: boolean;
   /** 'cover' kitölti a keretet (vág), 'contain' belefér (üres szél marad) */
   fit?: 'cover' | 'contain';
   filterId?: FilterId;

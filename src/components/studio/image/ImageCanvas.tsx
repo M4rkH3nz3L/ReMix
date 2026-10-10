@@ -3,6 +3,7 @@ import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
+import { BrushOverlay, type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
@@ -50,6 +51,10 @@ export function ImageCanvas({
   onLassoCancel,
   wandActive,
   onWandSeed,
+  brushActive,
+  brushColor = '#ff2d95',
+  brushSize = 8,
+  brushRef,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -84,6 +89,11 @@ export function ImageCanvas({
     v: number,
     box: { position: { x: number; y: number }; w: number; h: number }
   ) => void;
+  /** 🖌️ ecset-mód: Skia raszter-festés (a snapshotot a szülő fotó-rétegként menti) */
+  brushActive?: boolean;
+  brushColor?: string;
+  brushSize?: number;
+  brushRef?: Ref<BrushHandle>;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -221,7 +231,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -267,6 +277,11 @@ export function ImageCanvas({
 
           {/* 🪄 varázspálca-overlay (fotóra koppintás → szín-szelekció) */}
           {!capturing && wandActive ? <WandOverlay box={fit} onTap={onWandTap} /> : null}
+
+          {/* 🖌️ ecset-overlay (Skia raszter-festés) */}
+          {!capturing && brushActive ? (
+            <BrushOverlay ref={brushRef} box={fit} color={brushColor} size={brushSize} />
+          ) : null}
         </View>
       ) : null}
     </View>

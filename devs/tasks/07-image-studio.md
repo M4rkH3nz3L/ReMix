@@ -26,8 +26,9 @@
 | 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | ✅ KÉSZ · on-device | §2.0f |
 | 7 | **Lasszó** (szabadkézi → zárt path-forma) | ✅ KÉSZ · on-device | §2.1b |
 | 8 | **Varázspálca** (pixel-szín-szelekció, Skia) | ✅ KÉSZ · on-device (új Skia-build) | §2.1c |
-| 9 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
-| 10 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
+| 9 | **Ecset / raszter-festés** (Skia snapshot → fotó-réteg) | ✅ KÉSZ · on-device | §2.1d |
+| 10 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
+| 11 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
 > [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).
@@ -92,6 +93,14 @@ csak a picker-UI hiányzott. ÚJ **[GradientEditor](../../src/components/studio/
 (forma + háttér réteg): be/ki toggle (ki = vissza a tömör `fill`-hez), **6 gyors-preset** (valódi gradient-előnézettel),
 típus (lineáris/radiális/konikus), **szög-csúszka**, és a **kezdő/záró stop színe**. A `gradient` felülírja a tömör `fill`-t.
 On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a preset (lila→pink) is renderelt.
+
+### 2.1d Ecset / raszter-festés (Skia) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+A hiányzó Photoshop-alaptool: szabadkézi RASZTER-festés. Új „Ecset" eszköz az ADD csoportban → ecset-mód:
+[BrushOverlay](../../src/components/studio/image/BrushOverlay.tsx) egy Skia `Canvas`-ban rendereli a húzás menti SVG-path
+ecsetvonásokat (szín + méret); a „Kész" a vászon pillanatképét menti (`makeImageSnapshot` → `encodeToBytes` PNG →
+`expo-file-system` `File.write`), amit a szülő FOTÓ-rétegként tesz a vászonra ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)).
+Ecset-sáv: 6 szín + 3 méret + Mégse/Kész. Render-parity: a snapshot PNG a meglévő fotó-render-úton megy (worker kompozit).
+A Skia MÁR a dev-buildben van (varázspálca) → JS-reload elég. On-device bizonyítva: fehér ív festve → Done → megmaradt fotó-rétegként.
 
 ## 2. Feladatlista
 

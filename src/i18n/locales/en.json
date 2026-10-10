@@ -2832,6 +2832,7 @@
       "pen": "Pen",
       "lasso": "Lasso",
       "wand": "Magic wand",
+      "brush": "Brush",
       "photo": "Photo",
       "fill": "Fill",
       "delete": "Delete",
@@ -2933,6 +2934,8 @@
       "undoPen": "Pen drawing",
       "undoLasso": "Lasso shape",
       "undoWand": "Magic wand selection",
+      "undoBrush": "Brush painting",
+      "brush": { "hint": "Paint on the canvas · pick a color and size" },
       "lasso": { "hint": "Draw a freehand closed shape" },
       "wand": {
         "hint": "Tap a photo to select a similar-color region",

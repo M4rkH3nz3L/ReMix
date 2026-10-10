@@ -2832,6 +2832,7 @@
       "pen": "Toll",
       "lasso": "Lasszó",
       "wand": "Varázspálca",
+      "brush": "Ecset",
       "photo": "Fotó",
       "fill": "Háttér",
       "delete": "Törlés",
@@ -2933,6 +2934,8 @@
       "undoPen": "Toll-rajz",
       "undoLasso": "Lasszó-forma",
       "undoWand": "Varázspálca-kijelölés",
+      "undoBrush": "Ecset-festés",
+      "brush": { "hint": "Fess a vászonra · válassz színt és méretet" },
       "lasso": { "hint": "Rajzolj szabadkézzel egy zárt formát" },
       "wand": {
         "hint": "Koppints egy fotóra a hasonló-szín kijelöléshez",

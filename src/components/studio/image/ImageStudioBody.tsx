@@ -8,6 +8,7 @@ import { captureRef } from 'react-native-view-shot';
 
 import { SourceSheet } from '@/components/SourceSheet';
 import { Chip } from '@/components/ui/controls';
+import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { AdjustSheet } from '@/components/studio/image/AdjustSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
@@ -50,6 +51,7 @@ type ToolKey =
   | 'pen'
   | 'lasso'
   | 'wand'
+  | 'brush'
   | 'svg'
   | 'style'
   | 'adjust'
@@ -72,6 +74,10 @@ interface Tool {
 
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
 const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+
+/** ecset-színek + -méretek (px) a sávban */
+const BRUSH_COLORS = ['#ffffff', '#0b0b18', '#ff2d95', '#ffd166', '#39d98a', '#4d9dff'];
+const BRUSH_SIZES = [4, 10, 20];
 
 /** kivágás-arány presetek (pixel-arány w:h; null = szabad/teljes) */
 const CROP_PRESETS: { label: string; labelKey?: string; ratio: number | null }[] = [
@@ -97,6 +103,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'pen', icon: 'pencil-outline', labelKey: 'studio.imageTools.pen' },
       { key: 'lasso', icon: 'ellipse-outline', labelKey: 'studio.imageTools.lasso' },
       { key: 'wand', icon: 'color-wand-outline', labelKey: 'studio.imageTools.wand' },
+      { key: 'brush', icon: 'brush-outline', labelKey: 'studio.imageTools.brush' },
       { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
     ],
   },
@@ -164,6 +171,10 @@ export function ImageStudioBody({
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
   const [wandActive, setWandActive] = useState(false);
+  const [brushActive, setBrushActive] = useState(false);
+  const [brushColor, setBrushColor] = useState('#ff2d95');
+  const [brushSize, setBrushSize] = useState(8);
+  const brushRef = useRef<BrushHandle>(null);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -377,7 +388,19 @@ export function ImageStudioBody({
         setPenPoints(null);
         setPathEditId(null);
         setLassoActive(false);
+        setBrushActive(false);
         setWandActive(true);
+        break;
+      case 'brush':
+        // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(null);
+        setPenPoints(null);
+        setPathEditId(null);
+        setLassoActive(false);
+        setWandActive(false);
+        setBrushActive(true);
         break;
       case 'pen':
         // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
@@ -561,6 +584,27 @@ export function ImageStudioBody({
         setBusy(false);
         setWandActive(false);
       });
+  };
+
+  // 🖌️ ecset: a Skia-festés pillanatképe PNG-fájlként → FOTÓ-réteg a vásznon
+  const commitBrush = () => {
+    if (doc && brushRef.current?.hasStrokes()) {
+      const uri = brushRef.current.exportPng();
+      if (uri) {
+        const l: PhotoLayer = {
+          kind: 'photo',
+          id: makeId('lyr'),
+          uri,
+          position: { x: 0.5, y: 0.5 },
+          w: 1,
+          h: 1,
+          fit: 'contain',
+        };
+        commit(addLayer(doc, l), t('studio.image.undoBrush'));
+        setSelectedId(l.id);
+      }
+    }
+    setBrushActive(false);
   };
 
   // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma (egy undo-lépés)
@@ -774,6 +818,10 @@ export function ImageStudioBody({
           onLassoCancel={() => setLassoActive(false)}
           wandActive={wandActive}
           onWandSeed={onWandSeed}
+          brushActive={brushActive}
+          brushColor={brushColor}
+          brushSize={brushSize}
+          brushRef={brushRef}
         />
       ) : (
         <View style={styles.loading}>
@@ -789,7 +837,9 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {wandActive
+          {brushActive
+            ? t('studio.image.brush.hint')
+            : wandActive
             ? t('studio.image.wand.hint')
             : lassoActive
             ? t('studio.image.lasso.hint')
@@ -921,6 +971,37 @@ export function ImageStudioBody({
           <Text style={styles.lassoLabel} numberOfLines={1}>
             {t('studio.image.wand.hint')}
           </Text>
+        </View>
+      ) : brushActive ? (
+        /* 🖌️ ecset-sáv (szín + méret + Kész) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setBrushActive(false)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <View style={styles.brushRow}>
+            {BRUSH_COLORS.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setBrushColor(c)}
+                style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
+              />
+            ))}
+          </View>
+          <View style={styles.brushRow}>
+            {BRUSH_SIZES.map((s) => (
+              <Pressable
+                key={s}
+                onPress={() => setBrushSize(s)}
+                style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
+              >
+                <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={commitBrush} style={styles.cropApply} hitSlop={6}>
+            <Ionicons name="checkmark" size={16} color="#fff" />
+            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+          </Pressable>
         </View>
       ) : (
       /* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */
@@ -1148,4 +1229,18 @@ const styles = StyleSheet.create({
   penCloseText: { color: palette.text, fontSize: 13, fontWeight: '700' },
   penDisabled: { opacity: 0.4 },
   lassoLabel: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600', paddingLeft: 4 },
+  brushRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
+  brushDotActive: { borderColor: palette.text, borderWidth: 3 },
+  brushSizeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brushSizeActive: { borderColor: palette.accent, backgroundColor: `${palette.accent}22` },
 });

@@ -2832,6 +2832,7 @@
       "pen": "Stift",
       "lasso": "Lasso",
       "wand": "Zauberstab",
+      "brush": "Pinsel",
       "photo": "Foto",
       "fill": "Hintergrund",
       "delete": "Löschen",
@@ -2933,6 +2934,8 @@
       "undoPen": "Stift-Zeichnung",
       "undoLasso": "Lasso-Form",
       "undoWand": "Zauberstab-Auswahl",
+      "undoBrush": "Pinsel-Malerei",
+      "brush": { "hint": "Auf die Leinwand malen · Farbe und Größe wählen" },
       "lasso": { "hint": "Freihand eine geschlossene Form zeichnen" },
       "wand": {
         "hint": "Tippe ein Foto an, um einen ähnlichen Farbbereich auszuwählen",

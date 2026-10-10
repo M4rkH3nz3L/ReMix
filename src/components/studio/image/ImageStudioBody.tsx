@@ -20,6 +20,7 @@ import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
+import { magicWandSelect } from '@/lib/magicWandClient';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
 import {
@@ -48,6 +49,7 @@ type ToolKey =
   | 'shape'
   | 'pen'
   | 'lasso'
+  | 'wand'
   | 'svg'
   | 'style'
   | 'adjust'
@@ -94,6 +96,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
       { key: 'pen', icon: 'pencil-outline', labelKey: 'studio.imageTools.pen' },
       { key: 'lasso', icon: 'ellipse-outline', labelKey: 'studio.imageTools.lasso' },
+      { key: 'wand', icon: 'color-wand-outline', labelKey: 'studio.imageTools.wand' },
       { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
     ],
   },
@@ -160,6 +163,7 @@ export function ImageStudioBody({
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
+  const [wandActive, setWandActive] = useState(false);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -362,7 +366,18 @@ export function ImageStudioBody({
         setCropRect(null);
         setPenPoints(null);
         setPathEditId(null);
+        setWandActive(false);
         setLassoActive(true);
+        break;
+      case 'wand':
+        // 🪄 varázspálca-mód: fotóra koppintva szín-szelekció (Skia)
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(null);
+        setPenPoints(null);
+        setPathEditId(null);
+        setLassoActive(false);
+        setWandActive(true);
         break;
       case 'pen':
         // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
@@ -507,6 +522,45 @@ export function ImageStudioBody({
       }
     }
     setPenPoints(null);
+  };
+
+  // 🪄 varázspálca: a koppintott fotó-régió szín-szelekciója (Skia) → ZÁRT path-forma
+  //    a fotó dobozán (féligátlátszó kiemelés). A mag tesztelt; a Skia glue új build után fut.
+  const onWandSeed = (
+    uri: string,
+    u: number,
+    v: number,
+    box: { position: { x: number; y: number }; w: number; h: number }
+  ) => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    void magicWandSelect(uri, u, v)
+      .then((outline) => {
+        if (outline && outline.length >= 3 && doc) {
+          const shape: ShapeLayer = {
+            kind: 'shape',
+            id: makeId('lyr'),
+            shape: 'path',
+            points: outline,
+            closed: true,
+            position: box.position,
+            w: box.w,
+            h: box.h,
+            fill: '#7c5cff',
+            opacity: 0.5,
+          };
+          commit(addLayer(doc, shape), t('studio.image.undoWand'));
+          setSelectedId(shape.id);
+        } else {
+          Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
+        }
+      })
+      .finally(() => {
+        setBusy(false);
+        setWandActive(false);
+      });
   };
 
   // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma (egy undo-lépés)
@@ -718,6 +772,8 @@ export function ImageStudioBody({
           lassoActive={lassoActive}
           onLassoComplete={commitLasso}
           onLassoCancel={() => setLassoActive(false)}
+          wandActive={wandActive}
+          onWandSeed={onWandSeed}
         />
       ) : (
         <View style={styles.loading}>
@@ -733,7 +789,9 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {lassoActive
+          {wandActive
+            ? t('studio.image.wand.hint')
+            : lassoActive
             ? t('studio.image.lasso.hint')
             : pathEditId
               ? t('studio.image.pen.editHint')
@@ -851,6 +909,17 @@ export function ImageStudioBody({
           </Pressable>
           <Text style={styles.lassoLabel} numberOfLines={1}>
             {t('studio.image.lasso.hint')}
+          </Text>
+        </View>
+      ) : wandActive ? (
+        /* 🪄 varázspálca-sáv (fotóra koppintva szín-szelekció) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
+          <Text style={styles.lassoLabel} numberOfLines={1}>
+            {t('studio.image.wand.hint')}
           </Text>
         </View>
       ) : (

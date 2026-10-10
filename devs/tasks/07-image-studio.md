@@ -25,7 +25,7 @@
 | 5 | **Toll / vektor pen** (v1 tap-rajz · v2 node-húzás · v3 bezier-görbék) | ✅ KÉSZ · on-device | §2.1 |
 | 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | ✅ KÉSZ · on-device | §2.0f |
 | 7 | **Lasszó** (szabadkézi → zárt path-forma) | ✅ KÉSZ · on-device | §2.1b |
-| 8 | **Varázspálca** (pixel-szín-szelekció) | ⛔ raszter pixel-hozzáférés kell (natív/worker) | §2.1b megj. |
+| 8 | **Varázspálca** (pixel-szín-szelekció, Skia) | 🟡 mag+glue KÉSZ (8 teszt) · natív-build-verifikáció fut | §2.1c |
 | 9 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
 | 10 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
@@ -120,9 +120,17 @@ On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a p
 ### 2.1b Lasszó (szabadkézi → zárt path-forma) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
 Új „Lasszó" eszköz az ADD csoportban → szabadkézi húzás a vásznon ([LassoOverlay](../../src/components/studio/image/LassoOverlay.tsx):
 a mozgás mentén ritkított pont-mintavétel + élő szaggatott körvonal), felengedésre ZÁRT path-FORMA réteg a `penPath` maggal
-(`pathShapeFromCanvasPoints` closed=true). On-device bizonyítva: a szabadkézi blob zárt sokszög-formává vált (kijelölve, a tollal
-tovább szerkeszthető). Megj.: a „varázspálca" (pixel-alapú szín-szelekció) RASZTER pixel-hozzáférést kér (natív/worker) →
-a jelenlegi tiszta-RN preview-útban nem valósítható meg render-parityvel (külön natív/worker-feladat).
+(`pathShapeFromCanvasPoints` closed=true). On-device bizonyítva: a szabadkézi blob zárt sokszög-formává vált (kijelölve, a tollal tovább szerkeszthető).
+
+### 2.1c Varázspálca (pixel-szín-szelekció, Skia) — P1 🟡 (mag+glue KÉSZ+tesztelt; natív-build-verifikáció)
+Pixel-alapú szín-szelekció. **Algoritmus-MAG tiszta + tesztelt** ([magicWand.ts](../../src/lib/magicWand.ts), **8 teszt**):
+`floodFillMask` (szín-hasonlóság, 4-szomszéd) → `maskToPolygon` (Moore-kontúrkövetés) → `simplifyPolygon` → normalizált körvonal
+— natív függés NÉLKÜL bizonyítottan működik. **Glue** ([magicWandClient.ts](../../src/lib/magicWandClient.ts)): `@shopify/react-native-skia`
+2.6 — a fotó pixeleit olvassa (`Data.fromURI`+`readPixels`, MAX_DIM-re skálázva), a `magicWandOutline`-t hívja. **Tool+UI**: „Varázspálca"
+az ADD csoportban → fotóra koppintva a [WandOverlay](../../src/components/studio/image/WandOverlay.tsx)+`ImageCanvas` megtalálja a fotót,
+a Skia szelekciót ad → féligátlátszó path-forma a fotó dobozán ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)).
+⚠️ **A Skia ÚJ natív modul → ÚJ dev-build után verifikálható** (a mag tesztekkel már igen). v1 egyszerűsítés: a koppintás a fotó-dobozt
+contain-fit-szerűen képezi a forrásra (cover-crop-eltolás elhanyagolva).
 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).

@@ -2831,6 +2831,7 @@
       "shape": "Shape",
       "pen": "Pen",
       "lasso": "Lasso",
+      "wand": "Magic wand",
       "photo": "Photo",
       "fill": "Fill",
       "delete": "Delete",
@@ -2931,7 +2932,13 @@
       "undoCrop": "Crop",
       "undoPen": "Pen drawing",
       "undoLasso": "Lasso shape",
+      "undoWand": "Magic wand selection",
       "lasso": { "hint": "Draw a freehand closed shape" },
+      "wand": {
+        "hint": "Tap a photo to select a similar-color region",
+        "failTitle": "No selection",
+        "failBody": "Couldn't select a color region. Tap inside a photo layer."
+      },
       "pen": {
         "hint": "Tap to add points · tap the first point to close",
         "close": "Close",

@@ -2831,6 +2831,7 @@
       "shape": "Forma",
       "pen": "Toll",
       "lasso": "Lasszó",
+      "wand": "Varázspálca",
       "photo": "Fotó",
       "fill": "Háttér",
       "delete": "Törlés",
@@ -2931,7 +2932,13 @@
       "undoCrop": "Kivágás",
       "undoPen": "Toll-rajz",
       "undoLasso": "Lasszó-forma",
+      "undoWand": "Varázspálca-kijelölés",
       "lasso": { "hint": "Rajzolj szabadkézzel egy zárt formát" },
+      "wand": {
+        "hint": "Koppints egy fotóra a hasonló-szín kijelöléshez",
+        "failTitle": "Nincs kijelölés",
+        "failBody": "Nem sikerült szín-régiót kijelölni. Koppints egy fotó-réteg belsejébe."
+      },
       "pen": {
         "hint": "Koppints pontokért · az első pontra a záráshoz",
         "close": "Bezár",

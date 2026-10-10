@@ -10,6 +10,7 @@ import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
+import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
 import type { CropRect } from '@/lib/imageCrop';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
@@ -47,6 +48,8 @@ export function ImageCanvas({
   lassoActive,
   onLassoComplete,
   onLassoCancel,
+  wandActive,
+  onWandSeed,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -73,6 +76,14 @@ export function ImageCanvas({
   lassoActive?: boolean;
   onLassoComplete?: (points: CanvasPoint[]) => void;
   onLassoCancel?: () => void;
+  /** 🪄 varázspálca-mód: fotóra koppintva szín-szelekció (Skia) */
+  wandActive?: boolean;
+  onWandSeed?: (
+    uri: string,
+    u: number,
+    v: number,
+    box: { position: { x: number; y: number }; w: number; h: number }
+  ) => void;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -137,6 +148,24 @@ export function ImageCanvas({
     );
   };
 
+  // 🪄 varázspálca: a koppintás alatti LEGFELSŐ fotó-réteg + a dobozon belüli lokális (0–1) pont
+  const onWandTap = (nx: number, ny: number) => {
+    for (let i = doc.layers.length - 1; i >= 0; i--) {
+      const l = doc.layers[i];
+      if (l.kind !== 'photo' || l.hidden) continue;
+      const left = l.position.x - l.w / 2;
+      const top = l.position.y - l.h / 2;
+      if (nx >= left && nx <= left + l.w && ny >= top && ny <= top + l.h) {
+        onWandSeed?.(l.uri, (nx - left) / l.w, (ny - top) / l.h, {
+          position: l.position,
+          w: l.w,
+          h: l.h,
+        });
+        return;
+      }
+    }
+  };
+
   return (
     <View
       style={styles.stage}
@@ -192,7 +221,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -235,6 +264,9 @@ export function ImageCanvas({
           {!capturing && lassoActive && onLassoComplete && onLassoCancel ? (
             <LassoOverlay box={fit} onComplete={onLassoComplete} onCancel={onLassoCancel} />
           ) : null}
+
+          {/* 🪄 varázspálca-overlay (fotóra koppintás → szín-szelekció) */}
+          {!capturing && wandActive ? <WandOverlay box={fit} onTap={onWandTap} /> : null}
         </View>
       ) : null}
     </View>

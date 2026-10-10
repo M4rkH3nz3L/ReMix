@@ -2831,6 +2831,7 @@
       "shape": "Form",
       "pen": "Stift",
       "lasso": "Lasso",
+      "wand": "Zauberstab",
       "photo": "Foto",
       "fill": "Hintergrund",
       "delete": "Löschen",
@@ -2931,7 +2932,13 @@
       "undoCrop": "Zuschneiden",
       "undoPen": "Stift-Zeichnung",
       "undoLasso": "Lasso-Form",
+      "undoWand": "Zauberstab-Auswahl",
       "lasso": { "hint": "Freihand eine geschlossene Form zeichnen" },
+      "wand": {
+        "hint": "Tippe ein Foto an, um einen ähnlichen Farbbereich auszuwählen",
+        "failTitle": "Keine Auswahl",
+        "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene."
+      },
       "pen": {
         "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
         "close": "Schließen",

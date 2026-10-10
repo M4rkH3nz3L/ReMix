@@ -5,6 +5,7 @@ import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
+import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
@@ -43,6 +44,9 @@ export function ImageCanvas({
   pathEditId,
   selectedNode,
   onSelectNode,
+  lassoActive,
+  onLassoComplete,
+  onLassoCancel,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -65,6 +69,10 @@ export function ImageCanvas({
   /** ✏️ toll v3: a kijelölt node indexe (ennél jelennek meg a bezier-fogók) */
   selectedNode?: number | null;
   onSelectNode?: (index: number) => void;
+  /** 🪢 lasszó-mód: szabadkézi húzás → zárt path-forma */
+  lassoActive?: boolean;
+  onLassoComplete?: (points: CanvasPoint[]) => void;
+  onLassoCancel?: () => void;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -174,7 +182,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -210,6 +218,11 @@ export function ImageCanvas({
               onHandleLive={onHandleLive}
               onHandleCommit={onHandleCommit}
             />
+          ) : null}
+
+          {/* 🪢 lasszó-overlay (szabadkézi → zárt path) */}
+          {!capturing && lassoActive && onLassoComplete && onLassoCancel ? (
+            <LassoOverlay box={fit} onComplete={onLassoComplete} onCancel={onLassoCancel} />
           ) : null}
         </View>
       ) : null}

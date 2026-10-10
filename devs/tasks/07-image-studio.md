@@ -22,10 +22,12 @@
 | 2 | **CROP / kivágás** (interaktív overlay + arány-presetek + render-biztos reframe) | ✅ KÉSZ · on-device | §2.0c · `c87ff6b` |
 | 3 | **Tükrözés H/V** (flip — preview + worker) | ✅ KÉSZ · on-device | §2.0d · `775b24e` |
 | 4 | Réteg-inspector felszínre hozva (kijelölésre nyíló „Stílus" lap) | ✅ KÉSZ · on-device | §2.0e |
-| 5 | **Toll / vektor pen** (v1 tap-rajz → path-forma · v2 node-húzás) | ✅ KÉSZ · on-device | §2.1 (v3: bezier-handle hátra) |
+| 5 | **Toll / vektor pen** (v1 tap-rajz · v2 node-húzás · v3 bezier-görbék) | ✅ KÉSZ · on-device | §2.1 |
 | 6 | **Gradient-kitöltés** UI (multi-stop, preview-rendelt) | ✅ KÉSZ · on-device | §2.0f |
-| 7 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | 🚧 KÖVETKEZŐ | §2.2 |
-| 8 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
+| 7 | **Lasszó** (szabadkézi → zárt path-forma) | ✅ KÉSZ · on-device | §2.1b |
+| 8 | **Varázspálca** (pixel-szín-szelekció) | ⛔ raszter pixel-hozzáférés kell (natív/worker) | §2.1b megj. |
+| 9 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
+| 10 | (stretch) ecset/raszter-festés + PSD/PDF interop | ⬜ HÁTRA | §2.5/2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
 > [LayerPanel](../../src/components/studio/image/LayerPanel.tsx) inspectorában — csak felfedezhetőbbé kell tenni (#4).
@@ -109,6 +111,13 @@ On-device bizonyítva: a trapéz pink→fehér 135°-os átmenetre váltott; a p
   (négyzet-pöttyök + összekötő vonal), `dragHandle` *mirrored* módban (a szemközti fogó tükrözve követ). Élő újraformálás + egy
   undo-lépés. On-device bizonyítva: a trapéz sarka Smooth-szal íves lett, a fogó húzásával a görbe átformálódott.
 - [ ] ⬜ Hátra (v4): node-törlés/beszúrás (`deleteAnchor`/`insertAnchor`) + broken-fogó mód.
+
+### 2.1b Lasszó (szabadkézi → zárt path-forma) — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+Új „Lasszó" eszköz az ADD csoportban → szabadkézi húzás a vásznon ([LassoOverlay](../../src/components/studio/image/LassoOverlay.tsx):
+a mozgás mentén ritkított pont-mintavétel + élő szaggatott körvonal), felengedésre ZÁRT path-FORMA réteg a `penPath` maggal
+(`pathShapeFromCanvasPoints` closed=true). On-device bizonyítva: a szabadkézi blob zárt sokszög-formává vált (kijelölve, a tollal
+tovább szerkeszthető). Megj.: a „varázspálca" (pixel-alapú szín-szelekció) RASZTER pixel-hozzáférést kér (natív/worker) →
+a jelenlegi tiszta-RN preview-útban nem valósítható meg render-parityvel (külön natív/worker-feladat).
 
 ### 2.2 Effects panel UI — P1
 - [ ] 🖼️ A `layerEffects` mag vezérlő-panelje (hozzáadás/sorrend/paraméterek).

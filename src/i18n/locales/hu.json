@@ -2830,6 +2830,7 @@
       "shapes": "Formák",
       "shape": "Forma",
       "pen": "Toll",
+      "lasso": "Lasszó",
       "photo": "Fotó",
       "fill": "Háttér",
       "delete": "Törlés",
@@ -2929,6 +2930,8 @@
       "undoFlip": "Tükrözés",
       "undoCrop": "Kivágás",
       "undoPen": "Toll-rajz",
+      "undoLasso": "Lasszó-forma",
+      "lasso": { "hint": "Rajzolj szabadkézzel egy zárt formát" },
       "pen": {
         "hint": "Koppints pontokért · az első pontra a záráshoz",
         "close": "Bezár",

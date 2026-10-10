@@ -47,6 +47,7 @@ type ToolKey =
   | 'text'
   | 'shape'
   | 'pen'
+  | 'lasso'
   | 'svg'
   | 'style'
   | 'adjust'
@@ -92,6 +93,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
       { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
       { key: 'pen', icon: 'pencil-outline', labelKey: 'studio.imageTools.pen' },
+      { key: 'lasso', icon: 'ellipse-outline', labelKey: 'studio.imageTools.lasso' },
       { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
     ],
   },
@@ -157,6 +159,7 @@ export function ImageStudioBody({
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
+  const [lassoActive, setLassoActive] = useState(false);
   const canvasRef = useRef<View>(null);
 
   /**
@@ -352,6 +355,15 @@ export function ImageStudioBody({
       case 'shape':
         setSheet('shapePicker'); // 🔷 forma-TÍPUS választó (nem csak téglalap)
         break;
+      case 'lasso':
+        // 🪢 lasszó-mód: szabadkézi húzás → zárt path-forma (más módok bezárva)
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(null);
+        setPenPoints(null);
+        setPathEditId(null);
+        setLassoActive(true);
+        break;
       case 'pen':
         // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
         if (
@@ -495,6 +507,18 @@ export function ImageStudioBody({
       }
     }
     setPenPoints(null);
+  };
+
+  // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma (egy undo-lépés)
+  const commitLasso = (points: CanvasPoint[]) => {
+    if (doc && points.length >= 3) {
+      const shape = pathShapeFromCanvasPoints(points, true, makeId('lyr'));
+      if (shape) {
+        commit(addLayer(doc, shape), t('studio.image.undoLasso'));
+        setSelectedId(shape.id);
+      }
+    }
+    setLassoActive(false);
   };
 
   // ✏️ v3: a KIJELÖLT node típusa (görbe/sarok) — bezier-fogók létrehozása/törlése
@@ -681,6 +705,9 @@ export function ImageStudioBody({
           pathEditId={pathEditId}
           selectedNode={pathEditNode}
           onSelectNode={setPathEditNode}
+          lassoActive={lassoActive}
+          onLassoComplete={commitLasso}
+          onLassoCancel={() => setLassoActive(false)}
         />
       ) : (
         <View style={styles.loading}>
@@ -696,15 +723,17 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {pathEditId
-            ? t('studio.image.pen.editHint')
-            : penPoints
-              ? t('studio.image.pen.hint')
-              : cropRect
-                ? t('studio.image.crop.hint')
-                : selectedLayer
-                  ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-                  : t('studio.image.tapToSelect')}
+          {lassoActive
+            ? t('studio.image.lasso.hint')
+            : pathEditId
+              ? t('studio.image.pen.editHint')
+              : penPoints
+                ? t('studio.image.pen.hint')
+                : cropRect
+                  ? t('studio.image.crop.hint')
+                  : selectedLayer
+                    ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
+                    : t('studio.image.tapToSelect')}
         </Text>
       </View>
 
@@ -794,6 +823,16 @@ export function ImageStudioBody({
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.cropApplyText}>{t('common.done')}</Text>
           </Pressable>
+        </View>
+      ) : lassoActive ? (
+        /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setLassoActive(false)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <Text style={styles.lassoLabel} numberOfLines={1}>
+            {t('studio.image.lasso.hint')}
+          </Text>
         </View>
       ) : (
       /* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */
@@ -1020,4 +1059,5 @@ const styles = StyleSheet.create({
   },
   penCloseText: { color: palette.text, fontSize: 13, fontWeight: '700' },
   penDisabled: { opacity: 0.4 },
+  lassoLabel: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600', paddingLeft: 4 },
 });

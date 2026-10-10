@@ -2830,6 +2830,7 @@
       "shapes": "Formen",
       "shape": "Form",
       "pen": "Stift",
+      "lasso": "Lasso",
       "photo": "Foto",
       "fill": "Hintergrund",
       "delete": "Löschen",
@@ -2929,6 +2930,8 @@
       "undoFlip": "Spiegeln",
       "undoCrop": "Zuschneiden",
       "undoPen": "Stift-Zeichnung",
+      "undoLasso": "Lasso-Form",
+      "lasso": { "hint": "Freihand eine geschlossene Form zeichnen" },
       "pen": {
         "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
         "close": "Schließen",

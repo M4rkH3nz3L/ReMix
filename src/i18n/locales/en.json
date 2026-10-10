@@ -2830,6 +2830,7 @@
       "shapes": "Shapes",
       "shape": "Shape",
       "pen": "Pen",
+      "lasso": "Lasso",
       "photo": "Photo",
       "fill": "Fill",
       "delete": "Delete",
@@ -2929,6 +2930,8 @@
       "undoFlip": "Flip",
       "undoCrop": "Crop",
       "undoPen": "Pen drawing",
+      "undoLasso": "Lasso shape",
+      "lasso": { "hint": "Draw a freehand closed shape" },
       "pen": {
         "hint": "Tap to add points · tap the first point to close",
         "close": "Close",

@@ -1257,6 +1257,14 @@ export type TextLayer = ImageLayerBase & { kind: 'text' } & Omit<
 
 export type ImageLayer = FillLayer | PhotoLayer | ShapeLayer | TextLayer;
 
+/** 📐 kézzel húzott segédvonal (szerkesztő-only) — szerkezetileg a rulers.ts `Guide` */
+export interface ImageGuide {
+  id: string;
+  axis: 'x' | 'y';
+  /** 0…1 normalizált pozíció a vásznon */
+  pos: number;
+}
+
 export interface ImageDoc {
   id: string;
   name: string;
@@ -1271,6 +1279,8 @@ export interface ImageDoc {
   format?: 'raster' | 'vector';
   /** ALULRÓL FÖLFELÉ: a lista első eleme van leghátul */
   layers: ImageLayer[];
+  /** 📐 kézzel húzott segédvonalak (szerkesztő-only; a render NEM égeti be) */
+  guides?: ImageGuide[];
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */
   renderedUri?: string;
 }

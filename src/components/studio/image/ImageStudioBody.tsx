@@ -23,6 +23,7 @@ import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import { magicWandSelect } from '@/lib/magicWandClient';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
+import { compositionGuides } from '@/lib/rulers';
 import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
@@ -56,6 +57,7 @@ type ToolKey =
   | 'style'
   | 'adjust'
   | 'crop'
+  | 'guides'
   | 'align'
   | 'boolean'
   | 'forward'
@@ -111,6 +113,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
     labelKey: 'studio.imageGroups.arrange',
     tools: [
       { key: 'crop', icon: 'crop-outline', labelKey: 'studio.imageTools.crop' },
+      { key: 'guides', icon: 'grid-outline', labelKey: 'studio.imageTools.guides' },
       { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
       { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
       { key: 'rotate', icon: 'refresh-outline', labelKey: 'studio.imageTools.rotate' },
@@ -174,6 +177,7 @@ export function ImageStudioBody({
   const [brushActive, setBrushActive] = useState(false);
   const [brushColor, setBrushColor] = useState('#ff2d95');
   const [brushSize, setBrushSize] = useState(8);
+  const [guidesActive, setGuidesActive] = useState(false);
   const brushRef = useRef<BrushHandle>(null);
   const canvasRef = useRef<View>(null);
 
@@ -444,7 +448,19 @@ export function ImageStudioBody({
         // ✂️ kivágás-mód indítása (a kijelölés + lapok bezárva)
         setSheet(null);
         setSelectedId(null);
+        setGuidesActive(false);
         setCropRect(START_CROP);
+        break;
+      case 'guides':
+        // 📐 vonalzók + segédvonalak mód be/ki (a modal módok bezárva)
+        setSheet(null);
+        setCropRect(null);
+        setPenPoints(null);
+        setPathEditId(null);
+        setLassoActive(false);
+        setWandActive(false);
+        setBrushActive(false);
+        setGuidesActive((v) => !v);
         break;
       case 'align':
         if (canAlignLayer(selectedLayer)) {
@@ -822,6 +838,7 @@ export function ImageStudioBody({
           brushColor={brushColor}
           brushSize={brushSize}
           brushRef={brushRef}
+          guidesActive={guidesActive}
         />
       ) : (
         <View style={styles.loading}>
@@ -837,7 +854,9 @@ export function ImageStudioBody({
           color={selectedLayer ? palette.accent : palette.textDim}
         />
         <Text style={styles.statusText} numberOfLines={1}>
-          {brushActive
+          {guidesActive
+            ? t('studio.image.guides.hint')
+            : brushActive
             ? t('studio.image.brush.hint')
             : wandActive
             ? t('studio.image.wand.hint')
@@ -1002,6 +1021,30 @@ export function ImageStudioBody({
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.cropApplyText}>{t('common.done')}</Text>
           </Pressable>
+        </View>
+      ) : guidesActive ? (
+        /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
+        <View style={styles.cropBar}>
+          <Pressable onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
+            <Ionicons name="close" size={20} color={palette.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => doc && commit({ ...doc, guides: compositionGuides() }, t('studio.image.undoGuides'))}
+            style={styles.penClose}
+            hitSlop={6}
+          >
+            <Text style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
+            style={styles.penClose}
+            hitSlop={6}
+          >
+            <Text style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
+          </Pressable>
+          <Text style={styles.lassoLabel} numberOfLines={1}>
+            {t('studio.image.guides.hint')}
+          </Text>
         </View>
       ) : (
       /* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */

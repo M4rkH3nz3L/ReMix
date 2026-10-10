@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Layers",
       "crop": "Crop",
+      "guides": "Guides",
       "style": "Style",
       "adjust": "Adjust",
       "text": "Text",
@@ -2936,6 +2937,12 @@
       "undoWand": "Magic wand selection",
       "undoBrush": "Brush painting",
       "brush": { "hint": "Paint on the canvas · pick a color and size" },
+      "undoGuides": "Guides",
+      "guides": {
+        "hint": "Tap a ruler to add a guide · drag to the edge to remove",
+        "thirds": "Thirds",
+        "clear": "Clear"
+      },
       "lasso": { "hint": "Draw a freehand closed shape" },
       "wand": {
         "hint": "Tap a photo to select a similar-color region",

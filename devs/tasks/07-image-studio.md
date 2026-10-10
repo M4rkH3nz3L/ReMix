@@ -27,7 +27,8 @@
 | 7 | **Lasszó** (szabadkézi → zárt path-forma) | ✅ KÉSZ · on-device | §2.1b |
 | 8 | **Varázspálca** (pixel-szín-szelekció, Skia) | ✅ KÉSZ · on-device (új Skia-build) | §2.1c |
 | 9 | **Ecset / raszter-festés** (Skia snapshot → fotó-réteg) | ✅ KÉSZ · on-device | §2.1d |
-| 10 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
+| 10 | **Vonalzók & segédvonalak** (+ snap-mozgatás) | ✅ KÉSZ · on-device | §2.4 |
+| 11 | Dedikált **Effektek (fx)** panel (árnyék/ragyogás/stroke) | ⬜ HÁTRA (render-függő) | §2.2 |
 | 11 | (stretch) PSD/PDF interop | ⬜ HÁTRA (worker) | §2.8/2.9 |
 >
 > Megj.: a réteg-tulajdonságok (opacity/blend/stroke/árnyék/glow/text-stílusok) MA is élnek a
@@ -149,8 +150,13 @@ clampel.) v1 egyszerűsítés: a koppintás a fotó-dobozt contain-fit-szerűen 
 ### 2.3 Adjustment stack UI — P1
 - [ ] 🖼️ Az `adjustmentStack` mag vezérlő-UI-ja (stack szerkesztés + élő előnézet).
 
-### 2.4 Rulers / guides UI — P1
-- [ ] 🖼️ `rulers` mag → vonalzó + húzható guide-ok + snap.
+### 2.4 Rulers / guides UI — P1 ✅ KÉSZ (2026-10-10, on-device verifikálva)
+- [x] ✅ Új „Segédvonalak" eszköz (ARRANGE) → [RulersOverlay](../../src/components/studio/image/RulersOverlay.tsx): felső/bal
+  **vonalzó** (tick-ek a `rulerTicks` maggal), a vonalzóra koppintva **segédvonal** (függőleges/vízszintes), a guide húzással
+  mozgatható, a szélre húzva törlődik; „Harmadok" (`compositionGuides`) + „Törlés". A guide-ok a `ImageGuide[]` mezőben a
+  dokumentumban (szerkesztő-only, a render NEM égeti be), undo-zhatóan. **Snap:** a réteg-mozgatás a `snapPointToGuides` maggal
+  (core-tesztelt) illeszkedik a guide-okra ([ImageCanvas](../../src/components/studio/image/ImageCanvas.tsx) `move`). On-device
+  bizonyítva: vonalzók + a Thirds rácsa (3+3 guide) renderel. A snap a magban tesztelt + a move-handlerbe bekötve.
 
 ### 2.5 Pattern picker — P1
 - [ ] 🖼️ `patternFill` mag → minta-választó + paraméterek.

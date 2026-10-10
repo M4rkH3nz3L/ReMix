@@ -10,6 +10,7 @@ import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
+import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
@@ -17,6 +18,7 @@ import type { CropRect } from '@/lib/imageCrop';
 import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
+import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
@@ -55,6 +57,7 @@ export function ImageCanvas({
   brushColor = '#ff2d95',
   brushSize = 8,
   brushRef,
+  guidesActive,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -94,9 +97,12 @@ export function ImageCanvas({
   brushColor?: string;
   brushSize?: number;
   brushRef?: Ref<BrushHandle>;
+  /** 📐 vonalzók + segédvonalak megjelenítése/szerkesztése */
+  guidesActive?: boolean;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
+  const [liveGuide, setLiveGuide] = useState<{ id: string; pos: number } | null>(null);
 
   // a szabad W×H a mérvadó (kép-editor); különben a 3-arányos enum
   const av = doc.width && doc.height ? doc.width / doc.height : aspectValue(doc.aspectRatio);
@@ -107,8 +113,29 @@ export function ImageCanvas({
         : { w: container.w, h: container.w / av }
       : { w: 0, h: 0 };
 
-  const move = (id: string, position: { x: number; y: number }) =>
-    commit(updateLayer(doc, id, { position }), 'move');
+  // 📐 réteg-mozgatás a segédvonalakra illesztve (ha vannak)
+  const move = (id: string, position: { x: number; y: number }) => {
+    const snapped = doc.guides?.length ? snapPointToGuides(position, doc.guides) : null;
+    commit(
+      updateLayer(doc, id, { position: snapped ? { x: snapped.x, y: snapped.y } : position }),
+      'move'
+    );
+  };
+
+  // 📐 segédvonal-műveletek (hozzáadás / élő-mozgatás / rögzítés|törlés)
+  const guides = doc.guides ?? [];
+  const displayGuides = liveGuide
+    ? guides.map((g) => (g.id === liveGuide.id ? { ...g, pos: liveGuide.pos } : g))
+    : guides;
+  const onAddGuide = (axis: 'x' | 'y', pos: number) =>
+    commit({ ...doc, guides: addGuide(guides, axis, pos) }, 'guide-add');
+  const onCommitGuide = (id: string, pos: number | null) => {
+    setLiveGuide(null);
+    commit(
+      { ...doc, guides: pos == null ? removeGuide(guides, id) : moveGuide(guides, id, pos) },
+      'guide'
+    );
+  };
 
   const layers = visibleLayers(doc);
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
@@ -281,6 +308,32 @@ export function ImageCanvas({
           {/* 🖌️ ecset-overlay (Skia raszter-festés) */}
           {!capturing && brushActive ? (
             <BrushOverlay ref={brushRef} box={fit} color={brushColor} size={brushSize} />
+          ) : null}
+
+          {/* 📐 statikus segédvonalak — mindig látszanak, ha vannak (a snap miatt) */}
+          {!capturing && !guidesActive
+            ? guides.map((g) => (
+                <View
+                  key={g.id}
+                  pointerEvents="none"
+                  style={
+                    g.axis === 'x'
+                      ? { position: 'absolute', left: g.pos * fit.w, top: 0, bottom: 0, width: 1, backgroundColor: '#00e5ff' }
+                      : { position: 'absolute', top: g.pos * fit.h, left: 0, right: 0, height: 1, backgroundColor: '#00e5ff' }
+                  }
+                />
+              ))
+            : null}
+
+          {/* 📐 vonalzók + szerkeszthető segédvonalak (guides-mód) */}
+          {!capturing && guidesActive ? (
+            <RulersOverlay
+              box={fit}
+              guides={displayGuides}
+              onAddGuide={onAddGuide}
+              onMoveGuide={(id, pos) => setLiveGuide({ id, pos })}
+              onCommitGuide={onCommitGuide}
+            />
           ) : null}
         </View>
       ) : null}

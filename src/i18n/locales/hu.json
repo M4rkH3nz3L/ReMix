@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Rétegek",
       "crop": "Vágás",
+      "guides": "Segédvonalak",
       "style": "Stílus",
       "adjust": "Korrekció",
       "text": "Szöveg",
@@ -2936,6 +2937,12 @@
       "undoWand": "Varázspálca-kijelölés",
       "undoBrush": "Ecset-festés",
       "brush": { "hint": "Fess a vászonra · válassz színt és méretet" },
+      "undoGuides": "Segédvonalak",
+      "guides": {
+        "hint": "Koppints a vonalzóra új segédvonalhoz · húzd/szélre a törléshez",
+        "thirds": "Harmadok",
+        "clear": "Törlés"
+      },
       "lasso": { "hint": "Rajzolj szabadkézzel egy zárt formát" },
       "wand": {
         "hint": "Koppints egy fotóra a hasonló-szín kijelöléshez",

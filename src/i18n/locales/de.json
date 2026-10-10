@@ -2824,6 +2824,7 @@
     "imageTools": {
       "layers": "Ebenen",
       "crop": "Zuschneiden",
+      "guides": "Hilfslinien",
       "style": "Stil",
       "adjust": "Anpassen",
       "text": "Text",
@@ -2936,6 +2937,12 @@
       "undoWand": "Zauberstab-Auswahl",
       "undoBrush": "Pinsel-Malerei",
       "brush": { "hint": "Auf die Leinwand malen · Farbe und Größe wählen" },
+      "undoGuides": "Hilfslinien",
+      "guides": {
+        "hint": "Lineal antippen für eine Hilfslinie · zum Rand ziehen zum Löschen",
+        "thirds": "Drittel",
+        "clear": "Löschen"
+      },
       "lasso": { "hint": "Freihand eine geschlossene Form zeichnen" },
       "wand": {
         "hint": "Tippe ein Foto an, um einen ähnlichen Farbbereich auszuwählen",

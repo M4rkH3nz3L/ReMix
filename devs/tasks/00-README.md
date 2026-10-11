@@ -75,6 +75,10 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 > „soha ne vessz el munka" mentés (atomi + crash-recovery). **Minden stúdió és az AI erre a magra épül**
 > (audit §19 `Editor core ~70–80%` → **~100%**) — a 06/07/03/05 epikek erre a szilárd magra építhetnek.
 
+> **🎬 Prod-videó-stúdió:** mi hiányzik még a videó-stúdió **production** készültségéhez (render-parity
+> élő-verifikáció, prod worker-infra, export-megbízhatóság, bemeneti-formátum-robusztusság, eszközön-render):
+> [VIDEO-STUDIO-PROD.md](./VIDEO-STUDIO-PROD.md) — a 06 (feature) + 01 (infra) + NATIVE (eszköz) prod-deltája egy helyen.
+
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
 | 🧱 | **Editor-mag (alapfunkció)** | 🔴 **P0/P1** | **[CORE.md](./CORE.md)** |

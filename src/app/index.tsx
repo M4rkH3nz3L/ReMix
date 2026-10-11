@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -1148,7 +1149,7 @@ export default function FeedScreen() {
         <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
           {channelId ? (
             <View style={styles.channelBar}>
-              <Pressable onPress={() => router.back()} hitSlop={12}>
+              <Pressable onPress={() => goBackOrHome()} hitSlop={12}>
                 <Ionicons name="chevron-back" size={26} color="#fff" />
               </Pressable>
               <Text style={styles.channelTitle} numberOfLines={1}>

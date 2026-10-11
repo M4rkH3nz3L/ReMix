@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -245,7 +246,7 @@ export default function LiveStudioScreen() {
         <View style={styles.center}>
           <Ionicons name="alert-circle-outline" size={44} color={palette.border} />
           <Text style={styles.dim}>{t('common.error')}</Text>
-          <Pressable style={styles.secondaryBtn} onPress={() => router.back()}>
+          <Pressable style={styles.secondaryBtn} onPress={() => goBackOrHome()}>
             <Text style={styles.secondaryText}>{t('live.leave')}</Text>
           </Pressable>
         </View>
@@ -302,7 +303,7 @@ export default function LiveStudioScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* fejléc */}
       <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
+        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.text} />
         </Pressable>
         <TextInput

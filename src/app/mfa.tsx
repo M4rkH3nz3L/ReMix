@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -133,7 +133,7 @@ export default function MfaScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>

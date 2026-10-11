@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text } from 'react-native';
@@ -71,7 +72,7 @@ export default function AudioStudioScreen() {
       <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
         <Ionicons name="alert-circle-outline" size={40} color={palette.border} />
         <Text style={styles.missing}>{t('studio.notFound')}</Text>
-        <Pressable style={styles.backPill} onPress={() => router.back()}>
+        <Pressable style={styles.backPill} onPress={() => goBackOrHome()}>
           <Text style={styles.backPillText}>{t('studio.backToProjects')}</Text>
         </Pressable>
       </SafeAreaView>
@@ -122,7 +123,7 @@ export default function AudioStudioScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <AudioLayer />
-      <AudioStudioBody mode="project" title={project.name} onExit={() => router.back()} onExport={openExport} />
+      <AudioStudioBody mode="project" title={project.name} onExit={() => goBackOrHome()} onExport={openExport} />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -304,13 +305,13 @@ export default function LiveRoomScreen() {
             {
               text: t('common.notNow', { defaultValue: 'Most nem' }),
               style: 'cancel',
-              onPress: () => router.back(),
+              onPress: () => goBackOrHome(),
             },
             {
               text: t('live.vodShare', { defaultValue: 'Megosztás' }),
               onPress: () => {
                 void publishLiveVod(proj, vod).catch(() => {});
-                router.back();
+                goBackOrHome();
               },
             },
           ],
@@ -318,7 +319,7 @@ export default function LiveRoomScreen() {
         return; // a navigációt az Alert-gombok végzik
       }
     }
-    router.back();
+    goBackOrHome();
   };
 
   // host kilépéskor (unmount) best-effort leállítás
@@ -341,7 +342,7 @@ export default function LiveRoomScreen() {
         <View style={styles.center}>
           <Ionicons name="radio-outline" size={48} color={palette.border} />
           <Text style={styles.endedText}>{t('live.ended')}</Text>
-          <Pressable style={styles.leaveBtn} onPress={() => router.back()}>
+          <Pressable style={styles.leaveBtn} onPress={() => goBackOrHome()}>
             <Text style={styles.leaveText}>{t('live.leave')}</Text>
           </Pressable>
         </View>

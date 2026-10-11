@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +22,7 @@ export default function LegalScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 32 }}>
+        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={{ width: 32 }}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>

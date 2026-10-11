@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -135,7 +136,7 @@ export default function CommandPaletteScreen() {
           returnKeyType="search"
           testID="cmdk-input"
         />
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="cmdk-close">
+        <Pressable onPress={() => goBackOrHome()} hitSlop={10} testID="cmdk-close">
           <Ionicons name="close" size={22} color={palette.textDim} />
         </Pressable>
       </View>

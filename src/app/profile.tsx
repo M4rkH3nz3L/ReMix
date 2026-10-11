@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -558,7 +559,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />
           <Text style={styles.backText}>{t('common.back')}</Text>
         </Pressable>

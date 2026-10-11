@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -409,7 +409,7 @@ export default function AdminScreen() {
 function Header({ t }: { t: (k: string) => string }) {
   return (
     <View style={styles.header}>
-      <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 32 }}>
+      <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={{ width: 32 }}>
         <Ionicons name="chevron-back" size={22} color={palette.text} />
       </Pressable>
       <Text style={styles.headerTitle}>{t('admin.title')}</Text>

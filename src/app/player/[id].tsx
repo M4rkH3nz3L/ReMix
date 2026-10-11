@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -122,7 +123,7 @@ export default function PlayerScreen() {
       <View style={styles.playerArea}>
         <PreviewSurface mode="play" onHotspotPress={onHotspotPress} />
         <AudioLayer />
-        <Pressable onPress={() => router.back()} style={styles.closeButton} hitSlop={8}>
+        <Pressable onPress={() => goBackOrHome()} style={styles.closeButton} hitSlop={8}>
           <Ionicons name="close" size={22} color={palette.text} />
         </Pressable>
         {/* ▶️ Középső Play — állj/vége állapotban látszik. Weben ez a KOPPINTÁS az

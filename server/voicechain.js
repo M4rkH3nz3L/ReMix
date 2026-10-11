@@ -181,6 +181,7 @@ module.exports = {
   audioFxChain,
   panFilter,
   masterGraph,
+  masterEq,
   masterLra,
   dbToLinear,
   RNNOISE,

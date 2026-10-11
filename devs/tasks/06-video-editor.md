@@ -5,12 +5,13 @@
 
 ---
 
-> **📊 Haladás (2026-10-11):** ✅ 4 teljes · 🟡 5 mag kész · ⬜ 2 nyitva — Σ 11 tétel.
+> **📊 Haladás (2026-10-11):** ✅ 5 teljes · 🟡 4 mag kész · ⬜ 2 nyitva — Σ 11 tétel.
 > Keyframe / color / animated-mask / **effect-chain** / freeze+reverse kész (preview↔render parity;
 > a vizuális kimenet élő-ffmpeg-gel verifikálandó) + a **projekt forrás-mappa** a Toolbaron (§2.10).
 > **2026-10-11:** a **proxy-engine (§2.9)** lifecycle + LRU size-management KÉSZ (pure `planCacheEviction`
-> tesztelt + `pruneProxyCache` bekötve a szerkesztőbe). Hátra: profi **audio-UI** (§2.7), GIF-dekód+render
-> (§2.8), render-output cache (§2.9 maradék) és a teljes **uri→assetId** refaktor (§2.10).
+> tesztelt + `pruneProxyCache` bekötve), és a **profi audio-UI (§2.7)** lezárva (modell + render + UI már
+> megvolt → a render audio-lánc regressziós teszttel bizonyítva). Hátra: GIF-dekód+render (§2.8),
+> render-output cache (§2.9 maradék), teljes **uri→assetId** refaktor (§2.10), Creative Canvas (§2.11).
 
 ## 0. Kontextus & cél
 Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok mag kész, de a
@@ -66,8 +67,18 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   - [x] ✅ **Skew render**: [render.js](../../server/render.js) KÜLÖN `skewChain` pass (a `tiltChain`-t NEM érinti → bizonyított tilt-render változatlan, zéró regresszió), a kliens `shearPoint`-jával AZONOS matekkal + a `tiltChain` perspektíva-filter-mintájával; `padW/padH` `skewGrow`-val (ne vágódjon le). Guardolt (skew nélkül nincs pass). Szintaxis OK + audit zöld. ⚠️ **Runtime-verify**: a vizuális helyesség élő ffmpeg-gel igazolandó (itt nincs render-worker+ffmpeg).
   - [ ] ⬜ **Anchor-pivot render** (follow-up): a rotate-filter középpont-pivot; az anchor-pivot translate-rotate-translate — preview-ben már jó, a renderhez külön óvatos lépés.
 
-### 2.7 Profi audio UI — P1
-- [ ] 🖼️ Audio-mixer core kész → UI: **EQ/compressor/limiter/pan/normalize/noise-hum/sidechain/automation**.
+### 2.7 Profi audio UI — P1 ✅ KÉSZ (2026-10-11: render-lánc tesztelve)
+- [x] ✅ **Modell + render + UI mind kész** (az audit `main`-je elavult): per-klip `AudioFx`
+  ([project.ts](../../src/types/project.ts)) = highpass/lowpass/**3-sávos EQ**/denoise/deEsser/**compressor**/
+  **limiter**/**normalize**/reverb/delay, plusz `pan`, `autoDuck` (sidechain-jellegű ducking) és hangerő-
+  **automáció** (volume keyframes). Render: `audioFxChain`/`panFilter`/`voiceChain`/`masterGraph`
+  ([server/voicechain.js](../../server/voicechain.js)). UI: [AudioPanel](../../src/components/editor/panels/AudioPanel.tsx)
+  „fx" + „mix" szekció (Stepper-ek + chipek, `setFx`/`setEq`).
+- [x] ✅ **Render-lánc regressziós teszt (ÚJ, 2026-10-11)**: [server/voicechain.test.js](../../server/voicechain.test.js)
+  (22 eset) leszögezi az FFmpeg-szűrő-stringeket — `audioFxChain` (sorrend: szűrők→zaj→dinamika→tér→
+  normalizálás→limiter, + clamp/kerekítés), `panFilter` (sztereó pásztázás), `voiceChain`, `masterEq`/
+  `masterGraph` (EQ + 3-sávos multiband), `dbToLinear`, `masterLra`. A render audio-pipeline eddig
+  TESZTELETLEN volt (néma-regresszió-veszély); a `masterEq` most exportálva. (Live-ffmpeg runtime-verify a követő.)
 
 ### 2.8 GIF — P1
 - [x] ✅ **GIF-időzítés mag KÉSZ (2026-10-06)**: [src/lib/gifTiming.ts](../../src/lib/gifTiming.ts) — a master-óra playheadjéből (AGENTS.md: minden réteg a playheadből számol) `frameIndexAt` (a megjelenítendő kocka a változó kocka-késleltetésekből, loop-aware: loop=true ciklus, loop=false az utolsó kockán áll) + `gifDuration` + `loopCountAt`; a 0/negatív/NaN késleltetés a GIF-konvenció szerint 100 ms. Teszt: `gifTiming.test.ts` (7).

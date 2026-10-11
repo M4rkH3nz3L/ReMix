@@ -431,6 +431,16 @@ export async function uploadMediaResult(
  * (natívan `File`-ba, weben Blobként/URL-lel). A `base` a worker címe — natívan
  * a Pro-kapu mögötti `ensureCloud(...)`, weben a nyers `cloudBaseUrl()`.
  */
+/** 🛑 Best-effort szerver-oldali render-megszakítás (fire-and-forget): a worker
+ *  ffmpeg-jét leállítja / a sorból eltávolítja. A kliens nem várja meg a választ. */
+async function cancelRender(base: string, id: string): Promise<void> {
+  try {
+    await fetch(`${base}/render/${id}/cancel`, { method: 'POST', headers: await workerAuthHeaders() });
+  } catch {
+    // best-effort — a kliens akkor is megszakítottnak tekinti
+  }
+}
+
 async function submitAndPollRender(
   base: string,
   project: Project,
@@ -525,6 +535,7 @@ async function submitAndPollRender(
   const STALL_RECHECK_POLLS = 12; // ~18 mp zéró-progress után ellenőrizzük a workert
   for (let i = 0; i < MAX_POLLS; i++) {
     if (signal?.aborted) {
+      void cancelRender(base, id); // 🛑 a szervert is szóljuk (ffmpeg-kill / sor-eltávolítás)
       throw new RenderCancelledError();
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));

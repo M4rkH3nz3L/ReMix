@@ -78,6 +78,30 @@ async function getRenderJob(id) {
   };
 }
 
+/**
+ * 🛑 Best-effort render-job megszakítás a sorban: a VÁRAKOZÓ (waiting/delayed/
+ * paused) jobot eltávolítja; az ÉPP FUTÓ (active) ffmpeg-et a külön worker-
+ * folyamatból innen nem tudjuk leállítani (kooperatív abort = követő lépés). A
+ * hívó (index.js) a `userId`-vel BOLA-ellenőriz. @returns {found,userId,removed,active}
+ */
+async function cancelRenderJob(id) {
+  const job = await renderQueue().getJob(id);
+  if (!job) {
+    return { found: false, userId: null, removed: false, active: false };
+  }
+  const state = await job.getState();
+  const userId = job.data?.userId ?? null;
+  if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+    try {
+      await job.remove();
+      return { found: true, userId, removed: true, active: false };
+    } catch {
+      return { found: true, userId, removed: false, active: false };
+    }
+  }
+  return { found: true, userId, removed: false, active: state === 'active' };
+}
+
 /** Ahány render-worker-szál egyszerre dolgozik (a schedules-ETA ezzel skáláz). */
 function renderConcurrency() {
   return Math.max(1, parseInt(process.env.RENDER_CONCURRENCY || '2', 10));
@@ -130,6 +154,7 @@ module.exports = {
   enqueueRender,
   tierJobPriority,
   getRenderJob,
+  cancelRenderJob,
   listRenderJobs,
   renderConcurrency,
   connection,

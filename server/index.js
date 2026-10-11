@@ -32,7 +32,7 @@ const { renderProject } = require('./render');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
-const { queueEnabled, enqueueRender, getRenderJob, listRenderJobs, renderConcurrency } = require('./queue');
+const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJobs, renderConcurrency } = require('./queue');
 const { listWorkers } = require('./workers-registry');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { mediaStoreEnabled, uploadMedia: mediaStoreUpload, LOCAL_DIR: MEDIA_LOCAL_DIR, BUCKET: MEDIA_BUCKET } = require('./mediastore');
@@ -1947,7 +1947,10 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
   // tehát req.user a verifikált tokenből jön; dev-ben (INSECURE_DEV) a body-fallback.
   // Ezt MINDEN állapot-frissítésnél megőrizzük (a jobs.set teljes objektumot cserél).
   const uid = req.user?.id || (INSECURE_DEV && req.body.userId ? String(req.body.userId).trim() : null) || null;
-  jobs.set(id, { state: 'processing', progress: 0, dir: workDir, userId: uid });
+  // 🛑 megszakítás: a kliens ✕-je a /render/:id/cancel-en át abortálja ezt a
+  // controllert → az ffmpeg azonnal leáll, a temp-mappa törlődik (nincs pazarlás).
+  const controller = new AbortController();
+  jobs.set(id, { state: 'processing', progress: 0, dir: workDir, userId: uid, abort: () => controller.abort() });
   res.json({ id });
 
   let settings = {};
@@ -1965,14 +1968,21 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
         job.progress = progress;
       }
     },
-    settings
+    settings,
+    controller.signal
   )
     .then((file) => {
       jobs.set(id, { state: 'done', file, dir: workDir, userId: uid });
     })
     .catch((err) => {
-      console.error(`[${id}] render hiba:`, err.message);
-      jobs.set(id, { state: 'error', error: err.message, dir: workDir, userId: uid });
+      if (controller.signal.aborted) {
+        // megszakítva: nem hiba — a jobot lezárjuk és a temp-mappát takarítjuk
+        jobs.set(id, { state: 'cancelled', dir: workDir, userId: uid });
+        fs.rm(workDir, { recursive: true, force: true }, () => {});
+      } else {
+        console.error(`[${id}] render hiba:`, err.message);
+        jobs.set(id, { state: 'error', error: err.message, dir: workDir, userId: uid });
+      }
     });
 });
 
@@ -2612,6 +2622,39 @@ app.get('/render/:id/file', renderJobAuth, async (req, res) => {
     }
   }
   res.status(404).json({ error: 'A render még nem készült el.' });
+});
+
+// 🛑 Render MEGSZAKÍTÁS (12 §2.3): a kliens ✕-je ide szól → a lokális (in-process)
+// render ffmpeg-jét azonnal leállítjuk (AbortController), a sorban VÁRAKOZÓ jobot
+// eltávolítjuk. Idempotens: ismeretlen/már-kész jobra is OK (a kliens csak jelez).
+// BOLA: renderJobAuth + tulaj-egyezés (idegen jobot nem lehet megszakítani).
+app.post('/render/:id/cancel', renderJobAuth, async (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (job) {
+    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+      denyRenderJob(req, res, job.userId);
+      return;
+    }
+    try {
+      job.abort?.(); // → az ffmpeg SIGKILL + a temp-mappa törlése a render catch-ágában
+    } catch {
+      /* már leállt */
+    }
+    res.json({ ok: true, mode: 'local' });
+    return;
+  }
+  if (queueEnabled()) {
+    const r = await cancelRenderJob(req.params.id).catch(() => null);
+    if (r && r.found) {
+      if (!canAccessRenderJob(r.userId, req.user?.id)) {
+        denyRenderJob(req, res, r.userId);
+        return;
+      }
+      res.json({ ok: true, mode: 'queue', removed: r.removed, active: r.active });
+      return;
+    }
+  }
+  res.json({ ok: true, mode: 'none' });
 });
 
 // 🔌 Storage-gateway: a user SAJÁT külső forrásai (Google Drive / Dropbox / WebDAV

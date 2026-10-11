@@ -854,13 +854,34 @@ function visualSegments(project, total) {
  * ffmpeg futtatása előrehaladás-jelentéssel: a -progress kimenet out_time_us
  * sora (mikroszekundum) osztva a teljes hosszal adja a 0-1 arányt.
  */
-function runFfmpegWithProgress(args, totalSeconds, onProgress) {
+function runFfmpegWithProgress(args, totalSeconds, onProgress, signal) {
   return new Promise((resolve, reject) => {
+    // 🛑 megszakítás-tudatos: ha a hívó (kliens ✕) már abortált, el se indítjuk
+    if (signal && signal.aborted) {
+      reject(new Error('render megszakítva'));
+      return;
+    }
     // a -progress globális opció — a kimeneti fájl elé kell, különben az
     // ffmpeg második kimenetként értelmezné a pipe:1-et
     const child = spawn('ffmpeg', ['-progress', 'pipe:1', '-nostats', ...args], {
       timeout: 10 * 60 * 1000,
     });
+    // 🛑 abort → az ffmpeg-processt AZONNAL megállítjuk (ne pazaroljon CPU-t/lemezt)
+    const onAbort = () => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        /* a process már leállt */
+      }
+    };
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    const unbind = () => {
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
+    };
     let stderrTail = '';
     let buffer = '';
     child.stdout.on('data', (chunk) => {
@@ -878,9 +899,15 @@ function runFfmpegWithProgress(args, totalSeconds, onProgress) {
     child.stderr.on('data', (chunk) => {
       stderrTail = (stderrTail + chunk.toString()).slice(-2000);
     });
-    child.on('error', (err) => reject(new Error(`ffmpeg hiba: ${err.message}`)));
+    child.on('error', (err) => {
+      unbind();
+      reject(new Error(`ffmpeg hiba: ${err.message}`));
+    });
     child.on('close', (code) => {
-      if (code === 0) {
+      unbind();
+      if (signal && signal.aborted) {
+        reject(new Error('render megszakítva'));
+      } else if (code === 0) {
         resolve();
       } else {
         reject(new Error(`ffmpeg hiba: ${stderrTail}`));
@@ -901,7 +928,7 @@ function runFfmpegWithProgress(args, totalSeconds, onProgress) {
  * kész fájlra cseréli (a `comp`-ot törli) → onnantól sima videó-klip. Így a fő
  * render változatlan úton kompozitál. A rekurzió a levél-kompozícióknál megáll.
  */
-async function resolveCompounds(project, workDir, settings) {
+async function resolveCompounds(project, workDir, settings, signal) {
   let idx = 0;
   const tracks = [];
   for (const tk of project.tracks) {
@@ -921,7 +948,7 @@ async function resolveCompounds(project, workDir, settings) {
         const subDir = path.join(workDir, `comp_${idx++}`);
         try {
           fs.mkdirSync(subDir, { recursive: true });
-          await renderProject(sub, subDir, () => {}, settings); // ← rekurzió
+          await renderProject(sub, subDir, () => {}, settings, signal); // ← rekurzió (abort-tudatos)
           const mp4 = path.join(subDir, 'out.mp4');
           const dur = projectDuration(sub);
           clips.push({ ...c, uri: mp4, comp: undefined, trimIn: c.trimIn ?? 0, sourceDuration: dur, speed: c.speed ?? 1 });
@@ -937,7 +964,7 @@ async function resolveCompounds(project, workDir, settings) {
   return { ...project, tracks };
 }
 
-async function renderProject(project, workDir, onProgress, settings = {}) {
+async function renderProject(project, workDir, onProgress, settings = {}, signal) {
   // export-beállítások (P0-design): felbontás/fps/minőség a kliens Export
   // paneljéről — a FPS a modul-konstans árnyékolásával jut el minden lánchoz
   const shortSide = Math.min(2160, Math.max(480, parseInt(settings.resolution, 10) || 1080));
@@ -950,8 +977,11 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
   const even = (v) => Math.round((v * scale) / 2) * 2;
   const canvas = { w: even(base.w), h: even(base.h) };
   const { w: W, h: H } = canvas;
+  if (signal && signal.aborted) {
+    throw new Error('render megszakítva');
+  }
   // 🧱 compound clip / pre-compose: a beágyazott kompozíciók rekurzív renderje MP4-be
-  project = await resolveCompounds(project, workDir, settings);
+  project = await resolveCompounds(project, workDir, settings, signal);
   const total = projectDuration(project);
   if (total <= 0) {
     throw new Error('Üres projekt — nincs mit renderelni.');
@@ -2641,7 +2671,7 @@ async function renderProject(project, workDir, onProgress, settings = {}) {
     '-movflags', '+faststart',
     outFile,
   ];
-  await runFfmpegWithProgress(args, total, onProgress);
+  await runFfmpegWithProgress(args, total, onProgress, signal);
 
   // 🎚️ MASTER (kétmenetes): EQ + multiband + loudnorm(mért, linear) + alimiter a
   // kész keverékre. Hiba esetén a mester NÉLKÜLI kimenet marad (nem bukik a render).

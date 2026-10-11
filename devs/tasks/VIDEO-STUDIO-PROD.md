@@ -50,8 +50,13 @@ megosztás 25%-on ragad** — lásd a dev-stack-jegyzetet.)
 ### 3. 🟡 Export-megbízhatóság end-to-end (→ [12 §2.3](./12-code-quality.md))
 - [x] ✅ **Kliens-oldali cancellation ALAP**: a `renderCloud`/`submitAndPollRender` ([render.ts](../../src/lib/render.ts))
   `AbortSignal`-tudatos (`MAX_POLLS` ~10 perc timeout). (Natív oldalon is kész, lásd [12 §2.3](./12-code-quality.md).)
-- [ ] 🔌 **Worker-oldali job-cancel + temp-cleanup**: a megszakított kliens-kérés tényleg állítsa le az FFmpeg-
-  processt a workeren és takarítsa a köztes fájlokat (ma a kliens elenged, a worker tovább dolgozhat).
+- [x] ✅ **Worker-oldali job-cancel + temp-cleanup KÉSZ (2026-10-11)**: a kliens ✕-je a `/render/:id/cancel`-en
+  (BOLA: renderJobAuth + tulaj) át a LOKÁLIS (in-process) rendert `AbortController`-rel megszakítja → az
+  ffmpeg **SIGKILL** azonnal (a `runFfmpegWithProgress`/`renderProject`/`resolveCompounds` signal-tudatos,
+  backward-kompatibilis) + a temp-mappa törlődik; a sorban VÁRAKOZÓ jobot `cancelRenderJob` eltávolítja. A
+  kliens (`render.ts`) a poll-abortnál best-effort meghívja. **Élőben verifikálva** (eldobható API): 21.7%-on
+  renderelő job → cancel → azonnal `cancelled` + a fájl 404. **Hátra:** az ÉPP FUTÓ felhő-queue job
+  cross-process (kooperatív) abortja — a worker figyeljen egy Redis abort-flaget (follow-up).
 - [x] ✅ **Worker-hiány fail-fast KÉSZ (2026-10-11)**: a `/render` enqueue-ág a szerveren elutasít (503), ha
   `listWorkers()` üres (a média-feltöltés ELŐTT), a `/health` pedig jelenti a **worker-számot**; a kliens a
   tesztelt `cloudRenderBlocked` ([renderPreflight.ts](../../src/lib/renderPreflight.ts)) preflighttal MÁR a

@@ -61,7 +61,9 @@ async function renderOne(name, project, mediaFiles) {
     form.append(field, new Blob([buf]), path.basename(file));
   });
   form.append('uriMap', JSON.stringify(uriMap));
-  form.append('userId', 'smoke');
+  // ⚠️ SZÁNDÉKOSAN nincs userId → a job „tulajdonos-nélküli", így a státusz-poll
+  // és a fájl-letöltés token nélkül is hozzáfér (canAccessRenderJob: owner-less
+  // = korlátlan). userId-vel a BOLA-védelem tiltaná a token nélküli pollt.
   form.append('tier', 'pro');
 
   const submit = await fetch(`${BASE}/render`, { method: 'POST', body: form });

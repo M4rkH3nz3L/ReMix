@@ -24,6 +24,7 @@ import {
   type UsageMetric,
 } from '@/lib/usageMeter';
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
+import { fontFiles, fontOptions } from '@/constants/fonts';
 import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
 import {
   VIDEO_EFFECTS,
@@ -36,6 +37,9 @@ import type { VideoEffect } from '@/types/project';
 /* eslint-disable @typescript-eslint/no-require-imports */
 const workerUsage = require('../../server/usage');
 const workerRender = require('../../server/render');
+const workerFonts = require('../../server/fonts');
+const fs = require('fs');
+const path = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 describe('contract: usage-kvóta (usageMeter.ts ⇄ server/usage.js)', () => {
@@ -187,6 +191,42 @@ describe('contract: keyframe bezier-easing (keyframes.ts ⇄ server/render.js)',
     const custom: [number, number, number, number] = [0.2, 0.8, 0.3, 0.9];
     for (const p of ps) {
       expect(workerRender.bezierEaseNode(custom, p)).toBe(bezierEase(custom, p));
+    }
+  });
+});
+
+describe('contract: font-parity (constants/fonts.ts ⇄ server/fonts.js ⇄ _layout useFonts ⇄ TTF-ek)', () => {
+  const ROOT = process.cwd(); // a jest a repo-gyökérből fut
+
+  it('a kliens fontFiles bitre egyezik a worker FONT_FILES-szel (nincs drift)', () => {
+    // a preview (app @font-face) és az export (worker @font-face) UGYANABBÓL a
+    // family→TTF leképezésből dolgozik → bármelyik oldal bővítése a másik nélkül piros
+    expect(fontFiles).toEqual(workerFonts.FONT_FILES);
+  });
+
+  it('minden UI font-opció (family-vel) szerepel a render-készletben (Preview == Export)', () => {
+    for (const opt of fontOptions) {
+      if (opt.family) {
+        expect(Object.keys(fontFiles)).toContain(opt.family);
+      }
+    }
+  });
+
+  it('minden family TTF-je LÉTEZIK az appban ÉS a workerben is (nincs néma fallback)', () => {
+    for (const [family, file] of Object.entries(fontFiles)) {
+      expect(typeof file === 'string' && file.endsWith('.ttf')).toBe(true);
+      const appTtf = path.join(ROOT, 'assets', 'fonts', file);
+      const workerTtf = path.join(ROOT, 'server', 'assets', 'fonts', file);
+      expect({ family, app: fs.existsSync(appTtf) }).toEqual({ family, app: true });
+      expect({ family, worker: fs.existsSync(workerTtf) }).toEqual({ family, worker: true });
+    }
+  });
+
+  it('minden family regisztrálva van az app expo-font useFonts-ban (_layout.tsx) → a preview megjeleníti', () => {
+    const layout = fs.readFileSync(path.join(ROOT, 'src', 'app', '_layout.tsx'), 'utf8');
+    for (const [family, file] of Object.entries(fontFiles)) {
+      expect({ family, registered: layout.includes(`${family}: require(`) }).toEqual({ family, registered: true });
+      expect({ family, file, present: layout.includes(file) }).toEqual({ family, file, present: true });
     }
   });
 });

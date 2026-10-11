@@ -41,20 +41,10 @@ function findChromium() {
   return null;
 }
 
-// Választható betűtípusok (a család-név egyezik az app expo-font kulcsával).
-// A TTF base64 data-URI-ként ágyazódik a HTML-be — nem kell Chromium file-access.
-const FONT_FILES = {
-  Anton: 'Anton-Regular.ttf',
-  BebasNeue: 'BebasNeue-Regular.ttf',
-  Poppins: 'Poppins-Bold.ttf',
-  Pacifico: 'Pacifico-Regular.ttf',
-  Bungee: 'Bungee-Regular.ttf',
-  Oswald: 'Oswald-Regular.ttf',
-  ArchivoBlack: 'ArchivoBlack-Regular.ttf',
-  Righteous: 'Righteous-Regular.ttf',
-  Lobster: 'Lobster-Regular.ttf',
-  PermanentMarker: 'PermanentMarker-Regular.ttf',
-};
+// Választható betűtípusok (a család-név egyezik az app expo-font kulcsával) — a
+// render EGYETLEN forrása a függőség-mentes ./fonts (a kliens↔worker parity-t a
+// src/lib/contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
+const { FONT_FILES } = require('./fonts');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
 const fontFaceCache = {};
 

@@ -111,11 +111,14 @@ A prod-userek tetszőleges képet dobnak be (fotó-réteg / varázspálca-forrá
 ### 6. 🔌 PDF / PSD export (07 §2.9)
 - [ ] 🔌 Worker: **PDF-export** (nyomdakész) + **PSD-export** (réteg-megtartó) + AI-kompatibilis workflow.
 
-### 7. 🎨 Font-parity (preview ↔ worker)
-- [ ] 🎞️ A worker a **bundled TTF-eket** (`server/assets/fonts/`) használja a text-réteghez; az on-device preview
-  a RENDSZER-fontokat — ellenőrizni, hogy a UI font-választék egyezik a worker-készlettel (különben a szöveg
-  mást mutat szerkesztéskor, mint az exportban). A hiányzó fontok a worker-image-be (a Dockerfile emoji+latin
-  alapot már ad).
+### 7. ✅ Font-parity (preview ↔ worker) — KÉSZ
+- [x] ✅ **Contract-zárolt font-parity**: a text-réteg family-neve 4 helyen él (UI-választék
+  [constants/fonts.ts](../../src/constants/fonts.ts), app expo-font [_layout.tsx](../../src/app/_layout.tsx) useFonts,
+  worker [server/fonts.js](../../server/fonts.js) `FONT_FILES`, TTF-ek `assets/fonts/` + `server/assets/fonts/`). A
+  worker `FONT_FILES`-t kiemeltem egy függőség-mentes `server/fonts.js`-be, és a [contract.test.ts](../../src/lib/contract.test.ts)
+  4 új teszttel zárolja: (a) kliens `fontFiles` ≡ worker `FONT_FILES`, (b) minden UI-opció family-je a render-készletben
+  (Preview==Export), (c) minden TTF LÉTEZIK appban ÉS workerben (nincs néma fallback), (d) minden family regisztrálva
+  a useFonts-ban. Bármely oldal bővítése a másik nélkül → piros teszt (CI).
 
 ### 8. ⬜ Nagy-doc performancia
 - [ ] ⬜ Sok réteg / nagy vászon: on-device preview reszponzivitás (réteg-virtualizáció?), a `/imagedoc` render-idő,

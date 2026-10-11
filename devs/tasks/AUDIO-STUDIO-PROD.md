@@ -38,8 +38,8 @@
 
 | Szint | Tétel | Állapot |
 |------|-------|---------|
-| **P0 #1** | Export-parity ÉLŐ verifikáció (audio-smoke: render → LUFS/peak/hossz mérés) | ⬜ |
-| **P0 #2** | Preview↔export parity a per-klip fx-re + masterre (vagy jelzett eltérés) | ⬜ |
+| **P0 #1** | Export-parity ÉLŐ verifikáció (audio-smoke: render → LUFS/TP/hossz/pan mérés) | ✅ |
+| **P0 #2** | Preview↔export parity a per-klip fx-re + masterre (vagy jelzett eltérés) | ⬜ *(device)* |
 | **P0 #3** | Export-teljesség (formátum ✅ wav/mp3/aac/flac · minőség/sample-rate/channel UI) | 🟡 |
 | **P0 #4** | Worker-infra: az audio-export a /render queue-n megy (>15s) → worker kell | 🔌 |
 | **P1 §5** | Bemeneti audio-robusztusság (formátumok/sample-rate/hossz/néma/korrupt → barátságos hiba) | ⬜ |
@@ -52,17 +52,22 @@
 
 ## P0 — e nélkül nincs megbízható prod-export
 
-### 1. 🎧 Export-parity ÉLŐ verifikáció („amit hallasz == amit exportálsz") — a #1 prod-gate
-A `voicechain.test.js` ma a **filter-STRINGET** ellenőrzi, de nincs **tényleges render + mérés**. A kép/videó mintára
-(render-smoke / imagedoc-smoke) megépíthető — az audio-export a `/render`-en in-process megy (≤15s), ffmpeg-gel.
-- [ ] 🎧 **Audio-smoke mátrix**: 1-1 rövid audio-fixture MINDEN hang-funkcióra → worker-render → **mérés**
-  (`ffprobe`/loudnorm: **hossz**, **Integrated LUFS**, **True-Peak**, csatorna): **volume-automation** · **fade in/out** ·
-  **pan** (L/R energia-eltolás) · **per-klip audioFx** (highpass/lowpass/EQ/denoise/deesser/compressor/reverb/delay/
-  limiter) · **voice-enhance** + **de-reverb** · **autoDuck** · **Master** (LUFS-preset → a kész mix a célon ±1 LU-n
-  belül, TP ≤ cél) · **multiband** · **több-track mix** (music+voiceover+sfx).
-- [ ] 🎧 **Master-LUFS verifikáció**: a 2-passzos loudnorm célja (-11/-14/-16 preset) **mérve teljesül** a kimeneten
-  (a kép-stúdió „render-parity-jegyzőkönyv" hang-megfelelője).
-- [ ] 🎧 **Parity-jegyzőkönyv**: a mátrix eredménye rögzítve; eltérés → javítás. (Emberi FÜL + mért LUFS/TP.)
+### 1. ✅ Export-parity ÉLŐ verifikáció („amit hallasz == amit exportálsz") — KÉSZ
+A `voicechain.test.js` csak a filter-STRINGET ellenőrizte; most van **tényleges render + mérés** (a render-smoke/
+imagedoc-smoke hang-megfelelője). Az audio-export a `/render`-en in-process megy (≤15s), ffmpeg-gel.
+- [x] ✅ **Audio-smoke mátrix** — KÉSZ ([server/smokeAudioFixtures.js](../../server/smokeAudioFixtures.js) pure-mag +
+  [server/scripts/audio-smoke.js](../../server/scripts/audio-smoke.js) runner, `npm run smoke:audio`; validáció:
+  [smokeAudioFixtures.test.js](../../server/smokeAudioFixtures.test.js), +6 teszt): **18 per-funkció** audio-fixture →
+  `/render` WAV → **mérés** (`ffprobe` hossz/csatorna + `loudnorm` Integrated-LUFS/True-Peak + `astats` per-csatorna RMS):
+  volume · **fade** · **pan L/R** · **automation** · **per-klip audioFx** (highpass/lowpass/EQ/denoise/deesser/compressor/
+  limiter/reverb/delay) · **voice-enhance** + **de-reverb** · **autoDuck** · **Master** (podcast/music/multiband) ·
+  **3-track mix**. **ÉLŐ FUT 18/18** (2026-10-11), automata-ellenőrzésekkel.
+- [x] ✅ **Master-LUFS verifikáció (mérve)**: a 2-passzos loudnorm **célba talál** — podcast **−16.1 ≈ −16**,
+  music **−14.1 ≈ −14** (±1.5 LU-n belül); volume=0.5 **pontosan −6 LU**; voice-enhance a lánc végi loudnorm-mal **−16.0**.
+- [x] ✅ **Pan mérve helyes**: pan=−1 → bal −24.1 / jobb **−∞** (néma); pan=+1 → jobb −24.1 / bal **−∞**. *(Menet közben
+  a harness mérő-regexét kellett javítani — az astats `-inf` némát eldobta; a renderelt pan maga HELYES.)*
+- [x] ~ **Parity-jegyzőkönyv**: `.audio-smoke/manifest.json` (mért LUFS/TP/RMS/hossz + verdikt). A végső fül-parity
+  emberi, de a mérőszámok rögzítve.
 
 ### 2. 🟡 Preview ↔ export parity (a legnagyobb UX-csapda)
 Ma az előnézet **nem** alkalmazza a per-klip `audioFx`-et, a master-loudnorm-ot/dinamikát és a pan/stereo-generálást →

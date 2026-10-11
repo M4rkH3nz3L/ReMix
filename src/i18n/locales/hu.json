@@ -3084,7 +3084,15 @@
       "exportRendering": "{{format}} exportálása…",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",
-      "stemsWorking": "Stem-szeparáció…"
+      "stemsWorking": "Stem-szeparáció…",
+      "title": "Hang Stúdió",
+      "volume": "Hangerő",
+      "fadeIn": "Beúsztatás",
+      "fadeOut": "Kiúsztatás",
+      "enhance": "Hangjavítás",
+      "deReverb": "Visszhang-csökkentés",
+      "autoDuck": "Auto-halkítás beszéd alatt",
+      "enhanceHint": "A javítások a végső renderben, az eszközön érvényesülnek (az előnézet közelítés)."
     },
     "master": {
       "title": "Mixer és Master",
@@ -3132,16 +3140,6 @@
       "saturation": "Szaturáció",
       "temperature": "Melegség"
     }
-  },
-  "hangStudio": {
-    "title": "Hang Stúdió",
-    "volume": "Hangerő",
-    "fadeIn": "Beúsztatás",
-    "fadeOut": "Kiúsztatás",
-    "enhance": "Hangjavítás",
-    "deReverb": "Visszhang-csökkentés",
-    "autoDuck": "Auto-halkítás beszéd alatt",
-    "enhanceHint": "A javítások a végső renderben, az eszközön érvényesülnek (az előnézet közelítés)."
   },
   "collab": {
     "title": "Kollaboráció",

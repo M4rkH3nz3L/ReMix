@@ -3054,7 +3054,15 @@
       "exportRendering": "{{format}} wird exportiert…",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",
-      "stemsWorking": "Stems werden getrennt…"
+      "stemsWorking": "Stems werden getrennt…",
+      "title": "Sound-Studio",
+      "volume": "Lautstärke",
+      "fadeIn": "Einblenden",
+      "fadeOut": "Ausblenden",
+      "enhance": "Stimme verbessern",
+      "deReverb": "Raumhall reduzieren",
+      "autoDuck": "Auto-Absenkung unter Sprache",
+      "enhanceHint": "Die Verbesserungen werden beim finalen Rendern auf dem Gerät angewendet (die Vorschau nähert sie an)."
     },
     "master": {
       "title": "Mixer & Master",
@@ -3102,16 +3110,6 @@
       "saturation": "Sättigung",
       "temperature": "Wärme"
     }
-  },
-  "hangStudio": {
-    "title": "Sound-Studio",
-    "volume": "Lautstärke",
-    "fadeIn": "Einblenden",
-    "fadeOut": "Ausblenden",
-    "enhance": "Stimme verbessern",
-    "deReverb": "Raumhall reduzieren",
-    "autoDuck": "Auto-Absenkung unter Sprache",
-    "enhanceHint": "Die Verbesserungen werden beim finalen Rendern auf dem Gerät angewendet (die Vorschau nähert sie an)."
   },
   "collab": {
     "title": "Zusammenarbeit",

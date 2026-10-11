@@ -44,7 +44,7 @@
 | **P0 #4** | Worker-infra: az audio-export a /render queue-n megy (>15s) → worker kell | 🔌 |
 | **P1 §5** | Bemeneti audio-robusztusság (formátumok/sample-rate/hossz/néma/korrupt → barátságos hiba) | ⬜ |
 | **P1 §6** | Stem-szeparáció (Demucs) — env-gated Python/torch worker-image + runtime-verify | 🔌 |
-| **P1 §7** | i18n konszolidáció (studio.audio / studio.audioTools / panels.audio / hangStudio-legacy) | ⬜ |
+| **P1 §7** | i18n konszolidáció (hangStudio kivezetve + locale-parity teszt hu/en/de) | ✅ |
 | **P1 §8** | Automation/mixer-UI (a magok készek, idővonal-szerkesztő hiányzik) | 🟡 |
 | **P2** | fejlett mixer (bus/send/sidechain) · pitch-correction-UI a Hang Stúdióban · multiband per-band | ⬜ |
 
@@ -116,9 +116,15 @@ A prod-userek tetszőleges hangot dobnak be (import / videó-hang / felvétel).
   bele a sima Node/ffmpeg-image-be: **külön worker-image / sidecar** (nagy: torch+modell) + env-gate + 503-fallback
   (ma scaffold). Runtime-verify, ha a Demucs telepítve van. Pro-only.
 
-### 7. ⬜ i18n konszolidáció
-- [ ] ⬜ A hang-UI kulcsai **négy névtérben** szórtan: `studio.audio.*`, `studio.audioTools.*`, `panels.audio.*`,
-  `hangStudio.*` (legacy). Egységesítés `studio.audio*`-ra (a `hangStudio.*` kivezetése), a 3 nyelv (hu/en/de) szinkronban.
+### 7. ✅ i18n konszolidáció — KÉSZ
+- [x] ✅ **A legacy `hangStudio.*` kivezetve**: a 8 kulcs (title/volume/fadeIn/fadeOut/enhance/deReverb/autoDuck/
+  enhanceHint) a `studio.audio.*` alá költözött mindhárom nyelven, a `ClipEditSheet` refek frissítve, a `hangStudio`
+  blokk törölve (sehol nem maradt hivatkozás).
+- [x] ✅ **Locale-parity teszt** ([src/i18n/audioLocaleParity.test.ts](../../src/i18n/audioLocaleParity.test.ts), +5):
+  zárolja, hogy a hang-névterek (`studio.audio` · `studio.audioTools` · `panels.audio`) **azonos kulcs-halmazzal**
+  léteznek hu/en/de-ben (plural-suffix-normalizálva) + a `hangStudio` névtér egyik nyelvben sincs. Drift/hiányzó
+  fordítás → piros teszt (CI). *(Megj.: a `studio.audio` + `panels.audio` megmaradt — a teljes 1-névtérre egységesítés
+  nagyobb churn, külön; a parity-zár a prod-kockázatot [hiányzó fordítás] már lefedi.)*
 
 ### 8. 🟡 Automation / mixer UI (a magok készek)
 - [ ] 🟡 **Automation idővonal-szerkesztő**: az [automation.ts](../../src/lib/automation.ts) (volume/pan/send/filter

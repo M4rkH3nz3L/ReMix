@@ -134,7 +134,7 @@ export function ClipEditSheet({
         <SafeAreaView edges={['bottom']} style={styles.sheet}>
           <View style={styles.head}>
             <Text style={styles.title} numberOfLines={1}>
-              {clip.label || t('hangStudio.title')}
+              {clip.label || t('studio.audio.title')}
             </Text>
             <Pressable onPress={onDone} style={styles.doneBtn}>
               <Ionicons name="checkmark" size={18} color="#fff" />
@@ -161,7 +161,7 @@ export function ClipEditSheet({
             />
 
             <Slider
-              label={t('hangStudio.volume')}
+              label={t('studio.audio.volume')}
               value={volume}
               min={0}
               max={1}
@@ -179,7 +179,7 @@ export function ClipEditSheet({
               }
             />
             <Slider
-              label={t('hangStudio.fadeIn')}
+              label={t('studio.audio.fadeIn')}
               value={fadeIn}
               min={0}
               max={maxFade}
@@ -187,7 +187,7 @@ export function ClipEditSheet({
               format={(v) => `${v.toFixed(1)}s`}
             />
             <Slider
-              label={t('hangStudio.fadeOut')}
+              label={t('studio.audio.fadeOut')}
               value={fadeOut}
               min={0}
               max={maxFade}
@@ -214,9 +214,9 @@ export function ClipEditSheet({
             />
 
             <View style={styles.divider} />
-            <ToggleRow icon="sparkles-outline" label={t('hangStudio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
-            <ToggleRow icon="mic-outline" label={t('hangStudio.deReverb')} value={deReverb} onValueChange={setDeReverb} />
-            <ToggleRow icon="volume-low-outline" label={t('hangStudio.autoDuck')} value={autoDuck} onValueChange={setAutoDuck} />
+            <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
+            <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />
+            <ToggleRow icon="volume-low-outline" label={t('studio.audio.autoDuck')} value={autoDuck} onValueChange={setAutoDuck} />
 
             <View style={styles.divider} />
             <View style={styles.fxHead}>

@@ -3084,7 +3084,15 @@
       "exportRendering": "Exporting {{format}}…",
       "stems": "Separate stems (AI)",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",
-      "stemsWorking": "Separating stems…"
+      "stemsWorking": "Separating stems…",
+      "title": "Sound Studio",
+      "volume": "Volume",
+      "fadeIn": "Fade in",
+      "fadeOut": "Fade out",
+      "enhance": "Voice enhance",
+      "deReverb": "Reduce room echo",
+      "autoDuck": "Auto-duck under voice",
+      "enhanceHint": "Enhancements are applied on-device in the final render (the preview approximates them)."
     },
     "master": {
       "title": "Mixer & Master",
@@ -3132,16 +3140,6 @@
       "saturation": "Saturation",
       "temperature": "Warmth"
     }
-  },
-  "hangStudio": {
-    "title": "Sound Studio",
-    "volume": "Volume",
-    "fadeIn": "Fade in",
-    "fadeOut": "Fade out",
-    "enhance": "Voice enhance",
-    "deReverb": "Reduce room echo",
-    "autoDuck": "Auto-duck under voice",
-    "enhanceHint": "Enhancements are applied on-device in the final render (the preview approximates them)."
   },
   "collab": {
     "title": "Collaboration",

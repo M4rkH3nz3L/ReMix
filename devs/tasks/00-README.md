@@ -83,6 +83,10 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 > ↔ captureRef; export-formátumok PNG/JPG/WebP + vektor-SVG; bemeneti robusztusság HEIC/nagy/EXIF; PSD-import +
 > PDF/PSD-export; font-parity): [IMAGE-STUDIO-PROD.md](./IMAGE-STUDIO-PROD.md) — a 07 (feature) prod-deltája.
 
+> **🎧 Prod-hang-stúdió:** a Hang Stúdió **production** deltája (export-parity: on-device előnézet ↔ worker ffmpeg-mix
+> + 2-passzos loudnorm; per-klip audioFx + master preview↔export egyezés; export WAV/MP3/AAC/FLAC/opus + minőség-UI;
+> bemeneti audio-robusztusság; stem-szeparáció [Demucs] infra): [AUDIO-STUDIO-PROD.md](./AUDIO-STUDIO-PROD.md).
+
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
 | 🧱 | **Editor-mag (alapfunkció)** | 🔴 **P0/P1** | **[CORE.md](./CORE.md)** |

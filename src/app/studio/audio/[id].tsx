@@ -92,7 +92,7 @@ export default function AudioStudioScreen() {
       .catch(() => {});
   };
 
-  const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac') =>
+  const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus') =>
     guardPro(
       () =>
         withProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report) =>
@@ -110,6 +110,7 @@ export default function AudioStudioScreen() {
       { text: 'WAV', onPress: () => downloadAudio('wav') },
       { text: 'AAC (M4A)', onPress: () => downloadAudio('aac') },
       { text: 'FLAC', onPress: () => downloadAudio('flac') },
+      { text: 'Opus (OGG)', onPress: () => downloadAudio('opus') },
     ]);
 
   const openExport = () =>

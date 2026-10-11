@@ -40,7 +40,7 @@
 |------|-------|---------|
 | **P0 #1** | Export-parity ÉLŐ verifikáció (audio-smoke: render → LUFS/TP/hossz/pan mérés) | ✅ |
 | **P0 #2** | Preview↔export parity a per-klip fx-re + masterre (vagy jelzett eltérés) | ⬜ *(device)* |
-| **P0 #3** | Export-teljesség (formátum ✅ wav/mp3/aac/flac · minőség/sample-rate/channel UI) | 🟡 |
+| **P0 #3** | Export-teljesség (wav/mp3/aac/flac/**opus** + sample-rate/channel/bitráta a renderben) | ✅ 🟡UI |
 | **P0 #4** | Worker-infra: az audio-export a /render queue-n megy (>15s) → worker kell | 🔌 |
 | **P1 §5** | Bemeneti audio-robusztusság (formátumok/sample-rate/hossz/néma/korrupt → barátságos hiba) | ⬜ |
 | **P1 §6** | Stem-szeparáció (Demucs) — env-gated Python/torch worker-image + runtime-verify | 🔌 |
@@ -81,12 +81,16 @@ a felhasználó mást hall szerkesztéskor, mint az exportban.
 - [ ] 🟡 **Pan/fade/automation egyezés**: az előnézet lineáris rámpái és a worker `fade`/automation-görbéi egyezzenek
   (FPS-független) — a smoke-ban (#1) mérve.
 
-### 3. 🟡 Export-teljesség + minőség
-Ma az export **WAV/MP3/AAC/FLAC** ([render.ts](../../src/lib/render.ts) `exportAudioFile` + [render.js](../../server/render.js)
-`AUDIO_FORMATS`), de a minőség/paraméter-választás hiányzik a UI-ból.
-- [ ] 🟡 **Minőség/paraméter-UI**: a `RenderSettings` már vesz `sampleRate` (44.1/48k) · `channels` (mono/stereo) ·
-  `audioBitrateKbps`-t — tegyük **kliens-választhatóvá** az export-dialógusban (ma fix: 192k/stereo/worker-default).
-- [ ] ⬜ **Opus/OGG** (kisebb, streamelhető) a formátum-listához (a prod ffmpeg-image-ben a `libopus` legyen meg).
+### 3. ✅ Export-teljesség + minőség — RENDER KÉSZ (UI hátra)
+- [x] ✅ **Opus hozzáadva** + **minőség-plumbing**: [render.js](../../server/render.js) `audioExtractArgs(settings)`
+  (pure, tesztelt: [audioExport.test.js](../../server/audioExport.test.js) +5) — a hang-only extract most alkalmazza a
+  `sampleRate` (`-ar`) · `channels` (`-ac`) · `audioBitrateKbps` (`-b:a`, veszteséges formátumokra, 32–512 közé szorítva,
+  per-formátum alappal: mp3 192 / aac 256 / opus 192) paramétereket (eddig figyelmen kívül hagyta őket). Formátumok:
+  **WAV/MP3/AAC/FLAC/Opus**. **ÉLŐ-verifikált** az audio-smoke-kal: opus→`codec=opus`/48k OK, `-ac 1` mono OK, a bitráta
+  alkalmazva. Kliens: `RenderSettings.audioFormat` += `'opus'`, az export-dialógus „Opus (OGG)" gombja.
+- [ ] 🟡 **Minőség/paraméter-UI**: a szerver kész a sample-rate/channel/bitráta-választásra — a **kliens-választó**
+  (44.1/48k · mono/stereo · bitráta-csúszka) az export-dialógusba (device-verify: on-device hallgatás). *(opus `libopus`:
+  lokál ffmpeg-ben MEGVAN; a Debian-[Dockerfile](../../server/Dockerfile) is tartalmazza.)*
 - [ ] ⬜ **Hossz/méret-plafon**: nagyon hosszú projekt (pl. >2 óra) render-idő/memória — beszédes határ (a kép
   nagy-doc-guard hang-megfelelője).
 

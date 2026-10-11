@@ -24,6 +24,13 @@ const BASE = process.env.SMOKE_BASE || 'http://localhost:8787';
 const OUT_DIR = path.join(__dirname, '..', '..', '.audio-smoke');
 const POLL_MS = 1000;
 const MAX_POLLS = 120;
+// a kimeneti formátum/minőség a méréshez: alap WAV (pontos LUFS); felülírható
+// (pl. SMOKE_AUDIO_FORMAT=opus SMOKE_AUDIO_SR=48000 SMOKE_AUDIO_CH=1 → opus/mono/48k verifikáció)
+const FMT = (process.env.SMOKE_AUDIO_FORMAT || 'wav').toLowerCase();
+const SR = process.env.SMOKE_AUDIO_SR ? Number(process.env.SMOKE_AUDIO_SR) : undefined;
+const CH = process.env.SMOKE_AUDIO_CH ? Number(process.env.SMOKE_AUDIO_CH) : undefined;
+const FMT_EXT = { wav: 'wav', mp3: 'mp3', aac: 'm4a', flac: 'flac', opus: 'opus' };
+const EXT = FMT_EXT[FMT] || 'wav';
 
 function log(...a) {
   console.log('[asmoke]', ...a);
@@ -50,15 +57,18 @@ function generateMedia(dir) {
 
 // ── mérés ────────────────────────────────────────────────────────────────────
 
-/** hossz (mp) + csatorna-szám */
+/** hossz (mp) + csatorna-szám + codec + sample-rate */
 function probe(file) {
   const out = execFileSync('ffprobe', [
-    '-v', 'error', '-show_entries', 'format=duration:stream=channels', '-of', 'json', file,
+    '-v', 'error', '-show_entries', 'format=duration:stream=channels,codec_name,sample_rate', '-of', 'json', file,
   ]).toString();
   const j = JSON.parse(out);
+  const s = (j.streams && j.streams[0]) || {};
   return {
     durationSec: Number((j.format && j.format.duration) || 0),
-    channels: Number((j.streams && j.streams[0] && j.streams[0].channels) || 0),
+    channels: Number(s.channels || 0),
+    codec: s.codec_name || '?',
+    sampleRate: Number(s.sample_rate || 0),
   };
 }
 
@@ -122,7 +132,14 @@ async function renderOne(name, project, mediaFiles) {
   form.append('uriMap', JSON.stringify(uriMap));
   // ⚠️ SZÁNDÉKOSAN nincs userId → owner-less job (token nélkül is pollolható, BOLA-OK)
   form.append('tier', 'pro');
-  form.append('settings', JSON.stringify({ resolution: 480, fps: 30, quality: 'high', audioFormat: 'wav' }));
+  const settings = { resolution: 480, fps: 30, quality: 'high', audioFormat: FMT };
+  if (SR) {
+    settings.sampleRate = SR;
+  }
+  if (CH) {
+    settings.channels = CH;
+  }
+  form.append('settings', JSON.stringify(settings));
 
   const submit = await fetch(`${BASE}/render`, { method: 'POST', body: form });
   const body = await submit.json().catch(() => ({}));
@@ -137,7 +154,7 @@ async function renderOne(name, project, mediaFiles) {
       if (!fileRes.ok) {
         throw new Error(`file ${fileRes.status}`);
       }
-      const out = path.join(OUT_DIR, `${name}.wav`);
+      const out = path.join(OUT_DIR, `${name}.${EXT}`);
       fs.writeFileSync(out, Buffer.from(await fileRes.arrayBuffer()));
       return out;
     }
@@ -189,7 +206,7 @@ async function main() {
   }
   try {
     const h = await fetch(`${BASE}/health`).then((r) => r.json());
-    log(`API: ${BASE} · render=${h.render} · cloudMin=${h.cloudRenderMinSec}s · workers=${h.workers ?? 'n/a'}`);
+    log(`API: ${BASE} · render=${h.render} · format=${EXT}${SR ? ` · ${SR / 1000}k` : ''}${CH ? ` · ${CH}ch` : ''} · workers=${h.workers ?? 'n/a'}`);
   } catch {
     console.error(`✗ a render-API nem elérhető: ${BASE} — indítsd: cd server && ALLOW_INSECURE_DEV=1 npm start`);
     process.exit(1);
@@ -203,7 +220,7 @@ async function main() {
   const manifest = [];
   let baseline = null;
   let ok = 0;
-  log('fixture               | LUFS   | TP    | ch | hossz | ellenőrzés');
+  log('fixture               | LUFS   | TP    | ch | hossz | codec/sr | ellenőrzés');
   for (const { name, description, project, expect } of fixtures) {
     try {
       const out = await renderOne(name, project, mediaFiles);
@@ -217,7 +234,7 @@ async function main() {
       const verdict = evalExpect(expect, meas, baseline);
       const mark = verdict.ok ? '✓' : '✗';
       log(
-        `${name.padEnd(21)} | ${String(lufs.toFixed(1)).padStart(6)} | ${String(tp.toFixed(1)).padStart(5)} | ${String(p.channels).padStart(2)} | ${p.durationSec.toFixed(2).padStart(5)} | ${mark} ${verdict.note}`
+        `${name.padEnd(21)} | ${String(lufs.toFixed(1)).padStart(6)} | ${String(tp.toFixed(1)).padStart(5)} | ${String(p.channels).padStart(2)} | ${p.durationSec.toFixed(2).padStart(5)} | ${p.codec}/${Math.round(p.sampleRate / 1000)}k | ${mark} ${verdict.note}`
       );
       manifest.push({ name, description, ...meas, expect, verdict });
       if (verdict.ok) {

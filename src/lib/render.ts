@@ -131,8 +131,8 @@ export interface RenderSettings {
   /** hang bitráta kbps (alap 192) */
   audioBitrateKbps?: number;
   /** 🎧 HANG-ONLY export: a kész keverékből a worker ezt a formátumot vonja ki
-   *  (WAV/MP3/AAC/FLAC). Hiányzó = normál videó-kimenet. */
-  audioFormat?: 'wav' | 'mp3' | 'aac' | 'flac';
+   *  (WAV/MP3/AAC/FLAC/Opus). Hiányzó = normál videó-kimenet. */
+  audioFormat?: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus';
 }
 
 /**

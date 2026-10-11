@@ -286,11 +286,37 @@ function audioEncoderArgs(settings) {
 // A kivonás egy KÜLÖN, egyszerű ffmpeg-menet (`-vn`) → a videó-filtergraph
 // érintetlen (biztonságos). Kulcs = `settings.audioFormat`.
 const AUDIO_FORMATS = {
-  wav: { ext: 'wav', codec: ['-c:a', 'pcm_s16le'] },
-  mp3: { ext: 'mp3', codec: ['-c:a', 'libmp3lame', '-q:a', '2'] },
-  aac: { ext: 'm4a', codec: ['-c:a', 'aac', '-b:a', '256k'] },
-  flac: { ext: 'flac', codec: ['-c:a', 'flac'] },
+  wav: { ext: 'wav', lossy: false, codec: ['-c:a', 'pcm_s16le'] },
+  mp3: { ext: 'mp3', lossy: true, codec: ['-c:a', 'libmp3lame'], defaultKbps: 192 },
+  aac: { ext: 'm4a', lossy: true, codec: ['-c:a', 'aac'], defaultKbps: 256 },
+  flac: { ext: 'flac', lossy: false, codec: ['-c:a', 'flac'] },
+  opus: { ext: 'opus', lossy: true, codec: ['-c:a', 'libopus'], defaultKbps: 192 },
 };
+
+/**
+ * A hang-only export codec + MINŐSÉG-argumentumai a formátumból + a RenderSettings-ből.
+ * A veszteséges formátumok (mp3/aac/opus) `-b:a` bitrátát kapnak (settings vagy per-formátum
+ * alap), a veszteségmentesek (wav/flac) nem. A `sampleRate` (`-ar`) és `channels` (`-ac`)
+ * mindkettőre érvényes. `null`, ha nincs/ismeretlen audioFormat. (pure → tesztelhető)
+ */
+function audioExtractArgs(settings = {}) {
+  const fmt = AUDIO_FORMATS[settings.audioFormat];
+  if (!fmt) {
+    return null;
+  }
+  const args = [...fmt.codec];
+  if (fmt.lossy) {
+    const kbps = Math.max(32, Math.min(512, Math.round(Number(settings.audioBitrateKbps) || fmt.defaultKbps)));
+    args.push('-b:a', `${kbps}k`);
+  }
+  if (settings.sampleRate) {
+    args.push('-ar', String(settings.sampleRate));
+  }
+  if (settings.channels) {
+    args.push('-ac', String(settings.channels));
+  }
+  return { ext: fmt.ext, args };
+}
 
 // 🎚️ MASTER 1. menet: a master-gráf (EQ+multiband) + loudnorm MÉRÉS (JSON a
 // stderr-en) → a mért Integrated/TP/LRA/thresh/offset.
@@ -2685,11 +2711,12 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     );
   }
 
-  // 🎧 hang-only export (WAV/MP3/AAC/FLAC): a (masterelt) MP4-ből KIVONÁS.
-  const fmt = AUDIO_FORMATS[settings.audioFormat];
-  if (fmt) {
-    const audioFile = path.join(workDir, `out.${fmt.ext}`);
-    await runFfmpegWithProgress(['-y', '-i', masteredFile, '-vn', ...fmt.codec, audioFile], total, onProgress);
+  // 🎧 hang-only export (WAV/MP3/AAC/FLAC/Opus): a (masterelt) MP4-ből KIVONÁS +
+  // minőség (bitráta/sample-rate/csatorna) a settings-ből.
+  const audio = audioExtractArgs(settings);
+  if (audio) {
+    const audioFile = path.join(workDir, `out.${audio.ext}`);
+    await runFfmpegWithProgress(['-y', '-i', masteredFile, '-vn', ...audio.args, audioFile], total, onProgress);
     return audioFile;
   }
   return masteredFile;
@@ -2708,4 +2735,6 @@ module.exports = {
   EFFECT_DEFAULT_AMOUNT,
   shearPoint,
   bezierEaseNode,
+  audioExtractArgs,
+  AUDIO_FORMATS,
 };

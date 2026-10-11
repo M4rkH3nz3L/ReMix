@@ -50,10 +50,21 @@ A videós mintára (render-smoke) megépíthető — a `/imagedoc` fut, a worker
 
 ### 2. 🟡 Export-teljesség + minőség
 Ma az export **PNG** (a `rasterize` worker-PNG-je → `Sharing.shareAsync`); hiányzik a formátum/minőség-választás.
-- [ ] ⬜ **Formátum + minőség**: PNG (alfa) / **JPG** (minőség-csúszka, kisebb) / **WebP**; **felbontás/DPI**
-  (a `/imagedoc` `height`-et vesz — tegyük kliens-választhatóvá: 1×/2×/export-méret).
-- [ ] 🔌 **Vektor-hű SVG-export** (07 §2.9): a „svg" export-gomb MA raszterbe renderel — valódi **SVG-emitter**
-  kell (a `svgImport` párja: ImageDoc → `<svg>` réteg-fából), hogy a vektor-doc vektorként exportálódjon.
+- [x] 🟡 **Formátum + minőség** — SZERVER KÉSZ: a `/imagedoc` vesz `format` (png/jpg/webp) + `quality` (0–1)
+  paramétert; [server/imagedoc.js](../../server/imagedoc.js) `imageOutputArgs()` (pure, tesztelt:
+  [imagedoc.test.js](../../server/imagedoc.test.js) +4) + a renderelő-láncba kötve; a smoke `SMOKE_FORMAT`/
+  `SMOKE_QUALITY`-vel verifikál. **ÉLŐ: PNG 13/13 + JPG 13/13** (valódi JPEG, 720×720). ⚠️ **WebP** a prod
+  `libwebp`-es ffmpeg-et igényli (a lokális minimal-build-ből hiányzik; a Debian-alapú [Dockerfile](../../server/Dockerfile)
+  tartalmazza). JPG átlátszó→fekete (nincs alfa). *(Hátra: kliens export-UI — formátum + felbontás 1×/2× + minőség-csúszka
+  az [openExportMenu]-ben.)*
+- [x] 🔌 **Vektor-hű SVG-export** (07 §2.9) — KÉSZ: valódi **SVG-emitter** [src/lib/svgExport.ts](../../src/lib/svgExport.ts)
+  `imageDocToSvg(doc)` (az `svgImport` párja, pure, 21 teszt + round-trip az svgImport-tal): fill/fotó(`<image>`
+  data-URI beágyazással)/forma (rect/ellipse/line/star/arrow/**path+subpaths+fillRule**)/**gradient** (lin/rad;
+  konikus→első stop)/**pattern** (`<pattern>`)/**stroke**/**glow+árnyék** (`<filter feDropShadow>`)/szöveg/opacity/
+  blend/forgatás/tükrözés. **Bekötve** az export-menübe ([ImageStudioBody](../../src/components/studio/image/ImageStudioBody.tsx)
+  „SVG-export", i18n hu/en/de). **Raszter-parity vizuálisan verifikálva** (Chromium-render): gradient-irány
+  (CSS-szög-konvenció javítva), boolean-lyuk, screen-blend+forgatás+opacity+szöveg kompozit → egyezik a `/imagedoc`
+  raszterrel.
 - [ ] ⬜ **Nagy vászon**: a `/imagedoc` + Chromium memória/idő-korlát nagy (pl. 4000×4000) dokumentumnál;
   méret-plafon + beszédes hiba (ne csendben csonkoljon).
 

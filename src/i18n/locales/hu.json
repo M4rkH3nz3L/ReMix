@@ -2970,6 +2970,7 @@
       "exportedTitle": "Kép exportálva",
       "exportedBody": "A kirenderelt PNG a projekthez lett mentve.",
       "exportShare": "Megosztás / Letöltés (PNG)",
+      "exportSvg": "SVG-export (vektor)",
       "exportToVideo": "Beszúrás új videóba",
       "canvasTitle": "Vászon beállításai",
       "undoCanvas": "Vászon módosítása",

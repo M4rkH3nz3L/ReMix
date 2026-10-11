@@ -76,7 +76,27 @@ function fillAsShape(layer) {
  * @param workDir munkakönyvtár (a hívó takarítja)
  * @returns {Promise<string>} a kész PNG útvonala
  */
-async function renderImageDoc(doc, height, workDir) {
+/**
+ * A kimeneti formátum ffmpeg-argumentumai + kiterjesztés. A `quality` 0–1 (1 = a
+ * legjobb). PNG = veszteségmentes, alfával; JPG = nincs alfa (az átlátszó rész
+ * feketére lapul), q:v 2–31; WebP = alfás, 0–100 minőség.
+ */
+function imageOutputArgs(format, quality) {
+  const q = Math.max(0, Math.min(1, Number.isFinite(quality) ? quality : 0.92));
+  switch (String(format || 'png').toLowerCase()) {
+    case 'jpg':
+    case 'jpeg':
+      // 2 (legjobb) … 31 (legrosszabb); az alfát le kell lapítani
+      return { ext: 'jpg', args: ['-pix_fmt', 'yuv420p', '-q:v', String(Math.round(2 + (1 - q) * 29))] };
+    case 'webp':
+      return { ext: 'webp', args: ['-c:v', 'libwebp', '-lossless', '0', '-quality', String(Math.round(q * 100))] };
+    case 'png':
+    default:
+      return { ext: 'png', args: [] };
+  }
+}
+
+async function renderImageDoc(doc, height, workDir, opts = {}) {
   const canvas = docCanvas(doc, height);
   const layers = (doc.layers ?? []).filter(isVisible);
   if (layers.length === 0) {
@@ -177,7 +197,8 @@ async function renderImageDoc(doc, height, workDir) {
     last = `[${out}]`;
   }
 
-  const outFile = path.join(workDir, 'imagedoc.png');
+  const { ext, args: fmtArgs } = imageOutputArgs(opts.format, opts.quality);
+  const outFile = path.join(workDir, `imagedoc.${ext}`);
   await run([
     '-hide_banner',
     '-loglevel',
@@ -189,10 +210,11 @@ async function renderImageDoc(doc, height, workDir) {
     last,
     '-frames:v',
     '1',
+    ...fmtArgs,
     '-y',
     outFile,
   ]);
   return outFile;
 }
 
-module.exports = { renderImageDoc, canvasSize };
+module.exports = { renderImageDoc, canvasSize, imageOutputArgs };

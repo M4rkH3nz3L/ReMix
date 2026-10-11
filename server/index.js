@@ -1053,15 +1053,17 @@ app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, re
     }
   }
   const height = Math.max(240, Math.min(2160, Number(req.body.height) || 1280));
+  const format = req.body.format; // png (alap) | jpg | webp
+  const quality = req.body.quality != null ? Number(req.body.quality) : undefined;
   // ha a doc-hoz nem jött feltöltött média (tisztán vektor/forma/szöveg kép —
   // logó, gradient-poszter, felirat), a multer `destination`-je nem futott → nincs
   // req.workDir; itt pótoljuk, hogy a fotó NÉLKÜLI doc is renderelhető legyen.
   if (!req.workDir) {
     req.workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-render-'));
   }
-  // a válasz (PNG) teljes elküldése UTÁN takarítjuk a temp-mappát (eddig szivárgott)
+  // a válasz (kép) teljes elküldése UTÁN takarítjuk a temp-mappát (eddig szivárgott)
   res.on('finish', () => fs.rm(req.workDir, { recursive: true, force: true }, () => {}));
-  renderImageDoc(doc, height, req.workDir)
+  renderImageDoc(doc, height, req.workDir, { format, quality })
     .then((file) => res.sendFile(file))
     .catch((err) => {
       console.warn('imagedoc hiba:', err.message.slice(0, 300));

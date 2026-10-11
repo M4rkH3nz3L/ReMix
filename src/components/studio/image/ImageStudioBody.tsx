@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
@@ -40,6 +41,7 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
 import { pickImage, pickSvg } from '@/lib/media';
+import { imageDocToSvg } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
@@ -714,6 +716,61 @@ export function ImageStudioBody({
     }
   };
 
+  /**
+   * 🧩 VEKTOR-export: a dokumentum SVG-ként ([svgExport](@/lib/svgExport)), hogy a
+   * formák/szöveg/gradiensek vektorként maradjanak (nem raszter-PNG-be égetve). A
+   * fotó-rétegeket base64 data-URI-ba ágyazzuk → ÖNÁLLÓ, megosztható .svg.
+   */
+  const exportSvg = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const embedded = {
+        ...doc,
+        layers: doc.layers.map((l) => {
+          if (l.kind === 'photo' && typeof l.uri === 'string' && l.uri.startsWith('file://')) {
+            try {
+              const src = new File(l.uri);
+              if (src.exists) {
+                const ext = (l.uri.split('.').pop() ?? 'jpg').toLowerCase();
+                const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+                return { ...l, uri: `data:${mime};base64,${src.base64()}` };
+              }
+            } catch {
+              // nem olvasható fotó → marad a hivatkozás (nem self-contained)
+            }
+          }
+          return l;
+        }),
+      };
+      const svg = imageDocToSvg(embedded);
+      const dir = new Directory(Paths.cache, 'export');
+      if (!dir.exists) {
+        dir.create();
+      }
+      const safe = (doc.name || 'image').replace(/[^\w.-]+/g, '_');
+      const file = new File(dir, `${safe}.svg`);
+      try {
+        if (file.exists) {
+          file.delete();
+        }
+      } catch {
+        // a write úgyis felülírja
+      }
+      file.write(svg);
+      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      if (canShare) {
+        await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch(() => {});
+      } else {
+        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 🖼️→🎬 a kirasterizált kép ÚJ videó-projektbe (ReMix cél: „kép → videó")
   const insertIntoVideo = async () => {
     if (!doc || !project || busy) {
@@ -756,6 +813,7 @@ export function ImageStudioBody({
     Alert.alert(t('studio.export'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('studio.image.exportShare'), onPress: () => void exportImage() },
+      { text: t('studio.image.exportSvg'), onPress: () => void exportSvg() },
       { text: t('studio.image.exportToVideo'), onPress: () => void insertIntoVideo() },
     ]);
 

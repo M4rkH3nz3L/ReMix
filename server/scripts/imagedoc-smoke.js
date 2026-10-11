@@ -24,6 +24,9 @@ const { buildSmokeDocs, mediaUrisOf, SMOKE_IMAGE_MEDIA, W, H } = require('../smo
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:8787';
 const HEIGHT = Math.max(240, Math.min(2160, Number(process.env.SMOKE_HEIGHT) || H));
+const FORMAT = (process.env.SMOKE_FORMAT || 'png').toLowerCase(); // png | jpg | webp
+const QUALITY = process.env.SMOKE_QUALITY != null ? Number(process.env.SMOKE_QUALITY) : undefined;
+const EXT = FORMAT === 'jpeg' ? 'jpg' : FORMAT;
 const OUT_DIR = path.join(__dirname, '..', '..', '.imagedoc-smoke');
 
 function log(...a) {
@@ -59,13 +62,17 @@ async function rasterizeOne(name, doc, mediaFiles) {
   });
   form.append('uriMap', JSON.stringify(uriMap));
   form.append('height', String(HEIGHT));
+  form.append('format', FORMAT);
+  if (QUALITY != null) {
+    form.append('quality', String(QUALITY));
+  }
 
   const res = await fetch(`${BASE}/imagedoc`, { method: 'POST', body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(`HTTP ${res.status}: ${body.error || 'ismeretlen hiba'}`);
   }
-  const out = path.join(OUT_DIR, `${name}.png`);
+  const out = path.join(OUT_DIR, `${name}.${EXT}`);
   fs.writeFileSync(out, Buffer.from(await res.arrayBuffer()));
   return { out, bytes: fs.statSync(out).size };
 }
@@ -79,7 +86,7 @@ async function main() {
   }
   try {
     const h = await fetch(`${BASE}/health`).then((r) => r.json());
-    log(`API: ${BASE} · render=${h.render} · height=${HEIGHT}px`);
+    log(`API: ${BASE} · render=${h.render} · height=${HEIGHT}px · format=${EXT}${QUALITY != null ? ` q=${QUALITY}` : ''}`);
   } catch {
     console.error(`✗ az API nem elérhető: ${BASE} — indítsd el: cd server && ALLOW_INSECURE_DEV=1 npm start`);
     process.exit(1);

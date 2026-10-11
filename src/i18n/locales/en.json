@@ -2970,6 +2970,7 @@
       "exportedTitle": "Image exported",
       "exportedBody": "The rendered PNG was saved to the project.",
       "exportShare": "Share / Download (PNG)",
+      "exportSvg": "Export SVG (vector)",
       "exportToVideo": "Insert into new video",
       "canvasTitle": "Canvas settings",
       "undoCanvas": "Edit canvas",

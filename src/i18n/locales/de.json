@@ -2940,6 +2940,7 @@
       "exportedTitle": "Bild exportiert",
       "exportedBody": "Das gerenderte PNG wurde im Projekt gespeichert.",
       "exportShare": "Teilen / Herunterladen (PNG)",
+      "exportSvg": "SVG-Export (Vektor)",
       "exportToVideo": "In neues Video einfügen",
       "canvasTitle": "Leinwand-Einstellungen",
       "undoCanvas": "Leinwand ändern",

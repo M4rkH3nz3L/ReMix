@@ -2971,6 +2971,7 @@
       "exportedBody": "The rendered PNG was saved to the project.",
       "exportShare": "Share / Download (PNG)",
       "exportSvg": "Export SVG (vector)",
+      "exportPdf": "Export PDF (vector)",
       "exportToVideo": "Insert into new video",
       "skiaMissing": "This tool needs a new app build (the Skia module is missing from this dev client). Rebuild the dev client, then try again.",
       "export": {

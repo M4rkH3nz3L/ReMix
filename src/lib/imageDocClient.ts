@@ -40,6 +40,48 @@ function contentKey(doc: ImageDoc, height: number, fmt: string, quality?: number
   return h.toString(36);
 }
 
+/**
+ * 📄 A dokumentum (már legenerált, önálló) SVG-jéből nyomdakész VEKTOR-PDF a
+ * workerrel (Chromium `page.pdf`). Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott
+ * fotóktól nagy lehet). A PDF a `document/media`-ba kerül; a hívó megosztja.
+ */
+export async function renderSvgPdf(svg: string, width: number, height: number): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  try {
+    const dir = new Directory(Paths.document, 'media');
+    if (!dir.exists) {
+      dir.create();
+    }
+    // az SVG-t cache-fájlba írjuk, hogy fájlként (ne mezőként) tölthessük fel
+    const cache = new Directory(Paths.cache, 'export');
+    if (!cache.exists) {
+      cache.create();
+    }
+    const svgFile = new File(cache, `pdf_src_${Date.now().toString(36)}.svg`);
+    if (svgFile.exists) {
+      svgFile.delete();
+    }
+    svgFile.write(svg);
+
+    const form = new FormData();
+    form.append('svg', svgFile as unknown as Blob, 'doc.svg');
+    form.append('width', String(Math.round(width)));
+    form.append('height', String(Math.round(height)));
+
+    const res = await uploadFetch(`${renderServerUrl()}/svg/pdf`, { method: 'POST', body: form });
+    if (!res.ok) {
+      return null;
+    }
+    const target = new File(dir, `doc_${Date.now().toString(36)}.pdf`);
+    target.write(new Uint8Array(await res.arrayBuffer()));
+    return target.uri;
+  } catch {
+    return null;
+  }
+}
+
 export async function renderImageDoc(
   doc: ImageDoc,
   // a vászon-magasság: a létrehozáskor választott `doc.height`, egyébként az alap.

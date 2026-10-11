@@ -23,6 +23,7 @@ export function ExportSheet({
   busy,
   onRaster,
   onSvg,
+  onPdf,
   onVideo,
   onClose,
 }: {
@@ -30,6 +31,7 @@ export function ExportSheet({
   busy: boolean;
   onRaster: (opts: { format: Fmt; height: number; quality: number }) => void;
   onSvg: () => void;
+  onPdf: () => void;
   onVideo: () => void;
   onClose: () => void;
 }) {
@@ -91,6 +93,17 @@ export function ExportSheet({
       >
         <Ionicons name="color-wand-outline" size={16} color={palette.text} />
         <Text style={styles.secondaryText}>{t('studio.image.exportSvg')}</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.secondary, busy && styles.disabled]}
+        disabled={busy}
+        onPress={() => {
+          onPdf();
+          onClose();
+        }}
+      >
+        <Ionicons name="document-outline" size={16} color={palette.text} />
+        <Text style={styles.secondaryText}>{t('studio.image.exportPdf')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}

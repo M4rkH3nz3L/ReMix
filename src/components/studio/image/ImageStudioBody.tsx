@@ -42,10 +42,10 @@ import {
   updateLayer,
 } from '@/lib/imageDoc';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
-import { renderImageDoc } from '@/lib/imageDocClient';
+import { renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
 import { pickImage, pickSvg } from '@/lib/media';
-import { imageDocToSvg } from '@/lib/svgExport';
+import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
@@ -744,9 +744,34 @@ export function ImageStudioBody({
   };
 
   /**
-   * 🧩 VEKTOR-export: a dokumentum SVG-ként ([svgExport](@/lib/svgExport)), hogy a
-   * formák/szöveg/gradiensek vektorként maradjanak (nem raszter-PNG-be égetve). A
-   * fotó-rétegeket base64 data-URI-ba ágyazzuk → ÖNÁLLÓ, megosztható .svg.
+   * 🧩 ÖNÁLLÓ SVG a dokumentumból ([svgExport](@/lib/svgExport)): a fotó-rétegeket
+   * base64 data-URI-ba ágyazzuk, hogy a kimenet önmagában megálljon (SVG + PDF közös).
+   */
+  const buildExportSvg = (d: ImageDoc): string => {
+    const embedded = {
+      ...d,
+      layers: d.layers.map((l) => {
+        if (l.kind === 'photo' && typeof l.uri === 'string' && l.uri.startsWith('file://')) {
+          try {
+            const src = new File(l.uri);
+            if (src.exists) {
+              const ext = (l.uri.split('.').pop() ?? 'jpg').toLowerCase();
+              const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+              return { ...l, uri: `data:${mime};base64,${src.base64()}` };
+            }
+          } catch {
+            // nem olvasható fotó → marad a hivatkozás (nem self-contained)
+          }
+        }
+        return l;
+      }),
+    };
+    return imageDocToSvg(embedded);
+  };
+
+  /**
+   * 🧩 VEKTOR-export: a dokumentum SVG-ként, hogy a formák/szöveg/gradiensek
+   * vektorként maradjanak (nem raszter-PNG-be égetve) → ÖNÁLLÓ, megosztható .svg.
    */
   const exportSvg = async () => {
     if (!doc || busy) {
@@ -754,25 +779,7 @@ export function ImageStudioBody({
     }
     setBusy(true);
     try {
-      const embedded = {
-        ...doc,
-        layers: doc.layers.map((l) => {
-          if (l.kind === 'photo' && typeof l.uri === 'string' && l.uri.startsWith('file://')) {
-            try {
-              const src = new File(l.uri);
-              if (src.exists) {
-                const ext = (l.uri.split('.').pop() ?? 'jpg').toLowerCase();
-                const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-                return { ...l, uri: `data:${mime};base64,${src.base64()}` };
-              }
-            } catch {
-              // nem olvasható fotó → marad a hivatkozás (nem self-contained)
-            }
-          }
-          return l;
-        }),
-      };
-      const svg = imageDocToSvg(embedded);
+      const svg = buildExportSvg(doc);
       const dir = new Directory(Paths.cache, 'export');
       if (!dir.exists) {
         dir.create();
@@ -790,6 +797,34 @@ export function ImageStudioBody({
       const canShare = await Sharing.isAvailableAsync().catch(() => false);
       if (canShare) {
         await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch(() => {});
+      } else {
+        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * 📄 VEKTOR-PDF export: ugyanaz az önálló SVG → a worker Chromiumja nyomdakész
+   * PDF-be nyomtatja (`renderSvgPdf` → `/svg/pdf`). A lap pontosan a vászon mérete.
+   */
+  const exportPdf = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const svg = buildExportSvg(doc);
+      const { width, height } = svgDocSize(doc);
+      const uri = await renderSvgPdf(svg, width, height);
+      if (!uri) {
+        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
+        return;
+      }
+      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch(() => {});
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
@@ -1265,6 +1300,7 @@ export function ImageStudioBody({
           busy={busy}
           onRaster={(o) => void exportImage(o)}
           onSvg={() => void exportSvg()}
+          onPdf={() => void exportPdf()}
           onVideo={() => void insertIntoVideo()}
           onClose={() => setSheet(null)}
         />

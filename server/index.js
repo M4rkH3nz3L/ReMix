@@ -16,6 +16,7 @@ const { aiAvailable, aiProvider, probeProvider, runAssistant, runAutoEdit, runCa
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc, imageDocGuard } = require('./imagedoc');
+const { renderSvgToPdf } = require('./svgPdf');
 const { computeFocusAssets, computeParallaxAssets, depthAvailable, depthLayerDir, ensureDepth } = require('./depth');
 const { bgRemoveAvailable, bgRemoveDir, computeCutout } = require('./bgremove');
 const { colorStats, pixelColor, exportLut, scopeImage } = require('./color');
@@ -1073,6 +1074,35 @@ app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, re
     .then((file) => res.sendFile(file))
     .catch((err) => {
       console.warn('imagedoc hiba:', err.message.slice(0, 300));
+      res.status(500).json({ error: err.message.slice(0, 300) });
+    });
+});
+
+// 📄 SVG → nyomdakész vektor-PDF (a kliens imageDocToSvg kimenete → Chromium page.pdf).
+// Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott fotóktól nagy lehet — a mező-méret-limit
+// nem gond), a vászon-méret (width/height px) mezőben jön.
+app.post('/svg/pdf', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+  const svgFile = (req.files ?? []).find((f) => f.fieldname === 'svg');
+  let svg = '';
+  try {
+    svg = svgFile ? fs.readFileSync(svgFile.path, 'utf8') : String(req.body.svg || '');
+  } catch {
+    svg = String(req.body.svg || '');
+  }
+  if (!svg || !svg.includes('<svg')) {
+    res.status(400).json({ error: 'Hiányzó vagy hibás SVG.' });
+    return;
+  }
+  const width = Math.max(1, Math.min(10000, Number(req.body.width) || 1080));
+  const height = Math.max(1, Math.min(10000, Number(req.body.height) || 1080));
+  if (!req.workDir) {
+    req.workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-render-'));
+  }
+  res.on('finish', () => fs.rm(req.workDir, { recursive: true, force: true }, () => {}));
+  renderSvgToPdf(svg, { width, height, workDir: req.workDir })
+    .then((file) => res.sendFile(file))
+    .catch((err) => {
+      console.warn('svg/pdf hiba:', err.message.slice(0, 300));
       res.status(500).json({ error: err.message.slice(0, 300) });
     });
 });

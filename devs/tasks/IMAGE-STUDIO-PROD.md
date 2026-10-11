@@ -108,8 +108,14 @@ A prod-userek tetszőleges képet dobnak be (fotó-réteg / varázspálca-forrá
 ### 5. 🔌 PSD import (07 §2.8)
 - [ ] 🔌 Worker: **PSD → rétegek → raster/vektor-közelítés → ImageDoc** (a réteg-fa megtartásával).
 
-### 6. 🔌 PDF / PSD export (07 §2.9)
-- [ ] 🔌 Worker: **PDF-export** (nyomdakész) + **PSD-export** (réteg-megtartó) + AI-kompatibilis workflow.
+### 6. 🟡 PDF / PSD export (07 §2.9)
+- [x] ✅ **PDF-export (nyomdakész, VEKTOR)** — KÉSZ: a kliens `imageDocToSvg` önálló SVG-jét (fotók base64-ben) a
+  worker Chromiumja PDF-be nyomtatja ([server/svgPdf.js](../../server/svgPdf.js) `renderSvgToPdf` → `page.pdf`,
+  `POST /svg/pdf`); a lap PONTOSAN a vászon mérete (`svgDocSize`), margó nélkül, háttér megtartva. Kliens:
+  [imageDocClient.renderSvgPdf](../../src/lib/imageDocClient.ts) (SVG fájlként feltöltve) + ExportSheet „PDF-export",
+  i18n hu/en/de. **Élő-verifikált**: valódi `%PDF-1.4`, 1 oldal, a tartalom VEKTOR + vizuálisan azonos a PNG-vel
+  (forgatott gradient + screen-blend + szöveg). *(A `chrome-headless-shell` page.pdf-je leprobálva — működik.)*
+- [ ] 🔌 **PSD-export** (réteg-megtartó) + AI-kompatibilis workflow — külső worker-lib (nagyobb falat).
 
 ### 7. ✅ Font-parity (preview ↔ worker) — KÉSZ
 - [x] ✅ **Contract-zárolt font-parity**: a text-réteg family-neve 4 helyen él (UI-választék

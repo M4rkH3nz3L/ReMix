@@ -62,6 +62,12 @@ function canvas(doc: ImageDoc, opts?: SvgExportOptions): { W: number; H: number 
     : { W: base, H: Math.round((base * ah) / aw) };
 }
 
+/** a kimeneti SVG viewBox pixel-mérete (a PDF-lap mérethez — hogy EGYEZZEN a viewBox-szal) */
+export function svgDocSize(doc: ImageDoc, opts?: SvgExportOptions): { width: number; height: number } {
+  const { W, H } = canvas(doc, opts);
+  return { width: W, height: H };
+}
+
 interface Box {
   bw: number;
   bh: number;

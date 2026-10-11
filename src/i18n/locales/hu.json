@@ -2971,6 +2971,7 @@
       "exportedBody": "A kirenderelt PNG a projekthez lett mentve.",
       "exportShare": "Megosztás / Letöltés (PNG)",
       "exportSvg": "SVG-export (vektor)",
+      "exportPdf": "PDF-export (vektor)",
       "exportToVideo": "Beszúrás új videóba",
       "skiaMissing": "Ehhez az eszközhöz új app-build kell (a Skia natív modul hiányzik ebből a dev-kliensből). Építsd újra a dev-klienst, majd próbáld újra.",
       "export": {

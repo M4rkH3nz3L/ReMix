@@ -37,6 +37,7 @@ import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
+import { pruneProxyCache } from '@/lib/cacheManager';
 import { canCloudBackupMedia, projectMediaSafety } from '@/lib/storagePolicy';
 import {
   clearRecovery,
@@ -402,6 +403,16 @@ export default function EditorScreen() {
         .filter((c) => c.kind === 'video')
         .map((c) => c.uri)
     );
+    // 🧹 a proxy lemez-cache budget-nyírása (06 §2.9): a legrégebbi proxykat
+    // kiüríti, ha a mappa túlnőtt — halasztva, hogy a megnyitást ne blokkolja.
+    const prune = setTimeout(() => {
+      try {
+        pruneProxyCache();
+      } catch {
+        /* best-effort — a cache-nyírás sosem akaszthatja a szerkesztőt */
+      }
+    }, 3000);
+    return () => clearTimeout(prune);
   }, [projectId]);
 
   // autosave: minden módosítás után rövid szünettel mentünk.

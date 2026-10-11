@@ -5,10 +5,12 @@
 
 ---
 
-> **📊 Haladás (2026-10-07):** ✅ 4 teljes · 🟡 4 mag kész · ⬜ 3 nyitva — Σ 11 tétel.
+> **📊 Haladás (2026-10-11):** ✅ 4 teljes · 🟡 5 mag kész · ⬜ 2 nyitva — Σ 11 tétel.
 > Keyframe / color / animated-mask / **effect-chain** / freeze+reverse kész (preview↔render parity;
 > a vizuális kimenet élő-ffmpeg-gel verifikálandó) + a **projekt forrás-mappa** a Toolbaron (§2.10).
-> Hátra: profi **audio-UI** (§2.7), GIF-dekód+render (§2.8), proxy-engine (§2.9) és a teljes **uri→assetId** refaktor (§2.10).
+> **2026-10-11:** a **proxy-engine (§2.9)** lifecycle + LRU size-management KÉSZ (pure `planCacheEviction`
+> tesztelt + `pruneProxyCache` bekötve a szerkesztőbe). Hátra: profi **audio-UI** (§2.7), GIF-dekód+render
+> (§2.8), render-output cache (§2.9 maradék) és a teljes **uri→assetId** refaktor (§2.10).
 
 ## 0. Kontextus & cél
 Ez a legfontosabb terület, ha a cél **Premiere/CapCut-szintű mobil NLE**. Sok mag kész, de a
@@ -71,8 +73,18 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
 - [x] ✅ **GIF-időzítés mag KÉSZ (2026-10-06)**: [src/lib/gifTiming.ts](../../src/lib/gifTiming.ts) — a master-óra playheadjéből (AGENTS.md: minden réteg a playheadből számol) `frameIndexAt` (a megjelenítendő kocka a változó kocka-késleltetésekből, loop-aware: loop=true ciklus, loop=false az utolsó kockán áll) + `gifDuration` + `loopCountAt`; a 0/negatív/NaN késleltetés a GIF-konvenció szerint 100 ms. Teszt: `gifTiming.test.ts` (7).
 - [ ] 🔌🖼️ Hátra: a GIF **dekódolás** (natív, kocka-késleltetések kinyerése) + import + a preview-réteg a `frameIndexAt`-tel + timeline + render (ffmpeg).
 
-### 2.9 Proxy / performance engine — P1
-- [ ] 🟡 Proxy-alap van → ⬜ **background proxy-generálás + lifecycle + render-cache + invalidation + size-mgmt + storage-policy**.
+### 2.9 Proxy / performance engine — P1 🟡 (2026-10-11: lifecycle + size-mgmt KÉSZ)
+- [x] ✅ **Background proxy-generálás**: `prewarmProxies` ([proxy.ts](../../src/lib/proxy.ts)) a projekt
+  videóihoz a szerkesztő-mountnál (fire-and-forget, max 2 párhuzamos szemafor); a lejátszó a kész proxyt
+  oldja fel (`getProxyUriSync`), a klip uri-ja sosem íródik át → a render az eredetivel fut.
+- [x] ✅ **Size-management + lifecycle (LRU-eviction)**: a proxy lemez-cache korlátlanul nőtt — most a
+  pure `planCacheEviction` ([cacheEvict.ts](../../src/lib/cacheEvict.ts), tesztelt: cacheEvict.test.ts, 6 eset)
+  a legrégebben módosított proxykat egy bájt-budgetre (`PROXY_CACHE_MAX_BYTES` 512 MB) nyírja; a best-effort
+  `pruneProxyCache` ([cacheManager.ts](../../src/lib/cacheManager.ts)) a szerkesztő-mountnál (halasztva) fut.
+- [x] ✅ **Invalidation (tartalom-címzett)**: a proxy-kulcs a `fájlnév+méret+maxSide`-ból jön → a forrás
+  változása ÚJ kulcsot ad (implicit invalidáció), tier-váltáskor a session-cache ürül (`setProxyConfig`).
+- [ ] ⬜ **Hátra**: dedikált **render-output cache** policy (a `renders/` kimenetek elszámolása/nyírása — ma
+  a proxy+thumbnail+waveform cache-t a `cacheReport`/`clearCaches` kezeli, a renderelt kimeneteket nem).
 
 ### 2.10 Editor architecture refactor — P1 (alap)
 - [x] ~ **Projekt forrás-mappa (asset-bin) KÉSZ (2026-10-07)** — részlépés az asset-architektúra felé: a `project.assets` köré egységes forrás-bin ([projectSource.ts](../../src/lib/projectSource.ts) + [SourceSheet](../../src/components/SourceSheet.tsx)), a videó-editor Toolbarján is (forrás→idővonal), minden mutáció a **command-buson** (`ADD_ASSET`/`REMOVE_ASSET`). Lásd [08](./08-storage.md) §2.8.

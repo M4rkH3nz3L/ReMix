@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { planCacheEviction } from '@/lib/cacheEvict';
 import { clearBeatMemory } from '@/lib/beats';
 import { clearCutlistMemory } from '@/lib/cutlist';
 import { clearProxyMemory } from '@/lib/proxy';
@@ -116,6 +117,42 @@ export function clearCaches(): void {
   clearTranscriptMemory();
   clearVisionMemory();
   clearVoiceProxyMemory();
+}
+
+/** A vágási proxy-cache alap-budgetje (byte) — fölötte a legrégebbiek kiürülnek. */
+export const PROXY_CACHE_MAX_BYTES = 512 * 1024 * 1024; // 512 MB
+
+/**
+ * A vágási proxy lemez-cache nyírása egy budgetre (06 §2.9 „size-mgmt"): a
+ * legrégebben használt proxykat törli, amíg a mappa a limit alá nem fér. A
+ * proxyk eldobható, determinisztikus kulcsú műtermékek → bármikor újragenerálhatók.
+ * Best-effort (natív-only); weben + hibán no-op. @returns a felszabadított bájtok.
+ */
+export function pruneProxyCache(maxBytes: number = PROXY_CACHE_MAX_BYTES): number {
+  if (!HAS_DISK_CACHE) {
+    return 0;
+  }
+  const files = fileList(() => new Directory(Paths.document, 'proxies'));
+  const plan = planCacheEviction(
+    files.map((f) => ({ key: f.uri, size: f.size ?? 0, mtime: f.modificationTime ?? 0 })),
+    maxBytes
+  );
+  if (plan.evict.length === 0) {
+    return 0;
+  }
+  const evictSet = new Set(plan.evict);
+  for (const f of files) {
+    if (evictSet.has(f.uri)) {
+      try {
+        f.delete();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  // a memória-feloldások elavulhattak (törölt fájlra mutathatnak) → ürítjük
+  clearProxyMemory();
+  return plan.freed;
 }
 
 /** Ember-olvasható méret. */

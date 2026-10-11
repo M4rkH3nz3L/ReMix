@@ -3,6 +3,8 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { bakeImage } from '@/lib/imageEditor';
+import { intakeOps } from '@/lib/imageIntake';
 import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 
@@ -91,7 +93,27 @@ export async function pickVideo(): Promise<PickedVideo | null> {
   };
 }
 
-export async function pickImage(): Promise<{ uri: string } | null> {
+/**
+ * 🧼 Bevitt kép normalizálása (prod-robusztusság): re-encode (JPEG/PNG) → az EXIF-
+ * tájolás BEÉGED (az álló/fekvő telefon-fotó helyesen áll) és a HEIC/HEIF JPEG-re
+ * konvertálódik (a worker-ffmpeg nem feltétlen dekódol HEIC-et), a nagy-felbontású
+ * kép pedig a szerkesztéshez/exporthoz elég méretre (`INTAKE_MAX_DIM`) kicsinyedik.
+ * Hiba esetén az eredeti (tartós) uri megy tovább — a felvétel ne vesszen el.
+ */
+export async function normalizePickedImage(
+  uri: string,
+  width?: number,
+  height?: number
+): Promise<{ uri: string; width?: number; height?: number }> {
+  try {
+    const baked = await bakeImage(uri, intakeOps(width, height), { persist: true });
+    return { uri: baked.uri, width: baked.width, height: baked.height };
+  } catch {
+    return { uri: persistToLibrary(uri), width, height };
+  }
+}
+
+export async function pickImage(): Promise<{ uri: string; width?: number; height?: number } | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsMultipleSelection: false,
@@ -100,7 +122,8 @@ export async function pickImage(): Promise<{ uri: string } | null> {
   if (result.canceled || result.assets.length === 0) {
     return null;
   }
-  return { uri: persistToLibrary(result.assets[0].uri) };
+  const asset = result.assets[0];
+  return normalizePickedImage(asset.uri, asset.width, asset.height);
 }
 
 /**

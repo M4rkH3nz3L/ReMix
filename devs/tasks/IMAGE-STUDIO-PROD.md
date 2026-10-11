@@ -93,10 +93,17 @@ csak az eszköz aktiválásakor. Így a vászon/forma/szöveg/gradient/**export*
 brush/varázspálca Skia-t igényel → ha hiányzik, **barátságos üzenet** (`skiaMissing`) a crash helyett. *(Teljes
 funkcióhoz — brush/wand — új dev-build kell: iOS lokál Xcode-blokk → EAS cloud dev-build, vagy Android.)*
 
-### 4. ⬜ Bemeneti kép-robusztusság
+### 4. ✅ Bemeneti kép-robusztusság — KÉSZ
 A prod-userek tetszőleges képet dobnak be (fotó-réteg / varázspálca-forrás).
-- [ ] ⬜ **HEIC/HEIF** (iOS-fotók), **nagy felbontás** (lekicsinyítés a szerkesztéshez), **EXIF-forgatás**
-  (álló/fekvő telefon-fotó helyes tájolása), nem támogatott formátum → barátságos hiba.
+- [x] ✅ **HEIC/HEIF + nagy felbontás + EXIF-forgatás** — a bevitelt EGYSZER normalizáljuk a bevételi ponton
+  ([media.ts](../../src/lib/media.ts) `pickImage`→`normalizePickedImage`): a re-encode (`imageEditor.bakeImage`,
+  v57 ImageManipulator) **beégeti az EXIF-tájolást** (álló/fekvő telefon-fotó helyesen áll) és **HEIC/HEIF→JPEG**-et
+  konvertál (a worker-ffmpeg nem feltétlen dekódol HEIC-et), a nagy kép a leghosszabb oldalon `INTAKE_MAX_DIM=3072`-re
+  **kicsinyedik**. A döntés-mag pure + tesztelt: [imageIntake.ts](../../src/lib/imageIntake.ts) (`planImageResize`/
+  `intakeOps`/`isSupportedImage`, +10 teszt). Hiba → eredeti (tartós) uri (a felvétel nem vész el). **Bónusz:** MINDEN
+  `pickImage`-hívó (fotó-réteg, sticker, avatar, filter, projekt-forrás) is normalizáltat kap. *(Hátra: a `pickImage`
+  csak a könyvtárból vesz — kamera/DocumentPicker kép-út, ha lesz, ugyanezt hívja; nem támogatott formátum →
+  jelenleg graceful fallback, nem kemény hiba.)*
 
 ### 5. 🔌 PSD import (07 §2.8)
 - [ ] 🔌 Worker: **PSD → rétegek → raster/vektor-közelítés → ImageDoc** (a réteg-fa megtartásával).

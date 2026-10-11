@@ -42,7 +42,13 @@ pixel-kimenet** élő worker+ffmpeg-gel SOHA nem volt összevetve az előnézett
 ### 2. 🔌 Production render-worker infra (→ [01 §2.2](./01-production-go-live.md))
 A stúdió exportja a felhő-workerre épül; prod-ban ma nincs. (Dev-ben is most derült ki: **worker nélkül a
 megosztás 25%-on ragad** — lásd a dev-stack-jegyzetet.)
-- [ ] 🔌 **Prod Docker image**: FFmpeg + Whisper + Chromium (egress) + ONNX-runtime, pinned verziók.
+- [x] ~ **Prod Docker image MEGÍRVA (2026-10-11)**: [server/Dockerfile](../../server/Dockerfile) +
+  [.dockerignore](../../server/.dockerignore) — `node:20-bookworm-slim` + **ffmpeg** + **chromium**
+  (a `findChromium` már a `CHROMIUM_PATH=/usr/bin/chromium`-ot nézi → particles/animált-szöveg/forma megy) +
+  emoji/latin **fontok** + `tini` (graceful SIGTERM). Réteg-cache-barát (`npm ci` a lockfile-ból ELŐBB), nem-root
+  `node` user, `CMD render-worker.js` (API-ként: `node index.js` felülírással). A **Whisper kihagyva** (a
+  workerhez nem kell; az a /captions API-é). ⚠️ **Build-verify a deploy-környezetre vár** (a sandboxban nincs
+  futó Docker-daemon); chromium-sandbox: a futtatás kapjon `--cap-add=SYS_ADMIN`-t (dokumentálva a Dockerfile-ban).
 - [ ] 🔌 **Deploy + health-check endpoint + autoscaling + crash-recovery** (Fly/Render/VM).
 - [ ] 🔌 **Perzisztens temp/storage stratégia** (nagy köztes fájlok; takarítás).
 - [ ] 🔌 **Prod smoke-test**: render + TTS + audio-export + egress a prod workerben, CI-ből.

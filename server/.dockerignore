@@ -1,0 +1,15 @@
+# a telepített függőségek az image-ben az `npm ci`-ből jönnek (ne a hoszt-félék)
+node_modules
+# titkok + lokális env SOHA ne menjen az image-be
+.env
+.env.*
+*.env.bak*
+# logok + dev-műtermékek
+*.log
+.render-smoke
+# tesztek + dev-szkript (production image-be nem kell)
+**/*.test.js
+scripts/render-smoke.js
+# maga a build-leíró
+Dockerfile
+.dockerignore

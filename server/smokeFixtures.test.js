@@ -15,7 +15,7 @@ describe('buildSmokeProjects', () => {
   const projects = buildSmokeProjects();
 
   it('nem üres + egyedi nevek', () => {
-    expect(projects.length).toBeGreaterThanOrEqual(8);
+    expect(projects.length).toBeGreaterThanOrEqual(12);
     const names = projects.map((p) => p.name);
     expect(new Set(names).size).toBe(names.length);
   });
@@ -52,7 +52,7 @@ describe('buildSmokeProjects', () => {
 
   it('van legalább egy funkció-fixture a kulcs-render-utakra', () => {
     const names = buildSmokeProjects().map((p) => p.name);
-    for (const must of ['keyframe-rotate-opacity', 'color-grade', 'effect-chain', 'skew', 'reverse', 'transition-xfade']) {
+    for (const must of ['keyframe-rotate-opacity', 'color-grade', 'effect-chain', 'skew', 'reverse', 'transition-xfade', 'animated-mask', 'pip', 'particles', 'color-balance-3way']) {
       expect(names).toContain(must);
     }
   });

@@ -179,6 +179,55 @@ function buildSmokeProjects() {
         },
       ]),
     },
+    {
+      name: 'animated-mask',
+      description: 'Rotoszkóp: ellipszis-maszk balról jobbra mozog (track-kulcskockák).',
+      project: project('mask', [
+        videoTrack([
+          videoClip({
+            mask: {
+              shape: 'ellipse',
+              x: 0.5,
+              y: 0.5,
+              w: 0.4,
+              h: 0.4,
+              feather: 0.1,
+              track: [
+                { time: 0, x: 0.3, y: 0.5, w: 0.4, h: 0.4 },
+                { time: DUR, x: 0.7, y: 0.5, w: 0.4, h: 0.4 },
+              ],
+            },
+          }),
+        ]),
+      ]),
+    },
+    {
+      name: 'pip',
+      description: 'Picture-in-picture: egy második videó kicsinyítve a fő kép fölé.',
+      project: project('pip', [
+        videoTrack([videoClip()]),
+        {
+          id: 'trk-pip',
+          type: 'pip',
+          name: 'pip',
+          clips: [videoClip({ id: 'p1', uri: VIDEO2, transform: { scale: 0.4, x: 0.3, y: -0.3 } })],
+        },
+      ]),
+    },
+    {
+      name: 'particles',
+      description: 'Részecske-réteg (konfetti) a videó fölött.',
+      project: project('particles', [videoTrack([videoClip()])], {
+        particles: { preset: 'confetti', beatSync: false },
+      }),
+    },
+    {
+      name: 'color-balance-3way',
+      description: '3-way color balance: középtónus meleg/hideg eltolás (colorbalance).',
+      project: project('balance', [
+        videoTrack([videoClip({ adjust: { balance: { mid: { r: 0.4, g: 0, b: -0.3 } } } })]),
+      ]),
+    },
   ];
 }
 

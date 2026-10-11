@@ -67,8 +67,12 @@ Ma az export **PNG** (a `rasterize` worker-PNG-je → `Sharing.shareAsync`); hi�
   „SVG-export", i18n hu/en/de). **Raszter-parity vizuálisan verifikálva** (Chromium-render): gradient-irány
   (CSS-szög-konvenció javítva), boolean-lyuk, screen-blend+forgatás+opacity+szöveg kompozit → egyezik a `/imagedoc`
   raszterrel.
-- [ ] ⬜ **Nagy vászon**: a `/imagedoc` + Chromium memória/idő-korlát nagy (pl. 4000×4000) dokumentumnál;
-  méret-plafon + beszédes hiba (ne csendben csonkoljon).
+- [x] 🛡️ **Nagy vászon / pathológikus doc** — KÉSZ: a `/imagedoc` rétegenként egy Chromium-screenshotot készít →
+  `imageDocGuard()` ([server/imagedoc.js](../../server/imagedoc.js), pure, +3 teszt) korlátozza a réteg-számot
+  (≤400) és az össz-path-pontot (≤200000); túllépés → **HTTP 413 + beszédes magyar hiba** (nem néma elakadás).
+  **Élő-verifikált** (401 réteg→413, 3 réteg→200). A kimeneti felbontás már 240–2160-ra sapkázott; az
+  [ExportSheet](../../src/components/studio/image/ExportSheet.tsx) a felbontás-címkéken a VALÓS (sapkázott) px-t
+  mutatja → nincs néma lekicsinyítés. *(Stretch: 2160 fölötti export csempézéssel — külön feladat.)*
 
 ### 3. 🔌 Worker-infra (a `/imagedoc`-hoz) — nagyrészt a közös képpel kész
 - [x] ~ **A prod worker-image LEFEDI** ([server/Dockerfile](../../server/Dockerfile), [VIDEO-STUDIO-PROD](./VIDEO-STUDIO-PROD.md) #2):

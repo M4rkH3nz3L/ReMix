@@ -76,6 +76,40 @@ function fillAsShape(layer) {
  * @param workDir munkakönyvtár (a hívó takarítja)
  * @returns {Promise<string>} a kész PNG útvonala
  */
+// 🛡️ Nagy-doc védőkorlátok: a /imagedoc RÉTEGENKÉNT egy Chromium-screenshotot
+// készít (külön, 30 mp-es időkorláttal), majd ffmpeg-gel kompozitál — egy
+// pathológikus dokumentum (több ezer réteg / millió path-pont) percekre
+// elakasztaná a workert / elfogyasztaná a memóriát. Inkább BESZÉDES hibát adunk,
+// mint hogy csendben megakadjunk vagy csonka képet adjunk vissza.
+const MAX_LAYERS = 400;
+const MAX_TOTAL_POINTS = 200000;
+
+/**
+ * A dokumentum túllépi-e a render-korlátokat? `null` = rendben, különben a
+ * felhasználónak szánt (magyar) hibaüzenet.
+ */
+function imageDocGuard(doc) {
+  const layers = Array.isArray(doc && doc.layers) ? doc.layers : [];
+  if (layers.length > MAX_LAYERS) {
+    return `Túl sok réteg (${layers.length} > ${MAX_LAYERS}). Egyesíts vagy lapíts rétegeket az exporthoz.`;
+  }
+  let points = 0;
+  for (const l of layers) {
+    if (Array.isArray(l && l.points)) {
+      points += l.points.length;
+    }
+    if (Array.isArray(l && l.subpaths)) {
+      for (const sp of l.subpaths) {
+        points += Array.isArray(sp) ? sp.length : 0;
+      }
+    }
+  }
+  if (points > MAX_TOTAL_POINTS) {
+    return `Túl összetett vektor-tartalom (${points} pont > ${MAX_TOTAL_POINTS}). Egyszerűsítsd a path-okat.`;
+  }
+  return null;
+}
+
 /**
  * A kimeneti formátum ffmpeg-argumentumai + kiterjesztés. A `quality` 0–1 (1 = a
  * legjobb). PNG = veszteségmentes, alfával; JPG = nincs alfa (az átlátszó rész
@@ -217,4 +251,4 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   return outFile;
 }
 
-module.exports = { renderImageDoc, canvasSize, imageOutputArgs };
+module.exports = { renderImageDoc, canvasSize, imageOutputArgs, imageDocGuard, MAX_LAYERS, MAX_TOTAL_POINTS };

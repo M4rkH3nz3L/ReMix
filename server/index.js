@@ -15,7 +15,7 @@ const multer = require('multer');
 const { aiAvailable, aiProvider, probeProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
-const { renderImageDoc } = require('./imagedoc');
+const { renderImageDoc, imageDocGuard } = require('./imagedoc');
 const { computeFocusAssets, computeParallaxAssets, depthAvailable, depthLayerDir, ensureDepth } = require('./depth');
 const { bgRemoveAvailable, bgRemoveDir, computeCutout } = require('./bgremove');
 const { colorStats, pixelColor, exportLut, scopeImage } = require('./color');
@@ -1038,6 +1038,12 @@ app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, re
     uriMap = JSON.parse(req.body.uriMap ?? '{}');
   } catch {
     res.status(400).json({ error: 'Hibás doc/uriMap JSON.' });
+    return;
+  }
+  // 🛡️ nagy-doc gát: inkább beszédes hiba, mint néma elakadás a workeren
+  const guardError = imageDocGuard(doc);
+  if (guardError) {
+    res.status(413).json({ error: guardError });
     return;
   }
   // a rétegek uri-jait a feltöltött fájlokra írjuk át (ugyanaz a minta, mint a

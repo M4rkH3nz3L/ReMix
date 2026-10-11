@@ -55,7 +55,7 @@ export function ExportSheet({
 
       <Text style={styles.section}>{t('studio.image.export.resolutionLabel')}</Text>
       <View style={styles.row}>
-        <Chip label={`1× · ${base}px`} active={scale === 1} onPress={() => setScale(1)} />
+        <Chip label={`1× · ${Math.min(2160, base)}px`} active={scale === 1} onPress={() => setScale(1)} />
         <Chip label={`2× · ${Math.min(2160, base * 2)}px`} active={scale === 2} onPress={() => setScale(2)} />
       </View>
 

@@ -1,4 +1,4 @@
-const { imageOutputArgs } = require('./imagedoc');
+const { imageOutputArgs, imageDocGuard, MAX_LAYERS, MAX_TOTAL_POINTS } = require('./imagedoc');
 
 describe('imageOutputArgs (export-formátum → ffmpeg)', () => {
   test('alap = PNG (veszteségmentes, extra args nélkül)', () => {
@@ -31,5 +31,39 @@ describe('imageOutputArgs (export-formátum → ffmpeg)', () => {
     // NaN → alap 0.92
     const def = imageOutputArgs('webp', NaN);
     expect(def.args[def.args.indexOf('-quality') + 1]).toBe('92');
+  });
+});
+
+describe('imageDocGuard (nagy-doc védőkorlát)', () => {
+  const layer = () => ({ kind: 'shape', shape: 'rectangle', w: 0.5, h: 0.5, fill: '#000' });
+
+  test('normál doc → null (rendben)', () => {
+    expect(imageDocGuard({ layers: [layer(), layer(), { kind: 'fill', fill: '#111' }] })).toBeNull();
+    expect(imageDocGuard({ layers: [] })).toBeNull();
+    expect(imageDocGuard({})).toBeNull();
+    expect(imageDocGuard(null)).toBeNull();
+  });
+
+  test('túl sok réteg → beszédes hiba', () => {
+    const many = Array.from({ length: MAX_LAYERS + 1 }, layer);
+    const err = imageDocGuard({ layers: many });
+    expect(err).toMatch(/Túl sok réteg/);
+    expect(err).toContain(String(MAX_LAYERS + 1));
+    // pontosan a határ még rendben
+    expect(imageDocGuard({ layers: Array.from({ length: MAX_LAYERS }, layer) })).toBeNull();
+  });
+
+  test('túl sok path-pont (points + subpaths együtt) → beszédes hiba', () => {
+    const big = { kind: 'shape', shape: 'path', w: 1, h: 1, fill: '#000', points: new Array(MAX_TOTAL_POINTS + 1).fill({ x: 0.5, y: 0.5 }) };
+    expect(imageDocGuard({ layers: [big] })).toMatch(/Túl összetett/);
+    const bigSub = {
+      kind: 'shape',
+      shape: 'path',
+      w: 1,
+      h: 1,
+      fill: '#000',
+      subpaths: [new Array(MAX_TOTAL_POINTS).fill({ x: 0, y: 0 }), new Array(5).fill({ x: 0, y: 0 })],
+    };
+    expect(imageDocGuard({ layers: [bigSub] })).toMatch(/Túl összetett/);
   });
 });

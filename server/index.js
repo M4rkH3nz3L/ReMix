@@ -255,14 +255,18 @@ const upload = multer({
 app.get('/health', async (_req, res) => {
   // a próbák PÁRHUZAMOSAN futnak (cache-selve is) — a /health a kliens-oldali
   // elemzések kapuja, sorosan az elfoglalt Ollama túllépné a kliens timeoutját
-  const [ai, provider, vision] = await Promise.all([
+  const [ai, provider, vision, workerList] = await Promise.all([
     aiAvailable(),
     aiProvider(),
     visionAvailable(),
+    listWorkers().catch(() => []),
   ]);
   res.json({
     ok: true,
     service: 'vided-render',
+    // 🖥️ élő render-workerek száma (heartbeat, 20s TTL) — a kliens ebből tudja
+    // előre, hogy a felhő-render (hosszú videó) ténylegesen feldolgozható-e
+    workers: workerList.length,
     captions: fs.existsSync(WHISPER_MODEL),
     ai,
     aiProvider: provider,
@@ -1881,6 +1885,16 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
     // (trackUsage) az enqueue UTÁN, hogy csak a ténylegesen sorba tett jobot számoljuk.
     const minutes = Math.max(1, Math.ceil(totalDuration / 60));
     (async () => {
+      // 🖥️ FAIL-FAST: ne tegyünk sorba jobot, ha EGYETLEN render-worker sem él —
+      // különben a job „waiting"-ben ülne, a kliens pedig 25%-on ragadna a
+      // ~10 perces timeoutig (ez volt a „megosztás beragadt" tünet). Látható
+      // hibát adunk, hogy a UI újrapróbálhasson (a média-feltöltés ELŐTT).
+      const aliveWorkers = await listWorkers().catch(() => []);
+      if (aliveWorkers.length === 0) {
+        const wErr = new Error('Jelenleg nincs elérhető render-worker — indítsd el a render-workert, vagy próbáld újra pár perc múlva.');
+        wErr.status = 503;
+        throw wErr;
+      }
       const rGate = await enforceQuota(uid, await userTier(uid), 'renderMinutes', minutes);
       if (!rGate.ok) {
         const qErr = new Error(`Elérted a havi render-perc kvótád (hátralévő: ${rGate.remaining} perc).`);

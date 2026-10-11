@@ -2680,6 +2680,7 @@
       "codecNeedsCloud": "Dieser Codec/diese Auflösung (AV1 · ProRes · 8K) braucht Cloud-Render (Pro).",
       "renderError": "Render-Fehler.",
       "renderTimeout": "Der Render hat zu lange gedauert — versuch es noch mal.",
+      "noWorker": "Derzeit ist kein Render-Worker verfügbar — starte ihn (cd server && npm run worker) oder versuch es in ein paar Minuten erneut.",
       "soundLibraryUnreachable": "Die Sound-Bibliothek ist nicht erreichbar.",
       "autoCaptionNativeOnly": "Automatische Untertitel sind in der nativen App verfügbar (iOS/Android).",
       "noWhisperModel": "Kein Whisper-Modell auf dem Worker — siehe server/models (ggml-base.bin).",

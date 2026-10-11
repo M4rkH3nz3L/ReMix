@@ -15,6 +15,7 @@ import {
 import { fetchRead, readJson } from '@/lib/netRetry';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
+import { cloudRenderBlocked, type RenderHealth } from '@/lib/renderPreflight';
 import { renderCacheKey } from '@/lib/projectHash';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
@@ -448,10 +449,18 @@ async function submitAndPollRender(
     [PHASE_DOWNLOAD, 0.1],
   ]);
 
+  let health: RenderHealth = {};
   try {
-    await fetchWithTimeout(`${base}/health`, 3000);
+    const r = await fetchWithTimeout(`${base}/health`, 3000);
+    health = (await r.json()) as RenderHealth;
   } catch {
     throw new Error(tr('lib.render.workerUnreachable', { base }));
+  }
+  // ☁️ hosszú videó + van felhő-mód, de NINCS élő render-worker → fail-fast MÁR
+  // a média-feltöltés ELŐTT (különben a megosztás/export 25%-on ragadna a
+  // ~10 perces timeoutig). A szerver is elutasít; ez a sávszélesség-kímélő pár.
+  if (cloudRenderBlocked(health, projectDuration(project))) {
+    throw new Error(tr('lib.render.noWorker'));
   }
 
   // 🔗 ADR-012: a felhő-feltöltés előtt a klip-uri-kat a FELOLDOTT (asseten át)

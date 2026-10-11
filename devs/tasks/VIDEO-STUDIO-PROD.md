@@ -49,8 +49,11 @@ megosztás 25%-on ragad** — lásd a dev-stack-jegyzetet.)
   `AbortSignal`-tudatos (`MAX_POLLS` ~10 perc timeout). (Natív oldalon is kész, lásd [12 §2.3](./12-code-quality.md).)
 - [ ] 🔌 **Worker-oldali job-cancel + temp-cleanup**: a megszakított kliens-kérés tényleg állítsa le az FFmpeg-
   processt a workeren és takarítsa a köztes fájlokat (ma a kliens elenged, a worker tovább dolgozhat).
-- [ ] 🖼️ **Hibakezelés a UI-ban**: ha a worker **nem fut / lejár / hibázik**, az export/megosztás ne ragadjon
-  némán (pl. 25%) — **látható hiba + „Újra" gomb**; worker-health-probe a megosztás előtt (fail-fast üzenet).
+- [x] ✅ **Worker-hiány fail-fast KÉSZ (2026-10-11)**: a `/render` enqueue-ág a szerveren elutasít (503), ha
+  `listWorkers()` üres (a média-feltöltés ELŐTT), a `/health` pedig jelenti a **worker-számot**; a kliens a
+  tesztelt `cloudRenderBlocked` ([renderPreflight.ts](../../src/lib/renderPreflight.ts)) preflighttal MÁR a
+  feltöltés előtt beszédes hibát dob (`lib.render.noWorker`, hu/en/de) — **nem ragad 25%-on**. Teszt:
+  renderPreflight.test.ts (6). **Hátra:** a render-közbeni worker-halál detektálása (waiting-stall) + „Újra" gomb a progress-sheetben.
 - [ ] ⬜ **Hosszú/nehéz render**: a `MAX_POLLS` (10 perc) túllépés kezelt üzenettel; nagy (4K/hosszú) projekt
   várható-idő jelzés + háttér-folytatás (az app bezárása ne veszítse el a kész jobot).
 

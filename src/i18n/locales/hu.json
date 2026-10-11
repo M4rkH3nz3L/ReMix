@@ -2680,6 +2680,7 @@
       "codecNeedsCloud": "Ez a kodek/felbontás (AV1 · ProRes · 8K) felhő-rendert igényel (Pro).",
       "renderError": "Render hiba.",
       "renderTimeout": "A render túl sokáig tartott — próbáld újra.",
+      "noWorker": "Jelenleg nincs elérhető render-worker — indítsd el (cd server && npm run worker), vagy próbáld újra pár perc múlva.",
       "soundLibraryUnreachable": "A hang-könyvtár nem érhető el.",
       "autoCaptionNativeOnly": "Az automatikus felirat a natív appból érhető el (iOS/Android).",
       "noWhisperModel": "A workeren nincs Whisper-modell — lásd server/models (ggml-base.bin).",

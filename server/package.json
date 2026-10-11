@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env index.js",
     "worker": "node --env-file-if-exists=.env render-worker.js",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "smoke": "node scripts/render-smoke.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

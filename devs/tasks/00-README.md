@@ -79,6 +79,10 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 > élő-verifikáció, prod worker-infra, export-megbízhatóság, bemeneti-formátum-robusztusság, eszközön-render):
 > [VIDEO-STUDIO-PROD.md](./VIDEO-STUDIO-PROD.md) — a 06 (feature) + 01 (infra) + NATIVE (eszköz) prod-deltája egy helyen.
 
+> **🎨 Prod-kép-stúdió:** a kép-szerkesztő **production** deltája (rasterize-parity: preview ↔ worker `/imagedoc`
+> ↔ captureRef; export-formátumok PNG/JPG/WebP + vektor-SVG; bemeneti robusztusság HEIC/nagy/EXIF; PSD-import +
+> PDF/PSD-export; font-parity): [IMAGE-STUDIO-PROD.md](./IMAGE-STUDIO-PROD.md) — a 07 (feature) prod-deltája.
+
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
 | 🧱 | **Editor-mag (alapfunkció)** | 🔴 **P0/P1** | **[CORE.md](./CORE.md)** |

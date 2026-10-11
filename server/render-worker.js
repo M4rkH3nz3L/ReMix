@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const { Worker } = require('bullmq');
 
-const { connection, QUEUE_NAME } = require('./queue');
+const { connection, QUEUE_NAME, isJobCancelRequested, clearJobCancel } = require('./queue');
 const { downloadFile, uploadFile } = require('./s3store');
 const { renderProject } = require('./render');
 const { notifyAvailable, sendNotification } = require('./notify');
@@ -95,6 +95,19 @@ const worker = new Worker(
   async (job) => {
     const { project, settings } = job.data;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remix-render-'));
+    // 🛑 kooperatív megszakítás: a kliens ✕-je a /render/:id/cancel-en át Redis
+    // abort-flaget tesz; itt figyeljük, és abortra a renderProject SIGKILL-je az
+    // ffmpeg-et. (A flag TTL-je túléli a BullMQ-retryt → a 2. próba is azonnal bukik.)
+    const controller = new AbortController();
+    const cancelPoll = setInterval(() => {
+      isJobCancelRequested(job.id)
+        .then((req) => {
+          if (req && !controller.signal.aborted) {
+            controller.abort();
+          }
+        })
+        .catch(() => {}); // best-effort — a poll hibája sose döntse el a rendert
+    }, 1500);
     try {
       // 1) médiafájlok betöltése az S3-ból
       setPhase(job, 'download', 0);
@@ -113,7 +126,8 @@ const worker = new Worker(
             cur.progress = pct; // a heartbeat ~5 mp-enként tükrözi
           }
         },
-        settings || {}
+        settings || {},
+        controller.signal
       );
       // 3) kész fájl feltöltése — a kiterjesztés a rendertől jön (videó VAGY
       //    hang-only export: wav/mp3/m4a/flac), a content-type ehhez igazodik
@@ -131,6 +145,8 @@ const worker = new Worker(
       await uploadFile(outKey, out, CTYPE[ext] || 'application/octet-stream');
       return { outKey };
     } finally {
+      clearInterval(cancelPoll);
+      void clearJobCancel(job.id).catch(() => {}); // a flag ne ragadjon a Redisben
       activeJobs.delete(job.id);
       void heartbeat(); // a befejezett feladat azonnal lekerül a workerről
       try {
@@ -170,6 +186,11 @@ worker.on('completed', (job) => {
 });
 worker.on('failed', (job, err) => {
   console.log(`[render-worker] ✗ ${job?.id}: ${err?.message}`);
+  // 🛑 a felhasználó által MEGSZAKÍTOTT jobra nem küldünk „sikertelen" értesítést
+  // (szándékos volt) — a flag TTL-je miatt a retry is ezzel bukik
+  if (/megszakítva/i.test(err?.message || '')) {
+    return;
+  }
   // csak a VÉGLEGES bukásnál értesítünk (a BullMQ újrapróbál `attempts`-ig)
   if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
     notifyOwner(job, false, err?.message);

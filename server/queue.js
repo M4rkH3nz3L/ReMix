@@ -99,7 +99,26 @@ async function cancelRenderJob(id) {
       return { found: true, userId, removed: false, active: false };
     }
   }
-  return { found: true, userId, removed: false, active: state === 'active' };
+  if (state === 'active') {
+    // 🛑 ÉPP FUTÓ job: a worker külön folyamatban renderel → Redis abort-flaget
+    // teszünk, amit a worker figyel, és SIGKILL-je a saját ffmpeg-jét (kooperatív).
+    await requestJobCancel(id).catch(() => {});
+    return { found: true, userId, removed: false, active: true };
+  }
+  return { found: true, userId, removed: false, active: false };
+}
+
+// 🛑 Kooperatív abort-jelzés a futó render-jobnak (Redis flag, 10 perc TTL). A
+// worker a feldolgozás alatt figyeli; az index.js `cancelRenderJob` állítja be.
+const CANCEL_PREFIX = 'render:cancel:';
+async function requestJobCancel(id) {
+  await connection().set(CANCEL_PREFIX + id, '1', 'EX', 600);
+}
+async function isJobCancelRequested(id) {
+  return (await connection().exists(CANCEL_PREFIX + id)) === 1;
+}
+async function clearJobCancel(id) {
+  await connection().del(CANCEL_PREFIX + id);
 }
 
 /** Ahány render-worker-szál egyszerre dolgozik (a schedules-ETA ezzel skáláz). */
@@ -155,6 +174,9 @@ module.exports = {
   tierJobPriority,
   getRenderJob,
   cancelRenderJob,
+  requestJobCancel,
+  isJobCancelRequested,
+  clearJobCancel,
   listRenderJobs,
   renderConcurrency,
   connection,

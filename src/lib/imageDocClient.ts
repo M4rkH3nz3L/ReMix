@@ -14,8 +14,25 @@ import type { ImageDoc } from '@/types/project';
  * meglévő fájl megy vissza (nincs fölösleges render), ha bármit átállítottál,
  * új fájl születik, és a régi képklip nem íródik felül a hátad mögött.
  */
-function contentKey(doc: ImageDoc): string {
-  const src = JSON.stringify({ a: doc.aspectRatio, w: doc.width, h: doc.height, f: doc.format, l: doc.layers });
+/** 🎨 Export-kimenet: formátum + minőség (a `/imagedoc`-nak továbbadva). */
+export interface RenderImageOpts {
+  format?: 'png' | 'jpg' | 'webp';
+  /** 0–1 (csak jpg/webp) */
+  quality?: number;
+}
+
+function contentKey(doc: ImageDoc, height: number, fmt: string, quality?: number): string {
+  const src = JSON.stringify({
+    a: doc.aspectRatio,
+    w: doc.width,
+    h: doc.height,
+    f: doc.format,
+    l: doc.layers,
+    // a kimeneti variáns IS a kulcs része → 1×/2× és png/jpg/webp nem ütközik
+    oh: height,
+    of: fmt,
+    oq: quality ?? null,
+  });
   let h = 5381;
   for (let i = 0; i < src.length; i++) {
     h = ((h << 5) + h + src.charCodeAt(i)) >>> 0;
@@ -27,7 +44,8 @@ export async function renderImageDoc(
   doc: ImageDoc,
   // a vászon-magasság: a létrehozáskor választott `doc.height`, egyébként az alap.
   // (a szerver a szélességet az aspectRatióból számolja, és 2160-ra sapkázza)
-  height = doc.height ?? 1280
+  height = doc.height ?? 1280,
+  opts: RenderImageOpts = {}
 ): Promise<string | null> {
   if (Platform.OS === 'web') {
     return null;
@@ -37,7 +55,8 @@ export async function renderImageDoc(
     if (!dir.exists) {
       dir.create();
     }
-    const target = new File(dir, `doc_${doc.id}_${contentKey(doc)}.png`);
+    const fmt = opts.format === 'jpg' ? 'jpg' : opts.format === 'webp' ? 'webp' : 'png';
+    const target = new File(dir, `doc_${doc.id}_${contentKey(doc, height, fmt, opts.quality)}.${fmt}`);
     if (target.exists) {
       return target.uri;
     }
@@ -55,6 +74,12 @@ export async function renderImageDoc(
     form.append('doc', JSON.stringify(doc));
     form.append('uriMap', JSON.stringify(uriMap));
     form.append('height', String(height));
+    if (opts.format) {
+      form.append('format', fmt);
+    }
+    if (opts.quality != null) {
+      form.append('quality', String(opts.quality));
+    }
 
     const res = await uploadFetch(`${renderServerUrl()}/imagedoc`, {
       method: 'POST',

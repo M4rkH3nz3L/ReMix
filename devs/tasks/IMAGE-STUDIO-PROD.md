@@ -55,8 +55,10 @@ Ma az export **PNG** (a `rasterize` worker-PNG-je → `Sharing.shareAsync`); hi�
   [imagedoc.test.js](../../server/imagedoc.test.js) +4) + a renderelő-láncba kötve; a smoke `SMOKE_FORMAT`/
   `SMOKE_QUALITY`-vel verifikál. **ÉLŐ: PNG 13/13 + JPG 13/13** (valódi JPEG, 720×720). ⚠️ **WebP** a prod
   `libwebp`-es ffmpeg-et igényli (a lokális minimal-build-ből hiányzik; a Debian-alapú [Dockerfile](../../server/Dockerfile)
-  tartalmazza). JPG átlátszó→fekete (nincs alfa). *(Hátra: kliens export-UI — formátum + felbontás 1×/2× + minőség-csúszka
-  az [openExportMenu]-ben.)*
+  tartalmazza). JPG átlátszó→fekete (nincs alfa). **KLIENS-UI KÉSZ:** új
+  [ExportSheet](../../src/components/studio/image/ExportSheet.tsx) (formátum PNG/JPG/WebP + felbontás 1×/2× [2160-sapka] +
+  minőség-csúszka), a `renderImageDoc`/`rasterize`/`exportImage` opts-láncon át a `/imagedoc`-ba; a variáns a cache-kulcs
+  része (1×/2×/png/jpg/webp nem ütközik). i18n hu/en/de.
 - [x] 🔌 **Vektor-hű SVG-export** (07 §2.9) — KÉSZ: valódi **SVG-emitter** [src/lib/svgExport.ts](../../src/lib/svgExport.ts)
   `imageDocToSvg(doc)` (az `svgImport` párja, pure, 21 teszt + round-trip az svgImport-tal): fill/fotó(`<image>`
   data-URI beágyazással)/forma (rect/ellipse/line/star/arrow/**path+subpaths+fillRule**)/**gradient** (lin/rad;
@@ -77,6 +79,15 @@ Ma az export **PNG** (a `rasterize` worker-PNG-je → `Sharing.shareAsync`); hi�
 ---
 
 ## P1 — valós-világ robusztusság / teljesség
+
+### 3b. ✅ Skia natív-modul reziliencia (dev-kliens) — KÉSZ
+A `@shopify/react-native-skia` (2.6.2) natív modul hiánya egy RÉGI dev-kliensből EDDIG az EGÉSZ kép-stúdiót
+crash-eltette betöltéskor (`RNSkiaModule could not be found`), mert a `magicWandClient` + `BrushOverlay` a Skia-t
+a modul-tetején importálta (eager). **Fix:** mindkettő **lustán** töltődik — `magicWandClient` dinamikus `import()`
+a varázspálca-kezelőben, `BrushOverlay` `React.lazy`+`Suspense` az [ImageCanvas](../../src/components/studio/image/ImageCanvas.tsx)-ban,
+csak az eszköz aktiválásakor. Így a vászon/forma/szöveg/gradient/**export** Skia natív modul NÉLKÜL is megy; a
+brush/varázspálca Skia-t igényel → ha hiányzik, **barátságos üzenet** (`skiaMissing`) a crash helyett. *(Teljes
+funkcióhoz — brush/wand — új dev-build kell: iOS lokál Xcode-blokk → EAS cloud dev-build, vagy Android.)*
 
 ### 4. ⬜ Bemeneti kép-robusztusság
 A prod-userek tetszőleges képet dobnak be (fotó-réteg / varázspálca-forrás).

@@ -2972,6 +2972,16 @@
       "exportShare": "Share / Download (PNG)",
       "exportSvg": "Export SVG (vector)",
       "exportToVideo": "Insert into new video",
+      "skiaMissing": "This tool needs a new app build (the Skia module is missing from this dev client). Rebuild the dev client, then try again.",
+      "export": {
+        "formatLabel": "Format",
+        "resolutionLabel": "Resolution",
+        "qualityLabel": "Quality",
+        "hintPng": "Lossless, keeps transparency (alpha).",
+        "hintJpg": "Smaller file, no transparency.",
+        "hintWebp": "Small + alpha (modern; needs a WebP-capable server).",
+        "run": "Share / Download"
+      },
       "canvasTitle": "Canvas settings",
       "undoCanvas": "Edit canvas",
       "videoName": "{{name}} (video)",

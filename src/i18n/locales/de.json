@@ -2942,6 +2942,16 @@
       "exportShare": "Teilen / Herunterladen (PNG)",
       "exportSvg": "SVG-Export (Vektor)",
       "exportToVideo": "In neues Video einfügen",
+      "skiaMissing": "Dieses Werkzeug benötigt einen neuen App-Build (das Skia-Modul fehlt in diesem Dev-Client). Erstelle den Dev-Client neu und versuche es erneut.",
+      "export": {
+        "formatLabel": "Format",
+        "resolutionLabel": "Auflösung",
+        "qualityLabel": "Qualität",
+        "hintPng": "Verlustfrei, behält Transparenz (Alpha).",
+        "hintJpg": "Kleinere Datei, keine Transparenz.",
+        "hintWebp": "Klein + Alpha (modern; benötigt WebP-fähigen Server).",
+        "run": "Teilen / Herunterladen"
+      },
       "canvasTitle": "Leinwand-Einstellungen",
       "undoCanvas": "Leinwand ändern",
       "videoName": "{{name}} (Video)",

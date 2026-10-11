@@ -16,6 +16,7 @@ import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
+import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
@@ -24,7 +25,10 @@ import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
-import { magicWandSelect } from '@/lib/magicWandClient';
+// 🪄 magicWandClient (Skia-függő) SZÁNDÉKOSAN NINCS statikusan importálva — lustán
+// töltjük (lásd onWandSeed), hogy a @shopify/react-native-skia natív modul hiánya
+// (régi dev-kliens) ne crash-eltesse az EGÉSZ kép-stúdiót; a vászon/forma/szöveg/
+// gradient/export Skia nélkül is megy, csak a varázspálca igényli.
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import { compositionGuides } from '@/lib/rulers';
 import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
@@ -182,6 +186,7 @@ export function ImageStudioBody({
     | 'shapePicker'
     | 'canvas'
     | 'source'
+    | 'export'
     | null
   >(null);
   const [busy, setBusy] = useState(false);
@@ -205,8 +210,14 @@ export function ImageStudioBody({
    * ESZKÖZÖN a vászon `captureRef`-je a fallback — így a MENTÉS worker nélkül is
    * működik (offline/Expo Go). A kijelölés-króm elrejtve, hogy ne kerüljön a képbe.
    */
-  const rasterize = async (doc: ImageDoc): Promise<string | null> => {
-    const viaWorker = await renderImageDoc(doc);
+  const rasterize = async (
+    doc: ImageDoc,
+    opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number }
+  ): Promise<string | null> => {
+    const viaWorker = await renderImageDoc(doc, opts?.height ?? doc.height ?? 1280, {
+      format: opts?.format,
+      quality: opts?.quality,
+    });
     if (viaWorker) {
       return viaWorker;
     }
@@ -414,15 +425,25 @@ export function ImageStudioBody({
         setWandActive(true);
         break;
       case 'brush':
-        // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként
-        setSheet(null);
-        setSelectedId(null);
-        setCropRect(null);
-        setPenPoints(null);
-        setPathEditId(null);
-        setLassoActive(false);
-        setWandActive(false);
-        setBrushActive(true);
+        // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként. A Skia-függő
+        // overlay-t előbb LEPROBÁLJUK betölteni; ha a natív modul hiányzik (régi
+        // dev-kliens), barátságos üzenet jön a lazy-reject crash HELYETT.
+        void (async () => {
+          try {
+            await import('@/components/studio/image/BrushOverlay');
+          } catch {
+            Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
+            return;
+          }
+          setSheet(null);
+          setSelectedId(null);
+          setCropRect(null);
+          setPenPoints(null);
+          setPathEditId(null);
+          setLassoActive(false);
+          setWandActive(false);
+          setBrushActive(true);
+        })();
         break;
       case 'pen':
         // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
@@ -609,8 +630,11 @@ export function ImageStudioBody({
       return;
     }
     setBusy(true);
-    void magicWandSelect(uri, u, v)
-      .then((outline) => {
+    void (async () => {
+      try {
+        // Skia-függő mag → lustán töltjük; ha a natív modul hiányzik, a catch kezeli
+        const { magicWandSelect } = await import('@/lib/magicWandClient');
+        const outline = await magicWandSelect(uri, u, v);
         if (outline && outline.length >= 3 && doc) {
           const shape: ShapeLayer = {
             kind: 'shape',
@@ -629,11 +653,14 @@ export function ImageStudioBody({
         } else {
           Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
         }
-      })
-      .finally(() => {
+      } catch {
+        // a @shopify/react-native-skia natív modul hiányzik a dev-kliensből → új build kell
+        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
+      } finally {
         setBusy(false);
         setWandActive(false);
-      });
+      }
+    })();
   };
 
   // 🖌️ ecset: a Skia-festés pillanatképe PNG-fájlként → FOTÓ-réteg a vásznon
@@ -693,13 +720,13 @@ export function ImageStudioBody({
     }
   };
 
-  const exportImage = async () => {
+  const exportImage = async (opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number }) => {
     if (!doc || busy) {
       return;
     }
     setBusy(true);
     try {
-      const uri = await rasterize(doc);
+      const uri = await rasterize(doc, opts);
       if (!uri) {
         Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
         return;
@@ -809,13 +836,7 @@ export function ImageStudioBody({
     }
   };
 
-  const openExportMenu = () =>
-    Alert.alert(t('studio.export'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('studio.image.exportShare'), onPress: () => void exportImage() },
-      { text: t('studio.image.exportSvg'), onPress: () => void exportSvg() },
-      { text: t('studio.image.exportToVideo'), onPress: () => void insertIntoVideo() },
-    ]);
+  const openExportMenu = () => setSheet('export');
 
   const saveScoped = async () => {
     if (!doc || busy) {
@@ -1237,6 +1258,16 @@ export function ImageStudioBody({
       ) : null}
       {sheet === 'source' ? (
         <SourceSheet onInsert={insertSource} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'export' && doc ? (
+        <ExportSheet
+          doc={doc}
+          busy={busy}
+          onRaster={(o) => void exportImage(o)}
+          onSvg={() => void exportSvg()}
+          onVideo={() => void insertIntoVideo()}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
     </View>
   );

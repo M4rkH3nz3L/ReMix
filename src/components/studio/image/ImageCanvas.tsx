@@ -1,9 +1,12 @@
-import { type Ref, useState } from 'react';
+import { type Ref, Suspense, lazy, useState } from 'react';
 import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
-import { BrushOverlay, type BrushHandle } from '@/components/studio/image/BrushOverlay';
+// 🖌️ a BrushOverlay (Skia-függő) LUSTÁN töltődik — csak a TÍPUS statikus (erased),
+// a komponens csak az ecset bekapcsolásakor rántja be a @shopify/react-native-skia
+// natív modult, így annak hiánya (régi dev-kliens) nem crash-eltet betöltéskor.
+import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
@@ -21,6 +24,11 @@ import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
+
+// lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
+const BrushOverlay = lazy(() =>
+  import('@/components/studio/image/BrushOverlay').then((m) => ({ default: m.BrushOverlay }))
+);
 
 function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
   return { ...layer, ...patch } as ImageLayer;
@@ -305,9 +313,11 @@ export function ImageCanvas({
           {/* 🪄 varázspálca-overlay (fotóra koppintás → szín-szelekció) */}
           {!capturing && wandActive ? <WandOverlay box={fit} onTap={onWandTap} /> : null}
 
-          {/* 🖌️ ecset-overlay (Skia raszter-festés) */}
+          {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
           {!capturing && brushActive ? (
-            <BrushOverlay ref={brushRef} box={fit} color={brushColor} size={brushSize} />
+            <Suspense fallback={null}>
+              <BrushOverlay ref={brushRef} box={fit} color={brushColor} size={brushSize} />
+            </Suspense>
           ) : null}
 
           {/* 📐 statikus segédvonalak — mindig látszanak, ha vannak (a snap miatt) */}

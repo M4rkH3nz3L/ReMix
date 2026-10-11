@@ -26,6 +26,26 @@
 
 ---
 
+## 🧭 HALADÁS (2026-10-11) — hol tartunk / mi van hátra
+
+| Szint | Tétel | Állapot |
+|------|-------|---------|
+| **P0 #1** | Rasterize-parity (image-smoke 13/13 élő) + fotó-nélküli bug fix | ✅ |
+| **P0 #2** | Export: PNG/JPG/WebP + **SVG** + **PDF** (vektor) + export-UI + nagy-doc gát | ✅ |
+| **P0 #3** | Worker-infra (közös Dockerfile) | ✅ (deploy = [01 §2.2](./01-production-go-live.md)) |
+| **P1 §3b** | Skia natív-modul reziliencia (lusta betöltés, crash-fix) | ✅ |
+| **P1 §4** | Bemeneti robusztusság (HEIC/EXIF/nagy-felbontás) | ✅ |
+| **P1 §6** | **PDF-export** (vektor) | ✅ · **PSD-export** ⬜ |
+| **P1 §7** | Font-parity (contract-zárolt) | ✅ |
+| **P1 §8** | Nagy-doc perf (mérve ~36ms/réteg + plafonozva) | ✅ |
+| **P1 §5** | **PSD-import** (külső worker-lib) | ⬜ feature |
+| **P2** | boolean-divide · align/distribute kijelöltek · toll v5 · gazdagabb layerEffects | ⬜ feature-farok |
+
+**Export-mátrix (mind parity-ellenőrzött):** PNG · JPG · WebP · SVG (vektor) · PDF (vektor). A prod-export + robusztusság
+(input/font/nagy-doc) **kész**. Ami hátra: **PSD import/export** (nagyobb, külső lib) + a P2 feature-farok.
+
+---
+
 ## P0 — e nélkül nincs megbízható prod-export
 
 ### 1. 🎞️ Rasterize-parity ÉLŐ verifikáció (Preview == Export) — a #1 prod-gate
@@ -126,9 +146,16 @@ A prod-userek tetszőleges képet dobnak be (fotó-réteg / varázspálca-forrá
   (Preview==Export), (c) minden TTF LÉTEZIK appban ÉS workerben (nincs néma fallback), (d) minden family regisztrálva
   a useFonts-ban. Bármely oldal bővítése a másik nélkül → piros teszt (CI).
 
-### 8. ⬜ Nagy-doc performancia
-- [ ] ⬜ Sok réteg / nagy vászon: on-device preview reszponzivitás (réteg-virtualizáció?), a `/imagedoc` render-idő,
-  memória; mérés + plafon (07 „nagy-doc perf").
+### 8. 🟡 Nagy-doc performancia — MÉRVE + PLAFONOZVA
+- [x] ✅ **Render-idő mérés + plafon**: [server/scripts/imagedoc-perf.js](../../server/scripts/imagedoc-perf.js)
+  (`npm run perf:image`) megméri a `/imagedoc`-ot réteg-szám szerint. **Mért boríték** (2026-10-11, lokál, 720px):
+  1 réteg ≈ 450ms (Chromium-indítás), **marginális ~36 ms/réteg**, 200 réteg ≈ 7.6s → a **400-as GUARD-plafon ≈ 15s**.
+  A legtöbb valós doc <50 réteg (<2s); a [guard](#3b-✅-skia-natív-modul-reziliencia-dev-kliens--kész) a pathológikus
+  esetet fogja. **A plafon így indokolt.**
+- [x] ~ **On-device preview**: a projekt **React Compiler**-t használ (`transform.reactCompiler=true`) → a réteg-nézetek
+  auto-memoizáltak; a worst-case-t a réteg-guard fogja. *(Jövőbeli optimalizáció, ha kell: a `/imagedoc` ma RÉTEGENKÉNT
+  screenshotol — az új `imageDocToSvg` emitterrel a TELJES doc EGY Chromium-passzal is renderelhető lenne (PNG+PDF közös
+  út), ami a ~36 ms/réteg költséget nagyságrenddel csökkentené; külön, parity-kockázatos refaktor.)*
 
 ---
 

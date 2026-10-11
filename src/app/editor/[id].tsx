@@ -57,7 +57,6 @@ import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs, relinkCommandsF
 import type { MissingMedia } from '@/lib/videdFile';
 import { classifyMissingMedia, mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
-import { indexProjectVision } from '@/lib/visionSearch';
 import { useChat } from '@/store/chatStore';
 import { useCollabLive } from '@/store/collabLiveStore';
 import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
@@ -83,8 +82,6 @@ export default function EditorScreen() {
   // 🗂️ üres-állapot onboarding → forrás-sheet megnyitása (telefonon, ahol nincs dokk)
   const [showSource, setShowSource] = useState(false);
   const [collab, setCollab] = useState<{ ownerId: string; role: CollabRole } | null>(null);
-  /** 🔍 a vision-index előmelegítő időzítője — projektváltáskor törlendő */
-  const visionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 💾 mentés-állapot: bukott-e az utolsó autosave, és hányadik újrapróbánál tartunk
   const [saveFailed, setSaveFailed] = useState(false);
@@ -258,14 +255,10 @@ export default function EditorScreen() {
           // hiányzó média felismerése + automatikus visszaállítás a szerverről
           if (Platform.OS !== 'web') {
             void recoverMissingMedia(loaded);
-            // 🔍 vision-index előmelegítés (P0‑8): a Smart Search első
-            // keresése így azonnali — fájlonként cache-elt, hiba nem érdekes.
-            // ⚠️ refben tartjuk: gyors ki-be lépésnél enélkül minden megnyitás
-            // indított egy worker-feltöltéssel járó indexelést egy MÁR LEZÁRT
-            // projektre (a cleanup törli).
-            visionTimerRef.current = setTimeout(() => {
-              indexProjectVision(loaded).catch(() => {});
-            }, 4000);
+            // 🔍 Az automatikus vision-index ELŐMELEGÍTÉS KIKAPCSOLVA (felhasználói
+            // kérés: „az AI ne fusson"): a szerkesztő megnyitása ne indítson
+            // magától AI/worker-indexelést. A Smart Search továbbra is elérhető —
+            // az indexelést a keresés KÉZZEL indítja (AssistantPanel).
           }
         } else {
           // 🗄️ helyileg hiányzik → próbáljuk a FELHŐBŐL (más eszköz / újratelepítés
@@ -299,10 +292,6 @@ export default function EditorScreen() {
       });
     return () => {
       alive = false;
-      if (visionTimerRef.current) {
-        clearTimeout(visionTimerRef.current);
-        visionTimerRef.current = null;
-      }
     };
   }, [id, t]);
 

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { setAudioModeAsync } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,12 @@ export default function AudioStudioScreen() {
   const [loading, setLoading] = useState(true);
 
   usePlaybackClock();
+
+  // 🔊 néma-kapcsolónál is szóljon a lejátszás (mint a videó-editorban); a
+  // felvétel ideiglenesen record-módra vált, de a ClipEditSheet/stúdió vissza is állítja
+  useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;

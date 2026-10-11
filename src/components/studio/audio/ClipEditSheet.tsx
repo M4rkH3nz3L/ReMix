@@ -92,6 +92,8 @@ export function ClipEditSheet({
   const clipPlayhead = playhead - clip.start;
 
   const patchFx = (p: Partial<AudioFx>) => setFx((prev) => ({ ...prev, ...p }));
+  const eq = fx.eq ?? { low: 0, mid: 0, high: 0 };
+  const setEq = (p: Partial<typeof eq>) => patchFx({ eq: { ...eq, ...p } });
 
   const dirty =
     volume !== clip.volume ||
@@ -224,6 +226,28 @@ export function ClipEditSheet({
                 <Text style={styles.proTagText}>PRO</Text>
               </View>
             </View>
+            {/* 🎚️ szűrők: aluláteresztő (dörej) + felüláteresztő (sziszegés) — 0 = ki */}
+            <Slider
+              label={t('panels.audio.fxHighpass')}
+              value={fx.highpass ?? 0}
+              min={0}
+              max={300}
+              onChange={(v) => patchFx({ highpass: v < 20 ? 0 : Math.round(v) })}
+              format={(v) => (v < 20 ? t('common.off') : `${Math.round(v)} Hz`)}
+            />
+            <Slider
+              label={t('panels.audio.fxLowpass')}
+              value={fx.lowpass ?? 0}
+              min={0}
+              max={20000}
+              onChange={(v) => patchFx({ lowpass: v < 1000 ? 0 : Math.round(v / 100) * 100 })}
+              format={(v) => (v < 1000 ? t('common.off') : `${(v / 1000).toFixed(1)} kHz`)}
+            />
+            {/* 🎚️ 3-sávos EQ (−12…+12 dB) */}
+            <Slider label={t('panels.audio.fxEqLow')} value={eq.low} min={-12} max={12} onChange={(v) => setEq({ low: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+            <Slider label={t('panels.audio.fxEqMid')} value={eq.mid} min={-12} max={12} onChange={(v) => setEq({ mid: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+            <Slider label={t('panels.audio.fxEqHigh')} value={eq.high} min={-12} max={12} onChange={(v) => setEq({ high: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+
             <ToggleRow icon="remove-circle-outline" label={t('panels.audio.fxDenoise')} value={!!fx.denoise} onValueChange={(v) => patchFx({ denoise: v })} />
             <ToggleRow icon="cut-outline" label={t('panels.audio.fxDeEsser')} value={!!fx.deEsser} onValueChange={(v) => patchFx({ deEsser: v })} />
             <ToggleRow icon="contract-outline" label={t('panels.audio.fxCompressor')} value={!!fx.compressor} onValueChange={(v) => patchFx({ compressor: v })} />
@@ -235,6 +259,14 @@ export function ClipEditSheet({
               min={0}
               max={1}
               onChange={(v) => patchFx({ reverb: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+            <Slider
+              label={t('panels.audio.fxDelay')}
+              value={fx.delay ?? 0}
+              min={0}
+              max={1}
+              onChange={(v) => patchFx({ delay: v })}
               format={(v) => `${Math.round(v * 100)}%`}
             />
             <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>

@@ -89,6 +89,11 @@ export function AudioStudioBody({
     if (recorderState.isRecording) {
       const seconds = Math.max(recorderState.durationMillis / 1000, 0.5);
       await recorder.stop();
+      // 🔊 KRITIKUS: a felvétel az audio-módot `allowsRecording:true`-ra állította,
+      // amiben iOS-en a kimenet a fülhallgató-hangszóróra megy (halk/„néma"
+      // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
+      // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
       const uri = recorder.uri;
       if (uri) {
         useEditorStore.getState().addClip(

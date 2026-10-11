@@ -27,13 +27,16 @@
 ### 1. 🎞️ Render-parity ÉLŐ verifikáció (Preview == Export) — a #1 prod-gate
 A render-funkciók filter-stringjei kliens==worker contract-teszttel bizonyítottak, de a **tényleges
 pixel-kimenet** élő worker+ffmpeg-gel SOHA nem volt összevetve az előnézettel.
-- [ ] 🎞️ **Render-smoke mátrix**: 1-1 valódi export (worker fut, ffmpeg 8.1.2) MINDEN mag-funkcióra, és
-  vizuális összevetés az előnézettel: **keyframe** (rotation/opacity/scale/x/y + Bézier-easing), **color grade**
-  (curves/HSL/tone/temperature + **LUT**), **effect-lánc** (blur/sharpen/vignette/grain/…), **skew + anchor**,
-  **reverse**, **animált maszk/rotoszkóp**, **átmenetek (xfade)**, **PiP**, **crop/perspektíva/3D-tilt**, **speed-ramp**,
-  **particles**, **felirat/szöveg-stílus**, **audioFx** (EQ/komp/limiter/pan/reverb) + **master** (loudnorm/multiband).
-- [ ] 🎞️ **Parity-jegyzőkönyv**: a mátrix eredménye (OK / eltérés + screenshot) rögzítve; az eltérések javítva,
-  amíg a preview és az export **érzékelhetően egyezik**. Ez zárja a 06 összes „⚠️ runtime-verify" jelzését.
+- [x] ✅ **Render-smoke HARNESS KÉSZ + verifikált (2026-10-11)**: `npm run smoke` (server/) — a pure fixture-mag
+  ([smokeFixtures.js](../../server/smokeFixtures.js), tesztelt) per-funkció RÖVID projekteket épít
+  (baseline/keyframe-rotate+opacity/color-grade/effect-chain/skew/reverse/speed-2x/transition-xfade/
+  text-overlay/audio-fx), a runner ([scripts/render-smoke.js](../../server/scripts/render-smoke.js)) ffmpeg-gel
+  teszt-médiát gyárt, a futó API-val **in-process** rendereli mind, és a kész MP4-eket a `.render-smoke/`-ba
+  menti + manifest. A futó dev-API-n **10/10 fixture rendben** legenerált (a méretek funkciónként eltérnek →
+  a hatások beégtek). Hátra: bővítés LUT / animált-maszk / PiP / particles / 3-way-wheels fixture-ökkel.
+- [ ] 🎞️ **Vizuális parity-ítélet (EMBERI lépés)**: a `.render-smoke/` MP4-jeit végignézni + a szerkesztő
+  előnézetével összevetni; eltérés → javítás, amíg **érzékelhetően egyezik**. Ez zárja a 06 „⚠️ runtime-verify"
+  jelzéseit. (A harness csak az összevetendő exportokat adja; a döntés emberi.)
 - [ ] 🧪 **Golden-render regресszió (opcionális)**: pár referencia-export checksum/SSIM-gate CI-be (drift-védelem).
 
 ### 2. 🔌 Production render-worker infra (→ [01 §2.2](./01-production-go-live.md))

@@ -1022,6 +1022,8 @@
     "relinking": "Újracsatolás…",
     "missingMedia_one": "{{count}} médiafájl hiányzik — koppints az újracsatoláshoz",
     "missingMedia_other": "{{count}} médiafájl hiányzik — koppints az újracsatoláshoz",
+    "missingMediaOrphaned_one": "{{count}} médiafájl hiányzik — {{orphaned}} nincs a felhőben (kézi újracsatolás); koppints",
+    "missingMediaOrphaned_other": "{{count}} médiafájl hiányzik — {{orphaned}} nincs a felhőben (kézi újracsatolás); koppints",
     "rail_assistant": "AI",
     "rail_library": "Média",
     "rail_audio": "Audio",

@@ -46,6 +46,7 @@ import {
   findClip,
   sourceTimeAt,
   trackOf,
+  upcomingVisualClip,
 } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -172,6 +173,35 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     () => (imageClip && project ? (resolveClipUri(project, imageClip) ?? imageClip.uri) : null),
     [project, imageClip]
   );
+
+  // 🎬 Gapless-előtöltés (CORE §2.6): a KÖVETKEZŐ vizuális klip forrását a
+  // klip-határ ELŐTT bemelegítjük (a tesztelt `upcomingVisualClip`, 1 mp előre-
+  // tekintés) — videónál a vágási proxy generálása indul, képnél az expo-image
+  // cache. Így a váltáskor a fő lejátszó kész forrást kap (nincs „kattanás").
+  // Additív: a fő lejátszó-logikát NEM érinti; per-uri EGYSZER fut (ref-guard).
+  const upcoming = useMemo(() => {
+    if (!project) {
+      return null;
+    }
+    const next = upcomingVisualClip(project, playhead, 1);
+    if (!next) {
+      return null;
+    }
+    return { uri: resolveClipUri(project, next) ?? next.uri, isVideo: next.kind === 'video' };
+  }, [project, playhead]);
+  const preloadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const uri = upcoming?.uri ?? null;
+    if (!uri || preloadedRef.current === uri) {
+      return;
+    }
+    preloadedRef.current = uri;
+    if (upcoming?.isVideo) {
+      ensureProxy(uri).catch(() => {});
+    } else {
+      Image.prefetch(uri).catch(() => {});
+    }
+  }, [upcoming?.uri, upcoming?.isVideo]);
 
   // vászon-transzform gesztusok (kijelölt vizuális klipen)
   const gestureScale = useSharedValue(1);

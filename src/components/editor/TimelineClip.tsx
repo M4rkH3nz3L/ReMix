@@ -106,6 +106,9 @@ function TimelineClipInner({
   );
 
   const moveDX = useSharedValue(0);
+  // ↕️ függőleges húzás-eltolás (drag-to-track): a klip élőben követi az ujjat,
+  // elengedéskor a szomszédos kompatibilis sávra lép (lásd commitMove)
+  const moveDY = useSharedValue(0);
   const leftDelta = useSharedValue(0);
   const rightDelta = useSharedValue(0);
   // 🫳 „lift": húzás közben a klip finoman felemelkedik (scale + árnyék), hogy a
@@ -114,9 +117,10 @@ function TimelineClipInner({
 
   useEffect(() => {
     moveDX.value = 0;
+    moveDY.value = 0;
     leftDelta.value = 0;
     rightDelta.value = 0;
-  }, [clip.start, clip.duration, pps, moveDX, leftDelta, rightDelta]);
+  }, [clip.start, clip.duration, pps, moveDX, moveDY, leftDelta, rightDelta]);
 
   // 🧲 az illesztési küszöb az erősség-beállítás szerint (0 = kikapcsolt snap)
   const snapPx = () => SNAP_PX * SNAP_FACTOR[useEditorStore.getState().snapStrength];
@@ -178,9 +182,31 @@ function TimelineClipInner({
     return best;
   };
 
-  const commitMove = (dx: number) => {
+  const commitMove = (dx: number, dy = 0) => {
     moveDX.value = 0;
     const st = useEditorStore.getState();
+    // ↕️ DRAG-TO-TRACK: ha a függőleges szándék dominál és átlép egy küszöböt (fél+
+    // sávnyi), a klip a szomszédos KOMPATIBILIS sávra lép (le = +1, fel = −1). Csak
+    // egyedi, NEM-linkelt/köteg klipre és nem slip/slide módban — különben az eredeti
+    // vízszintes mozgatás/forrás-csúsztatás marad (zéró regresszió a megszokott húzáson).
+    const isGroup =
+      !!st.linkGroupOf(clip.id) ||
+      (st.multiSelectIds.length > 0 &&
+        (clip.id === st.selectedClipId || st.multiSelectIds.includes(clip.id)));
+    if (
+      !isGroup &&
+      trimMode !== 'slip' &&
+      trimMode !== 'slide' &&
+      Math.abs(dy) > height * 0.6 &&
+      Math.abs(dy) > Math.abs(dx)
+    ) {
+      if (st.moveClipByTrackStep(clip.id, dy > 0 ? 1 : -1)) {
+        selectionHaptic();
+        return;
+      }
+      // nincs hova lépni (a lánc szélén / nincs másik kompat. sáv) → essünk vissza
+      // a vízszintes mozgatásra az alábbi úton
+    }
     // ✂️ slip/slide: a test-húzás nem repozícionál, hanem a forrást/szomszédot csúsztatja
     if (trimMode === 'slip') {
       st.slipEdit(clip.id, dx / pps);
@@ -345,12 +371,14 @@ function TimelineClipInner({
     })
     .onUpdate((e) => {
       moveDX.value = e.translationX;
+      moveDY.value = e.translationY;
     })
     .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX);
+      runOnJS(commitMove)(e.translationX, e.translationY);
     })
     .onFinalize(() => {
       lift.value = withSpring(0, motion.spring.snappy);
+      moveDY.value = withSpring(0, motion.spring.snappy);
     });
 
   const trimLeftPan = Gesture.Pan()
@@ -387,6 +415,8 @@ function TimelineClipInner({
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: moveDX.value + leftDelta.value },
+      // ↕️ drag-to-track: a klip élőben követi az ujjat függőlegesen is
+      { translateY: moveDY.value },
       { scale: 1 + lift.value * 0.04 },
     ],
     width: Math.max(12, baseWidth - leftDelta.value + rightDelta.value),

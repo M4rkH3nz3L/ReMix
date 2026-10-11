@@ -1022,6 +1022,8 @@
     "relinking": "Neu verknüpfen…",
     "missingMedia_one": "{{count}} Mediendatei fehlt — tippe zum Neuverknüpfen",
     "missingMedia_other": "{{count}} Mediendateien fehlen — tippe zum Neuverknüpfen",
+    "missingMediaOrphaned_one": "{{count}} Mediendatei fehlt — {{orphaned}} nicht in der Cloud (manuell verknüpfen); tippe",
+    "missingMediaOrphaned_other": "{{count}} Mediendateien fehlen — {{orphaned}} nicht in der Cloud (manuell verknüpfen); tippe",
     "rail_assistant": "AI",
     "rail_library": "Medien",
     "rail_audio": "Audio",

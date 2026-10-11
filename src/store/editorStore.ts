@@ -301,6 +301,9 @@ interface EditorState {
   moveClip: (clipId: string, toTrackType: TrackType, start: number) => boolean;
   /** a kijelölt klipet a KÖVETKEZŐ kompatibilis sávra lépteti (a kezdetét megtartva) → a cél-sáv típusa vagy null */
   moveSelectedClipToNextTrack: () => TrackType | null;
+  /** ↕️ a klip EGY lépéssel a kompatibilis sávok közt a megadott irányba (drag-to-track);
+   *  a szélen (nincs hova) no-op — NEM ciklikus, a fizikai húzás-szándékhoz illően. @returns az új sáv vagy null */
+  moveClipByTrackStep: (clipId: string, dir: -1 | 1) => TrackType | null;
   selectClip: (clipId: string | null) => void;
   /** 🔒 collab klip-zár: identitás + zár-műveletek (broadcast + térkép-frissítés) */
   setCollabSelf: (self: { id: string; name?: string } | null) => void;
@@ -798,6 +801,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return null;
     }
     return get().moveClip(selectedClipId, next, found.clip.start) ? next : null;
+  },
+
+  moveClipByTrackStep: (clipId, dir) => {
+    const { project } = get();
+    if (!project) {
+      return null;
+    }
+    const found = findClip(project, clipId);
+    if (!found) {
+      return null;
+    }
+    const compat = compatibleTracksFor(found.clip.kind);
+    const idx = compat.indexOf(found.track.type);
+    if (idx < 0) {
+      return null;
+    }
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= compat.length) {
+      return null; // a kompatibilis sávok szélén: nincs hova lépni (nem ciklikus)
+    }
+    const next = compat[nextIdx];
+    return get().moveClip(clipId, next, found.clip.start) ? next : null;
   },
 
   selectClip: (clipId) => {

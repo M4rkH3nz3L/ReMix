@@ -268,6 +268,32 @@ describe('moveClip — frame-snap + sávok közti mozgatás (§2.3)', () => {
     load([track('video', [videoClip('a')]), track('pip')]);
     expect(store().moveSelectedClipToNextTrack()).toBeNull();
   });
+
+  it('moveClipByTrackStep: lefelé a következő kompatibilis sávra, a kezdet marad (drag-to-track)', () => {
+    load([track('video', [videoClip('a', 2, 5)]), track('pip')]);
+    expect(store().moveClipByTrackStep('a', 1)).toBe('pip'); // video → pip
+    expect(clipsOf('video')).toHaveLength(0);
+    expect(clipsOf('pip').map((c) => c.id)).toEqual(['a']);
+    expect(clipsOf('pip')[0].start).toBeCloseTo(2);
+  });
+
+  it('moveClipByTrackStep: a kompatibilis sávok SZÉLÉN no-op (nem ciklikus)', () => {
+    load([track('video', [videoClip('a')]), track('pip')]);
+    expect(store().moveClipByTrackStep('a', -1)).toBeNull(); // video a tetején → nincs feljebb
+    expect(clipsOf('video')).toHaveLength(1);
+  });
+
+  it('moveClipByTrackStep: hang a music→voiceover→sfx láncon lépked, a végén no-op', () => {
+    load([
+      track('music', [audioClip('m', 1, 3)]),
+      track('voiceover'),
+      track('sfx'),
+    ]);
+    expect(store().moveClipByTrackStep('m', 1)).toBe('voiceover');
+    expect(store().moveClipByTrackStep('m', 1)).toBe('sfx');
+    expect(store().moveClipByTrackStep('m', 1)).toBeNull(); // sfx a lánc végén
+    expect(clipsOf('sfx').map((c) => c.id)).toEqual(['m']);
+  });
 });
 
 describe('klip-vágólap — copy/cut/paste (§2.4)', () => {

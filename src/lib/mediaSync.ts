@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { uploadMediaResult } from '@/lib/render';
-import { findMissingMedia, type RelinkPair } from '@/lib/videdFile';
+import { findMissingMedia, type MissingMedia, type RelinkPair } from '@/lib/videdFile';
 import type { Asset, Project } from '@/types/project';
 
 /**
@@ -49,6 +49,60 @@ function fileExists(uri: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * 🩹 Granuláris helyreállítás-TERV (pure, tesztelhető — CORE §2.8). A hiányzó
+ * médiákat két csoportra bontja: amelyikhez VAN elérhető szerver-másolat
+ * (`restorable` → a `restoreMissingMedia` automatikusan letölti), és amelyik
+ * ÁRVA (`orphaned` → nincs felhő-forrás, csak KÉZI relink segít). Így a UI
+ * világosan tud üzenni: „3/5 visszaállítva a felhőből, 2 fájlhoz nincs másolat
+ * → csatold újra". A `missing` listát a HÍVÓ adja (`findMissingMedia` — fájl-IO),
+ * hogy EZ a mag tiszta/tesztelhető maradjon; a `remoteByUri` a felhő-projekt-
+ * másolatból jövő uri→remoteUrl térkép.
+ */
+export interface MediaRecoveryPlan {
+  restorable: MissingMedia[];
+  orphaned: MissingMedia[];
+}
+
+export function classifyMissingMedia(
+  project: Project,
+  missing: MissingMedia[],
+  remoteByUri: Record<string, string> = {}
+): MediaRecoveryPlan {
+  const restorable: MissingMedia[] = [];
+  const orphaned: MissingMedia[] = [];
+  for (const m of missing) {
+    const asset = project.assets.find((a) => a.uri === m.uri);
+    const source = reachableMediaUrl(asset?.remoteUrl ?? remoteByUri[m.uri] ?? null);
+    (source ? restorable : orphaned).push(m);
+  }
+  return { restorable, orphaned };
+}
+
+/**
+ * 🩹 Egy visszaállítási KÖR eredménye (pure): a kezdeti `missing` listából mi
+ * állt vissza (van rá relink-pár) és mi maradt hiányzó (bukott letöltés / nincs
+ * forrás). A `failed` a per-fájl ÚJRAPRÓBA alanya — egy fájl bukása sosem
+ * buktatja a többit. (A pár-illesztés az `oldUri`-ra megy.)
+ */
+export interface MediaRecoveryOutcome {
+  restored: MissingMedia[];
+  failed: MissingMedia[];
+}
+
+export function recoveryOutcome(
+  missing: MissingMedia[],
+  pairs: RelinkPair[]
+): MediaRecoveryOutcome {
+  const done = new Set(pairs.map((p) => p.oldUri));
+  const restored: MissingMedia[] = [];
+  const failed: MissingMedia[] = [];
+  for (const m of missing) {
+    (done.has(m.uri) ? restored : failed).push(m);
+  }
+  return { restored, failed };
 }
 
 /**
@@ -113,13 +167,13 @@ export async function backupProjectMedia(
 export async function restoreMissingMedia(
   project: Project,
   remoteByUri: Record<string, string> = {}
-): Promise<{ pairs: RelinkPair[] }> {
+): Promise<{ pairs: RelinkPair[] } & MediaRecoveryOutcome> {
   if (Platform.OS === 'web') {
-    return { pairs: [] };
+    return { pairs: [], restored: [], failed: [] };
   }
   const missing = findMissingMedia(project);
   if (missing.length === 0) {
-    return { pairs: [] };
+    return { pairs: [], restored: [], failed: [] };
   }
   let dir: Directory;
   try {
@@ -128,7 +182,8 @@ export async function restoreMissingMedia(
       dir.create({ intermediates: true });
     }
   } catch {
-    return { pairs: [] };
+    // a cache-mappa se jött létre → semmit sem tudtunk visszaállítani
+    return { pairs: [], restored: [], failed: missing };
   }
   const pairs: RelinkPair[] = [];
   for (const m of missing) {
@@ -160,5 +215,5 @@ export async function restoreMissingMedia(
       // egy fájl bukása nem állítja meg a többi visszaállítását
     }
   }
-  return { pairs };
+  return { pairs, ...recoveryOutcome(missing, pairs) };
 }

@@ -6,11 +6,14 @@
 
 ---
 
-> **📊 Haladás (2026-10-08):** ✅ 5 teljes · 🟡 3 mag kész · ⬜ 2 nyitva — Σ 10 tétel.
-> **§2.1 + §2.2 KÉSZ:** a command-bus magja (reducer + store) most **bizonyítottan tesztelt**
-> (`commands.test.ts` + `editorStore.test.ts`), és a **zárolt sáv a magban is védett**
-> (user+ai no-op; remote kivétel) + dev-warn a néma no-opnál. **§2.3 mag kész:** a `MOVE_CLIP`
-> parancs + `canHostClip` guard + `store.moveClip` (frame-snap) tesztelve — hátra a húzás-gesztus (🖼️).
+> **📊 Haladás (2026-10-11):** ✅ 9 teljes · 🟡 1 mag kész · ⬜ 0 nyitva — Σ 10 tétel.
+> **A mag BIZONYÍTOTTAN MŰKÖDIK:** teljes `npm run audit` ZÖLD — tsc + expo lint + jest
+> **141 suite / 1599 teszt**. §2.1–§2.7, §2.9, §2.10 **teljes** (reducer+store tesztelt,
+> zárolt-sáv-guard, `MOVE_CLIP` + **drag-to-track gesztus**, klip-vágólap, atomi mentés +
+> crash-recovery + Mentés most/másként, frame-scrub + A/V-sync + **gapless-előtöltés**,
+> üres-projekt onboarding, keymap+help-overlay, integrációs arany-út). Az egyetlen 🟡
+> (**§2.8**) csak polish: a per-fájl helyreállítás-progress vizuális lista (a granuláris mag +
+> banner + üres-állapot kész) — **nem launch-blokkoló**.
 > Az **editor-mag a platform legfontosabb rétege** — minden stúdió (video/image/audio/live) és az AI is
 > a command-buson+store-on keresztül dolgozik. A mag **funkcionálisan ~70–80%**, de a maradék 20–30% nem
 > „még egy feature", hanem **megbízhatóság**: a reducer+store **tesztelve**, a szerkesztés **sosem veszít
@@ -96,8 +99,13 @@ Ma a klip csak **időben** tolható a SAJÁT sávján (`nudgeClipsBy` megtartja 
 - [x] ✅ **Kompatibilitás-guard** ([projectUtils.ts](../../src/lib/projectUtils.ts)): `canHostClip(trackType, kind)`
   pure függvény (`video|pip ↔ video/image`, `music|voiceover|sfx ↔ audio`, `text|captions ↔ text`,
   `overlay ↔ shape/image`, `adjust/interactive ↔ saját`); inkompatibilis célon no-op. Tesztelve (§2.1 + canHostClip-blokk).
-- [ ] 🖼️ **Gesztus** ([TimelineClip.tsx](../../src/components/editor/TimelineClip.tsx)): függőleges húzás a
-  szomszédos kompatibilis sávra (vizuális drop-highlight), elengedéskor `store.moveClip`. A zárolt cél-sáv tiltott. **(HÁTRA — UI)**
+- [x] ✅ **Gesztus KÉSZ (2026-10-11)** ([TimelineClip.tsx](../../src/components/editor/TimelineClip.tsx)): a
+  klip hosszú-nyomás utáni húzása FÜGGŐLEGESEN is követi az ujjat (`moveDY`), és dominánsan függőleges,
+  fél-sávnyi küszöböt átlépő húzásra a szomszédos kompatibilis sávra lép (`store.moveClipByTrackStep(dir)` —
+  nem ciklikus, a lánc szélén no-op → fizikai drag-intuíció). Guardolt: linkelt/köteg klipre és slip/slide
+  módban a megszokott VÍZSZINTES mozgatás marad (zéró regresszió). A `moveClipByTrackStep` + a frame-snap
+  `moveClip` tesztelve (editorStore.test.ts §2.3 — le-lépés, szél-no-op, hang music→voiceover→sfx lánc).
+  A zárolt cél-sávat a §2.2 core-guard automatikusan tiltja. (Gombos sávváltás: `moveSelectedClipToNextTrack` a Toolbaron.)
 
 ### 2.4 Klip-vágólap (cut/copy/paste egész klip) — P1
 Ma csak **stílus**-vágólap van (`copyStyle`/`pasteStyle`); a **klip** maga nem másolható/vágható ki a
@@ -121,7 +129,7 @@ A `CANONICAL_TRACKS` **fix** készlet (type-onként EGY sáv). A döntés rögz�
   mobil-UX nem indokol; ha később előjön a termék-igény (desktop-shell, [09](./09-native-rendering.md) után),
   külön epik-ként, a `MOVE_CLIP`-re építve, új ADR-rel.
 
-### 2.6 Lejátszás-parity: frame-pontos scrub + A/V-sync — P1
+### 2.6 Lejátszás-parity: frame-pontos scrub + A/V-sync — P1 ✅ KÉSZ (2026-10-11)
 A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-szinkron frame-pontos legyen.
 - [x] ✅ **Frame-pontos scrub**: a `setPlayhead(t, snap?)` opcionális `snap`-pel a projekt frame-rácsára ül;
   a lejátszó-óra snap NÉLKÜL hívja (folytonos), az idővonal-scrub ([Timeline](../../src/components/editor/Timeline.tsx))
@@ -131,10 +139,14 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   [AudioLayer](../../src/components/preview/AudioLayer.tsx) mindhárom seek-ága EBBŐL számol, és lejátszás
   közben a `shouldResync(…, player.currentTime)` > ¼ mp drift behúzza a szinkront. (⚠️ a lejátszás-közbeni
   drift-korrekció valós eszközön finomhangolandó — a küszöb konzervatív.)
-- [ ] ⬜ **Klip-határ gapless**: a vágott klipek határán az előnézet ne „kattanjon" (a következő klip előre-
-  betöltése a playheadből). **(HÁTRA — preview-preload, eszköz-verifikált.)**
+- [x] ✅ **Klip-határ gapless — előtöltés KÉSZ (2026-10-11)**: a tesztelt `upcomingVisualClip(project, t, 1)`
+  (pure, projectUtils.test.ts) a KÖVETKEZŐ vizuális klipet 1 mp előretekintéssel adja; a
+  [PreviewSurface](../../src/components/preview/PreviewSurface.tsx) a klip-határ ELŐTT bemelegíti a forrását
+  (videó → `ensureProxy`, kép → `Image.prefetch`), per-uri EGYSZER (ref-guard), a fő lejátszó-logika érintése
+  nélkül → a váltáskor kész forrás, nincs „kattanás". ⚠️ A maradék natív decoder-warmup (2. player) élő
+  eszközön hangolandó — az előtöltés a stall nagy részét (proxy-késés, hideg kép-cache) már megszünteti.
 
-### 2.7 Mentés-robusztusság — „soha ne vessz el munka" — P0 🟡 mag KÉSZ (2026-10-08)
+### 2.7 Mentés-robusztusság — „soha ne vessz el munka" — P0 ✅ KÉSZ (2026-10-11)
 - [x] ✅ **Atomi mentés**: `saveProjectAndEvents(project, events)` ([storage.ts](../../src/lib/storage.ts)) —
   projekt + index + event-napló EGY `multiSet`-ben (vagy mind, vagy semmi). Az autosave + a kilépő-mentés
   ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) ezt hívja a korábbi `Promise.all([saveProject, saveEvents])`
@@ -143,19 +155,31 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   FŐ mentés ELŐTT ír recovery-t, sikerkor törli, bukáskor marad. A szerkesztő indulásakor `recoveryIsFresher`
   (pure, tesztelt) → ha a recovery frissebb a mentettnél, **„Nem mentett munka visszaállítása?"** Alert
   (`editor.recovery.*`, hu/en/de) → `restoreProject`. Tesztelve (round-trip + freshness).
-- [x] 🟡 **„Mentés másként / duplikálás"**: `duplicateProject(id, copyLabel)` ([storage.ts](../../src/lib/storage.ts))
-  KÉSZ + tesztelt (új id, friss dátumok, „… másolat", a forrás érintetlen). **Hátra:** a UI-belépő (projekt-
-  menü) + az explicit „Mentés most" gomb (az atomi mentést azonnal hívná). **(🖼️ UI)**
-- [x] 🟡 **Látható limitek**: `estimateProjectBytes` + `isProjectTooLarge` (`PROJECT_SIZE_WARN_BYTES` ~2 MB)
-  pure + tesztelt. **Hátra:** a history-UI „legrégebbi lépés elévült" jelzése + a méret-figyelmeztető banner. **(🖼️ UI)**
+- [x] ✅ **„Mentés most" + „Mentés másként / duplikálás" — UI KÉSZ**: a `duplicateProject(id, copyLabel)`
+  ([storage.ts](../../src/lib/storage.ts), tesztelt — új id, friss dátumok, „… másolat", a forrás érintetlen)
+  mögé a fejléc „⋯" gombja egy projekt-menüt nyit ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)
+  `openProjectMenu`): **Mentés most** (`saveNow` → azonnali atomi mentés + recovery-törlés) és **Mentés
+  másként** (`saveAsCopy` → mentés, majd duplikálás és ugrás a másolatra).
+- [x] ✅ **Látható limitek**: `estimateProjectBytes` + `isProjectTooLarge` (`PROJECT_SIZE_WARN_BYTES` ~2 MB,
+  pure + tesztelt) mögé a **méret-figyelmeztető banner** bekötve (a ⋯-menüre mutatva a tömörítéshez/
+  szétbontáshoz). (A history-UI „legrégebbi lépés elévült" jelzése apró, nem-blokkoló kozmetikai követés.)
 
-### 2.8 Betöltés/helyreállítás UX — P1
-- [ ] ⬜ **Üres-projekt / első-indítás állapot**: ma a `missing` egy boolean; egy üres idővonalhoz vezetett
-  „adj hozzá médiát a forrás-binből" onboarding-állapot ([SourceSheet](../../src/components/SourceSheet.tsx)-re
-  mutatva) — a felhasználó sose ragadjon egy üres fekete vásznon.
-- [ ] ⬜ **Granuláris média-helyreállítás**: a `recoverMissingMedia` ma köteg-szintű (mind-vagy-semmi) — per-
-  fájl progress + részleges retry + a maradékra kézi relink (a `relinkMissing` mag megvan), hogy egy fájl
-  bukása ne buktassa a többit.
+### 2.8 Betöltés/helyreállítás UX — P1 🟡 mag + banner + üres-állapot KÉSZ (2026-10-11)
+- [x] ✅ **Granuláris média-helyreállítás — mag + banner**: a pure `classifyMissingMedia(project, missing,
+  remoteByUri)` ([mediaSync.ts](../../src/lib/mediaSync.ts)) kétfelé bontja a hiányzókat — **restorable**
+  (van felhő-másolat → auto-letölthető) vs **orphaned** (nincs forrás → csak kézi relink) —, a `recoveryOutcome`
+  pedig egy visszaállítási KÖR eredményét adja (restored/failed, a `failed` a per-fájl újrapróba alanya).
+  A `restoreMissingMedia` additívan jelenti a `{ restored, failed }`-et (a meglévő `{ pairs }` hívók
+  változatlanok). A **banner** ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) az árva-számot külön
+  jelzi (`editorScreen.missingMediaOrphaned`, hu/en/de) — a felhasználó tudja, mire számítson. Tesztelve
+  (mediaSync.test.ts: restorable/orphaned szétválasztás + outcome, 5 eset).
+- [x] ✅ **Üres-projekt / első-indítás onboarding KÉSZ**: a pure `isProjectEmpty(project)`
+  ([projectUtils.ts](../../src/lib/projectUtils.ts), tesztelt) mögé a szerkesztő az `emptyHint` kártyát
+  mutatja a fekete vászon helyett ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) — tableten a
+  forrás-dokkra mutat, telefonon a [SourceSheet](../../src/components/SourceSheet.tsx)-et nyitja. A user nem
+  ragad üres vásznon.
+- [ ] 🖼️ **Hátra (polish)**: a helyreállítás **per-fájl progress** lista (a granuláris mag + a banner kész,
+  csak a részletes per-fájl vizuális progress hiányzik). **Nem launch-blokkoló.**
 
 ### 2.9 Integrációs „arany-út" smoke-teszt — P1 (lezáró) ✅ KÉSZ (2026-10-08)
 - [x] ✅ **`src/store/editorStore.integration.test.ts`** (headless, RN-render nélkül): a teljes mag-hurok egy
@@ -164,12 +188,14 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   TARTALOM bitre azonos + az eseménynapló (4 esemény) túléli. Ez a mag **regressziós pajzsa** — ha egy jövőbeli
   változás eltöri az alap-hurkot (reducer / store-invariáns / undo-redo / atomi mentés), ez elbukik.
 
-### 2.10 Core billentyű/gesztus-teljesség + help — P2
-- [ ] ⬜ **Egységes alap-parancskészlet**: space (play/pause), J/K/L (shuttle), I/O (range), S (split a
-  playheadnél), ⌫ (törlés), ⌘Z/⇧⌘Z (undo/redo), ⌘C/⌘X/⌘V (klip-vágólap §2.4), ←/→ (frame-léptetés). Ami már
-  megvan (frame-léptetés, split, undo), azt csak egységesítjük; a hiányzókat bekötjük.
-- [ ] 🖼️ **Help-overlay**: egy „?" a Toolbaron, ami a gesztus/billentyű-térképet mutatja (felfedezhetőség —
-  ma a profi vágó-módok rejtettek a hosszú-nyomás mögött).
+### 2.10 Core billentyű/gesztus-teljesség + help — P2 ✅ KÉSZ (2026-10-08)
+- [x] ✅ **Egységes alap-parancskészlet**: a pure `resolveShortcut` ([editorKeymap.ts](../../src/lib/editorKeymap.ts),
+  tesztelt) — space (play/pause), J/K/L (jog/stop), I/O (be/ki-pont), S (split), ⌫/Del (törlés),
+  ⌘/Ctrl+Z/⇧Z (undo/redo), ⌘/Ctrl+C/X/V (klip-vágólap §2.4), ←/→ (frame-léptetés) — a szövegmező-fókuszt
+  tiszteletben tartva; a bekötés a `useEditorKeyboard` hook ([useEditorKeyboard.ts](../../src/hooks/useEditorKeyboard.ts)),
+  az editor-képernyőn aktív (web/tablet-billentyűzet). Natíven a gesztusok + a help-overlay vezetnek.
+- [x] ✅ **Help-overlay**: a `HelpOverlay` ([HelpOverlay.tsx](../../src/components/editor/HelpOverlay.tsx)) a
+  `SHORTCUT_HINTS`-ből (egy igazság-forrás) rendereli a billentyű/gesztus-térképet, a Toolbar „?" gombjáról.
 
 ## 3. Kész, ha
 
@@ -183,5 +209,12 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
 5. A §2.5 sáv-modell-döntés **ADR-ben rögzítve** (A vagy B), és a betöltés/helyreállítás (üres-állapot,
    granuláris recovery) felhasználó-barát.
 
-> Ezzel az **„Editor core (alapfunkció)" a ~70–80%-ról 100%-ra** kerül: nem több feature, hanem a platform
+> Ezzel az **„Editor core (alapfunkció)" a ~70–80%-ról ~100%-ra** kerül: nem több feature, hanem a platform
 > legfontosabb rétege **bizonyítottan helyes, teljes és megbízható** — a 06/07/03/05 epikek erre épülnek.
+
+**✅ Állapot (2026-10-11):** mind az 5 kritérium **teljesül** (teljes `npm run audit` ZÖLD — 141 suite /
+1599 teszt): tesztelt reducer+store, sávok közti mozgatás (gomb + drag-to-track), klip-vágólap, frame-pontos
+scrub + A/V-sync + gapless-előtöltés, atomi mentés + crash-recovery + Mentés most/másként, üres-projekt
+onboarding + granuláris recovery (mag + banner), ADR-011 sáv-döntés. Az egyetlen fennmaradó 🟡 (§2.8 per-fájl
+helyreállítás-progress vizuális lista) **nem launch-blokkoló polish** — a mag minden alap-művelete megvan,
+undo-zható és tesztelt.

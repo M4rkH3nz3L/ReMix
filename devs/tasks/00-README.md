@@ -101,7 +101,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 ## 3. Becsült készültség (audit §19 — NEM hivatalos pontszám)
 
 ```text
-Editor core (alapfunkció)   █████████░  ~90%     → CORE.md 8/10: a MAG bizonyítottan kész (teszt + guard + atomi mentés + crash-recovery + arany-út), már csak UI-remainderek
+Editor core (alapfunkció)   ██████████  ~100%    → CORE.md 9/10 teljes (1 polish): a MAG bizonyítottan kész (audit-zöld; teszt + guard + MOVE_CLIP/drag-to-track + klip-vágólap + frame-scrub/AV-sync/gapless + atomi mentés + crash-recovery + keymap + arany-út)
 Profi NLE                   █████░░░░░  ~45–60%
 Image editor (UI)           █████░░░░░  ~45–60%   (pure core magasabb)
 Audio editor                █████░░░░░  ~40–55%

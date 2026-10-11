@@ -53,7 +53,7 @@ import {
 import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
 import { findAutoRelinkPairs, findMissingMedia, pickRelinkPairs, relinkCommandsFor } from '@/lib/videdFile';
 import type { MissingMedia } from '@/lib/videdFile';
-import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
+import { classifyMissingMedia, mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
 import { indexProjectVision } from '@/lib/visionSearch';
 import { useChat } from '@/store/chatStore';
@@ -613,6 +613,13 @@ export default function EditorScreen() {
     </View>
   );
 
+  // 🩹 granuláris helyreállítás (CORE §2.8): a hiányzók közül hány ÁRVA (nincs
+  // felhő-másolat → csak kézi relink segít) — a banner ezt külön jelzi, hogy a
+  // felhasználó tudja, mire számítson a koppintás után.
+  const orphanedCount =
+    project && missingMedia.length > 0
+      ? classifyMissingMedia(project, missingMedia, mediaRemoteMap(project)).orphaned.length
+      : 0;
   const missingBanner =
     missingMedia.length > 0 ? (
       <Pressable style={styles.missingBanner} onPress={relinkMissing}>
@@ -620,7 +627,12 @@ export default function EditorScreen() {
         <Text style={styles.missingBannerText}>
           {relinking
             ? t('editorScreen.relinking')
-            : t('editorScreen.missingMedia', { count: missingMedia.length })}
+            : orphanedCount > 0
+              ? t('editorScreen.missingMediaOrphaned', {
+                  count: missingMedia.length,
+                  orphaned: orphanedCount,
+                })
+              : t('editorScreen.missingMedia', { count: missingMedia.length })}
         </Text>
       </Pressable>
     ) : null;

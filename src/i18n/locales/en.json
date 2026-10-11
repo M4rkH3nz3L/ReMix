@@ -1022,6 +1022,8 @@
     "relinking": "Relinking…",
     "missingMedia_one": "{{count}} media file missing — tap to relink",
     "missingMedia_other": "{{count}} media files missing — tap to relink",
+    "missingMediaOrphaned_one": "{{count}} media file missing — {{orphaned}} not in cloud (manual relink); tap",
+    "missingMediaOrphaned_other": "{{count}} media files missing — {{orphaned}} not in cloud (manual relink); tap",
     "rail_assistant": "AI",
     "rail_library": "Media",
     "rail_audio": "Audio",

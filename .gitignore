@@ -81,3 +81,4 @@ server/.env.bak*
 
 # render-parity smoke kimenetek (dev-eszköz)
 .render-smoke/
+.imagedoc-smoke/

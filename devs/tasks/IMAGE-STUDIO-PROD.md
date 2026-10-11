@@ -31,14 +31,22 @@
 ### 1. 🎞️ Rasterize-parity ÉLŐ verifikáció (Preview == Export) — a #1 prod-gate
 Sok funkció on-device + worker párban verifikált EGYENKÉNT (07), de **rendszeres, teljes smoke-mátrix** nincs.
 A videós mintára (render-smoke) megépíthető — a `/imagedoc` fut, a worker-image kész.
-- [ ] 🎞️ **Image-smoke mátrix**: 1-1 `/imagedoc` raszter MINDEN réteg-funkcióra, és vizuális összevetés az
-  előnézettel: **fotó-réteg** (fit/forgatás/tükrözés) · **forma** (5 forma + fill/**gradiens**/**pattern**/blend/
-  **stroke/árnyék/glow**) · **path/toll** (bezier + fillRule) · **boolean** (union/subtract/intersect/exclude) ·
-  **szöveg** (stílus/igazítás/forgatás, **fontok**) · **adjustment-stack** (expozíció/kontraszt/tónus/vignetta) ·
-  **crop** · **több-réteg kompozit** (opacity/blend-sorrend) · **átlátszó háttér** (alfa-PNG).
+- [x] 🎞️ **Image-smoke mátrix** — KÉSZ ([server/smokeImageFixtures.js](../../server/smokeImageFixtures.js) pure-mag +
+  [server/scripts/imagedoc-smoke.js](../../server/scripts/imagedoc-smoke.js) runner, `npm run smoke:image`; validáció:
+  [smokeImageFixtures.test.js](../../server/smokeImageFixtures.test.js), +6 teszt): 13 per-funkció `/imagedoc`-raszter
+  **fotó-réteg** (fit/forgatás/tükrözés/adjust) · **forma** (fill/**gradiens**/**pattern**/blend/**stroke/árnyék/glow**) ·
+  **path/toll** (bezier) · **boolean** (subpaths + evenodd-lyuk) · **szöveg** (stílus) · **több-réteg kompozit**
+  (opacity/blend) · **átlátszó háttér** (alfa-PNG). **ÉLŐ FUT 13/13** (2026-10-11), mind vizuálisan verifikálva
+  (gradient/pattern/glow/boolean-lyuk/háromszög/bold-szöveg/forgatott-tükrözött fotó → helyes).
+  - **🐞 Közben kiszúrt + javított prod-bug:** fotó NÉLKÜLI doc (tisztán vektor/forma/szöveg — logó, gradient-poszter,
+    felirat) → **HTTP 500** `path … undefined`, mert a `req.workDir`-t CSAK a multer `destination`-je hozta létre, az
+    pedig csak feltöltött fájlnál fut. Fix: [server/index.js](../../server/index.js) `/imagedoc` workDir-pótlás +
+    a válasz utáni temp-takarítás (eddig szivárgott). A smoke 5/13→**13/13**.
 - [ ] 🎞️ **captureRef ↔ worker parity**: a fallback (c) és a worker (b) kimenete ne térjen el feltűnően (más
-  renderelő) — ha eltér, a worker az elsődleges + a fallback csak vész-eset (dokumentáltan).
+  renderelő) — ha eltér, a worker az elsődleges + a fallback csak vész-eset (dokumentáltan). *(worker-ág ✅; a
+  captureRef-összevetés on-device futást igényel.)*
 - [ ] 🎞️ **Parity-jegyzőkönyv**: a mátrix eredménye rögzítve; eltérés → javítás. (Emberi vizuális ítélet.)
+  *(a `/imagedoc` worker-mátrix jegyzőkönyve: `.imagedoc-smoke/manifest.json` + 13/13 vizuális OK.)*
 
 ### 2. 🟡 Export-teljesség + minőség
 Ma az export **PNG** (a `rasterize` worker-PNG-je → `Sharing.shareAsync`); hiányzik a formátum/minőség-választás.

@@ -52,8 +52,11 @@ megosztás 25%-on ragad** — lásd a dev-stack-jegyzetet.)
 - [x] ✅ **Worker-hiány fail-fast KÉSZ (2026-10-11)**: a `/render` enqueue-ág a szerveren elutasít (503), ha
   `listWorkers()` üres (a média-feltöltés ELŐTT), a `/health` pedig jelenti a **worker-számot**; a kliens a
   tesztelt `cloudRenderBlocked` ([renderPreflight.ts](../../src/lib/renderPreflight.ts)) preflighttal MÁR a
-  feltöltés előtt beszédes hibát dob (`lib.render.noWorker`, hu/en/de) — **nem ragad 25%-on**. Teszt:
-  renderPreflight.test.ts (6). **Hátra:** a render-közbeni worker-halál detektálása (waiting-stall) + „Újra" gomb a progress-sheetben.
+  feltöltés előtt beszédes hibát dob (`lib.render.noWorker`, hu/en/de) — **nem ragad 25%-on**.
+- [x] ✅ **Render-KÖZBENI worker-halál detektálás KÉSZ (2026-10-11)**: a poll-ciklus ~18 mp zéró-progress után
+  újranézi a `/health` worker-számát; ha közben elfogyott a worker (`cloudRenderStalled` → 0 progress + 0 worker),
+  azonnal beszédes hibát dob a ~10 perces timeout helyett. Teszt: renderPreflight.test.ts (10 eset összesen).
+  **Hátra:** „Újra" gomb a progress-sheetben (UI) + worker-oldali job-cancel+cleanup (lásd lentebb).
 - [ ] ⬜ **Hosszú/nehéz render**: a `MAX_POLLS` (10 perc) túllépés kezelt üzenettel; nagy (4K/hosszú) projekt
   várható-idő jelzés + háttér-folytatás (az app bezárása ne veszítse el a kész jobot).
 

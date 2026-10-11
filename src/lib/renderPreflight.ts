@@ -31,3 +31,13 @@ export function cloudRenderBlocked(health: RenderHealth, durationSec: number): b
   // blokkolásnak — csak az explicit 0-t (van jelentés, és tényleg nincs worker)
   return willQueue && health.workers === 0;
 }
+
+/**
+ * Render KÖZBEN veszett-e el a worker: a job nem halad (progress 0) ÉS a friss
+ * `/health` szerint 0 élő worker. Ilyenkor nincs értelme a teljes ~10 perces
+ * timeoutra várni — a hívó beszédes hibát dob. Ha a progress > 0 VAGY van worker
+ * (csak lassú/foglalt), NEM stall → tovább várunk (nincs hamis riasztás).
+ */
+export function cloudRenderStalled(health: RenderHealth, progress: number): boolean {
+  return progress === 0 && health.workers === 0;
+}

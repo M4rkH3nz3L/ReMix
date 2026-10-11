@@ -15,7 +15,7 @@ import {
 import { fetchRead, readJson } from '@/lib/netRetry';
 import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
-import { cloudRenderBlocked, type RenderHealth } from '@/lib/renderPreflight';
+import { cloudRenderBlocked, cloudRenderStalled, type RenderHealth } from '@/lib/renderPreflight';
 import { renderCacheKey } from '@/lib/projectHash';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
@@ -517,6 +517,12 @@ async function submitAndPollRender(
   const { id } = submitBody;
 
   onProgress?.({ phase: PHASE_RENDER, ratio: stages.ratioFor(PHASE_RENDER, 0) });
+  // 🖥️ render-közbeni worker-halál detektálás: ha a job sokáig NEM halad
+  // (progress 0), időnként újranézzük a worker-flottát — ha közben elfogyott
+  // (pl. a worker leállt), ne várjunk a teljes ~10 perces timeoutra.
+  let started = false; // volt-e már bármekkora előrehaladás
+  let zeroStreak = 0;
+  const STALL_RECHECK_POLLS = 12; // ~18 mp zéró-progress után ellenőrizzük a workert
   for (let i = 0; i < MAX_POLLS; i++) {
     if (signal?.aborted) {
       throw new RenderCancelledError();
@@ -543,11 +549,24 @@ async function submitAndPollRender(
       throw new Error(status.error ?? tr('lib.render.renderError'));
     }
     // a worker az ffmpeg tényleges előrehaladását adja (0-1)
-    if (typeof status.progress === 'number' && status.progress > 0) {
-      onProgress?.({
-        phase: PHASE_RENDER,
-        ratio: stages.ratioFor(PHASE_RENDER, status.progress),
-      });
+    const prog = typeof status.progress === 'number' ? status.progress : 0;
+    if (prog > 0) {
+      started = true;
+      zeroStreak = 0;
+      onProgress?.({ phase: PHASE_RENDER, ratio: stages.ratioFor(PHASE_RENDER, prog) });
+    } else if (!started) {
+      // még semmi nem történt — számoljuk a zéró-progress sorozatot, és időnként
+      // ellenőrizzük, él-e még worker (a submit-kori guard után is eltűnhet)
+      zeroStreak += 1;
+      if (zeroStreak >= STALL_RECHECK_POLLS) {
+        zeroStreak = 0;
+        const h = (await fetchWithTimeout(`${base}/health`, 3000)
+          .then((r) => r.json())
+          .catch(() => ({}))) as RenderHealth;
+        if (cloudRenderStalled(h, prog)) {
+          throw new Error(tr('lib.render.noWorker'));
+        }
+      }
     }
   }
   throw new Error(tr('lib.render.renderTimeout'));

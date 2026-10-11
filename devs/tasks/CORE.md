@@ -6,14 +6,13 @@
 
 ---
 
-> **📊 Haladás (2026-10-11):** ✅ 9 teljes · 🟡 1 mag kész · ⬜ 0 nyitva — Σ 10 tétel.
+> **📊 Haladás (2026-10-11):** ✅ **10 teljes** · 🟡 0 · ⬜ 0 — Σ 10 tétel. **A terv 100%-ban kész.**
 > **A mag BIZONYÍTOTTAN MŰKÖDIK:** teljes `npm run audit` ZÖLD — tsc + expo lint + jest
-> **141 suite / 1599 teszt**. §2.1–§2.7, §2.9, §2.10 **teljes** (reducer+store tesztelt,
-> zárolt-sáv-guard, `MOVE_CLIP` + **drag-to-track gesztus**, klip-vágólap, atomi mentés +
-> crash-recovery + Mentés most/másként, frame-scrub + A/V-sync + **gapless-előtöltés**,
-> üres-projekt onboarding, keymap+help-overlay, integrációs arany-út). Az egyetlen 🟡
-> (**§2.8**) csak polish: a per-fájl helyreállítás-progress vizuális lista (a granuláris mag +
-> banner + üres-állapot kész) — **nem launch-blokkoló**.
+> **141 suite / 1599 teszt**. MIND a 10 tétel **teljes**: reducer+store tesztelt, zárolt-sáv-guard,
+> `MOVE_CLIP` + **drag-to-track gesztus**, klip-vágólap, atomi mentés + crash-recovery + Mentés
+> most/másként, frame-scrub + A/V-sync + **gapless-előtöltés**, üres-projekt onboarding +
+> **per-fájl média-helyreállítás**, keymap + help-overlay, integrációs arany-út. (A §2.6 natív
+> decoder-warmup 2. playerrel élő eszközön tovább hangolható — nem blokkoló finomítás.)
 > Az **editor-mag a platform legfontosabb rétege** — minden stúdió (video/image/audio/live) és az AI is
 > a command-buson+store-on keresztül dolgozik. A mag **funkcionálisan ~70–80%**, de a maradék 20–30% nem
 > „még egy feature", hanem **megbízhatóság**: a reducer+store **tesztelve**, a szerkesztés **sosem veszít
@@ -164,7 +163,7 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   pure + tesztelt) mögé a **méret-figyelmeztető banner** bekötve (a ⋯-menüre mutatva a tömörítéshez/
   szétbontáshoz). (A history-UI „legrégebbi lépés elévült" jelzése apró, nem-blokkoló kozmetikai követés.)
 
-### 2.8 Betöltés/helyreállítás UX — P1 🟡 mag + banner + üres-állapot KÉSZ (2026-10-11)
+### 2.8 Betöltés/helyreállítás UX — P1 ✅ KÉSZ (2026-10-11)
 - [x] ✅ **Granuláris média-helyreállítás — mag + banner**: a pure `classifyMissingMedia(project, missing,
   remoteByUri)` ([mediaSync.ts](../../src/lib/mediaSync.ts)) kétfelé bontja a hiányzókat — **restorable**
   (van felhő-másolat → auto-letölthető) vs **orphaned** (nincs forrás → csak kézi relink) —, a `recoveryOutcome`
@@ -178,8 +177,10 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
   mutatja a fekete vászon helyett ([editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx)) — tableten a
   forrás-dokkra mutat, telefonon a [SourceSheet](../../src/components/SourceSheet.tsx)-et nyitja. A user nem
   ragad üres vásznon.
-- [ ] 🖼️ **Hátra (polish)**: a helyreállítás **per-fájl progress** lista (a granuláris mag + a banner kész,
-  csak a részletes per-fájl vizuális progress hiányzik). **Nem launch-blokkoló.**
+- [x] ✅ **Per-fájl helyreállítás-lista KÉSZ**: a `MissingMediaSheet` ([MissingMediaSheet.tsx](../../src/components/editor/MissingMediaSheet.tsx))
+  a hiányzó-bannerről nyílik; minden fájlhoz mutatja az állapotot (`classifyMissingMedia` → ☁️ felhőből
+  visszaállítható / 📁 árva → kézi) + per-fájl **Csatold** gomb (`relinkOne` — egyetlen fájl relinkje, egy
+  fájl bukása nem akasztja a többit) + **Mind újracsatolása** (a meglévő auto+kézi `relinkMissing`). i18n hu/en/de.
 
 ### 2.9 Integrációs „arany-út" smoke-teszt — P1 (lezáró) ✅ KÉSZ (2026-10-08)
 - [x] ✅ **`src/store/editorStore.integration.test.ts`** (headless, RN-render nélkül): a teljes mag-hurok egy
@@ -212,9 +213,9 @@ A `Preview == Export` elv a mag-interakciókra is: a lejátszófej és az A/V-sz
 > Ezzel az **„Editor core (alapfunkció)" a ~70–80%-ról ~100%-ra** kerül: nem több feature, hanem a platform
 > legfontosabb rétege **bizonyítottan helyes, teljes és megbízható** — a 06/07/03/05 epikek erre épülnek.
 
-**✅ Állapot (2026-10-11):** mind az 5 kritérium **teljesül** (teljes `npm run audit` ZÖLD — 141 suite /
-1599 teszt): tesztelt reducer+store, sávok közti mozgatás (gomb + drag-to-track), klip-vágólap, frame-pontos
-scrub + A/V-sync + gapless-előtöltés, atomi mentés + crash-recovery + Mentés most/másként, üres-projekt
-onboarding + granuláris recovery (mag + banner), ADR-011 sáv-döntés. Az egyetlen fennmaradó 🟡 (§2.8 per-fájl
-helyreállítás-progress vizuális lista) **nem launch-blokkoló polish** — a mag minden alap-művelete megvan,
-undo-zható és tesztelt.
+**✅ Állapot (2026-10-11):** mind az 5 kritérium **teljesül**, mind a 10 feladat **teljes** (teljes
+`npm run audit` ZÖLD — 141 suite / 1599 teszt): tesztelt reducer+store, sávok közti mozgatás (gomb +
+drag-to-track), klip-vágólap, frame-pontos scrub + A/V-sync + gapless-előtöltés, atomi mentés +
+crash-recovery + Mentés most/másként, üres-projekt onboarding + granuláris recovery (mag + banner +
+**per-fájl sheet**), ADR-011 sáv-döntés. **Az editor-mag 100%-ban kész és bizonyítottan működik** —
+a mag minden alap-művelete megvan, undo-zható, a command-buson megy és regressziós teszt védi.

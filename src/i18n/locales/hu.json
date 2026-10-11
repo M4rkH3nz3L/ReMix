@@ -778,6 +778,14 @@
       "title_creatorPreset": "🎨 Creator Preset",
       "title_workflow": "Pro Workflow"
     },
+    "missingSheet": {
+      "title": "Hiányzó média",
+      "summary": "{{total}} hiányzó fájl · {{cloud}} felhőből visszaállítható · {{manual}} kézi újracsatolás",
+      "statusCloud": "☁️ Felhőből visszaállítható",
+      "statusManual": "📁 Nincs felhő-másolat — kézi",
+      "relinkAll": "Mind újracsatolása",
+      "relinkOne": "Csatold"
+    },
     "timeline": {
       "trackMenuMessage": "A némítás és a solo CSAK az előnézetre hat — az exportált videó nem változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.",
       "mute": "🔇 Némítás",

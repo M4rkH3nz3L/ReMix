@@ -69,10 +69,11 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 
 ## 2. Audit-összkép és a feladatfájlok
 
-> **🧱 A mag előbb van:** az [CORE.md](./CORE.md) az **Editor-mag (alapfunkció)** 100%-ra vitele — a
-> command-bus + store **tesztelése**, a hiányzó alap-műveletek (klip sávok közti mozgatása, klip-vágólap),
-> a lejátszás-parity és a „soha ne vessz el munka" mentés. **Minden stúdió és az AI erre a magra épül**
-> (audit §19 `Editor core ~70–80%`) → ez a legjobb ár/érték a tervben, érdemes elöl kezdeni.
+> **🧱 A mag KÉSZ (2026-10-11):** az [CORE.md](./CORE.md) az **Editor-mag (alapfunkció)** 100%-ra vitele —
+> **10/10 teljes, audit-zöld**. Command-bus + store **tesztelve**, a hiányzó alap-műveletek bekötve (klip
+> sávok közti mozgatása gomb+drag, klip-vágólap), lejátszás-parity (frame-scrub + A/V-sync + gapless) és a
+> „soha ne vessz el munka" mentés (atomi + crash-recovery). **Minden stúdió és az AI erre a magra épül**
+> (audit §19 `Editor core ~70–80%` → **~100%**) — a 06/07/03/05 epikek erre a szilárd magra építhetnek.
 
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
@@ -101,7 +102,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 ## 3. Becsült készültség (audit §19 — NEM hivatalos pontszám)
 
 ```text
-Editor core (alapfunkció)   ██████████  ~100%    → CORE.md 9/10 teljes (1 polish): a MAG bizonyítottan kész (audit-zöld; teszt + guard + MOVE_CLIP/drag-to-track + klip-vágólap + frame-scrub/AV-sync/gapless + atomi mentés + crash-recovery + keymap + arany-út)
+Editor core (alapfunkció)   ██████████  100%     → CORE.md 10/10 KÉSZ: a MAG bizonyítottan működik (audit-zöld; teszt + guard + MOVE_CLIP/drag-to-track + klip-vágólap + frame-scrub/AV-sync/gapless + atomi mentés + crash-recovery + per-fájl recovery + keymap + arany-út)
 Profi NLE                   █████░░░░░  ~45–60%
 Image editor (UI)           █████░░░░░  ~45–60%   (pure core magasabb)
 Audio editor                █████░░░░░  ~40–55%

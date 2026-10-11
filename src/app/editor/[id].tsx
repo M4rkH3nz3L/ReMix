@@ -22,6 +22,7 @@ import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
 import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
+import { MissingMediaSheet } from '@/components/editor/MissingMediaSheet';
 import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
@@ -75,6 +76,8 @@ export default function EditorScreen() {
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
+  // 🩹 hiányzó-média per-fájl helyreállítás-lista (CORE §2.8)
+  const [missingSheetOpen, setMissingSheetOpen] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
   // 🗂️ üres-állapot onboarding → forrás-sheet megnyitása (telefonon, ahol nincs dokk)
   const [showSource, setShowSource] = useState(false);
@@ -341,6 +344,37 @@ export default function EditorScreen() {
         remaining = current ? findMissingMedia(current) : [];
       }
       setMissingMedia(remaining);
+      if (remaining.length === 0) {
+        setMissingSheetOpen(false);
+      }
+    } finally {
+      setRelinking(false);
+    }
+  };
+
+  /** 🩹 Per-fájl kézi újracsatolás (CORE §2.8): egyetlen hiányzó fájl relinkje —
+   *  egy fájl bukása/hiánya nem akasztja a többit. A `relinkMissing` auto+kézi
+   *  flow-ját tükrözi, de csak a kiválasztott elemre. */
+  const relinkOne = async (item: MissingMedia) => {
+    const state = useEditorStore.getState();
+    if (!state.project || relinking) {
+      return;
+    }
+    setRelinking(true);
+    try {
+      const pairs = await pickRelinkPairs([item]);
+      const proj = useEditorStore.getState().project;
+      if (proj && pairs.length > 0) {
+        for (const cmd of relinkCommandsFor(proj, pairs)) {
+          useEditorStore.getState().dispatch(cmd, 'user');
+        }
+      }
+      const current = useEditorStore.getState().project;
+      const remaining = current ? findMissingMedia(current) : [];
+      setMissingMedia(remaining);
+      if (remaining.length === 0) {
+        setMissingSheetOpen(false);
+      }
     } finally {
       setRelinking(false);
     }
@@ -622,7 +656,7 @@ export default function EditorScreen() {
       : 0;
   const missingBanner =
     missingMedia.length > 0 ? (
-      <Pressable style={styles.missingBanner} onPress={relinkMissing}>
+      <Pressable style={styles.missingBanner} onPress={() => setMissingSheetOpen(true)}>
         <Ionicons name="alert-circle-outline" size={16} color={palette.danger} />
         <Text style={styles.missingBannerText}>
           {relinking
@@ -837,6 +871,20 @@ export default function EditorScreen() {
             setShowSource(false);
           }}
           onClose={() => setShowSource(false)}
+        />
+      ) : null}
+      {missingSheetOpen && project && missingMedia.length > 0 ? (
+        <MissingMediaSheet
+          project={project}
+          missing={missingMedia}
+          relinking={relinking}
+          onRelinkAll={() => {
+            void relinkMissing();
+          }}
+          onRelinkOne={(m) => {
+            void relinkOne(m);
+          }}
+          onClose={() => setMissingSheetOpen(false)}
         />
       ) : null}
     </SafeAreaView>

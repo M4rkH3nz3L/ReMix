@@ -778,6 +778,14 @@
       "title_creatorPreset": "🎨 Creator Preset",
       "title_workflow": "Pro Workflow"
     },
+    "missingSheet": {
+      "title": "Missing media",
+      "summary": "{{total}} missing · {{cloud}} restorable from cloud · {{manual}} manual relink",
+      "statusCloud": "☁️ Restorable from cloud",
+      "statusManual": "📁 No cloud copy — manual",
+      "relinkAll": "Relink all",
+      "relinkOne": "Relink"
+    },
     "timeline": {
       "trackMenuMessage": "Mute and solo affect ONLY the preview — the exported video is not changed by them. For permanent muting, adjust the clip's volume.",
       "mute": "🔇 Mute",

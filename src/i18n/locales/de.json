@@ -778,6 +778,14 @@
       "title_creatorPreset": "🎨 Creator-Preset",
       "title_workflow": "Pro Workflow"
     },
+    "missingSheet": {
+      "title": "Fehlende Medien",
+      "summary": "{{total}} fehlend · {{cloud}} aus Cloud wiederherstellbar · {{manual}} manuell verknüpfen",
+      "statusCloud": "☁️ Aus Cloud wiederherstellbar",
+      "statusManual": "📁 Keine Cloud-Kopie — manuell",
+      "relinkAll": "Alle neu verknüpfen",
+      "relinkOne": "Verknüpfen"
+    },
     "timeline": {
       "trackMenuMessage": "Stumm und Solo wirken sich NUR auf die Vorschau aus — das exportierte Video wird dadurch nicht verändert. Zum dauerhaften Stummschalten passe die Lautstärke des Clips an.",
       "mute": "🔇 Stumm",

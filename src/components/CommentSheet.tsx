@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -29,7 +29,7 @@ import {
 import type { FeedPost } from '@/types/social';
 import { useRoles } from '@/store/roleStore';
 import { REPORT_REASONS, reportComment } from '@/lib/reports';
-import { listMyRestrictedIds, restrictUser, unrestrictUser } from '@/lib/blocks';
+import { filterBlocked, listMyBlockedIds, listMyRestrictedIds, restrictUser, unrestrictUser } from '@/lib/blocks';
 
 /** Rövid relatív idő (pl. „3p", „2ó", „5n") — nincs külső függőség. */
 function ago(iso: string): string {
@@ -57,6 +57,8 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
   const [sending, setSending] = useState(false);
   // 🚧 restrict (lágy tiltás): a poszt-tulaj korlátozott kommentelői (blocks.ts)
   const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
+  // 🛡️ a néző saját blokk-listája → a blokkolt szerzők kommentjeit elrejtjük
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
 
   const me = currentUserId();
   const isPostOwner = !!post && me === post.creator.id;
@@ -121,6 +123,22 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
       .then((ids) => setRestrictedIds(new Set(ids)))
       .catch(() => {});
   }, [post, isPostOwner]);
+
+  // a néző blokk-listája (bármely poszt megnyitásakor) → a blokkolt szerzők kommentjei rejtve
+  useEffect(() => {
+    if (!post || !me) {
+      return;
+    }
+    listMyBlockedIds()
+      .then(setBlockedIds)
+      .catch(() => {});
+  }, [post, me]);
+
+  // a blokkolt szerzők kommentjeit kiszűrjük (a filterBlocked pure + tesztelt)
+  const visibleComments = useMemo(
+    () => filterBlocked(comments, (c) => c.authorId, blockedIds),
+    [comments, blockedIds]
+  );
 
   const onToggleRestrict = (c: PostComment) => {
     const isR = restrictedIds.has(c.authorId);
@@ -264,7 +282,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
               </View>
             ) : (
               <FlatList
-                data={comments}
+                data={visibleComments}
                 keyExtractor={(c) => c.id}
                 renderItem={renderItem}
                 style={styles.list}

@@ -3459,6 +3459,11 @@
     "reason_offensive": "Anstößig",
     "reason_harassment": "Belästigung",
     "reason_illegal": "Rechtswidrig",
-    "reason_other": "Sonstiges"
+    "reason_other": "Sonstiges",
+    "blockTitle": "Nutzer blockieren",
+    "blockAction": "Blockieren",
+    "blockConfirm": "{{name}} blockieren? Du siehst keine Beiträge und Kommentare mehr.",
+    "blockDone": "{{name}} ist blockiert.",
+    "thisUser": "diesen Nutzer"
   }
 }

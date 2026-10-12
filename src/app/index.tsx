@@ -47,6 +47,7 @@ import {
 import { pageFromScroll, remixPages, resolveActiveId, visibleRemixes } from '@/lib/feedPager';
 import { runOptimistic } from '@/lib/optimistic';
 import { REPORT_REASONS, reportPost } from '@/lib/reports';
+import { blockUser, filterBlocked, listMyBlockedIds } from '@/lib/blocks';
 import type { FeedMode, FeedPost } from '@/types/social';
 import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
@@ -81,6 +82,9 @@ export default function FeedScreen() {
   const startId = typeof params.start === 'string' && params.start ? params.start : undefined;
   const [channelTitle, setChannelTitle] = useState('');
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  // 🛡️ a blokkolt szerzők id-jei (kliens-oldali feed-szűrés); ref, hogy a `load`
+  // ne induljon újra miatta, és a block-akció azonnal hasson a betöltött listára.
+  const blockedIdsRef = useRef<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [commentFor, setCommentFor] = useState<FeedPost | null>(null);
@@ -217,7 +221,9 @@ export default function FeedScreen() {
           })
         : listFeed(m);
       req
-        .then((list) => {
+        .then((rawList) => {
+          // a blokkolt szerzők posztjait kiszűrjük (a filterBlocked pure + tesztelt)
+          const list = filterBlocked(rawList, (p) => p.creator.id, blockedIdsRef.current);
           setPosts(list);
           // ⚡ az első elem AZONNAL aktív legyen — különben a lista „rajtra marad":
           // az első videó a viewability-eseményig nem indul be. Channel-módban a
@@ -241,6 +247,21 @@ export default function FeedScreen() {
   useEffect(() => {
     load(mode);
   }, [load, mode]);
+
+  // 🛡️ a saját blokk-lista betöltése (egyszer) → a már megjelenített feedből is
+  // kiszűrjük a blokkolt szerzőket (a block máshonnan is érkezhetett).
+  useEffect(() => {
+    listMyBlockedIds()
+      .then((ids) => {
+        blockedIdsRef.current = ids;
+        if (ids.length > 0) {
+          setPosts((prev) => filterBlocked(prev, (p) => p.creator.id, ids));
+        }
+      })
+      .catch(() => {
+        /* nem bejelentkezve / nincs backend → nincs blokk-szűrés */
+      });
+  }, []);
 
   const changeMode = (m: FeedMode) => {
     bumpChrome();
@@ -410,8 +431,8 @@ export default function FeedScreen() {
   };
 
   // 🚩 poszt bejelentése (nem-saját) — ok-választó
-  const onReportPost = (post: FeedPost) => {
-    bumpChrome();
+  // 🚩 jelentés ok-választó (a moderációs menüből)
+  const reportWithReason = (post: FeedPost) => {
     Alert.alert(t('report.title'), t('report.pickReason'), [
       ...REPORT_REASONS.map((r) => ({
         text: t(`report.reason_${r}`),
@@ -420,6 +441,36 @@ export default function FeedScreen() {
             .then(() => Alert.alert(t('report.title'), t('report.done')))
             .catch((e: unknown) => showError(e)),
       })),
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  };
+
+  // 🛡️ szerző blokkolása: a block szerverre megy, a posztjai AZONNAL eltűnnek a feedből
+  const onBlockUser = (post: FeedPost) => {
+    const name = post.creator.username ? `@${post.creator.username}` : t('report.thisUser');
+    Alert.alert(t('report.blockTitle'), t('report.blockConfirm', { name }), [
+      { text: t('common.cancel'), style: 'cancel' as const },
+      {
+        text: t('report.blockAction'),
+        style: 'destructive' as const,
+        onPress: () =>
+          blockUser(post.creator.id)
+            .then(() => {
+              blockedIdsRef.current = [...blockedIdsRef.current, post.creator.id];
+              setPosts((prev) => prev.filter((p) => p.creator.id !== post.creator.id));
+              Alert.alert(t('report.blockTitle'), t('report.blockDone', { name }));
+            })
+            .catch((e: unknown) => showError(e)),
+      },
+    ]);
+  };
+
+  // 🚩 moderációs menü (nem-saját poszt): jelentés VAGY a szerző blokkolása
+  const onReportPost = (post: FeedPost) => {
+    bumpChrome();
+    Alert.alert(t('report.title'), undefined, [
+      { text: t('report.label'), onPress: () => reportWithReason(post) },
+      { text: t('report.blockAction'), style: 'destructive' as const, onPress: () => onBlockUser(post) },
       { text: t('common.cancel'), style: 'cancel' as const },
     ]);
   };

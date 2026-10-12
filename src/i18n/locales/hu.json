@@ -3489,6 +3489,11 @@
     "reason_offensive": "Sértő tartalom",
     "reason_harassment": "Zaklatás",
     "reason_illegal": "Jogsértő",
-    "reason_other": "Egyéb"
+    "reason_other": "Egyéb",
+    "blockTitle": "Felhasználó blokkolása",
+    "blockAction": "Blokkolás",
+    "blockConfirm": "Blokkolod: {{name}}? Nem látod majd a posztjait és kommentjeit.",
+    "blockDone": "{{name}} blokkolva.",
+    "thisUser": "ez a felhasználó"
   }
 }

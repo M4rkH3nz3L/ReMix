@@ -45,8 +45,7 @@ méret-skálázott térköz/betű, széleskörű safe-area (38 hely). Az `orient
   **mikrofon/felvétel**, **expo-video/audio**, **LiveKit/WebRTC** (élő) — tableten/iPaden is működjenek.
 - [ ] 📱 **Teljesítmény a gyengébb eszközön**: nagy projekt + preview belépő-szintű telefonon se akadjon be (a React Compiler
   auto-memoizál; a nagy-doc guard véd) — mérni a legkisebb cél-eszközön.
-- [ ] 🟡 **Téma**: `userInterfaceStyle: "automatic"`, de az app **sötét-tónusú** — ellenőrizni, hogy világos rendszer-témánál is jól
-  néz ki (vagy expliciten `"dark"`-ra állítani).
+- [x] ✅ **Téma**: `userInterfaceStyle: "dark"` (explicit — az app sötét-tónusú, nincs light-mode; a rendszer-téma nem borítja fel).
 
 ### 1.2 🤖 Platform-technika (build-szint)
 - [x] ✅ **iOS**: `supportsTablet: true` · `ITSAppUsesNonExemptEncryption: false` · usage-stringek (kamera/mikrofon/fotó) ·
@@ -117,8 +116,14 @@ méret-skálázott térköz/betű, széleskörű safe-area (38 hely). Az `orient
 - [x] ✅ **GDPR-alap** (consent + privacy/terms) + **in-app fiók-törlés** (`softDeleteAccount`) — **Apple kötelező követelmény TELJESÍTVE** — + **adat-export** (`exportMyData`).
 - [x] ✅ **iOS privacyManifests** előre kitöltve (App Privacy-hez).
 - [ ] 👤 **Apple App Privacy** + **Google Data Safety** űrlapok kitöltése a konzolokon (a privacyManifest ad alapot).
-- [ ] 🟡 **R2-média erasure**: az `auth.users` delete-cascade a DB ~95%-át viszi; a **média-fájlok** végleges törlését is garantálni (rés).
-- [ ] ⚠️👤 **UGC-moderáció**: a social-feed + chat miatt **jelentés + blokkolás + objectionable-content** kezelés meglétét ellenőrizni (owner-moderáció már van).
+- [x] ✅ **R2-média hard-erasure KÉSZ** (nem rés!): a `POST /account/erase` ([server/index.js](../../server/index.js)) a soft-delete cooldown
+  után a `storagePrefixes` + `listAllObjects` ([server/security/accountErase.js](../../server/security/accountErase.js)) alapján
+  **PURGE-olja a média-objektumokat** az R2-ből (`account.erased` audit-log + `purgedObjects` szám). → 🔌 **csak az auto-finalizáló**
+  (a cooldown lejárta után a végleges erase automatikus futtatása) kell — ez **deploy** (cron/ütemezett job), nem kód.
+- [x] ✅ **UGC-moderáció KÉSZ**: **jelentés** (`reportPost`/`reportComment`/`reportMessage` + resolveReport — a feedből+kommentből
+  elérhető) + **felhasználó-blokkolás** (`blockUser`, a feed report-menüjében; a blokkolt szerző posztjai+kommentjei **kiszűrve**
+  `filterBlocked`-kal) + owner-moderáció + globális `post.moderate`/`comment.moderate` jog. → ⬜ follow-up: **blokkolt-lista
+  management** (unblock-UI a profilban).
 
 ---
 
@@ -128,6 +133,8 @@ méret-skálázott térköz/betű, széleskörű safe-area (38 hely). Az `orient
 - [ ] 🔌 **Működő backend a review alatt** (worker+API él) — különben 25%-stall → elutasítás.
 - [ ] 📱 **iPad/tablet nem „stretched phone"**: a review elutasíthatja, ha nagy képernyőn rossz a layout → a size-class miatt kész, de **tesztelni**.
 - [x] ✅ Nincs összeomlás a fő utakon (Skia-reziliencia-fix után a kép-stúdió natív-modul hiányában sem crashel).
+- [x] ✅ **UGC-követelmények kész** (gyakori elutasítás-ok): a feedből **jelentés** + **felhasználó-blokkolás** elérhető, a blokkolt
+  tartalom kiszűrve → az App Store/Play UGC-elvárása teljesül.
 
 ---
 

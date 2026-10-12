@@ -3489,6 +3489,11 @@
     "reason_offensive": "Offensive",
     "reason_harassment": "Harassment",
     "reason_illegal": "Illegal",
-    "reason_other": "Other"
+    "reason_other": "Other",
+    "blockTitle": "Block user",
+    "blockAction": "Block",
+    "blockConfirm": "Block {{name}}? You won't see their posts or comments.",
+    "blockDone": "{{name}} is blocked.",
+    "thisUser": "this user"
   }
 }

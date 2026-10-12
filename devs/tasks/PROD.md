@@ -1,152 +1,157 @@
-# 🚀 PROD.md — Store-indulási checklist (App Store + Google Play)
+# 🚀 PROD.md — Production-kiadás a 4 eszköz-célra (Android telefon + tablet · iPhone + iPad)
 
-> **Cél:** EGY helyen, mi kell ahhoz, hogy a **ReMix** éles boltba kerüljön (Apple App Store + Google Play).
-> Ez a **launch-kapu** — a részletek a témafájlokban: [01-production-go-live](./01-production-go-live.md) (backend-infra),
-> [02-monetization](./02-monetization.md) (IAP), [VIDEO-STUDIO-PROD](./VIDEO-STUDIO-PROD.md) / [IMAGE-STUDIO-PROD](./IMAGE-STUDIO-PROD.md) /
-> [AUDIO-STUDIO-PROD](./AUDIO-STUDIO-PROD.md) (stúdió-prod-réteg). Ez a fájl a **store-admin + go-live** deltát összegzi.
+> **Cél:** mi kell ahhoz, hogy a **ReMix** **production** szinten kiadható legyen **Android telefonra ÉS tabletre**,
+> valamint **iPhone-ra ÉS iPadre**. Ez a **launch-kapu** — a részletek a témafájlokban:
+> [01-production-go-live](./01-production-go-live.md) (backend), [02-monetization](./02-monetization.md) (IAP),
+> [VIDEO/IMAGE/AUDIO-STUDIO-PROD](./IMAGE-STUDIO-PROD.md) (stúdió-prod-réteg).
 >
-> **Jelmagyarázat:** ✅ kész · 🟡 részben · 🔌 deploy/infra · 👤 **a te dolgod** (fiók/konzol/banki/jogi — kódból nem megy) · 📱 device-build kell.
+> **Jelmagyarázat:** ✅ kész · 🟡 részben · 🔌 deploy/infra · 👤 **a te dolgod** (fiók/konzol/banki/jogi) · 📱 device-build/teszt kell.
 
 ---
 
-## 0. Olvasat — hol állunk
+## 0. Olvasat — a 4 cél = 2 build
 
-**A termék-mag és a prod-kód-réteg kész** (feature-teljes szerkesztők; a kép/hang/videó stúdió prod-paritása
-bizonyított; auth/előfizetés/tárhely/usage-metering szerver-kész; az app-config store-kész: EAS `production` profil,
-ikonok/splash, iOS usage-stringek + `ITSAppUsesNonExemptEncryption=false`, Android engedélyek, `com.h3nz3l.remix`).
+**Fontos:** a 4 form-faktorhoz NEM kell 4 külön build, hanem **2**:
+- **iOS: EGY univerzális build** (`supportsTablet: true` az [app.json](../../app.json)-ban) → **iPhone ÉS iPad** ugyanabból a `.ipa`-ból.
+- **Android: EGY AAB** → a Play **telefonra ÉS tabletre** is ebből telepít.
 
-**A launch NEM kódon múlik, hanem 3 dolgon:**
-1. **👤 Fejlesztői fiókok** (Apple Developer Program + Google Play Console) — nélkülük nincs build-signing és store-feltöltés.
-2. **🔌 Backend-deploy** (a render-worker + Supabase-prod + RevenueCat-prod ÉLESÍTÉSE — ma dev/lokál).
-3. **👤 Store-admin** (listázás, adatvédelmi űrlapok, IAP-termékek, review).
+**Jó hír:** az app **first-class reszponzív** — van size-class rendszer ([useLayout](../../src/hooks/useLayout.ts) + [constants/layout](../../src/constants/layout.ts) +
+[deviceInfo](../../src/lib/deviceInfo.ts)): `isExpanded` (iPad-fekvő/desktop → **dokkolt inspector + teljes idővonal**), `isTabletPortrait`,
+méret-skálázott térköz/betű, széleskörű safe-area (38 hely). Az `orientation: "default"` → **minden tájolás** megengedett.
+→ A tablet/iPad-támogatás **kódból kész**; a hátralévő eszköz-munka **valós-eszköz-verifikáció + store-asset** (nem újraírás).
 
-| Terület | Állapot | Blokkoló |
-|--------|---------|----------|
-| App-config (bundle/verzió/ikon/engedély) | ✅ | — |
-| EAS build-pipeline | ✅ (profilok kész) | 👤 Apple/Play fiók a signinghez |
-| Supabase prod | 🟡 provisioned | 🔌 jelszó-rotáció + dev/prod szétválasztás |
-| Render-worker | 🔌 lokál | **deploy kell (különben export 25%-on ragad)** |
-| RevenueCat (IAP) | 🟡 kód-kész | 👤 RC-fiók + store-termékek |
-| Push (APNs/FCM) | 🟡 kód-kész | 👤 kulcsok |
-| Store-listing + assets | ⬜ | 👤 |
-| Adatvédelmi űrlapok | 🟡 (consent/törlés/export kész) | 👤 Apple/Google űrlap kitöltés |
+**A launch 3 dolgon múlik:** 👤 **fejlesztői fiókok** · 🔌 **backend-deploy** · 👤 **store-admin** (lásd C–H).
 
 ---
 
-## A. 👤 Fejlesztői fiókok (a #1 blokkoló)
+## 1. 📱 ESZKÖZ-MÁTRIX — a 4 cél külön-külön
 
-- [ ] 👤 **Apple Developer Program** (99 USD/év) → App Store Connect hozzáférés. Kell: Apple ID + 2FA + jogi egyezmények
-  (Paid Apps agreement a IAP-hoz) + **banki + adó-adatok** (a bevételhez).
-- [ ] 👤 **Google Play Console** (25 USD egyszeri) → fejlesztői fiók + **merchant/banki** (IAP-hoz) + jogi egyezmények.
-- [x] ✅ **EAS/Expo fiók** megvan (`owner: vided`, projectId beállítva az [app.json](../../app.json)-ban).
-- [ ] 👤 **Márkanév-ellenőrzés**: a „Remix" app-név szabad-e mindkét boltban (gyakori név → lehet, hogy egyedibb display-name kell;
-  a bundle `com.h3nz3l.remix` fix maradhat).
+| Cél | Build | Store-követelmény | UI/UX production-kritérium |
+|-----|-------|-------------------|-----------------------------|
+| **Android telefon** | AAB (Play) | telefon-screenshotok | compact size-class, álló+fekvő, safe-area/gesture-nav |
+| **Android tablet** | ugyanaz az AAB | **tablet-screenshotok** + „large screen" minőség | expanded layout, fekvő-first, nagy-képernyő guideline |
+| **iPhone** | univerzális `.ipa` | 6.7"/6.5" (+5.5") screenshotok | compact, notch/Dynamic Island safe-area |
+| **iPad** | ugyanaz az `.ipa` | **iPad-screenshotok (12.9"/13" + 11")** | expanded (dokkolt inspector), minden tájolás, Stage Manager/Split View |
+
+### 1.1 📱 Közös eszköz-UX production-ellenőrzés (MINDEN form-faktoron)
+- [ ] 📱 **Reszponzív verifikáció valós/szimulált eszközön**: compact (telefon) **és** expanded (tablet/iPad) layout — a szerkesztő
+  (idővonal + vászon + inspector/panel) **ne legyen szétnyúló telefon-UI** nagy képernyőn (a size-class ezt kezeli → **tesztelni kell**).
+- [ ] 📱 **Tájolás**: álló **és** fekvő minden célon (az `orientation: default` miatt) — nincs levágott vezérlő, a vászon-arány stabil,
+  forgatáskor nem vész el állapot. *(Ha egy képernyő nem bírja a fekvőt, ott zárolni kell — tudatos döntés.)*
+- [ ] 📱 **Safe-area / cutout**: notch · Dynamic Island · iPad-sarkok · Android lyukkamera · gesztus-navigáció · tablet-navbar —
+  a top-bar és az alsó eszköztár ne lógjon a rendszer-UI alá.
+- [ ] 📱 **Érintés-ergonómia**: a vektor-toll / vágás / csúszkák ujjal is pontosak; tableten a nagyobb vászon kihasználva.
+- [ ] 📱 **Natív modulok minden form-faktoron**: **Skia** (kép-vászon/ecset), **kamera** (telefon+tablet, elülső/hátsó),
+  **mikrofon/felvétel**, **expo-video/audio**, **LiveKit/WebRTC** (élő) — tableten/iPaden is működjenek.
+- [ ] 📱 **Teljesítmény a gyengébb eszközön**: nagy projekt + preview belépő-szintű telefonon se akadjon be (a React Compiler
+  auto-memoizál; a nagy-doc guard véd) — mérni a legkisebb cél-eszközön.
+- [ ] 🟡 **Téma**: `userInterfaceStyle: "automatic"`, de az app **sötét-tónusú** — ellenőrizni, hogy világos rendszer-témánál is jól
+  néz ki (vagy expliciten `"dark"`-ra állítani).
+
+### 1.2 🤖 Platform-technika (build-szint)
+- [x] ✅ **iOS**: `supportsTablet: true` · `ITSAppUsesNonExemptEncryption: false` · usage-stringek (kamera/mikrofon/fotó) ·
+  **privacyManifests kitöltve** (email/userID/purchase/photos) · ATS: a prod API **HTTPS** legyen (a `NSAllowsLocalNetworking` csak dev).
+- [x] ✅ **Android**: engedélyek (kamera/mikrofon/média/foreground-service) · adaptive-icon (fg/bg/monochrome) ·
+  `predictiveBackGestureEnabled` beállítva.
+- [ ] 🔌 **Android Play-követelmények (2026)**: **targetSdk 35+** (Android 15) · **64-bit** · **16 KB page-size** natív libek ·
+  **AAB** kimenet — az Expo ~57 ezeket adja; **verifikálni** az éles buildben.
+- [ ] 📱 **iPad-specifikus**: multitasking (Split View / Stage Manager) — ha nem támogatjuk teljesen, **requires-fullscreen**-t
+  tudatosan állítani (különben a review elvárhatja a multitasking-helyes működést).
 
 ---
 
-## B. 📱 Build & signing (EAS production)
+## 2. 📱 Build & signing (EAS) — a 2 build legyártása
 
 - [x] ✅ `eas.json` **`production`** profil kész (`distribution: store`, `autoIncrement`, `appVersionSource: remote`, `submit.production`).
-- [ ] 📱👤 **iOS production build**: `eas build --profile production --platform ios` — az EAS-felhő intézi az aláírást (Apple-fiók +
-  distribution cert + provisioning profile az App Store Connectből). *(A lokál `expo run:ios` Xcode 26.4+-t igényel — lásd a
-  [ios-build jegyzetet]; az EAS-felhő ezt MEGKERÜLI, mert saját Xcode-ot használ.)*
-- [ ] 📱👤 **Android production build (AAB)**: `eas build --profile production --platform android` — EAS-kezelt keystore (vagy
-  feltöltött), kimenet **.aab** a Play-hez.
-- [ ] 👤 **Submit**: `eas submit --profile production -p ios|android` (App Store Connect API-kulcs / Play service-account JSON kell).
-- [ ] 🔌 **Runtime-env a prod buildhez**: a kliens a **prod** API/Supabase/R2-re mutasson (EAS `environment: production` →
-  env-ek), NE a devre. *(Ma a dev a PROD DB-re mutat — a prod buildnek külön, tiszta env kell.)*
+- [ ] 📱👤 **iOS**: `eas build --profile production --platform ios` → signed `.ipa` (EAS-felhő intézi a distribution cert +
+  provisioning profilt az Apple-fiókból). *(A lokál `expo run:ios` Xcode 26.4+-t igényel; az EAS-felhő MEGKERÜLI.)*
+- [ ] 📱👤 **Android**: `eas build --profile production --platform android` → signed **`.aab`** (EAS-kezelt keystore).
+- [ ] 👤 **Submit**: `eas submit --profile production -p ios|android` (App Store Connect API-kulcs / Play service-account).
+- [ ] 🔌 **Prod runtime-env a buildben**: a kliens a **prod** API/Supabase/R2-re mutasson (EAS `environment: production`), NE a devre.
+- [ ] 📱 **Belső teszt-terjesztés telepítve**: **mind a 4 form-faktoron** (TestFlight: iPhone+iPad; Play internal testing: telefon+tablet).
 
 ---
 
-## C. 🔌 Backend prod-infra (részletek: [01-production-go-live](./01-production-go-live.md))
+## 3. 👤 Fejlesztői fiókok (a #1 blokkoló)
 
-- [x] ✅ **Supabase prod** provisioned (eu-west-1, 26 migráció pushed + verifikálva).
-  - [ ] 🔌 **DB-jelszó rotálása** (a provisioning óta) + a secret-ek prod-vaultba.
-  - [ ] 🔌 **dev/prod szétválasztás** — a fejlesztés ma a prod DB-be ír; külön dev-projekt kell a launch előtt.
-  - [ ] 👤 **email-confirmation** döntés (ma OFF a launchre — OK, de tudatos legyen) + SMTP a prod e-mailekhez.
-- [ ] 🔌 **Render-worker DEPLOY** — **KRITIKUS**: a >15s exportok a BullMQ queue-ra mennek; worker nélkül a megosztás/export
-  **25%-on ragad** (a reviewer törött appot lát). Kell: a [server/Dockerfile](../../server/Dockerfile) (Node+ffmpeg+Chromium+fontok)
-  futó példánya(i) + Redis + R2 + health. *(Ez fedi a /imagedoc és /svg/pdf és /audio/* utakat is — egy image.)*
-- [ ] 🔌 **R2 (Cloudflare) tárhely** — ÉLŐ (platform-tár kész); a prod bucket + kulcsok a worker-env-ben.
-- [ ] 🔌 **Secret management (prod)**: Anthropic (AI), RevenueCat webhook-secret, Supabase service-role, R2, PayPal, LiveKit —
-  prod-vault, NEM a repóban.
-- [ ] 👤🔌 **Push (APNs + FCM)**: Apple APNs-kulcs + Google FCM service-account az expo-server-sdk-hoz.
-- [ ] 🔌 **Megfigyelhetőség**: alap health/log/alert a worker + API köré (01 §2.7).
+- [ ] 👤 **Apple Developer Program** (99 USD/év) → App Store Connect + Paid-Apps-egyezmény + **banki/adó** (bevétel).
+- [ ] 👤 **Google Play Console** (25 USD) → fejlesztői fiók + **merchant/banki** + jogi egyezmények.
+- [x] ✅ **EAS/Expo fiók** megvan (`owner: vided`, projectId beállítva).
+- [ ] 👤 **Név-ellenőrzés**: a „Remix" display-name szabad-e mindkét boltban (a bundle `com.h3nz3l.remix` fix).
 
 ---
 
-## D. 👤 IAP / monetizáció (store-politika!)
+## 4. 🔌 Backend prod-infra (részletek: [01](./01-production-go-live.md))
 
-- [x] ✅ **Szerver-autoritatív Pro-előfizetés** (Supabase + RevenueCat IAP sync) kód-kész; a kliens csak szinkronizál.
-- [ ] 👤 **RevenueCat prod**: fiók + API-kulcsok + a **termékek létrehozása mindkét boltban** (App Store Connect subscriptions +
-  Play Console subscriptions), RC-hez kötve; webhook a workerre.
-- [ ] 👤 **IAP-tesztelés sandboxban** (Apple sandbox-tester + Play internal testing) a review ELŐTT.
-- [ ] ⚠️👤 **Virtuális valuta / kifizetés store-politika**: a **coin-pénztárca + marketplace (Facebook Stars-szerű) + PayPal-kifizetés**
-  érzékeny terület. A boltok megkövetelik, hogy a **digitális javak IAP-n menjenek** (nem külső fizetés), és a **user→user
-  kifizetés/„cash-out"** ütközhet a politikával. **Jogi/politikai átvizsgálás kell launch előtt** — lehet, hogy a cash-out/payout
-  funkciót a v1-ben ki kell kapcsolni (env-gate már van). [02-monetization](./02-monetization.md).
-
----
-
-## E. 👤 Store-listing & assets
-
-- [ ] 👤 **App-ikon** ✅ (megvan) · **feature graphic** (Play) · **screenshotok** minden kötelező eszköz-méretre (iPhone 6.7"/6.5"/5.5",
-  iPad; Android telefon/tablet) · opcionális **preview-videó**.
-- [ ] 👤 **Leírás + kulcsszavak + kategória** (mindkét bolt), **rövid leírás** (Play), **promóciós szöveg** (Apple).
-- [ ] 👤 **Support-URL + marketing-URL + Privacy-Policy-URL** (kötelező, nyilvános link kell — a [legal.ts](../../src/constants/legal.ts)
-  tartalom publikálva egy URL-re).
-- [ ] 👤 **Korhatár-besorolás**: Apple age-rating kérdőív + Google **IARC** kérdőív (a social/UGC + chat miatt figyelni kell).
+- [x] ✅ **Supabase prod** provisioned (eu-west-1, 26 migráció). → 🔌 **DB-jelszó-rotáció** + **dev/prod szétválasztás** (ma a dev a prod DB-be ír!).
+- [ ] 🔌 **Render-worker DEPLOY — KRITIKUS**: a >15s exportok queue-ra mennek; worker nélkül az export **25%-on ragad** →
+  a reviewer törött appot lát. A közös [server/Dockerfile](../../server/Dockerfile) (Node+ffmpeg+Chromium+fontok) + Redis + R2 + health.
+  *(Fedi a /render + /imagedoc + /svg/pdf + /audio/* utakat is.)*
+- [x] ✅ **R2 (Cloudflare)** platform-tár élő → 🔌 prod bucket + kulcsok a worker-env-ben.
+- [ ] 🔌 **Secretek (prod-vault)**: Anthropic · RevenueCat webhook · Supabase service-role · R2 · PayPal · LiveKit — NEM a repóban.
+- [ ] 👤🔌 **Push**: Apple **APNs**-kulcs + Google **FCM** service-account (expo-server-sdk).
 
 ---
 
-## F. 🔒 Adatvédelem & megfelelés
+## 5. 👤 IAP / monetizáció (store-politika!)
 
-- [x] ✅ **GDPR-alap**: signup-consent (auditált `user_consents`) + privacy/terms dokumentumok ([legal.ts](../../src/constants/legal.ts)).
-- [x] ✅ **In-app fiók-törlés** (`softDeleteAccount`, [profile.tsx](../../src/app/profile.tsx)) — **Apple kötelező követelmény TELJESÍTVE**
-  (a törlés in-app indítható; soft-delete/grace után végleges). + **adat-export** (`exportMyData`).
-  - [ ] 🟡 **Teljes erasure a média-tárra (R2)**: az `auth.users` delete-cascade a DB ~95%-át viszi; az **R2-médiafájlok** végleges
-    törlését is garantálni kell a GDPR-erasure-höz (ma rés).
-- [ ] 👤 **Apple App Privacy** („nutrition labels"): milyen adatot gyűjt az app (fiók, tartalom, média, analitika) + célok.
-- [ ] 👤 **Google Data Safety** űrlap (ugyanez Play-oldalon).
-- [ ] ⚠️👤 **UGC-moderáció**: a social-feed + chat miatt a boltok **tartalom-moderációt + jelentés/blokk** funkciót várnak.
-  (Owner-moderáció + remix soft-removal már van; ellenőrizni: **jelentés** + **blokkolás** + **objectionable-content kezelés** megléte.)
+- [x] ✅ Szerver-autoritatív Pro-előfizetés (Supabase + RevenueCat) kód-kész.
+- [ ] 👤 **RevenueCat prod** + a **termékek létrehozása mindkét boltban** (ASC subscriptions + Play subscriptions) + sandbox-teszt.
+- [ ] ⚠️👤 **Virtuális valuta / kifizetés**: a **coin-pénztárca + marketplace + PayPal-cash-out** ütközhet a bolt-politikával
+  (digitális javak = IAP-kötelező; user→user cash-out érzékeny). **Jogi átvizsgálás** — lehet, hogy a cash-out v1-ben kimarad (env-gate megvan).
 
 ---
 
-## G. 🧪 App-review gotchák (gyakori elutasítás-okok)
+## 6. 👤 Store-listing & assets (eszköz-osztályonként!)
 
-- [ ] 👤 **Reviewer demo-fiók**: az app **login mögött** van → az App Store/Play reviewnek **működő teszt-hitelesítő** kell
-  (a review-notesban), Pro-funkciókkal (vagy sandbox-IAP).
-- [ ] 🔌 **Működő backend a review alatt**: a render-worker + API **ÉLJEN**, különben a reviewer 25%-on ragadó exportot lát → elutasítás.
-- [ ] ✅ **Nincs placeholder/összeomlás a fő utakon** (a Skia-reziliencia-fix után a kép-stúdió natív-modul hiányában sem omlik).
-- [ ] 👤 **HIG / Material** alap-megfelelés + nincs „beta/coming soon" felirat a v1-ben.
-- [ ] 👤 **Export-megosztás** jogtisztasága (a felhasználó saját médiája) — a UGC/feed-tartalomnál a jogi feltételek lefedik.
+- [ ] 👤 **Screenshotok MINDEN kötelező méretre**: **iPhone** 6.7"/6.5" (+5.5") · **iPad** 12.9"/13" + 11" · **Android telefon** · **Android tablet**.
+  (A tablet/iPad screenshot a „tablet-optimalizált" besoroláshoz + a review-hez kell.)
+- [ ] 👤 **Ikon** ✅ · Play **feature graphic** · leírás/kulcsszavak/kategória (mindkét bolt) · opcionális preview-videó.
+- [ ] 👤 **Privacy-Policy-URL + Support-URL** (nyilvános link — a [legal.ts](../../src/constants/legal.ts) tartalom publikálva).
+- [ ] 👤 **Korhatár**: Apple age-rating + Google **IARC** (a social/UGC/chat miatt figyelni).
 
 ---
 
-## H. ✅ Launch go/no-go — a minimális éles szett
+## 7. 🔒 Adatvédelem & megfelelés
 
-A v1 akkor adható be, ha MIND teljesül:
+- [x] ✅ **GDPR-alap** (consent + privacy/terms) + **in-app fiók-törlés** (`softDeleteAccount`) — **Apple kötelező követelmény TELJESÍTVE** — + **adat-export** (`exportMyData`).
+- [x] ✅ **iOS privacyManifests** előre kitöltve (App Privacy-hez).
+- [ ] 👤 **Apple App Privacy** + **Google Data Safety** űrlapok kitöltése a konzolokon (a privacyManifest ad alapot).
+- [ ] 🟡 **R2-média erasure**: az `auth.users` delete-cascade a DB ~95%-át viszi; a **média-fájlok** végleges törlését is garantálni (rés).
+- [ ] ⚠️👤 **UGC-moderáció**: a social-feed + chat miatt **jelentés + blokkolás + objectionable-content** kezelés meglétét ellenőrizni (owner-moderáció már van).
 
-1. 👤 Apple + Play fiók élő, egyezmények + banki/adó aláírva.
-2. 📱 EAS **production** build mindkét platformra (signed .ipa/.aab), telepítve belső tesztre.
-3. 🔌 **Render-worker + API + Supabase-prod + R2 ÉLŐ**, prod-env a buildben (nem dev).
-4. 👤 RevenueCat prod + IAP-termékek + sandbox-teszt zöld.
-5. 👤 Store-listing kész (screenshot/leírás/privacy-URL/age-rating).
-6. 👤 App Privacy + Data Safety űrlapok kitöltve.
-7. 👤 Reviewer demo-fiók + review-notes.
+---
+
+## 8. 🧪 App-review gotchák
+
+- [ ] 👤 **Reviewer demo-fiók** (az app login mögött van) + Pro-hozzáférés/sandbox a review-notesban.
+- [ ] 🔌 **Működő backend a review alatt** (worker+API él) — különben 25%-stall → elutasítás.
+- [ ] 📱 **iPad/tablet nem „stretched phone"**: a review elutasíthatja, ha nagy képernyőn rossz a layout → a size-class miatt kész, de **tesztelni**.
+- [x] ✅ Nincs összeomlás a fő utakon (Skia-reziliencia-fix után a kép-stúdió natív-modul hiányában sem crashel).
+
+---
+
+## 9. ✅ Go/No-go — a minimális production-szett a 4 célra
+
+1. 👤 Apple + Play fiók élő (egyezmények + banki/adó).
+2. 📱 EAS **production** build: **iOS univerzális `.ipa`** (iPhone+iPad) + **Android `.aab`** (telefon+tablet), signed.
+3. 📱 **Mind a 4 form-faktoron tesztelve** (TestFlight iPhone+iPad · Play internal telefon+tablet): layout/tájolás/safe-area/natív-modulok OK.
+4. 🔌 **Render-worker + API + Supabase-prod + R2 ÉLŐ**, prod-env a buildben.
+5. 👤 RevenueCat prod + IAP sandbox-teszt zöld.
+6. 👤 Store-listing kész **eszköz-osztályonkénti screenshotokkal** (telefon+tablet+iPhone+iPad) + privacy-URL + age-rating.
+7. 👤 App Privacy + Data Safety űrlapok.
 8. ⚠️👤 Monetizáció-politika tisztázva (coin/cash-out v1-ben be/ki).
 
 ---
 
-## Függelék — a termék-oldali prod-státusz (kész, bizonyítva)
+## Függelék — termék-oldali prod-státusz (kész, bizonyítva)
 
-| Stúdió | Account-független prod-réteg | Hátra (device/infra) |
-|--------|------------------------------|----------------------|
-| **Kép** ([IMAGE-STUDIO-PROD](./IMAGE-STUDIO-PROD.md)) | ✅ parity-harness · export PNG/JPG/WebP/SVG/PDF · HEIC/EXIF · font-parity · nagy-doc gát/perf · Skia-reziliencia | PSD import/export (lib) · P2 |
-| **Hang** ([AUDIO-STUDIO-PROD](./AUDIO-STUDIO-PROD.md)) | ✅ export-parity-harness (LUFS/TP/pan mérve) · +opus/minőség · i18n-parity | 📱 preview-parity + UI-k · Demucs-infra |
-| **Videó** ([VIDEO-STUDIO-PROD](./VIDEO-STUDIO-PROD.md)) | ✅ render-smoke-parity · cancel · worker-health | 🔌 worker-deploy · 📱 natív-render (Android MediaCodec) |
+| Stúdió | Account-független prod-réteg | Hátra |
+|--------|------------------------------|-------|
+| **Kép** | ✅ parity-harness · PNG/JPG/WebP/SVG/PDF · HEIC/EXIF · font-parity · nagy-doc gát/perf · Skia-reziliencia | PSD (lib) · P2 |
+| **Hang** | ✅ export-parity-harness (LUFS/TP/pan mérve) · +opus/minőség · i18n-parity | 📱 preview-DSP + UI-k · Demucs |
+| **Videó** | ✅ render-smoke-parity · cancel · worker-health | 🔌 worker-deploy · 📱 natív Android-render |
 
-> **A kódból elvégezhető prod-munka nagyrészt kész és bizonyított.** Ami hátra van, az **fiók + deploy + store-admin**
-> (ez a fájl A–H pontjai), plusz néhány **device-build-függő** finomítás (preview-DSP, UI-k) — ezekre az Apple ID /
-> Android dev fiók meglétekor térünk vissza.
+> **A kódból elvégezhető production-munka nagyrészt kész és bizonyított — a tablet/iPad-támogatás is kódszinten adott.**
+> Ami hátra: **fiók + deploy + store-admin** (3–9) + a **valós-eszköz-verifikáció** a 4 form-faktoron (1) — ez utóbbi a
+> device-buildekkel (Apple ID / Android dev fiók) indul.

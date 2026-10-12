@@ -75,8 +75,9 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 > „soha ne vessz el munka" mentés (atomi + crash-recovery). **Minden stúdió és az AI erre a magra épül**
 > (audit §19 `Editor core ~70–80%` → **~100%**) — a 06/07/03/05 epikek erre a szilárd magra építhetnek.
 
-> **🚀 STORE-INDULÁS (App Store + Google Play):** a teljes launch-kapu EGY helyen — fiókok, EAS-build, backend-deploy,
-> IAP, store-listing, adatvédelmi űrlapok, review-gotchák, go/no-go: **[PROD.md](./PROD.md)**.
+> **🚀 PRODUCTION-KIADÁS (Android telefon+tablet · iPhone+iPad):** a teljes launch-kapu EGY helyen — eszköz-mátrix
+> (4 cél = 2 build), EAS-build/signing, backend-deploy, IAP, store-listing (eszköz-osztályonkénti screenshot),
+> adatvédelem, review-gotchák, go/no-go: **[PROD.md](./PROD.md)**.
 
 > **🎬 Prod-videó-stúdió:** mi hiányzik még a videó-stúdió **production** készültségéhez (render-parity
 > élő-verifikáció, prod worker-infra, export-megbízhatóság, bemeneti-formátum-robusztusság, eszközön-render):

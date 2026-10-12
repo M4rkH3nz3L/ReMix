@@ -1,0 +1,83 @@
+# 🚀 ReMix backend — PRODUCTION stack (Hetzner / bármely Docker-host)
+#
+# 4 szolgáltatás EGY hoston: redis + api + worker (+1..N) + caddy (auto-HTTPS proxy).
+# Az `api` és a `worker` UGYANAZT az image-t futtatja (server/Dockerfile) — az api
+# felülírja a parancsot `node index.js`-re. Mindkettő `SYS_ADMIN`-t kap a headless
+# Chromium-sandboxhoz (/imagedoc, /svg/pdf, render-time particles/animált szöveg).
+#
+# Indítás:   cd server && cp .env.production.example .env.production && <kitöltöd> && docker compose up -d --build
+# Skálázás:  docker compose up -d --scale worker=3
+# Logok:     docker compose logs -f api worker
+# Lásd:      server/DEPLOY.md (lépésről lépésre)
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # 🌐 API (HTTP): auth/billing/render-submit/imagedoc/svg-pdf/audio/live — a Caddy mögött
+  api:
+    build: .
+    image: remix-backend
+    command: ['node', 'index.js']
+    restart: unless-stopped
+    env_file: [.env.production]
+    environment:
+      - PORT=8787
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    cap_add:
+      - SYS_ADMIN # headless Chromium sandbox (/imagedoc + /svg/pdf)
+    expose:
+      - '8787' # csak a Caddy éri el (nem publikus port)
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://127.0.0.1:8787/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # 🎬 render-worker: a BullMQ „render" sorából húz (>15s videó/queue). Skálázható.
+  worker:
+    build: .
+    image: remix-backend
+    # CMD = render-worker.js (a Dockerfile alapértelmezése)
+    restart: unless-stopped
+    env_file: [.env.production]
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    cap_add:
+      - SYS_ADMIN # render-time Chromium (particles / animált szöveg / forma)
+
+  # 🔒 Caddy: fordított proxy + AUTOMATIKUS Let's Encrypt HTTPS a ${RENDER_DOMAIN}-re
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      - RENDER_DOMAIN=${RENDER_DOMAIN:?a RENDER_DOMAIN kötelező (a .env-ben vagy exportálva) — pl. api.remix.app}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

@@ -82,10 +82,14 @@ méret-skálázott térköz/betű, széleskörű safe-area (38 hely). Az `orient
 
 ## 4. 🔌 Backend prod-infra (részletek: [01](./01-production-go-live.md))
 
+> **🆕 Deploy-stack KÉSZ (IaC):** [server/docker-compose.yml](../../server/docker-compose.yml) (redis + api + worker + Caddy auto-HTTPS) +
+> [Caddyfile](../../server/Caddyfile) + [.env.production.example](../../server/.env.production.example) + **lépésről-lépésre guide:
+> [server/DEPLOY.md](../../server/DEPLOY.md)**. A deploy már csak: szerver + domain + env kitöltése → `docker compose up -d --build`.
+
 - [x] ✅ **Supabase prod** provisioned (eu-west-1, 26 migráció). → 🔌 **DB-jelszó-rotáció** + **dev/prod szétválasztás** (ma a dev a prod DB-be ír!).
-- [ ] 🔌 **Render-worker DEPLOY — KRITIKUS**: a >15s exportok queue-ra mennek; worker nélkül az export **25%-on ragad** →
-  a reviewer törött appot lát. A közös [server/Dockerfile](../../server/Dockerfile) (Node+ffmpeg+Chromium+fontok) + Redis + R2 + health.
-  *(Fedi a /render + /imagedoc + /svg/pdf + /audio/* utakat is.)*
+- [ ] 🔌 **Render-worker DEPLOY — KRITIKUS** *(az IaC kész → futtatni kell)*: a >15s exportok queue-ra mennek; worker nélkül az
+  export **25%-on ragad**. A közös [server/Dockerfile](../../server/Dockerfile) (Node+ffmpeg+Chromium+fontok) + Redis + R2 + health,
+  a [docker-compose.yml](../../server/docker-compose.yml)-ben összekötve. *(Fedi a /render + /imagedoc + /svg/pdf + /audio/* utakat is.)*
 - [x] ✅ **R2 (Cloudflare)** platform-tár élő → 🔌 prod bucket + kulcsok a worker-env-ben.
 - [ ] 🔌 **Secretek (prod-vault)**: Anthropic · RevenueCat webhook · Supabase service-role · R2 · PayPal · LiveKit — NEM a repóban.
 - [ ] 👤🔌 **Push**: Apple **APNs**-kulcs + Google **FCM** service-account (expo-server-sdk).

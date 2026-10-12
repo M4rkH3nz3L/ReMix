@@ -1,0 +1,15 @@
+# 🔒 Caddy — fordított proxy + AUTOMATIKUS HTTPS (Let's Encrypt) a ReMix API-hoz.
+# A {$RENDER_DOMAIN} env-ből jön (docker-compose → environment). A Caddy magától
+# kér + újít TLS-tanúsítványt, ha a domain A/AAAA rekordja erre a hostra mutat.
+#
+# Nagy feltöltések (videó-render input): a Caddy streameli a bodyt, nincs méret-limit;
+# a tényleges plafont a multer/express szabja az API-ban.
+
+{$RENDER_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8787 {
+		# a kliens valós IP-je a rate-limit/audit-loghoz (x-forwarded-for)
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

@@ -82,6 +82,9 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [x] ✅ **Pásztázás-automáció** (ÚJ): `clip.keyframes.pan` → a worker per-frame `aeval` sztereó-balanszként.
   *ÉLŐ-BIZONYÍTVA: L→R söprés → bal csatorna −8.4 dB, jobb +8.4 dB az idő haladtával (worker-mérés).*
 - [x] ✅ **Sidechain-duck** (zene a beszéd alá) — a Mixerben (§2), worker-verifikált.
+- [x] ✅ **Hang-FX presetek** (ClipEditSheet-chipek): Tiszta/Podcast/Telefon/Rádió/Mély/Magas/Termi/Széles —
+  egy-koppintásos kombinációk a bizonyított FX-ekből ([audioFxPresets.ts], 7 teszt). *ÉLŐ-BIZONYÍTVA: a
+  „Telefon" preset sáv-korlátoz — in-band +9.7 dB a 100Hz, +25.8 dB a 10kHz fölött (worker-mérés).*
 - [ ] ⬜ **Tempó-szinkron effektek** (delay/LFO a BPM-hez) · **track/bus-insert FX** (ma per-klip) ·
   **send-buszok** (a `mixer.ts` toRenderPlan magja kész, worker send-routing hátra).
 

@@ -5,6 +5,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
+import { AUDIO_FX_PRESETS, presetFx } from '@/lib/audioFxPresets';
 import { RegionBar, Slider, ToggleRow, useWaveform } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
 import type { EditorCommand } from '@/lib/commands';
@@ -244,6 +245,15 @@ export function ClipEditSheet({
                 <Text style={styles.proTagText}>PRO</Text>
               </View>
             </View>
+            {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+              {AUDIO_FX_PRESETS.map((p) => (
+                <Pressable key={p.key} style={styles.presetChip} onPress={() => setFx(presetFx(p.key))}>
+                  <Ionicons name={p.icon as keyof typeof Ionicons.glyphMap} size={14} color={palette.accent} />
+                  <Text style={styles.presetChipText}>{t(`studio.audio.fxPreset.${p.key}`, { defaultValue: p.label })}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
             {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
             <Slider
               label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}
@@ -374,6 +384,9 @@ const styles = StyleSheet.create({
   fxTitle: { flex: 1, color: palette.text, fontSize: 13, fontWeight: '800' },
   proTag: { backgroundColor: palette.accentSoft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   proTagText: { color: palette.accent, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  presetRow: { gap: 6, paddingVertical: 2, paddingRight: 8, marginBottom: 6 },
+  presetChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: palette.surface },
+  presetChipText: { color: palette.text, fontSize: 12, fontWeight: '700' },
   hint: { color: palette.textDim, fontSize: 11, lineHeight: 16, marginTop: 10 },
   autoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 4 },
   stemsBtn: {

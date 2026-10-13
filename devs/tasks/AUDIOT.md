@@ -75,8 +75,9 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 
 ## 4. 🎛️ Effektek & feldolgozás — ✅ NAGYRÉSZT KÉSZ
 - [x] ✅ **Teljes per-klip FX-lánc** (ClipEditSheet): highpass/lowpass · 3-sávos EQ · denoise · **zajkapu (gate)** ·
-  de-esser · kompresszor · limiter · normalize · reverb · delay — mind a worker `audioFxChain`-jével renderel.
-  *A zajkapu ÉLŐ-BIZONYÍTVA: a halk szakasz −24 dB-lel lejjebb, a hangos érintetlen (worker-mérés).*
+  de-esser · kompresszor · limiter · normalize · reverb · delay · **sztereó-szélesítés (haas)** — mind a worker
+  `audioFxChain`-jével renderel. *ÉLŐ-BIZONYÍTVA: zajkapu → halk szakasz −24 dB; sztereó-szélesítés → a mono
+  side-energia −84→−13 dB (worker-mérés).*
 - [x] ✅ **Hangerő-automáció** (KeyframeGraphEditor → `clip.keyframes.volume`) — a worker `eval=frame`-mel égeti be.
 - [x] ✅ **Pásztázás-automáció** (ÚJ): `clip.keyframes.pan` → a worker per-frame `aeval` sztereó-balanszként.
   *ÉLŐ-BIZONYÍTVA: L→R söprés → bal csatorna −8.4 dB, jobb +8.4 dB az idő haladtával (worker-mérés).*

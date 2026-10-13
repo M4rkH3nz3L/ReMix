@@ -1044,6 +1044,8 @@ export interface AudioFx {
   normalize?: boolean;
   /** 🚪 zajkapu (agate): a küszöb alatti halk részeket (háttérzaj/szünetek) lehalkítja */
   gate?: boolean;
+  /** 🎧 sztereó-szélesítés (haas): a mono/szűk jelből szélesebb sztereó-kép (zenéhez) */
+  stereoWide?: boolean;
   /** visszhang-tér mértéke 0–1 (aecho) */
   reverb?: number;
   /** echo/delay mértéke 0–1 (aecho) */

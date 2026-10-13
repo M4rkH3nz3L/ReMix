@@ -109,6 +109,10 @@ function audioFxChain(fx) {
     const a = clampN(fx.delay, 0, 1);
     parts.push(`aecho=0.8:0.6:${Math.round(120 + a * 380)}:${(0.2 + a * 0.5).toFixed(2)}`);
   }
+  if (fx.stereoWide) {
+    // 🎧 Haas-szélesítés: mono/szűk → szélesebb sztereó-kép (a spatial effektek után)
+    parts.push('haas');
+  }
   if (fx.normalize) {
     parts.push('loudnorm=I=-16:TP=-1.5:LRA=11');
   }

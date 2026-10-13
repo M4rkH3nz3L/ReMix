@@ -89,6 +89,10 @@ function audioFxChain(fx) {
   if (fx.denoise) {
     parts.push('afftdn=nf=-25');
   }
+  if (fx.gate) {
+    // 🚪 zajkapu: a küszöb alatti halk részek (háttérzaj/szünetek) lehalkítása
+    parts.push('agate=threshold=0.05:ratio=9:attack=5:release=80:range=0.06');
+  }
   if (fx.deEsser) {
     parts.push('deesser');
   }

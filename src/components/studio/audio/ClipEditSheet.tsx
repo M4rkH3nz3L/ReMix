@@ -285,6 +285,7 @@ export function ClipEditSheet({
             <Slider label={t('panels.audio.fxEqHigh')} value={eq.high} min={-12} max={12} onChange={(v) => setEq({ high: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
 
             <ToggleRow icon="remove-circle-outline" label={t('panels.audio.fxDenoise')} value={!!fx.denoise} onValueChange={(v) => patchFx({ denoise: v })} />
+            <ToggleRow icon="power-outline" label={t('studio.audio.fxGate', { defaultValue: 'Zajkapu' })} value={!!fx.gate} onValueChange={(v) => patchFx({ gate: v })} />
             <ToggleRow icon="cut-outline" label={t('panels.audio.fxDeEsser')} value={!!fx.deEsser} onValueChange={(v) => patchFx({ deEsser: v })} />
             <ToggleRow icon="contract-outline" label={t('panels.audio.fxCompressor')} value={!!fx.compressor} onValueChange={(v) => patchFx({ compressor: v })} />
             <ToggleRow icon="alert-outline" label={t('panels.audio.fxLimiter')} value={!!fx.limiter} onValueChange={(v) => patchFx({ limiter: v })} />

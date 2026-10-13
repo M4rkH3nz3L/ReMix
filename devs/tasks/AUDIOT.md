@@ -9,6 +9,24 @@
 
 ---
 
+## 🧭 HALADÁS — hol tartunk (2026-10, mind ÉLŐ worker-renderrel bizonyítva)
+
+| § | Terület | Állapot |
+|---|---------|---------|
+| §1 | **Transport & idővonal** (undo/redo, loop, In/Out, beat-léptetés, zoom, snap, BPM, ütem-rács) | ✅ |
+| §2 | **Mixer** (sávonkénti fader + némít/szóló + **sidechain-DUCK**) | ✅ |
+| §3 | Klip-szerkesztés (klip-lap trim/fade/pan/EQ/FX) | ✅ *(idővonal-húzás/crossfade ⬜)* |
+| §4 | **Effektek** (teljes klip-FX + **zajkapu** + volume/pan-**automáció**) | ✅ *(track/bus-insert, send ⬜)* |
+| §5 | **Zenekészítés** (piano-roll **szintetizátor** + **dob-gép** + **pitch-shift** + **harmónia**) | ✅ *(auto-tune/skála 🟡, sampler ⬜)* |
+| §6 | Mixelés & mastering (Master-lánc EQ/LUFS/limiter + Analyze) | ✅ *(multiband/platform-preset/élő-meter ⬜)* |
+| §7 | Elemzés/stemek/AI | 🟡 *(Analyze ✅, stem 🔌, spektrum/AI ⬜)* |
+| §8 | UX-paritás a videó-editorral (panel-gazdagság, gyorsbillentyűk) | ⬜ |
+
+**Bizonyított kör-sorozat** (feat/studio-gaps ág): transport → mixer+sidechain → pan-automáció →
+szintetizátor → dob-gép → pitch-shift → harmónia → **zajkapu**. Minden tétel ÉLŐ worker-méréssel igazolva.
+
+---
+
 ## 0. 🔎 Rövid diagnózis (miért tűnik „üresnek")
 
 - A **transport-sor** (`AudioStudioBody` → `styles.transport`) **csak egy play/pause gomb + idő**. Se
@@ -56,8 +74,9 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [ ] 🟡 **Beat-re vágás/marker** — a `beatToCuts`/`beatToMarkers` kulcsok megvannak, UI-finomítás hátra.
 
 ## 4. 🎛️ Effektek & feldolgozás — ✅ NAGYRÉSZT KÉSZ
-- [x] ✅ **Teljes per-klip FX-lánc** (ClipEditSheet): highpass/lowpass · 3-sávos EQ · denoise · de-esser ·
-  kompresszor · limiter · normalize · reverb · delay — mind a worker `audioFxChain`-jével renderel.
+- [x] ✅ **Teljes per-klip FX-lánc** (ClipEditSheet): highpass/lowpass · 3-sávos EQ · denoise · **zajkapu (gate)** ·
+  de-esser · kompresszor · limiter · normalize · reverb · delay — mind a worker `audioFxChain`-jével renderel.
+  *A zajkapu ÉLŐ-BIZONYÍTVA: a halk szakasz −24 dB-lel lejjebb, a hangos érintetlen (worker-mérés).*
 - [x] ✅ **Hangerő-automáció** (KeyframeGraphEditor → `clip.keyframes.volume`) — a worker `eval=frame`-mel égeti be.
 - [x] ✅ **Pásztázás-automáció** (ÚJ): `clip.keyframes.pan` → a worker per-frame `aeval` sztereó-balanszként.
   *ÉLŐ-BIZONYÍTVA: L→R söprés → bal csatorna −8.4 dB, jobb +8.4 dB az idő haladtával (worker-mérés).*

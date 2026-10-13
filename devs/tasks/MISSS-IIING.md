@@ -79,7 +79,15 @@ A kóddal ellenőrizve az alábbiak **készek** (a markdown-only review tévesen
 - [ ] 🔌 **PSD-import** + **PSD-export** (PDF-export már kész) · toll v5 (P2 vektor-finomság).
 
 ## 7. 🎧 Audio Studio — maradék ([AUDIO-STUDIO-PROD](./AUDIO-STUDIO-PROD.md))
-- [ ] 🟡 **Album-UI + borító (kép-szerkesztővel) + lapozható album-share** (az [album] mag kész).
+- [x] ✅ **Több-számos album + borító + megosztás** — a hang-projekt TÖBB, külön szerkeszthető
+  SZÁMOT (`project.album.songs`, mindegyik teljes idővonal) + egy BORÍTÓT (ImageDoc a
+  `project.imageDocs`-ban, a kép-szerkesztővel) kezel. **AlbumSheet UI** (szám-lista: add/import/
+  vált/reorder/rename/törlés + borító pick/„szerkesztés a Kép Stúdióban"). A szám-váltás az
+  `APPLY_ALBUM` command snapshot+swap logikáján megy (az aktív szám a `project.tracks`-ban él →
+  az audio-editor változatlan); pure magok: `albumDoc.ts` (CRUD) + `albumShare.ts` (album-videó).
+  **Élő-verifikált**: borító + 2 szám (3s+2s) → 5.0s H.264+AAC MP4 (`buildAlbumVideoProject`→a meglévő
+  videó-render). A lapozható **audio-album-kártya** a feedben (per-szám lejátszóval) + a >10 perces
+  album-plafon feloldása a következő lépés (ma album-videó = egy videó-poszt).
 - [ ] 📱 **preview↔export DSP-parity** (per-klip fx + master élőben vagy proxy) — device-verify.
 - [x] ✅ **Bemeneti hang-robusztusság (pure)** — `audioIntake.ts` (`isSupportedAudio` formátum-kapu +
   `classifyAudioIntake` barátságos hiba/figyelmeztetés: nem-támogatott / ismeretlen-hossz / >3h), bekötve a

@@ -2623,6 +2623,7 @@
       "upsertImageDoc_other": "image document: {{name}} ({{count}} layers)",
       "removeImageDoc": "image document deleted",
       "reorderImageDocs": "Reorder pages ({{count}})",
+      "applyAlbum": "Album ({{count}} tracks)",
       "setLiveDoc": "live production updated ({{scenes}} scene(s))",
       "replaceTracks_one": "{{count}} track rebuilt",
       "replaceTracks_other": "{{count}} tracks rebuilt",

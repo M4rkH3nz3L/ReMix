@@ -4,6 +4,7 @@ import { relinkAsset } from '@/lib/assetResolve';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type {
+  AlbumDoc,
   AspectRatio,
   Asset,
   AudioMaster,
@@ -77,7 +78,15 @@ export type EditorCommand =
    * parancs teszi a `project.live`-ba — így a live-szerkesztés is undo-zható
    * (mint `UPSERT_IMAGE_DOC`), és élőben a data-channelre broadcastolható.
    */
-  | { type: 'SET_LIVE_DOC'; doc: LiveDoc; label?: string };
+  | { type: 'SET_LIVE_DOC'; doc: LiveDoc; label?: string }
+  /**
+   * 🎧💿 Album-dokumentum beírása (Hang Stúdió: több szám + borító). A manifeszt-CRUD pure
+   * (`albumDoc.ts`), az eredményt EZ a parancs teszi a `project.album`-ba — ÉS az idővonalat
+   * reconciliálja: a JELENLEGI `project.tracks`-ot az ELŐZŐ aktív számba menti, majd az ÚJ
+   * aktív szám sávjait tölti be. Így a szám-váltás/add/remove is egyetlen undo-lépés, és az
+   * audio-editor változatlanul a `project.tracks`-ot (= az aktív számot) szerkeszti.
+   */
+  | { type: 'APPLY_ALBUM'; album: AlbumDoc; label?: string };
 
 export type EventActor = 'user' | 'ai' | 'system' | 'remote';
 
@@ -313,6 +322,29 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, live: cmd.doc };
     }
 
+    case 'APPLY_ALBUM': {
+      const prev = project.album;
+      // 1) a JELENLEGI idővonalat elmentjük az ELŐZŐ aktív számba (ha az létezik az új listában)
+      let songs = cmd.album.songs;
+      if (prev && songs.some((s) => s.id === prev.activeSongId)) {
+        songs = songs.map((s) =>
+          s.id === prev.activeSongId ? { ...s, tracks: project.tracks, assets: project.assets } : s
+        );
+      }
+      const nextAlbum = { ...cmd.album, songs };
+      // 2) az ÚJ aktív szám sávjait töltjük a project.tracks-ba (ha van ilyen szám)
+      const active = songs.find((s) => s.id === nextAlbum.activeSongId);
+      const tracks = active ? active.tracks : project.tracks;
+      const assets = active ? active.assets : project.assets;
+      if (
+        JSON.stringify(project.album ?? null) === JSON.stringify(nextAlbum) &&
+        project.tracks === tracks
+      ) {
+        return null; // semmi nem változott
+      }
+      return { ...project, tracks, assets, album: nextAlbum };
+    }
+
     case 'SET_MARKERS': {
       const next = [...cmd.markers].sort((a, b) => a.time - b.time);
       const prev = project.markers ?? [];
@@ -506,6 +538,14 @@ export function describeCommand(cmd: EditorCommand): string {
         tr('lib.commands.setLiveDoc', {
           scenes: cmd.doc.scenes.length,
           defaultValue: `Live: ${cmd.doc.scenes.length} scene(s)`,
+        })
+      );
+    case 'APPLY_ALBUM':
+      return (
+        cmd.label ??
+        tr('lib.commands.applyAlbum', {
+          count: cmd.album.songs.length,
+          defaultValue: `Album (${cmd.album.songs.length} szám)`,
         })
       );
     case 'REPLACE_TRACKS':

@@ -1340,6 +1340,40 @@ export interface ImageDoc {
 }
 
 /**
+ * 🎧💿 Album-SZÁM (Hang Stúdió): egy önálló, teljes idővonallal bíró szám az albumban.
+ * A NEM-aktív számok idővonala ITT pihen (`tracks`/`assets`); az ÉPPEN szerkesztett szám
+ * idővonala a `project.tracks`-ban él (az `APPLY_ALBUM` command snapshot-olja/tölti be).
+ */
+export interface AlbumSong {
+  id: string;
+  name: string;
+  /** a szám sávjai (a nem-aktív számé; az aktívé a project.tracks-ban) */
+  tracks: Track[];
+  /** a szám által hivatkozott médiafájlok (a nem-aktív számé) */
+  assets: Asset[];
+  /** utolsó renderelt hossz mp (a megosztáshoz/albumlistához) */
+  durationSec?: number;
+  /** a szám renderelt hangja (helyi uri) — a megosztáskor ez megy az albumba */
+  renderedUri?: string;
+  /** a feltöltött publikus URL (feed/album-poszt) */
+  renderedUrl?: string;
+}
+
+/**
+ * 🎧💿 ALBUM-dokumentum (Hang Stúdió): a hang-projekt EGY album → több szám + egy BORÍTÓ.
+ * Additív/opcionális: album nélkül a hang-projekt a megszokott egy-idővonalas szám. Az
+ * `activeSongId` a `project.tracks`-ban élő szám; a borító egy `ImageDoc` a
+ * `project.imageDocs`-ban (a kép-szerkesztővel szerkeszthető → közös motor).
+ */
+export interface AlbumDoc {
+  songs: AlbumSong[];
+  /** az éppen szerkesztett szám id-ja (a project.tracks ezt tükrözi) */
+  activeSongId: string;
+  /** borító: egy ImageDoc id-ja a project.imageDocs-ban */
+  coverDocId?: string;
+}
+
+/**
  * 🔎 SEO / közzétételi meta — a felfedezéshez: a TikTok/Reels felirat + hashtag
  * és a YouTube cím/leírás/kulcsszavak. A projekt LÉTREHOZÁSAKOR kötelezően
  * kitöltött (lásd az „Új projekt” űrlapot a főképernyőn); a social `FeedPost`
@@ -1428,6 +1462,11 @@ export interface Project {
    * réteg-fa itt marad — ezért bármikor újraszerkeszthető.
    */
   imageDocs?: ImageDoc[];
+  /**
+   * 🎧💿 Album (Hang Stúdió): több szám + borító. Jelenléte → a projekt album-mód (a
+   * `project.tracks` az `album.activeSongId` számot tükrözi). Hiányzó = egy-idővonalas szám.
+   */
+  album?: AlbumDoc;
   /** 🎚️ projekt-szintű audio-master (hiányzó = nincs; opcionális/additív) */
   audioMaster?: AudioMaster;
   /** 🎚️ sávonkénti mixer-gain (fader, 0–1) — a music/voiceover/sfx sávokra; a

@@ -8,18 +8,23 @@ import {
 } from 'expo-audio';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SourceSheet } from '@/components/SourceSheet';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
+import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
 import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import { palette } from '@/constants/editor';
+import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
+import { buildAlbumVideoProject } from '@/lib/albumShare';
+import { publishRenderedProject } from '@/lib/feed';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
+import { exportAudioFile } from '@/lib/render';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -65,6 +70,8 @@ export function AudioStudioBody({
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
   const [source, setSource] = useState(false);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumSharing, setAlbumSharing] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -155,6 +162,51 @@ export function AudioStudioBody({
     setSource(false);
   };
 
+  /**
+   * 🎧💿➡️📲 Album megosztása a feedbe: a még nem renderelt (szerkesztőben épített) számokat
+   * a workeren renderelem (swap az adott számra → audio-export → renderedUri), majd a borító +
+   * a számok ALBUM-VIDEÓvá állnak össze (`buildAlbumVideoProject`) és a megszokott videó-úton
+   * posztolódnak. Az IMPORTÁLT számok már „renderelt"-ek (a fájl maga), így azonnal mennek.
+   */
+  const shareAlbum = async () => {
+    const store = useEditorStore.getState();
+    if (!store.project?.album || albumSharing) {
+      return;
+    }
+    setAlbumSharing(true);
+    try {
+      const album0 = store.project.album;
+      const originalActive = album0.activeSongId;
+      for (const s of album0.songs) {
+        if (s.renderedUri) {
+          continue;
+        }
+        // váltás a számra → a project.tracks ezt tükrözi → audio-render
+        store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, s.id) });
+        const p = useEditorStore.getState().project!;
+        const url = await exportAudioFile(p, 'aac');
+        store.dispatch({
+          type: 'APPLY_ALBUM',
+          album: setSongRender(useEditorStore.getState().project!.album!, s.id, url, projectDuration(p)),
+        });
+      }
+      // vissza az eredeti aktív számra
+      store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, originalActive) });
+
+      const albumProject = buildAlbumVideoProject(useEditorStore.getState().project!);
+      if (!albumProject) {
+        Alert.alert(t('common.error', { defaultValue: 'Hiba' }), t('studio.audio.album.needCover', { defaultValue: 'Az albumhoz borító és legalább egy renderelt szám kell.' }));
+        return;
+      }
+      await publishRenderedProject(albumProject, undefined, { visibility: 'public' });
+      Alert.alert(t('studio.audio.album.doneTitle', { defaultValue: 'Megosztva' }), t('studio.audio.album.doneBody', { defaultValue: 'Az album felkerült a feedbe.' }));
+    } catch (e) {
+      Alert.alert(t('common.error', { defaultValue: 'Hiba' }), (e as Error).message);
+    } finally {
+      setAlbumSharing(false);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
@@ -179,6 +231,24 @@ export function AudioStudioBody({
         >
           <Ionicons name="folder-open-outline" size={15} color={palette.textDim} />
         </Pressable>
+        {mode === 'project' ? (
+          <Pressable
+            onPress={() => setAlbumOpen(true)}
+            hitSlop={8}
+            style={styles.srcBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('studio.audio.album.title', { defaultValue: 'Album' })}
+          >
+            {albumSharing ? (
+              <ActivityIndicator size="small" color={palette.accent} />
+            ) : (
+              <>
+                <Ionicons name="albums-outline" size={15} color={project.album ? palette.accent : palette.textDim} />
+                {project.album ? <Text style={styles.albumCount}>{songCount(project.album)}</Text> : null}
+              </>
+            )}
+          </Pressable>
+        ) : null}
         {mode === 'scoped' ? (
           <Pressable onPress={onExit} hitSlop={10} style={styles.exportBtn}>
             <Ionicons name="checkmark" size={16} color="#fff" />
@@ -327,6 +397,7 @@ export function AudioStudioBody({
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
       {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
+      {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => void shareAlbum()} /> : null}
     </View>
   );
 }
@@ -358,6 +429,9 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   topBtn: { padding: 2 },
   srcBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 9,
@@ -365,6 +439,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: palette.surface,
   },
+  albumCount: { color: palette.accent, fontSize: 11, fontWeight: '800' },
   titleWrap: { flex: 1, gap: 2 },
   kindTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   kindTagText: { color: palette.accent, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },

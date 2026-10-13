@@ -2623,6 +2623,7 @@
       "upsertImageDoc_other": "kép-dokumentum: {{name}} ({{count}} réteg)",
       "removeImageDoc": "kép-dokumentum törölve",
       "reorderImageDocs": "Lapok átrendezése ({{count}})",
+      "applyAlbum": "Album ({{count}} szám)",
       "setLiveDoc": "élő produkció frissítve ({{scenes}} jelenet)",
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",

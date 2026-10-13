@@ -466,3 +466,54 @@ describe('applyCommand — REORDER_IMAGE_DOCS', () => {
     expect(describeCommand({ type: 'REORDER_IMAGE_DOCS', order: ['a', 'b'] })).toContain('2');
   });
 });
+
+describe('applyCommand — APPLY_ALBUM (szám-swap + történet)', () => {
+  const musicTrack = (clipId?: string): import('@/types/project').Track => ({
+    id: 'trk-music',
+    type: 'music',
+    name: 'Music',
+    clips: clipId ? [audioClip(clipId)] : [],
+  });
+  const song = (id: string, clipId?: string): import('@/types/project').AlbumSong => ({
+    id,
+    name: id,
+    tracks: [musicTrack(clipId)],
+    assets: [],
+  });
+
+  it('album inicializálás (prev nélkül): az aktív szám sávjai töltődnek', () => {
+    const p = makeProject();
+    const album = { songs: [song('s1', 'c1')], activeSongId: 's1' };
+    const next = expectChanged(p, applyCommand(p, { type: 'APPLY_ALBUM', album }));
+    expect(next.album!.activeSongId).toBe('s1');
+    expect(next.tracks.find((t) => t.type === 'music')!.clips.map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('szám-váltás: a JELENLEGI idővonal az ELŐZŐ aktívba mentődik, az ÚJ töltődik', () => {
+    // album 2 számmal, aktív = s1
+    let p = makeProject({ album: { songs: [song('s1'), song('s2', 'c2')], activeSongId: 's1' } });
+    // „élőben" szerkesztjük az s1-et: a project.tracks music-sávjára teszünk egy klipet
+    p = {
+      ...p,
+      tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [audioClip('live1')] } : t)),
+    };
+    // váltás s2-re
+    const album2 = { ...p.album!, activeSongId: 's2' };
+    const next = expectChanged(p, applyCommand(p, { type: 'APPLY_ALBUM', album: album2 }));
+    // a project.tracks most az s2 sávjait tükrözi
+    expect(next.tracks.find((t) => t.type === 'music')!.clips.map((c) => c.id)).toEqual(['c2']);
+    // s1 pedig megőrizte az élő szerkesztést
+    const s1 = next.album!.songs.find((s) => s.id === 's1')!;
+    expect(s1.tracks.find((t) => t.type === 'music')!.clips.map((c) => c.id)).toEqual(['live1']);
+  });
+
+  it('változatlan album + tracks → null (no-op)', () => {
+    const album = { songs: [song('s1', 'c1')], activeSongId: 's1' };
+    const p = makeProject({ album, tracks: [musicTrack('c1')] });
+    expect(applyCommand(p, { type: 'APPLY_ALBUM', album })).toBeNull();
+  });
+
+  it('describeCommand címke', () => {
+    expect(describeCommand({ type: 'APPLY_ALBUM', album: { songs: [song('a'), song('b')], activeSongId: 'a' } })).toContain('2');
+  });
+});

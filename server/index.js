@@ -647,7 +647,9 @@ app.post('/notify', express.json({ limit: '64kb' }), requireAuth, rateLimit('mes
 // invite + „meghívtak" értesítés. A névfeloldás (auth.users e-mail) miatt kell a
 // worker (a kliens az RLS-en nem lát más e-mailt). ⚠️ PROD: JWT + „ki hívhat meg"
 // jogosultság (csak a tulaj) mögé — lásd TODO.md Biztonság.
-app.post('/invite', express.json({ limit: '32kb' }), requireAuth, rateLimit('messaging'), (req, res) => {
+// 🤝 collab-meghívás: a MEGHÍVÓ (projekt-tulaj) min. Amatőr (TECH-TOP §4: „collab = Amatőr+").
+// A meghívott bárki lehet (a fizető gazda projektjéhez csatlakozik). INSECURE_DEV bypassol.
+app.post('/invite', express.json({ limit: '32kb' }), ...paidOnly, rateLimit('messaging'), (req, res) => {
   if (!notifyAvailable()) {
     res.status(503).json({ error: 'invite nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
     return;

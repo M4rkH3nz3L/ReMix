@@ -17,7 +17,8 @@
 | 3b | Free-vízjel — **videó/hang** | 🔗 **az Android on-device render-motorhoz KÖTÖTT** (lenn): a `/render` worker `paidOnly` → free nem éri el, a fizetős kimenet vízjel-mentes → a free videó/hang-vízjel **az eszközön-render-motor dolga**. A vízjel-MECHANIZMUST a kép már bizonyította (közös `shouldWatermark`). |
 | 4 | **Content-típus publish-célok** (`targetsForKind`: videó→TikTok/IG/YT/FB · kép→FB/Pinterest · hang→SoundCloud/Spotify) | ✅ **KÉSZ** (specek + teszt; az OAuth/feltöltés-wiring a fiókokhoz kötött) |
 | 5 | **Tartalom-tulajdon ToS** (anti-CapCut klauzula + vízjel-kivétel) | ✅ **KÉSZ** (legal.ts §3 + 6 teszt) |
-| 6+ | kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
+| 6 | **Collab-gate + owner=Admin + Céges-gate** (`collabAccess`: `canCollaborate`=Amatőr+ · `collabCan` owner=minden · `canManageCompany`=Céges) + szerver `/invite` → `paidOnly` | ✅ **KÉSZ** (collabAccess.test +6; /invite enforce) |
+| 7+ | kép-galéria · hang-album · cross-editor · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -115,9 +116,9 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 
 - **Ma:** RBAC + workspace + collaboration **magok készek** ([rbac]/workspace); az entitlement `rbac` + `team.seats` a Céges-en kész (SCOPES §5).
 - **Javítás:**
-  - 🟠 **Owner=Admin** mindig (a tartalom tulajdonosa teljes jog) + **barát-meghívás + jog-osztás** UI (projekt/live).
-  - 🟠 **Collab-gate**: a projekt-együttműködés **Amatőr+** entitlement mögött (`tierMeetsMin('basic')`).
-  - 🟠 **Céges-cégkezelés**: a Business user **szervezetet** hoz létre, **dolgozókat** ad hozzá, **szerepköröket/jogokat** oszt (RBAC-ra kötve).
+  - [x] ✅ **Owner=Admin** + **collab-gate** + **Céges-gate** MAG ([collabAccess.ts](../../src/lib/collabAccess.ts) + 6 teszt):
+    `collabCan('owner', *)` = minden jog · `canCollaborate` = Amatőr+ · `canManageCompany` = Céges. Szerver: `/invite` → `paidOnly`
+    (a meghívó min. Amatőr). *(Hátra: a barát-meghívás/jog-osztás UI + a Céges szervezet-modell [org + dolgozók] implementálása.)*
 
 ---
 

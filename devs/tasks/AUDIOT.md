@@ -132,7 +132,10 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [x] ✅ **Spektrogram-nézet** — a klip frekvencia-képe (showspectrumpic) a ClipEditSheet-ben, worker
   `/audio/spectrum` ([spectrum.js] 3 teszt + [audioSpectrum.ts] kliens). *ÉLŐ-BIZONYÍTVA: a feltöltött hangból
   valid PNG (1002×488, PNG-magic), HTTP 200 (worker-render).*
-- [ ] ⬜ **hangmagasság-detektálás** vizualizáció · **ütem-detektálás** jelölőkkel.
+- [x] ✅ **Tempó-/ütem-felismerés a Hang Stúdióban** — a transport „Auto" gombja a kiválasztott (vagy első)
+  hang-klip beat-rácsából (a MEGLÉVŐ `/beats` motor + `detectBeats`) felismeri a BPM-et → `SET_BPM` (a beat-rács
+  igazodik). *ÉLŐ-BIZONYÍTVA: 120 BPM-es click-track → a `/beats` 119.1 BPM-et detektál (worker-mérés).*
+- [ ] ⬜ **hangmagasság-detektálás** vizualizáció · beat-markerek az idővonalon.
 - [ ] ⬜ **AI-segéd** a hangra (dúdolás→dallam, „készíts dobsávot ehhez", zajszűrés/leválasztás).
 
 ## 8. 🧭 Munkafolyamat & UX-paritás a videó-editorral — ⬜

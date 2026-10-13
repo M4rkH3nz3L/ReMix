@@ -48,6 +48,7 @@ import { renderDrumsToClip } from '@/lib/drumsClient';
 import type { DrumHit } from '@/lib/drums';
 import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
+import { detectBeats } from '@/lib/beats';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -103,6 +104,7 @@ export function AudioStudioBody({
   const [drumBusy, setDrumBusy] = useState(false);
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
+  const [bpmBusy, setBpmBusy] = useState(false);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
@@ -179,6 +181,32 @@ export function AudioStudioBody({
 
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>
     useEditorStore.getState().toggleTrackFlag(type, flag);
+
+  // 🥁🔎 tempó auto-felismerés: a kiválasztott (vagy az első hang-) klip beat-rácsából (/beats) → BPM
+  const autoDetectBpm = async () => {
+    if (bpmBusy) {
+      return;
+    }
+    const firstAudio = project.tracks
+      .flatMap((tr) => tr.clips)
+      .find((c): c is AudioClip => c.kind === 'audio' && typeof (c as AudioClip).uri === 'string');
+    const uri = selClip?.uri ?? firstAudio?.uri ?? null;
+    if (!uri) {
+      Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmNoClip', { defaultValue: 'Nincs hang-klip az elemzéshez.' }));
+      return;
+    }
+    setBpmBusy(true);
+    try {
+      const grid = await detectBeats(uri);
+      if (grid && grid.bpm > 0) {
+        useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: Math.round(grid.bpm) });
+      } else {
+        Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült tempót felismerni (fut a render-worker?).' }));
+      }
+    } finally {
+      setBpmBusy(false);
+    }
+  };
 
   // 🎹 a piano-roll hangjegyei → worker /synth-render → sima hang-klip a music-sávon a playheadnél
   const bakeSynth = async (notes: SynthNote[], wave: SynthWave) => {
@@ -571,13 +599,19 @@ export function AudioStudioBody({
           <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead)}</Text>
         </View>
         <View style={styles.tSep} />
-        {/* BPM léptető */}
+        {/* BPM léptető + auto-felismerés (a kiválasztott/első hang-klipből) */}
         <TBtn icon="remove" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm - 1 })} />
         <View style={styles.bpmWrap}>
           <Text style={styles.bpmVal}>{bpm}</Text>
           <Text style={styles.bpmLabel}>BPM</Text>
         </View>
         <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} />
+        <TBtn
+          icon={bpmBusy ? undefined : 'sparkles-outline'}
+          label={bpmBusy ? '…' : 'Auto'}
+          active={bpmBusy}
+          onPress={() => void autoDetectBpm()}
+        />
         <View style={styles.tSep} />
         {/* zoom + snap */}
         <TBtn icon="remove-circle-outline" onPress={() => setZoomIndex(zoomOut(zoomIndex))} />

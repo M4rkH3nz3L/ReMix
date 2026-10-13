@@ -27,12 +27,14 @@ export function AddMediaSheet({
   onTts,
   onPianoRoll,
   onDrums,
+  onSampler,
 }: {
   track: TrackType;
   onClose: () => void;
   onTts?: () => void;
   onPianoRoll?: () => void;
   onDrums?: () => void;
+  onSampler?: () => void;
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<{ provider: StorageProvider; entry: StorageEntry }[] | null>(null);
@@ -177,6 +179,12 @@ export function AddMediaSheet({
             <Pressable onPress={onDrums} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
               <Ionicons name="grid-outline" size={18} color={palette.accent} />
               <Text style={styles.importText}>{t('studio.drums.entry', { defaultValue: 'Dob-gép (step-sequencer)' })}</Text>
+            </Pressable>
+          ) : null}
+          {onSampler ? (
+            <Pressable onPress={onSampler} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
+              <Ionicons name="color-filter-outline" size={18} color={palette.accent} />
+              <Text style={styles.importText}>{t('studio.sampler.entry', { defaultValue: 'Sampler (saját minta a rácsra)' })}</Text>
             </Pressable>
           ) : null}
 

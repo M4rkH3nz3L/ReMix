@@ -19,6 +19,7 @@ import { MasterSheet } from '@/components/studio/audio/MasterSheet';
 import { DrumMachineSheet } from '@/components/studio/audio/DrumMachineSheet';
 import { MixerSheet } from '@/components/studio/audio/MixerSheet';
 import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
+import { SamplerSheet } from '@/components/studio/audio/SamplerSheet';
 import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import { palette } from '@/constants/editor';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
@@ -45,6 +46,8 @@ import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import type { DrumHit } from '@/lib/drums';
+import { renderSamplerToClip } from '@/lib/samplerClient';
+import type { SamplerPattern } from '@/lib/sampler';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -98,6 +101,8 @@ export function AudioStudioBody({
   const [pianoBusy, setPianoBusy] = useState(false);
   const [drumMachine, setDrumMachine] = useState(false);
   const [drumBusy, setDrumBusy] = useState(false);
+  const [sampler, setSampler] = useState(false);
+  const [samplerBusy, setSamplerBusy] = useState(false);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
@@ -246,6 +251,43 @@ export function AudioStudioBody({
       setDrumMachine(false);
     } finally {
       setDrumBusy(false);
+    }
+  };
+
+  // 🎛️🔊 a sampler step-mintája (saját minta a rácson) → worker /sampler-render → klip a playheadnél
+  const bakeSampler = async (sampleUri: string, pattern: SamplerPattern, bars: number) => {
+    if (samplerBusy) {
+      return;
+    }
+    setSamplerBusy(true);
+    try {
+      const res = await renderSamplerToClip(sampleUri, pattern, { bpm, bars });
+      if (!res) {
+        Alert.alert(t('studio.sampler.title', { defaultValue: 'Sampler' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
+        return;
+      }
+      const start = snapToFrame(playhead, fps);
+      useEditorStore.getState().addClip(
+        'music',
+        {
+          kind: 'audio',
+          id: makeId('clip'),
+          start,
+          duration: res.durationSec,
+          trimIn: 0,
+          sourceDuration: res.durationSec,
+          uri: res.uri,
+          label: t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }),
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          source: 'imported',
+        },
+        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }), duration: res.durationSec }
+      );
+      setSampler(false);
+    } finally {
+      setSamplerBusy(false);
     }
   };
 
@@ -590,6 +632,10 @@ export function AudioStudioBody({
             setAdding(false);
             setDrumMachine(true);
           }}
+          onSampler={() => {
+            setAdding(false);
+            setSampler(true);
+          }}
         />
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
@@ -598,6 +644,9 @@ export function AudioStudioBody({
       ) : null}
       {drumMachine ? (
         <DrumMachineSheet bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars) => void bakeDrums(hits, bars)} />
+      ) : null}
+      {sampler ? (
+        <SamplerSheet bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)} />
       ) : null}
       {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => void shareAlbum()} /> : null}

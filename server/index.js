@@ -32,6 +32,7 @@ const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
 const { renderSynth } = require('./synth');
 const { renderDrums } = require('./drums');
+const { renderSampler } = require('./sampler');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
@@ -360,6 +361,44 @@ app.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, async (req, re
   res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
   try {
     const r = await renderSynth(notes, opts, out);
+    res.setHeader('X-Duration-Sec', String(r.durationSec));
+    res.sendFile(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 🎛️🔊 Sampler-render (AUDIOT §5): feltöltött minta (one-shot) a step-rács lépéseire. Multipart
+// (sample-fájl + steps/bpm/bars), szinkron audio-válasz. Worker-funkció → paidOnly (dev: INSECURE_DEV).
+app.post('/sampler', upload.any(), ...paidOnly, async (req, res) => {
+  const file = (req.files ?? [])[0];
+  if (!file) {
+    res.status(400).json({ error: 'Nincs minta-fájl.' });
+    return;
+  }
+  let steps = [];
+  try {
+    steps = JSON.parse(req.body?.steps ?? '[]');
+  } catch {
+    steps = [];
+  }
+  if (!Array.isArray(steps) || steps.length === 0) {
+    res.status(400).json({ error: 'Nincs lépés.' });
+    if (req.workDir) {
+      fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+    }
+    return;
+  }
+  const opts = { bpm: Number(req.body?.bpm) || 120, bars: Number(req.body?.bars) || 1 };
+  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
+  const out = path.join(req.workDir || os.tmpdir(), `sampler.${fmt}`);
+  res.on('finish', () => {
+    if (req.workDir) {
+      fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+    }
+  });
+  try {
+    const r = await renderSampler(file.path, steps, opts, out);
     res.setHeader('X-Duration-Sec', String(r.durationSec));
     res.sendFile(out);
   } catch (e) {

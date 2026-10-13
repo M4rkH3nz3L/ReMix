@@ -17,7 +17,7 @@
 | §2 | **Mixer** (sávonkénti fader + némít/szóló + **sidechain-DUCK**) | ✅ |
 | §3 | Klip-szerkesztés (klip-lap trim/fade/pan/EQ/FX) | ✅ *(idővonal-húzás/crossfade ⬜)* |
 | §4 | **Effektek** (teljes klip-FX + **zajkapu** + volume/pan-**automáció**) | ✅ *(track/bus-insert, send ⬜)* |
-| §5 | **Zenekészítés** (piano-roll **szintetizátor** + **dob-gép** + **pitch-shift** + **harmónia**) | ✅ *(auto-tune/skála 🟡, sampler ⬜)* |
+| §5 | **Zenekészítés** (piano-roll **szintetizátor** + **dob-gép** + **sampler** + **pitch-shift** + **harmónia**) | ✅ *(auto-tune/skála 🟡, loop-böngésző ⬜)* |
 | §6 | Mixelés & mastering (Master-lánc EQ/LUFS/limiter + Analyze + **platform-presetek**) | ✅ *(multiband/élő-meter ⬜)* |
 | §7 | Elemzés/stemek/AI | 🟡 *(Analyze ✅, stem 🔌, spektrum/AI ⬜)* |
 | §8 | UX-paritás a videó-editorral (panel-gazdagság, gyorsbillentyűk) | ⬜ |
@@ -98,7 +98,11 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
   minta-fájl-függés), 16-od rács × ütem, „Sávra" → worker `/drums` → klip (`drumsClient.ts`). A `drums.ts`
   pure mag (7 teszt) + `server/drums.js` (5 teszt). *ÉLŐ-BIZONYÍTVA: kick a beateken −7 dB vs közöttük −43 dB
   (36 dB), hihat a magas-sávban a lépésén (worker-mérés, bandpass+volumedetect); /drums HTTP 200.*
-- [ ] ⬜ **Sampler** (saját minta-feltöltés/one-shotok) + **loop/minta-böngésző** + több hangszer-preset.
+- [x] ✅ **Sampler** ([SamplerSheet]) — a user SAJÁT mintáját (one-shot) step-rácsra helyezi: minta-választás +
+  egysoros 16-od rács → worker `/sampler` (multipart: minta-fájl + lépések → `asplit`+`adelay`+`amix`) → klip
+  (`samplerClient.ts`). A `sampler.ts` pure (6 teszt) + `server/sampler.js` (4 teszt). *ÉLŐ-BIZONYÍTVA: a feltöltött
+  minta a 0/0.5/1/1.5s lépéseken −20.7 dB, közöttük −91 dB (csend); /sampler HTTP 200 (worker-mérés).*
+- [ ] ⬜ **loop/minta-böngésző** (beépített loop-könyvtár) + több hangszer-preset.
 - [x] ✅ **BPM/tempó + ütem-rács** — a transportban (§1) kész; metronóm-hang hátra.
 - [x] ✅ **Hangmagasság-eltolás (transzponálás)** — per-klip `audioFx.pitchSemitones` (−12…+12), a worker
   asetrate+aresample+atempo-val, **HOSSZ-tartó** (nem chipmunk); ClipEditSheet csúszka. *ÉLŐ-BIZONYÍTVA:

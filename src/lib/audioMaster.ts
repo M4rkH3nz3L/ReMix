@@ -14,15 +14,28 @@ export const AUDIO_MASTER_TARGETS: AudioMasterTarget[] = [
   'podcast',
   'music',
   'social',
+  // platform-célú presetek
+  'youtube',
+  'spotify',
+  'appleMusic',
+  'tiktok',
+  'club',
   'custom',
 ];
 
-/** target → alap LUFS / dBTP / dinamika (a 'custom' a videó-alapról indul). */
+/** target → alap LUFS / dBTP / dinamika (a 'custom' a videó-alapról indul).
+ *  A platform-presetek a hivatalos/ajánlott publikálási hangosság-szabványokat követik:
+ *  YouTube/Spotify/TikTok ≈ −14 LUFS, Apple Music ≈ −16, „club"/hangos master −9. */
 const PRESETS: Record<AudioMasterTarget, Omit<AudioMaster, 'target'>> = {
   video: { lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 0, mid: 0, high: 0 } },
   podcast: { lufs: -16, truePeak: -1.5, dynamics: 'natural', eq: { low: -1, mid: 1, high: 1 } },
   music: { lufs: -11, truePeak: -1, dynamics: 'punchy', eq: { low: 0, mid: 0, high: 0 }, multiband: true },
   social: { lufs: -14, truePeak: -1, dynamics: 'punchy', eq: { low: 1, mid: 0, high: 1 }, multiband: true },
+  youtube: { lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 0, mid: 0, high: 0 } },
+  spotify: { lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 0, mid: 0, high: 0 }, multiband: true },
+  appleMusic: { lufs: -16, truePeak: -1, dynamics: 'natural', eq: { low: 0, mid: 0, high: 0 } },
+  tiktok: { lufs: -14, truePeak: -1, dynamics: 'punchy', eq: { low: 1, mid: 0, high: 1 }, multiband: true },
+  club: { lufs: -9, truePeak: -1, dynamics: 'punchy', eq: { low: 1, mid: 0, high: 1 }, multiband: true },
   custom: { lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 0, mid: 0, high: 0 } },
 };
 

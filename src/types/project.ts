@@ -1422,7 +1422,18 @@ export interface RenderedVersion {
 }
 
 /** 🎚️ Projekt-szintű MASTER (AUDIO-MASTER): a teljes keverék hangosítása/plafonja. */
-export type AudioMasterTarget = 'video' | 'podcast' | 'music' | 'social' | 'custom';
+export type AudioMasterTarget =
+  | 'video'
+  | 'podcast'
+  | 'music'
+  | 'social'
+  // 🎯 platform-célú presetek (a publikálási hangosság-szabványokhoz)
+  | 'youtube'
+  | 'spotify'
+  | 'appleMusic'
+  | 'tiktok'
+  | 'club'
+  | 'custom';
 export type AudioMasterDynamics = 'natural' | 'balanced' | 'punchy';
 export interface AudioMaster {
   /** cél-preset (a többi mezőt ez tölti, kivéve 'custom') */

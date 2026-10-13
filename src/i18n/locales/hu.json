@@ -3125,7 +3125,7 @@
       "truePeak": "Csúcs (True Peak)",
       "apply": "Master alkalmazása",
       "turnOff": "Master kikapcsolása",
-      "target": { "video": "Videó", "podcast": "Podcast", "music": "Zene", "social": "Közösségi", "custom": "Egyéni" },
+      "target": { "video": "Videó", "podcast": "Podcast", "music": "Zene", "social": "Közösségi", "youtube": "YouTube", "spotify": "Spotify", "appleMusic": "Apple Music", "tiktok": "TikTok", "club": "Club", "custom": "Egyéni" },
       "dynamics": { "natural": "Természetes", "balanced": "Kiegyensúlyozott", "punchy": "Ütős" }
     }
   },

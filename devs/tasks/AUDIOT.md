@@ -18,7 +18,7 @@
 | §3 | Klip-szerkesztés (klip-lap trim/fade/pan/EQ/FX) | ✅ *(idővonal-húzás/crossfade ⬜)* |
 | §4 | **Effektek** (teljes klip-FX + **zajkapu** + volume/pan-**automáció**) | ✅ *(track/bus-insert, send ⬜)* |
 | §5 | **Zenekészítés** (piano-roll **szintetizátor** + **dob-gép** + **pitch-shift** + **harmónia**) | ✅ *(auto-tune/skála 🟡, sampler ⬜)* |
-| §6 | Mixelés & mastering (Master-lánc EQ/LUFS/limiter + Analyze) | ✅ *(multiband/platform-preset/élő-meter ⬜)* |
+| §6 | Mixelés & mastering (Master-lánc EQ/LUFS/limiter + Analyze + **platform-presetek**) | ✅ *(multiband/élő-meter ⬜)* |
 | §7 | Elemzés/stemek/AI | 🟡 *(Analyze ✅, stem 🔌, spektrum/AI ⬜)* |
 | §8 | UX-paritás a videó-editorral (panel-gazdagság, gyorsbillentyűk) | ⬜ |
 
@@ -109,12 +109,14 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [ ] 🟡 **Auto-tune (skálára-illesztés)** — a `pitch.ts` (pitchCorrectionPlan/snapMidiToScale) + a pitch-shift
   mag kész; hátra a hangmagasság-**detektálás** (worker-DSP) + a per-szegmens korrekció render-bekötése + UI.
 
-## 6. 🎚️ Mixelés & masterelés — 🟡 jó alap, mélység hiányzik
+## 6. 🎚️ Mixelés & masterelés — ✅ MÉLYÜLT (platform-presetek)
 - [x] ✅ **Master-lap**: master-hangerő + sávonkénti fader + master-lánc (EQ/loudnorm-**LUFS-cél**/true-peak limiter) +
   **Analyze** (LUFS/TP/LRA meter) — a [`audioMaster.ts`](../../src/lib/audioMaster.ts) + worker-render (loudnorm/alimiter).
+- [x] ✅ **Platform-célú mastering-presetek** — YouTube/Spotify/TikTok (−14) · Apple Music (−16) · Club (−9),
+  a publikálási hangosság-szabványokhoz; MasterSheet-chipek + i18n (hu/en/de). *ÉLŐ-BIZONYÍTVA: a renderelt
+  kimenet pontosan a cél-LUFS-re áll (Apple −16 → mért −16.02, Club −9 → −8.99; worker loudnorm-mérés).*
 - [ ] ⬜ **Multiband master per-sáv** finomhangolás (ma on/off; a worker `masterGraph` 3 sávot tud).
-- [ ] ⬜ **Referencia-A/B** (saját mix vs. referencia-track) · **dither** · platform-presetek (Spotify/YouTube/Apple célok).
-- [ ] ⬜ **Valós idejű master-meter** (a lejátszás alatt), nem csak offline Analyze.
+- [ ] ⬜ **Referencia-A/B** (saját mix vs. referencia-track) · **dither** · **valós idejű master-meter** (lejátszás alatt).
 
 ## 7. 🧪 Elemzés, stemek, AI — 🟡/🔌
 - [x] ✅ **Analyze** (LUFS/TP/LRA) a masterhez.

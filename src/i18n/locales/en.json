@@ -3125,7 +3125,7 @@
       "truePeak": "True peak",
       "apply": "Apply master",
       "turnOff": "Turn off master",
-      "target": { "video": "Video", "podcast": "Podcast", "music": "Music", "social": "Social", "custom": "Custom" },
+      "target": { "video": "Video", "podcast": "Podcast", "music": "Music", "social": "Social", "youtube": "YouTube", "spotify": "Spotify", "appleMusic": "Apple Music", "tiktok": "TikTok", "club": "Club", "custom": "Custom" },
       "dynamics": { "natural": "Natural", "balanced": "Balanced", "punchy": "Punchy" }
     }
   },

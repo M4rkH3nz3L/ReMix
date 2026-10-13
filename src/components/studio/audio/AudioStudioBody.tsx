@@ -17,6 +17,7 @@ import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
 import { MixerSheet } from '@/components/studio/audio/MixerSheet';
+import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
 import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import { palette } from '@/constants/editor';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
@@ -39,6 +40,8 @@ import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { exportAudioFile } from '@/lib/render';
+import { renderSynthToClip } from '@/lib/synthClient';
+import type { SynthNote, SynthWave } from '@/lib/synth';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -88,6 +91,8 @@ export function AudioStudioBody({
   const [mixerOpen, setMixerOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
+  const [pianoRoll, setPianoRoll] = useState(false);
+  const [pianoBusy, setPianoBusy] = useState(false);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
@@ -164,6 +169,43 @@ export function AudioStudioBody({
 
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>
     useEditorStore.getState().toggleTrackFlag(type, flag);
+
+  // 🎹 a piano-roll hangjegyei → worker /synth-render → sima hang-klip a music-sávon a playheadnél
+  const bakeSynth = async (notes: SynthNote[], wave: SynthWave) => {
+    if (pianoBusy) {
+      return;
+    }
+    setPianoBusy(true);
+    try {
+      const res = await renderSynthToClip(notes, { bpm, wave });
+      if (!res) {
+        Alert.alert(t('studio.pianoRoll.title', { defaultValue: 'Zeneszerzés' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
+        return;
+      }
+      const start = snapToFrame(playhead, fps);
+      useEditorStore.getState().addClip(
+        'music',
+        {
+          kind: 'audio',
+          id: makeId('clip'),
+          start,
+          duration: res.durationSec,
+          trimIn: 0,
+          sourceDuration: res.durationSec,
+          uri: res.uri,
+          label: t('studio.pianoRoll.clipLabel', { defaultValue: 'Zene' }),
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          source: 'imported',
+        },
+        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.pianoRoll.clipLabel', { defaultValue: 'Zene' }), duration: res.durationSec }
+      );
+      setPianoRoll(false);
+    } finally {
+      setPianoBusy(false);
+    }
+  };
 
   // 🗂️ forrás-mappából a sávra: a HANG-forrás klipként a 'music' sávon, a playheadnél
   const insertSource = (asset: Asset) => {
@@ -498,9 +540,16 @@ export function AudioStudioBody({
             setAdding(false);
             setTts(true);
           }}
+          onPianoRoll={() => {
+            setAdding(false);
+            setPianoRoll(true);
+          }}
         />
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
+      {pianoRoll ? (
+        <PianoRollSheet bpm={bpm} busy={pianoBusy} onClose={() => setPianoRoll(false)} onBake={(notes, wave) => void bakeSynth(notes, wave)} />
+      ) : null}
       {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => void shareAlbum()} /> : null}
     </View>

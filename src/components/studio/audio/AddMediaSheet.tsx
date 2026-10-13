@@ -25,10 +25,12 @@ export function AddMediaSheet({
   track,
   onClose,
   onTts,
+  onPianoRoll,
 }: {
   track: TrackType;
   onClose: () => void;
   onTts?: () => void;
+  onPianoRoll?: () => void;
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<{ provider: StorageProvider; entry: StorageEntry }[] | null>(null);
@@ -161,6 +163,12 @@ export function AddMediaSheet({
             <Pressable onPress={onTts} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
               <Ionicons name="sparkles-outline" size={18} color={palette.accent2} />
               <Text style={styles.importText}>{t('studio.audio.ttsTitle')}</Text>
+            </Pressable>
+          ) : null}
+          {onPianoRoll ? (
+            <Pressable onPress={onPianoRoll} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
+              <Ionicons name="musical-notes-outline" size={18} color={palette.accent} />
+              <Text style={styles.importText}>{t('studio.pianoRoll.entry', { defaultValue: 'Zeneszerzés (piano-roll)' })}</Text>
             </Pressable>
           ) : null}
 

@@ -65,16 +65,18 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [ ] ⬜ **Tempó-szinkron effektek** (delay/LFO a BPM-hez) · **track/bus-insert FX** (ma per-klip) ·
   **send-buszok** (a `mixer.ts` toRenderPlan magja kész, worker send-routing hátra).
 
-## 5. 🎹 Zenekészítés (DAW-mag) — ⬜ hiányzik (a legnagyobb rés)
-- [ ] ⬜ **Piano-roll + MIDI**: hangjegy-szerkesztő, MIDI import/export, kvantálás/swing (a `musicTime.quantize`
-  **kész**), velocity, hossz.
-- [ ] ⬜ **Virtuális hangszerek**: legalább 1 szintetizátor + **sampler/drum-rack** (one-shotok) + hangszer-preset.
-- [ ] ⬜ **Loop/minta-böngésző**: tempóhoz igazodó loopok, one-shotok, előre felvett sávok (a „zenekészítés" belépője).
-- [ ] 🟡 **BPM/tempó + ütem-rács + metronóm** — a [`musicTime.ts`](../../src/lib/musicTime.ts) (bars/beats,
-  tempo-map, quantize+swing, loop) **KÉSZ+tesztelt**; kell: UI (BPM-mező, rács, metronóm-hang).
-- [ ] 🟡 **Hangmagasság-javítás / auto-tune** — a [`pitch.ts`](../../src/lib/pitch.ts)
-  (pitchCorrectionPlan/harmonyLine/skála-snap) **KÉSZ+tesztelt, 0 UI**; kell: detektálás + render-bekötés + UI.
-- [ ] ⬜ **Hangszer-rögzítés** élő monitorozással (a mikrofon-felvétel megvan, a monitor/latency-komp nem).
+## 5. 🎹 Zenekészítés (DAW-mag) — ✅ ALAP SZINTETIZÁTOR + PIANO-ROLL KÉSZ (2026-10)
+- [x] ✅ **Piano-roll** ([PianoRollSheet]) — hangjegy-rács (hangmagasság-sorok × ütem-oszlopok), koppintás
+  add/törlés, hullámforma-választó (sine/square/triangle/saw), ütem-szám; a `synth.ts` pure mag (7 teszt).
+- [x] ✅ **Szintetizátor-render** — worker [`server/synth.js`] (MIDI→frekvencia, sine/sq/tri/saw + ADSR + amix +
+  limiter) a `/synth` endpointon; a piano-roll a kész hangot sima klipként teszi a music-sávra (`synthClient.ts`).
+  *ÉLŐ-BIZONYÍTVA: A4-hang → 440 Hz sáv 30 dB-lel dominál a 880 fölött; A4→A5 szekvencia → a 2. szakaszban a 880
+  dominál; a `/synth` endpoint HTTP 200 + 440 Hz. (worker-mérés, bandpass+volumedetect.)* `synth.test.js` 6 teszt.
+- [ ] ⬜ **MIDI import/export** · **kvantálás/swing UI** (a `musicTime.quantize` mag kész) · velocity-szerkesztés ·
+  **hangjegy-perzisztencia** (ma a piano-roll hanggá ég → a kotta nem szerkeszthető újra).
+- [ ] ⬜ **Sampler/drum-rack** (one-shotok) + **loop/minta-böngésző** + több hangszer-preset.
+- [x] ✅ **BPM/tempó + ütem-rács** — a transportban (§1) kész; metronóm-hang hátra.
+- [ ] 🟡 **Auto-tune** — a [`pitch.ts`](../../src/lib/pitch.ts) mag kész; detektálás + render-bekötés + UI hátra.
 
 ## 6. 🎚️ Mixelés & masterelés — 🟡 jó alap, mélység hiányzik
 - [x] ✅ **Master-lap**: master-hangerő + sávonkénti fader + master-lánc (EQ/loudnorm-**LUFS-cél**/true-peak limiter) +

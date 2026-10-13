@@ -30,6 +30,7 @@ const { composeThumbnail, pickThumbnails, scoreShots } = require('./thumbs');
 const { indexFrames, queryScores, visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
+const { renderSynth } = require('./synth');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
@@ -342,6 +343,29 @@ app.get('/health/routes', authenticated(), (_req, res) => {
 // Éles bekapcsolás előtt eldobható fiókkal verifikálandó.
 const ALLOW_ERASE = process.env.ALLOW_ACCOUNT_ERASE === '1';
 const ERASE_BUCKET = process.env.MEDIA_BUCKET || 'renders';
+// 🎹 Szintetizátor-render (AUDIOT §5): hangjegyek (MIDI) → generált hang. Szinkron, a kész
+// audio-fájlt közvetlenül visszaadja (mint az /imagedoc a PNG-t). Worker-funkció → paidOnly
+// (Amatőr+; dev-ben INSECURE_DEV átengedi). A hangmagasság = midiToFreq(midi) a server/synth.js-ben.
+app.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, async (req, res) => {
+  const notes = Array.isArray(req.body?.notes) ? req.body.notes : [];
+  if (notes.length === 0) {
+    res.status(400).json({ error: 'Nincs hangjegy.' });
+    return;
+  }
+  const opts = { bpm: Number(req.body?.bpm) || 120, wave: req.body?.wave };
+  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-synth-'));
+  const out = path.join(dir, `synth.${fmt}`);
+  res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
+  try {
+    const r = await renderSynth(notes, opts, out);
+    res.setHeader('X-Duration-Sec', String(r.durationSec));
+    res.sendFile(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async (req, res) => {
   if (!ALLOW_ERASE) {
     res.status(403).json({ error: 'A végleges törlés ki van kapcsolva (ALLOW_ACCOUNT_ERASE=1 kell).' });

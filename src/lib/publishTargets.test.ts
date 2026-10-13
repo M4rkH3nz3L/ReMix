@@ -5,6 +5,7 @@ import {
   adaptForPlatform,
   normalizeHashtag,
   normalizeHashtags,
+  targetsForKind,
 } from '@/lib/publishTargets';
 
 describe('normalizeHashtag', () => {
@@ -93,6 +94,29 @@ describe('adaptAll', () => {
   it('minden platformra ad variánst', () => {
     const out = adaptAll({ title: 'T', description: 'D', hashtags: ['#a'] });
     expect(out.map((v) => v.platform)).toEqual(PUBLISH_PLATFORMS);
-    expect(out.every((v) => v.description.includes('#a'))).toBe(true);
+    // a hashtag csak ott kerül a leírásba, ahol a platform ezt teszi (SoundCloud/Spotify nem)
+    expect(
+      out.filter((v) => PLATFORM_SPECS[v.platform].hashtagsInDescription).every((v) => v.description.includes('#a'))
+    ).toBe(true);
+  });
+});
+
+describe('targetsForKind — content-típus → platformok (TECH-TOP §3)', () => {
+  it('videó → TikTok/Instagram/YouTube/Facebook', () => {
+    expect(targetsForKind('video').sort()).toEqual(['facebook', 'instagram', 'tiktok', 'youtube']);
+  });
+  it('kép → Facebook + Pinterest', () => {
+    expect(targetsForKind('image').sort()).toEqual(['facebook', 'pinterest']);
+  });
+  it('hang → SoundCloud + Spotify', () => {
+    expect(targetsForKind('audio').sort()).toEqual(['soundcloud', 'spotify']);
+  });
+  it('minden platform legalább egy típushoz tartozik', () => {
+    for (const id of PUBLISH_PLATFORMS) {
+      expect(PLATFORM_SPECS[id].kinds.length).toBeGreaterThan(0);
+    }
+  });
+  it('a Spotify figyelmezteti a disztribútor-igényt', () => {
+    expect(PLATFORM_SPECS.spotify.note).toMatch(/disztribútor/i);
   });
 });

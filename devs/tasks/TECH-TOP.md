@@ -14,9 +14,9 @@
 | 1 | **Routing-magok** (`shouldWatermark`/`canCloudRender`/`canCloudStore`) kliens+szerver, unit + **contract-lock** | ✅ **KÉSZ** (40 teszt) |
 | 2 | **Szerver render-routing enforce**: `/render` → `paidOnly` (**min Amatőr**, free→402 „eszközön"); + **`isPro` bug-fix** (eddig a Profi/Céges usert is elutasította!) + `server/tiers.js` mirror + contract | ✅ **KÉSZ** (audit 177/1915) |
 | 3a | **Free-vízjel — KÉP** (`/imagedoc`, **szerver-hiteles** tier; a kliens nem kapcsolhatja ki) | ✅ **KÉSZ** — élő-verifikált (free→„Made with ReMix", pro→nincs) |
-| 3b | Free-vízjel — **videó** (render.js lánc) + **hang** (audio-export) + **on-device** vízjel a free-render-motorban | 🔄 következő |
-| 4 | Content-típus publish-célok (Pinterest/SoundCloud/Spotify) | ⬜ |
-| 5+ | tulajdon-ToS · kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** | ⬜ |
+| 3b | Free-vízjel — **videó/hang** | 🔗 **az Android on-device render-motorhoz KÖTÖTT** (lenn): a `/render` worker `paidOnly` → free nem éri el, a fizetős kimenet vízjel-mentes → a free videó/hang-vízjel **az eszközön-render-motor dolga**. A vízjel-MECHANIZMUST a kép már bizonyította (közös `shouldWatermark`). |
+| 4 | **Content-típus publish-célok** (`targetsForKind`: videó→TikTok/IG/YT/FB · kép→FB/Pinterest · hang→SoundCloud/Spotify) | ✅ **KÉSZ** (specek + teszt; az OAuth/feltöltés-wiring a fiókokhoz kötött) |
+| 5+ | tulajdon-ToS · kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -89,11 +89,14 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 
 > **Szabály:** a user a tartalom-típustól függően a **megfelelő platformra** oszt meg.
 
-| Típus | Cél-platformok (szabály) | Ma |
-|-------|--------------------------|----|
-| **Videó** | YouTube, TikTok, Reels, Facebook (+ amit lehet) | 🟡 van (tiktok/instagram/youtube/facebook) |
-| **Kép** | Facebook, **Pinterest** (+) | 🔴 **hiányzik** |
-| **Hang** | **SoundCloud, Spotify** (+) | 🔴 **hiányzik** |
+| Típus | Cél-platformok (szabály) | Állapot |
+|-------|--------------------------|---------|
+| **Videó** | YouTube, TikTok, Reels, Facebook | ✅ `targetsForKind('video')` |
+| **Kép** | Facebook, **Pinterest** | ✅ `targetsForKind('image')` |
+| **Hang** | **SoundCloud, Spotify** | ✅ `targetsForKind('audio')` (Spotify: disztribútor-note) |
+
+> ✅ **Specek + kiválasztás kész** ([publishTargets.ts](../../src/lib/publishTargets.ts) `PublishPlatform`+`kinds`+`targetsForKind`, tesztelt).
+> Hátra: az **OAuth + feltöltés-wiring** platformonként (fiók-függő, külön kör).
 
 - **Ma:** [publishTargets.ts](../../src/lib/publishTargets.ts) `PublishPlatform = tiktok|instagram|youtube|facebook` — **csak videó**, nem content-type-aware.
 - **Javítás:**

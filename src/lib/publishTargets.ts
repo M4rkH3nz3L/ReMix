@@ -11,23 +11,37 @@
  * tesztelt előkészítő, amit a preview-UI és a worker-publisher is használ.
  */
 
-export type PublishPlatform = 'tiktok' | 'instagram' | 'youtube' | 'facebook';
+export type PublishPlatform =
+  | 'tiktok'
+  | 'instagram'
+  | 'youtube'
+  | 'facebook'
+  | 'pinterest'
+  | 'soundcloud'
+  | 'spotify';
+
+/** A megosztható tartalom-típus (TECH-TOP §3: a user a TÍPUSNAK megfelelő platformra oszt). */
+export type PublishKind = 'video' | 'image' | 'audio';
 
 export interface PlatformSpec {
   id: PublishPlatform;
   label: string;
+  /** mely tartalom-típus(ok)hoz való ez a platform (video/image/audio) */
+  kinds: PublishKind[];
   /** külön CÍM-mező max hossza (0 = nincs külön cím → a caption/leírás viszi) */
   maxTitle: number;
   /** a leírás/caption max hossza */
   maxDescription: number;
   /** a HATÉKONY hashtagek max száma (fölötte a platform figyelmen kívül hagyhatja) */
   maxHashtags: number;
-  /** ajánlott képarány (short-form) */
+  /** ajánlott képarány (short-form / poszt / borító) */
   preferredAspect: string;
-  /** short-form max hossz másodpercben (fölötte más felületre/feldolgozásra kerül) */
+  /** short-form max hossz másodpercben (0 = nem short-video platform) */
   maxDurationSec: number;
   /** a hashtagek a leírásba fűződnek-e */
   hashtagsInDescription: boolean;
+  /** opcionális feltöltési figyelmeztetés (pl. Spotify = disztribútor kell) */
+  note?: string;
 }
 
 /**
@@ -38,6 +52,7 @@ export const PLATFORM_SPECS: Record<PublishPlatform, PlatformSpec> = {
   tiktok: {
     id: 'tiktok',
     label: 'TikTok',
+    kinds: ['video'],
     maxTitle: 0,
     maxDescription: 2200,
     maxHashtags: 30,
@@ -48,6 +63,7 @@ export const PLATFORM_SPECS: Record<PublishPlatform, PlatformSpec> = {
   instagram: {
     id: 'instagram',
     label: 'Instagram Reels',
+    kinds: ['video'],
     maxTitle: 0,
     maxDescription: 2200,
     maxHashtags: 30,
@@ -58,6 +74,7 @@ export const PLATFORM_SPECS: Record<PublishPlatform, PlatformSpec> = {
   youtube: {
     id: 'youtube',
     label: 'YouTube Shorts',
+    kinds: ['video'],
     maxTitle: 100,
     maxDescription: 5000,
     maxHashtags: 15,
@@ -67,7 +84,8 @@ export const PLATFORM_SPECS: Record<PublishPlatform, PlatformSpec> = {
   },
   facebook: {
     id: 'facebook',
-    label: 'Facebook Reels',
+    label: 'Facebook',
+    kinds: ['video', 'image'], // Reels (videó) + kép-poszt
     maxTitle: 0,
     maxDescription: 2200,
     maxHashtags: 30,
@@ -75,7 +93,53 @@ export const PLATFORM_SPECS: Record<PublishPlatform, PlatformSpec> = {
     maxDurationSec: 90,
     hashtagsInDescription: true,
   },
+  // ── 🖼️ KÉP ─────────────────────────────────────────────────────────────────
+  pinterest: {
+    id: 'pinterest',
+    label: 'Pinterest',
+    kinds: ['image'],
+    maxTitle: 100,
+    maxDescription: 500,
+    maxHashtags: 20,
+    preferredAspect: '2:3', // Pinterest ajánlott pin-arány
+    maxDurationSec: 0, // kép-platform
+    hashtagsInDescription: true,
+  },
+  // ── 🎧 HANG ────────────────────────────────────────────────────────────────
+  soundcloud: {
+    id: 'soundcloud',
+    label: 'SoundCloud',
+    kinds: ['audio'],
+    maxTitle: 100,
+    maxDescription: 4000,
+    maxHashtags: 30, // tag-ek
+    preferredAspect: '1:1', // borító
+    maxDurationSec: 0, // nincs short-form plafon
+    hashtagsInDescription: false,
+  },
+  spotify: {
+    id: 'spotify',
+    label: 'Spotify',
+    kinds: ['audio'],
+    maxTitle: 100,
+    maxDescription: 1500,
+    maxHashtags: 0,
+    preferredAspect: '1:1', // borító
+    maxDurationSec: 0,
+    hashtagsInDescription: false,
+    note: 'A Spotify közvetlen feltöltést nem enged — disztribútor (pl. DistroKid/TuneCore) szükséges.',
+  },
 };
+
+/**
+ * A tartalom-TÍPUSHOZ tartozó publish-platformok (TECH-TOP §3): videó → TikTok/Reels/
+ * YouTube/Facebook; kép → Facebook/Pinterest; hang → SoundCloud/Spotify.
+ */
+export function targetsForKind(kind: PublishKind): PublishPlatform[] {
+  return (Object.values(PLATFORM_SPECS) as PlatformSpec[])
+    .filter((s) => s.kinds.includes(kind))
+    .map((s) => s.id);
+}
 
 export const PUBLISH_PLATFORMS = Object.keys(PLATFORM_SPECS) as PublishPlatform[];
 

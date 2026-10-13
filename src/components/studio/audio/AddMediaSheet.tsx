@@ -26,11 +26,13 @@ export function AddMediaSheet({
   onClose,
   onTts,
   onPianoRoll,
+  onDrums,
 }: {
   track: TrackType;
   onClose: () => void;
   onTts?: () => void;
   onPianoRoll?: () => void;
+  onDrums?: () => void;
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<{ provider: StorageProvider; entry: StorageEntry }[] | null>(null);
@@ -169,6 +171,12 @@ export function AddMediaSheet({
             <Pressable onPress={onPianoRoll} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
               <Ionicons name="musical-notes-outline" size={18} color={palette.accent} />
               <Text style={styles.importText}>{t('studio.pianoRoll.entry', { defaultValue: 'Zeneszerzés (piano-roll)' })}</Text>
+            </Pressable>
+          ) : null}
+          {onDrums ? (
+            <Pressable onPress={onDrums} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
+              <Ionicons name="grid-outline" size={18} color={palette.accent} />
+              <Text style={styles.importText}>{t('studio.drums.entry', { defaultValue: 'Dob-gép (step-sequencer)' })}</Text>
             </Pressable>
           ) : null}
 

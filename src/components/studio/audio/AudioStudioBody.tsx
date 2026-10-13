@@ -16,6 +16,7 @@ import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
+import { DrumMachineSheet } from '@/components/studio/audio/DrumMachineSheet';
 import { MixerSheet } from '@/components/studio/audio/MixerSheet';
 import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
 import { TtsSheet } from '@/components/studio/audio/TtsSheet';
@@ -42,6 +43,8 @@ import { projectDuration } from '@/lib/projectUtils';
 import { exportAudioFile } from '@/lib/render';
 import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
+import { renderDrumsToClip } from '@/lib/drumsClient';
+import type { DrumHit } from '@/lib/drums';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -93,6 +96,8 @@ export function AudioStudioBody({
   const [tts, setTts] = useState(false);
   const [pianoRoll, setPianoRoll] = useState(false);
   const [pianoBusy, setPianoBusy] = useState(false);
+  const [drumMachine, setDrumMachine] = useState(false);
+  const [drumBusy, setDrumBusy] = useState(false);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
@@ -204,6 +209,43 @@ export function AudioStudioBody({
       setPianoRoll(false);
     } finally {
       setPianoBusy(false);
+    }
+  };
+
+  // 🥁 a dob-minta ütései → worker /drums-render → sima hang-klip a music-sávon a playheadnél
+  const bakeDrums = async (hits: DrumHit[], bars: number) => {
+    if (drumBusy) {
+      return;
+    }
+    setDrumBusy(true);
+    try {
+      const res = await renderDrumsToClip(hits, { bpm, bars });
+      if (!res) {
+        Alert.alert(t('studio.drums.title', { defaultValue: 'Dob-gép' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
+        return;
+      }
+      const start = snapToFrame(playhead, fps);
+      useEditorStore.getState().addClip(
+        'music',
+        {
+          kind: 'audio',
+          id: makeId('clip'),
+          start,
+          duration: res.durationSec,
+          trimIn: 0,
+          sourceDuration: res.durationSec,
+          uri: res.uri,
+          label: t('studio.drums.clipLabel', { defaultValue: 'Dob' }),
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          source: 'imported',
+        },
+        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.drums.clipLabel', { defaultValue: 'Dob' }), duration: res.durationSec }
+      );
+      setDrumMachine(false);
+    } finally {
+      setDrumBusy(false);
     }
   };
 
@@ -544,11 +586,18 @@ export function AudioStudioBody({
             setAdding(false);
             setPianoRoll(true);
           }}
+          onDrums={() => {
+            setAdding(false);
+            setDrumMachine(true);
+          }}
         />
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
       {pianoRoll ? (
         <PianoRollSheet bpm={bpm} busy={pianoBusy} onClose={() => setPianoRoll(false)} onBake={(notes, wave) => void bakeSynth(notes, wave)} />
+      ) : null}
+      {drumMachine ? (
+        <DrumMachineSheet bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars) => void bakeDrums(hits, bars)} />
       ) : null}
       {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => void shareAlbum()} /> : null}

@@ -74,7 +74,11 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
   dominál; a `/synth` endpoint HTTP 200 + 440 Hz. (worker-mérés, bandpass+volumedetect.)* `synth.test.js` 6 teszt.
 - [ ] ⬜ **MIDI import/export** · **kvantálás/swing UI** (a `musicTime.quantize` mag kész) · velocity-szerkesztés ·
   **hangjegy-perzisztencia** (ma a piano-roll hanggá ég → a kotta nem szerkeszthető újra).
-- [ ] ⬜ **Sampler/drum-rack** (one-shotok) + **loop/minta-böngésző** + több hangszer-preset.
+- [x] ✅ **Dob-gép / step-sequencer** ([DrumMachineSheet]) — kick/snare/hihat/clap **szintetizálva** (nincs
+  minta-fájl-függés), 16-od rács × ütem, „Sávra" → worker `/drums` → klip (`drumsClient.ts`). A `drums.ts`
+  pure mag (7 teszt) + `server/drums.js` (5 teszt). *ÉLŐ-BIZONYÍTVA: kick a beateken −7 dB vs közöttük −43 dB
+  (36 dB), hihat a magas-sávban a lépésén (worker-mérés, bandpass+volumedetect); /drums HTTP 200.*
+- [ ] ⬜ **Sampler** (saját minta-feltöltés/one-shotok) + **loop/minta-böngésző** + több hangszer-preset.
 - [x] ✅ **BPM/tempó + ütem-rács** — a transportban (§1) kész; metronóm-hang hátra.
 - [ ] 🟡 **Auto-tune** — a [`pitch.ts`](../../src/lib/pitch.ts) mag kész; detektálás + render-bekötés + UI hátra.
 

@@ -31,6 +31,7 @@ const { indexFrames, queryScores, visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
 const { renderSynth } = require('./synth');
+const { renderDrums } = require('./drums');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
@@ -359,6 +360,28 @@ app.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, async (req, re
   res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
   try {
     const r = await renderSynth(notes, opts, out);
+    res.setHeader('X-Duration-Sec', String(r.durationSec));
+    res.sendFile(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 🥁 Dob-gép-render (AUDIOT §5): ütések (voice+step) → szintetizált dob-minta. Szinkron,
+// a kész audiót közvetlenül visszaadja. Worker-funkció → paidOnly (dev-ben INSECURE_DEV átengedi).
+app.post('/drums', express.json({ limit: '512kb' }), ...paidOnly, async (req, res) => {
+  const hits = Array.isArray(req.body?.hits) ? req.body.hits : [];
+  if (hits.length === 0) {
+    res.status(400).json({ error: 'Nincs dob-ütés.' });
+    return;
+  }
+  const opts = { bpm: Number(req.body?.bpm) || 120, bars: Number(req.body?.bars) || 1 };
+  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-drums-'));
+  const out = path.join(dir, `drums.${fmt}`);
+  res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
+  try {
+    const r = await renderDrums(hits, opts, out);
     res.setHeader('X-Duration-Sec', String(r.durationSec));
     res.sendFile(out);
   } catch (e) {

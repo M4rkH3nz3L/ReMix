@@ -19,7 +19,8 @@
 | 5 | **Tartalom-tulajdon ToS** (anti-CapCut klauzula + vízjel-kivétel) | ✅ **KÉSZ** (legal.ts §3 + 6 teszt) |
 | 6 | **Collab-gate + owner=Admin + Céges-gate** (`collabAccess`: `canCollaborate`=Amatőr+ · `collabCan` owner=minden · `canManageCompany`=Céges) + szerver `/invite` → `paidOnly` | ✅ **KÉSZ** (collabAccess.test +6; /invite enforce) |
 | 7 | **Tárhely-védelem + coin-recurring** (`storageProtection`: `storageDowngradeBlocked` · `requiredBonusGB` · `coinToKeepContent` · `checkDowngrade`) — adatvesztés ellen | ✅ **KÉSZ** (storageProtection.test +5) |
-| 8+ | kép-galéria · hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) · coin→recurring UI/billing-bekötés | ⬜ |
+| 8 | **Kép-galéria → diavetítés MAG** (`slideshow`: `slideshowPlan` [ImageClip-ek] · `slideshowDurationSec`/`FitsMax`/`clampPerSlideForMax` · `backgroundMusicClip`) — a `project.imageDocs[]`-re | ✅ **KÉSZ** (slideshow.test +8; a 10 perc-plafon érvényes) |
+| 9+ | hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ free videó/hang-vízjel) · a galéria/album **UI+render-bekötés** · coin→recurring UI/billing | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -65,12 +66,12 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 
 ### 2.2 🖼️ Kép — teljes GALÉRIA (nem egy-doc)
 - **Szabály:** a user **teljes galériát** hoz létre, a hírfolyamba megosztható (mint a videó), **zenei illusztrációval + diavetítés-funkcióval**.
-- **Ma:** az image-stúdió **egy `ImageDoc`** (egy vászon) — nincs több-képes galéria/album, se diavetítés, se háttérzene.
+- **Ma:** a `project.imageDocs: ImageDoc[]` **már több képet tart** (adat-modell adott); a diavetítés-MAG kész.
 - **Javítás:**
-  - 🟠 **Galéria-projekt**: több `ImageDoc`/kép egy projektben (rendezhető lista).
-  - 🟠 **Diavetítés-mód**: a galériából időzített slideshow (áttűnés/időzítés) → megosztható videó-szerű poszt.
-  - 🟠 **Háttérzene** a diavetítéshez (a hang-mag újrahasználásával).
-  - 🟠 **Feed-megosztás**: a galéria **lapozható** posztként (mint a remix-pager).
+  - [x] ✅ **Diavetítés-mag** ([slideshow.ts](../../src/lib/slideshow.ts) + 8 teszt): `slideshowPlan` → időzített `ImageClip[]`
+    (perSlide + `transitionOut` átmenet) · `backgroundMusicClip` (zenei illusztráció) · `slideshowDurationSec`/`FitsMax`/
+    `clampPerSlideForMax` (a **10 perc-plafon** a diavetítésre is érvényes, auto-fit).
+  - [ ] 🟠 **UI + render-bekötés**: a galéria-kezelő (rendezhető képek) + a diavetítés-terv videó-render + a **lapozható feed-poszt** (remix-pager-minta).
 
 ### 2.3 🎧 Hang — teljes ALBUM + borító
 - **Szabály:** a user **teljes albumokat** hoz létre + **borítót** ad hozzá; a projekt a share-be a **TELJES albumot** osztja meg.

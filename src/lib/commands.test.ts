@@ -517,3 +517,16 @@ describe('applyCommand — APPLY_ALBUM (szám-swap + történet)', () => {
     expect(describeCommand({ type: 'APPLY_ALBUM', album: { songs: [song('a'), song('b')], activeSongId: 'a' } })).toContain('2');
   });
 });
+
+describe('applyCommand — SET_BPM', () => {
+  it('beállít + 20–300 közé szorít', () => {
+    const p = makeProject();
+    expect(expectChanged(p, applyCommand(p, { type: 'SET_BPM', bpm: 90 })).bpm).toBe(90);
+    expect(expectChanged(p, applyCommand(p, { type: 'SET_BPM', bpm: 5 })).bpm).toBe(20);
+    expect(expectChanged(p, applyCommand(p, { type: 'SET_BPM', bpm: 999 })).bpm).toBe(300);
+  });
+  it('változatlan → null', () => {
+    const p = makeProject({ bpm: 120 });
+    expect(applyCommand(p, { type: 'SET_BPM', bpm: 120 })).toBeNull();
+  });
+});

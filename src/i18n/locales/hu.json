@@ -2624,6 +2624,7 @@
       "removeImageDoc": "kép-dokumentum törölve",
       "reorderImageDocs": "Lapok átrendezése ({{count}})",
       "applyAlbum": "Album ({{count}} szám)",
+      "setBpm": "BPM: {{bpm}}",
       "setLiveDoc": "élő produkció frissítve ({{scenes}} jelenet)",
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",

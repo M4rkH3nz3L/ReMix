@@ -79,6 +79,8 @@ export type EditorCommand =
    * (mint `UPSERT_IMAGE_DOC`), és élőben a data-channelre broadcastolható.
    */
   | { type: 'SET_LIVE_DOC'; doc: LiveDoc; label?: string }
+  /** 🎵 Projekt-tempó (BPM) a Hang Stúdió ütem-rácsához/snap-jéhez. 20–300 közé szorítva. */
+  | { type: 'SET_BPM'; bpm: number }
   /**
    * 🎧💿 Album-dokumentum beírása (Hang Stúdió: több szám + borító). A manifeszt-CRUD pure
    * (`albumDoc.ts`), az eredményt EZ a parancs teszi a `project.album`-ba — ÉS az idővonalat
@@ -322,6 +324,14 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, live: cmd.doc };
     }
 
+    case 'SET_BPM': {
+      const bpm = Math.max(20, Math.min(300, Math.round(cmd.bpm)));
+      if ((project.bpm ?? 120) === bpm) {
+        return null;
+      }
+      return { ...project, bpm };
+    }
+
     case 'APPLY_ALBUM': {
       const prev = project.album;
       // 1) a JELENLEGI idővonalat elmentjük az ELŐZŐ aktív számba (ha az létezik az új listában)
@@ -540,6 +550,8 @@ export function describeCommand(cmd: EditorCommand): string {
           defaultValue: `Live: ${cmd.doc.scenes.length} scene(s)`,
         })
       );
+    case 'SET_BPM':
+      return tr('lib.commands.setBpm', { bpm: cmd.bpm, defaultValue: `BPM: ${cmd.bpm}` });
     case 'APPLY_ALBUM':
       return (
         cmd.label ??

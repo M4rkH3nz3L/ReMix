@@ -1435,6 +1435,9 @@ export interface Project {
   /** 🎞️ szerkesztési frame-ráta (timebase): a vágások/kulcskockák erre a rácsra
    *  ülnek, a timecode (HH:MM:SS:FF) ebből számol. Hiányzó = DEFAULT_FPS (30). */
   fps?: number;
+  /** 🎵 zenei tempó (BPM) a Hang Stúdió ütem-rácsához/metronómjához/snap-jéhez.
+   *  Hiányzó = 120. Csak a zenei időzítés-UI használja; a render-re nincs hatása. */
+  bpm?: number;
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */

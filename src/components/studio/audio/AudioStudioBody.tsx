@@ -20,6 +20,19 @@ import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import { palette } from '@/constants/editor';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
 import { buildAlbumVideoProject } from '@/lib/albumShare';
+import {
+  barsBeatsLabel,
+  beatLines,
+  DEFAULT_BPM,
+  DEFAULT_ZOOM_INDEX,
+  nextBeatSec,
+  prevBeatSec,
+  pxPerSecAt,
+  snapSec,
+  type SnapMode,
+  zoomIn,
+  zoomOut,
+} from '@/lib/audioTransport';
 import { publishRenderedProject } from '@/lib/feed';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -29,7 +42,6 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
 
-const PX_PER_SEC = 56;
 const LANE_H = 70;
 const RULER_H = 24;
 const HEADER_W = 62;
@@ -65,6 +77,11 @@ export function AudioStudioBody({
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
+  const loop = useEditorStore((s) => s.loop);
+  const rangeIn = useEditorStore((s) => s.rangeIn);
+  const rangeOut = useEditorStore((s) => s.rangeOut);
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
   const [editing, setEditing] = useState(false);
   const [mastering, setMastering] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -73,6 +90,8 @@ export function AudioStudioBody({
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const [snapMode, setSnapMode] = useState<SnapMode>('frame');
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const recordStartPlayhead = useRef(0);
@@ -81,15 +100,21 @@ export function AudioStudioBody({
     return null;
   }
   const fps = project.fps ?? 30;
+  const bpm = project.bpm ?? DEFAULT_BPM;
+  const pxPerSec = pxPerSecAt(zoomIndex);
   const duration = projectDuration(project);
-  const timelineW = Math.max(320, duration * PX_PER_SEC + 40);
+  const timelineW = Math.max(320, duration * pxPerSec + 40);
   const laneAreaH = RULER_H + LANE_H * LANES.length;
   const contentH = Math.max(tlH, laneAreaH); // a rács/playhead a teljes területet tölti
-  const ticks = Array.from({ length: Math.min(180, Math.ceil(timelineW / PX_PER_SEC)) + 1 }, (_, i) => i);
+  const ticks = Array.from({ length: Math.min(180, Math.ceil(timelineW / pxPerSec)) + 1 }, (_, i) => i);
   const selClip = selectedAudioClip(project, selectedClipId);
+  // 🎵 beat-rács (ütem-vonalak) a BPM szerint — a látható tartományra + max 300 vonalra sapkázva
+  const beatTimes = beatLines(bpm, 0, Math.min(duration + 2, (timelineW - 40) / pxPerSec)).slice(0, 300);
+  const secPerBar = (60 / bpm) * 4; // 4/4 ütem hossza (a downbeat kiemeléséhez)
 
+  const snapSecIn = (sec: number) => snapSec(sec, snapMode, fps, bpm);
   const seekAt = (e: GestureResponderEvent) =>
-    useEditorStore.getState().setPlayhead(snapToFrame(Math.max(0, e.nativeEvent.locationX / PX_PER_SEC), fps));
+    useEditorStore.getState().setPlayhead(snapSecIn(Math.max(0, e.nativeEvent.locationX / pxPerSec)));
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   const toggleRecord = async () => {
@@ -299,15 +324,39 @@ export function AudioStudioBody({
                 pointerEvents="none"
                 style={[
                   styles.grid,
-                  { left: i * PX_PER_SEC, height: contentH, backgroundColor: i % 5 === 0 ? palette.border : `${palette.border}66` },
+                  { left: i * pxPerSec, height: contentH, backgroundColor: i % 5 === 0 ? palette.border : `${palette.border}66` },
                 ]}
               />
             ))}
+            {/* 🎵 beat-rács: az ütem-kezdő (downbeat) vonalak kiemelve */}
+            {beatTimes.map((sec, i) => {
+              const isDownbeat = Math.abs((sec % secPerBar) ) < 1e-3 || Math.abs((sec % secPerBar) - secPerBar) < 1e-3;
+              return (
+                <View
+                  key={`beat${i}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.beatLine,
+                    { left: sec * pxPerSec, height: contentH, opacity: isDownbeat ? 0.5 : 0.22, width: isDownbeat ? 1.5 : 1 },
+                  ]}
+                />
+              );
+            })}
+            {/* 🔁 loop-régió árnyék (rangeIn…rangeOut) */}
+            {rangeIn != null && rangeOut != null && rangeOut > rangeIn ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.loopShade,
+                  { left: rangeIn * pxPerSec, width: (rangeOut - rangeIn) * pxPerSec, height: contentH },
+                ]}
+              />
+            ) : null}
             {/* idővonalzó (timecode) */}
             <View style={styles.ruler}>
               {ticks.map((i) =>
                 i % 5 === 0 ? (
-                  <Text key={`t${i}`} style={[styles.rulerLabel, { left: i * PX_PER_SEC + 3 }]}>
+                  <Text key={`t${i}`} style={[styles.rulerLabel, { left: i * pxPerSec + 3 }]}>
                     {formatTime(i)}
                   </Text>
                 ) : null
@@ -325,8 +374,8 @@ export function AudioStudioBody({
                     </Text>
                   ) : null}
                   {clips.map((clip) => {
-                    const left = clip.start * PX_PER_SEC;
-                    const w = Math.max(20, clip.duration * PX_PER_SEC);
+                    const left = clip.start * pxPerSec;
+                    const w = Math.max(20, clip.duration * pxPerSec);
                     const sel = clip.id === selectedClipId;
                     return (
                       <Pressable
@@ -350,23 +399,68 @@ export function AudioStudioBody({
               );
             })}
             {/* playhead a teljes magasságon + idő-buborék */}
-            <View pointerEvents="none" style={[styles.playhead, { left: playhead * PX_PER_SEC, height: contentH }]} />
-            <View pointerEvents="none" style={[styles.phBubble, { left: playhead * PX_PER_SEC - 21 }]}>
+            <View pointerEvents="none" style={[styles.playhead, { left: playhead * pxPerSec, height: contentH }]} />
+            <View pointerEvents="none" style={[styles.phBubble, { left: playhead * pxPerSec - 21 }]}>
               <Text style={styles.phBubbleText}>{formatTime(playhead)}</Text>
             </View>
           </View>
         </ScrollView>
       </View>
 
-      {/* transport */}
-      <View style={styles.transport}>
+      {/* transport — gazdag sor (undo/redo · ugrás · loop/In-Out · idő+ütem · BPM · zoom · snap) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.transport}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* undo / redo */}
+        <TBtn icon="arrow-undo" onPress={() => useEditorStore.getState().undo()} disabled={!canUndo} />
+        <TBtn icon="arrow-redo" onPress={() => useEditorStore.getState().redo()} disabled={!canRedo} />
+        <View style={styles.tSep} />
+        {/* ugrás elejére / lépés beatre vissza */}
+        <TBtn icon="play-skip-back" onPress={() => useEditorStore.getState().setPlayhead(0)} />
+        <TBtn icon="chevron-back" onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} />
         <Pressable onPress={() => useEditorStore.getState().setPlaying(!isPlaying)} style={styles.playBtn}>
-          <Ionicons name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
+          <Ionicons name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
         </Pressable>
-        <Text style={styles.time}>
-          {formatTime(playhead)} / {formatTime(duration)}
-        </Text>
-      </View>
+        <TBtn icon="chevron-forward" onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} />
+        <TBtn icon="play-skip-forward" onPress={() => useEditorStore.getState().setPlayhead(duration)} />
+        <View style={styles.tSep} />
+        {/* loop + In/Out + range törlés */}
+        <TBtn icon="repeat" active={loop} onPress={() => useEditorStore.getState().setLoop(!loop)} />
+        <TBtn label="In" onPress={() => useEditorStore.getState().setRangeIn()} />
+        <TBtn label="Out" onPress={() => useEditorStore.getState().setRangeOut()} />
+        {rangeIn != null || rangeOut != null ? (
+          <TBtn icon="close" onPress={() => useEditorStore.getState().clearRange()} />
+        ) : null}
+        <View style={styles.tSep} />
+        {/* idő + ütem:beat */}
+        <View style={styles.timeWrap}>
+          <Text style={styles.time}>
+            {formatTime(playhead)} / {formatTime(duration)}
+          </Text>
+          <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead)}</Text>
+        </View>
+        <View style={styles.tSep} />
+        {/* BPM léptető */}
+        <TBtn icon="remove" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm - 1 })} />
+        <View style={styles.bpmWrap}>
+          <Text style={styles.bpmVal}>{bpm}</Text>
+          <Text style={styles.bpmLabel}>BPM</Text>
+        </View>
+        <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} />
+        <View style={styles.tSep} />
+        {/* zoom + snap */}
+        <TBtn icon="remove-circle-outline" onPress={() => setZoomIndex(zoomOut(zoomIndex))} />
+        <TBtn icon="add-circle-outline" onPress={() => setZoomIndex(zoomIn(zoomIndex))} />
+        <TBtn
+          label={snapMode === 'off' ? 'Snap' : snapMode === 'frame' ? 'Frame' : 'Beat'}
+          icon="magnet-outline"
+          active={snapMode !== 'off'}
+          onPress={() => setSnapMode(snapMode === 'off' ? 'frame' : snapMode === 'frame' ? 'beat' : 'off')}
+        />
+      </ScrollView>
 
       {/* eszköz-sor */}
       <View style={styles.toolBar}>
@@ -424,6 +518,34 @@ function Tool({
   );
 }
 
+/** Kompakt transport-gomb (ikon és/vagy rövid címke; aktív/tiltott állapot). */
+function TBtn({
+  icon,
+  label,
+  onPress,
+  disabled,
+  active,
+}: {
+  icon?: keyof typeof Ionicons.glyphMap;
+  label?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  const color = disabled ? palette.border : active ? palette.accent : palette.text;
+  return (
+    <Pressable
+      style={[styles.tBtn, active && styles.tBtnActive]}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={6}
+    >
+      {icon ? <Ionicons name={icon} size={18} color={color} /> : null}
+      {label ? <Text style={[styles.tBtnLabel, { color }]}>{label}</Text> : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#05060a' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
@@ -456,6 +578,8 @@ const styles = StyleSheet.create({
   lane: { height: LANE_H, borderBottomWidth: 1, borderBottomColor: palette.border, justifyContent: 'center' },
   laneEmpty: { color: `${palette.textDim}55`, fontSize: 11, fontWeight: '800', paddingLeft: 10, textTransform: 'uppercase', letterSpacing: 1.5 },
   grid: { position: 'absolute', top: 0, width: 1 },
+  beatLine: { position: 'absolute', top: 0, backgroundColor: palette.accent },
+  loopShade: { position: 'absolute', top: 0, backgroundColor: `${palette.accent}1f`, borderLeftWidth: 1, borderRightWidth: 1, borderColor: `${palette.accent}88` },
   ruler: { height: RULER_H, borderBottomWidth: 1, borderBottomColor: palette.border },
   rulerLabel: { position: 'absolute', top: 5, color: palette.textDim, fontSize: 9, fontWeight: '600', fontVariant: ['tabular-nums'] },
   clip: { position: 'absolute', top: 6, bottom: 6, borderRadius: 8, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center' },
@@ -464,9 +588,18 @@ const styles = StyleSheet.create({
   playhead: { position: 'absolute', top: 0, width: 2, backgroundColor: '#fff' },
   phBubble: { position: 'absolute', top: 2, backgroundColor: palette.accent, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 },
   phBubbleText: { color: '#fff', fontSize: 9, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  transport: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8 },
-  playBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
-  time: { color: palette.text, fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  transport: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+  playBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', marginHorizontal: 2 },
+  time: { color: palette.text, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  timeWrap: { alignItems: 'center' },
+  bars: { color: palette.accent, fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  tBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, minWidth: 30, height: 32, paddingHorizontal: 7, borderRadius: 8, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, justifyContent: 'center' },
+  tBtnActive: { borderColor: palette.accent, backgroundColor: `${palette.accent}22` },
+  tBtnLabel: { fontSize: 11, fontWeight: '800' },
+  tSep: { width: 1, height: 24, backgroundColor: palette.border, marginHorizontal: 2 },
+  bpmWrap: { alignItems: 'center', minWidth: 34 },
+  bpmVal: { color: palette.text, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  bpmLabel: { color: palette.textDim, fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
   toolBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.surface, paddingTop: 10, paddingBottom: 6 },
   tool: { flex: 1, alignItems: 'center', gap: 4 },
   toolLabel: { fontSize: 10, fontWeight: '600' },

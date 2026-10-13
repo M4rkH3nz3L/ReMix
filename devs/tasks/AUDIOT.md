@@ -37,14 +37,16 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [ ] ⬜ **scrub** (húzható playhead) · **metronóm hang** (ma vizuális rács) · **count-in** felvételhez · **fit-zoom**.
 - [ ] ⬜ **Markerek & régiók** az idővonalon (a `Project.markers`/`regions` típus már létezik, a videóban használt).
 
-## 2. 🎚️ Sávok & keverő (mixer) — 🟡 a mag kész, UI hiányzik
-- [ ] 🟡 **Mixer-nézet**: csatorna-szalagok (fader + pan + mute/solo + **rec-arm** + meter) — a sávonkénti
-  gain már a MasterSheetben van, de **nincs rendes mixer-felület**.
-- [ ] 🟡 **Busz/Send/Group + sidechain** — a [`mixer.ts`](../../src/lib/mixer.ts) (channel/bus/send/sidechain +
-  ciklus-védelem + `toRenderPlan`) **KÉSZ+tesztelt, 0 UI-bekötés**. Ez a „profi mixelés" magja.
-- [ ] ⬜ **Dinamikus sávkezelés**: sáv hozzáadás/törlés/átnevezés/szín/sorrend (ma fix 3 sáv).
-- [ ] ⬜ **Insert-FX sávonként** (nem csak klipenként) + **send-to-reverb/delay busz**.
-- [ ] ⬜ **Valós idejű metering**: csúcs/RMS/korrelációs meter sávonként + masteren (ma csak offline Analyze).
+## 2. 🎚️ Sávok & keverő (mixer) — ✅ ALAP MIXER KÉSZ (2026-10, [MixerSheet], [mixerView.ts])
+- [x] ✅ **Mixer-nézet**: dedikált csatorna-szalagok (sávonkénti **fader** dB-kijelzéssel + **némít/szóló** +
+  **DUCK**), Master-lánc gomb. A fader a `SET_TRACK_GAIN`→`trackMix[type].gain`-t írja (a worker rendereli).
+  *ÉLŐ-BIZONYÍTVA: gain 0.5 → −6.0 dB a kimeneten (worker-mérés, volumedetect).*
+- [x] ✅ **Sidechain-duck** csatornánként — a DUCK a sáv klipjeire `autoDuck`-ot állít; a worker
+  `sidechaincompress`-szel a zenét/sfx-et a voiceover alá halkítja. *ÉLŐ-BIZONYÍTVA: a beszéd-régióban a
+  duckolt zene −2.6 dB-lel halkabb (worker-mérés).* A `mixerView.ts` pure mag (gain↔dB/fader/duck) 6 teszt.
+- [ ] 🟡 **Busz/Send/Group** (a `mixer.ts` toRenderPlan magja kész) — **worker send-routing** hátra (a sidechain már megy).
+- [ ] ⬜ **Dinamikus sávkezelés**: sáv hozzáadás/törlés/átnevezés/szín/sorrend (ma fix 3 sáv) + **rec-arm**.
+- [ ] ⬜ **Insert-FX sávonként** (ma csak klipenként) + **valós idejű metering** (ma offline Analyze).
 
 ## 3. ✂️ Klip-szerkesztés az idővonalon — ⬜ nyitott (erős klip-lap VAN)
 - [x] ✅ **Klip-lap** (ClipEditSheet): trim · fade be/ki · hangerő · pan · 3-sávos EQ · Pro FX · stem-split.

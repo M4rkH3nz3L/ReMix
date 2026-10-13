@@ -16,6 +16,7 @@ import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
+import { MixerSheet } from '@/components/studio/audio/MixerSheet';
 import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import { palette } from '@/constants/editor';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
@@ -84,6 +85,7 @@ export function AudioStudioBody({
   const canRedo = useEditorStore((s) => s.future.length > 0);
   const [editing, setEditing] = useState(false);
   const [mastering, setMastering] = useState(false);
+  const [mixerOpen, setMixerOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
   const [source, setSource] = useState(false);
@@ -474,11 +476,20 @@ export function AudioStudioBody({
         <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)} disabled={!selClip} />
         <Tool icon="options-outline" label={t('studio.audioTools.edit')} onPress={() => selClip && setEditing(true)} disabled={!selClip} />
         <Tool icon="trash-outline" label={t('studio.audioTools.delete')} onPress={() => selClip && useEditorStore.getState().removeClip(selClip.id)} disabled={!selClip} danger />
-        <Tool icon="pulse-outline" label={t('studio.audioTools.master')} onPress={() => setMastering(true)} />
+        <Tool icon="options" label={t('studio.audioTools.mixer', { defaultValue: 'Mixer' })} onPress={() => setMixerOpen(true)} />
       </View>
 
       {editing && selClip ? <ClipEditSheet clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
       {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
+      {mixerOpen ? (
+        <MixerSheet
+          onClose={() => setMixerOpen(false)}
+          onOpenMaster={() => {
+            setMixerOpen(false);
+            setMastering(true);
+          }}
+        />
+      ) : null}
       {adding ? (
         <AddMediaSheet
           track="music"

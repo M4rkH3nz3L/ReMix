@@ -121,6 +121,23 @@ export function can(tier: Tier, key: BooleanEntitlement): boolean {
   return entitlementsFor(tier)[key] === true;
 }
 
+// ── Routing-magok (TECH-TOP §1/§6): Free = 100% ESZKÖZÖN, a felhő a fizetős határ ──
+
+/** Rá kell-e égetni a kötelező free-vízjelet? (A free-n igen, fizetősön nem.) */
+export function shouldWatermark(tier: Tier): boolean {
+  return entitlementsFor(tier).watermark;
+}
+
+/** Használhat-e FELHŐ-rendert (worker)? Free = csak eszközön → false. */
+export function canCloudRender(tier: Tier): boolean {
+  return entitlementsFor(tier).renderEngine !== 'device';
+}
+
+/** Használhat-e FELHŐ-tárat (R2 mentés/szinkron)? Free = csak eszköz-tár → false. */
+export function canCloudStore(tier: Tier): boolean {
+  return entitlementsFor(tier).storageLocation !== 'device';
+}
+
 type BooleanEntitlement = {
   [K in keyof Entitlements]: Entitlements[K] extends boolean ? K : never;
 }[keyof Entitlements];

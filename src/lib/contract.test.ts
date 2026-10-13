@@ -11,7 +11,7 @@
  * Megjegyzés: a worker-modulok sima CommonJS JS-ek — a kliens (jest-expo) projekt
  * babellel betölti őket; a `require` visszatérése `any`, ezért a tsc nem lép be a .js-be.
  */
-import type { Tier } from '@/lib/tiers';
+import { TIER_ORDER, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
   TIER_QUOTAS,
   USAGE_METRICS,
@@ -26,7 +26,7 @@ import {
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
 import { fontFiles, fontOptions } from '@/constants/fonts';
 import { MAX_PROJECT_DURATION_SEC } from '@/lib/projectUtils';
-import { ENTITLEMENTS } from '@/lib/entitlements';
+import { ENTITLEMENTS, canCloudRender, canCloudStore, shouldWatermark } from '@/lib/entitlements';
 import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
 import {
   VIDEO_EFFECTS,
@@ -41,6 +41,7 @@ const workerUsage = require('../../server/usage');
 const workerRender = require('../../server/render');
 const workerFonts = require('../../server/fonts');
 const workerEntitlements = require('../../server/entitlements');
+const workerTiers = require('../../server/tiers');
 const fs = require('fs');
 const path = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -249,5 +250,28 @@ describe('contract: entitlement-mátrix (entitlements.ts ⇄ server/entitlements
   });
   it('mind az 5 tier jelen van mindkét oldalon', () => {
     expect(Object.keys(workerEntitlements.ENTITLEMENTS).sort()).toEqual(Object.keys(ENTITLEMENTS).sort());
+  });
+  it('routing-magok azonosak minden tieren (shouldWatermark/canCloudRender/canCloudStore)', () => {
+    for (const tier of TIER_ORDER) {
+      expect(workerEntitlements.shouldWatermark(tier)).toBe(shouldWatermark(tier));
+      expect(workerEntitlements.canCloudRender(tier)).toBe(canCloudRender(tier));
+      expect(workerEntitlements.canCloudStore(tier)).toBe(canCloudStore(tier));
+    }
+  });
+});
+
+describe('contract: tier-rangsor (tiers.ts ⇄ server/tiers.js)', () => {
+  it('TIER_ORDER + isPaidTier azonos', () => {
+    expect(workerTiers.TIER_ORDER).toEqual([...TIER_ORDER]);
+    for (const t of TIER_ORDER) {
+      expect(workerTiers.isPaidTier(t)).toBe(isPaidTier(t));
+    }
+  });
+  it('tierMeetsMin azonos MINDEN tier × minTier párra (a gate-logika egyezik)', () => {
+    for (const user of TIER_ORDER) {
+      for (const min of TIER_ORDER) {
+        expect(workerTiers.tierMeetsMin(user, min)).toBe(tierMeetsMin(user, min));
+      }
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { ENTITLEMENTS, can, entitlementsFor } from './entitlements';
+import { ENTITLEMENTS, can, canCloudRender, canCloudStore, entitlementsFor, shouldWatermark } from './entitlements';
 import { TIER_ORDER, type Tier } from './tiers';
 
 const INF = (n: number) => (n < 0 ? Infinity : n); // -1 = pool/korlátlan → Infinity a rendezéshez
@@ -89,5 +89,26 @@ describe('entitlements — SCOPES.md §5 mátrix', () => {
     expect(can('free', 'aiCloud')).toBe(false);
     expect(can('free', 'watermark')).toBe(true);
     expect(can('business', 'rbac')).toBe(true);
+  });
+
+  describe('routing-magok (Free = eszközön, felhő = Amatőr+)', () => {
+    test('shouldWatermark: CSAK a free-n', () => {
+      expect(shouldWatermark('free')).toBe(true);
+      for (const t of ['basic', 'pro', 'ultra', 'business'] as Tier[]) {
+        expect(shouldWatermark(t)).toBe(false);
+      }
+    });
+    test('canCloudRender: free NEM, Amatőr+ IGEN', () => {
+      expect(canCloudRender('free')).toBe(false);
+      for (const t of ['basic', 'pro', 'ultra', 'business'] as Tier[]) {
+        expect(canCloudRender(t)).toBe(true);
+      }
+    });
+    test('canCloudStore: free NEM (eszköz-tár), Amatőr+ IGEN', () => {
+      expect(canCloudStore('free')).toBe(false);
+      for (const t of ['basic', 'pro', 'ultra', 'business'] as Tier[]) {
+        expect(canCloudStore(t)).toBe(true);
+      }
+    });
   });
 });

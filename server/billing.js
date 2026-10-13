@@ -9,6 +9,7 @@
 // használja (hiteles lejárat); a manuális aktiválás mosttól (vagy a meglévő
 // lejárattól) hosszabbít 30 nappal (megújítás).
 const { adminClient } = require('./notify');
+const { tierMeetsMin, isPaidTier, asTier } = require('./tiers');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 30;
@@ -226,11 +227,15 @@ async function handleRevenueCatEvent(body) {
  *
  * Hiba esetén `false` (fail-closed) — inkább tagadjuk meg, mint hogy ingyen adjuk.
  */
-async function isPro(userId) {
+/**
+ * A HITELES (szerver-oldali) AKTÍV tier, vagy `'free'`, ha nincs érvényes előfizetés.
+ * Egy forrás az összes tier-gate-nek (isPro/isPaid) — így a 4→5-tier modellel sem csúszik.
+ */
+async function activeTier(userId) {
   const sb = adminClient();
   const uid = String(userId || '').trim();
   if (!sb || !uid) {
-    return false;
+    return 'free';
   }
   try {
     const { data, error } = await sb
@@ -238,17 +243,30 @@ async function isPro(userId) {
       .select('tier, status, current_period_end')
       .eq('user_id', uid)
       .maybeSingle();
-    if (error || !data || data.tier !== 'pro') {
-      return false;
+    if (error || !data) {
+      return 'free';
     }
     if (data.status && !['active', 'trialing', 'in_grace_period'].includes(data.status)) {
-      return false;
+      return 'free';
     }
     const end = data.current_period_end ? Date.parse(data.current_period_end) : NaN;
-    return !Number.isNaN(end) && end > Date.now();
+    if (Number.isNaN(end) || end <= Date.now()) {
+      return 'free';
+    }
+    return asTier(data.tier);
   } catch {
-    return false;
+    return 'free';
   }
+}
+
+/** Pro-szintű hozzáférés? rang ≥ `pro` → pro/ultra/business is (JAVÍTVA: eddig csak a 'pro' ment át). */
+async function isPro(userId) {
+  return tierMeetsMin(await activeTier(userId), 'pro');
+}
+
+/** Fizető (min Amatőr) hozzáférés? rang ≥ `basic` → a worker/felhő-render/R2-gate ehhez kötött (TECH-TOP §6). */
+async function isPaid(userId) {
+  return isPaidTier(await activeTier(userId));
 }
 
 module.exports = {
@@ -260,4 +278,6 @@ module.exports = {
   webhookEventSeen,
   recordWebhookEvent,
   isPro,
+  isPaid,
+  activeTier,
 };

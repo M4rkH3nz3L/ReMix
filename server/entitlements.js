@@ -55,4 +55,18 @@ function entitlementsFor(tier) {
   return ENTITLEMENTS[tier] || ENTITLEMENTS.free;
 }
 
-module.exports = { ENTITLEMENTS, entitlementsFor };
+// ── Routing-magok (TECH-TOP §1/§6) — a kliens tükre (src/lib/entitlements.ts) ──
+/** Rá kell-e égetni a kötelező free-vízjelet? */
+function shouldWatermark(tier) {
+  return entitlementsFor(tier).watermark;
+}
+/** Használhat-e FELHŐ-rendert (worker)? Free = csak eszközön → false. */
+function canCloudRender(tier) {
+  return entitlementsFor(tier).renderEngine !== 'device';
+}
+/** Használhat-e FELHŐ-tárat (R2)? Free = csak eszköz-tár → false. */
+function canCloudStore(tier) {
+  return entitlementsFor(tier).storageLocation !== 'device';
+}
+
+module.exports = { ENTITLEMENTS, entitlementsFor, shouldWatermark, canCloudRender, canCloudStore };

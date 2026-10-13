@@ -68,6 +68,7 @@ const {
   grantCredits,
   handleRevenueCatEvent,
   isPro,
+  isPaid,
 } = require('./billing');
 
 const WHISPER_MODEL =
@@ -115,6 +116,35 @@ function requirePro(req, res, next) {
 
 /** rövidítés: hitelesítés + szerver-hiteles Pro-ellenőrzés egy lépésben */
 const proOnly = [requireAuth, requirePro];
+
+/**
+ * 🎬 Min. AMATŐR (fizető) gate — a WORKER (felhő-render) + felhő-tár ehhez kötött
+ * (TECH-TOP §6: „Free = 100% ESZKÖZÖN"). A free user a szerver-rendert NEM éri el
+ * (402) → eszközön renderel. Amatőr/Haladó/Profi/Céges átmegy.
+ */
+function requirePaid(req, res, next) {
+  if (INSECURE_DEV) {
+    next();
+    return;
+  }
+  const uid = req.user?.id;
+  if (!uid) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  isPaid(uid)
+    .then((paid) => {
+      if (paid) {
+        next();
+        return;
+      }
+      res.status(402).json({ error: 'A felhő-render előfizetést igényel (min. Amatőr); ingyenesben a renderelés az eszközön történik.', pro: true });
+    })
+    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
+}
+
+/** hitelesítés + min. Amatőr (fizető) — a worker/felhő-render/felhő-tár gate-je */
+const paidOnly = [requireAuth, requirePaid];
 
 /**
  * 📊 §2.2: AI-token kvóta-gate (az AI-endpointok ELŐTT). Csak a MI felhő-
@@ -1831,7 +1861,7 @@ app.post('/wallet/payout', requireAuth, express.json({ limit: '4kb' }), async (r
   }
 });
 
-app.post('/render', upload.any(), ...proOnly, (req, res) => {
+app.post('/render', upload.any(), ...paidOnly, (req, res) => {
   let project;
   let uriMap;
   try {

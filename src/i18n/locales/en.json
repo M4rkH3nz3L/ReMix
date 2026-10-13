@@ -2456,6 +2456,15 @@
     "bubble": "🎈 Bubble"
   },
   "lib": {
+    "tiers": {
+      "label": {
+        "free": "Free",
+        "basic": "Amateur",
+        "pro": "Advanced",
+        "ultra": "Pro",
+        "business": "Business"
+      }
+    },
     "cameraPreset": {
       "pushIn": "🎥 Push in",
       "pushOut": "🎥 Push out",

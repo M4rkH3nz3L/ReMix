@@ -26,6 +26,7 @@ import {
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
 import { fontFiles, fontOptions } from '@/constants/fonts';
 import { MAX_PROJECT_DURATION_SEC } from '@/lib/projectUtils';
+import { ENTITLEMENTS } from '@/lib/entitlements';
 import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
 import {
   VIDEO_EFFECTS,
@@ -39,6 +40,7 @@ import type { VideoEffect } from '@/types/project';
 const workerUsage = require('../../server/usage');
 const workerRender = require('../../server/render');
 const workerFonts = require('../../server/fonts');
+const workerEntitlements = require('../../server/entitlements');
 const fs = require('fs');
 const path = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -237,5 +239,15 @@ describe('contract: videó max-hossz (projectUtils.ts ⇄ server/render.js)', ()
     // a kliens figyelmeztet, a szerver hard-enforce-ol — a határnak EGYEZNIE kell (short-video scope)
     expect(MAX_PROJECT_DURATION_SEC).toBe(600);
     expect(workerRender.MAX_RENDER_DURATION_SEC).toBe(MAX_PROJECT_DURATION_SEC);
+  });
+});
+
+describe('contract: entitlement-mátrix (entitlements.ts ⇄ server/entitlements.js)', () => {
+  it('a kliens ENTITLEMENTS BITRE egyezik a szerver-tükörrel (SCOPES §5, nincs drift)', () => {
+    // a kliens-gate (UX) és a szerver-enforce (autoritatív) UGYANABBÓL a mátrixból dolgozik
+    expect(workerEntitlements.ENTITLEMENTS).toEqual(ENTITLEMENTS);
+  });
+  it('mind az 5 tier jelen van mindkét oldalon', () => {
+    expect(Object.keys(workerEntitlements.ENTITLEMENTS).sort()).toEqual(Object.keys(ENTITLEMENTS).sort());
   });
 });

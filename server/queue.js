@@ -38,8 +38,9 @@ function renderQueue() {
  */
 function tierJobPriority(tier) {
   switch (tier) {
+    case 'business':
     case 'ultra':
-      return 1;
+      return 1; // top-prioritás (renderPriority entitlement)
     case 'pro':
       return 2;
     case 'basic':

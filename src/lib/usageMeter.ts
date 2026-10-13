@@ -35,6 +35,7 @@ export const TIER_QUOTAS: Record<Tier, UsageQuota> = {
   basic: { aiTokens: 100000, renderMinutes: 60, exports: 100, cloudJobs: 150 },
   pro: { aiTokens: 500000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
   ultra: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
+  business: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
 };
 
 export function quotaFor(tier: Tier): UsageQuota {

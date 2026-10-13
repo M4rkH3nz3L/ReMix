@@ -2456,6 +2456,15 @@
     "bubble": "🎈 Buborék"
   },
   "lib": {
+    "tiers": {
+      "label": {
+        "free": "Free",
+        "basic": "Amatőr",
+        "pro": "Haladó",
+        "ultra": "Profi",
+        "business": "Céges"
+      }
+    },
     "cameraPreset": {
       "pushIn": "🎥 Push in",
       "pushOut": "🎥 Push out",

@@ -12,12 +12,13 @@
  * `pro`/`basic`/`free` képességet is megkap.
  */
 
-export type Tier = 'free' | 'basic' | 'pro' | 'ultra';
+export type Tier = 'free' | 'basic' | 'pro' | 'ultra' | 'business';
 
-/** A szintek növekvő sorrendben (a rang = az index). */
-export const TIER_ORDER: readonly Tier[] = ['free', 'basic', 'pro', 'ultra'] as const;
+/** A szintek növekvő sorrendben (a rang = az index). Csomag-nevek (SCOPES.md §3):
+ *  free=Free · basic=Amatőr · pro=Haladó · ultra=Profi · business=Céges. */
+export const TIER_ORDER: readonly Tier[] = ['free', 'basic', 'pro', 'ultra', 'business'] as const;
 
-/** A szint rangja (0 = free … 3 = ultra). Ismeretlen értékre free-rang (0). */
+/** A szint rangja (0 = free … 4 = business). Ismeretlen értékre free-rang (0). */
 export function tierRank(tier: Tier): number {
   const i = TIER_ORDER.indexOf(tier);
   return i < 0 ? 0 : i;

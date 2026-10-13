@@ -168,17 +168,23 @@ Minden entitlementnek **két kapuja** van (és csak így „profi"):
 
 ## 8. Megvalósítási delta (mi van / mi hiányzik)
 
-| Terület | Ma (kód) | Teendő a scope-hoz |
-|---------|----------|---------------------|
-| Tier-ek | `free/basic/pro/ultra` | **+`business`** (5.) a `Tier`-be + `TIER_ORDER`/`tierMeetsMin` |
-| Kvóta-mérés | ✅ usageMeter + server/usage (contract) | kvóta-számok a mátrixra hangolva (§5) |
-| Entitlement-tábla | részleges (tier + guardPro + storageQuota) | **explicit `ENTITLEMENTS[tier]`** tábla (kliens⇄szerver, contract-tesztelt) a §4 kulcsokkal |
-| Szerver-autoritás | ✅ subscription.ts (Supabase) | a `business`/seat-ek + RBAC-scope bekötése |
-| **Eszközön-render + vízjel** | iOS v1; **Android hiány** | **Android MediaCodec-motor** + **Free-vízjel** a render-láncban (#1 prioritás) |
-| App-privát tár | ✅ `Paths.document` (sandbox) | data-loss-banner + „csak appból törölhető" UX megerősítés |
-| Publish/ütemezés | részleges/scaffold | `publish.*` entitlement + OAuth-fiók-limit enforce |
-| Analitika/planner/memory | magok készek (creator-OS) | `analytics.level`/`planner`/`creatorMemory` gate-elés |
-| Céges (seats/RBAC/governance) | RBAC + workspace magok | `team.*`/`brandGovernance` entitlement + billing (per-seat) |
+> **✅ A scope-MAG KÉSZ + BIZONYÍTVA (2026-10-13):** az 5-tier entitlement-rendszer él és contract-lockolt.
+
+| Terület | Állapot | Megjegyzés |
+|---------|---------|------------|
+| **Tier-ek** | ✅ **KÉSZ** | `free/basic/pro/ultra/**business**` ([tiers.ts](../../src/lib/tiers.ts) `Tier`/`TIER_ORDER`/`tierMeetsMin`) + i18n label (hu/en/de) + queue-prioritás |
+| **Entitlement-tábla** | ✅ **KÉSZ** | **`ENTITLEMENTS[tier]`** ([entitlements.ts](../../src/lib/entitlements.ts) + [server/entitlements.js](../../server/entitlements.js) tükör) a §4 kulcsokkal, resolver (`entitlementsFor`/`can`) |
+| **Bizonyítás (teszt)** | ✅ **KÉSZ** | [entitlements.test.ts](../../src/lib/entitlements.test.ts) (mátrix-cellák + Free=eszközön + monotonitás, 12 teszt) + [contract.test.ts](../../src/lib/contract.test.ts) **kliens≡szerver bitre** (nincs drift) |
+| **Kvóta-mérés** | ✅ KÉSZ | usageMeter + server/usage (`business` hozzáadva, contract-tesztelt) |
+| **Videó max-hossz** | ✅ KÉSZ | 600 mp hard-gate (`maxVideoSec` entitlement + `/render` 413 + contract) |
+| **Szerver-autoritás** | 🟡 | subscription.ts (Supabase) él; a `business`/seat + RBAC-scope **bekötése hátra** |
+| **Eszközön-render + vízjel** | 🔌 **#1** | iOS v1; **Android MediaCodec-motor** + **Free-vízjel a render-láncban** — a Free ezen áll (NATIVE.md) |
+| **Enforcement-wiring (per feature)** | 🟡 **hátra** | az `ENTITLEMENTS`-re kötni a konkrét kapukat: render-routing (device/cloud), publish-fiók-limit, analytics/planner/memory gate, team/governance UI |
+| App-privát tár | ✅ | `Paths.document` (sandbox); data-loss-banner UX megerősítés hátra |
+| Céges billing | 🟡 | `team.*`/`brandGovernance` entitlement kész; **per-seat billing** hátra |
+
+**Összegzés:** az **entitlement-SCOPE maga bizonyítottan működik** (típus + tábla + resolver + unit + contract-lock, audit-zöld).
+Ami hátra: a **per-feature enforcement-bekötés** (az `ENTITLEMENTS`-re) + az **Android eszközön-render-motor + vízjel** (a Free-hez) + a **per-seat billing** (Céges).
 
 ---
 

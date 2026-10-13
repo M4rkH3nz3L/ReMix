@@ -2456,6 +2456,15 @@
     "bubble": "🎈 Blase"
   },
   "lib": {
+    "tiers": {
+      "label": {
+        "free": "Free",
+        "basic": "Amateur",
+        "pro": "Fortgeschritten",
+        "ultra": "Pro",
+        "business": "Business"
+      }
+    },
     "cameraPreset": {
       "pushIn": "🎥 Reinfahren",
       "pushOut": "🎥 Rausfahren",

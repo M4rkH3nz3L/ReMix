@@ -80,7 +80,11 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
   (36 dB), hihat a magas-sávban a lépésén (worker-mérés, bandpass+volumedetect); /drums HTTP 200.*
 - [ ] ⬜ **Sampler** (saját minta-feltöltés/one-shotok) + **loop/minta-böngésző** + több hangszer-preset.
 - [x] ✅ **BPM/tempó + ütem-rács** — a transportban (§1) kész; metronóm-hang hátra.
-- [ ] 🟡 **Auto-tune** — a [`pitch.ts`](../../src/lib/pitch.ts) mag kész; detektálás + render-bekötés + UI hátra.
+- [x] ✅ **Hangmagasság-eltolás (transzponálás)** — per-klip `audioFx.pitchSemitones` (−12…+12), a worker
+  asetrate+aresample+atempo-val, **HOSSZ-tartó** (nem chipmunk); ClipEditSheet csúszka. *ÉLŐ-BIZONYÍTVA:
+  440Hz klip +12 félhang → 880Hz a kimeneten, 3.0s változatlan (worker-mérés).*
+- [ ] 🟡 **Auto-tune (skálára-illesztés)** — a `pitch.ts` (pitchCorrectionPlan/snapMidiToScale) + a pitch-shift
+  mag kész; hátra a hangmagasság-**detektálás** (worker-DSP) + a per-szegmens korrekció render-bekötése + UI.
 
 ## 6. 🎚️ Mixelés & masterelés — 🟡 jó alap, mélység hiányzik
 - [x] ✅ **Master-lap**: master-hangerő + sávonkénti fader + master-lánc (EQ/loudnorm-**LUFS-cél**/true-peak limiter) +

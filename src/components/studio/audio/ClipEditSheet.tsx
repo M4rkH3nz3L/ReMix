@@ -244,6 +244,15 @@ export function ClipEditSheet({
                 <Text style={styles.proTagText}>PRO</Text>
               </View>
             </View>
+            {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
+            <Slider
+              label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}
+              value={fx.pitchSemitones ?? 0}
+              min={-12}
+              max={12}
+              onChange={(v) => patchFx({ pitchSemitones: Math.round(v) })}
+              format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
+            />
             {/* 🎚️ szűrők: aluláteresztő (dörej) + felüláteresztő (sziszegés) — 0 = ki */}
             <Slider
               label={t('panels.audio.fxHighpass')}

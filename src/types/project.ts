@@ -1046,6 +1046,9 @@ export interface AudioFx {
   reverb?: number;
   /** echo/delay mértéke 0–1 (aecho) */
   delay?: number;
+  /** 🎚️ hangmagasság-eltolás félhangban (−12…+12; 0/hiányzó = nincs). A renderben
+   *  asetrate+atempo-val, a HOSSZ változatlan (nem chipmunk-effekt). */
+  pitchSemitones?: number;
 }
 
 export interface AudioClip extends ClipBase {

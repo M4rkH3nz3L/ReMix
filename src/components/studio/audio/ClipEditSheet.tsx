@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { AUDIO_FX_PRESETS, presetFx } from '@/lib/audioFxPresets';
+import { renderClipSpectrum } from '@/lib/audioSpectrum';
 import { RegionBar, Slider, ToggleRow, useWaveform } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
 import type { EditorCommand } from '@/lib/commands';
@@ -86,6 +88,24 @@ export function ClipEditSheet({
   const [deReverb, setDeReverb] = useState(!!clip.deReverb);
   const [autoDuck, setAutoDuck] = useState(!!clip.autoDuck);
   const [fx, setFx] = useState<AudioFx>(clip.audioFx ?? {});
+  const [spectrumUri, setSpectrumUri] = useState<string | null>(null);
+  const [specBusy, setSpecBusy] = useState(false);
+
+  const showSpectrum = async () => {
+    if (specBusy) {
+      return;
+    }
+    setSpecBusy(true);
+    try {
+      const uri = await renderClipSpectrum(clip.uri);
+      setSpectrumUri(uri);
+      if (!uri) {
+        Alert.alert(t('studio.audio.spectrum', { defaultValue: 'Spektrum' }), t('studio.pianoRoll.failed', { defaultValue: 'A render nem sikerült (fut a render-worker?).' }));
+      }
+    } finally {
+      setSpecBusy(false);
+    }
+  };
 
   const wave = useWaveform(clip.uri);
   const sourceDuration = clip.sourceDuration ?? clip.duration; // a trim ENNYIN belül mozoghat
@@ -241,10 +261,21 @@ export function ClipEditSheet({
             <View style={styles.fxHead}>
               <Ionicons name="pulse-outline" size={15} color={palette.accent} />
               <Text style={styles.fxTitle}>{t('panels.audio.fxTitle')}</Text>
+              <Pressable onPress={() => void showSpectrum()} hitSlop={6} style={styles.specBtn} disabled={specBusy}>
+                {specBusy ? (
+                  <ActivityIndicator size="small" color={palette.accent} />
+                ) : (
+                  <Ionicons name="stats-chart-outline" size={14} color={palette.accent} />
+                )}
+                <Text style={styles.specBtnText}>{t('studio.audio.spectrum', { defaultValue: 'Spektrum' })}</Text>
+              </Pressable>
               <View style={styles.proTag}>
                 <Text style={styles.proTagText}>PRO</Text>
               </View>
             </View>
+            {spectrumUri ? (
+              <Image source={{ uri: spectrumUri }} style={styles.spectrumImg} contentFit="contain" transition={120} />
+            ) : null}
             {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
               {AUDIO_FX_PRESETS.map((p) => (
@@ -387,6 +418,9 @@ const styles = StyleSheet.create({
   presetRow: { gap: 6, paddingVertical: 2, paddingRight: 8, marginBottom: 6 },
   presetChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: palette.surface },
   presetChipText: { color: palette.text, fontSize: 12, fontWeight: '700' },
+  specBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  specBtnText: { color: palette.accent, fontSize: 11, fontWeight: '700' },
+  spectrumImg: { width: '100%', height: 150, borderRadius: 8, marginBottom: 8, backgroundColor: '#000' },
   hint: { color: palette.textDim, fontSize: 11, lineHeight: 16, marginTop: 10 },
   autoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 4 },
   stemsBtn: {

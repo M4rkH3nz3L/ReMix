@@ -19,7 +19,7 @@
 | §4 | **Effektek** (teljes klip-FX + **zajkapu** + volume/pan-**automáció**) | ✅ *(track/bus-insert, send ⬜)* |
 | §5 | **Zenekészítés** (piano-roll **szintetizátor** + **dob-gép** + **sampler** + **pitch-shift** + **harmónia**) | ✅ *(auto-tune/skála 🟡, loop-böngésző ⬜)* |
 | §6 | Mixelés & mastering (Master-lánc EQ/LUFS/limiter + Analyze + **platform-presetek**) | ✅ *(multiband/élő-meter ⬜)* |
-| §7 | Elemzés/stemek/AI | 🟡 *(Analyze ✅, stem 🔌, spektrum/AI ⬜)* |
+| §7 | Elemzés/stemek/AI | 🟡 *(Analyze + **spektrogram** ✅, stem 🔌, AI ⬜)* |
 | §8 | UX-paritás a videó-editorral (panel-gazdagság, gyorsbillentyűk) | ⬜ |
 
 **Bizonyított kör-sorozat** (feat/studio-gaps ág): transport → mixer+sidechain → pan-automáció →
@@ -129,7 +129,10 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [x] ✅ **Analyze** (LUFS/TP/LRA) a masterhez.
 - [ ] 🔌 **Stem-szeparáció** teljes UI — a [`stems.ts`](../../src/lib/stems.ts) + a klip-lap „split" kezd; a worker
   **Demucs**-ot igényel (külön image).
-- [ ] ⬜ **Spektrum/spektrogram** nézet · **hangmagasság-detektálás** vizualizáció · **ütem-detektálás** jelölőkkel.
+- [x] ✅ **Spektrogram-nézet** — a klip frekvencia-képe (showspectrumpic) a ClipEditSheet-ben, worker
+  `/audio/spectrum` ([spectrum.js] 3 teszt + [audioSpectrum.ts] kliens). *ÉLŐ-BIZONYÍTVA: a feltöltött hangból
+  valid PNG (1002×488, PNG-magic), HTTP 200 (worker-render).*
+- [ ] ⬜ **hangmagasság-detektálás** vizualizáció · **ütem-detektálás** jelölőkkel.
 - [ ] ⬜ **AI-segéd** a hangra (dúdolás→dallam, „készíts dobsávot ehhez", zajszűrés/leválasztás).
 
 ## 8. 🧭 Munkafolyamat & UX-paritás a videó-editorral — ⬜

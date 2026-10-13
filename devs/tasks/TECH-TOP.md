@@ -20,7 +20,8 @@
 | 6 | **Collab-gate + owner=Admin + Céges-gate** (`collabAccess`: `canCollaborate`=Amatőr+ · `collabCan` owner=minden · `canManageCompany`=Céges) + szerver `/invite` → `paidOnly` | ✅ **KÉSZ** (collabAccess.test +6; /invite enforce) |
 | 7 | **Tárhely-védelem + coin-recurring** (`storageProtection`: `storageDowngradeBlocked` · `requiredBonusGB` · `coinToKeepContent` · `checkDowngrade`) — adatvesztés ellen | ✅ **KÉSZ** (storageProtection.test +5) |
 | 8 | **Kép-galéria → diavetítés MAG** (`slideshow`: `slideshowPlan` [ImageClip-ek] · `slideshowDurationSec`/`FitsMax`/`clampPerSlideForMax` · `backgroundMusicClip`) — a `project.imageDocs[]`-re | ✅ **KÉSZ** (slideshow.test +8; a 10 perc-plafon érvényes) |
-| 9+ | hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ free videó/hang-vízjel) · a galéria/album **UI+render-bekötés** · coin→recurring UI/billing | ⬜ |
+| 9 | **Import-range MAG** (`clampImportRange`: YT/TikTok -tól–-ig, forrás-plafon + 10 perc-cap) | ✅ **KÉSZ** (importRange.test +7) |
+| 10+ | hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ free videó/hang-vízjel) · galéria/album **UI+render-bekötés** · coin→recurring UI/billing · import-range **UI-bekötés** | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -151,7 +152,8 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 - **Javítás:**
   - 🔴 **Render-routing enforce**: a free render **kötelezően eszközön** (worker-submit csak `tierMeetsMin('basic')`-nél) — a szerver `/render` is utasítsa el a free felhő-submitet. **Előfeltétel: Android eszközön-render-motor** (NATIVE.md, #1 technikai út).
   - 🔴 **Storage-routing enforce**: free = eszköz-tár; R2 csak Amatőr+ (`storage.location`/`cloudBackup` entitlement).
-  - 🟠 **Import-range**: a YouTube/TikTok-importnál **-tól–-ig** (max 600 mp) választó → csak a kért szakasz importálódik.
+  - [x] ✅ **Import-range MAG** ([importRange.ts](../../src/lib/importRange.ts) `clampImportRange` + 7 teszt): YT/TikTok -tól–-ig,
+    forrás-hossz-plafon + 10 perc-cap, érvénytelen bemenet-kezelés. *(Hátra: a -tól–-ig választó UI + a tényleges szakasz-import bekötése.)*
 
 ---
 

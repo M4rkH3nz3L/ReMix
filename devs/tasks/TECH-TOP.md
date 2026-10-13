@@ -18,7 +18,8 @@
 | 4 | **Content-típus publish-célok** (`targetsForKind`: videó→TikTok/IG/YT/FB · kép→FB/Pinterest · hang→SoundCloud/Spotify) | ✅ **KÉSZ** (specek + teszt; az OAuth/feltöltés-wiring a fiókokhoz kötött) |
 | 5 | **Tartalom-tulajdon ToS** (anti-CapCut klauzula + vízjel-kivétel) | ✅ **KÉSZ** (legal.ts §3 + 6 teszt) |
 | 6 | **Collab-gate + owner=Admin + Céges-gate** (`collabAccess`: `canCollaborate`=Amatőr+ · `collabCan` owner=minden · `canManageCompany`=Céges) + szerver `/invite` → `paidOnly` | ✅ **KÉSZ** (collabAccess.test +6; /invite enforce) |
-| 7+ | kép-galéria · hang-album · cross-editor · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
+| 7 | **Tárhely-védelem + coin-recurring** (`storageProtection`: `storageDowngradeBlocked` · `requiredBonusGB` · `coinToKeepContent` · `checkDowngrade`) — adatvesztés ellen | ✅ **KÉSZ** (storageProtection.test +5) |
+| 8+ | kép-galéria · hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) · coin→recurring UI/billing-bekötés | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -130,9 +131,12 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 
 - **Ma:** coin-pénztárca kész; a storage-kvóta külön ([storageQuota](../../src/lib/storageQuota.ts)); **nincs** coin→recurring-extra csatolás, se tárhely-védelem.
 - **Javítás:**
+  - [x] ✅ **Tárhely-védelem MAG** ([storageProtection.ts](../../src/lib/storageProtection.ts) + 5 teszt): `storageDowngradeBlocked`
+    (a használat alá csökkentés tiltva) · `requiredBonusGB` / `coinToKeepContent` / `checkDowngrade` (mennyi bónusz-coin/hó tartja
+    meg a tartalmat) — az ADR-013 data-loss-elvvel összhangban. *(Hátra: a figyelmeztető-banner-UI + a billing-bekötés.)*
   - 🟠 **Coin-vásárlás pénzért** (IAP; a cash-out továbbra is **jogi gate** mögött — SCOPES).
-  - 🟠 **Extra-csomagok havidíjban** (extra tárhely/AI): a coin-vásárlás **megemeli a recurring havidíjat** (nem egyszeri) → az entitlement `storageQuotaGB`/`aiTokens` dinamikusan nő.
-  - 🔴 **Tárhely-védelem (adatvesztés-tiltás):** ha a tárhely csökkenne a tartalom alá, **ne törlődjön** — a rendszer **figyelmeztet** + a havidíj tartja a tárhelyet (grace + banner), összhangban az ADR-013 data-loss-elvvel.
+  - 🟠 **Extra-csomagok havidíjban** (extra tárhely/AI): a coin-vásárlás **megemeli a recurring havidíjat** → az entitlement
+    `storageQuotaGB`/`aiTokens` dinamikusan nő. *(A számítás-mag kész [storageProtection]; a billing-recurring-bekötés hátra.)*
 
 ---
 

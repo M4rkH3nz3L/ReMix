@@ -21,7 +21,9 @@
 | 7 | **Tárhely-védelem + coin-recurring** (`storageProtection`: `storageDowngradeBlocked` · `requiredBonusGB` · `coinToKeepContent` · `checkDowngrade`) — adatvesztés ellen | ✅ **KÉSZ** (storageProtection.test +5) |
 | 8 | **Kép-galéria → diavetítés MAG** (`slideshow`: `slideshowPlan` [ImageClip-ek] · `slideshowDurationSec`/`FitsMax`/`clampPerSlideForMax` · `backgroundMusicClip`) — a `project.imageDocs[]`-re | ✅ **KÉSZ** (slideshow.test +8; a 10 perc-plafon érvényes) |
 | 9 | **Import-range MAG** (`clampImportRange`: YT/TikTok -tól–-ig, forrás-plafon + 10 perc-cap) | ✅ **KÉSZ** (importRange.test +7) |
-| 10+ | hang-album · cross-editor · UI-drawer · **Android on-device render-motor** (+ free videó/hang-vízjel) · galéria/album **UI+render-bekötés** · coin→recurring UI/billing · import-range **UI-bekötés** | ⬜ |
+| 10 | **Hang-album MAG** (`album`: `buildAlbum` · `albumPagerItems` [borító+számok, remix-pager] · `formatAlbumDuration`) | ✅ **KÉSZ** (album.test +6) |
+| — | **A pure policy-/gate-/feature-MAG réteg KÉSZ + bizonyítva.** Hátra: csak **UI / render-bekötés / native** (device-függő) | 🏁 |
+| 11+ | cross-editor · UI-drawer · **Android on-device render-motor** (+ free videó/hang-vízjel) · galéria/album/import-range **UI+render-bekötés** · coin→recurring UI/billing · collab/Céges UI | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -79,9 +81,9 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
   Több tartalomnál **lapozható** (mint egy videó remixelésekor). A **borítót/albumot a KÉPSZERKESZTŐVEL** szerkeszti.
 - **Ma:** az audio-stúdió **egy multi-track projekt** (egy „szám") — nincs **album** (több szám) + **borító** + album-share + pager.
 - **Javítás:**
-  - 🟠 **Album-projekt**: több hang-track/„szám" egy albumban (rendezhető).
-  - 🟠 **Borító**: az albumhoz kép-borító, a **kép-szerkesztővel** szerkesztve (cross-editor).
-  - 🟠 **Album-share**: a feedbe a **teljes album** egy **lapozható** posztként.
+  - [x] ✅ **Album-mag** ([album.ts](../../src/lib/album.ts) + 6 teszt): `buildAlbum` (rendezett számok + borító + össz-hossz) ·
+    `albumPagerItems` (borító elöl, majd számonként egy lap — **lapozható feed-poszt**, remix-pager-minta) · `formatAlbumDuration`.
+  - [ ] 🟠 **UI + bekötés**: a több-szám album-kezelő UI · a borító a **kép-szerkesztővel** (cross-editor, §2.4) · az album-share render.
 
 ### 2.4 🔁 Cross-editor szerkesztés (KÖTELEZŐ)
 - **Szabály:** a **videó tartalmait** szükség esetén az **audió- és kép-szerkesztőben is** tudja szerkeszteni.

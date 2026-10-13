@@ -29,7 +29,7 @@ const { analyzeReframe } = require('./reframe');
 const { composeThumbnail, pickThumbnails, scoreShots } = require('./thumbs');
 const { indexFrames, queryScores, visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
-const { renderProject } = require('./render');
+const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
@@ -1915,6 +1915,16 @@ app.post('/render', upload.any(), ...proOnly, (req, res) => {
       (t.clips ?? []).map((c) => (c.start || 0) + (c.duration || 0))
     )
   );
+
+  // 🎬 HARD-GATE: a videó MAX 10 perc (short-video scope, SCOPES.md). A kliens is
+  // figyelmeztet, de a biztonsági határ ITT van (autoritatív, nem bízunk a kliensben).
+  if (totalDuration > MAX_RENDER_DURATION_SEC) {
+    fs.rm(workDir, { recursive: true, force: true }, () => {});
+    res.status(413).json({
+      error: `A videó túl hosszú (${Math.round(totalDuration)} mp). A maximum ${MAX_RENDER_DURATION_SEC} mp (10 perc).`,
+    });
+    return;
+  }
 
   // ☁️ FELHŐ-MÓD (csak a küszöbnél hosszabb videóra): média S3-ba, job a queue-ba —
   // külön worker(ek) renderelnek (skálázható, túléli az API-újraindítást).

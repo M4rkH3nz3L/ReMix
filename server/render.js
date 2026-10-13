@@ -16,6 +16,11 @@ const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, mast
 
 const FPS = 30;
 
+// 🎬 A videó MAX hossza — 10 perc (short-video scope, devs/tasks/SCOPES.md). A /render
+// HARD-ENFORCE-olja; a kliens tükre: src/lib/projectUtils.ts MAX_PROJECT_DURATION_SEC
+// (contract-teszt zárolja az egyezést). Tier-szinten szigoríthatóbb, feljebb nem.
+const MAX_RENDER_DURATION_SEC = 600;
+
 const CANVAS = {
   '9:16': { w: 1080, h: 1920 },
   '16:9': { w: 1920, h: 1080 },
@@ -2737,4 +2742,5 @@ module.exports = {
   bezierEaseNode,
   audioExtractArgs,
   AUDIO_FORMATS,
+  MAX_RENDER_DURATION_SEC,
 };

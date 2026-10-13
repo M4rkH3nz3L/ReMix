@@ -25,6 +25,7 @@ import {
 } from '@/lib/usageMeter';
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
 import { fontFiles, fontOptions } from '@/constants/fonts';
+import { MAX_PROJECT_DURATION_SEC } from '@/lib/projectUtils';
 import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
 import {
   VIDEO_EFFECTS,
@@ -228,5 +229,13 @@ describe('contract: font-parity (constants/fonts.ts ⇄ server/fonts.js ⇄ _lay
       expect({ family, registered: layout.includes(`${family}: require(`) }).toEqual({ family, registered: true });
       expect({ family, file, present: layout.includes(file) }).toEqual({ family, file, present: true });
     }
+  });
+});
+
+describe('contract: videó max-hossz (projectUtils.ts ⇄ server/render.js)', () => {
+  it('MAX_PROJECT_DURATION_SEC == MAX_RENDER_DURATION_SEC == 600 (10 perc)', () => {
+    // a kliens figyelmeztet, a szerver hard-enforce-ol — a határnak EGYEZNIE kell (short-video scope)
+    expect(MAX_PROJECT_DURATION_SEC).toBe(600);
+    expect(workerRender.MAX_RENDER_DURATION_SEC).toBe(MAX_PROJECT_DURATION_SEC);
   });
 });

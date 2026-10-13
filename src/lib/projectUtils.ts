@@ -363,6 +363,19 @@ export function projectDuration(project: Project): number {
 }
 
 /**
+ * 🎬 A videó MAX hossza — 10 perc (short-video scope, [SCOPES.md](../../devs/tasks/SCOPES.md)).
+ * Globális felső határ (a TikTok-plafonnal is egyezik); a szerver-render ezt HARD-ENFORCE-olja
+ * ([server/render.js](../../server/render.js) `MAX_RENDER_DURATION_SEC` — contract-tesztelt tükör),
+ * a kliens pedig ebből figyelmeztet/gátol a timeline-on. (Tier-szinten szigoríthatóbb, feljebb nem.)
+ */
+export const MAX_PROJECT_DURATION_SEC = 600;
+
+/** Túllépi-e a projekt a max hosszt (soft-warn/UX-gate forrása)? */
+export function exceedsMaxDuration(project: Project): boolean {
+  return projectDuration(project) > MAX_PROJECT_DURATION_SEC;
+}
+
+/**
  * Üres-e a projekt (egyetlen klip sincs egyetlen sávon sem).
  * A szerkesztő ebből dönti el, hogy a fekete vászon helyett onboardingot
  * mutasson, ami a forrás-binhez vezet (EDITOR-UX §2.5).

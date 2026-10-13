@@ -16,7 +16,8 @@
 | 3a | **Free-vízjel — KÉP** (`/imagedoc`, **szerver-hiteles** tier; a kliens nem kapcsolhatja ki) | ✅ **KÉSZ** — élő-verifikált (free→„Made with ReMix", pro→nincs) |
 | 3b | Free-vízjel — **videó/hang** | 🔗 **az Android on-device render-motorhoz KÖTÖTT** (lenn): a `/render` worker `paidOnly` → free nem éri el, a fizetős kimenet vízjel-mentes → a free videó/hang-vízjel **az eszközön-render-motor dolga**. A vízjel-MECHANIZMUST a kép már bizonyította (közös `shouldWatermark`). |
 | 4 | **Content-típus publish-célok** (`targetsForKind`: videó→TikTok/IG/YT/FB · kép→FB/Pinterest · hang→SoundCloud/Spotify) | ✅ **KÉSZ** (specek + teszt; az OAuth/feltöltés-wiring a fiókokhoz kötött) |
-| 5+ | tulajdon-ToS · kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
+| 5 | **Tartalom-tulajdon ToS** (anti-CapCut klauzula + vízjel-kivétel) | ✅ **KÉSZ** (legal.ts §3 + 6 teszt) |
+| 6+ | kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** (+ a free videó/hang-vízjel vele) | ⬜ |
 
 > **Eddig bizonyítva:** az `ENTITLEMENTS`-re kötött routing (Free=eszközön, felhő=Amatőr+) él, szerver-enforce-olt és
 > kliens≡szerver contract-tesztelt. Menet közben **valódi bug** javítva: a `isPro` csak a `'pro'`-t fogadta el → a
@@ -29,12 +30,12 @@
 > **Szabály:** a CapCut „magáévá teszi" a user tartalmát — **MI NEM.** Minden a useré marad. **Kivétel: a vízjeles
 > (ingyenes) exportok a MIEINK — de a user szabadon használhatja.**
 
-- **Ma:** nincs explicit tulajdon-klauzula; a vízjel ma csak **brand-logó** (user saját logója), nem a kötelező „Made with ReMix".
 - **Javítás:**
-  - 🔴 **ToS/jogi:** a [legal.ts](../../src/constants/legal.ts)-ben **egyértelmű tulajdon-klauzula**: a user **megtartja a tartalma
-    minden jogát**; a platform csak a szolgáltatáshoz szükséges, nem-kizárólagos licencet kap (tárolás/feldolgozás/megosztás).
-    A **vízjeles free-export** a platform branded terméke, de a user **korlátlanul használhatja**.
-  - 🔴 **Kötelező free-vízjel mind a 3 típuson** (lásd [§1](#1-kötelező-free-vízjel--minden-típuson)).
+  - [x] ✅ **ToS/jogi KÉSZ** ([legal.ts](../../src/constants/legal.ts) §3): „a tartalom a TE tulajdonod marad" + **nem-kizárólagos**
+    licenc + **nyomatékos anti-CapCut** (nincs tulajdon-elvétel, nincs hozzájárulás nélküli reklám/AI-tanítás) +
+    **vízjel-kivétel** (a „Made with ReMix" free-export a platformé, de **korlátozás nélkül** használható). **Bizonyítva:**
+    [legal.test.ts](../../src/constants/legal.test.ts) (6 teszt zárolja a klauzulákat).
+  - [ ] 🔴 **Kötelező free-vízjel mind a 3 típuson** — KÉP ✅ (lásd [§1](#1-kötelező-free-vízjel--minden-típuson)); videó/hang 🔗 az Android on-device render-motorral.
 
 ---
 

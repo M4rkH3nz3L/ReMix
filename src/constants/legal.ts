@@ -144,6 +144,13 @@ mások a tartalmad egy PILLANATKÉPÉBŐL remixet készítsenek (önálló műk�
 megjelölésével). Ezt az engedélyt a tartalom eltávolításával/deaktiválásával a
 jövőre nézve visszavonod (a már mások által készített remixekre ez nem hat vissza).
 
+Nyomatékosítjuk: a ReMix NEM szerez tulajdont a tartalmadon, és a hozzájárulásod
+nélkül NEM használja fel sem reklámra, sem mesterséges intelligencia tanítására. A
+tartalmad a tiéd marad, és bármikor exportálhatod/elviheted. KIVÉTEL a VÍZJELES
+(ingyenes) export: a „Made with ReMix" jelzésű kimenet a platform márkázott terméke,
+DE azt KORLÁTOZÁS NÉLKÜL, bárhol felhasználhatod (megoszthatod, közzéteheted) — a
+vízjel eltávolítása viszont nem engedélyezett (ahhoz előfizetés szükséges).
+
 4. ELFOGADHATÓ HASZNÁLAT
 Tilos jogsértő, gyűlölködő, zaklató, erőszakos, szexuálisan kizsákmányoló, csaló
 vagy mások jogait (szerzői jog, személyiségi jog) sértő tartalom közzététele, továbbá

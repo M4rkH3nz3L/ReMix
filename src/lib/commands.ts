@@ -68,6 +68,9 @@ export type EditorCommand =
    */
   | { type: 'UPSERT_IMAGE_DOC'; doc: ImageDoc; label?: string }
   | { type: 'REMOVE_IMAGE_DOC'; docId: string }
+  /** 🖼️📄 Kép-lapok ÁTRENDEZÉSE (galéria-sorrend): az `order` az új id-sorrend; a
+   *  listában nem szereplő lapok a végükön maradnak (stabil). Undo-zható. */
+  | { type: 'REORDER_IMAGE_DOCS'; order: string[] }
   /**
    * 🎥 Live-produkció dokumentum beírása (létrehozás ÉS módosítás). A jelenet-/
    * forrás-/cél-műveletek pure függvények (`liveDoc.ts`), az eredményt EZ a
@@ -286,6 +289,23 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, imageDocs: next.length > 0 ? next : undefined };
     }
 
+    case 'REORDER_IMAGE_DOCS': {
+      const docs = project.imageDocs ?? [];
+      if (docs.length < 2) {
+        return null;
+      }
+      const rank = new Map(cmd.order.map((id, i) => [id, i]));
+      // stabil rendezés: az order-ben szereplők elöl (sorrendben), a többi a végén az eredeti sorrendjében
+      const next = docs
+        .map((d, i) => ({ d, i, r: rank.has(d.id) ? (rank.get(d.id) as number) : cmd.order.length + i }))
+        .sort((a, b) => a.r - b.r)
+        .map((x) => x.d);
+      if (next.every((d, i) => d.id === docs[i].id)) {
+        return null; // nem változott a sorrend
+      }
+      return { ...project, imageDocs: next };
+    }
+
     case 'SET_LIVE_DOC': {
       if (JSON.stringify(project.live ?? null) === JSON.stringify(cmd.doc)) {
         return null; // semmi nem változott — ne szemetelje a history-t
@@ -475,6 +495,11 @@ export function describeCommand(cmd: EditorCommand): string {
       );
     case 'REMOVE_IMAGE_DOC':
       return tr('lib.commands.removeImageDoc');
+    case 'REORDER_IMAGE_DOCS':
+      return tr('lib.commands.reorderImageDocs', {
+        count: cmd.order.length,
+        defaultValue: `Lapok átrendezése (${cmd.order.length})`,
+      });
     case 'SET_LIVE_DOC':
       return (
         cmd.label ??

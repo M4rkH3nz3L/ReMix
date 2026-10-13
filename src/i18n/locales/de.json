@@ -2622,6 +2622,7 @@
       "upsertImageDoc_one": "Bilddokument: {{name}} ({{count}} Ebene)",
       "upsertImageDoc_other": "Bilddokument: {{name}} ({{count}} Ebenen)",
       "removeImageDoc": "Bilddokument gelöscht",
+      "reorderImageDocs": "Seiten neu anordnen ({{count}})",
       "setLiveDoc": "Live-Produktion aktualisiert ({{scenes}} Szene(n))",
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",

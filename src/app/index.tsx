@@ -26,6 +26,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { CollectionSheet } from '@/components/CollectionSheet';
 import { CommentSheet } from '@/components/CommentSheet';
+import { FeedImageCarousel } from '@/components/feed/FeedImageCarousel';
 import { GiftSheet } from '@/components/GiftSheet';
 import { LiveNowStrip } from '@/components/live/LiveNowStrip';
 import { showError } from '@/components/ui/errorAlert';
@@ -834,7 +835,10 @@ export default function FeedScreen() {
     <>
       <GestureDetector gesture={tapGesture(sub)}>
         <View style={StyleSheet.absoluteFill}>
-          {sub.id === activeId && sub.videoUri ? (
+          {sub.images && sub.images.length > 0 ? (
+            // 🖐️ lapozható kép-poszt (kép-projekt carousel-megosztása)
+            <FeedImageCarousel images={sub.images} />
+          ) : sub.id === activeId && sub.videoUri ? (
             Platform.OS === 'web' ? (
               // 🌐 web: NATÍV <video> (az expo-video web-lejátszója nem indít autoplay-t);
               // némítva a böngésző engedi az autoplay-t, a rail gombja kapcsol hangot.

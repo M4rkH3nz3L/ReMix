@@ -21,18 +21,25 @@ type Fmt = 'png' | 'jpg' | 'webp';
 export function ExportSheet({
   doc,
   busy,
+  pageCount = 1,
   onRaster,
   onSvg,
   onPdf,
   onVideo,
+  onShareSlideshow,
+  onShareCarousel,
   onClose,
 }: {
   doc: ImageDoc;
   busy: boolean;
+  /** a galéria lap-száma — ≥2 esetén jelenik meg a feed-megosztás (diavetítés/lapozható) */
+  pageCount?: number;
   onRaster: (opts: { format: Fmt; height: number; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
   onVideo: () => void;
+  onShareSlideshow?: () => void;
+  onShareCarousel?: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -116,6 +123,45 @@ export function ExportSheet({
         <Ionicons name="film-outline" size={16} color={palette.text} />
         <Text style={styles.secondaryText}>{t('studio.image.exportToVideo')}</Text>
       </Pressable>
+
+      {/* 🖼️➡️📲 feed-megosztás: több lap → diavetítés-videó VAGY lapozható kép-poszt */}
+      {pageCount >= 2 && (onShareSlideshow || onShareCarousel) ? (
+        <>
+          <Text style={[styles.section, { marginTop: 10 }]}>
+            {t('studio.image.shareFeed.label', { defaultValue: 'Megosztás a feedbe' })}
+          </Text>
+          {onShareSlideshow ? (
+            <Pressable
+              style={[styles.secondary, busy && styles.disabled]}
+              disabled={busy}
+              onPress={() => {
+                onShareSlideshow();
+                onClose();
+              }}
+            >
+              <Ionicons name="play-circle-outline" size={16} color={palette.text} />
+              <Text style={styles.secondaryText}>
+                {t('studio.image.shareFeed.slideshow', { defaultValue: 'Diavetítésként (videó)' })}
+              </Text>
+            </Pressable>
+          ) : null}
+          {onShareCarousel ? (
+            <Pressable
+              style={[styles.secondary, busy && styles.disabled]}
+              disabled={busy}
+              onPress={() => {
+                onShareCarousel();
+                onClose();
+              }}
+            >
+              <Ionicons name="albums-outline" size={16} color={palette.text} />
+              <Text style={styles.secondaryText}>
+                {t('studio.image.shareFeed.carousel', { defaultValue: 'Lapozhatóként (carousel)' })}
+              </Text>
+            </Pressable>
+          ) : null}
+        </>
+      ) : null}
     </StudioSheet>
   );
 }

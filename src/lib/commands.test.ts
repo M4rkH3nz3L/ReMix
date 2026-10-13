@@ -434,3 +434,35 @@ describe('describeCommand — minden parancs ad nem-üres címkét', () => {
     expect(label.length).toBeGreaterThan(0);
   });
 });
+
+describe('applyCommand — REORDER_IMAGE_DOCS', () => {
+  const doc = (id: string) =>
+    createImageDoc(id, '1:1', () => `lyr-${id}`, { width: 100, height: 100 }) as unknown as import('@/types/project').ImageDoc;
+
+  it('új sorrend az id-lista szerint', () => {
+    const [a, b, c] = [doc('a'), doc('b'), doc('c')].map((d, i) => ({ ...d, id: ['a', 'b', 'c'][i] }));
+    const p = makeProject({ imageDocs: [a, b, c] });
+    const next = expectChanged(p, applyCommand(p, { type: 'REORDER_IMAGE_DOCS', order: ['c', 'a', 'b'] }));
+    expect(next.imageDocs!.map((d) => d.id)).toEqual(['c', 'a', 'b']);
+    expect(p.imageDocs!.map((d) => d.id)).toEqual(['a', 'b', 'c']); // immutábilis
+  });
+
+  it('hiányzó id-k a végükön maradnak (stabil)', () => {
+    const [a, b, c] = ['a', 'b', 'c'].map((id) => ({ ...doc(id), id }));
+    const p = makeProject({ imageDocs: [a, b, c] });
+    const next = expectChanged(p, applyCommand(p, { type: 'REORDER_IMAGE_DOCS', order: ['c'] }));
+    expect(next.imageDocs!.map((d) => d.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('változatlan sorrend / <2 lap → null (no-op)', () => {
+    const [a, b] = ['a', 'b'].map((id) => ({ ...doc(id), id }));
+    const p = makeProject({ imageDocs: [a, b] });
+    expect(applyCommand(p, { type: 'REORDER_IMAGE_DOCS', order: ['a', 'b'] })).toBeNull();
+    const one = makeProject({ imageDocs: [a] });
+    expect(applyCommand(one, { type: 'REORDER_IMAGE_DOCS', order: ['a'] })).toBeNull();
+  });
+
+  it('describeCommand címke', () => {
+    expect(describeCommand({ type: 'REORDER_IMAGE_DOCS', order: ['a', 'b'] })).toContain('2');
+  });
+});

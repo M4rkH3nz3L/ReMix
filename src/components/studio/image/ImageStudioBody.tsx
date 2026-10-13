@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { SourceSheet } from '@/components/SourceSheet';
@@ -42,6 +42,9 @@ import {
   updateLayer,
 } from '@/lib/imageDoc';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
+import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
+import { publishImageProject } from '@/lib/feed';
+import type { ImageShareMode } from '@/lib/imageShare';
 import { renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
 import { pickImage, pickSvg } from '@/lib/media';
@@ -175,6 +178,7 @@ export function ImageStudioBody({
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<
     | 'layers'
     | 'style'
@@ -250,10 +254,17 @@ export function ImageStudioBody({
     }
   }, [mode]);
 
+  // 🖼️📄 project mód: a galéria lapjai közül az AKTÍV lapon dolgozunk (nem fixen a [0]-n).
+  // A gallériát a `project.imageDocs` adja; az aktív lap id-ja állapot — invalid/null id-ra
+  // render közben az ELSŐ lapra esik vissza (nincs effect-setState, nincs kaszkád-render).
+  const pages = mode === 'project' ? project?.imageDocs ?? [] : [];
+  const effectiveActivePageId =
+    activePageId && pages.some((d) => d.id === activePageId) ? activePageId : pages[0]?.id ?? null;
+
   const doc =
     mode === 'scoped'
       ? project?.imageDocs?.find((d) => d.id === docId) ?? null
-      : project?.imageDocs?.[0] ?? null;
+      : pages.find((d) => d.id === effectiveActivePageId) ?? pages[0] ?? null;
 
   const commit = (next: ImageDoc, label?: string) =>
     useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: next, label });
@@ -261,6 +272,67 @@ export function ImageStudioBody({
   // a kijelölés levezetve — ha a réteg eltűnik (törlés/undo), null-ra esik
   const selectedLayer = doc?.layers.find((l) => l.id === selectedId) ?? null;
   const effectiveSelectedId = selectedLayer ? selectedId : null;
+
+  // ── 🖼️📄 Galéria-lapok (project mód): új/duplikál/töröl/mozgat az aktív lapon ──
+  const addPage = () => {
+    const s = useEditorStore.getState();
+    if (!s.project) {
+      return;
+    }
+    const size = effectiveCanvas({ aspectRatio: s.project.aspectRatio });
+    const nd = createImageDoc(`Lap ${pages.length + 1}`, s.project.aspectRatio, () => makeId('lyr'), {
+      width: size.width,
+      height: size.height,
+    });
+    s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: nd });
+    setActivePageId(nd.id);
+    setSelectedId(null);
+  };
+
+  const duplicateActivePage = () => {
+    if (!doc) {
+      return;
+    }
+    const dup = duplicatePage(doc, makeId('img'));
+    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: dup, label: `Lap duplikálva: ${dup.name}` });
+    setActivePageId(dup.id);
+    setSelectedId(null);
+  };
+
+  const deleteActivePage = () => {
+    if (!doc || !canRemovePage({ imageDocs: pages })) {
+      return;
+    }
+    const idx = pages.findIndex((d) => d.id === doc.id);
+    const remaining = pages.filter((d) => d.id !== doc.id);
+    const nextIdx = pageIndexAfterRemoval(idx, pages.length);
+    Alert.alert(t('common.delete'), `„${doc.name}" lap törlése?`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          useEditorStore.getState().dispatch({ type: 'REMOVE_IMAGE_DOC', docId: doc.id });
+          setActivePageId(remaining[nextIdx]?.id ?? null);
+          setSelectedId(null);
+        },
+      },
+    ]);
+  };
+
+  const movePage = (dir: -1 | 1) => {
+    if (!doc) {
+      return;
+    }
+    const idx = pages.findIndex((d) => d.id === doc.id);
+    const reordered = reorderPages(pages, idx, idx + dir);
+    if (reordered === pages) {
+      return;
+    }
+    useEditorStore.getState().dispatch({ type: 'REORDER_IMAGE_DOCS', order: reordered.map((d) => d.id) });
+  };
+
+  const activeIdx = doc ? pages.findIndex((d) => d.id === doc.id) : -1;
 
   const add = (kind: ImageLayer['kind']) => {
     if (!doc) {
@@ -871,6 +943,43 @@ export function ImageStudioBody({
     }
   };
 
+  /**
+   * 🖼️➡️📲 A galéria megosztása a FEEDBE — diavetítés (videó) vagy lapozható (carousel).
+   * Előbb MINDEN lapot rasterizálunk (renderelt PNG), majd a `publishImageProject` a megfelelő
+   * poszttá alakítja. (Felhő-funkció: a render/feltöltés a workert/tárat igényli — a free a
+   * telefonon marad; a hiba barátságosan jelenik meg.)
+   */
+  const shareToFeed = async (shareMode: ImageShareMode) => {
+    const s = useEditorStore.getState();
+    if (!s.project || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const p of pages) {
+        if (!p.renderedUri) {
+          const uri = await rasterize(p);
+          if (uri) {
+            s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...p, renderedUri: uri } });
+          }
+        }
+      }
+      const fresh = useEditorStore.getState().project;
+      if (!fresh) {
+        return;
+      }
+      await publishImageProject(fresh, shareMode, { visibility: 'public' });
+      Alert.alert(
+        t('studio.image.shareFeed.doneTitle', { defaultValue: 'Megosztva' }),
+        t('studio.image.shareFeed.doneBody', { defaultValue: 'A poszt felkerült a feedbe.' })
+      );
+    } catch (e) {
+      Alert.alert(t('common.error', { defaultValue: 'Hiba' }), (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openExportMenu = () => setSheet('export');
 
   const saveScoped = async () => {
@@ -953,6 +1062,77 @@ export function ImageStudioBody({
           </Text>
         </Pressable>
       </View>
+
+      {/* 🖼️📄 galéria lap-strip (project mód): több kép → diavetítés/lapozható megosztás */}
+      {mode === 'project' && pages.length > 0 ? (
+        <View style={styles.pageStrip}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pageStripContent}
+          >
+            {pages.map((p, i) => {
+              const active = p.id === doc?.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => {
+                    setActivePageId(p.id);
+                    setSelectedId(null);
+                  }}
+                  style={[styles.pageChip, active && styles.pageChipActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${p.name} (${i + 1})`}
+                >
+                  {p.renderedUri ? (
+                    <Image source={{ uri: p.renderedUri }} style={styles.pageThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.pageThumbEmpty}>
+                      <Ionicons name="image-outline" size={16} color={palette.textDim} />
+                    </View>
+                  )}
+                  <Text style={styles.pageChipNum}>{i + 1}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable onPress={addPage} style={styles.pageAdd} accessibilityRole="button" accessibilityLabel={t('common.add')}>
+              <Ionicons name="add" size={22} color={palette.accent} />
+            </Pressable>
+          </ScrollView>
+          <View style={styles.pageActions}>
+            <Pressable onPress={() => movePage(-1)} disabled={activeIdx <= 0} hitSlop={6} style={styles.pageActionBtn}>
+              <Ionicons name="chevron-back" size={16} color={activeIdx <= 0 ? palette.border : palette.textDim} />
+            </Pressable>
+            <Pressable
+              onPress={() => movePage(1)}
+              disabled={activeIdx < 0 || activeIdx >= pages.length - 1}
+              hitSlop={6}
+              style={styles.pageActionBtn}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={activeIdx < 0 || activeIdx >= pages.length - 1 ? palette.border : palette.textDim}
+              />
+            </Pressable>
+            <Pressable onPress={duplicateActivePage} hitSlop={6} style={styles.pageActionBtn}>
+              <Ionicons name="copy-outline" size={15} color={palette.textDim} />
+            </Pressable>
+            <Pressable
+              onPress={deleteActivePage}
+              disabled={!canRemovePage({ imageDocs: pages })}
+              hitSlop={6}
+              style={styles.pageActionBtn}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={15}
+                color={canRemovePage({ imageDocs: pages }) ? palette.textDim : palette.border}
+              />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {/* vászon */}
       {doc ? (
@@ -1298,10 +1478,13 @@ export function ImageStudioBody({
         <ExportSheet
           doc={doc}
           busy={busy}
+          pageCount={mode === 'project' ? pages.length : 1}
           onRaster={(o) => void exportImage(o)}
           onSvg={() => void exportSvg()}
           onPdf={() => void exportPdf()}
           onVideo={() => void insertIntoVideo()}
+          onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
+          onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -1312,6 +1495,53 @@ export function ImageStudioBody({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#05060a' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  // 🖼️📄 galéria lap-strip
+  pageStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.border,
+  },
+  pageStripContent: { alignItems: 'center', gap: 8, paddingRight: 8 },
+  pageChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    overflow: 'hidden',
+    backgroundColor: '#0d0f16',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageChipActive: { borderColor: palette.accent },
+  pageThumb: { width: '100%', height: '100%' },
+  pageThumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  pageChipNum: {
+    position: 'absolute',
+    bottom: 1,
+    right: 3,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    textShadowColor: '#000',
+    textShadowRadius: 2,
+  },
+  pageAdd: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  pageActionBtn: { padding: 6 },
   topBtn: { padding: 2 },
   titleWrap: { flex: 1, gap: 2 },
   kindTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },

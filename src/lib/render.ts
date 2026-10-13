@@ -370,7 +370,7 @@ export async function renderProjectVersion(
 }
 
 /** Média-típus = mappanév a projekten belül a Storage-ban. */
-export type MediaKind = 'video' | 'poster' | 'media' | 'profile';
+export type MediaKind = 'video' | 'poster' | 'media' | 'profile' | 'image';
 
 /** Feltöltési cél: projekt-rendezett Storage-kulcs (`<projectId>/<kind>/<fájl>`). */
 export interface UploadTarget {

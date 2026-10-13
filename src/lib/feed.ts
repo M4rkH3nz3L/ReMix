@@ -7,6 +7,12 @@ import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
 import { needsPoster, posterFrameTime } from '@/lib/feedMedia';
+import {
+  buildSlideshowProject,
+  carouselImageUris,
+  type ImageShareMode,
+  type SlideshowBuildOptions,
+} from '@/lib/imageShare';
 import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
 import { renderAndUploadWeb, renderProjectVersion, uploadMedia } from '@/lib/render';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
@@ -35,7 +41,7 @@ interface PostRow {
   aspect_ratio: string;
   duration_sec: number;
   /** CSAK az interaktív (hotspot) réteg a feed-overlayhez — NEM a szerkeszthető projekt */
-  project_snapshot: { tracks: Track[] } | null;
+  project_snapshot: { tracks?: Track[]; carousel?: string[] } | null;
   visibility: string;
   moderation_status: string;
   promoted: boolean;
@@ -70,6 +76,13 @@ function toCreator(r: PostRow): Creator {
 }
 
 function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
+  // a project_snapshot jsonb KÉTFÉLE hasznot hordozhat: interaktív (hotspot) sáv
+  // `{ tracks }`, és/vagy a carousel kép-lista `{ carousel }` (kép-projekt lapozható
+  // megosztása). Visszafelé kompatibilis: a régi posztok csak `{ tracks }`-ot tároltak.
+  const snap = (r.project_snapshot ?? null) as { tracks?: Track[]; carousel?: string[] } | null;
+  const carousel = Array.isArray(snap?.carousel)
+    ? snap!.carousel.map((u) => reachableMediaUrl(u)).filter((u): u is string => !!u)
+    : undefined;
   return {
     id: r.id,
     creator: toCreator(r),
@@ -77,11 +90,12 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     description: r.description ?? '',
     hashtags: r.hashtags ?? [],
     videoUri: reachableMediaUrl(r.video_url),
+    images: carousel && carousel.length > 0 ? carousel : undefined,
     posterUri: reachableMediaUrl(r.poster_url),
     aspectRatio: (r.aspect_ratio as AspectRatio) ?? '9:16',
     durationSec: r.duration_sec,
     projectId: r.project_id ?? undefined,
-    interactive: r.project_snapshot ?? undefined,
+    interactive: snap?.tracks ? { tracks: snap.tracks } : undefined,
     rendered: !!r.video_url,
     remixable: r.remixable,
     remixOfPostId: r.remix_of_post_id ?? undefined,
@@ -463,6 +477,8 @@ export async function publishPost(
     videoUrl?: string | null;
     remixOfPostId?: string;
     remixOfCreator?: string;
+    /** 🖐️ carousel kép-poszt (kép-projekt lapozható megosztása): a lapok feltöltött URL-jei */
+    carouselUrls?: string[];
   }
 ): Promise<FeedPost> {
   const sb = requireSupabase();
@@ -473,9 +489,16 @@ export async function publishPost(
   const { username, name, avatar } = await creatorFields();
   // CSAK az interaktív (hotspot) réteget hordozzuk a poszton (feed-overlay) — a
   // teljes, szerkeszthető projektet SZÁNDÉKOSAN nem (a remix a videót importálja).
+  // A carousel kép-lista (ha van) ugyanebbe a jsonb-be megy (`carousel`).
   const interactiveTrack = project.tracks.find((tr) => tr.type === 'interactive');
-  const interactiveSnapshot =
-    interactiveTrack && interactiveTrack.clips.length > 0 ? { tracks: [interactiveTrack] } : null;
+  const snapshot: { tracks?: Track[]; carousel?: string[] } = {};
+  if (interactiveTrack && interactiveTrack.clips.length > 0) {
+    snapshot.tracks = [interactiveTrack];
+  }
+  if (opts?.carouselUrls && opts.carouselUrls.length > 0) {
+    snapshot.carousel = opts.carouselUrls;
+  }
+  const interactiveSnapshot = Object.keys(snapshot).length > 0 ? snapshot : null;
   const row = {
     creator_id: uid,
     creator_avatar: avatar,
@@ -593,6 +616,58 @@ export async function publishRenderedProject(
     remixOfCreator: updated.remixOf?.name,
   });
   return { post, project: updated };
+}
+
+/**
+ * 🖼️➡️📲 Egy KÉP-projekt (galéria) megosztása a feedbe — kétféle módon:
+ *  - `'slideshow'`: a lapokból DIAVETÍTÉS-VIDEÓ (`buildSlideshowProject` → a megszokott
+ *    `publishRenderedProject` renderel+feltölt+posztol). A feedben sima lejátszható poszt.
+ *  - `'carousel'`: a lapok renderelt PNG-jei feltöltődnek, és egy LAPOZHATÓ kép-poszt lesz
+ *    (nincs videó; a `project_snapshot.carousel` hordozza a kép-URL-eket, a feed-kártya pagerrel).
+ *
+ * ELŐFELTÉTEL: minden megosztandó lapnak legyen renderelt PNG-je (`imageDoc.renderedUri`) — a
+ * Kép Stúdió a megosztás előtt rasterizál. Csak a renderelt lapok kerülnek a posztba.
+ */
+export async function publishImageProject(
+  project: Project,
+  mode: ImageShareMode,
+  opts?: { visibility?: PostVisibility; onProgress?: (u: ProgressUpdate) => void } & SlideshowBuildOptions
+): Promise<{ post: FeedPost; project: Project }> {
+  if (mode === 'slideshow') {
+    const slideshow = buildSlideshowProject(project, opts ?? {});
+    if (!slideshow) {
+      throw new Error('Nincs renderelt lap a diavetítéshez — előbb rasterizáld a lapokat.');
+    }
+    // a diavetítés-projekt a megszokott videó-úton megy (render + feltöltés + poszt)
+    const { post } = await publishRenderedProject(slideshow, opts?.onProgress, {
+      visibility: opts?.visibility,
+    });
+    return { post, project };
+  }
+
+  // carousel: a renderelt lapok PNG-jeinek feltöltése → lapozható kép-poszt
+  const uris = carouselImageUris(project);
+  if (uris.length === 0) {
+    throw new Error('Nincs renderelt lap a lapozható poszthoz — előbb rasterizáld a lapokat.');
+  }
+  const urls: string[] = [];
+  for (let i = 0; i < uris.length; i++) {
+    const url = await uploadMedia(uris[i], {
+      projectId: project.id,
+      kind: 'image',
+      name: `${project.id}-page-${i}.png`,
+    });
+    urls.push(url);
+  }
+  const post = await publishPost(project, {
+    visibility: opts?.visibility ?? 'public',
+    videoUrl: null,
+    posterUrl: urls[0] ?? null, // a feed-rács borítója az első lap
+    carouselUrls: urls,
+    remixOfPostId: project.remixOf?.postId,
+    remixOfCreator: project.remixOf?.name,
+  });
+  return { post, project };
 }
 
 /** Töröl egy saját posztot. */

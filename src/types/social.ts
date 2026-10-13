@@ -61,6 +61,9 @@ export interface FeedPost {
   hashtags: string[];
   /** lejátszható videó (renderelt MP4 vagy nyers előnézet); null = nincs média */
   videoUri: string | null;
+  /** 🖐️ lapozható kép-poszt (kép-projekt carousel-megosztása): a lapok képei
+   *  sorrendben. Jelenléte → a feed-kártya vízszintes kép-pagert mutat videó helyett. */
+  images?: string[];
   /** borítókép (első kocka) — lejátszás előtt/alatt */
   posterUri: string | null;
   aspectRatio: AspectRatio;

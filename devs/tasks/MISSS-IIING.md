@@ -66,7 +66,12 @@ A kóddal ellenőrizve az alábbiak **készek** (a markdown-only review tévesen
 - [ ] 🟡📱 preview↔export finom-egyezés (élő worker+ffmpeg verifikáció) · fejlett szerkesztő-funkciók farka.
 
 ## 6. 🖼️ Image Studio — maradék ([IMAGE-STUDIO-PROD](./IMAGE-STUDIO-PROD.md))
-- [ ] 🟡 **Galéria-UI + diavetítés-render + lapozható feed-poszt** (a [slideshow] mag kész).
+- [x] ✅ **Több-képes galéria + megosztás-transzformáció** — a kép-projekt TÖBB, külön szerkeszthető
+  lapot (`project.imageDocs`) kezel: **lap-strip UI** (add/vált/duplikál/töröl/mozgat az aktív lapon;
+  `imageProjectPages.ts` + `REORDER_IMAGE_DOCS` command) a `[0]` hardcode helyett. Megosztáskor **két mód**
+  (`imageShare.ts`): 🎞️ **diavetítés-videó** (`buildSlideshowProject` → a meglévő videó-render; **élő-verifikált**:
+  3 kép × 2s → 6.0s H.264 MP4 + dissolve) vagy 🖐️ **lapozható carousel** (`publishImageProject`→`project_snapshot.carousel`,
+  migráció nélkül; `FeedImageCarousel` chevron+pötty-kártya a feedben, `FeedPost.images`). Pure magok tesztelve.
 - [x] ✅ **Boolean-divide** (`divideShapes` A∖B/B∖A/A∩B → külön rétegek; [boolean.ts] + `booleanDivideInDoc`
   [imageBoolean.ts]) · **align/distribute-selected** (`alignLayersInDoc`/`distributeSelectedInDoc`,
   kijelölés egymáshoz — [imageLayerLayout.ts]); pure + tesztelt. A divide-kimenet standard `shape:path`

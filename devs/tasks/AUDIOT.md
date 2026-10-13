@@ -83,6 +83,9 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [x] ✅ **Hangmagasság-eltolás (transzponálás)** — per-klip `audioFx.pitchSemitones` (−12…+12), a worker
   asetrate+aresample+atempo-val, **HOSSZ-tartó** (nem chipmunk); ClipEditSheet csúszka. *ÉLŐ-BIZONYÍTVA:
   440Hz klip +12 félhang → 880Hz a kimeneten, 3.0s változatlan (worker-mérés).*
+- [x] ✅ **Harmónia-hang** — per-klip `audioFx.harmony` (−12…+12): a klip mellé kevert, eltolt halkabb
+  másodhang (külön dekód → kombinált pitch → száraz busz); ClipEditSheet csúszka. *ÉLŐ-BIZONYÍTVA:
+  440Hz klip +7 harmónia → a mixben 440 ÉS 659 Hz (kvint) is szól (worker-mérés).*
 - [ ] 🟡 **Auto-tune (skálára-illesztés)** — a `pitch.ts` (pitchCorrectionPlan/snapMidiToScale) + a pitch-shift
   mag kész; hátra a hangmagasság-**detektálás** (worker-DSP) + a per-szegmens korrekció render-bekötése + UI.
 

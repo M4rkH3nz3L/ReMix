@@ -1049,6 +1049,9 @@ export interface AudioFx {
   /** 🎚️ hangmagasság-eltolás félhangban (−12…+12; 0/hiányzó = nincs). A renderben
    *  asetrate+atempo-val, a HOSSZ változatlan (nem chipmunk-effekt). */
   pitchSemitones?: number;
+  /** 🎵 harmónia-hang: a klip MELLÉ kevert, e félhanggal eltolt halkabb másodhang
+   *  (−12…+12; 0/hiányzó = nincs). Pl. +7 = kvint, +4 = nagy terc. A renderben. */
+  harmony?: number;
 }
 
 export interface AudioClip extends ClipBase {

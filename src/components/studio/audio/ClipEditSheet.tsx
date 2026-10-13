@@ -253,6 +253,15 @@ export function ClipEditSheet({
               onChange={(v) => patchFx({ pitchSemitones: Math.round(v) })}
               format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
             />
+            {/* 🎵 harmónia-hang: eltolt másodhang a klip mellé (pl. +7 kvint, +4 terc) */}
+            <Slider
+              label={t('studio.audio.fxHarmony', { defaultValue: 'Harmónia-hang (félhang)' })}
+              value={fx.harmony ?? 0}
+              min={-12}
+              max={12}
+              onChange={(v) => patchFx({ harmony: Math.round(v) })}
+              format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
+            />
             {/* 🎚️ szűrők: aluláteresztő (dörej) + felüláteresztő (sziszegés) — 0 = ki */}
             <Slider
               label={t('panels.audio.fxHighpass')}

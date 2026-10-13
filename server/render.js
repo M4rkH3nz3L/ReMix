@@ -2658,12 +2658,44 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     }
     chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
     graph.push(chain);
-    if (clip.source === 'voiceover') {
-      speechLabels.push(label);
-    } else if (clip.autoDuck) {
-      duckLabels.push(label);
-    } else {
-      audioLabels.push(label);
+    const pushToBus = (lbl) => {
+      if (clip.source === 'voiceover') {
+        speechLabels.push(lbl);
+      } else if (clip.autoDuck) {
+        duckLabels.push(lbl);
+      } else {
+        audioLabels.push(lbl);
+      }
+    };
+    pushToBus(label);
+
+    // 🎵 HARMÓNIA-hang (AUDIOT §5): a klip MELLÉ egy félhang-intervallummal eltolt, halkabb
+    // másodhang (külön dekód → ugyanaz a test + kombinált pitch-eltolás → a száraz busz). A
+    // teljes eltolás (klip-pitch + harmónia) ±12-re szorítva, hogy az atempo biztonságos maradjon.
+    const harm = clip.audioFx?.harmony;
+    if (harm && Math.round(harm) !== 0) {
+      const idx2 = addInput(['-i', clip.uri], `harm|${clip.uri}`);
+      const hlabel = `ah${audioIdx++}`;
+      const total = Math.max(-12, Math.min(12, Math.round(clip.audioFx.pitchSemitones || 0) + Math.round(harm)));
+      const hFx = { ...clip.audioFx, pitchSemitones: total, harmony: 0 };
+      let hchain =
+        `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration).toFixed(3)},asetpts=PTS-STARTPTS,` +
+        (clip.deReverb ? DEREVERB : '') +
+        (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+        audioFxChain(hFx) +
+        panChain(clip, 0) +
+        volumeExpr(clip, 0) +
+        `,volume=0.7` + // a harmónia halkabb (háttér-réteg)
+        (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
+      if (clip.fadeIn > 0) {
+        hchain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`;
+      }
+      if (clip.fadeOut > 0) {
+        hchain += `,afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`;
+      }
+      hchain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${hlabel}]`;
+      graph.push(hchain);
+      pushToBus(hlabel);
     }
   }
 

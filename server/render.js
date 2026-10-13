@@ -323,6 +323,20 @@ function audioExtractArgs(settings = {}) {
   return { ext: fmt.ext, args };
 }
 
+/**
+ * 🎞️ GIF-export argumentumai (VIDEO-STUDIO §5): a kész videóból palettegen/paletteuse
+ * két-fázisú (egy filtergraph) GIF — lekicsinyítve + alacsonyabb fps (a GIF nagy). A
+ * `gifFps` (5–30, alap 15) és `gifWidth` (120–1080, alap 480) a settings-ből. (pure → tesztelt)
+ */
+function gifArgs(settings = {}) {
+  const fps = Math.max(5, Math.min(30, Math.round(Number(settings.gifFps) || 15)));
+  const width = Math.max(120, Math.min(1080, Math.round(Number(settings.gifWidth) || 480)));
+  const vf =
+    `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];` +
+    `[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer`;
+  return { ext: 'gif', fps, width, args: ['-vf', vf, '-loop', '0'] };
+}
+
 // 🎚️ MASTER 1. menet: a master-gráf (EQ+multiband) + loudnorm MÉRÉS (JSON a
 // stderr-en) → a mért Integrated/TP/LRA/thresh/offset.
 function measureLoudnorm(inFile, graphStr, I, TP, LRA) {
@@ -2724,6 +2738,15 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     await runFfmpegWithProgress(['-y', '-i', masteredFile, '-vn', ...audio.args, audioFile], total, onProgress);
     return audioFile;
   }
+
+  // 🎞️ GIF-export (VIDEO-STUDIO §5): a kész videóból animált GIF (palette-optimalizálva).
+  if (settings.gif) {
+    const g = gifArgs(settings);
+    const gifFile = path.join(workDir, `out.${g.ext}`);
+    await runFfmpegWithProgress(['-y', '-i', masteredFile, ...g.args, gifFile], total, onProgress, signal);
+    return gifFile;
+  }
+
   return masteredFile;
 }
 
@@ -2741,6 +2764,7 @@ module.exports = {
   shearPoint,
   bezierEaseNode,
   audioExtractArgs,
+  gifArgs,
   AUDIO_FORMATS,
   MAX_RENDER_DURATION_SEC,
 };

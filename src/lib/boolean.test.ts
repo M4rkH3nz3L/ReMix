@@ -1,4 +1,4 @@
-import { booleanShapes, flattenShape } from '@/lib/boolean';
+import { booleanShapes, divideShapes, flattenShape } from '@/lib/boolean';
 import type { ShapeClip } from '@/types/project';
 
 // 🔗 Vektor-forma boolean (union/subtract/intersect/exclude; a preview ÉS a
@@ -61,5 +61,30 @@ describe('booleanShapes — a négy művelet kimenete', () => {
   it('subtract (nem átfedő) → csak a (nincs lyuk)', () => {
     const r = booleanShapes(a, bFar, 'subtract')!;
     expect(r.subpaths).toHaveLength(1);
+  });
+});
+
+describe('divideShapes — átfedő formák külön régiókra (Pathfinder divide)', () => {
+  const a = rect(0.5, 0.5, 0.4, 0.4); // x 0.3..0.7
+  const bOverlap = rect(0.6, 0.6, 0.4, 0.4); // fed
+  const bFar = rect(0.9, 0.9, 0.1, 0.1); // nincs átfedés
+
+  it('átfedő → 3 lap: A∖B, B∖A, A∩B (forrás-tagekkel)', () => {
+    const faces = divideShapes(a, bOverlap);
+    expect(faces).toHaveLength(3);
+    expect(faces.map((f) => f.source)).toEqual(['a', 'b', 'ab']);
+    expect(faces.every((f) => f.subpaths.length >= 1)).toBe(true);
+  });
+
+  it('nem átfedő → 2 egész forma (A, B)', () => {
+    const faces = divideShapes(a, bFar);
+    expect(faces).toHaveLength(2);
+    expect(faces.map((f) => f.source)).toEqual(['a', 'b']);
+  });
+
+  it('teljes átfedés (azonos forma) → kezeli, nem dob; van átfedés-lap', () => {
+    const faces = divideShapes(a, { ...a, id: 'a2' } as ShapeClip);
+    expect(faces.length).toBeGreaterThan(0);
+    expect(faces.some((f) => f.source === 'ab')).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
@@ -104,6 +104,15 @@ export function AddMediaSheet({
     try {
       const picked = await pickAudio();
       if (picked) {
+        // 🎵 §5 bevételi osztályozás: hard-stop a nem támogatott formátumra, egyébként
+        // figyelmeztetés (ismeretlen hossz / nagyon hosszú) — de a klip így is bekerül.
+        if (!picked.intake.ok) {
+          Alert.alert('Nem beolvasható', picked.intake.message ?? 'Ismeretlen hangformátum.');
+          return;
+        }
+        if (picked.intake.warning && picked.intake.message) {
+          Alert.alert('Figyelmeztetés', picked.intake.message);
+        }
         addAudio(picked.uri, picked.name, picked.duration);
       }
     } finally {

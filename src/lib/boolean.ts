@@ -1,6 +1,6 @@
 import type { PathPoint, ShapeClip } from '@/types/project';
 
-export type BooleanOp = 'union' | 'subtract' | 'intersect' | 'exclude';
+export type BooleanOp = 'union' | 'subtract' | 'intersect' | 'exclude' | 'divide';
 
 interface Pt {
   x: number;
@@ -139,6 +139,10 @@ export function booleanShapes(
   if (pa.length < 3 || pb.length < 3) {
     return null;
   }
+  if (op === 'divide') {
+    // a divide több RÉGIÓT ad → nem egy compound path; a `divideShapes`-t használd.
+    return null;
+  }
   if (op === 'intersect') {
     const clipped = clipSH(ensureWinding(pa, true), pb);
     if (clipped.length < 3) {
@@ -167,4 +171,49 @@ export function booleanShapes(
     subpaths: [toPathPoints(ensureWinding(pa, true)), toPathPoints(ensureWinding(pb, true))],
     fillRule: 'nonzero',
   };
+}
+
+/** divide-régió: `a` = csak A-ban, `b` = csak B-ben, `ab` = az átfedés (A∩B). */
+export type DivideSource = 'a' | 'b' | 'ab';
+
+export interface DivideFace {
+  subpaths: PathPoint[][];
+  fillRule: 'nonzero' | 'evenodd';
+  /** melyik forrásból ered a lap (a kitöltés-öröklődéshez) */
+  source: DivideSource;
+}
+
+/**
+ * ✂️ „Divide" (Illustrator/Figma Pathfinder): két átfedő formát KÜLÖN régiókra
+ * bont — A∖B, B∖A és az átfedés (A∩B) önálló lapok. Átfedés nélkül a két egész
+ * forma marad (2 lap). A lapok sorrendje: A∖B, B∖A, A∩B. @returns [] érvénytelen
+ * (degenerált) bemenetre.
+ */
+export function divideShapes(a: ShapeClip, b: ShapeClip): DivideFace[] {
+  const pa = flattenShape(a);
+  const pb = flattenShape(b);
+  if (pa.length < 3 || pb.length < 3) {
+    return [];
+  }
+  const whole = (poly: Pt[], source: DivideSource): DivideFace => ({
+    subpaths: [toPathPoints(ensureWinding(poly, true))],
+    fillRule: 'nonzero',
+    source,
+  });
+  const inter = booleanShapes(a, b, 'intersect'); // A∩B
+  if (!inter) {
+    // nincs értelmes átfedés → a két egész forma
+    return [whole(pa, 'a'), whole(pb, 'b')];
+  }
+  const faces: DivideFace[] = [];
+  const aMinusB = booleanShapes(a, b, 'subtract'); // A∖B
+  if (aMinusB) {
+    faces.push({ subpaths: aMinusB.subpaths, fillRule: aMinusB.fillRule, source: 'a' });
+  }
+  const bMinusA = booleanShapes(b, a, 'subtract'); // B∖A
+  if (bMinusA) {
+    faces.push({ subpaths: bMinusA.subpaths, fillRule: bMinusA.fillRule, source: 'b' });
+  }
+  faces.push({ subpaths: inter.subpaths, fillRule: inter.fillRule, source: 'ab' });
+  return faces;
 }

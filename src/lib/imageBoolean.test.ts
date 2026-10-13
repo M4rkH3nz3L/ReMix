@@ -1,4 +1,4 @@
-import { booleanCombineInDoc, canBoolean } from '@/lib/imageBoolean';
+import { booleanCombineInDoc, booleanDivideInDoc, canBoolean } from '@/lib/imageBoolean';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 const rect = (id: string, over: Partial<ShapeLayer> = {}): ShapeLayer =>
@@ -63,5 +63,34 @@ describe('booleanCombineInDoc — a két forma EGY path-formává olvad', () => 
 
   it('nincs másik forma → null', () => {
     expect(booleanCombineInDoc(doc([rect('a'), photo('p')]), 'a', 'union')).toBeNull();
+  });
+});
+
+describe('booleanDivideInDoc — divide: külön régió-rétegek', () => {
+  it('átfedő pár → 3 réteg (A∖B base-fill, B∖A sel-fill, A∩B base-fill); a 2 forrás eltűnik', () => {
+    const d = doc([
+      rect('base', { position: { x: 0.45, y: 0.5 }, fill: '#111111' }),
+      rect('sel', { position: { x: 0.6, y: 0.5 }, fill: '#eeeeee' }),
+      photo('p'),
+    ]);
+    const out = booleanDivideInDoc(d, 'sel');
+    expect(out).not.toBeNull();
+    const layers = out!.doc.layers;
+    // 3 arc-réteg + a foto; a base/sel forrás eltűnt
+    expect(layers.find((l) => l.id === 'base')).toBeUndefined();
+    expect(layers.find((l) => l.id === 'sel')).toBeUndefined();
+    expect(layers.find((l) => l.id === 'p')).toBeDefined();
+    const faces = layers.filter((l) => out!.resultIds.includes(l.id)) as ShapeLayer[];
+    expect(faces).toHaveLength(3);
+    expect(faces.every((f) => f.shape === 'path' && Array.isArray(f.subpaths))).toBe(true);
+    // a B∖A lap a sel kitöltését örökli
+    const fills = faces.map((f) => f.fill);
+    expect(fills).toContain('#eeeeee');
+    expect(fills).toContain('#111111');
+    expect(out!.doc.renderedUri).toBeUndefined();
+  });
+
+  it('nincs pár → null', () => {
+    expect(booleanDivideInDoc(doc([rect('a'), photo('p')]), 'a')).toBeNull();
   });
 });

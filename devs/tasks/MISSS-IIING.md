@@ -58,15 +58,27 @@ A kóddal ellenőrizve az alábbiak **készek** (a markdown-only review tévesen
 - [ ] 🟡 **Free render/tár kliens-routing**: a free kötelezően eszközön renderel/tárol (a szerver-enforce kész; a kliens-routing + paywall-UX hátra).
 
 ## 5. 🎬 Video Studio — maradék ([VIDEO-STUDIO-PROD](./VIDEO-STUDIO-PROD.md))
-- [ ] 🟡 preview↔export finom-egyezés (élő worker+ffmpeg verifikáció) · GIF-export · cache-korlát · fejlett szerkesztő-funkciók farka.
+- [x] ✅ **GIF-export** — `gifArgs` (palettegen/paletteuse, fps/width-clamp) a worker renderláncában
+  ([server/render.js]) + `RenderSettings.gif/gifFps/gifWidth` ([render.ts]); **élő-verifikált** (GIF89a,
+  `codec_name=gif`, 320px) + `server/gifExport.test.js`.
+- [x] ✅ **Cache-korlát** — `planCacheEviction` ([cacheEvict.ts]) + `pruneProxyCache` 512 MB
+  ([cacheManager.ts]), bekötve (profile + editor), tesztelt.
+- [ ] 🟡📱 preview↔export finom-egyezés (élő worker+ffmpeg verifikáció) · fejlett szerkesztő-funkciók farka.
 
 ## 6. 🖼️ Image Studio — maradék ([IMAGE-STUDIO-PROD](./IMAGE-STUDIO-PROD.md))
 - [ ] 🟡 **Galéria-UI + diavetítés-render + lapozható feed-poszt** (a [slideshow] mag kész).
-- [ ] 🔌 **PSD-import** + **PDF/PSD-export** (PDF-export már kész) · P2 vektor-finomságok (boolean-divide, align-selected, toll v5).
+- [x] ✅ **Boolean-divide** (`divideShapes` A∖B/B∖A/A∩B → külön rétegek; [boolean.ts] + `booleanDivideInDoc`
+  [imageBoolean.ts]) · **align/distribute-selected** (`alignLayersInDoc`/`distributeSelectedInDoc`,
+  kijelölés egymáshoz — [imageLayerLayout.ts]); pure + tesztelt. A divide-kimenet standard `shape:path`
+  (subpaths+fillRule) → a meglévő renderer kezeli, nincs új worker-kontraktus.
+- [ ] 🔌 **PSD-import** + **PSD-export** (PDF-export már kész) · toll v5 (P2 vektor-finomság).
 
 ## 7. 🎧 Audio Studio — maradék ([AUDIO-STUDIO-PROD](./AUDIO-STUDIO-PROD.md))
 - [ ] 🟡 **Album-UI + borító (kép-szerkesztővel) + lapozható album-share** (az [album] mag kész).
 - [ ] 📱 **preview↔export DSP-parity** (per-klip fx + master élőben vagy proxy) — device-verify.
+- [x] ✅ **Bemeneti hang-robusztusság (pure)** — `audioIntake.ts` (`isSupportedAudio` formátum-kapu +
+  `classifyAudioIntake` barátságos hiba/figyelmeztetés: nem-támogatott / ismeretlen-hossz / >3h), bekötve a
+  `pickAudio`-ba + AddMediaSheet Alert; pure + tesztelt. A tényleges dekódolás a natív/worker ffmpeg-é.
 - [ ] 🔌 **Stem-szeparáció (Demucs)** külön worker-image · export-minőség-UI (a szerver-formátum kész, +opus).
 
 ## 8. 📡 Social & publikálás — maradék
@@ -100,7 +112,8 @@ A kóddal ellenőrizve az alábbiak **készek** (a markdown-only review tévesen
 ## Javasolt sorrend (a reviewerével egyezik, a valós állapottal frissítve)
 1. **🔌 Production go-live kapu** (deploy — az IaC kész) + **👤 store-fiókok/build**.
 2. **📱 Free videó/hang-vízjel a natív motoron** + a free render/tár kliens-routing (a motor + a kép-vízjel kész).
-3. **🟡 A 3 stúdió maradék UI/export-bekötése** (galéria-UI, album-UI, audio-fx-UI, GIF).
+3. **🟡 A 3 stúdió maradék UI/export-bekötése** (galéria-UI, album-UI, audio-fx-UI). *(GIF-export, boolean-divide,
+   align/distribute-selected, audio-intake — a pure magok KÉSZ + tesztelt; lásd §5–§7.)*
 4. **📡🤝💾 Social/collab/storage** hátralék (moderáció-mélység, keresés, klip-zárolás, offline/szinkron).
 5. **🧠 AI Creator OS** + **🎨 UI-drawer/a11y** + **📚 docs/native** — a végére.
 

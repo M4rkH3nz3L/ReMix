@@ -1,4 +1,4 @@
-import { booleanShapes, type BooleanOp } from '@/lib/boolean';
+import { booleanShapes, divideShapes, type BooleanOp } from '@/lib/boolean';
 import { makeId } from '@/lib/id';
 import { layerToShapeClip } from '@/lib/imageLayerClip';
 import type { ImageDoc, ShapeLayer } from '@/types/project';
@@ -76,4 +76,52 @@ export function booleanCombineInDoc(
     .map((l, i) => (i === pair.baseIdx ? combined : l))
     .filter((l) => l.id !== sel.id);
   return { doc: { ...doc, layers, renderedUri: undefined }, resultId: id };
+}
+
+/**
+ * ✂️ „Divide": a kijelölt forma + a legközelebbi másik forma KÜLÖN régiókra bontása
+ * (A∖B, B∖A, A∩B) — minden régió önálló réteg. A `base`-eredetű lapok a `base`
+ * kitöltését, a `sel`-eredetűek a `sel` kitöltését öröklik; a lapok a `base` helyére
+ * kerülnek (a két forrás eltűnik). `null`, ha nincs pár / degenerált bemenet.
+ */
+export function booleanDivideInDoc(
+  doc: ImageDoc,
+  selectedId: string
+): { doc: ImageDoc; resultIds: string[] } | null {
+  const pair = findShapePair(doc, selectedId);
+  if (!pair) {
+    return null;
+  }
+  const base = doc.layers[pair.baseIdx] as ShapeLayer;
+  const sel = doc.layers[pair.selIdx] as ShapeLayer;
+  const faces = divideShapes(layerToShapeClip(base), layerToShapeClip(sel));
+  if (faces.length === 0) {
+    return null;
+  }
+  const faceLayers: ShapeLayer[] = faces.map((f) => {
+    const src = f.source === 'b' ? sel : base;
+    return {
+      kind: 'shape',
+      id: makeId('lyr'),
+      shape: 'path',
+      position: { x: 0.5, y: 0.5 },
+      w: 1,
+      h: 1,
+      fill: src.fill,
+      subpaths: f.subpaths,
+      fillRule: f.fillRule,
+      closed: true,
+      ...(src.opacity != null ? { opacity: src.opacity } : {}),
+    } as ShapeLayer;
+  });
+  // a lapok a base HELYÉRE kerülnek (a base-t kivéve), a sel eltűnik
+  const layers: ImageDoc['layers'] = [];
+  doc.layers.forEach((l, i) => {
+    if (i === pair.baseIdx) {
+      layers.push(...faceLayers);
+    } else if (l.id !== sel.id) {
+      layers.push(l);
+    }
+  });
+  return { doc: { ...doc, layers, renderedUri: undefined }, resultIds: faceLayers.map((l) => l.id) };
 }

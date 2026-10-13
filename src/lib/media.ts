@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { classifyAudioIntake, type AudioIntakeResult } from '@/lib/audioIntake';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
@@ -21,6 +22,8 @@ export interface PickedAudio {
   name: string;
   /** a fájl VALÓS hossza másodpercben (0 = nem sikerült kiolvasni) */
   duration: number;
+  /** bevételi osztályozás (barátságos hiba/figyelmeztetés — a UI-nak) */
+  intake: AudioIntakeResult;
 }
 
 /**
@@ -195,7 +198,9 @@ export async function pickAudio(): Promise<PickedAudio | null> {
   const uri = persistToLibrary(asset.uri);
   // a VALÓS hossz kiolvasása → a teljes fájl importálható (nem fix 10 mp)
   const duration = await probeAudioDuration(uri).catch(() => 0);
-  return { uri, name: asset.name, duration };
+  // 🎵 §5 bevételi osztályozás: barátságos hiba/figyelmeztetés a néma kudarc helyett
+  const intake = classifyAudioIntake({ uri, name: asset.name, durationSec: duration });
+  return { uri, name: asset.name, duration, intake };
 }
 
 export interface PickedLut {

@@ -133,6 +133,12 @@ export interface RenderSettings {
   /** 🎧 HANG-ONLY export: a kész keverékből a worker ezt a formátumot vonja ki
    *  (WAV/MP3/AAC/FLAC/Opus). Hiányzó = normál videó-kimenet. */
   audioFormat?: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus';
+  /** 🎞️ GIF-export: a kész videóból animált GIF (palette-optimalizálva). */
+  gif?: boolean;
+  /** GIF képkocka/mp (5–30, alap 15) */
+  gifFps?: number;
+  /** GIF szélesség px (120–1080, alap 480) */
+  gifWidth?: number;
 }
 
 /**

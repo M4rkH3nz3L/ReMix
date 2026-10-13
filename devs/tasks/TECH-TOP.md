@@ -13,7 +13,8 @@
 |------|-------|---------|
 | 1 | **Routing-magok** (`shouldWatermark`/`canCloudRender`/`canCloudStore`) kliens+szerver, unit + **contract-lock** | ✅ **KÉSZ** (40 teszt) |
 | 2 | **Szerver render-routing enforce**: `/render` → `paidOnly` (**min Amatőr**, free→402 „eszközön"); + **`isPro` bug-fix** (eddig a Profi/Céges usert is elutasította!) + `server/tiers.js` mirror + contract | ✅ **KÉSZ** (audit 177/1915) |
-| 3 | **Free-vízjel beégetés** (kép `/imagedoc` → videó → hang) | 🔄 folyamatban |
+| 3a | **Free-vízjel — KÉP** (`/imagedoc`, **szerver-hiteles** tier; a kliens nem kapcsolhatja ki) | ✅ **KÉSZ** — élő-verifikált (free→„Made with ReMix", pro→nincs) |
+| 3b | Free-vízjel — **videó** (render.js lánc) + **hang** (audio-export) + **on-device** vízjel a free-render-motorban | 🔄 következő |
 | 4 | Content-típus publish-célok (Pinterest/SoundCloud/Spotify) | ⬜ |
 | 5+ | tulajdon-ToS · kép-galéria · hang-album · cross-editor · owner/collab/cég · coin-recurring · UI-drawer · **Android on-device render-motor** | ⬜ |
 

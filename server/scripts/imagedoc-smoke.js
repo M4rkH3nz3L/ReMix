@@ -63,6 +63,7 @@ async function rasterizeOne(name, doc, mediaFiles) {
   form.append('uriMap', JSON.stringify(uriMap));
   form.append('height', String(HEIGHT));
   form.append('format', FORMAT);
+  form.append('tier', process.env.SMOKE_TIER || 'free'); // free → kötelező vízjel
   if (QUALITY != null) {
     form.append('quality', String(QUALITY));
   }

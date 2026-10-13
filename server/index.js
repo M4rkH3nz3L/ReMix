@@ -69,7 +69,10 @@ const {
   handleRevenueCatEvent,
   isPro,
   isPaid,
+  activeTier,
 } = require('./billing');
+const { shouldWatermark } = require('./entitlements');
+const { asTier } = require('./tiers');
 
 const WHISPER_MODEL =
   process.env.WHISPER_MODEL || path.join(__dirname, 'models', 'ggml-base.bin');
@@ -1100,7 +1103,11 @@ app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, re
   }
   // a válasz (kép) teljes elküldése UTÁN takarítjuk a temp-mappát (eddig szivárgott)
   res.on('finish', () => fs.rm(req.workDir, { recursive: true, force: true }, () => {}));
-  renderImageDoc(doc, height, req.workDir, { format, quality })
+  // 🏷️ free-vízjel a SZERVER-HITELES tier szerint (a kliens NEM kapcsolhatja ki):
+  // prod-ban a user előfizetéséből (activeTier), dev-ben a kért tier-ből.
+  const tierPromise = INSECURE_DEV ? Promise.resolve(asTier(req.body.tier)) : activeTier(req.user?.id);
+  tierPromise
+    .then((tier) => renderImageDoc(doc, height, req.workDir, { format, quality, watermark: shouldWatermark(tier) }))
     .then((file) => res.sendFile(file))
     .catch((err) => {
       console.warn('imagedoc hiba:', err.message.slice(0, 300));

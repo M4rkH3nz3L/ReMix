@@ -130,11 +130,30 @@ function imageOutputArgs(format, quality) {
   }
 }
 
+/** 🏷️ Kötelező free-vízjel text-rétege (alul-középen, félig-átlátszó). A text-render
+ * lánc (Chromium) rendereli, mint bármely text-réteget → a legfelső rétegként komponálódik. */
+function watermarkLayer() {
+  return {
+    kind: 'text',
+    id: 'wm-remix',
+    text: 'Made with ReMix',
+    color: '#ffffff',
+    fontSize: 3.2, // a vászon-MAGASSÁG %-a
+    fontWeight: 'bold',
+    position: { x: 0.5, y: 0.95 },
+    opacity: 0.72,
+  };
+}
+
 async function renderImageDoc(doc, height, workDir, opts = {}) {
   const canvas = docCanvas(doc, height);
   const layers = (doc.layers ?? []).filter(isVisible);
   if (layers.length === 0) {
     throw new Error('A dokumentumnak nincs látható rétege.');
+  }
+  // 🏷️ free-vízjel: a szerver-hiteles tier szerint (opts.watermark) a LEGFELSŐ rétegként
+  if (opts.watermark) {
+    layers.push(watermarkLayer());
   }
 
   // 1) a forma- és szöveg-rétegek a MEGLÉVŐ generátorokkal PNG-be

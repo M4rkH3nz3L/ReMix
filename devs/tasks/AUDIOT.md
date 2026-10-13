@@ -55,14 +55,15 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [ ] ⏺️ **Comping / take-lanes** (felvétel-változatok összevágása) · **ismétlés/duplázás** · **ripple-törlés**.
 - [ ] 🟡 **Beat-re vágás/marker** — a `beatToCuts`/`beatToMarkers` kulcsok megvannak, UI-finomítás hátra.
 
-## 4. 🎛️ Effektek & feldolgozás — 🟡 részben kész
-- [x] ✅ klip-szintű **EQ (3 sáv)** + Pro FX + master-lánc (EQ/loudnorm/limiter).
-- [ ] ⬜ **FX-lánc UI** klipre ÉS sávra (sorrendezhető insertek): EQ (parametrikus) · kompresszor/gate ·
-  reverb · delay · de-esser · szaturáció · chorus/flanger.
-- [ ] ⬜ **Tempó-szinkron effektek** (delay/LFO a BPM-hez) — a `musicTime` tempo-map adja az alapot.
-- [ ] 🟡 **Sidechain-kompresszió UI** (pl. zene duckolása beszéd alá) — a `mixer.ts` sidechain-magja kész.
-- [ ] 🟡 **Automatizálás**: húzható **automation-görbék** (hangerő/pan/send/szűrő) — az
-  [`automation.ts`](../../src/lib/automation.ts) (volume/pan/send/filter automation) **KÉSZ+tesztelt, 0 UI**.
+## 4. 🎛️ Effektek & feldolgozás — ✅ NAGYRÉSZT KÉSZ
+- [x] ✅ **Teljes per-klip FX-lánc** (ClipEditSheet): highpass/lowpass · 3-sávos EQ · denoise · de-esser ·
+  kompresszor · limiter · normalize · reverb · delay — mind a worker `audioFxChain`-jével renderel.
+- [x] ✅ **Hangerő-automáció** (KeyframeGraphEditor → `clip.keyframes.volume`) — a worker `eval=frame`-mel égeti be.
+- [x] ✅ **Pásztázás-automáció** (ÚJ): `clip.keyframes.pan` → a worker per-frame `aeval` sztereó-balanszként.
+  *ÉLŐ-BIZONYÍTVA: L→R söprés → bal csatorna −8.4 dB, jobb +8.4 dB az idő haladtával (worker-mérés).*
+- [x] ✅ **Sidechain-duck** (zene a beszéd alá) — a Mixerben (§2), worker-verifikált.
+- [ ] ⬜ **Tempó-szinkron effektek** (delay/LFO a BPM-hez) · **track/bus-insert FX** (ma per-klip) ·
+  **send-buszok** (a `mixer.ts` toRenderPlan magja kész, worker send-routing hátra).
 
 ## 5. 🎹 Zenekészítés (DAW-mag) — ⬜ hiányzik (a legnagyobb rés)
 - [ ] ⬜ **Piano-roll + MIDI**: hangjegy-szerkesztő, MIDI import/export, kvantálás/swing (a `musicTime.quantize`

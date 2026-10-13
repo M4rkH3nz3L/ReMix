@@ -213,6 +213,24 @@ export function ClipEditSheet({
               formatValue={(v) => `${Math.round(v * 100)}%`}
             />
 
+            {/* 🎚️ pásztázás-automáció (−1…1 görbe) — a render per-frame aeval-lal égeti be */}
+            <Text style={styles.autoLabel}>{t('studio.audio.panAutomation', { defaultValue: 'Pásztázás-automáció' })}</Text>
+            <KeyframeGraphEditor
+              keyframes={clip.keyframes?.pan ?? []}
+              duration={clip.duration}
+              min={-1}
+              max={1}
+              fallback={clip.pan ?? 0}
+              playhead={clamp(playhead - clip.start, 0, clip.duration)}
+              onChange={(next) =>
+                updateClip(clip.id, {
+                  keyframes: { ...clip.keyframes, pan: next.length > 0 ? next : undefined },
+                })
+              }
+              onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
+              formatValue={(v) => (Math.abs(v) < 0.02 ? 'C' : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`)}
+            />
+
             <View style={styles.divider} />
             <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
             <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />

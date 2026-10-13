@@ -729,6 +729,9 @@ export interface ClipKeyframes {
   opacity?: Keyframe[];
   /** hangerő-automáció 0–1 (videó- és hangklipen; a statikus volume az alap) */
   volume?: Keyframe[];
+  /** pásztázás-automáció −1…1 (hangklipen; a statikus pan az alap). A render per-frame
+   *  (aeval) sztereó-balanszként égeti be — kulcskocka nélkül a statikus pan érvényes. */
+  pan?: Keyframe[];
 }
 
 export interface TextClip extends ClipBase {

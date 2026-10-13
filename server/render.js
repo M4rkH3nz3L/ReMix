@@ -2579,6 +2579,22 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   const hasAnyVolume = (clip) =>
     clip.volume > 0 || (clip.keyframes?.volume ?? []).some((k) => k.value > 0);
 
+  // 🎚️ pásztázás: statikus (panFilter) VAGY automáció (pan-kulcskockák → per-frame aeval).
+  // A dinamikus balansz ugyanazt a lineáris törvényt követi, mint a statikus panFilter
+  // (lg=1-max(0,pan), rg=1-max(0,-pan)), csak a `pan` itt t-függő kifejezés.
+  const panChain = (clip, skip) => {
+    const pk = clip.keyframes?.pan;
+    if (!pk || pk.length === 0) {
+      return panFilter(clip.pan);
+    }
+    const T = skip > 0 ? `(t+${skip.toFixed(3)})` : 't';
+    const PAN = kfChannelExpr(pk, clip.pan ?? 0, T);
+    return (
+      `aformat=channel_layouts=stereo,` +
+      `aeval='val(0)*(1-max(0,${PAN}))|val(1)*(1-max(0,-(${PAN})))':c=stereo,`
+    );
+  };
+
   for (const seg of segments) {
     if (seg.kind !== 'video' || !hasAnyVolume(seg.clip)) {
       continue;
@@ -2631,7 +2647,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       (clip.voiceEnhance ? VOICE_ENHANCE : '') +
       // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
       audioFxChain(clip.audioFx) +
-      panFilter(clip.pan) +
+      panChain(clip, 0) +
       volumeExpr(clip, 0) +
       (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
     if (clip.fadeIn > 0) {

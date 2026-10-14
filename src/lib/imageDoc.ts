@@ -232,7 +232,18 @@ export function duplicateLayer(
 
 /** amit a rasterizáló ténylegesen kirajzol (rejtett és teljesen átlátszó nélkül) */
 export function visibleLayers(doc: ImageDoc): ImageLayer[] {
-  return doc.layers.filter((l) => !l.hidden && (l.opacity ?? 1) > 0.001);
+  // 🗂️ a rejtett csoport tagjai sem látszanak (a worker `isVisible && !groupHidden`-jével paritásban)
+  const hiddenGroups = new Set((doc.groups ?? []).filter((g) => g.hidden).map((g) => g.id));
+  return doc.layers.filter(
+    (l) => !l.hidden && (l.opacity ?? 1) > 0.001 && !(l.groupId && hiddenGroups.has(l.groupId))
+  );
+}
+
+/** 🗂️ egy réteg EFFEKTÍV áttetszősége a preview-hoz = saját opacity × a csoportja opacity-je. */
+export function effectiveLayerOpacity(doc: ImageDoc, layer: ImageLayer): number {
+  const own = layer.opacity ?? 1;
+  const g = layer.groupId ? (doc.groups ?? []).find((gr) => gr.id === layer.groupId) : undefined;
+  return own * (g?.opacity ?? 1);
 }
 
 /** a réteglista címkéje — a felhasználó adta név, vagy a tartalomból képzett */

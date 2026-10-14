@@ -12,7 +12,7 @@
 
 | § | Terület | Állapot |
 |---|---------|---------|
-| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**) | ✅ *(group/festett-maszk ⬜)* |
+| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**, **csoportok**, **kontúr**) | ✅ *(festett-maszk ⬜)* |
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
@@ -55,7 +55,13 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   + a render geq alfa-rámpával (minden réteg-fajtára); LayerInspector-választó. *ÉLŐ-BIZONYÍTVA: piros foto fehér
   fill fölött, 'right' maszk → bal piros (ff0e0e), jobb a fehér base (fcf6f6), közép rózsaszín (worker-pixelmérés).*
 - [ ] ⬜ **Festhető raszter-maszk** + **vektor/szelekció-maszk** per réteg + invertálás/törlés.
-- [ ] ⬜ **Csoport-rétegek (mappák)** — `group` réteg-fajta + beágyazott transzform/opacity.
+- [x] ✅ **Csoport-rétegek (mappák)** — LAPOS `groupId`-modell (`ImageLayerBase.groupId` + `ImageDoc.groups`
+  [`ImageGroup` id/name/hidden/collapsed/opacity]); a `layers` tömb lapos marad (nincs `kind`-ripple). Worker:
+  rejtett csoport tagjai kimaradnak, a csoport-opacity a tagokra RÁszorzódik; a preview `visibleLayers`+
+  `effectiveLayerOpacity` paritásban; lib `createGroup/assignLayerToGroup/ungroup/updateGroup` (4 teszt); UI:
+  LayerInspector „Csoport" chipek (hozzárendelés/új) + LayerPanel csoport-bucketing (fejléc: összecsukás/név/
+  közös-opacity/elrejt/feloldás, behúzott tagok). *ÉLŐ-BIZONYÍTVA (/imagedoc, kék fotó fehéren): kontroll=799fc7;
+  csoport rejtve=ffffff; opacity 0.5=bbcee3 (≈kék 50%); HTTP 200.* (beágyazott csoport + per-tag transzform ⬜)
 - [x] ✅ **Dokumentum-szintű GLOBÁLIS korrekció** (grade + adjust a TELJES kompozitra) — `ImageDoc.grade` +
   `ImageDoc.adjust`; a render a kompozit UTÁN égeti (`gradeFilterChain`+`adjustChain`, a vignetta/grain ELŐTT);
   CanvasSheet „Globális look" (grade-chipek + expozíció/kontraszt/telítettség csúszkák). *ÉLŐ-BIZONYÍTVA

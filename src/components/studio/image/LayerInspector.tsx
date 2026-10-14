@@ -7,7 +7,8 @@ import { ColorField } from '@/components/studio/image/ColorField';
 import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
-import { updateLayer } from '@/lib/imageDoc';
+import { assignLayerToGroup, createGroup, updateLayer } from '@/lib/imageDoc';
+import { makeId } from '@/lib/id';
 import { pickCubeLut } from '@/lib/media';
 import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import type {
@@ -452,6 +453,33 @@ export function LayerInspector({
         onChange={(v) => commit(updateLayer(doc, layer.id, { opacity: v }))}
         format={(v) => `${Math.round(v * 100)}%`}
       />
+      {/* 🗂️ csoport (mappa) — a kijelölt réteg hozzárendelése egy csoporthoz / új csoport */}
+      <Text style={styles.sectionLabel}>{t('studio.image.group', { defaultValue: 'Csoport' })}</Text>
+      <View style={styles.chipRow}>
+        <Chip
+          label={t('studio.image.groupNone', { defaultValue: 'Nincs' })}
+          active={!layer.groupId}
+          onPress={() => (layer.groupId ? commit(assignLayerToGroup(doc, layer.id, undefined), 'group') : undefined)}
+        />
+        {(doc.groups ?? []).map((g) => (
+          <Chip
+            key={g.id}
+            label={g.name}
+            active={layer.groupId === g.id}
+            onPress={() => commit(assignLayerToGroup(doc, layer.id, g.id), 'group')}
+          />
+        ))}
+        <Chip
+          label={t('studio.image.groupNew', { defaultValue: '➕ Új' })}
+          active={false}
+          onPress={() =>
+            commit(
+              createGroup(doc, [layer.id], makeId('grp'), t('studio.image.groupName', { defaultValue: 'Mappa {{n}}', n: (doc.groups?.length ?? 0) + 1 })),
+              'group-new'
+            )
+          }
+        />
+      </View>
       {/* 🎨 keverési mód — MINDEN réteg-fajtára (fill/photo/shape/text); a render ffmpeg-blenddel égeti */}
       <Text style={styles.sectionLabel}>{t('studio.image.blendMode', { defaultValue: 'Keverési mód' })}</Text>
       <View style={styles.chipRow}>

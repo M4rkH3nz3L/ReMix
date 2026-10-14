@@ -18,7 +18,7 @@ import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
 import type { CropRect } from '@/lib/imageCrop';
-import { updateLayer, visibleLayers } from '@/lib/imageDoc';
+import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
@@ -220,7 +220,12 @@ export function ImageCanvas({
     >
       {fit.w > 0 ? (
         <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }]}>
-          {layers.map((raw) => {
+          {layers.map((raw0) => {
+            // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
+            const raw =
+              raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
+                ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
+                : raw0;
             const l = live?.id === raw.id ? withLive(raw, live.patch) : raw;
             const selected = !capturing && l.id === selectedId;
             if (l.kind === 'fill') {

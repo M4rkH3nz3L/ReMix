@@ -16,8 +16,8 @@
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus) | ✅ *(toll v5, text-on-path ⬜)* |
-| §5 | **Korrekciók & szűrők** (adjustment-stack + forma-fx + **struktúra-szűrők**) | ✅ *(RAW-develop 🟡, artistic ⬜)* |
-| §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + vonalzó/guide/snap) | ✅ *(szabad-transzform/perspektíva/warp ⬜)* |
+| §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
+| §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
 | §8 | **UX-paritás** (vászon-zoom/pan, smart-guides, history-panel) | 🟡 |
 

@@ -63,7 +63,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [x] ✅ **Külső ragyogás (outer glow)** bármely pozícionált rétegre — `ImageLayerBase.outerGlow` + a render
   paddelt (túlterjedő), színes, elmosott sziluettet tesz mögé (`glowSilhouette`). *ÉLŐ-BIZONYÍTVA: foto körül
   glow-val 05030b (lilás halo) vs nélküle 000000 (worker-pixelmérés).*
-- [ ] ⬜ **Kontúr/stroke fotóra** · egyedi árnyék/glow szín/eltolás/lágyság.
+- [x] ✅ **Kontúr/stroke bármely pozícionált rétegre** (fotó/forma/szöveg) — `ImageLayerBase.stroke
+  {color,width}` (width a vászonszélesség törtje); a render a réteg színezett, N px-rel megnövelt
+  sziluettjét teszi MÖGÉ (`strokeSilhouette`, a glow/árnyék UTÁN = legközelebb); LayerInspector „Kontúr"
+  chip + ColorField + vastagság-csúszka. *ÉLŐ-BIZONYÍTVA (/imagedoc, 50%-os fotó fehér háttéren, piros 0.08):
+  közép=fotó 799fc7; keret=fe0000 (piros); háttér=ffffff; HTTP 200.*
+- [ ] ⬜ Egyedi **árnyék/glow szín/eltolás/lágyság** (ma fix szép paraméterek).
 
 ## 2. 🎯 Kijelölés & maszkolás — 🟡 kijelölés van, maszk-bekötés hiányzik
 - [x] ✅ **Lasszó** + **varázspálca** (magicWandClient) + **ecset** — a kijelölés/festés él.

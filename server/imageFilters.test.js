@@ -5,6 +5,8 @@ const {
   maskGradientFilter,
   shadowSilhouette,
   glowSilhouette,
+  hexToRgb,
+  strokeSilhouette,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -52,6 +54,19 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(g).toContain('lutrgb=r=124:g=92:b=255');
     expect(g).toContain('gblur=sigma=6.0');
     expect(g).toContain('colorchannelmixer=aa=0.850');
+  });
+
+  test('hexToRgb: #rrggbb → egész csatornák; hibás → fehér', () => {
+    expect(hexToRgb('#ff0000')).toEqual({ r: 255, g: 0, b: 0 });
+    expect(hexToRgb('00ff00')).toEqual({ r: 0, g: 255, b: 0 });
+    expect(hexToRgb('#7c5cff')).toEqual({ r: 124, g: 92, b: 255 });
+    expect(hexToRgb('nope')).toEqual({ r: 255, g: 255, b: 255 });
+  });
+
+  test('strokeSilhouette: szín-kitöltés + 2N px növelés (nearest)', () => {
+    const s = strokeSilhouette('#ff0000', 5);
+    expect(s).toContain('lutrgb=r=255:g=0:b=0');
+    expect(s).toContain('scale=iw+10:ih+10:flags=neighbor');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

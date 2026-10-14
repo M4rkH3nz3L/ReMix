@@ -375,20 +375,50 @@ export function LayerInspector({
         ))}
       </View>
 
-      {/* 🌑 vetett árnyék — pozícionált rétegre (fotó/forma/szöveg) */}
+      {/* 🌑 vetett árnyék / ragyogás / 🖊️ kontúr — pozícionált rétegre (fotó/forma/szöveg) */}
       {layer.kind !== 'fill' ? (
-        <View style={styles.chipRow}>
-          <Chip
-            label={t('studio.image.dropShadow', { defaultValue: 'Vetett árnyék' })}
-            active={!!layer.dropShadow}
-            onPress={() => commit(updateLayer(doc, layer.id, { dropShadow: layer.dropShadow ? undefined : true }))}
-          />
-          <Chip
-            label={t('studio.image.glow', { defaultValue: 'Ragyogás' })}
-            active={!!layer.outerGlow}
-            onPress={() => commit(updateLayer(doc, layer.id, { outerGlow: layer.outerGlow ? undefined : true }))}
-          />
-        </View>
+        <>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t('studio.image.dropShadow', { defaultValue: 'Vetett árnyék' })}
+              active={!!layer.dropShadow}
+              onPress={() => commit(updateLayer(doc, layer.id, { dropShadow: layer.dropShadow ? undefined : true }))}
+            />
+            <Chip
+              label={t('studio.image.glow', { defaultValue: 'Ragyogás' })}
+              active={!!layer.outerGlow}
+              onPress={() => commit(updateLayer(doc, layer.id, { outerGlow: layer.outerGlow ? undefined : true }))}
+            />
+            <Chip
+              label={t('studio.image.outline', { defaultValue: 'Kontúr' })}
+              active={!!layer.stroke}
+              onPress={() =>
+                commit(updateLayer(doc, layer.id, { stroke: layer.stroke ? undefined : { color: '#ffffff', width: 0.01 } }))
+              }
+            />
+          </View>
+          {layer.stroke ? (
+            <>
+              <ColorField
+                label={t('studio.image.outlineColor', { defaultValue: 'Kontúr szín' })}
+                value={layer.stroke.color}
+                onChange={(color) =>
+                  commit(updateLayer(doc, layer.id, { stroke: { color, width: layer.stroke?.width ?? 0.01 } }))
+                }
+              />
+              <Slider
+                label={t('studio.image.outlineWidth', { defaultValue: 'Kontúr vastagság' })}
+                value={layer.stroke.width}
+                min={0}
+                max={0.05}
+                onChange={(v) =>
+                  commit(updateLayer(doc, layer.id, { stroke: { color: layer.stroke?.color ?? '#ffffff', width: v } }))
+                }
+                format={(v) => `${(v * 100).toFixed(1)}%`}
+              />
+            </>
+          ) : null}
+        </>
       ) : null}
 
       {/* 🎭 gradient-maszk: a réteg a megadott irányba fokozatosan átlátszóvá fade-el (a render geq-vel) */}

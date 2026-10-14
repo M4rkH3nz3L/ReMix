@@ -106,6 +106,25 @@ function glowSilhouette(margin, sigma, opacity) {
   );
 }
 
+// #rrggbb → {r,g,b} egész (0–255); hibás bemenet → fehér (biztonságos alap)
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) {
+    return { r: 255, g: 255, b: 255 };
+  }
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// 🖊️ kontúr/körvonal sziluett: a réteg másolatának ALFÁJÁT a stroke-színnel kitölti, és
+// minden irányban N px-rel megnöveli (nearest-neighbor → éles keret). A hívó a réteg MÖGÉ
+// overlay-eli (középre) → a megnövelt rész N px-es keretként jelenik meg. (pure → tesztelhető)
+function strokeSilhouette(hex, widthPx) {
+  const { r, g, b } = hexToRgb(hex);
+  const n = Math.max(1, Math.round(widthPx));
+  return `format=rgba,lutrgb=r=${r}:g=${g}:b=${b},scale=iw+${2 * n}:ih+${2 * n}:flags=neighbor`;
+}
+
 module.exports = {
   filterChain,
   oneFilter,
@@ -113,4 +132,6 @@ module.exports = {
   maskGradientFilter,
   shadowSilhouette,
   glowSilhouette,
+  hexToRgb,
+  strokeSilhouette,
 };

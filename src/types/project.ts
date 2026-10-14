@@ -1260,6 +1260,9 @@ export interface ImageLayerBase {
   /** ✨ külső ragyogás (neon-halo) — a réteg paddelt, elmosott, színes sziluettje MÖGÉ.
    *  (Nem keverendő a forma `glow` mezőjével, ami a forma körvonalára hat.) */
   outerGlow?: boolean;
+  /** 🖊️ kontúr/körvonal (bármely pozícionált rétegre): a réteg színezett, N px-rel megnövelt
+   *  sziluettje MÖGÉ — keretként jelenik meg. `width` a vászonszélesség törtje (0–~0.05). */
+  stroke?: { color: string; width: number };
 }
 
 /** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */

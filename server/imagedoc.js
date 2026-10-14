@@ -11,7 +11,7 @@ const path = require('path');
 
 const { adjustChain } = require('./render');
 const { gradeFilterChain } = require('./grades');
-const { filterChain, maskGradientFilter, shadowSilhouette, glowSilhouette } = require('./imageFilters');
+const { filterChain, maskGradientFilter, shadowSilhouette, glowSilhouette, strokeSilhouette } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -292,6 +292,20 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       filters.push(`${last}[shl${idx}]overlay=${posX}+${dx}:${posY}+${dy}[${sout}]`);
       last = `[${sout}]`;
       prepared = `pl${idx}`; // a réteg a split másik fele (az árnyék-sziluett nem fogyasztja el)
+    }
+
+    // 🖊️ kontúr/stroke (pozícionált rétegre): a réteg színezett, N px-rel megnövelt sziluettje
+    // MÖGÉ (középre) — a réteghez legközelebb (a glow/árnyék UTÁN). N a vászonszélesség törtje.
+    if (layer.stroke && layer.kind !== 'fill') {
+      const sw = Math.max(1, Math.round(canvas.w * (Number(layer.stroke.width) || 0)));
+      if (sw >= 1 && Number(layer.stroke.width) > 0) {
+        const kout = `st${idx}`;
+        filters.push(`[${prepared}]split[plk${idx}][psk${idx}]`);
+        filters.push(`[psk${idx}]${strokeSilhouette(layer.stroke.color, sw)}[stl${idx}]`);
+        filters.push(`${last}[stl${idx}]overlay=${posX}:${posY}[${kout}]`);
+        last = `[${kout}]`;
+        prepared = `plk${idx}`;
+      }
     }
 
     const mode = BLEND_FF[layer.blendMode];

@@ -20,6 +20,7 @@ const {
   perspectiveFilter,
   gradientMapFilter,
 } = require('./imageFilters');
+const { maskGrayChain } = require('./imageMask');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -213,6 +214,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
   filters.push(`${last}format=rgba[base]`);
   last = '[base]';
+  let maskSeq = 0; // 🎭 maszk-belső címke-számláló (NEM input → az idx-et nem növeli)
 
   for (const layer of layers) {
     const opacity = Math.min(1, Math.max(0, layer.opacity ?? 1)) * groupOpacity(layer);
@@ -327,6 +329,24 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         last = `[${kout}]`;
         prepared = `plk${idx}`;
       }
+    }
+
+    // 🎭 réteg-maszk (szelekció/alak): a réteget átlátszó TELJES vászonra helyezzük, az alfáját a
+    // maszk-szürkével szorozzuk (a maszkon kívül átlátszó) → a base fölé. A maszk a blend ELŐTT nyer (v1).
+    const mask = layer.mask;
+    if (mask && mask.shape && layer.kind !== 'fill') {
+      const mi = maskSeq;
+      maskSeq += 1;
+      filters.push(`color=black@0:s=${canvas.w}x${canvas.h}[mbg${mi}]`);
+      filters.push(`[mbg${mi}][${prepared}]overlay=${posX}:${posY}[Lf${mi}]`);
+      filters.push(maskGrayChain(mask, canvas.w, canvas.h, `[mimg${mi}]`));
+      filters.push(`[Lf${mi}]split[mf${mi}][mfa${mi}]`);
+      filters.push(`[mfa${mi}]alphaextract[mae${mi}]`);
+      filters.push(`[mae${mi}][mimg${mi}]blend=all_mode=multiply:shortest=1[mab${mi}]`);
+      filters.push(`[mf${mi}][mab${mi}]alphamerge[mk${mi}]`);
+      filters.push(`${last}[mk${mi}]overlay=0:0[${out}]`);
+      last = `[${out}]`;
+      continue;
     }
 
     const mode = BLEND_FF[layer.blendMode];

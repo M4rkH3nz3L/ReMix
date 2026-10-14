@@ -1332,7 +1332,8 @@ export type ImageFilterType =
   | 'clarity'
   | 'dehaze'
   | 'pixelate'
-  | 'posterize';
+  | 'posterize'
+  | 'duotone';
 export interface ImageFilter {
   type: ImageFilterType;
   amount: number;

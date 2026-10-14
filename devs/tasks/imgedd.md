@@ -89,7 +89,9 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   piros→szürke (R=G=B 4c4c4c); blur a fekete tartományt az él közelében világosítja (000000→343434; worker-pixelmérés).*
 - [x] ✅ **Artistic szűrők** (pixelate + poszterizálás) — `pixelize` ill. `lutrgb` lépcsőzés a szűrő-láncon.
   *ÉLŐ-BIZONYÍTVA: pixelate blokk-egyenlőség (867b7a=867b7a); poszterizálás 220→32 distinct szint (worker-mérés).*
-- [ ] ⬜ **motion blur** · duotone/gradient-map · további szűrők.
+- [x] ✅ **Duotone** (kétszínű leképezés: árnyék→indigo, csúcsfény→pink; amount-blenddel) — `hue=s=0`+`lutrgb`.
+  *ÉLŐ-BIZONYÍTVA: csúcsfény → pink (fe8eab), árnyék → indigo-irány (worker-pixelmérés).*
+- [ ] ⬜ **motion blur** · egyedi-színű duotone/gradient-map · további szűrők.
 - [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
 - [ ] ⬜ **LUT/filmszimuláció** a fotóra (a videó-oldalon `lutImport` van — a képre hozni).
 

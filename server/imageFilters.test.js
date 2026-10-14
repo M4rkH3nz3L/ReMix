@@ -13,6 +13,7 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(oneFilter({ type: 'dehaze', amount: 1 })).toBe('eq=contrast=1.600:saturation=1.400');
     expect(oneFilter({ type: 'pixelate', amount: 1 })).toBe('pixelize=w=24:h=24');
     expect(oneFilter({ type: 'posterize', amount: 1 })).toContain("lutrgb=r='trunc(val/128)*128'");
+    expect(oneFilter({ type: 'duotone', amount: 1 })).toContain('hue=s=0,lutrgb=');
   });
 
   test('sepiaMixer: amount=0 ≈ identitás, amount=1 = teljes szépia', () => {

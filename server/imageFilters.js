@@ -45,6 +45,16 @@ function oneFilter(f) {
         ? `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`
         : '';
     }
+    case 'duotone': {
+      // kétszínű leképezés (árnyék→indigo, csúcsfény→pink); amount az eredeti szürke felé keveri
+      if (a <= 0) {
+        return '';
+      }
+      const c1 = [43, 45, 122]; // #2b2d7a indigo (árnyék)
+      const c2 = [255, 143, 171]; // #ff8fab pink (csúcsfény)
+      const ch = (lo, hi) => `val*${(1 - a).toFixed(3)}+(${lo}+${hi - lo}*val/255)*${a.toFixed(3)}`;
+      return `hue=s=0,lutrgb=r='${ch(c1[0], c2[0])}':g='${ch(c1[1], c2[1])}':b='${ch(c1[2], c2[2])}'`;
+    }
     default:
       return '';
   }

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { adjustChain } = require('./render');
-const { filterChain, maskGradientFilter, shadowSilhouette } = require('./imageFilters');
+const { filterChain, maskGradientFilter, shadowSilhouette, glowSilhouette } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -255,6 +255,18 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     const out = `c${idx}`;
     const posX = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.x ?? 0.5) * canvas.w)}-overlay_w/2`;
     const posY = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.y ?? 0.5) * canvas.h)}-overlay_h/2`;
+
+    // ✨ külső ragyogás (pozícionált rétegre): paddelt, színes sziluett → MÖGÉ overlay (középre).
+    if (layer.outerGlow && layer.kind !== 'fill') {
+      const gsig = Math.max(2, Math.round(canvas.w * 0.02));
+      const gm = gsig * 3;
+      const gout = `gl${idx}`;
+      filters.push(`[${prepared}]split[plg${idx}][psg${idx}]`);
+      filters.push(`[psg${idx}]${glowSilhouette(gm, gsig, 0.85)}[gll${idx}]`);
+      filters.push(`${last}[gll${idx}]overlay=${posX}:${posY}[${gout}]`);
+      last = `[${gout}]`;
+      prepared = `plg${idx}`;
+    }
 
     // 🌑 vetett árnyék (pozícionált rétegre): a prepared másolatából sziluett → MÖGÉ overlay eltolva.
     if (layer.dropShadow && layer.kind !== 'fill') {

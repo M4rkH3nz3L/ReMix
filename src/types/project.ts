@@ -1257,6 +1257,9 @@ export interface ImageLayerBase {
   /** 🌑 vetett árnyék (bármely pozícionált rétegre: fotó/forma/szöveg) — a render a réteg
    *  elmosott, eltolt sziluettjét teszi MÖGÉ. Fix szép paraméterek (eltolás/blur a vászonból). */
   dropShadow?: boolean;
+  /** ✨ külső ragyogás (neon-halo) — a réteg paddelt, elmosott, színes sziluettje MÖGÉ.
+   *  (Nem keverendő a forma `glow` mezőjével, ami a forma körvonalára hat.) */
+  outerGlow?: boolean;
 }
 
 /** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */

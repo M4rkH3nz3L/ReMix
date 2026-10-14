@@ -331,6 +331,11 @@ export function LayerInspector({
             active={!!layer.dropShadow}
             onPress={() => commit(updateLayer(doc, layer.id, { dropShadow: layer.dropShadow ? undefined : true }))}
           />
+          <Chip
+            label={t('studio.image.glow', { defaultValue: 'Ragyogás' })}
+            active={!!layer.outerGlow}
+            onPress={() => commit(updateLayer(doc, layer.id, { outerGlow: layer.outerGlow ? undefined : true }))}
+          />
         </View>
       ) : null}
 

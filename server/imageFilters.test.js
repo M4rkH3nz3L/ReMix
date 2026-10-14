@@ -1,4 +1,11 @@
-const { filterChain, oneFilter, sepiaMixer, maskGradientFilter, shadowSilhouette } = require('./imageFilters');
+const {
+  filterChain,
+  oneFilter,
+  sepiaMixer,
+  maskGradientFilter,
+  shadowSilhouette,
+  glowSilhouette,
+} = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
   test('oneFilter: típusonkénti ffmpeg-részlet', () => {
@@ -37,6 +44,14 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(s).toContain('lutrgb=r=0:g=0:b=0');
     expect(s).toContain('gblur=sigma=5.0');
     expect(s).toContain('colorchannelmixer=aa=0.500');
+  });
+
+  test('glowSilhouette: padding (túlterjedés) + glow-szín + blur + alfa', () => {
+    const g = glowSilhouette(18, 6, 0.85);
+    expect(g).toContain('pad=iw+36:ih+36:18:18');
+    expect(g).toContain('lutrgb=r=124:g=92:b=255');
+    expect(g).toContain('gblur=sigma=6.0');
+    expect(g).toContain('colorchannelmixer=aa=0.850');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

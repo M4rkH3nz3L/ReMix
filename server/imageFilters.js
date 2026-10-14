@@ -93,4 +93,24 @@ function shadowSilhouette(sigma, opacity) {
   return `lutrgb=r=0:g=0:b=0,gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`;
 }
 
-module.exports = { filterChain, oneFilter, sepiaMixer, maskGradientFilter, shadowSilhouette };
+// ✨ külső ragyogás sziluett: a réteg másolatát PADDELI (hogy a blur túlterjedjen), glow-színre
+// lutrgb-zi, elmossa, félig átlátszóvá teszi. A hívó a réteg MÖGÉ overlay-eli (középre, posX/posY).
+function glowSilhouette(margin, sigma, opacity) {
+  const m = Math.max(1, Math.round(margin));
+  const s = Math.max(0.5, Number(sigma) || 6);
+  const o = Math.max(0, Math.min(1, Number(opacity) || 0.85));
+  // accent-lila glow (#7c5cff → 124,92,255)
+  return (
+    `pad=iw+${2 * m}:ih+${2 * m}:${m}:${m}:color=black@0,` +
+    `lutrgb=r=124:g=92:b=255,gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`
+  );
+}
+
+module.exports = {
+  filterChain,
+  oneFilter,
+  sepiaMixer,
+  maskGradientFilter,
+  shadowSilhouette,
+  glowSilhouette,
+};

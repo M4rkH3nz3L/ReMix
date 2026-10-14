@@ -60,7 +60,10 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [x] ✅ **Vetett árnyék bármely pozícionált rétegre** (fotó/forma/szöveg) — `ImageLayerBase.dropShadow` + a render a
   réteg elmosott, eltolt sziluettjét teszi mögé (`shadowSilhouette`: lutrgb+gblur+alfa); LayerInspector-toggle.
   *ÉLŐ-BIZONYÍTVA: foto alatt-jobbra árnyékkal 7f7f7f (szürke) vs nélküle ffffff (worker-pixelmérés).*
-- [ ] ⬜ **Glow/kontúr fotóra** (a formán már van) · egyedi árnyék-szín/eltolás/lágyság.
+- [x] ✅ **Külső ragyogás (outer glow)** bármely pozícionált rétegre — `ImageLayerBase.outerGlow` + a render
+  paddelt (túlterjedő), színes, elmosott sziluettet tesz mögé (`glowSilhouette`). *ÉLŐ-BIZONYÍTVA: foto körül
+  glow-val 05030b (lilás halo) vs nélküle 000000 (worker-pixelmérés).*
+- [ ] ⬜ **Kontúr/stroke fotóra** · egyedi árnyék/glow szín/eltolás/lágyság.
 
 ## 2. 🎯 Kijelölés & maszkolás — 🟡 kijelölés van, maszk-bekötés hiányzik
 - [x] ✅ **Lasszó** + **varázspálca** (magicWandClient) + **ecset** — a kijelölés/festés él.

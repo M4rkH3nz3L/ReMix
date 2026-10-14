@@ -9,8 +9,10 @@ import {
 import type { ImageFilter } from '@/types/project';
 
 describe('imageFilters — foto szűrő-verem UI-mag', () => {
-  it('IMAGE_FILTER_TYPES: az 5 szűrő', () => {
-    expect(IMAGE_FILTER_TYPES.map((f) => f.type)).toEqual(['blur', 'sharpen', 'noise', 'grayscale', 'sepia']);
+  it('IMAGE_FILTER_TYPES: a 7 szűrő (clarity/dehaze is)', () => {
+    expect(IMAGE_FILTER_TYPES.map((f) => f.type)).toEqual([
+      'blur', 'sharpen', 'noise', 'grayscale', 'sepia', 'clarity', 'dehaze',
+    ]);
   });
 
   it('toggleFilter: be/ki, az új a végére kerül', () => {

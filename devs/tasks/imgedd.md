@@ -76,7 +76,10 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 ## 5. 🎨 Korrekciók & szűrők — ✅ adjustment-stack kész, mélység hiányzik
 - [x] ✅ **Adjustment-stack** (expozíció/kontraszt/fehéregyensúly/tónus: highlights/shadows/whites/blacks/telítettség/
   élénkség/vignetta) — a `adjustmentStack.ts` + worker-render (bizonyított render-parity).
-- [ ] 🟡 **RAW-develop UI** — a `photoDevelop.ts` (clarity/texture/dehaze/detail + görbe) **KÉSZ+tesztelt, 0 UI**.
+- [x] ✅ **RAW-develop (clarity + dehaze)** — a foto-szűrők közt (lokális ill. globális kontraszt): worker
+  `imageFilters.js` (clarity=nagy-sugarú unsharp, dehaze=eq contrast+saturation). *ÉLŐ-BIZONYÍTVA: dehaze a
+  kimosott tartományt tágítja (100..219→81..223); clarity a lokális kontrasztot (89..176→31..252; worker-mérés).*
+- [ ] 🟡 **RAW-develop teljes** — a `photoDevelop.ts` maradék detail-paraméterei (texture/sharpness/CA/zaj + görbe/csoportok).
 - [x] ✅ **Struktúra-szűrők** a foto-rétegen (blur/sharpen/zaj/szürke/szépia) — `PhotoLayer.filters` + worker
   `imageFilters.js` (ffmpeg gblur/unsharp/noise/hue/sepia-mixer, a korrekció UTÁN); LayerInspector chip+csúszka.
   Pure magok: `imageFilters.ts` (kliens, 4 teszt) + `server/imageFilters.js` (4 teszt). *ÉLŐ-BIZONYÍTVA: grayscale

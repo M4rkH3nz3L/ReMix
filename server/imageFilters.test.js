@@ -9,6 +9,8 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(oneFilter({ type: 'grayscale', amount: 1 })).toBe('hue=s=0.000');
     expect(oneFilter({ type: 'grayscale', amount: 0 })).toBe('');
     expect(oneFilter({ type: 'sepia', amount: 1 })).toContain('colorchannelmixer=0.3930');
+    expect(oneFilter({ type: 'clarity', amount: 1 })).toContain('unsharp=lx=13:ly=13:la=1.50');
+    expect(oneFilter({ type: 'dehaze', amount: 1 })).toBe('eq=contrast=1.600:saturation=1.400');
   });
 
   test('sepiaMixer: amount=0 ≈ identitás, amount=1 = teljes szépia', () => {

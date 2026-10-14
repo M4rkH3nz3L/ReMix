@@ -12,6 +12,8 @@ export const IMAGE_FILTER_TYPES: { type: ImageFilterType; label: string; icon: s
   { type: 'noise', label: 'Zaj', icon: 'apps-outline' },
   { type: 'grayscale', label: 'Szürke', icon: 'contrast-outline' },
   { type: 'sepia', label: 'Szépia', icon: 'sunny-outline' },
+  { type: 'clarity', label: 'Tisztaság', icon: 'sparkles-outline' },
+  { type: 'dehaze', label: 'Párátlanítás', icon: 'cloudy-outline' },
 ];
 
 export const DEFAULT_FILTER_AMOUNT = 0.6;

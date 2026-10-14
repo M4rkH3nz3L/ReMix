@@ -1315,8 +1315,9 @@ export interface PhotoLayer extends ImageLayerBase {
   mask?: ClipMask;
 }
 
-/** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség). */
-export type ImageFilterType = 'blur' | 'sharpen' | 'noise' | 'grayscale' | 'sepia';
+/** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).
+ *  `clarity`/`dehaze` a RAW-develop fő eszközei (lokális ill. globális kontraszt). */
+export type ImageFilterType = 'blur' | 'sharpen' | 'noise' | 'grayscale' | 'sepia' | 'clarity' | 'dehaze';
 export interface ImageFilter {
   type: ImageFilterType;
   amount: number;

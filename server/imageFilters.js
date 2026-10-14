@@ -27,6 +27,12 @@ function oneFilter(f) {
       return a > 0 ? `hue=s=${(1 - a).toFixed(3)}` : '';
     case 'sepia':
       return a > 0 ? sepiaMixer(a) : '';
+    case 'clarity':
+      // lokális (midtone) kontraszt — nagy sugarú unsharp
+      return a > 0 ? `unsharp=lx=13:ly=13:la=${(a * 1.5).toFixed(2)}` : '';
+    case 'dehaze':
+      // párátlanítás — globális kontraszt + telítettség emelés
+      return a > 0 ? `eq=contrast=${(1 + a * 0.6).toFixed(3)}:saturation=${(1 + a * 0.4).toFixed(3)}` : '';
     default:
       return '';
   }

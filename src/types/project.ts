@@ -1248,6 +1248,9 @@ export interface ImageLayerBase {
   hidden?: boolean;
   /** 0–1 (hiányzó = 1) */
   opacity?: number;
+  /** 🎨 keverési mód az ALATTA lévő rétegekkel (multiply/screen/overlay/…). Hiányzó = normál
+   *  (source-over). A render (`/imagedoc`) ffmpeg `blend`-del, a réteg alfájával maszkolva égeti be. */
+  blendMode?: BlendMode;
 }
 
 /** háttér-réteg: tömör szín vagy gradiens, a teljes vásznon */

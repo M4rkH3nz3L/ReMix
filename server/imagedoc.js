@@ -14,6 +14,21 @@ const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 
+// 🎨 réteg-keverési mód → ffmpeg `blend` all_mode (a BlendMode típusból). A hiányzó/'normal' = source-over.
+const BLEND_FF = {
+  multiply: 'multiply',
+  screen: 'screen',
+  overlay: 'overlay',
+  darken: 'darken',
+  lighten: 'lighten',
+  difference: 'difference',
+  exclusion: 'exclusion',
+  hardlight: 'hardlight',
+  softlight: 'softlight',
+  colordodge: 'dodge',
+  colorburn: 'burn',
+};
+
 function run(args) {
   return new Promise((resolve, reject) => {
     execFile(FFMPEG, args, { maxBuffer: 1 << 26 }, (err, stdout, stderr) =>
@@ -237,15 +252,29 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
     // elhelyezés: a réteg KÖZÉPPONTJA a `position`, a fill a teljes vászon
     const out = `c${idx}`;
-    if (layer.kind === 'fill') {
-      filters.push(`${last}[${prepared}]overlay=0:0[${out}]`);
+    const posX = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.x ?? 0.5) * canvas.w)}-overlay_w/2`;
+    const posY = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.y ?? 0.5) * canvas.h)}-overlay_h/2`;
+    const mode = BLEND_FF[layer.blendMode];
+    if (!mode) {
+      // normál (source-over)
+      filters.push(`${last}[${prepared}]overlay=${posX}:${posY}[${out}]`);
     } else {
-      const cx = (layer.position?.x ?? 0.5) * canvas.w;
-      const cy = (layer.position?.y ?? 0.5) * canvas.h;
-      filters.push(
-        `${last}[${prepared}]overlay=${Math.round(cx)}-overlay_w/2:` +
-          `${Math.round(cy)}-overlay_h/2[${out}]`
-      );
+      // 🎨 keverési mód: a réteget teljes átlátszó vászonra helyezzük (Lfull), a base-szel
+      // `blend`-eljük a módnak megfelelően, majd a réteg ALFÁJÁVAL maszkolva a base fölé mergeljük
+      // (így a blend csak ott hat, ahol a réteg átlátszatlan; az opacity az alfában benne van).
+      inputs.push('-f', 'lavfi', '-i', `color=black@0:s=${canvas.w}x${canvas.h}`);
+      const tIdx = idx;
+      idx += 1;
+      filters.push(`[${tIdx}:v]format=rgba[t${tIdx}]`);
+      filters.push(`[t${tIdx}][${prepared}]overlay=${posX}:${posY}[Lf${tIdx}]`);
+      filters.push(`[Lf${tIdx}]split[Lb${tIdx}][La${tIdx}]`);
+      filters.push(`${last}split[bb${tIdx}][bc${tIdx}]`);
+      // ⚠️ a `blend` RGB-SÍKOKON számoljon (gbrp), különben YUV-ban keverne → színhiba
+      filters.push(`[bb${tIdx}]format=gbrp[bbf${tIdx}]`);
+      filters.push(`[Lb${tIdx}]format=gbrp[Lbf${tIdx}]`);
+      filters.push(`[bbf${tIdx}][Lbf${tIdx}]blend=all_mode=${mode}:shortest=1[bl${tIdx}]`);
+      filters.push(`[La${tIdx}]alphaextract[am${tIdx}]`);
+      filters.push(`[bc${tIdx}][bl${tIdx}][am${tIdx}]maskedmerge[${out}]`);
     }
     last = `[${out}]`;
   }

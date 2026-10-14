@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
 import { Slider, ToggleRow } from '@/components/studio/audio/primitives';
@@ -17,7 +17,20 @@ import type {
   TextLayer,
 } from '@/types/project';
 
-const BLENDS: (BlendMode | 'normal')[] = ['normal', 'multiply', 'screen', 'overlay', 'softlight'];
+const BLENDS: (BlendMode | 'normal')[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'softlight',
+  'hardlight',
+  'difference',
+  'exclusion',
+  'colordodge',
+  'colorburn',
+];
 const SHAPES: ShapeLayer['shape'][] = ['rectangle', 'ellipse', 'line', 'arrow', 'star'];
 
 /**
@@ -204,22 +217,6 @@ export function LayerInspector({
               />
             ))}
           </View>
-          <View style={styles.chipRow}>
-            {BLENDS.map((b) => (
-              <Chip
-                key={b}
-                label={t(`studio.image.blend.${b}`)}
-                active={(layer.blendMode ?? 'normal') === b}
-                onPress={() =>
-                  commit(
-                    updateLayer<ShapeLayer>(doc, layer.id, {
-                      blendMode: b === 'normal' ? undefined : b,
-                    })
-                  )
-                }
-              />
-            ))}
-          </View>
           {layer.shape === 'rectangle' ? (
             <Slider
               label={t('studio.image.cornerRadius')}
@@ -289,6 +286,18 @@ export function LayerInspector({
         onChange={(v) => commit(updateLayer(doc, layer.id, { opacity: v }))}
         format={(v) => `${Math.round(v * 100)}%`}
       />
+      {/* 🎨 keverési mód — MINDEN réteg-fajtára (fill/photo/shape/text); a render ffmpeg-blenddel égeti */}
+      <Text style={styles.sectionLabel}>{t('studio.image.blendMode', { defaultValue: 'Keverési mód' })}</Text>
+      <View style={styles.chipRow}>
+        {BLENDS.map((b) => (
+          <Chip
+            key={b}
+            label={t(`studio.image.blend.${b}`, { defaultValue: b })}
+            active={(layer.blendMode ?? 'normal') === b}
+            onPress={() => commit(updateLayer(doc, layer.id, { blendMode: b === 'normal' ? undefined : b }))}
+          />
+        ))}
+      </View>
     </>
   );
 }
@@ -306,4 +315,5 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  sectionLabel: { color: palette.textDim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
 });

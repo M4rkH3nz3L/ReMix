@@ -12,7 +12,7 @@
 
 | § | Terület | Állapot |
 |---|---------|---------|
-| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, réteg-panel, opacity/hidden/sorrend) | ✅ *(blend-mode/group/maszk ⬜)* |
+| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden/sorrend, **blend-mode**) | ✅ *(group/maszk ⬜)* |
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus) | ✅ *(toll v5, text-on-path ⬜)* |
@@ -46,8 +46,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 
 ## 1. 🧱 Rétegek & kompozíció — ✅ alap kész, pro-kompozíció hiányzik
 - [x] ✅ fill/photo/shape/text réteg + **réteg-panel** (sorrend/rejtés/opacity/átnevezés/duplázás/törlés).
-- [ ] ⬜ **Réteg-blend-mode** (multiply/screen/overlay/… ) a fill/photo rétegre — modell (`ImageLayerBase.blendMode`)
-  + a render (`/imagedoc`) `mix-blend-mode` kompozíció. *Render-bizonyítható: két réteg multiply → a kimeneti pixel a szorzat.*
+- [x] ✅ **Réteg-blend-mode** (multiply/screen/overlay/darken/lighten/softlight/hardlight/difference/exclusion/
+  colordodge/colorburn) **MINDEN rétegre** (fill/photo/shape/text) — `ImageLayerBase.blendMode` + a `/imagedoc`
+  ffmpeg `blend`-del, a réteg alfájával `maskedmerge`-elve komponál; a LayerInspector-választó a közös szekcióba
+  került (eddig csak formán volt, és a render FIGYELMEN KÍVÜL hagyta). *ÉLŐ-BIZONYÍTVA: 808080×808080 multiply →
+  454545 (sötétít), 404040×404040 screen → 6c6c6c (világosít), színhelyes szürke (worker-pixelmérés).*
 - [ ] ⬜ **Réteg-maszk** (festhető raszter + vektor-maszk) per réteg + a maszk invertálása/törlése.
 - [ ] ⬜ **Csoport-rétegek (mappák)** — `group` réteg-fajta + beágyazott transzform/opacity.
 - [ ] ⬜ **Nem-destruktív korrekció-réteg** (az alatta lévőkre hat) — ma csak per-foto adjustment-stack.

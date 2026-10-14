@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { adjustChain } = require('./render');
-const { filterChain, maskGradientFilter } = require('./imageFilters');
+const { filterChain, maskGradientFilter, shadowSilhouette } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -255,6 +255,20 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     const out = `c${idx}`;
     const posX = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.x ?? 0.5) * canvas.w)}-overlay_w/2`;
     const posY = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.y ?? 0.5) * canvas.h)}-overlay_h/2`;
+
+    // 🌑 vetett árnyék (pozícionált rétegre): a prepared másolatából sziluett → MÖGÉ overlay eltolva.
+    if (layer.dropShadow && layer.kind !== 'fill') {
+      const sig = Math.max(1, Math.round(canvas.w * 0.012));
+      const dx = Math.round(canvas.w * 0.02);
+      const dy = Math.round(canvas.h * 0.02);
+      const sout = `sh${idx}`;
+      filters.push(`[${prepared}]split[pl${idx}][ps${idx}]`);
+      filters.push(`[ps${idx}]${shadowSilhouette(sig, 0.5)}[shl${idx}]`);
+      filters.push(`${last}[shl${idx}]overlay=${posX}+${dx}:${posY}+${dy}[${sout}]`);
+      last = `[${sout}]`;
+      prepared = `pl${idx}`; // a réteg a split másik fele (az árnyék-sziluett nem fogyasztja el)
+    }
+
     const mode = BLEND_FF[layer.blendMode];
     if (!mode) {
       // normál (source-over)

@@ -85,4 +85,12 @@ function maskGradientFilter(dir) {
   return e ? `,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*${e}'` : '';
 }
 
-module.exports = { filterChain, oneFilter, sepiaMixer, maskGradientFilter };
+// 🌑 vetett árnyék sziluett-lánca: a réteg másolatát feketére lutrgb-zi, elmossa, félig átlátszóvá
+// teszi (colorchannelmixer aa). A hívó a réteg MÖGÉ overlay-eli eltolva. (pure → tesztelhető)
+function shadowSilhouette(sigma, opacity) {
+  const s = Math.max(0.5, Number(sigma) || 4);
+  const o = Math.max(0, Math.min(1, Number(opacity) || 0.5));
+  return `lutrgb=r=0:g=0:b=0,gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`;
+}
+
+module.exports = { filterChain, oneFilter, sepiaMixer, maskGradientFilter, shadowSilhouette };

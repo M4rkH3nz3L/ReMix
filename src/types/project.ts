@@ -1254,6 +1254,9 @@ export interface ImageLayerBase {
   /** 🎭 lineáris gradient-maszk: a réteg a megadott irányba FOKOZATOSAN átlátszóvá fade-el
    *  (pl. 'right' = bal átlátszatlan → jobb átlátszó). A render geq alfa-rámpával égeti. */
   maskGradient?: MaskGradientDir;
+  /** 🌑 vetett árnyék (bármely pozícionált rétegre: fotó/forma/szöveg) — a render a réteg
+   *  elmosott, eltolt sziluettjét teszi MÖGÉ. Fix szép paraméterek (eltolás/blur a vászonból). */
+  dropShadow?: boolean;
 }
 
 /** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */

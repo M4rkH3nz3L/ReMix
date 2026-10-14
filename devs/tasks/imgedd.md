@@ -57,7 +57,10 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [ ] ⬜ **Festhető raszter-maszk** + **vektor/szelekció-maszk** per réteg + invertálás/törlés.
 - [ ] ⬜ **Csoport-rétegek (mappák)** — `group` réteg-fajta + beágyazott transzform/opacity.
 - [ ] ⬜ **Nem-destruktív korrekció-réteg** (az alatta lévőkre hat) — ma csak per-foto adjustment-stack.
-- [ ] 🟡 **Réteg-effektek a formán túl** (árnyék/glow/kontúr fotóra/szövegre is) — a `layerEffects.ts` mag kész, 0 UI.
+- [x] ✅ **Vetett árnyék bármely pozícionált rétegre** (fotó/forma/szöveg) — `ImageLayerBase.dropShadow` + a render a
+  réteg elmosott, eltolt sziluettjét teszi mögé (`shadowSilhouette`: lutrgb+gblur+alfa); LayerInspector-toggle.
+  *ÉLŐ-BIZONYÍTVA: foto alatt-jobbra árnyékkal 7f7f7f (szürke) vs nélküle ffffff (worker-pixelmérés).*
+- [ ] ⬜ **Glow/kontúr fotóra** (a formán már van) · egyedi árnyék-szín/eltolás/lágyság.
 
 ## 2. 🎯 Kijelölés & maszkolás — 🟡 kijelölés van, maszk-bekötés hiányzik
 - [x] ✅ **Lasszó** + **varázspálca** (magicWandClient) + **ecset** — a kijelölés/festés él.

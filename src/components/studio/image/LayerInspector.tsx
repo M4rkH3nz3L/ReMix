@@ -323,6 +323,17 @@ export function LayerInspector({
         ))}
       </View>
 
+      {/* 🌑 vetett árnyék — pozícionált rétegre (fotó/forma/szöveg) */}
+      {layer.kind !== 'fill' ? (
+        <View style={styles.chipRow}>
+          <Chip
+            label={t('studio.image.dropShadow', { defaultValue: 'Vetett árnyék' })}
+            active={!!layer.dropShadow}
+            onPress={() => commit(updateLayer(doc, layer.id, { dropShadow: layer.dropShadow ? undefined : true }))}
+          />
+        </View>
+      ) : null}
+
       {/* 🎭 gradient-maszk: a réteg a megadott irányba fokozatosan átlátszóvá fade-el (a render geq-vel) */}
       <Text style={styles.sectionLabel}>{t('studio.image.maskFade', { defaultValue: 'Gradient-maszk (elhalványulás)' })}</Text>
       <View style={styles.chipRow}>

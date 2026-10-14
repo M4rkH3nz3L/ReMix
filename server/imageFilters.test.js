@@ -1,4 +1,4 @@
-const { filterChain, oneFilter, sepiaMixer, maskGradientFilter } = require('./imageFilters');
+const { filterChain, oneFilter, sepiaMixer, maskGradientFilter, shadowSilhouette } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
   test('oneFilter: típusonkénti ffmpeg-részlet', () => {
@@ -30,6 +30,13 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(filterChain([{ type: 'blur', amount: 0 }, { type: 'nope', amount: 1 }])).toBe('');
     expect(filterChain([])).toBe('');
     expect(filterChain(undefined)).toBe('');
+  });
+
+  test('shadowSilhouette: fekete lutrgb + blur + alfa-csökkentés', () => {
+    const s = shadowSilhouette(5, 0.5);
+    expect(s).toContain('lutrgb=r=0:g=0:b=0');
+    expect(s).toContain('gblur=sigma=5.0');
+    expect(s).toContain('colorchannelmixer=aa=0.500');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

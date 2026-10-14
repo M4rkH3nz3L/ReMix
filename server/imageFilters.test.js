@@ -7,6 +7,7 @@ const {
   glowSilhouette,
   hexToRgb,
   strokeSilhouette,
+  perspectiveFilter,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -67,6 +68,16 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     const s = strokeSilhouette('#ff0000', 5);
     expect(s).toContain('lutrgb=r=255:g=0:b=0');
     expect(s).toContain('scale=iw+10:ih+10:flags=neighbor');
+  });
+
+  test('perspectiveFilter: nincs dőlés → ""; X>0 a jobb élt rövidíti', () => {
+    expect(perspectiveFilter(0, 0, 100, 100)).toBe('');
+    const px = perspectiveFilter(1, 0, 100, 100); // m=2 → PW=PH=104; hx=0.25 → TR.y=26, BR.y=78
+    expect(px).toContain('pad=iw+4:ih+4:2:2:color=black@0');
+    expect(px).toContain('perspective=0:0:104:26:0:104:104:78:sense=destination:interpolation=linear');
+    // Y>0 az alsó élt rövidíti (a bal/jobb alsó x-ek befelé)
+    const py = perspectiveFilter(0, 1, 100, 100); // vy=0.25 → BL.x=26, BR.x=78
+    expect(py).toContain('perspective=0:0:104:0:26:104:78:104:sense=destination');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

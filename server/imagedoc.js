@@ -11,7 +11,14 @@ const path = require('path');
 
 const { adjustChain } = require('./render');
 const { gradeFilterChain } = require('./grades');
-const { filterChain, maskGradientFilter, shadowSilhouette, glowSilhouette, strokeSilhouette } = require('./imageFilters');
+const {
+  filterChain,
+  maskGradientFilter,
+  shadowSilhouette,
+  glowSilhouette,
+  strokeSilhouette,
+  perspectiveFilter,
+} = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -240,9 +247,11 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           lutFrag = '';
         }
       }
+      // 📐 perspektíva/3D-dőlés a box-méretű fotóra (a filterek UTÁN, a flip/rotate ELŐTT)
+      const persp = perspectiveFilter(layer.perspectiveX, layer.perspectiveY, boxW, boxH);
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${filterChain(layer.filters)}${flip}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

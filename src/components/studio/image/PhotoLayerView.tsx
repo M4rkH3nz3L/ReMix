@@ -58,11 +58,17 @@ export function PhotoLayerView({
   const rotDeg = layer.rotation ?? 0;
   const sx = layer.flipH ? -1 : 1;
   const sy = layer.flipV ? -1 : 1;
+  // 📐 perspektíva-közelítés: X>0 → jobb él hátra (rotateY<0), Y>0 → alsó él hátra (rotateX>0)
+  const pX = layer.perspectiveX ?? 0;
+  const pY = layer.perspectiveY ?? 0;
   const dragStyle = useAnimatedStyle(() => ({
     transform: [
+      { perspective: 900 },
       { translateX: dragX.value },
       { translateY: dragY.value },
       { rotate: `${rotDeg}deg` },
+      { rotateY: `${-pX * 22}deg` },
+      { rotateX: `${pY * 22}deg` },
       { scaleX: sx },
       { scaleY: sy },
     ],

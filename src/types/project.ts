@@ -1320,6 +1320,10 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 'cover' kitölti a keretet (vág), 'contain' belefér (üres szél marad),
    *  'stretch' nem-arányosan a keretre nyújt (szabad transzform — torzíthat) */
   fit?: 'cover' | 'contain' | 'stretch';
+  /** 📐 perspektíva/3D-dőlés −1…1: X>0 a jobb él dől hátra (X<0 bal), Y>0 az alsó él (Y<0 felső).
+   *  A render ffmpeg `perspective`-vel (átlátszó OOB), a preview 3D rotate-tel közelít. */
+  perspectiveX?: number;
+  perspectiveY?: number;
   filterId?: FilterId;
   filterIntensity?: number;
   /** 🎬 filmes look-preset (LUT-szerű grade) a fotóra — a videó grade-rétegével AZONOS térkép

@@ -215,6 +215,27 @@ export function LayerInspector({
             }
             format={(v) => `${Math.round(v)}°`}
           />
+          {/* 📐 perspektíva / 3D-dőlés (a render ffmpeg perspective-vel, a preview 3D rotate-tel) */}
+          <Slider
+            label={t('studio.image.perspectiveX', { defaultValue: 'Perspektíva ↔' })}
+            value={layer.perspectiveX ?? 0}
+            min={-1}
+            max={1}
+            onChange={(v) =>
+              commit(updateLayer<PhotoLayer>(doc, layer.id, { perspectiveX: Math.abs(v) < 0.02 ? undefined : v }))
+            }
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
+          <Slider
+            label={t('studio.image.perspectiveY', { defaultValue: 'Perspektíva ↕' })}
+            value={layer.perspectiveY ?? 0}
+            min={-1}
+            max={1}
+            onChange={(v) =>
+              commit(updateLayer<PhotoLayer>(doc, layer.id, { perspectiveY: Math.abs(v) < 0.02 ? undefined : v }))
+            }
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
           {/* 🎛️ struktúra-szűrők (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg) */}
           <Text style={styles.sectionLabel}>{t('studio.image.filters', { defaultValue: 'Szűrők' })}</Text>
           <View style={styles.chipRow}>

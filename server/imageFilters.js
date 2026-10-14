@@ -125,6 +125,44 @@ function strokeSilhouette(hex, widthPx) {
   return `format=rgba,lutrgb=r=${r}:g=${g}:b=${b},scale=iw+${2 * n}:ih+${2 * n}:flags=neighbor`;
 }
 
+// 📐 perspektíva / 3D-dőlés: a fotó egyik éle "hátradől" (recede). px/py ∈ [-1,1]
+// (px>0 → jobb él dől, px<0 → bal; py>0 → alsó él, py<0 → felső). A fotót előbb
+// ÁTLÁTSZÓ kerettel paddoljuk, hogy a `perspective` él-replikációja az átlátszót
+// vigye az out-of-quad területre → ott a háttér látszik (nem él-maszat). Vezető-vesszős
+// fragment a box-méretű (boxW×boxH) fotóra; üres, ha nincs dőlés. (pure → tesztelhető)
+function perspectiveFilter(px, py, boxW, boxH) {
+  const hx = Math.max(-1, Math.min(1, Number(px) || 0)) * 0.25;
+  const vy = Math.max(-1, Math.min(1, Number(py) || 0)) * 0.25;
+  if (hx === 0 && vy === 0) {
+    return '';
+  }
+  const m = Math.max(2, Math.round(Math.min(boxW, boxH) * 0.02));
+  const PW = boxW + 2 * m;
+  const PH = boxH + 2 * m;
+  // sarkok a paddelt térben: TL, TR, BL, BR
+  const c = { tlx: 0, tly: 0, trx: PW, tryy: 0, blx: 0, bly: PH, brx: PW, bry: PH };
+  if (hx > 0) {
+    c.tryy += PH * hx; // jobb él rövidül (recede)
+    c.bry -= PH * hx;
+  } else if (hx < 0) {
+    c.tly += PH * -hx; // bal él rövidül
+    c.bly -= PH * -hx;
+  }
+  if (vy > 0) {
+    c.blx += PW * vy; // alsó él rövidül
+    c.brx -= PW * vy;
+  } else if (vy < 0) {
+    c.tlx += PW * -vy; // felső él rövidül
+    c.trx -= PW * -vy;
+  }
+  const r = (n) => Math.round(n);
+  return (
+    `,pad=iw+${2 * m}:ih+${2 * m}:${m}:${m}:color=black@0,` +
+    `perspective=${r(c.tlx)}:${r(c.tly)}:${r(c.trx)}:${r(c.tryy)}:` +
+    `${r(c.blx)}:${r(c.bly)}:${r(c.brx)}:${r(c.bry)}:sense=destination:interpolation=linear`
+  );
+}
+
 module.exports = {
   filterChain,
   oneFilter,
@@ -134,4 +172,5 @@ module.exports = {
   glowSilhouette,
   hexToRgb,
   strokeSilhouette,
+  perspectiveFilter,
 };

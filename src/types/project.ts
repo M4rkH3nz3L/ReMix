@@ -1363,6 +1363,10 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 🎚️ non-destruktív korrekciós-verem (az UI forrás-igazsága; → `adjust`) */
   adjustmentStack?: AdjustmentLayer[];
   mask?: ClipMask;
+  /** 🎯 kijelölés-alapú (lokális) korrekció: a `grade`/`adjust` CSAK a `mask` régión BELÜL hat,
+   *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker
+   *  a réteg dobozába transzformálja. Független a vágó `mask`-tól. */
+  localAdjust?: { mask: ClipMask; adjust?: ClipAdjust; grade?: GradeId };
 }
 
 /** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).

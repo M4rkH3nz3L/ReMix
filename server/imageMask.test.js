@@ -1,4 +1,4 @@
-const { maskWExpr, maskGrayChain, staticPoly } = require('./imageMask');
+const { maskWExpr, maskGrayChain, staticPoly, maskToBox } = require('./imageMask');
 
 describe('imageMask — ClipMask → geq alfa-súly (render-paritás)', () => {
   test('ellipszis: normalizált távolság / feather', () => {
@@ -25,6 +25,18 @@ describe('imageMask — ClipMask → geq alfa-súly (render-paritás)', () => {
     expect(p).toContain('gte(');
     expect(p).toContain('lte(');
     expect(p.startsWith('min(')).toBe(true);
+  });
+
+  test('maskToBox: teljes-képes réteg → identitás; fél-méretű → átskálázás', () => {
+    const full = { x: 0.3, y: 0.7, w: 0.4, h: 0.4, points: [{ x: 0.2, y: 0.8 }] };
+    const id = maskToBox(full, { w: 1, h: 1, position: { x: 0.5, y: 0.5 } });
+    expect(id.x).toBeCloseTo(0.3);
+    expect(id.w).toBeCloseTo(0.4);
+    expect(id.points[0]).toEqual({ x: 0.2, y: 0.8 });
+    // fél-méretű, középen álló réteg: a doboz [0.25,0.75]; a vászon-közép (0.5) → box-közép (0.5)
+    const half = maskToBox({ x: 0.5, y: 0.5, w: 0.25, h: 0.25 }, { w: 0.5, h: 0.5, position: { x: 0.5, y: 0.5 } });
+    expect(half.x).toBeCloseTo(0.5);
+    expect(half.w).toBeCloseTo(0.5); // 0.25 / 0.5
   });
 
   test('maskGrayChain: teljes-vászon szürke forrás + geq + címke; poligon→feather gblur', () => {

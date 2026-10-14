@@ -13,7 +13,7 @@
 | § | Terület | Állapot |
 |---|---------|---------|
 | §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**, **csoportok**, **kontúr**) | ✅ *(festett-maszk ⬜)* |
-| §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset + **réteg-maszk**: ellipszis/téglalap/**lasszó-poligon** + feather/invert/expand) | ✅ *(kijelölés-alapú korrekció ⬜)* |
+| §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset + **réteg-maszk** + **kijelölés-alapú korrekció**: ellipszis/téglalap/lasszó-poligon + feather/invert/expand) | ✅ *(festett raszter-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
@@ -90,7 +90,13 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   maszk** a kijelölt rétegre (ImageStudioBody `maskTargetId`+`commitLasso` ág). *ÉLŐ-BIZONYÍTVA (/imagedoc):
   ellipszis közép=kék/sarok=fehér; poligon-háromszög belül=kék/kívül=fehér; invert fordítva; mind HTTP 200.*
   (preview: a render az autoritatív — a maszk a renderben pontos; per-réteg korrekció-maszk ⬜)
-- [ ] ⬜ **Kijelölés-alapú korrekció** (csak a kijelölt területre hasson az adjust/filter).
+- [x] ✅ **Kijelölés-alapú (lokális) korrekció** — `PhotoLayer.localAdjust { mask, grade?, adjust? }`: a grade/adjust
+  CSAK a maszk-régión BELÜL hat (a maszkon kívül az eredeti). Render: a box-méretű prepared két példánya
+  (eredeti + korrigált), a korrigált alfája = (saját alfa × box-lokális maszk-szürke) → az eredeti fölé overlay
+  (`imageMask.maskToBox` transzformál vászon→doboz); LayerInspector szekció (Be/Nincs + Ellipszis/Téglalap/✏️
+  Lasszó + grade-chipek + expozíció/kontraszt/telítettség + lágy-él/invert); a ✏️ Lasszó a `localAdjust.mask`-ot
+  írja (`maskTarget.target='local'`). *ÉLŐ-BIZONYÍTVA (/imagedoc, kék fotó, ellipszis): lokális noir belül
+  949794 (R≈G≈B)/kívül 799fc7 (kék); exposure=0.8 belül d4feff/kívül 799fc7; HTTP 200.*
 - [ ] ⬜ **Él-felismerő/„objektum" kijelölés** (AI-select — a videóban a `selective` létezik, a képre hozni).
 
 ## 3. 🩹 Retusálás — ⬜ hiányzik (device/worker)

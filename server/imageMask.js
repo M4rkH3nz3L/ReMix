@@ -79,4 +79,23 @@ function maskGrayChain(mask, W, H, label) {
   return `color=white:s=${W}x${H},format=gray,geq=lum='255*${wExpr}'${blur}${label}`;
 }
 
-module.exports = { maskWExpr, maskGrayChain, polyWExpr, staticPoly };
+// 🎯 vászon-normalizált maszk → a réteg DOBOZÁBA (box-lokális 0–1) transzformálva — a lokális
+// korrekcióhoz, ami a box-méretű prepared rétegen fut. A réteg középe (position) + w/h adja a dobozt.
+function maskToBox(mask, layer) {
+  const bw = Math.max(Number(layer.w) || 1, 0.0001);
+  const bh = Math.max(Number(layer.h) || 1, 0.0001);
+  const bx = (layer.position?.x ?? 0.5) - bw / 2;
+  const by = (layer.position?.y ?? 0.5) - bh / 2;
+  const tx = (v) => (v - bx) / bw;
+  const ty = (v) => (v - by) / bh;
+  return {
+    ...mask,
+    x: tx(mask.x),
+    y: ty(mask.y),
+    w: mask.w / bw,
+    h: mask.h / bh,
+    points: Array.isArray(mask.points) ? mask.points.map((p) => ({ x: tx(p.x), y: ty(p.y) })) : undefined,
+  };
+}
+
+module.exports = { maskWExpr, maskGrayChain, polyWExpr, staticPoly, maskToBox };

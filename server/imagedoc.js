@@ -20,7 +20,7 @@ const {
   perspectiveFilter,
   gradientMapFilter,
 } = require('./imageFilters');
-const { maskGrayChain } = require('./imageMask');
+const { maskGrayChain, maskToBox } = require('./imageMask');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -266,6 +266,30 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
+
+      // 🎯 kijelölés-alapú (lokális) korrekció: a grade/adjust CSAK a maszk-régión BELÜL hat.
+      // A box-méretű prepared két példánya (eredeti + korrigált) a box-lokális maszkkal maskedmerge-elve.
+      const la = layer.localAdjust;
+      if (la && la.mask && la.mask.shape) {
+        const corr = (gradeFilterChain(la.grade) + adjustChain({ adjust: la.adjust })).replace(/^,/, '');
+        if (corr) {
+          const li = maskSeq;
+          maskSeq += 1;
+          const lmask = maskToBox(la.mask, layer);
+          // a korrigált példány alfája = (saját alfa × maszk) → az EREDETI fölé overlay-eljük:
+          // a maszkon belül a korrigált, kívül (alfa 0) az eredeti látszik. (A maskedmerge a szürke
+          // maszkot az rgba-auto-konverzió miatt félreértette — ez a bevált alphamerge+overlay út.)
+          filters.push(`[${prepared}]format=rgba,split[lo${li}][lx${li}]`);
+          filters.push(`[lx${li}]${corr},format=rgba[cadj${li}]`);
+          filters.push(maskGrayChain(lmask, boxW, boxH, `[lmg${li}]`));
+          filters.push(`[cadj${li}]split[cc${li}][caa${li}]`);
+          filters.push(`[caa${li}]alphaextract[cae${li}]`);
+          filters.push(`[cae${li}][lmg${li}]blend=all_mode=multiply:shortest=1[cam${li}]`);
+          filters.push(`[cc${li}][cam${li}]alphamerge[cadjA${li}]`);
+          filters.push(`[lo${li}][cadjA${li}]overlay=0:0[lc${li}]`);
+          prepared = `lc${li}`;
+        }
+      }
     } else {
       const png = rendered.get(layer.id);
       if (!png || !fs.existsSync(png)) {

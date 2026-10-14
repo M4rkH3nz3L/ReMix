@@ -200,8 +200,9 @@ export function ImageStudioBody({
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
-  // 🎭 ha be van állítva, a következő lasszó-rajz NEM új formát, hanem erre a rétegre MASZKOT készít
-  const [maskTargetId, setMaskTargetId] = useState<string | null>(null);
+  // 🎭 ha be van állítva, a következő lasszó-rajz MASZKOT készít: a réteg vágó-maszkja ('clip')
+  // vagy a lokális (kijelölés-alapú) korrekció maszkja ('local')
+  const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [brushActive, setBrushActive] = useState(false);
   const [brushColor, setBrushColor] = useState('#ff2d95');
@@ -759,17 +760,18 @@ export function ImageStudioBody({
   };
 
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
-  const startMaskDraw = (layerId: string) => {
+  // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)
+  const startMaskDraw = (layerId: string, target: 'clip' | 'local' = 'clip') => {
     setSelectedId(layerId);
-    setMaskTargetId(layerId);
+    setMaskTarget({ id: layerId, target });
     setLassoActive(true);
     setSheet(null); // a panel bezárul, hogy a vászon látsszon a rajzoláshoz
   };
 
   // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma — VAGY (maszk-módban) a kijelölt réteg maszkja
   const commitLasso = (points: CanvasPoint[]) => {
-    if (doc && points.length >= 3 && maskTargetId) {
-      // 🎭 szelekció → réteg-maszk (poligon): a vászon-normalizált pontok + bbox
+    if (doc && points.length >= 3 && maskTarget) {
+      // 🎭 szelekció → maszk (poligon): a vászon-normalizált pontok + bbox
       const xs = points.map((p) => p.x);
       const ys = points.map((p) => p.y);
       const minX = Math.min(...xs);
@@ -785,8 +787,18 @@ export function ImageStudioBody({
         h: Math.max(0.02, maxY - minY),
         feather: 0.02,
       };
-      commit(updateLayer(doc, maskTargetId, { mask } as Partial<ImageLayer>), t('studio.image.undoMask', { defaultValue: 'Maszk' }));
-      setMaskTargetId(null);
+      if (maskTarget.target === 'local') {
+        // a meglévő lokális grade/adjust megmarad, csak a maszk cserélődik
+        const cur = doc.layers.find((l) => l.id === maskTarget.id);
+        const prev = cur && 'localAdjust' in cur ? (cur as PhotoLayer).localAdjust : undefined;
+        commit(
+          updateLayer(doc, maskTarget.id, { localAdjust: { ...prev, mask } } as Partial<ImageLayer>),
+          t('studio.image.undoMask', { defaultValue: 'Maszk' })
+        );
+      } else {
+        commit(updateLayer(doc, maskTarget.id, { mask } as Partial<ImageLayer>), t('studio.image.undoMask', { defaultValue: 'Maszk' }));
+      }
+      setMaskTarget(null);
       setLassoActive(false);
       return;
     }
@@ -797,7 +809,7 @@ export function ImageStudioBody({
         setSelectedId(shape.id);
       }
     }
-    setMaskTargetId(null);
+    setMaskTarget(null);
     setLassoActive(false);
   };
 
@@ -1192,7 +1204,7 @@ export function ImageStudioBody({
           onLassoComplete={commitLasso}
           onLassoCancel={() => {
             setLassoActive(false);
-            setMaskTargetId(null);
+            setMaskTarget(null);
           }}
           wandActive={wandActive}
           onWandSeed={onWandSeed}

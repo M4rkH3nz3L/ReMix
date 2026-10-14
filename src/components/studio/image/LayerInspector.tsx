@@ -60,8 +60,9 @@ export function LayerInspector({
   layer: ImageLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onOpenAdjust: () => void;
-  /** 🎭 szabadkézi (lasszó) maszk rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot */
-  onDrawMask?: (layerId: string) => void;
+  /** 🎭 szabadkézi (lasszó) maszk rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot;
+   *  target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja */
+  onDrawMask?: (layerId: string, target: 'clip' | 'local') => void;
 }) {
   const { t } = useTranslation();
 
@@ -69,6 +70,10 @@ export function LayerInspector({
   const curMask = (layer as { mask?: ClipMask }).mask;
   const setMask = (mask: ClipMask | undefined) =>
     commit(updateLayer(doc, layer.id, { mask } as Partial<ImageLayer>), 'mask');
+
+  // 🎯 kijelölés-alapú (lokális) korrekció a fotón (grade/adjust CSAK a maszkon belül)
+  const setLocal = (next: PhotoLayer['localAdjust']) =>
+    commit(updateLayer<PhotoLayer>(doc, layer.id, { localAdjust: next }), 'local-adjust');
 
   // 🎞️ saját .cube LUT importálása a fotó-rétegre (pick + tartalmi validálás)
   const importLut = async (photo: PhotoLayer) => {
@@ -368,6 +373,50 @@ export function LayerInspector({
               />
             </>
           ) : null}
+          {/* 🎯 kijelölés-alapú (lokális) korrekció: grade/adjust CSAK a maszkon belül (maskedmerge) */}
+          <Text style={styles.sectionLabel}>{t('studio.image.localAdjust', { defaultValue: 'Kijelölés-alapú korrekció' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
+              active={!layer.localAdjust}
+              onPress={() => (layer.localAdjust ? setLocal(undefined) : undefined)}
+            />
+            <Chip
+              label={t('studio.image.localOn', { defaultValue: 'Be' })}
+              active={!!layer.localAdjust}
+              onPress={() =>
+                layer.localAdjust
+                  ? undefined
+                  : setLocal({ mask: { shape: 'ellipse', x: 0.5, y: 0.5, w: 0.6, h: 0.6, feather: 0.05 } })
+              }
+            />
+          </View>
+          {layer.localAdjust ? (
+            <>
+              <View style={styles.chipRow}>
+                <Chip label={t('studio.image.maskEllipse', { defaultValue: 'Ellipszis' })} active={layer.localAdjust.mask.shape === 'ellipse'} onPress={() => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, shape: 'ellipse' } })} />
+                <Chip label={t('studio.image.maskRect', { defaultValue: 'Téglalap' })} active={layer.localAdjust.mask.shape === 'rectangle'} onPress={() => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, shape: 'rectangle' } })} />
+                {onDrawMask ? (
+                  <Chip label={t('studio.image.maskLasso', { defaultValue: '✏️ Lasszó' })} active={layer.localAdjust.mask.shape === 'polygon'} onPress={() => onDrawMask(layer.id, 'local')} />
+                ) : null}
+              </View>
+              <View style={styles.chipRow}>
+                {GRADE_PRESETS.map((g) => (
+                  <Chip
+                    key={g.id}
+                    label={t(g.label, { defaultValue: g.id })}
+                    active={(layer.localAdjust?.grade ?? 'none') === g.id}
+                    onPress={() => setLocal({ ...layer.localAdjust!, grade: g.id === 'none' ? undefined : (g.id as GradeId) })}
+                  />
+                ))}
+              </View>
+              <Slider label={t('panels.adjust.adjust_exposure', { defaultValue: 'Expozíció' })} value={layer.localAdjust.adjust?.exposure ?? 0} min={-1} max={1} onChange={(v) => setLocal({ ...layer.localAdjust!, adjust: { ...layer.localAdjust!.adjust, exposure: v } })} format={(v) => v.toFixed(2)} />
+              <Slider label={t('panels.adjust.adjust_contrast', { defaultValue: 'Kontraszt' })} value={layer.localAdjust.adjust?.contrast ?? 0} min={-0.4} max={0.4} onChange={(v) => setLocal({ ...layer.localAdjust!, adjust: { ...layer.localAdjust!.adjust, contrast: v } })} format={(v) => v.toFixed(2)} />
+              <Slider label={t('panels.adjust.adjust_saturation', { defaultValue: 'Telítettség' })} value={layer.localAdjust.adjust?.saturation ?? 0} min={-1} max={1} onChange={(v) => setLocal({ ...layer.localAdjust!, adjust: { ...layer.localAdjust!.adjust, saturation: v } })} format={(v) => v.toFixed(2)} />
+              <Slider label={t('studio.image.maskFeather', { defaultValue: 'Lágy él' })} value={layer.localAdjust.mask.feather ?? 0.05} min={0} max={0.3} onChange={(v) => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, feather: v } })} format={(v) => v.toFixed(2)} />
+              <ToggleRow icon="contrast-outline" label={t('studio.image.maskInvert', { defaultValue: 'Invertálás' })} value={!!layer.localAdjust.mask.invert} onValueChange={(v) => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, invert: v } })} />
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -513,7 +562,7 @@ export function LayerInspector({
               <Chip
                 label={t('studio.image.maskLasso', { defaultValue: '✏️ Lasszó' })}
                 active={curMask?.shape === 'polygon'}
-                onPress={() => onDrawMask(layer.id)}
+                onPress={() => onDrawMask(layer.id, 'clip')}
               />
             ) : null}
           </View>

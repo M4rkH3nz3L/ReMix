@@ -19,6 +19,7 @@ import type {
   PhotoLayer,
   ShapeLayer,
   TextLayer,
+  TextPath,
 } from '@/types/project';
 
 const BLENDS: (BlendMode | 'normal')[] = [
@@ -182,6 +183,36 @@ export function LayerInspector({
               )
             }
           />
+          {/* 🛤️ szöveg görbe mentén (text-on-path) — a render SVG textPath-tal égeti */}
+          <Text style={styles.sectionLabel}>{t('studio.image.textPath', { defaultValue: 'Szöveg görbén' })}</Text>
+          <View style={styles.chipRow}>
+            {(['none', 'arc', 'valley', 'wave', 'circle'] as const).map((s) => (
+              <Chip
+                key={s}
+                label={t(`studio.image.textPathShape.${s}`, { defaultValue: s })}
+                active={(layer.textPath?.shape ?? 'none') === s}
+                onPress={() =>
+                  commit(
+                    updateLayer<TextLayer>(doc, layer.id, {
+                      textPath: s === 'none' ? undefined : { shape: s as TextPath['shape'], curve: layer.textPath?.curve ?? 0.5 },
+                    })
+                  )
+                }
+              />
+            ))}
+          </View>
+          {layer.textPath ? (
+            <Slider
+              label={t('studio.image.textPathCurve', { defaultValue: 'Görbület' })}
+              value={layer.textPath.curve}
+              min={0}
+              max={1}
+              onChange={(v) =>
+                commit(updateLayer<TextLayer>(doc, layer.id, { textPath: { shape: layer.textPath?.shape ?? 'arc', curve: v } }))
+              }
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          ) : null}
         </>
       ) : null}
 

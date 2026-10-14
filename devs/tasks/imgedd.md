@@ -15,7 +15,7 @@
 | §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**) | ✅ *(group/festett-maszk ⬜)* |
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
-| §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus) | ✅ *(toll v5, text-on-path ⬜)* |
+| §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
@@ -84,7 +84,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 ## 4. 🖊️ Vektor & szöveg — ✅ erős
 - [x] ✅ **Vektor-toll** (bezier node: hozzáad/split/join/reverse/node-típus) + **boolean** (divide-dal) + **SVG import/export**.
 - [x] ✅ **Szöveg-stílus** (gradient/kontúr/árnyék/glow — a renderben pontos) + **igazítás/elosztás**.
-- [ ] ⬜ **Szöveg görbén (text-on-path)** · **OpenType-funkciók** (ligatúrák/alternatívák) · **toll v5** (finom node-húzás/handle-arány).
+- [x] ✅ **Szöveg görbén (text-on-path)** a kép-stúdióban — a kész SVG-`textPath` render (`text-render.js`
+  `textPathHtml`, `TextLayer.textPath {shape:arc|valley|wave|circle, curve}`) bekötve a LayerInspector szöveg-
+  szekciójába (alakzat-chipek + görbület-csúszka); a render már támogatta. *ÉLŐ-BIZONYÍTVA (/imagedoc, 400² fehér
+  szöveg fekete háttéren): flat↔circle különbség-átlag 6.97, flat↔arc 7.57 (0=azonos → a textPath átrendezi a
+  glifeket); közép-sáv YAVG flat 35.3 → circle 25.2; mind HTTP 200.*
+- [ ] ⬜ **OpenType-funkciók** (ligatúrák/alternatívák) · **toll v5** (finom node-húzás/handle-arány).
 - [ ] ⬜ **Vektor-kitöltés gradiens/minta** a path-okon (ma szín/alap-gradient).
 
 ## 5. 🎨 Korrekciók & szűrők — ✅ adjustment-stack kész, mélység hiányzik

@@ -306,6 +306,14 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     last = `[${out}]`;
   }
 
+  // 🔦 dokumentum-szintű vignetta: a sarkokat sötétíti a TELJES kész képen (a kompozit után)
+  const vignette = Math.max(0, Math.min(1, Number(doc.vignette) || 0));
+  if (vignette > 0) {
+    const angle = (vignette * (Math.PI / 3)).toFixed(4);
+    filters.push(`${last}vignette=angle=${angle}[vig]`);
+    last = '[vig]';
+  }
+
   // 🎞️ dokumentum-szintű filmszemcse a TELJES kész képre (a kompozit után, a kimenet előtt)
   const grain = Math.max(0, Math.min(1, Number(doc.grain) || 0));
   if (grain > 0) {

@@ -1385,6 +1385,8 @@ export interface ImageDoc {
   guides?: ImageGuide[];
   /** 🎞️ dokumentum-szintű filmszemcse 0–1 (a TELJES kész képre; cinematic/retró finish). A render égeti. */
   grain?: number;
+  /** 🔦 dokumentum-szintű vignetta 0–1 (a sarkokat sötétíti a teljes képen; cinematic). A render égeti. */
+  vignette?: number;
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */
   renderedUri?: string;
 }

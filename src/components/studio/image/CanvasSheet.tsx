@@ -40,12 +40,21 @@ export function CanvasSheet({
   const [format, setFormat] = useState<'raster' | 'vector'>(doc.format ?? 'raster');
   const [bg, setBg] = useState<string>(docBackground(doc));
   const [grain, setGrain] = useState(doc.grain ?? 0);
+  const [vignette, setVignette] = useState(doc.vignette ?? 0);
 
   const apply = () => {
     const width = clampDim(w);
     const height = clampDim(h);
     const next = setBackground(
-      { ...doc, width, height, format, grain: grain > 0 ? grain : undefined, renderedUri: undefined },
+      {
+        ...doc,
+        width,
+        height,
+        format,
+        grain: grain > 0 ? grain : undefined,
+        vignette: vignette > 0 ? vignette : undefined,
+        renderedUri: undefined,
+      },
       bg === 'transparent' || isHexColor(bg) ? bg : BG_SWATCHES[0],
       () => makeId('lyr')
     );
@@ -153,6 +162,10 @@ export function CanvasSheet({
       {/* 🎞️ dokumentum-szintű filmszemcse (a teljes kész képre) */}
       <Text style={styles.section}>{t('studio.image.grain', { defaultValue: 'Filmszemcse' })}</Text>
       <Slider label="" value={grain} min={0} max={1} onChange={setGrain} format={(v) => `${Math.round(v * 100)}%`} />
+
+      {/* 🔦 dokumentum-szintű vignetta (a sarkokat sötétíti) */}
+      <Text style={styles.section}>{t('studio.image.vignette', { defaultValue: 'Vignetta' })}</Text>
+      <Slider label="" value={vignette} min={0} max={1} onChange={setVignette} format={(v) => `${Math.round(v * 100)}%`} />
     </StudioSheet>
   );
 }

@@ -101,6 +101,10 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [x] ✅ **Dokumentum-szintű filmszemcse (grain)** — a TELJES kész képre (cinematic/retró finish); `ImageDoc.grain`
   + a render `noise`-t tesz a kompozit UTÁN; CanvasSheet-csúszka. *ÉLŐ-BIZONYÍTVA: grain nélkül 118..211 →
   grain 0.8-del 110..221 (tágabb tartomány = szemcse; worker-mérés).*
+- [x] ✅ **Dokumentum-szintű vignetta** — a sarkokat sötétíti a TELJES kész képen (cinematic); `ImageDoc.vignette`
+  + a render `vignette=angle=vign·π/3`-t tesz a kompozit UTÁN; CanvasSheet-csúszka. *ÉLŐ-BIZONYÍTVA (/imagedoc,
+  fehér doc): vignetta nélkül közép+sarok `ffffff`; 0.9-del közép `ffffff` (változatlan) → sarok `121310` (majdnem
+  fekete); HTTP 200.*
 - [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
 - [ ] ⬜ **LUT/filmszimuláció** a fotóra (a videó-oldalon `lutImport` van — a képre hozni).
 

@@ -1,6 +1,6 @@
 import { t as tr } from 'i18next';
 
-import type { AspectRatio, ImageDoc, ImageLayer } from '@/types/project';
+import type { AspectRatio, ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
 
 /**
  * 🎨 Kép-dokumentum (Creative Canvas V1) — pure réteg-műveletek.
@@ -154,6 +154,64 @@ export function reorderLayer(doc: ImageDoc, id: string, delta: number): ImageDoc
 export function toggleLayerHidden(doc: ImageDoc, id: string): ImageDoc {
   const layer = doc.layers.find((l) => l.id === id);
   return layer ? updateLayer(doc, id, { hidden: !layer.hidden }) : doc;
+}
+
+// ── 🗂️ Réteg-csoportok (mappák) — lapos groupId-modell ──────────────────────
+
+/** egy csoport tagjait összefüggő blokká rendezi az ELSŐ tag helyén (a relatív
+ *  sorrendet megőrzi) — így a panel egymás mellett mutatja, a z-rend értelmes. */
+function placeContiguous(layers: ImageLayer[], groupId: string): ImageLayer[] {
+  const members = layers.filter((l) => l.groupId === groupId);
+  if (members.length < 2) {
+    return layers;
+  }
+  const rest = layers.filter((l) => l.groupId !== groupId);
+  const firstIdx = layers.findIndex((l) => l.groupId === groupId);
+  const before = layers.slice(0, firstIdx).filter((l) => l.groupId !== groupId).length;
+  return [...rest.slice(0, before), ...members, ...rest.slice(before)];
+}
+
+/** Új csoport létrehozása a megadott rétegekből (a tagok összefüggő blokkba kerülnek). */
+export function createGroup(doc: ImageDoc, layerIds: string[], id: string, name: string): ImageDoc {
+  const ids = new Set(layerIds.filter((lid) => doc.layers.some((l) => l.id === lid)));
+  if (ids.size === 0) {
+    return doc;
+  }
+  const group: ImageGroup = { id, name };
+  let layers = doc.layers.map((l) => (ids.has(l.id) ? ({ ...l, groupId: id } as ImageLayer) : l));
+  layers = placeContiguous(layers, id);
+  return { ...doc, layers, groups: [...(doc.groups ?? []), group], renderedUri: undefined };
+}
+
+/** Egy réteg csoportba tétele (vagy kivétele, ha `groupId` null/undefined). */
+export function assignLayerToGroup(doc: ImageDoc, layerId: string, groupId: string | undefined): ImageDoc {
+  if (!doc.layers.some((l) => l.id === layerId)) {
+    return doc;
+  }
+  let layers = doc.layers.map((l) => (l.id === layerId ? ({ ...l, groupId } as ImageLayer) : l));
+  if (groupId) {
+    layers = placeContiguous(layers, groupId);
+  }
+  return { ...doc, layers, renderedUri: undefined };
+}
+
+/** Csoport feloldása: a tagok groupId-ja törlődik, a csoport-rekord eltűnik. */
+export function ungroup(doc: ImageDoc, groupId: string): ImageDoc {
+  const layers = doc.layers.map((l) =>
+    l.groupId === groupId ? ({ ...l, groupId: undefined } as ImageLayer) : l
+  );
+  return { ...doc, layers, groups: (doc.groups ?? []).filter((g) => g.id !== groupId), renderedUri: undefined };
+}
+
+/** Csoport-mezők módosítása (név/rejtés/összecsukás/opacity). */
+export function updateGroup(doc: ImageDoc, groupId: string, patch: Partial<ImageGroup>): ImageDoc {
+  const groups = (doc.groups ?? []).map((g) => (g.id === groupId ? { ...g, ...patch } : g));
+  return { ...doc, groups, renderedUri: undefined };
+}
+
+/** Egy csoport tag-rétegei (a lapos `layers`-ben). */
+export function groupMembers(doc: ImageDoc, groupId: string): ImageLayer[] {
+  return doc.layers.filter((l) => l.groupId === groupId);
 }
 
 /** másolat KÖZVETLENÜL az eredeti fölé, hogy látható legyen az eredmény */

@@ -172,7 +172,11 @@ function watermarkLayer() {
 
 async function renderImageDoc(doc, height, workDir, opts = {}) {
   const canvas = docCanvas(doc, height);
-  const layers = (doc.layers ?? []).filter(isVisible);
+  // 🗂️ csoportok: a rejtett csoport tagjai kimaradnak, az opacity a tagokra RÁszorzódik
+  const groups = new Map((doc.groups ?? []).map((g) => [g.id, g]));
+  const groupHidden = (l) => l.groupId && groups.get(l.groupId)?.hidden;
+  const groupOpacity = (l) => (l.groupId ? Math.max(0, Math.min(1, Number(groups.get(l.groupId)?.opacity ?? 1))) : 1);
+  const layers = (doc.layers ?? []).filter((l) => isVisible(l) && !groupHidden(l));
   if (layers.length === 0) {
     throw new Error('A dokumentumnak nincs látható rétege.');
   }
@@ -211,7 +215,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   last = '[base]';
 
   for (const layer of layers) {
-    const opacity = Math.min(1, Math.max(0, layer.opacity ?? 1));
+    const opacity = Math.min(1, Math.max(0, layer.opacity ?? 1)) * groupOpacity(layer);
     let prepared;
 
     if (layer.kind === 'photo') {

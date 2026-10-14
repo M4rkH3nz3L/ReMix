@@ -1,13 +1,18 @@
 import {
   addLayer,
+  assignLayerToGroup,
+  createGroup,
   createImageDoc,
   docBackground,
   docMediaUris,
   duplicateLayer,
+  groupMembers,
   removeLayer,
   reorderLayer,
   setBackground,
   toggleLayerHidden,
+  ungroup,
+  updateGroup,
   updateLayer,
   visibleLayers,
 } from '@/lib/imageDoc';
@@ -121,5 +126,37 @@ describe('docMediaUris', () => {
       { kind: 'shape', id: 's2', shape: 'rectangle' } as ImageLayer, // nincs imageUri
     ]);
     expect(docMediaUris(base).sort()).toEqual(['file://1', 'file://logo']);
+  });
+});
+
+describe('🗂️ réteg-csoportok (lapos groupId)', () => {
+  it('createGroup: groupId-t tesz a tagokra + csoport-rekord + összefüggő blokk', () => {
+    const base = doc([fill('a'), photo('b', 'u'), fill('c'), photo('d', 'u')]);
+    const g = createGroup(base, ['b', 'd'], 'grp1', 'Mappa');
+    expect(g.groups).toEqual([{ id: 'grp1', name: 'Mappa' }]);
+    expect(groupMembers(g, 'grp1').map((l) => l.id)).toEqual(['b', 'd']);
+    // b és d összefüggő blokkba kerül az ELSŐ tag (b, idx1) helyén → a,b,d,c
+    expect(g.layers.map((l) => l.id)).toEqual(['a', 'b', 'd', 'c']);
+  });
+
+  it('assignLayerToGroup: hozzáad + a tag a blokk mellé kerül; undefined → kivesz', () => {
+    const base = createGroup(doc([fill('a'), fill('b'), fill('c')]), ['a'], 'g', 'G');
+    const added = assignLayerToGroup(base, 'c', 'g');
+    expect(groupMembers(added, 'g').map((l) => l.id).sort()).toEqual(['a', 'c']);
+    const removed = assignLayerToGroup(added, 'c', undefined);
+    expect(removed.layers.find((l) => l.id === 'c')?.groupId).toBeUndefined();
+  });
+
+  it('ungroup: törli a tagok groupId-ját + a csoport-rekordot', () => {
+    const base = createGroup(doc([fill('a'), fill('b')]), ['a', 'b'], 'g', 'G');
+    const out = ungroup(base, 'g');
+    expect(out.groups).toEqual([]);
+    expect(out.layers.every((l) => l.groupId === undefined)).toBe(true);
+  });
+
+  it('updateGroup: mezők módosítása (rejtés/opacity/név)', () => {
+    const base = createGroup(doc([fill('a')]), ['a'], 'g', 'G');
+    const out = updateGroup(base, 'g', { hidden: true, opacity: 0.5, name: 'Új' });
+    expect(out.groups?.[0]).toEqual({ id: 'g', name: 'Új', hidden: true, opacity: 0.5 });
   });
 });

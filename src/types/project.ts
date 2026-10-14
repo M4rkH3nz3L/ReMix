@@ -1263,6 +1263,25 @@ export interface ImageLayerBase {
   /** 🖊️ kontúr/körvonal (bármely pozícionált rétegre): a réteg színezett, N px-rel megnövelt
    *  sziluettje MÖGÉ — keretként jelenik meg. `width` a vászonszélesség törtje (0–~0.05). */
   stroke?: { color: string; width: number };
+  /** 🗂️ csoport-tagság: a réteg EHHEZ a `ImageGroup`-hoz tartozik (lapos modell — a rajzolási
+   *  sorrend a `layers` tömbé marad; az azonos groupId-jú rétegeket a panel egy mappába fogja). */
+  groupId?: string;
+}
+
+/**
+ * 🗂️ Réteg-csoport (mappa) — a KÉP-dokumentum lapos `groups` listájában él; a hozzá tartozó
+ * rétegeket a `layer.groupId` köti be. A csoport közös `hidden`/`opacity`-t ad (a render és a
+ * preview a tag-rétegekre alkalmazza), és panel-szinten összecsukható. NINCS beágyazás (v1 lapos).
+ */
+export interface ImageGroup {
+  id: string;
+  name: string;
+  /** a csoport összes tagja rejtve (a render kihagyja) */
+  hidden?: boolean;
+  /** a panelben összecsukva (a tagok nem látszanak a listában) */
+  collapsed?: boolean;
+  /** 0–1 közös áttetszőség — a tag-rétegek saját opacity-jére RÁszorzódik (render + preview) */
+  opacity?: number;
 }
 
 /** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */
@@ -1400,6 +1419,8 @@ export interface ImageDoc {
   format?: 'raster' | 'vector';
   /** ALULRÓL FÖLFELÉ: a lista első eleme van leghátul */
   layers: ImageLayer[];
+  /** 🗂️ réteg-csoportok (mappák) — a tagokat a `layer.groupId` köti be (lapos modell) */
+  groups?: ImageGroup[];
   /** 📐 kézzel húzott segédvonalak (szerkesztő-only; a render NEM égeti be) */
   guides?: ImageGuide[];
   /** 🎞️ dokumentum-szintű filmszemcse 0–1 (a TELJES kész képre; cinematic/retró finish). A render égeti. */

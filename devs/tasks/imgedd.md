@@ -12,7 +12,7 @@
 
 | § | Terület | Állapot |
 |---|---------|---------|
-| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden/sorrend, **blend-mode**) | ✅ *(group/maszk ⬜)* |
+| §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**) | ✅ *(group/festett-maszk ⬜)* |
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus) | ✅ *(toll v5, text-on-path ⬜)* |
@@ -51,7 +51,10 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   ffmpeg `blend`-del, a réteg alfájával `maskedmerge`-elve komponál; a LayerInspector-választó a közös szekcióba
   került (eddig csak formán volt, és a render FIGYELMEN KÍVÜL hagyta). *ÉLŐ-BIZONYÍTVA: 808080×808080 multiply →
   454545 (sötétít), 404040×404040 screen → 6c6c6c (világosít), színhelyes szürke (worker-pixelmérés).*
-- [ ] ⬜ **Réteg-maszk** (festhető raszter + vektor-maszk) per réteg + a maszk invertálása/törlése.
+- [x] ✅ **Gradient-maszk** per réteg (lineáris elhalványulás: left/right/up/down) — `ImageLayerBase.maskGradient`
+  + a render geq alfa-rámpával (minden réteg-fajtára); LayerInspector-választó. *ÉLŐ-BIZONYÍTVA: piros foto fehér
+  fill fölött, 'right' maszk → bal piros (ff0e0e), jobb a fehér base (fcf6f6), közép rózsaszín (worker-pixelmérés).*
+- [ ] ⬜ **Festhető raszter-maszk** + **vektor/szelekció-maszk** per réteg + invertálás/törlés.
 - [ ] ⬜ **Csoport-rétegek (mappák)** — `group` réteg-fajta + beágyazott transzform/opacity.
 - [ ] ⬜ **Nem-destruktív korrekció-réteg** (az alatta lévőkre hat) — ma csak per-foto adjustment-stack.
 - [ ] 🟡 **Réteg-effektek a formán túl** (árnyék/glow/kontúr fotóra/szövegre is) — a `layerEffects.ts` mag kész, 0 UI.

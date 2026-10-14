@@ -1,4 +1,4 @@
-const { filterChain, oneFilter, sepiaMixer } = require('./imageFilters');
+const { filterChain, oneFilter, sepiaMixer, maskGradientFilter } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
   test('oneFilter: típusonkénti ffmpeg-részlet', () => {
@@ -27,5 +27,14 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(filterChain([{ type: 'blur', amount: 0 }, { type: 'nope', amount: 1 }])).toBe('');
     expect(filterChain([])).toBe('');
     expect(filterChain(undefined)).toBe('');
+  });
+
+  test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {
+    expect(maskGradientFilter('right')).toContain("a='alpha(X,Y)*(1-X/W)'");
+    expect(maskGradientFilter('left')).toContain("a='alpha(X,Y)*(X/W)'");
+    expect(maskGradientFilter('down')).toContain("a='alpha(X,Y)*(1-Y/H)'");
+    expect(maskGradientFilter('up')).toContain("a='alpha(X,Y)*(Y/H)'");
+    expect(maskGradientFilter(undefined)).toBe('');
+    expect(maskGradientFilter('nope')).toBe('');
   });
 });

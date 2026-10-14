@@ -322,6 +322,19 @@ export function LayerInspector({
           />
         ))}
       </View>
+
+      {/* 🎭 gradient-maszk: a réteg a megadott irányba fokozatosan átlátszóvá fade-el (a render geq-vel) */}
+      <Text style={styles.sectionLabel}>{t('studio.image.maskFade', { defaultValue: 'Gradient-maszk (elhalványulás)' })}</Text>
+      <View style={styles.chipRow}>
+        {(['none', 'left', 'right', 'up', 'down'] as const).map((d) => (
+          <Chip
+            key={d}
+            label={t(`studio.image.maskDir.${d}`, { defaultValue: d })}
+            active={(layer.maskGradient ?? 'none') === d}
+            onPress={() => commit(updateLayer(doc, layer.id, { maskGradient: d === 'none' ? undefined : d }))}
+          />
+        ))}
+      </View>
     </>
   );
 }

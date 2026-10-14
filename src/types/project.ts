@@ -1251,7 +1251,13 @@ export interface ImageLayerBase {
   /** 🎨 keverési mód az ALATTA lévő rétegekkel (multiply/screen/overlay/…). Hiányzó = normál
    *  (source-over). A render (`/imagedoc`) ffmpeg `blend`-del, a réteg alfájával maszkolva égeti be. */
   blendMode?: BlendMode;
+  /** 🎭 lineáris gradient-maszk: a réteg a megadott irányba FOKOZATOSAN átlátszóvá fade-el
+   *  (pl. 'right' = bal átlátszatlan → jobb átlátszó). A render geq alfa-rámpával égeti. */
+  maskGradient?: MaskGradientDir;
 }
+
+/** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */
+export type MaskGradientDir = 'left' | 'right' | 'up' | 'down';
 
 /** háttér-réteg: tömör szín vagy gradiens, a teljes vásznon */
 export interface FillLayer extends ImageLayerBase {

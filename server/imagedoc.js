@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { adjustChain } = require('./render');
-const { filterChain } = require('./imageFilters');
+const { filterChain, maskGradientFilter } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -227,7 +227,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       prepared = `p${idx}`;
       filters.push(
         `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${filterChain(layer.filters)}${flip}${rotate}` +
-          `,colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+          `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
     } else {
@@ -246,7 +246,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
           : '';
       filters.push(
-        `[${idx}:v]format=rgba${flip}${rot},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+        `[${idx}:v]format=rgba${flip}${rot}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
     }

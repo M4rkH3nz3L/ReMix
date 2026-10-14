@@ -50,4 +50,17 @@ function filterChain(filters) {
   return parts.length ? ',' + parts.join(',') : '';
 }
 
-module.exports = { filterChain, oneFilter, sepiaMixer };
+// 🎭 lineáris gradient-maszk: a réteg alfáját X/Y mentén rámpázza (geq). Vezető vesszővel, hogy
+// a prepared-láncba fűzhető (a flip/rotate UTÁN, az opacity-colorchannelmixer ELŐTT). '' ha nincs.
+const MASK_EXPR = {
+  right: '(1-X/W)', // bal átlátszatlan → jobb átlátszó
+  left: '(X/W)',
+  down: '(1-Y/H)',
+  up: '(Y/H)',
+};
+function maskGradientFilter(dir) {
+  const e = MASK_EXPR[dir];
+  return e ? `,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*${e}'` : '';
+}
+
+module.exports = { filterChain, oneFilter, sepiaMixer, maskGradientFilter };

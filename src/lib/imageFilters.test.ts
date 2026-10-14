@@ -9,9 +9,9 @@ import {
 import type { ImageFilter } from '@/types/project';
 
 describe('imageFilters — foto szűrő-verem UI-mag', () => {
-  it('IMAGE_FILTER_TYPES: a 7 szűrő (clarity/dehaze is)', () => {
+  it('IMAGE_FILTER_TYPES: a 9 szűrő (pixelate/posterize is)', () => {
     expect(IMAGE_FILTER_TYPES.map((f) => f.type)).toEqual([
-      'blur', 'sharpen', 'noise', 'grayscale', 'sepia', 'clarity', 'dehaze',
+      'blur', 'sharpen', 'noise', 'grayscale', 'sepia', 'clarity', 'dehaze', 'pixelate', 'posterize',
     ]);
   });
 

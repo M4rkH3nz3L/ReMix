@@ -33,6 +33,18 @@ function oneFilter(f) {
     case 'dehaze':
       // párátlanítás — globális kontraszt + telítettség emelés
       return a > 0 ? `eq=contrast=${(1 + a * 0.6).toFixed(3)}:saturation=${(1 + a * 0.4).toFixed(3)}` : '';
+    case 'pixelate': {
+      // blokkos — méret-tartó (pixelize); nagyobb amount = nagyobb blokk
+      const block = 2 + Math.round(a * 22);
+      return a > 0 ? `pixelize=w=${block}:h=${block}` : '';
+    }
+    case 'posterize': {
+      // kevés szín-szint (sávosítás) — lutrgb lépcsőzés; nagyobb amount = kevesebb szint
+      const step = Math.round(8 + a * 120);
+      return a > 0
+        ? `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`
+        : '';
+    }
     default:
       return '';
   }

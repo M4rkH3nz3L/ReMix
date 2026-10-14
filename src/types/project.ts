@@ -1323,7 +1323,16 @@ export interface PhotoLayer extends ImageLayerBase {
 
 /** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).
  *  `clarity`/`dehaze` a RAW-develop fő eszközei (lokális ill. globális kontraszt). */
-export type ImageFilterType = 'blur' | 'sharpen' | 'noise' | 'grayscale' | 'sepia' | 'clarity' | 'dehaze';
+export type ImageFilterType =
+  | 'blur'
+  | 'sharpen'
+  | 'noise'
+  | 'grayscale'
+  | 'sepia'
+  | 'clarity'
+  | 'dehaze'
+  | 'pixelate'
+  | 'posterize';
 export interface ImageFilter {
   type: ImageFilterType;
   amount: number;

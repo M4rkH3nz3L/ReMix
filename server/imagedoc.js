@@ -306,6 +306,13 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     last = `[${out}]`;
   }
 
+  // 🎞️ dokumentum-szintű filmszemcse a TELJES kész képre (a kompozit után, a kimenet előtt)
+  const grain = Math.max(0, Math.min(1, Number(doc.grain) || 0));
+  if (grain > 0) {
+    filters.push(`${last}noise=alls=${Math.round(grain * 30)}:allf=t+u[grained]`);
+    last = '[grained]';
+  }
+
   const { ext, args: fmtArgs } = imageOutputArgs(opts.format, opts.quality);
   const outFile = path.join(workDir, `imagedoc.${ext}`);
   await run([

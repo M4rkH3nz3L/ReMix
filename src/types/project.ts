@@ -1383,6 +1383,8 @@ export interface ImageDoc {
   layers: ImageLayer[];
   /** 📐 kézzel húzott segédvonalak (szerkesztő-only; a render NEM égeti be) */
   guides?: ImageGuide[];
+  /** 🎞️ dokumentum-szintű filmszemcse 0–1 (a TELJES kész képre; cinematic/retró finish). A render égeti. */
+  grain?: number;
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */
   renderedUri?: string;
 }

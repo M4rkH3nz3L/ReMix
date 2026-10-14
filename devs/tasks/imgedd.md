@@ -98,6 +98,9 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [x] ✅ **Duotone** (kétszínű leképezés: árnyék→indigo, csúcsfény→pink; amount-blenddel) — `hue=s=0`+`lutrgb`.
   *ÉLŐ-BIZONYÍTVA: csúcsfény → pink (fe8eab), árnyék → indigo-irány (worker-pixelmérés).*
 - [ ] ⬜ **motion blur** · egyedi-színű duotone/gradient-map · további szűrők.
+- [x] ✅ **Dokumentum-szintű filmszemcse (grain)** — a TELJES kész képre (cinematic/retró finish); `ImageDoc.grain`
+  + a render `noise`-t tesz a kompozit UTÁN; CanvasSheet-csúszka. *ÉLŐ-BIZONYÍTVA: grain nélkül 118..211 →
+  grain 0.8-del 110..221 (tágabb tartomány = szemcse; worker-mérés).*
 - [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
 - [ ] ⬜ **LUT/filmszimuláció** a fotóra (a videó-oldalon `lutImport` van — a képre hozni).
 

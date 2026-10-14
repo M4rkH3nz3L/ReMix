@@ -91,7 +91,7 @@ export function PhotoLayerView({
         <Image
           source={{ uri: layer.uri }}
           style={StyleSheet.absoluteFill}
-          contentFit={layer.fit === 'contain' ? 'contain' : 'cover'}
+          contentFit={layer.fit === 'contain' ? 'contain' : layer.fit === 'stretch' ? 'fill' : 'cover'}
         />
         {tints.map((tint, i) => (
           <View

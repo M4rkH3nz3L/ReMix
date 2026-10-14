@@ -213,13 +213,16 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       inputs.push('-i', layer.uri);
       const boxW = Math.max(2, Math.round((layer.w ?? 1) * canvas.w));
       const boxH = Math.max(2, Math.round((layer.h ?? 1) * canvas.h));
-      // 'cover' kitölti a keretet (a túllógó rész levágódik), 'contain' belefér
+      // 'cover' kitölti a keretet (a túllógó rész levágódik), 'contain' belefér,
+      // 'stretch' NEM-arányosan a keretre nyújt (szabad transzform — torzíthat)
       const fit =
         layer.fit === 'contain'
           ? `scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
             `pad=${boxW}:${boxH}:(ow-iw)/2:(oh-ih)/2:color=black@0`
-          : `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
-            `crop=${boxW}:${boxH}`;
+          : layer.fit === 'stretch'
+            ? `scale=${boxW}:${boxH}`
+            : `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
+              `crop=${boxW}:${boxH}`;
       // 🔁 tükrözés a forgatás ELŐTT (helyi tér) — a preview scaleX/Y-nal egyezik
       const flip = `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}`;
       const rotate = layer.rotation

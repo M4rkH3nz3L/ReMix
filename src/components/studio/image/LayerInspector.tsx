@@ -190,13 +190,18 @@ export function LayerInspector({
           <View style={styles.chipRow}>
             <Chip
               label={t('studio.image.fitCover')}
-              active={layer.fit !== 'contain'}
+              active={!layer.fit || layer.fit === 'cover'}
               onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { fit: 'cover' }))}
             />
             <Chip
               label={t('studio.image.fitContain')}
               active={layer.fit === 'contain'}
               onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { fit: 'contain' }))}
+            />
+            <Chip
+              label={t('studio.image.fitStretch', { defaultValue: 'Nyújtás' })}
+              active={layer.fit === 'stretch'}
+              onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { fit: 'stretch' }))}
             />
             <Chip label={t('studio.image.corrections')} active={false} onPress={onOpenAdjust} />
           </View>

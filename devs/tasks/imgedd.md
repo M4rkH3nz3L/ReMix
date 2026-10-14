@@ -126,7 +126,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 
 ## 6. 📐 Transzformáció — ✅ alap kész
 - [x] ✅ mozgatás/skálázás/forgatás/tükrözés + **crop** + **vonalzók/segédvonalak/snap** (rulers).
-- [ ] ⬜ **Szabad transzform** (nem-arányos nyújtás/skewer) · **perspektíva/warp/torzítás** · **tartalom-tudatos skálázás**.
+- [x] ✅ **Nem-arányos nyújtás (`fit:'stretch'`)** — a fotó szabadon a keretre nyúlik (torzíthat); worker
+  `scale=W:H` (aspect-megőrzés nélkül), preview `contentFit='fill'`, LayerInspector „Nyújtás" chip a
+  cover/contain mellé. *ÉLŐ-BIZONYÍTVA (/imagedoc, 64×64 fehér marker 128², vászon 256×128, marker-aláírás
+  P1(180,64)/P2(128,10)): cover=ff/ff; contain=00/00; stretch=ff/00 (egyedi → 2:1 vízszintes nyújtás); HTTP 200.*
+- [ ] ⬜ **Skewer/perspektíva/warp/torzítás** · **tartalom-tudatos skálázás**.
 - [ ] ⬜ **Igazítás okos-segédvonalakkal** (dinamikus, a többi réteghez viszonyítva).
 
 ## 7. 📤 Export & megosztás — ✅ gazdag

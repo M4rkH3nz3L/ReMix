@@ -1317,8 +1317,9 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 🔁 tükrözés (kép-stúdió): vízszintes / függőleges */
   flipH?: boolean;
   flipV?: boolean;
-  /** 'cover' kitölti a keretet (vág), 'contain' belefér (üres szél marad) */
-  fit?: 'cover' | 'contain';
+  /** 'cover' kitölti a keretet (vág), 'contain' belefér (üres szél marad),
+   *  'stretch' nem-arányosan a keretre nyújt (szabad transzform — torzíthat) */
+  fit?: 'cover' | 'contain' | 'stretch';
   filterId?: FilterId;
   filterIntensity?: number;
   /** 🎬 filmes look-preset (LUT-szerű grade) a fotóra — a videó grade-rétegével AZONOS térkép

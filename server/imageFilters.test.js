@@ -8,6 +8,7 @@ const {
   hexToRgb,
   strokeSilhouette,
   perspectiveFilter,
+  gradientMapFilter,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -78,6 +79,15 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     // Y>0 az alsó élt rövidíti (a bal/jobb alsó x-ek befelé)
     const py = perspectiveFilter(0, 1, 100, 100); // vy=0.25 → BL.x=26, BR.x=78
     expect(py).toContain('perspective=0:0:104:0:26:104:78:104:sense=destination');
+  });
+
+  test('gradientMapFilter: hiányzó szín → ""; alfa-megőrzés + rgba-visszatérés', () => {
+    expect(gradientMapFilter('', '#fff')).toBe('');
+    const g = gradientMapFilter('#000080', '#ffff00'); // shadow(0,0,128) highlight(255,255,0)
+    expect(g).toContain('format=gbrap,geq=');
+    expect(g).toContain("r='0*(1-");
+    expect(g).toContain("+255*(");
+    expect(g).toContain("a='alpha(X,Y)',format=rgba");
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

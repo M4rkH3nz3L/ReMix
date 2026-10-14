@@ -18,6 +18,7 @@ const {
   glowSilhouette,
   strokeSilhouette,
   perspectiveFilter,
+  gradientMapFilter,
 } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
@@ -249,9 +250,13 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       }
       // 📐 perspektíva/3D-dőlés a box-méretű fotóra (a filterek UTÁN, a flip/rotate ELŐTT)
       const persp = perspectiveFilter(layer.perspectiveX, layer.perspectiveY, boxW, boxH);
+      // 🎨 gradient-map (egyedi-színű duotone) — a grade/lut UTÁN, a struktúra-szűrők ELŐTT
+      const gmap = layer.gradientMap
+        ? gradientMapFilter(layer.gradientMap.shadow, layer.gradientMap.highlight)
+        : '';
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

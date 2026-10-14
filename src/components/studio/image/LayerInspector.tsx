@@ -294,6 +294,39 @@ export function LayerInspector({
             ) : null}
           </View>
           {layer.lut ? <Text style={styles.hintText}>{layer.lutName ?? 'LUT.cube'}</Text> : null}
+          {/* 🎨 gradient-map (egyedi-színű duotone): sötét→shadow, világos→highlight (render geq) */}
+          <Text style={styles.sectionLabel}>{t('studio.image.gradientMap', { defaultValue: 'Gradient-map (duotone)' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={layer.gradientMap ? t('studio.image.gmapOff', { defaultValue: 'Duotone ki' }) : t('studio.image.gmapOn', { defaultValue: 'Duotone be' })}
+              active={!!layer.gradientMap}
+              onPress={() =>
+                commit(
+                  updateLayer<PhotoLayer>(doc, layer.id, {
+                    gradientMap: layer.gradientMap ? undefined : { shadow: '#0d1b3a', highlight: '#ffd27f' },
+                  })
+                )
+              }
+            />
+          </View>
+          {layer.gradientMap ? (
+            <>
+              <ColorField
+                label={t('studio.image.gmapShadow', { defaultValue: 'Árnyék szín' })}
+                value={layer.gradientMap.shadow}
+                onChange={(shadow) =>
+                  commit(updateLayer<PhotoLayer>(doc, layer.id, { gradientMap: { shadow, highlight: layer.gradientMap?.highlight ?? '#ffd27f' } }))
+                }
+              />
+              <ColorField
+                label={t('studio.image.gmapHighlight', { defaultValue: 'Világos szín' })}
+                value={layer.gradientMap.highlight}
+                onChange={(highlight) =>
+                  commit(updateLayer<PhotoLayer>(doc, layer.id, { gradientMap: { shadow: layer.gradientMap?.shadow ?? '#0d1b3a', highlight } }))
+                }
+              />
+            </>
+          ) : null}
         </>
       ) : null}
 

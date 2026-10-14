@@ -1334,6 +1334,9 @@ export interface PhotoLayer extends ImageLayerBase {
   lut?: string;
   /** a `lut` emberi neve a UI-nak (pl. a fájlnév) */
   lutName?: string;
+  /** 🎨 gradient-map (egyedi-színű duotone): a luminanciát a `shadow`→`highlight` szín közötti
+   *  átmenetre képezi (sötét→shadow, világos→highlight). A render geq-vel égeti (a grade/lut UTÁN). */
+  gradientMap?: { shadow: string; highlight: string };
   /** 🎛️ struktúra-szűrő verem (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg), a korrekció UTÁN */
   filters?: ImageFilter[];
   /** a render-input EGYETLEN korrekciója (a verem ebbe laposodik — `flattenAdjustments`) */

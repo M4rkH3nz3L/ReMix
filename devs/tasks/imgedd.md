@@ -102,7 +102,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   *ÉLŐ-BIZONYÍTVA: pixelate blokk-egyenlőség (867b7a=867b7a); poszterizálás 220→32 distinct szint (worker-mérés).*
 - [x] ✅ **Duotone** (kétszínű leképezés: árnyék→indigo, csúcsfény→pink; amount-blenddel) — `hue=s=0`+`lutrgb`.
   *ÉLŐ-BIZONYÍTVA: csúcsfény → pink (fe8eab), árnyék → indigo-irány (worker-pixelmérés).*
-- [ ] ⬜ **motion blur** · egyedi-színű duotone/gradient-map · további szűrők.
+- [x] ✅ **Gradient-map / egyedi-színű duotone** — `PhotoLayer.gradientMap {shadow,highlight}`; a render a
+  luminanciát (BT.601) a két szín közti átmenetre képezi (`gradientMapFilter` geq, alfa-megőrzéssel, a
+  grade/lut UTÁN); LayerInspector toggle + két ColorField. *ÉLŐ-BIZONYÍTVA (/imagedoc, kék fotó 120/160/200,
+  kék→sárga): kontroll=799fc7; duotone=989834 (≈153/153/51 — R/G fel, B le a luma szerint); HTTP 200.*
+- [ ] ⬜ **Motion blur** (irányított) · további artisztikus szűrők.
 - [x] ✅ **Dokumentum-szintű filmszemcse (grain)** — a TELJES kész képre (cinematic/retró finish); `ImageDoc.grain`
   + a render `noise`-t tesz a kompozit UTÁN; CanvasSheet-csúszka. *ÉLŐ-BIZONYÍTVA: grain nélkül 118..211 →
   grain 0.8-del 110..221 (tágabb tartomány = szemcse; worker-mérés).*

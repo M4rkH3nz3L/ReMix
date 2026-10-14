@@ -225,9 +225,21 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const rotate = layer.rotation
         ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
         : '';
+      // 🎞️ saját 3D LUT (.cube): a feltöltött fájlnak nincs .cube kiterjesztése (multer
+      // generált név) → workDir-be másoljuk .cube-ként, hogy az ffmpeg felismerje. A grade UTÁN.
+      let lutFrag = '';
+      if (layer.lut && fs.existsSync(layer.lut)) {
+        try {
+          const lutFile = path.join(workDir, `lut${idx}.cube`);
+          fs.copyFileSync(layer.lut, lutFile);
+          lutFrag = `,lut3d='${lutFile.replace(/'/g, "'\\''")}'`;
+        } catch {
+          lutFrag = '';
+        }
+      }
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${filterChain(layer.filters)}${flip}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${filterChain(layer.filters)}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

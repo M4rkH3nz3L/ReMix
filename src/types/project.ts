@@ -1321,6 +1321,11 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 🎬 filmes look-preset (LUT-szerű grade) a fotóra — a videó grade-rétegével AZONOS térkép
    *  (`server/grades.js`); a render split-tone eq+colorbalance láncot éget a korrekció UTÁN */
   grade?: GradeId;
+  /** 🎞️ saját 3D LUT (.cube) a fotóra — szerkesztő-local fájl-uri; a render feltölti és `lut3d`-del
+   *  égeti be (a grade UTÁN). A kliens `parseCubeLut` validál import-kor. */
+  lut?: string;
+  /** a `lut` emberi neve a UI-nak (pl. a fájlnév) */
+  lutName?: string;
   /** 🎛️ struktúra-szűrő verem (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg), a korrekció UTÁN */
   filters?: ImageFilter[];
   /** a render-input EGYETLEN korrekciója (a verem ebbe laposodik — `flattenAdjustments`) */

@@ -112,7 +112,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   a render split-tone eq+colorbalance láncot éget a korrekció UTÁN; LayerInspector „Filmes look" chipek.
   *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 120/160/200): none=121/159/199; noir=148/151/148 (R≈G≈B deszaturált);
   warm-film R↑ B↓ (131/…/181); cold R↓ B↑ (113/…/209); mind HTTP 200.*
-- [ ] ⬜ **Saját `.cube` LUT-import** a fotóra (a kliens `lutImport` parse kész — worker `lut3d`-be kötni).
+- [x] ✅ **Saját `.cube` LUT-import a fotóra** — `PhotoLayer.lut` (szerkesztő-local uri) + `lutName`; a
+  `media.pickCubeLut` fájl-pick + `parseCubeLut` tartalmi validálás; a `docMediaUris`+worker-remap feltölti,
+  az `imagedoc.js` workDir-be másolja `.cube`-ként és `lut3d`-del égeti (a grade UTÁN); LayerInspector
+  „Saját LUT (.cube)" import/csere/törlés chipek + fájlnév. *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 121/159/199):
+  nincs-LUT=121/159/199; identity=121/159/199 (változatlan=beolvas+alkalmaz); invert=133/94/55 ≈ 255−bemenet;
+  mind HTTP 200.*
 
 ## 6. 📐 Transzformáció — ✅ alap kész
 - [x] ✅ mozgatás/skálázás/forgatás/tükrözés + **crop** + **vonalzók/segédvonalak/snap** (rulers).

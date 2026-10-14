@@ -1196,7 +1196,7 @@ app.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, re
   // /render-nél); a nem feltöltött hivatkozás marad, a rasterizáló kihagyja
   const fieldToFile = new Map((req.files ?? []).map((f) => [f.fieldname, f.path]));
   for (const layer of doc.layers ?? []) {
-    for (const key of ['uri', 'imageUri']) {
+    for (const key of ['uri', 'imageUri', 'lut']) {
       const field = layer[key] ? uriMap[layer[key]] : null;
       const file = field ? fieldToFile.get(field) : null;
       if (file) {

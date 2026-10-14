@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { bakeImage } from '@/lib/imageEditor';
 import { intakeOps } from '@/lib/imageIntake';
+import { parseCubeLut } from '@/lib/lutImport';
 import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 
@@ -244,6 +245,36 @@ export async function pickSrt(): Promise<SrtCue[] | null> {
   const content = await new File(result.assets[0].uri).text();
   const cues = parseSrt(content);
   return cues.length > 0 ? cues : [];
+}
+
+/**
+ * 🎞️ `.cube` 3D LUT kiválasztása + tartalmi validálás (`parseCubeLut`). A fájlt a
+ * cache-be másoljuk (a render feltölti), a nevet a UI mutatja. Visszatérés:
+ *  - `{ uri, name }` ha érvényes LUT,
+ *  - `'invalid'` ha a fájl nem értelmezhető .cube,
+ *  - `null` ha a felhasználó elvetette.
+ */
+export async function pickCubeLut(): Promise<{ uri: string; name: string } | 'invalid' | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    // a .cube-nak nincs egységes MIME-ja → szélesre nyitunk, tartalom alapján validálunk
+    type: ['text/plain', 'application/octet-stream', '*/*'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  const asset = result.assets[0];
+  try {
+    const text = await new File(asset.uri).text();
+    const parsed = parseCubeLut(text);
+    if (!parsed.ok) {
+      return 'invalid';
+    }
+    return { uri: asset.uri, name: asset.name ?? 'LUT.cube' };
+  } catch {
+    return 'invalid';
+  }
 }
 
 /** SVG-fájl kiválasztása és beolvasása (nyers XML-szöveg); null, ha elvetve. */

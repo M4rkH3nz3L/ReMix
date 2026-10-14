@@ -223,6 +223,9 @@ export function docMediaUris(doc: ImageDoc): string[] {
   for (const l of doc.layers) {
     if (l.kind === 'photo') {
       out.push(l.uri);
+      if (l.lut) {
+        out.push(l.lut); // 🎞️ saját .cube LUT — a renderhez fel kell tölteni
+      }
     } else if (l.kind === 'shape' && l.imageUri) {
       out.push(l.imageUri);
     }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
 import { Slider, ToggleRow } from '@/components/studio/audio/primitives';
@@ -8,6 +8,7 @@ import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
 import { updateLayer } from '@/lib/imageDoc';
+import { pickCubeLut } from '@/lib/media';
 import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import type {
   BlendMode,
@@ -57,6 +58,20 @@ export function LayerInspector({
   onOpenAdjust: () => void;
 }) {
   const { t } = useTranslation();
+
+  // 🎞️ saját .cube LUT importálása a fotó-rétegre (pick + tartalmi validálás)
+  const importLut = async (photo: PhotoLayer) => {
+    const res = await pickCubeLut();
+    if (res === null) {
+      return; // elvetve
+    }
+    if (res === 'invalid') {
+      Alert.alert(t('studio.image.lutInvalid', { defaultValue: 'Érvénytelen .cube LUT fájl.' }));
+      return;
+    }
+    commit(updateLayer<PhotoLayer>(doc, photo.id, { lut: res.uri, lutName: res.name }));
+  };
+
   return (
     <>
       {layer.kind === 'text' ? (
@@ -236,6 +251,23 @@ export function LayerInspector({
               />
             ))}
           </View>
+          {/* 🎞️ saját 3D LUT (.cube) — a render lut3d-del égeti; a kliens parseCubeLut validál */}
+          <Text style={styles.sectionLabel}>{t('studio.image.customLut', { defaultValue: 'Saját LUT (.cube)' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={layer.lut ? t('studio.image.lutReplace', { defaultValue: 'LUT csere' }) : t('studio.image.lutImport', { defaultValue: 'LUT import' })}
+              active={!!layer.lut}
+              onPress={() => importLut(layer)}
+            />
+            {layer.lut ? (
+              <Chip
+                label={t('studio.image.lutClear', { defaultValue: 'LUT törlés' })}
+                active={false}
+                onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { lut: undefined, lutName: undefined }))}
+              />
+            ) : null}
+          </View>
+          {layer.lut ? <Text style={styles.hintText}>{layer.lutName ?? 'LUT.cube'}</Text> : null}
         </>
       ) : null}
 
@@ -389,4 +421,5 @@ const styles = StyleSheet.create({
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   sectionLabel: { color: palette.textDim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+  hintText: { color: palette.textDim, fontSize: 11, fontStyle: 'italic' },
 });

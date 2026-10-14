@@ -1406,6 +1406,10 @@ export interface ImageDoc {
   grain?: number;
   /** 🔦 dokumentum-szintű vignetta 0–1 (a sarkokat sötétíti a teljes képen; cinematic). A render égeti. */
   vignette?: number;
+  /** 🎬 dokumentum-szintű GLOBÁLIS filmes look-preset a TELJES kompozitra (a videó grade-térképe). A render égeti. */
+  grade?: GradeId;
+  /** 🎚️ dokumentum-szintű GLOBÁLIS korrekció (exposure/kontraszt/telítettség…) a TELJES kompozitra. A render égeti. */
+  adjust?: ClipAdjust;
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */
   renderedUri?: string;
 }

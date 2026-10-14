@@ -56,7 +56,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   fill fölött, 'right' maszk → bal piros (ff0e0e), jobb a fehér base (fcf6f6), közép rózsaszín (worker-pixelmérés).*
 - [ ] ⬜ **Festhető raszter-maszk** + **vektor/szelekció-maszk** per réteg + invertálás/törlés.
 - [ ] ⬜ **Csoport-rétegek (mappák)** — `group` réteg-fajta + beágyazott transzform/opacity.
-- [ ] ⬜ **Nem-destruktív korrekció-réteg** (az alatta lévőkre hat) — ma csak per-foto adjustment-stack.
+- [x] ✅ **Dokumentum-szintű GLOBÁLIS korrekció** (grade + adjust a TELJES kompozitra) — `ImageDoc.grade` +
+  `ImageDoc.adjust`; a render a kompozit UTÁN égeti (`gradeFilterChain`+`adjustChain`, a vignetta/grain ELŐTT);
+  CanvasSheet „Globális look" (grade-chipek + expozíció/kontraszt/telítettség csúszkák). *ÉLŐ-BIZONYÍTVA
+  (/imagedoc, kék fotó 121/159/199): kontroll=799fc7; doc-grade warm-film=131/161/181 (R↑ B↓);
+  saturation=-1→151/153/150 (R≈G≈B); exposure=0.8→210/255/255 (világosabb); mind HTTP 200.*
+- [ ] ⬜ **Per-réteg korrekció-réteg** (csak az ALATTA lévőkre hat, a stackben) — a doc-szintű globális kész; ez a réteg-fajta hátravan.
 - [x] ✅ **Vetett árnyék bármely pozícionált rétegre** (fotó/forma/szöveg) — `ImageLayerBase.dropShadow` + a render a
   réteg elmosott, eltolt sziluettjét teszi mögé (`shadowSilhouette`: lutrgb+gblur+alfa); LayerInspector-toggle.
   *ÉLŐ-BIZONYÍTVA: foto alatt-jobbra árnyékkal 7f7f7f (szürke) vs nélküle ffffff (worker-pixelmérés).*

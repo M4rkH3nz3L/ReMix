@@ -350,6 +350,13 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     last = `[${out}]`;
   }
 
+  // 🎚️ dokumentum-szintű GLOBÁLIS korrekció (grade preset + kézi adjust) a TELJES kompozitra
+  const docCorr = (gradeFilterChain(doc.grade) + adjustChain({ adjust: doc.adjust })).replace(/^,/, '');
+  if (docCorr) {
+    filters.push(`${last}${docCorr}[docc]`);
+    last = '[docc]';
+  }
+
   // 🔦 dokumentum-szintű vignetta: a sarkokat sötétíti a TELJES kész képen (a kompozit után)
   const vignette = Math.max(0, Math.min(1, Number(doc.vignette) || 0));
   if (vignette > 0) {

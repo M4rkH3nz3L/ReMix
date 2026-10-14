@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Chip } from '@/components/ui/controls';
 import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
+import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import { palette } from '@/constants/editor';
 import {
   BG_SWATCHES,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/canvasPresets';
 import { docBackground, setBackground } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
-import type { ImageDoc } from '@/types/project';
+import type { ClipAdjust, GradeId, ImageDoc } from '@/types/project';
 
 /**
  * 🖼️ Vászon-beállítás lap — a kép-editor „Új dokumentum” mezőivel AZONOS
@@ -41,6 +42,11 @@ export function CanvasSheet({
   const [bg, setBg] = useState<string>(docBackground(doc));
   const [grain, setGrain] = useState(doc.grain ?? 0);
   const [vignette, setVignette] = useState(doc.vignette ?? 0);
+  const [grade, setGrade] = useState<GradeId>(doc.grade ?? 'none');
+  const [adjust, setAdjust] = useState<ClipAdjust>(doc.adjust ?? {});
+  const setAdj = (patch: Partial<ClipAdjust>) => setAdjust((a) => ({ ...a, ...patch }));
+  const adjNeutral =
+    !Math.abs(adjust.exposure ?? 0) && !Math.abs(adjust.contrast ?? 0) && !Math.abs(adjust.saturation ?? 0);
 
   const apply = () => {
     const width = clampDim(w);
@@ -53,6 +59,8 @@ export function CanvasSheet({
         format,
         grain: grain > 0 ? grain : undefined,
         vignette: vignette > 0 ? vignette : undefined,
+        grade: grade === 'none' ? undefined : grade,
+        adjust: adjNeutral ? undefined : adjust,
         renderedUri: undefined,
       },
       bg === 'transparent' || isHexColor(bg) ? bg : BG_SWATCHES[0],
@@ -166,6 +174,22 @@ export function CanvasSheet({
       {/* 🔦 dokumentum-szintű vignetta (a sarkokat sötétíti) */}
       <Text style={styles.section}>{t('studio.image.vignette', { defaultValue: 'Vignetta' })}</Text>
       <Slider label="" value={vignette} min={0} max={1} onChange={setVignette} format={(v) => `${Math.round(v * 100)}%`} />
+
+      {/* 🎬 dokumentum-szintű GLOBÁLIS look (grade + korrekció) a TELJES képre */}
+      <Text style={styles.section}>{t('studio.image.globalLook', { defaultValue: 'Globális look' })}</Text>
+      <View style={styles.row}>
+        {GRADE_PRESETS.map((g) => (
+          <Chip
+            key={g.id}
+            label={t(g.label, { defaultValue: g.id })}
+            active={grade === g.id}
+            onPress={() => setGrade(g.id)}
+          />
+        ))}
+      </View>
+      <Slider label={t('panels.adjust.adjust_exposure', { defaultValue: 'Expozíció' })} value={adjust.exposure ?? 0} min={-1} max={1} onChange={(v) => setAdj({ exposure: v })} format={(v) => v.toFixed(2)} />
+      <Slider label={t('panels.adjust.adjust_contrast', { defaultValue: 'Kontraszt' })} value={adjust.contrast ?? 0} min={-0.4} max={0.4} onChange={(v) => setAdj({ contrast: v })} format={(v) => v.toFixed(2)} />
+      <Slider label={t('panels.adjust.adjust_saturation', { defaultValue: 'Telítettség' })} value={adjust.saturation ?? 0} min={-1} max={1} onChange={(v) => setAdj({ saturation: v })} format={(v) => v.toFixed(2)} />
     </StudioSheet>
   );
 }

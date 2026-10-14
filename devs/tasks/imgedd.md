@@ -16,7 +16,7 @@
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus) | ✅ *(toll v5, text-on-path ⬜)* |
-| §5 | **Korrekciók & szűrők** (adjustment-stack + forma-fx) | ✅ *(RAW-develop 🟡, blur/sharpen/artistic ⬜)* |
+| §5 | **Korrekciók & szűrők** (adjustment-stack + forma-fx + **struktúra-szűrők**) | ✅ *(RAW-develop 🟡, artistic ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + vonalzó/guide/snap) | ✅ *(szabad-transzform/perspektíva/warp ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
 | §8 | **UX-paritás** (vászon-zoom/pan, smart-guides, history-panel) | 🟡 |
@@ -77,7 +77,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 - [x] ✅ **Adjustment-stack** (expozíció/kontraszt/fehéregyensúly/tónus: highlights/shadows/whites/blacks/telítettség/
   élénkség/vignetta) — a `adjustmentStack.ts` + worker-render (bizonyított render-parity).
 - [ ] 🟡 **RAW-develop UI** — a `photoDevelop.ts` (clarity/texture/dehaze/detail + görbe) **KÉSZ+tesztelt, 0 UI**.
-- [ ] ⬜ **Szűrők** (gaussian/motion blur · sharpen/unsharp · zaj add/remove · artistic: poszter/pixelate) — render-bizonyítható.
+- [x] ✅ **Struktúra-szűrők** a foto-rétegen (blur/sharpen/zaj/szürke/szépia) — `PhotoLayer.filters` + worker
+  `imageFilters.js` (ffmpeg gblur/unsharp/noise/hue/sepia-mixer, a korrekció UTÁN); LayerInspector chip+csúszka.
+  Pure magok: `imageFilters.ts` (kliens, 4 teszt) + `server/imageFilters.js` (4 teszt). *ÉLŐ-BIZONYÍTVA: grayscale
+  piros→szürke (R=G=B 4c4c4c); blur a fekete tartományt az él közelében világosítja (000000→343434; worker-pixelmérés).*
+- [ ] ⬜ **Artistic** (poszterizálás/pixelate) · **motion blur** · további szűrők.
 - [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
 - [ ] ⬜ **LUT/filmszimuláció** a fotóra (a videó-oldalon `lutImport` van — a képre hozni).
 

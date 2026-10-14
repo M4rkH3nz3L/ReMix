@@ -1306,11 +1306,20 @@ export interface PhotoLayer extends ImageLayerBase {
   fit?: 'cover' | 'contain';
   filterId?: FilterId;
   filterIntensity?: number;
+  /** 🎛️ struktúra-szűrő verem (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg), a korrekció UTÁN */
+  filters?: ImageFilter[];
   /** a render-input EGYETLEN korrekciója (a verem ebbe laposodik — `flattenAdjustments`) */
   adjust?: ClipAdjust;
   /** 🎚️ non-destruktív korrekciós-verem (az UI forrás-igazsága; → `adjust`) */
   adjustmentStack?: AdjustmentLayer[];
   mask?: ClipMask;
+}
+
+/** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség). */
+export type ImageFilterType = 'blur' | 'sharpen' | 'noise' | 'grayscale' | 'sepia';
+export interface ImageFilter {
+  type: ImageFilterType;
+  amount: number;
 }
 
 /** forma-réteg — a ShapeClip minden megjelenés-mezője, idő nélkül */

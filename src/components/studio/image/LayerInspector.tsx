@@ -6,6 +6,7 @@ import { Slider, ToggleRow } from '@/components/studio/audio/primitives';
 import { ColorField } from '@/components/studio/image/ColorField';
 import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
+import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
 import { updateLayer } from '@/lib/imageDoc';
 import type {
   BlendMode,
@@ -192,6 +193,29 @@ export function LayerInspector({
             }
             format={(v) => `${Math.round(v)}°`}
           />
+          {/* 🎛️ struktúra-szűrők (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg) */}
+          <Text style={styles.sectionLabel}>{t('studio.image.filters', { defaultValue: 'Szűrők' })}</Text>
+          <View style={styles.chipRow}>
+            {IMAGE_FILTER_TYPES.map((f) => (
+              <Chip
+                key={f.type}
+                label={t(`studio.image.filter.${f.type}`, { defaultValue: f.label })}
+                active={hasFilter(layer.filters, f.type)}
+                onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { filters: toggleFilter(layer.filters, f.type) }))}
+              />
+            ))}
+          </View>
+          {IMAGE_FILTER_TYPES.filter((f) => hasFilter(layer.filters, f.type)).map((f) => (
+            <Slider
+              key={f.type}
+              label={t(`studio.image.filter.${f.type}`, { defaultValue: f.label })}
+              value={getFilterAmount(layer.filters, f.type)}
+              min={0}
+              max={1}
+              onChange={(v) => commit(updateLayer<PhotoLayer>(doc, layer.id, { filters: setFilterAmount(layer.filters, f.type, v) }))}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          ))}
         </>
       ) : null}
 

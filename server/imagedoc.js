@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { adjustChain } = require('./render');
+const { filterChain } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -225,7 +226,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         : '';
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${flip}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${filterChain(layer.filters)}${flip}${rotate}` +
           `,colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

@@ -1318,6 +1318,9 @@ export interface PhotoLayer extends ImageLayerBase {
   fit?: 'cover' | 'contain';
   filterId?: FilterId;
   filterIntensity?: number;
+  /** 🎬 filmes look-preset (LUT-szerű grade) a fotóra — a videó grade-rétegével AZONOS térkép
+   *  (`server/grades.js`); a render split-tone eq+colorbalance láncot éget a korrekció UTÁN */
+  grade?: GradeId;
   /** 🎛️ struktúra-szűrő verem (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg), a korrekció UTÁN */
   filters?: ImageFilter[];
   /** a render-input EGYETLEN korrekciója (a verem ebbe laposodik — `flattenAdjustments`) */

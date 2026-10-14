@@ -8,9 +8,11 @@ import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
 import { updateLayer } from '@/lib/imageDoc';
+import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import type {
   BlendMode,
   FillLayer,
+  GradeId,
   ImageDoc,
   ImageLayer,
   PhotoLayer,
@@ -216,6 +218,24 @@ export function LayerInspector({
               format={(v) => `${Math.round(v * 100)}%`}
             />
           ))}
+          {/* 🎬 filmes look-presetek (LUT-szerű grade) — a videó grade-rétegével AZONOS térkép */}
+          <Text style={styles.sectionLabel}>{t('studio.image.filmLook', { defaultValue: 'Filmes look' })}</Text>
+          <View style={styles.chipRow}>
+            {GRADE_PRESETS.map((g) => (
+              <Chip
+                key={g.id}
+                label={t(g.label, { defaultValue: g.id })}
+                active={(layer.grade ?? 'none') === g.id}
+                onPress={() =>
+                  commit(
+                    updateLayer<PhotoLayer>(doc, layer.id, {
+                      grade: g.id === 'none' ? undefined : (g.id as GradeId),
+                    })
+                  )
+                }
+              />
+            ))}
+          </View>
         </>
       ) : null}
 

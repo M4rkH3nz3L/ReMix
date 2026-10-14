@@ -106,7 +106,13 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   fehér doc): vignetta nélkül közép+sarok `ffffff`; 0.9-del közép `ffffff` (változatlan) → sarok `121310` (majdnem
   fekete); HTTP 200.*
 - [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
-- [ ] ⬜ **LUT/filmszimuláció** a fotóra (a videó-oldalon `lutImport` van — a képre hozni).
+- [x] ✅ **Filmszimuláció / LUT-szerű grade a fotóra** — a videó grade-rétegével AZONOS preset-térkép
+  (kiemelve `server/grades.js`-be, a `render.js` innen kéri → nincs drift; a kliens `constants/grades.ts`
+  ugyanazok az id-k). `PhotoLayer.grade` (teal-orange/moody/vintage/noir/warm-film/cold/vibrant/dreamy) →
+  a render split-tone eq+colorbalance láncot éget a korrekció UTÁN; LayerInspector „Filmes look" chipek.
+  *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 120/160/200): none=121/159/199; noir=148/151/148 (R≈G≈B deszaturált);
+  warm-film R↑ B↓ (131/…/181); cold R↓ B↑ (113/…/209); mind HTTP 200.*
+- [ ] ⬜ **Saját `.cube` LUT-import** a fotóra (a kliens `lutImport` parse kész — worker `lut3d`-be kötni).
 
 ## 6. 📐 Transzformáció — ✅ alap kész
 - [x] ✅ mozgatás/skálázás/forgatás/tükrözés + **crop** + **vonalzók/segédvonalak/snap** (rulers).

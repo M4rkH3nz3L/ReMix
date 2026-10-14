@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { adjustChain } = require('./render');
+const { gradeFilterChain } = require('./grades');
 const { filterChain, maskGradientFilter, shadowSilhouette, glowSilhouette } = require('./imageFilters');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
@@ -226,7 +227,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         : '';
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${filterChain(layer.filters)}${flip}${rotate}` +
+        `[${idx}:v]${fit},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${filterChain(layer.filters)}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

@@ -34,6 +34,7 @@ export function LayerPanel({
   commit,
   onClose,
   onOpenAdjust,
+  onDrawMask,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -42,6 +43,8 @@ export function LayerPanel({
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
   onOpenAdjust: () => void;
+  /** 🎭 lasszó-maszk rajzolása a rétegre (a szülő aktiválja a lasszó-módot + bezárja a panelt) */
+  onDrawMask?: (layerId: string) => void;
 }) {
   const { t } = useTranslation();
   const layer = doc.layers.find((l) => l.id === selectedId) ?? null;
@@ -105,7 +108,7 @@ export function LayerPanel({
       {layer ? (
         <View style={styles.inspector}>
           <Text style={styles.inspectorTitle}>{layerLabel(layer)}</Text>
-          <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} />
+          <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} onDrawMask={onDrawMask} />
         </View>
       ) : (
         <Text style={styles.hint}>{t('studio.image.selectHint')}</Text>

@@ -13,6 +13,7 @@ import { pickCubeLut } from '@/lib/media';
 import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import type {
   BlendMode,
+  ClipMask,
   FillLayer,
   GradeId,
   ImageDoc,
@@ -53,13 +54,21 @@ export function LayerInspector({
   layer,
   commit,
   onOpenAdjust,
+  onDrawMask,
 }: {
   doc: ImageDoc;
   layer: ImageLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onOpenAdjust: () => void;
+  /** 🎭 szabadkézi (lasszó) maszk rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot */
+  onDrawMask?: (layerId: string) => void;
 }) {
   const { t } = useTranslation();
+
+  // 🎭 a kijelölt réteg maszkja (union-safe olvasás) + módosítás/törlés
+  const curMask = (layer as { mask?: ClipMask }).mask;
+  const setMask = (mask: ClipMask | undefined) =>
+    commit(updateLayer(doc, layer.id, { mask } as Partial<ImageLayer>), 'mask');
 
   // 🎞️ saját .cube LUT importálása a fotó-rétegre (pick + tartalmi validálás)
   const importLut = async (photo: PhotoLayer) => {
@@ -480,6 +489,62 @@ export function LayerInspector({
           }
         />
       </View>
+      {/* 🎭 réteg-maszk (szelekció/alak) — nem-fill rétegre; a render geq-vel vágja (lágy él/invert/terjesztés) */}
+      {layer.kind !== 'fill' ? (
+        <>
+          <Text style={styles.sectionLabel}>{t('studio.image.mask', { defaultValue: 'Maszk' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
+              active={!curMask}
+              onPress={() => (curMask ? setMask(undefined) : undefined)}
+            />
+            <Chip
+              label={t('studio.image.maskEllipse', { defaultValue: 'Ellipszis' })}
+              active={curMask?.shape === 'ellipse'}
+              onPress={() => setMask({ shape: 'ellipse', x: 0.5, y: 0.5, w: 0.8, h: 0.8, feather: 0.05 })}
+            />
+            <Chip
+              label={t('studio.image.maskRect', { defaultValue: 'Téglalap' })}
+              active={curMask?.shape === 'rectangle'}
+              onPress={() => setMask({ shape: 'rectangle', x: 0.5, y: 0.5, w: 0.8, h: 0.8, feather: 0.05 })}
+            />
+            {onDrawMask ? (
+              <Chip
+                label={t('studio.image.maskLasso', { defaultValue: '✏️ Lasszó' })}
+                active={curMask?.shape === 'polygon'}
+                onPress={() => onDrawMask(layer.id)}
+              />
+            ) : null}
+          </View>
+          {curMask ? (
+            <>
+              <Slider
+                label={t('studio.image.maskFeather', { defaultValue: 'Lágy él' })}
+                value={curMask.feather ?? 0.05}
+                min={0}
+                max={0.3}
+                onChange={(v) => setMask({ ...curMask, feather: v })}
+                format={(v) => v.toFixed(2)}
+              />
+              <Slider
+                label={t('studio.image.maskExpand', { defaultValue: 'Terjesztés' })}
+                value={curMask.expand ?? 0}
+                min={-0.3}
+                max={0.3}
+                onChange={(v) => setMask({ ...curMask, expand: v })}
+                format={(v) => v.toFixed(2)}
+              />
+              <ToggleRow
+                icon="contrast-outline"
+                label={t('studio.image.maskInvert', { defaultValue: 'Invertálás' })}
+                value={!!curMask.invert}
+                onValueChange={(v) => setMask({ ...curMask, invert: v })}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
       {/* 🎨 keverési mód — MINDEN réteg-fajtára (fill/photo/shape/text); a render ffmpeg-blenddel égeti */}
       <Text style={styles.sectionLabel}>{t('studio.image.blendMode', { defaultValue: 'Keverési mód' })}</Text>
       <View style={styles.chipRow}>

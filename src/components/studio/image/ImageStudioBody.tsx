@@ -53,7 +53,7 @@ import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import type { Asset, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 
 type ToolKey =
   | 'layers'
@@ -200,6 +200,8 @@ export function ImageStudioBody({
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
+  // 🎭 ha be van állítva, a következő lasszó-rajz NEM új formát, hanem erre a rétegre MASZKOT készít
+  const [maskTargetId, setMaskTargetId] = useState<string | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [brushActive, setBrushActive] = useState(false);
   const [brushColor, setBrushColor] = useState('#ff2d95');
@@ -756,8 +758,38 @@ export function ImageStudioBody({
     setBrushActive(false);
   };
 
-  // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma (egy undo-lépés)
+  // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
+  const startMaskDraw = (layerId: string) => {
+    setSelectedId(layerId);
+    setMaskTargetId(layerId);
+    setLassoActive(true);
+    setSheet(null); // a panel bezárul, hogy a vászon látsszon a rajzoláshoz
+  };
+
+  // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma — VAGY (maszk-módban) a kijelölt réteg maszkja
   const commitLasso = (points: CanvasPoint[]) => {
+    if (doc && points.length >= 3 && maskTargetId) {
+      // 🎭 szelekció → réteg-maszk (poligon): a vászon-normalizált pontok + bbox
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const mask: ClipMask = {
+        shape: 'polygon',
+        points: points.map((p) => ({ x: p.x, y: p.y })),
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+        w: Math.max(0.02, maxX - minX),
+        h: Math.max(0.02, maxY - minY),
+        feather: 0.02,
+      };
+      commit(updateLayer(doc, maskTargetId, { mask } as Partial<ImageLayer>), t('studio.image.undoMask', { defaultValue: 'Maszk' }));
+      setMaskTargetId(null);
+      setLassoActive(false);
+      return;
+    }
     if (doc && points.length >= 3) {
       const shape = pathShapeFromCanvasPoints(points, true, makeId('lyr'));
       if (shape) {
@@ -765,6 +797,7 @@ export function ImageStudioBody({
         setSelectedId(shape.id);
       }
     }
+    setMaskTargetId(null);
     setLassoActive(false);
   };
 
@@ -1157,7 +1190,10 @@ export function ImageStudioBody({
           onSelectNode={setPathEditNode}
           lassoActive={lassoActive}
           onLassoComplete={commitLasso}
-          onLassoCancel={() => setLassoActive(false)}
+          onLassoCancel={() => {
+            setLassoActive(false);
+            setMaskTargetId(null);
+          }}
           wandActive={wandActive}
           onWandSeed={onWandSeed}
           brushActive={brushActive}
@@ -1429,6 +1465,7 @@ export function ImageStudioBody({
               setSheet('adjust');
             }
           }}
+          onDrawMask={startMaskDraw}
         />
       ) : null}
       {sheet === 'style' && doc && selectedLayer ? (

@@ -13,7 +13,7 @@
 | § | Terület | Állapot |
 |---|---------|---------|
 | §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**, **csoportok**, **kontúr**) | ✅ *(festett-maszk ⬜)* |
-| §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset) | 🟡 *(szelekció→réteg-maszk ⬜)* |
+| §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset + **réteg-maszk**: ellipszis/téglalap/**lasszó-poligon** + feather/invert/expand) | ✅ *(kijelölés-alapú korrekció ⬜)* |
 | §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
@@ -83,7 +83,13 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 
 ## 2. 🎯 Kijelölés & maszkolás — 🟡 kijelölés van, maszk-bekötés hiányzik
 - [x] ✅ **Lasszó** + **varázspálca** (magicWandClient) + **ecset** — a kijelölés/festés él.
-- [ ] ⬜ **Szelekció → réteg-maszk** (a kijelölésből maszk a rétegre) · **maszk-finomítás** (lágyítás/terjesztés).
+- [x] ✅ **Szelekció → réteg-maszk + maszk-finomítás** — `PhotoLayer/ShapeLayer/TextLayer.mask` (`ClipMask`
+  ellipszis/téglalap/poligon + feather/invert/expand); RENDER-mag: `server/imageMask.js` geq (a videó-maszkkal
+  azonos) → `imagedoc.js` alphamerge (átlátszó teljes vászon, külön `maskSeq`). UI: LayerInspector „Maszk"
+  szekció (Nincs/Ellipszis/Téglalap + ✏️ Lasszó + lágy-él/terjesztés/invert); a **lasszó-szelekció → poligon
+  maszk** a kijelölt rétegre (ImageStudioBody `maskTargetId`+`commitLasso` ág). *ÉLŐ-BIZONYÍTVA (/imagedoc):
+  ellipszis közép=kék/sarok=fehér; poligon-háromszög belül=kék/kívül=fehér; invert fordítva; mind HTTP 200.*
+  (preview: a render az autoritatív — a maszk a renderben pontos; per-réteg korrekció-maszk ⬜)
 - [ ] ⬜ **Kijelölés-alapú korrekció** (csak a kijelölt területre hasson az adjust/filter).
 - [ ] ⬜ **Él-felismerő/„objektum" kijelölés** (AI-select — a videóban a `selective` létezik, a képre hozni).
 

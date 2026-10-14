@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
+import { ToneCurveEditor } from '@/components/editor/ToneCurveEditor';
 import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
@@ -59,6 +60,7 @@ const ADD_ENTRIES: AddEntry[] = [
   { id: 'saturation', kind: 'saturation', seed: { saturation: 0 }, icon: 'color-palette-outline', nameKey: 'studio.image.adjustStack.kind.saturation' },
   { id: 'vibrance', kind: 'vibrance', seed: { vibrance: 0 }, icon: 'color-filter-outline', nameKey: 'studio.image.adjustStack.kind.vibrance' },
   { id: 'vignette', kind: 'vignette', seed: { vignette: 0 }, icon: 'ellipse-outline', nameKey: 'studio.image.adjustStack.kind.vignette' },
+  { id: 'curves', kind: 'curves', seed: {}, icon: 'analytics-outline', nameKey: 'studio.image.adjustStack.kind.curves' },
 ];
 
 const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -68,6 +70,7 @@ const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   saturation: 'color-palette-outline',
   vibrance: 'color-filter-outline',
   vignette: 'ellipse-outline',
+  curves: 'analytics-outline',
   custom: 'sunny',
 };
 
@@ -218,6 +221,14 @@ export function AdjustStackSheet({
                       />
                     );
                   })}
+
+                  {/* 📈 tónusgörbe-szerkesztő (RGB + csatornánként) — a renderben ffmpeg `curves` */}
+                  {l.kind === 'curves' ? (
+                    <ToneCurveEditor
+                      value={l.adjust.curves}
+                      onChange={(next) => commitStack(updateAdjustment(stack, l.id, { adjust: { curves: next } }))}
+                    />
+                  ) : null}
 
                   <Slider
                     label={t('studio.image.adjustStack.amount')}

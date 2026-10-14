@@ -110,7 +110,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   + a render `vignette=angle=vign·π/3`-t tesz a kompozit UTÁN; CanvasSheet-csúszka. *ÉLŐ-BIZONYÍTVA (/imagedoc,
   fehér doc): vignetta nélkül közép+sarok `ffffff`; 0.9-del közép `ffffff` (változatlan) → sarok `121310` (majdnem
   fekete); HTTP 200.*
-- [ ] ⬜ **Görbe/szintek (curves/levels)** + **csatorna-mixer** + **szelektív szín**.
+- [x] ✅ **Tónusgörbék (curves — RGB + csatornánként)** a fotóra — a kész `ToneCurveEditor` (videó-editor)
+  bekötve az AdjustStackSheet verembe új „Görbék" (`curves`) korrekció-rétegként; a verem `adjust.curves`-be
+  laposít → a render `adjustChain` ffmpeg `curves`-zel égeti (a render-út már KÉSZ volt). *ÉLŐ-BIZONYÍTVA
+  (/imagedoc, fotó 121/159/199): kontroll=121/159/199; invert-görbe (0→1,1→0)=134/95/56 (≈255−bemenet);
+  sötétítő (1→0.5)=60/79/100 (≈fél fényerő); mind HTTP 200.*
+- [ ] ⬜ **Szintek (levels)** + **csatorna-mixer** + **szelektív szín**.
 - [x] ✅ **Filmszimuláció / LUT-szerű grade a fotóra** — a videó grade-rétegével AZONOS preset-térkép
   (kiemelve `server/grades.js`-be, a `render.js` innen kéri → nincs drift; a kliens `constants/grades.ts`
   ugyanazok az id-k). `PhotoLayer.grade` (teal-orange/moody/vintage/noir/warm-film/cold/vibrant/dreamy) →

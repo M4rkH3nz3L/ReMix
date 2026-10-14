@@ -135,7 +135,10 @@ fader + master-lánc EQ/loudnorm-LUFS/true-peak limiter + **Analyze** LUFS/TP/LR
 - [x] ✅ **Tempó-/ütem-felismerés a Hang Stúdióban** — a transport „Auto" gombja a kiválasztott (vagy első)
   hang-klip beat-rácsából (a MEGLÉVŐ `/beats` motor + `detectBeats`) felismeri a BPM-et → `SET_BPM` (a beat-rács
   igazodik). *ÉLŐ-BIZONYÍTVA: 120 BPM-es click-track → a `/beats` 119.1 BPM-et detektál (worker-mérés).*
-- [ ] ⬜ **hangmagasság-detektálás** vizualizáció · beat-markerek az idővonalon.
+- [x] ✅ **Beat-vonalak az idővonalon** — az auto-BPM a felismert beateket vonalként is kirajzolja a Hang
+  Stúdió idővonalára (a klip start-jával eltolva, frame-re illesztve), az importált zene VALÓS beatjeihez
+  igazodva ([beatMarkers.ts] pure, 6 teszt; a `/beats` detektálás bizonyított).
+- [ ] ⬜ **hangmagasság-detektálás** vizualizáció · beat-markerek EXPORT-ja (projekt-markerként).
 - [ ] ⬜ **AI-segéd** a hangra (dúdolás→dallam, „készíts dobsávot ehhez", zajszűrés/leválasztás).
 
 ## 8. 🧭 Munkafolyamat & UX-paritás a videó-editorral — ⬜

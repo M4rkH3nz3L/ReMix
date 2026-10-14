@@ -49,6 +49,7 @@ import type { DrumHit } from '@/lib/drums';
 import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
 import { detectBeats } from '@/lib/beats';
+import { beatsToTimelineLines } from '@/lib/beatMarkers';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -105,6 +106,7 @@ export function AudioStudioBody({
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
   const [bpmBusy, setBpmBusy] = useState(false);
+  const [detectedBeats, setDetectedBeats] = useState<number[]>([]);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumSharing, setAlbumSharing] = useState(false);
@@ -190,7 +192,8 @@ export function AudioStudioBody({
     const firstAudio = project.tracks
       .flatMap((tr) => tr.clips)
       .find((c): c is AudioClip => c.kind === 'audio' && typeof (c as AudioClip).uri === 'string');
-    const uri = selClip?.uri ?? firstAudio?.uri ?? null;
+    const sourceClip = selClip ?? firstAudio ?? null;
+    const uri = sourceClip?.uri ?? null;
     if (!uri) {
       Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmNoClip', { defaultValue: 'Nincs hang-klip az elemzéshez.' }));
       return;
@@ -200,6 +203,8 @@ export function AudioStudioBody({
       const grid = await detectBeats(uri);
       if (grid && grid.bpm > 0) {
         useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: Math.round(grid.bpm) });
+        // 🥁📍 a felismert beatek vonalként az idővonalra (a klip start-jával eltolva)
+        setDetectedBeats(beatsToTimelineLines(grid.beats ?? [], sourceClip?.start ?? 0, fps));
       } else {
         Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült tempót felismerni (fut a render-worker?).' }));
       }
@@ -498,6 +503,14 @@ export function AudioStudioBody({
                 />
               );
             })}
+            {/* 🥁📍 detektált beat-vonalak (az importált zene VALÓS beatjei) */}
+            {detectedBeats.map((sec, i) => (
+              <View
+                key={`db${i}`}
+                pointerEvents="none"
+                style={[styles.detectedBeat, { left: sec * pxPerSec, height: contentH }]}
+              />
+            ))}
             {/* 🔁 loop-régió árnyék (rangeIn…rangeOut) */}
             {rangeIn != null && rangeOut != null && rangeOut > rangeIn ? (
               <View
@@ -771,6 +784,7 @@ const styles = StyleSheet.create({
   laneEmpty: { color: `${palette.textDim}55`, fontSize: 11, fontWeight: '800', paddingLeft: 10, textTransform: 'uppercase', letterSpacing: 1.5 },
   grid: { position: 'absolute', top: 0, width: 1 },
   beatLine: { position: 'absolute', top: 0, backgroundColor: palette.accent },
+  detectedBeat: { position: 'absolute', top: 0, width: 1.5, backgroundColor: palette.accent2, opacity: 0.55 },
   loopShade: { position: 'absolute', top: 0, backgroundColor: `${palette.accent}1f`, borderLeftWidth: 1, borderRightWidth: 1, borderColor: `${palette.accent}88` },
   ruler: { height: RULER_H, borderBottomWidth: 1, borderBottomColor: palette.border },
   rulerLabel: { position: 'absolute', top: 5, color: palette.textDim, fontSize: 9, fontWeight: '600', fontVariant: ['tabular-nums'] },

@@ -1,13 +1,13 @@
 # ⚙️ 09. Native / Rendering — P3 (platform-expanzió)
 
 > **Forrás:** [audit](../source/audit-2026-10-main.md) §9. · **Testvér:** [06-video-editor](./06-video-editor.md) (render-parity), [05-ai](./05-ai.md) (on-device-AI), [01-production](./01-production-go-live.md) (worker).
-> **Érintett kód:** [NATIVE.md](./NATIVE.md) (**élő** natív render-motor terv + fázisok A–E) · `modules/remix-render/` (natív modul) · [src/components/preview/](../../src/components/preview/) · [server/](../../server/) (ONNX/vision).
+> **Érintett kód:** `modules/remix-render/` (natív modul, A–E fázis) · [src/components/preview/](../../src/components/preview/) · [server/](../../server/) (ONNX/vision). · **Eszköz-oldali hátralék:** [DEVICES.md](./DEVICES.md).
 
 ---
 
 > **📊 Haladás (2026-10-07):** ✅ 0 · 🟡 1 · ⬜ 3 nyitva — Σ 4 tétel. **P3 platform-expanzió —
 > nincs launch-blokkoló.** A natív render-motor (§2.2) 🟡: iOS AVFoundation v1 kész + **Android
-> Fázis A–E TELJES (iOS-paritás)** (remux + GL-transzkód + multi-segment kompozit + hang-mix + valódi cancel + HEVC/bitráta, 10 emulátor-teszt) — részletek: [NATIVE.md](./NATIVE.md). A többi nyitva
+> Fázis A–E TELJES (iOS-paritás)** (remux + GL-transzkód + multi-segment kompozit + hang-mix + valódi cancel + HEVC/bitráta, 10 emulátor-teszt) — részletek lent (§2.2). A többi nyitva
 > (Skia / on-device-ONNX / generatív). **Céleszközök: Android telefon+tablet, iPhone+iPad** —
 > desktop és watchOS **kivéve** (nincs termék-igény).
 
@@ -16,7 +16,7 @@ Platform-expanzió: a mobil-preview/render hosszú távú motorja + a desktop + 
 Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a profi NLE-élmény alapja.
 
 ## 1. Jelenlegi állapot (bizonyíték)
-- Szerveres ONNX/vision létezik; a natív render-motor terv (`NATIVE.md`) 3-szintű (Preview/Local/
+- Szerveres ONNX/vision létezik; a natív render-motor 3-szintű (Preview/Local/
   Cloud); iOS AVFoundation-motor v1 kész, az Android MediaCodec-eszköz-render a fő tech-hiány.
 - Chromium-alapú text/shape-render megy, de mobil-preview-re nem ideális.
 
@@ -26,7 +26,7 @@ Többségük **P3** (nem launch-blokkoló), de a natív render-motor + Skia a pr
 - [ ] ⬜ Skia-alapú text/shape/preview-pipeline a Chromium helyett (mobil-perf + parity).
 
 ### 2.2 Native FFmpeg / on-device render-motor — P2/P3
-- [x] ~ **iOS AVFoundation v1 KÉSZ** + **Android Fázis A–E TELJES (iOS-paritás)** — részletek + a hátralévő: **[NATIVE.md](./NATIVE.md)**.
+- [x] ~ **iOS AVFoundation v1 KÉSZ** + **Android Fázis A–E TELJES (iOS-paritás)** — a fázis-bontás lent (2.2); eszköz-oldali hátralék: **[DEVICES.md](./DEVICES.md)**.
 - [x] ~ **Android MediaCodec-motor — A (remux) + B (GL-transzkód: skálázás/sebesség/szűrő) + C (multi-segment kompozit + hang-mix) + D (valódi cancel + robusztusság) + E (HEVC-opció + bitráta) TELJES**,
   10 instrumentált emulátor-teszttel verifikálva. **Hátra csak:** D-foreground-service (valós eszköz) + iOS-paritás-karbantartás (Xcode 26.4+).
 - [ ] ⬜ iOS: valódi cancel + fejlett effektek beégetése (paritás).

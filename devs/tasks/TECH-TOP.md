@@ -152,7 +152,7 @@ A `kind: 'video' | 'image' | 'audio'` már megvan, de a kép/hang **nem teljes**
 - **Ma:** az entitlement `renderEngine=device` (free) + `storageLocation=device` (free) **kész+tesztelt**; a **routing-enforce
   hiányzik** (a free-nek device-ra kell esnie, a worker/R2 csak Amatőr+). On-device YouTube-import van, **range-választó nincs**.
 - **Javítás:**
-  - 🔴 **Render-routing enforce**: a free render **kötelezően eszközön** (worker-submit csak `tierMeetsMin('basic')`-nél) — a szerver `/render` is utasítsa el a free felhő-submitet. **Előfeltétel: Android eszközön-render-motor** (NATIVE.md, #1 technikai út).
+  - 🔴 **Render-routing enforce**: a free render **kötelezően eszközön** (worker-submit csak `tierMeetsMin('basic')`-nél) — a szerver `/render` is utasítsa el a free felhő-submitet. **Előfeltétel: Android eszközön-render-motor** (09-native-rendering.md, #1 technikai út).
   - 🔴 **Storage-routing enforce**: free = eszköz-tár; R2 csak Amatőr+ (`storage.location`/`cloudBackup` entitlement).
   - [x] ✅ **Import-range MAG** ([importRange.ts](../../src/lib/importRange.ts) `clampImportRange` + 7 teszt): YT/TikTok -tól–-ig,
     forrás-hossz-plafon + 10 perc-cap, érvénytelen bemenet-kezelés. *(Hátra: a -tól–-ig választó UI + a tényleges szakasz-import bekötése.)*

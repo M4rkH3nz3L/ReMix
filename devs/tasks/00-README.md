@@ -69,7 +69,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 
 ## 2. Audit-összkép és a feladatfájlok
 
-> **🧱 A mag KÉSZ (2026-10-11):** az [CORE.md](./CORE.md) az **Editor-mag (alapfunkció)** 100%-ra vitele —
+> **🧱 A mag KÉSZ (2026-10-11):** az **Editor-mag (alapfunkció)** 100%-ra vitele (a lezárt CORE-epik) —
 > **10/10 teljes, audit-zöld**. Command-bus + store **tesztelve**, a hiányzó alap-műveletek bekötve (klip
 > sávok közti mozgatása gomb+drag, klip-vágólap), lejátszás-parity (frame-scrub + A/V-sync + gapless) és a
 > „soha ne vessz el munka" mentés (atomi + crash-recovery). **Minden stúdió és az AI erre a magra épül**
@@ -81,7 +81,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 
 > **🎬 Prod-videó-stúdió:** mi hiányzik még a videó-stúdió **production** készültségéhez (render-parity
 > élő-verifikáció, prod worker-infra, export-megbízhatóság, bemeneti-formátum-robusztusság, eszközön-render):
-> [VIDEO-STUDIO-PROD.md](./VIDEO-STUDIO-PROD.md) — a 06 (feature) + 01 (infra) + NATIVE (eszköz) prod-deltája egy helyen.
+> [VIDEO-STUDIO-PROD.md](./VIDEO-STUDIO-PROD.md) — a 06 (feature) + 01 (infra) + 09-native (eszköz) prod-deltája egy helyen.
 
 > **🎨 Prod-kép-stúdió:** a kép-szerkesztő **production** deltája (rasterize-parity: preview ↔ worker `/imagedoc`
 > ↔ captureRef; export-formátumok PNG/JPG/WebP + vektor-SVG; bemeneti robusztusság HEIC/nagy/EXIF; PSD-import +
@@ -93,7 +93,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 
 | # | Terület | Fő prioritás | Fájl |
 | - | --- | --- | --- |
-| 🧱 | **Editor-mag (alapfunkció)** | 🔴 **P0/P1** | **[CORE.md](./CORE.md)** |
+| 🧱 | **Editor-mag (alapfunkció)** | ✅ **kész** | lezárva → [06-video-editor.md](./06-video-editor.md) |
 | 01 | Production / Go-Live | 🔴 P0 | [01-production-go-live.md](./01-production-go-live.md) |
 | 02 | Monetizáció | 🔴 P0 / 🟠 P1 | [02-monetization.md](./02-monetization.md) |
 | 03 | Collaboration | 🟠 P1 | [03-collaboration.md](./03-collaboration.md) |
@@ -118,7 +118,7 @@ A feladatlista-tételek az audit §20 szerinti végleges státuszt kapják:
 ## 3. Becsült készültség (audit §19 — NEM hivatalos pontszám)
 
 ```text
-Editor core (alapfunkció)   ██████████  100%     → CORE.md 10/10 KÉSZ: a MAG bizonyítottan működik (audit-zöld; teszt + guard + MOVE_CLIP/drag-to-track + klip-vágólap + frame-scrub/AV-sync/gapless + atomi mentés + crash-recovery + per-fájl recovery + keymap + arany-út)
+Editor core (alapfunkció)   ██████████  100%     → Editor-mag 10/10 KÉSZ: a MAG bizonyítottan működik (audit-zöld; teszt + guard + MOVE_CLIP/drag-to-track + klip-vágólap + frame-scrub/AV-sync/gapless + atomi mentés + crash-recovery + per-fájl recovery + keymap + arany-út)
 Profi NLE                   █████░░░░░  ~45–60%
 Image editor (UI)           █████░░░░░  ~45–60%   (pure core magasabb)
 Audio editor                █████░░░░░  ~40–55%
@@ -141,7 +141,7 @@ Production readiness        ███░░░░░░░  ~30–40%
 
 | # | Terület | ✅ teljes | 🟡 mag kész | ⬜ nyitva | Σ |
 | - | --- | :-: | :-: | :-: | :-: |
-| 🧱 | **Editor-mag (CORE.md)** | 5 | 3 | 2 | 10 |
+| 🧱 | **Editor-mag** | 5 | 3 | 2 | 10 |
 | 01 | Production / Go-Live | 0 | 2 | 5 | 7 |
 | 02 | Monetizáció | 2 | 7 | 1 | 10 |
 | 03 | Collaboration | 2 | 3 | 1 | 6 |
@@ -160,7 +160,7 @@ Production readiness        ███░░░░░░░  ~30–40%
 **Olvasat:** a 114 tételből **20 teljes**, **51 „mag kész"** (a logika megvan, csak a következő réteg —
 UI/backend/render — hiányzik) és **43 nyitva**.
 
-**2026-10-08-i session:** (1) **Editor-mag (CORE.md) 8/10** — a platform legfontosabb rétege a ~70–80%-ról
+**2026-10-08-i session:** (1) **Editor-mag 8/10** — a platform legfontosabb rétege a ~70–80%-ról
 **~90%-ra**: a command-bus + store **tesztelt** (§2.1), core-guardok (§2.2), **MOVE_CLIP** (§2.3), **klip-vágólap**
 (§2.4), sáv-modell **ADR-011** (§2.5), **frame-scrub + A/V-sync** (§2.6), **mentés-robusztusság** (atomi mentés +
 crash-recovery, §2.7, P0), és a **lezáró arany-út integrációs teszt** (§2.9); hátra csak UI-remainderek (§2.8/§2.10

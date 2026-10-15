@@ -1,7 +1,7 @@
 # 🎬 EDITOR-UX — a (sima) videó-szerkesztő: használhatóság + reszponzivitás + látható forrás-mappa
 
 > **Forrás:** felhasználói kérés (2026-10-08) — „tegyük jobban használhatóvá + reszponzívabbá a UI-t,
-> és kell egy mappa, ahol a forrásfájlok (mind) láthatóak". · **Testvérek:** [CORE.md](./CORE.md) (editor-mag —
+> és kell egy mappa, ahol a forrásfájlok (mind) láthatóak". · **Testvérek:** [06-video-editor.md](./06-video-editor.md) (editor-mag —
 > a gesztus/mentés/onboarding remainderek innen jönnek), [06-video-editor](./06-video-editor.md) (NLE-feature-ök),
 > [10-brand-ui](./10-brand-ui.md) (vizuális nyelv), [08-storage](./08-storage.md) (forrás-asset/sync).
 > **Érintett kód:** [src/app/editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) (elrendezés, `:573–656`) ·
@@ -21,14 +21,14 @@
 > granuláris recovery per-fájl progress, toolbar-rail elrendezés, gapless double-buffer) — a szerkesztő a prod-login mögött
 > van, headless/emulátoron itt nem nyílik meg, ezért ezek on-device iterációt kérnek.
 > **Az editor-MAG kész + tesztelt**
-> ([CORE.md](./CORE.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
+> ([06-video-editor.md](./06-video-editor.md) 8/10); ez a fájl a **UI-réteget** célozza: a forrás-mappa láthatóvá tétele, a
 > húzásos szerkesztés, és a már kész magok (MOVE_CLIP, mentés-robusztusság, recovery) felhasználói felülete.
 
 ## 0. Kontextus & cél
 A szerkesztő már **reszponzív**: a `useLayout()` három méret-osztályt ad (`compact` <600pt / `medium` 600–899 /
 `expanded` ≥900×600), és az [editor/[id].tsx](../../src/app/editor/%5Bid%5D.tsx) 4 elrendezést vált (iPad-fekvő =
 dokkolt inspector + teljes timeline; iPad-álló = timeline + felülről jövő panel; telefon-fekvő = 52% oldalsáv;
-telefon-álló = panel ↔ timeline csere). A **mag** (command-bus, undo, mentés) [CORE.md](./CORE.md)-ben bizonyítottan kész.
+telefon-álló = panel ↔ timeline csere). A **mag** (command-bus, undo, mentés) [06-video-editor.md](./06-video-editor.md)-ben bizonyítottan kész.
 
 **A hiány felhasználói szemmel:** (1) a **forrás-bin modal sheet** — nem látszik folyamatosan, pedig a user
 „mappát" akar, ahol MIND a forrásfájl (video+kép+hang) látszik; (2) **nincs drag-and-drop** a forrásból/sávok

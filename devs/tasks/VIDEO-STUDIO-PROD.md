@@ -2,8 +2,8 @@
 
 > **Cél:** mi hiányzik még ahhoz, hogy a **videó-stúdió (NLE) PROD-ban megbízhatóan** menjen —
 > nem új feature, hanem a meglévő, audit-zöld magok **production-verifikációja + infra + robusztusság**.
-> **Testvérek (ne duplikáld):** [06-video-editor](./06-video-editor.md) (feature-lista), [CORE.md](./CORE.md)
-> (editor-mag 10/10), [01-production-go-live](./01-production-go-live.md) (prod-infra), [NATIVE.md](./NATIVE.md)
+> **Testvérek (ne duplikáld):** [06-video-editor](./06-video-editor.md) (feature-lista), [06-video-editor.md](./06-video-editor.md)
+> (editor-mag 10/10), [01-production-go-live](./01-production-go-live.md) (prod-infra), [09-native-rendering.md](./09-native-rendering.md)
 > (eszközön-render), [12-code-quality](./12-code-quality.md) (cancellation/retry).
 > **Érintett kód:** [server/render.js](../../server/render.js) · [server/index.js](../../server/index.js) ·
 > [server/render-worker.js](../../server/render-worker.js) · [src/lib/render.ts](../../src/lib/render.ts) ·
@@ -95,7 +95,7 @@ A prod-userek tetszőleges fájlt dobnak be — ma nincs explicit input-validác
   **audio sample-rate/csatorna** — normalizálás a render előtt (különben torz/hangtalan export).
 - [ ] ⬜ **Méret/hossz-limitek**: max felbontás/hossz tier szerint, memória-védelem, túllépés-üzenet.
 
-### 6. 🔌 Eszközön futó render-motor (→ [NATIVE.md](./NATIVE.md))
+### 6. 🔌 Eszközön futó render-motor (→ [09-native-rendering.md](./09-native-rendering.md))
 - [ ] 🔌 **Android MediaCodec valódi enkód** (ma triviális copy — a #1 natív tech-hiány); iOS AVFoundation v1 kész.
   Offline/azonnali export szerver-kör nélkül → prod-élmény + worker-tehermentesítés.
 

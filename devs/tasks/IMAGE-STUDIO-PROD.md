@@ -3,7 +3,7 @@
 > **Cél:** mi hiányzik még ahhoz, hogy a **kép-stúdió PROD-ban megbízhatóan** menjen — a videós
 > [VIDEO-STUDIO-PROD.md](./VIDEO-STUDIO-PROD.md) párja. Nem új feature, hanem a meglévő, on-device-verifikált
 > magok **rasterize-parity + export + robusztusság + infra** véglegesítése.
-> **Testvérek (ne duplikáld):** [07-image-studio](./07-image-studio.md) (feature-lista), [CORE.md](./CORE.md),
+> **Testvérek (ne duplikáld):** [07-image-studio](./07-image-studio.md) (feature-lista), [06-video-editor.md](./06-video-editor.md),
 > [01-production-go-live](./01-production-go-live.md) (prod-infra), [VIDEO-STUDIO-PROD](./VIDEO-STUDIO-PROD.md)
 > (közös worker-image + render-parity-minta).
 > **Érintett kód:** [server/imagedoc.js](../../server/imagedoc.js) (rasterizáló) · [server/index.js](../../server/index.js) `/imagedoc` ·

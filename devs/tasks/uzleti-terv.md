@@ -34,7 +34,7 @@ Ez a terv **sarokköve** (és a legnagyobb költség-/adatvédelmi előny):
 
 - **Render a telefonon** — a kész short **eszközön** készül el, **720p**, **vízjellel** („Made with ReMix").
   Nincs felhő-render-perc, nincs szerver-költség. *(Tech-előfeltétel: eszközön-render-motor — iOS AVFoundation v1 kész,
-  az **Android MediaCodec-motor a kulcs-teendő**, lásd [NATIVE.md](./NATIVE.md). A Free ezen áll vagy bukik.)*
+  az **Android MediaCodec-motor a kulcs-teendő**, lásd [09-native-rendering.md](./09-native-rendering.md). A Free ezen áll vagy bukik.)*
 - **Projekt-tárolás a telefonon, app-privát (sandbox) helyen** — **NEM a galériában/képek közt**, hanem az app saját,
   védett tárában ([expo-file-system](../../src/lib) `Paths.document`), ahonnan **közvetlenül nem törölhető** (fájlkezelő/
   galéria nem éri el), **csak az appból**. iOS: app-sandbox; Android: app-belső tár. → a user munkája nem vész el egy
@@ -136,7 +136,7 @@ terjeszthető** akvizíciós hurokként (lásd [§7](#7-go-to-market--növekedé
 - **TÁMOGATÓ:** kép-/hang-stúdió mint a shorts kiegészítői (thumbnail, hangjavítás, zene) — nem külön reklámozva.
 - **HALASZT (v2+):** social-feed/remix **növekedési hurokként**; marketplace **tartalom**ként (sablonok), nem cash-outtal.
 - **JOGI TISZTÁZÁSIG ZÁRVA:** coin-pénztárca + valódi-pénz cash-out.
-- **KRITIKUS TECH-ELŐFELTÉTEL:** **Android eszközön-render-motor** (MediaCodec) — a Free egésze ezen áll ([NATIVE.md](./NATIVE.md)).
+- **KRITIKUS TECH-ELŐFELTÉTEL:** **Android eszközön-render-motor** (MediaCodec) — a Free egésze ezen áll ([09-native-rendering.md](./09-native-rendering.md)).
 - **NICHE-ÉLESÍTÉS (opció):** indulj EGY alkotói szegmenssel (pl. talking-head/edukációs shorts, vagy e-commerce/UGC-ads), légy ott a legjobb.
 
 ---

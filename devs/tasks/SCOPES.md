@@ -141,7 +141,7 @@ Minden fizetős dolog **egy stabil kulcs** → kliens-gate + szerver-enforce ugy
 | AI | **eszközön** (Whisper-felirat, helyi vízió) | Anthropic (hook/script/trend/B-roll), mért token |
 | Publish | — | OAuth + ütemezés (worker) |
 
-> **⚠️ KRITIKUS ÚT:** a Free egésze az **Android eszközön-render-motoron** áll ([NATIVE.md](./NATIVE.md); iOS v1 kész, Android a hiány).
+> **⚠️ KRITIKUS ÚT:** a Free egésze az **Android eszközön-render-motoron** áll ([09-native-rendering.md](./09-native-rendering.md); iOS v1 kész, Android a hiány).
 > Nélküle nincs „eszközön-720p-vízjel" Free → a teljes modell megbicsaklik. Ez a **#1 technikai scope-prioritás**.
 
 ---
@@ -178,7 +178,7 @@ Minden entitlementnek **két kapuja** van (és csak így „profi"):
 | **Kvóta-mérés** | ✅ KÉSZ | usageMeter + server/usage (`business` hozzáadva, contract-tesztelt) |
 | **Videó max-hossz** | ✅ KÉSZ | 600 mp hard-gate (`maxVideoSec` entitlement + `/render` 413 + contract) |
 | **Szerver-autoritás** | 🟡 | subscription.ts (Supabase) él; a `business`/seat + RBAC-scope **bekötése hátra** |
-| **Eszközön-render + vízjel** | 🔌 **#1** | iOS v1; **Android MediaCodec-motor** + **Free-vízjel a render-láncban** — a Free ezen áll (NATIVE.md) |
+| **Eszközön-render + vízjel** | 🔌 **#1** | iOS v1; **Android MediaCodec-motor** + **Free-vízjel a render-láncban** — a Free ezen áll (09-native-rendering.md) |
 | **Enforcement-wiring (per feature)** | 🟡 **hátra** | az `ENTITLEMENTS`-re kötni a konkrét kapukat: render-routing (device/cloud), publish-fiók-limit, analytics/planner/memory gate, team/governance UI |
 | App-privát tár | ✅ | `Paths.document` (sandbox); data-loss-banner UX megerősítés hátra |
 | Céges billing | 🟡 | `team.*`/`brandGovernance` entitlement kész; **per-seat billing** hátra |

@@ -12,8 +12,8 @@
 
 A kóddal ellenőrizve az alábbiak **készek** (a markdown-only review tévesen vagy elavultan jelölte):
 
-- ✅ **Editor-core 100%** — [CORE.md](./CORE.md) 10/10, audit-zöld (a „2 nyitott" egy régi index-pillanatkép).
-- ✅ **Android eszközön-render-motor A–E TELJES + BEKÖTVE** — [NATIVE.md](./NATIVE.md) (10 emulátor-teszt) +
+- ✅ **Editor-core 100%** — [06-video-editor.md](./06-video-editor.md) 10/10, audit-zöld (a „2 nyitott" egy régi index-pillanatkép).
+- ✅ **Android eszközön-render-motor A–E TELJES + BEKÖTVE** — [09-native-rendering.md](./09-native-rendering.md) (10 emulátor-teszt) +
   [src/lib/nativeRender.ts](../../src/lib/nativeRender.ts) (`isNativeRenderAvailable`/`renderLocal`, használva a `render.ts`-ben).
   A régi „triviális copy / #1 hiány" **elavult**. Hátra csak: D-foreground-service valós eszközön + a free-vízjel ráégetése.
 - ✅ **Entitlement-/csomag-réteg** (5 tier: Free/Amatőr/Haladó/Profi/Céges) — `ENTITLEMENTS` + routing + **szerver-enforce**

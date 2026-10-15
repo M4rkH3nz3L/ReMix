@@ -49,12 +49,17 @@ modules/*/android/build/
 server/models/
 server/storage.config.json
 
-# env — dev/prod KÜLÖN, hogy ne keveredjenek. A valós env-fájlokat nem verziózzuk,
-# csak a *.example sablonokat. (Prod értékek élesben inkább EAS env-változóként.)
+# env — CSAK a .env.example (gyökér) sablon verziózott; MINDEN valós/lokális env
+# ignorált (app + server + supabase functions). Prod értékek élesben inkább EAS
+# env-változóként / `supabase secrets set`.
 .env
-.env.development
-.env.production
-.env.preview
+.env.*
+!.env.example
+server/.env
+server/.env.*
+supabase/functions/.env
+supabase/functions/.env.*
+*.xcode.env.local
 
 # helyi dev-szolgáltatások logjai/PID-jei (dev-up.sh)
 .devlogs/

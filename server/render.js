@@ -132,6 +132,10 @@ const EFFECT_DEFAULT_AMOUNT = {
   lightLeak: 0.6,
   motionBlur: 0.5,
   deflicker: 0.5,
+  clarity: 0.5,
+  dehaze: 0.5,
+  pixelate: 0.5,
+  posterize: 0.5,
 };
 // 🌅 fényszivárgás gauss-esése a jobb-felső sarokból — AZONOS a kliens `LIGHT_LEAK_L`-jével
 const LIGHT_LEAK_L = 'exp(-((X-W)*(X-W)+Y*Y)/(2*(W*0.4)*(W*0.4)))';
@@ -167,6 +171,19 @@ function effectFilterStr(effect) {
       return `tmix=frames=${2 + Math.round(a * 6)}`;
     case 'deflicker':
       return `deflicker=size=${2 + Math.round(a * 8)}:mode=pm`;
+    // 🖼️ kép-paritás (imageFilters.oneFilter AZONOS stringjei)
+    case 'clarity':
+      return `unsharp=lx=13:ly=13:la=${(a * 1.5).toFixed(2)}`;
+    case 'dehaze':
+      return `eq=contrast=${(1 + a * 0.6).toFixed(3)}:saturation=${(1 + a * 0.4).toFixed(3)}`;
+    case 'pixelate': {
+      const block = 2 + Math.round(a * 22);
+      return `pixelize=w=${block}:h=${block}`;
+    }
+    case 'posterize': {
+      const step = Math.round(8 + a * 120);
+      return `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`;
+    }
     default:
       return '';
   }

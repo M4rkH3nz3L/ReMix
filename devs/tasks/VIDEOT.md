@@ -16,7 +16,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 
 | § | Terület | Állapot |
 |---|---------|---------|
-| §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map/duotone a klipre) | ✅ *(struktúra-szűrők ⬜)* |
+| §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map · struktúra-szűrők a klipre) | ✅ |
 | §2 | **Új effektek** (**kromatikus aberráció** · **fényszivárgás** kész + **default-út effekt-bug javítva**; motion blur/deflicker ⬜) | ✅ |
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
 | §4 | **Transzformáció** (**anchor-pivot RENDER** kész — §2.6 adósság zárva; corner-pin/warp ⬜) | ✅ |
@@ -61,7 +61,10 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
   `gradientMapFilter` (geq luma→szín, enable-tudatos a geq-en). *ÉLŐ VIDEO-RENDER: kék→arany → 979733
   (≈153/153/51).* UI: AdjustPanel — Szintek + Csatorna-mixer (9 stepper) + Gradient-map (duotone presetek).
   Contract-teszt: `render.test.js` (adjustChain kibocsátja + grade-rétegen enable + identitás-üres).
-- [ ] ⬜ **Struktúra-szűrők paritás** (clarity/dehaze/pixelate/poszter) — a kép `imageFilters` a video effekt-láncba (következő).
+- [x] ✅ **Struktúra-szűrők paritás** (clarity/dehaze/pixelate/posterize) — a kép `imageFilters.oneFilter` AZONOS
+  stringjei új `VideoEffect` típusként a video effekt-láncba (kliens↔worker contract-tesztelt + i18n hu/en/de).
+  *ÉLŐ VIDEO-RENDER (renderProject, kék klip): posterize (step 128) → 018080 (diszkrét szintek); dehaze → 74afe2
+  (kontraszt+telítettség↑ a 779fc6-ról).*
 
 ## 2. ✨ Új effektek — ⬜ (render-bizonyítható)
 

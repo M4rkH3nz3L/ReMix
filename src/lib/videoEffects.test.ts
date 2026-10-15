@@ -27,7 +27,7 @@ const fx = (id: string, type: VideoEffect['type'], over: Partial<VideoEffect> = 
 
 describe('videoEffects — lánc-műveletek (audit §6.5)', () => {
   it('katalógus: minden típus benne', () => {
-    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak', 'motionBlur', 'deflicker']);
+    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak', 'motionBlur', 'deflicker', 'clarity', 'dehaze', 'pixelate', 'posterize']);
   });
 
   it('addEffect a lánc végére, default amounttal', () => {
@@ -106,6 +106,13 @@ describe('videoEffects — FFmpeg-filter leképezés', () => {
     expect(effectFilterString(fx('a', 'motionBlur', { amount: 1 }))).toBe('tmix=frames=8');
     // amount 0.5 → deflicker size = 2 + round(0.5*8) = 6
     expect(effectFilterString(fx('a', 'deflicker', { amount: 0.5 }))).toBe('deflicker=size=6:mode=pm');
+  });
+
+  it('kép-paritás struktúra-szűrők (clarity/dehaze/pixelate/posterize) AZONOSak a kép oneFilter-rel', () => {
+    expect(effectFilterString(fx('a', 'clarity', { amount: 1 }))).toBe('unsharp=lx=13:ly=13:la=1.50');
+    expect(effectFilterString(fx('a', 'dehaze', { amount: 1 }))).toBe('eq=contrast=1.600:saturation=1.400');
+    expect(effectFilterString(fx('a', 'pixelate', { amount: 1 }))).toBe('pixelize=w=24:h=24');
+    expect(effectFilterString(fx('a', 'posterize', { amount: 1 }))).toBe("lutrgb=r='trunc(val/128)*128':g='trunc(val/128)*128':b='trunc(val/128)*128'");
   });
 
   it('amount clamp a filterben is', () => {

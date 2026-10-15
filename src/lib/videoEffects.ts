@@ -33,6 +33,10 @@ export const VIDEO_EFFECTS: Record<VideoEffectType, EffectMeta> = {
   lightLeak: { label: 'lib.effects.lightLeak', parametric: true, defaultAmount: 0.6 },
   motionBlur: { label: 'lib.effects.motionBlur', parametric: true, defaultAmount: 0.5 },
   deflicker: { label: 'lib.effects.deflicker', parametric: true, defaultAmount: 0.5 },
+  clarity: { label: 'lib.effects.clarity', parametric: true, defaultAmount: 0.5 },
+  dehaze: { label: 'lib.effects.dehaze', parametric: true, defaultAmount: 0.5 },
+  pixelate: { label: 'lib.effects.pixelate', parametric: true, defaultAmount: 0.5 },
+  posterize: { label: 'lib.effects.posterize', parametric: true, defaultAmount: 0.5 },
 };
 
 // 🌅 fényszivárgás gauss-esése a JOBB-FELSŐ sarokból (geq; `W` a frame-szélesség) — kliens/worker AZONOS
@@ -133,6 +137,19 @@ export function effectFilterString(effect: VideoEffect): string {
     case 'deflicker':
       // temporális luma-villódzás simítás; 2–10 kocka ablak
       return `deflicker=size=${2 + Math.round(a * 8)}:mode=pm`;
+    // ── 🖼️ kép-paritás: a Kép Stúdió struktúra-szűrői (imageFilters.oneFilter) AZONOS stringgel ──
+    case 'clarity':
+      return `unsharp=lx=13:ly=13:la=${(a * 1.5).toFixed(2)}`;
+    case 'dehaze':
+      return `eq=contrast=${(1 + a * 0.6).toFixed(3)}:saturation=${(1 + a * 0.4).toFixed(3)}`;
+    case 'pixelate': {
+      const block = 2 + Math.round(a * 22);
+      return `pixelize=w=${block}:h=${block}`;
+    }
+    case 'posterize': {
+      const step = Math.round(8 + a * 120);
+      return `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`;
+    }
     default:
       return '';
   }

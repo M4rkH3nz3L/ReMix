@@ -2456,7 +2456,7 @@
     "bubble": "🎈 Bubble"
   },
   "lib": {
-    "effects": { "blur": "Blur", "sharpen": "Sharpen", "vignette": "Vignette", "grain": "Grain", "grayscale": "Grayscale", "sepia": "Sepia", "invert": "Invert", "chromaticAberration": "Chromatic aberration", "lightLeak": "Light leak", "motionBlur": "Motion blur", "deflicker": "Deflicker" },
+    "effects": { "blur": "Blur", "sharpen": "Sharpen", "vignette": "Vignette", "grain": "Grain", "grayscale": "Grayscale", "sepia": "Sepia", "invert": "Invert", "chromaticAberration": "Chromatic aberration", "lightLeak": "Light leak", "motionBlur": "Motion blur", "deflicker": "Deflicker", "clarity": "Clarity", "dehaze": "Dehaze", "pixelate": "Pixelate", "posterize": "Posterize" },
     "tiers": {
       "label": {
         "free": "Free",

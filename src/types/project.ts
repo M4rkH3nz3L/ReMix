@@ -685,7 +685,11 @@ export type VideoEffectType =
   | 'chromaticAberration'
   | 'lightLeak'
   | 'motionBlur'
-  | 'deflicker';
+  | 'deflicker'
+  | 'clarity'
+  | 'dehaze'
+  | 'pixelate'
+  | 'posterize';
 export interface VideoEffect {
   id: string;
   type: VideoEffectType;

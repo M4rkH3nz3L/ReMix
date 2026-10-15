@@ -666,6 +666,13 @@ export interface CanvasTransform {
    */
   skewX?: number;
   skewY?: number;
+  /**
+   * 📐 Perspektíva / 3D-dőlés −1…1 (corner-pin): X>0 a jobb él dől hátra (X<0 bal),
+   * Y>0 az alsó él (Y<0 felső). A render a Kép Stúdió `perspectiveFilter`-ével (átlátszó
+   * out-of-quad → a mögötti réteg látszik); a preview 3D rotate-tel közelít. (VIDEOT §4)
+   */
+  perspectiveX?: number;
+  perspectiveY?: number;
 }
 
 /**

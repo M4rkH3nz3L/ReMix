@@ -593,6 +593,10 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   // mai klipek transformja változatlan.
   const originStr = transformOrigin(committed);
   const skewEntries = skewTransformEntries(committed);
+  // 📐 perspektíva (corner-pin, VIDEOT §4) — a render perspectiveFilter-ét a preview 3D rotate-tel közelíti
+  const perspX = committed.perspectiveX ?? 0;
+  const perspY = committed.perspectiveY ?? 0;
+  const hasPersp = perspX !== 0 || perspY !== 0;
   const transformStyle = useAnimatedStyle(() => ({
     transformOrigin: originStr,
     transform: [
@@ -605,6 +609,13 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             { perspective: Math.max(boxH, 1) * 1.2 },
             { rotateX: `${tiltRotX}deg` },
             { rotateY: `${tiltRotY}deg` },
+          ]
+        : []),
+      ...(hasPersp
+        ? [
+            { perspective: Math.max(boxH, 1) * 1.2 },
+            { rotateY: `${-perspX * 22}deg` },
+            { rotateX: `${perspY * 22}deg` },
           ]
         : []),
       { rotate: `${committedRotation}deg` },

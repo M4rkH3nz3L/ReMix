@@ -368,6 +368,47 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
               })
             }
           />
+          {/* 📐 Perspektíva / corner-pin X/Y — a klip egyik éle hátradől (−1…1), VIDEOT §4 */}
+          <Stepper
+            label={t('panels.precision.perspectiveX', { defaultValue: 'Perspektíva ↔' })}
+            value={`${Math.round((clip.transform?.perspectiveX ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  perspectiveX: clamp((clip.transform?.perspectiveX ?? 0) - 0.1, -1, 1) || undefined,
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  perspectiveX: clamp((clip.transform?.perspectiveX ?? 0) + 0.1, -1, 1) || undefined,
+                },
+              })
+            }
+          />
+          <Stepper
+            label={t('panels.precision.perspectiveY', { defaultValue: 'Perspektíva ↕' })}
+            value={`${Math.round((clip.transform?.perspectiveY ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  perspectiveY: clamp((clip.transform?.perspectiveY ?? 0) - 0.1, -1, 1) || undefined,
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  perspectiveY: clamp((clip.transform?.perspectiveY ?? 0) + 0.1, -1, 1) || undefined,
+                },
+              })
+            }
+          />
           {/* ⚓ Pivot (anchor) X/Y — a forgatás/méretezés középpontja, audit §6.6 */}
           <Stepper
             label={t('panels.precision.anchorX', { defaultValue: 'Pivot X' })}

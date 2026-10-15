@@ -19,7 +19,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map · struktúra-szűrők a klipre) | ✅ |
 | §2 | **Új effektek** (**kromatikus aberráció** · **fényszivárgás** kész + **default-út effekt-bug javítva**; motion blur/deflicker ⬜) | ✅ |
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
-| §4 | **Transzformáció** (**anchor-pivot RENDER** kész — §2.6 adósság zárva; corner-pin/warp ⬜) | ✅ |
+| §4 | **Transzformáció** (**anchor-pivot RENDER** + **corner-pin/perspektíva** kész; tartalom-tudatos ⬜) | ✅ |
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
 | §6 | **Szín-eszközök UI** (3-way színkerék · split-toning · live scopes) | ⬜ |
 | §7 | **Audio** (metering/scope · sidechain tetszőleges sávra · per-band solo) | ⬜ |
@@ -96,7 +96,11 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
   csak STATIKUS forgatás + EGYEDI anchorra (kf-forgatás/közép = bitre változatlan). *ÉLŐ VIDEO-RENDER
   (renderProject, fehér pont a box 0.25,0.25-nél, rot90): kontroll (120,120)=fe; KÖZÉP-anchor=00 (pont
   elmozdul); PIVOT-anchor (0.25,0.25)=ff (pont HELYBEN marad).*
-- [ ] ⬜ **Corner-pin / perspektíva-warp** (4-sarok) — a kép `perspective`-mintájára a video-klipre.
+- [x] ✅ **Corner-pin / perspektíva-warp** — `CanvasTransform.perspectiveX/Y` (−1…1); a render a Kép Stúdió
+  `perspectiveFilter`-ét alkalmazza a klip-frame-re (átlátszó OOB → a mögötti réteg látszik), a `withTransform`
+  overlay-úton (hasPersp → hasTransform); a preview 3D rotateX/Y-nal közelít; PrecisionPanel „Perspektíva ↔/↕"
+  Stepperek. *ÉLŐ VIDEO-RENDER (renderProject, kék klip, X=1): közép 799fc6 (kék marad); jobb-felső 000000
+  (a jobb él hátradőlt → átlátszó → fekete base).*
 - [ ] ⬜ **Tartalom-tudatos skálázás** / szabad-warp rács.
 
 ## 5. 🔀 Átmenetek — ⬜

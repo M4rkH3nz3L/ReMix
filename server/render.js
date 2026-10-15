@@ -14,7 +14,7 @@ const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, masterLra } = require('./voicechain');
 // 🖼️ kép-paritás: a Kép Stúdió szín-magjai (már /imagedoc-on pixel-bizonyítva) a video-klip grade-jéhez
-const { levelsFilter, channelMixFilter, gradientMapFilter } = require('./imageFilters');
+const { levelsFilter, channelMixFilter, gradientMapFilter, perspectiveFilter } = require('./imageFilters');
 
 const FPS = 30;
 
@@ -1109,6 +1109,14 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       clip.tilt3d && ((clip.tilt3d.rotX ?? 0) !== 0 || (clip.tilt3d.rotY ?? 0) !== 0)
     );
 
+  // 📐 corner-pin / perspektíva-dőlés (VIDEOT §4) — a transform perspectiveX/Y-ja
+  const hasPersp = (clip) =>
+    Boolean(clip.transform && ((clip.transform.perspectiveX ?? 0) !== 0 || (clip.transform.perspectiveY ?? 0) !== 0));
+
+  // a KLIP frame-jére (W×H-ra skálázva) a Kép Stúdió perspektíva-filtere (átlátszó OOB)
+  const perspChain = (clip) =>
+    hasPersp(clip) ? perspectiveFilter(clip.transform.perspectiveX, clip.transform.perspectiveY, W, H) : '';
+
   const hasTransform = (clip) =>
     (clip.transform &&
       (clip.transform.scale !== 1 ||
@@ -1116,7 +1124,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         clip.transform.y !== 0 ||
         (clip.transform.rotation ?? 0) !== 0)) ||
     (clip.opacity ?? 1) < 1 ||
-    hasTilt(clip);
+    hasTilt(clip) ||
+    hasPersp(clip);
 
   /** a döntött kép túlnyúlhat az eredeti kereten — ekkora átlátszó margót kap */
   const TILT_PAD = 1.3;
@@ -1753,7 +1762,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           appearanceChain(clip, seg.skip) +
           effectChainFx(clip) +
           tiltChain(clip) +
-          skewChain(clip);
+          skewChain(clip) + perspChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`${decode}split[kA${i}][kB${i}]`);
@@ -1775,7 +1784,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           appearanceChain(clip, seg.skip) +
           effectChainFx(clip) +
           tiltChain(clip) +
-          skewChain(clip);
+          skewChain(clip) + perspChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`${decode}split[preA${i}][preB${i}]`);
@@ -1878,7 +1887,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           appearanceChain(clip, seg.skip) +
           effectChainFx(clip) +
           tiltChain(clip) +
-          skewChain(clip);
+          skewChain(clip) + perspChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`[${idx}:v]fps=${FPS},split[kA${i}][kB${i}]`);
@@ -1900,7 +1909,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           appearanceChain(clip, seg.skip) +
           effectChainFx(clip) +
           tiltChain(clip) +
-          skewChain(clip);
+          skewChain(clip) + perspChain(clip);
         let baseLabel;
         if (blur) {
           graph.push(`[${idx}:v]fps=${FPS},split[preA${i}][preB${i}]`);

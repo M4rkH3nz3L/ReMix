@@ -1399,7 +1399,20 @@ export type TextLayer = ImageLayerBase & { kind: 'text' } & Omit<
   'kind' | 'id' | 'start' | 'duration' | 'animation' | 'keyframes'
 >;
 
-export type ImageLayer = FillLayer | PhotoLayer | ShapeLayer | TextLayer;
+/**
+ * 🎚️ Korrekció-réteg (adjustment layer) — nincs saját tartalma; az ALATTA lévő KOMPOZITRA
+ * hat (CapCut/Photoshop-minta). A render a réteg rajzolási pozíciójánál alkalmazza a
+ * `grade` presetet + `adjust` láncot az addig felépült képre; `mask` esetén csak a maszkolt
+ * régióra. A preview tint-réteggel közelít a rajzolási sorrendben. NINCS position/w/h (teljes vászon).
+ */
+export type AdjustmentImageLayer = ImageLayerBase & {
+  kind: 'adjust';
+  grade?: GradeId;
+  adjust?: ClipAdjust;
+  mask?: ClipMask;
+};
+
+export type ImageLayer = FillLayer | PhotoLayer | ShapeLayer | TextLayer | AdjustmentImageLayer;
 
 /** 📐 kézzel húzott segédvonal (szerkesztő-only) — szerkezetileg a rulers.ts `Guide` */
 export interface ImageGuide {

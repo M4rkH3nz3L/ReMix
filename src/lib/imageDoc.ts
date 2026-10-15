@@ -266,6 +266,8 @@ export function layerLabel(layer: ImageLayer): string {
         : layer.shape === 'path'
           ? tr('lib.imageDoc.layerLabelDrawing')
           : tr('lib.imageDoc.layerLabelShape', { shape: layer.shape });
+    case 'adjust':
+      return tr('lib.imageDoc.layerLabelAdjust', { defaultValue: 'Korrekció' });
   }
 }
 
@@ -280,6 +282,8 @@ export function layerIcon(layer: ImageLayer): string {
       return '🅰️';
     case 'shape':
       return layer.imageUri ? '🏷️' : layer.shape === 'path' ? '✏️' : '⬛';
+    case 'adjust':
+      return '🎚️';
   }
 }
 

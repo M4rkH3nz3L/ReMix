@@ -217,6 +217,31 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   let maskSeq = 0; // 🎭 maszk-belső címke-számláló (NEM input → az idx-et nem növeli)
 
   for (const layer of layers) {
+    // 🎚️ korrekció-réteg: nincs saját tartalma — az ALATTA felépült kompozitra (last) hat.
+    // `mask` esetén csak a maszkolt régióra (a korrigált alfa = maszk → az eredeti fölé overlay).
+    if (layer.kind === 'adjust') {
+      const corr = (gradeFilterChain(layer.grade) + adjustChain({ adjust: layer.adjust })).replace(/^,/, '');
+      if (!corr) {
+        continue;
+      }
+      const ai = maskSeq;
+      maskSeq += 1;
+      if (layer.mask && layer.mask.shape) {
+        filters.push(`${last}format=rgba,split[ao${ai}][ax${ai}]`);
+        filters.push(`[ax${ai}]${corr},format=rgba[acx${ai}]`);
+        filters.push(maskGrayChain(layer.mask, canvas.w, canvas.h, `[amg${ai}]`));
+        filters.push(`[acx${ai}]split[acc${ai}][aca${ai}]`);
+        filters.push(`[aca${ai}]alphaextract[acae${ai}]`);
+        filters.push(`[acae${ai}][amg${ai}]blend=all_mode=multiply:shortest=1[acam${ai}]`);
+        filters.push(`[acc${ai}][acam${ai}]alphamerge[acadjA${ai}]`);
+        filters.push(`[ao${ai}][acadjA${ai}]overlay=0:0[adj${ai}]`);
+      } else {
+        filters.push(`${last}${corr}[adj${ai}]`);
+      }
+      last = `[adj${ai}]`;
+      continue;
+    }
+
     const opacity = Math.min(1, Math.max(0, layer.opacity ?? 1)) * groupOpacity(layer);
     let prepared;
 

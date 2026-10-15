@@ -256,6 +256,10 @@ export function ImageCanvas({
                 />
               );
             }
+            // 🎚️ korrekció-réteg: a preview tint-közelítése a 2/2 inkrementumban jön; a render már égeti
+            if (l.kind === 'adjust') {
+              return null;
+            }
             return (
               <TextOverlay
                 key={l.id}
@@ -271,7 +275,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}

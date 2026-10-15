@@ -132,6 +132,10 @@ function remapLayer(layer: ImageLayer, r: CropRect): ImageLayer {
     }
     return next;
   }
+  // 🎚️ korrekció-réteg: nincs pozíció/méret (teljes vászon) → változatlan marad a kivágáskor
+  if (layer.kind === 'adjust') {
+    return layer;
+  }
   // text: pozíció + betűméret (a magasság %-a); a tipográfia em-arányok → maradnak
   const next: TextLayer = {
     ...layer,

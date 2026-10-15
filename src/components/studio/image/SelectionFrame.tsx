@@ -94,7 +94,7 @@ export function SelectionFrame({
         pending.current = {};
         const d = dataRef.current;
         rotState.current = {
-          startRot: d && d.layer.kind !== 'fill' ? d.layer.rotation ?? 0 : 0,
+          startRot: d && d.layer.kind !== 'fill' && d.layer.kind !== 'adjust' ? d.layer.rotation ?? 0 : 0,
         };
         frameRef.current?.measureInWindow?.((x, y, w, h) => {
           rotState.current.center = { x: x + w / 2, y: y + h / 2 };

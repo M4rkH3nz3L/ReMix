@@ -9,6 +9,7 @@ const {
   strokeSilhouette,
   perspectiveFilter,
   gradientMapFilter,
+  splitToneFilter,
   healChain,
   levelsFilter,
   channelMixFilter,
@@ -93,6 +94,18 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(g).toContain("r='0*(1-");
     expect(g).toContain("+255*(");
     expect(g).toContain("a='alpha(X,Y)',format=rgba");
+  });
+
+  test('splitToneFilter: hiányzó szín / 0 erő → ""; árnyék-sW + csúcsfény-hW, alfa-megőrzés', () => {
+    expect(splitToneFilter('', '#fff', 1)).toBe('');
+    expect(splitToneFilter('#4080ff', '#ff4040', 0)).toBe('');
+    const s = splitToneFilter('#4080ff', '#ff4040', 1); // shadow(64,128,255) highlight(255,64,64)
+    expect(s).toContain('format=gbrap,geq=');
+    expect(s).toContain('max(0,1-2*'); // árnyék-súly
+    expect(s).toContain('max(0,2*'); // csúcsfény-súly
+    expect(s).toContain('(64-128)'); // shadow R offset
+    expect(s).toContain('(255-128)'); // highlight R offset
+    expect(s).toContain("a='alpha(X,Y)',format=rgba");
   });
 
   test('healChain: doboz-lokális téglalapok → delogo (px), képbe clampelve; üres → ""', () => {

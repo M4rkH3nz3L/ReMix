@@ -14,7 +14,7 @@ const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, masterLra } = require('./voicechain');
 // 🖼️ kép-paritás: a Kép Stúdió szín-magjai (már /imagedoc-on pixel-bizonyítva) a video-klip grade-jéhez
-const { levelsFilter, channelMixFilter, gradientMapFilter, perspectiveFilter } = require('./imageFilters');
+const { levelsFilter, channelMixFilter, gradientMapFilter, perspectiveFilter, splitToneFilter } = require('./imageFilters');
 
 const FPS = 30;
 
@@ -600,6 +600,9 @@ function adjustChain(clip, enableExpr) {
   if (a.gradientMap) {
     // a geq `enable`-ablakot kap grade-rétegen (a `en` a geq-re injektálódik)
     chain += gradientMapFilter(a.gradientMap.shadow, a.gradientMap.highlight, en);
+  }
+  if (a.splitTone) {
+    chain += splitToneFilter(a.splitTone.shadow, a.splitTone.highlight, a.splitTone.strength ?? 1, en);
   }
   return chain;
 }

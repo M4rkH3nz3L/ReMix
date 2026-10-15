@@ -21,7 +21,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
 | §4 | **Transzformáció** (**anchor-pivot RENDER** + **corner-pin/perspektíva** kész; tartalom-tudatos ⬜) | ✅ |
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
-| §6 | **Szín-eszközök UI** (3-way színkerék · split-toning · live scopes) | ⬜ |
+| §6 | **Szín-eszközök** (**split-toning** kész; 3-way színkerék-UI · live scopes ⬜) | 🟡 |
 | §7 | **Audio** (metering/scope · sidechain tetszőleges sávra · per-band solo) | ⬜ |
 | §8 | **Render/perf** (render-output cache — §2.9 adósság · batch/szegmens-export) | ⬜ |
 | §9 | **Nyitott adósságok** (GIF-dekód+render §2.8 · Creative Canvas a timeline-ba §2.11 · on-device natív render) | ⬜ |
@@ -115,7 +115,10 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 ## 6. 🎚️ Szín-eszközök UI — ⬜ (a grading már megvan, csak a felület)
 
 - [ ] ⬜ **3-way color wheels** (árnyék/középtónus/csúcsfény színkerék → a meglévő balance-mezőkre).
-- [ ] ⬜ **Split-toning** (árnyék-szín + csúcsfény-szín külön; ma RGB-offset).
+- [x] ✅ **Split-toning** (árnyék-szín + csúcsfény-szín külön) — `ClipAdjust.splitTone {shadow,highlight,strength}`;
+  a render `splitToneFilter`-rel (geq, luminancia-súlyozott: sW=max(0,1-2L) árnyék / hW=max(0,2L-1) csúcsfény,
+  a kép-struktúra megmarad), enable-tudatos; AdjustPanel preset-chipek + erősség-stepper. *ÉLŐ VIDEO-RENDER
+  (renderProject, él-klip, árnyék=kék/csúcsfény=piros): fehér→ffbfc0 (pink), fekete→00007f (kék); kontroll fdffff/000000.*
 - [ ] ⬜ **Élő scopes** (histogram/waveform/vectorscope valós-idejű a preview-ból, ma csak közelítés).
 
 ## 7. 🔊 Audio — ⬜ (a lánc+master már profi)

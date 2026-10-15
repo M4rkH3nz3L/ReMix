@@ -380,6 +380,9 @@ export interface ClipAdjust {
   channelMix?: { rr?: number; rg?: number; rb?: number; gr?: number; gg?: number; gb?: number; br?: number; bg?: number; bb?: number };
   /** 🎨 gradient-map (egyedi-színű duotone): luminancia → `shadow`→`highlight` átmenet. Renderben `geq`. */
   gradientMap?: { shadow: string; highlight: string };
+  /** 🎨 split-toning: az árnyékokat `shadow`, a csúcsfényeket `highlight` felé tintálja (kép-struktúra marad,
+   *  additív); `strength` 0–1. Renderben `geq` (luminancia-súlyozott), a kép `splitToneFilter`-ével azonos. */
+  splitTone?: { shadow: string; highlight: string; strength?: number };
 }
 
 /** Importált 3D LUT (.cube). */

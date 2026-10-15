@@ -71,6 +71,13 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
     { n: 'Fekete→Fehér', s: '#000000', h: '#ffffff' },
     { n: 'Teal→Rózsa', s: '#0f3b3b', h: '#ff9ec4' },
   ];
+  // 🎨 split-tone presetek (árnyék-szín + csúcsfény-szín); a kép-struktúra megmarad
+  const SPLIT_TONES = [
+    { n: 'Kék/Narancs', s: '#2b6cff', h: '#ff9e42' },
+    { n: 'Teal/Arany', s: '#1f9e9e', h: '#ffcf66' },
+    { n: 'Lila/Zöld', s: '#8a4bff', h: '#5bd98a' },
+    { n: 'Hideg/Meleg', s: '#4080ff', h: '#ff6b4d' },
+  ];
 
   const renderBalanceRange = (range: 'sh' | 'mid' | 'hi') =>
     (['r', 'g', 'b'] as const).map((ch) => {
@@ -264,6 +271,33 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
             />
           ))}
         </View>
+      </PanelSection>
+
+      {/* 🎨 split-toning: árnyék-szín + csúcsfény-szín (a kép-struktúra megmarad) */}
+      <PanelSection title={t('panels.adjust.splitToneTitle', { defaultValue: '🎨 Split-tone (árnyék/csúcsfény)' })}>
+        <View style={styles.row}>
+          <Chip
+            label={t('common.off', { defaultValue: 'Ki' })}
+            active={!adjust.splitTone}
+            onPress={() => (adjust.splitTone ? updateClip(clip.id, { adjust: { ...adjust, splitTone: undefined } }) : undefined)}
+          />
+          {SPLIT_TONES.map((d) => (
+            <Chip
+              key={d.n}
+              label={d.n}
+              active={adjust.splitTone?.shadow === d.s && adjust.splitTone?.highlight === d.h}
+              onPress={() => updateClip(clip.id, { adjust: { ...adjust, splitTone: { shadow: d.s, highlight: d.h, strength: adjust.splitTone?.strength ?? 0.8 } } })}
+            />
+          ))}
+        </View>
+        {adjust.splitTone ? (
+          <Stepper
+            label={t('panels.adjust.splitToneStrength', { defaultValue: 'Erősség' })}
+            value={`${Math.round((adjust.splitTone.strength ?? 0.8) * 100)}%`}
+            onDec={() => updateClip(clip.id, { adjust: { ...adjust, splitTone: { ...adjust.splitTone!, strength: clamp((adjust.splitTone!.strength ?? 0.8) - 0.1, 0.1, 1) } } })}
+            onInc={() => updateClip(clip.id, { adjust: { ...adjust, splitTone: { ...adjust.splitTone!, strength: clamp((adjust.splitTone!.strength ?? 0.8) + 0.1, 0.1, 1) } } })}
+          />
+        ) : null}
       </PanelSection>
 
       {ADJUST_GROUPS.filter((g) => g.id === 'effect').map((group) => (

@@ -185,6 +185,33 @@ function gradientMapFilter(shadowHex, highlightHex, enableSuffix = '') {
   );
 }
 
+// 🎨 split-toning: az ÁRNYÉKOKAT `shadowHex`, a CSÚCSFÉNYEKET `highlightHex` felé tintálja a
+// luminancia szerint (sW=max(0,1-2L) az árnyékban, hW=max(0,2L-1) a csúcsfényben; a középtónus
+// érintetlen), a KÉP-struktúrát megőrizve (additív, nem duotone). `strength` 0–1. (pure, enable-tudatos)
+function splitToneFilter(shadowHex, highlightHex, strength = 1, enableSuffix = '') {
+  if (!shadowHex || !highlightHex) {
+    return '';
+  }
+  const st = Math.max(0, Math.min(1, Number(strength)));
+  if (!(st > 0)) {
+    return '';
+  }
+  const s = hexToRgb(shadowHex);
+  const h = hexToRgb(highlightHex);
+  const L = '(0.299*r(X,Y)+0.587*g(X,Y)+0.114*b(X,Y))/255';
+  const sW = `max(0,1-2*${L})`;
+  const hW = `max(0,2*${L}-1)`;
+  const stf = st.toFixed(3);
+  const ch = (base, sc, hc) => `clip(${base}(X,Y)+${stf}*((${sc}-128)*(${sW})+(${hc}-128)*(${hW})),0,255)`;
+  return (
+    `,format=gbrap,geq=` +
+    `r='${ch('r', s.r, h.r)}':` +
+    `g='${ch('g', s.g, h.g)}':` +
+    `b='${ch('b', s.b, h.b)}':` +
+    `a='alpha(X,Y)'${enableSuffix},format=rgba`
+  );
+}
+
 // 🩹 folt-javítás / objektum-eltávolítás: doboz-lokális (0–1) téglalapok → ffmpeg `delogo`
 // (a régiót a környezetéből interpolálja). A delogo 1px belső keretet kíván (x/y≥1, x+w≤W-1),
 // ezért a téglalapokat a képbe CLAMPeljük. Vezető-vesszős lánc; üres, ha nincs régió. (pure)
@@ -253,6 +280,7 @@ module.exports = {
   strokeSilhouette,
   perspectiveFilter,
   gradientMapFilter,
+  splitToneFilter,
   healChain,
   levelsFilter,
   channelMixFilter,

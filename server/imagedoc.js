@@ -345,26 +345,30 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     const posY = layer.kind === 'fill' ? '0' : `${Math.round((layer.position?.y ?? 0.5) * canvas.h)}-overlay_h/2`;
 
     // ✨ külső ragyogás (pozícionált rétegre): paddelt, színes sziluett → MÖGÉ overlay (középre).
+    // A `outerGlow` lehet `true` (alap paraméterek) VAGY objektum ({color?,size?,opacity?}).
     if (layer.outerGlow && layer.kind !== 'fill') {
-      const gsig = Math.max(2, Math.round(canvas.w * 0.02));
+      const gc = typeof layer.outerGlow === 'object' ? layer.outerGlow : {};
+      const gsig = Math.max(2, Math.round(canvas.w * (Number(gc.size) || 0.02)));
       const gm = gsig * 3;
       const gout = `gl${idx}`;
       filters.push(`[${prepared}]split[plg${idx}][psg${idx}]`);
-      filters.push(`[psg${idx}]${glowSilhouette(gm, gsig, 0.85)}[gll${idx}]`);
+      filters.push(`[psg${idx}]${glowSilhouette(gm, gsig, gc.opacity != null ? gc.opacity : 0.85, gc.color)}[gll${idx}]`);
       filters.push(`${last}[gll${idx}]overlay=${posX}:${posY}[${gout}]`);
       last = `[${gout}]`;
       prepared = `plg${idx}`;
     }
 
     // 🌑 vetett árnyék (pozícionált rétegre): a prepared másolatából sziluett → MÖGÉ overlay eltolva.
+    // A `dropShadow` lehet `true` (alap) VAGY objektum ({color?,dx?,dy?,blur?,opacity?} — dx/dy/blur a vászon törtje).
     if (layer.dropShadow && layer.kind !== 'fill') {
-      const sig = Math.max(1, Math.round(canvas.w * 0.012));
-      const dx = Math.round(canvas.w * 0.02);
-      const dy = Math.round(canvas.h * 0.02);
+      const dc = typeof layer.dropShadow === 'object' ? layer.dropShadow : {};
+      const sig = Math.max(1, Math.round(canvas.w * (Number(dc.blur) >= 0 && dc.blur != null ? dc.blur : 0.012)));
+      const dx = Math.round(canvas.w * (dc.dx != null ? Number(dc.dx) : 0.02));
+      const dy = Math.round(canvas.h * (dc.dy != null ? Number(dc.dy) : 0.02));
       const sout = `sh${idx}`;
       filters.push(`[${prepared}]split[pl${idx}][ps${idx}]`);
-      filters.push(`[ps${idx}]${shadowSilhouette(sig, 0.5)}[shl${idx}]`);
-      filters.push(`${last}[shl${idx}]overlay=${posX}+${dx}:${posY}+${dy}[${sout}]`);
+      filters.push(`[ps${idx}]${shadowSilhouette(sig, dc.opacity != null ? dc.opacity : 0.5, dc.color)}[shl${idx}]`);
+      filters.push(`${last}[shl${idx}]overlay=${posX}+(${dx}):${posY}+(${dy})[${sout}]`);
       last = `[${sout}]`;
       prepared = `pl${idx}`; // a réteg a split másik fele (az árnyék-sziluett nem fogyasztja el)
     }

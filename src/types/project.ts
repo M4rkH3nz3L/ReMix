@@ -1255,11 +1255,13 @@ export interface ImageLayerBase {
    *  (pl. 'right' = bal átlátszatlan → jobb átlátszó). A render geq alfa-rámpával égeti. */
   maskGradient?: MaskGradientDir;
   /** 🌑 vetett árnyék (bármely pozícionált rétegre: fotó/forma/szöveg) — a render a réteg
-   *  elmosott, eltolt sziluettjét teszi MÖGÉ. Fix szép paraméterek (eltolás/blur a vászonból). */
-  dropShadow?: boolean;
+   *  elmosott, eltolt sziluettjét teszi MÖGÉ. `true` = alap szép paraméterek; objektum = egyedi
+   *  (color + dx/dy eltolás + blur a vászon törtje + opacity 0–1). */
+  dropShadow?: boolean | { color?: string; dx?: number; dy?: number; blur?: number; opacity?: number };
   /** ✨ külső ragyogás (neon-halo) — a réteg paddelt, elmosott, színes sziluettje MÖGÉ.
-   *  (Nem keverendő a forma `glow` mezőjével, ami a forma körvonalára hat.) */
-  outerGlow?: boolean;
+   *  (Nem keverendő a forma `glow` mezőjével, ami a forma körvonalára hat.) `true` = alap accent-glow;
+   *  objektum = egyedi (color + size a vászon törtje + opacity 0–1). */
+  outerGlow?: boolean | { color?: string; size?: number; opacity?: number };
   /** 🖊️ kontúr/körvonal (bármely pozícionált rétegre): a réteg színezett, N px-rel megnövelt
    *  sziluettje MÖGÉ — keretként jelenik meg. `width` a vászonszélesség törtje (0–~0.05). */
   stroke?: { color: string; width: number };

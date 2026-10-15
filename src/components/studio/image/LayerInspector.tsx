@@ -76,6 +76,14 @@ export function LayerInspector({
   const setLocal = (next: PhotoLayer['localAdjust']) =>
     commit(updateLayer<PhotoLayer>(doc, layer.id, { localAdjust: next }), 'local-adjust');
 
+  // 🌑/✨ egyedi árnyék/glow — a boolean `true` alap-paraméter, az objektum az egyedi
+  const dsCfg = typeof layer.dropShadow === 'object' ? layer.dropShadow : {};
+  const glowCfg = typeof layer.outerGlow === 'object' ? layer.outerGlow : {};
+  const setShadow = (patch: Record<string, unknown>) =>
+    commit(updateLayer(doc, layer.id, { dropShadow: { ...dsCfg, ...patch } } as Partial<ImageLayer>), 'shadow');
+  const setGlow = (patch: Record<string, unknown>) =>
+    commit(updateLayer(doc, layer.id, { outerGlow: { ...glowCfg, ...patch } } as Partial<ImageLayer>), 'glow');
+
   // 🎞️ saját .cube LUT importálása a fotó-rétegre (pick + tartalmi validálás)
   const importLut = async (photo: PhotoLayer) => {
     const res = await pickCubeLut();
@@ -664,6 +672,32 @@ export function LayerInspector({
               }
             />
           </View>
+          {/* 🌑 egyedi árnyék (szín/eltolás/lágyság/átlátszóság) */}
+          {layer.dropShadow ? (
+            <>
+              <ColorField
+                label={t('studio.image.shadowColor', { defaultValue: 'Árnyék szín' })}
+                value={dsCfg.color ?? '#000000'}
+                onChange={(color) => setShadow({ color })}
+              />
+              <Slider label={t('studio.image.shadowDx', { defaultValue: 'Árnyék X' })} value={dsCfg.dx ?? 0.02} min={-0.1} max={0.1} onChange={(v) => setShadow({ dx: v })} format={(v) => v.toFixed(3)} />
+              <Slider label={t('studio.image.shadowDy', { defaultValue: 'Árnyék Y' })} value={dsCfg.dy ?? 0.02} min={-0.1} max={0.1} onChange={(v) => setShadow({ dy: v })} format={(v) => v.toFixed(3)} />
+              <Slider label={t('studio.image.shadowBlur', { defaultValue: 'Árnyék lágyság' })} value={dsCfg.blur ?? 0.012} min={0} max={0.06} onChange={(v) => setShadow({ blur: v })} format={(v) => v.toFixed(3)} />
+              <Slider label={t('studio.image.shadowOpacity', { defaultValue: 'Árnyék átlátszóság' })} value={dsCfg.opacity ?? 0.5} min={0} max={1} onChange={(v) => setShadow({ opacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            </>
+          ) : null}
+          {/* ✨ egyedi ragyogás (szín/méret/átlátszóság) */}
+          {layer.outerGlow ? (
+            <>
+              <ColorField
+                label={t('studio.image.glowColor', { defaultValue: 'Ragyogás szín' })}
+                value={glowCfg.color ?? '#7c5cff'}
+                onChange={(color) => setGlow({ color })}
+              />
+              <Slider label={t('studio.image.glowSize', { defaultValue: 'Ragyogás méret' })} value={glowCfg.size ?? 0.02} min={0.005} max={0.08} onChange={(v) => setGlow({ size: v })} format={(v) => v.toFixed(3)} />
+              <Slider label={t('studio.image.glowOpacity', { defaultValue: 'Ragyogás erő' })} value={glowCfg.opacity ?? 0.85} min={0} max={1} onChange={(v) => setGlow({ opacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            </>
+          ) : null}
           {layer.stroke ? (
             <>
               <ColorField

@@ -85,24 +85,25 @@ function maskGradientFilter(dir) {
   return e ? `,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*${e}'` : '';
 }
 
-// 🌑 vetett árnyék sziluett-lánca: a réteg másolatát feketére lutrgb-zi, elmossa, félig átlátszóvá
-// teszi (colorchannelmixer aa). A hívó a réteg MÖGÉ overlay-eli eltolva. (pure → tesztelhető)
-function shadowSilhouette(sigma, opacity) {
+// 🌑 vetett árnyék sziluett-lánca: a réteg másolatát a SZÍNRE lutrgb-zi (alap: fekete), elmossa,
+// félig átlátszóvá teszi (colorchannelmixer aa). A hívó a réteg MÖGÉ overlay-eli eltolva. (pure)
+function shadowSilhouette(sigma, opacity, color) {
   const s = Math.max(0.5, Number(sigma) || 4);
   const o = Math.max(0, Math.min(1, Number(opacity) || 0.5));
-  return `lutrgb=r=0:g=0:b=0,gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`;
+  const { r, g, b } = hexToRgb(color || '#000000');
+  return `lutrgb=r=${r}:g=${g}:b=${b},gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`;
 }
 
-// ✨ külső ragyogás sziluett: a réteg másolatát PADDELI (hogy a blur túlterjedjen), glow-színre
-// lutrgb-zi, elmossa, félig átlátszóvá teszi. A hívó a réteg MÖGÉ overlay-eli (középre, posX/posY).
-function glowSilhouette(margin, sigma, opacity) {
+// ✨ külső ragyogás sziluett: a réteg másolatát PADDELI (hogy a blur túlterjedjen), a glow-SZÍNRE
+// lutrgb-zi (alap: accent-lila #7c5cff), elmossa, félig átlátszóvá teszi. A hívó a réteg MÖGÉ overlay-eli.
+function glowSilhouette(margin, sigma, opacity, color) {
   const m = Math.max(1, Math.round(margin));
   const s = Math.max(0.5, Number(sigma) || 6);
   const o = Math.max(0, Math.min(1, Number(opacity) || 0.85));
-  // accent-lila glow (#7c5cff → 124,92,255)
+  const { r, g, b } = hexToRgb(color || '#7c5cff');
   return (
     `pad=iw+${2 * m}:ih+${2 * m}:${m}:${m}:color=black@0,` +
-    `lutrgb=r=124:g=92:b=255,gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`
+    `lutrgb=r=${r}:g=${g}:b=${b},gblur=sigma=${s.toFixed(1)},colorchannelmixer=aa=${o.toFixed(3)}`
   );
 }
 

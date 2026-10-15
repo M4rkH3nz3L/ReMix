@@ -85,7 +85,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   sziluettjét teszi MÖGÉ (`strokeSilhouette`, a glow/árnyék UTÁN = legközelebb); LayerInspector „Kontúr"
   chip + ColorField + vastagság-csúszka. *ÉLŐ-BIZONYÍTVA (/imagedoc, 50%-os fotó fehér háttéren, piros 0.08):
   közép=fotó 799fc7; keret=fe0000 (piros); háttér=ffffff; HTTP 200.*
-- [ ] ⬜ Egyedi **árnyék/glow szín/eltolás/lágyság** (ma fix szép paraméterek).
+- [x] ✅ **Egyedi árnyék/glow** (szín/eltolás/lágyság/átlátszóság) — a `dropShadow`/`outerGlow` lehet
+  `true` (alap) VAGY config-objektum (`{color,dx,dy,blur,opacity}` ill. `{color,size,opacity}`); a render a
+  `shadowSilhouette`/`glowSilhouette`-et a megadott színnel/paraméterrel égeti; LayerInspector ColorField +
+  csúszkák. *ÉLŐ-BIZONYÍTVA (/imagedoc, 50%-os fotó fehéren): piros árnyék (dx/dy 0.08) → árnyék-régió fe0000
+  (fotó-közép 799fc7); zöld glow (size 0.05) → halo 85ff86; HTTP 200.*
 
 ## 2. 🎯 Kijelölés & maszkolás — 🟡 kijelölés van, maszk-bekötés hiányzik
 - [x] ✅ **Lasszó** + **varázspálca** (magicWandClient) + **ecset** — a kijelölés/festés él.
@@ -184,7 +188,8 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   közelít; LayerInspector két csúszka (↔/↕). *ÉLŐ-BIZONYÍTVA (/imagedoc, kék fotó zöld háttéren): X=0 minden
   sarok 799fc7 (kék); X=1 jobb sarkok 00ff01 (zöld háttér átlátszik), bal-felső+közép 799fc7; HTTP 200.*
 - [ ] ⬜ **Skewer/szabad-warp (rács)** · **tartalom-tudatos skálázás**.
-- [ ] ⬜ **Igazítás okos-segédvonalakkal** (dinamikus, a többi réteghez viszonyítva).
+- [x] ✅ **Igazítás okos-segédvonalakkal** (smart-guides) — lásd §8 (`snapToLayers`): a mozgatott réteg a többi
+  réteg közép/éleihez + a vászonhoz pattan, magenta jelző-vonallal. *BIZONYÍTVA: smartGuides pure teszt (4).*
 
 ## 7. 📤 Export & megosztás — ✅ gazdag
 - [x] ✅ **Raszter** (PNG/JPG/WebP + 1×/2× + minőség) · **SVG** · **PDF** · **beszúrás videóba**.

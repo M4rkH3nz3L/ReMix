@@ -370,3 +370,36 @@ describe('dev-warn a néma no-op parancsnál (§2.2)', () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 });
+
+describe('🕓 history-címkék + jumpHistory (§8)', () => {
+  const imgDoc = (id: string, name: string) => ({ id, name, aspectRatio: '1:1', layers: [] }) as never;
+
+  it('a dispatch a parancs label-jét a pastLabels-be teszi; undo/redo lépésenként mozgat', () => {
+    load([track('video', [videoClip('v1')])]);
+    expect(store().pastLabels).toEqual([]);
+    store().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: imgDoc('d1', 'Egy'), label: 'Első' });
+    store().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: imgDoc('d1', 'Kettő'), label: 'Második' });
+    expect(store().pastLabels).toEqual(['Első', 'Második']);
+    expect(store().futureLabels).toEqual([]);
+    store().undo();
+    expect(store().pastLabels).toEqual(['Első']);
+    expect(store().futureLabels).toEqual(['Második']);
+    store().redo();
+    expect(store().pastLabels).toEqual(['Első', 'Második']);
+    expect(store().futureLabels).toEqual([]);
+  });
+
+  it('jumpHistory(-n) = n undo, jumpHistory(n) = n redo (a címke-vermekkel együtt)', () => {
+    load([track('video', [videoClip('v1')])]);
+    store().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: imgDoc('d1', 'A'), label: 'A' });
+    store().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: imgDoc('d1', 'B'), label: 'B' });
+    store().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: imgDoc('d1', 'C'), label: 'C' });
+    expect(store().pastLabels).toEqual(['A', 'B', 'C']);
+    store().jumpHistory(-2);
+    expect(store().pastLabels).toEqual(['A']);
+    expect(store().futureLabels).toEqual(['B', 'C']);
+    store().jumpHistory(2);
+    expect(store().pastLabels).toEqual(['A', 'B', 'C']);
+    expect(store().futureLabels).toEqual([]);
+  });
+});

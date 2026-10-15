@@ -275,6 +275,10 @@ interface EditorState {
   activePanel: PanelId;
   past: Project[];
   future: Project[];
+  /** 🕓 a history-lépések ember-olvasható címkéi (a past/future-rel LÉPÉSENKÉNT igazítva —
+   *  tisztán kozmetikai a history-panelhez; az esetleges elcsúszás az undo HELYESSÉGÉT nem érinti) */
+  pastLabels: string[];
+  futureLabels: string[];
   /** van-e nem mentett módosítás (az autosave figyeli) */
   dirty: boolean;
   /** a projekt eseménynaplója — az undo NEM törli, az autosave menti */
@@ -453,6 +457,8 @@ interface EditorState {
   closeAudioStudio: () => void;
   undo: () => void;
   redo: () => void;
+  /** 🕓 ugrás a history-ban: delta<0 = ennyi undo, delta>0 = ennyi redo (egy állapot-cserében) */
+  jumpHistory: (delta: number) => void;
   markSaved: () => void;
   /** a renderelt változat rögzítése a projekten (artefaktum — nem undo/dirty) */
   setRendered: (rendered: Project['rendered']) => void;
@@ -551,6 +557,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   audioStudioClipId: null,
   past: [],
   future: [],
+  pastLabels: [],
+  futureLabels: [],
   dirty: false,
   events: [],
   // 🎯 teljesítmény: NEM session-reset, hogy projektváltáskor is megmaradjon
@@ -567,13 +575,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activePanel: null,
       past: [],
       future: [],
+      pastLabels: [],
+      futureLabels: [],
       dirty: false,
       events: events ?? [],
       ...SESSION_RESET,
     }),
 
   restoreProject: (snapshot) => {
-    const { project, past } = get();
+    const { project, past, pastLabels } = get();
     if (!project) {
       return;
     }
@@ -582,6 +592,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       project: snapshot,
       past: [...past.slice(-HISTORY_LIMIT + 1), project],
       future: [],
+      pastLabels: [...pastLabels.slice(-HISTORY_LIMIT + 1), 'Verzió visszaállítása'],
+      futureLabels: [],
       dirty: true,
       selectedClipId: null,
       multiSelectIds: [],
@@ -600,13 +612,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activePanel: null,
       past: [],
       future: [],
+      pastLabels: [],
+      futureLabels: [],
       dirty: false,
       events: [],
       ...SESSION_RESET,
     }),
 
   dispatch: (command, actor = 'user') => {
-    const { project, past, events, lockedTracks } = get();
+    const { project, past, pastLabels, events, lockedTracks } = get();
     if (!project) {
       return false;
     }
@@ -638,10 +652,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       command: slimForLog(command),
       ...(isHeavyCommand(command) ? { slim: true as const } : {}),
     };
+    // 🕓 history-címke: a parancs saját `label`-je (pl. UPSERT_IMAGE_DOC), vagy a leírása
+    const stepLabel = (command as { label?: string }).label || describeCommand(command);
     set({
       project: next,
       past: [...past.slice(-HISTORY_LIMIT + 1), project],
       future: [],
+      pastLabels: [...pastLabels.slice(-HISTORY_LIMIT + 1), stepLabel],
+      futureLabels: [],
       dirty: true,
       events: [...events.slice(-EVENT_LIMIT + 1), event],
     });
@@ -653,7 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   applyBatch: (commands, actor = 'ai') => {
-    const { project, past, events, lockedTracks } = get();
+    const { project, past, pastLabels, events, lockedTracks } = get();
     if (!project) {
       return 0;
     }
@@ -684,10 +702,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return 0;
     }
     // EGYETLEN pre-batch pillanatkép a history-ba → egy undo visszavonja az egészet
+    const batchLabel =
+      (commands[commands.length - 1] as { label?: string } | undefined)?.label ||
+      `${batchEvents.length} művelet`;
     set({
       project: cur,
       past: [...past.slice(-HISTORY_LIMIT + 1), project],
       future: [],
+      pastLabels: [...pastLabels.slice(-HISTORY_LIMIT + 1), batchLabel],
+      futureLabels: [],
       dirty: true,
       events: [...events, ...batchEvents].slice(-EVENT_LIMIT),
     });
@@ -1616,7 +1639,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPanel: (panel) => set({ activePanel: panel }),
 
   undo: () => {
-    const { past, project, future } = get();
+    const { past, project, future, pastLabels, futureLabels } = get();
     if (!project || past.length === 0) {
       return;
     }
@@ -1625,6 +1648,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       project: previous,
       past: past.slice(0, -1),
       future: [project, ...future].slice(0, HISTORY_LIMIT),
+      pastLabels: pastLabels.slice(0, -1),
+      futureLabels: [pastLabels[pastLabels.length - 1] ?? '', ...futureLabels].slice(0, HISTORY_LIMIT),
       dirty: true,
       // a kijelöléssel EGYÜTT a köteg is elévül: az undo után a klip-készlet
       // már más lehet (törölt/összevont klipek), árva köteg-id-k maradnának
@@ -1635,15 +1660,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   redo: () => {
-    const { past, project, future } = get();
+    const { past, project, future, pastLabels, futureLabels } = get();
     if (!project || future.length === 0) {
       return;
     }
     const [next, ...rest] = future;
+    const [nextLabel, ...restLabels] = futureLabels;
     set({
       project: next,
       past: [...past.slice(-HISTORY_LIMIT + 1), project],
       future: rest,
+      pastLabels: [...pastLabels.slice(-HISTORY_LIMIT + 1), nextLabel ?? ''],
+      futureLabels: restLabels,
       dirty: true,
       // a kijelöléssel EGYÜTT a köteg is elévül: az undo után a klip-készlet
       // már más lehet (törölt/összevont klipek), árva köteg-id-k maradnának
@@ -1651,6 +1679,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       multiSelectIds: [],
       multiSelectMode: false,
     });
+  },
+
+  // 🕓 ugrás a history-ban: delta<0 → |delta| undo, delta>0 → delta redo (lépésenként, biztonsággal)
+  jumpHistory: (delta) => {
+    const n = Math.trunc(delta);
+    if (n < 0) {
+      for (let i = 0; i < -n; i++) {
+        get().undo();
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        get().redo();
+      }
+    }
   },
 
   openImageStudio: (clipId) => set({ imageStudioClipId: clipId }),

@@ -16,6 +16,7 @@ import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
+import { HistorySheet } from '@/components/studio/image/HistorySheet';
 import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
@@ -191,6 +192,7 @@ export function ImageStudioBody({
     | 'canvas'
     | 'source'
     | 'export'
+    | 'history'
     | null
   >(null);
   const [busy, setBusy] = useState(false);
@@ -1092,6 +1094,17 @@ export function ImageStudioBody({
         </View>
         {doc ? (
           <Pressable
+            onPress={() => setSheet('history')}
+            hitSlop={8}
+            style={styles.canvasBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('studio.image.historyTitle', { defaultValue: 'Előzmények' })}
+          >
+            <Ionicons name="time-outline" size={15} color={palette.textDim} />
+          </Pressable>
+        ) : null}
+        {doc ? (
+          <Pressable
             onPress={() => setSheet('source')}
             hitSlop={8}
             style={styles.canvasBtn}
@@ -1545,6 +1558,7 @@ export function ImageStudioBody({
       {sheet === 'canvas' && doc ? (
         <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
+      {sheet === 'history' && doc ? <HistorySheet onClose={() => setSheet(null)} /> : null}
       {sheet === 'source' ? (
         <SourceSheet onInsert={insertSource} onClose={() => setSheet(null)} />
       ) : null}

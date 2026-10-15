@@ -19,7 +19,7 @@
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
-| §8 | **UX-paritás** (vászon-zoom/pan, smart-guides, history-panel) | 🟡 |
+| §8 | **UX-paritás** (**history-panel** kész; vászon-zoom/pan, smart-guides) | 🟡 *(zoom/pan ⬜)* |
 
 ---
 
@@ -193,7 +193,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
 
 ## 8. 🧭 UX-paritás a profi szerkesztőkkel — 🟡
 - [ ] 🟡 **Vászon-zoom/pan** (pinch + két-ujj pan) + **fit/100%** — ma korlátos (az audio-transport kapott zoomot, a kép nem).
-- [ ] ⬜ **History-panel** (vizuális undo-lépések; a command-bus már undo-zható) · **snapshot/verziók**.
+- [x] ✅ **History-panel** (vizuális undo-lépések) — a store-ba `pastLabels`/`futureLabels` címke-vermek (a
+  parancs `label`-je vagy `describeCommand`, a past/future-rel lépésenként igazítva) + `jumpHistory(delta)`;
+  `HistorySheet` kronológikus lépés-lista (Kiindulás → lépések → újra-elérhetők), a jelenlegi kiemelve, bármely
+  lépésre koppintva odaugrik; felső-sor „idő" gomb nyitja. *BIZONYÍTVA: store-teszt (2) — dispatch→pastLabels,
+  undo/redo lépésenkénti címke-mozgatás, jumpHistory(±n) = n undo/redo a vermekkel együtt; 32 suite-teszt zöld.*
+  (snapshot/nevezett verziók ⬜)
 - [ ] ⬜ **Billentyű/gesztus-paritás** · **akadálymentesség** · tablet/iPad dokkolt panelek.
 
 ---

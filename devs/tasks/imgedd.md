@@ -16,7 +16,7 @@
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset + **réteg-maszk** + **kijelölés-alapú korrekció**: ellipszis/téglalap/lasszó-poligon + feather/invert/expand) | ✅ *(festett raszter-maszk ⬜)* |
 | §3 | **Retusálás** (**folt-javítás/objektum-eltávolítás** + dodge/burn=lokális korrekció) | 🟡 *(klón-bélyegző/blur-ecset ⬜)* |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
-| §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
+| §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **levels** + **grade/LUT** + **csatorna-mixer** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(szelektív szín ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
 | §8 | **UX-paritás** (**history-panel** + **vászon-zoom/pan** + **smart-guides** kész) | ✅ *(billentyű/a11y ⬜)* |

@@ -129,7 +129,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   szöveg fekete háttéren): flat↔circle különbség-átlag 6.97, flat↔arc 7.57 (0=azonos → a textPath átrendezi a
   glifeket); közép-sáv YAVG flat 35.3 → circle 25.2; mind HTTP 200.*
 - [ ] ⬜ **OpenType-funkciók** (ligatúrák/alternatívák) · **toll v5** (finom node-húzás/handle-arány).
-- [ ] ⬜ **Vektor-kitöltés gradiens/minta** a path-okon (ma szín/alap-gradient).
+- [x] ✅ **Vektor-kitöltés gradiens/minta a path-okon** — a forma-renderer a zárt path-ot MULTI-STOP
+  gradienssel (`svgGradientDef` → `fill="url(#pgp)"`, lineáris/radiális) ÉS mintával (`shapePatternSvgDefJs`
+  → path-geometria `url(#pat)`) tölti; a LayerInspector GradientEditor/pattern a path-formákra is hat.
+  *ÉLŐ-BIZONYÍTVA (/imagedoc, path-háromszög függőleges gradienssel): fönt de001f (pirosas) → lent 1d00e1
+  (kékes); pattern-path HTTP 200. (A képességet verifikáltam — a renderben már élt.)*
 
 ## 5. 🎨 Korrekciók & szűrők — ✅ adjustment-stack kész, mélység hiányzik
 - [x] ✅ **Adjustment-stack** (expozíció/kontraszt/fehéregyensúly/tónus: highlights/shadows/whites/blacks/telítettség/

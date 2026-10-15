@@ -1375,6 +1375,9 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 📊 szintek (levels): fekete-pont (0–0.9) / fehér-pont (…–1) / gamma (0.1–5). A render
    *  `lutrgb`-vel remapeli: out = clip((val−black)/(white−black),0,1)^(1/gamma). Identitás = nincs hatás. */
   levels?: { black: number; white: number; gamma: number };
+  /** 🎨 csatorna-mixer: minden KIMENETI csatorna a bemenetek lineáris kombinációja (3×3 együttható).
+   *  A render `colorchannelmixer`-rel égeti; identitás (rr=gg=bb=1, többi 0) = nincs hatás. */
+  channelMix?: { rr?: number; rg?: number; rb?: number; gr?: number; gg?: number; gb?: number; br?: number; bg?: number; bb?: number };
 }
 
 /** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).

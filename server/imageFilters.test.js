@@ -11,6 +11,7 @@ const {
   gradientMapFilter,
   healChain,
   levelsFilter,
+  channelMixFilter,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -113,6 +114,14 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(levelsFilter({ black: 0, white: 1, gamma: 2 })).toContain('0.5000)*255');
     // white a black+0.05 alá nem mehet (védett osztás) → w-b ≥ 0.05
     expect(levelsFilter({ black: 0.9, white: 0.9, gamma: 1 })).toContain('val/255-0.9');
+  });
+
+  test('channelMixFilter: identitás → ""; R↔B csere colorchannelmixer', () => {
+    expect(channelMixFilter(undefined)).toBe('');
+    expect(channelMixFilter({ rr: 1, gg: 1, bb: 1 })).toBe('');
+    // R↔B csere: rr=0,rb=1, br=1,bb=0, gg=1
+    const swap = channelMixFilter({ rr: 0, rb: 1, gg: 1, br: 1, bb: 0 });
+    expect(swap).toBe(',colorchannelmixer=0:0:1:0:0:1:0:0:1:0:0:0:0:0:0:1');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

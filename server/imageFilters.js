@@ -225,6 +225,22 @@ function levelsFilter(levels) {
   return `,lutrgb=r='${e}':g='${e}':b='${e}'`;
 }
 
+// 🎨 csatorna-mixer: minden KIMENETI csatorna a bemenetek lineáris kombinációja (ffmpeg
+// `colorchannelmixer`). 3×3 együttható (rr..bb), identitásnál üres; az alfa megmarad. (pure)
+function channelMixFilter(mix) {
+  if (!mix) {
+    return '';
+  }
+  const n = (v, d) => (v != null && Number.isFinite(Number(v)) ? Number(v) : d);
+  const rr = n(mix.rr, 1), rg = n(mix.rg, 0), rb = n(mix.rb, 0);
+  const gr = n(mix.gr, 0), gg = n(mix.gg, 1), gb = n(mix.gb, 0);
+  const br = n(mix.br, 0), bg = n(mix.bg, 0), bb = n(mix.bb, 1);
+  if (rr === 1 && rg === 0 && rb === 0 && gr === 0 && gg === 1 && gb === 0 && br === 0 && bg === 0 && bb === 1) {
+    return '';
+  }
+  return `,colorchannelmixer=${rr}:${rg}:${rb}:0:${gr}:${gg}:${gb}:0:${br}:${bg}:${bb}:0:0:0:0:1`;
+}
+
 module.exports = {
   filterChain,
   oneFilter,
@@ -238,4 +254,5 @@ module.exports = {
   gradientMapFilter,
   healChain,
   levelsFilter,
+  channelMixFilter,
 };

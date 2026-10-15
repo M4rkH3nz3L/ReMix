@@ -167,7 +167,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   out = clip((val−black)/(white−black),0,1)^(1/gamma) (a korrekció/grade UTÁN); LayerInspector Be/Nincs +
   fekete-pont/fehér-pont/gamma csúszkák. *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 121/159/199): kontroll=799fc7;
   b0/w0.5=f2ffff (fehér-pont nyújtás); gamma2=afc9e0 (világosabb középtónus); HTTP 200.*
-- [ ] ⬜ **Csatorna-mixer** (colorchannelmixer) + **szelektív szín**.
+- [x] ✅ **Csatorna-mixer** (colorchannelmixer) — `PhotoLayer.channelMix` 3×3 együttható (rr..bb); a render
+  `colorchannelmixer`-rel keveri a kimeneti R/G/B-t a bemenetek lineáris kombinációjaként (a levels UTÁN);
+  LayerInspector Be/Nincs + 9 csúszka (R←R…B←B). *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 121/159/199): R↔B csere →
+  198/159/120 (felcserélve); monokróm (0.33×mind) → 158/158/158 (R≈G≈B); HTTP 200.*
+- [ ] ⬜ **Szelektív szín** (egy szín-tartomány célzott módosítása).
 - [x] ✅ **Filmszimuláció / LUT-szerű grade a fotóra** — a videó grade-rétegével AZONOS preset-térkép
   (kiemelve `server/grades.js`-be, a `render.js` innen kéri → nincs drift; a kliens `constants/grades.ts`
   ugyanazok az id-k). `PhotoLayer.grade` (teal-orange/moody/vintage/noir/warm-film/cold/vibrant/dreamy) →

@@ -76,6 +76,12 @@ export function LayerInspector({
   const setLocal = (next: PhotoLayer['localAdjust']) =>
     commit(updateLayer<PhotoLayer>(doc, layer.id, { localAdjust: next }), 'local-adjust');
 
+  // 🎨 csatorna-mixer patch (identitás-alapról)
+  const setMix = (patch: Record<string, number>) => {
+    const cur = (layer as PhotoLayer).channelMix ?? { rr: 1, gg: 1, bb: 1 };
+    commit(updateLayer<PhotoLayer>(doc, layer.id, { channelMix: { ...cur, ...patch } }), 'channel-mix');
+  };
+
   // 🌑/✨ egyedi árnyék/glow — a boolean `true` alap-paraméter, az objektum az egyedi
   const dsCfg = typeof layer.dropShadow === 'object' ? layer.dropShadow : {};
   const glowCfg = typeof layer.outerGlow === 'object' ? layer.outerGlow : {};
@@ -403,6 +409,25 @@ export function LayerInspector({
               <Slider label={t('studio.image.levelsGamma', { defaultValue: 'Gamma' })} value={layer.levels.gamma} min={0.2} max={3} onChange={(v) => commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: { ...layer.levels!, gamma: v } }), 'levels')} format={(v) => v.toFixed(2)} />
             </>
           ) : null}
+          {/* 🎨 csatorna-mixer: a kimeneti R/G/B csatorna a bemenetek lineáris kombinációja */}
+          <Text style={styles.sectionLabel}>{t('studio.image.channelMix', { defaultValue: 'Csatorna-mixer' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip label={t('studio.image.maskNone', { defaultValue: 'Nincs' })} active={!layer.channelMix} onPress={() => (layer.channelMix ? commit(updateLayer<PhotoLayer>(doc, layer.id, { channelMix: undefined }), 'channel-mix') : undefined)} />
+            <Chip label={t('studio.image.localOn', { defaultValue: 'Be' })} active={!!layer.channelMix} onPress={() => (layer.channelMix ? undefined : commit(updateLayer<PhotoLayer>(doc, layer.id, { channelMix: { rr: 1, gg: 1, bb: 1 } }), 'channel-mix'))} />
+          </View>
+          {layer.channelMix
+            ? ([['rr', 'R←R'], ['rg', 'R←G'], ['rb', 'R←B'], ['gr', 'G←R'], ['gg', 'G←G'], ['gb', 'G←B'], ['br', 'B←R'], ['bg', 'B←G'], ['bb', 'B←B']] as const).map(([k, lbl]) => (
+                <Slider
+                  key={k}
+                  label={lbl}
+                  value={layer.channelMix?.[k] ?? (k === 'rr' || k === 'gg' || k === 'bb' ? 1 : 0)}
+                  min={-1}
+                  max={2}
+                  onChange={(v) => setMix({ [k]: v })}
+                  format={(v) => v.toFixed(2)}
+                />
+              ))
+            : null}
           {/* 🎯 kijelölés-alapú (lokális) korrekció: grade/adjust CSAK a maszkon belül (maskedmerge) */}
           <Text style={styles.sectionLabel}>{t('studio.image.localAdjust', { defaultValue: 'Kijelölés-alapú korrekció' })}</Text>
           <View style={styles.chipRow}>

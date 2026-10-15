@@ -21,6 +21,7 @@ const {
   gradientMapFilter,
   healChain,
   levelsFilter,
+  channelMixFilter,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
@@ -291,9 +292,11 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const heal = healChain(layer.heal, boxW, boxH);
       // 📊 szintek (levels): a tonális remap a korrekció/grade UTÁN, a struktúra-szűrők előtt
       const lvl = levelsFilter(layer.levels);
+      // 🎨 csatorna-mixer: a levels UTÁN (a kimeneti csatornák lineáris keverése)
+      const chmix = channelMixFilter(layer.channelMix);
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${lvl}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
+        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

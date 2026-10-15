@@ -11,7 +11,7 @@ const path = require('path');
 
 const express = require('express');
 
-const { aiAvailable, aiProvider, probeProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
+const { aiAvailable, aiProvider } = require('./ai');
 const { analyzeBeats } = require('./beats');
 const { voiceChain } = require('./voicechain');
 const { renderImageDoc, imageDocGuard } = require('./imagedoc');
@@ -67,7 +67,7 @@ const WHISPER_MODEL =
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
 
 // 🔐 Megosztott HTTP-guardok + egységes hiba-handler (01-api-architecture §01.1/§01.3).
-const { proOnly, paidOnly, aiMeter, renderJobAuth } = require('./lib/guards');
+const { proOnly, paidOnly, renderJobAuth } = require('./lib/guards');
 const { errorHandler } = require('./lib/httpError');
 
 const app = express();
@@ -405,32 +405,8 @@ app.post('/upscale', upload.any(), ...proOnly, mediaGuard('image'), (req, res) =
     });
 });
 
-// 🪝 Hook Generator (P2): téma → 6 különböző stílusú nyitómondat
-app.post('/ai/hooks', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/hooks', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
-  const { summary, aiConfig } = req.body ?? {};
-  if (!summary || typeof summary !== 'string') {
-    res.status(400).json({ error: 'Hiányzó összefoglaló.' });
-    return;
-  }
-  runHookGenerator(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('Hook hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🟢 Provider-health: elérhető-e a modell végpontja (a karakter-picker bogyójához)
-app.post('/ai/probe', express.json({ limit: '64kb' }), ...authenticated({ method: 'POST', path: '/ai/probe', rateClass: 'ai' }), rateLimit('ai'), (req, res) => {
-  const cfg = sanitizeAiConfig(req.body?.aiConfig);
-  if (!cfg) {
-    res.json({ ok: false });
-    return;
-  }
-  probeProvider(cfg)
-    .then((ok) => res.json({ ok }))
-    .catch(() => res.json({ ok: false }));
-});
+// 🤖 AI-worker route-ok (hooks/probe/translate/highlights/story/thumbheadlines/captionstudio/assist/autoedit) — domain-router (§01.1).
+app.use(require('./routes/ai'));
 
 // 🔔 Értesítés-küldés (service_role): SELF + CROSS-USER (team-working). Beszúr a
 // notifications-be (realtime kézbesíti) + best-effort Expo push a push_tokenekre.
@@ -508,65 +484,7 @@ app.use(require('./routes/live'));
 // 💳 Billing / shop-kredit route-ok — domain-router (§01.1).
 app.use(require('./routes/billing'));
 
-// 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
-app.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
-  const { segments, lang, aiConfig } = req.body ?? {};
-  if (!Array.isArray(segments) || segments.length === 0 || !lang) {
-    res.status(400).json({ error: 'Hiányzó szegmensek vagy célnyelv.' });
-    return;
-  }
-  runTranslateCaptions(segments.slice(0, 200), String(lang).slice(0, 40), sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('Translate hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
 
-// 🎯 Highlights (Phase 3.3): long-form → több önálló short-jelölt (idő-ablak)
-app.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
-  const { context, aiConfig } = req.body ?? {};
-  if (!context || typeof context !== 'object') {
-    res.status(400).json({ error: 'Hiányzó kontextus.' });
-    return;
-  }
-  runHighlights(context, sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('Highlights hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🎬 Story Engine (Phase 1.1): jelek (hossz + átirat) → dramaturgiai fejezetek
-app.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
-  const { context, aiConfig } = req.body ?? {};
-  if (!context || typeof context !== 'object') {
-    res.status(400).json({ error: 'Hiányzó kontextus.' });
-    return;
-  }
-  runStoryEngine(context, sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('Story hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🎬 Thumbnail headline-javaslatok (CC V2): téma-összefoglaló → 3 rövid cím
-app.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/thumbheadlines', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
-  const { summary, aiConfig } = req.body ?? {};
-  if (!summary || typeof summary !== 'string') {
-    res.status(400).json({ error: 'Hiányzó összefoglaló.' });
-    return;
-  }
-  runThumbHeadlines(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('ThumbHeadline hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
 
 // 🎬 headline ráégetése a kiválasztott borítóra (Chromium-raszter + overlay)
 app.post('/thumbnails/compose', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
@@ -593,20 +511,7 @@ app.post('/thumbnails/compose', upload.any(), requireAuth, rateLimit('analysis')
     });
 });
 
-// ✨ Caption Studio (P1): kiemelt szavak + emoji a felirat-szegmensekhez
-app.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticated({ method: 'POST', path: '/ai/captionstudio', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
-  const { segments, aiConfig } = req.body ?? {};
-  if (!Array.isArray(segments) || segments.length === 0) {
-    res.status(400).json({ error: 'Hiányzó szegmensek.' });
-    return;
-  }
-  runCaptionStudio(segments.slice(0, 60), sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('CaptionStudio hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
+
 
 // 🎨 Color AI (P1 v1): egy kocka szín-statisztikái — Auto/Match Color alapja
 /**
@@ -993,36 +898,7 @@ app.get('/depth/:id/:name', (req, res) => {
   res.sendFile(file);
 });
 
-// AI-asszisztens: kontextus + utasítás → validált parancslista
-app.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ method: 'POST', path: '/ai/assist', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
-  const { context, instruction, aiConfig } = req.body ?? {};
-  if (!instruction || typeof instruction !== 'string') {
-    res.status(400).json({ error: 'Hiányzó utasítás.' });
-    return;
-  }
-  runAssistant(context ?? {}, instruction, sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('AI hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
 
-// AI Edit Engine (P0-1): elemzett jelek → 3 vágás-változat (keep-sávok +
-// felirat-javaslatok) — a kliens fordítja commandokká és kér jóváhagyást.
-app.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
-  const { context, aiConfig } = req.body ?? {};
-  if (!context || typeof context !== 'object') {
-    res.status(400).json({ error: 'Hiányzó kontextus.' });
-    return;
-  }
-  runAutoEdit(context, sanitizeAiConfig(aiConfig))
-    .then((reply) => res.json(reply))
-    .catch((err) => {
-      console.error('AutoEdit hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
 
 // Auto-caption: médiafájl → hang kinyerése → Whisper → SRT.
 // A kliens a kapott SRT-t a meglévő import-útvonalon dolgozza fel.
@@ -2343,213 +2219,8 @@ app.post('/render/:id/cancel', renderJobAuth, async (req, res) => {
 // / S3) a `user_storage_providers` táblából + a legacy globális admin-config
 // (storage.config.json). A hitelesítés (OAuth token/kulcs) a WORKEREN marad — a
 // kliens sosem látja, csak a proxyzott végpontokat. Minden route requireAuth.
-app.get('/storage/sources', requireAuth, async (req, res) => {
-  const uid = callerId(req, req.query.userId);
-  try {
-    const { describeSources } = require('./storage');
-    const user = uid ? await userStorage.describeUserSources(uid) : [];
-    // a user sajátjai + a legacy globális admin-források (ha be van állítva config)
-    res.json({ sources: [...user, ...describeSources()] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// A user bekötött külső forrásai a profil-kezeléshez (státusszal, globális nélkül).
-app.get('/storage/connected', requireAuth, async (req, res) => {
-  const uid = callerId(req, req.query.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Hiányzó felhasználó.' });
-    return;
-  }
-  try {
-    const [providers, defaultTarget] = await Promise.all([
-      userStorage.listConnected(uid),
-      userStorage.getDefaultTarget(uid),
-    ]);
-    // default: a kijelölt forrás-id, vagy null (= ReMix-tárhely az alap)
-    res.json({ providers, default: defaultTarget });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 🎯 Az AKTÍV tárhely-cél beállítása: { sourceId } (null/üres → ReMix-tárhely).
-// Ide ment ezután MINDEN studio, és innen olvas vissza.
-app.post('/storage/default', requireAuth, express.json({ limit: '4kb' }), async (req, res) => {
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Hiányzó felhasználó.' });
-    return;
-  }
-  try {
-    const sourceId = req.body?.sourceId ? String(req.body.sourceId) : null;
-    await userStorage.setDefaultTarget(uid, sourceId);
-    res.json({ ok: true, default: sourceId });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 🔑 Külső forrás bekötése — OAuth (Drive/Dropbox) VAGY manuális (WebDAV/S3).
-// OAuth: visszaad egy authorize-URL-t, amit a kliens böngészőben megnyit.
-app.post('/storage/oauth/:provider/start', requireAuth, express.json({ limit: '4kb' }), (req, res) => {
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Hiányzó felhasználó.' });
-    return;
-  }
-  try {
-    const redirectBase =
-      process.env.OAUTH_REDIRECT_BASE || `${req.protocol}://${req.get('host')}`;
-    const { url } = userStorage.oauthStartUrl(
-      uid,
-      req.params.provider,
-      redirectBase,
-      typeof req.body?.returnUrl === 'string' ? req.body.returnUrl : null
-    );
-    res.json({ url });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// OAuth-callback: a szolgáltató IDE tér vissza (nincs bearer → a state hordja a
-// usert). Token-csere → DB-sor, majd egy záró-oldal (opcionális deep-link).
-app.get('/storage/oauth/:provider/callback', async (req, res) => {
-  const { code, state, error: oauthErr } = req.query;
-  if (oauthErr) {
-    res.status(400).send(`OAuth hiba: ${String(oauthErr)}`);
-    return;
-  }
-  try {
-    const ret = await userStorage.oauthCallback(
-      req.params.provider,
-      String(code || ''),
-      String(state || '')
-    );
-    const target = ret ? String(ret) : '';
-    res.set('Content-Type', 'text/html; charset=utf-8').send(
-      `<!doctype html><meta charset="utf-8"><title>Kész</title>` +
-        `<body style="font-family:system-ui;padding:2rem;text-align:center">` +
-        `<h2>✅ Tárhely bekötve</h2><p>Bezárhatod ezt az ablakot.</p>` +
-        (target ? `<script>location.replace(${JSON.stringify(target)})</script>` : '') +
-        `</body>`
-    );
-  } catch (err) {
-    res.status(400).send(`Bekötés sikertelen: ${err.message}`);
-  }
-});
-
-// Manuális forrás (WebDAV/S3): a kulcsokat a kliens küldi, a workeren tároljuk.
-app.post('/storage/connect', requireAuth, express.json({ limit: '8kb' }), async (req, res) => {
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Hiányzó felhasználó.' });
-    return;
-  }
-  const type = String(req.body?.type || '');
-  if (!['webdav', 's3'].includes(type)) {
-    res.status(400).json({ error: 'Csak webdav/s3 köthető be manuálisan (Drive/Dropbox: OAuth).' });
-    return;
-  }
-  try {
-    const id = await userStorage.upsertProvider(uid, {
-      type,
-      label: String(req.body?.label || type),
-      config: req.body?.config || {},
-    });
-    res.json({ id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/storage/:sourceId/disconnect', requireAuth, async (req, res) => {
-  const uid = callerId(req, req.query.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Hiányzó felhasználó.' });
-    return;
-  }
-  try {
-    await userStorage.disconnectSource(uid, req.params.sourceId);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/storage/:sourceId/list', requireAuth, async (req, res) => {
-  const uid = callerId(req, req.query.userId);
-  const { listSource } = require('./storage');
-  try {
-    // előbb a user saját forrása, aztán a legacy globális admin-config
-    let entries = uid ? await userStorage.listUserSource(uid, req.params.sourceId) : null;
-    if (entries === null) {
-      entries = await listSource(req.params.sourceId);
-    }
-    if (entries === null) {
-      res.status(404).json({ error: 'Ismeretlen forrás.' });
-      return;
-    }
-    res.json({ entries });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
-
-// hossz-lekérdezés hozzáadás előtt: az ffprobe a saját gateway-URL-t olvassa
-// (faststart médiánál csak a fejlécet tölti le). A self-hívás egy capability-
-// tokennel jut át az authos /file-on (az ffprobe nem küld bearert).
-app.get('/storage/:sourceId/probe', requireAuth, (req, res) => {
-  const uid = callerId(req, req.query.userId);
-  const rel = typeof req.query.path === 'string' ? req.query.path : '';
-  const it = uid
-    ? `&it=${encodeURIComponent(userStorage.fileToken(uid, req.params.sourceId, rel))}`
-    : '';
-  const selfUrl = `http://127.0.0.1:${PORT}/storage/${encodeURIComponent(
-    req.params.sourceId
-  )}/file?path=${encodeURIComponent(rel)}${it}`;
-  execFile(
-    'ffprobe',
-    ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', selfUrl],
-    { timeout: 60 * 1000 },
-    (err, stdout) => {
-      if (err) {
-        res.json({ duration: null });
-        return;
-      }
-      const duration = parseFloat((stdout ?? '').trim());
-      res.json({ duration: Number.isFinite(duration) ? duration : null });
-    }
-  );
-});
-
-// A /file NEM használ requireAuth middleware-t: a stream-URL BEÁGYAZÓDIK a
-// projektbe és a lejátszó bearer nélkül hívja → a hozzáférés a capability-token
-// (`it`) VAGY (ha jelen van) a bejelentkezett user. A tokent a `listUserSource`
-// tette az URL-be; a visszavonás a DB-sor törlése.
-app.get('/storage/:sourceId/file', (req, res) => {
-  const { streamSourceFile } = require('./storage');
-  const rel = typeof req.query.path === 'string' ? req.query.path : '';
-  let uid = callerId(req, null);
-  if (!uid && typeof req.query.it === 'string') {
-    uid = userStorage.verifyFileToken(req.query.it, req.params.sourceId, rel);
-  }
-  (async () => {
-    const own = uid ? await userStorage.findUserSource(uid, req.params.sourceId) : null;
-    if (own) {
-      await userStorage.streamUserSourceFile(uid, req.params.sourceId, rel, res);
-    } else {
-      // legacy globális admin-forrás (auth nélkül is elérhető, ahogy eddig)
-      await streamSourceFile(req.params.sourceId, rel, res);
-    }
-  })().catch((err) => {
-    if (!res.headersSent) {
-      res.status(502).json({ error: err.message });
-    }
-  });
-});
+// 🗄️ Külső tárhely-providerek (Drive/Dropbox/WebDAV/S3) — domain-router (§01.1).
+app.use(require('./routes/storage'));
 
 // médiatár: a server/library mappa videó/kép/hang fájljai (app „Tár" panel)
 let mediaLibCache = null;

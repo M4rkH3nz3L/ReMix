@@ -1,0 +1,2323 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ReMix backend (vided render worker)",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/health/routes": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/synth": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/audio/spectrum": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/sampler": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/drums": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/account/erase": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/youtube": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/youtube/{id}/{name}": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/tts/voices": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/tts": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/tts/{id}/{name}": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/faces": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/shotscore": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/sky/presets": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/sky": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/upscale": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/hooks": {
+      "post": {
+        "x-policy": "AUTHENTICATED",
+        "x-rate-class": "ai",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/probe": {
+      "post": {
+        "x-policy": "AUTHENTICATED",
+        "x-rate-class": "ai",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/notify": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/invite": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/live/token": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/live/egress/start": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/live/egress/stop": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/live/destinations/set-key": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/live/egress-layout": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/billing/activate": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/shop/credits/grant": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/billing/deactivate": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/billing/revenuecat": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/translate": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/highlights": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/story": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/thumbheadlines": {
+      "post": {
+        "x-policy": "AUTHENTICATED",
+        "x-rate-class": "ai",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/thumbnails/compose": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/captionstudio": {
+      "post": {
+        "x-policy": "AUTHENTICATED",
+        "x-rate-class": "ai",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/voice/preview": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/imagedoc": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/svg/pdf": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/color/stats": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/color/pixel": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/color/lut-export": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/color/scope": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/text/bake": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/bgremove": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/bgremove/{id}/{name}": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/stickers3d": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/stickers3d/{id}.png": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/depth/parallax": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/depth/focus": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/depth/{id}/{name}": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/assist": {
+      "post": {
+        "x-policy": "AUTHENTICATED",
+        "x-rate-class": "ai",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/ai/autoedit": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/captions": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/waveform": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/media/upload": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/audio/analyze": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/audio/stems": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/usage": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/wallet/payout": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/render": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/scenes": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/beats": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/track": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/vision/index": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/vision/query": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/thumbnails": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/reframe": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/silence": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/proxy": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/collect": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/render/queue": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/render/{id}": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/render/{id}/file": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/render/{id}/cancel": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/sources": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/connected": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/default": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/oauth/{provider}/start": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/oauth/{provider}/callback": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/connect": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/{sourceId}/disconnect": {
+      "post": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/{sourceId}/list": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/{sourceId}/probe": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/storage/{sourceId}/file": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/library": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/library/{id}/file": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/music": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    },
+    "/music/{id}/file": {
+      "get": {
+        "x-policy": "PUBLIC",
+        "x-rate-class": "default",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validációs hiba — { error, code, issues }"
+          },
+          "401": {
+            "description": "Hitelesítés szükséges"
+          },
+          "402": {
+            "description": "Pro/előfizetés szükséges"
+          },
+          "429": {
+            "description": "Rate-limit / kvóta"
+          },
+          "500": {
+            "description": "Szerverhiba — { error }"
+          }
+        }
+      }
+    }
+  }
+}

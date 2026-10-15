@@ -10,7 +10,6 @@ const os = require('os');
 const path = require('path');
 
 const express = require('express');
-const multer = require('multer');
 
 const { aiAvailable, aiProvider, probeProvider, runAssistant, runAutoEdit, runCaptionStudio, runHighlights, runHookGenerator, runStoryEngine, runThumbHeadlines, runTranslateCaptions, sanitizeAiConfig } = require('./ai');
 const { analyzeBeats } = require('./beats');
@@ -30,10 +29,6 @@ const { composeThumbnail, pickThumbnails, scoreShots } = require('./thumbs');
 const { indexFrames, queryScores, visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
-const { renderSynth } = require('./synth');
-const { renderDrums } = require('./drums');
-const { renderSampler } = require('./sampler');
-const { renderSpectrum } = require('./spectrum');
 const { ensureSfx, listLibrary } = require('./sfx');
 const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
 const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
@@ -46,7 +41,7 @@ const userStorage = require('./userStorage');
 const { notifyAvailable, sendNotification, inviteMember, adminClient, canNotify } = require('./notify');
 const { payoutsConfigured, sendPayout } = require('./payouts');
 const { stemsConfigured, separateStems } = require('./stems');
-const { callerId, corsAllowlist, requireAuth, verifyToken, INSECURE_DEV } = require('./auth');
+const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
 // 🛡️ Security-réteg (devs/tasks/remix/): rate-limit (API4) + policy-leltár (API9).
 const { rateLimit, DEFAULTS: RL_DEFAULTS } = require('./security/rateLimit');
 const { authenticated, routeInventory } = require('./security/authorization');
@@ -54,25 +49,13 @@ const { mediaGuard } = require('./security/uploadPolicy');
 
 // 🔴 LiveKit (élő videó) — token-mintázás a host/néző szerepéhez. A key/secret
 // env-ből; lokális dev: `livekit-server --dev` → devkey/secret, ws://<host>:7880.
-const { AccessToken } = require('livekit-server-sdk');
-const { startEgress, stopEgress } = require('./liveEgress');
-const { encryptStreamKey, encryptionEnabled } = require('./liveCrypto');
-const { enforceQuota, trackUsage, userTier, aiUsageContext } = require('./usage');
-const LIVEKIT_URL = (process.env.LIVEKIT_URL || '').trim();
-const LIVEKIT_API_KEY = (process.env.LIVEKIT_API_KEY || '').trim();
-const LIVEKIT_API_SECRET = (process.env.LIVEKIT_API_SECRET || '').trim();
+const { enforceQuota, trackUsage, userTier } = require('./usage');
 const { canAccessRenderJob } = require('./security/renderAuth');
 const { securityHeaders } = require('./security/securityHeaders');
 const { securityEvent } = require('./security/auditLog');
 const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('./security/accountErase');
 const {
   billingAvailable,
-  activatePro,
-  deactivatePro,
-  grantCredits,
-  handleRevenueCatEvent,
-  isPro,
-  isPaid,
   activeTier,
 } = require('./billing');
 const { shouldWatermark } = require('./entitlements');
@@ -83,157 +66,9 @@ const WHISPER_MODEL =
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
 
-/**
- * 🔐 A MANUÁLIS fizetési út (Pro-aktiválás, kredit-jóváírás, Pro-visszavonás)
- * alapból KI VAN KAPCSOLVA. Éles környezetben a Pro/kredit kizárólag a védett
- * RevenueCat webhookon keresztül jöhet — a manuális végpontok csak fejlesztéshez
- * valók, és kifejezett `ALLOW_DEV_BILLING=1` kell hozzájuk.
- */
-/**
- * 💳 SZERVER-HITELES Pro-kapu. A kliens `ensureCloud()`-ja csak UX (a lokális
- * entitlement-állapotot nézi) — egy módosított kliens vagy egy curl enélkül
- * ingyen használná a fizetős felhő-funkciókat. Ez a middleware a
- * `subscriptions` táblából dönt, a VERIFIKÁLT token user-ére.
- *
- * ⚠️ A lista a kliens `src/lib/capabilities.ts` `where:'cloud', pro:true`
- *    sorait tükrözi. A determinisztikus, szándékosan INGYENES worker-utilok
- *    (beat/csend/jelenet/szkóp/proxy/thumbnail/hook/asszisztens) NEM kerülnek
- *    kapu mögé — azok a `renderServerUrl()`-en mennek, `ensureCloud` nélkül.
- */
-function requirePro(req, res, next) {
-  if (INSECURE_DEV) {
-    next(); // lokális fejlesztés — a requireAuth már naplózott róla
-    return;
-  }
-  const uid = req.user?.id;
-  if (!uid) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  isPro(uid)
-    .then((pro) => {
-      if (pro) {
-        next();
-        return;
-      }
-      res.status(402).json({ error: 'Ehhez a funkcióhoz Pro-előfizetés szükséges.', pro: true });
-    })
-    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
-}
-
-/** rövidítés: hitelesítés + szerver-hiteles Pro-ellenőrzés egy lépésben */
-const proOnly = [requireAuth, requirePro];
-
-/**
- * 🎬 Min. AMATŐR (fizető) gate — a WORKER (felhő-render) + felhő-tár ehhez kötött
- * (TECH-TOP §6: „Free = 100% ESZKÖZÖN"). A free user a szerver-rendert NEM éri el
- * (402) → eszközön renderel. Amatőr/Haladó/Profi/Céges átmegy.
- */
-function requirePaid(req, res, next) {
-  if (INSECURE_DEV) {
-    next();
-    return;
-  }
-  const uid = req.user?.id;
-  if (!uid) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  isPaid(uid)
-    .then((paid) => {
-      if (paid) {
-        next();
-        return;
-      }
-      res.status(402).json({ error: 'A felhő-render előfizetést igényel (min. Amatőr); ingyenesben a renderelés az eszközön történik.', pro: true });
-    })
-    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
-}
-
-/** hitelesítés + min. Amatőr (fizető) — a worker/felhő-render/felhő-tár gate-je */
-const paidOnly = [requireAuth, requirePaid];
-
-/**
- * 📊 §2.2: AI-token kvóta-gate (az AI-endpointok ELŐTT). Csak a MI felhő-
- * token-költségünket mérjük: a BYOK (saját kulcs/végpont) és a lokális provider
- * KIMARAD — azoknál nincs gate és nincs könyvelés (a BYOK a user költsége, a
- * lokális Ollama ingyenes on-device-elvű inferencia). A hiteles tier a
- * subscriptionből; a tényleges KÖNYVELÉST a provider-független `runStructured`
- * (server/ai.js) végzi a valós token-számmal, az itt beállított
- * AsyncLocalStorage-uid alapján.
- *
- * ⚠️ Az auth-middleware(ek) UTÁN kell állnia (hogy a `req.user` hiteles legyen),
- *    de a handler ELŐTT. DB/service_role nélkül best-effort megenged.
- */
-async function aiMeter(req, res, next) {
-  try {
-    // BYOK → a felhasználó saját kulcsa/költsége → nem a mi kvótánk
-    if (sanitizeAiConfig(req.body && req.body.aiConfig)) {
-      next();
-      return;
-    }
-    // lokális / nincs env-Anthropic → nincs felhő-token-költség → nem meterelünk
-    if ((await aiProvider()) !== 'anthropic') {
-      next();
-      return;
-    }
-    const uid = callerId(req, req.body && req.body.userId);
-    const gate = await enforceQuota(uid, await userTier(uid), 'aiTokens', 1);
-    if (!gate.ok) {
-      res.status(429).json({ error: `Elérted a havi AI-token kvótád. Hátralévő: ${gate.remaining}.` });
-      return;
-    }
-    // a hívó uid-ját a kérés idejére az ALS-be tesszük → runStructured onnan könyvel
-    aiUsageContext.run({ uid }, () => next());
-  } catch {
-    next(); // best-effort: a metering sosem blokkolja a funkciót hiba esetén
-  }
-}
-
-/**
- * 🎬 Render-job „puha" hitelesítés (BOLA-fix, devs/tasks/remix/07). A hívót a
- * tokenből azonosítja — a token jöhet Authorization fejlécben (poll, natív
- * letöltés), VAGY `?t=` query-paraméterben (a kész MP4 URL-je, amit pl.
- * uploadMedia / a böngésző FETCH-el, ahol nem lehet fejlécet küldeni).
- *
- * SZÁNDÉKOSAN nem 401-ezik: a `jobs` map KÖZÖS (a /proxy, /collect is ide tesz,
- * és a /render/:id-en pollozódik token nélkül). Ha nincs/érvénytelen a token,
- * `req.user = null` és továbbenged — az ÉRDEMI döntést a handler ownership-
- * ellenőrzése (`canAccessRenderJob`) hozza: TULAJDONOLT jobhoz kell az egyező
- * token (idegen → 404), a tulajdonos-nélküli (proxy/collect) marad elérhető.
- */
-function renderJobAuth(req, _res, next) {
-  const m = /^Bearer\s+(.+)$/i.exec((req.headers.authorization || '').trim());
-  const queryTok = typeof req.query.t === 'string' ? req.query.t.trim() : '';
-  const token = (m ? m[1].trim() : '') || queryTok;
-  if (!token) {
-    req.user = null;
-    next();
-    return;
-  }
-  verifyToken(token)
-    .then((result) => {
-      req.user = result.ok ? result.user : null;
-      next();
-    })
-    .catch(() => {
-      req.user = null;
-      next();
-    });
-}
-
-const DEV_BILLING = process.env.ALLOW_DEV_BILLING === '1';
-function devBillingGuard(_req, res, next) {
-  if (!DEV_BILLING) {
-    res.status(403).json({
-      error:
-        'A manuális aktiválás ki van kapcsolva. A Pro/kredit a RevenueCat webhookon jön ' +
-        '(fejlesztéshez: ALLOW_DEV_BILLING=1).',
-    });
-    return;
-  }
-  next();
-}
+// 🔐 Megosztott HTTP-guardok + egységes hiba-handler (01-api-architecture §01.1/§01.3).
+const { proOnly, paidOnly, aiMeter, renderJobAuth } = require('./lib/guards');
+const { errorHandler } = require('./lib/httpError');
 
 const app = express();
 const jobs = new Map(); // id → { state: 'processing'|'done'|'error', file?, error?, dir }
@@ -274,21 +109,7 @@ if (MEDIA_LOCAL_DIR) {
 // (devs/tasks/remix/03).
 app.use(rateLimit('default'));
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      if (!req.workDir) {
-        req.workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-render-'));
-      }
-      cb(null, req.workDir);
-    },
-    filename: (_req, file, cb) => {
-      // a fieldname a kulcs; a kiterjesztést megőrizzük az ffmpeg formátum-döntéséhez
-      cb(null, `${file.fieldname}${path.extname(file.originalname) || ''}`);
-    },
-  }),
-  limits: { fileSize: 2 * 1024 * 1024 * 1024 },
-});
+const { upload } = require('./lib/upload');
 
 app.get('/health', async (_req, res) => {
   // a próbák PÁRHUZAMOSAN futnak (cache-selve is) — a /health a kliens-oldali
@@ -346,111 +167,8 @@ app.get('/health/routes', authenticated(), (_req, res) => {
 // Éles bekapcsolás előtt eldobható fiókkal verifikálandó.
 const ALLOW_ERASE = process.env.ALLOW_ACCOUNT_ERASE === '1';
 const ERASE_BUCKET = process.env.MEDIA_BUCKET || 'renders';
-// 🎹 Szintetizátor-render (AUDIOT §5): hangjegyek (MIDI) → generált hang. Szinkron, a kész
-// audio-fájlt közvetlenül visszaadja (mint az /imagedoc a PNG-t). Worker-funkció → paidOnly
-// (Amatőr+; dev-ben INSECURE_DEV átengedi). A hangmagasság = midiToFreq(midi) a server/synth.js-ben.
-app.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, async (req, res) => {
-  const notes = Array.isArray(req.body?.notes) ? req.body.notes : [];
-  if (notes.length === 0) {
-    res.status(400).json({ error: 'Nincs hangjegy.' });
-    return;
-  }
-  const opts = { bpm: Number(req.body?.bpm) || 120, wave: req.body?.wave };
-  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-synth-'));
-  const out = path.join(dir, `synth.${fmt}`);
-  res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
-  try {
-    const r = await renderSynth(notes, opts, out);
-    res.setHeader('X-Duration-Sec', String(r.durationSec));
-    res.sendFile(out);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// 📊 Spektrogram (AUDIOT §7): feltöltött hangból frekvencia-kép (showspectrumpic) → PNG. Elemző
-// funkció (nem módosít hangot) → requireAuth (dev: INSECURE_DEV átengedi). Szinkron, a PNG-t adja.
-app.post('/audio/spectrum', upload.any(), requireAuth, async (req, res) => {
-  const file = (req.files ?? [])[0];
-  if (!file) {
-    res.status(400).json({ error: 'Nincs hang-fájl.' });
-    return;
-  }
-  const opts = { width: Number(req.body?.width) || 720, height: Number(req.body?.height) || 360, mode: req.body?.mode };
-  const out = path.join(req.workDir || os.tmpdir(), 'spectrum.png');
-  res.on('finish', () => {
-    if (req.workDir) {
-      fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-    }
-  });
-  try {
-    await renderSpectrum(file.path, opts, out);
-    res.sendFile(out);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// 🎛️🔊 Sampler-render (AUDIOT §5): feltöltött minta (one-shot) a step-rács lépéseire. Multipart
-// (sample-fájl + steps/bpm/bars), szinkron audio-válasz. Worker-funkció → paidOnly (dev: INSECURE_DEV).
-app.post('/sampler', upload.any(), ...paidOnly, async (req, res) => {
-  const file = (req.files ?? [])[0];
-  if (!file) {
-    res.status(400).json({ error: 'Nincs minta-fájl.' });
-    return;
-  }
-  let steps = [];
-  try {
-    steps = JSON.parse(req.body?.steps ?? '[]');
-  } catch {
-    steps = [];
-  }
-  if (!Array.isArray(steps) || steps.length === 0) {
-    res.status(400).json({ error: 'Nincs lépés.' });
-    if (req.workDir) {
-      fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-    }
-    return;
-  }
-  const opts = { bpm: Number(req.body?.bpm) || 120, bars: Number(req.body?.bars) || 1 };
-  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
-  const out = path.join(req.workDir || os.tmpdir(), `sampler.${fmt}`);
-  res.on('finish', () => {
-    if (req.workDir) {
-      fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-    }
-  });
-  try {
-    const r = await renderSampler(file.path, steps, opts, out);
-    res.setHeader('X-Duration-Sec', String(r.durationSec));
-    res.sendFile(out);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// 🥁 Dob-gép-render (AUDIOT §5): ütések (voice+step) → szintetizált dob-minta. Szinkron,
-// a kész audiót közvetlenül visszaadja. Worker-funkció → paidOnly (dev-ben INSECURE_DEV átengedi).
-app.post('/drums', express.json({ limit: '512kb' }), ...paidOnly, async (req, res) => {
-  const hits = Array.isArray(req.body?.hits) ? req.body.hits : [];
-  if (hits.length === 0) {
-    res.status(400).json({ error: 'Nincs dob-ütés.' });
-    return;
-  }
-  const opts = { bpm: Number(req.body?.bpm) || 120, bars: Number(req.body?.bars) || 1 };
-  const fmt = req.body?.format === 'wav' ? 'wav' : 'm4a';
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-drums-'));
-  const out = path.join(dir, `drums.${fmt}`);
-  res.on('finish', () => fs.rm(dir, { recursive: true, force: true }, () => {}));
-  try {
-    const r = await renderDrums(hits, opts, out);
-    res.setHeader('X-Duration-Sec', String(r.durationSec));
-    res.sendFile(out);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// 🎚️ Hang-generáló route-ok (synth/drums/sampler/spektrogram) — domain-router (§01.1).
+app.use(require('./routes/audioGen'));
 
 app.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async (req, res) => {
   if (!ALLOW_ERASE) {
@@ -784,252 +502,11 @@ app.post('/invite', express.json({ limit: '32kb' }), ...paidOnly, rateLimit('mes
     });
 });
 
-// 🔴 LiveKit access-token az élő-roomhoz. A `room` a live_sessions id-ja, az
-// identity a verifikált user. A host (`publish: true`) kamerát/mikrofont ad; a
-// néző csak feliratkozik.
-//
-// 🔐 F1 — a `publish` szerepet a SZERVER dönti a `live_sessions.host_id` ellen,
-// NEM a kliens: aki publish-t kér de nem a szoba hostja, az néző-tokent kap
-// (canPublish:false). Így egy elfogott/hamisított kérés sem tud idegen szobába
-// publikálni. Dev-ben (ALLOW_INSECURE_DEV, nincs service_role) a kliens-kérés
-// marad (lokál-fejlesztés) — lásd [[hosted-supabase-prod]].
-async function resolveLivePublish(room, uid, requested) {
-  if (!requested) {
-    return false;
-  }
-  const sb = adminClient();
-  if (!sb) {
-    // Nincs service_role → nem tudunk verifikálni. Dev-ben bízunk a kliensben,
-    // prod-ban viszont NEM adunk publish-t verifikáció nélkül.
-    return INSECURE_DEV;
-  }
-  const { data, error } = await sb
-    .from('live_sessions')
-    .select('host_id')
-    .eq('id', room)
-    .maybeSingle();
-  if (error || !data) {
-    // Ismeretlen szoba: dev-ben átengedjük (lokál session nincs a DB-ben), prod-ban nem.
-    return INSECURE_DEV;
-  }
-  return data.host_id === uid;
-}
+// 🔴 Live (LiveKit) route-ok — domain-router (§01.1).
+app.use(require('./routes/live'));
 
-app.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimit('messaging'), async (req, res) => {
-  if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-    res.status(503).json({ error: 'LiveKit nincs konfigurálva (LIVEKIT_API_KEY / LIVEKIT_API_SECRET).' });
-    return;
-  }
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  const room = String(req.body?.room || '').trim();
-  if (!room) {
-    res.status(400).json({ error: 'room kötelező.' });
-    return;
-  }
-  const name = String(req.body?.name || uid).slice(0, 80);
-  try {
-    // 🔐 F1: a publish szerepet a host-ownership dönti (server-authoritative)
-    const canPublish = await resolveLivePublish(room, uid, req.body?.publish === true);
-    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: uid, name, ttl: '2h' });
-    at.addGrant({ roomJoin: true, room, canPublish, canSubscribe: true, canPublishData: true });
-    const token = await at.toJwt();
-    res.json({ token, url: LIVEKIT_URL, canPublish });
-  } catch (err) {
-    res.status(500).json({ error: `Token-hiba: ${err.message}` });
-  }
-});
-
-// 🎥 Multistream EGRESS (LIVE.md Fázis E) — a host adása a külső RTMP-céljaira
-// (LiveKit Egress, RoomComposite → fan-out). PRO-only. A host-ownershipet és a
-// cél-kulcsokat a worker ellenőrzi/olvassa (service_role); a kliens kulcsot nem küld.
-app.post('/live/egress/start', express.json({ limit: '4kb' }), ...proOnly, rateLimit('messaging'), async (req, res) => {
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  const room = String(req.body?.room || '').trim();
-  if (!room) {
-    res.status(400).json({ error: 'room kötelező.' });
-    return;
-  }
-  const result = await startEgress({ room, userId: uid });
-  if (!result.ok) {
-    res.status(result.status || 500).json({ error: result.error });
-    return;
-  }
-  res.json({ egressId: result.egressId, destinations: result.destinations, vodUrl: result.vodUrl ?? null });
-});
-
-app.post('/live/egress/stop', express.json({ limit: '2kb' }), ...proOnly, async (req, res) => {
-  const egressId = String(req.body?.egressId || '').trim();
-  if (!egressId) {
-    res.status(400).json({ error: 'egressId kötelező.' });
-    return;
-  }
-  const result = await stopEgress(egressId);
-  if (!result.ok) {
-    res.status(result.status || 500).json({ error: result.error });
-    return;
-  }
-  res.json({ ok: true });
-});
-
-// 🔐 F2 — RTMP stream-kulcs beállítása TITKOSÍTVA. A kliens a cél-sort kulcs
-// NÉLKÜL szúrja be (RLS), majd a nyers kulcsot CSAK ide POST-olja (TLS); a worker
-// a saját secretjével titkosítja és service_role-lal írja a `stream_key`-be. Így a
-// nyers kulcs sosem a kliens-írható úton tárolódik, és nyugalmi állapotban rejtjelezett.
-// Nem Pro-only: a cél beállítása ingyenes, csak a tényleges multistream (egress) Pro.
-app.post('/live/destinations/set-key', express.json({ limit: '2kb' }), requireAuth, rateLimit('messaging'), async (req, res) => {
-  const uid = callerId(req, req.body?.userId);
-  if (!uid) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  const destinationId = String(req.body?.destinationId || '').trim();
-  const streamKey = String(req.body?.streamKey || '').trim();
-  if (!destinationId || !streamKey) {
-    res.status(400).json({ error: 'destinationId és streamKey kötelező.' });
-    return;
-  }
-  if (streamKey.length > 512) {
-    res.status(400).json({ error: 'Túl hosszú stream-kulcs.' });
-    return;
-  }
-  const sb = adminClient();
-  if (!sb) {
-    res.status(503).json({ error: 'Nincs service_role konfigurálva a kulcs-tároláshoz.' });
-    return;
-  }
-  // 🔐 ownership: csak a cél tulajdonosa állíthat kulcsot
-  const { data: dest, error: readErr } = await sb
-    .from('live_destinations')
-    .select('user_id')
-    .eq('id', destinationId)
-    .maybeSingle();
-  if (readErr) {
-    res.status(500).json({ error: readErr.message });
-    return;
-  }
-  if (!dest || dest.user_id !== uid) {
-    res.status(403).json({ error: 'Nem a te célod.' });
-    return;
-  }
-  const { error: updErr } = await sb
-    .from('live_destinations')
-    .update({ stream_key: encryptStreamKey(streamKey) })
-    .eq('id', destinationId);
-  if (updErr) {
-    res.status(500).json({ error: updErr.message });
-    return;
-  }
-  res.json({ ok: true, encrypted: encryptionEnabled() });
-});
-
-// 🎥 LIVE.md 168 — Egress web-layout template (scene-pontos kompozitor). A LiveKit
-// Egress headless Chrome-ja tölti be `?url=&token=&layout=`-szal; PUBLIKUS GET (az
-// egress nem app-auth-al jön, a LiveKit-token a query-ben van). A lap maga ártalmatlan:
-// érvényes token nélkül nem tud a szobához csatlakozni. Az env `EGRESS_LAYOUT_URL`
-// erre a route-ra mutasson (lásd liveEgress.js — enélkül grid-layout a fallback).
-app.get('/live/egress-layout', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'egressLayout.html'));
-});
-
-// 💳 Pro aktiválás — MANUÁLIS / DEV / promó út (a valós pénz a RevenueCat
-// webhookon jön, lásd lentebb). service_role-lal ír a subscriptions-be.
-//
-// 🔐 KÉTRÉTEGŰ VÉDELEM:
-//   1. `devBillingGuard` — az egész manuális út KI VAN KAPCSOLVA, hacsak az
-//      ALLOW_DEV_BILLING=1 nincs beállítva. Prod-ban a Pro KIZÁRÓLAG a
-//      RevenueCat webhookon jöhet (az védett: RC_WEBHOOK_AUTH).
-//   2. `requireAuth` + a userId a VERIFIKÁLT tokenből — így még bekapcsolt
-//      dev-módban is csak SAJÁT magának adhat bárki Pro-t, másnak nem.
-// Korábban: `curl -d '{"userId":"<bármely uuid>","days":36500}'` = örökös Pro.
-app.post('/billing/activate', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
-  if (!billingAvailable()) {
-    res.status(503).json({ error: 'billing nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
-    return;
-  }
-  const { days } = req.body ?? {};
-  const userId = callerId(req, (req.body ?? {}).userId);
-  if (!userId) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  activatePro(userId, { days: Number.isFinite(days) ? days : 30, source: 'manual' })
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('Billing activate hiba:', err.message);
-      res.status(400).json({ error: err.message });
-    });
-});
-
-// 🪙 Shop kredit feltöltés — DEV/manuális (a valós top-up a RevenueCat consumable
-// webhookon, `credits_<n>` product). Ugyanaz a kétrétegű védelem, mint fent.
-app.post('/shop/credits/grant', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
-  if (!billingAvailable()) {
-    res.status(503).json({ error: 'billing nincs konfigurálva' });
-    return;
-  }
-  const { amount } = req.body ?? {};
-  const userId = callerId(req, (req.body ?? {}).userId);
-  if (!userId) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  grantCredits(userId, Number.isFinite(amount) ? amount : 100, 'topup', 'manual')
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('Credit grant hiba:', err.message);
-      res.status(400).json({ error: err.message });
-    });
-});
-
-// 💳 Pro visszavonás — DEV/manuális (teszteléshez). Ugyanaz a kétrétegű védelem:
-// enélkül bárki visszavonhatta MÁS felhasználó Pro-ját (DoS).
-app.post('/billing/deactivate', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
-  if (!billingAvailable()) {
-    res.status(503).json({ error: 'billing nincs konfigurálva' });
-    return;
-  }
-  const target = callerId(req, (req.body ?? {}).userId);
-  if (!target) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  deactivatePro(target, { source: 'manual', status: 'canceled' })
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('Billing deactivate hiba:', err.message);
-      res.status(400).json({ error: err.message });
-    });
-});
-
-// 💳 RevenueCat webhook — a VALÓS pénz-út (App Store / Play IAP). A RevenueCat
-// egy általad megadott Authorization-fejlécet küld: RC_WEBHOOK_AUTH env-ből.
-// Beállítva: az egyezést ellenőrizzük; enélkül 503 (nincs bekötve).
-app.post('/billing/revenuecat', express.json({ limit: '256kb' }), (req, res) => {
-  const secret = process.env.RC_WEBHOOK_AUTH;
-  if (!secret || !billingAvailable()) {
-    res.status(503).json({ error: 'RevenueCat webhook nincs konfigurálva (RC_WEBHOOK_AUTH / service_role)' });
-    return;
-  }
-  const auth = req.headers.authorization || '';
-  if (auth !== secret && auth !== `Bearer ${secret}`) {
-    res.status(401).json({ error: 'unauthorized' });
-    return;
-  }
-  handleRevenueCatEvent(req.body ?? {})
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('RevenueCat webhook hiba:', err.message);
-      res.status(400).json({ error: err.message });
-    });
-});
+// 💳 Billing / shop-kredit route-ok — domain-router (§01.1).
+app.use(require('./routes/billing'));
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
 app.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
@@ -3144,22 +2621,33 @@ app.get('/music/:id/file', (req, res) => {
     .catch(() => res.status(500).json({ error: 'A könyvtár nem olvasható.' }));
 });
 
-// a music/library mappa változhat futás közben — a cache 30 mp-enként frissül
-setInterval(() => {
-  libraryCache = null;
-  mediaLibCache = null;
-}, 30 * 1000).unref();
+// 🧯 Egységes hiba-handler a lánc VÉGÉN (01-api-architecture §01.3): a route-okból
+// dobott HttpError / next(err) egységes JSON-alakra ({ error, code?, issues? }).
+app.use(errorHandler);
 
-// 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
-// Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
-const { sweepStaleEgress } = require('./liveEgress');
-setInterval(() => {
-  sweepStaleEgress().catch(() => {});
-}, 5 * 60 * 1000).unref();
+// 🚀 A szerver CSAK közvetlen indításkor figyel + futtat háttér-ciklusokat
+// (node index.js). Teszt-importkor (require('./index')) NEM fut a listen/interval —
+// így a route-réteg integrációs teszttel vizsgálható (01-api-architecture §01.1).
+if (require.main === module) {
+  // a music/library mappa változhat futás közben — a cache 30 mp-enként frissül
+  setInterval(() => {
+    libraryCache = null;
+    mediaLibCache = null;
+  }, 30 * 1000).unref();
 
-app.listen(PORT, () => {
-  console.log(`vided render worker: http://localhost:${PORT}`);
-  ensureSfx()
-    .then(() => console.log('SFX-könyvtár kész (server/assets/sfx)'))
-    .catch(() => {});
-});
+  // 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
+  // Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
+  const { sweepStaleEgress } = require('./liveEgress');
+  setInterval(() => {
+    sweepStaleEgress().catch(() => {});
+  }, 5 * 60 * 1000).unref();
+
+  app.listen(PORT, () => {
+    console.log(`vided render worker: http://localhost:${PORT}`);
+    ensureSfx()
+      .then(() => console.log('SFX-könyvtár kész (server/assets/sfx)'))
+      .catch(() => {});
+  });
+}
+
+module.exports = app;

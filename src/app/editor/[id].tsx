@@ -37,7 +37,7 @@ import { openProjectConversation } from '@/lib/chat';
 import { myMembership, type CollabRole } from '@/lib/collab';
 import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
-import { pruneProxyCache } from '@/lib/cacheManager';
+import { pruneProxyCache, pruneRenderCache } from '@/lib/cacheManager';
 import { canCloudBackupMedia, projectMediaSafety } from '@/lib/storagePolicy';
 import {
   clearRecovery,
@@ -397,6 +397,7 @@ export default function EditorScreen() {
     const prune = setTimeout(() => {
       try {
         pruneProxyCache();
+        pruneRenderCache(); // 🎬 a renderelt kimenetek (renders/) LRU-nyírása (VIDEOT §8)
       } catch {
         /* best-effort — a cache-nyírás sosem akaszthatja a szerkesztőt */
       }

@@ -45,4 +45,14 @@ describe('planCacheEviction — LRU cache-nyírás budgetre (06 §2.9)', () => {
   it('üres bemenet → üres terv', () => {
     expect(planCacheEviction([], 500)).toEqual({ evict: [], freed: 0, keptBytes: 0 });
   });
+
+  it('🎬 render-cache forgatókönyv (VIDEOT §8): a régi projekt-renderek esnek ki, a frissek maradnak', () => {
+    // projektenként 1 MP4 (id-kulcs); a budget alá a legrégebben renderelteket dobja
+    const plan = planCacheEviction(
+      [e('renders/p1.mp4', 500, 100), e('renders/p2.mp4', 500, 200), e('renders/p3.mp4', 500, 300)],
+      1000
+    );
+    expect(plan.evict).toEqual(['renders/p1.mp4']); // a legrégebbi
+    expect(plan.keptBytes).toBe(1000); // p2+p3 (a frissek) marad
+  });
 });

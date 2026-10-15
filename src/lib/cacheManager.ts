@@ -74,6 +74,9 @@ export interface CacheReport {
   waveforms: number;
   /** filmstrip-képkockák össz-mérete (byte) */
   thumbnails: number;
+  /** 🎬 renderelt kimenetek (`renders/`) össz-mérete (byte) — projektenként 1 MP4, LRU-nyírható */
+  renders: number;
+  /** az ELDOBHATÓ cache össz (proxy+waveform+thumbnail); a renders KÜLÖN (félig-tartalom) */
   total: number;
 }
 
@@ -81,7 +84,8 @@ export function cacheReport(): CacheReport {
   const proxies = sumBytes(fileList(() => new Directory(Paths.document, 'proxies')));
   const waveforms = sumBytes(waveformFiles());
   const thumbnails = sumBytes(fileList(() => thumbnailDir()));
-  return { proxies, waveforms, thumbnails, total: proxies + waveforms + thumbnails };
+  const renders = sumBytes(fileList(() => new Directory(Paths.document, 'renders')));
+  return { proxies, waveforms, thumbnails, renders, total: proxies + waveforms + thumbnails };
 }
 
 /** Az eldobható cache-ek (proxy + hullámforma) törlése lemezről és memóriából. */
@@ -152,6 +156,41 @@ export function pruneProxyCache(maxBytes: number = PROXY_CACHE_MAX_BYTES): numbe
   }
   // a memória-feloldások elavulhattak (törölt fájlra mutathatnak) → ürítjük
   clearProxyMemory();
+  return plan.freed;
+}
+
+/** A renderelt kimenetek (`renders/`) alap-budgetje — projektenként 1 MP4 halmozódott, eddig sosem nyírva. */
+export const RENDER_CACHE_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+
+/**
+ * 🎬 A renderelt kimenetek lemez-cache-ének nyírása egy budgetre (06 §2.9 maradék / VIDEOT §8):
+ * a projektenkénti `${id}.mp4` kimenetek a `renders/`-ben korlátlanul halmozódtak (a `pruneProxyCache`
+ * SZÁNDÉKOSAN kihagyta őket). A legrégebben használt (nem mostanában nyitott/renderelt projekt) kimeneteit
+ * dobja, amíg a mappa a limit alá nem fér — a render bármikor újragenerálható a projekt-JSON-ből. Best-effort
+ * (natív-only), weben/hibán no-op. @returns a felszabadított bájtok.
+ */
+export function pruneRenderCache(maxBytes: number = RENDER_CACHE_MAX_BYTES): number {
+  if (!HAS_DISK_CACHE) {
+    return 0;
+  }
+  const files = fileList(() => new Directory(Paths.document, 'renders'));
+  const plan = planCacheEviction(
+    files.map((f) => ({ key: f.uri, size: f.size ?? 0, mtime: f.modificationTime ?? 0 })),
+    maxBytes
+  );
+  if (plan.evict.length === 0) {
+    return 0;
+  }
+  const evictSet = new Set(plan.evict);
+  for (const f of files) {
+    if (evictSet.has(f.uri)) {
+      try {
+        f.delete();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   return plan.freed;
 }
 

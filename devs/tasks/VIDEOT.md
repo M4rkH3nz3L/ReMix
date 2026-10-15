@@ -23,7 +23,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
 | §6 | **Szín-eszközök** (**split-toning** kész; 3-way színkerék-UI · live scopes ⬜) | 🟡 |
 | §7 | **Audio** (metering/scope · sidechain tetszőleges sávra · per-band solo) | ⬜ |
-| §8 | **Render/perf** (render-output cache — §2.9 adósság · batch/szegmens-export) | ⬜ |
+| §8 | **Render/perf** (**render-output cache** kész — §2.9 adósság zárva; batch-export ⬜) | ✅ |
 | §9 | **Nyitott adósságok** (GIF-dekód+render §2.8 · Creative Canvas a timeline-ba §2.11 · on-device natív render) | ⬜ |
 
 ---
@@ -129,7 +129,11 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 
 ## 8. ⚙️ Render / perf — ⬜
 
-- [ ] ⬜ **Render-output cache-politika** (§2.9 maradék) — a `renders/` LRU-takarítása (a `planCacheEviction` újrahasznosítva).
+- [x] ✅ **Render-output cache-politika** (§2.9 maradék zárva) — a `renders/` (projektenként 1 MP4, eddig
+  korlátlanul halmozódott) LRU-nyírása: `cacheManager.pruneRenderCache` a `planCacheEviction`-nel (2 GB budget),
+  az editor-nyitáskor a `pruneProxyCache` mellett fut; a `cacheReport` külön `renders` mezőt kapott.
+  *BIZONYÍTVA: `cacheEvict.test.ts` render-forgatókönyv (a legrégebbi projekt-render esik ki, a frissek
+  maradnak) — 7 teszt zöld; audit 206 suite zöld.*
 - [ ] ⬜ **Batch / szegmens-export** (több felbontás/formátum egy jobban · jelenet-enkénti kliplista).
 
 ## 9. 🔌 Nyitott adósságok — ⬜

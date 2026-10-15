@@ -97,8 +97,9 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   `pruneProxyCache` ([cacheManager.ts](../../src/lib/cacheManager.ts)) a szerkesztő-mountnál (halasztva) fut.
 - [x] ✅ **Invalidation (tartalom-címzett)**: a proxy-kulcs a `fájlnév+méret+maxSide`-ból jön → a forrás
   változása ÚJ kulcsot ad (implicit invalidáció), tier-váltáskor a session-cache ürül (`setProxyConfig`).
-- [ ] ⬜ **Hátra**: dedikált **render-output cache** policy (a `renders/` kimenetek elszámolása/nyírása — ma
-  a proxy+thumbnail+waveform cache-t a `cacheReport`/`clearCaches` kezeli, a renderelt kimeneteket nem).
+- [x] ✅ **render-output cache** policy (KÉSZ — 2026-10, lásd [VIDEOT.md](./VIDEOT.md) §8): a `renders/` kimenetek
+  LRU-nyírása `cacheManager.pruneRenderCache`-sel (a `planCacheEviction`-ön, 2 GB budget), az editor-nyitáskor fut;
+  a `cacheReport` külön `renders` mezőt kapott. Teszt: `cacheEvict.test.ts` render-forgatókönyv.
 
 ### 2.10 Editor architecture refactor — P1 (alap)
 - [x] ~ **Projekt forrás-mappa (asset-bin) KÉSZ (2026-10-07)** — részlépés az asset-architektúra felé: a `project.assets` köré egységes forrás-bin ([projectSource.ts](../../src/lib/projectSource.ts) + [SourceSheet](../../src/components/SourceSheet.tsx)), a videó-editor Toolbarján is (forrás→idővonal), minden mutáció a **command-buson** (`ADD_ASSET`/`REMOVE_ASSET`). Lásd [08](./08-storage.md) §2.8.

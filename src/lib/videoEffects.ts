@@ -37,6 +37,8 @@ export const VIDEO_EFFECTS: Record<VideoEffectType, EffectMeta> = {
   dehaze: { label: 'lib.effects.dehaze', parametric: true, defaultAmount: 0.5 },
   pixelate: { label: 'lib.effects.pixelate', parametric: true, defaultAmount: 0.5 },
   posterize: { label: 'lib.effects.posterize', parametric: true, defaultAmount: 0.5 },
+  scanlines: { label: 'lib.effects.scanlines', parametric: true, defaultAmount: 0.6 },
+  halftone: { label: 'lib.effects.halftone', parametric: true, defaultAmount: 0.5 },
 };
 
 // 🌅 fényszivárgás gauss-esése a JOBB-FELSŐ sarokból (geq; `W` a frame-szélesség) — kliens/worker AZONOS
@@ -149,6 +151,17 @@ export function effectFilterString(effect: VideoEffect): string {
     case 'posterize': {
       const step = Math.round(8 + a * 120);
       return `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`;
+    }
+    case 'scanlines': {
+      // 🖥️ CRT-szkennvonal: a páratlan sorok sötétítése (szín megmarad, gbrp)
+      const f = `(1-${(a * 0.6).toFixed(3)}*mod(Y,2))`;
+      return `format=gbrp,geq=r='r(X,Y)*${f}':g='g(X,Y)*${f}':b='b(X,Y)*${f}'`;
+    }
+    case 'halftone': {
+      // ⚫ halftone: monokróm pont-raszter, a pont sugara a luminanciával arányos; amount = csempeméret
+      const T = 4 + Math.round(a * 10);
+      const h = (T / 2).toFixed(1);
+      return `format=gray,geq=lum='255*lte((mod(X,${T})-${h})*(mod(X,${T})-${h})+(mod(Y,${T})-${h})*(mod(Y,${T})-${h}),${((T * T) / 4).toFixed(2)}*(lum(X,Y)/255))'`;
     }
     default:
       return '';

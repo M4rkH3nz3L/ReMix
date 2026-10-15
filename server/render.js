@@ -136,6 +136,8 @@ const EFFECT_DEFAULT_AMOUNT = {
   dehaze: 0.5,
   pixelate: 0.5,
   posterize: 0.5,
+  scanlines: 0.6,
+  halftone: 0.5,
 };
 // 🌅 fényszivárgás gauss-esése a jobb-felső sarokból — AZONOS a kliens `LIGHT_LEAK_L`-jével
 const LIGHT_LEAK_L = 'exp(-((X-W)*(X-W)+Y*Y)/(2*(W*0.4)*(W*0.4)))';
@@ -183,6 +185,15 @@ function effectFilterStr(effect) {
     case 'posterize': {
       const step = Math.round(8 + a * 120);
       return `lutrgb=r='trunc(val/${step})*${step}':g='trunc(val/${step})*${step}':b='trunc(val/${step})*${step}'`;
+    }
+    case 'scanlines': {
+      const f = `(1-${(a * 0.6).toFixed(3)}*mod(Y,2))`;
+      return `format=gbrp,geq=r='r(X,Y)*${f}':g='g(X,Y)*${f}':b='b(X,Y)*${f}'`;
+    }
+    case 'halftone': {
+      const T = 4 + Math.round(a * 10);
+      const h = (T / 2).toFixed(1);
+      return `format=gray,geq=lum='255*lte((mod(X,${T})-${h})*(mod(X,${T})-${h})+(mod(Y,${T})-${h})*(mod(Y,${T})-${h}),${((T * T) / 4).toFixed(2)}*(lum(X,Y)/255))'`;
     }
     default:
       return '';

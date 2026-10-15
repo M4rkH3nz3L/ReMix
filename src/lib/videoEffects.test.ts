@@ -27,7 +27,7 @@ const fx = (id: string, type: VideoEffect['type'], over: Partial<VideoEffect> = 
 
 describe('videoEffects — lánc-műveletek (audit §6.5)', () => {
   it('katalógus: minden típus benne', () => {
-    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak', 'motionBlur', 'deflicker', 'clarity', 'dehaze', 'pixelate', 'posterize']);
+    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak', 'motionBlur', 'deflicker', 'clarity', 'dehaze', 'pixelate', 'posterize', 'scanlines', 'halftone']);
   });
 
   it('addEffect a lánc végére, default amounttal', () => {
@@ -113,6 +113,17 @@ describe('videoEffects — FFmpeg-filter leképezés', () => {
     expect(effectFilterString(fx('a', 'dehaze', { amount: 1 }))).toBe('eq=contrast=1.600:saturation=1.400');
     expect(effectFilterString(fx('a', 'pixelate', { amount: 1 }))).toBe('pixelize=w=24:h=24');
     expect(effectFilterString(fx('a', 'posterize', { amount: 1 }))).toBe("lutrgb=r='trunc(val/128)*128':g='trunc(val/128)*128':b='trunc(val/128)*128'");
+  });
+
+  it('artisztikus: szkennvonal (CRT) + halftone', () => {
+    // scanlines amount 0.5 → faktor 1-0.300*mod(Y,2)
+    expect(effectFilterString(fx('a', 'scanlines', { amount: 0.5 }))).toContain("geq=r='r(X,Y)*(1-0.300*mod(Y,2))'");
+    expect(effectFilterString(fx('a', 'scanlines', { amount: 0.5 }))).toContain('format=gbrp');
+    // halftone amount 0.5 → T = 4+round(5) = 9, h=4.5, T*T/4=20.25
+    const ht = effectFilterString(fx('a', 'halftone', { amount: 0.5 }));
+    expect(ht).toContain('format=gray,geq=lum=');
+    expect(ht).toContain('mod(X,9)-4.5');
+    expect(ht).toContain('20.25*(lum(X,Y)/255)');
   });
 
   it('amount clamp a filterben is', () => {

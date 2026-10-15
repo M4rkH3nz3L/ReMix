@@ -80,7 +80,10 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
   motionBlur = temporális kocka-átlag (2–8 kocka), deflicker = luma-villódzás-simítás (2–10 kocka). *ÉLŐ
   VIDEO-RENDER (renderProject): deflicker villódzás-szórás 83→27 (~3× csökkenés); motion blur a fekete→fehér
   vágásnál közbenső rámpa 96→112→146 (elmosás). +i18n (hu/en/de).*
-- [ ] ⬜ **Halftone / szkennvonal / CRT** artisztikus szűrők · **per-effekt blend-mód**.
+- [x] ✅ **Szkennvonal (CRT) + halftone** artisztikus szűrők — két új `VideoEffect` (geq; kliens↔worker azonos,
+  contract-tesztelt + i18n). *ÉLŐ VIDEO-RENDER (renderProject): szkennvonal páros sor 144 / páratlan 51
+  (váltakozó); halftone egy 9px csempén min 9 / max 255 (pont-raszter).*
+- [ ] ⬜ **Per-effekt blend-mód** · további artisztikus szűrők.
 
 ## 3. ⏱️ Idő & sebesség — ⬜
 

@@ -696,7 +696,9 @@ export type VideoEffectType =
   | 'clarity'
   | 'dehaze'
   | 'pixelate'
-  | 'posterize';
+  | 'posterize'
+  | 'scanlines'
+  | 'halftone';
 export interface VideoEffect {
   id: string;
   type: VideoEffectType;

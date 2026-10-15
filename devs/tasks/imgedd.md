@@ -19,7 +19,7 @@
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
-| §8 | **UX-paritás** (**history-panel** + **vászon-zoom/pan** kész; smart-guides) | ✅ *(smart-guides ⬜)* |
+| §8 | **UX-paritás** (**history-panel** + **vászon-zoom/pan** + **smart-guides** kész) | ✅ *(billentyű/a11y ⬜)* |
 
 ---
 
@@ -206,7 +206,12 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   koordináta-tere sértetlen), a capture/raszterizálás érintetlen (a transzform `!capturing`-gel gated).
   *BIZONYÍTVA: canvasZoom pure teszt (4) — clamp/lépés/pan-határ/transzform; audit 205/2135 zöld. A gesztus-érzet
   eszközön verifikálandó (nem render-mérhető).*
-- [ ] ⬜ **Smart-guides** (dinamikus igazítás a többi réteghez) · billentyű/gesztus-paritás · akadálymentesség.
+- [x] ✅ **Smart-guides** (dinamikus igazodás a többi réteghez) — `src/lib/smartGuides.ts` pure mag
+  (`snapToLayers`): a mozgatott réteg közép/élei a többi réteg közép/éleihez + a vászon közepéhez/széleihez
+  pattannak (0–1 térben, küszöb); ImageCanvas `move` a kézi guide-ok UTÁN ezt alkalmazza, + rövid magenta
+  jelző-vonal-felvillanás a pattintott tengelyen. *BIZONYÍTVA: smartGuides pure teszt (4) — vászon-közép-snap,
+  küszöb-kívül nincs, center-to-center + él-igazítás; audit 206/2139 zöld.*
+- [ ] ⬜ **Billentyű/gesztus-paritás** · **akadálymentesség** · tablet/iPad dokkolt panelek.
 
 ---
 

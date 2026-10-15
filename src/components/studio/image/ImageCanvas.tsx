@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { type Ref, Suspense, lazy, useRef, useState } from 'react';
+import { type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { type LayoutChangeEvent, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
@@ -22,6 +22,7 @@ import { gradeTint } from '@/constants/grades';
 import { adjustTintLayers } from '@/lib/adjustPreview';
 import { canvasTransform, clampPan, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
+import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
@@ -118,6 +119,14 @@ export function ImageCanvas({
   // 🔍 nézegetős zoom/pan — a szerkesztés 1:1-nél, zoom>1-nél a pan-overlay veszi át a gesztust
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // 🧲 smart-guides: a pattintott tengelyek jelző-vonalai (rövid felvillanás a mozgatás után)
+  const [smartLines, setSmartLines] = useState<SnapLine[]>([]);
+  const smartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (smartTimer.current) {
+      clearTimeout(smartTimer.current);
+    }
+  }, []);
 
   // a szabad W×H a mérvadó (kép-editor); különben a 3-arányos enum
   const av = doc.width && doc.height ? doc.width / doc.height : aspectValue(doc.aspectRatio);
@@ -163,13 +172,38 @@ export function ImageCanvas({
     setPan((p) => clampPan(p, z, fitRef.current));
   };
 
-  // 📐 réteg-mozgatás a segédvonalakra illesztve (ha vannak)
+  // 🧲 egy réteg igazodó-doboza (közép-pozíció + méret; a méret nélkülieké — pl. szöveg — 0)
+  const layerBox = (l: ImageLayer, posOverride?: { x: number; y: number }): LayerBox => {
+    const pos = posOverride ?? ('position' in l ? l.position : { x: 0.5, y: 0.5 });
+    const w = 'w' in l && typeof l.w === 'number' ? l.w : 0;
+    const h = 'h' in l && typeof l.h === 'number' ? l.h : 0;
+    return { x: pos.x, y: pos.y, w, h };
+  };
+
+  // 📐 réteg-mozgatás: kézi vonalzó-guide-ok (ha vannak), MAJD 🧲 smart-guides (a többi réteghez + vászonhoz)
   const move = (id: string, position: { x: number; y: number }) => {
-    const snapped = doc.guides?.length ? snapPointToGuides(position, doc.guides) : null;
-    commit(
-      updateLayer(doc, id, { position: snapped ? { x: snapped.x, y: snapped.y } : position }),
-      'move'
-    );
+    let pos = position;
+    const g = doc.guides?.length ? snapPointToGuides(pos, doc.guides) : null;
+    if (g) {
+      pos = { x: g.x, y: g.y };
+    }
+    const dragged = doc.layers.find((l) => l.id === id);
+    if (dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
+      const others = visibleLayers(doc)
+        .filter((l) => l.id !== id && l.kind !== 'fill' && l.kind !== 'adjust')
+        .map((l) => layerBox(l));
+      const snap = snapToLayers(layerBox(dragged, pos), others);
+      pos = { x: snap.x, y: snap.y };
+      // rövid jelző-vonal-felvillanás a pattintott tengely(ek)en
+      if (smartTimer.current) {
+        clearTimeout(smartTimer.current);
+      }
+      setSmartLines(snap.lines);
+      if (snap.lines.length) {
+        smartTimer.current = setTimeout(() => setSmartLines([]), 800);
+      }
+    }
+    commit(updateLayer(doc, id, { position: pos }), 'move');
   };
 
   // 📐 segédvonal-műveletek (hozzáadás / élő-mozgatás / rögzítés|törlés)
@@ -330,6 +364,19 @@ export function ImageCanvas({
               />
             );
           })}
+
+          {/* 🧲 smart-guide jelző-vonalak (a pattintott tengelyeken, rövid felvillanás) */}
+          {!capturing && smartLines.map((ln, i) => (
+            <View
+              key={`sg${i}`}
+              pointerEvents="none"
+              style={
+                ln.axis === 'x'
+                  ? { position: 'absolute', left: ln.at * fit.w, top: 0, bottom: 0, width: 1, backgroundColor: '#ff2d95' }
+                  : { position: 'absolute', top: ln.at * fit.h, left: 0, right: 0, height: 1, backgroundColor: '#ff2d95' }
+              }
+            />
+          ))}
 
           {!capturing && zoom === 1 && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
             <SelectionFrame

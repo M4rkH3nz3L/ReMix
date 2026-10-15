@@ -13,6 +13,8 @@ const { bgRemoveDir } = require('./bgremove');
 const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, masterLra } = require('./voicechain');
+// 🖼️ kép-paritás: a Kép Stúdió szín-magjai (már /imagedoc-on pixel-bizonyítva) a video-klip grade-jéhez
+const { levelsFilter, channelMixFilter, gradientMapFilter } = require('./imageFilters');
 
 const FPS = 30;
 
@@ -539,7 +541,23 @@ function adjustChain(clip, enableExpr) {
   if (vignette > 0.01) {
     parts.push(`vignette=angle=${(vignette * (Math.PI / 4)).toFixed(4)}${en}`);
   }
-  return parts.length ? ',' + parts.join(',') : '';
+  let chain = parts.length ? ',' + parts.join(',') : '';
+  // 🖼️ kép-paritás (szintek / csatorna-mixer / gradient-map) — a kép magjaival AZONOS filter-stringek.
+  // A levels/csatorna-mixer EGY szűrő → grade-rétegen is kaphat `enable`-ablakot; a gradient-map
+  // TÖBB szűrő (format+geq+format) → csak a KLIP saját grade-jén (grade-rétegen kimarad).
+  const lv = levelsFilter(a.levels);
+  if (lv) {
+    chain += en ? lv + en : lv;
+  }
+  const cm = channelMixFilter(a.channelMix);
+  if (cm) {
+    chain += en ? cm + en : cm;
+  }
+  if (a.gradientMap) {
+    // a geq `enable`-ablakot kap grade-rétegen (a `en` a geq-re injektálódik)
+    chain += gradientMapFilter(a.gradientMap.shadow, a.gradientMap.highlight, en);
+  }
+  return chain;
 }
 
 /**

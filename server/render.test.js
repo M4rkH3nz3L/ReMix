@@ -1,6 +1,7 @@
 // ⏪ Reverse render-matek (audit §6.3) — a szegmens forrás-ablaka normál vs reversed.
 // Konzisztens a kliens projectUtils.sourceTimeAt-tal (preview==render parity).
-const { segSourceWindow, effectFilterStr, effectChainFx } = require('./render');
+const { segSourceWindow, effectFilterStr, effectChainFx, adjustChain } = require('./render');
+const { levelsFilter, channelMixFilter, gradientMapFilter } = require('./imageFilters');
 
 // klip: trimIn=1, duration=4 (idővonal), speed=1 → forrás-szakasz [1, 5]
 const clip = (over = {}) => ({ trimIn: 1, duration: 4, speed: 1, ...over });
@@ -78,5 +79,32 @@ describe('effectChainFx — guardolt lánc-füzér', () => {
       ],
     };
     expect(effectChainFx(clip)).toBe(',hue=s=0,gblur=sigma=10.00');
+  });
+});
+
+describe('adjustChain — 🖼️ kép-paritás (levels / csatorna-mixer / gradient-map)', () => {
+  test('a klip saját grade-jén a három új szín-eszköz a kép-magokkal AZONOS stringet ad', () => {
+    const a = {
+      levels: { black: 0, white: 0.5, gamma: 1 },
+      channelMix: { rr: 0, rb: 1, gg: 1, br: 1, bb: 0 },
+      gradientMap: { shadow: '#000080', highlight: '#ffff00' },
+    };
+    const chain = adjustChain({ adjust: a });
+    expect(chain).toContain(levelsFilter(a.levels));
+    expect(chain).toContain(channelMixFilter(a.channelMix));
+    expect(chain).toContain(gradientMapFilter('#000080', '#ffff00'));
+  });
+
+  test('grade-RÉTEG (enableExpr): mindhárom ENABLE-ablakot kap (levels/mixer/gradient-map geq)', () => {
+    const a = { channelMix: { rr: 0, rb: 1, gg: 1, br: 1, bb: 0 }, gradientMap: { shadow: '#000000', highlight: '#ffffff' } };
+    const chain = adjustChain({ adjust: a }, 'between(t,0,2)');
+    expect(chain).toContain('colorchannelmixer');
+    expect(chain).toContain('geq='); // a gradient-map geq-je is ott van
+    expect(chain).toContain(":enable='between(t,0,2)'");
+  });
+
+  test('üres/identitás adjust → a szín-eszközök nem adnak hozzá semmit', () => {
+    expect(adjustChain({ adjust: {} })).toBe('');
+    expect(adjustChain({ adjust: { levels: { black: 0, white: 1, gamma: 1 } } })).toBe('');
   });
 });

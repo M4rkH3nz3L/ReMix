@@ -58,6 +58,20 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
       adjust: { ...adjust, balance: { ...balance, [range]: { ...cur, [ch]: nv } } },
     });
   };
+  // 📊 szintek (levels) + 🎨 csatorna-mixer + 🎨 gradient-map — a Kép Stúdióval azonos szín-eszközök
+  const levels = adjust.levels;
+  const setLevels = (patch: Partial<NonNullable<typeof levels>>) =>
+    updateClip(clip.id, { adjust: { ...adjust, levels: { black: 0, white: 1, gamma: 1, ...levels, ...patch } } });
+  const mix = adjust.channelMix;
+  const setMix = (patch: Record<string, number>) =>
+    updateClip(clip.id, { adjust: { ...adjust, channelMix: { rr: 1, gg: 1, bb: 1, ...mix, ...patch } } });
+  const DUOTONES = [
+    { n: 'Kék→Arany', s: '#0d1b3a', h: '#ffd27f' },
+    { n: 'Lila→Narancs', s: '#2a0d3a', h: '#ff8c42' },
+    { n: 'Fekete→Fehér', s: '#000000', h: '#ffffff' },
+    { n: 'Teal→Rózsa', s: '#0f3b3b', h: '#ff9ec4' },
+  ];
+
   const renderBalanceRange = (range: 'sh' | 'mid' | 'hi') =>
     (['r', 'g', 'b'] as const).map((ch) => {
       const value = balance[range]?.[ch] ?? 0;
@@ -193,6 +207,63 @@ export function AdjustPanel({ clip }: { clip: AdjustClip }) {
           />
         </View>
         <Text style={styles.note}>{t('panels.adjust.lutNote')}</Text>
+      </PanelSection>
+
+      {/* 📊 szintek (levels) — a Kép Stúdióval azonos (render: lutrgb) */}
+      <PanelSection title={t('panels.adjust.levelsTitle', { defaultValue: '📊 Szintek' })}>
+        <View style={styles.row}>
+          <Chip
+            label={levels ? t('common.off', { defaultValue: 'Ki' }) : t('common.on', { defaultValue: 'Be' })}
+            active={!!levels}
+            onPress={() => updateClip(clip.id, { adjust: { ...adjust, levels: levels ? undefined : { black: 0, white: 1, gamma: 1 } } })}
+          />
+        </View>
+        {levels ? (
+          <>
+            <Stepper label={t('panels.adjust.levelsBlack', { defaultValue: 'Fekete-pont' })} value={`${Math.round((levels.black ?? 0) * 100)}`} onDec={() => setLevels({ black: clamp((levels.black ?? 0) - 0.05, 0, 0.9) })} onInc={() => setLevels({ black: clamp((levels.black ?? 0) + 0.05, 0, 0.9) })} />
+            <Stepper label={t('panels.adjust.levelsWhite', { defaultValue: 'Fehér-pont' })} value={`${Math.round((levels.white ?? 1) * 100)}`} onDec={() => setLevels({ white: clamp((levels.white ?? 1) - 0.05, 0.1, 1) })} onInc={() => setLevels({ white: clamp((levels.white ?? 1) + 0.05, 0.1, 1) })} />
+            <Stepper label={t('panels.adjust.levelsGamma', { defaultValue: 'Gamma' })} value={`${((levels.gamma ?? 1)).toFixed(2)}`} onDec={() => setLevels({ gamma: clamp((levels.gamma ?? 1) - 0.1, 0.2, 3) })} onInc={() => setLevels({ gamma: clamp((levels.gamma ?? 1) + 0.1, 0.2, 3) })} />
+          </>
+        ) : null}
+      </PanelSection>
+
+      {/* 🎨 csatorna-mixer — a Kép Stúdióval azonos (render: colorchannelmixer) */}
+      <PanelSection title={t('panels.adjust.channelMixTitle', { defaultValue: '🎨 Csatorna-mixer' })}>
+        <View style={styles.row}>
+          <Chip
+            label={mix ? t('common.off', { defaultValue: 'Ki' }) : t('common.on', { defaultValue: 'Be' })}
+            active={!!mix}
+            onPress={() => updateClip(clip.id, { adjust: { ...adjust, channelMix: mix ? undefined : { rr: 1, gg: 1, bb: 1 } } })}
+          />
+        </View>
+        {mix
+          ? ([['rr', 'R←R'], ['rg', 'R←G'], ['rb', 'R←B'], ['gr', 'G←R'], ['gg', 'G←G'], ['gb', 'G←B'], ['br', 'B←R'], ['bg', 'B←G'], ['bb', 'B←B']] as const).map(([k, lbl]) => {
+              const dv = k === 'rr' || k === 'gg' || k === 'bb' ? 1 : 0;
+              const v = mix[k] ?? dv;
+              return (
+                <Stepper key={k} label={lbl} value={`${v.toFixed(2)}`} onDec={() => setMix({ [k]: Math.round(clamp(v - 0.1, -1, 2) * 100) / 100 })} onInc={() => setMix({ [k]: Math.round(clamp(v + 0.1, -1, 2) * 100) / 100 })} />
+              );
+            })
+          : null}
+      </PanelSection>
+
+      {/* 🎨 gradient-map (egyedi duotone) — preset-párok (render: geq luma→szín) */}
+      <PanelSection title={t('panels.adjust.gradientMapTitle', { defaultValue: '🎨 Gradient-map (duotone)' })}>
+        <View style={styles.row}>
+          <Chip
+            label={t('common.off', { defaultValue: 'Ki' })}
+            active={!adjust.gradientMap}
+            onPress={() => (adjust.gradientMap ? updateClip(clip.id, { adjust: { ...adjust, gradientMap: undefined } }) : undefined)}
+          />
+          {DUOTONES.map((d) => (
+            <Chip
+              key={d.n}
+              label={d.n}
+              active={adjust.gradientMap?.shadow === d.s && adjust.gradientMap?.highlight === d.h}
+              onPress={() => updateClip(clip.id, { adjust: { ...adjust, gradientMap: { shadow: d.s, highlight: d.h } } })}
+            />
+          ))}
+        </View>
       </PanelSection>
 
       {ADJUST_GROUPS.filter((g) => g.id === 'effect').map((group) => (

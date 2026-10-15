@@ -167,20 +167,21 @@ function perspectiveFilter(px, py, boxW, boxH) {
 // 🎨 gradient-map / egyedi-színű duotone: a luminanciát a `shadow`→`highlight` szín közötti
 // lineáris átmenetre képezi (sötét → shadow, világos → highlight). Vezető-vesszős geq-fragment
 // (BT.601 luma); üres, ha nincs megadva. (pure → tesztelhető)
-function gradientMapFilter(shadowHex, highlightHex) {
+function gradientMapFilter(shadowHex, highlightHex, enableSuffix = '') {
   if (!shadowHex || !highlightHex) {
     return '';
   }
   const s = hexToRgb(shadowHex);
   const h = hexToRgb(highlightHex);
   const L = '(0.299*r(X,Y)+0.587*g(X,Y)+0.114*b(X,Y))/255';
-  // gbrap (alfás planáris RGB) → a geq megőrzi az alfát (a='alpha(X,Y)'); utána vissza rgba-ra
+  // gbrap (alfás planáris RGB) → a geq megőrzi az alfát (a='alpha(X,Y)'); utána vissza rgba-ra.
+  // Az `enableSuffix` (pl. `:enable='between(t,0,2)'`) a geq-re kerül → grade-rétegen időablakot kaphat.
   return (
     `,format=gbrap,geq=` +
     `r='${s.r}*(1-${L})+${h.r}*(${L})':` +
     `g='${s.g}*(1-${L})+${h.g}*(${L})':` +
     `b='${s.b}*(1-${L})+${h.b}*(${L})':` +
-    `a='alpha(X,Y)',format=rgba`
+    `a='alpha(X,Y)'${enableSuffix},format=rgba`
   );
 }
 

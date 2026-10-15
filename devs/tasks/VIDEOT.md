@@ -16,7 +16,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 
 | § | Terület | Állapot |
 |---|---------|---------|
-| §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map/duotone · struktúra-szűrők a video-klipre) | ⬜ |
+| §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map/duotone a klipre) | ✅ *(struktúra-szűrők ⬜)* |
 | §2 | **Új effektek** (irányított/motion blur · kromatikus aberráció · fényszivárgás · deflicker · tükrözés-warp) | ⬜ |
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
 | §4 | **Transzformáció** (anchor-pivot RENDER — §2.6 adósság · corner-pin/warp · tartalom-tudatos) | ⬜ |
@@ -51,12 +51,17 @@ karaoke, 17 átmenet, proxy-motor. A **render = igazság** (preview közelít) e
 
 ## 1. 🎨 Szín-paritás a képpel — ⬜ (render-bizonyítható, nagy érték)
 
-A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js` `adjustChain`/megjelenés-lánc) is:
-- [ ] ⬜ **Szintek (levels)** a klipre — a kép `levelsFilter` (lutrgb black/white/gamma) a video-adjustba.
-- [ ] ⬜ **Csatorna-mixer** a klipre — a kép `channelMixFilter` (colorchannelmixer 3×3) a video-adjustba.
-- [ ] ⬜ **Gradient-map / egyedi duotone** a klipre — a kép `gradientMapFilter` (geq luma→szín) effektként.
-- [ ] ⬜ **Struktúra-szűrők paritás** (clarity/dehaze/pixelate/poszter) — a kép `imageFilters` a video effekt-láncba.
-*(Mind render-bizonyítható `/render`-rel vagy a klip-adjust-lánc ffmpeg-mérésével, a kép-sweep mintájára.)*
+A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js` `adjustChain`) is bekötve:
+- [x] ✅ **Szintek (levels)** a klipre — `ClipAdjust.levels {black,white,gamma}` → `adjustChain` a kép
+  `levelsFilter`-ét fűzi (lutrgb); grade-rétegen `enable`-ablakkal. *ÉLŐ VIDEO-RENDER (renderProject, 480² kék
+  klip): kontroll 779fc6 → b0/w0.5 = f2ffff (fehér-pont nyújtás).*
+- [x] ✅ **Csatorna-mixer** a klipre — `ClipAdjust.channelMix` (3×3) → `channelMixFilter` (colorchannelmixer);
+  grade-rétegen enable-lel. *ÉLŐ VIDEO-RENDER: R↔B csere → 779fc6 → c79f79 (R és B felcserélve).*
+- [x] ✅ **Gradient-map / egyedi duotone** a klipre — `ClipAdjust.gradientMap {shadow,highlight}` →
+  `gradientMapFilter` (geq luma→szín, enable-tudatos a geq-en). *ÉLŐ VIDEO-RENDER: kék→arany → 979733
+  (≈153/153/51).* UI: AdjustPanel — Szintek + Csatorna-mixer (9 stepper) + Gradient-map (duotone presetek).
+  Contract-teszt: `render.test.js` (adjustChain kibocsátja + grade-rétegen enable + identitás-üres).
+- [ ] ⬜ **Struktúra-szűrők paritás** (clarity/dehaze/pixelate/poszter) — a kép `imageFilters` a video effekt-láncba (következő).
 
 ## 2. ✨ Új effektek — ⬜ (render-bizonyítható)
 

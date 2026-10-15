@@ -373,6 +373,13 @@ export interface ClipAdjust {
    * .cube-ot a médiával együtt kapja meg (mint a klip-uri-kat).
    */
   lut?: ClipLut;
+  // ── 🖼️ Kép-paritás: a Kép Stúdióval AZONOS szín-eszközök a video/image-klipre ──
+  /** 📊 szintek (levels): fekete/fehér-pont + gamma. Renderben `lutrgb` (a kép `levelsFilter`-ével azonos). */
+  levels?: { black: number; white: number; gamma: number };
+  /** 🎨 csatorna-mixer: 3×3 együttható (rr..bb). Renderben `colorchannelmixer` (a kép `channelMixFilter`-ével azonos). */
+  channelMix?: { rr?: number; rg?: number; rb?: number; gr?: number; gg?: number; gb?: number; br?: number; bg?: number; bb?: number };
+  /** 🎨 gradient-map (egyedi-színű duotone): luminancia → `shadow`→`highlight` átmenet. Renderben `geq`. */
+  gradientMap?: { shadow: string; highlight: string };
 }
 
 /** Importált 3D LUT (.cube). */

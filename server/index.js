@@ -23,15 +23,15 @@ const { visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
 const { ensureSfx, listLibrary } = require('./sfx');
-const { ttsAvailable, synthesize, ttsFile, listVoices } = require('./tts');
-const { ytAvailable, importMedia, youtubeFile } = require('./youtube');
+const { ttsAvailable } = require('./tts');
+const { ytAvailable } = require('./youtube');
 const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJobs, renderConcurrency } = require('./queue');
 const { listWorkers } = require('./workers-registry');
 const { s3Enabled, uploadFile, publicUrl } = require('./s3store');
 const { mediaStoreEnabled, uploadMedia: mediaStoreUpload, LOCAL_DIR: MEDIA_LOCAL_DIR, BUCKET: MEDIA_BUCKET } = require('./mediastore');
 const { QuotaExceededError, quotaAvailable, usageFor, recordObject, wouldExceed } = require('./quota');
 const userStorage = require('./userStorage');
-const { notifyAvailable, sendNotification, inviteMember, adminClient, canNotify } = require('./notify');
+const { notifyAvailable, adminClient } = require('./notify');
 const { payoutsConfigured, sendPayout } = require('./payouts');
 const { stemsConfigured, separateStems } = require('./stems');
 const { callerId, corsAllowlist, requireAuth, INSECURE_DEV } = require('./auth');
@@ -222,62 +222,8 @@ app.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async (r
   }
 });
 
-// 🔗 URL-import (YouTube stb.): teljes videó / csak hang / egy képkocka
-app.post('/youtube', express.json({ limit: '8kb' }), ...proOnly, async (req, res) => {
-  if (!ytAvailable()) {
-    res.status(501).json({ error: 'A yt-dlp nincs telepítve a workeren (brew install yt-dlp).' });
-    return;
-  }
-  try {
-    const { url, kind, atSec } = req.body || {};
-    res.json(await importMedia(url, kind, atSec));
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-app.get('/youtube/:id/:name', (req, res) => {
-  const file = youtubeFile(req.params.id, req.params.name);
-  if (!file || !fs.existsSync(file)) {
-    res.status(404).end();
-    return;
-  }
-  res.sendFile(file);
-});
-
-// 🗣️ TTS (szöveg → beszéd): elérhető hangok, generálás, letöltés
-app.get('/tts/voices', async (_req, res) => {
-  res.json({ available: ttsAvailable(), voices: await listVoices() });
-});
-app.post('/tts', express.json({ limit: '256kb' }), ...proOnly, async (req, res) => {
-  if (!ttsAvailable()) {
-    res.status(501).json({ error: 'A TTS csak macOS dev-workeren érhető el.' });
-    return;
-  }
-  try {
-    // 📊 §2.2: havi kvóta-gate a `cloudJobs` metrikára (a hiteles tier a subscriptionből).
-    // DB/tábla nélkül best-effort megenged; a könyvelés a siker után (best-effort).
-    const uid = callerId(req, req.body?.userId);
-    const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', 1);
-    if (!gate.ok) {
-      res.status(429).json({ error: `Elérted a havi felhő-job kvótád. Hátralévő: ${gate.remaining}.` });
-      return;
-    }
-    const { text, voice } = req.body || {};
-    const result = await synthesize(text, voice);
-    void trackUsage(uid, 'cloudJobs', 1);
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-app.get('/tts/:id/:name', (req, res) => {
-  const file = ttsFile(req.params.id, req.params.name);
-  if (!fs.existsSync(file)) {
-    res.status(404).end();
-    return;
-  }
-  res.sendFile(file);
-});
+// 🔗 Külső média route-ok (YouTube + TTS) — domain-router (§01.1).
+app.use(require('./routes/externalMedia'));
 
 // 🖼️🤖 Kép-AI route-ok — domain-router (§01.1).
 app.use(require('./routes/imageAI'));
@@ -285,75 +231,8 @@ app.use(require('./routes/imageAI'));
 // 🤖 AI-worker route-ok (hooks/probe/translate/highlights/story/thumbheadlines/captionstudio/assist/autoedit) — domain-router (§01.1).
 app.use(require('./routes/ai'));
 
-// 🔔 Értesítés-küldés (service_role): SELF + CROSS-USER (team-working). Beszúr a
-// notifications-be (realtime kézbesíti) + best-effort Expo push a push_tokenekre.
-// ⚠️ PROD: JWT-verifikáció + hívó-jogosultság (ki kinek küldhet) mögé kell tenni,
-//    lásd TODO.md „Biztonság" (a worker ma nem hitelesít).
-app.post('/notify', express.json({ limit: '64kb' }), requireAuth, rateLimit('messaging'), (req, res) => {
-  if (!notifyAvailable()) {
-    res.status(503).json({ error: 'notify nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
-    return;
-  }
-  // 🔐 Címzettenkénti jogosultság (OWASP API1/API5): a hitelesítés már megszüntette
-  // a NÉVTELEN spamet; ez a lépés a CROSS-USER spam/phishinget is lezárja. Csak
-  // akkor mehet értesítés, ha a hívó és a címzett közt VAN kapcsolat: saját maga,
-  // közös projekt (collab), vagy follow-él (social) — `canNotify` dönt. A címzett
-  // a body `userId`-ja. INSECURE_DEV-ben a kapu kimarad (lokális fejlesztés).
-  const caller = callerId(req, 'dev');
-  if (!caller) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  const recipient = String(req.body?.userId || '').trim();
-  const gate = INSECURE_DEV ? Promise.resolve(true) : canNotify(caller, recipient);
-  gate
-    .then((allowed) => {
-      if (!allowed) {
-        res
-          .status(403)
-          .json({ error: 'Nincs jogosultság értesítést küldeni ennek a felhasználónak.' });
-        return undefined;
-      }
-      return sendNotification(req.body ?? {}).then((result) => res.json(result));
-    })
-    .catch((err) => {
-      console.error('Notify hiba:', err.message);
-      if (!res.headersSent) {
-        res.status(400).json({ error: err.message });
-      }
-    });
-});
-
-// 👥 Meghívás egy projektbe (service_role): e-mail → tag hozzáadás VAGY pending
-// invite + „meghívtak" értesítés. A névfeloldás (auth.users e-mail) miatt kell a
-// worker (a kliens az RLS-en nem lát más e-mailt). ⚠️ PROD: JWT + „ki hívhat meg"
-// jogosultság (csak a tulaj) mögé — lásd TODO.md Biztonság.
-// 🤝 collab-meghívás: a MEGHÍVÓ (projekt-tulaj) min. Amatőr (TECH-TOP §4: „collab = Amatőr+").
-// A meghívott bárki lehet (a fizető gazda projektjéhez csatlakozik). INSECURE_DEV bypassol.
-app.post('/invite', express.json({ limit: '32kb' }), ...paidOnly, rateLimit('messaging'), (req, res) => {
-  if (!notifyAvailable()) {
-    res.status(503).json({ error: 'invite nincs konfigurálva (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' });
-    return;
-  }
-  // 🔐 CSAK A TULAJ hívhat meg: az `ownerId` nem a body-ból érvényes, hanem a
-  // verifikált tokenből. Enélkül bárki felvehette magát `editor`-ként BÁRMELY
-  // projektbe (az RLS-t megkerülve), ha ismerte az owner/project id-t.
-  const owner = callerId(req, req.body?.ownerId);
-  if (!owner) {
-    res.status(401).json({ error: 'Nem azonosítható hívó.' });
-    return;
-  }
-  if (req.user && req.body?.ownerId && req.body.ownerId !== owner) {
-    res.status(403).json({ error: 'Csak a projekt tulajdonosa hívhat meg tagot.' });
-    return;
-  }
-  inviteMember({ ...(req.body ?? {}), ownerId: owner, invitedBy: owner })
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('Invite hiba:', err.message);
-      res.status(400).json({ error: err.message });
-    });
-});
+// 🔔 Social route-ok (notify + invite) — domain-router (§01.1).
+app.use(require('./routes/social'));
 
 // 🔴 Live (LiveKit) route-ok — domain-router (§01.1).
 app.use(require('./routes/live'));

@@ -19,7 +19,7 @@
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
 | §7 | **Export & megosztás** (PNG/JPG/WebP/SVG/PDF + galéria/diavetítés/carousel) | ✅ *(PSD import/export ⬜)* |
-| §8 | **UX-paritás** (**history-panel** kész; vászon-zoom/pan, smart-guides) | 🟡 *(zoom/pan ⬜)* |
+| §8 | **UX-paritás** (**history-panel** + **vászon-zoom/pan** kész; smart-guides) | ✅ *(smart-guides ⬜)* |
 
 ---
 
@@ -199,7 +199,14 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   lépésre koppintva odaugrik; felső-sor „idő" gomb nyitja. *BIZONYÍTVA: store-teszt (2) — dispatch→pastLabels,
   undo/redo lépésenkénti címke-mozgatás, jumpHistory(±n) = n undo/redo a vermekkel együtt; 32 suite-teszt zöld.*
   (snapshot/nevezett verziók ⬜)
-- [ ] ⬜ **Billentyű/gesztus-paritás** · **akadálymentesség** · tablet/iPad dokkolt panelek.
+- [x] ✅ **Vászon-zoom/pan** (nézegetős) — `src/lib/canvasZoom.ts` pure mag (clampZoom/zoomStep/clampPan/
+  canvasTransform, 1–6×) + ImageCanvas: a tartalom scale+translate transzformmal nagyítódik, zoom-gombok
+  (+/−/1:1) jobb-fönt, zoom>1-nél pan-overlay (PanResponder) viszi a nézetet. BIZTONSÁGOS: a szerkesztés
+  1:1-nél marad (zoom>1 → az overlay elnyeli a gesztust, a SelectionFrame rejtve → a húzás/hit-test
+  koordináta-tere sértetlen), a capture/raszterizálás érintetlen (a transzform `!capturing`-gel gated).
+  *BIZONYÍTVA: canvasZoom pure teszt (4) — clamp/lépés/pan-határ/transzform; audit 205/2135 zöld. A gesztus-érzet
+  eszközön verifikálandó (nem render-mérhető).*
+- [ ] ⬜ **Smart-guides** (dinamikus igazítás a többi réteghez) · billentyű/gesztus-paritás · akadálymentesség.
 
 ---
 

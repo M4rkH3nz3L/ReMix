@@ -1,5 +1,6 @@
-import { type Ref, Suspense, lazy, useState } from 'react';
-import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { type Ref, Suspense, lazy, useRef, useState } from 'react';
+import { type LayoutChangeEvent, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
@@ -19,6 +20,7 @@ import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
 import { adjustTintLayers } from '@/lib/adjustPreview';
+import { canvasTransform, clampPan, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
@@ -113,6 +115,9 @@ export function ImageCanvas({
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
   const [liveGuide, setLiveGuide] = useState<{ id: string; pos: number } | null>(null);
+  // 🔍 nézegetős zoom/pan — a szerkesztés 1:1-nél, zoom>1-nél a pan-overlay veszi át a gesztust
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
 
   // a szabad W×H a mérvadó (kép-editor); különben a 3-arányos enum
   const av = doc.width && doc.height ? doc.width / doc.height : aspectValue(doc.aspectRatio);
@@ -122,6 +127,41 @@ export function ImageCanvas({
         ? { w: container.h * av, h: container.h }
         : { w: container.w, h: container.w / av }
       : { w: 0, h: 0 };
+
+  // 🔍 zoom/pan — a transzform + a pan-overlay PanResponder (a SelectionFrame dataRef-mintájával,
+  // hogy a PanResponder EGYSZER jöjjön létre, és friss zoom/pan/fit-tel dolgozzon)
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+  const panStart = useRef({ x: 0, y: 0 });
+  const zoomPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        panStart.current = panRef.current;
+      },
+      onPanResponderMove: (_e, g) => {
+        setPan(clampPan({ x: panStart.current.x + g.dx, y: panStart.current.y + g.dy }, zoomRef.current, fitRef.current));
+      },
+    })
+  ).current;
+  const tf = canvasTransform(zoom, pan, fit);
+  const zoomStyle = !capturing && zoom !== 1
+    ? { transform: [{ translateX: tf.translateX }, { translateY: tf.translateY }, { scale: tf.scale }] }
+    : undefined;
+  const resetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+  const applyZoom = (dir: 1 | -1) => {
+    const z = zoomStep(zoomRef.current, dir);
+    setZoom(z);
+    setPan((p) => clampPan(p, z, fitRef.current));
+  };
 
   // 📐 réteg-mozgatás a segédvonalakra illesztve (ha vannak)
   const move = (id: string, position: { x: number; y: number }) => {
@@ -222,6 +262,9 @@ export function ImageCanvas({
     >
       {fit.w > 0 ? (
         <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }]}>
+          {/* 🔍 zoom/pan-wrapper: a tartalom (rétegek + overlay-k) együtt skálázódik/tolódik;
+              capture-kor és zoom===1-nél identitás (a raszterizálás + a szerkesztés érintetlen) */}
+          <View style={[StyleSheet.absoluteFill, zoomStyle]} pointerEvents="box-none">
           {layers.map((raw0) => {
             // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
             const raw =
@@ -288,7 +331,7 @@ export function ImageCanvas({
             );
           })}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
+          {!capturing && zoom === 1 && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -367,6 +410,30 @@ export function ImageCanvas({
               onCommitGuide={onCommitGuide}
             />
           ) : null}
+          </View>
+
+          {/* 🔍 pan-overlay: zoom>1-nél a teljes vásznon ül → a gesztus a NÉZETET tolja (a szerkesztés
+              szünetel, így a réteg-húzás koordináta-rendszere sértetlen marad) */}
+          {!capturing && zoom !== 1 ? (
+            <View style={StyleSheet.absoluteFill} {...zoomPanResponder.panHandlers} />
+          ) : null}
+
+          {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re */}
+          {!capturing ? (
+            <View style={styles.zoomBar} pointerEvents="box-none">
+              <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} hitSlop={6} accessibilityLabel="zoom in">
+                <Ionicons name="add" size={18} color={palette.text} />
+              </Pressable>
+              <Pressable style={styles.zoomBtn} onPress={() => applyZoom(-1)} hitSlop={6} accessibilityLabel="zoom out">
+                <Ionicons name="remove" size={18} color={palette.text} />
+              </Pressable>
+              {zoom !== 1 ? (
+                <Pressable style={styles.zoomBtn} onPress={resetZoom} hitSlop={6} accessibilityLabel="reset zoom">
+                  <Ionicons name="scan-outline" size={15} color={palette.accent} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -381,5 +448,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: '#0b0c12',
+  },
+  zoomBar: { position: 'absolute', top: 8, right: 8, gap: 6 },
+  zoomBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: `${palette.surfaceHigh}ee`,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

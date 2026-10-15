@@ -19,7 +19,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map/duotone a klipre) | ✅ *(struktúra-szűrők ⬜)* |
 | §2 | **Új effektek** (**kromatikus aberráció** · **fényszivárgás** kész + **default-út effekt-bug javítva**; motion blur/deflicker ⬜) | ✅ |
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
-| §4 | **Transzformáció** (anchor-pivot RENDER — §2.6 adósság · corner-pin/warp · tartalom-tudatos) | ⬜ |
+| §4 | **Transzformáció** (**anchor-pivot RENDER** kész — §2.6 adósság zárva; corner-pin/warp ⬜) | ✅ |
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
 | §6 | **Szín-eszközök UI** (3-way színkerék · split-toning · live scopes) | ⬜ |
 | §7 | **Audio** (metering/scope · sidechain tetszőleges sávra · per-band solo) | ⬜ |
@@ -85,7 +85,11 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 
 ## 4. 📐 Transzformáció — ⬜ (§2.6 adósság)
 
-- [ ] ⬜ **Anchor-pivot RENDER** — a render-`rotate` a `clip.anchor` pont körül forogjon (ma a középre); a preview már tudja. *(06-video §2.6 adósság — render-bizonyítható: ismert pivot → ismert elmozdulás.)*
+- [x] ✅ **Anchor-pivot RENDER** (§2.6 adósság zárva) — a `withTransform` overlay-eltolással
+  (`delta = (I − Rθ)·d`, `d = (anchor − 0.5)·box`) pivot-forgatássá alakítja az ffmpeg közép-forgatását;
+  csak STATIKUS forgatás + EGYEDI anchorra (kf-forgatás/közép = bitre változatlan). *ÉLŐ VIDEO-RENDER
+  (renderProject, fehér pont a box 0.25,0.25-nél, rot90): kontroll (120,120)=fe; KÖZÉP-anchor=00 (pont
+  elmozdul); PIVOT-anchor (0.25,0.25)=ff (pont HELYBEN marad).*
 - [ ] ⬜ **Corner-pin / perspektíva-warp** (4-sarok) — a kép `perspective`-mintájára a video-klipre.
 - [ ] ⬜ **Tartalom-tudatos skálázás** / szabad-warp rács.
 

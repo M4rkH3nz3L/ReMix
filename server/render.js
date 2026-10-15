@@ -1635,8 +1635,24 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
    */
   const withTransform = (i, srcLabel, clip, dur, suffix, baseLabel) => {
     const t = clip.transform;
-    const ox = Math.round((t?.x ?? 0) * W);
-    const oy = Math.round((t?.y ?? 0) * H);
+    let ox = Math.round((t?.x ?? 0) * W);
+    let oy = Math.round((t?.y ?? 0) * H);
+    // ⚓ anchor-pivot (§2.6): az ffmpeg `rotate` a KÖZÉP körül forgat; a pivot körüli forgatás =
+    // középforgatás + egy overlay-eltolás  delta = (I − Rθ)·d,  d = (anchor − 0.5)·box.
+    // Csak STATIKUS forgatás + EGYEDI anchorra (kf-forgatás/alap-közép = bitre változatlan).
+    const rot = t?.rotation ?? 0;
+    const kfRot = clip.keyframes?.rotation?.length;
+    const customAnchor = (t?.anchorX !== undefined && t.anchorX !== 0.5) || (t?.anchorY !== undefined && t.anchorY !== 0.5);
+    if (rot !== 0 && !kfRot && customAnchor) {
+      const scale = t?.scale ?? 1;
+      const dx = ((t.anchorX ?? 0.5) - 0.5) * W * scale;
+      const dy = ((t.anchorY ?? 0.5) - 0.5) * H * scale;
+      const th = ((rot % 360) * Math.PI) / 180;
+      const cos = Math.cos(th);
+      const sin = Math.sin(th);
+      ox += Math.round(dx - (dx * cos - dy * sin));
+      oy += Math.round(dy - (dx * sin + dy * cos));
+    }
     let base = baseLabel;
     if (!base) {
       base = `tbase${i}`;

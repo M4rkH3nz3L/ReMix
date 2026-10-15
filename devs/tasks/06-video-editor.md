@@ -65,7 +65,10 @@ meglévő megjelenés-lánc (filter/adjust/lut) UTÁN fut → a mai klipek vált
   - [x] Preview: [PreviewSurface](../../src/components/preview/PreviewSurface.tsx) `transformOrigin` + RN-skew (guardolva → mai klip változatlan).
   - [x] UI: [PrecisionPanel](../../src/components/editor/panels/PrecisionPanel.tsx) „appearance" szekció — skewX/Y + pivot (anchor) X/Y Stepperek. **Preview-ben teljesen használható.**
   - [x] ✅ **Skew render**: [render.js](../../server/render.js) KÜLÖN `skewChain` pass (a `tiltChain`-t NEM érinti → bizonyított tilt-render változatlan, zéró regresszió), a kliens `shearPoint`-jával AZONOS matekkal + a `tiltChain` perspektíva-filter-mintájával; `padW/padH` `skewGrow`-val (ne vágódjon le). Guardolt (skew nélkül nincs pass). Szintaxis OK + audit zöld. ⚠️ **Runtime-verify**: a vizuális helyesség élő ffmpeg-gel igazolandó (itt nincs render-worker+ffmpeg).
-  - [ ] ⬜ **Anchor-pivot render** (follow-up): a rotate-filter középpont-pivot; az anchor-pivot translate-rotate-translate — preview-ben már jó, a renderhez külön óvatos lépés.
+  - [x] ✅ **Anchor-pivot render** (KÉSZ — 2026-10, lásd [VIDEOT.md](./VIDEOT.md) §4): a `withTransform` overlay-eltolással
+    (`delta = (I − Rθ)·d`, `d = (anchor − 0.5)·box`) pivot-forgatássá alakítja az ffmpeg közép-forgatását; statikus
+    forgatás + egyedi anchorra (kf/közép változatlan). **ÉLŐ VIDEO-RENDER-rel bizonyítva** (renderProject): a pivotnál
+    lévő pont rot90 után HELYBEN marad (120,120)=ff, a közép-anchoré elmozdul (=00).
 
 ### 2.7 Profi audio UI — P1 ✅ KÉSZ (2026-10-11: render-lánc tesztelve)
 - [x] ✅ **Modell + render + UI mind kész** (az audit `main`-je elavult): per-klip `AudioFx`

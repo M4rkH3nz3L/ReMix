@@ -84,13 +84,6 @@ server/.env.bak*
 .imagedoc-smoke/
 .audio-smoke/
 
-# devs/ — belső fejlesztői jegyzetek/tervek, NE kerüljenek a (public) repóba.
-# KIVÉTELEK (követve maradnak): a cloudflare-setup prompt, a source/ audit és a
-# tasks/DEVICES.md. Megj.: egész mappa-ignore alól csak úgy lehet fájlt visszavenni,
-# ha a könyvtárat előbb vissza-engedjük (!devs/tasks/), majd a tartalmát újra ignoráljuk.
-devs/*
-!devs/cloudflare-r2-setup-prompt.md
-!devs/source/
-!devs/tasks/
-devs/tasks/*
-!devs/tasks/DEVICES.md
+# devs/ — belső fejlesztői jegyzetek/tervek/taszkok: fejlesztéshez, LOKÁLIS.
+# A teljes mappa ignorált (nem kerül a repóba), a fájlok a lemezen maradnak.
+devs/

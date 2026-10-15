@@ -27,7 +27,7 @@ const fx = (id: string, type: VideoEffect['type'], over: Partial<VideoEffect> = 
 
 describe('videoEffects — lánc-műveletek (audit §6.5)', () => {
   it('katalógus: minden típus benne', () => {
-    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert']);
+    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak']);
   });
 
   it('addEffect a lánc végére, default amounttal', () => {
@@ -88,6 +88,16 @@ describe('videoEffects — FFmpeg-filter leképezés', () => {
     expect(effectFilterString(fx('a', 'grayscale'))).toBe('hue=s=0');
     expect(effectFilterString(fx('a', 'invert'))).toBe('negate');
     expect(effectFilterString(fx('a', 'sepia'))).toContain('colorchannelmixer=');
+  });
+
+  it('új effektek: kromatikus aberráció (rgbashift) + fényszivárgás (geq)', () => {
+    // amount 0.5 → n = round(0.5*12) = 6 → R jobbra 6, B balra 6
+    expect(effectFilterString(fx('a', 'chromaticAberration', { amount: 0.5 }))).toBe('rgbashift=rh=6:bh=-6');
+    expect(effectFilterString(fx('a', 'chromaticAberration', { amount: 0 }))).toBe('rgbashift=rh=0:bh=0');
+    const ll = effectFilterString(fx('a', 'lightLeak', { amount: 0.6 }));
+    expect(ll).toContain('format=gbrp,geq=');
+    expect(ll).toContain("b='b(X,Y)'"); // a kék csatorna változatlan
+    expect(ll).toContain('exp(-((X-W)');
   });
 
   it('amount clamp a filterben is', () => {

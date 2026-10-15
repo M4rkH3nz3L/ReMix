@@ -29,7 +29,12 @@ export const VIDEO_EFFECTS: Record<VideoEffectType, EffectMeta> = {
   grayscale: { label: 'lib.effects.grayscale', parametric: false, defaultAmount: 1 },
   sepia: { label: 'lib.effects.sepia', parametric: false, defaultAmount: 1 },
   invert: { label: 'lib.effects.invert', parametric: false, defaultAmount: 1 },
+  chromaticAberration: { label: 'lib.effects.chromaticAberration', parametric: true, defaultAmount: 0.5 },
+  lightLeak: { label: 'lib.effects.lightLeak', parametric: true, defaultAmount: 0.6 },
 };
+
+// 🌅 fényszivárgás gauss-esése a JOBB-FELSŐ sarokból (geq; `W` a frame-szélesség) — kliens/worker AZONOS
+export const LIGHT_LEAK_L = 'exp(-((X-W)*(X-W)+Y*Y)/(2*(W*0.4)*(W*0.4)))';
 
 export const VIDEO_EFFECT_TYPES = Object.keys(VIDEO_EFFECTS) as VideoEffectType[];
 
@@ -112,6 +117,14 @@ export function effectFilterString(effect: VideoEffect): string {
       return `colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131`;
     case 'invert':
       return `negate`;
+    case 'chromaticAberration': {
+      // RGB-szétcsúsztatás (R jobbra, B balra) — élek mentén szín-fringe
+      const n = Math.round(a * 12);
+      return `rgbashift=rh=${n}:bh=${-n}`;
+    }
+    case 'lightLeak':
+      // meleg (R↑ G↑) gauss-glow a jobb-felső sarokból; a B változatlan
+      return `format=gbrp,geq=r='min(255,r(X,Y)+${(a * 1.4).toFixed(3)}*255*${LIGHT_LEAK_L})':g='min(255,g(X,Y)+${(a * 0.8).toFixed(3)}*255*${LIGHT_LEAK_L})':b='b(X,Y)'`;
     default:
       return '';
   }

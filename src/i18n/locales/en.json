@@ -2456,6 +2456,7 @@
     "bubble": "🎈 Bubble"
   },
   "lib": {
+    "effects": { "blur": "Blur", "sharpen": "Sharpen", "vignette": "Vignette", "grain": "Grain", "grayscale": "Grayscale", "sepia": "Sepia", "invert": "Invert", "chromaticAberration": "Chromatic aberration", "lightLeak": "Light leak" },
     "tiers": {
       "label": {
         "free": "Free",

@@ -17,7 +17,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | § | Terület | Állapot |
 |---|---------|---------|
 | §1 | **Szín-paritás a képpel** (levels · csatorna-mixer · gradient-map/duotone a klipre) | ✅ *(struktúra-szűrők ⬜)* |
-| §2 | **Új effektek** (irányított/motion blur · kromatikus aberráció · fényszivárgás · deflicker · tükrözés-warp) | ⬜ |
+| §2 | **Új effektek** (**kromatikus aberráció** · **fényszivárgás** kész + **default-út effekt-bug javítva**; motion blur/deflicker ⬜) | ✅ |
 | §3 | **Idő & sebesség** (time-remap = sebesség-görbe · per-effekt amount-keyframe) | ⬜ |
 | §4 | **Transzformáció** (anchor-pivot RENDER — §2.6 adósság · corner-pin/warp · tartalom-tudatos) | ⬜ |
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
@@ -65,10 +65,15 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 
 ## 2. ✨ Új effektek — ⬜ (render-bizonyítható)
 
-- [ ] ⬜ **Irányított / motion blur** (ffmpeg — N eltolt másolat átlagolása vagy `tblend`/`minterpolate` mozgás-becslés).
-- [ ] ⬜ **Kromatikus aberráció** (RGB-csatorna-eltolás `rgbashift`) — trendi „üveg/retró" look; render-bizonyítható (R/B szél-eltolás).
-- [ ] ⬜ **Fényszivárgás (light leak)** — screen/add blend-overlay animált gradienssel; render-bizonyítható.
-- [ ] ⬜ **Deflicker** (`deflicker` filter) — villódzás-simítás; render-bizonyítható (idősor-luma szórás csökken).
+- [x] ✅ **Kromatikus aberráció** (`rgbashift` R jobbra / B balra) — új `VideoEffect` típus (kliens↔worker
+  AZONOS string, contract-tesztelt). *ÉLŐ VIDEO-RENDER (renderProject, él-klip): fringe x=244 ff0304 (piros),
+  x=236 fbff06 (sárga) — R/B szétvált az élnél.*
+- [x] ✅ **Fényszivárgás (light leak)** — új `VideoEffect` (meleg gauss-glow a jobb-felső sarokból, `geq`;
+  kliens↔worker azonos). *ÉLŐ VIDEO-RENDER (kék klip): jobb-felső ffffc7 (meleg), bal-alsó 799fc6 (változatlan).*
+- [x] 🐛 **Default-út effekt-bug JAVÍTVA** — a sima video+kép render-út (se kf/transform/maszk) KIHAGYTA az
+  `effectChainFx`-et → eddig a 7 meglévő effekt (blur/grain/…) SEM hatott az egyszerű klipeken. Pótolva mindkét
+  default-ágon (render.js). + i18n (lib.effects, 9 címke, hu/en/de).
+- [ ] ⬜ **Motion blur** (temporal `tmix`) · **deflicker** (`deflicker`) — temporális, mozgó/villódzó teszt-klip kell a bizonyításhoz (következő).
 - [ ] ⬜ **Halftone / szkennvonal / CRT** artisztikus szűrők · **per-effekt blend-mód**.
 
 ## 3. ⏱️ Idő & sebesség — ⬜

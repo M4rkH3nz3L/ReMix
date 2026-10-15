@@ -2456,6 +2456,7 @@
     "bubble": "🎈 Buborék"
   },
   "lib": {
+    "effects": { "blur": "Elmosás", "sharpen": "Élesítés", "vignette": "Vignetta", "grain": "Szemcse", "grayscale": "Szürkeárnyalat", "sepia": "Szépia", "invert": "Invertálás", "chromaticAberration": "Kromatikus aberráció", "lightLeak": "Fényszivárgás" },
     "tiers": {
       "label": {
         "free": "Free",

@@ -681,7 +681,9 @@ export type VideoEffectType =
   | 'grain'
   | 'grayscale'
   | 'sepia'
-  | 'invert';
+  | 'invert'
+  | 'chromaticAberration'
+  | 'lightLeak';
 export interface VideoEffect {
   id: string;
   type: VideoEffectType;

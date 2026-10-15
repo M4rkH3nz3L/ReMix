@@ -128,7 +128,11 @@ const EFFECT_DEFAULT_AMOUNT = {
   grayscale: 1,
   sepia: 1,
   invert: 1,
+  chromaticAberration: 0.5,
+  lightLeak: 0.6,
 };
+// 🌅 fényszivárgás gauss-esése a jobb-felső sarokból — AZONOS a kliens `LIGHT_LEAK_L`-jével
+const LIGHT_LEAK_L = 'exp(-((X-W)*(X-W)+Y*Y)/(2*(W*0.4)*(W*0.4)))';
 
 // 🎛️ Effekt-lánc (audit §6.5) — egy effekt FFmpeg-filtere. AZONOS a kliens
 // src/lib/videoEffects.ts `effectFilterString`-jével (preview/UI == render konzisztencia);
@@ -151,6 +155,12 @@ function effectFilterStr(effect) {
       return `colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131`;
     case 'invert':
       return `negate`;
+    case 'chromaticAberration': {
+      const n = Math.round(a * 12);
+      return `rgbashift=rh=${n}:bh=${-n}`;
+    }
+    case 'lightLeak':
+      return `format=gbrp,geq=r='min(255,r(X,Y)+${(a * 1.4).toFixed(3)}*255*${LIGHT_LEAK_L})':g='min(255,g(X,Y)+${(a * 0.8).toFixed(3)}*255*${LIGHT_LEAK_L})':b='b(X,Y)'`;
     default:
       return '';
   }
@@ -1764,10 +1774,13 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );
       } else {
+        // 🎛️ a sima video-út (se kf, se transform, se maszk) EDDIG kihagyta az effekt-láncot
+        // (effectChainFx) — így a blur/grain/… + az új effektek a leggyakoribb klipen nem hatottak. Pótolva.
         graph.push(
           decode +
             `scale=${W}:${H}:force_original_aspect_ratio=decrease,` +
             `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1` +
+            effectChainFx(clip) +
             suffix +
             `[${label}]`
         );
@@ -1889,9 +1902,11 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           `[${baseLabel}][${fgM}]overlay=x=0:y=0:shortest=0` + suffix + `[${label}]`
         );
       } else {
+        // 🎛️ a sima KÉP-út is kihagyta az effekt-láncot (effectChainFx) — pótolva (mint a video-ágon)
         graph.push(
           `[${idx}:v]fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=increase,` +
             `crop=${W}:${H},setsar=1,format=yuv420p` +
+            effectChainFx(clip) +
             suffix +
             `[${label}]`
         );

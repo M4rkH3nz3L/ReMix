@@ -208,6 +208,23 @@ function healChain(regions, W, H) {
   return parts.length ? ',' + parts.join(',') : '';
 }
 
+// 📊 szintek (levels): fekete/fehér-pont + gamma — out = clip((val-black)/(white-black),0,1)^(1/gamma).
+// Vezető-vesszős lutrgb-fragment (a kifejezés egyszeres idézőjelben → a filter_complex-vessző védve);
+// identitásnál (b=0,w=1,g=1) üres. (pure → tesztelhető)
+function levelsFilter(levels) {
+  if (!levels) {
+    return '';
+  }
+  const b = Math.max(0, Math.min(0.9, Number(levels.black) || 0));
+  const w = Math.max(b + 0.05, Math.min(1, levels.white != null ? Number(levels.white) : 1));
+  const g = Math.max(0.1, Math.min(5, Number(levels.gamma) || 1));
+  if (b === 0 && w === 1 && g === 1) {
+    return '';
+  }
+  const e = `pow(clip((val/255-${b})/(${(w - b).toFixed(4)}),0,1),${(1 / g).toFixed(4)})*255`;
+  return `,lutrgb=r='${e}':g='${e}':b='${e}'`;
+}
+
 module.exports = {
   filterChain,
   oneFilter,
@@ -220,4 +237,5 @@ module.exports = {
   perspectiveFilter,
   gradientMapFilter,
   healChain,
+  levelsFilter,
 };

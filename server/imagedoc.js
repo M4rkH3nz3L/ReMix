@@ -20,6 +20,7 @@ const {
   perspectiveFilter,
   gradientMapFilter,
   healChain,
+  levelsFilter,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
@@ -288,9 +289,11 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         : '';
       // 🩹 folt-javítás: a nyers (fit-elt) fotón, a korrekció/szűrők ELŐTT (delogo a környezetből interpolál)
       const heal = healChain(layer.heal, boxW, boxH);
+      // 📊 szintek (levels): a tonális remap a korrekció/grade UTÁN, a struktúra-szűrők előtt
+      const lvl = levelsFilter(layer.levels);
       prepared = `p${idx}`;
       filters.push(
-        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
+        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${lvl}${filterChain(layer.filters)}${persp}${flip}${rotate}` +
           `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;

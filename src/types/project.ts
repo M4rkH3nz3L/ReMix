@@ -1372,6 +1372,9 @@ export interface PhotoLayer extends ImageLayerBase {
   /** 🩹 folt-javítás / objektum-eltávolítás: doboz-lokális (0–1) téglalapok, amiket a render a
    *  környezetükből interpolálva eltüntet (ffmpeg `delogo`). A felhasználó lasszóval jelöli (bbox). */
   heal?: { x: number; y: number; w: number; h: number }[];
+  /** 📊 szintek (levels): fekete-pont (0–0.9) / fehér-pont (…–1) / gamma (0.1–5). A render
+   *  `lutrgb`-vel remapeli: out = clip((val−black)/(white−black),0,1)^(1/gamma). Identitás = nincs hatás. */
+  levels?: { black: number; white: number; gamma: number };
 }
 
 /** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).

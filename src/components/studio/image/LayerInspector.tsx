@@ -382,6 +382,27 @@ export function LayerInspector({
               />
             </>
           ) : null}
+          {/* 📊 szintek (levels): fekete/fehér-pont + gamma — a render lutrgb-vel remapeli */}
+          <Text style={styles.sectionLabel}>{t('studio.image.levels', { defaultValue: 'Szintek' })}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
+              active={!layer.levels}
+              onPress={() => (layer.levels ? commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: undefined }), 'levels') : undefined)}
+            />
+            <Chip
+              label={t('studio.image.localOn', { defaultValue: 'Be' })}
+              active={!!layer.levels}
+              onPress={() => (layer.levels ? undefined : commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: { black: 0, white: 1, gamma: 1 } }), 'levels'))}
+            />
+          </View>
+          {layer.levels ? (
+            <>
+              <Slider label={t('studio.image.levelsBlack', { defaultValue: 'Fekete-pont' })} value={layer.levels.black} min={0} max={0.9} onChange={(v) => commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: { ...layer.levels!, black: v } }), 'levels')} format={(v) => v.toFixed(2)} />
+              <Slider label={t('studio.image.levelsWhite', { defaultValue: 'Fehér-pont' })} value={layer.levels.white} min={0.1} max={1} onChange={(v) => commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: { ...layer.levels!, white: v } }), 'levels')} format={(v) => v.toFixed(2)} />
+              <Slider label={t('studio.image.levelsGamma', { defaultValue: 'Gamma' })} value={layer.levels.gamma} min={0.2} max={3} onChange={(v) => commit(updateLayer<PhotoLayer>(doc, layer.id, { levels: { ...layer.levels!, gamma: v } }), 'levels')} format={(v) => v.toFixed(2)} />
+            </>
+          ) : null}
           {/* 🎯 kijelölés-alapú (lokális) korrekció: grade/adjust CSAK a maszkon belül (maskedmerge) */}
           <Text style={styles.sectionLabel}>{t('studio.image.localAdjust', { defaultValue: 'Kijelölés-alapú korrekció' })}</Text>
           <View style={styles.chipRow}>

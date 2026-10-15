@@ -10,6 +10,7 @@ const {
   perspectiveFilter,
   gradientMapFilter,
   healChain,
+  levelsFilter,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -101,6 +102,17 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     const c = healChain([{ x: 0, y: 0, w: 1, h: 1 }], 100, 100);
     expect(c).toContain('delogo=x=1:y=1:');
     expect(c).toContain('w=97'); // 100 - 1 - 2
+  });
+
+  test('levelsFilter: identitás → ""; fekete/fehér-pont + gamma lutrgb (idézőjeles kifejezés)', () => {
+    expect(levelsFilter(undefined)).toBe('');
+    expect(levelsFilter({ black: 0, white: 1, gamma: 1 })).toBe('');
+    const l = levelsFilter({ black: 0, white: 0.5, gamma: 1 });
+    expect(l).toContain("lutrgb=r='pow(clip((val/255-0)/(0.5000),0,1),1.0000)*255'");
+    // gamma 2 → kitevő 1/2 = 0.5
+    expect(levelsFilter({ black: 0, white: 1, gamma: 2 })).toContain('0.5000)*255');
+    // white a black+0.05 alá nem mehet (védett osztás) → w-b ≥ 0.05
+    expect(levelsFilter({ black: 0.9, white: 0.9, gamma: 1 })).toContain('val/255-0.9');
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

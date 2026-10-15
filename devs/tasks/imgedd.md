@@ -163,7 +163,11 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   laposít → a render `adjustChain` ffmpeg `curves`-zel égeti (a render-út már KÉSZ volt). *ÉLŐ-BIZONYÍTVA
   (/imagedoc, fotó 121/159/199): kontroll=121/159/199; invert-görbe (0→1,1→0)=134/95/56 (≈255−bemenet);
   sötétítő (1→0.5)=60/79/100 (≈fél fényerő); mind HTTP 200.*
-- [ ] ⬜ **Szintek (levels)** + **csatorna-mixer** + **szelektív szín**.
+- [x] ✅ **Szintek (levels)** — `PhotoLayer.levels {black,white,gamma}`; a render `lutrgb`-vel remapel:
+  out = clip((val−black)/(white−black),0,1)^(1/gamma) (a korrekció/grade UTÁN); LayerInspector Be/Nincs +
+  fekete-pont/fehér-pont/gamma csúszkák. *ÉLŐ-BIZONYÍTVA (/imagedoc, fotó 121/159/199): kontroll=799fc7;
+  b0/w0.5=f2ffff (fehér-pont nyújtás); gamma2=afc9e0 (világosabb középtónus); HTTP 200.*
+- [ ] ⬜ **Csatorna-mixer** (colorchannelmixer) + **szelektív szín**.
 - [x] ✅ **Filmszimuláció / LUT-szerű grade a fotóra** — a videó grade-rétegével AZONOS preset-térkép
   (kiemelve `server/grades.js`-be, a `render.js` innen kéri → nincs drift; a kliens `constants/grades.ts`
   ugyanazok az id-k). `PhotoLayer.grade` (teal-orange/moody/vintage/noir/warm-film/cold/vibrant/dreamy) →

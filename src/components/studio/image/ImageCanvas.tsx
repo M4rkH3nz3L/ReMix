@@ -17,6 +17,8 @@ import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
+import { gradeTint } from '@/constants/grades';
+import { adjustTintLayers } from '@/lib/adjustPreview';
 import type { CropRect } from '@/lib/imageCrop';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
@@ -256,9 +258,20 @@ export function ImageCanvas({
                 />
               );
             }
-            // 🎚️ korrekció-réteg: a preview tint-közelítése a 2/2 inkrementumban jön; a render már égeti
+            // 🎚️ korrekció-réteg: teljes-vászon tint-közelítés a RAJZOLÁSI sorrendben (az alatta
+            // lévőkre ül rá, a fölötte lévők föléje rajzolnak) — a render pontosan égeti (maszkkal is)
             if (l.kind === 'adjust') {
-              return null;
+              const tints = [...gradeTint(l.grade), ...(l.adjust ? adjustTintLayers(l.adjust) : [])];
+              if (!tints.length) {
+                return null;
+              }
+              return (
+                <View key={l.id} pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  {tints.map((tint, i) => (
+                    <View key={i} style={[StyleSheet.absoluteFill, { backgroundColor: tint.color, opacity: tint.opacity }]} />
+                  ))}
+                </View>
+              );
             }
             return (
               <TextOverlay

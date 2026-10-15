@@ -376,16 +376,18 @@ export function ImageStudioBody({
           }
         : kind === 'fill'
           ? { kind: 'fill', id, fill: '#12121a' }
-          : {
-              kind: 'shape',
-              id,
-              shape: 'rectangle',
-              position: { x: 0.5, y: 0.5 },
-              w: 0.4,
-              h: 0.24,
-              fill: '#ff2d95',
-              cornerRadius: 0.12,
-            };
+          : kind === 'adjust'
+            ? { kind: 'adjust', id, adjust: {} }
+            : {
+                kind: 'shape',
+                id,
+                shape: 'rectangle',
+                position: { x: 0.5, y: 0.5 },
+                w: 0.4,
+                h: 0.24,
+                fill: '#ff2d95',
+                cornerRadius: 0.12,
+              };
     commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
     setSelectedId(id);
   };

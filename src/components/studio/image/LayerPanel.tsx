@@ -61,6 +61,7 @@ export function LayerPanel({
           <AddChip icon="shapes" label={t('studio.imageTools.shape')} onPress={() => onAdd('shape')} />
           <AddChip icon="image" label={t('studio.imageTools.photo')} onPress={() => onAdd('photo')} />
           <AddChip icon="color-fill" label={t('studio.imageTools.fill')} onPress={() => onAdd('fill')} />
+          <AddChip icon="options-outline" label={t('studio.imageTools.adjust', { defaultValue: 'Korrekció' })} onPress={() => onAdd('adjust')} />
         </View>
       }
     >

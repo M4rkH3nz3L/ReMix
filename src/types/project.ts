@@ -1367,6 +1367,9 @@ export interface PhotoLayer extends ImageLayerBase {
    *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker
    *  a réteg dobozába transzformálja. Független a vágó `mask`-tól. */
   localAdjust?: { mask: ClipMask; adjust?: ClipAdjust; grade?: GradeId };
+  /** 🩹 folt-javítás / objektum-eltávolítás: doboz-lokális (0–1) téglalapok, amiket a render a
+   *  környezetükből interpolálva eltüntet (ffmpeg `delogo`). A felhasználó lasszóval jelöli (bbox). */
+  heal?: { x: number; y: number; w: number; h: number }[];
 }
 
 /** 🎛️ Kép-struktúra-szűrő (a foto-réteg renderében). Az `amount` 0–1 (erősség).

@@ -14,7 +14,7 @@
 |---|---------|---------|
 | §1 | **Rétegek & kompozíció** (fill/photo/shape/text, panel, opacity/hidden, **blend-mode**, **gradient-maszk**, **csoportok**, **kontúr**) | ✅ *(festett-maszk ⬜)* |
 | §2 | **Kijelölés & maszkolás** (lasszó + varázspálca + ecset + **réteg-maszk** + **kijelölés-alapú korrekció**: ellipszis/téglalap/lasszó-poligon + feather/invert/expand) | ✅ *(festett raszter-maszk ⬜)* |
-| §3 | **Retusálás** (klón/gyógyító/dodge-burn/blur-ecset) | ⬜ |
+| §3 | **Retusálás** (**folt-javítás/objektum-eltávolítás** + dodge/burn=lokális korrekció) | 🟡 *(klón-bélyegző/blur-ecset ⬜)* |
 | §4 | **Vektor & szöveg** (toll/node + boolean + SVG import/export + szöveg-stílus + **text-on-path**) | ✅ *(toll v5, OpenType ⬜)* |
 | §5 | **Korrekciók & szűrők** (adjustment-stack + **görbék** + **grade/LUT** + forma-fx + struktúra-szűrők + **gradient-map**) | ✅ *(levels/channel-mixer ⬜)* |
 | §6 | **Transzformáció** (mozgat/skála/forgat/tükröz/crop + **nyújtás** + **perspektíva** + vonalzó/guide/snap) | ✅ *(warp-rács ⬜)* |
@@ -105,9 +105,15 @@ worker-Chromium (`/imagedoc`), ami a formát/szöveget/mintát pontosan égeti.
   949794 (R≈G≈B)/kívül 799fc7 (kék); exposure=0.8 belül d4feff/kívül 799fc7; HTTP 200.*
 - [ ] ⬜ **Él-felismerő/„objektum" kijelölés** (AI-select — a videóban a `selective` létezik, a képre hozni).
 
-## 3. 🩹 Retusálás — ⬜ hiányzik (device/worker)
-- [ ] ⬜ **Klón-bélyegző** + **gyógyító-ecset** (spot-heal) — folt/tárgy-eltávolítás.
-- [ ] ⬜ **Dodge/Burn** (világosítás/sötétítés ecset) · **blur/sharpen-ecset** · **folt-elmosás**.
+## 3. 🩹 Retusálás — 🟡 folt-javítás + dodge/burn kész, ecset-alapúak hátra
+- [x] ✅ **Folt-javítás / objektum-eltávolítás (gyógyító-ecset v1)** — `PhotoLayer.heal[]` (doboz-lokális
+  téglalapok); a felhasználó lasszóval körbejelöl egy foltot → a bbox doboz-lokálisra transzformálva
+  (`maskTarget.target='heal'`), a render `delogo`-val a környezetéből interpolálja (`healChain`, a korrekció
+  ELŐTT); LayerInspector „Folt-javítás" (✏️ Folt lasszó + Törlés + db). *ÉLŐ-BIZONYÍTVA (/imagedoc, kék fotó
+  piros folttal): kontroll folt=fe0000 (piros) → heal után 799fc7 (kék, interpolált); HTTP 200.*
+- [x] ✅ **Dodge/Burn (világosítás/sötétítés)** — a kész **kijelölés-alapú (lokális) korrekcióval** (§2):
+  exposure/kontraszt a maszkolt régión → helyi világosítás/sötétítés (render-bizonyítva ott).
+- [ ] ⬜ **Klón-bélyegző** (forrás→cél másolás) · **blur/sharpen-ecset** · festett (szabad-alakú) folt-maszk.
 - [ ] 🔌 **AI-objektum-eltávolítás / inpaint** (a videó-oldali gen-média mintájára, külön worker-modell).
 
 ## 4. 🖊️ Vektor & szöveg — ✅ erős

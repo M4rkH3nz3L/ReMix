@@ -43,9 +43,9 @@ export function LayerPanel({
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
   onOpenAdjust: () => void;
-  /** 🎭 lasszó-maszk rajzolása a rétegre (a szülő aktiválja a lasszó-módot + bezárja a panelt);
-   *  target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja */
-  onDrawMask?: (layerId: string, target: 'clip' | 'local') => void;
+  /** 🎭 lasszó rajzolása a rétegre (a szülő aktiválja a lasszó-módot + bezárja a panelt);
+   *  target: 'clip' = vágó-maszk, 'local' = korrekció-maszk, 'heal' = folt-javítás régió */
+  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
 }) {
   const { t } = useTranslation();
   const layer = doc.layers.find((l) => l.id === selectedId) ?? null;

@@ -200,9 +200,9 @@ export function ImageStudioBody({
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
-  // 🎭 ha be van állítva, a következő lasszó-rajz MASZKOT készít: a réteg vágó-maszkja ('clip')
-  // vagy a lokális (kijelölés-alapú) korrekció maszkja ('local')
-  const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' } | null>(null);
+  // 🎭 ha be van állítva, a következő lasszó-rajz: vágó-maszk ('clip'), lokális korrekció-maszk
+  // ('local'), vagy 🩹 folt-javítás régió ('heal' — a bbox-ot delogo-zza a render)
+  const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [brushActive, setBrushActive] = useState(false);
   const [brushColor, setBrushColor] = useState('#ff2d95');
@@ -763,7 +763,7 @@ export function ImageStudioBody({
 
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
   // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)
-  const startMaskDraw = (layerId: string, target: 'clip' | 'local' = 'clip') => {
+  const startMaskDraw = (layerId: string, target: 'clip' | 'local' | 'heal' = 'clip') => {
     setSelectedId(layerId);
     setMaskTarget({ id: layerId, target });
     setLassoActive(true);
@@ -780,6 +780,29 @@ export function ImageStudioBody({
       const maxX = Math.max(...xs);
       const minY = Math.min(...ys);
       const maxY = Math.max(...ys);
+      if (maskTarget.target === 'heal') {
+        // 🩹 folt-javítás: a lasszó bbox-át a FOTÓ dobozába transzformáljuk (0–1 box-lokális) → heal-régió
+        const cur = doc.layers.find((l) => l.id === maskTarget.id);
+        if (cur && cur.kind === 'photo') {
+          const bw = Math.max(cur.w ?? 1, 0.0001);
+          const bh = Math.max(cur.h ?? 1, 0.0001);
+          const bx = cur.position.x - bw / 2;
+          const by = cur.position.y - bh / 2;
+          const region = {
+            x: Math.max(0, (minX - bx) / bw),
+            y: Math.max(0, (minY - by) / bh),
+            w: Math.min(1, (maxX - minX) / bw),
+            h: Math.min(1, (maxY - minY) / bh),
+          };
+          commit(
+            updateLayer<PhotoLayer>(doc, maskTarget.id, { heal: [...(cur.heal ?? []), region] }),
+            t('studio.image.undoHeal', { defaultValue: 'Folt-javítás' })
+          );
+        }
+        setMaskTarget(null);
+        setLassoActive(false);
+        return;
+      }
       const mask: ClipMask = {
         shape: 'polygon',
         points: points.map((p) => ({ x: p.x, y: p.y })),

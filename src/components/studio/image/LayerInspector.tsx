@@ -61,9 +61,9 @@ export function LayerInspector({
   layer: ImageLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onOpenAdjust: () => void;
-  /** 🎭 szabadkézi (lasszó) maszk rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot;
-   *  target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja */
-  onDrawMask?: (layerId: string, target: 'clip' | 'local') => void;
+  /** 🎭 szabadkézi (lasszó) rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot;
+   *  target: 'clip' = vágó-maszk, 'local' = korrekció-maszk, 'heal' = folt-javítás régió */
+  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
 }) {
   const { t } = useTranslation();
 
@@ -417,6 +417,19 @@ export function LayerInspector({
               <Slider label={t('studio.image.maskFeather', { defaultValue: 'Lágy él' })} value={layer.localAdjust.mask.feather ?? 0.05} min={0} max={0.3} onChange={(v) => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, feather: v } })} format={(v) => v.toFixed(2)} />
               <ToggleRow icon="contrast-outline" label={t('studio.image.maskInvert', { defaultValue: 'Invertálás' })} value={!!layer.localAdjust.mask.invert} onValueChange={(v) => setLocal({ ...layer.localAdjust!, mask: { ...layer.localAdjust!.mask, invert: v } })} />
             </>
+          ) : null}
+          {/* 🩹 folt-javítás / objektum-eltávolítás: lasszózd körbe a foltot → a render delogo-zza (bbox) */}
+          <Text style={styles.sectionLabel}>{t('studio.image.heal', { defaultValue: 'Folt-javítás' })}</Text>
+          <View style={styles.chipRow}>
+            {onDrawMask ? (
+              <Chip label={t('studio.image.healAdd', { defaultValue: '✏️ Folt lasszó' })} active={false} onPress={() => onDrawMask(layer.id, 'heal')} />
+            ) : null}
+            {layer.heal?.length ? (
+              <Chip label={t('studio.image.healClear', { defaultValue: 'Törlés' })} active={false} onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { heal: undefined }), 'heal-clear')} />
+            ) : null}
+          </View>
+          {layer.heal?.length ? (
+            <Text style={styles.hintText}>{t('studio.image.healCount', { defaultValue: '{{n}} folt', n: layer.heal.length })}</Text>
           ) : null}
         </>
       ) : null}

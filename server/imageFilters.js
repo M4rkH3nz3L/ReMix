@@ -183,6 +183,30 @@ function gradientMapFilter(shadowHex, highlightHex) {
   );
 }
 
+// 🩹 folt-javítás / objektum-eltávolítás: doboz-lokális (0–1) téglalapok → ffmpeg `delogo`
+// (a régiót a környezetéből interpolálja). A delogo 1px belső keretet kíván (x/y≥1, x+w≤W-1),
+// ezért a téglalapokat a képbe CLAMPeljük. Vezető-vesszős lánc; üres, ha nincs régió. (pure)
+function healChain(regions, W, H) {
+  if (!Array.isArray(regions) || regions.length === 0) {
+    return '';
+  }
+  const parts = [];
+  for (const r of regions) {
+    let x = Math.round((Number(r.x) || 0) * W);
+    let y = Math.round((Number(r.y) || 0) * H);
+    let w = Math.round((Number(r.w) || 0) * W);
+    let h = Math.round((Number(r.h) || 0) * H);
+    x = Math.max(1, Math.min(x, W - 3));
+    y = Math.max(1, Math.min(y, H - 3));
+    w = Math.max(1, Math.min(w, W - x - 2));
+    h = Math.max(1, Math.min(h, H - y - 2));
+    if (w >= 1 && h >= 1) {
+      parts.push(`delogo=x=${x}:y=${y}:w=${w}:h=${h}`);
+    }
+  }
+  return parts.length ? ',' + parts.join(',') : '';
+}
+
 module.exports = {
   filterChain,
   oneFilter,
@@ -194,4 +218,5 @@ module.exports = {
   strokeSilhouette,
   perspectiveFilter,
   gradientMapFilter,
+  healChain,
 };

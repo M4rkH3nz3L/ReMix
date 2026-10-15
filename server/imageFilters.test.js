@@ -9,6 +9,7 @@ const {
   strokeSilhouette,
   perspectiveFilter,
   gradientMapFilter,
+  healChain,
 } = require('./imageFilters');
 
 describe('imageFilters — ffmpeg szűrő-lánc', () => {
@@ -88,6 +89,16 @@ describe('imageFilters — ffmpeg szűrő-lánc', () => {
     expect(g).toContain("r='0*(1-");
     expect(g).toContain("+255*(");
     expect(g).toContain("a='alpha(X,Y)',format=rgba");
+  });
+
+  test('healChain: doboz-lokális téglalapok → delogo (px), képbe clampelve; üres → ""', () => {
+    expect(healChain(undefined, 256, 256)).toBe('');
+    expect(healChain([], 256, 256)).toBe('');
+    expect(healChain([{ x: 0.375, y: 0.375, w: 0.156, h: 0.156 }], 256, 256)).toBe(',delogo=x=96:y=96:w=40:h=40');
+    // szélre lógó téglalap clampelődik (x≥1, x+w≤W-2)
+    const c = healChain([{ x: 0, y: 0, w: 1, h: 1 }], 100, 100);
+    expect(c).toContain('delogo=x=1:y=1:');
+    expect(c).toContain('w=97'); // 100 - 1 - 2
   });
 
   test('maskGradientFilter: irányonkénti alfa-rámpa (geq), ismeretlen → ""', () => {

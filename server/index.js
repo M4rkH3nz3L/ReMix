@@ -15,11 +15,10 @@ const { aiAvailable, aiProvider } = require('./ai');
 const { voiceChain } = require('./voicechain');
 const { depthAvailable, ensureDepth } = require('./depth');
 const { bgRemoveAvailable } = require('./bgremove');
-const { detectFaces, faceAvailable } = require('./face');
+const { faceAvailable } = require('./face');
 const { stickers3dAvailable } = require('./sticker3d');
-const { listSkies, replaceSky } = require('./sky');
-const { upscaleAvailable, upscaleImage } = require('./upscale');
-const { composeThumbnail, scoreShots } = require('./thumbs');
+const { upscaleAvailable } = require('./upscale');
+const { composeThumbnail } = require('./thumbs');
 const { visionAvailable } = require('./vision');
 const { listMediaLibrary } = require('./library');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('./render');
@@ -280,124 +279,8 @@ app.get('/tts/:id/:name', (req, res) => {
   res.sendFile(file);
 });
 
-// 🙂 Arc-detektálás egy képkockán (UltraFace, CPU) — a dobozok a megadott
-// vászon-arányra normalizálva jönnek (a tracker/pozicionálás nyelvén).
-app.post('/faces', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
-  const file = (req.files ?? [])[0];
-  if (!file) {
-    res.status(400).json({ error: 'Hiányzó médiafájl.' });
-    return;
-  }
-  const cleanup = () => {
-    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-  };
-  const num = (v, fallback) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : fallback;
-  };
-  detectFaces(file.path, {
-    atSec: num(req.body.atSec, 0),
-    aspectW: num(req.body.aspectW, 9),
-    aspectH: num(req.body.aspectH, 16),
-  })
-    .then((result) => {
-      cleanup();
-      res.json(result);
-    })
-    .catch((err) => {
-      cleanup();
-      console.error('faces hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🏆 Best-shot pontozás (P0-1): forrás-időpontok vizuális minősége az Auto Edithez
-app.post('/shotscore', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('video'), (req, res) => {
-  const file = (req.files ?? [])[0];
-  if (!file) {
-    res.status(400).json({ error: 'Hiányzó médiafájl.' });
-    return;
-  }
-  const cleanup = () => {
-    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-  };
-  let times;
-  try {
-    times = JSON.parse(req.body.times ?? '[]');
-  } catch {
-    times = [];
-  }
-  if (!Array.isArray(times) || times.length === 0) {
-    cleanup();
-    res.status(400).json({ error: 'Hiányzó időpontok.' });
-    return;
-  }
-  scoreShots(file.path, times.map(Number).filter((t) => Number.isFinite(t) && t >= 0))
-    .then((shots) => {
-      cleanup();
-      res.json({ shots });
-    })
-    .catch((err) => {
-      cleanup();
-      console.error('shotscore hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🌅 Sky Replacement (CC V2): égbolt-csere presetekkel (mélység-alapú maszk)
-app.get('/sky/presets', (_req, res) => {
-  res.json({ presets: listSkies() });
-});
-
-app.post('/sky', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
-  const file = (req.files ?? [])[0];
-  const preset = String(req.body.preset ?? 'sunset');
-  if (!file) {
-    res.status(400).json({ error: 'Hiányzó képfájl.' });
-    return;
-  }
-  const cleanup = () => {
-    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-  };
-  ensureDepth(file.path)
-    .then(({ dir, depthPng, w, h }) =>
-      replaceSky(file.path, depthPng, preset, dir, { w, h })
-    )
-    .then(({ file: out, cached }) => {
-      const pngBase64 = fs.readFileSync(out).toString('base64');
-      cleanup();
-      res.json({ cached, pngBase64 });
-    })
-    .catch((err) => {
-      cleanup();
-      console.error('sky hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
-
-// 🔍 Upscale / Enhance (CC V2): fotó felnagyítása szuper-felbontással
-app.post('/upscale', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
-  const file = (req.files ?? [])[0];
-  if (!file) {
-    res.status(400).json({ error: 'Hiányzó képfájl.' });
-    return;
-  }
-  const cleanup = () => {
-    fs.rm(req.workDir, { recursive: true, force: true }, () => {});
-  };
-  const scale = parseInt(req.body.scale, 10) === 4 ? 4 : 2;
-  upscaleImage(file.path, { scale, workDir: req.workDir })
-    .then(({ file: out, width, height, cached }) => {
-      const pngBase64 = fs.readFileSync(out).toString('base64');
-      cleanup();
-      res.json({ width, height, cached, pngBase64 });
-    })
-    .catch((err) => {
-      cleanup();
-      console.error('upscale hiba:', err.message);
-      res.status(500).json({ error: err.message });
-    });
-});
+// 🖼️🤖 Kép-AI route-ok — domain-router (§01.1).
+app.use(require('./routes/imageAI'));
 
 // 🤖 AI-worker route-ok (hooks/probe/translate/highlights/story/thumbheadlines/captionstudio/assist/autoedit) — domain-router (§01.1).
 app.use(require('./routes/ai'));

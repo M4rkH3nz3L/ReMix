@@ -35,6 +35,7 @@ import {
   renderAndShareMp4,
 } from '@/lib/render';
 import type { ExportPlatform, PostTarget, RenderSettings } from '@/lib/render';
+import { planBatchExport } from '@/lib/batchExport';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
 import type { PostVisibility } from '@/types/social';
@@ -82,6 +83,8 @@ export function ExportPanel() {
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [codec, setCodec] = useState<'h264' | 'hevc' | 'av1' | 'prores'>('h264');
   const [platform, setPlatform] = useState<ExportPlatform | null>(null);
+  // 📦 batch-export: több platform egyszerre (deduplikált jobok → sorban renderelve)
+  const [batchSet, setBatchSet] = useState<ReadonlySet<ExportPlatform>>(new Set());
   // 🎚️ Pro export-kontroll (Advanced): bitráta / GOP / bit-mélység / szín / audio
   const [advOpen, setAdvOpen] = useState(false);
   const [bitrateMode, setBitrateMode] = useState<'crf' | 'vbr' | 'cbr'>('crf');
@@ -195,6 +198,34 @@ export function ExportPanel() {
         }
       })
       .finally(() => setRenderStatus(null));
+  };
+
+  // 📦 Batch-export: a kiválasztott platformok deduplikált jobjai SORBAN (mindegyik a saját
+  // aspect + settings beállítással renderel + megoszt). A pure terv: `planBatchExport` (tesztelt).
+  const exportBatch = async () => {
+    if (renderStatus) {
+      return;
+    }
+    const jobs = planBatchExport([...batchSet], buildSettings());
+    if (jobs.length === 0) {
+      return;
+    }
+    setRenderStatus(t('common.processing'));
+    try {
+      for (const job of jobs) {
+        const jobProject = { ...project, aspectRatio: job.aspect as typeof project.aspectRatio };
+        // SORBAN rendereljük (párhuzamosan túlterhelné az eszközt)
+        await withCancellableProgress(`${t('panels.export.exportOnDevice')} · ${job.label}`, (report, signal) =>
+          renderAndShareMp4(jobProject, report, job.settings, { mode: 'local', signal })
+        );
+      }
+    } catch (err) {
+      if (!isRenderCancelledError(err as Error)) {
+        Alert.alert(t('panels.export.batchTitle', { defaultValue: 'Batch export' }), (err as Error).message);
+      }
+    } finally {
+      setRenderStatus(null);
+    }
   };
 
   // ☁️ Felhő HD render (Pro) — a fizetős workereken; Pro-hiánynál paywall
@@ -387,6 +418,36 @@ export function ExportPanel() {
             />
           ))}
         </View>
+
+        {/* 📦 batch-export: több platform kijelölése → egy gombbal sorban rendereli (dedup) */}
+        <Text style={styles.settingLabel}>{t('panels.export.batchLabel', { defaultValue: '📦 Batch (több platform egyszerre)' })}</Text>
+        <View style={styles.row}>
+          {(Object.keys(PLATFORM_PRESETS) as ExportPlatform[]).map((p) => (
+            <Chip
+              key={`b-${p}`}
+              label={PLATFORM_PRESETS[p].label}
+              active={batchSet.has(p)}
+              onPress={() =>
+                setBatchSet((prev) => {
+                  const next = new Set(prev);
+                  next.has(p) ? next.delete(p) : next.add(p);
+                  return next;
+                })
+              }
+            />
+          ))}
+        </View>
+        {batchSet.size > 0 ? (
+          <Pressable style={styles.batchBtn} onPress={exportBatch} disabled={!!renderStatus}>
+            <Text style={styles.batchBtnText}>
+              {t('panels.export.batchRun', {
+                defaultValue: 'Batch export ({{n}} kimenet)',
+                n: planBatchExport([...batchSet], buildSettings()).length,
+              })}
+            </Text>
+          </Pressable>
+        ) : null}
+
         <Text style={styles.settingLabel}>{t('panels.export.resolution')}</Text>
         <View style={styles.row}>
           {RESOLUTIONS.map((r) => (
@@ -802,6 +863,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
+  batchBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: `${palette.accent}1a`,
+    alignItems: 'center',
+  },
+  batchBtnText: { color: palette.accent, fontSize: 13, fontWeight: '800' },
   estimate: {
     color: palette.text,
     fontSize: 12,

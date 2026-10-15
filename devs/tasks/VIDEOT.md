@@ -137,7 +137,12 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
   az editor-nyitáskor a `pruneProxyCache` mellett fut; a `cacheReport` külön `renders` mezőt kapott.
   *BIZONYÍTVA: `cacheEvict.test.ts` render-forgatókönyv (a legrégebbi projekt-render esik ki, a frissek
   maradnak) — 7 teszt zöld; audit 206 suite zöld.*
-- [ ] ⬜ **Batch / szegmens-export** (több felbontás/formátum egy jobban · jelenet-enkénti kliplista).
+- [x] ✅ **Batch-export** (több platform egy gombbal) — `src/lib/batchExport.ts` pure `planBatchExport`: a
+  kiválasztott platformokból (TikTok/Reels/Shorts/YouTube/Instagram) DEDUPLIKÁLT render-job-listát épít
+  (az azonos aspect+settings platformok egy jobba vonódnak → nem renderel 3× ugyanazt); az ExportPanel
+  multi-select chipek + „Batch export (N kimenet)" gomb sorban rendereli. *BIZONYÍTVA: `batchExport.test.ts`
+  (4) — dedup 9:16 → 1 job; eltérő arányok → külön; preset-merge a base fölé; audit 207/2154 zöld.*
+- [ ] ⬜ **Szegmens-export** (jelenet-enkénti kliplista).
 
 ## 9. 🔌 Nyitott adósságok — ⬜
 

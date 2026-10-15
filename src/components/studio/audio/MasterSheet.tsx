@@ -239,6 +239,19 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
               />
             </View>
 
+            {/* 🎚️ sidechain-duck TRIGGER: melyik sáv hangja alatt halkuljanak az autoDuck-klipek */}
+            <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.duckTrigger', { defaultValue: 'Auto-duck trigger' })}</Text>
+            <View style={styles.chipRow}>
+              {([undefined, 'voiceover', 'music', 'sfx'] as const).map((tt) => (
+                <Chip
+                  key={tt ?? 'auto'}
+                  label={tt ? t('studio.master.track_' + tt, { defaultValue: tt }) : t('studio.master.duckAuto', { defaultValue: 'Beszéd (auto)' })}
+                  active={(m.duckTrigger ?? undefined) === tt}
+                  onPress={() => setField({ duckTrigger: tt })}
+                />
+              ))}
+            </View>
+
             <View style={{ gap: 8, marginTop: 12 }}>
               <PrimaryButton icon="pulse" label={t('studio.master.apply')} onPress={apply} />
               {applied ? (

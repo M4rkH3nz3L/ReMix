@@ -2694,6 +2694,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       clipTrackType[c.id] = tr.type;
     }
   }
+  // 🎚️ sidechain-duck trigger-sáv (AudioMaster.duckTrigger); hiányzó = voiceover-viselkedés
+  const duckTrigger = project.audioMaster?.duckTrigger;
   for (const clip of audioClips) {
     if (!hasAnyVolume(clip)) {
       continue;
@@ -2726,8 +2728,13 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     }
     chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
     graph.push(chain);
+    // 🎚️ sidechain-duck TRIGGER: alapból a voiceover/beszéd; ha a projekt `duckTrigger` sávot ad meg,
+    // AZ a sáv a kulcs (pl. 'sfx' → a zene a hangeffektek alatt duckol).
+    const isTrigger = duckTrigger
+      ? clipTrackType[clip.id] === duckTrigger
+      : clip.source === 'voiceover';
     const pushToBus = (lbl) => {
-      if (clip.source === 'voiceover') {
+      if (isTrigger) {
         speechLabels.push(lbl);
       } else if (clip.autoDuck) {
         duckLabels.push(lbl);

@@ -22,7 +22,7 @@ Ez a fájl a **profi-paritás + parity-hézagok + nyitott adósságok** pótlás
 | §4 | **Transzformáció** (**anchor-pivot RENDER** + **corner-pin/perspektíva** kész; tartalom-tudatos ⬜) | ✅ |
 | §5 | **Átmenetek** (egyedi bezier-easing · több átmenet · csoportos alkalmazás) | ⬜ |
 | §6 | **Szín-eszközök** (**split-toning** kész; 3-way színkerék-UI · live scopes ⬜) | 🟡 |
-| §7 | **Audio** (metering/scope · sidechain tetszőleges sávra · per-band solo) | ⬜ |
+| §7 | **Audio** (**sidechain tetszőleges sávra** kész; metering/scope · per-band solo ⬜) | 🟡 |
 | §8 | **Render/perf** (**render-output cache** kész — §2.9 adósság zárva; batch-export ⬜) | ✅ |
 | §9 | **Nyitott adósságok** (GIF-dekód+render §2.8 · Creative Canvas a timeline-ba §2.11 · on-device natív render) | ⬜ |
 
@@ -123,9 +123,12 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 
 ## 7. 🔊 Audio — ⬜ (a lánc+master már profi)
 
-- [ ] ⬜ **Metering/scope** (peak/RMS/LUFS-mérő a mixerben).
-- [ ] ⬜ **Sidechain tetszőleges sávra** (ma `autoDuck` hardcode-olt) — a duck-forrás választható.
-- [ ] ⬜ **Per-band solo/mute** a multiband-kompresszorban · **sáv-almix/csoport**.
+- [x] ✅ **Sidechain tetszőleges sávra** — `AudioMaster.duckTrigger?: TrackType` (hiányzó = voiceover/beszéd,
+  mai viselkedés); a render a kiválasztott sáv hangját teszi a sidechain-kulcsra (az `autoDuck` klipek AZ alatt
+  halkulnak); MasterSheet trigger-választó chipek (Beszéd-auto / voiceover / music / sfx). *ÉLŐ AUDIO-RENDER
+  (renderProject, duckTrigger='sfx', 440Hz zene + 2000Hz sfx az első félidőben): a 440Hz-sáv [0,1]=−28.0 dB
+  (sfx alatt duckolt) vs [1,2]=−18.7 dB (teljes) → ~9.3 dB duck a KIVÁLASZTOTT sfx-sávra.*
+- [ ] ⬜ **Metering/scope** (peak/RMS/LUFS-mérő a mixerben) · **per-band solo/mute** a multibandban · sáv-almix.
 
 ## 8. ⚙️ Render / perf — ⬜
 

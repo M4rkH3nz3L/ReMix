@@ -130,6 +130,8 @@ const EFFECT_DEFAULT_AMOUNT = {
   invert: 1,
   chromaticAberration: 0.5,
   lightLeak: 0.6,
+  motionBlur: 0.5,
+  deflicker: 0.5,
 };
 // 🌅 fényszivárgás gauss-esése a jobb-felső sarokból — AZONOS a kliens `LIGHT_LEAK_L`-jével
 const LIGHT_LEAK_L = 'exp(-((X-W)*(X-W)+Y*Y)/(2*(W*0.4)*(W*0.4)))';
@@ -161,6 +163,10 @@ function effectFilterStr(effect) {
     }
     case 'lightLeak':
       return `format=gbrp,geq=r='min(255,r(X,Y)+${(a * 1.4).toFixed(3)}*255*${LIGHT_LEAK_L})':g='min(255,g(X,Y)+${(a * 0.8).toFixed(3)}*255*${LIGHT_LEAK_L})':b='b(X,Y)'`;
+    case 'motionBlur':
+      return `tmix=frames=${2 + Math.round(a * 6)}`;
+    case 'deflicker':
+      return `deflicker=size=${2 + Math.round(a * 8)}:mode=pm`;
     default:
       return '';
   }

@@ -683,7 +683,9 @@ export type VideoEffectType =
   | 'sepia'
   | 'invert'
   | 'chromaticAberration'
-  | 'lightLeak';
+  | 'lightLeak'
+  | 'motionBlur'
+  | 'deflicker';
 export interface VideoEffect {
   id: string;
   type: VideoEffectType;

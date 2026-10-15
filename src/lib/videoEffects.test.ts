@@ -27,7 +27,7 @@ const fx = (id: string, type: VideoEffect['type'], over: Partial<VideoEffect> = 
 
 describe('videoEffects — lánc-műveletek (audit §6.5)', () => {
   it('katalógus: minden típus benne', () => {
-    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak']);
+    expect(VIDEO_EFFECT_TYPES).toEqual(['blur', 'sharpen', 'vignette', 'grain', 'grayscale', 'sepia', 'invert', 'chromaticAberration', 'lightLeak', 'motionBlur', 'deflicker']);
   });
 
   it('addEffect a lánc végére, default amounttal', () => {
@@ -98,6 +98,14 @@ describe('videoEffects — FFmpeg-filter leképezés', () => {
     expect(ll).toContain('format=gbrp,geq=');
     expect(ll).toContain("b='b(X,Y)'"); // a kék csatorna változatlan
     expect(ll).toContain('exp(-((X-W)');
+  });
+
+  it('temporális effektek: motion blur (tmix) + deflicker', () => {
+    // amount 0.5 → tmix frames = 2 + round(0.5*6) = 5
+    expect(effectFilterString(fx('a', 'motionBlur', { amount: 0.5 }))).toBe('tmix=frames=5');
+    expect(effectFilterString(fx('a', 'motionBlur', { amount: 1 }))).toBe('tmix=frames=8');
+    // amount 0.5 → deflicker size = 2 + round(0.5*8) = 6
+    expect(effectFilterString(fx('a', 'deflicker', { amount: 0.5 }))).toBe('deflicker=size=6:mode=pm');
   });
 
   it('amount clamp a filterben is', () => {

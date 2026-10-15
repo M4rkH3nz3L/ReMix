@@ -31,6 +31,8 @@ export const VIDEO_EFFECTS: Record<VideoEffectType, EffectMeta> = {
   invert: { label: 'lib.effects.invert', parametric: false, defaultAmount: 1 },
   chromaticAberration: { label: 'lib.effects.chromaticAberration', parametric: true, defaultAmount: 0.5 },
   lightLeak: { label: 'lib.effects.lightLeak', parametric: true, defaultAmount: 0.6 },
+  motionBlur: { label: 'lib.effects.motionBlur', parametric: true, defaultAmount: 0.5 },
+  deflicker: { label: 'lib.effects.deflicker', parametric: true, defaultAmount: 0.5 },
 };
 
 // 🌅 fényszivárgás gauss-esése a JOBB-FELSŐ sarokból (geq; `W` a frame-szélesség) — kliens/worker AZONOS
@@ -125,6 +127,12 @@ export function effectFilterString(effect: VideoEffect): string {
     case 'lightLeak':
       // meleg (R↑ G↑) gauss-glow a jobb-felső sarokból; a B változatlan
       return `format=gbrp,geq=r='min(255,r(X,Y)+${(a * 1.4).toFixed(3)}*255*${LIGHT_LEAK_L})':g='min(255,g(X,Y)+${(a * 0.8).toFixed(3)}*255*${LIGHT_LEAK_L})':b='b(X,Y)'`;
+    case 'motionBlur':
+      // temporális kocka-átlag (mozgásra elmosódás-csík); 2–8 kocka
+      return `tmix=frames=${2 + Math.round(a * 6)}`;
+    case 'deflicker':
+      // temporális luma-villódzás simítás; 2–10 kocka ablak
+      return `deflicker=size=${2 + Math.round(a * 8)}:mode=pm`;
     default:
       return '';
   }

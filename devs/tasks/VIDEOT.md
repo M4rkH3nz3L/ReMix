@@ -73,7 +73,10 @@ A kép-sweepben épült szín-eszközöket a **video/image-klipre** (`render.js`
 - [x] 🐛 **Default-út effekt-bug JAVÍTVA** — a sima video+kép render-út (se kf/transform/maszk) KIHAGYTA az
   `effectChainFx`-et → eddig a 7 meglévő effekt (blur/grain/…) SEM hatott az egyszerű klipeken. Pótolva mindkét
   default-ágon (render.js). + i18n (lib.effects, 9 címke, hu/en/de).
-- [ ] ⬜ **Motion blur** (temporal `tmix`) · **deflicker** (`deflicker`) — temporális, mozgó/villódzó teszt-klip kell a bizonyításhoz (következő).
+- [x] ✅ **Motion blur (`tmix`) + deflicker** — két új `VideoEffect` típus (kliens↔worker azonos, contract-tesztelt):
+  motionBlur = temporális kocka-átlag (2–8 kocka), deflicker = luma-villódzás-simítás (2–10 kocka). *ÉLŐ
+  VIDEO-RENDER (renderProject): deflicker villódzás-szórás 83→27 (~3× csökkenés); motion blur a fekete→fehér
+  vágásnál közbenső rámpa 96→112→146 (elmosás). +i18n (hu/en/de).*
 - [ ] ⬜ **Halftone / szkennvonal / CRT** artisztikus szűrők · **per-effekt blend-mód**.
 
 ## 3. ⏱️ Idő & sebesség — ⬜

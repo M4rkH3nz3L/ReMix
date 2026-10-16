@@ -3,6 +3,7 @@
 
 const express = require('express');
 const { callerId, requireAuth } = require('../auth');
+const { rateLimit } = require('../security/rateLimit');
 const { usageFor, quotaAvailable } = require('../quota');
 const { payoutsConfigured, sendPayout } = require('../payouts');
 const { adminClient } = require('../notify');
@@ -32,7 +33,7 @@ router.get('/storage/usage', requireAuth, async (req, res) => {
 // az atomikus request_payout_for RPC végzi, majd megpróbáljuk a provider-utalást
 // (PayPal). Provider nélkül a kérelem 'pending' marad (manuális teljesítés). A
 // hívó a VERIFIKÁLT tokenből — mást nem lehet a nevében kifizettetni.
-router.post('/wallet/payout', requireAuth, express.json({ limit: '4kb' }), async (req, res) => {
+router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json({ limit: '4kb' }), async (req, res) => {
   const uid = callerId(req, req.body?.userId);
   if (!uid) {
     res.status(401).json({ error: 'Hiányzó felhasználó.' });

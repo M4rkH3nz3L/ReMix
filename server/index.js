@@ -221,6 +221,11 @@ app.use(errorHandler);
 // (node index.js). Teszt-importkor (require('./index')) NEM fut a listen/interval —
 // így a route-réteg integrációs teszttel vizsgálható (01-api-architecture §01.1).
 if (require.main === module) {
+  // 🔒 04-security §04.1: prod-ban a dev-kapuk (ALLOW_INSECURE_DEV/RL_DISABLED/
+  // ALLOW_DEV_BILLING) auth/rate-limit/billing védelmet kapcsolnak ki → az indulás
+  // megtagadva, ha bármelyik be van kapcsolva production-ben (go-live blokkoló).
+  require('./security/prodGates').assertProdGates();
+
   // 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
   // Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
   const { sweepStaleEgress } = require('./liveEgress');

@@ -17,6 +17,8 @@
 //   RL_<OSZTÁLY>_WINDOW=<ms> → az ablak hossza ms-ben
 //   (pl. RL_AI_MAX=30 RL_AI_WINDOW=60000)
 
+const { securityEvent } = require('./auditLog');
+
 const INSECURE_DEV = process.env.ALLOW_INSECURE_DEV === '1';
 const DISABLED = process.env.RL_DISABLED === '1';
 
@@ -161,6 +163,12 @@ function rateLimit(className) {
           return;
         }
         res.setHeader('Retry-After', String(r.retryAfterSec));
+        // 🔎 anti-abuse audit (04-security §04.2/§04.7): a blokk ténye naplózódik
+        securityEvent('ratelimit.block', {
+          target: `${req.method} ${req.path}`,
+          result: 'blocked',
+          meta: { class: className, retryAfterSec: r.retryAfterSec, limit: r.limit },
+        });
         res.status(429).json({
           error: `Túl sok kérés. Próbáld újra ${r.retryAfterSec} mp múlva.`,
         });

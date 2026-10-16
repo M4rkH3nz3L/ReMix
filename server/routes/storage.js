@@ -10,6 +10,7 @@ const { execFile } = require('child_process');
 const express = require('express');
 
 const { callerId, requireAuth } = require('../auth');
+const { rateLimit } = require('../security/rateLimit');
 const userStorage = require('../userStorage');
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
@@ -47,7 +48,7 @@ router.get('/storage/connected', requireAuth, async (req, res) => {
 });
 
 // 🎯 Az AKTÍV tárhely-cél beállítása: { sourceId } (null/üres → ReMix-tárhely).
-router.post('/storage/default', requireAuth, express.json({ limit: '4kb' }), async (req, res) => {
+router.post('/storage/default', requireAuth, rateLimit('messaging'), express.json({ limit: '4kb' }), async (req, res) => {
   const uid = callerId(req, req.body?.userId);
   if (!uid) {
     res.status(401).json({ error: 'Hiányzó felhasználó.' });
@@ -63,7 +64,7 @@ router.post('/storage/default', requireAuth, express.json({ limit: '4kb' }), asy
 });
 
 // 🔑 Külső forrás bekötése — OAuth (Drive/Dropbox): authorize-URL-t ad vissza.
-router.post('/storage/oauth/:provider/start', requireAuth, express.json({ limit: '4kb' }), (req, res) => {
+router.post('/storage/oauth/:provider/start', requireAuth, rateLimit('messaging'), express.json({ limit: '4kb' }), (req, res) => {
   const uid = callerId(req, req.body?.userId);
   if (!uid) {
     res.status(401).json({ error: 'Hiányzó felhasználó.' });
@@ -111,7 +112,7 @@ router.get('/storage/oauth/:provider/callback', async (req, res) => {
 });
 
 // Manuális forrás (WebDAV/S3): a kulcsokat a kliens küldi, a workeren tároljuk.
-router.post('/storage/connect', requireAuth, express.json({ limit: '8kb' }), async (req, res) => {
+router.post('/storage/connect', requireAuth, rateLimit('messaging'), express.json({ limit: '8kb' }), async (req, res) => {
   const uid = callerId(req, req.body?.userId);
   if (!uid) {
     res.status(401).json({ error: 'Hiányzó felhasználó.' });
@@ -134,7 +135,7 @@ router.post('/storage/connect', requireAuth, express.json({ limit: '8kb' }), asy
   }
 });
 
-router.post('/storage/:sourceId/disconnect', requireAuth, async (req, res) => {
+router.post('/storage/:sourceId/disconnect', requireAuth, rateLimit('messaging'), async (req, res) => {
   const uid = callerId(req, req.query.userId);
   if (!uid) {
     res.status(401).json({ error: 'Hiányzó felhasználó.' });

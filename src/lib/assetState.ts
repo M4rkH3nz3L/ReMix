@@ -120,3 +120,98 @@ export function canDownload(state: AssetState): boolean {
 export function canEvict(state: AssetState): boolean {
   return state === 'cached';
 }
+
+// ── §03.2 Eviction-politika (LRU + byte-cap, adatvesztés-védett) ──────────────
+
+/**
+ * Automatikus cache-eviction szempontjából dobható-e: CSAK a távoli forrásból
+ * ÚJRA-LETÖLTHETŐ állapotok (`cached` friss, `stale` elavult). A device-saját
+ * `imported`-ot SOHA (nincs távoli másolat → adatvesztés, ADR-013). A `canEvict`
+ * (UI-gomb) ennél szigorúbb — csak a friss `cached`-et kínálja kézzel.
+ */
+export function isCacheEvictable(state: AssetState): boolean {
+  return state === 'cached' || state === 'stale';
+}
+
+/** Foglal-e HELYI tárat (van letöltött fájlja) — a byte-cap számításához.
+ *  (A `isLocallyAvailable` az AZONNAL renderelhetőt jelenti, az kizárja a stale-t.) */
+export function occupiesDisk(state: AssetState): boolean {
+  return state === 'cached' || state === 'imported' || state === 'stale';
+}
+
+export interface CacheEntry {
+  /** a hívó azonosítója — a kiválasztott bejegyzéseket ezzel kapja vissza */
+  id?: string;
+  /** az asset állapota (a hívó számolja `assetStateOf`/`assetDisplayState`-tel) */
+  state: AssetState;
+  /** a helyi fájl mérete bájtban */
+  bytes?: number;
+  /** utolsó hozzáférés (ms epoch) — az LRU-rendezéshez */
+  lastAccessMs?: number;
+}
+
+/**
+ * LRU + byte-cap eviction-TERV: ha a helyben tárolt méret meghaladja a cap-et, a
+ * legrégebben használt, ÚJRA-LETÖLTHETŐ (`isCacheEvictable`) bejegyzéseket választja
+ * ki, amíg a cap alá nem ér. A device-saját `imported`-ot SOHA nem dobja — ha emiatt
+ * a cap fölött marad, a maradékot visszaadatlanul hagyja (a hívó jelzi a usernek;
+ * nincs adatvesztés, ADR-013). Tiszta: a méret/idő a hívótól jön.
+ */
+export function selectForEviction(
+  entries: readonly CacheEntry[],
+  { maxBytes }: { maxBytes: number },
+): CacheEntry[] {
+  const list = entries ?? [];
+  let total = list
+    .filter((e) => occupiesDisk(e.state))
+    .reduce((s, e) => s + Math.max(0, e.bytes ?? 0), 0);
+  if (total <= maxBytes) {
+    return [];
+  }
+  const evictable = list
+    .filter((e) => isCacheEvictable(e.state))
+    .sort((a, b) => (a.lastAccessMs ?? 0) - (b.lastAccessMs ?? 0)); // legrégebbi elöl
+  const out: CacheEntry[] = [];
+  for (const e of evictable) {
+    if (total <= maxBytes) {
+      break;
+    }
+    out.push(e);
+    total -= Math.max(0, e.bytes ?? 0);
+  }
+  return out;
+}
+
+// ── §03.3 Remote-changed verziózás (ETag / Last-Modified) ─────────────────────
+
+export interface RemoteMeta {
+  etag?: string | null;
+  lastModified?: string | null;
+}
+
+export type RemoteChange = 'unchanged' | 'changed' | 'unknown';
+
+/**
+ * Megváltozott-e a távoli forrás a cache-elt verzióhoz képest. ETag-elsőbbség
+ * (erős validátor); ha az nincs mindkét oldalon, a Last-Modified dönt (a távoli
+ * ÚJABB → changed); ha egyik sem összevethető → unknown. A `changed` eredményt a
+ * hívó `assetStateOf(..., { remoteChanged: true })`-ba vezeti → az asset `stale` lesz.
+ */
+export function remoteChangeDecision(cached: RemoteMeta, remote: RemoteMeta): RemoteChange {
+  const ce = cached?.etag?.trim();
+  const re = remote?.etag?.trim();
+  if (ce && re) {
+    return ce === re ? 'unchanged' : 'changed';
+  }
+  const cm = Date.parse(cached?.lastModified ?? '');
+  const rm = Date.parse(remote?.lastModified ?? '');
+  if (Number.isFinite(cm) && Number.isFinite(rm)) {
+    return rm > cm ? 'changed' : 'unchanged';
+  }
+  return 'unknown';
+}
+
+/** Rövid forma: BIZTOSAN megváltozott-e (az 'unknown' NEM számít változásnak). */
+export function remoteChanged(cached: RemoteMeta, remote: RemoteMeta): boolean {
+  return remoteChangeDecision(cached, remote) === 'changed';
+}

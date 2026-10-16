@@ -62,13 +62,16 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
 // 🔐 Megosztott HTTP-guardok + egységes hiba-handler (01-api-architecture §01.1/§01.3).
 const { proOnly, paidOnly, renderJobAuth } = require('./lib/guards');
 const { errorHandler } = require('./lib/httpError');
+const { log, makeRequestId } = require('./lib/log');
 
 const app = express();
 
 // kérés-napló (diagnosztika): honnan jön a hívás és mire — a „nem érhető el”
 // hibáknál ebből látszik, hogy a kérés egyáltalán megérkezik-e
 app.use((req, _res, next) => {
-  console.log(`[req] ${req.method} ${req.path} ← ${req.ip}`);
+  // 🪵 05-observability §05.1: strukturált, korrelálható kérés-napló (request-id)
+  req.id = makeRequestId();
+  log.info('req', { reqId: req.id, method: req.method, path: req.path, ip: req.ip });
   next();
 });
 
@@ -225,6 +228,13 @@ if (require.main === module) {
   // ALLOW_DEV_BILLING) auth/rate-limit/billing védelmet kapcsolnak ki → az indulás
   // megtagadva, ha bármelyik be van kapcsolva production-ben (go-live blokkoló).
   require('./security/prodGates').assertProdGates();
+
+  // 🧯 05-observability §05.3: nem-kezelt hibák strukturált logba (a process ne haljon
+  // némán) — a külső monitor/alerting ebből riaszt. Best-effort, a logging sosem dob.
+  process.on('unhandledRejection', (reason) =>
+    log.error('unhandledRejection', { reason: String((reason && reason.message) || reason) })
+  );
+  process.on('uncaughtException', (err) => log.error('uncaughtException', { error: err && err.message }));
 
   // 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
   // Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).

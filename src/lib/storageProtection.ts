@@ -49,3 +49,86 @@ export function checkDowngrade(usedBytes: number, newBaseBytes: number): Downgra
   const bonusGB = requiredBonusGB(usedBytes, newBaseBytes);
   return { safe: bonusGB === 0, bonusGB, monthlyCoin: monthlyCoinForBonus(bonusGB) };
 }
+
+// ── Írás-idejű kvóta-döntés (a record_storage_object szerver-enforce kliens-tükre) ──
+// A szerver akkor blokkol, ha `(used − existing + bytes) > quota` (SZIGORÚ >); ez a
+// mag ugyanezt mondja ki a hard-block UX-előnézethez, MIELŐTT a user feltölt.
+
+/** Innentől figyelmeztet a UI (a kvóta hányada). */
+export const QUOTA_WARN_FRACTION = 0.8;
+
+export type QuotaStatus = 'ok' | 'warn' | 'full';
+
+/** Szabad bájt (nem-negatív). */
+export function remainingBytes(usedBytes: number, quotaBytes: number): number {
+  return Math.max(0, Math.max(0, quotaBytes) - Math.max(0, usedBytes));
+}
+
+/** Kihasználtság 0–1+ (túllépve >1); kvóta ≤ 0 → 1 ha van használat, különben 0. */
+export function usedFraction(usedBytes: number, quotaBytes: number): number {
+  const q = Math.max(0, quotaBytes);
+  const used = Math.max(0, usedBytes);
+  if (q <= 0) {
+    return used > 0 ? 1 : 0;
+  }
+  return used / q;
+}
+
+/** Megjelenítés-státusz: tele (nincs szabad) / figyelmeztet (≥80%) / ok. */
+export function quotaStatus(usedBytes: number, quotaBytes: number): QuotaStatus {
+  const q = Math.max(0, quotaBytes);
+  const used = Math.max(0, usedBytes);
+  if (used >= q) {
+    return 'full';
+  }
+  return q > 0 && used / q >= QUOTA_WARN_FRACTION ? 'warn' : 'ok';
+}
+
+export interface StoreOpts {
+  /** a FELÜLÍRT objektum mérete (replace nem duplázza a használatot) */
+  replacingBytes?: number;
+}
+
+export interface StoreDecision {
+  allowed: boolean;
+  remainingBytes: number;
+  /** ennyivel lépné túl a kvótát (0 ha belefér) */
+  overBy: number;
+  reason: 'ok' | 'quota_exceeded';
+}
+
+/** Egy `addBytes`-os írás döntése (a szerver `>`-tükör + replace-szemantika). */
+export function storeDecision(
+  usedBytes: number,
+  quotaBytes: number,
+  addBytes: number,
+  opts: StoreOpts = {},
+): StoreDecision {
+  const replacing = Math.max(0, opts.replacingBytes ?? 0);
+  const q = Math.max(0, quotaBytes);
+  const effective = Math.max(0, Math.max(0, usedBytes) - replacing + Math.max(0, addBytes));
+  const over = effective - q;
+  const allowed = over <= 0;
+  return {
+    allowed,
+    remainingBytes: Math.max(0, q - effective),
+    overBy: Math.max(0, over),
+    reason: allowed ? 'ok' : 'quota_exceeded',
+  };
+}
+
+/** Belefér-e az írás kvóta-túllépés nélkül (hard-block előnézet). */
+export function canStore(usedBytes: number, quotaBytes: number, addBytes: number, opts: StoreOpts = {}): boolean {
+  return storeDecision(usedBytes, quotaBytes, addBytes, opts).allowed;
+}
+
+/** Hány GB bónusz kell, hogy EZ az írás beleférjen (0 ha belefér). */
+export function bonusGBToFit(usedBytes: number, quotaBytes: number, addBytes: number, opts: StoreOpts = {}): number {
+  const over = storeDecision(usedBytes, quotaBytes, addBytes, opts).overBy;
+  return over <= 0 ? 0 : Math.ceil(over / GB_BYTES);
+}
+
+/** Az írás befogadásának HAVI coin-költsége (a hiányzó GB-okra, 0 ha belefér). */
+export function coinToFit(usedBytes: number, quotaBytes: number, addBytes: number, opts: StoreOpts = {}): number {
+  return monthlyCoinForBonus(bonusGBToFit(usedBytes, quotaBytes, addBytes, opts));
+}

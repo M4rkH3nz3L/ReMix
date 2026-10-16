@@ -275,3 +275,32 @@ describe('contract: tier-rangsor (tiers.ts ⇄ server/tiers.js)', () => {
     }
   });
 });
+
+describe('contract: mirror-TELJESSÉG (drift-őr — egyoldali bővítés piros, 06-contract §06.1)', () => {
+  // A bitre-egyezésen (toEqual) FELÜL: ha valaki tier-t ad a TIER_ORDER-hez a
+  // kvóta nélkül, vagy metrikát a USAGE_METRICS-hez a quota-táblázat nélkül, az
+  // a toEqual-t nem feltétlen bukná el két helyen szinkronban — ezt fogja meg.
+  it('a TIER_QUOTAS tier-kulcsai PONTOSAN a TIER_ORDER (mindkét oldal)', () => {
+    const order = [...TIER_ORDER].sort();
+    expect(Object.keys(TIER_QUOTAS).sort()).toEqual(order);
+    expect(Object.keys(workerUsage.TIER_QUOTAS).sort()).toEqual(order);
+  });
+
+  it('minden tier MINDEN USAGE_METRICS-re definiál kvótát (nincs hiányzó metrika egyik oldalon sem)', () => {
+    for (const tier of TIER_ORDER) {
+      const q = quotaFor(tier);
+      const wq = workerUsage.quotaFor(tier);
+      for (const m of USAGE_METRICS) {
+        expect({ tier, m, client: q[m] !== undefined }).toEqual({ tier, m, client: true });
+        expect({ tier, m, worker: wq[m] !== undefined }).toEqual({ tier, m, worker: true });
+        expect(wq[m]).toBe(q[m]);
+      }
+    }
+  });
+
+  it('az ENTITLEMENTS tierei PONTOSAN a TIER_ORDER (nincs tier-drift a 3 mirror-tábla közt)', () => {
+    const order = [...TIER_ORDER].sort();
+    expect(Object.keys(ENTITLEMENTS).sort()).toEqual(order);
+    expect(Object.keys(workerEntitlements.ENTITLEMENTS).sort()).toEqual(order);
+  });
+});

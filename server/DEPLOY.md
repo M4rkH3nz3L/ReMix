@@ -4,7 +4,8 @@ A ReMix backend (API + render-worker + Redis) telepítése EGY Hetzner (vagy bá
 Docker-képes) szerverre, **automatikus HTTPS**-szel. A stack: [docker-compose.yml](./docker-compose.yml)
 (redis + api + worker + caddy), [Caddyfile](./Caddyfile), [.env.production.example](./.env.production.example).
 
-> **Ez a fájl a HOGYAN.** A teljes launch-kontextus: [../devs/tasks/PROD.md](../devs/tasks/PROD.md) (§4 backend-infra).
+> **Ez a fájl a HOGYAN.** A teljes launch-kontextus a fejlesztői Server-task-leírásokban él
+> (`devs/tasks/Server/` — lokális/gitignored munkaanyag).
 
 ---
 
@@ -170,8 +171,34 @@ docker compose up -d --scale worker=3
 
 - **Chromium-sandbox:** az `api` és a `worker` `cap_add: SYS_ADMIN`-t kap (a compose-ban beállítva) — e nélkül a
   particles / animált-szöveg / forma-rétegek csendben kimaradnának a renderből, és az `/imagedoc`/`/svg/pdf` hibázna.
-- **GDPR hard-erase cron (hátralévő):** a `/account/erase` kész (R2-purge is), de a cooldown utáni AUTOMATIKUS futtatáshoz
-  egy ütemezett job kell (pl. napi `cron` a szerveren, ami a lejárt soft-delete-eket hard-erase-eli) — ez deploy-feladat.
-- **Backup:** a Supabase (DB) saját backup; az R2 (média) a Cloudflare-nél; a Redis-queue efemer (nem kritikus).
+- **GDPR hard-erase cron (KÉSZ):** a lejárt-cooldownú soft-delete-eket a `scripts/erase-cron.js` törli véglegesen
+  (storage-média purge + auth-user delete + audit). Napi ütemezés pl. host-cronnal:
+  `0 3 * * *  cd /opt/remix/server && ALLOW_ACCOUNT_ERASE=1 node scripts/erase-cron.js >> /var/log/remix-erase.log 2>&1`
+  (service_role + `ALLOW_ACCOUNT_ERASE=1` kell; a cooldown `ERASE_COOLDOWN_DAYS`, alap 14 nap; a `/account/erase` a self-service út).
 - **Egress/Live (LiveKit):** külön szolgáltatás (LiveKit Cloud vagy saját Docker-egress) — nem ez a stack.
-- **Memória:** 2+ render-worker párhuzamos 4K-render memória-igényes; figyeld a `docker stats`-ot, méretezd a gépet/RENDER_CONCURRENCY-t.
+- **Memória:** 2+ render-worker párhuzamos 4K-render memória-igényes; figyeld a `docker stats`-ot, méretezd a gépet/RENDER_CONCURRENCY-t (§8 méretezés-doktrina).
+
+---
+
+## 10. Backup / restore (03 §3.5)
+
+| Forrás | Backup | RPO / RTO | Restore |
+|---|---|---|---|
+| **DB** (Supabase) | Supabase automatikus PITR (point-in-time) | RPO ~perc / RTO ~10 perc | Supabase Dashboard → Database → PITR → időpont visszaállítás |
+| **Média** (R2/S3) | Cloudflare R2 objektum-verziózás / replikáció (bucket-szinten bekapcsolandó) | RPO = replikáció / RTO ~perc | R2 konzol: objektum-verzió visszaállítás vagy replika-bucketből másolás |
+| **Queue** (Redis) | — (EFEMER, nem kritikus) | — | nincs: a projekt-JSON a kliensnél + `cloud_projects`-ben; a félbehagyott jobot a crash-recovery adja vissza (02 §2.4) |
+
+**Restore-próba (staging, kötelező legalább egyszer):** Supabase PITR egy korábbi időpontra → `/health` zöld → egy ismert projekt
+visszaolvasása. A Redis-queue elvesztése NEM okoz adatvesztést (a render újraindítható).
+
+## 11. Frissítés / zero-downtime deploy (03 §3.6)
+
+```bash
+cd /opt/remix && git pull && cd server
+docker compose up -d --build       # új image + rolling restart
+docker compose ps                  # várd meg: api 'healthy' (/health 200)
+```
+
+- A **worker-restart** nem veszít jobot: a `restart: unless-stopped` + a stalled-job crash-recovery (02 §2.4) a futó jobot visszaadja a sorba.
+- Az **api-restart** alatt a Caddy pár másodpercig 502-ezhet → a kliens retry-zik; teljes zero-downtime-hoz rolling api (2 replikA + Caddy load-balance) a következő lépés.
+- A `healthcheck` (`docker compose ps` → `healthy`, azaz `/health` 200) a readiness-gate a forgalom ráengedése előtt.

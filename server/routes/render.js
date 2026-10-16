@@ -21,6 +21,7 @@ const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJo
 const { listWorkers } = require('../workers-registry');
 const { s3Enabled, uploadFile, publicUrl } = require('../s3store');
 const { canAccessRenderJob } = require('../security/renderAuth');
+const { securityEvent } = require('../security/auditLog');
 const { trackUsage, userTier, enforceQuota } = require('../usage');
 
 const router = express.Router();

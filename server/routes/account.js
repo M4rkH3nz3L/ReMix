@@ -5,6 +5,7 @@ const express = require('express');
 const { callerId, requireAuth } = require('../auth');
 const { adminClient } = require('../notify');
 const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('../security/accountErase');
+const { securityEvent } = require('../security/auditLog');
 
 const ALLOW_ERASE = process.env.ALLOW_ACCOUNT_ERASE === '1';
 const ERASE_BUCKET = process.env.MEDIA_BUCKET || 'renders';

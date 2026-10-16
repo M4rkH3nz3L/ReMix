@@ -1,4 +1,12 @@
-import { aggregateByPost, aggregateViews, mergeViewSignals, type ViewEvent } from '@/lib/viewSignals';
+import {
+  aggregateByPost,
+  aggregateViews,
+  mergeViewSignals,
+  negativeSignal,
+  QUICK_SKIP_THRESHOLD,
+  type ViewEvent,
+} from '@/lib/viewSignals';
+import { scorePost } from '@/lib/feedRanking';
 
 describe('aggregateViews', () => {
   it('végignézés = min(1, watched/duration) átlag; a túlnézés 1-re szorítva', () => {
@@ -67,5 +75,37 @@ describe('mergeViewSignals', () => {
     const base = { likes: 5, views: 50 };
     expect(mergeViewSignals(base, undefined)).toBe(base);
     expect(mergeViewSignals(base, { views: 0, uniqueViewers: 0, completionRate: 0, rewatchRate: 0 })).toBe(base);
+  });
+});
+
+describe('negativeSignal — gyors-átugrás + explicit elrejtés/report (§01.1)', () => {
+  const skip: ViewEvent = { postId: 'p', watchedMs: 500, durationMs: 10_000 }; // 0.05 < 0.15 → skip
+  const watched: ViewEvent = { postId: 'p', watchedMs: 8_000, durationMs: 10_000 }; // 0.8 → nem skip
+
+  it('a küszöb alatti végignézés gyors-átugrásként számít', () => {
+    expect(negativeSignal({ events: [skip, skip, watched] })).toBeCloseTo(2 / 3, 10);
+    expect(negativeSignal({ events: [watched, watched] })).toBe(0);
+  });
+
+  it('a report a legerősebb jel (×6), az elrejtés ×3', () => {
+    expect(negativeSignal({ hides: 1, impressions: 10 })).toBeCloseTo(3 / 10, 10);
+    expect(negativeSignal({ reports: 1, impressions: 10 })).toBeCloseTo(6 / 10, 10);
+    expect(negativeSignal({ reports: 2, impressions: 10 })).toBe(1); // 12/10 → klamp 1
+  });
+
+  it('impressions alapból az események száma; üres → 0', () => {
+    expect(negativeSignal({ events: [skip] })).toBe(1); // 1 skip / 1 impression
+    expect(negativeSignal({})).toBe(0);
+  });
+
+  it('a kimenet a scorePost negativePenalty-ágát hajtja (negatív jel → alacsonyabb rang)', () => {
+    const base = { likes: 20, views: 100, ageHours: 1, completionRate: 0.5 };
+    const clean = scorePost({ ...base, negative: 0 });
+    const noisy = scorePost({ ...base, negative: negativeSignal({ reports: 1, hides: 2, impressions: 10 }) });
+    expect(noisy).toBeLessThan(clean);
+  });
+
+  it('QUICK_SKIP_THRESHOLD a dokumentált alapérték', () => {
+    expect(QUICK_SKIP_THRESHOLD).toBe(0.15);
   });
 });

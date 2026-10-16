@@ -96,3 +96,41 @@ export function mergeViewSignals(base: PostSignals, agg: ViewAggregate | undefin
     completionRate: agg.completionRate,
   };
 }
+
+// ── Negatív jelek (For-You §01.1) ────────────────────────────────────────────
+
+/** Ennél kevesebb végignézés a lapozásnál „gyors átugrás" (implicit negatív jel). */
+export const QUICK_SKIP_THRESHOLD = 0.15;
+
+export interface NegativeInput {
+  /** a poszt nézési eseményei — a gyors-átugrás ezekből számol */
+  events?: readonly ViewEvent[];
+  /** explicit „nem érdekel / elrejtés ettől az alkotótól" akciók száma */
+  hides?: number;
+  /** report-ok száma (a legerősebb negatív jel) */
+  reports?: number;
+  /** ahányszor a poszt megjelent (normalizáló); alap = az események száma */
+  impressions?: number;
+  /** a gyors-átugrás küszöbe (alap {@link QUICK_SKIP_THRESHOLD}) */
+  quickSkipThreshold?: number;
+}
+
+/**
+ * Poszt-szintű negatív jel 0–1 (a `PostSignals.negative`-hez, ahol a `scorePost`
+ * `negativePenalty` ága él). Súlyozott negatív-akció / megjelenés: gyors-átugrás ×1,
+ * explicit elrejtés ×3, report ×6 — 1-re szorítva. A report keveset is magasra visz.
+ */
+export function negativeSignal(input: NegativeInput): number {
+  const events = input.events ?? [];
+  const threshold = input.quickSkipThreshold ?? QUICK_SKIP_THRESHOLD;
+  let quickSkips = 0;
+  for (const e of events) {
+    if (clampFraction(e.watchedMs, e.durationMs) < threshold) {
+      quickSkips += 1;
+    }
+  }
+  const impressions = Math.max(1, input.impressions ?? events.length);
+  const raw = quickSkips * 1 + Math.max(0, input.hides ?? 0) * 3 + Math.max(0, input.reports ?? 0) * 6;
+  const rate = raw / impressions;
+  return rate < 0 ? 0 : rate > 1 ? 1 : rate;
+}

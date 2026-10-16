@@ -46,7 +46,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # 🎬 render-worker: a BullMQ „render" sorából húz (>15s videó/queue). Skálázható.
+  # 🎬 render-worker: a BullMQ „render" sorából húz (>15s videó/queue). Skálázható:
+  #   docker compose up -d --scale worker=N   (vízszintes: példányszám)
+  #   RENDER_CONCURRENCY=K                     (függőleges: szál/példány; crash-recovery: queue.workerOptions)
   worker:
     build: .
     image: remix-backend
@@ -60,6 +62,11 @@ services:
         condition: service_healthy
     cap_add:
       - SYS_ADMIN # render-time Chromium (particles / animált szöveg / forma)
+    # 🧠 OOM-védelem (02-render §02.5): a 4K-render + headless Chromium memória-éhes.
+    # A mem_limit megakadályozza, hogy EGY worker OOM-ja lerántsa a hostot/redist —
+    # a konténert a kernel OOM-killeli, a stalled-job (queue.workerOptions) visszaadja
+    # a sorba. Méretezd a géphez (pl. 8 GB host → 2 worker × ~3g), figyeld: docker stats.
+    mem_limit: 3g
 
   # 🔒 Caddy: fordított proxy + AUTOMATIKUS Let's Encrypt HTTPS a ${RENDER_DOMAIN}-re
   caddy:

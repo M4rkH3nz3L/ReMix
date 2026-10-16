@@ -50,16 +50,26 @@ function tierJobPriority(tier) {
   }
 }
 
-/** Sorba tesz egy render-jobot a megadott id-vel; visszaadja a job id-t. */
-async function enqueueRender(jobId, payload) {
-  await renderQueue().add('render', payload, {
+/**
+ * 💠 A render-job BullMQ-opciói (02-render §02.3). SZÁNDÉKOSAN pure → tesztelhető.
+ * Idempotencia: a `jobId` determinisztikus (ugyanaz az id ugyanazt a slotot foglalja,
+ * nincs párhuzamos dupla). Retry: 2 próba, fix 3 s backoff (a tranziens S3/hálózat-hibára).
+ * A lezárt jobok ~1 óra után kikerülnek (removeOn*), hogy a „Sor" ne hízzon végtelenül.
+ */
+function renderJobOptions(jobId, payload) {
+  return {
     jobId,
     priority: tierJobPriority(payload && payload.tier), // 💠 tier-alapú sorrend (§2.6)
     attempts: 2,
     backoff: { type: 'fixed', delay: 3000 },
     removeOnComplete: { age: 3600, count: 200 },
     removeOnFail: { age: 3600, count: 200 },
-  });
+  };
+}
+
+/** Sorba tesz egy render-jobot a megadott id-vel; visszaadja a job id-t. */
+async function enqueueRender(jobId, payload) {
+  await renderQueue().add('render', payload, renderJobOptions(jobId, payload));
   return jobId;
 }
 
@@ -127,6 +137,25 @@ function renderConcurrency() {
   return Math.max(1, parseInt(process.env.RENDER_CONCURRENCY || '2', 10));
 }
 
+/**
+ * 🧵 A render-worker BullMQ-Worker opciói (02-render §02.4/§02.5). SZÁNDÉKOSAN pure.
+ *  - `concurrency`: a párhuzamos render-szálak száma (RENDER_CONCURRENCY).
+ *  - `lockDuration`: amíg a job-lock él renew nélkül; a futó worker automatikusan
+ *    megújítja, DE ha a worker ÖSSZEOMLIK (OOM/kill), a lock ennyi után lejár →
+ *    a BullMQ a jobot `stalled`-ként visszaadja a sorba (CRASH-RECOVERY).
+ *  - `stalledInterval`: ennyinként söpri a lejárt-lockú (stalled) jobokat.
+ *  - `maxStalledCount`: ennyiszer veszi vissza stalled után, utána `failed`
+ *    (poison-job védelem — egy crash-okozó render ne renderelődjön végtelenül).
+ */
+function workerOptions() {
+  return {
+    concurrency: renderConcurrency(),
+    lockDuration: 60 * 1000,
+    stalledInterval: 30 * 1000,
+    maxStalledCount: 1,
+  };
+}
+
 /** Egy BullMQ-job → a schedules-nézet nyers mezői (belső, nem exportált). */
 function jobFields(job, state) {
   const d = job.data || {};
@@ -172,6 +201,7 @@ module.exports = {
   queueEnabled,
   renderQueue,
   enqueueRender,
+  renderJobOptions,
   tierJobPriority,
   getRenderJob,
   cancelRenderJob,
@@ -180,6 +210,7 @@ module.exports = {
   clearJobCancel,
   listRenderJobs,
   renderConcurrency,
+  workerOptions,
   connection,
   QUEUE_NAME,
 };

@@ -143,6 +143,27 @@ docker compose restart api
 docker compose down          # leállítás (a volume-ok megmaradnak)
 ```
 
+### Render-worker méretezés-doktrina (02-render §02.5)
+
+Két tengely: **példányszám** (`--scale worker=N`) × **szál/példány** (`RENDER_CONCURRENCY=K`).
+A 4K-render + headless Chromium memória-éhes → a worker-konténer `mem_limit: 3g`
+(compose) védi a hostot az OOM-tól; egy OOM-killelt workert a stalled-job
+(`queue.js` `workerOptions`) visszaad a sorba (crash-recovery).
+
+| Host (vCPU / RAM) | Ajánlott | Megjegyzés |
+|---|---|---|
+| 4 vCPU / 8 GB (CX32) | `worker=2`, `RENDER_CONCURRENCY=1` | 4K-nál 1 szál/worker (mem-éhes) |
+| 8 vCPU / 16 GB | `worker=3–4`, `RENDER_CONCURRENCY=1–2` | 1080p-nél mehet 2 szál |
+| több-render terhelés | `worker=N` lineáris áteresztés | a „Sor"-ETA (`index.js`) a concurrency-vel skáláz |
+
+```bash
+docker stats                 # élő CPU/MEM worker-példányonként (OOM-figyelés)
+docker compose up -d --scale worker=3
+```
+
+> ⚠️ A `RENDER_CONCURRENCY × worker-példány × ~3g` ne lépje túl a host RAM-ját,
+> hogy maradjon fejhely a redis + api + caddy + OS számára.
+
 ---
 
 ## 9. Megjegyzések / kockázatok

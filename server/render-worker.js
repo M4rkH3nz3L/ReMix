@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const { Worker } = require('bullmq');
 
-const { connection, QUEUE_NAME, isJobCancelRequested, clearJobCancel } = require('./queue');
+const { connection, QUEUE_NAME, isJobCancelRequested, clearJobCancel, workerOptions } = require('./queue');
 const { downloadFile, uploadFile } = require('./s3store');
 const { renderProject } = require('./render');
 const { notifyAvailable, sendNotification } = require('./notify');
@@ -156,7 +156,8 @@ const worker = new Worker(
       }
     }
   },
-  { connection: connection(), concurrency: CONCURRENCY }
+  // 🧵 concurrency + crash-recovery (stalled-job) opciók a queue-ból (02-render §02.4/§02.5)
+  { connection: connection(), ...workerOptions() }
 );
 
 // 🔔 A job GAZDÁJÁNAK értesítése (a `render` típus a klienst a „Sor" nézetre

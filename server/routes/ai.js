@@ -24,10 +24,13 @@ const {
   runAutoEdit,
 } = require('../ai');
 
+const { validate } = require('../lib/validate');
+const aiSchemas = require('./schemas/ai');
+
 const router = express.Router();
 
 // 🪝 Hook Generator (P2): téma → 6 különböző stílusú nyitómondat
-router.post('/ai/hooks', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/hooks', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/hooks', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/hooks', rateClass: 'ai' }), rateLimit('ai'), aiMeter, validate(aiSchemas.hooks), (req, res) => {
   const { summary, aiConfig } = req.body ?? {};
   if (!summary || typeof summary !== 'string') {
     res.status(400).json({ error: 'Hiányzó összefoglaló.' });
@@ -54,7 +57,7 @@ router.post('/ai/probe', express.json({ limit: '64kb' }), ...authenticated({ met
 });
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
-router.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, validate(aiSchemas.translate), (req, res) => {
   const { segments, lang, aiConfig } = req.body ?? {};
   if (!Array.isArray(segments) || segments.length === 0 || !lang) {
     res.status(400).json({ error: 'Hiányzó szegmensek vagy célnyelv.' });
@@ -69,7 +72,7 @@ router.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateL
 });
 
 // 🎯 Highlights (Phase 3.3): long-form → több önálló short-jelölt (idő-ablak)
-router.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, validate(aiSchemas.highlights), (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
@@ -84,7 +87,7 @@ router.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rate
 });
 
 // 🎬 Story Engine (Phase 1.1): jelek (hossz + átirat) → dramaturgiai fejezetek
-router.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit('ai'), aiMeter, validate(aiSchemas.story), (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });
@@ -99,7 +102,7 @@ router.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit
 });
 
 // 🎬 Thumbnail headline-javaslatok (CC V2): téma-összefoglaló → 3 rövid cím
-router.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/thumbheadlines', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authenticated({ method: 'POST', path: '/ai/thumbheadlines', rateClass: 'ai' }), rateLimit('ai'), aiMeter, validate(aiSchemas.thumbheadlines), (req, res) => {
   const { summary, aiConfig } = req.body ?? {};
   if (!summary || typeof summary !== 'string') {
     res.status(400).json({ error: 'Hiányzó összefoglaló.' });
@@ -114,7 +117,7 @@ router.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authentic
 });
 
 // ✨ Caption Studio (P1): kiemelt szavak + emoji a felirat-szegmensekhez
-router.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticated({ method: 'POST', path: '/ai/captionstudio', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticated({ method: 'POST', path: '/ai/captionstudio', rateClass: 'ai' }), rateLimit('ai'), aiMeter, validate(aiSchemas.captionstudio), (req, res) => {
   const { segments, aiConfig } = req.body ?? {};
   if (!Array.isArray(segments) || segments.length === 0) {
     res.status(400).json({ error: 'Hiányzó szegmensek.' });
@@ -129,7 +132,7 @@ router.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticate
 });
 
 // AI-asszisztens: kontextus + utasítás → validált parancslista
-router.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ method: 'POST', path: '/ai/assist', rateClass: 'ai' }), rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ method: 'POST', path: '/ai/assist', rateClass: 'ai' }), rateLimit('ai'), aiMeter, validate(aiSchemas.assist), (req, res) => {
   const { context, instruction, aiConfig } = req.body ?? {};
   if (!instruction || typeof instruction !== 'string') {
     res.status(400).json({ error: 'Hiányzó utasítás.' });
@@ -144,7 +147,7 @@ router.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ met
 });
 
 // AI Edit Engine (P0-1): elemzett jelek → 3 vágás-változat
-router.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, rateLimit('ai'), aiMeter, (req, res) => {
+router.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, rateLimit('ai'), aiMeter, validate(aiSchemas.autoedit), (req, res) => {
   const { context, aiConfig } = req.body ?? {};
   if (!context || typeof context !== 'object') {
     res.status(400).json({ error: 'Hiányzó kontextus.' });

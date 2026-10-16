@@ -47,15 +47,33 @@ describe('AI domain-router (e2e)', () => {
     expect(hooks.rateClass).toBe('ai');
   });
 
-  test('POST /ai/hooks üres → 400 (hiányzó összefoglaló)', async () => {
+  test('POST /ai/hooks üres → 400 { code:"validation", issues } (zod-validáció §01.2)', async () => {
     const { status, json } = await post('/ai/hooks', {});
     expect(status).toBe(400);
     expect(typeof json.error).toBe('string');
+    expect(json.code).toBe('validation');
+    expect(Array.isArray(json.issues)).toBe(true);
+    expect(json.issues[0].path).toBe('summary');
   });
 
-  test('POST /ai/assist üres → 400 (hiányzó utasítás)', async () => {
-    const { status } = await post('/ai/assist', {});
+  test('POST /ai/assist üres → 400 + issues (instruction hiány)', async () => {
+    const { status, json } = await post('/ai/assist', {});
     expect(status).toBe(400);
+    expect(json.code).toBe('validation');
+    expect(json.issues.some((i) => i.path === 'instruction')).toBe(true);
+  });
+
+  test('POST /ai/captionstudio üres segments → 400 + issues', async () => {
+    const { status, json } = await post('/ai/captionstudio', { segments: [] });
+    expect(status).toBe(400);
+    expect(json.code).toBe('validation');
+    expect(json.issues.some((i) => i.path === 'segments')).toBe(true);
+  });
+
+  test('POST /ai/highlights nem-objektum context → 400 + issues', async () => {
+    const { status, json } = await post('/ai/highlights', { context: null });
+    expect(status).toBe(400);
+    expect(json.code).toBe('validation');
   });
 
   test('POST /ai/translate hiányzó lang → 400', async () => {

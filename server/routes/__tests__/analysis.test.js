@@ -42,7 +42,7 @@ describe('analysis domain-router (e2e)', () => {
     expect(res.status).toBe(400);
   });
 
-  test('POST /vision/query üres törzs → 400', async () => {
+  test('POST /vision/query üres törzs → 400 { code:"validation", issues } (zod §01.2)', async () => {
     const res = await fetch(base + '/vision/query', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -51,5 +51,7 @@ describe('analysis domain-router (e2e)', () => {
     expect(res.status).toBe(400);
     const b = await res.json().catch(() => null);
     expect(b && typeof b.error).toBe('string');
+    expect(b.code).toBe('validation');
+    expect(Array.isArray(b.issues)).toBe(true);
   });
 });

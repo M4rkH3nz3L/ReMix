@@ -18,6 +18,9 @@ const { indexFrames, queryScores } = require('../vision');
 const { pickThumbnails } = require('../thumbs');
 const { analyzeReframe } = require('../reframe');
 
+const { validate } = require('../lib/validate');
+const analysisSchemas = require('./schemas/analysis');
+
 const router = express.Router();
 
 // Jelenet-detektálás (Editor AI, szemantikus index): FFmpeg scene-score —
@@ -172,7 +175,7 @@ router.post('/vision/index', upload.any(), requireAuth, rateLimit('analysis'), (
 
 // Smart Search lekérdezés: query + dokumentumok → hasonlóság-pontok
 // (nomic-embed-text a lokális Ollamában).
-router.post('/vision/query', express.json({ limit: '1mb' }), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/vision/query', express.json({ limit: '1mb' }), requireAuth, rateLimit('analysis'), validate(analysisSchemas.visionQuery), (req, res) => {
   const { query, docs } = req.body ?? {};
   if (!query || !Array.isArray(docs) || docs.length === 0) {
     res.status(400).json({ error: 'Hiányzó lekérdezés vagy dokumentumok.' });

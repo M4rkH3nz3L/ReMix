@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -99,7 +100,18 @@ function aspectValue(ar: string | undefined): number {
 }
 
 /** Program-előnézet (SZERKESZTŐ mód): a jelenet forrásait 0–1 dobozokként rajzolja.
- *  Az élő videó-kompozíció a Fázis B (nézői PreviewSurface + data-channel). */
+ *  A `camera` forrás ÉLŐ `expo-camera` előnézetet kap (a host saját kamerája, pontosan
+ *  a forrás transformjában pozicionálva → OBS-szerű valós kompozíció). A Studio élő ELŐTTI
+ *  (a LiveKit csak a „Start streaming"-re indul), így a kamera itt szabad — nem ütközik a
+ *  publisherrel, és nem a (New-Arch alatt feketén renderelő) WebRTC-nézeten megy.
+ *
+ *  ⚠️ New-Arch (Fabric) + expo-camera workaround (expo/expo#49760, #31597, #50015): a
+ *  Fabric a gyerek-sorrend változását Remove+Insert mutációként commitálja → a `CameraView`
+ *  natív nézete `removeFromSuperview`-t kapna JS-unmount nélkül, és NEM inicializálna újra
+ *  (fekete, pedig a zöld pont ég). Ezért a `CameraView` egy `collapsable={false}` wrapper
+ *  EGYEDÜLI gyereke, külön STABIL rétegben (mindig a vászon első gyereke), és soha nem
+ *  rendeződik át; a feliratok/keret FÖLÖTTE, abszolút overlayként jönnek. Egyszerre csak EGY
+ *  kamera aktív (iOS), ezért csak az `primaryCameraId` kap élő képet. */
 function LiveCanvas({
   doc,
   width,
@@ -107,6 +119,11 @@ function LiveCanvas({
   maxHeight,
   selectedId,
   onSelect,
+  facing,
+  cameraGranted,
+  primaryCameraId,
+  onRequestCamera,
+  onFlip,
 }: {
   doc: LiveDoc;
   width: number;
@@ -114,6 +131,11 @@ function LiveCanvas({
   maxHeight: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  facing: 'front' | 'back';
+  cameraGranted: boolean;
+  primaryCameraId: string | null;
+  onRequestCamera: () => void;
+  onFlip: () => void;
 }) {
   const scene = getActiveScene(doc);
   // a 9:16 vászon túl magas lenne teljes szélességen → ha kell, a magasságra
@@ -124,18 +146,42 @@ function LiveCanvas({
     height = maxHeight;
     w = height * aspect;
   }
+  // az élő kamera-forrás (az első látható) — a preview KÜLÖN, STABIL rétegben megy
+  const primaryCam = scene?.sources.find((s) => s.id === primaryCameraId) ?? null;
+  const showCamera = !!primaryCam && cameraGranted;
   return (
     <View style={[styles.canvas, { width: w, height }]}>
+      {showCamera && primaryCam && (
+        <View
+          collapsable={false}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: primaryCam.transform.x * w,
+            top: primaryCam.transform.y * height,
+            width: Math.max(28, primaryCam.transform.w * w),
+            height: Math.max(22, primaryCam.transform.h * height),
+            borderRadius: 8,
+            overflow: 'hidden',
+            backgroundColor: '#000',
+          }}
+        >
+          <CameraView style={StyleSheet.absoluteFill} facing={facing} mode="video" />
+        </View>
+      )}
       {scene &&
         sortedSources(scene).map((src) => {
           const t = src.transform;
           const selected = src.id === selectedId;
+          const isCamera = src.kind === 'camera';
+          const liveCamera = isCamera && src.visible && src.id === primaryCameraId && cameraGranted;
           return (
             <Pressable
               key={src.id}
-              onPress={() => onSelect(src.id)}
+              onPress={() => (isCamera && !cameraGranted ? onRequestCamera() : onSelect(src.id))}
               style={[
                 styles.srcBox,
+                liveCamera && styles.srcBoxLive,
                 {
                   left: t.x * w,
                   top: t.y * height,
@@ -147,10 +193,26 @@ function LiveCanvas({
                 },
               ]}
             >
-              <Ionicons name={SOURCE_ICON[src.kind]} size={16} color="#fff" />
-              <Text style={styles.srcBoxLabel} numberOfLines={1}>
-                {src.label || src.kind}
-              </Text>
+              {liveCamera ? (
+                <View pointerEvents="none" style={styles.camTag}>
+                  <Ionicons name="videocam" size={11} color="#fff" />
+                  <Text style={styles.camTagText}>{src.label || 'Camera'}</Text>
+                </View>
+              ) : isCamera ? (
+                <>
+                  <Ionicons name="videocam-off" size={18} color="#fff" />
+                  <Text style={styles.srcBoxLabel} numberOfLines={1}>
+                    {cameraGranted ? src.label || 'Camera' : 'Tap to enable camera'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name={SOURCE_ICON[src.kind]} size={16} color="#fff" />
+                  <Text style={styles.srcBoxLabel} numberOfLines={1}>
+                    {src.label || src.kind}
+                  </Text>
+                </>
+              )}
             </Pressable>
           );
         })}
@@ -159,6 +221,11 @@ function LiveCanvas({
           <Ionicons name="add-circle-outline" size={28} color={palette.textDim} />
           <Text style={styles.canvasEmptyText}>—</Text>
         </View>
+      )}
+      {showCamera && (
+        <Pressable onPress={onFlip} style={styles.flipBtn} hitSlop={8}>
+          <Ionicons name="camera-reverse" size={20} color="#fff" />
+        </Pressable>
       )}
     </View>
   );
@@ -191,6 +258,9 @@ export default function LiveStudioScreen() {
   const [rtmpLabel, setRtmpLabel] = useState('');
   const [rtmpUrl, setRtmpUrl] = useState('');
   const [rtmpKey, setRtmpKey] = useState('');
+  // 🎥 élő kamera-előnézet (expo-camera) — a Studio élő ELŐTTI, így a kamera szabad
+  const [camPerm, requestCam] = useCameraPermissions();
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
 
   const loadDests = useCallback(() => {
     listDestinations()
@@ -239,6 +309,17 @@ export default function LiveStudioScreen() {
     () => scene?.sources.find((s) => s.id === selectedId) ?? null,
     [scene, selectedId]
   );
+  // 🎥 egyszerre csak EGY élő kamera (iOS) → az első látható kamera-forrás kap képet
+  const primaryCameraId = useMemo(
+    () => (scene ? sortedSources(scene).find((s) => s.kind === 'camera' && s.visible)?.id ?? null : null),
+    [scene]
+  );
+  // belépéskor elkérjük a kamera-engedélyt (a preview-hoz) — ha már eldőlt, no-op
+  useEffect(() => {
+    if (!camPerm?.granted) {
+      requestCam();
+    }
+  }, [camPerm?.granted, requestCam]);
 
   if (loadError) {
     return (
@@ -332,6 +413,11 @@ export default function LiveStudioScreen() {
               maxHeight={winH * 0.42}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              facing={facing}
+              cameraGranted={!!camPerm?.granted}
+              primaryCameraId={primaryCameraId}
+              onRequestCamera={() => requestCam()}
+              onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
             />
           )}
         </View>
@@ -691,6 +777,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   srcBoxLabel: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  srcBoxLive: { backgroundColor: 'transparent' },
+  camTag: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#00000073',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  camTagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  flipBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#00000073',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#ffffff44',
+  },
   canvasEmpty: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 4 },
   canvasEmptyText: { color: palette.textDim },
 

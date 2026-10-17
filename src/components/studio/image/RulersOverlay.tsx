@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { PanResponder, type PanResponderInstance, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import { rulerTicks } from '@/lib/rulers';
@@ -13,6 +14,11 @@ const EDGE = 0.012; // a szélre húzva a segédvonal törlődik (normalizált)
  * koppintva új (függőleges/vízszintes) segédvonal; a segédvonalak húzással
  * mozgathatók, a szélre húzva törlődnek. Szerkesztő-only (a render nem égeti be);
  * a réteg-mozgatás a `snapPointToGuides`-szal illeszkedik rájuk (ImageCanvas).
+ *
+ * Gesztus: modern react-native-gesture-handler (Touch/03). A vonalzó-sáv `Gesture.Tap`
+ * (a korábbi „kis elmozdulás = tap" kézi logika helyett), a segédvonal `Gesture.Pan`;
+ * mindkettő EGYSZER jön létre (stabil), a friss propokat `dataRef`-ből olvassa,
+ * `runOnJS(true)`. A `Tap` `e.x/e.y`-a a sáv lokális koordinátája (= `locationX/Y`).
  */
 export function RulersOverlay({
   box,
@@ -29,23 +35,17 @@ export function RulersOverlay({
 }) {
   const dataRef = useRef({ box, onAddGuide });
   dataRef.current = { box, onAddGuide };
-  const tapRef = useRef({ x: 0, y: 0 });
 
-  const resp = useRef<{ top: PanResponderInstance; left: PanResponderInstance } | null>(null);
-  if (!resp.current) {
+  const gestures = useRef<{ top: ReturnType<typeof Gesture.Tap>; left: ReturnType<typeof Gesture.Tap> } | null>(null);
+  if (!gestures.current) {
     const makeAdd = (axis: 'x' | 'y') =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e) => {
-          tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-        },
-        onPanResponderRelease: (_e, g) => {
-          if (Math.hypot(g.dx, g.dy) > 10) return;
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd((e) => {
           const d = dataRef.current;
-          d.onAddGuide(axis, axis === 'x' ? tapRef.current.x / d.box.w : tapRef.current.y / d.box.h);
-        },
-      });
-    resp.current = { top: makeAdd('x'), left: makeAdd('y') };
+          d.onAddGuide(axis, axis === 'x' ? e.x / d.box.w : e.y / d.box.h);
+        });
+    gestures.current = { top: makeAdd('x'), left: makeAdd('y') };
   }
 
   const xTicks = rulerTicks(0, 1, box.w);
@@ -59,17 +59,21 @@ export function RulersOverlay({
       ))}
 
       {/* felső vonalzó */}
-      <View style={[styles.rulerTop, { width: box.w }]} {...resp.current.top.panHandlers}>
-        {xTicks.map((t, i) => (
-          <View key={i} pointerEvents="none" style={[styles.tickV, { left: t.px, height: t.major ? 10 : 5 }]} />
-        ))}
-      </View>
+      <GestureDetector gesture={gestures.current.top}>
+        <View style={[styles.rulerTop, { width: box.w }]}>
+          {xTicks.map((t, i) => (
+            <View key={i} pointerEvents="none" style={[styles.tickV, { left: t.px, height: t.major ? 10 : 5 }]} />
+          ))}
+        </View>
+      </GestureDetector>
       {/* bal vonalzó */}
-      <View style={[styles.rulerLeft, { height: box.h }]} {...resp.current.left.panHandlers}>
-        {yTicks.map((t, i) => (
-          <View key={i} pointerEvents="none" style={[styles.tickH, { top: t.px, width: t.major ? 10 : 5 }]} />
-        ))}
-      </View>
+      <GestureDetector gesture={gestures.current.left}>
+        <View style={[styles.rulerLeft, { height: box.h }]}>
+          {yTicks.map((t, i) => (
+            <View key={i} pointerEvents="none" style={[styles.tickH, { top: t.px, width: t.major ? 10 : 5 }]} />
+          ))}
+        </View>
+      </GestureDetector>
     </>
   );
 }
@@ -89,42 +93,40 @@ function GuideLine({
   dataRef.current = { guide, box, onMove, onCommit };
   const startRef = useRef(0);
 
-  const pan = useRef<PanResponderInstance | null>(null);
-  if (!pan.current) {
-    pan.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+  const pan = useRef(
+    Gesture.Pan()
+      .runOnJS(true)
+      .onStart(() => {
         startRef.current = dataRef.current.guide.pos;
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const d = dataRef.current;
-        const delta = d.guide.axis === 'x' ? g.dx / d.box.w : g.dy / d.box.h;
+        const delta = d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h;
         d.onMove(d.guide.id, startRef.current + delta);
-      },
-      onPanResponderRelease: (_e, g) => {
+      })
+      .onEnd((e) => {
         const d = dataRef.current;
-        const delta = d.guide.axis === 'x' ? g.dx / d.box.w : g.dy / d.box.h;
+        const delta = d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h;
         const pos = startRef.current + delta;
         // a szélre húzva törlés
         d.onCommit(d.guide.id, pos < EDGE || pos > 1 - EDGE ? null : pos);
-      },
-    });
-  }
+      })
+  ).current;
 
   const isX = guide.axis === 'x';
   return (
-    <View
-      style={[
-        styles.hit,
-        isX
-          ? { left: guide.pos * box.w - 10, top: 0, width: 20, height: box.h }
-          : { top: guide.pos * box.h - 10, left: 0, height: 20, width: box.w },
-      ]}
-      {...pan.current.panHandlers}
-    >
-      <View pointerEvents="none" style={isX ? styles.lineV : styles.lineH} />
-    </View>
+    <GestureDetector gesture={pan}>
+      <View
+        style={[
+          styles.hit,
+          isX
+            ? { left: guide.pos * box.w - 10, top: 0, width: 20, height: box.h }
+            : { top: guide.pos * box.h - 10, left: 0, height: 20, width: box.w },
+        ]}
+      >
+        <View pointerEvents="none" style={isX ? styles.lineV : styles.lineH} />
+      </View>
+    </GestureDetector>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { PanResponder, type PanResponderInstance, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import { type CropCorner, type CropRect, moveCropRect, resizeCropCorner } from '@/lib/imageCrop';
@@ -10,8 +11,13 @@ import { type CropCorner, type CropRect, moveCropRect, resizeCropCorner } from '
  * segédvonalak. A `rect` vezérelt (a szülő tartja), a gesztus `onChange`-dzsel
  * frissít; az „Alkalmaz" a szülőben hívja a `cropImageDoc`-ot (egy undo-lépés).
  *
- * A gesztus-kezelők a `dataRef`/`startRef`-ből olvasnak (a PanResponder EGYSZER
- * jön létre) — ugyanaz a minta, mint a SelectionFrame-ben.
+ * Gesztus: modern react-native-gesture-handler (Touch/03). A body + 4 sarok
+ * `Gesture.Pan`-je EGYSZER jön létre (stabil handler), a friss `rect/box/onChange`-t
+ * a `dataRef`-ből olvassa, a gesztus kezdetén a `startRef`-be rögzíti a rect-et, és
+ * `e.translationX/Y`-ból számol (= a korábbi `g.dx/dy`). A sarok-fogók a keret FÖLÖTT
+ * renderelődnek → az átfedésben a sarok-húzás győz a mozgatás ellen. A crop-on kívüli
+ * érintést a gyökér-View nyeli el (a dim-sávok `pointerEvents="none"`, a rétegek
+ * testvérek → nem mozdulnak). `runOnJS(true)`: a callbackek a JS-szálon (setState).
  */
 export function CropOverlay({
   box,
@@ -26,46 +32,35 @@ export function CropOverlay({
   dataRef.current = { rect, box, onChange };
   const startRef = useRef<CropRect>(rect);
 
-  const resp = useRef<{
-    swallow: PanResponderInstance;
-    body: PanResponderInstance;
-    corners: Record<CropCorner, PanResponderInstance>;
+  const g = useRef<{
+    body: ReturnType<typeof Gesture.Pan>;
+    corners: Record<CropCorner, ReturnType<typeof Gesture.Pan>>;
   } | null>(null);
-
-  if (!resp.current) {
+  if (!g.current) {
     const makeCorner = (corner: CropCorner) =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
+      Gesture.Pan()
+        .runOnJS(true)
+        .onStart(() => {
           startRef.current = dataRef.current.rect;
-        },
-        onPanResponderMove: (_e, g) => {
+        })
+        .onUpdate((e) => {
           const d = dataRef.current;
-          d.onChange(resizeCropCorner(startRef.current, corner, g.dx / d.box.w, g.dy / d.box.h));
-        },
-      });
-    resp.current = {
-      // a téglalapon kívüli érintést elnyeli (ne mozduljanak a rétegek crop közben).
-      // CSAK start-on nyel: a move-kérés ellopná a sarok/test-gesztust (RN termination)
-      swallow: PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-      }),
-      body: PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
+          d.onChange(resizeCropCorner(startRef.current, corner, e.translationX / d.box.w, e.translationY / d.box.h));
+        });
+    g.current = {
+      body: Gesture.Pan()
+        .runOnJS(true)
+        .onStart(() => {
           startRef.current = dataRef.current.rect;
-        },
-        onPanResponderMove: (_e, g) => {
+        })
+        .onUpdate((e) => {
           const d = dataRef.current;
-          d.onChange(moveCropRect(startRef.current, g.dx / d.box.w, g.dy / d.box.h));
-        },
-      }),
+          d.onChange(moveCropRect(startRef.current, e.translationX / d.box.w, e.translationY / d.box.h));
+        }),
       corners: { tl: makeCorner('tl'), tr: makeCorner('tr'), bl: makeCorner('bl'), br: makeCorner('br') },
     };
   }
-  const { swallow, body, corners } = resp.current;
+  const { body, corners } = g.current;
 
   const cx = rect.x * box.w;
   const cy = rect.y * box.h;
@@ -73,7 +68,7 @@ export function CropOverlay({
   const ch = rect.h * box.h;
 
   return (
-    <View style={StyleSheet.absoluteFill} {...swallow.panHandlers}>
+    <View style={StyleSheet.absoluteFill}>
       {/* sötétítő maszk a kivágáson kívül (4 sáv) */}
       <View pointerEvents="none" style={[styles.dim, { left: 0, top: 0, width: box.w, height: cy }]} />
       <View
@@ -87,26 +82,36 @@ export function CropOverlay({
       />
 
       {/* a kivágás-keret + mozgató-terület + harmadoló vonalak */}
-      <View style={[styles.cropBox, { left: cx, top: cy, width: cw, height: ch }]} {...body.panHandlers}>
-        <View pointerEvents="none" style={[styles.thirdV, { left: cw / 3 }]} />
-        <View pointerEvents="none" style={[styles.thirdV, { left: (2 * cw) / 3 }]} />
-        <View pointerEvents="none" style={[styles.thirdH, { top: ch / 3 }]} />
-        <View pointerEvents="none" style={[styles.thirdH, { top: (2 * ch) / 3 }]} />
-      </View>
+      <GestureDetector gesture={body}>
+        <View style={[styles.cropBox, { left: cx, top: cy, width: cw, height: ch }]}>
+          <View pointerEvents="none" style={[styles.thirdV, { left: cw / 3 }]} />
+          <View pointerEvents="none" style={[styles.thirdV, { left: (2 * cw) / 3 }]} />
+          <View pointerEvents="none" style={[styles.thirdH, { top: ch / 3 }]} />
+          <View pointerEvents="none" style={[styles.thirdH, { top: (2 * ch) / 3 }]} />
+        </View>
+      </GestureDetector>
 
       {/* 4 sarok-fogó (a keret fölött, hogy a sarok-húzás győzzön a mozgatás ellen) */}
-      <View style={[styles.handle, { left: cx - 18, top: cy - 18 }]} {...corners.tl.panHandlers}>
-        <View style={[styles.mark, styles.mTL]} />
-      </View>
-      <View style={[styles.handle, { left: cx + cw - 18, top: cy - 18 }]} {...corners.tr.panHandlers}>
-        <View style={[styles.mark, styles.mTR]} />
-      </View>
-      <View style={[styles.handle, { left: cx - 18, top: cy + ch - 18 }]} {...corners.bl.panHandlers}>
-        <View style={[styles.mark, styles.mBL]} />
-      </View>
-      <View style={[styles.handle, { left: cx + cw - 18, top: cy + ch - 18 }]} {...corners.br.panHandlers}>
-        <View style={[styles.mark, styles.mBR]} />
-      </View>
+      <GestureDetector gesture={corners.tl}>
+        <View style={[styles.handle, { left: cx - 18, top: cy - 18 }]}>
+          <View style={[styles.mark, styles.mTL]} />
+        </View>
+      </GestureDetector>
+      <GestureDetector gesture={corners.tr}>
+        <View style={[styles.handle, { left: cx + cw - 18, top: cy - 18 }]}>
+          <View style={[styles.mark, styles.mTR]} />
+        </View>
+      </GestureDetector>
+      <GestureDetector gesture={corners.bl}>
+        <View style={[styles.handle, { left: cx - 18, top: cy + ch - 18 }]}>
+          <View style={[styles.mark, styles.mBL]} />
+        </View>
+      </GestureDetector>
+      <GestureDetector gesture={corners.br}>
+        <View style={[styles.handle, { left: cx + cw - 18, top: cy + ch - 18 }]}>
+          <View style={[styles.mark, styles.mBR]} />
+        </View>
+      </GestureDetector>
     </View>
   );
 }

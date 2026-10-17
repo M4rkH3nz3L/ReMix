@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 
 import { palette } from '@/constants/editor';
@@ -13,6 +14,12 @@ const MIN_STEP = 0.014;
  * 🪢 Lasszó-overlay — SZABADKÉZI húzás a vásznon: a mozgás mentén pontokat
  * mintavételez (ritkítva), felengedésre ZÁRT path-formát ad vissza (`onComplete`).
  * Az élő körvonalat rajzolja húzás közben. A pontok vászon-térben (0–1).
+ *
+ * Gesztus: modern react-native-gesture-handler (Touch/03). A `Gesture.Pan` EGYSZER
+ * jön létre (stabil handler), a friss propokat a `dataRef`-ből olvassa; `minDistance(0)`
+ * → a rajz már a lenyomásnál indul (nincs aktiválási küszöb). `runOnJS(true)`: a
+ * callbackek a JS-szálon (setState). A `GestureDetector` `e.x/e.y`-a a nézethez
+ * képesti lokális koordináta (= a korábbi `locationX/Y`).
  */
 export function LassoOverlay({
   box,
@@ -29,31 +36,25 @@ export function LassoOverlay({
   dataRef.current = { box, onComplete, onCancel };
 
   const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .onStart((e) => {
         const { box: b } = dataRef.current;
-        const p = {
-          x: clamp(e.nativeEvent.locationX / b.w, 0, 1),
-          y: clamp(e.nativeEvent.locationY / b.h, 0, 1),
-        };
+        const p = { x: clamp(e.x / b.w, 0, 1), y: clamp(e.y / b.h, 0, 1) };
         ptsRef.current = [p];
         setPts([p]);
-      },
-      onPanResponderMove: (e) => {
+      })
+      .onUpdate((e) => {
         const { box: b } = dataRef.current;
-        const p = {
-          x: clamp(e.nativeEvent.locationX / b.w, 0, 1),
-          y: clamp(e.nativeEvent.locationY / b.h, 0, 1),
-        };
+        const p = { x: clamp(e.x / b.w, 0, 1), y: clamp(e.y / b.h, 0, 1) };
         const last = ptsRef.current[ptsRef.current.length - 1];
         if (!last || Math.hypot(p.x - last.x, p.y - last.y) > MIN_STEP) {
           ptsRef.current = [...ptsRef.current, p];
           setPts(ptsRef.current);
         }
-      },
-      onPanResponderRelease: () => {
+      })
+      .onEnd(() => {
         const d = dataRef.current;
         if (ptsRef.current.length >= 3) {
           d.onComplete(ptsRef.current);
@@ -62,8 +63,17 @@ export function LassoOverlay({
         }
         ptsRef.current = [];
         setPts([]);
-      },
-    })
+      })
+      .onFinalize((_e, success) => {
+        // megszakadt gesztus (nem rendes felengedés) → mégse, ne ragadjon bent félkész körvonal
+        if (!success) {
+          if (ptsRef.current.length > 0) {
+            dataRef.current.onCancel();
+          }
+          ptsRef.current = [];
+          setPts([]);
+        }
+      })
   ).current;
 
   const d =
@@ -77,12 +87,14 @@ export function LassoOverlay({
       : '';
 
   return (
-    <View style={StyleSheet.absoluteFill} {...pan.panHandlers}>
-      {d ? (
-        <Svg width={box.w} height={box.h} style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Path d={d} stroke={palette.accent} strokeWidth={2} strokeDasharray="6 4" fill={`${palette.accent}22`} />
-        </Svg>
-      ) : null}
-    </View>
+    <GestureDetector gesture={pan}>
+      <View style={StyleSheet.absoluteFill}>
+        {d ? (
+          <Svg width={box.w} height={box.h} style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Path d={d} stroke={palette.accent} strokeWidth={2} strokeDasharray="6 4" fill={`${palette.accent}22`} />
+          </Svg>
+        ) : null}
+      </View>
+    </GestureDetector>
   );
 }

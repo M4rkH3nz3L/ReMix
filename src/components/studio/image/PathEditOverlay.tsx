@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { PanResponder, type PanResponderInstance, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Line } from 'react-native-svg';
 
 import { palette } from '@/constants/editor';
@@ -13,6 +14,14 @@ import type { ShapeLayer } from '@/types/project';
  * `onLive` élőben újraformálja a path-t (a SelectionFrame `live`-patch mintája),
  * a végén `onCommit` egy undo-lépés. A node-ok a klip SAJÁT dobozához (0–1)
  * normalizáltak → itt vászon-pixelekbe képezzük (position − w/2 + local·w).
+ *
+ * Gesztus: modern react-native-gesture-handler (Touch/03). A háttér él-beszúró
+ * `Gesture.Tap` (a korábbi „kis elmozdulás = koppintás" helyett); a node/fogó-pöttyök
+ * `Gesture.Pan`-je `minDistance(0)` → a koppintás is kijelöl (mint az eredeti `onGrant`).
+ * Mindegyik EGYSZER jön létre (stabil), a friss propokat `dataRef`-ből olvassa, a
+ * gesztus kezdetén `startRef`-be rögzíti a pont/fogó helyét, `e.translationX/Y`-ból
+ * számol. `runOnJS(true)`: a callbackek a JS-szálon. A háttér-View a pöttyök ALATT
+ * (azok elfogják a sajátjukat; a háttéren a drag nem mozdítja a rétegeket).
  */
 export function PathEditOverlay({
   box,
@@ -45,23 +54,16 @@ export function PathEditOverlay({
   // 🖐️ háttér-koppintás az él-beszúráshoz (a node/fogó-pöttyök FÖLÖTTE vannak)
   const bgRef = useRef({ box, layer, onInsertNode });
   bgRef.current = { box, layer, onInsertNode };
-  const tapRef = useRef({ x: 0, y: 0 });
-  const bgPan = useRef<PanResponderInstance | null>(null);
-  if (!bgPan.current) {
-    bgPan.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-      },
-      onPanResponderRelease: (_e, g) => {
-        if (Math.hypot(g.dx, g.dy) > 10) return; // húzás, nem koppintás
+  const bgTap = useRef(
+    Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((e) => {
         const d = bgRef.current;
-        const lx = (tapRef.current.x / d.box.w - (d.layer.position.x - d.layer.w / 2)) / Math.max(1e-6, d.layer.w);
-        const ly = (tapRef.current.y / d.box.h - (d.layer.position.y - d.layer.h / 2)) / Math.max(1e-6, d.layer.h);
+        const lx = (e.x / d.box.w - (d.layer.position.x - d.layer.w / 2)) / Math.max(1e-6, d.layer.w);
+        const ly = (e.y / d.box.h - (d.layer.position.y - d.layer.h / 2)) / Math.max(1e-6, d.layer.h);
         d.onInsertNode(lx, ly);
-      },
-    });
-  }
+      })
+  ).current;
 
   const sel = selectedNode != null ? pts[selectedNode] : null;
   const anchorPx = sel ? toPx(sel.x, sel.y) : null;
@@ -71,7 +73,9 @@ export function PathEditOverlay({
   return (
     <>
       {/* 🖐️ háttér (él-beszúró koppintás) — LEGALUL, a pöttyök elfogják a sajátjukat */}
-      <View style={StyleSheet.absoluteFill} {...bgPan.current.panHandlers} />
+      <GestureDetector gesture={bgTap}>
+        <View style={StyleSheet.absoluteFill} />
+      </GestureDetector>
 
       {/* bezier-fogó összekötő vonalak a kijelölt node-nál */}
       {anchorPx && (h1Px || h2Px) ? (
@@ -131,36 +135,45 @@ function NodeDot({
   dataRef.current = { box, layer, index, onSelectNode, onLive, onCommit };
   const startRef = useRef({ x: 0, y: 0 });
 
-  const pan = useRef<PanResponderInstance | null>(null);
-  if (!pan.current) {
-    pan.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+  const pan = useRef(
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .hitSlop(10)
+      .onStart(() => {
         const d = dataRef.current;
         d.onSelectNode(d.index);
         const p = d.layer.points?.[d.index];
         startRef.current = { x: p?.x ?? 0, y: p?.y ?? 0 };
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const d = dataRef.current;
-        d.onLive(d.index, startRef.current.x + g.dx / d.box.w / Math.max(1e-6, d.layer.w), startRef.current.y + g.dy / d.box.h / Math.max(1e-6, d.layer.h));
-      },
-      onPanResponderRelease: (_e, g) => {
+        d.onLive(
+          d.index,
+          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
+          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
+        );
+      })
+      .onEnd((e) => {
         const d = dataRef.current;
-        d.onCommit(d.index, startRef.current.x + g.dx / d.box.w / Math.max(1e-6, d.layer.w), startRef.current.y + g.dy / d.box.h / Math.max(1e-6, d.layer.h));
-      },
-    });
-  }
+        d.onCommit(
+          d.index,
+          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
+          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
+        );
+      })
+  ).current;
 
   const local = layer.points?.[index] ?? { x: 0, y: 0 };
   const cx = (layer.position.x - layer.w / 2 + local.x * layer.w) * box.w;
   const cy = (layer.position.y - layer.h / 2 + local.y * layer.h) * box.h;
 
   return (
-    <View style={[styles.hit, { left: cx - 18, top: cy - 18 }]} hitSlop={10} {...pan.current.panHandlers}>
-      <View style={[styles.dot, selected ? styles.dotSel : null]} />
-    </View>
+    <GestureDetector gesture={pan}>
+      <View style={[styles.hit, { left: cx - 18, top: cy - 18 }]}>
+        <View style={[styles.dot, selected ? styles.dotSel : null]} />
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -183,36 +196,49 @@ function HandleDot({
   dataRef.current = { box, layer, index, handle, onLive, onCommit };
   const startRef = useRef({ x: 0, y: 0 });
 
-  const pan = useRef<PanResponderInstance | null>(null);
-  if (!pan.current) {
-    pan.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+  const pan = useRef(
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .hitSlop(10)
+      .onStart(() => {
         const d = dataRef.current;
         const h = d.layer.points?.[d.index]?.[d.handle];
         startRef.current = { x: h?.x ?? 0, y: h?.y ?? 0 };
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const d = dataRef.current;
-        d.onLive(d.index, d.handle, startRef.current.x + g.dx / d.box.w / Math.max(1e-6, d.layer.w), startRef.current.y + g.dy / d.box.h / Math.max(1e-6, d.layer.h));
-      },
-      onPanResponderRelease: (_e, g) => {
+        d.onLive(
+          d.index,
+          d.handle,
+          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
+          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
+        );
+      })
+      .onEnd((e) => {
         const d = dataRef.current;
-        d.onCommit(d.index, d.handle, startRef.current.x + g.dx / d.box.w / Math.max(1e-6, d.layer.w), startRef.current.y + g.dy / d.box.h / Math.max(1e-6, d.layer.h));
-      },
-    });
-  }
+        d.onCommit(
+          d.index,
+          d.handle,
+          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
+          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
+        );
+      })
+  ).current;
 
   const h = layer.points?.[index]?.[handle];
-  if (!h) return null;
+  if (!h) {
+    return null;
+  }
   const cx = (layer.position.x - layer.w / 2 + h.x * layer.w) * box.w;
   const cy = (layer.position.y - layer.h / 2 + h.y * layer.h) * box.h;
 
   return (
-    <View style={[styles.hit, { left: cx - 18, top: cy - 18 }]} hitSlop={10} {...pan.current.panHandlers}>
-      <View style={styles.handle} />
-    </View>
+    <GestureDetector gesture={pan}>
+      <View style={[styles.hit, { left: cx - 18, top: cy - 18 }]}>
+        <View style={styles.handle} />
+      </View>
+    </GestureDetector>
   );
 }
 

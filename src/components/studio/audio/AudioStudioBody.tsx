@@ -11,9 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SourceSheet } from '@/components/SourceSheet';
-import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
+import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
 import { DrumMachineSheet } from '@/components/studio/audio/DrumMachineSheet';
@@ -542,28 +542,17 @@ export function AudioStudioBody({
                       {t(lane.labelKey)}
                     </Text>
                   ) : null}
-                  {clips.map((clip) => {
-                    const left = clip.start * pxPerSec;
-                    const w = Math.max(20, clip.duration * pxPerSec);
-                    const sel = clip.id === selectedClipId;
-                    return (
-                      <Pressable
-                        key={clip.id}
-                        onPress={() => {
-                          useEditorStore.getState().selectClip(clip.id);
-                          useEditorStore.getState().setPlayhead(clip.start);
-                        }}
-                        style={[styles.clip, { left, width: w, borderColor: sel ? '#fff' : `${lane.color}99` }]}
-                      >
-                        <View style={[styles.clipFill, { backgroundColor: `${lane.color}26` }]}>
-                          <ClipWaveform clip={clip} widthPx={w} heightPx={LANE_H - 22} color={lane.color} />
-                        </View>
-                        <Text style={styles.clipLabel} numberOfLines={1}>
-                          {clip.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  {clips.map((clip) => (
+                    <AudioTimelineClip
+                      key={clip.id}
+                      clip={clip}
+                      pxPerSec={pxPerSec}
+                      laneColor={lane.color}
+                      laneH={LANE_H}
+                      selected={clip.id === selectedClipId}
+                      snap={snapSecIn}
+                    />
+                  ))}
                 </Pressable>
               );
             })}

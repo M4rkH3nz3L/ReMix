@@ -1,20 +1,12 @@
 import { useRef } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import type { LivePatch } from '@/lib/imageLayerClip';
 import type { ImageLayer } from '@/types/project';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-interface FrameData {
-  layer: ImageLayer;
-  halfW: number;
-  halfH: number;
-  rot: number;
-  onLive: (patch: LivePatch) => void;
-  onCommit: (patch: LivePatch) => void;
-}
 
 /**
  * 🎯 Kijelölő-keret a vászon aktív rétegén — közvetlen KÉZI méretezés (sarok-fogó,
@@ -23,8 +15,10 @@ interface FrameData {
  * render (PNG-forgatás) egyformán érvényesíti. A gesztus alatt `onLive` élőben
  * rajzol; a végén `onCommit` egyetlen undo-lépésként rögzít.
  *
- * A gesztus-kezelők a `dataRef`-ből olvasnak (a PanResponder EGYSZER jön létre,
- * a záródó változók elavulnának) — ugyanaz a minta, mint a hang-stúdió Sliderében.
+ * Gesztus: modern react-native-gesture-handler (Touch/03) — a fogók inline
+ * `Gesture.Pan`-je MINDEN renderben friss closure-t kap (a committed réteg a drag
+ * alatt állandó, mert az `onLive` csak előnézetet rajzol), így nem kell a korábbi
+ * `dataRef`-minta. A callbackek `.runOnJS(true)`-val a JS-szálon futnak (setState).
  */
 export function SelectionFrame({
   layer,
@@ -40,93 +34,9 @@ export function SelectionFrame({
   // — MINDEN hook a korai visszatérés ELŐTT (rules-of-hooks) —
   const pending = useRef<LivePatch>({});
   const frameRef = useRef<View>(null);
-  const dataRef = useRef<FrameData | null>(null);
   const rotState = useRef<{ center?: { x: number; y: number }; startAngle?: number; startRot: number }>({
     startRot: 0,
   });
-
-  const scalePan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pending.current = {};
-      },
-      onPanResponderMove: (_e, g) => {
-        const d = dataRef.current;
-        if (!d) {
-          return;
-        }
-        const rad = (d.rot * Math.PI) / 180;
-        const sx = d.halfW * Math.cos(rad) - d.halfH * Math.sin(rad);
-        const sy = d.halfW * Math.sin(rad) + d.halfH * Math.cos(rad);
-        const diag = Math.max(1, Math.hypot(d.halfW, d.halfH));
-        const factor = clamp(Math.hypot(sx + g.dx, sy + g.dy) / diag, 0.12, 8);
-        if (d.layer.kind === 'text') {
-          const fontSize = clamp(Math.round(d.layer.fontSize * factor * 10) / 10, 2, 40);
-          pending.current = { fontSize };
-          d.onLive({ fontSize });
-        } else if (d.layer.kind === 'photo' || d.layer.kind === 'shape') {
-          const w = clamp(Math.round(d.layer.w * factor * 1000) / 1000, 0.02, 2);
-          const h = clamp(Math.round(d.layer.h * factor * 1000) / 1000, 0.02, 2);
-          pending.current = { w, h };
-          d.onLive({ w, h });
-        }
-      },
-      onPanResponderRelease: () => {
-        if (Object.keys(pending.current).length > 0) {
-          dataRef.current?.onCommit(pending.current);
-        }
-        pending.current = {};
-      },
-      onPanResponderTerminate: () => {
-        pending.current = {};
-        dataRef.current?.onLive({});
-      },
-    })
-  ).current;
-
-  const rotatePan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pending.current = {};
-        const d = dataRef.current;
-        rotState.current = {
-          startRot: d && d.layer.kind !== 'fill' && d.layer.kind !== 'adjust' ? d.layer.rotation ?? 0 : 0,
-        };
-        frameRef.current?.measureInWindow?.((x, y, w, h) => {
-          rotState.current.center = { x: x + w / 2, y: y + h / 2 };
-        });
-      },
-      onPanResponderMove: (_e, g) => {
-        const c = rotState.current.center;
-        if (!c) {
-          return;
-        }
-        const ang = Math.atan2(g.moveY - c.y, g.moveX - c.x);
-        if (rotState.current.startAngle === undefined) {
-          rotState.current.startAngle = ang;
-        }
-        const deg = Math.round(
-          rotState.current.startRot + ((ang - rotState.current.startAngle) * 180) / Math.PI
-        );
-        pending.current = { rotation: deg };
-        dataRef.current?.onLive({ rotation: deg });
-      },
-      onPanResponderRelease: () => {
-        if (pending.current.rotation !== undefined) {
-          dataRef.current?.onCommit({ rotation: pending.current.rotation });
-        }
-        pending.current = {};
-      },
-      onPanResponderTerminate: () => {
-        pending.current = {};
-        dataRef.current?.onLive({});
-      },
-    })
-  ).current;
 
   // — geometria a réteg-fajtából —
   let cx: number;
@@ -154,8 +64,81 @@ export function SelectionFrame({
     return null; // fill: háttér, nincs kerete
   }
 
-  // a gesztus-kezelők legfrissebb bemenete
-  dataRef.current = { layer, halfW, halfH, rot, onLive, onCommit };
+  // ── Méretezés (sarok-fogó): a teljes elmozdulásból abszolút skála-faktor ──
+  const scaleGesture = Gesture.Pan()
+    .runOnJS(true)
+    .hitSlop(12)
+    .onStart(() => {
+      pending.current = {};
+    })
+    .onUpdate((e) => {
+      const rad = (rot * Math.PI) / 180;
+      const sx = halfW * Math.cos(rad) - halfH * Math.sin(rad);
+      const sy = halfW * Math.sin(rad) + halfH * Math.cos(rad);
+      const diag = Math.max(1, Math.hypot(halfW, halfH));
+      const factor = clamp(Math.hypot(sx + e.translationX, sy + e.translationY) / diag, 0.12, 8);
+      if (layer.kind === 'text') {
+        const fontSize = clamp(Math.round(layer.fontSize * factor * 10) / 10, 2, 40);
+        pending.current = { fontSize };
+        onLive({ fontSize });
+      } else if (layer.kind === 'photo' || layer.kind === 'shape') {
+        const w = clamp(Math.round(layer.w * factor * 1000) / 1000, 0.02, 2);
+        const h = clamp(Math.round(layer.h * factor * 1000) / 1000, 0.02, 2);
+        pending.current = { w, h };
+        onLive({ w, h });
+      }
+    })
+    .onEnd(() => {
+      if (Object.keys(pending.current).length > 0) {
+        onCommit(pending.current);
+      }
+      pending.current = {};
+    })
+    .onFinalize((_e, success) => {
+      if (!success) {
+        pending.current = {};
+        onLive({});
+      }
+    });
+
+  // ── Forgatás (fej-fogó): a keret középpontja köré, abszolút képernyő-koordinátából ──
+  const rotateGesture = Gesture.Pan()
+    .runOnJS(true)
+    .hitSlop(12)
+    .onStart(() => {
+      pending.current = {};
+      rotState.current = { startRot: rot };
+      frameRef.current?.measureInWindow?.((x, y, w, h) => {
+        rotState.current.center = { x: x + w / 2, y: y + h / 2 };
+      });
+    })
+    .onUpdate((e) => {
+      const c = rotState.current.center;
+      if (!c) {
+        return;
+      }
+      const ang = Math.atan2(e.absoluteY - c.y, e.absoluteX - c.x);
+      if (rotState.current.startAngle === undefined) {
+        rotState.current.startAngle = ang;
+      }
+      const deg = Math.round(
+        rotState.current.startRot + ((ang - rotState.current.startAngle) * 180) / Math.PI
+      );
+      pending.current = { rotation: deg };
+      onLive({ rotation: deg });
+    })
+    .onEnd(() => {
+      if (pending.current.rotation !== undefined) {
+        onCommit({ rotation: pending.current.rotation });
+      }
+      pending.current = {};
+    })
+    .onFinalize((_e, success) => {
+      if (!success) {
+        pending.current = {};
+        onLive({});
+      }
+    });
 
   return (
     <View
@@ -175,14 +158,18 @@ export function SelectionFrame({
       {canRotate ? (
         <>
           <View pointerEvents="none" style={styles.rotStem} />
-          <View style={styles.rotHandle} hitSlop={12} {...rotatePan.panHandlers}>
-            <View style={styles.rotDot} />
-          </View>
+          <GestureDetector gesture={rotateGesture}>
+            <View style={styles.rotHandle}>
+              <View style={styles.rotDot} />
+            </View>
+          </GestureDetector>
         </>
       ) : null}
-      <View style={styles.scaleHandle} hitSlop={12} {...scalePan.panHandlers}>
-        <View style={styles.scaleDot} />
-      </View>
+      <GestureDetector gesture={scaleGesture}>
+        <View style={styles.scaleHandle}>
+          <View style={styles.scaleDot} />
+        </View>
+      </GestureDetector>
     </View>
   );
 }

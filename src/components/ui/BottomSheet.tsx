@@ -17,13 +17,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { haptics, motion, palette, radius } from '@/design';
+import { gestures, haptics, motion, palette, radius } from '@/design';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Ennyi lehúzás (px) VAGY ekkora sebesség (px/s) fölött a lap bezár. */
-const DISMISS_DISTANCE = 110;
-const DISMISS_VELOCITY = 820;
+/** Ennyi lehúzás (px) VAGY ekkora sebesség (px/s) fölött a lap bezár (→ `@/design` gestures). */
+const DISMISS_DISTANCE = gestures.sheet.dismissDistance;
+const DISMISS_VELOCITY = gestures.sheet.dismissVelocity;
 
 interface BottomSheetProps {
   visible: boolean;

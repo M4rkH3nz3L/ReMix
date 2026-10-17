@@ -3,6 +3,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
 import { palette } from '@/constants/editor';
+import { gestures } from '@/design';
 import { insertVertex, maskBox, moveMask, moveVertex, removeVertex, resizeMask } from '@/lib/maskEdit';
 import type { ClipMask } from '@/types/project';
 
@@ -113,7 +114,7 @@ export function MaskOverlay({
         });
         // hosszú nyomás a csúcson = törlés (min. 3 pont marad)
         const vertexDelete = Gesture.LongPress()
-          .minDuration(350)
+          .minDuration(gestures.longPress.context)
           .onStart(() => {
             runOnJS(commitDeleteVertex)(i);
           });

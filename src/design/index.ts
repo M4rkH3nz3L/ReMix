@@ -8,6 +8,7 @@
  * - `typography` — SF Pro súlyok, méret-skála, kész szöveg-stílusok
  * - `colors`     — `palette` (re-export) + funkcionális (jelentés-alapú) színek
  * - `haptics`    — szemantikus, best-effort tapintható visszajelzés
+ * - `gestures`   — interakciós küszöbök (long-press, slop, sheet-dismiss, pinch-clamp)
  *
  * A RESZPONZÍV tokenek (spacing, méret-osztály, EditorMetrics) továbbra is a
  * `@/constants/layout`-ból jönnek — azok a képernyő-mérettől függenek.
@@ -17,3 +18,4 @@ export { radius, type RadiusToken } from './radius';
 export { typography, weight, size, text } from './typography';
 export { colors, palette, functional, accentGradient, trackColors, type FunctionalColor } from './colors';
 export { haptics } from './haptics';
+export { gestures, type Gestures } from './gestures';

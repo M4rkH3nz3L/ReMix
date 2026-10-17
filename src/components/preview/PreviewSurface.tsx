@@ -20,6 +20,7 @@ import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
 import { videoFill } from '@/components/preview/videoFill';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
+import { gestures } from '@/design';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { aspectValue, filters, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
@@ -405,7 +406,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
     const tInClip = clamp(state.playhead - clip.start, 0, clip.duration);
     const current = sampleClipTransform(clip, tInClip);
-    const scale = clamp(current.scale * gestureScale.value, 0.5, 4);
+    const scale = clamp(current.scale * gestureScale.value, gestures.pinch.previewScaleMin, gestures.pinch.previewScaleMax);
     const x = clamp(current.x + gestureDX.value / Math.max(boxW, 1), -0.75, 0.75);
     const y = clamp(current.y + gestureDY.value / Math.max(boxH, 1), -0.75, 0.75);
     gestureScale.value = 1;

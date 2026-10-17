@@ -63,6 +63,8 @@ const LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; color: str
   { type: 'voiceover', icon: 'mic', color: palette.accent2, labelKey: 'editor.track.voiceover' },
   { type: 'sfx', icon: 'flash', color: '#39d98a', labelKey: 'editor.track.sfx' },
 ];
+/** a sávok típusai fentről le — stabil referencia az AudioTimelineClip sáv-váltásához */
+const LANE_TYPES = LANES.map((l) => l.type);
 
 /**
  * 🎧 A hang-stúdió TÖRZSE — store-vezérelt, UI-only. A projektet a hívó tölti a
@@ -549,6 +551,8 @@ export function AudioStudioBody({
                       pxPerSec={pxPerSec}
                       laneColor={lane.color}
                       laneH={LANE_H}
+                      laneType={lane.type}
+                      laneTypes={LANE_TYPES}
                       selected={clip.id === selectedClipId}
                       snap={snapSecIn}
                     />

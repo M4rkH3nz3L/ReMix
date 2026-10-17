@@ -9,6 +9,7 @@ import {
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { SourceSheet } from '@/components/SourceSheet';
 import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
@@ -36,7 +37,9 @@ import {
   type SnapMode,
   zoomIn,
   zoomOut,
+  ZOOM_LEVELS,
 } from '@/lib/audioTransport';
+import { zoomIndexForPinch } from '@/lib/audioTimelineGestures';
 import { publishRenderedProject } from '@/lib/feed';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -118,6 +121,11 @@ export function AudioStudioBody({
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const recordStartPlayhead = useRef(0);
+  // 🔍 pinch-zoom: a mindig friss zoom-index + a csippentés kezdő-indexe (ref, hogy a
+  // gesztus-callback ne stale state-et lásson)
+  const zoomIndexRef = useRef(DEFAULT_ZOOM_INDEX);
+  zoomIndexRef.current = zoomIndex;
+  const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
 
   if (!project) {
     return null;
@@ -138,6 +146,20 @@ export function AudioStudioBody({
   const snapSecIn = (sec: number) => snapSec(sec, snapMode, fps, bpm);
   const seekAt = (e: GestureResponderEvent) =>
     useEditorStore.getState().setPlayhead(snapSecIn(Math.max(0, e.nativeEvent.locationX / pxPerSec)));
+
+  // 🔍 kétujjas csippentés = idővonal-zoom (a 7 szint közt lépked). A pinch a
+  // timelineWrap-en ül → a 2-ujjas zoom és az 1-ujjas vízszintes görgetés nem ütközik.
+  const timelinePinch = Gesture.Pinch()
+    .runOnJS(true)
+    .onStart(() => {
+      pinchStartRef.current = zoomIndexRef.current;
+    })
+    .onUpdate((e) => {
+      const next = zoomIndexForPinch(pinchStartRef.current, e.scale, ZOOM_LEVELS.length);
+      if (next !== zoomIndexRef.current) {
+        setZoomIndex(next);
+      }
+    });
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   const toggleRecord = async () => {
@@ -451,6 +473,7 @@ export function AudioStudioBody({
       </View>
 
       {/* multi-track idővonal */}
+      <GestureDetector gesture={timelinePinch}>
       <View style={styles.timelineWrap} onLayout={(e) => setTlH(e.nativeEvent.layout.height)}>
         <View style={styles.headers}>
           <View style={{ height: RULER_H }} />
@@ -568,6 +591,7 @@ export function AudioStudioBody({
           </View>
         </ScrollView>
       </View>
+      </GestureDetector>
 
       {/* transport — gazdag sor (undo/redo · ugrás · loop/In-Out · idő+ütem · BPM · zoom · snap) */}
       <ScrollView

@@ -18,3 +18,19 @@ export function audioLaneTarget(
   const step = Math.round(dy / laneH);
   return Math.max(0, Math.min(count - 1, currentIndex + step));
 }
+
+/** Egy pinch-lépéshez ennyi nagyítás kell (a ZOOM_LEVELS ~1,55× átlagos lépésköze). */
+const PINCH_STEP = 1.6;
+
+/**
+ * 🔍 Pinch-skála → diszkrét zoom-szint index. A `startIndex` a csippentés kezdetén
+ * érvényes szint; a `scale` (csippentés óta) logaritmikusan lépésekre váltódik
+ * (minden ~1,6× = egy szint), majd a cél-index [0, levelCount-1]-re clampelve.
+ */
+export function zoomIndexForPinch(startIndex: number, scale: number, levelCount: number): number {
+  if (!(scale > 0) || levelCount <= 0) {
+    return startIndex;
+  }
+  const step = Math.round(Math.log(scale) / Math.log(PINCH_STEP));
+  return Math.max(0, Math.min(levelCount - 1, startIndex + step));
+}

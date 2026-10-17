@@ -21,10 +21,6 @@ import { gestures, haptics, motion, palette, radius } from '@/design';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Ennyi lehúzás (px) VAGY ekkora sebesség (px/s) fölött a lap bezár (→ `@/design` gestures). */
-const DISMISS_DISTANCE = gestures.sheet.dismissDistance;
-const DISMISS_VELOCITY = gestures.sheet.dismissVelocity;
-
 interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -114,13 +110,20 @@ export function BottomSheet({
     }
   };
 
+  // 🧲 bezárás-küszöbök (px / px/s) RENDER-időben olvasva — NEM modul-eval-kor: a
+  // `@/design` barrel re-exportja HMR/körkörös-betöltésnél még lehet „kész előtti"
+  // állapotban (→ „Cannot read property 'sheet' of undefined"). A worklet ezeket a
+  // PRIMITÍVEKET zárja be, nem a `gestures` objektumot.
+  const dismissDistance = gestures.sheet.dismissDistance;
+  const dismissVelocity = gestures.sheet.dismissVelocity;
+
   const pan = Gesture.Pan()
     .onUpdate((e) => {
       const dy = Math.max(0, e.translationY);
       progress.value = 1 - Math.min(1, dy / sheetH.value);
     })
     .onEnd((e) => {
-      if (e.translationY > DISMISS_DISTANCE || e.velocityY > DISMISS_VELOCITY) {
+      if (e.translationY > dismissDistance || e.velocityY > dismissVelocity) {
         // ÖNMAGÁT unmountolja a kilépő animáció végén — nem függ attól, hogy a szülő
         // flippeli-e a `visible`-t (különben láthatatlanul mountolva maradna és
         // elnyelné az érintéseket az egész képernyőn)

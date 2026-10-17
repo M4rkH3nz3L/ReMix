@@ -20,7 +20,7 @@ import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
 import { videoFill } from '@/components/preview/videoFill';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
-import { gestures } from '@/design';
+import { gestures, haptics } from '@/design';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { aspectValue, filters, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
@@ -61,6 +61,18 @@ import type {
 } from '@/types/project';
 
 const IDENTITY: CanvasTransform = { scale: 1, x: 0, y: 0 };
+
+/** 🔄 forgatás-snap: a legközelebbi 15°-ra pattint, ha ±5°-on belül (különben egész fok).
+ *  A `snapped` csak akkor igaz, ha ténylegesen behúzta (>0,5° korrekció) — haptika-triggerhez. */
+const ROT_SNAP_STEP = 15;
+const ROT_SNAP_TOL = 5;
+function snapAngle(deg: number): { value: number; snapped: boolean } {
+  const nearest = Math.round(deg / ROT_SNAP_STEP) * ROT_SNAP_STEP;
+  if (Math.abs(deg - nearest) <= ROT_SNAP_TOL) {
+    return { value: nearest, snapped: Math.abs(deg - nearest) > 0.5 };
+  }
+  return { value: Math.round(deg), snapped: false };
+}
 
 /** 💡 lighting-előnézet tintek — a valódi split-tone grade a renderben ég be */
 const LIGHTING_TINTS: Record<string, { color: string; opacity: number }> = {
@@ -208,6 +220,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const gestureScale = useSharedValue(1);
   const gestureDX = useSharedValue(0);
   const gestureDY = useSharedValue(0);
+  const gestureRotation = useSharedValue(0); // 🔄 élő forgatás-delta (fok) a két-ujjas gesztusból
   const splitStartX = useSharedValue(0);
 
   const player = useVideoPlayer(null);
@@ -409,9 +422,15 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     const scale = clamp(current.scale * gestureScale.value, gestures.pinch.previewScaleMin, gestures.pinch.previewScaleMax);
     const x = clamp(current.x + gestureDX.value / Math.max(boxW, 1), -0.75, 0.75);
     const y = clamp(current.y + gestureDY.value / Math.max(boxH, 1), -0.75, 0.75);
+    // 🔄 forgatás: a gesztus-delta (fok) a jelenlegi szöghöz adva, mágneses snap 15°-ra (±5°)
+    const rot = snapAngle((current.rotation ?? 0) + gestureRotation.value);
+    if (rot.snapped) {
+      haptics.snap();
+    }
     gestureScale.value = 1;
     gestureDX.value = 0;
     gestureDY.value = 0;
+    gestureRotation.value = 0;
     if (hasKeyframes(clip)) {
       const k = clip.keyframes ?? {};
       state.updateClip(visualId, {
@@ -419,13 +438,13 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           scale: setChannelKeyframe(k.scale, tInClip, scale, 'easeInOut'),
           x: setChannelKeyframe(k.x, tInClip, x, 'easeInOut'),
           y: setChannelKeyframe(k.y, tInClip, y, 'easeInOut'),
+          rotation: setChannelKeyframe(k.rotation, tInClip, rot.value, 'easeInOut'),
         },
       });
       return;
     }
     const t = clip.transform ?? IDENTITY;
-    // a forgatást a gesztus nem módosítja, megőrizzük
-    state.updateClip(visualId, { transform: { ...t, scale, x, y } });
+    state.updateClip(visualId, { transform: { ...t, scale, x, y, rotation: rot.value } });
   };
 
   const resetTransform = () => {
@@ -438,6 +457,17 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     .enabled(canTransform)
     .onUpdate((e) => {
       gestureScale.value = e.scale;
+    })
+    .onEnd(() => {
+      runOnJS(commitTransform)();
+    });
+
+  // 🔄 két-ujjas forgatás a kijelölt overlay-objektumon (a pinch mellé, egyszerre skála+forgat).
+  // Élőben a shared value-n (fok), commit elengedéskor a `commitTransform`-ban (snap + undo-lépés).
+  const rotation = Gesture.Rotation()
+    .enabled(canTransform)
+    .onUpdate((e) => {
+      gestureRotation.value = (e.rotation * 180) / Math.PI;
     })
     .onEnd(() => {
       runOnJS(commitTransform)();
@@ -578,7 +608,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     drawBrush || drawMaskMode
       ? drawPan
       : Gesture.Race(
-          Gesture.Simultaneous(pinch, panCanvas),
+          Gesture.Simultaneous(pinch, rotation, panCanvas),
           Gesture.Exclusive(doubleTapReset, tapSelect)
         );
 
@@ -619,7 +649,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             { rotateX: `${perspY * 22}deg` },
           ]
         : []),
-      { rotate: `${committedRotation}deg` },
+      { rotate: `${committedRotation + gestureRotation.value}deg` },
     ],
   }));
 

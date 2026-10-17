@@ -18,8 +18,9 @@
  *  Video-idővonal (TimelineClip): pan=klip-move / trim-fogantyú · tap=select/seek · long-press=drag-aktiválás
  *    kompozíció: Race(movePan, tap) + külön trim-pan a fogantyúkon
  *  Kép-canvas (ImageCanvas):   pan=RNGH(1-ujj) · pinch=RNGH(2-ujj,center) · tap=select/wand  (Touch/03 KÉSZ)
- *  Audio-idővonal:             pan/trim/pinch/long-press = HIÁNYZIK*                     → Touch/04 rendezi
- *  (* = nyitott rés — lásd devs/tasks/Touch/01-shared-gesture-foundation.md)
+ *  Audio-idővonal (AudioTimelineClip): pan=klip-move/lane + külön trim-fogó · pinch=idővonal-zoom(focal)
+ *    · tap=select/seek · long-press=drag-aktiválás  (Touch/04 KÉSZ)
+ *  Előnézet-forgatás: Gesture.Rotation a Simultaneous-ban (two-finger rotate + 15°-snap)  (Touch/02.1 KÉSZ)
  */
 import { SNAP_PX } from '@/constants/editor';
 import { TOUCH_MIN } from '@/constants/layout';

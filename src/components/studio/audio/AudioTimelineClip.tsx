@@ -6,9 +6,10 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { palette } from '@/constants/editor';
 import { gestures, haptics, motion } from '@/design';
+import { audioLaneTarget } from '@/lib/audioTimelineGestures';
 import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip } from '@/types/project';
+import type { AudioClip, TrackType } from '@/types/project';
 
 /**
  * 🎧 Egy audio-klip az idővonalon — gesztus-vezérelt (Touch/04).
@@ -30,6 +31,8 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   pxPerSec,
   laneColor,
   laneH,
+  laneType,
+  laneTypes,
   selected,
   snap,
 }: {
@@ -37,12 +40,17 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   pxPerSec: number;
   laneColor: string;
   laneH: number;
+  /** ennek a sávnak a típusa (a sáv-váltás kiindulása) */
+  laneType: TrackType;
+  /** a sávok típusai fentről le (zene/voiceover/sfx) — a sáv-váltás cél-sávjához */
+  laneTypes: TrackType[];
   selected: boolean;
   /** frame/beat-illesztés a transport snap-módja szerint (AudioStudioBody adja) */
   snap: (sec: number) => number;
 }) {
   // élő eltolások (px): test-mozgatás + bal/jobb trim; a „lift" visszajelzi a fogást
   const moveDX = useSharedValue(0);
+  const moveDY = useSharedValue(0);
   const leftDelta = useSharedValue(0);
   const rightDelta = useSharedValue(0);
   const lift = useSharedValue(0);
@@ -50,9 +58,10 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   // committed állapot után a vizuális eltolások nullázódnak (a klip a helyén áll)
   useEffect(() => {
     moveDX.value = 0;
+    moveDY.value = 0;
     leftDelta.value = 0;
     rightDelta.value = 0;
-  }, [clip.start, clip.duration, pxPerSec, moveDX, leftDelta, rightDelta]);
+  }, [clip.start, clip.duration, pxPerSec, moveDX, moveDY, leftDelta, rightDelta]);
 
   const selectAndSeek = () => {
     const st = useEditorStore.getState();
@@ -60,9 +69,20 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     st.setPlayhead(clip.start);
   };
 
-  const commitMove = (dx: number) => {
+  const commitMove = (dx: number, dy: number) => {
     moveDX.value = 0;
+    moveDY.value = 0;
     const next = Math.max(0, snap(clip.start + dx / pxPerSec));
+    // ↕️ függőleges szándék → szomszédos sávra (a moveClip ellenőrzi a kompatibilitást;
+    // inkompatibilis vagy nincs-hova esetben no-op → marad a vízszintes mozgatás)
+    const curIdx = laneTypes.indexOf(laneType);
+    const tgtIdx = audioLaneTarget(curIdx, dy, laneH, laneTypes.length);
+    if (curIdx >= 0 && tgtIdx !== curIdx) {
+      if (useEditorStore.getState().moveClip(clip.id, laneTypes[tgtIdx], next)) {
+        haptics.snap();
+        return;
+      }
+    }
     if (Math.abs(next - clip.start) > 1e-4) {
       useEditorStore.getState().updateClip(clip.id, { start: next });
       haptics.snap();
@@ -103,9 +123,10 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     })
     .onUpdate((e) => {
       moveDX.value = e.translationX;
+      moveDY.value = e.translationY;
     })
     .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX);
+      runOnJS(commitMove)(e.translationX, e.translationY);
     })
     .onFinalize(() => {
       lift.value = withSpring(0, motion.spring.snappy);
@@ -138,7 +159,11 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   const w = Math.max(20, clip.duration * pxPerSec);
 
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: moveDX.value + leftDelta.value }, { scale: 1 + lift.value * 0.03 }],
+    transform: [
+      { translateX: moveDX.value + leftDelta.value },
+      { translateY: moveDY.value },
+      { scale: 1 + lift.value * 0.03 },
+    ],
     width: Math.max(20, w + rightDelta.value - leftDelta.value),
   }));
 

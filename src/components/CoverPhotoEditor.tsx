@@ -7,12 +7,12 @@ import {
   Alert,
   type LayoutChangeEvent,
   Modal,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { COVER_ASPECT, palette } from '@/constants/editor';
 import { bakeImage, getImageSize, type ImageOp } from '@/lib/imageEditor';
@@ -140,18 +140,17 @@ export function CoverPhotoEditor({
   clampRef.current = clampOffsets;
   const startRef = useRef({ x: 0, y: 0 });
   const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .onStart(() => {
         startRef.current = { x: txRef.current, y: tyRef.current };
-      },
-      onPanResponderMove: (_e, g) => {
-        const next = clampRef.current(startRef.current.x + g.dx, startRef.current.y + g.dy);
+      })
+      .onUpdate((e) => {
+        const next = clampRef.current(startRef.current.x + e.translationX, startRef.current.y + e.translationY);
         setTx(next.x);
         setTy(next.y);
-      },
-    })
+      })
   ).current;
 
   // zoom-lépés a keret KÖZEPÉT megtartva (természetes közelítés)
@@ -217,12 +216,12 @@ export function CoverPhotoEditor({
           </Pressable>
         </View>
 
+        <GestureDetector gesture={pan}>
         <View
           style={styles.canvas}
           onLayout={(e: LayoutChangeEvent) =>
             setCanvas({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
           }
-          {...pan.panHandlers}
         >
           {ready && frame ? (
             <>
@@ -258,6 +257,7 @@ export function CoverPhotoEditor({
             </View>
           ) : null}
         </View>
+        </GestureDetector>
 
         <View style={styles.controls}>
           <Text style={styles.hint}>{t('profile.coverEditor.hint')}</Text>
@@ -287,18 +287,17 @@ function ZoomSlider({
   const vRef = useRef(value);
   vRef.current = value;
   const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .onStart(() => {
         startRef.current = vRef.current;
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const tw = Math.max(1, wRef.current - 22);
-        const d = (g.dx / tw) * (MAX_ZOOM - 1);
+        const d = (e.translationX / tw) * (MAX_ZOOM - 1);
         cbRef.current(clamp(startRef.current + d, 1, MAX_ZOOM));
-      },
-    })
+      })
   ).current;
   const frac = (value - 1) / (MAX_ZOOM - 1);
   return (
@@ -309,14 +308,15 @@ function ZoomSlider({
           <Text style={styles.sliderVal}>{`${value.toFixed(1)}×`}</Text>
         </Pressable>
       </View>
-      <View
-        style={styles.track}
-        onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
-        {...pan.panHandlers}
-      >
-        <View style={styles.trackLine} />
-        <View style={[styles.thumb, { left: frac * Math.max(0, w - 22) }]} />
-      </View>
+      <GestureDetector gesture={pan}>
+        <View
+          style={styles.track}
+          onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+        >
+          <View style={styles.trackLine} />
+          <View style={[styles.thumb, { left: frac * Math.max(0, w - 22) }]} />
+        </View>
+      </GestureDetector>
     </View>
   );
 }

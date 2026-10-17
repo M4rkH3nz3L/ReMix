@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
-import { type LayoutChangeEvent, PanResponder, StyleSheet, Switch, Text, View } from 'react-native';
+import { type LayoutChangeEvent, StyleSheet, Switch, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import { getWaveform, type WaveformData } from '@/lib/waveform';
@@ -64,19 +65,18 @@ export function Slider({
   rangeRef.current = { min, max };
   const startRef = useRef(value);
   const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .onStart(() => {
         startRef.current = vRef.current;
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const { min: lo, max: hi } = rangeRef.current;
         const tw = Math.max(1, wRef.current - 22);
-        const d = (g.dx / tw) * (hi - lo);
+        const d = (e.translationX / tw) * (hi - lo);
         cbRef.current(Math.round(clamp(startRef.current + d, lo, hi) * 100) / 100);
-      },
-    })
+      })
   ).current;
   const frac = max > min ? clamp((value - min) / (max - min), 0, 1) : 0;
   return (
@@ -85,15 +85,16 @@ export function Slider({
         <Text style={styles.sliderLabel}>{label}</Text>
         <Text style={styles.sliderVal}>{format(value)}</Text>
       </View>
-      <View
-        style={styles.track}
-        onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
-        {...pan.panHandlers}
-      >
-        <View style={styles.trackLine} />
-        <View style={[styles.trackFill, { width: frac * Math.max(0, w - 22) + 11 }]} />
-        <View style={[styles.thumb, { left: frac * Math.max(0, w - 22) }]} />
-      </View>
+      <GestureDetector gesture={pan}>
+        <View
+          style={styles.track}
+          onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+        >
+          <View style={styles.trackLine} />
+          <View style={[styles.trackFill, { width: frac * Math.max(0, w - 22) + 11 }]} />
+          <View style={[styles.thumb, { left: frac * Math.max(0, w - 22) }]} />
+        </View>
+      </GestureDetector>
     </View>
   );
 }
@@ -154,21 +155,21 @@ export function RegionBar({
 }) {
   const [w, setW] = useState(0);
   const src = Math.max(0.1, sourceDuration);
-  // élő értékek ref-ben (a PanResponder gesztus alatt olvassa)
+  // élő értékek ref-ben (a gesztus-handler a húzás alatt olvassa)
   const ref = useRef({ trimIn, duration, w, cb: onChange });
   ref.current = { trimIn, duration, w, cb: onChange };
   const grab = useRef({ trimIn, end: trimIn + duration });
 
   const mk = (side: 'left' | 'right') =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+    Gesture.Pan()
+      .runOnJS(true)
+      .minDistance(0)
+      .onStart(() => {
         grab.current = { trimIn: ref.current.trimIn, end: ref.current.trimIn + ref.current.duration };
-      },
-      onPanResponderMove: (_e, g) => {
+      })
+      .onUpdate((e) => {
         const full = Math.max(1, ref.current.w);
-        const dt = (g.dx / full) * src;
+        const dt = (e.translationX / full) * src;
         if (side === 'left') {
           const t = clamp(Math.round((grab.current.trimIn + dt) * 10) / 10, 0, grab.current.end - 0.5);
           ref.current.cb({ trimIn: t, duration: grab.current.end - t });
@@ -176,8 +177,7 @@ export function RegionBar({
           const end = clamp(Math.round((grab.current.end + dt) * 10) / 10, grab.current.trimIn + 0.5, src);
           ref.current.cb({ trimIn: grab.current.trimIn, duration: end - grab.current.trimIn });
         }
-      },
-    });
+      });
   const panL = useRef(mk('left')).current;
   const panR = useRef(mk('right')).current;
 
@@ -228,13 +228,17 @@ export function RegionBar({
         {foW > 1 ? <View style={[styles.fade, { left: Math.max(leftX, rightX - foW), width: foW }]} /> : null}
         <View style={[styles.playhead, { left: phX }]} />
         {/* bal fogó (trimIn) */}
-        <View style={[styles.trimHandle, { left: Math.max(0, leftX - 11) }]} {...panL.panHandlers}>
-          <View style={styles.trimGrip} />
-        </View>
+        <GestureDetector gesture={panL}>
+          <View style={[styles.trimHandle, { left: Math.max(0, leftX - 11) }]}>
+            <View style={styles.trimGrip} />
+          </View>
+        </GestureDetector>
         {/* jobb fogó (vég) */}
-        <View style={[styles.trimHandle, { left: Math.max(0, rightX - 11) }]} {...panR.panHandlers}>
-          <View style={styles.trimGrip} />
-        </View>
+        <GestureDetector gesture={panR}>
+          <View style={[styles.trimHandle, { left: Math.max(0, rightX - 11) }]}>
+            <View style={styles.trimGrip} />
+          </View>
+        </GestureDetector>
       </View>
     </View>
   );

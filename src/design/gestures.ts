@@ -17,7 +17,7 @@
  *    kompozíció: Race(Simultaneous(pinch,pan), Exclusive(doubleTap,tap)) — commit elengedéskor
  *  Video-idővonal (TimelineClip): pan=klip-move / trim-fogantyú · tap=select/seek · long-press=drag-aktiválás
  *    kompozíció: Race(movePan, tap) + külön trim-pan a fogantyúkon
- *  Kép-canvas (ImageCanvas):   pan=PanResponder* · pinch=HIÁNYZIK* · tap=select/wand   → Touch/03 rendezi
+ *  Kép-canvas (ImageCanvas):   pan=RNGH(1-ujj) · pinch=RNGH(2-ujj,center) · tap=select/wand  (Touch/03 KÉSZ)
  *  Audio-idővonal:             pan/trim/pinch/long-press = HIÁNYZIK*                     → Touch/04 rendezi
  *  (* = nyitott rés — lásd devs/tasks/Touch/01-shared-gesture-foundation.md)
  */

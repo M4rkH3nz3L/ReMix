@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { haptics, motion } from '@/design';
+import { gestures, haptics, motion } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -363,7 +363,7 @@ function TimelineClipInner({
 
   const movePan = Gesture.Pan()
     .enabled(!locked)
-    .activateAfterLongPress(220)
+    .activateAfterLongPress(gestures.longPress.drag)
     .onStart(() => {
       lift.value = withSpring(1, motion.spring.snappy);
       runOnJS(selectionHaptic)();

@@ -23,6 +23,15 @@ export function zoomStep(z: number, dir: 1 | -1): number {
 }
 
 /**
+ * 🤏 Csippentés → zoom: a csippentés kezdetén érvényes `startZoom`-ot a `scale`-lel
+ * (a gesztus kezdete óta mért relatív nagyítás) szorozza, a [MIN,MAX] tartományba
+ * szorítva. A gesztus-komponens a csippentés kezdetén rögzíti a `startZoom`-ot.
+ */
+export function pinchZoom(startZoom: number, scale: number): number {
+  return clampZoom((Number.isFinite(startZoom) ? startZoom : 1) * (scale > 0 ? scale : 1));
+}
+
+/**
  * a pan-eltolás határokba szorítva: a nagyított tartalom szélei nem húzhatók beljebb
  * a kereten (max ±(box·(zoom-1)/2) px). Zoom===1-nél a pan mindig {0,0}.
  */

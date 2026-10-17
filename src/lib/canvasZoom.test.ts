@@ -1,4 +1,4 @@
-import { ZOOM_MIN, ZOOM_MAX, clampZoom, zoomStep, clampPan, canvasTransform } from '@/lib/canvasZoom';
+import { ZOOM_MIN, ZOOM_MAX, clampZoom, zoomStep, pinchZoom, clampPan, canvasTransform } from '@/lib/canvasZoom';
 
 describe('canvasZoom — vászon-zoom/pan mag', () => {
   it('clampZoom: a [MIN,MAX] tartományba szorít + kerekít', () => {
@@ -14,6 +14,16 @@ describe('canvasZoom — vászon-zoom/pan mag', () => {
     expect(zoomStep(1, -1)).toBe(ZOOM_MIN); // nem megy 1 alá
     expect(zoomStep(ZOOM_MAX, 1)).toBe(ZOOM_MAX); // nem megy MAX fölé
     expect(zoomStep(2.25, -1)).toBe(1.5);
+  });
+
+  it('pinchZoom: startZoom × scale, határokba szorítva', () => {
+    expect(pinchZoom(1, 2)).toBe(2); // 1× kezdet, 2× csippentés → 2
+    expect(pinchZoom(2, 1.5)).toBe(3); // 2× kezdet, 1,5× → 3
+    expect(pinchZoom(1, 0.5)).toBe(ZOOM_MIN); // nem megy 1 alá
+    expect(pinchZoom(4, 3)).toBe(ZOOM_MAX); // nem megy MAX fölé
+    expect(pinchZoom(2, 1)).toBe(2); // scale=1 → változatlan
+    expect(pinchZoom(2, 0)).toBe(2); // érvénytelen scale → a kezdő zoom
+    expect(pinchZoom(NaN, 2)).toBe(2); // érvénytelen startZoom → 1×scale
   });
 
   it('clampPan: zoom=1 → {0,0}; zoom>1 → ±(box·(z-1)/2) határ', () => {

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { type LayoutChangeEvent, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
@@ -20,7 +21,7 @@ import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
 import { adjustTintLayers } from '@/lib/adjustPreview';
-import { canvasTransform, clampPan, zoomStep } from '@/lib/canvasZoom';
+import { canvasTransform, clampPan, pinchZoom, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
@@ -137,8 +138,11 @@ export function ImageCanvas({
         : { w: container.w, h: container.w / av }
       : { w: 0, h: 0 };
 
-  // 🔍 zoom/pan — a transzform + a pan-overlay PanResponder (a SelectionFrame dataRef-mintájával,
-  // hogy a PanResponder EGYSZER jöjjön létre, és friss zoom/pan/fit-tel dolgozzon)
+  // 🔍 zoom/pan gesztusok (Touch/03, RNGH): a vászon CSIPPENTÉSSEL nagyítható (2 ujj),
+  // zoom>1-nél 1 ujjal tolható (pan-overlay). A gesztusok EGYSZER jönnek létre (stabil),
+  // a friss zoom/pan/fit-et refből olvassák. A csippentés a KÜLSŐ vásznon ül → együtt él
+  // az 1-ujjas réteg-szerkesztéssel (azt a leszármazott réteg-gesztusok viszik); a pan
+  // `maxPointers(1)` → a 2-ujjas gesztus a csippentésé marad.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const panRef = useRef(pan);
@@ -146,17 +150,35 @@ export function ImageCanvas({
   const fitRef = useRef(fit);
   fitRef.current = fit;
   const panStart = useRef({ x: 0, y: 0 });
-  const zoomPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+  const zoomStart = useRef(1);
+  const panGesture = useRef(
+    Gesture.Pan()
+      .runOnJS(true)
+      .maxPointers(1)
+      .onStart(() => {
         panStart.current = panRef.current;
-      },
-      onPanResponderMove: (_e, g) => {
-        setPan(clampPan({ x: panStart.current.x + g.dx, y: panStart.current.y + g.dy }, zoomRef.current, fitRef.current));
-      },
-    })
+      })
+      .onUpdate((e) => {
+        setPan(
+          clampPan(
+            { x: panStart.current.x + e.translationX, y: panStart.current.y + e.translationY },
+            zoomRef.current,
+            fitRef.current
+          )
+        );
+      })
+  ).current;
+  const pinchGesture = useRef(
+    Gesture.Pinch()
+      .runOnJS(true)
+      .onStart(() => {
+        zoomStart.current = zoomRef.current;
+      })
+      .onUpdate((e) => {
+        const z = pinchZoom(zoomStart.current, e.scale);
+        setZoom(z);
+        setPan((p) => clampPan(p, z, fitRef.current));
+      })
   ).current;
   const tf = canvasTransform(zoom, pan, fit);
   const zoomStyle = !capturing && zoom !== 1
@@ -295,6 +317,7 @@ export function ImageCanvas({
       }
     >
       {fit.w > 0 ? (
+        <GestureDetector gesture={pinchGesture}>
         <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }]}>
           {/* 🔍 zoom/pan-wrapper: a tartalom (rétegek + overlay-k) együtt skálázódik/tolódik;
               capture-kor és zoom===1-nél identitás (a raszterizálás + a szerkesztés érintetlen) */}
@@ -462,7 +485,9 @@ export function ImageCanvas({
           {/* 🔍 pan-overlay: zoom>1-nél a teljes vásznon ül → a gesztus a NÉZETET tolja (a szerkesztés
               szünetel, így a réteg-húzás koordináta-rendszere sértetlen marad) */}
           {!capturing && zoom !== 1 ? (
-            <View style={StyleSheet.absoluteFill} {...zoomPanResponder.panHandlers} />
+            <GestureDetector gesture={panGesture}>
+              <View style={StyleSheet.absoluteFill} />
+            </GestureDetector>
           ) : null}
 
           {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re */}
@@ -482,6 +507,7 @@ export function ImageCanvas({
             </View>
           ) : null}
         </View>
+        </GestureDetector>
       ) : null}
     </View>
   );

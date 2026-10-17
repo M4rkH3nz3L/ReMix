@@ -70,8 +70,13 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
 
 /** ESZKÖZÖN (natív) dekódolás → csúcsok, worker nélkül (react-native-audio-api). */
 async function computeNativeWaveform(uri: string): Promise<WaveformData | null> {
-  if (nativeDecoder === 'missing' || isExpoGo) {
-    return null; // nincs natív modul — nincs import-kísérlet, nincs hibalog
+  // ⚠️ iOS ideiglenes kihagyás: a `react-native-audio-api` `install`-ja a jelenlegi
+  //    `react-native-worklets` (0.10.1) ABI-val SZEGFAULTOL (getUIWorkletRuntime) —
+  //    ez NATÍV crash, amit a lenti try/catch NEM fog el (nem JS-hiba). Amíg nincs
+  //    kompatibilis build (react-native-audio-api 0.13.6+ + prebuild/rebuild), iOS-en
+  //    a worker-fallbackre esünk vissza (a waveform csendben címkés marad worker nélkül).
+  if (nativeDecoder === 'missing' || isExpoGo || Platform.OS === 'ios') {
+    return null; // nincs natív modul (vagy iOS-kihagyás) — nincs import-kísérlet
   }
   try {
     const { decodeAudioData } = await import('react-native-audio-api');

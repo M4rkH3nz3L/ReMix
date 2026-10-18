@@ -11,17 +11,10 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { SourceSheet } from '@/components/SourceSheet';
-import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
-import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
-import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
-import { MasterSheet } from '@/components/studio/audio/MasterSheet';
-import { DrumMachineSheet } from '@/components/studio/audio/DrumMachineSheet';
-import { MixerSheet } from '@/components/studio/audio/MixerSheet';
-import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
-import { SamplerSheet } from '@/components/studio/audio/SamplerSheet';
-import { TtsSheet } from '@/components/studio/audio/TtsSheet';
+import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
+import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
+import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
 import { palette } from '@/constants/editor';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
 import { buildAlbumVideoProject } from '@/lib/albumShare';
@@ -655,88 +648,51 @@ export function AudioStudioBody({
       </ScrollView>
 
       {/* eszköz-sor */}
-      <View style={styles.toolBar}>
-        <Tool icon="add-circle-outline" label={t('studio.audioTools.add')} onPress={() => setAdding(true)} />
-        <Tool
-          icon={recorderState.isRecording ? 'stop-circle' : 'mic-outline'}
-          label={t('studio.audioTools.record')}
-          onPress={toggleRecord}
-          danger={recorderState.isRecording}
-        />
-        <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)} disabled={!selClip} />
-        <Tool icon="options-outline" label={t('studio.audioTools.edit')} onPress={() => selClip && setEditing(true)} disabled={!selClip} />
-        <Tool icon="trash-outline" label={t('studio.audioTools.delete')} onPress={() => selClip && useEditorStore.getState().removeClip(selClip.id)} disabled={!selClip} danger />
-        <Tool icon="options" label={t('studio.audioTools.mixer', { defaultValue: 'Mixer' })} onPress={() => setMixerOpen(true)} />
-      </View>
+      <AudioStudioToolbar
+        hasSelection={!!selClip}
+        isRecording={recorderState.isRecording}
+        onAdd={() => setAdding(true)}
+        onRecord={toggleRecord}
+        onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
+        onEdit={() => selClip && setEditing(true)}
+        onDelete={() => selClip && useEditorStore.getState().removeClip(selClip.id)}
+        onMixer={() => setMixerOpen(true)}
+      />
 
-      {editing && selClip ? <ClipEditSheet clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
-      {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
-      {mixerOpen ? (
-        <MixerSheet
-          onClose={() => setMixerOpen(false)}
-          onOpenMaster={() => {
-            setMixerOpen(false);
-            setMastering(true);
-          }}
-        />
-      ) : null}
-      {adding ? (
-        <AddMediaSheet
-          track="music"
-          onClose={() => setAdding(false)}
-          onTts={() => {
-            setAdding(false);
-            setTts(true);
-          }}
-          onPianoRoll={() => {
-            setAdding(false);
-            setPianoRoll(true);
-          }}
-          onDrums={() => {
-            setAdding(false);
-            setDrumMachine(true);
-          }}
-          onSampler={() => {
-            setAdding(false);
-            setSampler(true);
-          }}
-        />
-      ) : null}
-      {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
-      {pianoRoll ? (
-        <PianoRollSheet bpm={bpm} busy={pianoBusy} onClose={() => setPianoRoll(false)} onBake={(notes, wave) => void bakeSynth(notes, wave)} />
-      ) : null}
-      {drumMachine ? (
-        <DrumMachineSheet bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars) => void bakeDrums(hits, bars)} />
-      ) : null}
-      {sampler ? (
-        <SamplerSheet bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)} />
-      ) : null}
-      {source ? <SourceSheet onInsert={insertSource} onClose={() => setSource(false)} /> : null}
-      {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => void shareAlbum()} /> : null}
+      <AudioStudioSheets
+        selClip={selClip}
+        fps={fps}
+        bpm={bpm}
+        editing={editing}
+        mastering={mastering}
+        mixerOpen={mixerOpen}
+        adding={adding}
+        tts={tts}
+        pianoRoll={pianoRoll}
+        pianoBusy={pianoBusy}
+        drumMachine={drumMachine}
+        drumBusy={drumBusy}
+        sampler={sampler}
+        samplerBusy={samplerBusy}
+        source={source}
+        albumOpen={albumOpen}
+        setEditing={setEditing}
+        setMastering={setMastering}
+        setMixerOpen={setMixerOpen}
+        setAdding={setAdding}
+        setTts={setTts}
+        setPianoRoll={setPianoRoll}
+        setDrumMachine={setDrumMachine}
+        setSampler={setSampler}
+        setSource={setSource}
+        setAlbumOpen={setAlbumOpen}
+        onBakeSynth={(notes, wave) => void bakeSynth(notes, wave)}
+        onBakeDrums={(hits, bars) => void bakeDrums(hits, bars)}
+        onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
+        onInsertSource={insertSource}
+        onShareAlbum={() => void shareAlbum()}
+      />
     </View>
-  );
-}
-
-function Tool({
-  icon,
-  label,
-  onPress,
-  disabled,
-  danger,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
-  const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
-  return (
-    <Pressable style={styles.tool} onPress={onPress} disabled={disabled}>
-      <Ionicons name={icon} size={22} color={color} />
-      <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -823,7 +779,4 @@ const styles = StyleSheet.create({
   bpmWrap: { alignItems: 'center', minWidth: 34 },
   bpmVal: { color: palette.text, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   bpmLabel: { color: palette.textDim, fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
-  toolBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.surface, paddingTop: 10, paddingBottom: 6 },
-  tool: { flex: 1, alignItems: 'center', gap: 4 },
-  toolLabel: { fontSize: 10, fontWeight: '600' },
 });

@@ -130,4 +130,10 @@ export interface LiveDoc {
   destinations: LiveDestination[];
   /** 🎚️ élő audio-mixer (mikrofon/zene/média/rendszer-hang + master + auto-duck). */
   mixer?: LiveMixer;
+  /**
+   * 📼 Felveszi-e az adást (VOD)? Ha IGEN → az adás végén a felvételből `kind:'video'`
+   * projekt jön létre (szerkeszthető). Ha NEM → NINCS projekt (a live-config projekt
+   * az adás/cancel végén törlődik — nincs üres-projekt clutter). Hiányzó = nem rögzít.
+   */
+  record?: boolean;
 }

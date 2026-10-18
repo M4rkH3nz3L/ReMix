@@ -30,6 +30,7 @@ import {
   removeSource,
   reorderSource,
   setActiveScene,
+  setRecord,
   setTitle as setDocTitle,
   sortedSources,
   toggleDestination,
@@ -52,7 +53,7 @@ import {
   setDestinationEnabled,
   type LiveDestinationRow,
 } from '@/lib/liveDestinations';
-import { loadEvents, loadProject, saveProject } from '@/lib/storage';
+import { deleteProject, loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type {
   LiveChannelId,
@@ -360,6 +361,16 @@ export default function LiveStudioScreen() {
     commit(setActiveScene(next, added.id), '+ scene');
   };
 
+  // 🧹 Studióból kilépés = a live MEGSZAKÍTÁSA (nem indult adás) → a transient live-config
+  // projekt törlése, hogy ne maradjon üres projekt a galériában. A „Start streaming" NEM
+  // ezen megy (az router.replace-szel az /live/[id]-re lép), így a tényleges adást nem törli.
+  const onCancel = () => {
+    if (project?.kind === 'live') {
+      deleteProject(String(id)).catch(() => {});
+    }
+    goBackOrHome();
+  };
+
   const onStart = async () => {
     const title = (titleDraft.trim() || live.title).slice(0, 120);
     setStarting(true);
@@ -384,7 +395,7 @@ export default function LiveStudioScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* fejléc */}
       <View style={styles.topBar}>
-        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.iconBtn}>
+        <Pressable onPress={onCancel} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.text} />
         </Pressable>
         <TextInput
@@ -567,6 +578,33 @@ export default function LiveStudioScreen() {
           ))}
         </View>
         <Text style={styles.hint}>{t('live.studio.destHint', { defaultValue: 'ReMix feed is always on. External platforms are Pro (multistream).' })}</Text>
+
+        {/* 📼 Rögzítés: BE → az adás végén a teljes felvételből szerkeszthető video-projekt;
+            KI → NINCS projekt (a live csak élő adás, nem keletkezik üres-projekt). */}
+        <Text style={styles.sectionLabel}>{t('live.studio.recordSection', { defaultValue: 'Rögzítés' })}</Text>
+        <Pressable
+          onPress={() => commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on')}
+          style={[styles.recordRow, live.record && styles.recordRowOn]}
+        >
+          <Ionicons
+            name={live.record ? 'videocam' : 'videocam-off'}
+            size={20}
+            color={live.record ? palette.danger : palette.textDim}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.recordLabel}>{t('live.studio.recordLabel', { defaultValue: 'Élő mentése videó-projektbe' })}</Text>
+            <Text style={styles.recordSub}>
+              {live.record
+                ? t('live.studio.recordOn', { defaultValue: 'Az adás végén a teljes felvételből szerkeszthető projekt lesz.' })
+                : t('live.studio.recordOff', { defaultValue: 'Nincs felvétel/projekt — csak élő adás.' })}
+            </Text>
+          </View>
+          <Ionicons
+            name={live.record ? 'toggle' : 'toggle-outline'}
+            size={38}
+            color={live.record ? palette.danger : palette.textDim}
+          />
+        </Pressable>
 
         {/* 🎚️ audio-mixer */}
         {live.mixer && (
@@ -888,6 +926,20 @@ const styles = StyleSheet.create({
   destChipTextOn: { color: palette.accent },
   destPro: { color: palette.textDim, fontSize: 10, fontWeight: '800' },
   hint: { color: palette.textDim, fontSize: 12, lineHeight: 17 },
+  recordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: palette.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  recordRowOn: { borderColor: palette.danger, backgroundColor: palette.danger + '18' },
+  recordLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  recordSub: { color: palette.textDim, fontSize: 11, lineHeight: 15, marginTop: 2 },
 
   duckChip: {
     flexDirection: 'row',

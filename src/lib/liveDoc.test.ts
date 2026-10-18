@@ -6,6 +6,7 @@ import {
   createLiveDoc,
   defaultTransformFor,
   enabledExternalDestinations,
+  liveEndDisposition,
   newSource,
   removeDestination,
   removeScene,
@@ -13,6 +14,7 @@ import {
   renameScene,
   reorderSource,
   setActiveScene,
+  setRecord,
   setTitle,
   setVisibility,
   sortedSources,
@@ -240,5 +242,28 @@ describe('liveDoc — SET_LIVE_DOC command + kind:live projekt', () => {
     const doc = createLiveDoc('x', idGen());
     const next = applyCommand(p, { type: 'SET_LIVE_DOC', doc });
     expect(next!.live).toEqual(doc);
+  });
+});
+
+describe('📼 record (felvétel) + adás-vége disposition', () => {
+  it('createLiveDoc: record alapból false (nincs üres-projekt clutter)', () => {
+    expect(createLiveDoc('x', idGen()).record).toBe(false);
+  });
+
+  it('setRecord: be/ki kapcsol; azonos értéknél ugyanaz a referencia (no-op)', () => {
+    const doc = createLiveDoc('x', idGen());
+    const on = setRecord(doc, true);
+    expect(on.record).toBe(true);
+    expect(on).not.toBe(doc);
+    expect(setRecord(on, true)).toBe(on);
+    expect(setRecord(on, false).record).toBe(false);
+  });
+
+  it('liveEndDisposition: CSAK record=be ÉS van VOD → import-vod; különben delete-config', () => {
+    expect(liveEndDisposition(true, true)).toBe('import-vod');
+    expect(liveEndDisposition(true, false)).toBe('delete-config'); // rögzít, de nincs VOD (nincs egress) → törlés
+    expect(liveEndDisposition(false, true)).toBe('delete-config'); // nem rögzít → törlés (clutter-fix)
+    expect(liveEndDisposition(false, false)).toBe('delete-config');
+    expect(liveEndDisposition(undefined, true)).toBe('delete-config'); // hiányzó flag = nem rögzít
   });
 });

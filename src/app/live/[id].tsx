@@ -37,8 +37,8 @@ import {
 } from '@/lib/live';
 import { publishLiveVod } from '@/lib/feed';
 import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
-import { setActiveScene } from '@/lib/liveDoc';
-import { loadProject } from '@/lib/storage';
+import { liveEndDisposition, setActiveScene } from '@/lib/liveDoc';
+import { deleteProject, loadProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
 import type { Project } from '@/types/project';
 // type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
@@ -293,10 +293,12 @@ export default function LiveRoomScreen() {
         egressIdRef.current = null;
       }
       await endLive(session.id).catch(() => {});
-      // 📼 D158: ha készült felvétel (VOD), felajánljuk a feedre megosztást (opcionális)
       const vod = vodUrlRef.current;
       const proj = liveProjRef.current;
-      if (vod && proj) {
+      const record = liveDocRef.current?.record ?? false;
+      // 📼 record=be + van felvétel (VOD) → felajánljuk a feedre (a video-projekt-import a
+      //    05.1); KÜLÖNBEN a transient live-config projekt TÖRLŐDIK → nincs üres-projekt clutter.
+      if (liveEndDisposition(record, !!vod) === 'import-vod' && vod && proj) {
         vodUrlRef.current = null;
         Alert.alert(
           t('live.vodTitle', { defaultValue: 'Felvétel kész' }),
@@ -318,6 +320,10 @@ export default function LiveRoomScreen() {
         );
         return; // a navigációt az Alert-gombok végzik
       }
+      // 🧹 nem rögzített (vagy nincs VOD) → a transient live-config projekt törlése
+      if (projectParam) {
+        void deleteProject(String(projectParam)).catch(() => {});
+      }
     }
     goBackOrHome();
   };
@@ -332,9 +338,13 @@ export default function LiveRoomScreen() {
           egressIdRef.current = null;
         }
         void endLive(session.id).catch(() => {});
+        // 🧹 hirtelen kilépés + nem rögzít → a transient live-config projekt törlése (nincs clutter)
+        if (!liveDocRef.current?.record && projectParam) {
+          void deleteProject(String(projectParam)).catch(() => {});
+        }
       }
     };
-  }, [isHost, session]);
+  }, [isHost, session, projectParam]);
 
   if (notFound) {
     return (

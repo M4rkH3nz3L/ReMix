@@ -106,7 +106,26 @@ export function createLiveDoc(
     activeSceneId: scene.id,
     destinations: [remix],
     mixer: createLiveMixer(),
+    record: false, // 📼 alapból NEM rögzít → nincs üres-projekt clutter (ld. setRecord)
   };
+}
+
+/** 📼 Felvétel (VOD) be/ki — a Studio „Rögzítés" kapcsolója a command-buson át. */
+export function setRecord(doc: LiveDoc, record: boolean): LiveDoc {
+  if ((doc.record ?? false) === record) {
+    return doc;
+  }
+  return { ...doc, record };
+}
+
+/**
+ * 📼 Mi történjen az adás VÉGÉN a live-config projekttel?
+ * - `'import-vod'`: rögzített ÉS van VOD → a felvételből `kind:'video'` projekt (szerkeszthető).
+ * - `'delete-config'`: nem rögzített VAGY nincs VOD → a transient config-projekt TÖRLŐDIK
+ *   (nincs üres-projekt clutter). Pure döntés-mag (tesztelhető).
+ */
+export function liveEndDisposition(record: boolean | undefined, hasVod: boolean): 'import-vod' | 'delete-config' {
+  return record && hasVod ? 'import-vod' : 'delete-config';
 }
 
 // ── lekérdezések ────────────────────────────────────────────────────────────

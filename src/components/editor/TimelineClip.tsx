@@ -15,6 +15,7 @@ import Animated, {
 import { ClipFilmstrip } from '@/components/editor/ClipFilmstrip';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { MIN_CLIP_DURATION, SNAP_PX, palette, trackColors } from '@/constants/editor';
+import { makeId } from '@/lib/id';
 import { getProxyUriSync } from '@/lib/proxy';
 import { sourceTimeAt, trimClipLeft, trimClipRight } from '@/lib/projectUtils';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
@@ -361,6 +362,36 @@ function TimelineClipInner({
     runOnJS(handleTap)();
   });
 
+  /**
+   * 📋 Klip-kontextusmenü (Touch/02): long-press-HOLD + elengedés MOZGÁS NÉLKÜL →
+   * natív gyors-menü (vágás a playheadnél / duplikálás / törlés). A long-press-drag
+   * gesztust ÚJRAHASZNÁLJA (nem ad új, ütköző long-presst): a mozgás-küszöb (`slop.pan`)
+   * dönt — alatta menü, fölötte klip-mozgatás. Így a tulajdonjog tiszta marad.
+   */
+  const showClipMenu = () => {
+    const st = useEditorStore.getState();
+    haptics.impact();
+    const onClip = st.playhead > clip.start && st.playhead < clip.start + clip.duration;
+    const splitAt = onClip ? st.playhead : clip.start + clip.duration / 2;
+    Alert.alert(t('editor.track.' + trackType), undefined, [
+      {
+        text: t('editor.toolbar.splitHere', { defaultValue: 'Vágás itt' }),
+        onPress: () => st.splitClipAt(clip.id, splitAt),
+      },
+      {
+        text: t('common.duplicate', { defaultValue: 'Duplikálás' }),
+        onPress: () =>
+          st.addClip(trackType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }),
+      },
+      {
+        text: t('common.delete', { defaultValue: 'Törlés' }),
+        style: 'destructive',
+        onPress: () => st.removeClip(clip.id),
+      },
+      { text: t('common.cancel', { defaultValue: 'Mégse' }), style: 'cancel' },
+    ]);
+  };
+
   const movePan = Gesture.Pan()
     .enabled(!locked)
     .activateAfterLongPress(gestures.longPress.drag)
@@ -374,7 +405,12 @@ function TimelineClipInner({
       moveDY.value = e.translationY;
     })
     .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX, e.translationY);
+      // hold + elengedés mozgás nélkül (< pan-küszöb) → kontextusmenü; különben klip-mozgatás
+      if (Math.abs(e.translationX) < gestures.slop.pan && Math.abs(e.translationY) < gestures.slop.pan) {
+        runOnJS(showClipMenu)();
+      } else {
+        runOnJS(commitMove)(e.translationX, e.translationY);
+      }
     })
     .onFinalize(() => {
       lift.value = withSpring(0, motion.spring.snappy);

@@ -7,21 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
-import { SourceSheet } from '@/components/SourceSheet';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
-import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
-import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
-import { PatternSheet } from '@/components/studio/image/PatternSheet';
-import { AlignSheet } from '@/components/studio/image/AlignSheet';
-import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
-import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
-import { HistorySheet } from '@/components/studio/image/HistorySheet';
-import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
-import { LayerPanel } from '@/components/studio/image/LayerPanel';
-import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
-import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
+import { ImageStudioSheets, type SheetKind } from '@/components/studio/image/body/ImageStudioSheets';
+import { ImageStudioToolbar, type ToolKey } from '@/components/studio/image/body/ImageStudioToolbar';
 import { palette } from '@/constants/editor';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
@@ -56,38 +46,6 @@ import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 
-type ToolKey =
-  | 'layers'
-  | 'photo'
-  | 'text'
-  | 'shape'
-  | 'pen'
-  | 'lasso'
-  | 'wand'
-  | 'brush'
-  | 'svg'
-  | 'style'
-  | 'adjust'
-  | 'fx'
-  | 'pattern'
-  | 'crop'
-  | 'guides'
-  | 'align'
-  | 'boolean'
-  | 'forward'
-  | 'back'
-  | 'rotate'
-  | 'flipH'
-  | 'flipV'
-  | 'duplicate'
-  | 'delete';
-
-interface Tool {
-  key: ToolKey;
-  icon: keyof typeof Ionicons.glyphMap;
-  labelKey: string;
-}
-
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
 const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
 
@@ -102,58 +60,6 @@ const CROP_PRESETS: { label: string; labelKey?: string; ratio: number | null }[]
   { label: '4:5', ratio: 4 / 5 },
   { label: '16:9', ratio: 16 / 9 },
   { label: '9:16', ratio: 9 / 16 },
-];
-
-/**
- * 📱 Telefon-optimalizált, CSOPORTOSÍTOTT eszköztár (vízszintesen görgethető) —
- * a lapos 9-elemű sor helyett kategóriák (Hozzáadás / Rendezés / Stílus / Réteg),
- * így a teljes eszközkészlet kézre esik a kis kijelzőn is.
- */
-const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
-  {
-    labelKey: 'studio.imageGroups.add',
-    tools: [
-      { key: 'photo', icon: 'image-outline', labelKey: 'studio.imageTools.photo' },
-      { key: 'text', icon: 'text-outline', labelKey: 'studio.imageTools.text' },
-      { key: 'shape', icon: 'shapes-outline', labelKey: 'studio.imageTools.shape' },
-      { key: 'pen', icon: 'pencil-outline', labelKey: 'studio.imageTools.pen' },
-      { key: 'lasso', icon: 'ellipse-outline', labelKey: 'studio.imageTools.lasso' },
-      { key: 'wand', icon: 'color-wand-outline', labelKey: 'studio.imageTools.wand' },
-      { key: 'brush', icon: 'brush-outline', labelKey: 'studio.imageTools.brush' },
-      { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
-    ],
-  },
-  {
-    labelKey: 'studio.imageGroups.arrange',
-    tools: [
-      { key: 'crop', icon: 'crop-outline', labelKey: 'studio.imageTools.crop' },
-      { key: 'guides', icon: 'grid-outline', labelKey: 'studio.imageTools.guides' },
-      { key: 'align', icon: 'magnet-outline', labelKey: 'studio.imageTools.align' },
-      { key: 'boolean', icon: 'git-merge-outline', labelKey: 'studio.imageTools.boolean' },
-      { key: 'rotate', icon: 'refresh-outline', labelKey: 'studio.imageTools.rotate' },
-      { key: 'flipH', icon: 'swap-horizontal-outline', labelKey: 'studio.imageTools.flipH' },
-      { key: 'flipV', icon: 'swap-vertical-outline', labelKey: 'studio.imageTools.flipV' },
-      { key: 'forward', icon: 'chevron-up-outline', labelKey: 'studio.imageTools.forward' },
-      { key: 'back', icon: 'chevron-down-outline', labelKey: 'studio.imageTools.back' },
-    ],
-  },
-  {
-    labelKey: 'studio.imageGroups.style',
-    tools: [
-      { key: 'style', icon: 'options-outline', labelKey: 'studio.imageTools.style' },
-      { key: 'fx', icon: 'sparkles-outline', labelKey: 'studio.imageTools.fx' },
-      { key: 'pattern', icon: 'grid-outline', labelKey: 'studio.imageTools.pattern' },
-      { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
-    ],
-  },
-  {
-    labelKey: 'studio.imageGroups.layer',
-    tools: [
-      { key: 'layers', icon: 'layers-outline', labelKey: 'studio.imageTools.layers' },
-      { key: 'duplicate', icon: 'copy-outline', labelKey: 'studio.imageTools.duplicate' },
-      { key: 'delete', icon: 'trash-outline', labelKey: 'studio.imageTools.delete' },
-    ],
-  },
 ];
 
 /**
@@ -180,21 +86,7 @@ export function ImageStudioBody({
   const project = useEditorStore((s) => s.project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<
-    | 'layers'
-    | 'style'
-    | 'adjust'
-    | 'fx'
-    | 'pattern'
-    | 'align'
-    | 'boolean'
-    | 'shapePicker'
-    | 'canvas'
-    | 'source'
-    | 'export'
-    | 'history'
-    | null
-  >(null);
+  const [sheet, setSheet] = useState<SheetKind>(null);
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
@@ -1459,123 +1351,31 @@ export function ImageStudioBody({
           </Text>
         </View>
       ) : (
-      /* 📱 telefon-optimalizált, csoportosított, vízszintesen görgethető eszköztár */
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.toolBar}
-        contentContainerStyle={styles.toolBarContent}
-      >
-        {TOOL_GROUPS.map((group, gi) => (
-          <View key={group.labelKey} style={styles.toolGroupRow}>
-            <View style={styles.toolGroup}>
-              <Text style={styles.groupLabel}>{t(group.labelKey)}</Text>
-              <View style={styles.groupTools}>
-                {group.tools.map((tool) => {
-                  const disabled = toolDisabled(tool.key);
-                  const danger = tool.key === 'delete';
-                  const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
-                  return (
-                    <Pressable
-                      key={tool.key}
-                      style={styles.tool}
-                      onPress={() => onTool(tool.key)}
-                      disabled={disabled}
-                      accessibilityRole="button"
-                      accessibilityLabel={t(tool.labelKey)}
-                    >
-                      <Ionicons name={tool.icon} size={22} color={color} />
-                      <Text
-                        style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}
-                        numberOfLines={1}
-                      >
-                        {t(tool.labelKey)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-            {gi < TOOL_GROUPS.length - 1 ? <View style={styles.groupDivider} /> : null}
-          </View>
-        ))}
-      </ScrollView>
+        <ImageStudioToolbar onTool={onTool} toolDisabled={toolDisabled} />
       )}
 
-      {sheet === 'layers' && doc ? (
-        <LayerPanel
-          doc={doc}
-          selectedId={effectiveSelectedId}
-          onSelect={setSelectedId}
-          onAdd={add}
-          commit={commit}
-          onClose={() => setSheet(null)}
-          onOpenAdjust={() => {
-            if (selectedLayer?.kind === 'photo') {
-              setSheet('adjust');
-            }
-          }}
-          onDrawMask={startMaskDraw}
-        />
-      ) : null}
-      {sheet === 'style' && doc && selectedLayer ? (
-        <LayerStyleSheet
-          doc={doc}
-          layer={selectedLayer}
-          commit={commit}
-          onOpenAdjust={() => {
-            if (selectedLayer.kind === 'photo') {
-              setSheet('adjust');
-            }
-          }}
-          onClose={() => setSheet(null)}
-        />
-      ) : null}
-      {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (
-        <AdjustStackSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (
-        <EffectsSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'pattern' && doc && selectedLayer?.kind === 'shape' ? (
-        <PatternSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'align' && doc && selectedLayer && canAlignLayer(selectedLayer) ? (
-        <AlignSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'boolean' && doc && effectiveSelectedId && canBoolean(doc, effectiveSelectedId) ? (
-        <BooleanSheet
-          doc={doc}
-          selectedId={effectiveSelectedId}
-          commit={commit}
-          onResult={setSelectedId}
-          onClose={() => setSheet(null)}
-        />
-      ) : null}
-      {sheet === 'shapePicker' && doc ? (
-        <ShapePickerSheet onPick={addShapeType} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'canvas' && doc ? (
-        <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'history' && doc ? <HistorySheet onClose={() => setSheet(null)} /> : null}
-      {sheet === 'source' ? (
-        <SourceSheet onInsert={insertSource} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === 'export' && doc ? (
-        <ExportSheet
-          doc={doc}
-          busy={busy}
-          pageCount={mode === 'project' ? pages.length : 1}
-          onRaster={(o) => void exportImage(o)}
-          onSvg={() => void exportSvg()}
-          onPdf={() => void exportPdf()}
-          onVideo={() => void insertIntoVideo()}
-          onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
-          onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
-          onClose={() => setSheet(null)}
-        />
-      ) : null}
+      <ImageStudioSheets
+        sheet={sheet}
+        doc={doc}
+        selectedLayer={selectedLayer}
+        effectiveSelectedId={effectiveSelectedId}
+        mode={mode}
+        pageCount={pages.length}
+        busy={busy}
+        commit={commit}
+        setSheet={setSheet}
+        setSelectedId={setSelectedId}
+        onAdd={add}
+        onAddShapeType={addShapeType}
+        onInsertSource={insertSource}
+        onDrawMask={startMaskDraw}
+        onRaster={(o) => void exportImage(o)}
+        onSvg={() => void exportSvg()}
+        onPdf={() => void exportPdf()}
+        onVideo={() => void insertIntoVideo()}
+        onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
+        onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
+      />
     </View>
   );
 }
@@ -1668,46 +1468,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   statusText: { flex: 1, color: palette.textDim, fontSize: 11, fontWeight: '600' },
-  toolBar: {
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    backgroundColor: palette.surface,
-    flexGrow: 0,
-  },
-  toolBarContent: {
-    alignItems: 'flex-start',
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingHorizontal: 8,
-  },
-  toolGroupRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  toolGroup: {
-    paddingHorizontal: 6,
-  },
-  groupLabel: {
-    color: palette.textDim,
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginLeft: 6,
-    marginBottom: 2,
-    opacity: 0.7,
-  },
-  groupTools: {
-    flexDirection: 'row',
-  },
-  groupDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: palette.border,
-    marginVertical: 4,
-    marginHorizontal: 2,
-  },
-  tool: { width: 60, alignItems: 'center', gap: 4, paddingVertical: 2 },
-  toolLabel: { fontSize: 10, fontWeight: '600' },
   cropBar: {
     flexDirection: 'row',
     alignItems: 'center',

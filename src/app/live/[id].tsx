@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +38,10 @@ import {
 import { publishLiveVod } from '@/lib/feed';
 import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
 import { liveEndDisposition, setActiveScene } from '@/lib/liveDoc';
-import { deleteProject, loadProject } from '@/lib/storage';
+import { buildVodProject } from '@/lib/liveVod';
+import { projectFps } from '@/lib/frames';
+import { makeId } from '@/lib/id';
+import { deleteProject, loadProject, saveProject } from '@/lib/storage';
 import type { LiveDoc } from '@/types/live';
 import type { Project } from '@/types/project';
 // type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
@@ -157,6 +160,11 @@ export default function LiveRoomScreen() {
   const egressIdRef = useRef<string | null>(null); // host: a futó multistream-egress (Pro)
   const vodUrlRef = useRef<string | null>(null); // host: a felvett VOD URL-je (D158, ha van)
   const liveProjRef = useRef<Project | null>(null); // host: a live-produkció projektje (VOD-poszthoz)
+  // 📼 az adás KEZDETÉNEK időbélyege → az adás végén az eltelt idő a VOD becsült
+  //    hossza (a tényleges hosszt az editor a videó betöltésekor pontosítja). A
+  //    Date.now() render-tiltott, ezért a stampet a session-betöltő effektben
+  //    (nem renderben) állítjuk; 0 = még nem indult.
+  const startStampRef = useRef(0);
   const endedRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
@@ -243,13 +251,17 @@ export default function LiveRoomScreen() {
         if (active && proj?.live) {
           liveDocRef.current = proj.live;
           liveProjRef.current = proj; // VOD-poszthoz (D158)
+          startStampRef.current = Date.now(); // 📼 az adás kezdete (eltelt idő → VOD becsült hossz)
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
           setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
           broadcastScene();
-          // 🎥 multistream (Pro): ha van engedélyezett RTMP-cél → egress indítása
-          // (a ReMix-feed mindig megy; nem-Pro / nincs egress-infra esetén csendben kimarad)
+          // 🎥 egress indítása, ha VAN engedélyezett RTMP-cél (multistream, Pro)
+          //    VAGY a RÖGZÍTÉS be van kapcsolva (ekkor az egress adja a VOD-ot — a
+          //    felvétel RTMP-cél nélkül is működik). A ReMix-feed mindig megy;
+          //    nem-Pro / nincs egress-infra esetén az egress csendben kimarad.
+          const wantRecord = proj.live.record ?? false;
           hasEnabledTargets()
-            .then((has) => (has && active ? startLiveEgress(liveId) : null))
+            .then((has) => ((has || wantRecord) && active ? startLiveEgress(liveId) : null))
             .then((r) => {
               if (r && active) {
                 egressIdRef.current = r.egressId;
@@ -296,25 +308,47 @@ export default function LiveRoomScreen() {
       const vod = vodUrlRef.current;
       const proj = liveProjRef.current;
       const record = liveDocRef.current?.record ?? false;
-      // 📼 record=be + van felvétel (VOD) → felajánljuk a feedre (a video-projekt-import a
-      //    05.1); KÜLÖNBEN a transient live-config projekt TÖRLŐDIK → nincs üres-projekt clutter.
+      // 📼 record=be + van felvétel (VOD) → a felvételből SZERKESZTHETŐ video-projekt
+      //    (LIVE/05.1): a VOD a fő videosávon lévő klip (command-bus). KÜLÖNBEN a
+      //    transient live-config projekt TÖRLŐDIK → nincs üres-projekt clutter.
       if (liveEndDisposition(record, !!vod) === 'import-vod' && vod && proj) {
         vodUrlRef.current = null;
+        // ⏱️ a VOD becsült hossza = az adás eltelt ideje (a tényleges hosszt az editor
+        //    a videó betöltésekor pontosítja); a klip a projekt frame-rácsára ül.
+        //    (startStamp=0 → nem indult el a mérés; 0 hosszt adunk, a builder 1 kockára emeli.)
+        const elapsedSec = startStampRef.current > 0 ? (Date.now() - startStampRef.current) / 1000 : 0;
+        const vodProject = buildVodProject({
+          vodUrl: vod,
+          durationSec: elapsedSec,
+          fps: projectFps(proj),
+          makeId: () => makeId('clip'),
+          name: proj.live?.title || proj.name || 'Live felvétel',
+          aspectRatio: proj.aspectRatio,
+        });
+        void saveProject(vodProject).catch(() => {});
+        // 🧹 a transient live-config projekt törlése (a VOD-projekt az új otthon)
+        if (projectParam) {
+          void deleteProject(String(projectParam)).catch(() => {});
+        }
         Alert.alert(
           t('live.vodTitle', { defaultValue: 'Felvétel kész' }),
-          t('live.vodBody', { defaultValue: 'Megosztod az élő adás felvételét a feedre?' }),
+          t('live.vodBody', { defaultValue: 'Az élő adás felvétele szerkeszthető projekt lett.' }),
           [
             {
-              text: t('common.notNow', { defaultValue: 'Most nem' }),
-              style: 'cancel',
-              onPress: () => goBackOrHome(),
+              text: t('live.vodOpen', { defaultValue: 'Projekt megnyitása' }),
+              onPress: () => router.push(`/editor/${vodProject.id}`),
             },
             {
-              text: t('live.vodShare', { defaultValue: 'Megosztás' }),
+              text: t('live.vodShare', { defaultValue: 'Megosztás feedre' }),
               onPress: () => {
-                void publishLiveVod(proj, vod).catch(() => {});
+                void publishLiveVod(vodProject, vod).catch(() => {});
                 goBackOrHome();
               },
+            },
+            {
+              text: t('common.done', { defaultValue: 'Kész' }),
+              style: 'cancel',
+              onPress: () => goBackOrHome(),
             },
           ],
         );

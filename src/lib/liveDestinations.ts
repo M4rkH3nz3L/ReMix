@@ -144,11 +144,14 @@ export interface EgressStart {
  * A worker ellenőrzi a host-ownershipet + olvassa a kulcsokat (service_role).
  * Hibánál dob (pl. 503 = nincs egress-infra / LiveKit Cloud; 402/403 = nem Pro).
  */
-export async function startLiveEgress(room: string): Promise<EgressStart> {
+export async function startLiveEgress(room: string, record = false, aspect?: string): Promise<EgressStart> {
   const res = await fetch(`${cloudBaseUrl()}/live/egress/start`, {
     method: 'POST',
     headers: await workerJsonHeaders(),
-    body: JSON.stringify({ room }),
+    // 📼 a `record` jelzi: készüljön VOD-fájl (akár RTMP-cél nélkül is) — a szerver
+    //    csak-felvétel esetén is elindítja az egresst (fájl-only kimenet).
+    // 📐 az `aspect` (a live-projekt aránya) az egress-kimenet méretét állítja (portré/landscape).
+    body: JSON.stringify({ room, record, aspect }),
   });
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string };

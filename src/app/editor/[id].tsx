@@ -29,6 +29,7 @@ import { TransportBar } from '@/components/editor/TransportBar';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { PreviewSurface } from '@/components/preview/PreviewSurface';
+import { VodProcessingOverlay } from '@/components/editor/VodProcessingOverlay';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
 import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import { useLayout } from '@/hooks/useLayout';
@@ -888,6 +889,8 @@ export default function EditorScreen() {
           onClose={() => setMissingSheetOpen(false)}
         />
       ) : null}
+      {/* ⏳ live-VOD feldolgozás-loader: a legfelső réteg, amíg a felvétel elérhető nem lesz */}
+      <VodProcessingOverlay />
     </SafeAreaView>
   );
 }

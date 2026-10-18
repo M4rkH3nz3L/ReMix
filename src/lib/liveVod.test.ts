@@ -19,6 +19,8 @@ describe('liveVod — buildVodClip (pure)', () => {
     expect(clip.speed).toBe(1);
     expect(clip.volume).toBe(1);
     expect(clip.filterId).toBe('none');
+    // ⏳ az adás végén a felvétel még töltődik fel → az editor loadert mutat
+    expect(clip.pending).toBe(true);
   });
 
   it('a duration/sourceDuration a frame-rácson ül (becsült hossz → snap)', () => {

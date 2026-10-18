@@ -46,6 +46,9 @@ export function buildVodClip(opts: BuildVodOptions): VideoClip {
     start: 0,
     duration,
     uri: opts.vodUrl,
+    // ⏳ az adás végén az egress MÉG tölti fel a VOD-ot az R2-be → az editor loadert
+    //    mutat, amíg a `uri` elérhető nem lesz, majd törli ezt a flaget (UPDATE_CLIP).
+    pending: true,
     trimIn: 0,
     sourceDuration: duration,
     speed: 1,

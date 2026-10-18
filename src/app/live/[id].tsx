@@ -137,6 +137,27 @@ function LiveVideoUnavailable({ hostAvatar }: LiveVideoStageProps) {
   );
 }
 
+/** 🔴 Élő-időzítő: mióta tart az adás (host). Másodpercenként ketyeg; a `Date.now()`
+ * CSAK az intervallum-callbackben fut (nem renderben), az elapsed state-ben tárolt. */
+function LiveTimer({ startMs }: { startMs: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!startMs) {
+      return;
+    }
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startMs]);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const text = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  return <Text style={styles.liveTimer}>{text}</Text>;
+}
+
 export default function LiveRoomScreen() {
   const { t } = useTranslation();
   const { id, project: projectParam } = useLocalSearchParams<{ id: string; project?: string }>();
@@ -154,6 +175,8 @@ export default function LiveRoomScreen() {
   const [hostScenes, setHostScenes] = useState<{ id: string; name: string }[]>([]);
   // 🎚️ host: mikrofon némítva (az élő mic-kontroll; a mixer kezdőértékéből)
   const [micMuted, setMicMuted] = useState(false);
+  // 🔴 host: az adás kezdetének ms-időbélyege a live-timerhez (0 = még nem él)
+  const [liveStartMs, setLiveStartMs] = useState(0);
 
   const roomRef = useRef<LiveRoom | null>(null);
   const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
@@ -251,7 +274,9 @@ export default function LiveRoomScreen() {
         if (active && proj?.live) {
           liveDocRef.current = proj.live;
           liveProjRef.current = proj; // VOD-poszthoz (D158)
-          startStampRef.current = Date.now(); // 📼 az adás kezdete (eltelt idő → VOD becsült hossz)
+          const startedAt = Date.now(); // 📼 az adás kezdete (VOD becsült hossz + 🔴 live-timer)
+          startStampRef.current = startedAt;
+          setLiveStartMs(startedAt);
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
           setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
           broadcastScene();
@@ -261,7 +286,9 @@ export default function LiveRoomScreen() {
           //    nem-Pro / nincs egress-infra esetén az egress csendben kimarad.
           const wantRecord = proj.live.record ?? false;
           hasEnabledTargets()
-            .then((has) => ((has || wantRecord) && active ? startLiveEgress(liveId) : null))
+            .then((has) =>
+              (has || wantRecord) && active ? startLiveEgress(liveId, wantRecord, proj.aspectRatio) : null,
+            )
             .then((r) => {
               if (r && active) {
                 egressIdRef.current = r.egressId;
@@ -465,6 +492,13 @@ export default function LiveRoomScreen() {
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.viewerCount}>{viewers}</Text>
           </View>
+          {/* 🔴 host: mióta tart az adás (live-timer) */}
+          {isHost && liveStartMs > 0 && (
+            <View style={styles.timerChip}>
+              <View style={styles.liveDot} />
+              <LiveTimer startMs={liveStartMs} />
+            </View>
+          )}
           {/* 🎚️ host: élő mikrofon-némítás (LiveKit) */}
           {isHost && (
             <Pressable
@@ -595,6 +629,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   viewerCount: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  timerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#00000066',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  liveTimer: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
   micBtn: {
     width: 36,
     height: 36,

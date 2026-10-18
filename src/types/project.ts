@@ -519,6 +519,13 @@ export interface VideoClip extends ClipBase {
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
   assetId?: string;
   uri: string;
+  /**
+   * ⏳ Live-VOD feldolgozás alatt: a forrás (az egress-felvétel) MÉG töltődik fel
+   * (R2), a `uri` csak hamarosan lesz elérhető. Az editor ilyenkor loadert mutat +
+   * pollozza a `uri`-t, és elérhetővé váláskor törli a flaget (UPDATE_CLIP) → a
+   * lejátszó újratölti. Hiányzó = kész forrás. (LIVE/05.1)
+   */
+  pending?: boolean;
   /** a forrásfájlon belüli kezdőpont (mp) */
   trimIn: number;
   /** a forrásfájl teljes hossza (mp) */

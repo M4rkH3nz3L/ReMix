@@ -84,7 +84,13 @@ router.post('/live/egress/start', express.json({ limit: '4kb' }), ...proOnly, ra
     res.status(400).json({ error: 'room kötelező.' });
     return;
   }
-  const result = await startEgress({ room, userId: uid });
+  const record = req.body?.record === true || req.body?.record === 'true';
+  const aspect = typeof req.body?.aspect === 'string' ? req.body.aspect : undefined;
+  const result = await startEgress({ room, userId: uid, record, aspect });
+  // 🔎 dev-diagnosztika: record-flag + az egress-indítás kimenete (VOD-debughoz)
+  console.log(
+    `[egress/start] room=${room.slice(0, 8)} record=${record} → ok=${result.ok} status=${result.status || 200} vod=${result.vodUrl ? 'yes' : 'no'}${result.ok ? '' : ' err=' + result.error}`,
+  );
   if (!result.ok) {
     res.status(result.status || 500).json({ error: result.error });
     return;

@@ -1,560 +1,45 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
-import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Chip, PrimaryButton } from '@/components/ui/controls';
-import { COVER_ASPECT, palette } from '@/constants/editor';
+import { Chip } from '@/components/ui/controls';
+import { palette } from '@/constants/editor';
 import { setLanguage } from '@/i18n';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
-import { type CacheReport, cacheReport, clearCaches, formatBytes } from '@/lib/cacheManager';
-import { type ProxyQuality, useEditorStore } from '@/store/editorStore';
-import {
-  isNonEmpty,
-  isValidBirthday,
-  isValidFullName,
-  isValidPhone,
-  isValidUsername,
-} from '@/lib/accountValidation';
-import {
-  AI_PROVIDER_KINDS,
-  AI_TASKS,
-  type AiProvider,
-  type AiProviderKind,
-  type AiTask,
-  createAiProvider,
-  deleteAiProvider,
-  listAiProviders,
-  listTaskAssignments,
-  setDefaultAiProvider,
-  setTaskAssignment,
-  updateAiProvider,
-} from '@/lib/aiProviders';
-import { AI_CAPABILITIES, generatePersona } from '@/lib/aiPersona';
-import { AvatarBuilder } from '@/components/editor/AvatarBuilder';
-import { AvatarSvg } from '@/components/AvatarSvg';
-import { StorageCard } from '@/components/profile/StorageCard';
-import { WalletCard } from '@/components/profile/WalletCard';
-import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
-import { activateProDev, billingClientAvailable, deactivateProDev, restorePurchases } from '@/lib/billing';
-import { syncMyPostsAvatar } from '@/lib/feed';
-import { reachableMediaUrl } from '@/lib/mediaUrl';
-import {
-  type AccountProfile,
-  emptyProfile,
-  fetchProfile,
-  pickAndUploadProfileImage,
-  pickProfileImageLocal,
-  saveProfile,
-  uploadProfileImage,
-} from '@/lib/profile';
+import { CollapsibleCard } from '@/components/ui/CollapsibleCard';
 import { CoverPhotoEditor } from '@/components/CoverPhotoEditor';
-import { CreatorTypePicker, TagEditor } from '@/components/profile/CreatorControls';
 import { SocialLinksEditor } from '@/components/profile/SocialLinksEditor';
 import { ShowcaseEditor } from '@/components/profile/ShowcaseEditor';
-import { CollapsibleCard } from '@/components/ui/CollapsibleCard';
-import { SUGGESTED_INTERESTS, SUGGESTED_LANGUAGES, SUGGESTED_SKILLS } from '@/lib/creatorProfile';
-import { fetchSubscriptionDetails, type SubscriptionDetails } from '@/lib/subscription';
-import { useAuth } from '@/store/authStore';
-import { useEntitlement } from '@/store/entitlementStore';
-import { usePaywall } from '@/store/paywallStore';
-import { useRoles } from '@/store/roleStore';
-import { exportMyData, softDeleteAccount } from '@/lib/account';
-
-const PROVIDER_KINDS: AiProviderKind[] = ['openai', 'anthropic', 'ollama', 'custom'];
-const PROVIDER_LABEL: Record<AiProviderKind, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  ollama: 'Ollama',
-  custom: 'Custom',
-};
-
-interface ProviderForm {
-  id: string | null; // null = új
-  label: string;
-  provider: AiProviderKind;
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  personaName: string;
-  personaEmoji: string;
-  personaStory: string;
-  capabilities: string[];
-  avatar: AvatarConfig;
-}
-
-const EMPTY_FORM: ProviderForm = {
-  id: null,
-  label: '',
-  provider: 'openai',
-  baseUrl: '',
-  model: '',
-  apiKey: '',
-  personaName: '',
-  personaEmoji: '',
-  personaStory: '',
-  capabilities: [],
-  avatar: DEFAULT_AVATAR,
-};
+import { StorageCard } from '@/components/profile/StorageCard';
+import { WalletCard } from '@/components/profile/WalletCard';
+import { IdentityCard } from '@/components/profile/IdentityCard';
+import { PersonalCard } from '@/components/profile/PersonalCard';
+import { CreatorCard } from '@/components/profile/CreatorCard';
+import { SubscriptionCard } from '@/components/profile/SubscriptionCard';
+import { AiModelsCard } from '@/components/profile/AiModelsCard';
+import { AiTasksCard } from '@/components/profile/AiTasksCard';
+import { PerformanceCard } from '@/components/profile/PerformanceCard';
+import { AccountCard } from '@/components/profile/AccountCard';
+import { LegalCard } from '@/components/profile/LegalCard';
+import { ProviderEditorModal } from '@/components/profile/ProviderEditorModal';
+import { profileStyles as styles } from '@/components/profile/styles';
+import { useProfile } from '@/hooks/useProfile';
 
 /**
- * 👤 Profil — a bejelentkezett felhasználó adatai és beállításai.
- *  - Személyes adatok (profiles tábla)
- *  - AI-modellek (user_ai_providers): saját endpoint + kulcs (BYOK)
- *  - Kijelentkezés
+ * 👤 Profil — a bejelentkezett felhasználó adatai és beállításai (VÉKONY KOMPOZÍCIÓ).
+ *  - Személyes/creator adatok (profiles tábla), social/showcase, nyelv
+ *  - Pro-előfizetés, koin-pénztárca, tárhely, teljesítmény/gyorsítótár
+ *  - AI-modellek (user_ai_providers): saját endpoint + kulcs (BYOK) + feladat-mátrix
+ *  - Fiók / jogi / kijelentkezés
+ *
+ * A NEM-prezentációs logika a `useProfile()` hookban, a szekciók a
+ * `src/components/profile/` al-komponensekben (props-ból rendelnek, saját fetch nélkül).
  */
 export default function ProfileScreen() {
-  const { t, i18n } = useTranslation();
-  const configured = useAuth((s) => s.configured);
-  const email = useAuth((s) => s.user?.email ?? '');
-  const userId = useAuth((s) => s.user?.id ?? null);
-  const signOut = useAuth((s) => s.signOut);
-  const signOutOtherSessions = useAuth((s) => s.signOutOtherSessions);
-  // 💳 Pro-állapot reaktívan (aktiválás után azonnal frissül a szekció)
-  const isPro = useEntitlement((s) => s.isPro());
-  // 🛡️ admin-belépő: csak szerep-/user-kezelő jog birtokosának látszik
-  const canAdmin = useRoles(
-    (s) => s.permissions.includes('role.manage') || s.permissions.includes('user.manage')
-  );
-  const proUntil = useEntitlement((s) => s.proUntil);
-  const [sub, setSub] = useState<SubscriptionDetails | null>(null);
-  // a dátum-kijelzéseket effektben számoljuk (a render TISZTA marad — react-hooks/purity)
-  const [proMeta, setProMeta] = useState<{ untilText: string; updatedText: string | null }>({
-    untilText: '',
-    updatedText: null,
-  });
-
-  // configured=false esetén nincs mit tölteni → azonnal false (nem villog a spinner)
-  const [loading, setLoading] = useState(configured);
-  const [profile, setProfile] = useState<AccountProfile>(() => emptyProfile());
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [providers, setProviders] = useState<AiProvider[]>([]);
-  // 🤖 feladat → provider hozzárendelések (a „AI-modellek feladatonként" mátrixhoz)
-  const [taskAssign, setTaskAssign] = useState<Partial<Record<AiTask, string>>>({});
-
-  const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [savingProvider, setSavingProvider] = useState(false);
-
-  // 🎯 teljesítmény / gyorsítótár
-  const proxyEnabled = useEditorStore((s) => s.proxyEnabled);
-  const proxyQuality = useEditorStore((s) => s.proxyQuality);
-  const setProxyEnabled = useEditorStore((s) => s.setProxyEnabled);
-  const setProxyQuality = useEditorStore((s) => s.setProxyQuality);
-  const [cacheInfo, setCacheInfo] = useState<CacheReport>(() => cacheReport());
-  const onClearCache = useCallback(() => {
-    clearCaches();
-    setCacheInfo(cacheReport());
-  }, []);
-
-  // adatok betöltése/frissítése — promise-chain (a setState .then/.finally
-  // callbackben fut, nem az effekt szinkron testében), fókuszkor újratölt
-  const refresh = useCallback(() => {
-    if (!configured) {
-      return;
-    }
-    Promise.all([fetchProfile(), listAiProviders(), listTaskAssignments()])
-      .then(([p, list, tasks]) => {
-        setProfile(p);
-        setProviders(list);
-        setTaskAssign(tasks);
-      })
-      .catch((e: unknown) => {
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [configured, t]);
-
-  useFocusEffect(refresh);
-
-  // 💳 az előfizetés részletei (minden adat) — betöltés + a Pro-állapot
-  // változásakor (pl. aktiválás/visszaállítás után) újratöltés
-  // az előfizetés részletei + a dátum-kijelzések. A setState a .then callbackben
-  // fut (nem az effekt szinkron testében — react-hooks/set-state-in-effect), és a
-  // Date-hívások is ott (nem renderben — react-hooks/purity).
-  useEffect(() => {
-    const uid = userId;
-    Promise.resolve(uid ? fetchSubscriptionDetails(uid) : null)
-      .then((d) => {
-        setSub(d);
-        let untilText = '';
-        if (uid) {
-          if (proUntil) {
-            const days = Math.max(0, Math.ceil((Date.parse(proUntil) - Date.now()) / 86400000));
-            untilText = `${new Date(proUntil).toLocaleDateString()} · ${t('profile.subDaysLeft', { count: days })}`;
-          } else {
-            untilText = t('profile.subForever');
-          }
-        }
-        const updatedText = d?.updatedAt ? new Date(d.updatedAt).toLocaleDateString() : null;
-        setProMeta({ untilText, updatedText });
-      })
-      .catch(() => {});
-  }, [userId, isPro, proUntil, t]);
-
-  // — személyes adatok —
-  const setField = (key: keyof AccountProfile, value: string) =>
-    setProfile((prev) => ({ ...prev, [key]: value }));
-  // — tömb-mezők (creator-típusok, készségek, érdeklődés, nyelvek) —
-  const setArr = (key: 'creatorTypes' | 'skills' | 'interests' | 'languages', value: string[]) =>
-    setProfile((prev) => ({ ...prev, [key]: value }));
-
-  const nameError = profile.fullName.length > 0 && !isValidFullName(profile.fullName);
-  const usernameError = profile.username.length > 0 && !isValidUsername(profile.username);
-  const phoneError = profile.phone.length > 0 && !isValidPhone(profile.phone);
-  const birthdayError = profile.birthday.length > 0 && !isValidBirthday(profile.birthday);
-  const profileValid =
-    isValidUsername(profile.username) &&
-    isValidFullName(profile.fullName) &&
-    isValidPhone(profile.phone) &&
-    isValidBirthday(profile.birthday) &&
-    isNonEmpty(profile.country) &&
-    isNonEmpty(profile.city);
-
-  const onSaveProfile = async () => {
-    if (!profileValid || savingProfile) {
-      return;
-    }
-    setSavingProfile(true);
-    try {
-      await saveProfile(profile);
-      Alert.alert(t('profile.savedTitle'), t('profile.profileSaved'));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // beszédes üzenet a username-hibákra (a lib sentinel-kódot dob)
-      const friendly =
-        msg === 'USERNAME_TAKEN'
-          ? t('profile.usernameTaken')
-          : msg === 'USERNAME_REQUIRED'
-            ? t('auth.usernameHint')
-            : msg;
-      Alert.alert(t('common.error'), friendly);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  // a szekció-kártyák közös „Mentés" gombja (mindegyik a TELJES profilt menti)
-  const renderSaveButton = () => (
-    <View style={{ marginTop: 12 }}>
-      {savingProfile ? (
-        <View style={styles.busyBox}>
-          <ActivityIndicator color={palette.text} />
-        </View>
-      ) : (
-        <PrimaryButton
-          icon="checkmark"
-          label={t('common.save')}
-          disabled={!profileValid}
-          onPress={() => {
-            void onSaveProfile();
-          }}
-        />
-      )}
-    </View>
-  );
-
-  // időzóna automatikus kitöltése az eszközről (Intl; ha nincs, csendben kihagyjuk)
-  const detectTimezone = () => {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) {
-        setField('timezone', tz);
-      }
-    } catch {
-      /* Intl/timeZone nem elérhető — marad a kézi bevitel */
-    }
-  };
-
-  // 🖼️ profil-/borítókép: választás + feltöltés → azonnal mentjük a profilhoz
-  const [imgBusy, setImgBusy] = useState(false);
-  // a borítóhoz kiválasztott NYERS kép — ha van, nyitva az igazító-modal
-  const [coverDraftUri, setCoverDraftUri] = useState<string | null>(null);
-  const onPickProfileImage = async (kind: 'avatar' | 'cover') => {
-    if (imgBusy) {
-      return;
-    }
-    // borító: előbb kiválasztás, majd igazító-modal — a feltöltés a „Kész" után
-    if (kind === 'cover') {
-      try {
-        const local = await pickProfileImageLocal();
-        if (local) {
-          setCoverDraftUri(local);
-        }
-      } catch (e) {
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      }
-      return;
-    }
-    setImgBusy(true);
-    try {
-      const url = await pickAndUploadProfileImage();
-      if (!url) {
-        return; // a felhasználó mégse választott
-      }
-      const next: AccountProfile = { ...profile, avatarUrl: url };
-      setProfile(next);
-      await saveProfile(next);
-      // a profilkép változását a KORÁBBI posztokra is átvezetjük (denormalizált feed-avatar)
-      void syncMyPostsAvatar(url);
-    } catch (e) {
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setImgBusy(false);
-    }
-  };
-
-  // a borító-igazító „Kész" után: a bevágott képet feltöltjük + mentjük
-  const commitCover = async (croppedUri: string) => {
-    if (imgBusy) {
-      return;
-    }
-    setImgBusy(true);
-    try {
-      const url = await uploadProfileImage(croppedUri);
-      const next: AccountProfile = { ...profile, coverUrl: url };
-      setProfile(next);
-      await saveProfile(next);
-      setCoverDraftUri(null); // csak sikeres mentés után zárjuk
-    } catch (e) {
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setImgBusy(false);
-    }
-  };
-
-  // 💳 előfizetés — feliratkozás (paywall) + korábbi vásárlás visszaállítása
-  const onSubscribe = () => usePaywall.getState().open();
-
-  // 🧪 CSAK DEV: közvetlen Pro be/ki a szerver-hiteles /billing/activate|deactivate-tel.
-  // Éles buildben (__DEV__ === false) NEM renderelődik → ott kizárólag a valós IAP.
-  // A kliens itt sem grantel magának: a workert kéri (service_role a subscriptions-höz).
-  const [devBusy, setDevBusy] = useState(false);
-  const onDevActivate = async () => {
-    if (devBusy) {
-      return;
-    }
-    setDevBusy(true);
-    try {
-      await activateProDev();
-      Alert.alert(t('profile.devProTitle'), t('profile.devProActivated'));
-    } catch (e) {
-      Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setDevBusy(false);
-    }
-  };
-  const onDevDeactivate = async () => {
-    if (devBusy) {
-      return;
-    }
-    setDevBusy(true);
-    try {
-      await deactivateProDev();
-      Alert.alert(t('profile.devProTitle'), t('profile.devProDeactivated'));
-    } catch (e) {
-      // a deactivate/refreshEntitlement hibáját is jelezzük (szimmetria az activate-tel)
-      Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setDevBusy(false);
-    }
-  };
-  const onRestore = () => {
-    restorePurchases()
-      .then((ok) =>
-        Alert.alert(
-          t('paywallSheet.restoreTitle'),
-          ok ? t('paywallSheet.restoreOk') : t('paywallSheet.restoreNone')
-        )
-      )
-      .catch((e: unknown) =>
-        Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e))
-      );
-  };
-
-  const subRow = (label: string, value: string) => (
-    <View style={styles.subRow}>
-      <Text style={styles.subRowLabel}>{label}</Text>
-      <Text style={styles.subRowValue}>{value}</Text>
-    </View>
-  );
-
-  // — AI-modellek —
-  const openNew = () => {
-    setForm(EMPTY_FORM);
-    setEditorOpen(true);
-  };
-  const openEdit = (p: AiProvider) => {
-    setForm({
-      id: p.id,
-      label: p.label,
-      provider: p.provider,
-      baseUrl: p.baseUrl,
-      model: p.model,
-      apiKey: p.apiKey,
-      personaName: p.personaName ?? '',
-      personaEmoji: p.personaEmoji ?? '',
-      personaStory: p.personaStory ?? '',
-      capabilities: p.capabilities ?? [],
-      avatar: p.avatar ?? DEFAULT_AVATAR,
-    });
-    setEditorOpen(true);
-  };
-
-  const kindMeta = AI_PROVIDER_KINDS[form.provider];
-  const formValid =
-    form.label.trim().length > 0 &&
-    form.model.trim().length > 0 &&
-    (form.provider !== 'custom' || form.baseUrl.trim().length > 0) &&
-    (!kindMeta.needsKey || form.apiKey.trim().length > 0);
-
-  const onSaveProvider = async () => {
-    if (!formValid || savingProvider) {
-      return;
-    }
-    setSavingProvider(true);
-    const input = {
-      label: form.label,
-      provider: form.provider,
-      baseUrl: form.baseUrl,
-      model: form.model,
-      apiKey: form.apiKey,
-      // EGY név: a persona neve = a modell neve (a „Név" mező), így a szerkesztő
-      // asszisztens-köszönései is ugyanazt a nevet használják
-      personaName: form.label,
-      personaEmoji: form.personaEmoji,
-      personaStory: form.personaStory,
-      capabilities: form.capabilities,
-      avatar: form.avatar,
-    };
-    try {
-      if (form.id) {
-        await updateAiProvider(form.id, input);
-      } else {
-        await createAiProvider(input);
-      }
-      setEditorOpen(false);
-      refresh();
-    } catch (e) {
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingProvider(false);
-    }
-  };
-
-  const onDeleteProvider = (p: AiProvider) => {
-    Alert.alert(p.label, t('profile.deleteModelConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          deleteAiProvider(p.id)
-            .then(() => refresh())
-            .catch((e: Error) => Alert.alert(t('common.error'), e.message));
-        },
-      },
-    ]);
-  };
-
-  const onSetDefault = (p: AiProvider) => {
-    if (p.isDefault) {
-      return;
-    }
-    setDefaultAiProvider(p.id)
-      .then(() => refresh())
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message));
-  };
-
-  // 🤖 feladat → provider választás (Auto = null); optimista + perzisztálva
-  const pickTask = (task: AiTask, providerId: string | null) => {
-    setTaskAssign((prev) => {
-      const next = { ...prev };
-      if (providerId) {
-        next[task] = providerId;
-      } else {
-        delete next[task];
-      }
-      return next;
-    });
-    setTaskAssignment(task, providerId).catch((e: Error) =>
-      Alert.alert(t('common.error'), e.message)
-    );
-  };
-
-  // 📤 GDPR adat-export: az összes saját adat JSON-ban, megosztva
-  const onExportData = () => {
-    exportMyData().catch((e: unknown) =>
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
-    );
-  };
-
-  // 🗑️ GDPR soft-delete: a fiók deaktiválása (visszaállítható), majd kijelentkezés
-  const onDeleteAccount = () => {
-    Alert.alert(t('gdpr.deleteTitle'), t('gdpr.deleteBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('gdpr.deleteConfirm'),
-        style: 'destructive',
-        onPress: () =>
-          softDeleteAccount()
-            .then(() => {
-              void signOut();
-            })
-            .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
-            ),
-      },
-    ]);
-  };
-
-  const onSignOut = () => {
-    Alert.alert(t('auth.account'), t('auth.signOutConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('auth.signOut'),
-        style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
-      },
-    ]);
-  };
-
-  const onSignOutOthers = () => {
-    Alert.alert(t('auth.signOutOthers'), t('auth.signOutOthersConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('auth.signOutOthers'),
-        style: 'destructive',
-        onPress: async () => {
-          const result = await signOutOtherSessions();
-          Alert.alert(
-            t('auth.signOutOthers'),
-            result.error ?? t('auth.signOutOthersDone'),
-          );
-        },
-      },
-    ]);
-  };
+  const p = useProfile();
+  const { t, i18n } = p;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -567,11 +52,11 @@ export default function ProfileScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {loading ? (
+      {p.loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color={palette.accent} />
         </View>
-      ) : !configured ? (
+      ) : !p.configured ? (
         <View style={styles.loadingBox}>
           <Text style={styles.notConfigured}>{t('auth.notConfigured')}</Text>
         </View>
@@ -582,7 +67,7 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* 🛡️ Admin-panel (RBAC) — csak jog-birtokosnak */}
-          {canAdmin ? (
+          {p.canAdmin ? (
             <Pressable
               onPress={() => router.push('/admin')}
               style={{
@@ -609,252 +94,60 @@ export default function ProfileScreen() {
           {/* ═══ PROFIL-SZERKESZTŐ: összecsukható szekciók ═══ */}
 
           {/* — 👤 Identitás: kép/borító + username + név + bio — */}
-          <CollapsibleCard
-            icon="person-circle-outline"
-            title={t('profile.identitySection')}
-            subtitle={t('profile.identityHint')}
-            defaultOpen
-          >
-            <View style={styles.coverWrap}>
-              <Pressable
-                onPress={() => onPickProfileImage('cover')}
-                disabled={imgBusy}
-                style={StyleSheet.absoluteFill}
-                accessibilityRole="button"
-                accessibilityLabel={t('profile.changeCover')}
-              >
-                {reachableMediaUrl(profile.coverUrl) ? (
-                  <Image
-                    source={{ uri: reachableMediaUrl(profile.coverUrl) ?? undefined }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, styles.coverPlaceholder]} />
-                )}
-              </Pressable>
-              <View style={styles.coverBadge} pointerEvents="none">
-                <Ionicons name="camera" size={13} color="#fff" />
-                <Text style={styles.coverBadgeText}>{t('profile.changeCover')}</Text>
-              </View>
-              <Pressable
-                onPress={() => onPickProfileImage('avatar')}
-                disabled={imgBusy}
-                style={styles.avatarEdit}
-                accessibilityRole="button"
-                accessibilityLabel={t('profile.changeAvatar')}
-              >
-                {reachableMediaUrl(profile.avatarUrl) ? (
-                  <Image
-                    source={{ uri: reachableMediaUrl(profile.avatarUrl) ?? undefined }}
-                    style={styles.avatarImg}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarInitial}>
-                      {(profile.fullName || '?').slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.avatarCam} pointerEvents="none">
-                  <Ionicons name="camera" size={11} color="#fff" />
-                </View>
-              </Pressable>
-            </View>
-            <Text style={styles.sectionHint}>
-              {imgBusy ? t('profile.imageUploading') : t('profile.appearanceHint')}
-            </Text>
-
-            {/* 🔑 EGYEDI felhasználónév (login-handle) — ezzel is be lehet lépni; NEM a display name */}
-            <Text style={styles.fieldLabel}>{t('auth.usernameLabel')}</Text>
-            <TextInput
-              value={profile.username}
-              onChangeText={(v) => setField('username', v.trim())}
-              placeholder={t('auth.usernamePlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, usernameError && styles.inputError]}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text style={usernameError ? styles.error : styles.sectionHint}>
-              {t('auth.usernameHint')}
-            </Text>
-
-            <Text style={styles.fieldLabel}>{t('auth.nameLabel')}</Text>
-            <TextInput
-              value={profile.fullName}
-              onChangeText={(v) => setField('fullName', v)}
-              placeholder={t('auth.namePlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, nameError && styles.inputError]}
-              autoCapitalize="words"
-            />
-            {nameError ? <Text style={styles.error}>{t('auth.nameHint')}</Text> : null}
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.bioLabel')}</Text>
-            <TextInput
-              value={profile.bio}
-              onChangeText={(v) => setField('bio', v)}
-              placeholder={t('creatorProfile.bioPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, styles.inputArea]}
-              multiline
-              maxLength={500}
-            />
-            <Text style={styles.counter}>{`${profile.bio.length}/500`}</Text>
-
-            {renderSaveButton()}
-          </CollapsibleCard>
+          <IdentityCard
+            profile={p.profile}
+            setField={p.setField}
+            usernameError={p.usernameError}
+            nameError={p.nameError}
+            imgBusy={p.imgBusy}
+            onPickImage={(kind) => void p.onPickProfileImage(kind)}
+            savingProfile={p.savingProfile}
+            profileValid={p.profileValid}
+            onSaveProfile={p.onSaveProfile}
+          />
 
           {/* — 🔒 Személyes adatok (alapból privát mezők) — */}
-          <CollapsibleCard
-            icon="lock-closed-outline"
-            title={t('profile.personalSection')}
-            subtitle={t('profile.personalHint')}
-          >
-            <Text style={styles.fieldLabel}>{t('auth.phoneLabel')}</Text>
-            <TextInput
-              value={profile.phone}
-              onChangeText={(v) => setField('phone', v)}
-              placeholder={t('auth.phonePlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, phoneError && styles.inputError]}
-              keyboardType="phone-pad"
-            />
-            {phoneError ? <Text style={styles.error}>{t('auth.phoneInvalid')}</Text> : null}
-
-            <Text style={styles.fieldLabel}>{t('auth.birthdayLabel')}</Text>
-            <TextInput
-              value={profile.birthday}
-              onChangeText={(v) => setField('birthday', v)}
-              placeholder={t('auth.birthdayPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, birthdayError && styles.inputError]}
-              autoCapitalize="none"
-            />
-            {birthdayError ? <Text style={styles.error}>{t('auth.birthdayInvalid')}</Text> : null}
-
-            <Text style={styles.fieldLabel}>{t('auth.locationLabel')}</Text>
-            <TextInput
-              value={profile.country}
-              onChangeText={(v) => setField('country', v)}
-              placeholder={t('auth.countryPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-            />
-            <TextInput
-              value={profile.city}
-              onChangeText={(v) => setField('city', v)}
-              placeholder={t('auth.cityPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-            />
-
-            <Text style={styles.fieldLabel}>{t('profile.languagesLabel')}</Text>
-            <TagEditor
-              value={profile.languages}
-              onChange={(v) => setArr('languages', v)}
-              suggestions={SUGGESTED_LANGUAGES}
-              placeholder={t('profile.languagesPlaceholder')}
-            />
-
-            <Text style={styles.fieldLabel}>{t('profile.timezoneLabel')}</Text>
-            <View style={styles.tzRow}>
-              <TextInput
-                value={profile.timezone}
-                onChangeText={(v) => setField('timezone', v)}
-                placeholder={t('profile.timezonePlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={[styles.input, { flex: 1 }]}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable onPress={detectTimezone} style={styles.tzAuto} accessibilityRole="button">
-                <Ionicons name="navigate" size={15} color={palette.accent} />
-                <Text style={styles.tzAutoText}>{t('profile.timezoneAuto')}</Text>
-              </Pressable>
-            </View>
-
-            {renderSaveButton()}
-          </CollapsibleCard>
+          <PersonalCard
+            profile={p.profile}
+            setField={p.setField}
+            setArr={p.setArr}
+            phoneError={p.phoneError}
+            birthdayError={p.birthdayError}
+            detectTimezone={p.detectTimezone}
+            savingProfile={p.savingProfile}
+            profileValid={p.profileValid}
+            onSaveProfile={p.onSaveProfile}
+          />
 
           {/* — 🎨 Creator: mutasd be magad — */}
-          <CollapsibleCard
-            icon="color-palette-outline"
-            title={t('creatorProfile.section')}
-            subtitle={t('creatorProfile.sectionHint')}
-          >
-            <Text style={styles.fieldLabel}>{t('creatorProfile.typesLabel')}</Text>
-            <CreatorTypePicker value={profile.creatorTypes} onChange={(v) => setArr('creatorTypes', v)} />
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.skillsLabel')}</Text>
-            <TagEditor
-              value={profile.skills}
-              onChange={(v) => setArr('skills', v)}
-              suggestions={SUGGESTED_SKILLS}
-              placeholder={t('creatorProfile.skillsPlaceholder')}
-            />
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.interestsLabel')}</Text>
-            <TagEditor
-              value={profile.interests}
-              onChange={(v) => setArr('interests', v)}
-              suggestions={SUGGESTED_INTERESTS}
-              placeholder={t('creatorProfile.interestsPlaceholder')}
-            />
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.aboutLabel')}</Text>
-            <TextInput
-              value={profile.aboutMe}
-              onChangeText={(v) => setField('aboutMe', v)}
-              placeholder={t('creatorProfile.aboutPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, styles.inputArea]}
-              multiline
-            />
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.whatLabel')}</Text>
-            <TextInput
-              value={profile.whatIMake}
-              onChangeText={(v) => setField('whatIMake', v)}
-              placeholder={t('creatorProfile.whatPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, styles.inputArea]}
-              multiline
-            />
-
-            <Text style={styles.fieldLabel}>{t('creatorProfile.workingLabel')}</Text>
-            <TextInput
-              value={profile.workingOn}
-              onChangeText={(v) => setField('workingOn', v)}
-              placeholder={t('creatorProfile.workingPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-            />
-
-            {renderSaveButton()}
-          </CollapsibleCard>
+          <CreatorCard
+            profile={p.profile}
+            setField={p.setField}
+            setArr={p.setArr}
+            savingProfile={p.savingProfile}
+            profileValid={p.profileValid}
+            onSaveProfile={p.onSaveProfile}
+          />
 
           {/* — 🔗 Social linkek — */}
-          {userId ? (
+          {p.userId ? (
             <CollapsibleCard
               icon="link-outline"
               title={t('profile.socialSection')}
               subtitle={t('profile.socialHint')}
             >
-              <SocialLinksEditor userId={userId} />
+              <SocialLinksEditor userId={p.userId} />
             </CollapsibleCard>
           ) : null}
 
           {/* — 🖼️ Showcase (portfólió) — */}
-          {userId ? (
+          {p.userId ? (
             <CollapsibleCard
               icon="albums-outline"
               title={t('profile.showcaseSection')}
               subtitle={t('profile.showcaseHint')}
             >
-              <ShowcaseEditor userId={userId} />
+              <ShowcaseEditor userId={p.userId} />
             </CollapsibleCard>
           ) : null}
 
@@ -876,92 +169,16 @@ export default function ProfileScreen() {
           </View>
 
           {/* — Pro előfizetés — */}
-          <Text style={styles.sectionTitle}>{t('profile.subscriptionSection')}</Text>
-          <View style={styles.card}>
-            {isPro ? (
-              <>
-                <View style={styles.subHeader}>
-                  <View style={styles.proBadge}>
-                    <Ionicons name="sparkles" size={13} color={palette.accent} />
-                    <Text style={styles.proBadgeText}>PRO</Text>
-                  </View>
-                  <Text style={styles.subActive}>{t('profile.subActive')}</Text>
-                </View>
-                {subRow(
-                  t('profile.subStatusLabel'),
-                  t(`profile.subStatus.${sub?.status ?? 'active'}`, {
-                    defaultValue: sub?.status ?? 'active',
-                  })
-                )}
-                {subRow(t('profile.subUntilLabel'), proMeta.untilText)}
-                {subRow(
-                  t('profile.subSourceLabel'),
-                  t(`profile.subSource.${sub?.source ?? 'manual'}`, {
-                    defaultValue: sub?.source ?? 'manual',
-                  })
-                )}
-                {proMeta.updatedText
-                  ? subRow(t('profile.subUpdatedLabel'), proMeta.updatedText)
-                  : null}
-                {billingClientAvailable() ? (
-                  <Pressable onPress={onRestore} style={styles.subRestore}>
-                    <Ionicons name="refresh" size={15} color={palette.textDim} />
-                    <Text style={styles.subRestoreText}>{t('paywallSheet.restore')}</Text>
-                  </Pressable>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <View style={styles.subHeader}>
-                  <View style={styles.freeBadge}>
-                    <Text style={styles.freeBadgeText}>FREE</Text>
-                  </View>
-                  <Text style={styles.subFreeTitle}>{t('profile.subNone')}</Text>
-                </View>
-                <Text style={styles.subFreeHint}>{t('profile.subNoneHint')}</Text>
-                <View style={{ marginTop: 10, gap: 8 }}>
-                  <PrimaryButton
-                    icon="rocket"
-                    label={t('profile.subscribeCta')}
-                    onPress={onSubscribe}
-                  />
-                  {billingClientAvailable() ? (
-                    <Pressable onPress={onRestore} style={styles.subRestore}>
-                      <Ionicons name="refresh" size={15} color={palette.textDim} />
-                      <Text style={styles.subRestoreText}>{t('paywallSheet.restore')}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </>
-            )}
-            {__DEV__ ? (
-              <Pressable
-                onPress={isPro ? onDevDeactivate : onDevActivate}
-                disabled={devBusy}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  marginTop: 12,
-                  paddingVertical: 9,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: palette.border,
-                  borderStyle: 'dashed',
-                }}
-              >
-                <Ionicons name="construct-outline" size={14} color={palette.accent2} />
-                <Text style={{ color: palette.accent2, fontSize: 12, fontWeight: '700' }}>
-                  {devBusy
-                    ? t('profile.devProBusy')
-                    : isPro
-                      ? t('profile.devProOff')
-                      : t('profile.devProOn')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+          <SubscriptionCard
+            isPro={p.isPro}
+            sub={p.sub}
+            proMeta={p.proMeta}
+            onSubscribe={p.onSubscribe}
+            onRestore={p.onRestore}
+            devBusy={p.devBusy}
+            onDevActivate={p.onDevActivate}
+            onDevDeactivate={p.onDevDeactivate}
+          />
 
           {/* — Koin-pénztárca (vétel / Pro / küldés / kiváltás) — */}
           <WalletCard />
@@ -970,587 +187,60 @@ export default function ProfileScreen() {
           <StorageCard />
 
           {/* — AI-modellek — */}
-          <Text style={styles.sectionTitle}>{t('profile.aiSection')}</Text>
-          <Text style={styles.sectionHint}>{t('profile.aiSectionHint')}</Text>
-          <View style={styles.card}>
-            {providers.length === 0 ? (
-              <Text style={styles.emptyText}>{t('profile.noModels')}</Text>
-            ) : (
-              providers.map((p) => (
-                <View key={p.id} style={styles.providerRow}>
-                  <Pressable
-                    style={styles.providerMain}
-                    onPress={() => onSetDefault(p)}
-                    accessibilityRole="button"
-                  >
-                    <Ionicons
-                      name={p.isDefault ? 'radio-button-on' : 'radio-button-off'}
-                      size={20}
-                      color={p.isDefault ? palette.accent : palette.textDim}
-                    />
-                    <AvatarSvg config={p.avatar} size={34} />
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.providerTitleRow}>
-                        <Text style={styles.providerLabel} numberOfLines={1}>
-                          {p.label}
-                        </Text>
-                        {p.isDefault ? (
-                          <View style={styles.defaultBadge}>
-                            <Text style={styles.defaultBadgeText}>
-                              {t('profile.defaultBadge')}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.providerMeta} numberOfLines={1}>
-                        {PROVIDER_LABEL[p.provider]} · {p.model || '—'}
-                        {p.apiKey ? ' · 🔑' : ''}
-                        {p.capabilities && p.capabilities.length > 0
-                          ? ' · ' +
-                            p.capabilities
-                              .map((c) => AI_CAPABILITIES.find((x) => x.id === c)?.emoji ?? '')
-                              .join('')
-                          : ''}
-                      </Text>
-                    </View>
-                  </Pressable>
-                  <Pressable onPress={() => openEdit(p)} hitSlop={8} style={styles.iconBtn}>
-                    <Ionicons name="create-outline" size={20} color={palette.textDim} />
-                  </Pressable>
-                  <Pressable onPress={() => onDeleteProvider(p)} hitSlop={8} style={styles.iconBtn}>
-                    <Ionicons name="trash-outline" size={20} color={palette.danger} />
-                  </Pressable>
-                </View>
-              ))
-            )}
-            <Pressable onPress={openNew} style={styles.addRow}>
-              <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
-              <Text style={styles.addText}>{t('profile.addModel')}</Text>
-            </Pressable>
-          </View>
+          <AiModelsCard
+            providers={p.providers}
+            onSetDefault={p.onSetDefault}
+            onEdit={p.openEdit}
+            onDelete={p.onDeleteProvider}
+            onAdd={p.openNew}
+          />
 
           {/* — AI-modellek feladatonként (mátrix) — */}
-          <Text style={styles.sectionTitle}>{t('profile.aiTasksSection')}</Text>
-          <Text style={styles.sectionHint}>{t('profile.aiTasksHint')}</Text>
-          <View style={styles.card}>
-            {providers.length === 0 ? (
-              <Text style={styles.emptyText}>{t('profile.aiTasksNoModels')}</Text>
-            ) : (
-              AI_TASKS.map((task) => (
-                <View key={task} style={styles.taskRow}>
-                  <Text style={styles.taskLabel}>{t('profile.task_' + task)}</Text>
-                  <View style={styles.taskChips}>
-                    <Chip
-                      label={t('aiPicker.auto')}
-                      leading={
-                        <Ionicons
-                          name="flash"
-                          size={13}
-                          color={!taskAssign[task] ? palette.text : palette.textDim}
-                        />
-                      }
-                      active={!taskAssign[task]}
-                      onPress={() => pickTask(task, null)}
-                    />
-                    {providers.map((p) => (
-                      <Chip
-                        key={p.id}
-                        label={p.label}
-                        leading={<AvatarSvg config={p.avatar} size={18} />}
-                        active={taskAssign[task] === p.id}
-                        onPress={() => pickTask(task, p.id)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
+          <AiTasksCard providers={p.providers} taskAssign={p.taskAssign} onPickTask={p.pickTask} />
 
           {/* — Teljesítmény / gyorsítótár — */}
-          <Text style={styles.sectionTitle}>{t('profile.perfSection')}</Text>
-          <Text style={styles.sectionHint}>{t('profile.perfHint')}</Text>
-          <View style={styles.card}>
-            <View style={styles.perfRow}>
-              <Text style={styles.perfLabel}>{t('profile.proxyLabel')}</Text>
-              <Chip
-                label={proxyEnabled ? t('common.on') : t('common.off')}
-                active={proxyEnabled}
-                onPress={() => setProxyEnabled(!proxyEnabled)}
-              />
-            </View>
-            {proxyEnabled ? (
-              <View style={styles.perfRow}>
-                <Text style={styles.perfLabel}>{t('profile.proxyQuality')}</Text>
-                <View style={styles.perfChips}>
-                  {(['low', 'medium', 'high'] as ProxyQuality[]).map((q) => (
-                    <Chip
-                      key={q}
-                      label={t('profile.proxyQuality_' + q)}
-                      active={proxyQuality === q}
-                      onPress={() => setProxyQuality(q)}
-                    />
-                  ))}
-                </View>
-              </View>
-            ) : null}
-            <View style={styles.perfRow}>
-              <Text style={styles.perfLabel}>{t('profile.cacheSize')}</Text>
-              <Text style={styles.perfValue}>{formatBytes(cacheInfo.total)}</Text>
-            </View>
-            <Pressable onPress={onClearCache} style={styles.signOutBtn}>
-              <Ionicons name="trash-outline" size={18} color={palette.danger} />
-              <Text style={styles.signOutText}>{t('profile.clearCache')}</Text>
-            </Pressable>
-          </View>
+          <PerformanceCard
+            proxyEnabled={p.proxyEnabled}
+            proxyQuality={p.proxyQuality}
+            setProxyEnabled={p.setProxyEnabled}
+            setProxyQuality={p.setProxyQuality}
+            cacheInfo={p.cacheInfo}
+            onClearCache={p.onClearCache}
+          />
 
           {/* — Fiók — */}
-          <Text style={styles.sectionTitle}>{t('profile.accountSection')}</Text>
-          <View style={styles.card}>
-            <Text style={styles.emailText}>{t('auth.signedInAs', { email })}</Text>
-            <Pressable onPress={() => router.push('/mfa')} style={styles.signOutBtn}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={palette.text} />
-              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.mfaEntry')}</Text>
-            </Pressable>
-            <Pressable onPress={() => router.push('/devices')} style={styles.signOutBtn}>
-              <Ionicons name="phone-portrait-outline" size={18} color={palette.text} />
-              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.devicesTitle')}</Text>
-            </Pressable>
-            <Pressable onPress={onSignOutOthers} style={styles.signOutBtn}>
-              <Ionicons name="log-out-outline" size={18} color={palette.text} />
-              <Text style={[styles.signOutText, { color: palette.text }]}>{t('auth.signOutOthers')}</Text>
-            </Pressable>
-            <Pressable onPress={onSignOut} style={styles.signOutBtn}>
-              <Ionicons name="log-out-outline" size={18} color={palette.danger} />
-              <Text style={styles.signOutText}>{t('auth.signOut')}</Text>
-            </Pressable>
-            <Pressable onPress={onDeleteAccount} style={styles.signOutBtn}>
-              <Ionicons name="person-remove-outline" size={18} color={palette.danger} />
-              <Text style={styles.signOutText}>{t('gdpr.deleteTitle')}</Text>
-            </Pressable>
-          </View>
+          <AccountCard
+            email={p.email}
+            onSignOutOthers={p.onSignOutOthers}
+            onSignOut={p.onSignOut}
+            onDeleteAccount={p.onDeleteAccount}
+          />
 
           {/* — 📜 Jogi / Adatvédelem (GDPR) — */}
-          <Text style={styles.sectionTitle}>{t('profile.legalSection')}</Text>
-          <View style={styles.card}>
-            <Pressable
-              onPress={() => router.push('/legal?doc=privacy')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
-            >
-              <Ionicons name="shield-outline" size={18} color={palette.textDim} />
-              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('legal.privacyTitle')}</Text>
-              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/legal?doc=terms')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
-            >
-              <Ionicons name="document-text-outline" size={18} color={palette.textDim} />
-              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('legal.termsTitle')}</Text>
-              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
-            </Pressable>
-            <Pressable
-              onPress={onExportData}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}
-            >
-              <Ionicons name="download-outline" size={18} color={palette.textDim} />
-              <Text style={{ flex: 1, color: palette.text, fontSize: 14 }}>{t('gdpr.exportTitle')}</Text>
-              <Ionicons name="chevron-forward" size={15} color={palette.textDim} />
-            </Pressable>
-          </View>
+          <LegalCard onExportData={p.onExportData} />
         </ScrollView>
       )}
 
       {/* — provider szerkesztő modal — */}
-      <Modal visible={editorOpen} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={styles.modalBackdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.modalCard}>
-            <View style={styles.modalGrabber} />
-            <Text style={styles.modalTitle}>
-              {form.id ? t('profile.editModel') : t('profile.newModel')}
-            </Text>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              <Text style={styles.fieldLabel}>{t('profile.labelLabel')}</Text>
-              <TextInput
-                value={form.label}
-                onChangeText={(v) => setForm((f) => ({ ...f, label: v }))}
-                placeholder={t('profile.labelPlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={styles.input}
-              />
-
-              <Text style={styles.fieldLabel}>{t('profile.providerLabel')}</Text>
-              <View style={styles.chipRow}>
-                {PROVIDER_KINDS.map((kind) => (
-                  <Chip
-                    key={kind}
-                    label={PROVIDER_LABEL[kind]}
-                    active={form.provider === kind}
-                    onPress={() => setForm((f) => ({ ...f, provider: kind }))}
-                  />
-                ))}
-              </View>
-
-              <Text style={styles.fieldLabel}>{t('profile.modelLabel')}</Text>
-              <TextInput
-                value={form.model}
-                onChangeText={(v) => setForm((f) => ({ ...f, model: v }))}
-                placeholder={kindMeta.sampleModel || t('profile.modelPlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <Text style={styles.fieldLabel}>{t('profile.baseUrlLabel')}</Text>
-              <TextInput
-                value={form.baseUrl}
-                onChangeText={(v) => setForm((f) => ({ ...f, baseUrl: v }))}
-                placeholder={kindMeta.defaultBaseUrl || t('profile.baseUrlPlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
-              <Text style={styles.hint}>{t('profile.baseUrlHint')}</Text>
-
-              <Text style={styles.fieldLabel}>{t('profile.apiKeyLabel')}</Text>
-              <TextInput
-                value={form.apiKey}
-                onChangeText={(v) => setForm((f) => ({ ...f, apiKey: v }))}
-                placeholder={
-                  kindMeta.needsKey ? t('profile.apiKeyPlaceholder') : t('profile.apiKeyOptional')
-                }
-                placeholderTextColor={palette.textDim}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-              />
-              <Text style={styles.hint}>{t('profile.apiKeyHint')}</Text>
-
-              {/* 👤 Karakter (persona) — személyesebb hangulat */}
-              <Text style={styles.fieldLabel}>{t('profile.personaSection')}</Text>
-              <Text style={styles.hint}>{t('profile.personaHint')}</Text>
-
-              <Text style={styles.fieldLabel}>{t('profile.personaPurpose')}</Text>
-              <View style={styles.chipRow}>
-                {AI_CAPABILITIES.map((c) => (
-                  <Chip
-                    key={c.id}
-                    label={`${c.emoji} ${t('aiPersona.cap_' + c.id)}`}
-                    active={form.capabilities.includes(c.id)}
-                    onPress={() =>
-                      setForm((f) => ({
-                        ...f,
-                        capabilities: f.capabilities.includes(c.id)
-                          ? f.capabilities.filter((x) => x !== c.id)
-                          : [...f.capabilities, c.id],
-                      }))
-                    }
-                  />
-                ))}
-              </View>
-
-              {/* 🧑‍🎨 karakter-építő (a user rakja össze) */}
-              <AvatarBuilder
-                value={form.avatar}
-                onChange={(a) => setForm((f) => ({ ...f, avatar: a }))}
-              />
-
-              <TextInput
-                value={form.personaStory}
-                onChangeText={(v) => setForm((f) => ({ ...f, personaStory: v }))}
-                placeholder={t('profile.personaStoryPlaceholder')}
-                placeholderTextColor={palette.textDim}
-                style={[styles.input, styles.storyInput]}
-                multiline
-              />
-              <Pressable
-                onPress={() => {
-                  const p = generatePersona(form.capabilities);
-                  setForm((f) => ({
-                    ...f,
-                    // csak akkor ad nevet, ha még nincs — a beírt nevet (pl. GYP) megőrzi
-                    label: f.label.trim() ? f.label : p.name,
-                    personaStory: p.story,
-                    avatar: randomAvatar(),
-                  }));
-                }}
-                style={styles.addRow}
-              >
-                <Ionicons name="sparkles-outline" size={20} color={palette.accent} />
-                <Text style={styles.addText}>{t('profile.personaGenerate')}</Text>
-              </Pressable>
-            </ScrollView>
-
-            {savingProvider ? (
-              <View style={styles.busyBox}>
-                <ActivityIndicator color={palette.text} />
-              </View>
-            ) : (
-              <PrimaryButton
-                icon="checkmark"
-                label={t('common.save')}
-                disabled={!formValid}
-                onPress={() => {
-                  void onSaveProvider();
-                }}
-              />
-            )}
-            <Pressable onPress={() => setEditorOpen(false)} style={styles.cancel}>
-              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <ProviderEditorModal
+        visible={p.editorOpen}
+        form={p.form}
+        setForm={p.setForm}
+        kindMeta={p.kindMeta}
+        saving={p.savingProvider}
+        valid={p.formValid}
+        onSave={p.onSaveProvider}
+        onGeneratePersona={p.generateFormPersona}
+        onClose={() => p.setEditorOpen(false)}
+      />
 
       {/* 🖼️ borító-igazító: húzd a képet a kívánt kivágáshoz, majd Kész */}
       <CoverPhotoEditor
-        uri={coverDraftUri}
-        busy={imgBusy}
-        onCancel={() => setCoverDraftUri(null)}
-        onConfirm={commitCover}
+        uri={p.coverDraftUri}
+        busy={p.imgBusy}
+        onCancel={() => p.setCoverDraftUri(null)}
+        onConfirm={p.commitCover}
       />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 84,
-  },
-  backText: { color: palette.text, fontSize: 16 },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: palette.text,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  notConfigured: {
-    color: palette.danger,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  scroll: { padding: 16, gap: 8, paddingBottom: 40 },
-  sectionTitle: {
-    color: palette.textDim,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  sectionHint: { color: palette.textDim, fontSize: 12, lineHeight: 16, marginBottom: 8 },
-  perfRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  perfLabel: { color: palette.text, fontSize: 14, fontWeight: '600' },
-  perfValue: { color: palette.textDim, fontSize: 14, fontVariant: ['tabular-nums'] },
-  perfChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  card: {
-    backgroundColor: palette.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 16,
-    gap: 6,
-  },
-  fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
-  // 🖼️ csatorna-megjelenés: borító-banner + átfedő avatar
-  coverWrap: {
-    // szabványos FB borító-arány (COVER_ASPECT) — teljes szélesség, a magasság
-    // az arányból; a vágó és a megjelenítés ugyanezt az arányt használja
-    aspectRatio: COVER_ASPECT,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: palette.surfaceHigh,
-    marginBottom: 4,
-  },
-  coverPlaceholder: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
-  coverBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#00000088',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  coverBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  avatarEdit: { position: 'absolute', left: 12, bottom: 10 },
-  avatarImg: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 2,
-    borderColor: palette.surface,
-    backgroundColor: palette.accentSoft,
-  },
-  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: palette.text, fontSize: 34, fontWeight: '800' },
-  avatarCam: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: palette.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: palette.surface,
-  },
-  subHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  proBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: palette.accentSoft,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  proBadgeText: { color: palette.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  freeBadge: {
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  freeBadgeText: { color: palette.textDim, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  subActive: { color: palette.ok, fontSize: 14, fontWeight: '700' },
-  subFreeTitle: { color: palette.text, fontSize: 14, fontWeight: '700' },
-  subFreeHint: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
-  subRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 5,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-  },
-  subRowLabel: { color: palette.textDim, fontSize: 13 },
-  subRowValue: { color: palette.text, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
-  subRestore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
-  subRestoreText: { color: palette.textDim, fontSize: 14, fontWeight: '600' },
-  input: {
-    backgroundColor: palette.surfaceHigh,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    color: palette.text,
-    padding: 12,
-    fontSize: 15,
-  },
-  inputArea: { minHeight: 92, paddingTop: 12, textAlignVertical: 'top' },
-  counter: { color: palette.textDim, fontSize: 11, textAlign: 'right', marginTop: -2 },
-  tzRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tzAuto: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.accentSoft,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  tzAutoText: { color: palette.accent, fontSize: 13, fontWeight: '700' },
-  inputError: { borderColor: palette.danger },
-  error: { color: palette.danger, fontSize: 12, fontWeight: '600' },
-  hint: { color: palette.textDim, fontSize: 11 },
-  busyBox: { height: 48, alignItems: 'center', justifyContent: 'center' },
-  providerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
-  },
-  providerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  providerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  providerLabel: { color: palette.text, fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  providerMeta: { color: palette.textDim, fontSize: 12, marginTop: 1 },
-  defaultBadge: {
-    backgroundColor: palette.accentSoft,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  defaultBadgeText: { color: palette.accent, fontSize: 9, fontWeight: '800' },
-  iconBtn: { padding: 6 },
-  addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12 },
-  addText: { color: palette.accent, fontSize: 14, fontWeight: '700' },
-  emptyText: { color: palette.textDim, fontSize: 13, paddingVertical: 6 },
-  taskRow: {
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
-    gap: 6,
-  },
-  taskLabel: { color: palette.text, fontSize: 13, fontWeight: '600' },
-  taskChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  personaNameRow: { flexDirection: 'row', gap: 8 },
-  emojiInput: { width: 56, textAlign: 'center' },
-  storyInput: { minHeight: 64, textAlignVertical: 'top' },
-  emailText: { color: palette.text, fontSize: 14, marginBottom: 10 },
-  signOutBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  signOutText: { color: palette.danger, fontSize: 15, fontWeight: '700' },
-  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: palette.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 20,
-    paddingBottom: 34,
-    gap: 10,
-    maxHeight: '88%',
-  },
-  modalGrabber: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.border,
-  },
-  modalTitle: { color: palette.text, fontSize: 17, fontWeight: '800' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cancel: { alignItems: 'center', paddingVertical: 6 },
-  cancelText: { color: palette.textDim, fontSize: 13 },
-});

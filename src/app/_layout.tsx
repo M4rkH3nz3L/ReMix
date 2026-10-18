@@ -155,17 +155,20 @@ export default function RootLayout() {
               <Stack.Screen name="mfa" />
               <Stack.Screen name="devices" />
               <Stack.Screen name="admin" />
-              <Stack.Screen name="editor/[id]" />
-              <Stack.Screen name="studio/image/[id]" />
-              <Stack.Screen name="studio/audio/[id]" />
+              {/* ✏️ Szerkesztő-képernyők: az iOS balról-jobbra swipe-back KI (gestureEnabled:false)
+                  — szerkesztés közben a felület FIX, nem csúszik/megy vissza a húzással; vissza
+                  CSAK a vissza-gombbal (a gesztusokat a vászon/idővonal használja). */}
+              <Stack.Screen name="editor/[id]" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="studio/image/[id]" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="studio/audio/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="player/[id]" />
-              <Stack.Screen name="collab/[id]" />
+              <Stack.Screen name="collab/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="shop" />
               <Stack.Screen name="search" />
               <Stack.Screen name="command" />
               <Stack.Screen name="live" />
               <Stack.Screen name="live/[id]" />
-              <Stack.Screen name="live/studio/[id]" />
+              <Stack.Screen name="live/studio/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="channel/[id]" />
               <Stack.Screen name="inbox" />
               <Stack.Screen name="chat/[id]" />

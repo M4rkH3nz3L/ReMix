@@ -18,23 +18,6 @@ import { describeAiPlan } from '@/lib/aiPlan';
 import type { AiPlanItem } from '@/lib/aiPlan';
 import { toAppError } from '@/lib/errors';
 import { haptics } from '@/design';
-import {
-  applyBrandCaptions,
-  buildWatermarkClip,
-  deriveBrandKit,
-  describeBrandKit,
-} from '@/lib/brandKit';
-import type { BrandKit } from '@/lib/brandKit';
-import {
-  INTRO_TEMPLATES,
-  OUTRO_TEMPLATES,
-  buildBrandSegmentPlan,
-} from '@/lib/brandIntro';
-import type { IntroTemplate, OutroTemplate } from '@/lib/brandIntro';
-import { loadBrandKit, saveBrandKit } from '@/lib/brandStore';
-import { buildHookClip, replaceHookClips } from '@/lib/hooks';
-import type { HookSuggestion } from '@/lib/hooks';
-import { fetchHooks } from '@/lib/hooksClient';
 import { makeId } from '@/lib/id';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import { compileVariant } from '@/lib/autoedit';
@@ -42,30 +25,24 @@ import type { AutoEditVariant } from '@/lib/autoedit';
 import { runAutoEditFlow } from '@/lib/autoeditClient';
 import { buildBeatFlashPlan, buildBeatPulsePlan } from '@/lib/beatFx';
 import { buildBeatSplitPlan, detectBeats, timelineBeats } from '@/lib/beats';
-import { planSoundDesign, usedSfxIds } from '@/lib/soundDesign';
-import type { SfxId, SfxPlacement } from '@/lib/soundDesign';
 import { buildCutPlan, buildSceneSplitPlan, detectScenes, detectSilence } from '@/lib/cutlist';
 import type { SilenceRange } from '@/lib/cutlist';
-import { MOTION_PACKS, buildMotionPackPlan } from '@/lib/motionPacks';
-import { buildProductAdPlan } from '@/lib/productAd';
-import type { MotionPack } from '@/lib/motionPacks';
-import { clipsAt, projectDuration } from '@/lib/projectUtils';
+import { projectDuration } from '@/lib/projectUtils';
 import { buildSmartReframe } from '@/lib/reframeClient';
-import { downloadTrack, fetchSoundLibrary, renderServerUrl } from '@/lib/render';
+import { renderServerUrl } from '@/lib/render';
 import { formatTime } from '@/lib/time';
 import { findBrollSpots } from '@/lib/brollClient';
 import { findHighlights } from '@/lib/highlightsClient';
 import type { Highlight } from '@/lib/highlightsClient';
 import { analyzeQuality } from '@/lib/qualityClient';
-import { fetchShotScores } from '@/lib/shotScore';
-import { fetchThumbHeadlines } from '@/lib/thumbStudio';
-import { mergeSearchHits, searchTranscript } from '@/lib/transcriptSearch';
-import { indexProjectVision, searchVision } from '@/lib/visionSearch';
-import type { SearchHit } from '@/lib/visionIndex';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
-import type { VideoClip } from '@/types/project';
+import { BrandKitSection } from '@/components/editor/panels/assistant/BrandKitSection';
+import { HooksSection } from '@/components/editor/panels/assistant/HooksSection';
+import { LookPacksSection } from '@/components/editor/panels/assistant/LookPacksSection';
+import { SmartSearchSection } from '@/components/editor/panels/assistant/SmartSearchSection';
+import { SoundDesignSection } from '@/components/editor/panels/assistant/SoundDesignSection';
 
 const QUICK_ACTIONS = ['makeEngaging', 'shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
@@ -98,20 +75,12 @@ export function AssistantPanel() {
   // + a preview alatt esetleg tett szerkesztések), NEM vak undo() a user editjén
   const previewBaseLen = useRef(0);
   const previewingRef = useRef(false);
-  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
-  const [intro, setIntro] = useState<IntroTemplate | null>(null);
-  const [outro, setOutro] = useState<OutroTemplate | null>(null);
   // worker-diagnosztika: mit hív a kliens, és eléri-e (a „nem érhető el”
   // hibák oka azonnal látszik: rossz URL vs. nem futó worker vs. hálózat)
   const [workerDiag, setWorkerDiag] = useState<string>(t('panels.assistant.workerChecking'));
   // 🤖 melyik AI-modell oldja meg a feladatot (a profilban felvett modellek közül);
   useEffect(() => {
     let alive = true;
-    loadBrandKit().then((kit) => {
-      if (alive) {
-        setBrandKit(kit);
-      }
-    });
     const base = renderServerUrl();
     // az első videóklip fájlja megvan-e — konténer-költözésnél (Expo Go
     // frissítés/újratelepítés) a mentett file:// utak elszakadnak, és minden
@@ -207,273 +176,12 @@ export function AssistantPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 🎬 Look-csomag: kamera + átmenetek + lighting egy koppintásra, egy undóban
-  const applyMotionPack = (pack: MotionPack) => {
-    const state = useEditorStore.getState();
-    if (!state.project) {
-      return;
-    }
-    const plan = buildMotionPackPlan(state.project, pack);
-    if (!plan) {
-      Alert.alert(t('panels.assistant.lookPackTitle'), t('panels.assistant.lookPackNoClip'));
-      return;
-    }
-    Alert.alert(
-      t('panels.assistant.lookPackHeader', { pack: MOTION_PACKS[pack].label }),
-      t('panels.assistant.lookPackBody', { count: plan.touched }) +
-        (plan.skippedCamera > 0
-          ? t('panels.assistant.lookPackSkipped', { count: plan.skippedCamera })
-          : '') +
-        t('panels.assistant.lookPackUndo'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('panels.assistant.applyAction'),
-          onPress: () => {
-            const ok = useEditorStore
-              .getState()
-              .dispatch(
-                { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
-                'user'
-              );
-            setApplied(
-              ok
-                ? t('panels.assistant.lookPackApplied', {
-                    pack: MOTION_PACKS[pack].label,
-                    count: plan.touched,
-                  })
-                : t('panels.assistant.applyFailed')
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  // 🪝 Hook Generator: erősebb nyitómondatok a videó témájából
-  const [hookStatus, setHookStatus] = useState<string | null>(null);
-  const [hooks, setHooks] = useState<HookSuggestion[] | null>(null);
-
-  const generateHooks = async () => {
-    const state = useEditorStore.getState();
-    if (!state.project || hookStatus) {
-      return;
-    }
-    setHookStatus(t('panels.assistant.hookWriting'));
-    try {
-      const transcript = await getTimelineTranscript(state.project).catch(() => null);
-      const lines = (transcript ?? []).slice(0, 12).map((l) => l.text);
-      const summary = `${state.project.name}\n${lines.join('\n')}`.slice(0, 900);
-      const list = await fetchHooks(summary);
-      if (!list) {
-        Alert.alert(
-          t('panels.assistant.hookGeneratorTitle'),
-          t('panels.assistant.hookUnavailable')
-        );
-        return;
-      }
-      setHooks(list);
-    } finally {
-      setHookStatus(null);
-    }
-  };
-
-  /** a választott hook cím-klipként a szöveg-sáv elejére (a korábbit cserélve) */
-  const applyHook = (hook: HookSuggestion) => {
-    const state = useEditorStore.getState();
-    if (!state.project) {
-      return;
-    }
-    const clip = buildHookClip(
-      hook.text,
-      projectDuration(state.project),
-      () => makeId('clip')
-    );
-    const textTrack = state.project.tracks.find((t) => t.type === 'text');
-    const clips = replaceHookClips(textTrack?.clips ?? [], clip);
-    const ok = state.dispatch(
-      { type: 'REPLACE_TRACK_CLIPS', trackType: 'text', clips },
-      'ai'
-    );
-    setApplied(
-      ok ? t('panels.assistant.hookApplied', { text: hook.text }) : t('panels.assistant.applyFailed')
-    );
-  };
-
-  // 🛍️ Product showcase: a legjobb pillanatokból 10 mp-es termékvideó
-  const [productStatus, setProductStatus] = useState<string | null>(null);
-
-  const makeProductAd = async () => {
-    const state = useEditorStore.getState();
-    if (!state.project || productStatus) {
-      return;
-    }
-    const source = state.project.tracks
-      .filter((t) => t.type === 'video')
-      .flatMap((t) => t.clips)
-      .filter((c): c is VideoClip => c.kind === 'video')
-      .sort((a, b) => a.start - b.start)[0];
-    if (!source) {
-      Alert.alert(t('panels.assistant.productAdTitle'), t('panels.assistant.productAdNeedsClip'));
-      return;
-    }
-    setProductStatus(t('panels.assistant.productFindingMoments'));
-    try {
-      const scenes = (await detectScenes(source.uri)) ?? [];
-      const times = [0.5, ...scenes.map((s) => s + 0.4)].slice(0, 16);
-      const shots = await fetchShotScores(source.uri, times);
-      if (!shots || shots.length === 0) {
-        Alert.alert(
-          t('panels.assistant.productAdTitle'),
-          t('panels.assistant.productScoringUnavailable')
-        );
-        return;
-      }
-      setProductStatus(t('panels.assistant.productWritingHeadline'));
-      const headlines = await fetchThumbHeadlines(
-        t('panels.assistant.productHeadlinePrompt', { name: state.project.name })
-      );
-      const plan = buildProductAdPlan(source, shots, {
-        targetSeconds: 10,
-        headline: headlines?.[0],
-        cta: t('panels.assistant.productCta'),
-        makeId: () => makeId('clip'),
-      });
-      if (!plan) {
-        Alert.alert(t('panels.assistant.productAdTitle'), t('panels.assistant.productNotEnoughMoments'));
-        return;
-      }
-      setProductStatus(null);
-      Alert.alert(
-        t('panels.assistant.productAdEmojiTitle'),
-        t('panels.assistant.productAdBody', {
-          shots: plan.shots,
-          seconds: plan.totalSeconds,
-        }) +
-          (plan.captions.length > 0
-            ? t('panels.assistant.productAdCaption', { text: plan.captions[0].text })
-            : '') +
-          t('panels.assistant.productAdUndo'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('panels.assistant.createAction'),
-            onPress: () => {
-              const s = useEditorStore.getState();
-              const ok = s.dispatch(
-                { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
-                'ai'
-              );
-              if (ok && plan.captions.length > 0) {
-                s.dispatch(
-                  { type: 'ADD_CLIPS', trackType: 'captions', clips: plan.captions },
-                  'ai'
-                );
-              }
-              setApplied(
-                ok
-                  ? t('panels.assistant.productAdDone', {
-                      shots: plan.shots,
-                      seconds: plan.totalSeconds,
-                    })
-                  : t('panels.assistant.applyFailed')
-              );
-            },
-          },
-        ]
-      );
-    } finally {
-      setProductStatus(null);
-    }
-  };
-
-  // 🎨 Brand Kit: stílusprofil mentése a nyitott projektből
-  const learnBrand = async () => {
-    const project = useEditorStore.getState().project;
-    if (!project) {
-      return;
-    }
-    const kit = deriveBrandKit(project, new Date().toISOString());
-    if (!kit) {
-      Alert.alert(
-        t('panels.assistant.brandKitTitle'),
-        t('panels.assistant.brandKitNoStyle')
-      );
-      return;
-    }
-    await saveBrandKit(kit);
-    setBrandKit(kit);
-    Alert.alert(t('panels.assistant.brandKitSaved'), describeBrandKit(kit));
-  };
-
-  // 🎨 Brand Kit: a mentett márka alkalmazása a nyitott projektre
-  const applyBrand = async () => {
-    const state = useEditorStore.getState();
-    const project = state.project;
-    if (!project) {
-      return;
-    }
-    const kit = brandKit ?? (await loadBrandKit());
-    if (!kit) {
-      Alert.alert(t('panels.assistant.brandKitTitle'), t('panels.assistant.brandKitNoSaved'));
-      return;
-    }
-    let captionCount = 0;
-    const captionsTrack = project.tracks.find((t) => t.type === 'captions');
-    if (kit.caption && captionsTrack && captionsTrack.clips.length > 0) {
-      const { clips, changed } = applyBrandCaptions(captionsTrack.clips, kit);
-      if (changed > 0) {
-        state.dispatch(
-          { type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips },
-          'user'
-        );
-        captionCount = changed;
-      }
-    }
-    let watermarkAdded = false;
-    if (kit.watermark) {
-      const exists = project.tracks
-        .flatMap((t) => t.clips)
-        .some((c) => c.kind === 'shape' && c.imageUri === kit.watermark!.imageUri);
-      if (!exists) {
-        const clip = buildWatermarkClip(
-          kit.watermark,
-          projectDuration(project),
-          makeId('clip')
-        );
-        watermarkAdded = state.dispatch(
-          {
-            type: 'ADD_CLIP',
-            trackType: 'overlay',
-            clip,
-            asset: {
-              id: makeId('ast'),
-              kind: 'image',
-              uri: kit.watermark.imageUri,
-              provider: 'local',
-              name: t('panels.assistant.watermarkName'),
-            },
-          },
-          'user'
-        );
-      }
-    }
-    if (captionCount === 0 && !watermarkAdded) {
-      Alert.alert(t('panels.assistant.brandKitTitle'), t('panels.assistant.brandNothingToApply'));
-      return;
-    }
-    Alert.alert(
-      t('panels.assistant.brandApplied'),
-      [
-        captionCount > 0
-          ? t('panels.assistant.brandCaptionsRestyled', { count: captionCount })
-          : null,
-        watermarkAdded ? t('panels.assistant.brandWatermarkAdded') : null,
-      ]
-        .filter(Boolean)
-        .join(' · ') + t('panels.assistant.brandUndoStepwise')
-    );
-  };
+  // 🪝 kiemelt AI-módok busy-állapota: a MEGLÉVŐ busyLabel-aggregációt megőrizve
+  // a panel tartja a slotot, a szekciók vezérlik propból (controlled status)
+  const [hookBusy, setHookBusy] = useState<string | null>(null);
+  const [productBusy, setProductBusy] = useState<string | null>(null);
+  const [sfxBusy, setSfxBusy] = useState<string | null>(null);
+  const [searchBusy, setSearchBusy] = useState<string | null>(null);
 
   const send = async (text: string) => {
     const state = useEditorStore.getState();
@@ -906,209 +614,6 @@ export function AssistantPanel() {
 
   const [beatStatus, setBeatStatus] = useState<string | null>(null);
   const [fxStatus, setFxStatus] = useState<string | null>(null);
-  const [sfxStatus, setSfxStatus] = useState<string | null>(null);
-  const [sfxPunch, setSfxPunch] = useState<'subtle' | 'normal' | 'punchy'>('normal');
-
-  /** 🔊 Beat FX: zoom-pulzus az ütemekre vagy flash a downbeatekre */
-  /**
-   * 🎬 Intro/outro beszúrása a mentett márka (szín + logó + felirat-stílus)
-   * alapján. Az intro RIPPLE: minden sáv csúszik a hosszával, ezért az egész
-   * egyetlen REPLACE_TRACKS parancsban megy be — egy undo-lépés.
-   */
-  const applyBrandSegments = async () => {
-    const state = useEditorStore.getState();
-    if (!state.project) {
-      return;
-    }
-    if (!intro && !outro) {
-      Alert.alert(t('panels.assistant.introOutroTitle'), t('panels.assistant.introOutroPickTemplate'));
-      return;
-    }
-    const kit = brandKit ?? (await loadBrandKit());
-    const plan = buildBrandSegmentPlan(
-      state.project.tracks.map((t) => ({ type: t.type, clips: t.clips })),
-      {
-        intro: intro ?? undefined,
-        outro: outro ?? undefined,
-        kit,
-        title: state.project.name,
-        makeId: () => makeId('clip'),
-      }
-    );
-    if (!plan) {
-      Alert.alert(t('panels.assistant.introOutroTitle'), t('panels.assistant.introOutroBuildFailed'));
-      return;
-    }
-    Alert.alert(
-      t('panels.assistant.introOutroTitle'),
-      t('panels.assistant.introOutroBody', { summary: plan.summary }) +
-        (plan.duration > 0
-          ? t('panels.assistant.introOutroShift', { duration: plan.duration.toFixed(1) })
-          : '') +
-        (kit?.watermark
-          ? t('panels.assistant.introOutroLogoIncluded')
-          : t('panels.assistant.introOutroNoLogo')) +
-        t('panels.assistant.introOutroUndo'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('panels.assistant.insertAction'),
-          onPress: () => {
-            useEditorStore.getState().dispatch(
-              {
-                type: 'REPLACE_TRACKS',
-                tracks: plan.tracks,
-                label: t('panels.assistant.introOutroUndoLabel', { summary: plan.summary }),
-              },
-              'user'
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  /**
-   * 🔊 Sound Design AI v1: a vágópontokra és a beat-rácsra oszt ki SFX-eket a
-   * worker generált könyvtárából (whoosh/bassdrop/riser/pop). A terv pure
-   * (soundDesign.ts), itt csak a jelek összegyűjtése, a fájlok letöltése és a
-   * sávra rakás megy — egy undo-lépésben.
-   */
-  const runSoundDesign = async () => {
-    const state = useEditorStore.getState();
-    if (!state.project || sfxStatus) {
-      return;
-    }
-    const project = state.project;
-    const videoClips = project.tracks
-      .filter((t) => t.type === 'video')
-      .flatMap((t) => t.clips)
-      .sort((a, b) => a.start - b.start);
-    if (videoClips.length === 0) {
-      Alert.alert(t('panels.assistant.soundDesignTitle'), t('panels.assistant.soundDesignNeedsVideo'));
-      return;
-    }
-
-    setSfxStatus(t('panels.assistant.analyzing'));
-    try {
-      // vágópontok: minden klip-kezdet az első után
-      const cuts = videoClips.slice(1).map((c) => c.start);
-      // hangsúlyok: felirat- és overlay-megjelenések
-      const accents = project.tracks
-        .filter((t) => t.type === 'captions' || t.type === 'overlay')
-        .flatMap((t) => t.clips)
-        .map((c) => c.start);
-
-      // beat-rács, ha van zene (enélkül is dolgozunk, csak vágásra)
-      let beats: number[] = [];
-      let downbeats: number[] = [];
-      const musicClip = project.tracks
-        .filter((t) => t.type === 'music')
-        .flatMap((t) => t.clips)
-        .filter((c) => c.kind === 'audio')
-        .sort((a, b) => a.start - b.start)[0];
-      if (musicClip && musicClip.kind === 'audio') {
-        setSfxStatus(t('panels.assistant.beatAnalysis'));
-        const grid = await detectBeats(musicClip.uri);
-        if (grid && grid.bpm > 0) {
-          beats = timelineBeats(musicClip, grid.beats);
-          downbeats = timelineBeats(musicClip, grid.downbeats);
-        }
-      }
-
-      const duration = Math.max(
-        ...project.tracks.flatMap((t) => t.clips.map((c) => c.start + c.duration)),
-        0
-      );
-      const plan = planSoundDesign(
-        { cuts, beats, downbeats, accents, duration },
-        { intensity: sfxPunch }
-      );
-      if (plan.length === 0) {
-        Alert.alert(
-          t('panels.assistant.soundDesignTitle'),
-          t('panels.assistant.soundDesignNoPoints')
-        );
-        return;
-      }
-
-      // a szükséges SFX-fájlok letöltése (mindegyik csak egyszer)
-      setSfxStatus(t('panels.assistant.downloadingSounds'));
-      const library = await fetchSoundLibrary();
-      const uriById = new Map<SfxId, { uri: string; name: string }>();
-      for (const id of usedSfxIds(plan)) {
-        const track = library.find((t) => t.id === id);
-        if (!track) {
-          continue;
-        }
-        try {
-          uriById.set(id, { uri: await downloadTrack(track), name: track.name });
-        } catch {
-          // ez az egy SFX kimarad, a többi mehet
-        }
-      }
-      setSfxStatus(null);
-      if (uriById.size === 0) {
-        Alert.alert(t('panels.assistant.soundDesignTitle'), t('panels.assistant.soundLibraryUnavailable'));
-        return;
-      }
-
-      const usable = plan.filter((p) => uriById.has(p.sfxId));
-      const sfxTrack = project.tracks.find((t) => t.type === 'sfx');
-      const summary = usable.reduce<Record<string, number>>((acc, p) => {
-        acc[p.reason] = (acc[p.reason] ?? 0) + 1;
-        return acc;
-      }, {});
-      const lines = Object.entries(summary).map(([r, n]) => `· ${n}× ${r}`);
-
-      Alert.alert(
-        t('panels.assistant.soundDesignTitle'),
-        t('panels.assistant.soundDesignBody', {
-          count: usable.length,
-          lines: lines.join('\n'),
-        }) +
-          (beats.length > 0
-            ? t('panels.assistant.soundDesignWithBeats')
-            : t('panels.assistant.soundDesignNoBeats')) +
-          t('panels.assistant.soundDesignKeepUndo'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('panels.assistant.applyAction'),
-            onPress: () => {
-              const newClips = usable.map((p: SfxPlacement) => {
-                const entry = uriById.get(p.sfxId)!;
-                return {
-                  kind: 'audio' as const,
-                  id: makeId('clip'),
-                  start: Math.round(p.start * 1000) / 1000,
-                  duration: p.duration,
-                  uri: entry.uri,
-                  label: `${entry.name} — ${p.reason}`,
-                  volume: p.volume,
-                  fadeIn: 0,
-                  fadeOut: Math.min(0.12, p.duration / 3),
-                  source: 'imported' as const,
-                };
-              });
-              useEditorStore.getState().dispatch(
-                {
-                  type: 'REPLACE_TRACK_CLIPS',
-                  trackType: 'sfx',
-                  clips: [...(sfxTrack?.clips ?? []), ...newClips].sort(
-                    (a, b) => a.start - b.start
-                  ),
-                },
-                'ai'
-              );
-            },
-          },
-        ]
-      );
-    } finally {
-      setSfxStatus(null);
-    }
-  };
 
   const applyBeatFx = async (kind: 'pulse' | 'flash') => {
     const state = useEditorStore.getState();
@@ -1351,10 +856,6 @@ export function AssistantPanel() {
     smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
   };
 
-  // --- Smart Search (P0‑8) ---
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchStatus, setSearchStatus] = useState<string | null>(null);
-
   /**
    * 🔔 A tevékenység-sáv a MEGLÉVŐ állapotokból származik — nem kellett a 13
    * hívási helyet átírni. Bármelyik fut, a sáv látszik, és mutatja az eltelt
@@ -1362,91 +863,21 @@ export function AssistantPanel() {
    */
   const busyLabel =
     status ??
-    hookStatus ??
-    productStatus ??
+    hookBusy ??
+    productBusy ??
     cutStatus ??
     sceneStatus ??
     autoStatus ??
     beatStatus ??
     fxStatus ??
-    sfxStatus ??
+    sfxBusy ??
     reframeStatus ??
-    searchStatus ??
+    searchBusy ??
     highlightStatus ??
     footageStatus ??
     brollStatus ??
     null;
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
-  const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null);
-
-  const runSearch = async () => {
-    const state = useEditorStore.getState();
-    const query = searchQuery.trim();
-    if (!state.project || !query || searchStatus) {
-      return;
-    }
-    setSearchHits(null);
-    state.setSearchMatchTimes([]); // korábbi kiemelés törlése
-    setSearchStatus(t('panels.assistant.searching'));
-    try {
-      // 📝 átirat-találatok a vision-találatokkal EGY listában (P0‑8)
-      const transcript =
-        (await getTimelineTranscript(state.project).catch(() => null)) ?? [];
-      const transcriptHits = searchTranscript(transcript, query);
-      const index = await withProgress(t('panels.assistant.progressVisualIndex'), (report) =>
-        indexProjectVision(state.project!, report)
-      );
-      let visionHits: SearchHit[] = [];
-      if (index.length > 0) {
-        setSearchStatus(t('panels.assistant.scoring'));
-        visionHits = await searchVision(query, index);
-      }
-      if (index.length === 0 && transcriptHits.length === 0) {
-        Alert.alert(
-          t('panels.assistant.smartSearchTitle'),
-          t('panels.assistant.searchNoIndex')
-        );
-        return;
-      }
-      const merged = mergeSearchHits(visionHits, transcriptHits);
-      setSearchHits(merged);
-      // 🔎 találatok kiemelése az idővonalon (Phase 2.2)
-      state.setSearchMatchTimes(merged.map((h) => h.time));
-    } finally {
-      setSearchStatus(null);
-    }
-  };
-
-  /**
-   * 🔎 Semantic select (Phase 2.1): a keresési találatok idejeit a videóklipekre
-   * képezi, és MIND kijelöli (multi-select) — „válaszd ki az összes ilyen
-   * snittet". Onnan a köteg-műveletek (stílus, törlés…) mennek. Kliens-oldali.
-   */
-  const selectSearchMatches = () => {
-    const state = useEditorStore.getState();
-    const vt = state.project?.tracks.find((tk) => tk.type === 'video');
-    if (!vt || !searchHits || searchHits.length === 0) {
-      return;
-    }
-    const byId = new Map<string, VideoClip>();
-    for (const hit of searchHits) {
-      for (const c of clipsAt<VideoClip>(vt, hit.time)) {
-        if (c.kind === 'video') {
-          byId.set(c.id, c);
-        }
-      }
-    }
-    const clips = [...byId.values()].sort((a, b) => a.start - b.start);
-    if (clips.length === 0) {
-      Alert.alert(t('panels.assistant.smartSearchTitle'), t('panels.assistant.selectMatchesNone'));
-      return;
-    }
-    state.selectClips(clips.map((c) => c.id));
-    Alert.alert(
-      t('panels.assistant.smartSearchTitle'),
-      t('panels.assistant.selectMatchesDone', { count: clips.length })
-    );
-  };
 
   // 👁️ terv-elem előnézete alkalmazás ELŐTT: a lejátszófej az érintett régióra
   // ugrik, és (ha van) kijelöli az érintett klipet — a felhasználó látja, mit
@@ -1729,157 +1160,13 @@ export function AssistantPanel() {
         </View>
       </PanelSection>
 
-      <PanelSection title={t('panels.assistant.sectionSmartSearch')}>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={styles.input}
-          placeholder={t('panels.assistant.searchPlaceholder')}
-          placeholderTextColor={palette.textDim}
-        />
-        <PrimaryButton
-          icon="search-outline"
-          label={searchStatus ?? t('panels.assistant.searchInVisual')}
-          onPress={() => {
-            runSearch().catch((err: Error) => Alert.alert('Smart Search', err.message));
-          }}
-        />
-        {searchHits !== null ? (
-          searchHits.length === 0 ? (
-            <Text style={styles.note}>{t('panels.assistant.searchNoResults')}</Text>
-          ) : (
-            <>
-            <PrimaryButton
-              icon="checkbox-outline"
-              label={t('panels.assistant.selectMatchesBtn', { count: searchHits.length })}
-              onPress={selectSearchMatches}
-            />
-            {searchHits.map((hit, i) => (
-              <Pressable
-                key={`${hit.time.toFixed(1)}-${i}`}
-                style={styles.variantCard}
-                onPress={() => useEditorStore.getState().setPlayhead(hit.time)}
-              >
-                <Text style={styles.variantMeta}>
-                  {hit.source === 'transcript' ? '📝' : '👁'} ▶ {formatTime(hit.time)} ·{' '}
-                  {(hit.score * 100).toFixed(0)}%
-                </Text>
-                <Text style={styles.variantRationale} numberOfLines={2}>
-                  {hit.description || hit.labels.join(', ')}
-                </Text>
-              </Pressable>
-            ))}
-            </>
-          )
-        ) : (
-          <Text style={styles.note}>{t('panels.assistant.smartSearchIntro')}</Text>
-        )}
-      </PanelSection>
+      <SmartSearchSection busy={searchBusy} setBusy={setSearchBusy} />
 
-      <PanelSection title={t('panels.assistant.sectionHookGenerator')}>
-        <AiProviderPicker task="hooks" />
-        <PrimaryButton
-          icon="flash-outline"
-          label={hookStatus ?? t('panels.assistant.hookGenerateBtn')}
-          onPress={() => {
-            generateHooks().catch((err: Error) =>
-              Alert.alert('Hook Generator', err.message)
-            );
-          }}
-        />
-        {hooks?.map((hook) => (
-          <Pressable
-            key={hook.text}
-            style={styles.variantCard}
-            onPress={() => applyHook(hook)}
-          >
-            <Text style={styles.variantTitle}>{hook.text}</Text>
-            <Text style={styles.variantMeta}>
-              {t('panels.assistant.hookMeta', { style: hook.style, count: hook.text.length })}
-            </Text>
-          </Pressable>
-        ))}
-        <Text style={styles.note}>{t('panels.assistant.hookNote')}</Text>
-      </PanelSection>
+      <HooksSection busy={hookBusy} setBusy={setHookBusy} setApplied={setApplied} />
 
-      <PanelSection title={t('panels.assistant.sectionLookPacks')}>
-        <View style={styles.packRow}>
-          {(Object.keys(MOTION_PACKS) as MotionPack[]).map((pack) => (
-            <Chip
-              key={pack}
-              label={MOTION_PACKS[pack].label}
-              active={false}
-              onPress={() => applyMotionPack(pack)}
-            />
-          ))}
-        </View>
-        <Text style={styles.note}>{t('panels.assistant.lookPacksNote')}</Text>
-        <PrimaryButton
-          icon="pricetag-outline"
-          label={productStatus ?? t('panels.assistant.makeProductAdBtn')}
-          onPress={() => {
-            makeProductAd().catch((err: Error) =>
-              Alert.alert(t('panels.assistant.productAdTitle'), err.message)
-            );
-          }}
-        />
-        <Text style={styles.note}>{t('panels.assistant.productAdNote')}</Text>
-      </PanelSection>
+      <LookPacksSection busy={productBusy} setBusy={setProductBusy} setApplied={setApplied} />
 
-      <PanelSection title={t('panels.assistant.sectionBrandKit')}>
-        <PrimaryButton
-          icon="bookmark-outline"
-          label={t('panels.assistant.brandSaveStyle')}
-          onPress={() => {
-            void learnBrand();
-          }}
-        />
-        <PrimaryButton
-          icon="color-wand-outline"
-          label={t('panels.assistant.brandApplyBtn')}
-          onPress={() => {
-            void applyBrand();
-          }}
-        />
-        <Text style={styles.note}>
-          {brandKit
-            ? t('panels.assistant.brandSavedInfo', { info: describeBrandKit(brandKit) })
-            : t('panels.assistant.brandNoSavedHint')}
-        </Text>
-
-        <Text style={styles.subLabel}>{t('panels.assistant.introLabel')}</Text>
-        <View style={styles.row}>
-          {INTRO_TEMPLATES.map((tpl) => (
-            <Chip
-              key={tpl.id}
-              label={t(tpl.label)}
-              active={intro === tpl.id}
-              onPress={() => setIntro(intro === tpl.id ? null : tpl.id)}
-            />
-          ))}
-        </View>
-        <Text style={styles.subLabel}>{t('panels.assistant.outroLabel')}</Text>
-        <View style={styles.row}>
-          {OUTRO_TEMPLATES.map((tpl) => (
-            <Chip
-              key={tpl.id}
-              label={t(tpl.label)}
-              active={outro === tpl.id}
-              onPress={() => setOutro(outro === tpl.id ? null : tpl.id)}
-            />
-          ))}
-        </View>
-        <PrimaryButton
-          icon="albums-outline"
-          label={t('panels.assistant.insertIntroOutroBtn')}
-          onPress={() => {
-            applyBrandSegments().catch((err: Error) =>
-              Alert.alert(t('panels.assistant.introOutroTitle'), err.message)
-            );
-          }}
-        />
-        <Text style={styles.note}>{t('panels.assistant.introOutroNote')}</Text>
-      </PanelSection>
+      <BrandKitSection />
 
       <PanelSection title={t('panels.assistant.sectionCutTools')}>
         <PrimaryButton
@@ -1955,34 +1242,7 @@ export function AssistantPanel() {
         <Text style={styles.note}>{t('panels.assistant.socialNote')}</Text>
       </PanelSection>
 
-      <PanelSection title={t('panels.assistant.sectionSoundDesign')}>
-        <View style={styles.row}>
-          {(
-            [
-              { id: 'subtle', label: t('panels.assistant.intensitySubtle') },
-              { id: 'normal', label: t('panels.assistant.intensityNormal') },
-              { id: 'punchy', label: t('panels.assistant.intensityPunchy') },
-            ] as const
-          ).map((opt) => (
-            <Chip
-              key={opt.id}
-              label={opt.label}
-              active={sfxPunch === opt.id}
-              onPress={() => setSfxPunch(opt.id)}
-            />
-          ))}
-        </View>
-        <PrimaryButton
-          icon="volume-high-outline"
-          label={sfxStatus ?? t('panels.assistant.soundDesignBtn')}
-          onPress={() => {
-            runSoundDesign().catch((err: Error) =>
-              Alert.alert(t('panels.assistant.soundDesignTitle'), err.message)
-            );
-          }}
-        />
-        <Text style={styles.note}>{t('panels.assistant.soundDesignNote')}</Text>
-      </PanelSection>
+      <SoundDesignSection busy={sfxBusy} setBusy={setSfxBusy} />
 
       {reply ? (
         <PanelSection title={t('panels.assistant.sectionSuggestion')}>
@@ -2075,11 +1335,6 @@ const styles = StyleSheet.create({
   variantCardActive: {
     borderColor: palette.accent,
   },
-  packRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
   variantActions: {
     flexDirection: 'row',
     marginTop: 6,
@@ -2133,11 +1388,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginTop: 8,
   },
-  changeItem: {
-    color: palette.text,
-    fontSize: 12,
-    lineHeight: 18,
-  },
   planRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2180,13 +1430,6 @@ const styles = StyleSheet.create({
     color: palette.accent,
     fontSize: 11,
     fontWeight: '700',
-  },
-  subLabel: {
-    color: palette.textDim,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 10,
-    marginBottom: 4,
   },
   note: {
     color: palette.textDim,

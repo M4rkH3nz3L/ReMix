@@ -43,6 +43,42 @@ export function snapThumbTime(second: number): number {
   return Math.max(0, Math.round(second * 2) / 2);
 }
 
+/** Egy csempe minimum négyzet-mérete px-ben (a sáv-magassághoz igazítva, de ≥ 24). */
+const MIN_TILE = 24;
+/** Max. csempe-szám EGY klipre — perf-korlát a kocka-generálásra (hosszú klip is ennyi). */
+export const FILMSTRIP_MAX_TILES = 48;
+
+/**
+ * 🎞️ Filmstrip-elrendezés egy klipre: HÁNY csempe, mekkora SZÉLESSÉGGEL, és MELY
+ * forrás-időpontokról.
+ *
+ * A csempe-szám a klip renderelt szélességéből jön (négyzetes cél: `widthPx/tile`),
+ * de `[1, maxTiles]`-re szorítva (perf). A KULCS: `tileW = widthPx / count`, így a
+ * csempék VÉGIG kitöltik a klip teljes szélességét — NEM ragadnak meg az első N
+ * csempénél fix szélességgel (ez volt a „hosszú klipnél 22 mp után üres" bug: a
+ * csempék `tile` szélesen, balról töltöttek, a maradék üres maradt). A `times` a
+ * klip TELJES hosszán oszlik el (minden csempe a saját idő-szelete közepéről),
+ * trim/sebesség-helyesen, 0,5 mp-re pattintva (cache-barát) — így az UTOLSÓ csempe
+ * a klip VÉGÉHEZ közeli kockát mutat, nem a 22. mp-nél elakadva.
+ */
+export function filmstripTiles(
+  widthPx: number,
+  heightPx: number,
+  durationSec: number,
+  trimIn: number,
+  speed: number,
+  maxTiles: number = FILMSTRIP_MAX_TILES
+): { count: number; tileW: number; times: number[] } {
+  const tile = Math.max(MIN_TILE, heightPx);
+  const w = Math.max(0, widthPx);
+  const count = Math.max(1, Math.min(maxTiles, Math.ceil(w / tile)));
+  const tileW = w > 0 ? w / count : tile;
+  const times = Array.from({ length: count }, (_, i) =>
+    snapThumbTime(trimIn + (i + 0.5) * (durationSec / count) * speed)
+  );
+  return { count, tileW, times };
+}
+
 export async function getFilmstrip(
   uri: string,
   times: number[]

@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { getProxyUriSync } from '@/lib/proxy';
-import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
-import { clamp } from '@/lib/time';
+import { filmstripTiles, getFilmstrip } from '@/lib/thumbnails';
 import type { ImageClip, VideoClip } from '@/types/project';
 
 interface Props {
@@ -15,25 +14,20 @@ interface Props {
   heightPx: number;
 }
 
-const MAX_TILES = 24;
-
 /**
- * Filmstrip a videó/kép klipek hátterében: négyzetes csempék a klip
- * trim/sebesség-helyes forrás-időpontjairól. A generálás debounce-olt
- * (pinch-zoom közben nem pörög), a kockák (uri, mp) kulcson cache-elődnek.
+ * Filmstrip a videó/kép klipek hátterében: a klip teljes szélességét KITÖLTŐ csempék
+ * a trim/sebesség-helyes forrás-időpontokról (a `filmstripTiles` magból — hosszú klip
+ * is VÉGIG fedett, nincs üres rész). A generálás debounce-olt (pinch-zoom közben nem
+ * pörög), a kockák (uri, mp) kulcson cache-elődnek.
  */
 export function ClipFilmstrip({ clip, widthPx, heightPx }: Props) {
-  const tile = Math.max(24, heightPx);
-  const count = clamp(Math.ceil(widthPx / tile), 1, MAX_TILES);
-
-  const times = useMemo(() => {
-    if (clip.kind === 'image') {
-      return [];
-    }
-    return Array.from({ length: count }, (_, i) =>
-      snapThumbTime(clip.trimIn + (i + 0.5) * (clip.duration / count) * clip.speed)
-    );
-  }, [clip, count]);
+  const { tileW, times } = useMemo(
+    () =>
+      clip.kind === 'image'
+        ? { tileW: 0, times: [] as number[] }
+        : filmstripTiles(widthPx, heightPx, clip.duration, clip.trimIn, clip.speed),
+    [clip, widthPx, heightPx]
+  );
   const timesKey = times.join(',');
 
   const [thumbs, setThumbs] = useState<(string | null)[]>([]);
@@ -80,11 +74,11 @@ export function ClipFilmstrip({ clip, widthPx, heightPx }: Props) {
             <Image
               key={`${i}-${uri}`}
               source={{ uri }}
-              style={{ width: tile, height: heightPx }}
+              style={{ width: tileW, height: heightPx }}
               contentFit="cover"
             />
           ) : (
-            <View key={i} style={{ width: tile, height: heightPx }} />
+            <View key={i} style={{ width: tileW, height: heightPx }} />
           )
         )}
       </View>

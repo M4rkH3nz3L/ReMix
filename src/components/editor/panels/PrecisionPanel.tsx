@@ -307,6 +307,67 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
         <PanelSection title={t('panels.precision.appearanceTitle')}>
+          {/* 🔭 Méret + pozíció numerikus mezők (a gesztus-szerkesztés precíz párja) */}
+          <Stepper
+            label={t('panels.precision.scale', { defaultValue: 'Méret' })}
+            value={`${(clip.transform?.scale ?? 1).toFixed(2)}×`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  scale: clamp(Math.round(((clip.transform?.scale ?? 1) - 0.1) * 100) / 100, 0.2, 4),
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  scale: clamp(Math.round(((clip.transform?.scale ?? 1) + 0.1) * 100) / 100, 0.2, 4),
+                },
+              })
+            }
+          />
+          <Stepper
+            label={t('panels.precision.posX', { defaultValue: 'Pozíció X' })}
+            value={`${Math.round((clip.transform?.x ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  x: clamp(Math.round(((clip.transform?.x ?? 0) - 0.05) * 100) / 100, -0.75, 0.75),
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  x: clamp(Math.round(((clip.transform?.x ?? 0) + 0.05) * 100) / 100, -0.75, 0.75),
+                },
+              })
+            }
+          />
+          <Stepper
+            label={t('panels.precision.posY', { defaultValue: 'Pozíció Y' })}
+            value={`${Math.round((clip.transform?.y ?? 0) * 100)}%`}
+            onDec={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  y: clamp(Math.round(((clip.transform?.y ?? 0) - 0.05) * 100) / 100, -0.75, 0.75),
+                },
+              })
+            }
+            onInc={() =>
+              updateClip(clip.id, {
+                transform: {
+                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
+                  y: clamp(Math.round(((clip.transform?.y ?? 0) + 0.05) * 100) / 100, -0.75, 0.75),
+                },
+              })
+            }
+          />
           <Stepper
             label={t('panels.precision.rotation')}
             value={`${clip.transform?.rotation ?? 0}°`}

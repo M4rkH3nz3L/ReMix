@@ -3,7 +3,7 @@
 > ↑ [docs/hu index](../README.md) · [architecture/state.md](../architecture/state.md)
 
 - **Státusz:** Elfogadva (2026-10-08)
-- **Horgony:** [projectUtils.ts](../../../src/lib/projectUtils.ts) (`CANONICAL_TRACKS`, `canHostClip`) · [CORE.md §2.5](../../../devs/tasks/CORE.md)
+- **Horgony:** [projectUtils.ts](../../../src/lib/projectUtils.ts) (`CANONICAL_TRACKS`, `canHostClip`) · [06-video-editor](../../../devs/tasks/06-video-editor.md)
 
 ## Kontextus
 A projekt **fix** sávkészlettel indul (`CANONICAL_TRACKS`): típusonként EGY sáv —
@@ -27,7 +27,7 @@ rétegződik; a klip sávok közti mozgatását a [`MOVE_CLIP`](./ADR-001-comman
 - **Lánc-stabilitás:** a `type`-alapú azonosításra épül a teljes lib-réteg
   (`trackOf`, migrációk, ripple/roll/slip/slide, pre-compose, az AI cut-listák,
   a render-sorrend). A `type → trackId` átállás lánc-széles, kockázatos refaktor —
-  a mag 100%-ra vitelének ([CORE.md](../../../devs/tasks/CORE.md)) nem előfeltétele.
+  a mag 100%-ra vitelének ([06-video-editor](../../../devs/tasks/06-video-editor.md)) nem előfeltétele.
 - **A rétegzés már megvan:** a `pip`/`overlay`/`adjust` a gyakorlatban fedi a
   több-réteg igény nagy részét, új modell nélkül.
 
@@ -43,4 +43,4 @@ rétegződik; a klip sávok közti mozgatását a [`MOVE_CLIP`](./ADR-001-comman
 - Ha a (A) valaha megvalósul, ez az ADR-t egy követő ADR váltja le.
 
 ## Kapcsolódó
-[ADR-001](./ADR-001-command-bus.md) · [ADR-005](./ADR-005-session-vs-project-state.md) · [CORE.md §2.3/§2.5](../../../devs/tasks/CORE.md).
+[ADR-001](./ADR-001-command-bus.md) · [ADR-005](./ADR-005-session-vs-project-state.md) · [06-video-editor](../../../devs/tasks/06-video-editor.md).

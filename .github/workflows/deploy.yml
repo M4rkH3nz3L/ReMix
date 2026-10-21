@@ -1,0 +1,75 @@
+name: Deploy (Hetzner)
+
+# A ReMix-backend éles deployja: SSH-val a szerverre, git pull + docker compose
+# újraépítés a server/ stackből (api + worker + redis + caddy). A hiteles HOGYAN:
+# server/DEPLOY.md. A compose context a `server/` almappa, ezért a build is ott fut.
+#
+# ⚠️ ELŐFELTÉTEL (egyszeri, kézi first-run — a workflow NEM végzi el):
+#   1) a szerver fel van húzva (ops/server-setup.sh lefutott, deploy user + docker),
+#   2) a repo klónozva: /var/www/app  (git root),
+#   3) kitöltve: /var/www/app/server/.env.production  (titkok — NEM gitben)
+#      és /var/www/app/server/.env  (RENDER_DOMAIN=... a compose változó-behelyettesítéshez).
+# Ezek után minden main-push ezzel a workflow-val automatikusan újradeployol.
+#
+# GitHub secretek (Settings → Secrets and variables → Actions):
+#   SSH_HOST         = 195.201.16.57
+#   SSH_USER         = deploy
+#   SSH_KEY          = a ~/.ssh/remix_deploy TELJES tartalma (BEGIN…END sorokkal)
+#   SSH_KNOWN_HOSTS  = `ssh-keyscan 195.201.16.57` kimenete  (opcionális, lásd lent)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy a szerverre
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy — git pull + docker compose up --build
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: 22
+          key: ${{ secrets.SSH_KEY }}
+          # Host-kulcs ellenőrzés: ha beállítod az SSH_KNOWN_HOSTS secretet
+          # (`ssh-keyscan 195.201.16.57`), a MITM-védelemhez add meg itt a
+          # szerver ujjlenyomatát is: fingerprint: <sha256:...>. Enélkül az
+          # appleboy/ssh-action a futás elején fogadja a host-kulcsot.
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd /var/www/app
+            git pull --ff-only
+            cd server
+            test -f .env.production || { echo "HIBA: hiányzik a server/.env.production (first-run kézi lépés)"; exit 1; }
+            test -f .env || { echo "HIBA: hiányzik a server/.env (RENDER_DOMAIN=...)"; exit 1; }
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
+            docker compose ps
+
+      - name: Health-ellenőrzés
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: 22
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            # a konténer belső health-je (a Caddy mögött); a domain-health kívülről mehet
+            for i in $(seq 1 10); do
+              if docker compose -f /var/www/app/server/docker-compose.yml exec -T api \
+                   node -e "require('http').get('http://127.0.0.1:8787/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"; then
+                echo "API health OK"; exit 0
+              fi
+              echo "várakozás az API-ra ($i/10)…"; sleep 6
+            done
+            echo "HIBA: az API nem lett healthy"; exit 1

@@ -26,15 +26,15 @@ function fadeFactor(clip: AudioClip, t: number): number {
 }
 
 /**
- * Láthatatlan réteg: sávonként egy lejátszó (zene + voiceover + SFX egyszerre
- * szól), a rAF-órához szinkronizálva. Egy sávon belül átfedésnél a legutóbb
- * kezdődő klip szól; a fade-görbék a hangerőn keresztül érvényesülnek.
+ * Láthatatlan réteg: sávonként (zene + voiceover + SFX) a playheadnél futó MINDEN
+ * klip szól — egy sávon belüli ÁTFEDÉSNÉL is (klipenként saját lejátszó →
+ * akusztikusan keverednek), a rAF-órához szinkronban. A fade-görbék a hangerőn át.
  *
  * ⚠️ FÓKUSZ-KAPU: a réteget a szerkesztő ÉS a lejátszó képernyő is mountolja, és
  * a navigáció `push`-sal megy (az előző képernyő mountolva marad). Kapu nélkül
- * mindkét példány 4 natív lejátszót tartana életben ugyanarra a `isPlaying`
- * állapotra — duplikált hang és felesleges dekóder-terhelés. Takart képernyőn
- * nem rendereljük, így a lejátszók fel is szabadulnak.
+ * mindkét példány lejátszókat tartana életben ugyanarra a `isPlaying` állapotra —
+ * duplikált hang és felesleges dekóder-terhelés. Takart képernyőn nem rendereljük,
+ * így a lejátszók fel is szabadulnak.
  */
 export function AudioLayer() {
   const isFocused = useIsFocused();
@@ -190,14 +190,17 @@ function VideoVoice() {
   return null;
 }
 
+/**
+ * Egy audio-sáv: a playheadnél futó MINDEN aktív klipre egy-egy `ClipAudioPlayer`
+ * (kulcs = clip.id) → a sávon belüli átfedő klipek EGYSZERRE szólnak (keverednek).
+ * Korábban átfedésnél csak a legutóbb kezdődő klip szólt (a többi néma volt).
+ */
 function TrackAudio({ trackType }: { trackType: TrackType }) {
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
-  const isPlaying = useEditorStore((s) => s.isPlaying);
   // 🎚️ sáv-monitorozás: némítás/solo CSAK az előnézetre hat (a render nem tud róla)
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
-  const masterVolume = useEditorStore((s) => s.masterVolume);
   const audible =
     soloTracks.length > 0 ? soloTracks.includes(trackType) : !mutedTracks.includes(trackType);
 
@@ -207,11 +210,39 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
   const active = track
     ? clipsAt<AudioClip>(track, playhead).filter((c) => c.kind === 'audio')
     : [];
-  const clip = active.length > 0 ? active.reduce((a, b) => (b.start >= a.start ? b : a)) : null;
+
+  return (
+    <>
+      {active.map((clip) => (
+        <ClipAudioPlayer key={clip.id} clip={clip} audible={audible} trackGain={trackGain} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Egyetlen audio-klip lejátszója (saját `useAudioPlayer`), a rAF-órához szinkronban.
+ * A `TrackAudio` klipenként egy példányt rendertel → a sávon belüli ÁTFEDÉST ez
+ * teszi lehetővé (a párhuzamos klipek akusztikusan összegződnek). A klip inaktívvá
+ * válásakor a komponens unmountol → a lejátszó elhallgat + felszabadul.
+ */
+function ClipAudioPlayer({
+  clip,
+  audible,
+  trackGain,
+}: {
+  clip: AudioClip;
+  audible: boolean;
+  trackGain: number;
+}) {
+  const project = useEditorStore((s) => s.project);
+  const playhead = useEditorStore((s) => s.playhead);
+  const isPlaying = useEditorStore((s) => s.isPlaying);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
 
   // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
   const resolvedUri = useMemo(
-    () => (project && clip ? (resolveClipUri(project, clip) ?? clip.uri) : null),
+    () => (project ? (resolveClipUri(project, clip) ?? clip.uri) : null),
     [project, clip]
   );
 
@@ -221,26 +252,18 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
   /**
    * 🎙️ Voice Studio előnézet: ha a klipen be van kapcsolva az Enhance/de-reverb,
    * a FELDOLGOZOTT hangot játsszuk (ugyanaz a lánc, mint a renderben). Amíg a
-   * proxy készül, a nyers hang szól — így a lejátszás sosem akad meg.
-   *
-   * A kész proxyt RENDER-IDŐBEN olvassuk a memória-cache-ből (nincs setState az
-   * effektben — azt a `react-hooks/set-state-in-effect` szabály tiltja); az
-   * effekt csak az aszinkron elkészítést indítja, és a kulccsal együtt tárolja
-   * az eredményt, hogy egy elavult válasz ne kerülhessen másik kliphez.
+   * proxy készül, a nyers hang szól — így a lejátszás sosem akad meg. A kész
+   * proxyt RENDER-IDŐBEN olvassuk a cache-ből (nincs setState az effektben).
    */
-  const voiceOpts = clip
-    ? { voiceEnhance: clip.voiceEnhance, deReverb: clip.deReverb }
-    : null;
-  const needsProxy = voiceOpts ? needsVoiceProxy(voiceOpts) : false;
-  const voiceKey = clip
-    ? `${resolvedUri ?? clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`
-    : '';
+  const voiceOpts = { voiceEnhance: clip.voiceEnhance, deReverb: clip.deReverb };
+  const needsProxy = needsVoiceProxy(voiceOpts);
+  const voiceKey = `${resolvedUri ?? clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`;
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
   // csak primitív függőségek → őszinte dep-lista, elnémított hook-szabály nélkül
-  const voiceSrcUri = needsProxy && clip ? (resolvedUri ?? clip.uri) : null;
-  const voiceEnhance = clip?.voiceEnhance ?? false;
-  const voiceDeReverb = clip?.deReverb ?? false;
+  const voiceSrcUri = needsProxy ? (resolvedUri ?? clip.uri) : null;
+  const voiceEnhance = clip.voiceEnhance ?? false;
+  const voiceDeReverb = clip.deReverb ?? false;
   useEffect(() => {
     if (!voiceSrcUri) {
       return;
@@ -259,23 +282,14 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     };
   }, [voiceSrcUri, voiceEnhance, voiceDeReverb, voiceKey]);
 
-  const voiceUri =
-    clip && voiceOpts && needsProxy
-      ? (getVoiceProxySync(resolvedUri ?? clip.uri, voiceOpts) ??
-        (fetched?.key === voiceKey ? fetched.uri : null))
-      : null;
-  const playUri = voiceUri ?? resolvedUri ?? clip?.uri ?? null;
+  const voiceUri = needsProxy
+    ? (getVoiceProxySync(resolvedUri ?? clip.uri, voiceOpts) ??
+      (fetched?.key === voiceKey ? fetched.uri : null))
+    : null;
+  const playUri = voiceUri ?? resolvedUri ?? clip.uri ?? null;
 
+  // betöltés + kezdő seek/play (forrás-idő = trimIn + klip-eleji offset, avSync)
   useEffect(() => {
-    if (!clip) {
-      if (loadedUriRef.current !== null) {
-        loadedUriRef.current = null;
-        try {
-          player.pause();
-        } catch {}
-      }
-      return;
-    }
     if (!playUri || loadedUriRef.current === playUri) {
       return;
     }
@@ -283,7 +297,6 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     try {
       player.replace(playUri);
       const state = useEditorStore.getState();
-      // forrás-idő = trimIn + a klip-eleji offset (egységes seek-pont, avSync)
       player.seekTo(sourceTimeOf(clip, state.playhead)).catch(() => {});
       if (state.isPlaying) {
         player.play();
@@ -291,25 +304,26 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
     } catch {}
   }, [player, clip, playUri]);
 
+  // play/pause követés; a klip inaktívvá válásakor (unmount) elhallgat
   useEffect(() => {
     try {
-      if (isPlaying && clip) {
+      if (isPlaying) {
         player.play();
       } else {
         player.pause();
       }
     } catch {}
-  }, [player, isPlaying, clip]);
+    return () => {
+      try {
+        player.pause();
+      } catch {}
+    };
+  }, [player, isPlaying]);
 
   // álló óránál seek, futásnál hangerő + fade követés.
-  // ⚡ A playhead ~60×/mp változik, és ebből a rétegből 4 példány fut (zene,
-  // voiceover, SFX, videó-hang) — küszöb nélkül ez 240 natív hangerő-írás
-  // másodpercenként. Csak érdemi eltérésnél írunk (a fade-görbe így is sima).
+  // ⚡ A playhead ~60×/mp változik — csak érdemi hangerő-eltérésnél írunk (sima fade).
   const lastVolRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!clip) {
-      return;
-    }
     const t = playhead - clip.start;
     try {
       // 🎚️ hangerő-automáció: a volume-csatorna a playheadből interpolál

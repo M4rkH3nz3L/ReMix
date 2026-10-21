@@ -1,5 +1,6 @@
 import { SourceSheet } from '@/components/SourceSheet';
 import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
+import { DevelopSheet } from '@/components/studio/image/DevelopSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
@@ -19,6 +20,7 @@ export type SheetKind =
   | 'layers'
   | 'style'
   | 'adjust'
+  | 'develop'
   | 'fx'
   | 'pattern'
   | 'align'
@@ -112,6 +114,9 @@ export function ImageStudioSheets({
       ) : null}
       {sheet === 'adjust' && doc && selectedLayer?.kind === 'photo' ? (
         <AdjustStackSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'develop' && doc && selectedLayer?.kind === 'photo' ? (
+        <DevelopSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (
         <EffectsSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />

@@ -5,6 +5,7 @@
  */
 
 import type { LiveDoc } from './live';
+import type { PhotoDevelop } from '@/lib/photoDevelop';
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 
@@ -1398,6 +1399,14 @@ export interface PhotoLayer extends ImageLayerBase {
   adjust?: ClipAdjust;
   /** 🎚️ non-destruktív korrekciós-verem (az UI forrás-igazsága; → `adjust`) */
   adjustmentStack?: AdjustmentLayer[];
+  /**
+   * 📸 RAW-develop (S-PHOTO): non-destruktív fotó-előhívás a fájl mellett — tónus/szín
+   * (base: `ClipAdjust`) + RAW-detail (clarity/texture/dehaze/élesítés/zaj/CA/torzítás).
+   * A render a `developToFilterPlan` lépéseit a korrekció-lánc UTÁN égeti be
+   * (`@/lib/photoDevelop` + `server/imagedoc.js` `developFilterPlan` — contract-locked).
+   * Hiányzó / neutrális = nincs hatás (a `adjust`/`adjustmentStack` mellett, additív).
+   */
+  develop?: PhotoDevelop;
   mask?: ClipMask;
   /** 🎯 kijelölés-alapú (lokális) korrekció: a `grade`/`adjust` CSAK a `mask` régión BELÜL hat,
    *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker

@@ -16,6 +16,7 @@ export type ToolKey =
   | 'svg'
   | 'style'
   | 'adjust'
+  | 'develop'
   | 'fx'
   | 'pattern'
   | 'crop'
@@ -76,6 +77,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'fx', icon: 'sparkles-outline', labelKey: 'studio.imageTools.fx' },
       { key: 'pattern', icon: 'grid-outline', labelKey: 'studio.imageTools.pattern' },
       { key: 'adjust', icon: 'contrast-outline', labelKey: 'studio.imageTools.adjust' },
+      { key: 'develop', icon: 'aperture-outline', labelKey: 'studio.imageTools.develop' },
     ],
   },
   {

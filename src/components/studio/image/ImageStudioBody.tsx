@@ -454,6 +454,14 @@ export function ImageStudioBody({
           Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
         }
         break;
+      case 'develop':
+        // 📸 RAW-develop (non-destruktív előhívás) — csak fotó-rétegre
+        if (selectedLayer?.kind === 'photo') {
+          setSheet('develop');
+        } else {
+          Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
+        }
+        break;
       case 'fx':
         // ✨ réteg-effektek (ragyogás/árnyék/körvonal) — csak forma-rétegre
         if (selectedLayer?.kind === 'shape') {
@@ -559,6 +567,7 @@ export function ImageStudioBody({
       case 'style':
         return !selectedLayer;
       case 'adjust':
+      case 'develop':
         return selectedLayer?.kind !== 'photo';
       case 'align':
         return !canAlignLayer(selectedLayer);

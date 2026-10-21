@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { makeId } from '@/lib/id';
+import { EFFECT_PREVIEW_SUPPORT } from '@/lib/skiaEffects';
 import {
   addEffect,
   moveEffect,
@@ -75,6 +76,12 @@ export function EffectsSection({ clip }: { clip: VideoClip | ImageClip }) {
               }
             />
           ) : null}
+          {/* 👁️ jelzi, hogy az effekt látszik-e az előnézetben (Skia), vagy csak a renderben ég be */}
+          {EFFECT_PREVIEW_SUPPORT[fx.type] === 'render-only' ? (
+            <Text style={styles.renderOnly}>
+              {t('panels.filter.renderOnly', { defaultValue: 'csak render' })}
+            </Text>
+          ) : null}
         </View>
       ))}
       <Text style={styles.note}>
@@ -97,5 +104,12 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     lineHeight: 16,
+  },
+  renderOnly: {
+    color: palette.textDim,
+    fontSize: 10,
+    fontWeight: '700',
+    alignSelf: 'center',
+    opacity: 0.8,
   },
 });

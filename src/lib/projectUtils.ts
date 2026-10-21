@@ -432,6 +432,8 @@ export interface ActiveTransition {
   from: VideoClip | ImageClip;
   to: VideoClip | ImageClip;
   type: NonNullable<VideoClip['transitionOut']>['type'];
+  /** 🧭 irány (az irányos előnézet-variánst választja, a render-rel paritásban) */
+  direction?: NonNullable<VideoClip['transitionOut']>['direction'];
   /** 0 → 1 az átmenet-ablakban */
   progress: number;
 }
@@ -463,6 +465,7 @@ export function activeTransition(project: Project, t: number): ActiveTransition 
         from,
         to: clips[i + 1],
         type: tr.type,
+        direction: tr.direction,
         progress: Math.max(0, Math.min(1, (t - (end - d)) / d)),
       };
     }

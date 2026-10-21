@@ -33,6 +33,43 @@ const CANVAS = {
 const FFMPEG_BLEND = { colordodge: 'dodge', colorburn: 'burn' };
 const blendName = (m) => FFMPEG_BLEND[m] || m;
 
+// 🧊 3D/dinamikus átmenet (klip transitionOut) → ffmpeg xfade-alapmód. EGYETLEN
+// forrás: a kliens-tükre src/lib/transitions.ts TRANSITION_XFADE, amit a
+// contract-teszt `toEqual`-lal zárol (preview == export). NE változtasd a
+// render-viselkedést — csak a map él modul-szinten, hogy exportálható legyen.
+const XFADE_MODES = {
+  zoom: 'zoomin',
+  spin: 'squeezeh',
+  flip: 'squeezev',
+  cube: 'smoothleft',
+  circle: 'circleopen',
+  dissolve: 'dissolve',
+  // 2D átmenetek — közvetlen ffmpeg xfade-nevek
+  wipeLeft: 'wipeleft',
+  wipeRight: 'wiperight',
+  wipeUp: 'wipeup',
+  wipeDown: 'wipedown',
+  slideLeft: 'slideleft',
+  slideRight: 'slideright',
+  pixelize: 'pixelize',
+  blur: 'hblur',
+  fadeBlack: 'fadeblack',
+  fadeWhite: 'fadewhite',
+  radial: 'radial',
+};
+
+// 🧭 irány: az irányos családoknál (wipe/slide/cube) az xfade-variánst váltja,
+// különben az alapmód. UGYANAZ a logika, mint a kliensen (transitions.ts xfadeMode).
+function xfadeMode(type, direction) {
+  const base = XFADE_MODES[type];
+  if (direction) {
+    if (type.startsWith('wipe')) return `wipe${direction}`;
+    if (type.startsWith('slide')) return `slide${direction}`;
+    if (type === 'cube') return `smooth${direction}`;
+  }
+  return base;
+}
+
 function run(cmd, args, timeoutMs) {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { timeout: timeoutMs ?? 10 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -2000,26 +2037,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   // clone), és xfade viszi át a következő szegmensbe — az időzítés így NEM
   // csúszik (kimenet-hossz = szegmensek összege). Átmenet nélkül páronkénti
   // concat. Az xfade azonos tb/fps/formátumot kér → normalizálás elöl.
-  const XFADE = {
-    zoom: 'zoomin',
-    spin: 'squeezeh',
-    flip: 'squeezev',
-    cube: 'smoothleft',
-    circle: 'circleopen',
-    dissolve: 'dissolve',
-    // 2D átmenetek — közvetlen ffmpeg xfade-nevek
-    wipeLeft: 'wipeleft',
-    wipeRight: 'wiperight',
-    wipeUp: 'wipeup',
-    wipeDown: 'wipedown',
-    slideLeft: 'slideleft',
-    slideRight: 'slideright',
-    pixelize: 'pixelize',
-    blur: 'hblur',
-    fadeBlack: 'fadeblack',
-    fadeWhite: 'fadewhite',
-    radial: 'radial',
-  };
+  // 🧊 átmenet-map: modul-szintű XFADE_MODES (EGY forrás a kliens-tükörrel)
+  const XFADE = XFADE_MODES;
   const hasAnyTransition = segments.some(
     (s, i) =>
       i < segments.length - 1 &&
@@ -2054,12 +2073,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           segments[i].duration
         );
         // 🧭 irány: az irányos családoknál (wipe/slide/cube) az xfade-variánst váltja
-        let xmode = mode;
-        if (trans.direction) {
-          if (trans.type.startsWith('wipe')) xmode = `wipe${trans.direction}`;
-          else if (trans.type.startsWith('slide')) xmode = `slide${trans.direction}`;
-          else if (trans.type === 'cube') xmode = `smooth${trans.direction}`;
-        }
+        const xmode = xfadeMode(trans.type, trans.direction);
         // ⏩ easing: a tiszta crossfade-nél (dissolve) eased progress egyéni expr-rel
         const ez = trans.easing && trans.easing !== 'linear' ? trans.easing : null;
         let xfadeArgs;
@@ -2890,4 +2904,6 @@ module.exports = {
   gifArgs,
   AUDIO_FORMATS,
   MAX_RENDER_DURATION_SEC,
+  XFADE_MODES,
+  xfadeMode,
 };

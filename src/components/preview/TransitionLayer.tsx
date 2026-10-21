@@ -6,6 +6,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { videoFill } from '@/components/preview/videoFill';
 import { resolveClipUri } from '@/lib/assetResolve';
 import { activeTransition, type ActiveTransition } from '@/lib/projectUtils';
+import { transitionPreviewGeometry, type TransitionGeometry } from '@/lib/transitions';
 import { useEditorStore } from '@/store/editorStore';
 
 /**
@@ -28,7 +29,7 @@ export function TransitionLayer({ box }: { box: { w: number; h: number } }) {
 
 /** A bejövő (B) klip rétege — saját lejátszóval (a kezdőkockát mutatja). */
 function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: number; h: number } }) {
-  const { to, type, progress } = trans;
+  const { to, type, direction, progress } = trans;
   const toVideo = to.kind === 'video' ? to : null;
   const toImage = to.kind === 'image' ? to : null;
 
@@ -63,7 +64,9 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
       .catch(() => {});
   }, [player, toVideo, toVideoUri]);
 
-  const style = transitionStyle(type, progress, box);
+  // 🔗 KÖZÖS átmenet-spec: a preview-geometria a render-paritásos magból jön
+  // (transitions.ts), az irányt a trans adja (klip transitionOut.direction).
+  const style = geometryToStyle(transitionPreviewGeometry(type, direction, progress, box));
   // fadeBlack/fadeWhite: a szín a transition KÖZEPÉN a legerősebb (fade-through)
   const fadeColor = type === 'fadeBlack' ? '#000' : type === 'fadeWhite' ? '#fff' : null;
 
@@ -99,40 +102,47 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
 }
 
 /**
- * A bejövő klip stílusa a típus + haladás szerint — per-típus közelítés:
- * irányos slide/wipe = csúszás, zoom = beúszó nagyítás, spin = beforgás,
- * flip = perspektivikus billenés, a többi (dissolve/cube/circle/pixelize/blur/
- * radial/fade) kereszttűnés. A pontos xfade a renderben ég be.
+ * A pure előnézet-geometriát (transitions.ts) RN `ViewStyle`-ra képezi: az
+ * opacity közvetlen, a translate/scale/rotate/rotateY/perspective a transform-
+ * tömbbe kerül (a perspektíva mindig elöl, hogy a rotateY hatson). A geometriát
+ * a render-paritásos mag adja — ez a réteg csak megjeleníti, nem közelít külön.
  */
-function transitionStyle(
-  type: ActiveTransition['type'],
-  p: number,
-  box: { w: number; h: number }
-): ViewStyle {
-  switch (type) {
-    case 'slideLeft':
-    case 'wipeLeft':
-      return { transform: [{ translateX: (1 - p) * box.w }] }; // jobbról be
-    case 'slideRight':
-    case 'wipeRight':
-      return { transform: [{ translateX: -(1 - p) * box.w }] }; // balról be
-    case 'wipeUp':
-      return { transform: [{ translateY: (1 - p) * box.h }] }; // alulról be
-    case 'wipeDown':
-      return { transform: [{ translateY: -(1 - p) * box.h }] }; // felülről be
-    case 'zoom':
-      return { opacity: p, transform: [{ scale: 1.35 - 0.35 * p }] }; // beúszik zoomolva
-    case 'spin':
-      return {
-        opacity: p,
-        transform: [{ rotate: `${(1 - p) * 90}deg` }, { scale: 0.6 + 0.4 * p }],
-      };
-    case 'flip':
-      return {
-        opacity: Math.min(1, p * 1.6),
-        transform: [{ perspective: box.h * 1.2 }, { rotateY: `${(1 - p) * 90}deg` }],
-      };
-    default:
-      return { opacity: p }; // kereszttűnés (dissolve/cube/circle/pixelize/blur/radial/fade…)
+function geometryToStyle(g: TransitionGeometry): ViewStyle {
+  // a perspektíva mindig elöl, hogy a rotateY-ra hasson (RN transform-sorrend)
+  const transform: TransformEntry[] = [];
+  if (g.perspective !== undefined) {
+    transform.push({ perspective: g.perspective });
   }
+  if (g.translateX !== undefined) {
+    transform.push({ translateX: g.translateX });
+  }
+  if (g.translateY !== undefined) {
+    transform.push({ translateY: g.translateY });
+  }
+  if (g.rotateYDeg !== undefined) {
+    transform.push({ rotateY: `${g.rotateYDeg}deg` });
+  }
+  if (g.rotateDeg !== undefined) {
+    transform.push({ rotate: `${g.rotateDeg}deg` });
+  }
+  if (g.scale !== undefined) {
+    transform.push({ scale: g.scale });
+  }
+  const style: ViewStyle = {};
+  if (g.opacity !== undefined) {
+    style.opacity = g.opacity;
+  }
+  if (transform.length > 0) {
+    style.transform = transform;
+  }
+  return style;
 }
+
+/** egyetlen transform-bejegyzés (a ViewStyle.transform readonly-union mutálható eleme) */
+type TransformEntry =
+  | { perspective: number }
+  | { translateX: number }
+  | { translateY: number }
+  | { rotateY: string }
+  | { rotate: string }
+  | { scale: number };

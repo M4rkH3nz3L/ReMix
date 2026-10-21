@@ -24,6 +24,7 @@ import {
   type UsageMetric,
 } from '@/lib/usageMeter';
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
+import { TRANSITION_XFADE, xfadeMode, type TransitionType } from '@/lib/transitions';
 import { fontFiles, fontOptions } from '@/constants/fonts';
 import { MAX_PROJECT_DURATION_SEC } from '@/lib/projectUtils';
 import { ENTITLEMENTS, canCloudRender, canCloudStore, shouldWatermark } from '@/lib/entitlements';
@@ -129,6 +130,44 @@ describe('contract: effekt-filterek (videoEffects.ts ⇄ server/render.js)', () 
       { id: 'd', type: 'vignette', amount: 0.25 },
     ];
     expect(workerRender.effectChainFx({ effects })).toBe(effectChainFilters(effects));
+  });
+});
+
+describe('contract: átmenet-xfade (transitions.ts ⇄ server/render.js)', () => {
+  it('TRANSITION_XFADE BITRE egyezik a worker XFADE_MODES-szal (preview == export)', () => {
+    // EGYETLEN forrás: a preview-geometria és a render ugyanabból a típus→xfade
+    // leképezésből dolgozik — egyoldali bővítés itt azonnal piros.
+    expect(workerRender.XFADE_MODES).toEqual(TRANSITION_XFADE);
+  });
+
+  it('mind a 17 átmenet-típus jelen van mindkét oldalon', () => {
+    const clientKeys = Object.keys(TRANSITION_XFADE).sort();
+    expect(clientKeys.length).toBe(17);
+    expect(Object.keys(workerRender.XFADE_MODES).sort()).toEqual(clientKeys);
+  });
+
+  it('xfadeMode irány-variánsok azonosak (wipe/slide/cube + minden irány)', () => {
+    const dirs: Array<'left' | 'right' | 'up' | 'down'> = ['left', 'right', 'up', 'down'];
+    const types: TransitionType[] = [
+      'wipeLeft',
+      'wipeRight',
+      'wipeUp',
+      'wipeDown',
+      'slideLeft',
+      'slideRight',
+      'cube',
+      'zoom',
+      'dissolve',
+      'pixelize',
+    ];
+    for (const type of types) {
+      // irány nélkül
+      expect(workerRender.xfadeMode(type)).toBe(xfadeMode(type));
+      // minden iránnyal
+      for (const d of dirs) {
+        expect(workerRender.xfadeMode(type, d)).toBe(xfadeMode(type, d));
+      }
+    }
   });
 });
 

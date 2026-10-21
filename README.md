@@ -22,7 +22,110 @@ npm run ios             # iOS szimulátor
 npm run android         # Android emulátor
 ```
 
-Minden használt natív modul Expo Go-kompatibilis, dev build nem kötelező.
+A videó-editorhoz a natív modulok Expo Go-kompatibilisek, dev build nem kötelező.
+A **natív live/kamera (LiveKit/WebRTC) + a Skia-előnézet** viszont **dev-buildet**
+igényel egy valódi eszközön — lásd lent.
+
+## Natív build parancssorból (lokális dev + EAS felhő/prod)
+
+A dev-buildhez **Xcode 26.4+** kell (a projekt Xcode 27 / Swift 6.4-en épül; a régebbi
+`weak let` toolchain-gát megszűnt) + egy Apple fejlesztői csapat (eszközre-telepítéshez
+ingyenes *personal team* is jó).
+
+### Dev-stack (háttérben fusson)
+
+```bash
+npx expo start --dev-client --port 8081                 # Metro (JS-bundle, WiFi-n szolgál)
+cd server && node --env-file-if-exists=.env index.js    # API worker (:8787)
+# live-hoz ráadásul: livekit-server --dev --bind 0.0.0.0 --node-ip <Mac-LAN-IP>
+```
+
+A Mac LAN-IP-je rögzített a configban (`.env.development` → `EXPO_PUBLIC_SERVER_HOST`,
+`server/.env` → `LIVEKIT_URL`/`node_ip`). **Ha a Mac IP-je változik, ezeket frissítsd**,
+különben az eszközök nem érik el a szervert.
+
+### Csatlakoztatott eszközök listázása
+
+```bash
+xcrun devicectl list devices    # fizikai iPhone/iPad (UDID)
+xcrun simctl list devices       # szimulátorok
+```
+
+### Build + telepítés + indítás FIZIKAI eszközön
+
+```bash
+# a teszt-készülékek (UDID a fentivel listázható):
+npx expo run:ios --device 00008150-001C03861E78401C --no-bundler   # iPhone 17 Pro Max
+npx expo run:ios --device 00008103-000634C026BB001E --no-bundler   # iPad Pro
+```
+
+- `--no-bundler`: a **már futó Metrót** használja (nem indít másikat a :8081-en).
+- A build után magától **települ → elindul → rácsatlakozik a Metróra** (WiFi-n).
+- **Csak JS-t változtattál?** NEM kell új build — elég az appban **reload** (a Metro
+  szolgálja az új bundle-t). Új build csak natív-dep / config-változásnál kell.
+- **Két eszközre NE buildelj párhuzamosan** (közös `DerivedData` → ütközés) — sorban.
+
+### Szimulátor (ha nincs kéznél eszköz)
+
+Xcode 27-ben nincs különálló `Simulator.app` GUI → **headless** `simctl` + `idb`:
+
+```bash
+xcrun simctl create "ReMix-Test" "iPhone 16 Pro" "com.apple.CoreSimulator.SimRuntime.iOS-26-0"
+xcrun simctl boot <SIM-UDID>
+npx expo run:ios --device <SIM-UDID> --no-bundler
+xcrun simctl openurl <SIM-UDID> "remix://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+xcrun simctl io <SIM-UDID> screenshot shot.png          # képernyőkép (ezt a GUI nélkül is látod)
+# koppintás/gépelés a sim-en (fb-idb + idb-companion, brew: facebook/fb/idb-companion):
+idb ui tap  --udid <SIM-UDID> <x> <y>
+idb ui text --udid <SIM-UDID> "szöveg"
+```
+
+### Gyakori buktatók (saját tapasztalat)
+
+- **„No space left on device" buildkor** → tele a lemez. Tisztíts (mind regenerálható):
+  `docker builder prune -af` · `rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex`.
+- **iPad első buildje provisioning-hibát dob** (az UDID nincs a profilban). Regisztráld:
+  `xcodebuild -workspace ios/Remix.xcworkspace -scheme Remix -configuration Debug -destination 'id=<iPad-UDID>' -allowProvisioningUpdates -allowProvisioningDeviceRegistration build`,
+  majd `xcrun devicectl device install app --device <iPad-UDID> <.../Debug-iphoneos/Remix.app>`.
+- **„Szerver nem elérhető" az appban** → iOS **Helyi hálózat** engedély: *Beállítások → Remix →
+  Helyi hálózat → BE*; és a telefon a Mac-kel **AZONOS WiFi-n** legyen (ne mobiladaton).
+- **Fekete a kamera, amikor az iPhone a Machez van DUGVA** → **Continuity Camera**: a macOS
+  webkameraként elkéri a telefon kameráját, így az iPhone-on belül (natív Kamera / a mi Live-unk)
+  fekete lesz. Kamera/live teszthez **húzd ki a kábelt** (futáshoz nem kell USB — WiFi-n megy),
+  vagy *iPhone → Beállítások → Általános → AirPlay és folytonosság → Folytonossági kamera → KI*.
+
+### Felhő-build (EAS): dev-client · preview · prod/store
+
+Mac/Xcode nélkül, vagy a **store-hoz (prod)** a build az **EAS**-en fut (profilok: `eas.json`).
+Előbb `eas login` (vagy `npx eas-cli@latest`).
+
+```bash
+# dev-client (Metro-ra csatlakozó, telepíthető build):
+eas build --profile development     --platform android     # dev-client APK
+eas build --profile development-sim --platform ios         # iOS szimulátor dev-build
+
+# preview (belső teszt, nem dev-client):
+eas build --profile preview         --platform android
+eas build --profile preview-sim     --platform ios
+
+# PROD / store (release, auto verzió-emelés):
+eas build --profile production      --platform ios         # App Store IPA
+eas build --profile production      --platform android     # Play AAB
+
+# store-feltöltés (App Store Connect / Play Console):
+eas submit --profile production --platform ios
+eas submit --profile production --platform android
+```
+
+Lokális **release**-build (prod-viselkedés eszközön, Xcode-dal, nem store):
+`npx expo run:ios --configuration Release --device <UDID>`.
+
+**Prod / iOS-device build előfeltételek:**
+
+- **Apple Developer Program** ($99/év) — iOS **eszköz-** és **store-**buildhez kell (az ingyenes
+  *personal team* csak LOKÁLIS `expo run:ios`-hoz elég); iOS **szimulátor**-build Apple-fiók nélkül is megy.
+- **Prod env-kulcsok** az EAS-ben (RevenueCat IAP, Supabase prod, Cloudflare R2) — a
+  `environment: production` profil ezeket húzza; go-live előtt kötelezők.
 
 ## Ami már működik (MVP)
 

@@ -228,9 +228,11 @@ export interface SearchResults {
 
 /**
  * 🔎 Keresés a nyilvános feedben: cím / alkotó-username / megjelenített név
- * (ilike), plusz hashtag-egyezés (a `#tag` és a sima szó is). A találatokból
- * kinyerjük az egyedi alkotókat is (a kereső „Alkotók" szekciójához). Csak
- * publikus + moderált (`ok`) posztok — az RLS is ezt engedi kijelentkezve is.
+ * (ilike), plusz hashtag-egyezés (a `#tag` és a sima szó is). A posztok mellett
+ * KÖZVETLENÜL a USEREKET is keresi a `profiles`-ban (username / megjelenített
+ * név) — így az is megjelenik az „Alkotók" szekcióban, akinek nincs a keresésre
+ * illő posztja (vagy posztja egyáltalán). Csak publikus + moderált (`ok`) posztok
+ * — az RLS is ezt engedi kijelentkezve is.
  */
 export async function searchFeed(query: string, limit = 40): Promise<SearchResults> {
   const q = query.trim();
@@ -256,8 +258,15 @@ export async function searchFeed(query: string, limit = 40): Promise<SearchResul
   const tagReq = tag
     ? base().contains('hashtags', [tag]).order('created_at', { ascending: false }).limit(limit)
     : Promise.resolve({ data: [] as PostRow[], error: null });
+  // 👤 KÖZVETLEN user-keresés a profiles-ból (username / megjelenített név) — így az
+  //    is kereshető, akinek nincs a keresésre illő posztja (vagy posztja egyáltalán)
+  const userReq = sb
+    .from('profiles')
+    .select('id, username, full_name, avatar_url')
+    .or(`username.ilike.${like},full_name.ilike.${like}`)
+    .limit(limit);
 
-  const [textRes, tagRes] = await Promise.all([textReq, tagReq]);
+  const [textRes, tagRes, userRes] = await Promise.all([textReq, tagReq, userReq]);
   if (textRes.error) {
     throw new Error(textRes.error.message);
   }
@@ -273,8 +282,29 @@ export async function searchFeed(query: string, limit = 40): Promise<SearchResul
   const { liked, saved } = await viewerEngagement(rows.map((r) => r.id));
   const posts = rows.map((r) => toPost(r, liked, saved));
 
-  // egyedi alkotók a találatokból (első előfordulás sorrendjében)
+  // egyedi alkotók: ELŐSZÖR a közvetlen user-találatok (profiles — akkor is, ha
+  // nincs posztjuk), UTÁNA a találati posztok szerzői (első előfordulás sorrendjében).
+  // A profiles-ág hibája NEM végzetes (a poszt-találatok így is megjönnek).
   const creatorMap = new Map<string, Creator>();
+  if (!userRes.error) {
+    (
+      (userRes.data ?? []) as Array<{
+        id: string;
+        username: string | null;
+        full_name: string | null;
+        avatar_url: string | null;
+      }>
+    ).forEach((r) => {
+      if (r.id && !creatorMap.has(r.id)) {
+        creatorMap.set(r.id, {
+          id: r.id,
+          username: r.username ?? r.id.slice(0, 8),
+          displayName: r.full_name ?? r.username ?? 'Creator',
+          avatarUri: reachableMediaUrl(r.avatar_url ?? null) ?? undefined,
+        });
+      }
+    });
+  }
   posts.forEach((p) => {
     if (!creatorMap.has(p.creator.id)) {
       creatorMap.set(p.creator.id, p.creator);

@@ -18,6 +18,7 @@ import { MaskOverlay } from '@/components/preview/MaskOverlay';
 import { PipLayer } from '@/components/preview/PipLayer';
 import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
 import { SkiaFilteredImage } from '@/components/preview/SkiaFilteredImage';
+import { SkiaFilteredVideo } from '@/components/preview/SkiaFilteredVideo';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
 import { videoFill } from '@/components/preview/videoFill';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
@@ -369,6 +370,16 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     !comparingOriginal &&
     (!isIdentityMatrix(clipColorMatrix(imageClip.adjust, imageClip.effects)) ||
       effectImageFilters(imageClip.effects, box).length > 0);
+  // 🎬 Skia-előnézet a MOZGÓ VIDEÓ-klipen (az imageSkiaActive párja): ha a grade/
+  // szín-effektek valódi hatást adnak, a nyers `<VideoView>` FÖLÉ rajzolunk egy
+  // szűrt Skia-réteget. ADDITÍV — szűrő nélkül (identitás ColorMatrix + nincs blur)
+  // SEMMI Skia, a VideoView pontosan a mai (nulla regresszió, nulla perf-teher).
+  // A before/after „eredeti" nézeten kívül (akkor a nyers forrás kell).
+  const videoSkiaActive =
+    !!videoClip &&
+    !comparingOriginal &&
+    (!isIdentityMatrix(clipColorMatrix(videoClip.adjust, videoClip.effects)) ||
+      effectImageFilters(videoClip.effects, box).length > 0);
   // 🅱️ before/after slider: a look-rétegek CSAK az elválasztótól jobbra fedjenek
   // (bal fél = nyers forrás). Slider nélkül teljes vászon. Nem-vizuális módban null.
   const sliderX = compareSplit != null ? Math.round(compareSplit * boxW) : 0;
@@ -738,12 +749,31 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               style={[StyleSheet.absoluteFill, { opacity: mediaOpacity }, transformStyle]}
             >
               {videoClip ? (
-                <VideoView
-                  player={player}
-                  style={videoFill}
-                  contentFit="contain"
-                  nativeControls={false}
-                />
+                // 🎬 A nyers VideoView VÁLTOZATLAN: ez adja az AUDIO-t + a teljes
+                // playback-logikát (replaceAsync/seek/rate/volume). Ha van tényleges
+                // grade/effekt (`videoSkiaActive`), FÖLÉ egy szűrt Skia-réteg kerül
+                // (JSX-ben a VideoView UTÁN → fölé rajzol); amíg a Skia-frame null,
+                // a nyers VideoView látszik alatta (nincs üres villanás). Szűrő
+                // nélkül NINCS Skia → a VideoView pontosan a mai (nulla regresszió).
+                <>
+                  <VideoView
+                    player={player}
+                    style={videoFill}
+                    contentFit="contain"
+                    nativeControls={false}
+                  />
+                  {videoSkiaActive && playbackUri ? (
+                    <SkiaFilteredVideo
+                      uri={playbackUri}
+                      box={box}
+                      contentFit="contain"
+                      sourceTime={sourceTimeAt(videoClip, playhead)}
+                      playing={isPlaying}
+                      adjust={videoClip.adjust}
+                      effects={videoClip.effects}
+                    />
+                  ) : null}
+                </>
               ) : imageClip ? (
                 // 🌫️ mélység-fókusznál a worker portré-blur változata megy
                 (() => {
@@ -887,8 +917,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               szaturáció rétegekkel — a pontos korrekció a renderben készül */}
           {(() => {
             const adjust = (videoClip ?? imageClip)?.adjust;
-            // 🎨 ha a kép-klip grade-jét már a Skia-réteg rajzolja, NE duplázzuk rá a tint-közelítést
-            if (!adjust || comparingOriginal || imageSkiaActive) {
+            // 🎨 ha a klip grade-jét már a Skia-réteg rajzolja (kép VAGY videó), NE duplázzuk rá a tint-közelítést
+            if (!adjust || comparingOriginal || imageSkiaActive || videoSkiaActive) {
               return null;
             }
             return adjustTintLayers(adjust).map((l, i) => (

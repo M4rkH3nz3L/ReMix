@@ -17,6 +17,7 @@ import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { MaskOverlay } from '@/components/preview/MaskOverlay';
 import { PipLayer } from '@/components/preview/PipLayer';
 import { SafeZoneOverlay } from '@/components/preview/SafeZoneOverlay';
+import { SkiaFilteredImage } from '@/components/preview/SkiaFilteredImage';
 import { TransitionLayer } from '@/components/preview/TransitionLayer';
 import { videoFill } from '@/components/preview/videoFill';
 import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
@@ -40,6 +41,7 @@ import { maskFromStroke } from '@/lib/maskEdit';
 import { makeId } from '@/lib/id';
 import { ensureProxy, getProxyUriSync } from '@/lib/proxy';
 import { snapPosition } from '@/lib/snapping';
+import { clipColorMatrix, effectImageFilters, isIdentityMatrix } from '@/lib/skiaEffects';
 import {
   activeAdjustClips,
   activeVisualClip,
@@ -358,6 +360,15 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     boxW = boxH * ar;
   }
   const box = { w: boxW, h: boxH };
+  // 🎨 Skia-előnézet a KÉP-klipen: ha a grade/szín-effektek valódi hatást adnak
+  // (nem identitás a ColorMatrix VAGY van blur-leíró), a nyers expo-image HELYETT
+  // a Skia-réteg rajzol — identitásnál a sima image marad (perf). CSAK a before/
+  // after „eredeti” nézeten kívül (akkor a nyers forrás kell). A videó-utat NEM érinti.
+  const imageSkiaActive =
+    !!imageClip &&
+    !comparingOriginal &&
+    (!isIdentityMatrix(clipColorMatrix(imageClip.adjust, imageClip.effects)) ||
+      effectImageFilters(imageClip.effects, box).length > 0);
   // 🅱️ before/after slider: a look-rétegek CSAK az elválasztótól jobbra fedjenek
   // (bal fél = nyers forrás). Slider nélkül teljes vászon. Nem-vizuális módban null.
   const sliderX = compareSplit != null ? Math.round(compareSplit * boxW) : 0;
@@ -734,12 +745,23 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
                   nativeControls={false}
                 />
               ) : imageClip ? (
-                <Image
-                  // 🌫️ mélység-fókusznál a worker portré-blur változata megy
-                  source={{ uri: imageClip.depthFocus?.previewUri ?? imageSrcUri ?? imageClip.uri }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit={imageClip.backgroundFill === 'blur' ? 'contain' : 'cover'}
-                />
+                // 🌫️ mélység-fókusznál a worker portré-blur változata megy
+                (() => {
+                  const uri = imageClip.depthFocus?.previewUri ?? imageSrcUri ?? imageClip.uri;
+                  const fit = imageClip.backgroundFill === 'blur' ? 'contain' : 'cover';
+                  // 🎨 valódi grade/effekt-előnézet Skiával (ha hat); különben a nyers expo-image (perf)
+                  return imageSkiaActive ? (
+                    <SkiaFilteredImage
+                      uri={uri}
+                      box={box}
+                      contentFit={fit}
+                      adjust={imageClip.adjust}
+                      effects={imageClip.effects}
+                    />
+                  ) : (
+                    <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit={fit} />
+                  );
+                })()
               ) : null}
             </Animated.View>
           ) : (
@@ -865,7 +887,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
               szaturáció rétegekkel — a pontos korrekció a renderben készül */}
           {(() => {
             const adjust = (videoClip ?? imageClip)?.adjust;
-            if (!adjust || comparingOriginal) {
+            // 🎨 ha a kép-klip grade-jét már a Skia-réteg rajzolja, NE duplázzuk rá a tint-közelítést
+            if (!adjust || comparingOriginal || imageSkiaActive) {
               return null;
             }
             return adjustTintLayers(adjust).map((l, i) => (

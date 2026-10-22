@@ -1,0 +1,259 @@
+# ReMix — teljes app-funkcionalitás (funkció-fa)
+# Interaktív videószerkesztő + kreatív közösségi platform.
+# A fa a tényleges user-facing funkciókat tükrözi (src/app, src/components, src/lib).
+
+ReMix:
+
+  - User (fiók / identitás / biztonság / monetizáció):
+    - Bejelentkezés / Regisztráció:
+      - Belépés (email / felhasználónév / telefon + jelszó)
+      - Regisztráció (email vagy SMS-OTP)
+      - Email-megerősítés
+      - Jelszó-erősség (12+ karakter)
+      - GDPR-hozzájárulás (feltételek + adatvédelem elfogadása)
+    - Kétlépcsős hitelesítés (MFA / TOTP):
+      - Faktor felvétele (QR + titkos kulcs)
+      - Faktor megerősítése / eltávolítása
+    - Eszközkezelés:
+      - Bejelentkezett eszközök (platform / OS / verzió / utolsó elérés)
+      - Jelenlegi eszköz megjelölése
+      - Eszköz eltávolítása
+      - Összes többi munkamenet kiléptetése
+    - Profil szerkesztése:
+      - Identitás (avatar, borítókép, felhasználónév, név, bio)
+      - Személyes adatok (telefon, szül.dátum, ország, város, nyelvek, időzóna):
+        - Mező-szintű privátság (ki mit lát)
+      - Creator-réteg (creator-típusok, készségek, érdeklődések, bemutatkozás)
+      - Social-linkek (külső profilok, per-link láthatóság)
+      - Showcase / portfólió (munkák, per-munka láthatóság)
+    - Fiók:
+      - Email megjelenítése
+      - Kijelentkezés
+      - Fiók törlése (soft-delete)
+    - Pénztárca / Monetizáció:
+      - Coin-pénztárca:
+        - Egyenleg
+        - Koin-vásárlás (5 Ft/koin)
+        - Koin-kiváltás készpénzre (3 Ft/koin, jóváhagyás után)
+        - Koin-küldés / transzfer más usernek
+        - Ajándék-küldés (katalógus, fix ár)
+        - Tranzakció-előzmények
+        - Kifizetési számla (PayPal / Stripe)
+        - Kifizetés-kérelem (min. küszöb)
+      - Pro előfizetés:
+        - Aktiválás (RevenueCat IAP vagy koin)
+        - Vásárlások visszaállítása
+        - Előfizetés-részletek (státusz, lejárat, forrás)
+        - Pro-előnyök (tárhely-bónusz, koinstream, multistream)
+    - Tárhely:
+      - Saját (ReMix) tárhely:
+        - Kvóta (ingyenes 1 GB / Pro 5 GB)
+        - Használat (% + abszolút bájt)
+        - Bővítés koinnal (100 koin/GB/hó)
+      - Külső tárhely-szolgáltatók:
+        - Google Drive / Dropbox / OneDrive (OAuth)
+        - WebDAV / NAS
+        - S3 / MinIO / Cloudflare R2
+        - Aktív tárhely-cél kiválasztása
+    - AI-modellek (BYOK):
+      - Saját modellek (OpenAI / Anthropic / Ollama / custom endpoint):
+        - Modell hozzáadása / szerkesztése / törlése
+        - Alapértelmezett modell
+        - Persona (név, emoji, avatar, sztori)
+        - Képességek (szöveg / kép / videó / hang / felirat / zene / ötlet)
+      - Feladat → modell hozzárendelés (assistant, autoEdit, captionStudio, hooks, thumbHeadlines, storyStructure)
+    - Beállítások:
+      - Nyelvválasztás
+      - Teljesítmény / proxy (be-ki, minőség)
+      - Gyorsítótár (méret, ürítés)
+    - Jogi / GDPR:
+      - Adatvédelmi nyilatkozat
+      - Felhasználási feltételek
+      - Adat-export (profil, projektek, posztok, kommentek, hozzájárulások, JSON)
+      - Fiók-törlés
+
+  - Értesítések:
+    - Típusok (info, komment, meghívás, mention, render-kész, rendszer)
+    - Lista (olvasott/olvasatlan, deep-link cél)
+    - Olvasottá állítás (egyenként / összes)
+    - Valós idejű érkezés
+    - Push-értesítés (Expo, deep-link navigáció)
+
+  - Chat:
+    - Beszélgetés-típusok:
+      - Magánüzenet (DM)
+      - Csoport (név, tagok, hozzáadás/eltávolítás, kilépés)
+      - Projekt-chat (projekt-résztvevők)
+    - Üzenetküldés (szöveg, optimista UI)
+    - Gépelés-jelző
+    - Valós idejű szinkron
+    - Inbox:
+      - Beszélgetés-lista (legutóbbi elöl)
+      - Olvasatlanság-badge
+      - Új csoport létrehozása (követettekből)
+
+  - Feed (főoldal):
+    - Videó-görgetés (függőleges):
+      - Mód — Követett / Neked / Felkapott
+      - Remix-lapozás (vízszintes, poszton belül)
+    - Interakció:
+      - Like
+      - Komment (olvasás / írás / törlés)
+      - Mentés (kollekció-választó)
+      - Ajándék (koin)
+      - Megosztás / remix
+      - DM
+      - Követés
+    - Lejátszó vezérlők (hangerő, előrehaladás-csúszka)
+    - Interaktív hotspotok (URL / időugrás / kvíz)
+    - Moderáció:
+      - Poszt-eltávolítás (tulaj)
+      - Remix-eltávolítás / visszaállítás (eredeti tulaj)
+      - Jelentés (spam / sértő / erőszak / jogellenes / egyéb)
+
+  - Felfedezés:
+    - Keresés (cím / szerző / hashtag; alkotók + videók)
+    - Hashtag-oldal (posztok rácsban)
+    - Csatorna (creator-profil):
+      - Profil-adatok (név, bio, avatar, borító, creator-jelvények, élő-jelzés)
+      - Statisztika (posztok, követők, követettek, nézettség, like, remix)
+      - Videó-rács
+      - Követés / DM / ajándék (más csatornán)
+      - Saját — poszt-kiemelés, poszt-statisztika, remix-moderáció, poszt-törlés
+    - Gyűjtemények:
+      - Mappa létrehozása / törlése / megnyitása
+      - Poszt-mentés mappába (toggle)
+    - Élő-hub (futó közvetítések listája, nézettség, csatlakozás)
+
+  - Shop (marketplace):
+    - Böngészés:
+      - Típus-szűrő (sablon, overlay, LUT, SFX, sticker, betűtípus, preset)
+      - Rendezés (új / népszerű)
+    - Vásárlás (kredit/koin, atomi tranzakció)
+    - Vásárlásaim (megvett elemek, projektben használat)
+    - Eladásaim (projekt → sablon közzététel, ár, eltávolítás)
+    - 30% platform-jutalék
+
+  - Projektek (projekt-kezelés):
+    - Új projekt:
+      - Típus — Videó / Kép / Hang
+      - Név + SEO-metaadatok + képarány
+      - Sablonból (felkapott / összes)
+    - Projekt-lista (legutóbbi, megosztott, sablonok)
+    - Műveletek (megnyitás, átnevezés, duplikálás, törlés)
+    - Beállítások (fps 24/30/60, képarány 16:9 / 9:16 / 1:1)
+    - Felhő-biztonsági másolat + megosztás (collab)
+
+  - Stúdiók:
+    - Videó (videószerkesztő):
+      - Felület (fejléc, előnézet, transport, idővonal, eszköztár)
+      - Idővonal + sávok:
+        - Sáv-típusok — videó, PiP, szín-grade, szöveg, felirat, overlay, interaktív, zene, voiceover, SFX
+        - Klip-műveletek (hozzáadás, split, trim, mozgatás, duplikálás, törlés)
+        - Marker, fejezetek, régiók, minimap
+      - Videó-klip:
+        - Trim, sebesség (0.1–10×), visszafelé lejátszás, fade
+        - Effekt-lánc (blur, sharpen, vignette, grain, light leak, motion blur, deflicker, pixelate, posterize…)
+        - Szűrők (warm, cool, mono, vivid, fade, night, retro, sunset, forest)
+        - Szín-korrekció (fényerő, kontraszt, telítettség, hőmérséklet, exponálás, csúcsfény, árnyék, 3-way balance, tónusgörbe, LUT, HSL, split-tone)
+        - Green-screen (chroma key, spill-suppression, él-igazítás)
+        - Maszk (téglalap, ellipszis, poligon, feather, rotoszkóp), matte (luma/alpha)
+        - Transzformáció (skála, pozíció, forgatás, perspektíva, nyírás)
+        - Kulcskockák (zoom, pan, forgatás, átlátszóság, hangerő)
+        - 3D (döntés, mélység-parallaxis, mélység-fókusz), lighting-preset
+        - Arc-elmosás, AI-szelekció (téma / háttér)
+        - Hang a klipben (hangerő, Voice Studio, auto-ducking)
+        - Átmenet a következő klipre (zoom, spin, flip, cube, dissolve, wipe, slide, pixelize, blur, fade, radial)
+        - Beágyazott kompozíció (compound clip)
+      - Kép-klip (szűrő, effekt, grade, maszk, transzformáció, kulcskocka, green-screen, 3D)
+      - Szöveg-klip:
+        - Tartalom, szín, háttér, méret, vastagság, betűtípus
+        - Animáció (fade, slide, pulse, typewriter, pop, shake, karaoke)
+        - Stílus (plain, bubble, outline, neon; gradiens, kontúr, árnyék, ragyogás)
+        - Tipográfia (tracking, sorköz, baseline, kerning)
+        - Kinetikus tipográfia, szöveg görbe mentén, szöveg-maszk, 3D szöveg
+      - Forma-klip (téglalap, ellipszis, vonal, nyíl, csillag, path; kitöltés/gradiens/minta; drawOn, morph)
+      - Hang-klip (trim, sebesség, pan, fade, effekt-lánc, auto-duck, harmónia)
+      - Interaktív-klip (hotspot-régió, CTA — URL / seek / kvíz)
+      - Szín-grade-klip (filmes look-presetek — teal-orange, moody, vintage, noir, warm-film…)
+      - Önálló panelek (AI-asszisztens, könyvtár/media bin, átirat, export, Audio-stúdió, Kép-stúdió)
+      - Részecske-réteg (confetti, sparkle, snow, embers, beat-sync)
+      - Lejátszás (play/pause, sebesség, playhead, loop)
+      - Undo / redo (teljes parancs-történet)
+      - Export / render:
+        - Felbontás (480p–8K), kodek (H.264 / HEVC / AV1 / ProRes), fps, minőség, bitráta
+        - Platform-export (TikTok / YouTube / Instagram…), batch-export
+        - Felirat-export (SRT / VTT / ASS), interaktív metaadatok
+        - Thumbnail Studio (AI-címjavaslat)
+    - Live (OBS-szerű élő stúdió):
+      - Jelenetek (létrehozás, váltás, törlés, sorrend)
+      - Vászon-kompozitor (élő előnézet, forrás-pozíció/méret, elrendezés-presetek)
+      - Források (kamera + lencseváltás, képernyő, kép, videó, szöveg, forma, logó, böngésző)
+      - Audio-mixer (mikrofon / zene / média / rendszer; hangerő, némítás, solo, auto-duck, master)
+      - Közvetítés (cím, adás indítása, nézőszám, élő-idő)
+      - Chat + emoji-reakciók
+      - Célplatformok (ReMix-feed mindig; YouTube / TikTok / Twitch / Facebook / egyéni RTMP — Pro; multistream)
+      - Rögzítés (VOD-projekt generálása, feed-megosztás)
+    - Kép (fotó-szerkesztő, Photoshop-szerű):
+      - Rétegek (fotó, szöveg, forma, kitöltés, kiigazítás; duplikálás, törlés, sorrend)
+      - Rajz-eszközök (vektor-toll, lasszó, varázspálca, ecset, SVG-import)
+      - Képmanipuláció (kivágás arány-presetekkel, forgatás, tükrözés)
+      - Pozicionálás (igazítás/elosztás, vonalzók/segédvonalak)
+      - Korrekció (tónus, kontraszt, telítettség, exponálás, fehéregyensúly)
+      - RAW-fejlesztés (kamera-/lencseprofil, clarity, texture, dehaze)
+      - Réteg-effektek (ragyogás, árnyék, körvonal), minták (csempe)
+      - Maszkozás (vágó-maszk, lokális korrekció, folt-javítás)
+      - Export (PNG/JPG/WebP, SVG, PDF, videó-klip)
+      - Megosztás (diavetítés-videó, lapozható kép-poszt)
+    - Hang (több-sávos audio editor):
+      - Sávok (zene, voiceover, SFX)
+      - Felvétel (mikrofon)
+      - Szintézis (zongora-roll, dob-gép, sampler)
+      - TTS (szöveg-beszéd)
+      - Klip-kezelés (vágás, hangerő, fade, törlés)
+      - Idővonal (zoom, playhead, loop-régió, beat-rács, frame-snap)
+      - Analízis (BPM- és beat-felismerés)
+      - Mixer (némítás, solo, fader dB, pan)
+      - Mastering (master-fader, loudnorm, kompresszor, EQ, limiter)
+      - Stem-szeparáció (Demucs)
+      - Album (borító, számok rendezése, feed-megosztás)
+      - Export (MP3 / WAV / AAC / FLAC / Opus; videó-hangként)
+      - Videó-hang leválasztása
+
+  - Együttműködés (collab):
+    - Projekt megosztása (felhő-másolat, Pro-kapu, idempotens)
+    - Tagok és szerepek (owner / editor / viewer)
+    - Meghívás (email-alapú; létező user azonnal, ismeretlen email pending)
+    - Tagsági műveletek (szerep-váltás, eltávolítás, kilépés)
+    - Közös szerkesztés (élő):
+      - Jelenlét (presence, avatar + szín)
+      - Parancs-szinkron (broadcast, dedup)
+      - Lejátszófej-pozíció követése
+      - Klip-zárolás (heartbeat + takarítás)
+      - Felhő-resync
+    - Projekt-kommentek (horgony — timecode / frame / audio / design; mention, szál, feloldás)
+
+  - Parancs-paletta (⌘K):
+    - Keresési területek (projektek, assetek, emberek, üzenetek, zene, fotók, videók, dokumentumok, sablonok, shop, AI)
+    - Természetes-nyelvi szűrők (státusz, idő, típus, keresőszó)
+    - Did-you-mean / autocomplete, deep-link eredményre
+    - Chat-parancsok (open, send, version, export, share, schedule, search)
+
+  - Ütemezés / Render-sor:
+    - Poszt-ütemezés (platform + idő)
+    - Render-job állapot (active / waiting / completed / failed)
+    - Job-info (projekt, haladás %, sor-pozíció, ETA, fázis, hiba-ok)
+    - Saját job kiemelése
+    - Render-worker flotta (worker-azonosító, kapacitás, státusz, aktív feladatok)
+    - Sor-állapot (aktív / várakozó / worker-szám, polling)
+
+  - Dashboard / Analitika:
+    - Aggregált statisztika (nézet, like, komment, mentés, remix)
+    - Remix-ráta + remixelt-arány
+    - Top-remixelt posztok rangsora
+
+  - Admin (RBAC / moderáció — jogosultsághoz kötött):
+    - Szerep → jog mátrix (szerepek, jogok, új/egyedi szerep)
+    - Felhasználók (szerep-kiosztás, felfüggesztés / feloldás)
+    - Bejelentések (ok megtekintése, tartalom, poszt/komment eltávolítás, lezárás)
+    - Fellebbezések (jóváhagyás / elutasítás)

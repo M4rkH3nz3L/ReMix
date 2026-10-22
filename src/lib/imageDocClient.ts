@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { ensureCloud } from '@/lib/backend';
 import { docMediaUris } from '@/lib/imageDoc';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
@@ -80,6 +81,60 @@ export async function renderSvgPdf(svg: string, width: number, height: number): 
   } catch {
     return null;
   }
+}
+
+/**
+ * 🖼️ PSD-import (IMAGE 01.1): egy .psd fájlt felküld a worker `/psd/import`-jára,
+ * ami beolvassa (ag-psd), réteg-fát `ImageDoc`-ra képezi, per-réteg PNG-ket a
+ * média-tárba tölt, és a kész `ImageDoc`-ot adja vissza. A hívó EGY
+ * `UPSERT_IMAGE_DOC` parancsként teszi a command-busra (undo-barát).
+ *
+ * Tier-gate: `ensureCloud('psdImport')` DOB (ProRequiredError), ha nincs Pro — a
+ * UI ezt paywallra fordítja (guardPro). A worker SZERVER-hitelesen is gate-el (402).
+ *
+ * @param file a kiválasztott PSD (uri + név, lásd `pickPsd`)
+ * @param projectId opcionális — a réteg-PNG-k projekt-rendezett kulcsot kapnak
+ * @returns a beolvasott `ImageDoc`, vagy `null` (weben / hiba esetén a hívó kezeli)
+ */
+export async function importPsd(
+  file: { uri: string; name: string },
+  projectId?: string
+): Promise<ImageDoc | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  // 🔒 tier-gate: nincs Pro → ProRequiredError (a UI guardPro-val paywallra fordítja)
+  const base = ensureCloud('psdImport');
+
+  const form = new FormData();
+  const psd = new File(file.uri);
+  if (!psd.exists) {
+    return null;
+  }
+  form.append('psd', psd as unknown as Blob, file.name || 'import.psd');
+  if (projectId) {
+    form.append('projectId', projectId);
+  }
+  // a doc-nevet a fájlnévből (kiterjesztés nélkül) adjuk
+  const docName = (file.name || 'PSD').replace(/\.[^.]+$/, '').slice(0, 120) || 'PSD import';
+  form.append('name', docName);
+
+  const res = await uploadFetch(`${base}/psd/import`, { method: 'POST', body: form });
+  if (!res.ok) {
+    // a worker barátságos (magyar) hibaüzenetet ad — azt dobjuk tovább
+    let msg = 'A PSD-import nem sikerült.';
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) {
+        msg = body.error;
+      }
+    } catch {
+      // nem-JSON válasz — marad az alap üzenet
+    }
+    throw new Error(msg);
+  }
+  const body = (await res.json()) as { doc?: ImageDoc };
+  return body?.doc ?? null;
 }
 
 export async function renderImageDoc(

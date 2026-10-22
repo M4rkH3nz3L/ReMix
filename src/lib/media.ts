@@ -291,3 +291,28 @@ export async function pickSvg(): Promise<string | null> {
   }
   return new File(result.assets[0].uri).text();
 }
+
+/** egy kiválasztott PSD fájl (BINÁRIS → URI + név, nem szöveg, mint az SVG). */
+export interface PickedPsd {
+  uri: string;
+  name: string;
+}
+
+/**
+ * 🖼️ Egy .psd kiválasztása (Kép Stúdió PSD-import). A PSD BINÁRIS — a workernek
+ * FÁJLKÉNT töltjük fel (nem olvassuk be a kliensen; az `ag-psd`-parser a workeren
+ * fut). Sok picker nem ad pontos MIME-t → szélesre nyitunk, a worker a magic-byte
+ * (`8BPS`) alapján validál. Lemondás/üres → null.
+ */
+export async function pickPsd(): Promise<PickedPsd | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ['image/vnd.adobe.photoshop', 'application/x-photoshop', 'image/psd', 'application/octet-stream', '*/*'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  const asset = result.assets[0];
+  return { uri: asset.uri, name: asset.name || 'import.psd' };
+}

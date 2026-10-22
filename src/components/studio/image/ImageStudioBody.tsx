@@ -36,14 +36,16 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
-import { renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
+import { importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
-import { pickImage, pickSvg } from '@/lib/media';
+import { pickImage, pickPsd, pickSvg } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { guardPro } from '@/store/paywallStore';
 import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
@@ -84,6 +86,8 @@ export function ImageStudioBody({
 }) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  // 🔒 reaktív Pro-állapot a PSD-import gombhoz (free → letiltva + upsell)
+  const isPro = useEntitlement((s) => s.isPro());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -357,6 +361,40 @@ export function ImageStudioBody({
     }
   };
 
+  /**
+   * 🖼️ PSD-import (IMAGE 01.1): egy .psd-t a workerrel réteges `ImageDoc`-ká
+   * olvasunk (ag-psd, réteg-megőrzés), és EGY `UPSERT_IMAGE_DOC` parancsként
+   * tesszük a projektbe (undo-barát) — a meglévő dokumentumok érintetlenek. Pro-
+   * gated: free usernél a gomb letiltva, de ha mégis ide jutunk, a `guardPro`
+   * elkapja a `ProRequiredError`-t és felhozza a paywallt.
+   */
+  const importPsdDoc = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const file = await pickPsd();
+      if (!file) {
+        return;
+      }
+      const psdDoc = await guardPro(
+        () => importPsd(file, project?.id),
+        (e) => Alert.alert(t('studio.image.psdFailTitle'), e.message || t('studio.image.psdFailBody'))
+      );
+      if (!psdDoc) {
+        return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
+      }
+      // EGY command: a réteges doc a projektbe (sosem közvetlen doc-írás)
+      useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: psdDoc, label: t('studio.image.undoImportPsd') });
+      setSheet('layers');
+    } catch (e) {
+      Alert.alert(t('studio.image.psdFailTitle'), (e as Error)?.message || t('studio.image.psdFailBody'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onTool = (key: ToolKey) => {
     if (!doc) {
       return;
@@ -438,6 +476,11 @@ export function ImageStudioBody({
         break;
       case 'svg':
         void importSvg();
+        break;
+      case 'psd':
+        // 🖼️ PSD-import (Pro). Free usernél a gomb letiltva (toolDisabled) + ha
+        // mégis ide jut, a guardPro a paywallt hozza fel.
+        void importPsdDoc();
         break;
       case 'style':
         // 🎛️ a kijelölt réteg gazdag tulajdonság-lapja KÖZVETLENÜL (felfedezhetőség)
@@ -573,6 +616,9 @@ export function ImageStudioBody({
         return !canAlignLayer(selectedLayer);
       case 'boolean':
         return !canBoolean(doc, effectiveSelectedId);
+      case 'psd':
+        // 🔒 PSD-import Pro-only: free usernél letiltva (upsell a letiltott gombon)
+        return !isPro;
       default:
         return false;
     }

@@ -3,20 +3,24 @@
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből —
 // kép-rasterizálás/elemzés/ONNX; a viselkedés (watermark/tier/404-precedencia) változatlan.
 
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const express = require('express');
 
-const { requireAuth, INSECURE_DEV } = require('../auth');
+const { requireAuth, INSECURE_DEV, callerId } = require('../auth');
 const { proOnly } = require('../lib/guards');
 const { rateLimit } = require('../security/rateLimit');
 const { mediaGuard } = require('../security/uploadPolicy');
-const { upload } = require('../lib/upload');
+const { upload, uploadImage } = require('../lib/upload');
 const { shouldWatermark } = require('../entitlements');
 const { asTier } = require('../tiers');
 const { activeTier } = require('../billing');
 const { renderImageDoc, imageDocGuard } = require('../imagedoc');
+const { parsePsdToImageDoc } = require('../psdImport');
+const { mediaStoreEnabled, uploadMedia } = require('../mediastore');
+const { enforceQuota, trackUsage, userTier } = require('../usage');
 const { renderSvgToPdf } = require('../svgPdf');
 const { computeFocusAssets, computeParallaxAssets, depthLayerDir } = require('../depth');
 const { bgRemoveDir, computeCutout } = require('../bgremove');
@@ -80,6 +84,88 @@ router.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req,
       res.status(500).json({ error: err.message.slice(0, 300) });
     });
 });
+
+/**
+ * 🖼️ PSD-import (IMAGE 01.1): egy feltöltött .psd → `ImageDoc` réteg-fa, per-réteg
+ * PNG-k a média-tárba töltve. A parser-mag (`parsePsdToImageDoc`) injektált
+ * `uploadLayerPng`-del dolgozik → a valós feltöltés ITT (mediastore) megy.
+ *
+ * Tier-gate (IMAGE 01.4): Pro-only SZERVER-hitelesen (`proOnly` — a `/bgremove`
+ * mintája); free user → 402. Siker → beszámít a `usage_counters`-be (`cloudJobs`).
+ * A dev `ALLOW_INSECURE_DEV` bypass a `proOnly`/`enforceQuota`-ban automatikus
+ * (a többi gate-tel konzisztens).
+ */
+router.post('/psd/import', uploadImage.any(), ...proOnly, mediaGuard('psd'), async (req, res) => {
+  const f = (req.files ?? [])[0];
+  if (!f) {
+    res.status(400).json({ error: 'Hiányzó PSD-fájl.' });
+    return;
+  }
+  const cleanup = () => fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+  const uid = callerId(req, req.body?.userId);
+  try {
+    if (!mediaStoreEnabled()) {
+      cleanup();
+      res.status(503).json({ error: 'A média-tár nincs konfigurálva (SUPABASE service_role vagy S3_* / R2).' });
+      return;
+    }
+    // 📊 §2.2: a felhő-PSD-beolvasás havi `cloudJobs`-kvóta-gate (a hiteles tier a
+    // subscriptionből; DB/service_role nélkül best-effort megenged — nincs regresszió).
+    const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', 1);
+    if (!gate.ok) {
+      cleanup();
+      res.status(429).json({ error: `Elérted a havi felhő-művelet kvótád (hátralévő: ${gate.remaining}).` });
+      return;
+    }
+
+    const buf = fs.readFileSync(f.path);
+    const publicBase = `${req.protocol}://${req.get('host')}`;
+    const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
+    const docId = crypto.randomUUID();
+
+    // a réteg-PNG-k feltöltője: projekt-rendezett kulcs (<projectId>/psd/<docId>/<layer>.png)
+    const uploadLayerPng = async (png, layerId) => {
+      const safe = String(layerId).replace(/[^\w-]/g, '').slice(0, 40) || crypto.randomUUID();
+      const key = projectId
+        ? `${projectId}/psd/${docId}/${safe}.png`
+        : `psd/${docId}/${safe}.png`;
+      const tmp = path.join(req.workDir, `${safe}.png`);
+      fs.writeFileSync(tmp, png);
+      const url = await uploadMedia(key, tmp, 'image/png', publicBase);
+      // a kliens a `src`/`uri`-t egyformán renderelhető URL-ként kezeli
+      return { src: url, uri: url };
+    };
+
+    const name = typeof req.body?.name === 'string' && req.body.name ? req.body.name.slice(0, 120) : undefined;
+    const doc = await parsePsdToImageDoc(buf, { makeId: psdMakeId(), uploadLayerPng, name });
+
+    // 🛡️ a kész doc átmegy a RENDER-guardon is (nagy-doc védőkorlát), hogy később
+    // biztosan renderelhető legyen — inkább itt beszédes hiba, mint a rendernél.
+    const guardError = imageDocGuard(doc);
+    if (guardError) {
+      cleanup();
+      res.status(413).json({ error: guardError });
+      return;
+    }
+
+    // 📊 §2.2: sikeres beolvasás → +1 `cloudJobs` (atomikus RPC; best-effort)
+    void trackUsage(uid, 'cloudJobs', 1);
+    cleanup();
+    res.json({ doc });
+  } catch (err) {
+    cleanup();
+    const msg = String(err && err.message ? err.message : err).slice(0, 300);
+    console.warn('psd/import hiba:', msg);
+    // a parser barátságos (magyar) üzenetei → 400 (kliens-hiba: rossz/túl nagy PSD)
+    res.status(400).json({ error: msg });
+  }
+});
+
+/** szerver-oldali id-generátor a PSD-mag `makeId`-jéhez (prefix + ütközésbiztos). */
+function psdMakeId() {
+  let n = 0;
+  return (prefix) => `${prefix}_${(n++).toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
+}
 
 // 📄 SVG → nyomdakész vektor-PDF (a kliens imageDocToSvg kimenete → Chromium page.pdf).
 // Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott fotóktól nagy lehet — a mező-méret-limit

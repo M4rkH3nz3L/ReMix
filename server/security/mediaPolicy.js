@@ -25,6 +25,7 @@ function detectKind(buf) {
   if (ascii(0, 4) === 'GIF8') return 'image'; // GIF
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'image'; // WEBP
   if (b[0] === 0x42 && b[1] === 0x4d) return 'image'; // BMP
+  if (ascii(0, 4) === '8BPS') return 'image'; // Photoshop PSD/PSB (réteg-import)
 
   // --- RIFF/WAVE audio ---
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WAVE') return 'audio'; // WAV
@@ -65,6 +66,8 @@ const MB = 1024 * 1024;
  */
 const MEDIA_PROFILES = {
   image: { exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 8 },
+  // 🖼️ PSD-import (IMAGE 01.1): egyetlen Photoshop-fájl, réteg-fa beolvasásra
+  psd: { exts: ['psd', 'psb'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 1 },
   video: { exts: ['mp4', 'mov', 'm4v', 'webm', 'mkv'], kinds: ['video'], maxBytes: 500 * MB, maxCount: 1 },
   audio: { exts: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'], kinds: ['audio'], maxBytes: 100 * MB, maxCount: 8 },
   // vegyes média (pl. thumbnails/compose: kép + opcionális overlay)

@@ -4,6 +4,7 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { aiConfigForTask } from '@/lib/aiProviders';
+import { localThumbHeadlines } from '@/lib/localTasks';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
@@ -65,7 +66,8 @@ export async function suggestThumbnails(
   }
 }
 
-/** 🎬 AI-címjavaslatok a borítóra (lokális AI vagy Claude a workeren) */
+/** 🎬 AI-címjavaslatok a borítóra (lokális AI vagy Claude a workeren).
+ *  🧩 Worker/AI nélkül a LOKÁL sablon-út ad címeket (ingyen, offline). */
 export async function fetchThumbHeadlines(summary: string): Promise<string[] | null> {
   try {
     const aiConfig = await aiConfigForTask('thumbHeadlines');
@@ -77,16 +79,16 @@ export async function fetchThumbHeadlines(summary: string): Promise<string[] | n
       body: JSON.stringify({ summary, aiConfig }),
     });
     if (!res.ok) {
-      return null;
+      return localThumbHeadlines(summary);
     }
     const body = (await res.json()) as { headlines: string[] };
     const list = (body.headlines ?? [])
       .map((h) => h.trim())
       .filter((h) => h.length > 0)
       .slice(0, 3);
-    return list.length > 0 ? list : null;
+    return list.length > 0 ? list : localThumbHeadlines(summary);
   } catch {
-    return null;
+    return localThumbHeadlines(summary);
   }
 }
 

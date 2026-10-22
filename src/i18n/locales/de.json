@@ -423,6 +423,7 @@
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "Prüfung nötig",
     "catalog_remix-assistant": "Alle KI-Aufgaben (läuft in der Cloud, mit Kontingent)",
+    "catalog_local-heuristics": "Kostenloser lokaler Schnellpfad für jede KI-Aufgabe — offline, ohne Kontingent",
     "catalog_whisper-tiny-q8": "Untertitel + Stille-Schnitt — schnell, offline",
     "catalog_whisper-base-q5": "Untertitel + Stille-Schnitt — genauer",
     "catalog_silero-vad": "Sprach-/Stille-Erkennung (kommt mit der Whisper-Engine)",
@@ -2544,6 +2545,26 @@
     },
     "aiFetch": {
       "timeout": "Die KI hat innerhalb von {{seconds}} Sekunden nicht geantwortet. Falls das lokale Modell läuft, lädt es vielleicht noch oder ist überlastet — versuch es erneut, oder setz ANTHROPIC_API_KEY auf dem Worker."
+    },
+    "localIntent": {
+      "applied": "🧩 Lokal interpretiert (kostenloser Lokal-Pfad): {{count}} Aktion(en) vorbereitet."
+    },
+    "localTasks": {
+      "hookQuestion": "„{{topic}}“ — aber was steckt dahinter?",
+      "styleQuestion": "Frage",
+      "hookSecret": "Was dir niemand darüber sagt: {{topic}}.",
+      "styleSecret": "Geheimnis",
+      "hookMistake": "Das machen die meisten falsch: {{topic}}.",
+      "styleMistake": "Fehler",
+      "hookResult": "Das Ergebnis spricht für sich: {{topic}}.",
+      "styleResult": "Ergebnis",
+      "hookChallenge": "Ich hab's ausprobiert: {{topic}}. Das kam dabei raus.",
+      "styleChallenge": "Challenge",
+      "hookPov": "POV: {{topic}}.",
+      "stylePov": "POV",
+      "headlineBold": "{{topic}} — EHRLICH",
+      "headlineHow": "SO GEHT'S: {{topic}}",
+      "headlineNow": "SCHAU DIR DAS AN: {{topic}}"
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

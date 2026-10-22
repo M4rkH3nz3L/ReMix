@@ -2,6 +2,7 @@ import { t as tr } from 'i18next';
 
 import { AI_PROBE_TIMEOUT_MS, aiFetch, aiPostJson } from '@/lib/aiFetch';
 import { aiConfigForTask } from '@/lib/aiProviders';
+import { parseLocalIntent, type LocalIntentContext } from '@/lib/localIntent';
 import { renderServerUrl } from '@/lib/render';
 
 import type { AssistantReply } from '@/lib/aiCommands';
@@ -11,11 +12,20 @@ import type { AssistantReply } from '@/lib/aiCommands';
  * az aiCommands.ts-ben van (expo-mentes, tesztelhető).
  */
 
-/** A worker AI-válaszának lekérése. */
+/** A worker AI-válaszának lekérése — lokál-előúttal (ingyenes gyors-út). */
 export async function askAssistant(
   context: Record<string, unknown>,
-  instruction: string
+  instruction: string,
+  /** 🧩 ha megvan, az egyszerű utasítás HELYBEN fordul parancsra (ingyen,
+   *  offline, azonnal) — csak a nem-illeszkedő kérés megy a workerre */
+  localCtx?: LocalIntentContext
 ): Promise<AssistantReply> {
+  if (localCtx) {
+    const local = parseLocalIntent(instruction, localCtx);
+    if (local) {
+      return local;
+    }
+  }
   const base = renderServerUrl();
   // a felhasználó saját modellje (BYOK), ha be van állítva — ekkor a worker
   // env-AI-ja nem is kell

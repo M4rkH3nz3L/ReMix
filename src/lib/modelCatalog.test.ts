@@ -132,8 +132,9 @@ describe('modelCatalog — státusz-mátrix', () => {
 });
 
 describe('modelCatalog — deviceCaps a routinghoz (06.1)', () => {
-  it('alap-buildben nincs lokál modalitás (minden motor hiányzik)', () => {
-    expect(deviceCapsFromCatalog().modalities).toEqual([]);
+  it('alap-buildben is van lokál smallText (ReMix Lokál heurisztika) — más nincs', () => {
+    // 🧩 „mindenből legyen ingyenes local": a js-heurisztika minden buildben él
+    expect(deviceCapsFromCatalog().modalities).toEqual(['smallText']);
   });
 
   it('validált whisper + aktív VAD → transcribe képesség; a csak-letöltött NEM számít', () => {

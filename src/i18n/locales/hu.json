@@ -423,6 +423,7 @@
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "vizsga szükséges",
     "catalog_remix-assistant": "Minden AI-feladat (felhőben fut, kvótával)",
+    "catalog_local-heuristics": "Minden AI-feladat ingyenes helyi gyors-útja — offline, kvóta nélkül",
     "catalog_whisper-tiny-q8": "Felirat + csend-vágás — gyors, offline",
     "catalog_whisper-base-q5": "Felirat + csend-vágás — pontosabb",
     "catalog_silero-vad": "Beszéd/csend-felismerés (a Whisper-motorral érkezik)",
@@ -2544,6 +2545,26 @@
     },
     "aiFetch": {
       "timeout": "Az AI {{seconds}} másodperc alatt nem válaszolt. Ha a lokális modell fut, lehet, hogy még tölt vagy túlterhelt — próbáld újra, vagy állíts be ANTHROPIC_API_KEY-t a workeren."
+    },
+    "localIntent": {
+      "applied": "🧩 Helyben értelmeztem (ingyenes lokál-út): {{count}} művelet előkészítve."
+    },
+    "localTasks": {
+      "hookQuestion": "„{{topic}}” — de mi van mögötte?",
+      "styleQuestion": "Kérdés",
+      "hookSecret": "Amit senki nem mond el erről: {{topic}}.",
+      "styleSecret": "Titok",
+      "hookMistake": "Ezt rontja el a legtöbb ember: {{topic}}.",
+      "styleMistake": "Hiba",
+      "hookResult": "Az eredmény magáért beszél: {{topic}}.",
+      "styleResult": "Eredmény",
+      "hookChallenge": "Kipróbáltam: {{topic}}. Ez lett belőle.",
+      "styleChallenge": "Kihívás",
+      "hookPov": "POV: {{topic}}.",
+      "stylePov": "POV",
+      "headlineBold": "{{topic}} — ŐSZINTÉN",
+      "headlineHow": "ÍGY: {{topic}}",
+      "headlineNow": "EZT NÉZD: {{topic}}"
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

@@ -207,7 +207,13 @@ export function AssistantPanel() {
         context.transcript = transcript;
       }
       setStatus(t('panels.assistant.thinking'));
-      const answer = await askAssistant(context, text);
+      // 🧩 lokál-előút (ingyenes): az egyszerű utasítás helyben fordul parancsra,
+      // worker/kvóta nélkül — csak a nem-illeszkedő kérés megy hálózatra
+      const answer = await askAssistant(context, text, {
+        project: state.project,
+        playhead: state.playhead,
+        selectedClipId: state.selectedClipId,
+      });
       setReply(answer);
       setAiResult({
         ok: true,

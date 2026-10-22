@@ -18,7 +18,8 @@ import type { ModelManifestEntry } from '@/lib/modelRegistry';
  */
 
 export type CatalogWhere = 'device' | 'system' | 'worker';
-export type CatalogEngine = 'whisper-rn' | 'executorch' | 'system' | 'worker';
+/** `js` = tiszta JS heurisztika/sablon-motor — minden buildben jelen van */
+export type CatalogEngine = 'whisper-rn' | 'executorch' | 'system' | 'worker' | 'js';
 
 export interface CatalogEntry {
   id: string;
@@ -58,6 +59,20 @@ export const MODEL_CATALOG: CatalogEntry[] = [
     engine: 'worker',
     modalities: ['text', 'smallText', 'vision'],
     tasks: ALL_TASKS,
+  },
+  {
+    // 🧩 „mindenből legyen ingyenes local": determinista sablon/szabály-motor
+    // MINDEN feladatra (localIntent + localTasks + captionStudio/autoedit
+    // heurisztikák) — offline, kvóta nélkül, minden buildben aktív. A kliensek
+    // automatikus fallbackje; a felhő-út opcionális minőség-lépcső fölötte.
+    id: 'local-heuristics',
+    label: 'ReMix Lokál',
+    emoji: '🧩',
+    where: 'device',
+    engine: 'js',
+    modalities: ['smallText'],
+    tasks: ALL_TASKS,
+    bundled: true,
   },
   {
     id: 'whisper-tiny-q8',
@@ -179,8 +194,9 @@ export function catalogForTask(task: AiTask): CatalogEntry[] {
  */
 export const BUILD_ENGINES: Readonly<Partial<Record<CatalogEngine, boolean>>> = {
   worker: true,
+  js: true, // tiszta JS heurisztikák — mindig jelen vannak
   system: false,
-  'whisper-rn': false,
+  'whisper-rn': false, // runtime-detektálás írja felül (catalogRuntime)
   executorch: false,
 };
 

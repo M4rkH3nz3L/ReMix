@@ -423,6 +423,7 @@
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "exam required",
     "catalog_remix-assistant": "All AI tasks (runs in the cloud, metered)",
+    "catalog_local-heuristics": "Free local fast path for every AI task — offline, no quota",
     "catalog_whisper-tiny-q8": "Captions + silence cutting — fast, offline",
     "catalog_whisper-base-q5": "Captions + silence cutting — more accurate",
     "catalog_silero-vad": "Speech/silence detection (ships with the Whisper engine)",
@@ -2544,6 +2545,26 @@
     },
     "aiFetch": {
       "timeout": "The AI did not respond within {{seconds}} seconds. If the local model is running, it may still be loading or overloaded — try again, or set ANTHROPIC_API_KEY on the worker."
+    },
+    "localIntent": {
+      "applied": "🧩 Interpreted locally (free local path): {{count}} action(s) prepared."
+    },
+    "localTasks": {
+      "hookQuestion": "“{{topic}}” — but what's behind it?",
+      "styleQuestion": "Question",
+      "hookSecret": "What nobody tells you about this: {{topic}}.",
+      "styleSecret": "Secret",
+      "hookMistake": "This is what most people get wrong: {{topic}}.",
+      "styleMistake": "Mistake",
+      "hookResult": "The result speaks for itself: {{topic}}.",
+      "styleResult": "Result",
+      "hookChallenge": "I tried it: {{topic}}. Here's what happened.",
+      "styleChallenge": "Challenge",
+      "hookPov": "POV: {{topic}}.",
+      "stylePov": "POV",
+      "headlineBold": "{{topic}} — HONESTLY",
+      "headlineHow": "HOW: {{topic}}",
+      "headlineNow": "WATCH THIS: {{topic}}"
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

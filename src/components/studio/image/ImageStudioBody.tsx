@@ -36,9 +36,9 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
-import { exportPsd, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
+import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
-import { pickImage, pickPsd, pickSvg } from '@/lib/media';
+import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
@@ -395,6 +395,51 @@ export function ImageStudioBody({
     }
   };
 
+  /**
+   * 📄 PDF-import (IMAGE 01.3): egy .pdf-et a workerrel OLDALANKÉNT egy `ImageDoc`-ká
+   * olvasunk (pdf-lib struktúra + pdfjs+canvas raszter), és a kész lapokat EGY
+   * `applyBatch` köteg-paranccsal tesszük a projekt-galériába (az egész import EGY
+   * undo-lépés — a meglévő lapok érintetlenek). Pro-gated: free usernél a gomb
+   * letiltva, de ha mégis ide jutunk, a `guardPro` felhozza a paywallt.
+   */
+  const importPdfDocs = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const file = await pickPdf();
+      if (!file) {
+        return;
+      }
+      const pdfDocs = await guardPro(
+        () => importPdf(file, project?.id),
+        (e) => Alert.alert(t('studio.image.pdfFailTitle'), e.message || t('studio.image.pdfFailBody'))
+      );
+      if (!pdfDocs || pdfDocs.length === 0) {
+        return; // lemondás / Pro-paywall / hiba / üres (a guardPro már jelzett)
+      }
+      // EGY köteg-command (applyBatch): oldalanként egy UPSERT_IMAGE_DOC, de az
+      // egész import EGY undo-lépés (sosem közvetlen doc-írás)
+      useEditorStore
+        .getState()
+        .applyBatch(
+          pdfDocs.map((d) => ({ type: 'UPSERT_IMAGE_DOC', doc: d, label: t('studio.image.undoImportPdf') })),
+          'user'
+        );
+      // az ÚJ első lapra ugrunk (project módban), hogy a felhasználó rögtön lássa
+      if (mode === 'project') {
+        setActivePageId(pdfDocs[0].id);
+        setSelectedId(null);
+      }
+      setSheet('layers');
+    } catch (e) {
+      Alert.alert(t('studio.image.pdfFailTitle'), (e as Error)?.message || t('studio.image.pdfFailBody'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onTool = (key: ToolKey) => {
     if (!doc) {
       return;
@@ -481,6 +526,11 @@ export function ImageStudioBody({
         // 🖼️ PSD-import (Pro). Free usernél a gomb letiltva (toolDisabled) + ha
         // mégis ide jut, a guardPro a paywallt hozza fel.
         void importPsdDoc();
+        break;
+      case 'pdf':
+        // 📄 PDF-import (Pro). Free usernél a gomb letiltva (toolDisabled) + ha
+        // mégis ide jut, a guardPro a paywallt hozza fel.
+        void importPdfDocs();
         break;
       case 'style':
         // 🎛️ a kijelölt réteg gazdag tulajdonság-lapja KÖZVETLENÜL (felfedezhetőség)
@@ -618,6 +668,9 @@ export function ImageStudioBody({
         return !canBoolean(doc, effectiveSelectedId);
       case 'psd':
         // 🔒 PSD-import Pro-only: free usernél letiltva (upsell a letiltott gombon)
+        return !isPro;
+      case 'pdf':
+        // 🔒 PDF-import Pro-only: free usernél letiltva (upsell a letiltott gombon)
         return !isPro;
       default:
         return false;

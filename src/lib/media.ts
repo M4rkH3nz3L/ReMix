@@ -316,3 +316,29 @@ export async function pickPsd(): Promise<PickedPsd | null> {
   const asset = result.assets[0];
   return { uri: asset.uri, name: asset.name || 'import.psd' };
 }
+
+/** egy kiválasztott PDF fájl (BINÁRIS → URI + név, mint a PSD). */
+export interface PickedPdf {
+  uri: string;
+  name: string;
+}
+
+/**
+ * 📄 Egy .pdf kiválasztása (Kép Stúdió PDF-import, IMAGE 01.3). A PDF BINÁRIS — a
+ * workernek FÁJLKÉNT töltjük fel (a worker pdf-lib-bel olvassa a struktúrát, és
+ * oldalanként pdfjs+canvas rasterizál). A `pickPsd` mintája: a picker a PDF-re ad
+ * pontos MIME-t (`application/pdf`), de szélesre nyitunk, a worker a magic-byte
+ * (`%PDF`) alapján validál. Lemondás/üres → null.
+ */
+export async function pickPdf(): Promise<PickedPdf | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ['application/pdf', 'application/octet-stream', '*/*'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  const asset = result.assets[0];
+  return { uri: asset.uri, name: asset.name || 'import.pdf' };
+}

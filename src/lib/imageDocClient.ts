@@ -138,6 +138,61 @@ export async function importPsd(
 }
 
 /**
+ * 📄 PDF-import (IMAGE 01.3): egy .pdf fájlt felküld a worker `/pdf/import`-jára,
+ * ami beolvassa (pdf-lib struktúra), oldalanként `ImageDoc`-ra képezi, az oldal-PNG-ket
+ * a média-tárba rasterizálja (pdfjs+canvas), és a kész `ImageDoc[]`-ot adja vissza
+ * (oldalanként egy dokumentum, a galéria-lap konvenciója szerint). A hívó oldalanként
+ * EGY `UPSERT_IMAGE_DOC` parancsként teszi a command-busra (undo-barát).
+ *
+ * Tier-gate: `ensureCloud('pdfImport')` DOB (ProRequiredError), ha nincs Pro — a UI
+ * ezt guardPro-val paywallra fordítja. A worker SZERVER-hitelesen is gate-el (402).
+ *
+ * @param file a kiválasztott PDF (uri + név, lásd `pickPdf`)
+ * @param projectId opcionális — az oldal-PNG-k projekt-rendezett kulcsot kapnak
+ * @returns a beolvasott `ImageDoc[]` (oldalanként), vagy `null` (weben / lemondás)
+ */
+export async function importPdf(
+  file: { uri: string; name: string },
+  projectId?: string
+): Promise<ImageDoc[] | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  // 🔒 tier-gate: nincs Pro → ProRequiredError (a UI guardPro-val paywallra fordítja)
+  const base = ensureCloud('pdfImport');
+
+  const form = new FormData();
+  const pdf = new File(file.uri);
+  if (!pdf.exists) {
+    return null;
+  }
+  form.append('pdf', pdf as unknown as Blob, file.name || 'import.pdf');
+  if (projectId) {
+    form.append('projectId', projectId);
+  }
+  // a doc-alapnevet a fájlnévből (kiterjesztés nélkül) adjuk; az oldalszám-utótagot a worker fűzi
+  const docName = (file.name || 'PDF').replace(/\.[^.]+$/, '').slice(0, 120) || 'PDF import';
+  form.append('name', docName);
+
+  const res = await uploadFetch(`${base}/pdf/import`, { method: 'POST', body: form });
+  if (!res.ok) {
+    // a worker barátságos (magyar) hibaüzenetet ad — azt dobjuk tovább
+    let msg = 'A PDF-import nem sikerült.';
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) {
+        msg = body.error;
+      }
+    } catch {
+      // nem-JSON válasz — marad az alap üzenet
+    }
+    throw new Error(msg);
+  }
+  const body = (await res.json()) as { docs?: ImageDoc[] };
+  return Array.isArray(body?.docs) ? body.docs : null;
+}
+
+/**
  * 🖼️ PSD-export (IMAGE 01.2): az `ImageDoc`-ot felküldi a worker `/psd/export`-jára,
  * ami RÉTEG-MEGŐRZÉSSEL (NEM flatten!) felépíti a .psd-t (ag-psd), a média-tárba
  * tölti, és a letölthető URL-t adja vissza. A kliens letölti a `document/media`-ba,

@@ -52,6 +52,7 @@ export type CapabilityId =
   | 'aiAvatar' // AI-avatar / digital-human
   | 'psdImport' // 🖼️ Kép Stúdió: PSD → réteges ImageDoc (worker-parser, réteg-megőrzés)
   | 'psdExport' // 🖼️ Kép Stúdió: ImageDoc → réteges .psd (worker-builder, réteg-megőrzés)
+  | 'pdfImport' // 📄 Kép Stúdió: PDF → oldalanként egy ImageDoc (worker pdfjs+canvas raszter)
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
 /**
@@ -107,6 +108,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   aiAvatar: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.aiAvatar' },
   psdImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdImport' },
   psdExport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdExport' },
+  pdfImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.pdfImport' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
   soundLibrary: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.soundLibrary' },
 };

@@ -39,6 +39,7 @@ const H = {
   mp3frame: bytes([0xff, 0xfb, 0x90, 0x00]),
   ogg: ascii('OggS'),
   flac: ascii('fLaC'),
+  pdf: ascii('%PDF-1.7'),
   exe: bytes([0x4d, 0x5a, 0x90, 0x00]), // MZ
 };
 
@@ -58,6 +59,7 @@ describe('mediaPolicy — detectKind (magic-byte)', () => {
     ['mp3frame', 'audio'],
     ['ogg', 'audio'],
     ['flac', 'audio'],
+    ['pdf', 'document'],
   ])('%s → %s', (key, expected) => {
     expect(detectKind(H[key])).toBe(expected);
   });
@@ -130,13 +132,24 @@ describe('mediaPolicy — validateUploads (darabszám + batch)', () => {
     ];
     expect(validateUploads(files, 'image')).toMatchObject({ ok: false, status: 415 });
   });
+
+  it('📄 pdf profil: valódi PDF .pdf néven → OK', () => {
+    expect(validateUploads([{ originalname: 'doc.pdf', size: 1000, header: H.pdf }], 'pdf')).toMatchObject({ ok: true });
+  });
+
+  it('📄 pdf profil: kép-tartalom .pdf néven → 415 (kind-eltérés)', () => {
+    expect(validateUploads([{ originalname: 'doc.pdf', size: 1000, header: H.png }], 'pdf')).toMatchObject({
+      ok: false,
+      status: 415,
+    });
+  });
 });
 
 describe('mediaPolicy — profilok', () => {
-  it('minden profil kinds-e a {image,video,audio} részhalmaza', () => {
+  it('minden profil kinds-e a {image,video,audio,document} részhalmaza', () => {
     for (const p of Object.values(MEDIA_PROFILES)) {
       for (const k of p.kinds) {
-        expect(['image', 'video', 'audio']).toContain(k);
+        expect(['image', 'video', 'audio', 'document']).toContain(k);
       }
       expect(p.maxBytes).toBeGreaterThan(0);
       expect(p.maxCount).toBeGreaterThan(0);

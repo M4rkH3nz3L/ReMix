@@ -15,6 +15,7 @@ export type ToolKey =
   | 'brush'
   | 'svg'
   | 'psd'
+  | 'pdf'
   | 'style'
   | 'adjust'
   | 'develop'
@@ -56,6 +57,7 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
       { key: 'brush', icon: 'brush-outline', labelKey: 'studio.imageTools.brush' },
       { key: 'svg', icon: 'download-outline', labelKey: 'studio.imageTools.svg' },
       { key: 'psd', icon: 'layers-outline', labelKey: 'studio.imageTools.psd' },
+      { key: 'pdf', icon: 'document-outline', labelKey: 'studio.imageTools.pdf' },
     ],
   },
   {

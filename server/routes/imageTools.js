@@ -20,6 +20,7 @@ const { activeTier } = require('../billing');
 const { renderImageDoc, imageDocGuard } = require('../imagedoc');
 const { parsePsdToImageDoc } = require('../psdImport');
 const { buildPsdFromImageDoc } = require('../psdExport');
+const { parsePdfToImageDocs } = require('../pdfImport');
 const { safeFetch } = require('../ssrf');
 const { mediaStoreEnabled, uploadMedia } = require('../mediastore');
 const { enforceQuota, trackUsage, userTier } = require('../usage');
@@ -167,6 +168,161 @@ router.post('/psd/import', uploadImage.any(), ...proOnly, mediaGuard('psd'), asy
 function psdMakeId() {
   let n = 0;
   return (prefix) => `${prefix}_${(n++).toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
+}
+
+/**
+ * 📄 PDF-import (IMAGE 01.3): egy feltöltött PDF → oldalanként EGY `ImageDoc` (galéria-
+ * lapok). A parser-mag (`parsePdfToImageDocs`) PURE — a struktúrát (oldal-szám +
+ * oldal-méret) `pdf-lib`-bel olvassa, a lap→PNG rasterizálás INJEKTÁLT: itt a worker-
+ * oldali `pdfjs-dist` (legacy, worker nélkül) + `@napi-rs/canvas` (prebuilt — NINCS
+ * build-lépés) renderel, és a kész oldal-PNG a média-tárba (`mediastore`) tölt.
+ *
+ * Tier-gate (IMAGE 01.4): Pro-only SZERVER-hitelesen (`proOnly`, mint a `/psd/import`);
+ * free user → 402. A PDF oldalanként drága (külön render + feltöltés), ezért a
+ * `cloudJobs`-kvótát OLDAL-SZÁM szerint mérjük (enforceQuota(pages) + trackUsage(pages)),
+ * nem fix 1 job/import. A dev `ALLOW_INSECURE_DEV` bypass a gate-ekben automatikus.
+ */
+router.post('/pdf/import', uploadImage.any(), ...proOnly, mediaGuard('pdf'), async (req, res) => {
+  const f = (req.files ?? [])[0];
+  if (!f) {
+    res.status(400).json({ error: 'Hiányzó PDF-fájl.' });
+    return;
+  }
+  const cleanup = () => fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+  const uid = callerId(req, req.body?.userId);
+  try {
+    if (!mediaStoreEnabled()) {
+      cleanup();
+      res.status(503).json({ error: 'A média-tár nincs konfigurálva (SUPABASE service_role vagy S3_* / R2).' });
+      return;
+    }
+
+    const buf = fs.readFileSync(f.path);
+    // 📄 az oldal-szám ELŐRE (a kvóta-gate oldal-szám alapú); ha olvashatatlan a PDF,
+    // ez beszédes hibát dob → 400 (nem crash, nem fölösleges kvóta-terhelés).
+    const { pageCount } = await probePdfPageCount(buf);
+
+    // 📊 §2.2: a felhő-PDF-beolvasás havi `cloudJobs`-kvóta-gate OLDAL-SZÁM szerint
+    // (oldalanként render+feltöltés → oldalanként 1 job). A hiteles tier a subscriptionből.
+    const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', pageCount);
+    if (!gate.ok) {
+      cleanup();
+      res.status(429).json({ error: `Elérted a havi felhő-művelet kvótád (hátralévő: ${gate.remaining}).` });
+      return;
+    }
+
+    const publicBase = `${req.protocol}://${req.get('host')}`;
+    const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
+    const importId = crypto.randomUUID();
+    const name = typeof req.body?.name === 'string' && req.body.name ? req.body.name.slice(0, 120) : undefined;
+
+    // a lap→PNG rasterizáló (injektált): pdfjs+canvas → PNG → média-tár-feltöltés.
+    // A pdfjs-munkamenetet CSAK az első hívásnál nyitjuk meg (lusta), és a hívások
+    // közt újrahasználjuk (egy getDocument / PDF több oldalhoz).
+    let pdfSession = null;
+    const renderPageToPng = async (pdfBuf, pageIndex, size) => {
+      if (!pdfSession) {
+        pdfSession = await openPdfForRaster(pdfBuf);
+      }
+      const png = await rasterPdfPage(pdfSession, pageIndex, size);
+      const key = projectId
+        ? `${projectId}/pdf/${importId}/page-${pageIndex + 1}.png`
+        : `pdf/${importId}/page-${pageIndex + 1}.png`;
+      const tmp = path.join(req.workDir, `page-${pageIndex + 1}.png`);
+      fs.writeFileSync(tmp, png);
+      const url = await uploadMedia(key, tmp, 'image/png', publicBase);
+      return { src: url, uri: url };
+    };
+
+    const docs = await parsePdfToImageDocs(buf, { makeId: psdMakeId(), renderPageToPng, name });
+
+    // 🛡️ minden kész doc átmegy a RENDER-guardon (nagy-doc védőkorlát), hogy később
+    // biztosan renderelhető legyen — inkább itt beszédes hiba, mint a rendernél.
+    for (const doc of docs) {
+      const guardError = imageDocGuard(doc);
+      if (guardError) {
+        cleanup();
+        res.status(413).json({ error: guardError });
+        return;
+      }
+    }
+
+    // 📊 §2.2: sikeres beolvasás → +oldal-szám `cloudJobs` (atomikus RPC; best-effort)
+    void trackUsage(uid, 'cloudJobs', docs.length);
+    cleanup();
+    // a kliens oldalanként EGY `UPSERT_IMAGE_DOC`-ot tesz a command-busra (undo-barát)
+    res.json({ docs });
+  } catch (err) {
+    cleanup();
+    const msg = String(err && err.message ? err.message : err).slice(0, 300);
+    console.warn('pdf/import hiba:', msg);
+    // a parser barátságos (magyar) üzenetei → 400 (kliens-hiba: rossz/túl nagy PDF)
+    res.status(400).json({ error: msg });
+  }
+});
+
+/**
+ * 📄 A PDF oldal-számának PURE kiolvasása (pdf-lib) — a kvóta-gate ELŐTT, a költséges
+ * rasterizálás NÉLKÜL. Olvashatatlan PDF → beszédes hiba (a `parsePdfToImageDocs`
+ * `readPdfStructure`-je úgyis ugyanazt dobja; itt csak az oldal-szám kell előre).
+ */
+async function probePdfPageCount(buf) {
+  const { PDFDocument } = require('pdf-lib');
+  let pdf;
+  try {
+    pdf = await PDFDocument.load(new Uint8Array(buf), { ignoreEncryption: true, updateMetadata: false });
+  } catch (err) {
+    throw new Error(`A PDF-fájl nem olvasható: ${String(err && err.message ? err.message : err).slice(0, 160)}`);
+  }
+  const pageCount = pdf.getPageCount();
+  if (pageCount < 1) {
+    throw new Error('A PDF-ben nincs oldal.');
+  }
+  return { pageCount };
+}
+
+/**
+ * 📄 pdfjs-munkamenet nyitása a rasterizáláshoz (legacy node-build, worker NÉLKÜL).
+ * A `pdfjs-dist/legacy/build/pdf.mjs` ESM → dinamikus `import()` (lusta, csak akkor
+ * húzzuk be, ha tényleg rasterizálunk). A `@napi-rs/canvas` (prebuilt) adja a 2D-
+ * kontextust. Ha bármelyik hiányzik a workeren → beszédes hiba (a /pdf/import 400-zal
+ * jelzi; a MAG + a struktúra akkor is kész + tesztelt, ez a prod-raszter TODO-felülete).
+ */
+async function openPdfForRaster(buf) {
+  let pdfjs;
+  let napiCanvas;
+  try {
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    napiCanvas = require('@napi-rs/canvas');
+  } catch (err) {
+    throw new Error(
+      `A PDF-rasterizáló nincs telepítve a workeren (pdfjs-dist / @napi-rs/canvas): ${String(err && err.message ? err.message : err).slice(0, 120)}`
+    );
+  }
+  const task = pdfjs.getDocument({
+    data: new Uint8Array(buf),
+    disableWorker: true,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+  const pdf = await task.promise;
+  return { pdf, napiCanvas };
+}
+
+/** 📄 egy PDF-oldal (0-alapú index) PNG-buffer a kívánt px-méretre (pdfjs + canvas). */
+async function rasterPdfPage(session, pageIndex, size) {
+  const page = await session.pdf.getPage(pageIndex + 1); // pdfjs 1-alapú
+  // a kívánt px-szélesség/az oldal pt-szélessége = a render-skála (a mag px-mérete mérvadó)
+  const base = page.getViewport({ scale: 1 });
+  const scale = base.width > 0 ? size.w / base.width : 1;
+  const viewport = page.getViewport({ scale });
+  const canvas = session.napiCanvas.createCanvas(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)));
+  const ctx = canvas.getContext('2d');
+  // fehér háttér (a PDF-oldal átlátszó területei ne legyenek feketék a PNG-ben)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return canvas.toBuffer('image/png');
 }
 
 /**

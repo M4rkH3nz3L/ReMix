@@ -11,13 +11,16 @@
 
 // ───────────────────────────────────────────────── magic-byte detektálás
 
-/** egy buffer kezdő-bájtjaiból a médiatípus: 'image' | 'video' | 'audio' | null */
+/** egy buffer kezdő-bájtjaiból a médiatípus: 'image' | 'video' | 'audio' | 'document' | null */
 function detectKind(buf) {
   if (!buf || buf.length < 12) {
     return null;
   }
   const b = buf;
   const ascii = (start, len) => b.slice(start, start + len).toString('latin1');
+
+  // --- dokumentum ---
+  if (ascii(0, 4) === '%PDF') return 'document'; // PDF (oldal-import)
 
   // --- kép ---
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image'; // JPEG
@@ -68,6 +71,8 @@ const MEDIA_PROFILES = {
   image: { exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 8 },
   // 🖼️ PSD-import (IMAGE 01.1): egyetlen Photoshop-fájl, réteg-fa beolvasásra
   psd: { exts: ['psd', 'psb'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 1 },
+  // 📄 PDF-import (IMAGE 01.3): egyetlen PDF, oldalanként-egy-ImageDoc beolvasásra
+  pdf: { exts: ['pdf'], kinds: ['document'], maxBytes: 40 * MB, maxCount: 1 },
   video: { exts: ['mp4', 'mov', 'm4v', 'webm', 'mkv'], kinds: ['video'], maxBytes: 500 * MB, maxCount: 1 },
   audio: { exts: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'], kinds: ['audio'], maxBytes: 100 * MB, maxCount: 8 },
   // vegyes média (pl. thumbnails/compose: kép + opcionális overlay)

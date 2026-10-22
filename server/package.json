@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env index.js",
     "worker": "node --env-file-if-exists=.env render-worker.js",
+    "erase-sweep": "node --env-file-if-exists=.env eraseSweep.js",
     "lint": "expo lint",
     "smoke": "node scripts/render-smoke.js",
     "smoke:image": "node scripts/imagedoc-smoke.js",

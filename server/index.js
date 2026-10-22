@@ -243,6 +243,23 @@ if (require.main === module) {
     sweepStaleEgress().catch(() => {});
   }, 5 * 60 * 1000).unref();
 
+  // 🗑️ GDPR hard-erase sweep (03-production §03.4): a lejárt-cooldownú soft-delete-elt
+  // fiókok NAPONTA automatikusan véglegesen törlődnek (storage-purge + auth-user-delete +
+  // audit). CSAK ha `ALLOW_ACCOUNT_ERASE=1` + van service_role admin-kliens; különben no-op
+  // (nem élesben is biztonságos). Egy indulás-utáni futás (1 perc) + 24h-s ismétlés. A
+  // host-cron/sidecar alternatíva: `node server/eraseSweep.js` (CLI-entrypoint).
+  const { eraseSweepEnabled, runEraseSweepOnce } = require('./eraseSweep');
+  const eraseAdmin = require('./notify').adminClient();
+  if (eraseSweepEnabled(process.env, !!eraseAdmin)) {
+    const runSweep = () =>
+      runEraseSweepOnce({ sb: eraseAdmin, logger: log }).catch((e) =>
+        log.error('erase-sweep', { error: e && e.message })
+      );
+    setTimeout(runSweep, 60 * 1000).unref();
+    setInterval(runSweep, 24 * 60 * 60 * 1000).unref();
+    log.info('erase-sweep ütemezve', { intervalHours: 24 });
+  }
+
   app.listen(PORT, () => {
     console.log(`vided render worker: http://localhost:${PORT}`);
     ensureSfx()

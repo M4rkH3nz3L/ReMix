@@ -84,4 +84,60 @@ async function sweepExpiredErasures({ sb, now = Date.now(), bucket = ERASE_BUCKE
   return { eligible: uids.length, erased, failed };
 }
 
-module.exports = { eligibleForErase, eraseAccount, sweepExpiredErasures, ERASE_BUCKET };
+/**
+ * 🕒 Fut-e a hard-erase sweep? CSAK ha az erase env-gate BE (`ALLOW_ACCOUNT_ERASE=1`)
+ * ÉS van service_role admin-kliens. PURE → tesztelhető (nincs mellékhatás).
+ */
+function eraseSweepEnabled(env = process.env, hasAdmin = false) {
+  return env.ALLOW_ACCOUNT_ERASE === '1' && !!hasAdmin;
+}
+
+/**
+ * Egy sweep-futás strukturált összegzés-loggal — a NAPI scheduler (index.js) ÉS a
+ * `node server/eraseSweep.js` CLI közös belépője. A `sweep`/`logger` injektálható (teszt).
+ * @returns {Promise<{eligible:number, erased:number, failed:number}>}
+ */
+async function runEraseSweepOnce({
+  sb,
+  now = Date.now(),
+  bucket = ERASE_BUCKET,
+  erase = eraseAccount,
+  sweep = sweepExpiredErasures,
+  logger,
+} = {}) {
+  const res = await sweep({ sb, now, bucket, erase });
+  const summary = { eligible: res.eligible ?? 0, erased: res.erased ?? 0, failed: res.failed ?? 0 };
+  if (logger && typeof logger.info === 'function') {
+    logger.info('erase-sweep', summary);
+  } else {
+    console.log(`[erase-sweep] eligible=${summary.eligible} erased=${summary.erased} failed=${summary.failed}`);
+  }
+  return summary;
+}
+
+module.exports = {
+  eligibleForErase,
+  eraseAccount,
+  sweepExpiredErasures,
+  eraseSweepEnabled,
+  runEraseSweepOnce,
+  ERASE_BUCKET,
+};
+
+// 🖥️ CLI: `node server/eraseSweep.js` — a host-cron / compose-sidecar EGYSZERI futtatása
+// (service_role-lal, az `ALLOW_ACCOUNT_ERASE=1` kapu mellett). Exit-kód: 0 = OK, 1 = volt
+// sikertelen törlés / hiba. A `require()`-elt modul NEM futtat (csak a közvetlen hívás).
+if (require.main === module) {
+  const { adminClient } = require('./notify');
+  const sb = adminClient();
+  if (!eraseSweepEnabled(process.env, !!sb)) {
+    console.log('[erase-sweep] kihagyva (ALLOW_ACCOUNT_ERASE!=1 vagy nincs service_role).');
+    process.exit(0);
+  }
+  runEraseSweepOnce({ sb })
+    .then((s) => process.exit(s.failed > 0 ? 1 : 0))
+    .catch((e) => {
+      console.error('[erase-sweep] hiba:', e.message);
+      process.exit(1);
+    });
+}

@@ -1,6 +1,12 @@
 // 🗑️ GDPR hard-erase sweep (03-production §03.4) — a selector + az orchestrator
 // hálózat nélkül, injektált fake sb/erase-szel. (A destruktív storage/auth staging-e2e.)
-const { eligibleForErase, eraseAccount, sweepExpiredErasures } = require('./eraseSweep');
+const {
+  eligibleForErase,
+  eraseAccount,
+  sweepExpiredErasures,
+  eraseSweepEnabled,
+  runEraseSweepOnce,
+} = require('./eraseSweep');
 
 const DAY = 24 * 3600 * 1000;
 const NOW = 1_800_000_000_000; // fix „most"
@@ -88,5 +94,30 @@ describe('eraseAccount — per-fiók hard-erase (fake sb)', () => {
     const sb = fakeSb([]);
     sb.auth.admin.deleteUser = async () => ({ error: { message: 'nincs jogosultság' } });
     await expect(eraseAccount(sb, 'uid-1')).rejects.toThrow(/auth-user törlés/);
+  });
+});
+
+describe('eraseSweepEnabled — a napi sweep/CLI kapuja', () => {
+  test('CSAK ALLOW_ACCOUNT_ERASE=1 ÉS van service_role-admin → true', () => {
+    expect(eraseSweepEnabled({ ALLOW_ACCOUNT_ERASE: '1' }, true)).toBe(true);
+    expect(eraseSweepEnabled({ ALLOW_ACCOUNT_ERASE: '1' }, false)).toBe(false); // nincs admin-kliens
+    expect(eraseSweepEnabled({ ALLOW_ACCOUNT_ERASE: '0' }, true)).toBe(false); // gate ki
+    expect(eraseSweepEnabled({}, true)).toBe(false); // nincs env → alapból OFF (prod-biztonság)
+  });
+});
+
+describe('runEraseSweepOnce — scheduler/CLI közös belépő', () => {
+  test('lefuttatja a sweepet + strukturált összegzést logol', async () => {
+    const logs = [];
+    const sweep = async () => ({ eligible: 2, erased: 1, failed: 1 });
+    const logger = { info: (msg, meta) => logs.push({ msg, meta }) };
+    const s = await runEraseSweepOnce({ sb: {}, sweep, logger });
+    expect(s).toEqual({ eligible: 2, erased: 1, failed: 1 });
+    expect(logs).toEqual([{ msg: 'erase-sweep', meta: { eligible: 2, erased: 1, failed: 1 } }]);
+  });
+
+  test('a sweep hiányzó mezőit 0-ra tölti', async () => {
+    const s = await runEraseSweepOnce({ sb: {}, sweep: async () => ({}), logger: { info: () => {} } });
+    expect(s).toEqual({ eligible: 0, erased: 0, failed: 0 });
   });
 });

@@ -20,6 +20,7 @@ import { CreatorCard } from '@/components/profile/CreatorCard';
 import { SubscriptionCard } from '@/components/profile/SubscriptionCard';
 import { AiModelsCard } from '@/components/profile/AiModelsCard';
 import { AiTasksCard } from '@/components/profile/AiTasksCard';
+import { FactoryModelsCard } from '@/components/profile/FactoryModelsCard';
 import { PerformanceCard } from '@/components/profile/PerformanceCard';
 import { AccountCard } from '@/components/profile/AccountCard';
 import { LegalCard } from '@/components/profile/LegalCard';
@@ -185,6 +186,9 @@ export default function ProfileScreen() {
 
           {/* — Tárhely + külső tárhelyek — */}
           <StorageCard />
+
+          {/* — Gyári AI-modellek (local-ai 5.1): katalógus cél-kötéssel — */}
+          <FactoryModelsCard />
 
           {/* — AI-modellek — */}
           <AiModelsCard

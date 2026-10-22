@@ -9,6 +9,9 @@
  * A [aiRouting](./aiRouting.ts) 'device'/'hybrid' döntése ezekre a modellekre épül.
  */
 
+import type { AiModality } from '@/lib/aiRouting';
+import type { AiTask } from '@/lib/aiProviders'; // type-only → nem húzza be a supabase-réteget
+
 export type ModelKind = 'whisper' | 'embedding' | 'slm' | 'onnx' | 'vision';
 
 export interface ModelManifestEntry {
@@ -16,8 +19,16 @@ export interface ModelManifestEntry {
   version: string;
   url: string;
   sha256: string;
+  /** közelítő méret a letöltés-UI-hoz; a cache a letöltött fájl VALÓS méretét tárolja */
   sizeBytes: number;
   kind: ModelKind;
+  /**
+   * 🎯 Cél-kötés (local-ai 5.2): amire a modell KÉPES (routing-tengely) és amire
+   * HASZNÁLHATÓ (termék-tengely). A feloldók híváskor ellenőrzik — modell csak a
+   * deklarált céljára fogható, a UI-szűrés önmagában nem határ.
+   */
+  modalities?: AiModality[];
+  tasks?: AiTask[];
 }
 
 export interface CachedModel {

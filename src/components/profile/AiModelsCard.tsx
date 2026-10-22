@@ -5,7 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { AvatarSvg } from '@/components/AvatarSvg';
 import { palette } from '@/constants/editor';
 import { AI_CAPABILITIES } from '@/lib/aiPersona';
-import type { AiProvider } from '@/lib/aiProviders';
+import { AI_TASKS, type AiProvider } from '@/lib/aiProviders';
 import { PROVIDER_LABEL } from './aiProviderMeta';
 import { profileStyles as styles } from './styles';
 
@@ -68,6 +68,14 @@ export function AiModelsCard({
                           .map((c) => AI_CAPABILITIES.find((x) => x.id === c)?.emoji ?? '')
                           .join('')
                       : ''}
+                    {/* 🧪 feladat-vizsga állapota (local-ai 5.3) */}
+                    {' · '}
+                    {p.validatedTasks == null
+                      ? t('profile.examNeeded')
+                      : t('profile.examBadge', {
+                          passed: p.validatedTasks.length,
+                          total: AI_TASKS.length,
+                        })}
                   </Text>
                 </View>
               </Pressable>

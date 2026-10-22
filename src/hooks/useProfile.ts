@@ -25,6 +25,7 @@ import {
   setTaskAssignment,
   updateAiProvider,
 } from '@/lib/aiProviders';
+import { examineProvider } from '@/lib/aiExamClient';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { generatePersona } from '@/lib/aiPersona';
 import { activateProDev, deactivateProDev, restorePurchases } from '@/lib/billing';
@@ -390,13 +391,19 @@ export function useProfile() {
       avatar: form.avatar,
     };
     try {
+      let saved: AiProvider;
       if (form.id) {
         await updateAiProvider(form.id, input);
+        saved = { id: form.id, isDefault: false, ...input };
       } else {
-        await createAiProvider(input);
+        saved = await createAiProvider(input);
       }
       setEditorOpen(false);
       refresh();
+      // 🧪 feladat-vizsga (local-ai 5.3) a háttérben: a modell feladatonként
+      // bevizsgázik, és csak a sikeres feladataira lesz fogható; az eredmény
+      // beérkeztekor a lista újratölt (a kártya 🧪 n/6 jelvénye frissül)
+      void examineProvider(saved).then(() => refresh());
     } catch (e) {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {

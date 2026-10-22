@@ -1,3 +1,4 @@
+import { examAllowsTask } from '@/lib/aiExam';
 import { normalizeAvatar, type AvatarConfig } from '@/lib/avatar';
 import { hasSupabaseConfig, requireSupabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -32,6 +33,16 @@ export interface AiProvider {
   avatar?: AvatarConfig;
   /** mire való: 'text' | 'image' | 'video' | 'audio' | 'captions' | 'music' | 'ideas' */
   capabilities?: string[];
+  /**
+   * 🧪 Feladat-vizsga eredménye (local-ai 5.3): mely feladatokra vizsgázott be a
+   * modell. `null`/hiányzó = még nem vizsgázott (legacy — átmenetileg minden megy);
+   * vizsga után CSAK a listában lévő feladatra fogható (`examAllowsTask`).
+   */
+  validatedTasks?: AiTask[] | null;
+  /** a vizsga időpontja (ISO) */
+  validatedAt?: string | null;
+  /** a vizsgált konfiguráció ujjlenyomata (provider|baseUrl|model) — eltérés = érvénytelen */
+  validatedModel?: string | null;
 }
 
 /** Új provider bevitele (id/isDefault nélkül). */
@@ -106,11 +117,17 @@ interface Row {
   persona_story?: string | null;
   persona_avatar?: unknown;
   capabilities?: string[] | null;
+  validated_tasks?: string[] | null;
+  validated_at?: string | null;
+  validated_model?: string | null;
 }
 
-/** a select-mezők (list/create/update egységesen ezt kéri) */
-const ROW_COLUMNS =
-  'id, label, provider, base_url, model, api_key, is_default, persona_name, persona_emoji, persona_story, persona_avatar, capabilities';
+/**
+ * A select mindent kér (`*`): a vizsga-oszlopok (validated_*) migrációja nélkül
+ * futó DB-n is működik (a hiányzó mező egyszerűen nincs a sorban) — explicit
+ * oszloplistával a régi DB-n az egész lista eltörne.
+ */
+const ROW_COLUMNS = '*';
 
 function toProvider(row: Row): AiProvider {
   const kind = (['openai', 'anthropic', 'ollama', 'custom'] as const).includes(
@@ -131,6 +148,13 @@ function toProvider(row: Row): AiProvider {
     personaStory: row.persona_story ?? undefined,
     avatar: row.persona_avatar ? normalizeAvatar(row.persona_avatar) : undefined,
     capabilities: row.capabilities ?? [],
+    // 🧪 vizsga-állapot (local-ai 5.3): hiányzó oszlop/NULL = még nem vizsgázott
+    validatedTasks:
+      row.validated_tasks == null
+        ? null
+        : row.validated_tasks.filter((t): t is AiTask => (AI_TASKS as string[]).includes(t)),
+    validatedAt: row.validated_at ?? null,
+    validatedModel: row.validated_model ?? null,
   };
 }
 
@@ -297,6 +321,9 @@ export async function aiConfigForRequest(): Promise<AiRequestConfig | undefined>
  *   1. a feladathoz kézzel rendelt provider (user_ai_task_providers),
  *   2. az alapértelmezett provider (is_default),
  *   3. `undefined` → a worker env-AI-ja.
+ * 🔒 Cél-kötés HÍVÁSKOR (local-ai 5.2/5.3): a vizsgázott provider csak a
+ * bevizsgázott feladatára megy — a nem-engedett (vagy modell-váltás óta érvénytelen
+ * vizsgájú) provider helyett a következő feloldási szint jön (nincs crash).
  * Sosem dob (az AI-funkciók hibatűrők maradnak).
  */
 export async function aiConfigForTask(task: AiTask): Promise<AiRequestConfig | undefined> {
@@ -308,18 +335,49 @@ export async function aiConfigForTask(task: AiTask): Promise<AiRequestConfig | u
     // egy lekérés: a feladathoz kötött provider beágyazva (RLS mindkét táblán saját)
     const { data } = await supabase
       .from('user_ai_task_providers')
-      .select('provider:user_ai_providers(id, label, provider, base_url, model, api_key, is_default)')
+      .select('provider:user_ai_providers(*)')
       .eq('task', task)
       .maybeSingle();
     const embedded = (data as { provider?: Row | Row[] } | null)?.provider;
     const row = Array.isArray(embedded) ? embedded[0] : embedded;
     if (row) {
-      return toConfig(toProvider(row));
+      const p = toProvider(row);
+      if (examAllowsTask(p, task)) {
+        return toConfig(p);
+      }
+      // a hozzárendelt modell nem erre vizsgázott → default/env-fallback
     }
-    // nincs feladat-hozzárendelés → alapértelmezett provider
-    return aiConfigForRequest();
+    const def = await getDefaultAiProvider();
+    if (def && examAllowsTask(def, task)) {
+      return toConfig(def);
+    }
+    return undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * 🧪 A feladat-vizsga eredményének mentése (local-ai 5.3): CSAK a sikeres
+ * feladatok + az ujjlenyomat, amire az eredmény vonatkozik. A provider
+ * módosítása (modell/URL) után az ujjlenyomat eltér → újra-vizsga kell.
+ */
+export async function saveProviderExam(
+  id: string,
+  tasks: AiTask[],
+  fingerprint: string,
+): Promise<void> {
+  const supabase = requireSupabase();
+  const { error } = await supabase
+    .from('user_ai_providers')
+    .update({
+      validated_tasks: tasks,
+      validated_at: new Date().toISOString(),
+      validated_model: fingerprint,
+    })
+    .eq('id', id);
+  if (error) {
+    throw new Error(error.message);
   }
 }
 

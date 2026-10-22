@@ -56,6 +56,8 @@ export function ImageStudioSheets({
   onRaster,
   onSvg,
   onPdf,
+  onPsd,
+  canPsd,
   onVideo,
   onShareSlideshow,
   onShareCarousel,
@@ -77,6 +79,9 @@ export function ImageStudioSheets({
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
+  onPsd: () => void;
+  /** 🔒 PSD-export Pro-kapu (false → letiltva + upsell) */
+  canPsd: boolean;
   onVideo: () => void;
   onShareSlideshow?: () => void;
   onShareCarousel?: () => void;
@@ -151,9 +156,11 @@ export function ImageStudioSheets({
           doc={doc}
           busy={busy}
           pageCount={mode === 'project' ? pageCount : 1}
+          canPsd={canPsd}
           onRaster={onRaster}
           onSvg={onSvg}
           onPdf={onPdf}
+          onPsd={onPsd}
           onVideo={onVideo}
           onShareSlideshow={onShareSlideshow}
           onShareCarousel={onShareCarousel}

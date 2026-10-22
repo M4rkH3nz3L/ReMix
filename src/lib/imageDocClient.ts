@@ -137,6 +137,68 @@ export async function importPsd(
   return body?.doc ?? null;
 }
 
+/**
+ * 🖼️ PSD-export (IMAGE 01.2): az `ImageDoc`-ot felküldi a worker `/psd/export`-jára,
+ * ami RÉTEG-MEGŐRZÉSSEL (NEM flatten!) felépíti a .psd-t (ag-psd), a média-tárba
+ * tölti, és a letölthető URL-t adja vissza. A kliens letölti a `document/media`-ba,
+ * és megosztja. A `importPsd` PÁRJA.
+ *
+ * Tier-gate: `ensureCloud('psdExport')` DOB (ProRequiredError), ha nincs Pro — a
+ * UI guardPro-val paywallra fordítja. A worker SZERVER-hitelesen is gate-el (402).
+ *
+ * @param doc a kép-dokumentum (réteg-fa)
+ * @param projectId opcionális — a PSD projekt-rendezett kulcsot kap a tárban
+ * @returns a letöltött .psd helyi uri-ja, vagy `null` (weben / hiba esetén)
+ */
+export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  // 🔒 tier-gate: nincs Pro → ProRequiredError (a UI guardPro-val paywallra fordítja)
+  const base = ensureCloud('psdExport');
+
+  const res = await uploadFetch(`${base}/psd/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ doc, ...(projectId ? { projectId } : {}) }),
+  });
+  if (!res.ok) {
+    // a worker barátságos (magyar) hibaüzenetet ad — azt dobjuk tovább
+    let msg = 'A PSD-export nem sikerült.';
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) {
+        msg = body.error;
+      }
+    } catch {
+      // nem-JSON válasz — marad az alap üzenet
+    }
+    throw new Error(msg);
+  }
+  const body = (await res.json()) as { url?: string; name?: string };
+  if (!body?.url) {
+    return null;
+  }
+
+  // a kész .psd-t a document/media-ba töltjük (a többi export-letöltés mintája)
+  try {
+    const dir = new Directory(Paths.document, 'media');
+    if (!dir.exists) {
+      dir.create();
+    }
+    const fileName = (body.name || `${doc.id}.psd`).replace(/[^\w.-]+/g, '_');
+    const target = new File(dir, `psd_${Date.now().toString(36)}_${fileName}`);
+    const dl = await fetch(body.url);
+    if (!dl.ok) {
+      return null;
+    }
+    target.write(new Uint8Array(await dl.arrayBuffer()));
+    return target.uri;
+  } catch {
+    return null;
+  }
+}
+
 export async function renderImageDoc(
   doc: ImageDoc,
   // a vászon-magasság: a létrehozáskor választott `doc.height`, egyébként az alap.

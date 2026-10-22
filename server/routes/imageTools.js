@@ -19,6 +19,8 @@ const { asTier } = require('../tiers');
 const { activeTier } = require('../billing');
 const { renderImageDoc, imageDocGuard } = require('../imagedoc');
 const { parsePsdToImageDoc } = require('../psdImport');
+const { buildPsdFromImageDoc } = require('../psdExport');
+const { safeFetch } = require('../ssrf');
 const { mediaStoreEnabled, uploadMedia } = require('../mediastore');
 const { enforceQuota, trackUsage, userTier } = require('../usage');
 const { renderSvgToPdf } = require('../svgPdf');
@@ -166,6 +168,91 @@ function psdMakeId() {
   let n = 0;
   return (prefix) => `${prefix}_${(n++).toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
 }
+
+/**
+ * 🖼️ PSD-export (IMAGE 01.2): a kliens elküldi az `ImageDoc`-ot (JSON), a worker a
+ * fotó-rétegek PNG-jeit a média-tárból letölti (SSRF-védett `safeFetch`), majd a
+ * `buildPsdFromImageDoc` mag RÉTEG-MEGŐRZÉSSEL (NEM flatten!) felépíti a .psd-t,
+ * és a buffert FELTÖLTI a média-tárba → letölthető URL-t ad vissza (a kliens
+ * menti/megosztja). A `/psd/import` PÁRJA, UGYANAZZAL a tier-gate-tel.
+ *
+ * Tier-gate (IMAGE 01.4): Pro-only SZERVER-hitelesen (`proOnly`) + havi `cloudJobs`
+ * kvóta (`enforceQuota`) + siker → `trackUsage` — pontosan mint a `/psd/import`.
+ * A dev `ALLOW_INSECURE_DEV` bypass a gate-ekben automatikus (konzisztens).
+ */
+router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (req, res) => {
+  const uid = callerId(req, req.body?.userId);
+  let workDir;
+  const cleanup = () => {
+    if (workDir) {
+      fs.rm(workDir, { recursive: true, force: true }, () => {});
+    }
+  };
+  try {
+    const doc = req.body && typeof req.body.doc === 'object' ? req.body.doc : null;
+    if (!doc || !Array.isArray(doc.layers)) {
+      res.status(400).json({ error: 'Hiányzó vagy hibás ImageDoc.' });
+      return;
+    }
+    if (!mediaStoreEnabled()) {
+      res.status(503).json({ error: 'A média-tár nincs konfigurálva (SUPABASE service_role vagy S3_* / R2).' });
+      return;
+    }
+    // 🛡️ a doc átmegy a RENDER-guardon (nagy-doc védőkorlát) a PSD-építés ELŐTT
+    const guardError = imageDocGuard(doc);
+    if (guardError) {
+      res.status(413).json({ error: guardError });
+      return;
+    }
+
+    // 📊 §2.2: a felhő-PSD-export havi `cloudJobs`-kvóta-gate (a `/psd/import` mintája)
+    const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', 1);
+    if (!gate.ok) {
+      res.status(429).json({ error: `Elérted a havi felhő-művelet kvótád (hátralévő: ${gate.remaining}).` });
+      return;
+    }
+
+    // a fotó-réteg PNG-jét a média-URL-ről töltjük (SSRF-védett; nem-OK → a réteg
+    // pixel nélkül marad, a mag best-effort kihagyja). ArrayBuffer → Node Buffer.
+    const fetchLayerPng = async (srcOrUri) => {
+      const url = String(srcOrUri || '');
+      if (!/^https?:\/\//i.test(url)) {
+        // nem-HTTP (pl. helyi file-uri) a workeren nem elérhető → a réteg kimarad
+        return null;
+      }
+      const r = await safeFetch(url, { redirect: 'follow' });
+      if (!r || !r.ok) {
+        return null;
+      }
+      return Buffer.from(await r.arrayBuffer());
+    };
+
+    const psdBuf = await buildPsdFromImageDoc(doc, { fetchLayerPng });
+
+    // a PSD-t a média-tárba töltjük → letölthető URL (projekt-rendezett kulcs)
+    workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-psd-'));
+    const publicBase = `${req.protocol}://${req.get('host')}`;
+    const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
+    const exportId = crypto.randomUUID();
+    const safeName = (String(doc.name || 'image').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'image');
+    const key = projectId
+      ? `${projectId}/psd-export/${exportId}/${safeName}.psd`
+      : `psd-export/${exportId}/${safeName}.psd`;
+    const tmp = path.join(workDir, `${safeName}.psd`);
+    fs.writeFileSync(tmp, psdBuf);
+    const url = await uploadMedia(key, tmp, 'image/vnd.adobe.photoshop', publicBase);
+
+    // 📊 §2.2: sikeres export → +1 `cloudJobs` (atomikus RPC; best-effort)
+    void trackUsage(uid, 'cloudJobs', 1);
+    cleanup();
+    res.json({ url, name: `${safeName}.psd`, bytes: psdBuf.length });
+  } catch (err) {
+    cleanup();
+    const msg = String(err && err.message ? err.message : err).slice(0, 300);
+    console.warn('psd/export hiba:', msg);
+    res.status(400).json({ error: msg });
+  }
+});
 
 // 📄 SVG → nyomdakész vektor-PDF (a kliens imageDocToSvg kimenete → Chromium page.pdf).
 // Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott fotóktól nagy lehet — a mező-méret-limit

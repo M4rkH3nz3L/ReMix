@@ -36,7 +36,7 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
-import { importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
+import { exportPsd, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { makeId } from '@/lib/id';
 import { pickImage, pickPsd, pickSvg } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
@@ -924,6 +924,41 @@ export function ImageStudioBody({
     }
   };
 
+  /**
+   * 🖼️ PSD-export (IMAGE 01.2): a réteg-fát a workerrel RÉTEG-MEGŐRZÉSSEL (NEM
+   * flatten!) .psd-vé építjük (`exportPsd` → `/psd/export`), és megosztjuk. Pro-
+   * gated: free usernél az ExportSheet gombja letiltva (`canPsd`), de ha ide jutunk,
+   * a `guardPro` elkapja a `ProRequiredError`-t és felhozza a paywallt.
+   */
+  const exportPsdFile = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const uri = await guardPro(
+        () => exportPsd(doc, project?.id),
+        (e) => Alert.alert(t('studio.image.psdExportFailTitle'), e.message || t('studio.image.psdExportFailBody'))
+      );
+      if (!uri) {
+        return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
+      }
+      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/vnd.adobe.photoshop',
+          dialogTitle: t('studio.export'),
+        }).catch(() => {});
+      } else {
+        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
+      }
+    } catch (e) {
+      Alert.alert(t('studio.image.psdExportFailTitle'), (e as Error)?.message || t('studio.image.psdExportFailBody'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 🖼️→🎬 a kirasterizált kép ÚJ videó-projektbe (ReMix cél: „kép → videó")
   const insertIntoVideo = async () => {
     if (!doc || !project || busy) {
@@ -1427,6 +1462,8 @@ export function ImageStudioBody({
         onRaster={(o) => void exportImage(o)}
         onSvg={() => void exportSvg()}
         onPdf={() => void exportPdf()}
+        onPsd={() => void exportPsdFile()}
+        canPsd={isPro}
         onVideo={() => void insertIntoVideo()}
         onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
         onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}

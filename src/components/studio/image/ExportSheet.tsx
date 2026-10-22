@@ -22,9 +22,11 @@ export function ExportSheet({
   doc,
   busy,
   pageCount = 1,
+  canPsd = true,
   onRaster,
   onSvg,
   onPdf,
+  onPsd,
   onVideo,
   onShareSlideshow,
   onShareCarousel,
@@ -34,9 +36,13 @@ export function ExportSheet({
   busy: boolean;
   /** a galéria lap-száma — ≥2 esetén jelenik meg a feed-megosztás (diavetítés/lapozható) */
   pageCount?: number;
+  /** 🔒 PSD-export Pro-kapu: false → a gomb letiltva (upsell), true → engedélyezett */
+  canPsd?: boolean;
   onRaster: (opts: { format: Fmt; height: number; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
+  /** 🖼️ réteges .psd export (worker, réteg-megőrzés) — Pro-gated */
+  onPsd: () => void;
   onVideo: () => void;
   onShareSlideshow?: () => void;
   onShareCarousel?: () => void;
@@ -111,6 +117,19 @@ export function ExportSheet({
       >
         <Ionicons name="document-outline" size={16} color={palette.text} />
         <Text style={styles.secondaryText}>{t('studio.image.exportPdf')}</Text>
+      </Pressable>
+      {/* 🖼️ réteges PSD-export (worker, réteg-megőrzés) — Pro-gated; free → letiltva + upsell */}
+      <Pressable
+        style={[styles.secondary, (busy || !canPsd) && styles.disabled]}
+        disabled={busy || !canPsd}
+        onPress={() => {
+          onPsd();
+          onClose();
+        }}
+      >
+        <Ionicons name="layers-outline" size={16} color={palette.text} />
+        <Text style={styles.secondaryText}>{t('studio.image.exportPsd')}</Text>
+        {!canPsd ? <Text style={styles.proBadge}>PRO</Text> : null}
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -193,5 +212,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   secondaryText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  proBadge: {
+    color: palette.accent,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
   disabled: { opacity: 0.5 },
 });

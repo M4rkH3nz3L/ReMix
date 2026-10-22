@@ -2588,6 +2588,7 @@
         "voiceClone": "Voice clone",
         "aiAvatar": "AI avatar",
         "psdImport": "PSD import (layered)",
+        "psdExport": "PSD export (layered)",
         "soundLibrary": "Sound library",
         "collab": "Project collaboration",
         "objectTrack": "Object tracking"
@@ -3009,6 +3010,7 @@
       "exportShare": "Share / Download (PNG)",
       "exportSvg": "Export SVG (vector)",
       "exportPdf": "Export PDF (vector)",
+      "exportPsd": "Export PSD (layered)",
       "exportToVideo": "Insert into new video",
       "skiaMissing": "This tool needs a new app build (the Skia module is missing from this dev client). Rebuild the dev client, then try again.",
       "export": {
@@ -3031,6 +3033,8 @@
       "undoImportPsd": "Import PSD",
       "psdFailTitle": "PSD import",
       "psdFailBody": "Couldn't read this PSD. Try a smaller or simpler file.",
+      "psdExportFailTitle": "PSD export",
+      "psdExportFailBody": "Couldn't build the PSD. Try a smaller or simpler document.",
       "undoOrder": "Layer order",
       "undoRotate": "Rotate 90°",
       "undoFlip": "Flip",

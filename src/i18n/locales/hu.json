@@ -2588,6 +2588,7 @@
         "voiceClone": "Hang-klón",
         "aiAvatar": "AI avatar",
         "psdImport": "PSD-import (réteges)",
+        "psdExport": "PSD-export (réteges)",
         "soundLibrary": "Hang-könyvtár",
         "collab": "Projekt-kollaboráció",
         "objectTrack": "Objektum-követés"
@@ -3009,6 +3010,7 @@
       "exportShare": "Megosztás / Letöltés (PNG)",
       "exportSvg": "SVG-export (vektor)",
       "exportPdf": "PDF-export (vektor)",
+      "exportPsd": "PSD-export (réteges)",
       "exportToVideo": "Beszúrás új videóba",
       "skiaMissing": "Ehhez az eszközhöz új app-build kell (a Skia natív modul hiányzik ebből a dev-kliensből). Építsd újra a dev-klienst, majd próbáld újra.",
       "export": {
@@ -3031,6 +3033,8 @@
       "undoImportPsd": "PSD importálása",
       "psdFailTitle": "PSD import",
       "psdFailBody": "Nem sikerült beolvasni ezt a PSD-t. Próbálj kisebb vagy egyszerűbb fájlt.",
+      "psdExportFailTitle": "PSD export",
+      "psdExportFailBody": "Nem sikerült felépíteni a PSD-t. Próbálj kisebb vagy egyszerűbb dokumentumot.",
       "undoOrder": "Réteg-sorrend",
       "undoRotate": "Forgatás 90°",
       "undoFlip": "Tükrözés",

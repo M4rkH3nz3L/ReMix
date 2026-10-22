@@ -2588,6 +2588,7 @@
         "voiceClone": "Stimmklon",
         "aiAvatar": "KI-Avatar",
         "psdImport": "PSD-Import (mit Ebenen)",
+        "psdExport": "PSD-Export (mit Ebenen)",
         "soundLibrary": "Sound-Bibliothek",
         "collab": "Projekt-Zusammenarbeit",
         "objectTrack": "Objektverfolgung"
@@ -2979,6 +2980,7 @@
       "exportShare": "Teilen / Herunterladen (PNG)",
       "exportSvg": "SVG-Export (Vektor)",
       "exportPdf": "PDF-Export (Vektor)",
+      "exportPsd": "PSD-Export (mit Ebenen)",
       "exportToVideo": "In neues Video einfügen",
       "skiaMissing": "Dieses Werkzeug benötigt einen neuen App-Build (das Skia-Modul fehlt in diesem Dev-Client). Erstelle den Dev-Client neu und versuche es erneut.",
       "export": {
@@ -3001,6 +3003,8 @@
       "undoImportPsd": "PSD importieren",
       "psdFailTitle": "PSD-Import",
       "psdFailBody": "Diese PSD konnte nicht gelesen werden. Versuche eine kleinere oder einfachere Datei.",
+      "psdExportFailTitle": "PSD-Export",
+      "psdExportFailBody": "Die PSD konnte nicht erstellt werden. Versuche ein kleineres oder einfacheres Dokument.",
       "undoOrder": "Ebenen-Reihenfolge",
       "undoRotate": "Um 90° drehen",
       "undoFlip": "Spiegeln",

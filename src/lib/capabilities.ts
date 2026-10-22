@@ -51,6 +51,7 @@ export type CapabilityId =
   | 'voiceClone' // hang-klón (a TTS bővítése; hozzájárulással)
   | 'aiAvatar' // AI-avatar / digital-human
   | 'psdImport' // 🖼️ Kép Stúdió: PSD → réteges ImageDoc (worker-parser, réteg-megőrzés)
+  | 'psdExport' // 🖼️ Kép Stúdió: ImageDoc → réteges .psd (worker-builder, réteg-megőrzés)
   | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
 
 /**
@@ -105,6 +106,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   voiceClone: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.voiceClone' },
   aiAvatar: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.aiAvatar' },
   psdImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdImport' },
+  psdExport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdExport' },
   // a hang-könyvtár felhőből jön, de minden felhasználónak jár
   soundLibrary: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.soundLibrary' },
 };

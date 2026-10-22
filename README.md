@@ -28,9 +28,10 @@ igényel egy valódi eszközön — lásd lent.
 
 ## Natív build parancssorból (lokális dev + EAS felhő/prod)
 
-A dev-buildhez **Xcode 26.4+** kell (a projekt Xcode 27 / Swift 6.4-en épül; a régebbi
+A dev-buildhez **iOS-en Xcode 26.4+** kell (a projekt Xcode 27 / Swift 6.4-en épül; a régebbi
 `weak let` toolchain-gát megszűnt) + egy Apple fejlesztői csapat (eszközre-telepítéshez
-ingyenes *personal team* is jó).
+ingyenes *personal team* is jó); **Android-on JDK 17 + Android SDK** (lásd lent az *Android*
+alszakaszt). A felhő-build (EAS) egyik platformhoz sem igényel lokális toolchaint.
 
 ### Dev-stack (háttérben fusson)
 
@@ -93,6 +94,45 @@ idb ui text --udid <SIM-UDID> "szöveg"
   webkameraként elkéri a telefon kameráját, így az iPhone-on belül (natív Kamera / a mi Live-unk)
   fekete lesz. Kamera/live teszthez **húzd ki a kábelt** (futáshoz nem kell USB — WiFi-n megy),
   vagy *iPhone → Beállítások → Általános → AirPlay és folytonosság → Folytonossági kamera → KI*.
+
+### Android (lokális dev build)
+
+Android-hoz **JDK 17 + Android SDK (command-line tools)** kell (Homebrew-val), nem Xcode.
+Egyszeri telepítés + env (a `~/.zshrc`-ben rögzítve, ezek a bevált értékek):
+
+```bash
+brew install openjdk@17
+brew install --cask android-commandlinetools
+sdkmanager "platform-tools" "emulator" "platforms;android-36" \
+           "system-images;android-36;google_apis;arm64-v8a" "build-tools;36.0.0"
+
+# ~/.zshrc:
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+```
+
+Eszközök listázása + emulátor indítása:
+
+```bash
+adb devices                 # csatlakozott fizikai eszközök / futó emulátorok
+emulator -list-avds         # elérhető AVD-k (teszt-AVD: ReMix_API36 — Android 16 arm64)
+emulator -avd ReMix_API36 & # emulátor indítása háttérben
+```
+
+Build + telepítés + indítás (a Metro már fusson, lásd *Dev-stack*):
+
+```bash
+npx expo run:android --no-bundler              # futó emulátorra VAGY az egyetlen eszközre
+npx expo run:android --device <ADB-SERIAL>     # konkrét eszköz (az `adb devices` sorából)
+npx expo run:android --variant release --no-bundler   # lokális RELEASE-build (prod-viselkedés, nem store)
+```
+
+- Package: `com.h3nz3l.remix`. Az `android/` a repóban van (committed prebuild) — `npx expo prebuild --platform android --clean` csak natív-config változásnál kell.
+- `--no-bundler`: a **már futó Metrót** használja. **Csak JS-t változtattál?** NEM kell új build — elég a **reload** az appban (mint iOS-en). Új build csak natív-dep/config-változásnál.
+- **„Szerver nem elérhető" emulátoron** → a host a `10.0.2.2`-n érhető el, fizikai eszköz pedig a Mac **LAN-IP**-jén (lásd `EXPO_PUBLIC_SERVER_HOST`); az eszköz a Mac-kel **azonos WiFi-n** legyen.
+- Az **emulátor szoftveres GPU-t** használ → a Skia-előnézet/live-kamera lassú vagy fekete lehet; ezeket **fizikai eszközön** teszteld.
 
 ### Felhő-build (EAS): dev-client · preview · prod/store
 

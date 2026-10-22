@@ -264,6 +264,7 @@ describe('nem-fotó réteg rasterizálóval (text/shape → raszter-réteg)', ()
       width: 60,
       height: 60,
       layers: [
+        // `shape` mező NÉLKÜL (ismeretlen forma) → NEM vektorizálható → raszter-fallback
         { id: 'sh', kind: 'shape', name: 'Box', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5 },
       ],
     };
@@ -275,6 +276,154 @@ describe('nem-fotó réteg rasterizálóval (text/shape → raszter-réteg)', ()
     expect(read.children).toHaveLength(1);
     expect(read.children[0].name).toBe('Box');
     expect(read.children[0].imageData.width).toBe(30);
+  });
+});
+
+describe('shape-réteg → PSD-VEKTOR (VECTOR 03.2) — él-vektor, NEM raszter', () => {
+  /** 1 zárt Bézier-path (3 pont, fogókkal) + 1 téglalap (kontúrral) — mind shape-réteg */
+  function vectorDoc() {
+    return {
+      id: 'vd',
+      name: 'vector',
+      aspectRatio: '1:1',
+      width: 100,
+      height: 80,
+      layers: [
+        // zárt köbös Bézier path, fill-lel (NINCS border → nincs stroke)
+        {
+          id: 'p1',
+          kind: 'shape',
+          shape: 'path',
+          name: 'Blob',
+          position: { x: 0.5, y: 0.5 },
+          w: 0.6,
+          h: 0.6,
+          fill: '#ff3300',
+          closed: true,
+          points: [
+            { x: 0.5, y: 0, h2: { x: 0.8, y: 0.1 } },
+            { x: 1, y: 1, h1: { x: 0.9, y: 0.7 } },
+            { x: 0, y: 1 },
+          ],
+        },
+        // téglalap fill + kontúr → vectorFill + vectorStroke
+        {
+          id: 'r1',
+          kind: 'shape',
+          shape: 'rectangle',
+          name: 'Rect',
+          position: { x: 0.3, y: 0.3 },
+          w: 0.4,
+          h: 0.2,
+          fill: '#00cc66',
+          borderColor: '#000000',
+          borderWidth: 2,
+        },
+      ],
+    };
+  }
+
+  let read;
+  beforeAll(async () => {
+    // a fetchLayerPng SOHA nem hívódik (nincs fotó-réteg); rasterizáló SINCS →
+    // ha bármelyik shape raszterre esne, elveszne — a teszt bizonyítja, hogy VEKTOR
+    const psdBuf = await buildPsdFromImageDoc(vectorDoc(), { fetchLayerPng: async () => null });
+    read = agPsd.readPsd(psdBuf, { useImageData: false, skipThumbnail: true });
+  });
+
+  test('mindkét shape-réteg bekerült (vektorként, raszter/rasterizáló NÉLKÜL)', () => {
+    expect(read.children).toHaveLength(2);
+    expect(read.children.map((c) => c.name).sort()).toEqual(['Blob', 'Rect']);
+  });
+
+  test('a path-réteg ÉL-VEKTOR: vectorMask + knot-szám + vectorFill szín', () => {
+    const blob = read.children.find((c) => c.name === 'Blob');
+    expect(blob.vectorMask).toBeTruthy();
+    expect(blob.vectorMask.paths).toHaveLength(1);
+    expect(blob.vectorMask.paths[0].open).toBe(false); // zárt
+    expect(blob.vectorMask.paths[0].knots).toHaveLength(3); // 3 horgony
+    // NINCS beégetett raszter-pixel → tiszta vektor
+    expect(blob.imageData).toBeFalsy();
+    // a fill szín visszaolvasható
+    expect(blob.vectorFill).toEqual({ type: 'color', color: { r: 255, g: 51, b: 0 } });
+    // nincs border → nincs stroke
+    expect(blob.vectorStroke).toBeFalsy();
+  });
+
+  test('a Bézier-fogók a doc-pixelbe transzformálva jönnek vissza', () => {
+    const blob = read.children.find((c) => c.name === 'Blob');
+    // 0.6×0.6 doboz (0.5,0.5) középen a 100×80 vásznon → left=20 top=16 bw=60 bh=48
+    // 1. horgony (0.5,0) → (50,16); h2 (0.8,0.1) = cpAfter → (68, 20.8)
+    const k0 = blob.vectorMask.paths[0].knots[0].points.map((v) => Math.round(v * 100) / 100);
+    expect(k0[2]).toBeCloseTo(50); // anchor x
+    expect(k0[3]).toBeCloseTo(16); // anchor y
+    expect(k0[4]).toBeCloseTo(68); // cpAfter x (h2)
+    expect(k0[5]).toBeCloseTo(20.8); // cpAfter y (h2)
+  });
+
+  test('a téglalap ÉL-VEKTOR: 4 sarok-knot + vectorFill + vectorStroke (kontúr)', () => {
+    const rect = read.children.find((c) => c.name === 'Rect');
+    expect(rect.vectorMask.paths[0].knots).toHaveLength(4);
+    expect(rect.vectorFill.color).toEqual({ r: 0, g: 204, b: 102 });
+    expect(rect.vectorStroke).toBeTruthy();
+    expect(rect.vectorStroke.content.color).toEqual({ r: 0, g: 0, b: 0 });
+    // borderWidth 2% * 80 (vászon-magasság) = 1.6px
+    expect(rect.vectorStroke.lineWidth.value).toBeCloseTo(1.6);
+  });
+
+  test('NYITOTT path → vonal-vektor (vectorStroke a fill színnel, nincs vectorFill)', async () => {
+    const doc = {
+      id: 'op',
+      name: 'open',
+      aspectRatio: '1:1',
+      width: 100,
+      height: 100,
+      layers: [
+        {
+          id: 'ln',
+          kind: 'shape',
+          shape: 'path',
+          name: 'Line',
+          position: { x: 0.5, y: 0.5 },
+          w: 1,
+          h: 1,
+          fill: '#2200ff',
+          closed: false,
+          strokeWidth: 4,
+          points: [{ x: 0, y: 0 }, { x: 0.5, y: 0.5 }, { x: 1, y: 0 }],
+        },
+      ],
+    };
+    const buf = await buildPsdFromImageDoc(doc, { fetchLayerPng: async () => null });
+    const r = agPsd.readPsd(buf, { useImageData: false, skipThumbnail: true });
+    const line = r.children[0];
+    expect(line.vectorMask.paths[0].open).toBe(true);
+    expect(line.vectorMask.paths[0].knots).toHaveLength(3);
+    expect(line.vectorFill).toBeFalsy(); // nyitott → nincs kitöltés
+    expect(line.vectorStroke.content.color).toEqual({ r: 34, g: 0, b: 255 });
+    expect(line.vectorStroke.lineWidth.value).toBeCloseTo(4); // 4% * 100
+  });
+
+  test('1-pontos path (nem vektorizálható) → raszter-fallback a rasterizálóval', async () => {
+    const doc = {
+      id: 'bad',
+      name: 'bad',
+      aspectRatio: '1:1',
+      width: 50,
+      height: 50,
+      layers: [
+        { id: 's', kind: 'shape', shape: 'path', name: 'Dot', position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fill: '#000', points: [{ x: 0.5, y: 0.5 }] },
+      ],
+    };
+    const buf = await buildPsdFromImageDoc(doc, {
+      fetchLayerPng: async () => null,
+      rasterizeLayerPng: async () => solidPng(10, 10, [0, 0, 0, 255]),
+    });
+    const r = agPsd.readPsd(buf, { useImageData: true, skipThumbnail: true });
+    expect(r.children).toHaveLength(1);
+    // raszter-réteg lett (nincs vektor-mask), de a réteg NEM veszett el
+    expect(r.children[0].imageData).toBeTruthy();
+    expect(r.children[0].vectorMask).toBeFalsy();
   });
 });
 

@@ -16,6 +16,7 @@ const agPsd = require('ag-psd');
 const { PNG } = require('pngjs');
 
 const { BLEND_MAP } = require('./psdImport');
+const { shapeToVector } = require('./psdVector');
 
 // 🧩 PURE-JS canvas-shim az ag-psd ÍRÓJÁHOZ. Az `imageDataStyle: 'raw'` úttal a
 // writer a nyers RGBA-t közvetlenül csomagolja, de a defenzív init így is kell
@@ -148,10 +149,13 @@ function pngToImageData(pngBuffer) {
  * mezőket (név/opacity/blend/visibility/box); a `fetchLayerPng` injektált.
  *
  * - PhotoLayer: a réteg PNG-jét a `fetchLayerPng(src||uri)` adja → `pngToImageData`.
- * - TextLayer/ShapeLayer/FillLayer/AdjustmentImageLayer: RASZTER-réteg — a hívó
+ * - ShapeLayer: ÉL-VEKTOR (VECTOR 03.2) — `shapeToVector` → `vectorMask`+`vectorFill`
+ *   (+`vectorStroke`); a forma Photoshopban tovább-szerkeszthető vektor marad (NEM
+ *   raszter). Ha a forma nem vektorizálható → raszter-fallback (lásd alább).
+ * - TextLayer/FillLayer/AdjustmentImageLayer: RASZTER-réteg — a hívó
  *   `rasterizeLayerPng`-je (ha van) PNG-t ad vissza, különben a réteg kimarad.
- *   (A v1-ben NINCS szerkeszthető PSD-szöveg/vektor — dokumentálva: a text/shape
- *   réteg a Photoshopban raszter-pixelként nyílik, nem él/típus-szerkeszthetően.)
+ *   (A v1-ben NINCS szerkeszthető PSD-SZÖVEG — dokumentálva: a text-réteg a
+ *   Photoshopban raszter-pixelként nyílik, nem típus-szerkeszthetően.)
  */
 async function buildLayer(layer, ctx) {
   if (!layer || typeof layer !== 'object') {
@@ -192,10 +196,32 @@ async function buildLayer(layer, ctx) {
     };
   }
 
+  // 🔷 shape-réteg → PSD-VEKTOR (VECTOR 03.2): a rect/ellipse/line/arrow/star/path
+  // formát `vectorMask` + `vectorFill` (+ `vectorStroke`) ÉL-VEKTORKÉNT őrizzük (NEM
+  // raszterizáljuk) → Photoshopban tovább-szerkeszthető vektor-forma. A geometria a
+  // `psdVector.shapeToVector`-ban (a svgExport matekjának pure-JS párja). A roundtrip
+  // BIZONYÍTOTT (psdVector.test.js + a lenti export-teszt): a knots/fill/stroke pontosan
+  // visszaolvasható. Ha a forma nem vektorizálható (null) → raszter-fallback alább.
+  if (layer.kind === 'shape') {
+    const vec = shapeToVector(layer, ctx.canvasW, ctx.canvasH);
+    if (vec) {
+      // a box-a a forma-doboz (docBox), a vektor-mask doc-pixel koordinátái mellé;
+      // nincs `imageData` → a réteg tiszta vektor (a PS a maszkból rajzolja a formát).
+      return {
+        ...base,
+        right: box.right,
+        bottom: box.bottom,
+        ...vec,
+      };
+    }
+    // vec === null → a forma nem vektorizálható (pl. 1-pontos path) → raszter alább
+  }
+
   // ✍️/🔷/🎚️ nem-fotó réteg (text/shape/fill/adjust): RASZTERIZÁLÁS. A hívó opcionális
   // `rasterizeLayerPng(layer, box)`-a a `server/imagedoc.js` per-réteg renderével
   // állít elő egy átlátszó PNG-t; ha nincs rasterizáló, a réteg kimarad (dokumentált
-  // v1-korlát: az exportban csak a fotó-rétegek garantáltak réteg-pixelként).
+  // v1-korlát: az exportban a fotó-rétegek réteg-pixelként, a shape-ek ÉL-VEKTORként
+  // garantáltak; a text/fill/adjust raszterként, ha van rasterizáló).
   if (typeof ctx.rasterizeLayerPng === 'function') {
     let png = null;
     try {

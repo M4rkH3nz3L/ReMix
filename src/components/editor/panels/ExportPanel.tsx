@@ -34,7 +34,7 @@ import {
   renderAndPost,
   renderAndShareMp4,
 } from '@/lib/render';
-import type { ExportPlatform, PostTarget, RenderSettings } from '@/lib/render';
+import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
@@ -82,6 +82,9 @@ export function ExportPanel() {
   const [fps, setFps] = useState<number>(30);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [codec, setCodec] = useState<'h264' | 'hevc' | 'av1' | 'prores'>('h264');
+  // ⚙️ Pro: render-motor választás (eszköz/felhő) — a posztolás/feed-megosztás
+  // is ezt használja ('auto' = eszköz, ha tudja; különben felhő)
+  const [engine, setEngine] = useState<RenderMode>('auto');
   const [platform, setPlatform] = useState<ExportPlatform | null>(null);
   // 📦 batch-export: több platform egyszerre (deduplikált jobok → sorban renderelve)
   const [batchSet, setBatchSet] = useState<ReadonlySet<ExportPlatform>>(new Set());
@@ -271,7 +274,10 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withProgress(t('feed.rendering'), (report) =>
-          publishRenderedProject(project, report, { visibility }).then((res) => {
+          publishRenderedProject(project, report, {
+            visibility,
+            ...(isPro ? { renderMode: engine } : {}),
+          }).then((res) => {
             useEditorStore.getState().setRendered(res.project.rendered);
             Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
               { text: t('common.ok') },
@@ -301,7 +307,10 @@ export function ExportPanel() {
     void guardPro(
       () =>
         withCancellableProgress(t('panels.export.postTo', { target }), (report, signal) =>
-          renderAndPost(project, target, report, buildSettings(), { mode: 'auto', signal })
+          renderAndPost(project, target, report, buildSettings(), {
+            mode: isPro ? engine : 'auto',
+            signal,
+          })
         ),
       (err) => {
         if (!isRenderCancelledError(err)) {
@@ -571,6 +580,34 @@ export function ExportPanel() {
             </View>
             <Text style={styles.note}>{t('panels.export.advancedNote')}</Text>
           </View>
+        ) : null}
+
+        {/* ⚙️ Pro: render-motor választás — eszköz (ingyen) vagy felhő (mért);
+            a posztolás/feed-megosztás is a kiválasztott motort használja */}
+        {isPro ? (
+          <>
+            <Text style={styles.settingLabel}>{t('panels.export.engineLabel')}</Text>
+            <View style={styles.row}>
+              <Chip
+                label={t('panels.export.engineAuto')}
+                active={engine === 'auto'}
+                onPress={() => setEngine('auto')}
+              />
+              {isNativeRenderAvailable() ? (
+                <Chip
+                  label={t('panels.export.engineLocal')}
+                  active={engine === 'local'}
+                  onPress={() => setEngine('local')}
+                />
+              ) : null}
+              <Chip
+                label={t('panels.export.engineCloud')}
+                active={engine === 'cloud'}
+                onPress={() => setEngine('cloud')}
+              />
+            </View>
+            <Text style={styles.note}>{t('panels.export.engineNote')}</Text>
+          </>
         ) : null}
 
         <PrimaryButton

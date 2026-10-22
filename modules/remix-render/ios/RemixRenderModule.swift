@@ -7,12 +7,17 @@ import UIKit
 //
 // A JS (`src/lib/nativeRender.ts`) egy render-tervet ad JSON-ként; itt
 // AVMutableComposition + AVMutableVideoComposition épül belőle, majd
-// AVAssetExportSession renderel H.264 MP4-et a megadott kimeneti útra.
+// AVAssetExportSession renderel MP4-et a megadott kimeneti útra.
 //
-// A v1 a rövidvideó gyakori esetét fedi le KORREKTEN: a videó-szegmensek
-// egymás után (vágással + sebességgel) egy fix vászonra (aspect-fill),
-// a szegmensek saját hangja + a külön hang-szegmensek keverve. A fejlett
-// effektek (fejlett átmenetek, 3D, AI-szűrők) továbbra is a felhő-render sajátjai.
+// A v2 a rövidvideó gyakori esetét fedi le KORREKTEN: a videó-szegmensek
+// egymás után (vágással + sebességgel + klip-hangerővel) egy fix vászonra
+// (aspect-fill), a szegmensek saját hangja + a külön hang-szegmensek keverve
+// (AVAudioMix). A terv opcionális mezői: `watermark` (ReMix-vízjel a nem-fizető
+// tiernek), `codec` ('hevc' → HEVC-preset, ha az eszköz tudja), `bitRate`
+// (cél-bitráta → fájlméret-plafon közelítés, mert az export-session nem fogad
+// nyers bitrátát). A futó export a `cancel()`-lel ténylegesen leáll
+// (`cancelExport`), a részfájl törlődik. A fejlett effektek (szűrők, átmenetek,
+// 3D, AI) továbbra is a felhő-render sajátjai.
 
 struct RenderVideoSegment: Codable {
   let uri: String
@@ -39,6 +44,10 @@ struct RenderPlan: Codable {
   let background: String
   let video: [RenderVideoSegment]
   let audio: [RenderAudioSegment]
+  // opcionális terv-mezők — a JS csak akkor küldi, ha van (régi tervek is érvényesek)
+  let watermark: Bool?
+  let codec: String?
+  let bitRate: Int?
 }
 
 enum RenderError: Error, LocalizedError {
@@ -46,6 +55,7 @@ enum RenderError: Error, LocalizedError {
   case noVideo
   case noTracks(String)
   case exportFailed(String)
+  case cancelled
 
   var errorDescription: String? {
     switch self {
@@ -53,12 +63,21 @@ enum RenderError: Error, LocalizedError {
     case .noVideo: return "Nincs helyi videóklip az eszközön-renderhez."
     case .noTracks(let s): return "A forrás nem tartalmaz sávot: \(s)"
     case .exportFailed(let s): return "Az export nem sikerült: \(s)"
+    case .cancelled: return "A render megszakítva."
     }
   }
 }
 
 public class RemixRenderModule: Module {
   private var progressTimer: Timer?
+  // a futó export + a megszakítás-jelző — a JS `cancel()` másik szálról jön
+  private let stateLock = NSLock()
+  private var activeExport: AVAssetExportSession?
+  private var cancelRequested = false
+  // SOROS queue: egyszerre EGY render fut. Gyors cancel→újraindítás esetén a
+  // régi export még pöröghet, miközben az új már jönne — konkurens futásnál
+  // közös lenne az activeExport/progressTimer (és akár a kimeneti fájl is).
+  private let renderQueue = DispatchQueue(label: "expo.remixrender.render", qos: .userInitiated)
 
   public func definition() -> ModuleDefinition {
     Name("RemixRender")
@@ -66,14 +85,25 @@ public class RemixRenderModule: Module {
     Events("onProgress")
 
     AsyncFunction("exportPlan") { (planJson: String, outputPath: String, promise: Promise) in
-      DispatchQueue.global(qos: .userInitiated).async {
+      self.renderQueue.async {
         do {
           let url = try self.render(planJson: planJson, outputPath: outputPath)
           DispatchQueue.main.async { promise.resolve(url) }
         } catch {
-          DispatchQueue.main.async { promise.reject("ERR_RENDER", error.localizedDescription) }
+          // promise.reject(error): az UnexpectedException a localizedDescription-t
+          // adja tovább a JS-nek — a (code, description) alak a bridge-ben elveszik
+          DispatchQueue.main.async { promise.reject(error) }
         }
       }
+    }
+
+    // a futó render tényleges leállítása (a JS AbortSignal → ide jut)
+    AsyncFunction("cancel") { () in
+      self.stateLock.lock()
+      self.cancelRequested = true
+      let session = self.activeExport
+      self.stateLock.unlock()
+      session?.cancelExport()
     }
   }
 
@@ -82,12 +112,23 @@ public class RemixRenderModule: Module {
     return URL(fileURLWithPath: uri)
   }
 
+  private func isCancelRequested() -> Bool {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return cancelRequested
+  }
+
   private func render(planJson: String, outputPath: String) throws -> String {
     guard let data = planJson.data(using: .utf8),
           let plan = try? JSONDecoder().decode(RenderPlan.self, from: data) else {
       throw RenderError.badPlan
     }
     if plan.video.isEmpty { throw RenderError.noVideo }
+
+    // új render → az előző megszakítás-jelző nem érvényes rá
+    stateLock.lock()
+    cancelRequested = false
+    stateLock.unlock()
 
     let composition = AVMutableComposition()
     guard let compVideo = composition.addMutableTrack(
@@ -102,6 +143,9 @@ public class RemixRenderModule: Module {
     let renderSize = CGSize(width: plan.width, height: plan.height)
 
     var instructions: [AVMutableVideoCompositionInstruction] = []
+    // klip-hangerő (0 = némítva) — eddig elnyelődött, a néma klip is szólt
+    let mainAudioParams = AVMutableAudioMixInputParameters(track: compAudio)
+    var mixParams: [AVMutableAudioMixInputParameters] = []
     var cursor = CMTime.zero // a videó-idővonal aktuális vége (egymás után fűzünk)
 
     for seg in plan.video {
@@ -125,6 +169,7 @@ public class RemixRenderModule: Module {
       if let srcAudio = asset.tracks(withMediaType: .audio).first {
         try? compAudio.insertTimeRange(srcRange, of: srcAudio, at: insertAt)
       }
+      mainAudioParams.setVolume(Float(max(0, min(1, seg.volume))), at: insertAt)
 
       // sebesség: a beszúrt tartományt a kívánt idővonal-hosszra skálázzuk
       let targetDur = CMTime(seconds: seg.durationSec, preferredTimescale: timescale)
@@ -151,6 +196,7 @@ public class RemixRenderModule: Module {
     }
 
     if cursor == .zero { throw RenderError.noVideo }
+    mixParams.append(mainAudioParams)
 
     // külön hang-szegmensek (zene/voiceover/SFX) — az abszolút idejükre helyezve
     for seg in plan.audio {
@@ -163,6 +209,9 @@ public class RemixRenderModule: Module {
         duration: CMTime(seconds: seg.durationSec, preferredTimescale: timescale))
       let at = CMTime(seconds: max(0, seg.atSec), preferredTimescale: timescale)
       try? extra.insertTimeRange(srcRange, of: srcAudio, at: at)
+      let params = AVMutableAudioMixInputParameters(track: extra)
+      params.setVolume(Float(max(0, min(1, seg.volume))), at: .zero)
+      mixParams.append(params)
     }
 
     let videoComposition = AVMutableVideoComposition()
@@ -170,23 +219,86 @@ public class RemixRenderModule: Module {
     videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(fps))
     videoComposition.instructions = instructions
 
+    // 🏷️ ReMix-vízjel (exportPolicy: ingyen on-device + nem-fizető tier) — a
+    // kompozíció jobb-alsó sarkára, CoreAnimation réteggel (origó: bal-alsó)
+    if plan.watermark == true {
+      let parent = CALayer()
+      parent.frame = CGRect(origin: .zero, size: renderSize)
+      let videoLayer = CALayer()
+      videoLayer.frame = parent.frame
+      parent.addSublayer(videoLayer)
+
+      let fontSize = max(14, renderSize.height * 0.032)
+      let margin = renderSize.height * 0.02
+      let text = CATextLayer()
+      text.string = "ReMix"
+      text.font = "HelveticaNeue-Bold" as CFTypeRef
+      text.fontSize = fontSize
+      text.alignmentMode = .right
+      text.foregroundColor = UIColor(white: 1.0, alpha: 0.72).cgColor
+      text.shadowColor = UIColor.black.cgColor
+      text.shadowOpacity = 0.6
+      text.shadowOffset = CGSize(width: 0, height: 1)
+      text.shadowRadius = 2
+      text.contentsScale = 2
+      let boxWidth = renderSize.width * 0.5
+      text.frame = CGRect(
+        x: renderSize.width - boxWidth - margin,
+        y: margin,
+        width: boxWidth,
+        height: fontSize * 1.4)
+      parent.addSublayer(text)
+      videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+        postProcessingAsVideoLayer: videoLayer, in: parent)
+    }
+
     // kimenet
     let outURL = self.fileURL(outputPath)
     try? FileManager.default.removeItem(at: outURL)
 
-    guard let export = AVAssetExportSession(
-      asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+    // 🎞️ kodek: 'hevc' → HEVC-preset, ha az eszköz/kompozíció tudja; különben H.264
+    let wantHevc = plan.codec == "hevc"
+    let hevcOk = wantHevc &&
+      AVAssetExportSession.exportPresets(compatibleWith: composition)
+        .contains(AVAssetExportPresetHEVCHighestQuality)
+    let preset = hevcOk ? AVAssetExportPresetHEVCHighestQuality : AVAssetExportPresetHighestQuality
+
+    guard let export = AVAssetExportSession(asset: composition, presetName: preset) else {
       throw RenderError.exportFailed("nincs export-session")
     }
     export.outputURL = outURL
     export.outputFileType = .mp4
     export.shouldOptimizeForNetworkUse = true
     export.videoComposition = videoComposition
+    let mix = AVMutableAudioMix()
+    mix.inputParameters = mixParams
+    export.audioMix = mix
+    // cél-bitráta → fájlméret-plafon (az export-session nem fogad nyers bitrátát;
+    // a plafon alá az enkóder maga lő be — kis ráhagyás a konténer-fejlécnek)
+    if let bitRate = plan.bitRate, bitRate > 0 {
+      let seconds = CMTimeGetSeconds(cursor)
+      if seconds.isFinite && seconds > 0 {
+        export.fileLengthLimit = Int64(Double(bitRate) / 8.0 * seconds * 1.08)
+      }
+    }
+
+    // megszakítás: a sessiont regisztráljuk, hogy a `cancel()` elérje; ha a
+    // kérés már az indítás előtt megjött, el se kezdjük
+    stateLock.lock()
+    let alreadyCancelled = cancelRequested
+    activeExport = export
+    stateLock.unlock()
+    if alreadyCancelled {
+      stateLock.lock()
+      activeExport = nil
+      stateLock.unlock()
+      throw RenderError.cancelled
+    }
 
     // progressz-jelzés (0–1) a JS felé
     DispatchQueue.main.async {
-      self.progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
-        self.sendEvent("onProgress", ["progress": Double(export.progress)])
+      self.progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        self?.sendEvent("onProgress", ["progress": Double(export.progress)])
       }
     }
 
@@ -194,12 +306,21 @@ public class RemixRenderModule: Module {
     export.exportAsynchronously { sema.signal() }
     sema.wait()
 
+    stateLock.lock()
+    activeExport = nil
+    let wasCancelled = cancelRequested
+    stateLock.unlock()
+
     DispatchQueue.main.async {
       self.progressTimer?.invalidate()
       self.progressTimer = nil
       self.sendEvent("onProgress", ["progress": 1.0])
     }
 
+    if export.status == .cancelled || wasCancelled {
+      try? FileManager.default.removeItem(at: outURL) // részfájl takarítása
+      throw RenderError.cancelled
+    }
     if export.status != .completed {
       throw RenderError.exportFailed(export.error?.localizedDescription ?? "ismeretlen")
     }

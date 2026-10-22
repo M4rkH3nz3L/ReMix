@@ -84,6 +84,23 @@ describe('FREE eszközön-render — korlátlan hossz', () => {
     expect(buildRenderPlan(p, DEFAULT_SETTINGS, true).watermark).toBe(true); // exportPolicy → vízjel
   });
 
+  it('a HEVC-kodek + cél-bitráta a tervbe kerül (a natív oldal honorálja)', () => {
+    const p = projectWithClips([videoClip('a', 0, 10)]);
+    const hevc: RenderSettings = {
+      ...DEFAULT_SETTINGS,
+      codec: 'hevc',
+      bitrateMode: 'vbr',
+      bitrateMbps: 5,
+    };
+    const plan = buildRenderPlan(p, hevc);
+    expect(plan.codec).toBe('hevc');
+    expect(plan.bitRate).toBe(5_000_000);
+    // alap H.264 + CRF: a mezők KIMARADNAK (a régi natív oldal is érti a tervet)
+    const basePlan = buildRenderPlan(p, DEFAULT_SETTINGS);
+    expect(basePlan.codec).toBeUndefined();
+    expect(basePlan.bitRate).toBeUndefined();
+  });
+
   it('a hosszú, alap-beállítású projekt ESZKÖZÖN renderelhető (nincs Pro-kényszer)', () => {
     const clips = [videoClip('a', 0, 90), videoClip('b', 90, 90)];
     const project = projectWithClips(clips);

@@ -95,6 +95,15 @@ export default function RootLayout() {
     void configureBilling(userId);
   }, [userId]);
 
+  // 📱 eszközön-render füstteszt (CSAK dev + env-kapcsoló): az eredmény a
+  // Metro-konzolra megy `[RENDER-SMOKE]` prefixszel. A dinamikus import miatt
+  // a smoke-kód + a minta-videó a release bundle-ből kimarad.
+  useEffect(() => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_RENDER_SMOKE === '1') {
+      void import('@/lib/renderSmoke').then((m) => m.runRenderSmoke());
+    }
+  }, []);
+
   // 📲 notification-koppintás → deep-link (előtér/háttér + hideg indítás)
   useEffect(() => {
     const unsub = addNotificationResponseListener(openNotificationRoute);

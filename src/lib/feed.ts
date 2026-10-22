@@ -15,6 +15,7 @@ import {
 } from '@/lib/imageShare';
 import { createEmptyProject, projectDuration } from '@/lib/projectUtils';
 import { renderAndUploadWeb, renderProjectVersion, uploadMedia } from '@/lib/render';
+import type { RenderMode } from '@/lib/render';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { saveProject } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
@@ -584,7 +585,11 @@ export async function publishLiveVod(
 export async function publishRenderedProject(
   project: Project,
   onProgress?: (u: ProgressUpdate) => void,
-  opts?: { visibility?: PostVisibility }
+  opts?: {
+    visibility?: PostVisibility;
+    /** Pro: a render-motor választása (eszköz/felhő); hiányzó = auto */
+    renderMode?: RenderMode;
+  }
 ): Promise<{ post: FeedPost; project: Project }> {
   let updated = project;
   let rendered = project.rendered;
@@ -595,7 +600,12 @@ export async function publishRenderedProject(
     rendered =
       Platform.OS === 'web'
         ? await renderAndUploadWeb(project, onProgress)
-        : await renderProjectVersion(project, onProgress);
+        : await renderProjectVersion(
+            project,
+            onProgress,
+            undefined,
+            opts?.renderMode ? { mode: opts.renderMode } : undefined
+          );
     updated = { ...updated, rendered };
     await saveProject(updated);
   }

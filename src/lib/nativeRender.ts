@@ -238,21 +238,25 @@ export async function renderLocal(
       throw cancelledError();
     }
     // versenyeztetés: amelyik előbb — a kész render vagy a megszakítás.
-    // Abortkor a natív `cancel()` ténylegesen leállítja a kódolást.
-    const outUri = await Promise.race([
-      exporting,
-      new Promise<never>((_, reject) => {
-        signal.addEventListener(
-          'abort',
-          () => {
-            Native.cancel().catch(() => {});
-            reject(cancelledError());
-          },
-          { once: true }
-        );
-      }),
-    ]);
-    return new File(outUri);
+    // Abortkor a natív `cancel()` ténylegesen leállítja a kódolást. A listener
+    // a render VÉGÉN lekerül a signalról — különben egy befejezés utáni abort
+    // (pl. az overlay cleanup-ja) a KÖVETKEZŐ render natív exportját lőné le.
+    let onAbort: (() => void) | null = null;
+    try {
+      const outUri = await new Promise<string>((resolve, reject) => {
+        onAbort = () => {
+          Native.cancel().catch(() => {});
+          reject(cancelledError());
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+        exporting.then(resolve, reject);
+      });
+      return new File(outUri);
+    } finally {
+      if (onAbort) {
+        signal.removeEventListener('abort', onAbort);
+      }
+    }
   } finally {
     sub?.remove();
   }

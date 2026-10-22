@@ -1,4 +1,11 @@
-import { bytesToBase64, encodeWavPcm16, floatPcmToBytes, makeTestTone } from '@/lib/wav';
+import {
+  bytesToBase64,
+  downmixToMono,
+  encodeWavPcm16,
+  floatPcmToBytes,
+  makeTestTone,
+  resampleLinear,
+} from '@/lib/wav';
 
 /**
  * 🎚️ WAV/PCM kódolás (local-ai Fázis A): fejléc-mezők, kvantálás, base64 — a
@@ -64,6 +71,23 @@ describe('bytesToBase64', () => {
     expect(enc('fo')).toBe('Zm8=');
     expect(enc('foo')).toBe('Zm9v');
     expect(enc('foobar')).toBe('Zm9vYmFy');
+  });
+});
+
+describe('downmixToMono + resampleLinear', () => {
+  it('két csatorna átlaga; egy csatorna változatlan referencia', () => {
+    const mono = downmixToMono([new Float32Array([1, 0]), new Float32Array([0, 1])]);
+    expect(Array.from(mono)).toEqual([0.5, 0.5]);
+    const single = new Float32Array([0.3]);
+    expect(downmixToMono([single])).toBe(single);
+  });
+
+  it('resample: fél ráta → fele hossz, kezdőpont megtartva; azonos ráta no-op', () => {
+    const src = new Float32Array([0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25]);
+    const out = resampleLinear(src, 16000, 8000);
+    expect(out.length).toBe(4);
+    expect(out[0]).toBe(0);
+    expect(resampleLinear(src, 16000, 16000)).toBe(src);
   });
 });
 

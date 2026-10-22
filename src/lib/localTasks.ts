@@ -1,5 +1,7 @@
 import { t as tr } from 'i18next';
 
+import { speechSegments } from '@/lib/autoedit';
+import type { Highlight } from '@/lib/highlightsClient';
 import type { HookSuggestion } from '@/lib/hooks';
 import type { StoryChapter } from '@/lib/storyClient';
 import type { TranscriptLine } from '@/lib/transcripts';
@@ -49,6 +51,30 @@ export function localThumbHeadlines(summary: string): string[] {
     tr('lib.localTasks.headlineHow', { topic }),
     tr('lib.localTasks.headlineNow', { topic }),
   ];
+}
+
+/**
+ * 🎯 Short-jelöltek lokálisan: a leghosszabb összefüggő beszéd-szakaszok
+ * (max 4, min 4 mp, 60 mp-re vágva) — a felhő-modell helyett alapszintű,
+ * determinista kiválasztás az átiratból.
+ */
+export function localHighlights(
+  transcript: TranscriptLine[],
+  durationSec: number,
+  { minLen = 4, maxLen = 60, max = 4 }: { minLen?: number; maxLen?: number; max?: number } = {},
+): Highlight[] {
+  const segs = speechSegments(transcript)
+    .map((s) => ({ start: Math.max(0, s.start), end: Math.min(durationSec, s.end) }))
+    .filter((s) => s.end - s.start >= minLen)
+    .sort((a, b) => b.end - b.start - (a.end - a.start))
+    .slice(0, max)
+    .sort((a, b) => a.start - b.start);
+  return segs.map((s, i) => ({
+    start: Math.round(s.start * 100) / 100,
+    end: Math.round(Math.min(s.end, s.start + maxLen) * 100) / 100,
+    title: tr('lib.localTasks.highlightTitle', { n: i + 1 }),
+    reason: tr('lib.localTasks.highlightReason'),
+  }));
 }
 
 /** a short-form dramaturgia időarányos íve (a worker-prompt is ezt a mintát kéri) */

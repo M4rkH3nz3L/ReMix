@@ -1,4 +1,10 @@
-import { localHooks, localStoryChapters, localThumbHeadlines, topicOf } from '@/lib/localTasks';
+import {
+  localHighlights,
+  localHooks,
+  localStoryChapters,
+  localThumbHeadlines,
+  topicOf,
+} from '@/lib/localTasks';
 
 /**
  * 🧩 Lokális feladat-magok (local-ai: „mindenből legyen ingyenes local"):
@@ -41,6 +47,27 @@ describe('localThumbHeadlines', () => {
     for (const h of list) {
       expect(h.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('localHighlights', () => {
+  it('a leghosszabb beszéd-szakaszok, időrendben, max 4, min-hossz szűrve', () => {
+    const transcript = [
+      { start: 0, end: 10, text: 'hosszú blokk eleje' }, // 10 mp
+      { start: 20, end: 22, text: 'rövid' }, // 2 mp → kiesik (min 4)
+      { start: 30, end: 50, text: 'leghosszabb blokk' }, // 20 mp
+    ];
+    const h = localHighlights(transcript, 60);
+    expect(h).toHaveLength(2);
+    expect(h[0].start).toBeLessThan(h[1].start); // időrend
+    for (const x of h) {
+      expect(x.end - x.start).toBeGreaterThanOrEqual(4);
+      expect(x.title.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('üres átirat → üres lista (a hívó null-ra fordítja)', () => {
+    expect(localHighlights([], 60)).toEqual([]);
   });
 });
 

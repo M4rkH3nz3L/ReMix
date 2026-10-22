@@ -13,7 +13,23 @@ import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
  * videók beszéde Whisperrel átírva, a klipek trim/sebesség-ablakain át az
  * idővonalra képezve. Fájlonként cache-elve — egy hosszabb projektnél is csak
  * egyszer fut le a felismerés.
+ *
+ * 🧩 LOCAL-FIRST (local-ai): ha van használható on-device Whisper-modell
+ * (letöltve + smoke-PASS a Profil gyári-katalógusából), az átirat az ESZKÖZÖN
+ * készül — ingyen, offline, worker nélkül; különben a worker-út jön. A
+ * szó-szintű cue-k (text-based editing) egyelőre worker-útasak.
  */
+
+/** egy fájl átirata: előbb on-device Whisper, aztán worker (`transcribeToSrt`) */
+async function transcribeUriPreferLocal(uri: string): Promise<SrtCue[]> {
+  // lusta import: a whisper-kliens csak akkor töltődik, ha tényleg átírunk
+  const { transcribeMediaOnDevice } = await import('@/lib/whisperClient');
+  const local = await transcribeMediaOnDevice(uri).catch(() => null);
+  if (local && local.lines.length > 0) {
+    return local.lines.map((l) => ({ start: l.start, end: l.end, text: l.text }));
+  }
+  return parseSrt(await transcribeToSrt(uri));
+}
 
 /** e fölött nem indítunk automatikus átirat-készítést (mp, összes videó) */
 const MAX_AUTO_TRANSCRIBE_SECONDS = 15 * 60;
@@ -121,11 +137,11 @@ export async function getTimelineTranscript(
       unit: tr('lib.transcripts.videoUnit'),
     });
     try {
-      const cues = parseSrt(await transcribeToSrt(uri));
+      const cues = await transcribeUriPreferLocal(uri);
       cueCache.set(uri, cues);
       cuesByUri.set(uri, cues);
     } catch {
-      // nincs worker / Whisper / hang — a többi fájllal megyünk tovább
+      // se on-device modell, se worker / Whisper / hang — a többi fájllal megyünk tovább
     }
   }
   if (cuesByUri.size === 0) {

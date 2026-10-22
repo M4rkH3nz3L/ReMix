@@ -2564,7 +2564,9 @@
       "stylePov": "POV",
       "headlineBold": "{{topic}} — HONESTLY",
       "headlineHow": "HOW: {{topic}}",
-      "headlineNow": "WATCH THIS: {{topic}}"
+      "headlineNow": "WATCH THIS: {{topic}}",
+      "highlightTitle": "Strong moment {{n}}",
+      "highlightReason": "Long continuous speech section — picked locally from the transcript."
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

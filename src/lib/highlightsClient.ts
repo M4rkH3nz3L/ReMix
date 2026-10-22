@@ -23,17 +23,31 @@ export interface Highlight {
 
 const MIN_LEN = 4;
 
-/** Short-jelöltek keresése. `null`, ha nincs értékelhető eredmény. */
+/** Short-jelöltek keresése. `null`, ha nincs értékelhető eredmény.
+ *  🧩 Nem-Pro / worker-hiba esetén LOKÁL kiválasztás az átiratból (ingyen, offline). */
 export async function findHighlights(project: Project): Promise<Highlight[] | null> {
-  const base = ensureCloud('autoEdit'); // Pro-kapu
   const duration = projectDuration(project);
   if (duration <= MIN_LEN) {
     return null;
   }
   const transcript = (await getTimelineTranscript(project).catch(() => null)) ?? [];
+  const { localHighlights } = await import('@/lib/localTasks');
+  const localOrNull = (): Highlight[] | null => {
+    const local = localHighlights(transcript, duration);
+    return local.length > 0 ? local : null;
+  };
+
+  let base: string;
+  try {
+    base = ensureCloud('autoEdit'); // Pro-kapu — a FELHŐ-útra; lokál út ingyenes
+  } catch {
+    return localOrNull();
+  }
   const aiConfig = await aiConfigForTask('autoEdit');
 
-  const res = await aiFetch(`${base}/ai/highlights`, {
+  let res: Awaited<ReturnType<typeof aiFetch>>;
+  try {
+    res = await aiFetch(`${base}/ai/highlights`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -49,9 +63,12 @@ export async function findHighlights(project: Project): Promise<Highlight[] | nu
       },
       aiConfig,
     }),
-  });
+    });
+  } catch {
+    return localOrNull();
+  }
   if (!res.ok) {
-    return null;
+    return localOrNull();
   }
   const body = (await res.json()) as { highlights?: Partial<Highlight>[] };
 
@@ -82,5 +99,5 @@ export async function findHighlights(project: Project): Promise<Highlight[] | nu
       out.push(h);
     }
   }
-  return out.length > 0 ? out : null;
+  return out.length > 0 ? out : localOrNull();
 }

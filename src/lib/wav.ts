@@ -76,6 +76,48 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return out;
 }
 
+/** Többcsatornás PCM → mono (csatorna-átlag). */
+export function downmixToMono(channels: readonly Float32Array[]): Float32Array {
+  if (channels.length === 0) {
+    return new Float32Array(0);
+  }
+  if (channels.length === 1) {
+    return channels[0];
+  }
+  const n = Math.min(...channels.map((c) => c.length));
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) {
+    let sum = 0;
+    for (const ch of channels) {
+      sum += ch[i];
+    }
+    out[i] = sum / channels.length;
+  }
+  return out;
+}
+
+/** Lineáris újramintavételezés (a whisper 16 kHz-éhez; alapszintű, determinista). */
+export function resampleLinear(
+  samples: Float32Array,
+  fromRate: number,
+  toRate: number,
+): Float32Array {
+  if (fromRate === toRate || samples.length === 0 || fromRate <= 0 || toRate <= 0) {
+    return samples;
+  }
+  const outLen = Math.max(1, Math.round((samples.length * toRate) / fromRate));
+  const out = new Float32Array(outLen);
+  const step = (samples.length - 1) / Math.max(1, outLen - 1);
+  for (let i = 0; i < outLen; i += 1) {
+    const pos = i * step;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(samples.length - 1, i0 + 1);
+    const frac = pos - i0;
+    out[i] = samples[i0] * (1 - frac) + samples[i1] * frac;
+  }
+  return out;
+}
+
 /** Determinista teszt-hang: halk 440 Hz-es szinusz (a smoke-testhez — nem csend,
  *  hogy a dekóder tényleg dolgozzon rajta). */
 export function makeTestTone(seconds = 1, sampleRate = WHISPER_SAMPLE_RATE): Float32Array {

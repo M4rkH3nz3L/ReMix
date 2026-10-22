@@ -1,5 +1,12 @@
+import { decodeToMono16k } from '@/lib/audioDecode';
 import type { TimeRange } from '@/lib/autoedit';
-import { markModelUsed, modelFileUri, setModelSmokeResult } from '@/lib/modelRegistryClient';
+import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
+import {
+  catalogRuntime,
+  markModelUsed,
+  modelFileUri,
+  setModelSmokeResult,
+} from '@/lib/modelRegistryClient';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import type { TranscriptLine } from '@/lib/transcripts';
 import { bytesToBase64, floatPcmToBytes, makeTestTone } from '@/lib/wav';
@@ -111,6 +118,58 @@ export async function transcribeWavOnDevice(
     const { promise } = ctx.transcribe(wavUri.replace(/^file:\/\//, ''), {
       language: opts.language,
       onProgress: opts.onProgress,
+    });
+    const result = await promise;
+    if (result.isAborted) {
+      return null;
+    }
+    const lines = toLines(result);
+    return {
+      lines,
+      speech: lines.map((l) => ({ start: l.start, end: l.end })),
+      language: result.language,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** a legjobb HASZNÁLHATÓ (letöltött + smoke-PASS) whisper-modell; base > tiny */
+export function bestUsableWhisperModelId(): string | null {
+  const rt = catalogRuntime();
+  for (const id of ['whisper-base-q5', 'whisper-tiny-q8']) {
+    const entry = catalogEntry(id);
+    if (entry && catalogAvailability(entry, rt) === 'validated') {
+      return id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Tetszőleges média (mp4/m4a/mp3/wav) átirata az eszközön: natív dekódolás
+ * 16 kHz mono PCM-re (`audioDecode`), majd whisper a nyers PCM-en. `null`, ha
+ * nincs használható modell / a dekódolás vagy a futás elbukik (→ worker-út).
+ */
+export async function transcribeMediaOnDevice(
+  uri: string,
+  opts: { modelId?: string; language?: string } = {},
+): Promise<OnDeviceTranscript | null> {
+  const modelId = opts.modelId ?? bestUsableWhisperModelId();
+  if (!modelId) {
+    return null;
+  }
+  const pcm = await decodeToMono16k(uri);
+  if (!pcm || pcm.length === 0) {
+    return null;
+  }
+  const ctx = await getContext(modelId);
+  if (!ctx) {
+    return null;
+  }
+  try {
+    const { promise } = ctx.transcribeData(bytesToBase64(floatPcmToBytes(pcm)), {
+      language: opts.language,
     });
     const result = await promise;
     if (result.isAborted) {

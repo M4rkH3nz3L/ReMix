@@ -2564,7 +2564,9 @@
       "stylePov": "POV",
       "headlineBold": "{{topic}} — EHRLICH",
       "headlineHow": "SO GEHT'S: {{topic}}",
-      "headlineNow": "SCHAU DIR DAS AN: {{topic}}"
+      "headlineNow": "SCHAU DIR DAS AN: {{topic}}",
+      "highlightTitle": "Starker Moment {{n}}",
+      "highlightReason": "Langer zusammenhängender Sprachabschnitt — lokal aus dem Transkript gewählt."
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

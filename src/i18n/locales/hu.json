@@ -2564,7 +2564,9 @@
       "stylePov": "POV",
       "headlineBold": "{{topic}} — ŐSZINTÉN",
       "headlineHow": "ÍGY: {{topic}}",
-      "headlineNow": "EZT NÉZD: {{topic}}"
+      "headlineNow": "EZT NÉZD: {{topic}}",
+      "highlightTitle": "Erős pillanat {{n}}",
+      "highlightReason": "Hosszú, összefüggő beszéd-szakasz — helyi kiválasztás az átiratból."
     },
     "autoedit": {
       "viralTitle": "🔥 Viral",

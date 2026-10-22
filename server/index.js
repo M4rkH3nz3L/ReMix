@@ -63,15 +63,21 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
 const { proOnly, paidOnly, renderJobAuth } = require('./lib/guards');
 const { errorHandler } = require('./lib/httpError');
 const { log, makeRequestId } = require('./lib/log');
+const { recordRequest, metricsSnapshot } = require('./metrics');
 
 const app = express();
 
 // kérés-napló (diagnosztika): honnan jön a hívás és mire — a „nem érhető el”
 // hibáknál ebből látszik, hogy a kérés egyáltalán megérkezik-e
-app.use((req, _res, next) => {
+app.use((req, res, next) => {
   // 🪵 05-observability §05.1: strukturált, korrelálható kérés-napló (request-id)
   req.id = makeRequestId();
   log.info('req', { reqId: req.id, method: req.method, path: req.path, ip: req.ip });
+  // 📊 05.2: a LEZÁRULT kérés metrikája (status-osztály + latency) a /metrics-hez
+  const startNs = process.hrtime.bigint();
+  res.on('finish', () => {
+    recordRequest(res.statusCode, Number(process.hrtime.bigint() - startNs) / 1e6);
+  });
   next();
 });
 
@@ -140,6 +146,12 @@ app.get('/health', async (_req, res) => {
     storage: mediaStoreEnabled(),
     cloudRenderMinSec: parseInt(process.env.CLOUD_RENDER_MIN_SEC || '15', 10),
   });
+});
+
+// 📊 05-observability §05.2: process-metrikák (kérés-szám, status-osztály, error-ráta,
+// latency, uptime) a külső monitornak/dashboardnak. Hitelesítés mögött (nem publikus).
+app.get('/metrics', authenticated(), (_req, res) => {
+  res.json({ ok: true, ...metricsSnapshot() });
 });
 
 // 📋 Route-/policy-leltár (OWASP API9): a security-réteg által regisztrált

@@ -18,6 +18,7 @@ import {
   MODEL_CACHE_MAX_BYTES,
   removeModel,
 } from '@/lib/modelRegistryClient';
+import { runWhisperSmokeTest } from '@/lib/whisperClient';
 import { profileStyles as styles } from './styles';
 
 /**
@@ -51,6 +52,14 @@ export function FactoryModelsCard() {
     void Promise.resolve().then(refresh);
   }, [refresh]);
 
+  // 🧪 használat-előtti smoke-test (local-ai 5.3): PASS-ig a modell nem „használható"
+  const runSmoke = (entry: CatalogEntry): Promise<unknown> => {
+    if (entry.manifest?.kind === 'whisper') {
+      return runWhisperSmokeTest(entry.id);
+    }
+    return Promise.resolve();
+  };
+
   const onDownload = (entry: CatalogEntry) => {
     if (!entry.manifest || busyId) {
       return;
@@ -60,12 +69,26 @@ export function FactoryModelsCard() {
       .then((res) => {
         if (!res.ok) {
           Alert.alert(t('common.error'), t('profile.modelDownloadFailed', { reason: res.reason }));
+          return;
         }
+        // letöltés után azonnal smoke-test — sikerrel rögtön 'használható'
+        return runSmoke(entry);
       })
       .finally(() => {
         setBusyId(null);
         refresh();
       });
+  };
+
+  const onRunSmoke = (entry: CatalogEntry) => {
+    if (busyId) {
+      return;
+    }
+    setBusyId(entry.id);
+    runSmoke(entry).finally(() => {
+      setBusyId(null);
+      refresh();
+    });
   };
 
   const onRemove = (entry: CatalogEntry) => {
@@ -114,9 +137,17 @@ export function FactoryModelsCard() {
                   <Ionicons name="download-outline" size={20} color={palette.accent} />
                 </Pressable>
               ) : DELETABLE.has(availability) ? (
-                <Pressable onPress={() => onRemove(entry)} hitSlop={8} style={styles.iconBtn}>
-                  <Ionicons name="trash-outline" size={20} color={palette.danger} />
-                </Pressable>
+                <>
+                  {availability !== 'validated' ? (
+                    // letöltve/failed → a próba (újra)futtatható
+                    <Pressable onPress={() => onRunSmoke(entry)} hitSlop={8} style={styles.iconBtn}>
+                      <Ionicons name="flask-outline" size={20} color={palette.accent} />
+                    </Pressable>
+                  ) : null}
+                  <Pressable onPress={() => onRemove(entry)} hitSlop={8} style={styles.iconBtn}>
+                    <Ionicons name="trash-outline" size={20} color={palette.danger} />
+                  </Pressable>
+                </>
               ) : null}
             </View>
           );

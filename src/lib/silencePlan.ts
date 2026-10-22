@@ -1,7 +1,8 @@
-import { buildKeepPlan, type TimeRange } from '@/lib/autoedit';
+import { buildKeepPlan, speechSegments, type TimeRange } from '@/lib/autoedit';
 import type { EditorCommand } from '@/lib/commands';
 import { projectFps, snapToFrame } from '@/lib/frames';
 import { projectDuration } from '@/lib/projectUtils';
+import type { TranscriptLine } from '@/lib/transcripts';
 import type { Project } from '@/types/project';
 
 /**
@@ -157,4 +158,19 @@ export function planSilenceCut(
     cuts: Math.max(0, clips.length - 1),
     commands: [{ type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips }],
   };
+}
+
+/**
+ * Csend-vágás terve ÁTIRATBÓL (a teljes on-device lánc második fele): a
+ * whisper-sorokból (`transcribeWavOnDevice` / worker-átirat — azonos formátum)
+ * az `autoedit.speechSegments` csinál beszéd-sávokat (kis rések összeolvasztva,
+ * szél-pad), a többi út azonos a `planSilenceCut`-tal. VAD-motor nélkül is
+ * működik — a Silero-út később csak pontosítja a szegmenseket.
+ */
+export function planSilenceCutFromTranscript(
+  project: Project,
+  lines: TranscriptLine[],
+  opts: SilencePlanOptions = {},
+): SilenceCutPlan | null {
+  return planSilenceCut(project, speechSegments(lines), opts);
 }

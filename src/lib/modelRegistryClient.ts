@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { BUILD_ENGINES, type CatalogRuntime } from '@/lib/modelCatalog';
+import { executorchEngineAvailable, whisperEngineAvailable } from '@/lib/nativeEngines';
 import {
   planModelEviction,
   verifyChecksum,
@@ -221,7 +222,13 @@ export function catalogRuntime(): CatalogRuntime {
     }
   }
   return {
-    engines: BUILD_ENGINES,
+    // a motor-jelenlét VALÓS runtime-detektálás: a npm-csomag megléte ≠ natív
+    // modul — új dev-buildig a TurboModule hiányzik → engine_missing (őszinte)
+    engines: {
+      ...BUILD_ENGINES,
+      'whisper-rn': whisperEngineAvailable(),
+      executorch: executorchEngineAvailable(),
+    },
     downloaded: records.map((r) => r.id),
     smoke,
   };

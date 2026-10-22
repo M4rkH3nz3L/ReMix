@@ -11,6 +11,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "whisper.rn/index": [
+        "./node_modules/whisper.rn/lib/typescript/index.d.ts"
       ]
     },
     "noImplicitReturns": true,

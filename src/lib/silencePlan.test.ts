@@ -1,4 +1,9 @@
-import { keepsFromSilences, planSilenceCut, silencesFromSpeech } from '@/lib/silencePlan';
+import {
+  keepsFromSilences,
+  planSilenceCut,
+  planSilenceCutFromTranscript,
+  silencesFromSpeech,
+} from '@/lib/silencePlan';
 import type { Project, Track, VideoClip } from '@/types/project';
 
 /**
@@ -168,5 +173,30 @@ describe('planSilenceCut', () => {
   it('beszéd nélkül → null', () => {
     const project = fixtureProject([videoClip()]);
     expect(planSilenceCut(project, [])).toBeNull();
+  });
+});
+
+describe('planSilenceCutFromTranscript (teljes on-device lánc)', () => {
+  it('whisper-sorokból csend-vágás terv: a hosszú rés kiesik, a kis szünet marad', () => {
+    const project = fixtureProject([videoClip({ duration: 10, sourceDuration: 10 })]);
+    const plan = planSilenceCutFromTranscript(project, [
+      { start: 0.3, end: 2.0, text: 'szia, ez az eleje' },
+      { start: 2.3, end: 3.8, text: 'ez még ugyanaz a gondolat' }, // 0.3 mp rés → összeolvad
+      { start: 8.0, end: 9.6, text: 'ez pedig a vége' }, // 4+ mp rés → csend kiesik
+    ])!;
+    expect(plan).not.toBeNull();
+    const cmd = plan.commands[0];
+    expect(cmd.type).toBe('REPLACE_TRACK_CLIPS');
+    if (cmd.type !== 'REPLACE_TRACK_CLIPS') {
+      return;
+    }
+    // két beszéd-blokk marad → két klip-darab, a köztes csend kivágva
+    expect(cmd.clips).toHaveLength(2);
+    expect(plan.removedSec).toBeGreaterThan(3);
+  });
+
+  it('üres átirat → null (fallback a hívóé)', () => {
+    const project = fixtureProject([videoClip()]);
+    expect(planSilenceCutFromTranscript(project, [])).toBeNull();
   });
 });

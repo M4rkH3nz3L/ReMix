@@ -1663,6 +1663,7 @@
       "projectFileSection": "Project file",
       "shareRemixFile": "Share .remix project file",
       "collectZip": "Collect — package with media (zip)",
+      "shareRpFile": "Full project package (.rp) — with media",
       "collectPackaging": "Collect — packaging",
       "projectFileNote": "The .remix file is the project + asset references (without media) — restore it with the home screen's import button, reattaching any missing media. Collect packages everything into a single zip on the worker (project.remix + media/) — for handoff and archiving.",
       "cloudTitle": "Cloud backup",
@@ -2545,6 +2546,16 @@
     },
     "aiFetch": {
       "timeout": "The AI did not respond within {{seconds}} seconds. If the local model is running, it may still be loading or overloaded — try again, or set ANTHROPIC_API_KEY on the worker."
+    },
+    "rpFile": {
+      "nativeOnly": ".rp packaging is only available in the app (not on web).",
+      "tooLarge": "The project media is too large for an .rp package (max ~4 GB).",
+      "corrupt": "The .rp file is corrupt or incomplete.",
+      "unsupportedCompression": "This package is a compressed zip — the .rp standard is uncompressed. Repackage it with the app.",
+      "invalidPackage": "Not a valid .rp project package (project.json missing).",
+      "packingPhase": "Packaging (.rp)",
+      "unpackingPhase": "Unpacking (.rp)",
+      "fileUnit": "file"
     },
     "localIntent": {
       "applied": "🧩 Interpreted locally (free local path): {{count}} action(s) prepared."

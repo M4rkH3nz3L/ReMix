@@ -36,6 +36,7 @@ import {
 } from '@/lib/render';
 import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
+import { shareRpFile } from '@/lib/rpFile';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
 import type { PostVisibility } from '@/types/social';
@@ -757,16 +758,18 @@ export function ExportPanel() {
         />
         <PrimaryButton
           icon="archive-outline"
-          label={collectStatus ?? t('panels.export.collectZip')}
+          label={collectStatus ?? t('panels.export.shareRpFile')}
           onPress={() => {
             if (collectStatus) {
               return; // már fut
             }
+            // 📦 a szabványos teljes-projekt csomag (.rp) — ESZKÖZÖN készül
+            // (ingyen, offline); a worker /collect útja fallbackként él tovább
             setCollectStatus(t('common.processing'));
             withProgress(t('panels.export.collectPackaging'), (report) =>
-              collectAndShareProject(project, report)
+              shareRpFile(project, report).catch(() => collectAndShareProject(project, report))
             )
-              .catch((err: Error) => Alert.alert('Collect', err.message))
+              .catch((err: Error) => Alert.alert('.rp', err.message))
               .finally(() => setCollectStatus(null));
           }}
         />

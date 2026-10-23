@@ -1663,6 +1663,7 @@
       "projectFileSection": "Projektfájl",
       "shareRemixFile": ".remix projektfájl megosztása",
       "collectZip": "Collect — csomag a médiával (zip)",
+      "shareRpFile": "Teljes projekt-csomag (.rp) — médiával",
       "collectPackaging": "Collect — csomagolás",
       "projectFileNote": "A .remix fájl a projekt + asset-referenciák (média nélkül) — a főképernyő import-gombjával tölthető vissza, hiányzó médiánál újracsatolással. A Collect a workeren csomagol mindent egyetlen zip-be (project.remix + media/) — átadáshoz, archiváláshoz.",
       "cloudTitle": "Felhő-mentés",
@@ -2545,6 +2546,16 @@
     },
     "aiFetch": {
       "timeout": "Az AI {{seconds}} másodperc alatt nem válaszolt. Ha a lokális modell fut, lehet, hogy még tölt vagy túlterhelt — próbáld újra, vagy állíts be ANTHROPIC_API_KEY-t a workeren."
+    },
+    "rpFile": {
+      "nativeOnly": "A .rp csomagolás csak az appban érhető el (weben nem).",
+      "tooLarge": "A projekt médiája túl nagy egy .rp csomaghoz (max ~4 GB).",
+      "corrupt": "A .rp fájl sérült vagy hiányos.",
+      "unsupportedCompression": "Ez a csomag tömörített zip — a .rp szabvány tömörítetlen. Csomagold újra az appal.",
+      "invalidPackage": "Ez nem érvényes .rp projekt-csomag (hiányzik a project.json).",
+      "packingPhase": "Csomagolás (.rp)",
+      "unpackingPhase": "Kibontás (.rp)",
+      "fileUnit": "fájl"
     },
     "localIntent": {
       "applied": "🧩 Helyben értelmeztem (ingyenes lokál-út): {{count}} művelet előkészítve."

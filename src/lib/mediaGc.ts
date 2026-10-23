@@ -66,6 +66,29 @@ export function extractMediaKeys(raw: string | null | undefined): Set<string> {
 }
 
 /**
+ * App-média hivatkozások URI→kulcs párokként (a `.rp` csomag-export bemenete):
+ * minden EGYEDI app-média uri a hozzá tartozó fájl-kulccsal. Séma-független
+ * (nyers JSON-szövegen megy, mint az `extractMediaKeys`).
+ */
+export function extractMediaUriEntries(
+  raw: string | null | undefined,
+): { uri: string; key: MediaFileKey }[] {
+  const out = new Map<string, MediaFileKey>();
+  if (!raw) {
+    return [];
+  }
+  for (const uri of raw.match(/file:\/\/[^"\\]+/g) ?? []) {
+    if (!out.has(uri)) {
+      const key = mediaFileKeyOf(uri);
+      if (key) {
+        out.set(uri, key);
+      }
+    }
+  }
+  return [...out.entries()].map(([uri, key]) => ({ uri, key }));
+}
+
+/**
  * Törlés-terv: a törölt dokumentumokban hivatkozott app-média fájlok, amikre a
  * MEGMARADÓ dokumentumok egyike sem hivatkozik. Determinista, duplikátum-mentes.
  */

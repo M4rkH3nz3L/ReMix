@@ -1663,6 +1663,7 @@
       "projectFileSection": "Projektdatei",
       "shareRemixFile": ".remix-Projektdatei teilen",
       "collectZip": "Collect — Paket mit Medien (zip)",
+      "shareRpFile": "Komplettes Projektpaket (.rp) — mit Medien",
       "collectPackaging": "Collect — Verpacken",
       "projectFileNote": "Die .remix-Datei ist das Projekt + Asset-Referenzen (ohne Medien) — stell sie mit der Import-Taste auf dem Startbildschirm wieder her, fehlende Medien werden neu verknüpft. Collect packt auf dem Worker alles in ein einziges Zip (project.remix + media/) — zur Übergabe und Archivierung.",
       "cloudTitle": "Cloud-Backup",
@@ -2545,6 +2546,16 @@
     },
     "aiFetch": {
       "timeout": "Die KI hat innerhalb von {{seconds}} Sekunden nicht geantwortet. Falls das lokale Modell läuft, lädt es vielleicht noch oder ist überlastet — versuch es erneut, oder setz ANTHROPIC_API_KEY auf dem Worker."
+    },
+    "rpFile": {
+      "nativeOnly": ".rp-Paketierung ist nur in der App verfügbar (nicht im Web).",
+      "tooLarge": "Die Projektmedien sind zu groß für ein .rp-Paket (max. ~4 GB).",
+      "corrupt": "Die .rp-Datei ist beschädigt oder unvollständig.",
+      "unsupportedCompression": "Dieses Paket ist ein komprimiertes Zip — der .rp-Standard ist unkomprimiert. Mit der App neu paketieren.",
+      "invalidPackage": "Kein gültiges .rp-Projektpaket (project.json fehlt).",
+      "packingPhase": "Paketieren (.rp)",
+      "unpackingPhase": "Entpacken (.rp)",
+      "fileUnit": "Datei"
     },
     "localIntent": {
       "applied": "🧩 Lokal interpretiert (kostenloser Lokal-Pfad): {{count}} Aktion(en) vorbereitet."

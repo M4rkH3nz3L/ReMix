@@ -258,12 +258,26 @@ export async function pickAndParseVided(): Promise<ImportResult | null> {
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: false,
-    type: ['application/json', 'application/octet-stream', 'text/plain', '*/*'],
+    type: ['application/json', 'application/zip', 'application/octet-stream', 'text/plain', '*/*'],
   });
   if (result.canceled || result.assets.length === 0) {
     return null;
   }
-  const text = await new File(result.assets[0].uri).text();
+  const picked = new File(result.assets[0].uri);
+  // 📦 `.rp` csomag (a szabványos teljes-projekt formátum): zip-magic ('PK') →
+  // a média-kibontós import; minden más a könnyű JSON (.remix) úton megy
+  try {
+    const handle = picked.open();
+    const magic = handle.readBytes(2);
+    handle.close();
+    if (magic.length === 2 && magic[0] === 0x50 && magic[1] === 0x4b) {
+      const { importRpFromUri } = await import('@/lib/rpFile');
+      return importRpFromUri(picked.uri);
+    }
+  } catch {
+    // nem olvasható bináris fejként → JSON-ként próbáljuk
+  }
+  const text = await picked.text();
   const source = parseVided(text);
   const now = new Date().toISOString();
   const imported: Project = {

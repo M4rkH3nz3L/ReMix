@@ -764,6 +764,7 @@
       "restore": "Visszaállítás",
       "restoreTitle": "Verzió visszaállítása",
       "restoreConfirm": "Visszaállítod ezt: „{{name}}”? A jelenlegi állapot egy undo-lépésként megmarad.",
+      "logSnapshot": "Verzió-pillanatkép mentve: {{name}}",
       "cloudFetchFailed": "A felhő-verzió letöltése nem sikerült.",
       "autoLabel": "Autosave",
       "copySuffix": "(másolat)",
@@ -3261,6 +3262,40 @@
     }
   },
   "collab": {
+    "alwaysOn": {
+      "title": "A projekt-szoba élesedik…",
+      "hint": "A szoba mindig aktív — most jön létre a tagságod, utána hívhatsz be bárkit."
+    },
+    "roles": {
+      "title": "Szerepkörök és jogok",
+      "hint": "Te adod meg a szerepköröket és a hozzájuk tartozó projekt-jogokat — a tagok és a projekt-szoba is ezeket öröklik. A nézet-jog minden szerepben benne marad.",
+      "builtinTag": "beépített",
+      "invalidName": "Adj nevet a szerepkörnek.",
+      "inUse": "Ez a szerepkör használatban van — előbb sorold át a tagokat.",
+      "builtin": "A beépített szerepkör nem törölhető.",
+      "newPlaceholder": "Új szerepkör neve (pl. Vágó)",
+      "add": "Szerepkör hozzáadása",
+      "pickTitle": "Új szerepkör a tagnak"
+    },
+    "perm": {
+      "view": "nézet",
+      "chat": "chat",
+      "edit": "szerkesztés",
+      "export": "export",
+      "invite": "meghívás",
+      "manageProject": "projekt-kezelés"
+    },
+    "settings": {
+      "title": "Projekt-beállítások",
+      "name": "Név",
+      "aspect": "Képarány",
+      "fps": "Képkocka-ráta",
+      "seoDescription": "Leírás (SEO)",
+      "seoHashtags": "Hashtagek",
+      "seoKeywords": "Kulcsszavak",
+      "saved": "A beállítások mentve (felhőbe is).",
+      "logUpdated": "Projekt-beállítások frissítve"
+    },
     "title": "Kollaboráció",
     "share": "Kollaboráció…",
     "sharedWithMe": "Velem megosztva",

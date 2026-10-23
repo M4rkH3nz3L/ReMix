@@ -379,6 +379,49 @@ export async function sendMessage(conversationId: string, body: string): Promise
   return toMessage(data as MessageRow);
 }
 
+/**
+ * 🧾 RENDSZER-üzenet a beszélgetésbe (kind='system') — a projekt-szoba aktivitás-
+ * naplója ezen megy („ki mit csinált"): meghívás, szerep-váltás, verzió-mentés,
+ * beállítás-módosítás. A felado az aktuális user (ő végezte a műveletet), a
+ * megjelenítés viszont semleges, középre zárt sor (ChatThread).
+ */
+export async function sendSystemMessage(conversationId: string, body: string): Promise<void> {
+  const sb = requireSupabase();
+  const uid = currentUserId();
+  const text = body.trim();
+  if (!uid || !text) {
+    return;
+  }
+  const { username, name, avatar } = await senderFields();
+  await sb.from('messages').insert({
+    conversation_id: conversationId,
+    sender_id: uid,
+    body: text,
+    kind: 'system',
+    sender_username: username,
+    sender_name: name,
+    sender_avatar: avatar,
+  });
+}
+
+/**
+ * 🧾 Projekt-aktivitás naplózása a projekt-szobába — BEST-EFFORT (sosem dob,
+ * offline/login nélkül csendben kimarad). A szoba mindig elérhető (a
+ * get_or_create RPC létrehozza, ha még nincs), így a napló az első művelettől él.
+ */
+export async function logProjectActivity(
+  ownerId: string,
+  projectId: string,
+  text: string
+): Promise<void> {
+  try {
+    const convId = await openProjectConversation(ownerId, projectId);
+    await sendSystemMessage(convId, text);
+  } catch {
+    // a napló sosem akaszthatja meg magát a műveletet
+  }
+}
+
 // ── realtime ────────────────────────────────────────────────────────────────
 /** Monoton számláló egyedi realtime-topichoz (lásd a notifications mintát). */
 let channelSeq = 0;

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ProjectMetaSection } from '@/components/collab/ProjectMetaSection';
+import { RoleManagerSection } from '@/components/collab/RoleManagerSection';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import {
@@ -23,20 +25,27 @@ import {
   ensureShared,
   inviteMember,
   leaveProject,
+  loadProjectRoles,
   pullSharedProject,
   removeMember,
   type CollabRole,
 } from '@/lib/collab';
+import { defaultProjectRoles, type ProjectRole } from '@/lib/projectRoles';
 import { saveProject, loadProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
 import { useCollab } from '@/store/collabStore';
 import type { Project } from '@/types/project';
 
-const ROLE_COLOR: Record<CollabRole, string> = {
+const ROLE_COLOR: Record<string, string> = {
   owner: palette.accent,
   editor: palette.accent2,
   viewer: palette.textDim,
 };
+
+/** egyéni role-ok a második hangsúly-színt kapják */
+function roleColor(roleId: string): string {
+  return ROLE_COLOR[roleId] ?? palette.accent2;
+}
 
 function initials(name: string): string {
   const parts = name.replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean);
@@ -56,12 +65,15 @@ export default function CollabScreen() {
   const [localProject, setLocalProject] = useState<Project | null>(null);
   const [email, setEmail] = useState('');
   // alap: NÉZŐ (a meghívott nézőként lép be; a tulaj utána adhat szerkesztő jogot)
-  const [inviteRole, setInviteRole] = useState<Exclude<CollabRole, 'owner'>>('viewer');
+  const [inviteRole, setInviteRole] = useState<CollabRole>('viewer');
   const [busy, setBusy] = useState(false);
+  // 🔑 a tulaj által definiált role-ok (a tagok + a chat-szoba ezeket öröklik)
+  const [roles, setRoles] = useState<ProjectRole[]>(defaultProjectRoles());
 
   useEffect(() => {
     if (ownerId && projectId) {
       void open(ownerId, projectId);
+      loadProjectRoles(ownerId, projectId).then(setRoles).catch(() => {});
     }
     return () => close();
   }, [ownerId, projectId, open, close]);
@@ -83,17 +95,25 @@ export default function CollabScreen() {
     [t]
   );
 
-  // 🔗 megosztás bekapcsolása (tulaj, Pro) — felhő-mentés + tulaj tag-sor
-  const enableSharing = () => {
-    if (!localProject) {
-      return;
+  // 🔗 A szoba MINDIG él: a tulajnál az első megnyitás automatikusan létrehozza a
+  // tagságot (nincs ki/be kapcsoló — a „kikapcsolt" állapot = nincs behívva senki).
+  const autoShared = useRef(false);
+  useEffect(() => {
+    if (
+      !autoShared.current &&
+      !loading &&
+      members.length === 0 &&
+      ownerId === me &&
+      localProject
+    ) {
+      autoShared.current = true;
+      setBusy(true);
+      ensureShared(localProject)
+        .then(() => refresh())
+        .catch(onError)
+        .finally(() => setBusy(false));
     }
-    setBusy(true);
-    void guardPro(async () => {
-      await ensureShared(localProject);
-      await refresh();
-    }, onError).finally(() => setBusy(false));
-  };
+  }, [loading, members.length, ownerId, me, localProject, refresh, onError]);
 
   // ➕ meghívás e-mail alapján
   const doInvite = () => {
@@ -117,11 +137,32 @@ export default function CollabScreen() {
     }, onError).finally(() => setBusy(false));
   };
 
-  const toggleRole = (memberId: string, current: CollabRole) => {
-    const next: CollabRole = current === 'editor' ? 'viewer' : 'editor';
-    changeRole(ownerId, projectId, memberId, next)
-      .then(refresh)
-      .catch(onError);
+  // 🔑 szerep-választó a TULAJ által definiált role-okból (nem fix editor/viewer váltó)
+  const pickRole = (memberId: string, current: CollabRole, memberLabel: string) => {
+    const options = roles.filter((r) => r.id !== 'owner' && r.id !== current);
+    Alert.alert(
+      t('collab.roles.pickTitle'),
+      memberLabel,
+      [
+        ...options.map((r) => ({
+          text: roleName(r.id),
+          onPress: () =>
+            changeRole(ownerId, projectId, memberId, r.id, memberLabel)
+              .then(refresh)
+              .catch(onError),
+        })),
+        { text: t('common.cancel'), style: 'cancel' as const },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  /** role-név: beépítettnél i18n, egyéninél a tulaj által adott név */
+  const roleName = (roleId: string): string => {
+    if (roleId === 'owner' || roleId === 'editor' || roleId === 'viewer') {
+      return t(`collab.role.${roleId}`);
+    }
+    return roles.find((r) => r.id === roleId)?.name ?? roleId;
   };
 
   const confirmRemove = (memberId: string, name: string) => {
@@ -130,7 +171,7 @@ export default function CollabScreen() {
       {
         text: t('collab.remove.confirm'),
         style: 'destructive',
-        onPress: () => removeMember(ownerId, projectId, memberId).then(refresh).catch(onError),
+        onPress: () => removeMember(ownerId, projectId, memberId, name).then(refresh).catch(onError),
       },
     ]);
   };
@@ -164,8 +205,6 @@ export default function CollabScreen() {
       .finally(() => setBusy(false));
   };
 
-  const roleLabel = (r: CollabRole) => t(`collab.role.${r}`);
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -184,9 +223,9 @@ export default function CollabScreen() {
           {projectName}
         </Text>
         {role ? (
-          <View style={[styles.roleBadge, { borderColor: ROLE_COLOR[role] }]}>
-            <Text style={[styles.roleBadgeText, { color: ROLE_COLOR[role] }]}>
-              {t('collab.youAre', { role: roleLabel(role) })}
+          <View style={[styles.roleBadge, { borderColor: roleColor(role) }]}>
+            <Text style={[styles.roleBadgeText, { color: roleColor(role) }]}>
+              {t('collab.youAre', { role: roleName(role) })}
             </Text>
           </View>
         ) : null}
@@ -198,17 +237,12 @@ export default function CollabScreen() {
         ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : !shared && ownerId === me ? (
-          // a tulaj még nem osztotta meg → bekapcsolás (Pro)
+          // a szoba automatikusan jön létre (nincs ki/be kapcsoló) — rövid türelmi állapot
           <View style={styles.emptyCard}>
             <Ionicons name="people-circle-outline" size={40} color={palette.accent} />
-            <Text style={styles.emptyTitle}>{t('collab.enable.title')}</Text>
-            <Text style={styles.emptyHint}>{t('collab.enable.hint')}</Text>
-            <PrimaryButton
-              label={t('collab.enable.cta')}
-              icon="cloud-upload-outline"
-              onPress={enableSharing}
-              disabled={busy || !localProject}
-            />
+            <Text style={styles.emptyTitle}>{t('collab.alwaysOn.title')}</Text>
+            <Text style={styles.emptyHint}>{t('collab.alwaysOn.hint')}</Text>
+            <ActivityIndicator color={palette.accent} />
           </View>
         ) : !shared ? (
           <Text style={styles.errorText}>{t('collab.noAccess')}</Text>
@@ -228,18 +262,18 @@ export default function CollabScreen() {
                   autoCorrect={false}
                 />
                 <View style={styles.roleRow}>
-                  <Chip
-                    label={roleLabel('editor')}
-                    active={inviteRole === 'editor'}
-                    onPress={() => setInviteRole('editor')}
-                    color={ROLE_COLOR.editor}
-                  />
-                  <Chip
-                    label={roleLabel('viewer')}
-                    active={inviteRole === 'viewer'}
-                    onPress={() => setInviteRole('viewer')}
-                    color={ROLE_COLOR.viewer}
-                  />
+                  {/* 🔑 a tulaj által definiált role-ok közül választható a meghívás szerepe */}
+                  {roles
+                    .filter((r) => r.id !== 'owner')
+                    .map((r) => (
+                      <Chip
+                        key={r.id}
+                        label={roleName(r.id)}
+                        active={inviteRole === r.id}
+                        onPress={() => setInviteRole(r.id)}
+                        color={roleColor(r.id)}
+                      />
+                    ))}
                 </View>
                 <PrimaryButton
                   label={t('collab.invite.cta')}
@@ -260,8 +294,8 @@ export default function CollabScreen() {
                 const canManage = isOwner && m.role !== 'owner';
                 return (
                   <View key={m.memberId} style={styles.memberRow}>
-                    <View style={[styles.avatar, { backgroundColor: ROLE_COLOR[m.role] + '33' }]}>
-                      <Text style={[styles.avatarText, { color: ROLE_COLOR[m.role] }]}>
+                    <View style={[styles.avatar, { backgroundColor: roleColor(m.role) + '33' }]}>
+                      <Text style={[styles.avatarText, { color: roleColor(m.role) }]}>
                         {initials(name)}
                       </Text>
                     </View>
@@ -278,16 +312,16 @@ export default function CollabScreen() {
                     </View>
                     {canManage ? (
                       <Pressable
-                        onPress={() => toggleRole(m.memberId, m.role)}
-                        style={[styles.roleChip, { borderColor: ROLE_COLOR[m.role] }]}
+                        onPress={() => pickRole(m.memberId, m.role, name)}
+                        style={[styles.roleChip, { borderColor: roleColor(m.role) }]}
                       >
-                        <Text style={[styles.roleChipText, { color: ROLE_COLOR[m.role] }]}>
-                          {roleLabel(m.role)}
+                        <Text style={[styles.roleChipText, { color: roleColor(m.role) }]}>
+                          {roleName(m.role)}
                         </Text>
                       </Pressable>
                     ) : (
-                      <Text style={[styles.roleTag, { color: ROLE_COLOR[m.role] }]}>
-                        {roleLabel(m.role)}
+                      <Text style={[styles.roleTag, { color: roleColor(m.role) }]}>
+                        {roleName(m.role)}
                       </Text>
                     )}
                     {canManage ? (
@@ -303,6 +337,24 @@ export default function CollabScreen() {
                 );
               })}
             </View>
+
+            {isOwner ? (
+              <RoleManagerSection
+                ownerId={ownerId}
+                projectId={projectId}
+                roles={roles}
+                memberRoleIds={members.map((m) => m.role)}
+                onChanged={setRoles}
+              />
+            ) : null}
+
+            {isOwner && localProject ? (
+              <ProjectMetaSection
+                ownerId={ownerId}
+                project={localProject}
+                onSaved={setLocalProject}
+              />
+            ) : null}
 
             {/* megosztott projekt (nem én vagyok a tulaj) — megnyitás + kilépés */}
             {ownerId !== me && role ? (

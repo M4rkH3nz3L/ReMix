@@ -54,6 +54,17 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
   };
 
   const bubble = ({ item }: { item: ChatMessage }) => {
+    // 🧾 rendszer-üzenet (projekt-aktivitás napló): semleges, középre zárt sor
+    if (item.kind === 'system') {
+      return (
+        <View style={styles.systemRow}>
+          <Text style={styles.systemText}>
+            {item.senderName ? `${item.senderName} · ` : ''}
+            {item.body}
+          </Text>
+        </View>
+      );
+    }
     const mine = item.senderId === me;
     return (
       <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowOther]}>
@@ -119,6 +130,8 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  systemRow: { alignItems: 'center', marginVertical: 4, paddingHorizontal: 16 },
+  systemText: { color: palette.textDim, fontSize: 11, textAlign: 'center' },
   typing: {
     color: palette.textDim,
     fontSize: 12,

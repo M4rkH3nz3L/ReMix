@@ -764,6 +764,7 @@
       "restore": "Wiederherstellen",
       "restoreTitle": "Version wiederherstellen",
       "restoreConfirm": "„{{name}}“ wiederherstellen? Der aktuelle Stand bleibt als ein Undo-Schritt erhalten.",
+      "logSnapshot": "Versions-Snapshot gespeichert: {{name}}",
       "cloudFetchFailed": "Die Cloud-Version konnte nicht geladen werden.",
       "autoLabel": "Autosave",
       "copySuffix": "(Kopie)",
@@ -3231,6 +3232,40 @@
     }
   },
   "collab": {
+    "alwaysOn": {
+      "title": "Projektraum wird eingerichtet…",
+      "hint": "Der Raum ist immer aktiv — deine Mitgliedschaft wird erstellt, danach kannst du einladen."
+    },
+    "roles": {
+      "title": "Rollen und Rechte",
+      "hint": "Du definierst die Rollen und ihre Projektrechte — Mitglieder und der Projektraum erben sie. Das Ansichtsrecht bleibt in jeder Rolle.",
+      "builtinTag": "integriert",
+      "invalidName": "Gib der Rolle einen Namen.",
+      "inUse": "Diese Rolle ist in Verwendung — weise die Mitglieder zuerst neu zu.",
+      "builtin": "Integrierte Rollen können nicht gelöscht werden.",
+      "newPlaceholder": "Neuer Rollenname (z. B. Cutter)",
+      "add": "Rolle hinzufügen",
+      "pickTitle": "Neue Rolle für das Mitglied"
+    },
+    "perm": {
+      "view": "Ansicht",
+      "chat": "Chat",
+      "edit": "Bearbeiten",
+      "export": "Export",
+      "invite": "Einladen",
+      "manageProject": "Projektverwaltung"
+    },
+    "settings": {
+      "title": "Projekteinstellungen",
+      "name": "Name",
+      "aspect": "Seitenverhältnis",
+      "fps": "Bildrate",
+      "seoDescription": "Beschreibung (SEO)",
+      "seoHashtags": "Hashtags",
+      "seoKeywords": "Schlüsselwörter",
+      "saved": "Einstellungen gespeichert (auch in der Cloud).",
+      "logUpdated": "Projekteinstellungen aktualisiert"
+    },
     "title": "Zusammenarbeit",
     "share": "Zusammenarbeit…",
     "sharedWithMe": "Mit mir geteilt",

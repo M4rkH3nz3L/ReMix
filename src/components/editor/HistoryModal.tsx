@@ -83,6 +83,14 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
       .then(() => pushProjectVersions(p.id))
       .then(() => listCloudVersionMetas(p.id).then(setCloudMetas))
       .catch(() => {});
+    // 🧾 aktivitás a projekt-szobába (ha tag vagyok — best-effort)
+    void import('@/lib/collab').then(({ myMembership }) =>
+      myMembership(p.id).then((m) =>
+        m ? import('@/lib/chat').then(({ logProjectActivity }) =>
+          logProjectActivity(m.ownerId, p.id, `🕓 ${t('editor.versions.logSnapshot', { name: v.name })}`)
+        ) : undefined
+      )
+    ).catch(() => {});
   };
 
   /** a lista-elem TELJES pillanatképe: lokálisból azonnal, felhőből letöltve */

@@ -1,6 +1,8 @@
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
 import { workerJsonHeaders } from '@/lib/workerAuth';
+import { logProjectActivity } from '@/lib/chat';
 import { pushProject } from '@/lib/cloudSync';
+import { normalizeProjectRoles, OWNER_ROLE_ID, type ProjectRole } from '@/lib/projectRoles';
 import { migrateProject } from '@/lib/projectUtils';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
@@ -14,10 +16,15 @@ import type { Project } from '@/types/project';
  * kényszeríti ki (a néző nem tud a felhőbe írni). A meghívás (e-mail → user) a
  * worker `POST /invite`-ján megy, mert a névfeloldáshoz service_role kell.
  *
- * Pro-funkció a TULAJNAK (`ensureCloud('collab')`); a meghívott ingyen csatlakozik.
+ * ⚠️ A kollaboráció NEM kapcsolható ki: a projekt-szoba mindig él — a „nincs
+ * kollaboráció" azt jelenti, hogy a tulaj még nem hívott be senkit. A role-okat
+ * (és a hozzájuk tartozó projekt-jogokat) a TULAJ definiálja a projekt-
+ * beállításokon (`projectRoles.ts` pure mag + `project_role_defs` tábla); a
+ * tag-műveletek rendszer-üzenetként a projekt-szobába naplózódnak.
  */
 
-export type CollabRole = 'owner' | 'editor' | 'viewer';
+/** role-ID: 'owner' | 'editor' | 'viewer' | a tulaj által definiált egyéni role */
+export type CollabRole = string;
 
 export interface ProjectMember {
   ownerId: string;
@@ -178,9 +185,13 @@ export async function inviteMember(input: {
   projectId: string;
   projectName?: string;
   email: string;
-  role: Exclude<CollabRole, 'owner'>;
+  /** bármely nem-owner role-id (beépített vagy a tulaj által definiált) */
+  role: CollabRole;
 }): Promise<InviteResult> {
-  ensureCloud('collab'); // Pro-kapu a tulajnak
+  if (input.role === OWNER_ROLE_ID) {
+    throw new Error('A tulajdonos szerep nem adható meghívással.');
+  }
+  ensureCloud('collab'); // capability-kapu a tulajnak
   // 🔐 a worker az ownerId-t a VERIFIKÁLT tokenből veszi („csak a tulaj hívhat meg")
   const res = await fetch(`${cloudBaseUrl()}/invite`, {
     method: 'POST',
@@ -191,7 +202,14 @@ export async function inviteMember(input: {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || `Meghívás sikertelen (${res.status}).`);
   }
-  return (await res.json()) as InviteResult;
+  const result = (await res.json()) as InviteResult;
+  // 🧾 aktivitás a projekt-szobába (best-effort)
+  void logProjectActivity(
+    input.ownerId,
+    input.projectId,
+    `➕ ${input.email} meghívva (${input.role})`
+  );
+  return result;
 }
 
 /** Szerep-váltás (csak a tulaj — RLS). */
@@ -199,7 +217,8 @@ export async function changeRole(
   ownerId: string,
   projectId: string,
   memberId: string,
-  role: CollabRole
+  role: CollabRole,
+  memberLabel?: string
 ): Promise<void> {
   const sb = requireSupabase();
   const { error } = await sb
@@ -211,13 +230,19 @@ export async function changeRole(
   if (error) {
     throw new Error(error.message);
   }
+  void logProjectActivity(
+    ownerId,
+    projectId,
+    `🔑 ${memberLabel ?? memberId.slice(0, 8)} új szerepe: ${role}`
+  );
 }
 
 /** Tag eltávolítása (csak a tulaj — RLS). */
 export async function removeMember(
   ownerId: string,
   projectId: string,
-  memberId: string
+  memberId: string,
+  memberLabel?: string
 ): Promise<void> {
   const sb = requireSupabase();
   const { error } = await sb
@@ -229,12 +254,71 @@ export async function removeMember(
   if (error) {
     throw new Error(error.message);
   }
+  void logProjectActivity(
+    ownerId,
+    projectId,
+    `➖ ${memberLabel ?? memberId.slice(0, 8)} eltávolítva a projektből`
+  );
+}
+
+// ── 👥 role-definíciók (a tulaj által megadott projekt-jogok) ─────────────────
+
+/**
+ * A projekt role-definíciói (minden tag olvashatja — a chat/jog-kapuk ezt öröklik).
+ * Hiányzó sor / hiba → az alap role-készlet (owner/editor/viewer).
+ */
+export async function loadProjectRoles(ownerId: string, projectId: string): Promise<ProjectRole[]> {
+  try {
+    const sb = requireSupabase();
+    const { data } = await sb
+      .from('project_role_defs')
+      .select('roles')
+      .eq('owner_id', ownerId)
+      .eq('project_id', projectId)
+      .maybeSingle();
+    return normalizeProjectRoles(data?.roles);
+  } catch {
+    return normalizeProjectRoles(null);
+  }
+}
+
+/** A role-definíciók mentése (csak a tulaj — RLS) + aktivitás-napló. */
+export async function saveProjectRoles(
+  ownerId: string,
+  projectId: string,
+  roles: ProjectRole[]
+): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.from('project_role_defs').upsert(
+    {
+      owner_id: ownerId,
+      project_id: projectId,
+      roles: normalizeProjectRoles(roles),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'owner_id,project_id' }
+  );
+  if (error) {
+    throw new Error(error.message);
+  }
+  void logProjectActivity(ownerId, projectId, '🔑 A projekt szerepkörei frissültek');
 }
 
 /** Kilépés a projektből (a saját tag-sor törlése — RLS engedi). */
 export async function leaveProject(ownerId: string, projectId: string): Promise<void> {
   const uid = requireUserId();
-  await removeMember(ownerId, projectId, uid);
+  // 🧾 a napló MÉG tagként megy ki (a sor törlése után az RLS már nem engedné)
+  await logProjectActivity(ownerId, projectId, '👋 Kilépett a projektből');
+  const sb = requireSupabase();
+  const { error } = await sb
+    .from('project_members')
+    .delete()
+    .eq('owner_id', ownerId)
+    .eq('project_id', projectId)
+    .eq('member_id', uid);
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 /** A VELEM megosztott projektek (ahol tag vagyok, de nem tulaj). */

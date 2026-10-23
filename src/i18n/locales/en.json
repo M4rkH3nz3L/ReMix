@@ -764,6 +764,7 @@
       "restore": "Restore",
       "restoreTitle": "Restore version",
       "restoreConfirm": "Restore \"{{name}}\"? The current state stays as one undo step.",
+      "logSnapshot": "Version snapshot saved: {{name}}",
       "cloudFetchFailed": "Could not download the cloud version.",
       "autoLabel": "Autosave",
       "copySuffix": "(copy)",
@@ -3261,6 +3262,40 @@
     }
   },
   "collab": {
+    "alwaysOn": {
+      "title": "Setting up the project room…",
+      "hint": "The room is always on — your membership is being created, then you can invite anyone."
+    },
+    "roles": {
+      "title": "Roles and permissions",
+      "hint": "You define the roles and their project permissions — members and the project room inherit them. The view permission stays in every role.",
+      "builtinTag": "built-in",
+      "invalidName": "Give the role a name.",
+      "inUse": "This role is in use — reassign the members first.",
+      "builtin": "Built-in roles cannot be deleted.",
+      "newPlaceholder": "New role name (e.g. Cutter)",
+      "add": "Add role",
+      "pickTitle": "New role for the member"
+    },
+    "perm": {
+      "view": "view",
+      "chat": "chat",
+      "edit": "edit",
+      "export": "export",
+      "invite": "invite",
+      "manageProject": "manage project"
+    },
+    "settings": {
+      "title": "Project settings",
+      "name": "Name",
+      "aspect": "Aspect ratio",
+      "fps": "Frame rate",
+      "seoDescription": "Description (SEO)",
+      "seoHashtags": "Hashtags",
+      "seoKeywords": "Keywords",
+      "saved": "Settings saved (and backed up).",
+      "logUpdated": "Project settings updated"
+    },
     "title": "Collaboration",
     "share": "Collaboration…",
     "sharedWithMe": "Shared with me",

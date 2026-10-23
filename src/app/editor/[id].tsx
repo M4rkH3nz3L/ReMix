@@ -35,7 +35,7 @@ import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { openProjectConversation } from '@/lib/chat';
-import { myMembership, type CollabRole } from '@/lib/collab';
+import { currentUserId, ensureShared, myMembership, type CollabRole } from '@/lib/collab';
 import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
 import { pruneProxyCache, pruneRenderCache } from '@/lib/cacheManager';
@@ -127,18 +127,27 @@ export default function EditorScreen() {
     };
   }, [collab?.ownerId, id, project?.id]);
 
-  // 💬 collab-chat: a projekt-beszélgetést nyitja (a résztvevőkkel) a chat-képernyőn
+  // 💬 projekt-szoba: MINDIG elérhető — a „nincs kollaboráció" csak annyit jelent,
+  // hogy még nincs behívva senki. Tulajként az első megnyitás hozza létre a szobát
+  // (tag-sor + felhő-terv), aztán a beszélgetés nyílik a chat-képernyőn.
   const openCollabChat = () => {
-    const owner = collab?.ownerId;
-    if (!owner || !id) {
-      return;
-    }
-    openProjectConversation(owner, id)
-      .then((convId) => {
-        void useChat.getState().loadInbox(); // a fejléc-cím/kind azonnal helyes legyen
-        router.push(`/chat/${convId}`);
-      })
-      .catch(() => {});
+    const run = async () => {
+      let owner = collab?.ownerId;
+      if (!owner) {
+        const me = currentUserId();
+        const proj = useEditorStore.getState().project;
+        if (!me || !proj || proj.id !== id) {
+          return;
+        }
+        await ensureShared(proj);
+        setCollab({ ownerId: me, role: 'owner' });
+        owner = me;
+      }
+      const convId = await openProjectConversation(owner, id);
+      void useChat.getState().loadInbox(); // a fejléc-cím/kind azonnal helyes legyen
+      router.push(`/chat/${convId}`);
+    };
+    void run().catch(() => {});
   };
 
   // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
@@ -578,17 +587,19 @@ export default function EditorScreen() {
       <View style={styles.headerActions}>
         {/* 👥 élő résztvevők (realtime presence) — csak ha más is bent van */}
         <CollabPresence />
-        {/* 💬 collab-chat — csak megosztott projektnél */}
-        {collab ? (
-          <Pressable
-            onPress={openCollabChat}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('chat.projectConversation')}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={21} color={palette.accent2} />
-          </Pressable>
-        ) : null}
+        {/* 💬 projekt-szoba — MINDIG elérhető (tulajként az első megnyitás hozza létre) */}
+        <Pressable
+          onPress={openCollabChat}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('chat.projectConversation')}
+        >
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={21}
+            color={collab ? palette.accent2 : palette.textDim}
+          />
+        </Pressable>
         {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
         <Pressable
           onPress={() => useTutorial.getState().openMenu()}

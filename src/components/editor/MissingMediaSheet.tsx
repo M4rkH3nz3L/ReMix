@@ -29,6 +29,7 @@ export function MissingMediaSheet({
   relinking,
   onRelinkAll,
   onRelinkOne,
+  onRestoreFromRp,
   onClose,
 }: {
   project: Project;
@@ -36,6 +37,8 @@ export function MissingMediaSheet({
   relinking: boolean;
   onRelinkAll: () => void;
   onRelinkOne: (item: MissingMedia) => void;
+  /** 📲 felhő nélküli út: a másik eszközről hozott .rp csomagból pótolja a hiányzókat */
+  onRestoreFromRp: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -48,17 +51,30 @@ export function MissingMediaSheet({
       icon="alert-circle"
       onClose={onClose}
       footer={
-        <Pressable
-          style={[styles.allBtn, relinking && styles.btnDisabled]}
-          disabled={relinking}
-          onPress={onRelinkAll}
-          accessibilityRole="button"
-        >
-          <Ionicons name="link" size={16} color="#fff" />
-          <Text style={styles.allBtnText}>
-            {relinking ? t('editorScreen.relinking') : t('editor.missingSheet.relinkAll')}
-          </Text>
-        </Pressable>
+        <View style={styles.footerCol}>
+          <Pressable
+            style={[styles.allBtn, relinking && styles.btnDisabled]}
+            disabled={relinking}
+            onPress={onRelinkAll}
+            accessibilityRole="button"
+          >
+            <Ionicons name="link" size={16} color="#fff" />
+            <Text style={styles.allBtnText}>
+              {relinking ? t('editorScreen.relinking') : t('editor.missingSheet.relinkAll')}
+            </Text>
+          </Pressable>
+          {/* 📲 felhő nélkül, másik eszközről: .rp csomagból pótlás */}
+          <Pressable
+            style={[styles.rpBtn, relinking && styles.btnDisabled]}
+            disabled={relinking}
+            onPress={onRestoreFromRp}
+            accessibilityRole="button"
+          >
+            <Ionicons name="archive-outline" size={15} color={palette.accent} />
+            <Text style={styles.rpBtnText}>{t('editor.missingSheet.fromRp')}</Text>
+          </Pressable>
+          <Text style={styles.rpHint}>{t('editor.missingSheet.fromRpHint')}</Text>
+        </View>
       }
     >
       <Text style={styles.summary}>
@@ -151,4 +167,17 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.5,
   },
+  footerCol: { gap: 8 },
+  rpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.accent,
+  },
+  rpBtnText: { color: palette.accent, fontSize: 13, fontWeight: '800' },
+  rpHint: { color: palette.textDim, fontSize: 11, textAlign: 'center', lineHeight: 15 },
 });

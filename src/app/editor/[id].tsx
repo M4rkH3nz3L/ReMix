@@ -897,6 +897,53 @@ export default function EditorScreen() {
           onRelinkOne={(m) => {
             void relinkOne(m);
           }}
+          onRestoreFromRp={() => {
+            // 📲 felhő nélküli eszközváltás: a másik eszközről (AirDrop/Fájlok)
+            // áthozott .rp csomagból PONT a hiányzók pótlódnak, undo-safe relinkkel
+            const run = async () => {
+              const proj = useEditorStore.getState().project;
+              if (!proj) {
+                return;
+              }
+              setRelinking(true);
+              try {
+                const res = await import('@/lib/rpFile').then((m) =>
+                  m.pickAndRestoreMissingFromRp(proj)
+                );
+                if (!res) {
+                  return; // mégse
+                }
+                const store = useEditorStore.getState();
+                if (res.pairs.length > 0 && store.project?.id === proj.id) {
+                  store.applyBatch(
+                    res.pairs.map((p) => ({
+                      type: 'RELINK_URI' as const,
+                      oldUri: p.oldUri,
+                      newUri: p.newUri,
+                    })),
+                    'system'
+                  );
+                }
+                const remaining = findMissingMedia(useEditorStore.getState().project!);
+                setMissingMedia(remaining);
+                if (remaining.length === 0) {
+                  setMissingSheetOpen(false);
+                }
+                Alert.alert(
+                  t('editor.missingSheet.fromRp'),
+                  t('editor.missingSheet.fromRpResult', {
+                    count: res.pairs.length,
+                    remaining: remaining.length,
+                  })
+                );
+              } catch (e) {
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+              } finally {
+                setRelinking(false);
+              }
+            };
+            void run();
+          }}
           onClose={() => setMissingSheetOpen(false)}
         />
       ) : null}

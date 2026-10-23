@@ -21,6 +21,7 @@ import { SubscriptionCard } from '@/components/profile/SubscriptionCard';
 import { AiModelsCard } from '@/components/profile/AiModelsCard';
 import { AiTasksCard } from '@/components/profile/AiTasksCard';
 import { FactoryModelsCard } from '@/components/profile/FactoryModelsCard';
+import { DangerZoneCard } from '@/components/profile/DangerZoneCard';
 import { PerformanceCard } from '@/components/profile/PerformanceCard';
 import { AccountCard } from '@/components/profile/AccountCard';
 import { LegalCard } from '@/components/profile/LegalCard';
@@ -211,6 +212,9 @@ export default function ProfileScreen() {
             cacheInfo={p.cacheInfo}
             onClearCache={p.onClearCache}
           />
+
+          {/* — 🧨 Veszélyzóna: minden projekt törlése (tiszta lap) — */}
+          <DangerZoneCard />
 
           {/* — Fiók — */}
           <AccountCard

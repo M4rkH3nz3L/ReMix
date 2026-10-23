@@ -311,6 +311,46 @@ export function extractRpMediaSelected(uri: string, names: readonly string[]): M
   return out;
 }
 
+/**
+ * 📲 FELHŐ NÉLKÜLI eszközváltás: a projekt-terv (JSON) ingyen szinkronizál, a
+ * médiát pedig a másik eszközről áthozott `.rp` csomag adja — ez a gazdaságos út
+ * (AirDrop / Fájlok / saját Drive, nulla szerver-költség). Ez a helper a MÁSIK
+ * eszközön kiválasztott `.rp`-ből PONT a hiányzó fájlokat köti vissza:
+ * kulcs-egyezés (media/<név>) alapján bont ki, és relink-párokat ad — a hívó a
+ * command-buson viszi át (undo-safe). `null` = a user mégsem választott fájlt.
+ */
+export async function pickAndRestoreMissingFromRp(
+  project: Project,
+): Promise<{ pairs: { oldUri: string; newUri: string }[]; matched: number } | null> {
+  const DocumentPicker = await import('expo-document-picker');
+  const picked = await DocumentPicker.getDocumentAsync({
+    copyToCacheDirectory: true,
+    multiple: false,
+    type: ['application/zip', 'application/octet-stream', '*/*'],
+  });
+  if (picked.canceled || picked.assets.length === 0) {
+    return null;
+  }
+  const rpUri = picked.assets[0].uri;
+  const available = new Set(listRpMediaEntries(rpUri).map((e) => e.name));
+  // a projekt hiányzó app-média hivatkozásai → melyik entry fedi őket
+  const wanted: { oldUri: string; entry: string }[] = [];
+  for (const { uri, key } of extractMediaUriEntries(JSON.stringify(project))) {
+    const entry = `${key.dir}/${key.name}`;
+    if (available.has(entry)) {
+      wanted.push({ oldUri: uri, entry });
+    }
+  }
+  if (wanted.length === 0) {
+    return { pairs: [], matched: 0 };
+  }
+  const restored = extractRpMediaSelected(rpUri, wanted.map((w) => w.entry));
+  const pairs = wanted
+    .map((w) => ({ oldUri: w.oldUri, newUri: restored.get(w.entry) ?? '' }))
+    .filter((p) => p.newUri && p.newUri !== p.oldUri);
+  return { pairs, matched: restored.size };
+}
+
 export async function importRpFromUri(
   uri: string,
   onProgress?: (u: ProgressUpdate) => void,

@@ -403,6 +403,18 @@
     "timezoneLabel": "Time zone",
     "timezonePlaceholder": "e.g. Europe/Budapest",
     "timezoneAuto": "Auto",
+    "danger": {
+      "title": "Danger zone",
+      "wipeTitle": "Delete all projects",
+      "wipeHint": "Clean slate: delete every project + media file from this device and from your cloud rows.",
+      "wipeConfirm1": "ALL projects and media files will be deleted from this device and your cloud backups. Sure?",
+      "wipeConfirm2": "This cannot be undone. Export an .rp package first if needed. Delete?",
+      "wipeCta": "Delete…",
+      "wipeCta2": "Delete permanently",
+      "wipeDone": "{{projects}} project(s) and {{files}} file(s) deleted. Cloud: {{cloud}}.",
+      "cloudOk": "cleaned",
+      "cloudSkipped": "skipped (offline / not signed in)"
+    },
     "aiSection": "AI models",
     "aiSectionHint": "Bring your own models: set an endpoint, model id and API key. The default one is used by the AI features.",
     "aiTasksSection": "AI models per task",
@@ -809,6 +821,9 @@
       "statusCloud": "☁️ Restorable from cloud",
       "statusManual": "📁 No cloud copy — manual",
       "relinkAll": "Relink all",
+      "fromRp": "Restore from .rp package (other device)",
+      "fromRpHint": "No cloud needed: export an .rp package on the other device (Export → Full project package), bring it over via AirDrop/Files and pick it here — exactly the missing files get restored.",
+      "fromRpResult": "{{count}} file(s) restored from the package; {{remaining}} still missing.",
       "relinkOne": "Relink"
     },
     "timeline": {

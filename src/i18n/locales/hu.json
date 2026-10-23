@@ -403,6 +403,18 @@
     "timezoneLabel": "Időzóna",
     "timezonePlaceholder": "pl. Europe/Budapest",
     "timezoneAuto": "Automatikus",
+    "danger": {
+      "title": "Veszélyzóna",
+      "wipeTitle": "Összes projekt törlése",
+      "wipeHint": "Tiszta lap: minden projekt + médiafájl törlése az eszközről és a saját felhő-sorokból.",
+      "wipeConfirm1": "MINDEN projekt és médiafájl törlődik az eszközről és a felhő-mentésekből. Biztos?",
+      "wipeConfirm2": "Ez visszafordíthatatlan. Ha kell, előbb exportálj .rp csomagot. Törlöd?",
+      "wipeCta": "Törlés…",
+      "wipeCta2": "Végleges törlés",
+      "wipeDone": "{{projects}} projekt és {{files}} fájl törölve. Felhő: {{cloud}}.",
+      "cloudOk": "kitakarítva",
+      "cloudSkipped": "kihagyva (offline / nincs bejelentkezés)"
+    },
     "aiSection": "AI-modellek",
     "aiSectionHint": "Saját modellek: adj meg endpointot, modell-azonosítót és API-kulcsot. Az alapértelmezettet használják az AI-funkciók.",
     "aiTasksSection": "AI-modellek feladatonként",
@@ -809,6 +821,9 @@
       "statusCloud": "☁️ Felhőből visszaállítható",
       "statusManual": "📁 Nincs felhő-másolat — kézi",
       "relinkAll": "Mind újracsatolása",
+      "fromRp": "Pótlás .rp csomagból (másik eszközről)",
+      "fromRpHint": "Felhő nélkül: a másik eszközön exportálj .rp csomagot (Export → Teljes projekt-csomag), hozd át AirDroppal/Fájlokkal, és itt válaszd ki — pont a hiányzók pótlódnak.",
+      "fromRpResult": "{{count}} fájl pótolva a csomagból; {{remaining}} maradt hiányzó.",
       "relinkOne": "Csatold"
     },
     "timeline": {

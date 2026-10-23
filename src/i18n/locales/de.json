@@ -403,6 +403,18 @@
     "timezoneLabel": "Zeitzone",
     "timezonePlaceholder": "z. B. Europe/Budapest",
     "timezoneAuto": "Auto",
+    "danger": {
+      "title": "Gefahrenzone",
+      "wipeTitle": "Alle Projekte löschen",
+      "wipeHint": "Reiner Tisch: alle Projekte + Mediendateien von diesem Gerät und aus deinen Cloud-Zeilen löschen.",
+      "wipeConfirm1": "ALLE Projekte und Mediendateien werden von diesem Gerät und aus deinen Cloud-Backups gelöscht. Sicher?",
+      "wipeConfirm2": "Das kann nicht rückgängig gemacht werden. Exportiere bei Bedarf zuerst ein .rp-Paket. Löschen?",
+      "wipeCta": "Löschen…",
+      "wipeCta2": "Endgültig löschen",
+      "wipeDone": "{{projects}} Projekt(e) und {{files}} Datei(en) gelöscht. Cloud: {{cloud}}.",
+      "cloudOk": "bereinigt",
+      "cloudSkipped": "übersprungen (offline / nicht angemeldet)"
+    },
     "aiSection": "KI-Modelle",
     "aiSectionHint": "Eigene Modelle: Endpunkt, Modell-ID und API-Schlüssel festlegen. Das Standardmodell nutzen die KI-Funktionen.",
     "aiTasksSection": "KI-Modelle pro Aufgabe",
@@ -809,6 +821,9 @@
       "statusCloud": "☁️ Aus Cloud wiederherstellbar",
       "statusManual": "📁 Keine Cloud-Kopie — manuell",
       "relinkAll": "Alle neu verknüpfen",
+      "fromRp": "Aus .rp-Paket ergänzen (anderes Gerät)",
+      "fromRpHint": "Ohne Cloud: Exportiere auf dem anderen Gerät ein .rp-Paket (Export → Komplettes Projektpaket), bring es per AirDrop/Dateien herüber und wähle es hier — genau die fehlenden Dateien werden ergänzt.",
+      "fromRpResult": "{{count}} Datei(en) aus dem Paket ergänzt; {{remaining}} fehlen noch.",
       "relinkOne": "Verknüpfen"
     },
     "timeline": {

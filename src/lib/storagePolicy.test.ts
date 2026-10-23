@@ -1,4 +1,5 @@
 import {
+  canBackupMedia,
   canCloudBackupMedia,
   MEDIA_BACKUP_MIN_TIER,
   projectMediaSafety,
@@ -77,5 +78,19 @@ describe('storageBillingBasis — a fizetős R2 beárazás-alapja', () => {
 
   it('negatív/0 bemenet biztonságos', () => {
     expect(storageBillingBasis(-5, 0, 100)).toMatchObject({ usedGB: 0, overageGB: 0, estimatedCoinPerMonth: 0 });
+  });
+});
+
+describe('canBackupMedia — saját aktív tár (pl. Google Drive) tier-től független', () => {
+  it('free + saját cél → mehet (a user saját tárhelye/költsége)', () => {
+    expect(canBackupMedia('free', true)).toBe(true);
+  });
+
+  it('free + nincs saját cél → nem (ADR-013: eszközön marad)', () => {
+    expect(canBackupMedia('free', false)).toBe(false);
+  });
+
+  it('pro-nak saját cél nélkül is jár (R2)', () => {
+    expect(canBackupMedia('pro', false)).toBe(true);
   });
 });

@@ -29,6 +29,16 @@ export function canCloudBackupMedia(tier: Tier): boolean {
   return tierMeetsMin(tier, MEDIA_BACKUP_MIN_TIER);
 }
 
+/**
+ * Futhat-e a média-backup: a MI R2-tárunkba tier-kötött (Pro+), DE a user SAJÁT
+ * aktív külső tára (Google Drive / Dropbox / OneDrive / WebDAV / S3 — a szerver
+ * „aktív cél" útja oda routol, kvóta-terhelés nélkül) tier-től FÜGGETLENÜL jár:
+ * az a user saját tárhelye és költsége. Free + saját tár = ingyenes backup-út.
+ */
+export function canBackupMedia(tier: Tier, hasOwnStorageTarget: boolean): boolean {
+  return hasOwnStorageTarget || canCloudBackupMedia(tier);
+}
+
 function isMediaAsset(a: Asset): boolean {
   return a.kind === 'video' || a.kind === 'image' || a.kind === 'audio';
 }

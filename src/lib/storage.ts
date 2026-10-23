@@ -130,7 +130,21 @@ export async function saveProject(project: Project): Promise<void> {
   ]);
 }
 
+/** a média-GC-ben hivatkozásnak számító kulcs-előtagok (projekt+verziók+recovery+napló) */
+const MEDIA_REF_PREFIXES = [
+  projectKey(''),
+  versionsKey(''),
+  recoveryKey(''),
+  eventsKey(''),
+] as const;
+
 export async function deleteProject(id: string): Promise<void> {
+  // 🧹 ADR-013: a projekt-média az APP tárolja, és a fájl a PROJEKTTEL törlődik.
+  // A tartalom kiolvasása MÉG a kulcs-törlés előtt (ezek a törlés-jelöltek) …
+  const deletedDocs = (
+    await AsyncStorage.multiGet([projectKey(id), versionsKey(id), recoveryKey(id)])
+  ).map(([, raw]) => raw);
+
   const metas = await listProjects();
   await AsyncStorage.multiSet([[INDEX_KEY, JSON.stringify(metas.filter((m) => m.id !== id))]]);
   await AsyncStorage.multiRemove([
@@ -140,6 +154,24 @@ export async function deleteProject(id: string): Promise<void> {
     lastAutoKey(id),
     recoveryKey(id),
   ]);
+
+  // … majd ref-számolt fájl-takarítás: ami MÁSIK projektben/verzióban/recovery-ben/
+  // naplóban is él (duplikált/remixelt projekt ugyanazt a fájlt osztja), az MARAD.
+  // Best-effort — a GC hibája sosem akasztja meg a projekt-törlést.
+  try {
+    const remainingKeys = (await AsyncStorage.getAllKeys()).filter((k) =>
+      MEDIA_REF_PREFIXES.some((p) => k.startsWith(p)),
+    );
+    const remainingDocs = (await AsyncStorage.multiGet(remainingKeys)).map(([, raw]) => raw);
+    const { planMediaDeletion } = await import('@/lib/mediaGc');
+    const plan = planMediaDeletion(deletedDocs, remainingDocs);
+    if (plan.length > 0) {
+      const { deleteMediaFiles } = await import('@/lib/mediaGcClient');
+      deleteMediaFiles(plan);
+    }
+  } catch {
+    // árva fájl maradhat — a következő törlés/GC elviszi
+  }
 }
 
 /**

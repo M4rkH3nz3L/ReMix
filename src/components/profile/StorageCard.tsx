@@ -185,6 +185,9 @@ export function StorageCard() {
     setBusy(true);
     try {
       await setDefaultStorage(sourceId);
+      // a mentés-kori backup-döntés cache-elt cél-ellenőrzése frissüljön azonnal
+      const { invalidateOwnStorageTargetCache } = await import('@/lib/externalStorage');
+      invalidateOwnStorageTargetCache();
       await refresh();
     } catch (e) {
       Alert.alert(t('common.error'), (e as Error).message);

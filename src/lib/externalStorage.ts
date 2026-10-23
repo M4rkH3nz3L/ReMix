@@ -117,6 +117,34 @@ export async function fetchConnectedProviders(): Promise<ConnectedProvider[]> {
   return parseConnectedProviders(await res.json().catch(() => null));
 }
 
+/** rövid cache: a mentés-kori backup-döntés ne kérdezze le a workert minden alkalommal */
+let ownTargetCache: { at: number; value: boolean } | null = null;
+const OWN_TARGET_CACHE_MS = 5 * 60 * 1000;
+
+/**
+ * Van-e a usernek SAJÁT aktív tárhely-célja (is_default külső forrás — pl. Google
+ * Drive)? A média-backup ekkor tier-től függetlenül futhat: a szerver `/media/upload`
+ * útja az aktív célra tölt (kvóta-terhelés nélkül). Hiba/offline → utolsó ismert
+ * érték, különben `false` (sosem dob).
+ */
+export async function hasOwnStorageTarget(): Promise<boolean> {
+  if (ownTargetCache && Date.now() - ownTargetCache.at < OWN_TARGET_CACHE_MS) {
+    return ownTargetCache.value;
+  }
+  try {
+    const value = (await fetchConnectedProviders()).some((p) => p.isDefault);
+    ownTargetCache = { at: Date.now(), value };
+    return value;
+  } catch {
+    return ownTargetCache?.value ?? false;
+  }
+}
+
+/** a cache érvénytelenítése (cél-váltás után hívandó, pl. a StorageCard-ból) */
+export function invalidateOwnStorageTargetCache(): void {
+  ownTargetCache = null;
+}
+
 /**
  * OAuth-szolgáltató (Drive/Dropbox) bekötése: a worker ad egy authorize-URL-t,
  * amit böngészőben megnyitunk; a callback a workeren tárolja a tokent. `true`, ha

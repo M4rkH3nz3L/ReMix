@@ -36,6 +36,7 @@ import {
 } from '@/lib/render';
 import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
+import { CloudMediaSection } from '@/components/editor/panels/CloudMediaSection';
 import { shareRpFile } from '@/lib/rpFile';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
@@ -792,6 +793,9 @@ export function ExportPanel() {
         </Text>
         <Text style={styles.note}>{t('panels.export.cloudSyncNote')}</Text>
       </PanelSection>
+
+      {/* 🎯 fájlonkénti visszaállítás: felhő-mentésből (R2 / saját tár, pl. Drive) és .rp-ből */}
+      <CloudMediaSection project={project} />
     </View>
   );
 }

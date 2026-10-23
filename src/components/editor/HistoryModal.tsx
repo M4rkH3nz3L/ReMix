@@ -4,11 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import {
+  deleteCloudVersion,
+  fetchCloudVersion,
+  listCloudVersionMetas,
+  pushProjectVersions,
+} from '@/lib/cloudSync';
 import { describeCommand } from '@/lib/commands';
 import type { EventActor } from '@/lib/commands';
 import { makeId } from '@/lib/id';
 import { loadVersions, saveVersions, type ProjectVersion } from '@/lib/storage';
 import { compareProjects } from '@/lib/versionDiff';
+import { mergeVersionLists, type CloudVersionMeta, type VersionListItem } from '@/lib/versionsSync';
 import { useEditorStore } from '@/store/editorStore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -45,11 +52,15 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
   const restore = useEditorStore((s) => s.restoreProject);
   const data = [...events].reverse(); // legújabb elöl
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
+  // ☁️ felhő-verziók (cloud_project_versions) — másik eszközről is látszanak
+  const [cloudMetas, setCloudMetas] = useState<CloudVersionMeta[]>([]);
+  const items: VersionListItem[] = mergeVersionLists(versions, cloudMetas);
 
   // 🕓 a mentett verziók betöltése a modal megnyitásakor (async → nem sync setState)
   useEffect(() => {
     if (visible && projectId) {
       loadVersions(projectId).then(setVersions).catch(() => setVersions([]));
+      listCloudVersionMetas(projectId).then(setCloudMetas).catch(() => setCloudMetas([]));
     }
   }, [visible, projectId]);
 
@@ -67,12 +78,26 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
     };
     const next = [...versions, v];
     setVersions(next);
-    saveVersions(p.id, next).catch(() => {});
+    saveVersions(p.id, next)
+      // ☁️ a kézi snapshot azonnal megy a felhőbe is (best-effort)
+      .then(() => pushProjectVersions(p.id))
+      .then(() => listCloudVersionMetas(p.id).then(setCloudMetas))
+      .catch(() => {});
+  };
+
+  /** a lista-elem TELJES pillanatképe: lokálisból azonnal, felhőből letöltve */
+  const resolveVersion = async (item: VersionListItem): Promise<ProjectVersion | null> => {
+    if (item.local) {
+      return item.local;
+    }
+    return projectId ? fetchCloudVersion(projectId, item.id) : null;
   };
 
   // 📑 verzió duplikálása → új (kézi) verzió-bejegyzés ugyanabból az állapotból
-  const duplicateVersion = (v: ProjectVersion) => {
-    if (!projectId) {
+  // (csak-felhős elemből is: a letöltött pillanatkép lokális másolatot kap)
+  const duplicateVersion = async (item: VersionListItem) => {
+    const v = await resolveVersion(item);
+    if (!projectId || !v) {
       return;
     }
     const copy: ProjectVersion = {
@@ -88,9 +113,10 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
   };
 
   // 🔍 összehasonlítás a JELENLEGI állapottal (mi változott a pillanatkép óta)
-  const compareVersion = (v: ProjectVersion) => {
+  const compareVersion = async (item: VersionListItem) => {
     const cur = useEditorStore.getState().project;
-    if (!cur) {
+    const v = await resolveVersion(item);
+    if (!cur || !v) {
       return;
     }
     const d = compareProjects(v.project, cur);
@@ -108,24 +134,40 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
     );
   };
 
-  const restoreVersion = (v: ProjectVersion) => {
-    Alert.alert(t('editor.versions.restoreTitle'), t('editor.versions.restoreConfirm', { name: v.name }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('editor.versions.restore'),
-        onPress: () => {
-          restore(v.project);
-          onClose();
+  const restoreVersion = (item: VersionListItem) => {
+    Alert.alert(
+      t('editor.versions.restoreTitle'),
+      t('editor.versions.restoreConfirm', { name: item.name }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('editor.versions.restore'),
+          onPress: () => {
+            // csak-felhős verziónál előbb letöltjük a pillanatképet
+            void resolveVersion(item).then((v) => {
+              if (!v) {
+                Alert.alert(t('common.error'), t('editor.versions.cloudFetchFailed'));
+                return;
+              }
+              restore(v.project);
+              onClose();
+            });
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
-  const deleteVersion = (v: ProjectVersion) => {
-    const next = versions.filter((x) => x.id !== v.id);
+  // 🗑️ törlés MINDKÉT helyről (lokális + felhő) — különben visszaszivárogna a listába
+  const deleteVersion = (item: VersionListItem) => {
+    const next = versions.filter((x) => x.id !== item.id);
     setVersions(next);
+    setCloudMetas((metas) => metas.filter((m) => m.versionId !== item.id));
     if (projectId) {
       saveVersions(projectId, next).catch(() => {});
+      if (item.inCloud) {
+        void deleteCloudVersion(projectId, item.id);
+      }
     }
   };
 
@@ -143,24 +185,34 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
               <Text style={styles.saveBtnText}>{t('editor.versions.save')}</Text>
             </Pressable>
           </View>
-          {versions.length === 0 ? (
+          {items.length === 0 ? (
             <Text style={styles.empty}>{t('editor.versions.empty')}</Text>
           ) : (
-            [...versions].reverse().map((v) => (
+            [...items].reverse().map((v) => (
               <View style={styles.row} key={v.id}>
                 <Ionicons
-                  name={v.kind === 'auto' ? 'sync-outline' : 'bookmark'}
+                  name={
+                    !v.local
+                      ? 'cloud-download-outline' // csak felhőben él (pl. másik eszközről)
+                      : v.kind === 'auto'
+                        ? 'sync-outline'
+                        : 'bookmark'
+                  }
                   size={15}
                   color={v.kind === 'auto' ? palette.textDim : palette.accent}
                 />
                 <Text style={styles.label} numberOfLines={1}>
                   {v.kind === 'auto' ? t('editor.versions.autoLabel') : v.name}
                 </Text>
+                {/* ☁️ a felhőben is mentett verzió jelzése */}
+                {v.inCloud && v.local ? (
+                  <Ionicons name="cloud-done-outline" size={13} color={palette.textDim} />
+                ) : null}
                 <Text style={styles.time}>{shortTime(v.at)}</Text>
-                <Pressable onPress={() => compareVersion(v)} hitSlop={8}>
+                <Pressable onPress={() => void compareVersion(v)} hitSlop={8}>
                   <Ionicons name="git-compare-outline" size={15} color={palette.textDim} />
                 </Pressable>
-                <Pressable onPress={() => duplicateVersion(v)} hitSlop={8}>
+                <Pressable onPress={() => void duplicateVersion(v)} hitSlop={8}>
                   <Ionicons name="copy-outline" size={15} color={palette.textDim} />
                 </Pressable>
                 <Pressable onPress={() => restoreVersion(v)} hitSlop={8}>

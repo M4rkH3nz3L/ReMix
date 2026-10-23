@@ -223,16 +223,12 @@ function readEntryBytes(src: File, entry: ZipEntry): Uint8Array {
  * Név-ütközésnél: azonos méretű meglévő fájl ÚJRAHASZNÁLÓDIK (dedup), eltérő
  * tartalomnál a bejövő új, előtagolt nevet kap.
  */
-export async function importRpFromUri(
-  uri: string,
-  onProgress?: (u: ProgressUpdate) => void,
-): Promise<ImportResult> {
-  const src = new File(uri);
+/** A csomag bejegyzés-listája (EOCD a fájl végéről, majd a central directory). */
+function readRpEntries(src: File): ZipEntry[] {
   const size = src.size ?? 0;
   if (size < 22) {
     throw new Error(tr('lib.rpFile.corrupt'));
   }
-  // EOCD a fájl végéről (hátulról pásztázva), majd a central directory
   const srcHandle = src.open(FileMode.ReadOnly);
   let entries: ZipEntry[];
   try {
@@ -250,6 +246,77 @@ export async function importRpFromUri(
   if (entries.some((e) => e.method !== 0)) {
     throw new Error(tr('lib.rpFile.unsupportedCompression'));
   }
+  return entries;
+}
+
+/** egy média-entry kibontása az app tárába (dedup/átnevezés) → entry-név + új uri */
+function extractMediaEntryToStore(src: File, entry: ZipEntry): { key: string; uri: string } | null {
+  const slash = entry.name.indexOf('/');
+  const dirName = entry.name.slice(0, slash);
+  const fileName = entry.name.slice(slash + 1);
+  if (!fileName || fileName.includes('/') || fileName.includes('..')) {
+    return null; // védekezés a kitörős entry-nevek ellen
+  }
+  const dir = new Directory(Paths.document, dirName);
+  if (!dir.exists) {
+    dir.create();
+  }
+  let target = new File(dir, fileName);
+  if (target.exists && target.size === entry.size) {
+    // dedup: azonos nevű+méretű fájl már itt van (pl. visszaimport ugyanarra az eszközre)
+    return { key: entry.name, uri: target.uri };
+  }
+  if (target.exists) {
+    target = new File(dir, `${Date.now().toString(36)}_${fileName}`);
+  }
+  extractEntry(src, entry, target);
+  return { key: entry.name, uri: target.uri };
+}
+
+/** a csomag média-bejegyzései (a szelektív visszaállítás listájához) */
+export interface RpMediaEntry {
+  /** entry-név: `media/<fájlnév>` vagy `mediacache/<fájlnév>` */
+  name: string;
+  /** fájlnév (megjelenítéshez) */
+  fileName: string;
+  size: number;
+}
+
+/** 🎯 A `.rp` csomag média-fájljainak listája — kibontás NÉLKÜL (gyors: central directory). */
+export function listRpMediaEntries(uri: string): RpMediaEntry[] {
+  const entries = readRpEntries(new File(uri));
+  return entries
+    .filter((e) => e.name.startsWith('media/') || e.name.startsWith('mediacache/'))
+    .map((e) => ({ name: e.name, fileName: e.name.slice(e.name.indexOf('/') + 1), size: e.size }));
+}
+
+/**
+ * 🎯 KIVÁLASZTOTT fájlok visszaállítása egy `.rp` csomagból (pl. Drive-ra mentett
+ * csomagból 1-1 fájl) — a teljes projekt importja NÉLKÜL. A fájl az app tárába
+ * kerül (dedup/átnevezés az importtal azonosan); entry-név → új uri térkép.
+ */
+export function extractRpMediaSelected(uri: string, names: readonly string[]): Map<string, string> {
+  const src = new File(uri);
+  const wanted = new Set(names);
+  const out = new Map<string, string>();
+  for (const entry of readRpEntries(src)) {
+    if (!wanted.has(entry.name)) {
+      continue;
+    }
+    const res = extractMediaEntryToStore(src, entry);
+    if (res) {
+      out.set(res.key, res.uri);
+    }
+  }
+  return out;
+}
+
+export async function importRpFromUri(
+  uri: string,
+  onProgress?: (u: ProgressUpdate) => void,
+): Promise<ImportResult> {
+  const src = new File(uri);
+  const entries = readRpEntries(src);
 
   const projectEntry = entries.find((e) => e.name === 'project.json');
   if (!projectEntry) {
@@ -275,27 +342,10 @@ export async function importRpFromUri(
       total: mediaEntries.length,
       unit: tr('lib.rpFile.fileUnit'),
     });
-    const slash = entry.name.indexOf('/');
-    const dirName = entry.name.slice(0, slash);
-    const fileName = entry.name.slice(slash + 1);
-    if (!fileName || fileName.includes('/') || fileName.includes('..')) {
-      continue; // védekezés a kitörős entry-nevek ellen
+    const res = extractMediaEntryToStore(src, entry);
+    if (res) {
+      newUriByKey.set(res.key, res.uri);
     }
-    const dir = new Directory(Paths.document, dirName);
-    if (!dir.exists) {
-      dir.create();
-    }
-    let target = new File(dir, fileName);
-    if (target.exists && target.size === entry.size) {
-      // dedup: azonos nevű+méretű fájl már itt van (pl. visszaimport ugyanarra az eszközre)
-      newUriByKey.set(entry.name, target.uri);
-      continue;
-    }
-    if (target.exists) {
-      target = new File(dir, `${Date.now().toString(36)}_${fileName}`);
-    }
-    extractEntry(src, entry, target);
-    newUriByKey.set(entry.name, target.uri);
   }
 
   // URI-átírás: minden app-média hivatkozás az ÚJ helyre (konténer-független kulcs szerint)

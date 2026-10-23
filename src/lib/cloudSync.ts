@@ -2,8 +2,9 @@ import { ensureCloud } from '@/lib/backend';
 import { backupProjectMedia, mediaRemoteMap } from '@/lib/mediaSync';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
 import { canBackupMedia } from '@/lib/storagePolicy';
-import { listProjects, saveProject } from '@/lib/storage';
+import { listProjects, loadVersions, saveProject, type ProjectVersion } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
+import { pickVersionsToPush, type CloudVersionMeta } from '@/lib/versionsSync';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, ProjectMeta } from '@/types/project';
@@ -108,8 +109,127 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
       { user_id: uid, project_id: backed.id, name: backed.name, data: backed },
       { onConflict: 'user_id,project_id' }
     );
+    // 🕓 a KÉZI verzió-pillanatképek felhő-tükre (idempotens, best-effort)
+    await pushProjectVersions(backed.id);
   } catch {
     // az auto-backup sosem törheti meg a szerkesztést
+  }
+}
+
+// ── 🕓 Felhő-verziókezelés: a kézi snapshotok tükre a cloud_project_versions-ben ──
+
+/**
+ * A projekt KÉZI verzióinak felszinkronizálása — idempotens (csak a felhőből
+ * hiányzó megy fel), best-effort (sosem dob; login/migráció nélkül skip).
+ */
+export async function pushProjectVersions(projectId: string): Promise<number> {
+  try {
+    const uid = useAuth.getState().user?.id;
+    if (!supabase || !uid) {
+      return 0;
+    }
+    const { data } = await supabase
+      .from('cloud_project_versions')
+      .select('version_id')
+      .eq('user_id', uid)
+      .eq('project_id', projectId);
+    const cloudIds = new Set((data ?? []).map((r: { version_id: string }) => r.version_id));
+    const toPush = pickVersionsToPush(await loadVersions(projectId), cloudIds);
+    if (toPush.length === 0) {
+      return 0;
+    }
+    const { error } = await supabase.from('cloud_project_versions').upsert(
+      toPush.map((v) => ({
+        user_id: uid,
+        project_id: projectId,
+        version_id: v.id,
+        name: v.name,
+        kind: v.kind ?? 'manual',
+        at: v.at,
+        data: v.project,
+      })),
+      { onConflict: 'user_id,project_id,version_id' }
+    );
+    return error ? 0 : toPush.length;
+  } catch {
+    return 0;
+  }
+}
+
+/** A projekt felhő-verzióinak lista-metái (a `data` nélkül — az csak visszaállításkor jön). */
+export async function listCloudVersionMetas(projectId: string): Promise<CloudVersionMeta[]> {
+  try {
+    const uid = useAuth.getState().user?.id;
+    if (!supabase || !uid) {
+      return [];
+    }
+    const { data, error } = await supabase
+      .from('cloud_project_versions')
+      .select('version_id, name, at, kind')
+      .eq('user_id', uid)
+      .eq('project_id', projectId)
+      .order('at', { ascending: true });
+    if (error || !data) {
+      return [];
+    }
+    return data.map((r: { version_id: string; name: string; at: string; kind: string }) => ({
+      versionId: r.version_id,
+      name: r.name ?? '',
+      at: r.at,
+      kind: r.kind === 'auto' ? 'auto' : 'manual',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Egy felhő-verzió TELJES pillanatképe (letöltés visszaállításhoz). `null`, ha nincs/hiba. */
+export async function fetchCloudVersion(
+  projectId: string,
+  versionId: string
+): Promise<ProjectVersion | null> {
+  try {
+    const uid = useAuth.getState().user?.id;
+    if (!supabase || !uid) {
+      return null;
+    }
+    const { data, error } = await supabase
+      .from('cloud_project_versions')
+      .select('version_id, name, at, kind, data')
+      .eq('user_id', uid)
+      .eq('project_id', projectId)
+      .eq('version_id', versionId)
+      .maybeSingle();
+    if (error || !data) {
+      return null;
+    }
+    return {
+      id: data.version_id,
+      name: data.name ?? '',
+      at: data.at,
+      kind: data.kind === 'auto' ? 'auto' : 'manual',
+      project: migrateProject(data.data as Project),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Egy felhő-verzió törlése (a lokális példányt nem érinti). */
+export async function deleteCloudVersion(projectId: string, versionId: string): Promise<void> {
+  try {
+    const uid = useAuth.getState().user?.id;
+    if (!supabase || !uid) {
+      return;
+    }
+    await supabase
+      .from('cloud_project_versions')
+      .delete()
+      .eq('user_id', uid)
+      .eq('project_id', projectId)
+      .eq('version_id', versionId);
+  } catch {
+    // best-effort
   }
 }
 

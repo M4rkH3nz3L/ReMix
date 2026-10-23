@@ -154,6 +154,74 @@ export async function backupProjectMedia(
 }
 
 /**
+ * 🎯 Kiválasztható visszaállítás cél-listája (pure): a KÉRT asset-urikból azok,
+ * amikhez van elérhető felhő-forrás — fájlonkénti user-visszaállításhoz
+ * (nem csak a hiányzókra: a felülírt/sérült helyi fájl is visszahozható).
+ */
+export function selectableRestoreTargets(
+  project: Project,
+  selectedUris: readonly string[],
+  remoteByUri: Record<string, string> = {}
+): { uri: string; url: string; name: string }[] {
+  const out: { uri: string; url: string; name: string }[] = [];
+  for (const uri of new Set(selectedUris)) {
+    const asset = project.assets.find((a) => a.uri === uri);
+    const url = reachableMediaUrl(asset?.remoteUrl ?? remoteByUri[uri] ?? null);
+    if (url) {
+      out.push({ uri, url, name: asset?.name ?? (uri.split('/').pop() ?? uri) });
+    }
+  }
+  return out;
+}
+
+/**
+ * 🎯 A user által KIVÁLASZTOTT fájlok visszaállítása a felhő-másolatból (akkor
+ * is, ha helyben létezik — pl. sérült/felülírt fájl). A letöltés a determinista
+ * `mediacache` névre megy (újratöltésnél FELÜLÍR — ez a visszaállítás értelme),
+ * az eredmény relink-PÁR, amit a hívó a command-buson visz át.
+ */
+export async function restoreSelectedMedia(
+  project: Project,
+  selectedUris: readonly string[],
+  remoteByUri: Record<string, string> = {}
+): Promise<{ pairs: RelinkPair[]; failed: string[] }> {
+  if (Platform.OS === 'web') {
+    return { pairs: [], failed: [...selectedUris] };
+  }
+  const targets = selectableRestoreTargets(project, selectedUris, remoteByUri);
+  let dir: Directory;
+  try {
+    dir = new Directory(Paths.document, 'mediacache');
+    if (!dir.exists) {
+      dir.create({ intermediates: true });
+    }
+  } catch {
+    return { pairs: [], failed: targets.map((t) => t.uri) };
+  }
+  const pairs: RelinkPair[] = [];
+  const failed: string[] = [];
+  for (const t of targets) {
+    const base = t.url.split('?')[0].split('/').pop() || t.name;
+    const file = new File(dir, base);
+    try {
+      // explicit visszaállítás → a meglévő cache-példányt is frissítjük
+      if (file.exists) {
+        file.delete();
+      }
+      await File.downloadFileAsync(t.url, file);
+      if ((file.size ?? 0) === 0) {
+        failed.push(t.uri);
+        continue;
+      }
+      pairs.push({ oldUri: t.uri, newUri: file.uri });
+    } catch {
+      failed.push(t.uri);
+    }
+  }
+  return { pairs, failed };
+}
+
+/**
  * A hiányzó (helyileg nem elérhető) médiafájlok letöltése a szerver-másolatból egy
  * determinisztikus cache-fájlba, és a `oldUri→newUri` relink-PÁROK visszaadása.
  *

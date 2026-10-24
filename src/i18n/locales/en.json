@@ -2788,6 +2788,7 @@
       "renderStartFailed": "Could not start the render.",
       "codecNeedsCloud": "This codec/resolution (AV1 · ProRes · 8K) needs cloud render (Pro).",
       "contentNeedsCloud": "The project uses {{count}} element(s) (e.g. text, effects, transitions) the on-device renderer cannot reproduce yet. Use cloud render to get what you see in the editor.",
+      "overlayRasterFailed": "Caption rasterization failed — try again or use cloud render.",
       "renderError": "Render error.",
       "renderTimeout": "The render took too long — try again.",
       "noWorker": "No render worker is available right now — start it (cd server && npm run worker) or try again in a few minutes.",

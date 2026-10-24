@@ -74,10 +74,14 @@ class RemixRenderModule : Module() {
     val seg = video.getJSONObject(0)
     val extraAudio = audio != null && audio.length() > 0
     val multi = video.length() > 1
+    // 🖼️ overlay-k (szöveg/felirat PNG-k): jelenlétük KÖTELEZŐEN a kompozit-útra
+    // visz — a remux/transzkód gyors-utak nem tudnak rárajzolni.
+    val overlays = plan.optJSONArray("overlays")
+    val hasOverlays = overlays != null && overlays.length() > 0
 
-    // Multi-segment / külön hang-sáv / egyedi hangerő → kompozit (Fázis C).
-    if (multi || extraAudio || seg.optDouble("volume", 1.0) != 1.0) {
-      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, enc, isCancelled, outFile, progress)
+    // Multi-segment / külön hang-sáv / egyedi hangerő / overlay → kompozit (Fázis C).
+    if (multi || extraAudio || hasOverlays || seg.optDouble("volume", 1.0) != 1.0) {
+      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, enc, isCancelled, outFile, progress, overlays)
     }
 
     // ── egy klip, nincs külön hang, teljes hangerő → A/B gyors út ──

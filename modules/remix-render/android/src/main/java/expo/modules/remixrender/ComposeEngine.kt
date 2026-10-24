@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import expo.modules.remixrender.gl.InputSurface
 import expo.modules.remixrender.gl.OutputSurface
+import expo.modules.remixrender.gl.OverlayRender
 import org.json.JSONArray
 import java.io.File
 import java.nio.ByteBuffer
@@ -44,7 +45,7 @@ object ComposeEngine {
     isCancelled: () -> Boolean = { false },
     outputPath: String,
     onProgress: (Double) -> Unit,
-  ): String = compose(video, audio, canvasWidth, canvasHeight, fps, EncoderSpec(), isCancelled, outputPath, onProgress)
+  ): String = compose(video, audio, canvasWidth, canvasHeight, fps, EncoderSpec(), isCancelled, outputPath, onProgress, null)
 
   fun compose(
     video: JSONArray,
@@ -56,6 +57,7 @@ object ComposeEngine {
     isCancelled: () -> Boolean,
     outputPath: String,
     onProgress: (Double) -> Unit,
+    overlays: JSONArray? = null,
   ): String {
     val canvasW = evenDim(canvasWidth)
     val canvasH = evenDim(canvasHeight)
@@ -113,6 +115,9 @@ object ComposeEngine {
     var inputSurface: InputSurface? = null
     var outputSurface: OutputSurface? = null
     var muxer: MediaMuxer? = null
+    // 🖼️ overlay-réteg (szöveg/felirat PNG-k) — a program/textúrák lazy-k, a GL
+    // kontextus (encoder input surface) aktívvá válása után jönnek létre
+    val overlayRender = OverlayRender(overlays)
     try {
       encoder = VideoEncoderFactory.createConfigured(canvasW, canvasH, fps, enc).codec
       inputSurface = InputSurface(encoder.createInputSurface())
@@ -167,7 +172,7 @@ object ComposeEngine {
       // ── szegmensek dekódolása sorban, folytonos PTS-sel ──
       for (seg in segs) {
         if (isCancelled()) throw RenderCancelledException()
-        decodeSegment(seg, canvasW, canvasH, firstAtUs, outputSurface, inputSurface, totalDurUs, isCancelled, onProgress) {
+        decodeSegment(seg, canvasW, canvasH, firstAtUs, outputSurface, inputSurface, totalDurUs, isCancelled, onProgress, overlayRender) {
           drainEncoder(false)
         }
       }
@@ -181,6 +186,7 @@ object ComposeEngine {
       try { if (out.exists()) out.delete() } catch (_: Exception) {}
       throw e
     } finally {
+      try { overlayRender.release() } catch (_: Exception) {}
       try { outputSurface?.release() } catch (_: Exception) {}
       try { encoder?.stop() } catch (_: Exception) {}
       try { encoder?.release() } catch (_: Exception) {}
@@ -200,6 +206,7 @@ object ComposeEngine {
     totalDurUs: Long,
     isCancelled: () -> Boolean,
     onProgress: (Double) -> Unit,
+    overlayRender: OverlayRender? = null,
     pump: () -> Unit,
   ) {
     val extractor = MediaExtractor()
@@ -267,6 +274,8 @@ object ComposeEngine {
             outputSurface.awaitNewImage()
             outputSurface.drawImage()
             val outPtsUs = segBaseUs + ((ptsUs - seg.inUs).toDouble() / seg.speed).toLong()
+            // 🖼️ overlay-k (szöveg/felirat) a videó-frame FÖLÉ, az idő-ablakuk szerint
+            overlayRender?.drawAt(outPtsUs)
             inputSurface.setPresentationTime(outPtsUs * 1000L)
             inputSurface.swapBuffers()
             if (totalDurUs > 0L) {

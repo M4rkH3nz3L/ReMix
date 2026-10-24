@@ -23,6 +23,7 @@ import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { MissingMediaSheet } from '@/components/editor/MissingMediaSheet';
+import { OverlayRasterHost } from '@/components/editor/OverlayRasterHost';
 import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
@@ -1026,6 +1027,9 @@ export default function EditorScreen() {
           onClose={() => setMissingSheetOpen(false)}
         />
       ) : null}
+      {/* 📸 overlay-raszter host: az eszközön-render szöveg-PNG-it a preview-
+          komponens snapshotja adja (pixel-hű) — láthatatlan, csak renderkor él */}
+      <OverlayRasterHost />
       {/* ⏳ live-VOD feldolgozás-loader: a legfelső réteg, amíg a felvétel elérhető nem lesz */}
       <VodProcessingOverlay />
     </SafeAreaView>

@@ -59,8 +59,15 @@ describe('localRenderGaps', () => {
     expect(localRenderMatchesPreview(p, 'android')).toBe(true);
   });
 
-  it('SZÖVEG-klip → rés (ez volt a bejelentett bug)', () => {
+  it('SZÖVEG-klip: Androidon az overlay-út viszi (nem rés), iOS-en még rés', () => {
     const p = project([videoClip()], [{ id: 'tt', type: 'captions', name: 'C', clips: [textClip] }]);
+    expect(localRenderGaps(p, 'android')).toEqual([]);
+    expect(localRenderGaps(p, 'ios')).toContain('text');
+  });
+
+  it('idő-függő tartalmú szöveg (typewriter/karaoke/textMotion/kulcskocka) Androidon is rés', () => {
+    const tw = { ...textClip, id: 'tw', animation: 'typewriter' as const };
+    const p = project([videoClip()], [{ id: 'tt', type: 'captions', name: 'C', clips: [tw] }]);
     expect(localRenderGaps(p, 'android')).toContain('text');
     expect(localRenderMatchesPreview(p, 'android')).toBe(false);
   });

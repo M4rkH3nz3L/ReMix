@@ -2788,6 +2788,7 @@
       "renderStartFailed": "Der Render konnte nicht gestartet werden.",
       "codecNeedsCloud": "Dieser Codec/diese Auflösung (AV1 · ProRes · 8K) braucht Cloud-Render (Pro).",
       "contentNeedsCloud": "Das Projekt nutzt {{count}} Element(e) (z. B. Text, Effekte, Übergänge), die der Geräte-Renderer noch nicht kann. Nutze Cloud-Render, um zu bekommen, was du im Editor siehst.",
+      "overlayRasterFailed": "Die Untertitel-Rasterung ist fehlgeschlagen — versuch es erneut oder nutze Cloud-Render.",
       "renderError": "Render-Fehler.",
       "renderTimeout": "Der Render hat zu lange gedauert — versuch es noch mal.",
       "noWorker": "Derzeit ist kein Render-Worker verfügbar — starte ihn (cd server && npm run worker) oder versuch es in ein paar Minuten erneut.",

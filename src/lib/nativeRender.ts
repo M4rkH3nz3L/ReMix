@@ -1,9 +1,11 @@
 import { requireOptionalNativeModule } from 'expo';
 import { Directory, File, Paths } from 'expo-file-system';
 import { t as tr } from 'i18next';
-import { Platform } from 'react-native';
+import { PixelRatio, Platform } from 'react-native';
 
 import { resolveClipUri } from '@/lib/assetResolve';
+import { deviceTextClips, deviceTextOverlaySpecs } from '@/lib/overlayPlan';
+import { hasOverlayRasterHost, rasterTextOverlays } from '@/lib/overlayRasterBridge';
 import type { RenderSettings } from '@/lib/render';
 import { localRenderMatchesPreview } from '@/lib/renderParity';
 import type { Project } from '@/types/project';
@@ -100,6 +102,19 @@ interface RenderPlan {
   audio: PlanAudioSegment[];
   /** 🏷️ ReMix-vízjel a kimenetre (ingyen on-device, nem-fizető tier — `exportPolicy`) */
   watermark?: boolean;
+  /** 🖼️ szöveg/felirat-overlay-k (Android): teljes-vásznas PNG + idő-ablak +
+   *  belépő animáció paraméterei (a natív OverlayRender játssza újra) */
+  overlays?: {
+    png: string;
+    clipId: string;
+    atSec: number;
+    durationSec: number;
+    opacity: number;
+    anim: 'none' | 'fade' | 'slide' | 'pop' | 'pulse' | 'shake';
+    ampNorm: number;
+    anchorX: number;
+    anchorY: number;
+  }[];
   /** 🎞️ cél-kodek (Fázis E): 'hevc' → kisebb fájl, ha az eszköz bírja; alap h264 */
   codec?: string;
   /** cél-bitráta bit/s-ben (0/hiányzó = automatikus a felbontásból) */
@@ -199,7 +214,15 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
     return false;
   }
   const platform = Platform.OS === 'android' ? 'android' : 'ios';
-  return localRenderMatchesPreview(project, platform);
+  if (!localRenderMatchesPreview(project, platform)) {
+    return false;
+  }
+  // 🖼️ szöveg-overlay kell → csak raszter-hosttal megy (a szerkesztő adja); host
+  // nélkül (pl. feed-posztolás háttérből) a felhő-út a helyes
+  if (deviceTextClips(project).length > 0 && !hasOverlayRasterHost()) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -222,6 +245,30 @@ export async function renderLocal(
     throw new LocalRenderUnavailableError();
   }
   const plan = buildRenderPlan(project, settings, watermark);
+
+  // 🖼️ szöveg/felirat-overlay-k (Android): a preview-komponens snapshotjából
+  // raszterizált PNG-k + a belépő animáció paraméterei a natív újrajátszáshoz.
+  // A raszter-vászon dp-mérete úgy van megválasztva, hogy a capture pixel-mérete
+  // a kimenettel egyezzen (dp × pixelRatio ≈ plan px).
+  if (Platform.OS === 'android') {
+    const specs = deviceTextOverlaySpecs(project, plan.height / PixelRatio.get());
+    if (specs.length > 0) {
+      const pngByClip = await rasterTextOverlays({
+        project,
+        width: plan.width / PixelRatio.get(),
+        height: plan.height / PixelRatio.get(),
+        clipIds: specs.map((sp) => sp.clipId),
+      });
+      const overlays = specs
+        .filter((sp) => pngByClip.has(sp.clipId))
+        .map((sp) => ({ ...sp, png: pngByClip.get(sp.clipId)! }));
+      if (overlays.length < specs.length) {
+        // 🎯 WYSIWYG: ha egy felirat rasztere elbukott, NEM adunk hiányos videót
+        throw new Error(tr('lib.render.overlayRasterFailed'));
+      }
+      (plan as { overlays?: unknown }).overlays = overlays;
+    }
+  }
 
   const dir = new Directory(Paths.cache, 'render');
   if (!dir.exists) {

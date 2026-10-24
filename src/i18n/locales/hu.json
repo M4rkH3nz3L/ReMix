@@ -2788,6 +2788,7 @@
       "renderStartFailed": "A render indítása nem sikerült.",
       "codecNeedsCloud": "Ez a kodek/felbontás (AV1 · ProRes · 8K) felhő-rendert igényel (Pro).",
       "contentNeedsCloud": "A projekt olyan elemeket használ ({{count}} db — pl. szöveg, effekt, átmenet), amiket az eszközön-render még nem tud. Válaszd a felhő-rendert, hogy azt kapd, amit a szerkesztőben látsz.",
+      "overlayRasterFailed": "A felirat-raszterizálás nem sikerült — próbáld újra, vagy válaszd a felhő-rendert.",
       "renderError": "Render hiba.",
       "renderTimeout": "A render túl sokáig tartott — próbáld újra.",
       "noWorker": "Jelenleg nincs elérhető render-worker — indítsd el (cd server && npm run worker), vagy próbáld újra pár perc múlva.",

@@ -1,3 +1,4 @@
+import { textClipUnsupportedOnDevice } from '@/lib/overlayPlan';
 import type { Clip, Project, VideoClip } from '@/types/project';
 
 /**
@@ -104,10 +105,13 @@ function videoClipGaps(clip: VideoClip, platform: RenderPlatform, out: Set<Local
   }
 }
 
-function clipKindGap(clip: Clip): LocalRenderGap | null {
+function clipKindGap(clip: Clip, platform: RenderPlatform): LocalRenderGap | null {
   switch (clip.kind) {
     case 'text':
-      return 'text';
+      // 🖼️ Androidon a szöveg az overlay-úton (preview-snapshot PNG + natív
+      // belépő-animáció) eszközön megy — csak az idő-függő tartalmú klip rés;
+      // iOS-en a natív motor még nem tud overlay-t → minden szöveg felhő-út
+      return platform === 'ios' || textClipUnsupportedOnDevice(clip) ? 'text' : null;
     case 'image':
       return 'image';
     case 'shape':
@@ -130,7 +134,7 @@ export function localRenderGaps(project: Project, platform: RenderPlatform): Loc
   const out = new Set<LocalRenderGap>();
   for (const track of project.tracks) {
     for (const clip of track.clips) {
-      const kindGap = clipKindGap(clip);
+      const kindGap = clipKindGap(clip, platform);
       if (kindGap) {
         out.add(kindGap);
         continue;

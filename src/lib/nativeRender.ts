@@ -1,9 +1,11 @@
 import { requireOptionalNativeModule } from 'expo';
 import { Directory, File, Paths } from 'expo-file-system';
 import { t as tr } from 'i18next';
+import { Platform } from 'react-native';
 
 import { resolveClipUri } from '@/lib/assetResolve';
 import type { RenderSettings } from '@/lib/render';
+import { localRenderMatchesPreview } from '@/lib/renderParity';
 import type { Project } from '@/types/project';
 
 /**
@@ -185,9 +187,19 @@ export function buildRenderPlan(
   };
 }
 
-/** Igaz, ha a projekt eszközön is renderelhető (van legalább egy helyi videó). */
+/**
+ * Igaz, ha a projekt eszközön is renderelhető: van legalább egy helyi videó, ÉS
+ * 🎯 a PARITÁS-KAPU szerint az eszköz-motor a LÁTOTT tartalmat hiánytalanul
+ * vissza tudja adni (szöveg/effekt/átmenet/kulcskocka stb. → felhő-út). Eddig a
+ * plan-builder ezeket némán eldobta, és a kész videóból hiányzott a felirat meg
+ * az effekt — a WYSIWYG-szabály miatt ilyenkor NEM választható az eszköz-motor.
+ */
 export function canRenderLocally(project: Project, settings: RenderSettings): boolean {
-  return buildRenderPlan(project, settings).video.length > 0;
+  if (buildRenderPlan(project, settings).video.length === 0) {
+    return false;
+  }
+  const platform = Platform.OS === 'android' ? 'android' : 'ios';
+  return localRenderMatchesPreview(project, platform);
 }
 
 /**

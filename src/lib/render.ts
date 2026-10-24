@@ -17,6 +17,7 @@ import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { cloudRenderBlocked, cloudRenderStalled, type RenderHealth } from '@/lib/renderPreflight';
 import { renderCacheKey } from '@/lib/projectHash';
+import { localRenderGaps } from '@/lib/renderParity';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders, workerAuthToken } from '@/lib/workerAuth';
@@ -278,8 +279,16 @@ export async function renderMp4(
     );
   } else if (mode === 'local') {
     // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,
-    // vagy nincs natív modul (pl. Expo Go)
-    throw needCloud ? new Error(tr('lib.render.codecNeedsCloud')) : new LocalRenderUnavailableError();
+    // nincs natív modul (pl. Expo Go), VAGY 🎯 a paritás-kapu szerint a kész
+    // videóból hiányozna, amit a szerkesztő mutat (szöveg/effekt/átmenet…)
+    if (needCloud) {
+      throw new Error(tr('lib.render.codecNeedsCloud'));
+    }
+    const gaps = localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios');
+    if (gaps.length > 0) {
+      throw new Error(tr('lib.render.contentNeedsCloud', { count: gaps.length }));
+    }
+    throw new LocalRenderUnavailableError();
   } else {
     // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)
     out = await renderCloud(project, onProgress, settings, opts?.signal);

@@ -41,5 +41,7 @@ export function projectRenderHash(project: Project): string {
 
 /** Render-cache kulcs a projektből + a render-beállításból. */
 export function renderCacheKey(project: Project, settings: unknown): string {
-  return `${projectRenderHash(project)}_${hashString(stableStringify(settings ?? {}))}`;
+  // v2: a paritás-kapu előtti (felirat/effekt nélküli) cache-elt renderek érvénytelenek —
+  // a verzió-só nélkül a régi, hiányos fájl jönne vissza változatlan projektre
+  return `v2_${projectRenderHash(project)}_${hashString(stableStringify(settings ?? {}))}`;
 }

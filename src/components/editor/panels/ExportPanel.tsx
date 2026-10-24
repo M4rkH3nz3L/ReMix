@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
@@ -37,6 +37,7 @@ import {
 import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
 import { CloudMediaSection } from '@/components/editor/panels/CloudMediaSection';
+import { localRenderGaps } from '@/lib/renderParity';
 import { shareRpFile } from '@/lib/rpFile';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
@@ -188,14 +189,39 @@ export function ExportPanel() {
     if (s.bitrateMbps) setBitrateMbps(s.bitrateMbps);
   };
 
+  // 🎯 paritás-előkérdés (WYSIWYG): ha az eszköz-motor nem tudná visszaadni,
+  // amit a szerkesztő mutat (szöveg/effekt/átmenet…), NEM adunk néma, hiányos
+  // videót — a user választ: felhő-render (teljes paritás) vagy mégse.
+  const resolveLocalMode = (): Promise<'local' | 'cloud' | null> => {
+    const gaps = localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios');
+    if (gaps.length === 0) {
+      return Promise.resolve('local');
+    }
+    return new Promise((resolve) => {
+      Alert.alert(
+        t('panels.export.parityTitle'),
+        t('panels.export.parityMsg', { count: gaps.length }),
+        [
+          { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+          { text: t('panels.export.parityCloudCta'), onPress: () => resolve('cloud') },
+        ],
+        { cancelable: false }
+      );
+    });
+  };
+
   // 📱 Export az ESZKÖZÖN (ingyen, szerver nélkül) — a build natív renderelője
-  const exportLocal = () => {
+  const exportLocal = async () => {
     if (renderStatus) {
       return; // már fut
     }
+    const mode = await resolveLocalMode();
+    if (!mode) {
+      return;
+    }
     setRenderStatus(t('common.processing'));
     withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
-      renderAndShareMp4(project, report, buildSettings(), { mode: 'local', signal })
+      renderAndShareMp4(project, report, buildSettings(), { mode, signal })
     )
       .catch((err: Error) => {
         if (!isRenderCancelledError(err)) {
@@ -215,13 +241,18 @@ export function ExportPanel() {
     if (jobs.length === 0) {
       return;
     }
+    // 🎯 paritás-előkérdés a batch-re is (egyszer, az egész sorozatra)
+    const mode = await resolveLocalMode();
+    if (!mode) {
+      return;
+    }
     setRenderStatus(t('common.processing'));
     try {
       for (const job of jobs) {
         const jobProject = { ...project, aspectRatio: job.aspect as typeof project.aspectRatio };
         // SORBAN rendereljük (párhuzamosan túlterhelné az eszközt)
         await withCancellableProgress(`${t('panels.export.exportOnDevice')} · ${job.label}`, (report, signal) =>
-          renderAndShareMp4(jobProject, report, job.settings, { mode: 'local', signal })
+          renderAndShareMp4(jobProject, report, job.settings, { mode, signal })
         );
       }
     } catch (err) {
@@ -449,7 +480,7 @@ export function ExportPanel() {
           ))}
         </View>
         {batchSet.size > 0 ? (
-          <Pressable style={styles.batchBtn} onPress={exportBatch} disabled={!!renderStatus}>
+          <Pressable style={styles.batchBtn} onPress={() => void exportBatch()} disabled={!!renderStatus}>
             <Text style={styles.batchBtnText}>
               {t('panels.export.batchRun', {
                 defaultValue: 'Batch export ({{n}} kimenet)',
@@ -615,7 +646,7 @@ export function ExportPanel() {
         <PrimaryButton
           icon="phone-portrait-outline"
           label={renderStatus ?? t('panels.export.exportOnDeviceFree')}
-          onPress={exportLocal}
+          onPress={() => void exportLocal()}
         />
         <Pressable
           style={[styles.cloudBtn, renderStatus ? styles.postBtnOff : null]}

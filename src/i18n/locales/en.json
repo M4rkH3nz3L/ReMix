@@ -822,6 +822,8 @@
       "statusManual": "📁 No cloud copy — manual",
       "relinkAll": "Relink all",
       "fromRp": "Restore from .rp package (other device)",
+      "fromTransfer": "Download from transfer store ({{size}} MB)",
+      "transferGone": "The transfer package expired or was deleted — send it again from the other device.",
       "fromRpHint": "No cloud needed: export an .rp package on the other device (Export → Full project package), bring it over via AirDrop/Files and pick it here — exactly the missing files get restored.",
       "fromRpResult": "{{count}} file(s) restored from the package; {{remaining}} still missing.",
       "relinkOne": "Relink"
@@ -1681,6 +1683,8 @@
       "shareRemixFile": "Share .remix project file",
       "collectZip": "Collect — package with media (zip)",
       "shareRpFile": "Full project package (.rp) — with media",
+      "transferSend": "Send to my other device (24 h)",
+      "transferSent": "The package is in the transfer store — on your other device, download it with one tap from the missing-media sheet. It lives for 24 hours, then auto-expires.",
       "cloudFilesTitle": "Cloud files — restore per file",
       "cloudFilesEmpty": "No files backed up to the cloud yet. After a cloud backup you can restore individual files here.",
       "restoredOk": "Restored: {{name}}",

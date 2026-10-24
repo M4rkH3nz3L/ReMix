@@ -319,21 +319,15 @@ export function extractRpMediaSelected(uri: string, names: readonly string[]): M
  * kulcs-egyezés (media/<név>) alapján bont ki, és relink-párokat ad — a hívó a
  * command-buson viszi át (undo-safe). `null` = a user mégsem választott fájlt.
  */
-export async function pickAndRestoreMissingFromRp(
-  project: Project,
-): Promise<{ pairs: { oldUri: string; newUri: string }[]; matched: number } | null> {
-  const DocumentPicker = await import('expo-document-picker');
-  const picked = await DocumentPicker.getDocumentAsync({
-    copyToCacheDirectory: true,
-    multiple: false,
-    type: ['application/zip', 'application/octet-stream', '*/*'],
-  });
-  if (picked.canceled || picked.assets.length === 0) {
-    return null;
-  }
-  const rpUri = picked.assets[0].uri;
+export interface RpRestoreOutcome {
+  pairs: { oldUri: string; newUri: string }[];
+  matched: number;
+}
+
+/** A megadott .rp-ből PONT a projekt hiányzó/app-média hivatkozásait pótolja. */
+export function restoreMissingFromRpUri(project: Project, rpUri: string): RpRestoreOutcome {
   const available = new Set(listRpMediaEntries(rpUri).map((e) => e.name));
-  // a projekt hiányzó app-média hivatkozásai → melyik entry fedi őket
+  // a projekt app-média hivatkozásai → melyik entry fedi őket
   const wanted: { oldUri: string; entry: string }[] = [];
   for (const { uri, key } of extractMediaUriEntries(JSON.stringify(project))) {
     const entry = `${key.dir}/${key.name}`;
@@ -349,6 +343,21 @@ export async function pickAndRestoreMissingFromRp(
     .map((w) => ({ oldUri: w.oldUri, newUri: restored.get(w.entry) ?? '' }))
     .filter((p) => p.newUri && p.newUri !== p.oldUri);
   return { pairs, matched: restored.size };
+}
+
+export async function pickAndRestoreMissingFromRp(
+  project: Project,
+): Promise<RpRestoreOutcome | null> {
+  const DocumentPicker = await import('expo-document-picker');
+  const picked = await DocumentPicker.getDocumentAsync({
+    copyToCacheDirectory: true,
+    multiple: false,
+    type: ['application/zip', 'application/octet-stream', '*/*'],
+  });
+  if (picked.canceled || picked.assets.length === 0) {
+    return null;
+  }
+  return restoreMissingFromRpUri(project, picked.assets[0].uri);
 }
 
 export async function importRpFromUri(

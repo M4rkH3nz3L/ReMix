@@ -9,6 +9,7 @@ import { palette } from '@/constants/editor';
 import { extractMediaUriEntries } from '@/lib/mediaGc';
 import { restoreSelectedMedia } from '@/lib/mediaSync';
 import { extractRpMediaSelected, listRpMediaEntries } from '@/lib/rpFile';
+import { uploadProjectTransfer } from '@/lib/transferClient';
 import { relinkCommandsFor, type RelinkPair } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project } from '@/types/project';
@@ -43,6 +44,7 @@ export function CloudMediaSection({ project }: { project: Project }) {
   const { t } = useTranslation();
   const [busyUri, setBusyUri] = useState<string | null>(null);
   const [rpBusy, setRpBusy] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
 
   const backedUp = project.assets.filter(
     (a) => a.remoteUrl && (a.kind === 'video' || a.kind === 'image' || a.kind === 'audio'),
@@ -164,6 +166,22 @@ export function CloudMediaSection({ project }: { project: Project }) {
         label={rpBusy ? t('common.processing') : t('panels.export.rpRestoreBtn')}
         onPress={() => {
           void restoreFromRp();
+        }}
+      />
+      {/* 📲 átviteli tár: a teljes csomag 24 órára felmegy — a másik eszköz
+          a hiányzó-média lapról egy gombbal lehúzza (felhő-előfizetés nélkül) */}
+      <PrimaryButton
+        icon="swap-horizontal-outline"
+        label={transferBusy ? t('common.processing') : t('panels.export.transferSend')}
+        onPress={() => {
+          if (transferBusy) {
+            return;
+          }
+          setTransferBusy(true);
+          uploadProjectTransfer(project)
+            .then(() => Alert.alert(t('panels.export.transferSend'), t('panels.export.transferSent')))
+            .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+            .finally(() => setTransferBusy(false));
         }}
       />
     </PanelSection>

@@ -30,6 +30,8 @@ export function MissingMediaSheet({
   onRelinkAll,
   onRelinkOne,
   onRestoreFromRp,
+  transferSizeBytes,
+  onRestoreFromTransfer,
   onClose,
 }: {
   project: Project;
@@ -39,6 +41,9 @@ export function MissingMediaSheet({
   onRelinkOne: (item: MissingMedia) => void;
   /** 📲 felhő nélküli út: a másik eszközről hozott .rp csomagból pótolja a hiányzókat */
   onRestoreFromRp: () => void;
+  /** 📲 átviteli tár: van elérhető csomag (méret bájtban) — letöltés egy gombbal */
+  transferSizeBytes?: number | null;
+  onRestoreFromTransfer: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -63,6 +68,22 @@ export function MissingMediaSheet({
               {relinking ? t('editorScreen.relinking') : t('editor.missingSheet.relinkAll')}
             </Text>
           </Pressable>
+          {/* 📲 átviteli tár: a másik eszközön feltöltött csomag letöltése egy gombbal */}
+          {transferSizeBytes ? (
+            <Pressable
+              style={[styles.rpBtn, relinking && styles.btnDisabled]}
+              disabled={relinking}
+              onPress={onRestoreFromTransfer}
+              accessibilityRole="button"
+            >
+              <Ionicons name="swap-horizontal-outline" size={15} color={palette.accent} />
+              <Text style={styles.rpBtnText}>
+                {t('editor.missingSheet.fromTransfer', {
+                  size: Math.max(1, Math.round(transferSizeBytes / 1024 / 1024)),
+                })}
+              </Text>
+            </Pressable>
+          ) : null}
           {/* 📲 felhő nélkül, másik eszközről: .rp csomagból pótlás */}
           <Pressable
             style={[styles.rpBtn, relinking && styles.btnDisabled]}

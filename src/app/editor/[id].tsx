@@ -77,6 +77,8 @@ export default function EditorScreen() {
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
+  // 📲 átviteli tár: van-e letölthető csomag ehhez a projekthez (B eszköz)
+  const [transferSize, setTransferSize] = useState<number | null>(null);
   // 🩹 hiányzó-média per-fájl helyreállítás-lista (CORE §2.8)
   const [missingSheetOpen, setMissingSheetOpen] = useState(false);
   const [lineageOpen, setLineageOpen] = useState(false);
@@ -126,6 +128,33 @@ export default function EditorScreen() {
       useCollabLive.getState().stop();
     };
   }, [collab?.ownerId, id, project?.id]);
+
+  // 📲 átviteli tár: ha van hiányzó média, megnézzük, vár-e ránk csomag (B eszköz)
+  useEffect(() => {
+    let alive = true;
+    if (missingMedia.length === 0) {
+      // a setState mikrotaszkban (react-hooks/set-state-in-effect)
+      void Promise.resolve().then(() => {
+        if (alive) {
+          setTransferSize(null);
+        }
+      });
+      return () => {
+        alive = false;
+      };
+    }
+    void import('@/lib/transferClient')
+      .then((m) => m.fetchProjectTransfer(id))
+      .then((meta) => {
+        if (alive) {
+          setTransferSize(meta && !meta.expired ? meta.sizeBytes : null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [missingMedia.length, id]);
 
   // 💬 projekt-szoba: MINDIG elérhető — a „nincs kollaboráció" csak annyit jelent,
   // hogy még nincs behívva senki. Tulajként az első megnyitás hozza létre a szobát
@@ -891,6 +920,56 @@ export default function EditorScreen() {
           project={project}
           missing={missingMedia}
           relinking={relinking}
+          transferSizeBytes={transferSize}
+          onRestoreFromTransfer={() => {
+            // 📲 átviteli tár: a másik eszközön feltöltött .rp letöltése + pontos pótlás
+            const run = async () => {
+              const proj = useEditorStore.getState().project;
+              if (!proj) {
+                return;
+              }
+              setRelinking(true);
+              try {
+                const res = await import('@/lib/transferClient').then((m) =>
+                  m.restoreProjectFromTransfer(proj)
+                );
+                if (!res) {
+                  setTransferSize(null); // lejárt/eltűnt — a gomb tűnjön el
+                  Alert.alert(t('editor.missingSheet.title'), t('editor.missingSheet.transferGone'));
+                  return;
+                }
+                const store = useEditorStore.getState();
+                if (res.pairs.length > 0 && store.project?.id === proj.id) {
+                  store.applyBatch(
+                    res.pairs.map((p) => ({
+                      type: 'RELINK_URI' as const,
+                      oldUri: p.oldUri,
+                      newUri: p.newUri,
+                    })),
+                    'system'
+                  );
+                }
+                const remaining = findMissingMedia(useEditorStore.getState().project!);
+                setMissingMedia(remaining);
+                setTransferSize(null); // sikeres átvétel után a csomag törlődik
+                if (remaining.length === 0) {
+                  setMissingSheetOpen(false);
+                }
+                Alert.alert(
+                  t('editor.missingSheet.title'),
+                  t('editor.missingSheet.fromRpResult', {
+                    count: res.pairs.length,
+                    remaining: remaining.length,
+                  })
+                );
+              } catch (e) {
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+              } finally {
+                setRelinking(false);
+              }
+            };
+            void run();
+          }}
           onRelinkAll={() => {
             void relinkMissing();
           }}

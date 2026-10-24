@@ -822,6 +822,8 @@
       "statusManual": "📁 Keine Cloud-Kopie — manuell",
       "relinkAll": "Alle neu verknüpfen",
       "fromRp": "Aus .rp-Paket ergänzen (anderes Gerät)",
+      "fromTransfer": "Aus dem Übertragungsspeicher laden ({{size}} MB)",
+      "transferGone": "Das Übertragungspaket ist abgelaufen oder gelöscht — sende es erneut vom anderen Gerät.",
       "fromRpHint": "Ohne Cloud: Exportiere auf dem anderen Gerät ein .rp-Paket (Export → Komplettes Projektpaket), bring es per AirDrop/Dateien herüber und wähle es hier — genau die fehlenden Dateien werden ergänzt.",
       "fromRpResult": "{{count}} Datei(en) aus dem Paket ergänzt; {{remaining}} fehlen noch.",
       "relinkOne": "Verknüpfen"
@@ -1681,6 +1683,8 @@
       "shareRemixFile": ".remix-Projektdatei teilen",
       "collectZip": "Collect — Paket mit Medien (zip)",
       "shareRpFile": "Komplettes Projektpaket (.rp) — mit Medien",
+      "transferSend": "An mein anderes Gerät senden (24 h)",
+      "transferSent": "Das Paket liegt im Übertragungsspeicher — auf deinem anderen Gerät lädst du es mit einem Tipp vom Fehlende-Medien-Blatt. Es lebt 24 Stunden, dann läuft es automatisch ab.",
       "cloudFilesTitle": "Cloud-Dateien — Wiederherstellung pro Datei",
       "cloudFilesEmpty": "Noch keine Dateien in der Cloud gesichert. Nach einem Cloud-Backup kannst du hier einzelne Dateien wiederherstellen.",
       "restoredOk": "Wiederhergestellt: {{name}}",

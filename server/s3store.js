@@ -65,4 +65,10 @@ function publicUrl(key) {
     : `${PUBLIC_BASE}/${BUCKET}/${key}`; // Supabase: .../object/public/<bucket>/<key>
 }
 
-module.exports = { s3Enabled, uploadFile, downloadFile, publicUrl, BUCKET };
+/** Objektum törlése (pl. átviteli csomag TTL-söprése / felülírás előtti takarítás). */
+async function deleteFile(key) {
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+module.exports = { s3Enabled, uploadFile, downloadFile, deleteFile, publicUrl, BUCKET };

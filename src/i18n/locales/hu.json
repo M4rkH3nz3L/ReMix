@@ -822,6 +822,8 @@
       "statusManual": "📁 Nincs felhő-másolat — kézi",
       "relinkAll": "Mind újracsatolása",
       "fromRp": "Pótlás .rp csomagból (másik eszközről)",
+      "fromTransfer": "Letöltés az átviteli tárból ({{size}} MB)",
+      "transferGone": "Az átviteli csomag lejárt vagy már törölve lett — küldd fel újra a másik eszközről.",
       "fromRpHint": "Felhő nélkül: a másik eszközön exportálj .rp csomagot (Export → Teljes projekt-csomag), hozd át AirDroppal/Fájlokkal, és itt válaszd ki — pont a hiányzók pótlódnak.",
       "fromRpResult": "{{count}} fájl pótolva a csomagból; {{remaining}} maradt hiányzó.",
       "relinkOne": "Csatold"
@@ -1681,6 +1683,8 @@
       "shareRemixFile": ".remix projektfájl megosztása",
       "collectZip": "Collect — csomag a médiával (zip)",
       "shareRpFile": "Teljes projekt-csomag (.rp) — médiával",
+      "transferSend": "Küldés a másik eszközömre (24 óra)",
+      "transferSent": "A csomag felment az átviteli tárba — a másik eszközödön a hiányzó-média lapról egy gombbal letöltheted. 24 óráig él, utána magától törlődik.",
       "cloudFilesTitle": "Felhő-fájlok — visszaállítás fájlonként",
       "cloudFilesEmpty": "Még nincs felhőbe mentett fájl. A felhő-mentés után itt fájlonként is visszaállíthatsz.",
       "restoredOk": "Visszaállítva: {{name}}",

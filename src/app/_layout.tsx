@@ -1,9 +1,11 @@
 import { useFonts } from 'expo-font';
-import { router, Stack } from 'expo-router';
+import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+import { installGlobalBugHandlers, setBugRoute } from '@/lib/bugReporter';
 
 // 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
 // (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
@@ -49,6 +51,16 @@ function openNotificationRoute(route: string) {
 }
 
 export default function RootLayout() {
+  // 🐞 globális hibagyűjtés (JS-hiba, kezeletlen promise) → server/bugs/ — a
+  // legelső effekt, hogy az indulás közbeni hibák is jelentődjenek
+  useEffect(() => {
+    installGlobalBugHandlers();
+  }, []);
+  // 🐞 a jelentésekhez: melyik képernyőn történt (+ navigációs breadcrumb)
+  const pathname = usePathname();
+  useEffect(() => {
+    setBugRoute(pathname);
+  }, [pathname]);
   // 💳 Free/Pro szint betöltése a tárolóból (a felhő-funkciók kapuja)
   const hydrateEntitlement = useEntitlement((s) => s.hydrate);
   // 🔐 session betöltése — amíg nem kész, nem tudjuk, be van-e jelentkezve a user

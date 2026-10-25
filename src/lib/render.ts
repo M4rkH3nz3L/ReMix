@@ -4,7 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { Linking, Platform } from 'react-native';
 
 import { flattenClipUris } from '@/lib/assetResolve';
-import { cloudBaseUrl, ensureCloud, renderServerUrl } from '@/lib/backend';
+import { cloudBaseUrl, ensureCloud, isProRequiredError, renderServerUrl } from '@/lib/backend';
 import { exportPolicy } from '@/lib/exportPolicy';
 import {
   canRenderLocally,
@@ -270,13 +270,18 @@ export async function renderMp4(
     // 🏷️ on-device = INGYEN (nem mért); a nem-fizető tier kimenetére ReMix-vízjel
     // kerül (exportPolicy — a felhő-render ezzel szemben mért + tiszta).
     const { watermark } = exportPolicy(useEntitlement.getState().effectiveTier(), 'local');
-    out = await renderLocal(
-      project,
-      effective,
-      (p) => onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p }),
-      opts?.signal, // ✕ gomb: eddig NEM ment át ide, ezért hatástalan volt
-      watermark
-    );
+    try {
+      out = await renderLocal(
+        project,
+        effective,
+        (p) => onProgress?.({ phase: tr('lib.render.phaseRenderingOnDevice'), ratio: p }),
+        opts?.signal, // ✕ gomb: eddig NEM ment át ide, ezért hatástalan volt
+        watermark
+      );
+    } catch (e) {
+      reportRenderFailure(e, 'renderLocal', project, effective);
+      throw e;
+    }
   } else if (mode === 'local') {
     // kifejezetten eszközön kérték, de nem megy: kodek/felbontás felhőt igényel,
     // nincs natív modul (pl. Expo Go), VAGY 🎯 a paritás-kapu szerint a kész
@@ -291,9 +296,43 @@ export async function renderMp4(
     throw new LocalRenderUnavailableError();
   } else {
     // FELHŐ: Pro-gate (nincs Pro → ProRequiredError a UI paywalljára)
-    out = await renderCloud(project, onProgress, settings, opts?.signal);
+    try {
+      out = await renderCloud(project, onProgress, settings, opts?.signal);
+    } catch (e) {
+      reportRenderFailure(e, 'renderCloud', project, effective);
+      throw e;
+    }
   }
   return storeRenderCache(cacheKey, out);
+}
+
+/**
+ * 🐞 Render-bukás jelentése a szerver bug-mappájába — a nem-hiba kimeneteleket
+ * (user-megszakítás, Pro-kapu, betelt tárhely-kvóta) kihagyva. A kontextus
+ * PII-mentes: motor, platform, kimeneti beállítás, a projekt mérete.
+ */
+function reportRenderFailure(
+  e: unknown,
+  where: 'renderLocal' | 'renderCloud',
+  project: Project,
+  settings: RenderSettings
+): void {
+  if (isRenderCancelledError(e) || isProRequiredError(e) || e instanceof StorageQuotaError) {
+    return;
+  }
+  void import('@/lib/bugReporter').then(({ reportBug }) =>
+    reportBug(e, {
+      kind: 'handled',
+      extra: {
+        where,
+        resolution: settings.resolution,
+        fps: settings.fps,
+        codec: settings.codec ?? 'h264',
+        clips: project.tracks.reduce((n, t) => n + t.clips.length, 0),
+        tracks: project.tracks.filter((t) => t.clips.length > 0).map((t) => t.type).join(','),
+      },
+    })
+  );
 }
 
 /** Render-cache mappa (OS által üríthető cache-terület). */

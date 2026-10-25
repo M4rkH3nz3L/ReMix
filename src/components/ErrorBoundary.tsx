@@ -3,6 +3,7 @@ import { Component, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { reportBug } from '@/lib/bugReporter';
 
 interface Props {
   children: ReactNode;
@@ -28,6 +29,8 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack?: string }) {
     // a Metro konzolra — így a fejlesztés közbeni hibák nyoma megmarad
     console.error('[ErrorBoundary]', error, info?.componentStack ?? '');
+    // 🐞 + a szerver bug-mappájába (komponens-stackkel), hogy javítani lehessen
+    void reportBug(error, { kind: 'boundary', componentStack: info?.componentStack ?? '' });
   }
 
   private reset = () => {

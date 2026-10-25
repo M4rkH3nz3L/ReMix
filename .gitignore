@@ -74,6 +74,8 @@ supabase/functions/.env.*
 
 # futásidejű szerver-artefaktumok (renderelt média, worker-log, render-cache)
 server/media/
+# 🐞 app-hibajelentések (futásidejű adat, user-id-kat tartalmazhat)
+server/bugs/
 server/worker.log
 server/assets/stickers3d/cache/
 

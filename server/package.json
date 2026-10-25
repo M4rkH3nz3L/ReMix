@@ -10,6 +10,7 @@
     "erase-sweep": "node --env-file-if-exists=.env eraseSweep.js",
     "lint": "expo lint",
     "smoke": "node scripts/render-smoke.js",
+    "bugs": "node scripts/bugs-summary.js",
     "smoke:image": "node scripts/imagedoc-smoke.js",
     "smoke:audio": "node scripts/audio-smoke.js",
     "perf:image": "node scripts/imagedoc-perf.js"

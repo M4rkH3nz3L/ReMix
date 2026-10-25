@@ -202,6 +202,8 @@ app.use(require('./routes/billing'));
 app.use(require('./routes/media'));
 // 📲 átviteli tár: eszköz→eszköz .rp továbbítás (24h TTL, kvótán kívüli, méret-plafonos)
 app.use(require('./routes/transfer'));
+// 🐞 app-hibajelentések → server/bugs/ (hibánként egy fájl, javításhoz)
+app.use(require('./routes/bugs'));
 
 // 🖼️ Kép-eszköz route-ok — domain-router (§01.1).
 app.use(require('./routes/imageTools'));

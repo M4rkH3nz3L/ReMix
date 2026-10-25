@@ -33,6 +33,7 @@ const DEFAULTS = {
   messaging: { windowMs: 60_000, max: 60 }, // notify/invite
   billing: { windowMs: 60_000, max: 30 },
   public: { windowMs: 60_000, max: 240 }, // library/music/health — laza, de van
+  bugs: { windowMs: 60_000, max: 30 }, // app-hibajelentés (nyitott végpont — szűk)
   default: { windowMs: 60_000, max: 120 },
 };
 

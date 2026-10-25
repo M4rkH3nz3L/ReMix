@@ -15,7 +15,7 @@
 | Root user | `root` |
 | Root jelszó | `__________________________` ← a rebuild után a Hetzner egyszer mutatja; ide/jelszókezelőbe írd |
 | Deploy user | `deploy` (csak SSH kulccsal) |
-| App könyvtár | `/opt/remix` |
+| App könyvtár | `/var/www/app` |
 | App port (belső) | `3000` (nincs publikálva, csak a Caddy éri el) |
 | Publikus portok | 22 (SSH), 80, 443 (HTTP/HTTPS, HTTP/3) |
 
@@ -94,7 +94,7 @@ chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 600 /home/deploy/.ssh/authorized_keys
 
 # app könyvtár
-install -d -o deploy -g deploy /opt/remix
+install -d -o deploy -g deploy /var/www/app
 
 # tűzfal
 ufw default deny incoming
@@ -119,18 +119,18 @@ echo "KÉSZ. Teszt új terminálból: ssh -i ~/.ssh/remix_deploy deploy@195.201.
 
 > Ne zárd be a root sessiont, amíg egy **új** terminálból sikeresen be nem léptél kulccsal.
 
-### Szerver oldali `.env` (`/opt/remix/.env`, deploy userként)
+### Szerver oldali `.env` (`/var/www/app/.env`, deploy userként)
 
 ```bash
 ssh remix
-cat > /opt/remix/.env <<'EOF'
+cat > /var/www/app/.env <<'EOF'
 DOMAIN=remix.pelda.hu
 NODE_ENV=production
 PORT=3000
 SESSION_SECRET=CSERÉLD_LE_openssl_rand_hex_32
 # DATABASE_URL=postgres://...
 EOF
-chmod 600 /opt/remix/.env
+chmod 600 /var/www/app/.env
 ```
 
 Titok generálás: `openssl rand -hex 32`
@@ -332,7 +332,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy/docker-compose.yml,deploy/Caddyfile"
-          target: /opt/remix
+          target: /var/www/app
           strip_components: 1
 
       - name: Pull & restart
@@ -350,7 +350,7 @@ jobs:
           envs: GHCR_USER,GHCR_TOKEN,APP_IMAGE,APP_TAG
           script: |
             set -e
-            cd /opt/remix
+            cd /var/www/app
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             # a használt image/tag rögzítése, hogy kézi restartnál is ugyanaz induljon
             grep -v '^APP_IMAGE=\|^APP_TAG=' .env > .env.tmp || true
@@ -370,7 +370,7 @@ jobs:
 2. Szerveren:
    ```bash
    ssh remix
-   cd /opt/remix
+   cd /var/www/app
    docker compose ps
    docker compose logs -f app
    docker compose logs -f caddy
@@ -381,7 +381,7 @@ jobs:
 
 | Feladat | Parancs |
 |---|---|
-| Újraindítás | `cd /opt/remix && docker compose restart app` |
+| Újraindítás | `cd /var/www/app && docker compose restart app` |
 | Rollback adott commitra | `.env`-ben `APP_TAG=<sha>` → `docker compose up -d` |
 | Logok | `docker compose logs -f --tail=200 app` |
 | Erőforrás | `docker stats`, `htop`, `df -h` |

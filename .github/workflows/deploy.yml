@@ -6,9 +6,9 @@ name: Deploy (Hetzner)
 #
 # ⚠️ ELŐFELTÉTEL (egyszeri, kézi first-run — a workflow NEM végzi el):
 #   1) a szerver fel van húzva (ops/server-setup.sh lefutott, deploy user + docker),
-#   2) a repo klónozva: /var/www/app  (git root),
-#   3) kitöltve: /var/www/app/server/.env.production  (titkok — NEM gitben)
-#      és /var/www/app/server/.env  (RENDER_DOMAIN=... a compose változó-behelyettesítéshez).
+#   2) (opcionális) a repo klónozva: /var/www/app — ha nincs, az első futás klónozza,
+#   3) az env: vagy az ENV_PRODUCTION + RENDER_DOMAIN secretek, vagy kézzel
+#      /var/www/app/server/.env.production + /var/www/app/server/.env (RENDER_DOMAIN=...).
 # Ezek után minden main-push ezzel a workflow-val automatikusan újradeployol.
 #
 # GitHub secretek (Settings → Secrets and variables → Actions):
@@ -16,6 +16,13 @@ name: Deploy (Hetzner)
 #   SSH_USER         = deploy
 #   SSH_KEY          = a ~/.ssh/remix_deploy TELJES tartalma (BEGIN…END sorokkal)
 #   SSH_KNOWN_HOSTS  = `ssh-keyscan 195.201.16.57` kimenete  (opcionális, lásd lent)
+#   ENV_PRODUCTION   = a TELJES server/.env.production tartalma (opcionális — ha megvan,
+#                      a deploy írja ki a szerverre; enélkül kézzel kell elhelyezni)
+#   RENDER_DOMAIN    = a backend domainje (pl. api.pelda.hu) — a DNS A-rekordja
+#                      a szerver IP-jére mutasson (a Caddy ebből kér HTTPS-t)
+#
+# Első futáskor a workflow MAGA klónozza a repót /var/www/app-ba (ha még nincs),
+# és mindig a MAIN ágat futtatja (fast-forward).
 
 on:
   push:
@@ -32,8 +39,27 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Deploy — git pull + docker compose up --build
+      # 🔑 Az env-fájl a GitHub secretből (opcionális): a TELJES server/.env.production
+      # tartalma az ENV_PRODUCTION secretben. Base64-ben megy át (a több soros érték
+      # így sértetlen marad), és maszkolva van a logban.
+      - name: Env előkészítése (ha az ENV_PRODUCTION secret meg van adva)
+        env:
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+        run: |
+          if [ -n "${ENV_PRODUCTION:-}" ]; then
+            b64=$(printf '%s' "$ENV_PRODUCTION" | base64 -w0)
+            echo "::add-mask::$b64"
+            echo "ENV_B64=$b64" >> "$GITHUB_ENV"
+            echo "ENV_PRODUCTION secret: megvan → a szerveren felülírja a server/.env.production-t"
+          else
+            echo "ENV_PRODUCTION secret: nincs → a szerveren kézzel elhelyezett server/.env.production kell"
+          fi
+
+      - name: Deploy — (első futáskor klón) + main + docker compose up --build
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          RENDER_DOMAIN: ${{ secrets.RENDER_DOMAIN }}
+          GIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -43,14 +69,39 @@ jobs:
           # (`ssh-keyscan 195.201.16.57`), a MITM-védelemhez add meg itt a
           # szerver ujjlenyomatát is: fingerprint: <sha256:...>. Enélkül az
           # appleboy/ssh-action a futás elején fogadja a host-kulcsot.
-          command_timeout: 20m
+          command_timeout: 30m
+          envs: ENV_B64,RENDER_DOMAIN,GIT_SHA
           script: |
             set -euo pipefail
-            cd /var/www/app
-            git pull --ff-only
+            APP=/var/www/app
+            # 🧰 első futás: a repo klónozása, ha még nincs a szerveren
+            if [ ! -d "$APP/.git" ]; then
+              echo "==> első futás: klónozás ide: $APP"
+              sudo install -d -o "$(id -un)" -g "$(id -gn)" "$APP"
+              if [ -n "$(ls -A "$APP" 2>/dev/null)" ]; then
+                echo "HIBA: a $APP nem üres és nem git-repo — nézd meg kézzel"; exit 1
+              fi
+              git clone https://github.com/M4rkH3nz3L/ReMix.git "$APP"
+            fi
+            cd "$APP"
+            # 🌿 a szerver MINDIG a main ágat futtatja (fast-forward — helyi változást nem dob el)
+            git fetch --prune origin main
+            git checkout -q main 2>/dev/null || git checkout -q -b main origin/main
+            git merge --ff-only origin/main
+            echo "==> main @ $(git rev-parse --short HEAD)"
             cd server
-            test -f .env.production || { echo "HIBA: hiányzik a server/.env.production (first-run kézi lépés)"; exit 1; }
-            test -f .env || { echo "HIBA: hiányzik a server/.env (RENDER_DOMAIN=...)"; exit 1; }
+            # 🔑 env-fájlok a secretekből (ha meg vannak adva), különben a kézzel elhelyezettek
+            if [ -n "${ENV_B64:-}" ]; then
+              umask 077
+              printf '%s' "$ENV_B64" | base64 -d > .env.production
+            fi
+            if [ -n "${RENDER_DOMAIN:-}" ]; then
+              printf 'RENDER_DOMAIN=%s\n' "$RENDER_DOMAIN" > .env
+            fi
+            test -f .env.production || { echo "HIBA: hiányzik a server/.env.production — add meg az ENV_PRODUCTION secretet (a teljes fájl tartalma), vagy helyezd el kézzel"; exit 1; }
+            test -f .env || { echo "HIBA: hiányzik a RENDER_DOMAIN — add meg a RENDER_DOMAIN secretet (pl. api.pelda.hu)"; exit 1; }
+            # a futó commit a /health-ben is látszik (kívülről ellenőrizhető, mi fut)
+            export GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD)}"
             docker compose up -d --build --remove-orphans
             docker image prune -f
             docker compose ps
@@ -72,4 +123,6 @@ jobs:
               fi
               echo "várakozás az API-ra ($i/10)…"; sleep 6
             done
-            echo "HIBA: az API nem lett healthy"; exit 1
+            echo "HIBA: az API nem lett healthy"
+            docker compose -f /var/www/app/server/docker-compose.yml logs --tail=80 api || true
+            exit 1

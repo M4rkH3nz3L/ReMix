@@ -9,6 +9,23 @@ Docker-képes) szerverre, **automatikus HTTPS**-szel. A stack: [docker-compose.y
 
 ---
 
+## ⚡ Automatikus deploy (ajánlott út)
+
+Minden **main-push** élesre deployol (`.github/workflows/deploy.yml`) — a szerver MINDIG
+a `main` ágat futtatja a `/var/www/app` alatt. Egyszeri beállítás:
+
+1. **Szerver:** `ops/server-setup.sh` lefuttatva (Docker + `deploy` user + `/var/www/app`).
+2. **DNS:** a backend-domain **A-rekordja** a szerver IP-jére mutasson (a Caddy ebből kér HTTPS-t).
+3. **GitHub secretek** (Settings → Secrets and variables → Actions):
+   `SSH_HOST`, `SSH_USER` (`deploy`), `SSH_KEY` (a `~/.ssh/remix_deploy` teljes tartalma),
+   `RENDER_DOMAIN` (a domain), `ENV_PRODUCTION` (a **teljes** `server/.env.production` tartalma).
+
+Ennyi: az első futás **magától klónozza** a repót, kiírja az env-fájlokat a secretekből, és
+elindítja a stacket. Ellenőrzés kívülről: `https://<domain>/health` → a `commit` mező a
+futó main-commit rövid hash-e. (A lenti kézi lépések az automatika nélküli / hibakereső út.)
+
+---
+
 ## 0. Előfeltételek (mielőtt kezdenéd)
 
 - **Hetzner szerver** — ajánlott: **CX32+ / CPX31+** (4 vCPU, 8 GB RAM, Ubuntu 24.04). A render + Chromium
@@ -55,8 +72,8 @@ api.pelda.hu.   A   <SZERVER_IP>
 
 ```bash
 # a repo klónozása (vagy privát repónál deploy-key / rsync a server/ mappáról)
-git clone https://github.com/M4rkH3nz3L/ReMix.git /opt/remix
-cd /opt/remix/server
+git clone https://github.com/M4rkH3nz3L/ReMix.git /var/www/app
+cd /var/www/app/server
 ```
 
 > Csak a `server/` mappa kell a futtatáshoz (a compose context = `server/`). A kliens-app NEM fut itt.
@@ -136,7 +153,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 docker compose up -d --scale worker=3
 
 # frissítés (új kód)
-cd /opt/remix && git pull && cd server && docker compose up -d --build
+cd /var/www/app && git pull && cd server && docker compose up -d --build
 
 # logok / újraindítás
 docker compose logs -f worker
@@ -173,7 +190,7 @@ docker compose up -d --scale worker=3
   particles / animált-szöveg / forma-rétegek csendben kimaradnának a renderből, és az `/imagedoc`/`/svg/pdf` hibázna.
 - **GDPR hard-erase cron (KÉSZ):** a lejárt-cooldownú soft-delete-eket a `scripts/erase-cron.js` törli véglegesen
   (storage-média purge + auth-user delete + audit). Napi ütemezés pl. host-cronnal:
-  `0 3 * * *  cd /opt/remix/server && ALLOW_ACCOUNT_ERASE=1 node scripts/erase-cron.js >> /var/log/remix-erase.log 2>&1`
+  `0 3 * * *  cd /var/www/app/server && ALLOW_ACCOUNT_ERASE=1 node scripts/erase-cron.js >> /var/log/remix-erase.log 2>&1`
   (service_role + `ALLOW_ACCOUNT_ERASE=1` kell; a cooldown `ERASE_COOLDOWN_DAYS`, alap 14 nap; a `/account/erase` a self-service út).
 - **Egress/Live (LiveKit):** külön szolgáltatás (LiveKit Cloud vagy saját Docker-egress) — nem ez a stack.
 - **Memória:** 2+ render-worker párhuzamos 4K-render memória-igényes; figyeld a `docker stats`-ot, méretezd a gépet/RENDER_CONCURRENCY-t (§8 méretezés-doktrina).
@@ -194,7 +211,7 @@ visszaolvasása. A Redis-queue elvesztése NEM okoz adatvesztést (a render újr
 ## 11. Frissítés / zero-downtime deploy (03 §3.6)
 
 ```bash
-cd /opt/remix && git pull && cd server
+cd /var/www/app && git pull && cd server
 docker compose up -d --build       # új image + rolling restart
 docker compose ps                  # várd meg: api 'healthy' (/health 200)
 ```

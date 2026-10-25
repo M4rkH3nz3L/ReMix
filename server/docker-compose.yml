@@ -33,6 +33,8 @@ services:
     environment:
       - PORT=8787
       - REDIS_URL=redis://redis:6379
+      # a deploy exportálja: a /health `commit` mezője — kívülről látszik, melyik main fut
+      - GIT_SHA=${GIT_SHA:-}
     depends_on:
       redis:
         condition: service_healthy

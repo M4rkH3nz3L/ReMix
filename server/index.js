@@ -124,6 +124,8 @@ app.get('/health', async (_req, res) => {
   res.json({
     ok: true,
     service: 'vided-render',
+    // 🌿 a futó kód commitja (a deploy adja át) — így kívülről ellenőrizhető, mi fut
+    commit: process.env.GIT_SHA ? process.env.GIT_SHA.slice(0, 7) : null,
     // 🖥️ élő render-workerek száma (heartbeat, 20s TTL) — a kliens ebből tudja
     // előre, hogy a felhő-render (hosszú videó) ténylegesen feldolgozható-e
     workers: workerList.length,

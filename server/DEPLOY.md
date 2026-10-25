@@ -17,7 +17,8 @@ a `main` ágat futtatja a `/var/www/app` alatt. Egyszeri beállítás:
 1. **Szerver:** `ops/server-setup.sh` lefuttatva (Docker + `deploy` user + `/var/www/app`).
 2. **DNS:** a backend-domain **A-rekordja** a szerver IP-jére mutasson (a Caddy ebből kér HTTPS-t).
 3. **GitHub secretek** (Settings → Secrets and variables → Actions):
-   `SSH_HOST`, `SSH_USER` (`deploy`), `SSH_KEY` (a `~/.ssh/remix_deploy` teljes tartalma),
+   `SSH_HOST`, `SSH_USER` (`deploy`), `SSH_KEY` (a `~/.ssh/remix_deploy` teljes tartalma — VAGY
+   `SSH_PASSWORD` a szerver-user jelszavával),
    `RENDER_DOMAIN` (a domain), `ENV_PRODUCTION` (a **teljes** `server/.env.production` tartalma).
 
 Ennyi: az első futás **magától klónozza** a repót, kiírja az env-fájlokat a secretekből, és

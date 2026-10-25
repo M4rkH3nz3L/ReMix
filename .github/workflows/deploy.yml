@@ -15,6 +15,7 @@ name: Deploy (Hetzner)
 #   SSH_HOST         = 195.201.16.57
 #   SSH_USER         = deploy
 #   SSH_KEY          = a ~/.ssh/remix_deploy TELJES tartalma (BEGIN…END sorokkal)
+#   SSH_PASSWORD     = VAGY a szerver-user jelszava (ha nincs kulcs — a kulcs ajánlott)
 #   SSH_KNOWN_HOSTS  = `ssh-keyscan 195.201.16.57` kimenete  (opcionális, lásd lent)
 #   ENV_PRODUCTION   = a TELJES server/.env.production tartalma (opcionális — ha megvan,
 #                      a deploy írja ki a szerverre; enélkül kézzel kell elhelyezni)
@@ -39,6 +40,36 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      # 🩺 Előellenőrzés: melyik secret van meg (az ÉRTÉKEK NÉLKÜL) — a hiányzó/hibás
+      # beállítás NYILVÁNOS annotációként jelenik meg a futás összegzésében, így a
+      # hiba oka a log megnyitása nélkül is látszik.
+      - name: Secretek ellenőrzése
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          RENDER_DOMAIN: ${{ secrets.RENDER_DOMAIN }}
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+        run: |
+          fail=0
+          [ -n "${SSH_HOST:-}" ] || { echo "::error title=Hiányzó secret::SSH_HOST (a szerver IP-je, pl. 195.201.16.57)"; fail=1; }
+          [ -n "${SSH_USER:-}" ] || { echo "::error title=Hiányzó secret::SSH_USER (pl. deploy vagy root)"; fail=1; }
+          if [ -n "${SSH_KEY:-}" ]; then
+            if printf '%s' "$SSH_KEY" | grep -q -- '-----BEGIN'; then
+              echo "::notice title=SSH-belépés::kulccsal (SSH_KEY)"
+            else
+              echo "::error title=Hibás SSH_KEY::a TELJES privát kulcs kell, a -----BEGIN … -----END sorokkal együtt"; fail=1
+            fi
+          elif [ -n "${SSH_PASSWORD:-}" ]; then
+            echo "::notice title=SSH-belépés::jelszóval (SSH_PASSWORD)"
+          else
+            echo "::error title=Hiányzó secret::SSH_KEY vagy SSH_PASSWORD (a szerver-belépéshez)"; fail=1
+          fi
+          [ -n "${RENDER_DOMAIN:-}" ] && echo "::notice title=RENDER_DOMAIN::megadva" || echo "::warning title=Nincs RENDER_DOMAIN secret::a szerveren kézzel elhelyezett server/.env kell (RENDER_DOMAIN=...)"
+          [ -n "${ENV_PRODUCTION:-}" ] && echo "::notice title=ENV_PRODUCTION::megadva" || echo "::warning title=Nincs ENV_PRODUCTION secret::a szerveren kézzel elhelyezett server/.env.production kell"
+          exit $fail
+
       # 🔑 Az env-fájl a GitHub secretből (opcionális): a TELJES server/.env.production
       # tartalma az ENV_PRODUCTION secretben. Base64-ben megy át (a több soros érték
       # így sértetlen marad), és maszkolva van a logban.
@@ -65,6 +96,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: 22
           key: ${{ secrets.SSH_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           # Host-kulcs ellenőrzés: ha beállítod az SSH_KNOWN_HOSTS secretet
           # (`ssh-keyscan 195.201.16.57`), a MITM-védelemhez add meg itt a
           # szerver ujjlenyomatát is: fingerprint: <sha256:...>. Enélkül az
@@ -113,6 +145,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: 22
           key: ${{ secrets.SSH_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
             set -e
             # a konténer belső health-je (a Caddy mögött); a domain-health kívülről mehet

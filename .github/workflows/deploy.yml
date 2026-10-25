@@ -51,8 +51,25 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           RENDER_DOMAIN: ${{ secrets.RENDER_DOMAIN }}
           ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+          # a gyakori félrekattintás felismerése: Variables fülre került Secrets helyett
+          V_SSH_HOST: ${{ vars.SSH_HOST }}
+          V_SSH_USER: ${{ vars.SSH_USER }}
+          V_SSH_KEY: ${{ vars.SSH_KEY }}
+          V_SSH_PASSWORD: ${{ vars.SSH_PASSWORD }}
+          V_RENDER_DOMAIN: ${{ vars.RENDER_DOMAIN }}
+          V_ENV_PRODUCTION: ${{ vars.ENV_PRODUCTION }}
         run: |
           fail=0
+          for n in SSH_HOST SSH_USER SSH_KEY SSH_PASSWORD RENDER_DOMAIN ENV_PRODUCTION; do
+            v="V_$n"
+            if [ -n "${!v:-}" ]; then
+              echo "::warning title=$n a VARIABLES fülön van::Settings → Secrets and variables → Actions → a „Secrets” fülre kell (a Variables-t a titkokhoz nem használjuk)"
+            fi
+          done
+          # a NEM titkos host/user a Variables-ből is elfogadható
+          SSH_HOST="${SSH_HOST:-${V_SSH_HOST:-}}"
+          SSH_USER="${SSH_USER:-${V_SSH_USER:-}}"
+          RENDER_DOMAIN="${RENDER_DOMAIN:-${V_RENDER_DOMAIN:-}}"
           [ -n "${SSH_HOST:-}" ] || { echo "::error title=Hiányzó secret::SSH_HOST (a szerver IP-je, pl. 195.201.16.57)"; fail=1; }
           [ -n "${SSH_USER:-}" ] || { echo "::error title=Hiányzó secret::SSH_USER (pl. deploy vagy root)"; fail=1; }
           if [ -n "${SSH_KEY:-}" ]; then
@@ -89,11 +106,11 @@ jobs:
       - name: Deploy — (első futáskor klón) + main + docker compose up --build
         uses: appleboy/ssh-action@v1.2.0
         env:
-          RENDER_DOMAIN: ${{ secrets.RENDER_DOMAIN }}
+          RENDER_DOMAIN: ${{ secrets.RENDER_DOMAIN || vars.RENDER_DOMAIN }}
           GIT_SHA: ${{ github.sha }}
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || vars.SSH_USER }}
           port: 22
           key: ${{ secrets.SSH_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
@@ -141,8 +158,8 @@ jobs:
       - name: Health-ellenőrzés
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || vars.SSH_USER }}
           port: 22
           key: ${{ secrets.SSH_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}

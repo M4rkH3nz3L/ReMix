@@ -18,6 +18,7 @@ import { projectDuration } from '@/lib/projectUtils';
 import { cloudRenderBlocked, cloudRenderStalled, type RenderHealth } from '@/lib/renderPreflight';
 import { renderCacheKey } from '@/lib/projectHash';
 import { localRenderGaps } from '@/lib/renderParity';
+import { addBreadcrumb, reportBug } from '@/lib/bugReporter';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders, workerAuthToken } from '@/lib/workerAuth';
@@ -257,6 +258,8 @@ export async function renderMp4(
 
   // av1/prores + 8K csak felhőben megy → az eszköz-utat kizárjuk
   const needCloud = settingsNeedCloud(effective);
+  // 🐞 a hibajelentések kontextusa: milyen render indult (motor-döntés előtt)
+  addBreadcrumb(`render: ${mode} ${effective.resolution}p ${effective.codec ?? 'h264'}`);
 
   // ESZKÖZÖN: ingyen, szerver nélkül — ha a build támogatja és van mit renderelni
   const canLocal =
@@ -320,19 +323,17 @@ function reportRenderFailure(
   if (isRenderCancelledError(e) || isProRequiredError(e) || e instanceof StorageQuotaError) {
     return;
   }
-  void import('@/lib/bugReporter').then(({ reportBug }) =>
-    reportBug(e, {
-      kind: 'handled',
-      extra: {
-        where,
-        resolution: settings.resolution,
-        fps: settings.fps,
-        codec: settings.codec ?? 'h264',
-        clips: project.tracks.reduce((n, t) => n + t.clips.length, 0),
-        tracks: project.tracks.filter((t) => t.clips.length > 0).map((t) => t.type).join(','),
-      },
-    })
-  );
+  void reportBug(e, {
+    kind: 'handled',
+    extra: {
+      where,
+      resolution: settings.resolution,
+      fps: settings.fps,
+      codec: settings.codec ?? 'h264',
+      clips: project.tracks.reduce((n, t) => n + t.clips.length, 0),
+      tracks: project.tracks.filter((t) => t.clips.length > 0).map((t) => t.type).join(','),
+    },
+  });
 }
 
 /** Render-cache mappa (OS által üríthető cache-terület). */

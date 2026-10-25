@@ -1,12 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
 import {
+  buildBugPayload,
+  deliveryOutcome,
   emptyThrottle,
   enqueueBug,
+  makeQid,
   normalizeError,
   parseBugQueue,
   pushBreadcrumb,
@@ -25,17 +28,28 @@ import { workerAuthHeaders } from '@/lib/workerAuth';
  * hibákra (pl. render-bukás). Minden jelentéshez: platform/OS/eszköz/app-verzió,
  * az aktuális route, a nyitott projekt id-ja, a hiba előtti utolsó lépések
  * (breadcrumb) és a legutóbbi szerkesztő-parancsok TÍPUSAI (tartalom nélkül).
- * Hálózati hiba → offline-sor (AsyncStorage), a következő indításkor elküldve.
- * Sosem dob, nem rekurzál; `EXPO_PUBLIC_BUG_REPORTS=0` kikapcsolja.
+ *
+ * KÉZBESÍTÉSI GARANCIA (legalább-egyszer, a szerver szűri a duplikátumot):
+ *  - minden jelentés egyedi `qid`-et kap; a szerver az újraküldöttet eldobja,
+ *  - az offline-sor MINDEN olvasás-írása egy soros záron megy (az egyidejű
+ *    jelentés és ürítés nem írja felül egymást — nincs elveszett jelentés),
+ *  - az ürítés egyszerre csak egyszer fut, és csak a SIKERESEN kézbesítetteket
+ *    veszi ki a sorból (közben érkező új elem megmarad),
+ *  - fatális hibánál az eredeti kezelő (ami leállíthatja az appot) csak a
+ *    lemezre írás UTÁN fut (max 1,5 mp várakozással).
+ * Sosem dob; `EXPO_PUBLIC_BUG_REPORTS=0` kikapcsolja.
  */
 
 const QUEUE_KEY = 'remix.bugQueue.v1';
-const ENABLED = process.env.EXPO_PUBLIC_BUG_REPORTS !== '0';
+const FATAL_PERSIST_TIMEOUT_MS = 1500;
+
+function reportsEnabled(): boolean {
+  return process.env.EXPO_PUBLIC_BUG_REPORTS !== '0';
+}
 
 let throttle = emptyThrottle();
 let breadcrumbs: string[] = [];
 let currentRoute = '';
-let installed = false;
 
 /** a hiba előtti lépések nyoma (navigáció, fontos műveletek) */
 export function addBreadcrumb(text: string): void {
@@ -50,105 +64,172 @@ export function setBugRoute(route: string): void {
   }
 }
 
-interface BugContext {
-  kind?: BugKind;
-  /** fatális hibánál: előbb a tartós sorba, onnan küldés (a folyamat leállhat) */
-  persistFirst?: boolean;
-  componentStack?: string;
-  /** rövid, PII-mentes kulcs-érték kontextus (pl. { where: 'renderLocal' }) */
-  extra?: Record<string, unknown>;
+// ── offline-sor: SOROS zár minden olvasás-írásra ────────────────────────────
+
+let queueLock: Promise<unknown> = Promise.resolve();
+
+function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queueLock.then(fn, fn);
+  queueLock = run.catch(() => undefined);
+  return run;
 }
 
-type BugPayload = Record<string, unknown>;
+async function readQueue(): Promise<Record<string, unknown>[]> {
+  try {
+    return parseBugQueue(await AsyncStorage.getItem(QUEUE_KEY));
+  } catch {
+    return [];
+  }
+}
 
-async function postBug(payload: BugPayload): Promise<boolean> {
+async function writeQueue(queue: Record<string, unknown>[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch {
+    // a tároló hibája nem okozhat újabb hibát
+  }
+}
+
+function enqueue(payload: Record<string, unknown>): Promise<void> {
+  return withQueueLock(async () => {
+    await writeQueue(enqueueBug(await readQueue(), payload));
+  });
+}
+
+async function postBug(payload: Record<string, unknown>): Promise<'done' | 'retry'> {
   try {
     const res = await fetch(`${cloudBaseUrl()}/bugs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) },
       body: JSON.stringify(payload),
     });
-    // 4xx (pl. üres/hibás jelentés) ne kerüljön vissza a sorba — újraküldve is bukna
-    return res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429);
+    return deliveryOutcome(res.status);
   } catch {
-    return false;
+    return deliveryOutcome(null);
   }
 }
 
-async function enqueue(payload: BugPayload): Promise<void> {
-  try {
-    const queue = parseBugQueue(await AsyncStorage.getItem(QUEUE_KEY));
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(enqueueBug(queue, payload)));
-  } catch {
-    // a sor is best-effort
-  }
+/** sor-elem azonosító: a qid, vagy (régi, qid nélküli elemnél) a tartalom */
+function itemKey(item: Record<string, unknown>): string {
+  return typeof item.qid === 'string' ? item.qid : JSON.stringify(item);
 }
 
-/** az offline-sor elküldése (indításkor + minden sikeres küldés után) */
-export async function flushBugQueue(): Promise<void> {
-  try {
-    const queue = parseBugQueue(await AsyncStorage.getItem(QUEUE_KEY));
-    if (queue.length === 0) {
-      return;
+let flushing: Promise<void> | null = null;
+let flushAgain = false;
+
+/**
+ * Az offline-sor elküldése (indításkor, előtérbe lépéskor, sikeres küldés után).
+ * Egyszerre egy fut; ha futás közben újra kérik, a végén még egy kör jön.
+ * Csak a sikeresen (vagy véglegesen) lezárt elemek kerülnek ki a sorból.
+ */
+export function flushBugQueue(): Promise<void> {
+  if (flushing) {
+    flushAgain = true;
+    return flushing;
+  }
+  flushing = (async () => {
+    try {
+      do {
+        flushAgain = false;
+        const snapshot = await withQueueLock(readQueue);
+        if (snapshot.length === 0) {
+          break;
+        }
+        const finished = new Set<string>();
+        for (const item of snapshot) {
+          if ((await postBug(item)) === 'done') {
+            finished.add(itemKey(item));
+          } else {
+            break; // hálózat/szerver gond — a többit se most próbáljuk
+          }
+        }
+        if (finished.size > 0) {
+          await withQueueLock(async () => {
+            const current = await readQueue();
+            await writeQueue(current.filter((x) => !finished.has(itemKey(x))));
+          });
+        }
+        if (finished.size < snapshot.length) {
+          break; // maradt sikertelen — majd a következő alkalommal
+        }
+      } while (flushAgain);
+    } catch {
+      // best-effort
+    } finally {
+      flushing = null;
     }
-    const remaining: unknown[] = [];
-    for (const item of queue) {
-      if (!(await postBug(item as BugPayload))) {
-        remaining.push(item);
-      }
-    }
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
-  } catch {
-    // best-effort
-  }
+  })();
+  return flushing;
 }
 
-/** a nyitott projekt + az utolsó parancs-típusok (lusta import: nincs import-kör) */
-async function editorContext(): Promise<{ projectId: string; recent: string[] }> {
+// ── kontextus-szolgáltatók (a gyökér-layout regisztrálja) ───────────────────
+// Szándékosan NEM importáljuk a store-okat: így nincs import-kör (a store-ok
+// gráfja a render-utat is behúzza), és a modul önmagában tesztelhető.
+
+export interface BugEditorContext {
+  projectId: string;
+  /** az utolsó szerkesztő-parancsok TÍPUSAI (`actor:TYPE`) — tartalom nélkül */
+  recent: string[];
+}
+
+let editorProvider: (() => BugEditorContext) | null = null;
+let signedInFlag = false;
+
+/** a nyitott projekt kontextusának forrása (null = leiratkozás) */
+export function setBugEditorContextProvider(fn: (() => BugEditorContext) | null): void {
+  editorProvider = fn;
+}
+
+/** be van-e jelentkezve a user (a gyökér-layout frissíti) */
+export function setBugSignedIn(value: boolean): void {
+  signedInFlag = value;
+}
+
+function editorContext(): BugEditorContext {
   try {
-    const { useEditorStore } = await import('@/store/editorStore');
-    const st = useEditorStore.getState();
+    const ctx = editorProvider?.();
     return {
-      projectId: st.project?.id ?? '',
-      recent: (st.events ?? []).slice(-8).map((e) => `${e.actor}:${e.command.type}`),
+      projectId: typeof ctx?.projectId === 'string' ? ctx.projectId : '',
+      recent: Array.isArray(ctx?.recent) ? ctx.recent.slice(-8) : [],
     };
   } catch {
     return { projectId: '', recent: [] };
   }
 }
 
-async function currentUserIdSafe(): Promise<string | null> {
-  try {
-    const { useAuth } = await import('@/store/authStore');
-    return useAuth.getState().user?.id ?? null;
-  } catch {
-    return null;
-  }
+export interface BugContext {
+  kind?: BugKind;
+  componentStack?: string;
+  /** rövid, PII-mentes kulcs-érték kontextus (pl. { where: 'renderLocal' }) */
+  extra?: Record<string, unknown>;
+  /** fatális hibánál: a hívó csak a lemezre írásig vár, a küldés háttérben megy */
+  persistOnly?: boolean;
 }
 
+export type BugReportResult = 'sent' | 'queued' | 'throttled' | 'disabled' | 'failed';
+
 /**
- * Hiba jelentése a szerverre. Sosem dob; a hívót nem várakoztatja érdemben
- * (fire-and-forget is használható). Throttle-olt: ugyanaz a hiba percenként egyszer.
+ * Hiba jelentése a szerverre. Sosem dob. Throttle-olt: ugyanaz a hiba percenként
+ * egyszer (az elnyelt ismétlések száma a következő jelentéssel megy).
  */
-export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<void> {
-  if (!ENABLED) {
-    return;
+export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<BugReportResult> {
+  if (!reportsEnabled()) {
+    return 'disabled';
   }
   try {
     const err = normalizeError(error);
     const decision = throttleDecision(throttle, throttleKey(err), Date.now());
-    if (!decision.send) {
-      return;
-    }
     throttle = decision.next;
-    const editor = await editorContext();
-    const userId = await currentUserIdSafe();
-    const payload: BugPayload = {
+    if (!decision.send) {
+      return 'throttled';
+    }
+    const editor = editorContext();
+    const payload = buildBugPayload({
+      qid: makeQid(Date.now(), Math.random()),
       kind: ctx.kind ?? 'handled',
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-      componentStack: ctx.componentStack ?? '',
+      error: err,
+      repeat: decision.repeat,
+      componentStack: ctx.componentStack,
       platform: Platform.OS,
       osVersion: String(Platform.Version ?? ''),
       appVersion: Constants.expoConfig?.version ?? '',
@@ -159,22 +240,23 @@ export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<v
         ...breadcrumbs,
         ...(editor.recent.length > 0 ? [`parancsok: ${editor.recent.join(', ')}`] : []),
       ],
-      extra: { ...(ctx.extra ?? {}), ...(userId ? { signedIn: true } : { signedIn: false }) },
-    };
-    if (ctx.persistFirst) {
-      // a sorból megy ki (siker esetén onnan törlődik) — így nincs dupla küldés,
-      // és ha a folyamat a küldés előtt leáll, a következő indítás pótolja
+      extra: { ...(ctx.extra ?? {}), signedIn: signedInFlag },
+    });
+    if (ctx.persistOnly) {
+      // a sorból megy ki (siker esetén onnan törlődik) — ha a folyamat a küldés
+      // előtt leáll, a következő indítás pótolja
       await enqueue(payload);
-      await flushBugQueue();
-      return;
-    }
-    if (await postBug(payload)) {
       void flushBugQueue();
-    } else {
-      await enqueue(payload);
+      return 'queued';
     }
+    if ((await postBug(payload)) === 'done') {
+      void flushBugQueue();
+      return 'sent';
+    }
+    await enqueue(payload);
+    return 'queued';
   } catch {
-    // a hibajelentő sosem okozhat újabb hibát
+    return 'failed';
   }
 }
 
@@ -191,33 +273,52 @@ interface HermesLike {
   }) => void;
 }
 
+interface BugGlobals {
+  ErrorUtils?: ErrorUtilsLike;
+  HermesInternal?: HermesLike;
+  /** a Fast Refresh a modult újrafuttathatja — a telepítés jelzője a globálison él */
+  __remixBugHandlersInstalled?: boolean;
+}
+
+function timeout(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * A globális hibakezelők telepítése (egyszer, a gyökér-layoutból):
- *  - JS-hiba (fatális is) → jelentés, majd az EREDETI kezelő fut tovább
- *    (dev-ben a LogBox / redbox, prodban a natív crash-viselkedés marad);
- *    fatálisnál a jelentés előbb a sorba íródik (a folyamat leállhat a küldés előtt)
+ *  - JS-hiba → jelentés, majd az EREDETI kezelő fut tovább (dev-ben LogBox/
+ *    redbox, prodban a natív crash-viselkedés marad); fatálisnál az eredeti
+ *    kezelő csak a jelentés lemezre írása UTÁN fut (max 1,5 mp)
  *  - kezeletlen promise-elutasítás (Hermes tracker) → jelentés + konzol-figyelmeztetés
- *  - induláskor a korábbi (pl. crash előtti) sor elküldése
+ *  - előtérbe lépés / indulás → a korábbi (pl. crash előtti) sor elküldése
  */
 export function installGlobalBugHandlers(): void {
-  if (installed || !ENABLED || Platform.OS === 'web') {
+  const g = globalThis as BugGlobals;
+  if (g.__remixBugHandlersInstalled || !reportsEnabled() || Platform.OS === 'web') {
     return;
   }
-  installed = true;
+  g.__remixBugHandlersInstalled = true;
 
-  const g = globalThis as { ErrorUtils?: ErrorUtilsLike; HermesInternal?: HermesLike };
   const eu = g.ErrorUtils;
   if (eu) {
     const prev = eu.getGlobalHandler();
     eu.setGlobalHandler((error, isFatal) => {
-      void reportBug(error, { kind: isFatal ? 'js-fatal' : 'js-error', persistFirst: !!isFatal });
+      if (isFatal) {
+        const persisted = reportBug(error, { kind: 'js-fatal', persistOnly: true });
+        void Promise.race([persisted, timeout(FATAL_PERSIST_TIMEOUT_MS)]).finally(() =>
+          prev(error, isFatal)
+        );
+        return;
+      }
+      void reportBug(error, { kind: 'js-error' });
       prev(error, isFatal);
     });
   }
 
-  const tracker = g.HermesInternal?.enablePromiseRejectionTracker;
-  if (tracker) {
-    tracker({
+  const hermes = g.HermesInternal;
+  if (hermes && typeof hermes.enablePromiseRejectionTracker === 'function') {
+    // metódusként hívva (a natív függvény `this`-e a HermesInternal)
+    hermes.enablePromiseRejectionTracker({
       allRejections: true,
       onUnhandled: (_id, rejection) => {
         void reportBug(rejection, { kind: 'unhandled-rejection' });
@@ -228,5 +329,31 @@ export function installGlobalBugHandlers(): void {
     });
   }
 
+  // előtérbe lépéskor az addig összegyűlt sor kimegy; a háttér/előtér is breadcrumb
+  AppState.addEventListener('change', (state) => {
+    addBreadcrumb(`app: ${state}`);
+    if (state === 'active') {
+      void flushBugQueue();
+    }
+  });
+
   void flushBugQueue();
+}
+
+/** a sorban várakozó (még nem kézbesített) jelentések száma — diagnosztikához */
+export async function pendingBugCount(): Promise<number> {
+  return (await withQueueLock(readQueue)).length;
+}
+
+/** csak teszthez: a modul-állapot visszaállítása */
+export function __resetBugReporterForTests(): void {
+  throttle = emptyThrottle();
+  breadcrumbs = [];
+  currentRoute = '';
+  editorProvider = null;
+  signedInFlag = false;
+  flushing = null;
+  flushAgain = false;
+  queueLock = Promise.resolve();
+  (globalThis as BugGlobals).__remixBugHandlersInstalled = false;
 }

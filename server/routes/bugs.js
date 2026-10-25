@@ -4,7 +4,7 @@ const express = require('express');
 
 const { verifyRequest } = require('../auth');
 const { rateLimit } = require('../security/rateLimit');
-const { bugFileName, fingerprint, mergeBug, sanitizeReport } = require('../lib/bugReport');
+const { bugFileName, fingerprint, isDuplicateOccurrence, mergeBug, sanitizeReport } = require('../lib/bugReport');
 
 /**
  * 🐞 Hibajelentés-fogadó: az app futásidejű hibái → `server/bugs/` mappa,
@@ -86,6 +86,10 @@ router.post('/bugs', rateLimit('bugs'), express.json({ limit: '64kb' }), async (
         if (count >= MAX_FILES) {
           return { dropped: true };
         }
+      }
+      // legalább-egyszer kézbesítés: az újraküldött jelentést nem számoljuk duplán
+      if (isDuplicateOccurrence(existing, report)) {
+        return { id: fp, count: existing.count, status: existing.status, duplicate: true };
       }
       const merged = mergeBug(existing, report, fp, new Date().toISOString(), userId);
       const file = existingPath || path.join(BUGS_DIR, bugFileName(fp, report));

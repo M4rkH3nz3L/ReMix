@@ -21,6 +21,7 @@ import { SubscriptionCard } from '@/components/profile/SubscriptionCard';
 import { AiModelsCard } from '@/components/profile/AiModelsCard';
 import { AiTasksCard } from '@/components/profile/AiTasksCard';
 import { FactoryModelsCard } from '@/components/profile/FactoryModelsCard';
+import { BugReportCard } from '@/components/profile/BugReportCard';
 import { DangerZoneCard } from '@/components/profile/DangerZoneCard';
 import { PerformanceCard } from '@/components/profile/PerformanceCard';
 import { AccountCard } from '@/components/profile/AccountCard';
@@ -212,6 +213,9 @@ export default function ProfileScreen() {
             cacheInfo={p.cacheInfo}
             onClearCache={p.onClearCache}
           />
+
+          {/* — 🐞 hibajelentés-diagnosztika (csak dev-build): eszközönkénti próba — */}
+          {__DEV__ ? <BugReportCard /> : null}
 
           {/* — 🧨 Veszélyzóna: minden projekt törlése (tiszta lap) — */}
           <DangerZoneCard />

@@ -4,8 +4,10 @@
  * A kliens a futásidejű hibákat a workerre küldi (`POST /bugs` → a
  * `server/bugs/` mappába, hibánként egy fájl). Itt van: a tetszőleges dobott
  * érték normalizálása, a hiba-vihar elleni throttle (ugyanaz a hiba percenként
- * egyszer, munkamenetenként plafon), a breadcrumb-gyűrű (a hiba előtti utolsó
- * lépések) és az offline-sor kezelése. A hálózat/eszköz-infó a `bugReporter.ts`.
+ * egyszer — a közben elnyelt ismétlések SZÁMA a következő jelentéssel megy, így
+ * a szerver-számláló pontos marad), a breadcrumb-gyűrű, a payload méret-plafonja
+ * (a szerver 64 KB-os limitje alatt — különben a jelentés némán elveszne) és az
+ * offline-sor elemei. A hálózat/eszköz-infó/sor-zár a `bugReporter.ts`.
  */
 
 export type BugKind =
@@ -49,45 +51,63 @@ export function normalizeError(e: unknown): NormalizedError {
   return { name: 'Error', message: String(e), stack: '' };
 }
 
-/** a kliens-oldali throttle kulcsa (a szerver ennél pontosabb ujjlenyomatot számol) */
+/**
+ * A throttle kulcsa: a VÁLTOZÓ részek (azonosítók, számok) nélkül — különben
+ * egy render-ciklusban változó id-vel dobó hiba minden példánya „új" lenne, és
+ * elárasztaná a szervert. (A szerver ennél pontosabb ujjlenyomatot számol.)
+ */
 export function throttleKey(err: NormalizedError): string {
   const firstFrame = err.stack.split('\n').find((l) => l.trim().startsWith('at ')) ?? '';
-  return `${err.name}|${err.message.slice(0, 120)}|${firstFrame.trim().replace(/:\d+:\d+/g, '')}`;
+  const msg = err.message
+    .replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, '<uuid>')
+    .replace(/\b[a-z]+_[0-9a-z]{4,}\b/gi, '<id>')
+    .replace(/\d+/g, '<n>')
+    .slice(0, 160);
+  return `${err.name}|${msg}|${firstFrame.trim().replace(/:\d+:\d+/g, '')}`;
 }
 
 export interface BugThrottleState {
   lastSent: Record<string, number>;
+  /** a throttle-ablakban elnyelt ismétlések kulcsonként (a következő küldéssel mennek) */
+  suppressed: Record<string, number>;
   sentThisSession: number;
 }
 
 export const BUG_THROTTLE_MS = 60_000;
-export const BUG_SESSION_CAP = 30;
+export const BUG_SESSION_CAP = 50;
 
 export function emptyThrottle(): BugThrottleState {
-  return { lastSent: {}, sentThisSession: 0 };
+  return { lastSent: {}, suppressed: {}, sentThisSession: 0 };
 }
 
 /**
  * Mehet-e a jelentés: ugyanaz a hiba percenként egyszer, munkamenetenként max
- * `BUG_SESSION_CAP` — egy render-ciklusban dobó hiba ne árassza el a szervert.
- * Tiszta: az új állapotot adja vissza (`send=false` esetén változatlan).
+ * `BUG_SESSION_CAP`. Az elnyelt ismétlések nem vesznek el: `repeat` = 1 + a
+ * közben elnyeltek száma (a szerver ennyivel növeli a számlálót). Tiszta.
  */
 export function throttleDecision(
   state: BugThrottleState,
   key: string,
   nowMs: number,
-): { send: boolean; next: BugThrottleState } {
-  if (state.sentThisSession >= BUG_SESSION_CAP) {
-    return { send: false, next: state };
-  }
+): { send: boolean; repeat: number; next: BugThrottleState } {
   const last = state.lastSent[key];
-  if (last != null && nowMs - last < BUG_THROTTLE_MS) {
-    return { send: false, next: state };
+  const inWindow = last != null && nowMs - last < BUG_THROTTLE_MS;
+  if (inWindow || state.sentThisSession >= BUG_SESSION_CAP) {
+    return {
+      send: false,
+      repeat: 0,
+      next: { ...state, suppressed: { ...state.suppressed, [key]: (state.suppressed[key] ?? 0) + 1 } },
+    };
   }
+  const repeat = 1 + (state.suppressed[key] ?? 0);
+  const suppressed = { ...state.suppressed };
+  delete suppressed[key];
   return {
     send: true,
+    repeat,
     next: {
       lastSent: { ...state.lastSent, [key]: nowMs },
+      suppressed,
       sentThisSession: state.sentThisSession + 1,
     },
   };
@@ -106,6 +126,116 @@ export function pushBreadcrumb(
   return [...list, entry].slice(-max);
 }
 
+/** hossz-plafonok (a szerver `sanitizeReport` tükre — ott se vágódjon semmi) */
+export const PAYLOAD_LIMITS = {
+  message: 2000,
+  stack: 8000,
+  componentStack: 4000,
+  name: 120,
+  route: 200,
+  breadcrumb: 200,
+  breadcrumbs: 30,
+  extraValue: 500,
+  extraKeys: 20,
+} as const;
+
+/** a szerver body-limitje 64 KB — ennél kisebb biztonsági plafon */
+export const MAX_PAYLOAD_BYTES = 48 * 1024;
+
+function cut(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+export interface BugPayloadInput {
+  qid: string;
+  kind: BugKind;
+  error: NormalizedError;
+  repeat: number;
+  componentStack?: string;
+  platform: string;
+  osVersion: string;
+  appVersion: string;
+  model: string;
+  route: string;
+  projectId: string;
+  breadcrumbs: readonly string[];
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * A küldendő payload, méret-plafonnal: a mezők a szerver-limitekre vágva, és
+ * ha a JSON így is túl nagy (pl. sok több-bájtos karakter), a stack/komponens-
+ * stack fokozatosan rövidül — a jelentés SOSEM lépi túl a szerver body-limitjét.
+ */
+export function buildBugPayload(input: BugPayloadInput): Record<string, unknown> {
+  const extra: Record<string, string | number | boolean> = {};
+  for (const [k, v] of Object.entries(input.extra ?? {}).slice(0, PAYLOAD_LIMITS.extraKeys)) {
+    if (typeof v === 'number' || typeof v === 'boolean') {
+      extra[k] = v;
+    } else {
+      let s: string;
+      try {
+        s = typeof v === 'string' ? v : JSON.stringify(v);
+      } catch {
+        s = String(v);
+      }
+      extra[k] = cut(s ?? '', PAYLOAD_LIMITS.extraValue);
+    }
+  }
+  const payload = {
+    qid: input.qid,
+    kind: input.kind,
+    repeat: Math.max(1, Math.min(1000, Math.floor(input.repeat))),
+    name: cut(input.error.name, PAYLOAD_LIMITS.name),
+    message: cut(input.error.message, PAYLOAD_LIMITS.message),
+    stack: cut(input.error.stack, PAYLOAD_LIMITS.stack),
+    componentStack: cut(input.componentStack ?? '', PAYLOAD_LIMITS.componentStack),
+    platform: input.platform,
+    osVersion: cut(input.osVersion, 40),
+    appVersion: cut(input.appVersion, 40),
+    model: cut(input.model, 80),
+    route: cut(input.route, PAYLOAD_LIMITS.route),
+    projectId: cut(input.projectId, 80),
+    breadcrumbs: input.breadcrumbs
+      .slice(-PAYLOAD_LIMITS.breadcrumbs)
+      .map((b) => cut(b, PAYLOAD_LIMITS.breadcrumb)),
+    extra,
+  };
+  // végső biztosíték: bájt-méret (UTF-8 ≈ ≤ 3 bájt/kódegység) a plafon alá
+  let budget: number = PAYLOAD_LIMITS.stack;
+  while (utf8Length(JSON.stringify(payload)) > MAX_PAYLOAD_BYTES && budget > 200) {
+    budget = Math.floor(budget / 2);
+    payload.stack = cut(input.error.stack, budget);
+    payload.componentStack = cut(input.componentStack ?? '', Math.floor(budget / 2));
+    payload.breadcrumbs = payload.breadcrumbs.slice(-Math.max(5, Math.floor(budget / 400)));
+  }
+  return payload;
+}
+
+/** UTF-8 bájthossz (a szerver-limit bájtban értendő, nem karakterben) */
+export function utf8Length(s: string): number {
+  let n = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) {
+      n += 1;
+    } else if (c < 0x800) {
+      n += 2;
+    } else if (c >= 0xd800 && c <= 0xdbff) {
+      n += 4; // surrogate-pár: 4 bájt, a második fél kimarad
+      i += 1;
+    } else {
+      n += 3;
+    }
+  }
+  return n;
+}
+
+/** egyedi sor-azonosító (a szerver ebből szűri az újraküldött duplikátumot) */
+export function makeQid(nowMs: number, rand: number): string {
+  return `${nowMs.toString(36)}${Math.floor(rand * 1e9).toString(36)}`;
+}
+
 export const BUG_QUEUE_MAX = 30;
 
 /** az offline-sor bővítése (a legrégebbiek esnek ki, ha betelt) */
@@ -114,14 +244,40 @@ export function enqueueBug<T>(queue: readonly T[], item: T, max: number = BUG_QU
 }
 
 /** a tárolt sor biztonságos visszaolvasása (sérült/idegen tartalom → üres) */
-export function parseBugQueue(raw: string | null): unknown[] {
+export function parseBugQueue(raw: string | null): Record<string, unknown>[] {
   if (!raw) {
     return [];
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(-BUG_QUEUE_MAX) : [];
+    return Array.isArray(parsed)
+      ? (parsed.filter((x) => x && typeof x === 'object' && !Array.isArray(x)) as Record<
+          string,
+          unknown
+        >[]).slice(-BUG_QUEUE_MAX)
+      : [];
   } catch {
     return [];
   }
+}
+
+/**
+ * Mi a teendő a szerver-válasz alapján: `done` (siker, vagy végleges elutasítás
+ * — újraküldve is ugyanígy járna: 4xx, 507 betelt mappa) vagy `retry` (hálózat,
+ * 5xx, 429 rate-limit — később újra).
+ */
+export function deliveryOutcome(status: number | null): 'done' | 'retry' {
+  if (status == null) {
+    return 'retry';
+  }
+  if (status >= 200 && status < 300) {
+    return 'done';
+  }
+  if (status === 429) {
+    return 'retry';
+  }
+  if (status === 507 || (status >= 400 && status < 500)) {
+    return 'done';
+  }
+  return 'retry';
 }

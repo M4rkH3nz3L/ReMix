@@ -403,6 +403,18 @@
     "timezoneLabel": "Időzóna",
     "timezonePlaceholder": "pl. Europe/Budapest",
     "timezoneAuto": "Automatikus",
+    "bugs": {
+      "title": "Hibajelentés",
+      "sendTest": "Teszt-hiba küldése a szerverre",
+      "hint": "Ellenőrzi, hogy a hibagyűjtés él-e ezen az eszközön.",
+      "result_sent": "✅ elküldve — nézd: cd server && npm run bugs",
+      "result_queued": "📥 sorban vár (nincs kapcsolat a workerrel) — később automatikusan megy",
+      "result_throttled": "⏱️ percenként egyszer — próbáld újra egy perc múlva",
+      "result_disabled": "⛔ kikapcsolva (EXPO_PUBLIC_BUG_REPORTS=0)",
+      "result_failed": "❌ belső hiba",
+      "pending_one": "{{count}} várakozó",
+      "pending_other": "{{count}} várakozó"
+    },
     "danger": {
       "title": "Veszélyzóna",
       "wipeTitle": "Összes projekt törlése",

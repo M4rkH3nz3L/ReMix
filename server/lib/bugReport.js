@@ -47,7 +47,12 @@ function sanitizeReport(body) {
       extra[str(k, 60)] = typeof v === 'string' ? str(v, 500) : str(JSON.stringify(v), 500);
     }
   }
+  const qid = typeof body.qid === 'string' && /^[0-9a-z]{4,40}$/.test(body.qid) ? body.qid : '';
+  const repeatRaw = Number(body.repeat);
+  const repeat = Number.isFinite(repeatRaw) ? Math.max(1, Math.min(1000, Math.floor(repeatRaw))) : 1;
   return {
+    qid,
+    repeat,
     kind: KINDS.has(body.kind) ? body.kind : 'js-error',
     name: str(body.name, 120).trim() || 'Error',
     message,
@@ -142,9 +147,22 @@ function bump(map, key) {
  * Egy előfordulás beolvasztása a hiba-fájlba (`existing` = null → új hiba).
  * Determinista: a `nowIso` kívülről jön.
  */
+/**
+ * Újraküldött (már beolvasztott) jelentés-e: a kliens legalább-egyszer kézbesít,
+ * ugyanazzal a `qid`-del — a már rögzített előfordulást NEM számoljuk újra.
+ */
+function isDuplicateOccurrence(existing, report) {
+  if (!existing || !report.qid) {
+    return false;
+  }
+  return (existing.occurrences || []).some((o) => o.qid === report.qid);
+}
+
 function mergeBug(existing, report, fp, nowIso, userId) {
   const occurrence = {
     at: nowIso,
+    qid: report.qid || undefined,
+    repeat: report.repeat > 1 ? report.repeat : undefined,
     kind: report.kind,
     platform: report.platform,
     osVersion: report.osVersion,
@@ -178,7 +196,8 @@ function mergeBug(existing, report, fp, nowIso, userId) {
     // a fixed-re jelölt hiba visszatért → a javítás nem tartott
     status: base.status === 'fixed' ? 'regressed' : base.status || 'open',
     lastSeen: nowIso,
-    count: (base.count || 0) + 1,
+    // a kliens-throttle által elnyelt ismétlések is számítanak (repeat ≥ 1)
+    count: (base.count || 0) + (report.repeat || 1),
     name: report.name,
     message: report.message,
     stack: report.stack || base.stack || '',
@@ -198,6 +217,7 @@ module.exports = {
   fingerprint,
   slugify,
   bugFileName,
+  isDuplicateOccurrence,
   mergeBug,
   MAX_OCCURRENCES,
 };

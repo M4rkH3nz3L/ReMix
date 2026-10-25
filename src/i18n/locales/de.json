@@ -403,6 +403,18 @@
     "timezoneLabel": "Zeitzone",
     "timezonePlaceholder": "z. B. Europe/Budapest",
     "timezoneAuto": "Auto",
+    "bugs": {
+      "title": "Fehlerberichte",
+      "sendTest": "Testfehler an den Server senden",
+      "hint": "Prüft, ob die Fehlererfassung auf diesem Gerät funktioniert.",
+      "result_sent": "✅ gesendet — siehe: cd server && npm run bugs",
+      "result_queued": "📥 in der Warteschlange (Worker nicht erreichbar) — wird automatisch gesendet",
+      "result_throttled": "⏱️ einmal pro Minute — in einer Minute erneut versuchen",
+      "result_disabled": "⛔ deaktiviert (EXPO_PUBLIC_BUG_REPORTS=0)",
+      "result_failed": "❌ interner Fehler",
+      "pending_one": "{{count}} ausstehend",
+      "pending_other": "{{count}} ausstehend"
+    },
     "danger": {
       "title": "Gefahrenzone",
       "wipeTitle": "Alle Projekte löschen",

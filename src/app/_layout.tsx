@@ -5,7 +5,13 @@ import { useEffect } from 'react';
 import { ActivityIndicator, LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { installGlobalBugHandlers, setBugRoute } from '@/lib/bugReporter';
+import {
+  installGlobalBugHandlers,
+  setBugEditorContextProvider,
+  setBugRoute,
+  setBugSignedIn,
+} from '@/lib/bugReporter';
+import { useEditorStore } from '@/store/editorStore';
 
 // 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
 // (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
@@ -55,6 +61,14 @@ export default function RootLayout() {
   // legelső effekt, hogy az indulás közbeni hibák is jelentődjenek
   useEffect(() => {
     installGlobalBugHandlers();
+    // a jelentésekhez: a nyitott projekt + az utolsó parancs-TÍPUSOK (tartalom nélkül)
+    setBugEditorContextProvider(() => {
+      const st = useEditorStore.getState();
+      return {
+        projectId: st.project?.id ?? '',
+        recent: (st.events ?? []).slice(-8).map((e) => `${e.actor}:${e.command.type}`),
+      };
+    });
   }, []);
   // 🐞 a jelentésekhez: melyik képernyőn történt (+ navigációs breadcrumb)
   const pathname = usePathname();
@@ -70,6 +84,10 @@ export default function RootLayout() {
   // guard egy verifikált-TOTP usert már AAL1-en beengedne → MFA-bypass. (Faktor nélküli
   // usernél mfaPending mindig false → a viselkedés változatlan.)
   const authed = useAuth((s) => s.session != null && !s.mfaPending);
+  // 🐞 a hibajelentésekhez: bejelentkezett-e (a user-id-t a szerver a tokenből veszi)
+  useEffect(() => {
+    setBugSignedIn(authed);
+  }, [authed]);
   const userId = useAuth((s) => s.user?.id ?? null);
   useEffect(() => {
     void hydrateAuth();

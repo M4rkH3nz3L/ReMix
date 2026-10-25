@@ -1,6 +1,7 @@
 const {
   bugFileName,
   fingerprint,
+  isDuplicateOccurrence,
   mergeBug,
   normalizeMessage,
   sanitizeReport,
@@ -120,5 +121,33 @@ describe('mergeBug', () => {
     const again = mergeBug(fixed, report(), fp, '2026-10-26T10:00:00Z', null);
     expect(again.status).toBe('regressed');
     expect(again.notes).toBe('javítva: 1fe9c2d');
+  });
+});
+
+describe('legalább-egyszer kézbesítés + pontos számláló', () => {
+  const fp = 'abcdef012345';
+
+  it('qid: csak biztonságos formátum marad meg; repeat 1–1000 közé vágva', () => {
+    expect(report({ qid: 'lq3k9a2bz1x' }).qid).toBe('lq3k9a2bz1x');
+    expect(report({ qid: '../etc' }).qid).toBe('');
+    expect(report({ repeat: 5 }).repeat).toBe(5);
+    expect(report({ repeat: -3 }).repeat).toBe(1);
+    expect(report({ repeat: 99999 }).repeat).toBe(1000);
+    expect(report({ repeat: 'x' }).repeat).toBe(1);
+  });
+
+  it('az újraküldött (azonos qid) jelentés duplikátum — nem számolódik újra', () => {
+    const first = mergeBug(null, report({ qid: 'aaaa1111' }), fp, '2026-10-25T10:00:00Z', null);
+    expect(isDuplicateOccurrence(first, report({ qid: 'aaaa1111' }))).toBe(true);
+    expect(isDuplicateOccurrence(first, report({ qid: 'bbbb2222' }))).toBe(false);
+    expect(isDuplicateOccurrence(first, report({ qid: '' }))).toBe(false); // qid nélkül nincs szűrés
+    expect(isDuplicateOccurrence(null, report({ qid: 'aaaa1111' }))).toBe(false);
+  });
+
+  it('a kliens által elnyelt ismétlések (repeat) a számlálóba kerülnek', () => {
+    const a = mergeBug(null, report({ qid: 'q1aaaa' }), fp, '2026-10-25T10:00:00Z', null);
+    const b = mergeBug(a, report({ qid: 'q2bbbb', repeat: 7 }), fp, '2026-10-25T10:01:00Z', null);
+    expect(b.count).toBe(8);
+    expect(b.occurrences[1].repeat).toBe(7);
   });
 });

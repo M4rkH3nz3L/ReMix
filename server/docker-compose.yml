@@ -40,6 +40,10 @@ services:
       - SYS_ADMIN # headless Chromium sandbox (/imagedoc + /svg/pdf)
     expose:
       - '8787' # csak a Caddy éri el (nem publikus port)
+    volumes:
+      # 🐞 app-hibajelentések (hibánként egy JSON) — a deploy-ok közt MEGMARAD
+      #    áttekintés: docker compose exec api npm run bugs
+      - bugs-data:/app/server/bugs
     healthcheck:
       test: ['CMD', 'node', '-e', "require('http').get('http://127.0.0.1:8787/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 15s
@@ -85,6 +89,7 @@ services:
       - api
 
 volumes:
+  bugs-data:
   redis-data:
   caddy-data:
   caddy-config:

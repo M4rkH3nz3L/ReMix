@@ -4,8 +4,9 @@ node_modules
 .env
 .env.*
 *.env.bak*
-# logok + dev-műtermékek
+# logok + dev-műtermékek (a lokális hibajelentések sem kerülnek az image-be)
 *.log
+bugs/
 .render-smoke
 # tesztek + dev-szkript (production image-be nem kell)
 **/*.test.js

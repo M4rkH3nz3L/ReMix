@@ -44,6 +44,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 # 2) a worker forrása (a .dockerignore kiszűri a node_modules/.env/teszteket/dev-szkriptet)
 COPY . ./
 
+# 🐞 a hibajelentések mappája (server/bugs/): a nem-root `node` user írhatja, és a
+# compose `bugs-data` kötete ide csatol — a named volume az image-ből örökli a
+# tulajdonost, így a deploy-ok közt is megmarad és írható marad
+RUN mkdir -p /app/server/bugs && chown node:node /app/server/bugs
+
 # nem-root futtatás (a node image beépített `node` usere)
 USER node
 

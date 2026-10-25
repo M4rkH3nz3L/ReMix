@@ -1,109 +1,111 @@
-const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
-const { verifyRequest } = require('../auth');
+const { verifyToken } = require('../auth');
 const { rateLimit } = require('../security/rateLimit');
-const { bugFileName, fingerprint, isDuplicateOccurrence, mergeBug, sanitizeReport } = require('../lib/bugReport');
+const { sanitizeReport } = require('../lib/bugReport');
+const { LoadShedder, TokenCache } = require('../lib/bugGuards');
+const { BugStore } = require('../lib/bugStore');
 
 /**
  * 🐞 Hibajelentés-fogadó: az app futásidejű hibái → `server/bugs/` mappa,
  * HIBÁNKÉNT EGY JSON-fájl (`<ujjlenyomat>_<slug>.json`), hogy javítani lehessen.
  *
- * Auth NEM kötelező (a login előtti crash is számít), de ha van érvényes token,
- * a hívó user-id-ja az előforduláshoz kerül. Védelem a nyitott végpontra:
- * rate-limit, 64 KB body-plafon, fájlszám-plafon (BUGS_MAX_FILES — fölötte új
- * hiba nem, csak a meglévők számlálója nő), fájlnév kizárólag hash+slug (nincs
- * útvonal-injektálás), atomi írás (tmp → rename), ujjlenyomatonként soros
- * feldolgozás (az egyidejű azonos jelentések nem veszítenek számlálót).
+ * KÍMÉLETES a workerre (ami a renderelést/AI-t is kiszolgálja):
+ *  - KÖTEGELT fogadás: `{ items: [...] }` (max 20) — a kliens offline-sora egy
+ *    kérésben ürül; egyetlen jelentés objektumként is jöhet,
+ *  - csak aszinkron fájlművelet, memória-index (nincs mappa-listázás kérésenként),
+ *  - a token → user-id feloldás cache-elve (nem minden jelentés Supabase-hívás),
+ *  - globális terhelés-levezetés: percenkénti plafon fölött 503 + Retry-After —
+ *    a kliensek ennyi ideig nem próbálkoznak (visszalépnek),
+ *  - IP-nkénti rate-limit, body-plafon, fájlszám-plafon, hash+slug fájlnév.
+ * Az auth NEM kötelező (a login előtti crash is számít).
  */
 
 const router = express.Router();
 
-const BUGS_DIR = process.env.BUGS_DIR || path.join(__dirname, '..', 'bugs');
-const MAX_FILES = Number(process.env.BUGS_MAX_FILES || 2000);
+const store = new BugStore({
+  dir: process.env.BUGS_DIR || path.join(__dirname, '..', 'bugs'),
+  maxFiles: Number(process.env.BUGS_MAX_FILES || 2000),
+});
+const tokens = new TokenCache();
+const shedder = new LoadShedder({ maxPerWindow: Number(process.env.BUGS_MAX_PER_MIN || 300) });
 
-/** ujjlenyomatonkénti soros lánc (read-modify-write verseny ellen) */
-const locks = new Map();
-function withLock(key, fn) {
-  const prev = locks.get(key) || Promise.resolve();
-  const next = prev.then(fn, fn);
-  locks.set(
-    key,
-    next.catch(() => {}).finally(() => {
-      if (locks.get(key) === next) {
-        locks.delete(key);
-      }
-    })
-  );
-  return next;
+const MAX_BATCH = 20;
+
+function bearer(req) {
+  const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || '').trim());
+  return m ? m[1].trim() : null;
 }
 
-/** a már létező fájl az ujjlenyomathoz (a slug az első üzenetből jött — változhat) */
-function findExisting(fp) {
-  try {
-    const hit = fs.readdirSync(BUGS_DIR).find((f) => f.startsWith(`${fp}_`) && f.endsWith('.json'));
-    return hit ? path.join(BUGS_DIR, hit) : null;
-  } catch {
+/** opcionális user-id a tokenből — cache-elve (a hibás token is cache-el: null) */
+async function resolveUserId(req) {
+  const token = bearer(req);
+  if (!token) {
     return null;
   }
-}
-
-function writeAtomic(file, data) {
-  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, file);
-}
-
-router.post('/bugs', rateLimit('bugs'), express.json({ limit: '64kb' }), async (req, res) => {
-  const report = sanitizeReport(req.body);
-  if (!report) {
-    res.status(400).json({ error: 'üres hibajelentés' });
-    return;
+  const now = Date.now();
+  const cached = tokens.get(token, now);
+  if (cached !== undefined) {
+    return cached;
   }
-  // opcionális hitelesítés: token esetén a user-id a jelentéshez kerül
   let userId = null;
   try {
-    const auth = await verifyRequest(req);
-    userId = auth.ok ? auth.user.id : null;
+    const res = await verifyToken(token);
+    userId = res.ok ? res.user.id : null;
   } catch {
     userId = null;
   }
-  const fp = fingerprint(report);
+  tokens.set(token, userId, now);
+  return userId;
+}
+
+router.post('/bugs', rateLimit('bugs'), express.json({ limit: '512kb' }), async (req, res) => {
+  const body = req.body;
+  const batched = Array.isArray(body?.items);
+  const rawItems = batched ? body.items : [body];
+  if (rawItems.length === 0 || rawItems.length > MAX_BATCH) {
+    res.status(400).json({ error: `1–${MAX_BATCH} jelentés kérésenként` });
+    return;
+  }
+  const reports = rawItems.map(sanitizeReport);
+  const validCount = reports.filter(Boolean).length;
+  if (validCount === 0) {
+    res.status(400).json({ error: 'üres hibajelentés' });
+    return;
+  }
+  // 🧯 terhelés-levezetés: hiba-viharban a kliensek visszalépnek (Retry-After)
+  const admit = shedder.admit(validCount, Date.now());
+  if (!admit.ok) {
+    res.set('Retry-After', String(admit.retryAfterSec));
+    res.status(503).json({ error: 'túl sok hibajelentés — később', retryAfterSec: admit.retryAfterSec });
+    return;
+  }
+  const userId = await resolveUserId(req);
   try {
-    const result = await withLock(fp, () => {
-      fs.mkdirSync(BUGS_DIR, { recursive: true });
-      const existingPath = findExisting(fp);
-      let existing = null;
-      if (existingPath) {
-        try {
-          existing = JSON.parse(fs.readFileSync(existingPath, 'utf8'));
-        } catch {
-          existing = null; // sérült fájl → újrakezdjük (a régi felülíródik)
-        }
-      } else {
-        const count = fs.readdirSync(BUGS_DIR).filter((f) => f.endsWith('.json')).length;
-        if (count >= MAX_FILES) {
-          return { dropped: true };
-        }
+    const results = [];
+    for (const report of reports) {
+      if (!report) {
+        results.push({ error: 'üres' });
+        continue;
       }
-      // legalább-egyszer kézbesítés: az újraküldött jelentést nem számoljuk duplán
-      if (isDuplicateOccurrence(existing, report)) {
-        return { id: fp, count: existing.count, status: existing.status, duplicate: true };
+      const r = await store.ingest(report, userId);
+      if (r.isNew) {
+        console.warn(`🐞 új hiba: ${r.file}`);
       }
-      const merged = mergeBug(existing, report, fp, new Date().toISOString(), userId);
-      const file = existingPath || path.join(BUGS_DIR, bugFileName(fp, report));
-      writeAtomic(file, merged);
-      if (!existing) {
-        console.warn(`🐞 új hiba: ${path.basename(file)} — ${merged.title}`);
+      results.push(r);
+    }
+    if (!batched) {
+      // egyetlen jelentésnél a korábbi válasz-alak megmarad
+      const r = results[0];
+      if (r.dropped) {
+        res.status(507).json({ error: 'a bug-mappa megtelt' });
+        return;
       }
-      return { id: fp, count: merged.count, status: merged.status, file: path.basename(file) };
-    });
-    if (result.dropped) {
-      res.status(507).json({ error: 'a bug-mappa megtelt', maxFiles: MAX_FILES });
+      res.json({ ok: true, ...r });
       return;
     }
-    res.json({ ok: true, ...result });
+    res.json({ ok: true, results });
   } catch (e) {
     res.status(500).json({ error: e?.message || 'bug-írási hiba' });
   }

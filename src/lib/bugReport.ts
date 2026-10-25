@@ -68,22 +68,39 @@ export function throttleKey(err: NormalizedError): string {
 
 export interface BugThrottleState {
   lastSent: Record<string, number>;
+  /** kulcsonként hányszor ment már ki (az eszkalálódó ablakhoz) */
+  sends: Record<string, number>;
   /** a throttle-ablakban elnyelt ismétlések kulcsonként (a következő küldéssel mennek) */
   suppressed: Record<string, number>;
   sentThisSession: number;
 }
 
-export const BUG_THROTTLE_MS = 60_000;
+/**
+ * ESZKALÁLÓDÓ ablak: ugyanaz a hiba az 1. küldés után 1 perc, majd 5, 15, végül
+ * 60 perc múlva mehet újra — egy folyamatosan dobó hiba így eszközönként óránként
+ * ~4 jelentés (nem 60), a szerver-számláló mégis pontos (`repeat`).
+ */
+export const BUG_THROTTLE_LADDER_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000] as const;
+/** az első ablak (visszafelé-kompatibilis név) */
+export const BUG_THROTTLE_MS = BUG_THROTTLE_LADDER_MS[0];
 export const BUG_SESSION_CAP = 50;
 
 export function emptyThrottle(): BugThrottleState {
-  return { lastSent: {}, suppressed: {}, sentThisSession: 0 };
+  return { lastSent: {}, sends: {}, suppressed: {}, sentThisSession: 0 };
+}
+
+/** a következő küldésig kötelező ablak `n` korábbi küldés után */
+export function throttleWindowMs(sends: number): number {
+  if (sends <= 0) {
+    return 0;
+  }
+  return BUG_THROTTLE_LADDER_MS[Math.min(sends - 1, BUG_THROTTLE_LADDER_MS.length - 1)];
 }
 
 /**
- * Mehet-e a jelentés: ugyanaz a hiba percenként egyszer, munkamenetenként max
- * `BUG_SESSION_CAP`. Az elnyelt ismétlések nem vesznek el: `repeat` = 1 + a
- * közben elnyeltek száma (a szerver ennyivel növeli a számlálót). Tiszta.
+ * Mehet-e a jelentés (eszkalálódó ablak + munkamenet-plafon). Az elnyelt
+ * ismétlések nem vesznek el: `repeat` = 1 + a közben elnyeltek száma (a szerver
+ * ennyivel növeli a számlálót). Tiszta.
  */
 export function throttleDecision(
   state: BugThrottleState,
@@ -91,7 +108,7 @@ export function throttleDecision(
   nowMs: number,
 ): { send: boolean; repeat: number; next: BugThrottleState } {
   const last = state.lastSent[key];
-  const inWindow = last != null && nowMs - last < BUG_THROTTLE_MS;
+  const inWindow = last != null && nowMs - last < throttleWindowMs(state.sends[key] ?? 0);
   if (inWindow || state.sentThisSession >= BUG_SESSION_CAP) {
     return {
       send: false,
@@ -107,6 +124,7 @@ export function throttleDecision(
     repeat,
     next: {
       lastSent: { ...state.lastSent, [key]: nowMs },
+      sends: { ...state.sends, [key]: (state.sends[key] ?? 0) + 1 },
       suppressed,
       sentThisSession: state.sentThisSession + 1,
     },
@@ -231,9 +249,14 @@ export function utf8Length(s: string): number {
   return n;
 }
 
-/** egyedi sor-azonosító (a szerver ebből szűri az újraküldött duplikátumot) */
-export function makeQid(nowMs: number, rand: number): string {
-  return `${nowMs.toString(36)}${Math.floor(rand * 1e9).toString(36)}`;
+/**
+ * Egyedi sor-azonosító (a szerver ebből szűri az újraküldött duplikátumot). A
+ * munkamenet-szintű sorszám garantálja, hogy két, ugyanabban a milliszekundumban
+ * keletkező jelentés se kapjon azonos qid-et (különben a szerver duplikátumnak
+ * venné a másodikat).
+ */
+export function makeQid(nowMs: number, rand: number, seq: number = 0): string {
+  return `${nowMs.toString(36)}${Math.floor(rand * 1e9).toString(36)}${seq.toString(36)}`;
 }
 
 export const BUG_QUEUE_MAX = 30;
@@ -280,4 +303,68 @@ export function deliveryOutcome(status: number | null): 'done' | 'retry' {
     return 'done';
   }
   return 'retry';
+}
+
+// ── visszalépés + kötegelés (a szerver kímélése) ────────────────────────────
+
+export const BACKOFF_BASE_MS = 30_000;
+export const BACKOFF_MAX_MS = 30 * 60_000;
+
+/**
+ * Exponenciális visszalépés `failures` egymás utáni sikertelen kézbesítés után
+ * (30 mp → 1 → 2 → 4 … max 30 perc), ±20% jitterrel — hogy egy felépülő szervert
+ * ne rohanjon meg egyszerre minden eszköz. Közben az új jelentések csak a sorba
+ * kerülnek (nincs hálózati kísérlet). A `rand` [0,1) kívülről jön (tesztelhető).
+ */
+export function nextBackoffMs(failures: number, rand: number): number {
+  if (failures <= 0) {
+    return 0;
+  }
+  const base = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (failures - 1));
+  return Math.round(base * (0.8 + 0.4 * Math.min(Math.max(rand, 0), 1)));
+}
+
+/** `Retry-After` fejléc (másodperc VAGY HTTP-dátum) → ms; hibás/hiányzó → 0 */
+export function parseRetryAfterMs(header: string | null | undefined, nowMs: number): number {
+  if (!header) {
+    return 0;
+  }
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return Math.min(BACKOFF_MAX_MS, Number(trimmed) * 1000);
+  }
+  const at = Date.parse(trimmed);
+  return Number.isFinite(at) ? Math.min(BACKOFF_MAX_MS, Math.max(0, at - nowMs)) : 0;
+}
+
+export const BATCH_MAX_ITEMS = 20;
+/** egy köteg bájt-plafonja (a szerver 512 KB-os body-limitje alatt bőven) */
+export const BATCH_MAX_BYTES = 200 * 1024;
+
+/**
+ * A sor kötegekre bontása: kötegenként max `BATCH_MAX_ITEMS` elem és
+ * `BATCH_MAX_BYTES` bájt — a sor egy-két kérésben ürül, nem elemenként.
+ */
+export function chunkBatches<T>(
+  items: readonly T[],
+  maxItems: number = BATCH_MAX_ITEMS,
+  maxBytes: number = BATCH_MAX_BYTES,
+): T[][] {
+  const out: T[][] = [];
+  let cur: T[] = [];
+  let bytes = 0;
+  for (const item of items) {
+    const size = utf8Length(JSON.stringify(item));
+    if (cur.length > 0 && (cur.length >= maxItems || bytes + size > maxBytes)) {
+      out.push(cur);
+      cur = [];
+      bytes = 0;
+    }
+    cur.push(item);
+    bytes += size;
+  }
+  if (cur.length > 0) {
+    out.push(cur);
+  }
+  return out;
 }

@@ -1,9 +1,16 @@
 import {
+  BACKOFF_MAX_MS,
+  BATCH_MAX_ITEMS,
   BUG_QUEUE_MAX,
   BUG_SESSION_CAP,
+  BUG_THROTTLE_LADDER_MS,
   BUG_THROTTLE_MS,
   BREADCRUMB_MAX,
   buildBugPayload,
+  chunkBatches,
+  nextBackoffMs,
+  parseRetryAfterMs,
+  throttleWindowMs,
   deliveryOutcome,
   emptyThrottle,
   enqueueBug,
@@ -71,8 +78,36 @@ describe('throttleDecision', () => {
     }
     const later = throttleDecision(st, key, 1000 + BUG_THROTTLE_MS);
     expect(later).toMatchObject({ send: true, repeat: 5 }); // 1 + 4 elnyelt
-    // a számláló nullázódott
-    expect(throttleDecision(later.next, key, 1000 + 2 * BUG_THROTTLE_MS).repeat).toBe(1);
+    // a második küldés után már 5 perces az ablak — és a számláló nullázódott
+    const t2 = 1000 + BUG_THROTTLE_MS;
+    expect(throttleDecision(later.next, key, t2 + BUG_THROTTLE_MS).send).toBe(false);
+    expect(throttleDecision(later.next, key, t2 + BUG_THROTTLE_LADDER_MS[1]).repeat).toBe(1);
+  });
+
+  it('eszkalálódó ablak: 1 → 5 → 15 → 60 perc, utána 60 percen marad', () => {
+    expect(throttleWindowMs(0)).toBe(0);
+    expect(throttleWindowMs(1)).toBe(60_000);
+    expect(throttleWindowMs(2)).toBe(5 * 60_000);
+    expect(throttleWindowMs(3)).toBe(15 * 60_000);
+    expect(throttleWindowMs(4)).toBe(60 * 60_000);
+    expect(throttleWindowMs(99)).toBe(60 * 60_000);
+  });
+
+  it('egy folyamatosan (másodpercenként) dobó hiba első órája: legfeljebb 4 jelentés, a számláló pontos', () => {
+    let st = emptyThrottle();
+    let sent = 0;
+    let counted = 0;
+    for (let t = 0; t < 3_600_000; t += 1000) {
+      const d = throttleDecision(st, 'vihar', t);
+      st = d.next;
+      if (d.send) {
+        sent += 1;
+        counted += d.repeat;
+      }
+    }
+    expect(sent).toBeLessThanOrEqual(4);
+    // a még el nem küldött elnyeltekkel együtt minden előfordulás megvan
+    expect(counted + (st.suppressed.vihar ?? 0)).toBe(3600);
   });
 
   it('eltérő hibák egymástól függetlenek; a munkamenet-plafon megfog (de számol)', () => {
@@ -179,10 +214,44 @@ describe('breadcrumb + offline-sor + qid', () => {
     expect(parseBugQueue('[1,"x",null,{"qid":"a"},[2]]')).toEqual([{ qid: 'a' }]);
   });
 
-  it('a qid szerver-kompatibilis ([0-9a-z]) és egyedi', () => {
-    const a = makeQid(1761400000000, 0.123456);
-    const b = makeQid(1761400000000, 0.654321);
-    expect(a).toMatch(/^[0-9a-z]{4,40}$/);
-    expect(a).not.toBe(b);
+  it('a qid szerver-kompatibilis ([0-9a-z]) és egyedi — ugyanabban a ms-ban, azonos véletlennel is', () => {
+    const a = makeQid(1761400000000, 0.123456, 1);
+    const b = makeQid(1761400000000, 0.654321, 2);
+    const c = makeQid(1761400000000, 0.5, 3);
+    const d = makeQid(1761400000000, 0.5, 4);
+    for (const q of [a, b, c, d]) {
+      expect(q).toMatch(/^[0-9a-z]{4,40}$/);
+    }
+    expect(new Set([a, b, c, d]).size).toBe(4);
+  });
+});
+
+describe('visszalépés + Retry-After + kötegelés', () => {
+  it('exponenciális visszalépés ±20% jitterrel, 30 perces plafonnal', () => {
+    expect(nextBackoffMs(0, 0.5)).toBe(0);
+    expect(nextBackoffMs(1, 0.5)).toBe(30_000);
+    expect(nextBackoffMs(2, 0.5)).toBe(60_000);
+    expect(nextBackoffMs(3, 0.5)).toBe(120_000);
+    expect(nextBackoffMs(1, 0)).toBe(24_000);
+    expect(nextBackoffMs(1, 1)).toBe(36_000);
+    expect(nextBackoffMs(50, 0.5)).toBe(BACKOFF_MAX_MS);
+  });
+
+  it('Retry-After: másodperc és HTTP-dátum; hibás érték → 0; plafonozva', () => {
+    const now = Date.parse('2026-10-25T12:00:00Z');
+    expect(parseRetryAfterMs('45', now)).toBe(45_000);
+    expect(parseRetryAfterMs('Sun, 25 Oct 2026 12:02:00 GMT', now)).toBe(120_000);
+    expect(parseRetryAfterMs('nonsense', now)).toBe(0);
+    expect(parseRetryAfterMs(null, now)).toBe(0);
+    expect(parseRetryAfterMs('999999', now)).toBe(BACKOFF_MAX_MS);
+  });
+
+  it('kötegek: max 20 elem és bájt-plafon; sorrend megmarad', () => {
+    const items = Array.from({ length: 45 }, (_, i) => ({ i }));
+    const batches = chunkBatches(items);
+    expect(batches.map((b) => b.length)).toEqual([BATCH_MAX_ITEMS, BATCH_MAX_ITEMS, 5]);
+    expect(batches.flat()).toEqual(items);
+    const big = Array.from({ length: 5 }, () => ({ s: 'x'.repeat(90_000) }));
+    expect(chunkBatches(big).map((b) => b.length)).toEqual([2, 2, 1]);
   });
 });

@@ -6,12 +6,15 @@ import { AppState, Platform } from 'react-native';
 import { cloudBaseUrl } from '@/lib/backend';
 import {
   buildBugPayload,
+  chunkBatches,
   deliveryOutcome,
   emptyThrottle,
   enqueueBug,
   makeQid,
+  nextBackoffMs,
   normalizeError,
   parseBugQueue,
+  parseRetryAfterMs,
   pushBreadcrumb,
   throttleDecision,
   throttleKey,
@@ -37,6 +40,14 @@ import { workerAuthHeaders } from '@/lib/workerAuth';
  *    veszi ki a sorból (közben érkező új elem megmarad),
  *  - fatális hibánál az eredeti kezelő (ami leállíthatja az appot) csak a
  *    lemezre írás UTÁN fut (max 1,5 mp várakozással).
+ *
+ * SZERVER-KÍMÉLÉS (egyetlen kódút: sor → KÖTEGELT ürítés):
+ *  - ugyanaz a hiba eszkalálódó ablakkal megy újra (1 → 5 → 15 → 60 perc),
+ *    az elnyelt ismétlések száma (`repeat`) a következővel — pontos számláló,
+ *  - a sor kötegekben ürül (max 20 jelentés / ~200 KB kérésenként),
+ *  - sikertelen kézbesítés után exponenciális visszalépés jitterrel (30 mp →
+ *    max 30 perc); a szerver `Retry-After`-jét tiszteli; közben az új jelentés
+ *    csak a sorba kerül — a bajban lévő szervert nem terheljük tovább.
  * Sosem dob; `EXPO_PUBLIC_BUG_REPORTS=0` kikapcsolja.
  */
 
@@ -48,6 +59,7 @@ function reportsEnabled(): boolean {
 }
 
 let throttle = emptyThrottle();
+let qidSeq = 0;
 let breadcrumbs: string[] = [];
 let currentRoute = '';
 
@@ -96,16 +108,57 @@ function enqueue(payload: Record<string, unknown>): Promise<void> {
   });
 }
 
-async function postBug(payload: Record<string, unknown>): Promise<'done' | 'retry'> {
+// ── kézbesítés: kötegelt POST + visszalépés ──────────────────────────────────
+
+/** visszalépés-állapot: eddig a pillanatig nincs hálózati kísérlet */
+let suspendedUntil = 0;
+let consecutiveFailures = 0;
+
+function isSuspended(nowMs: number): boolean {
+  return nowMs < suspendedUntil;
+}
+
+/** a visszalépés végén EGY újrapróba (különben új hiba/előtérbe-lépés nélkül a sor ragadna) */
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onDeliveryFailure(retryAfterMs: number): void {
+  consecutiveFailures += 1;
+  const wait = Math.max(nextBackoffMs(consecutiveFailures, Math.random()), retryAfterMs);
+  suspendedUntil = Date.now() + wait;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+  }
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void runFlush();
+  }, wait + 50);
+}
+
+function onDeliverySuccess(): void {
+  consecutiveFailures = 0;
+  suspendedUntil = 0;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+}
+
+/** egy köteg kézbesítése (`{ items }`) → 'done' | 'retry' (+ a szerver Retry-After-je) */
+async function postBatch(
+  items: Record<string, unknown>[],
+): Promise<{ outcome: 'done' | 'retry'; retryAfterMs: number }> {
   try {
     const res = await fetch(`${cloudBaseUrl()}/bugs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await workerAuthHeaders()) },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ items }),
     });
-    return deliveryOutcome(res.status);
+    return {
+      outcome: deliveryOutcome(res.status),
+      retryAfterMs: parseRetryAfterMs(res.headers?.get?.('Retry-After') ?? null, Date.now()),
+    };
   } catch {
-    return deliveryOutcome(null);
+    return { outcome: deliveryOutcome(null), retryAfterMs: 0 };
   }
 }
 
@@ -114,52 +167,82 @@ function itemKey(item: Record<string, unknown>): string {
   return typeof item.qid === 'string' ? item.qid : JSON.stringify(item);
 }
 
-let flushing: Promise<void> | null = null;
+let flushing: Promise<Set<string>> | null = null;
 let flushAgain = false;
 
 /**
- * Az offline-sor elküldése (indításkor, előtérbe lépéskor, sikeres küldés után).
- * Egyszerre egy fut; ha futás közben újra kérik, a végén még egy kör jön.
- * Csak a sikeresen (vagy véglegesen) lezárt elemek kerülnek ki a sorból.
+ * Az offline-sor KÖTEGELT elküldése (indításkor, előtérbe lépéskor, minden új
+ * jelentés után). Egyszerre egy fut; ha futás közben újra kérik, a végén még egy
+ * kör jön. Csak a sikeresen (vagy véglegesen) lezárt elemek kerülnek ki a sorból.
+ * Visszalépés alatt nem próbálkozik. Az eredmény: a kézbesített elemek kulcsai.
  */
-export function flushBugQueue(): Promise<void> {
+function runFlush(): Promise<Set<string>> {
   if (flushing) {
     flushAgain = true;
     return flushing;
   }
-  flushing = (async () => {
-    try {
-      do {
-        flushAgain = false;
-        const snapshot = await withQueueLock(readQueue);
-        if (snapshot.length === 0) {
-          break;
-        }
-        const finished = new Set<string>();
-        for (const item of snapshot) {
-          if ((await postBug(item)) === 'done') {
-            finished.add(itemKey(item));
-          } else {
-            break; // hálózat/szerver gond — a többit se most próbáljuk
-          }
-        }
-        if (finished.size > 0) {
-          await withQueueLock(async () => {
-            const current = await readQueue();
-            await writeQueue(current.filter((x) => !finished.has(itemKey(x))));
-          });
-        }
-        if (finished.size < snapshot.length) {
-          break; // maradt sikertelen — majd a következő alkalommal
-        }
-      } while (flushAgain);
-    } catch {
-      // best-effort
-    } finally {
+  // ⚠️ a futás és a jelző SZÉTVÁLASZTVA: ha a futás szinkronban véget ér (pl.
+  // visszalépés miatt azonnal kilép), egy belső `finally { flushing = null }`
+  // még a hozzárendelés ELŐTT futna le → a jelző örökre bent ragadna, és a sor
+  // soha többé nem ürülne. A `.finally` callback mindig a hozzárendelés UTÁN fut.
+  const run = doFlush();
+  flushing = run;
+  void run.finally(() => {
+    if (flushing === run) {
       flushing = null;
     }
-  })();
-  return flushing;
+  });
+  return run;
+}
+
+async function doFlush(): Promise<Set<string>> {
+  const delivered = new Set<string>();
+  try {
+    do {
+      flushAgain = false;
+      if (isSuspended(Date.now())) {
+        break;
+      }
+      const snapshot = await withQueueLock(readQueue);
+      if (snapshot.length === 0) {
+        break;
+      }
+      const finished = new Set<string>();
+      let failed = false;
+      for (const batch of chunkBatches(snapshot)) {
+        const { outcome, retryAfterMs } = await postBatch(batch);
+        if (outcome === 'done') {
+          for (const item of batch) {
+            finished.add(itemKey(item));
+          }
+          onDeliverySuccess();
+        } else {
+          onDeliveryFailure(retryAfterMs);
+          failed = true;
+          break; // a többit se most — a szerver/hálózat bajban van
+        }
+      }
+      if (finished.size > 0) {
+        await withQueueLock(async () => {
+          const current = await readQueue();
+          await writeQueue(current.filter((x) => !finished.has(itemKey(x))));
+        });
+        for (const k of finished) {
+          delivered.add(k);
+        }
+      }
+      if (failed) {
+        break;
+      }
+    } while (flushAgain);
+  } catch {
+    // best-effort
+  }
+  return delivered;
+}
+
+export async function flushBugQueue(): Promise<void> {
+  await runFlush();
 }
 
 // ── kontextus-szolgáltatók (a gyökér-layout regisztrálja) ───────────────────
@@ -209,8 +292,9 @@ export interface BugContext {
 export type BugReportResult = 'sent' | 'queued' | 'throttled' | 'disabled' | 'failed';
 
 /**
- * Hiba jelentése a szerverre. Sosem dob. Throttle-olt: ugyanaz a hiba percenként
- * egyszer (az elnyelt ismétlések száma a következő jelentéssel megy).
+ * Hiba jelentése a szerverre. Sosem dob. Throttle-olt (eszkalálódó ablak — az
+ * elnyelt ismétlések száma a következő jelentéssel megy); visszalépés alatt csak
+ * a sorba kerül, és a következő sikeres ürítéssel megy ki.
  */
 export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<BugReportResult> {
   if (!reportsEnabled()) {
@@ -225,7 +309,7 @@ export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<B
     }
     const editor = editorContext();
     const payload = buildBugPayload({
-      qid: makeQid(Date.now(), Math.random()),
+      qid: makeQid(Date.now(), Math.random(), ++qidSeq),
       kind: ctx.kind ?? 'handled',
       error: err,
       repeat: decision.repeat,
@@ -242,19 +326,15 @@ export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<B
       ],
       extra: { ...(ctx.extra ?? {}), signedIn: signedInFlag },
     });
+    // EGYETLEN kódút: előbb a tartós sorba, onnan kötegelt kézbesítés — így a
+    // menet közbeni leállás sem veszít, és a sor egy kérésben ürül
+    await enqueue(payload);
     if (ctx.persistOnly) {
-      // a sorból megy ki (siker esetén onnan törlődik) — ha a folyamat a küldés
-      // előtt leáll, a következő indítás pótolja
-      await enqueue(payload);
-      void flushBugQueue();
+      void runFlush(); // fatális: a hívó csak a lemezre írásig vár
       return 'queued';
     }
-    if ((await postBug(payload)) === 'done') {
-      void flushBugQueue();
-      return 'sent';
-    }
-    await enqueue(payload);
-    return 'queued';
+    const delivered = await runFlush();
+    return delivered.has(itemKey(payload)) ? 'sent' : 'queued';
   } catch {
     return 'failed';
   }
@@ -354,6 +434,12 @@ export function __resetBugReporterForTests(): void {
   signedInFlag = false;
   flushing = null;
   flushAgain = false;
+  suspendedUntil = 0;
+  consecutiveFailures = 0;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
   queueLock = Promise.resolve();
   (globalThis as BugGlobals).__remixBugHandlersInstalled = false;
 }

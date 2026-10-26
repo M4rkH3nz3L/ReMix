@@ -9,6 +9,7 @@
  * A publikus szimbólumokat (PanelId, SnapStrength, SNAP_FACTOR, …) a `editorStore.ts`
  * tovább-exportálja, hogy a `@/store/editorStore` importok változatlanok maradjanak.
  */
+import type { VideoPanelId } from '@/lib/panelSpecs';
 import { findClip } from '@/lib/projectUtils';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import type { LockBroadcast, LockMap } from '@/lib/clipLock';
@@ -60,28 +61,8 @@ export const DEFAULT_SNAP_TARGETS: SnapTargets = {
 /** 🏷️ timeline-régió színek — új régió ciklikusan kap, az átszínezés ezen lépked */
 export const REGION_COLORS = ['#7c5cff', '#4a9eff', '#2ecc8f', '#ffb454', '#ff5ca8', '#ff6b6b'];
 
-export type PanelId =
-  | 'text'
-  | 'filter'
-  | 'speed'
-  | 'audio'
-  | 'hotspot'
-  | 'captions'
-  | 'sticker'
-  | 'transition'
-  | 'precision'
-  | 'assistant'
-  | 'library'
-  | 'transcript'
-  | 'shape'
-  | 'adjust'
-  | 'pip'
-  | 'imagedoc'
-  | 'export'
-  | 'multicam'
-  | 'creatorPreset'
-  | 'workflow'
-  | null;
+/** a panel-azonosítók egyetlen forrása a panel-regiszter (`@/lib/panelSpecs`) */
+export type PanelId = VideoPanelId | null;
 
 /** Kijelöléshez nem kötött panelek — nyitva maradnak kijelölés nélkül is. */
 export const STANDALONE_PANELS: PanelId[] = [

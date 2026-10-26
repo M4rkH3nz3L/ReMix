@@ -13,24 +13,11 @@ import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canBoolean } from '@/lib/imageBoolean';
+import type { ImageSheetId } from '@/lib/panelSpecs';
 import type { Asset, ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 /** 🗂️ melyik szerkesztő-lap van nyitva — a body `sheet` állapotának típusa */
-export type SheetKind =
-  | 'layers'
-  | 'style'
-  | 'adjust'
-  | 'develop'
-  | 'fx'
-  | 'pattern'
-  | 'align'
-  | 'boolean'
-  | 'shapePicker'
-  | 'canvas'
-  | 'source'
-  | 'export'
-  | 'history'
-  | null;
+export type SheetKind = ImageSheetId | null;
 
 /**
  * 🗂️ Sheet-host — a `sheet` állapottól függő szerkesztő-lapok feltételes

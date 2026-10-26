@@ -35,6 +35,7 @@ import { TransitionPanel } from '@/components/editor/panels/TransitionPanel';
 import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
 import { motion, radius } from '@/design';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useLayout } from '@/hooks/useLayout';
 import type { Detent } from '@/lib/panelLayout';
 import { videoPanelSpec } from '@/lib/panelSpecs';
@@ -82,6 +83,14 @@ export function PanelHost({
   const selected = useEditorStore(selectSelectedClip);
   const L = useLayout();
   const { t } = useTranslation();
+  // ↩️ vissza: Focus-ból (lapról kért) a laphoz, egyébként a panel zárul
+  useBackLayer(
+    activePanel && visible
+      ? panelFocus
+        ? () => setPanelFocus(false)
+        : () => setPanel(null)
+      : null
+  );
 
   if (!activePanel || !visible) {
     return null;

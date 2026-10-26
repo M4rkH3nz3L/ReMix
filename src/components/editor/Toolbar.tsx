@@ -1,6 +1,6 @@
 import { haptics, motion } from '@/design';
 import type { Ionicons } from '@expo/vector-icons';
-import { type ComponentProps, useEffect, useState } from 'react';
+import { type ComponentProps, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -412,6 +412,15 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
   };
 
   const [moreOpen, setMoreOpen] = useState(false);
+  // a „Több"-ből indított, ÚJ modált/natív képernyőt nyitó akció (képválasztó, kamera,
+  // forrás, súgó) csak a lap TELJES lezárulása után fut — iOS-en a záródó Modal alatt
+  // indított prezentáció csendben elveszne. (A panel-váltás azonnali: az nem modál.)
+  const pendingMoreAction = useRef<(() => void) | null>(null);
+  const runPendingMoreAction = () => {
+    const fn = pendingMoreAction.current;
+    pendingMoreAction.current = null;
+    fn?.();
+  };
 
   const copyStyleAction = () => {
     if (!useEditorStore.getState().copyStyle()) {
@@ -594,6 +603,8 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
           onAfter?.();
           if (def.panel) {
             togglePanel(def.panel);
+          } else if (onAfter) {
+            pendingMoreAction.current = def.onPress ?? null;
           } else {
             def.onPress?.();
           }
@@ -650,6 +661,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
       <BottomSheet
         visible={moreOpen}
         onClose={() => setMoreOpen(false)}
+        onDismissed={runPendingMoreAction}
         maxHeightFraction={0.6}
         accessibilityLabel={t('editor.toolbar.more')}
       >

@@ -91,6 +91,8 @@ export default function EditorScreen() {
   const [timelineH, setTimelineH] = useState<number | undefined>(undefined);
   const [transportH, setTransportH] = useState<number | undefined>(undefined);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  // a projekt-menü lezárulása UTÁN futó akció (lásd `menuAction`) — a korai return-ök ELÉ
+  const pendingMenuAction = useRef<(() => void) | null>(null);
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
@@ -594,9 +596,16 @@ export default function EditorScreen() {
   // ⋯ projekt-menü lapként (nem Alert): telefonon ide költöznek a fejléc ritka
   // elemei is (képarány, közreműködők, bemutató) — az Android Alert max 3 gombot tud.
   const openProjectMenu = () => setProjectMenuOpen(true);
+  // a menü-akció a lap TELJES lezárulása után fut (onDismissed): a bemutató/navigáció
+  // új felületet nyit, ami iOS-en egy záródó Modal alatt elveszhetne
   const menuAction = (fn: () => void) => () => {
+    pendingMenuAction.current = fn;
     setProjectMenuOpen(false);
-    fn();
+  };
+  const runPendingMenuAction = () => {
+    const fn = pendingMenuAction.current;
+    pendingMenuAction.current = null;
+    fn?.();
   };
   const openCollabScreen = () =>
     router.push(`/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`);
@@ -980,6 +989,7 @@ export default function EditorScreen() {
         <BottomSheet
           visible={projectMenuOpen}
           onClose={() => setProjectMenuOpen(false)}
+          onDismissed={runPendingMenuAction}
           accessibilityLabel={t('editorScreen.projectMenuTitle')}
         >
           <Text style={styles.menuTitle}>{t('editorScreen.projectMenuTitle')}</Text>

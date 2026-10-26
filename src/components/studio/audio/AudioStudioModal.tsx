@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Modal } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBackLayer } from '@/hooks/useBackLayer';
+import { handleBack } from '@/lib/backStack';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Clip } from '@/types/project';
@@ -44,8 +46,12 @@ export function AudioStudioModal() {
     }
   }, [open, clipId]);
 
+  // a stúdió maga is réteg a vissza-veremben (a mögötte lévő szerkesztő-panel elé)
+  useBackLayer(open ? close : null);
+
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={close}>
+    // ↩️ a vissza előbb a stúdión BELÜLI legfelső felületet zárja (lap/precíziós mód)
+    <Modal visible={open} animationType="slide" onRequestClose={() => handleBack() || close()}>
       {open ? (
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <SafeAreaView style={{ flex: 1, backgroundColor: '#05060a' }} edges={['top', 'bottom']}>

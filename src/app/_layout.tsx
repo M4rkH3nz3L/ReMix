@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Alert, LogBox, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import {
@@ -11,6 +11,7 @@ import {
   setBugRoute,
   setBugSignedIn,
 } from '@/lib/bugReporter';
+import { handleBack } from '@/lib/backStack';
 import { useEditorStore } from '@/store/editorStore';
 import { t as tr } from 'i18next';
 import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
@@ -59,6 +60,14 @@ function openNotificationRoute(route: string) {
 }
 
 export default function RootLayout() {
+  // ↩️ hardveres vissza (Android): ELŐBB a legfelső nyitott szerkesztő-felület
+  // (inline lap, Focus, workspace, precíziós mód) zárul — csak üres veremnél
+  // navigál vissza. A gyerek NavigationContainer a saját listenerét KORÁBBAN
+  // jegyzi be (gyerek-effekt előbb fut), így a mienk fut előbb (LIFO).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', handleBack);
+    return () => sub.remove();
+  }, []);
   // 🐞 globális hibagyűjtés (JS-hiba, kezeletlen promise) → server/bugs/ — a
   // legelső effekt, hogy az indulás közbeni hibák is jelentődjenek
   useEffect(() => {

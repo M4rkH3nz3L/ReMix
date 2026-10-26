@@ -3,6 +3,8 @@ import { Modal } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBackLayer } from '@/hooks/useBackLayer';
+import { handleBack } from '@/lib/backStack';
 import { ImageStudioBody } from '@/components/studio/image/ImageStudioBody';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
@@ -99,8 +101,12 @@ export function ImageStudioModal() {
     close();
   };
 
+  // a stúdió maga is réteg a vissza-veremben (a mögötte lévő szerkesztő-panel elé)
+  useBackLayer(open ? close : null);
+
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={close}>
+    // ↩️ a vissza előbb a stúdión BELÜLI legfelső felületet zárja (lap/precíziós mód)
+    <Modal visible={open} animationType="slide" onRequestClose={() => handleBack() || close()}>
       {open && imageClip ? (
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>

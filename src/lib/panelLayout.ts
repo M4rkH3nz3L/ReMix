@@ -182,8 +182,10 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     body - kb - transportHeight - timelineHeightFor(mode) - panelHeight - toolbarHeight;
 
   // 🛡️ vászon-garancia: ha a preview a minimum alá menne, előbb az idővonal
-  // húzódik mini-sorrá, aztán (végső esetben) a panel enged.
-  if (rest(timelineMode) < minPreview && timelineMode === 'full') {
+  // húzódik mini-sorrá, aztán (végső esetben) a panel enged. CSAK nyitott panelnél:
+  // panel nélkül az idővonal a fő munkafelület — mini-sorba zárva (ahonnan a ⌃ nem
+  // tud mit „lejjebb engedni") elérhetetlenné válna sok sávos projektnél.
+  if (panelHeight > 0 && rest(timelineMode) < minPreview && timelineMode === 'full') {
     timelineMode = 'mini';
   }
   if (rest(timelineMode) < minPreview && panelHeight > 0) {

@@ -30,6 +30,12 @@ interface BottomSheetProps {
   /** háttér-elhomályosítás (default true) */
   backdrop?: boolean;
   accessibilityLabel?: string;
+  /**
+   * a kilépő animáció VÉGÉN (a Modal már lezárult) — ide tegyél minden olyan
+   * műveletet, ami ÚJ modált / natív képernyőt nyit (képválasztó, kamera, másik lap).
+   * iOS-en egy záródó Modal alatt indított új prezentáció csendben elveszhet.
+   */
+  onDismissed?: () => void;
 }
 
 /**
@@ -57,6 +63,7 @@ export function BottomSheet({
   maxHeightFraction = 0.75,
   backdrop = true,
   accessibilityLabel,
+  onDismissed,
 }: BottomSheetProps) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -65,6 +72,13 @@ export function BottomSheet({
   // a belépő rugót csak az első layout (valós magasság) után indítjuk, hogy a
   // rövid lap ne a túlbecsült fallback-magasságból „ugorjon" fel
   const measured = useRef(false);
+  const onDismissedRef = useRef(onDismissed);
+  onDismissedRef.current = onDismissed;
+  // a lap TÉNYLEGES lezárulása (unmount) + értesítés
+  const finishClose = () => {
+    setRendered(false);
+    onDismissedRef.current?.();
+  };
 
   // progress: 0 = zárt (lecsúszva) … 1 = nyitott. Ez az EGYETLEN mozgás-driver.
   const progress = useSharedValue(visible ? 1 : 0);
@@ -88,7 +102,7 @@ export function BottomSheet({
       }
     } else {
       progress.value = withTiming(0, motion.timing.exit, (finished) => {
-        if (finished) runOnJS(setRendered)(false);
+        if (finished) runOnJS(finishClose)();
       });
     }
     // csak a `visible` váltására fusson — a `height`-et szándékosan snapshotoljuk
@@ -129,7 +143,7 @@ export function BottomSheet({
         // elnyelné az érintéseket az egész képernyőn)
         progress.value = withTiming(0, motion.timing.exit, (finished) => {
           if (finished) {
-            runOnJS(setRendered)(false);
+            runOnJS(finishClose)();
           }
         });
         runOnJS(haptics.snap)();

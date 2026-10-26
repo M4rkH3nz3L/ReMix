@@ -17,6 +17,7 @@ import {
 } from '@/components/studio/image/body/ImageStudioSheets';
 import { ImageStudioToolbar, type ToolKey } from '@/components/studio/image/body/ImageStudioToolbar';
 import { palette } from '@/constants/editor';
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
 import { IMAGE_SHEET_SPECS, type ImageSheetId } from '@/lib/panelSpecs';
@@ -132,6 +133,21 @@ export function ImageStudioBody({
   const [brushColor, setBrushColor] = useState('#ff2d95');
   const [brushSize, setBrushSize] = useState(8);
   const [guidesActive, setGuidesActive] = useState(false);
+  // ↩️ precíziós módban a vissza a MÓDBÓL lép ki (nem a stúdióból) — mint a sáv ✕-e
+  useBackLayer(
+    cropRect || penPoints || pathEditId || lassoActive || wandActive || brushActive || guidesActive
+      ? () => {
+          setCropRect(null);
+          setPenPoints(null);
+          setPathEditId(null);
+          setLassoActive(false);
+          setMaskTarget(null);
+          setWandActive(false);
+          setBrushActive(false);
+          setGuidesActive(false);
+        }
+      : null
+  );
   const brushRef = useRef<BrushHandle>(null);
   const canvasRef = useRef<View>(null);
 

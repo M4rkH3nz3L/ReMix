@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { InlineSheet } from '@/components/ui/InlineSheet';
 import { palette } from '@/constants/editor';
 import type { Detent } from '@/lib/panelLayout';
@@ -50,6 +51,8 @@ export function AudioSheetFrame({
   const frame = useContext(AudioSheetFrameContext);
   const spec = AUDIO_SHEET_SPECS[id];
   const padH = StyleSheet.flatten(sheetStyle).paddingHorizontal ?? 16;
+  // ↩️ inline/dokkolt/workspace keretnek nincs Modal-ja → a vissza-verem zárja
+  useBackLayer(frame && (spec.tier === 'workspace' || !spec.modal) ? onClose : null);
 
   if (frame && spec.tier === 'workspace') {
     return (

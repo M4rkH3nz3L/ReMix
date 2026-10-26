@@ -51,8 +51,9 @@ describe('panelLayout — vászon-garancia', () => {
   describe('invariánsok minden magasságon és szinten', () => {
     const heights = [360, 420, 500, 583, 640, 700, 798, 816, 900, 1100];
     const tiers: SurfaceTier[] = ['none', 'strip', 'sheet', 'focus'];
-    it.each(heights)('body=%i: a preview soha nem megy a minimum alá', (h) => {
-      for (const tier of tiers) {
+    it.each(heights)('body=%i: nyitott panelnél a preview soha nem megy a minimum alá', (h) => {
+      // panel nélkül (`none`) nincs garancia: ott az idővonal a fő munkafelület
+      for (const tier of tiers.filter((x) => x !== 'none')) {
         for (const detent of DETENTS) {
           const b = layoutBudget({ bodyHeight: h, tier, detent });
           expect(b.previewHeight).toBeGreaterThanOrEqual(b.minPreview);
@@ -123,6 +124,12 @@ describe('panelLayout — vászon-garancia', () => {
     const b = layoutBudget({ bodyHeight: 700, tier: 'sheet', detent: 'peek', timelineFullHeight: 360 });
     expect(b.timelineMode).toBe('mini');
     expect(b.previewHeight).toBeGreaterThanOrEqual(b.minPreview);
+  });
+
+  it('panel NÉLKÜL a magas idővonal sosem zárul mini-sorba (különben elérhetetlen lenne)', () => {
+    const b = layoutBudget({ bodyHeight: 583, tier: 'none', timelineFullHeight: 420 });
+    expect(b.timelineMode).toBe('full');
+    expect(b.timelineHeight).toBe(420);
   });
 
   it('MÉRT idővonal-magasság: ha belefér, a becslés helyett azt használja', () => {

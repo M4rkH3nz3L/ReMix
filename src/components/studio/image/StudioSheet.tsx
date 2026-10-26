@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createContext, type ReactNode, useContext } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useBackLayer } from '@/hooks/useBackLayer';
 import { InlineSheet } from '@/components/ui/InlineSheet';
 import { palette } from '@/constants/editor';
 import type { Detent } from '@/lib/panelLayout';
@@ -46,6 +47,8 @@ export function StudioSheet({
   footer?: ReactNode;
 }) {
   const frame = useContext(StudioSheetFrameContext);
+  // ↩️ az inline/dokkolt lapnak nincs Modal-ja → a vissza-verem zárja (a modálisnál a Modal)
+  useBackLayer(frame?.inline ? onClose : null);
 
   const head = (
     <View style={[styles.head, frame?.inline ? styles.headInline : null]}>

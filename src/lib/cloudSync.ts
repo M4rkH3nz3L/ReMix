@@ -2,7 +2,14 @@ import { ensureCloud } from '@/lib/backend';
 import { backupProjectMedia, mediaRemoteMap } from '@/lib/mediaSync';
 import { migrateProject, projectDuration } from '@/lib/projectUtils';
 import { canBackupMedia } from '@/lib/storagePolicy';
-import { listProjects, loadVersions, saveProject, type ProjectVersion } from '@/lib/storage';
+import { pendingCloudDeletes, restorableIds } from '@/lib/projectTombstones';
+import {
+  deletedProjectIds,
+  listProjects,
+  loadVersions,
+  saveProject,
+  type ProjectVersion,
+} from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { pickVersionsToPush, type CloudVersionMeta } from '@/lib/versionsSync';
 import { useAuth } from '@/store/authStore';
@@ -81,6 +88,10 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
     if (!supabase || !uid) {
       return;
     }
+    // 🪦 törölt projekt mentése el se induljon (a média-feltöltés se)
+    if ((await deletedProjectIds()).has(project.id)) {
+      return;
+    }
     // már ismert remote-ok a korábbi felhő-másolatból (dupla-feltöltés ellen)
     let known: Record<string, string> = {};
     try {
@@ -104,6 +115,11 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
     const { hasOwnStorageTarget } = await import('@/lib/externalStorage');
     if (canBackupMedia(useEntitlement.getState().effectiveTier(), await hasOwnStorageTarget())) {
       backed = (await backupProjectMedia(project, known)).project;
+    }
+    // 🪦 a (lassú) média-feltöltés alatt a felhasználó törölhette a projektet → NE
+    // töltsük vissza a felhőbe, különben a következő indításkor „feltámadna"
+    if ((await deletedProjectIds()).has(backed.id)) {
+      return;
     }
     await supabase.from('cloud_projects').upsert(
       { user_id: uid, project_id: backed.id, name: backed.name, data: backed },
@@ -260,15 +276,26 @@ export async function listCloudProjectMetas(): Promise<ProjectMeta[]> {
 }
 
 /** A felhő-projekt törlése (a DB-trigger kaszkádban törli a hozzá tartozó posztokat is). */
-export async function deleteCloudProject(projectId: string): Promise<void> {
+/**
+ * A felhő-projekt törlése. @returns true, ha a felhőben biztosan nincs (törölve).
+ * A Supabase hibánál NEM dob, hanem `{ error }`-t ad — ezt eddig nem néztük, így egy
+ * elbukott törlés láthatatlan volt. A sírkő (storage) miatt a sikertelen törlést a
+ * következő `syncProjectsFromCloud` újrapróbálja.
+ */
+export async function deleteCloudProject(projectId: string): Promise<boolean> {
   try {
     const uid = useAuth.getState().user?.id;
     if (!supabase || !uid) {
-      return;
+      return false;
     }
-    await supabase.from('cloud_projects').delete().eq('user_id', uid).eq('project_id', projectId);
+    const { error } = await supabase
+      .from('cloud_projects')
+      .delete()
+      .eq('user_id', uid)
+      .eq('project_id', projectId);
+    return !error;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -292,10 +319,15 @@ export async function syncProjectsFromCloud(): Promise<number> {
     if (!ids || ids.length === 0) {
       return 0;
     }
+    const cloudIds = (ids as { project_id: string }[]).map((r) => r.project_id);
     const localIds = new Set((await listProjects()).map((m) => m.id));
-    const missing = (ids as { project_id: string }[])
-      .map((r) => r.project_id)
-      .filter((id) => !localIds.has(id));
+    const tombstones = await deletedProjectIds();
+    // 🪦 öngyógyulás: a helyben törölt, de a felhőben maradt projektek újratörlése
+    for (const id of pendingCloudDeletes(cloudIds, tombstones)) {
+      await deleteCloudProject(id);
+    }
+    // csak a valóban hiányzó ÉS nem törölt projektek jönnek vissza
+    const missing = restorableIds(cloudIds, localIds, tombstones);
     if (missing.length === 0) {
       return 0;
     }

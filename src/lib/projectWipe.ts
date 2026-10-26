@@ -1,6 +1,6 @@
 import { currentUserId } from '@/lib/collab';
 import { sweepAppMediaDirs } from '@/lib/mediaGcClient';
-import { deleteProject, listProjects } from '@/lib/storage';
+import { deleteProject, listProjects, markProjectsDeleted } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -42,11 +42,23 @@ export async function wipeAllProjects(): Promise<WipeResult> {
   const uid = currentUserId();
   if (supabase && uid) {
     try {
-      await supabase.from('cloud_project_versions').delete().eq('user_id', uid);
-      await supabase.from('cloud_projects').delete().eq('user_id', uid);
-      await supabase.from('project_invites').delete().eq('owner_id', uid);
-      await supabase.from('project_members').delete().eq('owner_id', uid);
-      cloudOk = true;
+      // a Supabase hibánál NEM dob, hanem `{ error }`-t ad → minden lépést ellenőrzünk
+      // (korábban egy elbukott felhő-törlés „sikeresnek" látszott, és a projektek a
+      // következő induláskor visszatöltődtek). A helyi sírkövek ettől függetlenül
+      // megvédik a listát, és a szinkron a maradékot újra törli.
+      // a CSAK felhőben lévő projektek is sírkövet kapnak (ha a törlés elbukna, se jöjjenek vissza)
+      const { data: cloudRows } = await supabase
+        .from('cloud_projects')
+        .select('project_id')
+        .eq('user_id', uid);
+      await markProjectsDeleted(((cloudRows ?? []) as { project_id: string }[]).map((r) => r.project_id));
+      const results = await Promise.all([
+        supabase.from('cloud_project_versions').delete().eq('user_id', uid),
+        supabase.from('project_invites').delete().eq('owner_id', uid),
+        supabase.from('project_members').delete().eq('owner_id', uid),
+      ]);
+      const projects = await supabase.from('cloud_projects').delete().eq('user_id', uid);
+      cloudOk = [...results, projects].every((r) => !r.error);
     } catch {
       cloudOk = false;
     }

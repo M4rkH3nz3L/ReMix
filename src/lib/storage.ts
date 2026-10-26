@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ProjectEvent } from '@/lib/commands';
 import { makeId } from '@/lib/id';
 import { migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
+import { addTombstones, removeTombstones } from '@/lib/projectTombstones';
 import type { Project, ProjectMeta } from '@/types/project';
 
 const INDEX_KEY = 'vided.projects.v1';
@@ -13,6 +14,8 @@ const versionsKey = (id: string) => `vided.versions.v1.${id}`;
 const lastAutoKey = (id: string) => `vided.versions.lastauto.v1.${id}`;
 /** 🛟 crash-recovery pillanatkép külön kulcson (a félbeszakadt/bukott mentés ellen) */
 const recoveryKey = (id: string) => `vided.recovery.v1.${id}`;
+/** 🪦 a törölt projektek id-i (sírkövek) — lásd `@/lib/projectTombstones` */
+const TOMBSTONE_KEY = 'vided.deletedProjects.v1';
 
 /** 🕓 Projekt-verzió (pillanatkép): a projekt TELJES állapota egy néven, on-device. */
 export interface ProjectVersion {
@@ -105,6 +108,45 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   return metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+// ── 🪦 Sírkövek: a törölt projekt NEM jöhet vissza a felhőből ──────────────────
+// Memória-cache: a mentés-útvonal (autosave) is olvassa, ne legyen minden mentés I/O.
+let tombstoneCache: string[] | null = null;
+
+async function readTombstones(): Promise<string[]> {
+  if (tombstoneCache) {
+    return tombstoneCache;
+  }
+  try {
+    const raw = await AsyncStorage.getItem(TOMBSTONE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    tombstoneCache = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    tombstoneCache = [];
+  }
+  return tombstoneCache;
+}
+
+/** A törölt (sírköves) projekt-id-k. */
+export async function deletedProjectIds(): Promise<Set<string>> {
+  return new Set(await readTombstones());
+}
+
+/** Projekt(ek) töröltként jelölése — a felhő-visszatöltés és a háttér-mentés kihagyja. */
+export async function markProjectsDeleted(ids: string[]): Promise<void> {
+  tombstoneCache = addTombstones(await readTombstones(), ids);
+  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch(() => {});
+}
+
+/** Ugyanazzal az id-vel KIFEJEZETTEN újra elmentett projekt (pl. .rp-import) ismét él. */
+async function clearTombstone(id: string): Promise<void> {
+  const cur = await readTombstones();
+  if (!cur.includes(id)) {
+    return;
+  }
+  tombstoneCache = removeTombstones(cur, [id]);
+  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch(() => {});
+}
+
 export async function loadProject(id: string): Promise<Project | null> {
   const raw = await AsyncStorage.getItem(projectKey(id));
   if (!raw) {
@@ -119,6 +161,7 @@ export async function loadProject(id: string): Promise<Project | null> {
 }
 
 export async function saveProject(project: Project): Promise<void> {
+  await clearTombstone(project.id);
   const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
   // a `listProjects` sérült indexnél ÚJRAÉPÍT (nem üres listát ad), így a
   // következő sor nem törli ki a többi projektet az indexből
@@ -139,6 +182,9 @@ const MEDIA_REF_PREFIXES = [
 ] as const;
 
 export async function deleteProject(id: string): Promise<void> {
+  // 🪦 ELŐSZÖR a sírkő: ha a felhős törlés elbukik, vagy egy futó háttér-mentés
+  // utólag feltölti, a felhő-visszatöltés akkor sem hozza vissza
+  await markProjectsDeleted([id]);
   // 🧹 ADR-013: a projekt-média az APP tárolja, és a fájl a PROJEKTTEL törlődik.
   // A tartalom kiolvasása MÉG a kulcs-törlés előtt (ezek a törlés-jelöltek) …
   const deletedDocs = (
@@ -183,6 +229,7 @@ export async function saveProjectAndEvents(
   project: Project,
   events: ProjectEvent[]
 ): Promise<void> {
+  await clearTombstone(project.id);
   const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
   const metas = await listProjects();
   const nextIndex = [metaOf(stamped), ...metas.filter((m) => m.id !== stamped.id)];

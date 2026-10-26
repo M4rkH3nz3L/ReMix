@@ -9,6 +9,7 @@
  * A publikus szimbólumokat (PanelId, SnapStrength, SNAP_FACTOR, …) a `editorStore.ts`
  * tovább-exportálja, hogy a `@/store/editorStore` importok változatlanok maradjanak.
  */
+import type { Detent } from '@/lib/panelLayout';
 import type { VideoPanelId } from '@/lib/panelSpecs';
 import { findClip } from '@/lib/projectUtils';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
@@ -217,6 +218,12 @@ export interface EditorState {
   pickTarget: ((point: { x: number; y: number }) => void) | null;
   zoom: number;
   activePanel: PanelId;
+  /** 📐 a nyitott Sheet detentje (MOBILE-UI §3.2) — panel-nyitáskor a memóriából/regiszterből */
+  panelDetent: Detent;
+  /** ⚡ Strip-panel „Részletek"-re kibontva (strip → sheet) */
+  panelExpanded: boolean;
+  /** 📐 a felhasználó utolsó detent-választása panelenként (session-szintű) */
+  panelDetentMemory: Partial<Record<VideoPanelId, Detent>>;
   past: Project[];
   future: Project[];
   /** 🕓 a history-lépések ember-olvasható címkéi (a past/future-rel LÉPÉSENKÉNT igazítva —
@@ -391,6 +398,10 @@ export interface EditorState {
   setPickTarget: (fn: ((point: { x: number; y: number }) => void) | null) => void;
   setZoom: (zoom: number) => void;
   setPanel: (panel: PanelId) => void;
+  /** 📐 detent-váltás (húzás/snap) — megjegyzi az aktív panelhez */
+  setPanelDetent: (detent: Detent) => void;
+  /** ⚡ Strip → Sheet („Részletek") */
+  expandPanel: () => void;
   /** 🖼️ Kép Stúdió (teljes képernyős, on-device képszerkesztő) cél-klipje */
   imageStudioClipId: string | null;
   openImageStudio: (clipId: string) => void;

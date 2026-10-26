@@ -20,6 +20,7 @@ import { SourceBin } from '@/components/SourceBin';
 import { SourceSheet } from '@/components/SourceSheet';
 import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
 import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
+import { MiniTimeline } from '@/components/editor/MiniTimeline';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { MissingMediaSheet } from '@/components/editor/MissingMediaSheet';
@@ -28,6 +29,7 @@ import { Timeline } from '@/components/editor/Timeline';
 import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { VodProcessingOverlay } from '@/components/editor/VodProcessingOverlay';
@@ -37,6 +39,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { openProjectConversation } from '@/lib/chat';
 import { currentUserId, ensureShared, myMembership, type CollabRole } from '@/lib/collab';
+import { layoutBudget } from '@/lib/panelLayout';
 import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
 import { pruneProxyCache, pruneRenderCache } from '@/lib/cacheManager';
@@ -61,7 +64,12 @@ import { classifyMissingMedia, mediaRemoteMap, restoreMissingMedia } from '@/lib
 import type { Project } from '@/types/project';
 import { useChat } from '@/store/chatStore';
 import { useCollabLive } from '@/store/collabLiveStore';
-import { selectPanelVisible, useEditorStore, type PanelId } from '@/store/editorStore';
+import {
+  selectPanelVisible,
+  selectSurfaceTier,
+  useEditorStore,
+  type PanelId,
+} from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { useTutorial } from '@/store/tutorialStore';
@@ -75,6 +83,13 @@ export default function EditorScreen() {
   const dirty = useEditorStore((s) => s.dirty);
   const tier = useEntitlement((s) => s.effectiveTier());
   const panelVisible = useEditorStore(selectPanelVisible);
+  // 📐 MOBILE-UI §4: a panel felület-szintje + detentje → layout-költségvetés
+  const surfaceTier = useEditorStore(selectSurfaceTier);
+  const panelDetent = useEditorStore((s) => s.panelDetent);
+  const [bodyH, setBodyH] = useState(0);
+  const [timelineH, setTimelineH] = useState<number | undefined>(undefined);
+  const [transportH, setTransportH] = useState<number | undefined>(undefined);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [missing, setMissing] = useState(false);
   const [missingMedia, setMissingMedia] = useState<MissingMedia[]>([]);
   const [relinking, setRelinking] = useState(false);
@@ -575,13 +590,38 @@ export default function EditorScreen() {
       .catch(() => {});
   };
 
-  const openProjectMenu = () => {
-    Alert.alert(t('editorScreen.projectMenuTitle'), undefined, [
-      { text: t('editorScreen.saveNow'), onPress: saveNow },
-      { text: t('editorScreen.saveAsCopy'), onPress: saveAsCopy },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+  // ⋯ projekt-menü lapként (nem Alert): telefonon ide költöznek a fejléc ritka
+  // elemei is (képarány, közreműködők, bemutató) — az Android Alert max 3 gombot tud.
+  const openProjectMenu = () => setProjectMenuOpen(true);
+  const menuAction = (fn: () => void) => () => {
+    setProjectMenuOpen(false);
+    fn();
   };
+  const openCollabScreen = () =>
+    router.push(`/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`);
+  const projectMenuItems: {
+    icon: React.ComponentProps<typeof Ionicons>['name'];
+    label: string;
+    onPress: () => void;
+  }[] = [
+    { icon: 'save-outline', label: t('editorScreen.saveNow'), onPress: menuAction(saveNow) },
+    { icon: 'copy-outline', label: t('editorScreen.saveAsCopy'), onPress: menuAction(saveAsCopy) },
+    ...(L.isCompact
+      ? ([
+          {
+            icon: 'crop-outline',
+            label: t('editorScreen.menuAspect', { aspect: project?.aspectRatio ?? '' }),
+            onPress: cycleAspect,
+          },
+          { icon: 'people-outline', label: t('collab.title'), onPress: menuAction(openCollabScreen) },
+          {
+            icon: 'help-circle-outline',
+            label: t('tutorial.launch'),
+            onPress: menuAction(() => useTutorial.getState().openMenu()),
+          },
+        ] as const)
+      : []),
+  ];
 
   const header = (
     <View style={styles.header}>
@@ -630,32 +670,36 @@ export default function EditorScreen() {
             color={collab ? palette.accent2 : palette.textDim}
           />
         </Pressable>
-        {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
-        <Pressable
-          onPress={() => useTutorial.getState().openMenu()}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('tutorial.launch')}
-        >
-          <Ionicons name="help-circle-outline" size={22} color={palette.textDim} />
-        </Pressable>
-        <Pressable
-          onPress={() =>
-            router.push(`/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`)
-          }
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('collab.title')}
-        >
-          <Ionicons
-            name={collab ? 'people' : 'people-outline'}
-            size={22}
-            color={collab ? palette.accent : palette.textDim}
-          />
-        </Pressable>
-        <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
-          <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
-        </Pressable>
+        {/* telefonon (compact) a ritka elemek — bemutató, közreműködők, képarány —
+            a ⋯ projekt-menübe költöznek (MOBILE-UI §6.1): a fejléc egy sor marad */}
+        {L.isCompact ? null : (
+          <>
+            {/* 🎓 interaktív bemutató indítása (felület-vezető) */}
+            <Pressable
+              onPress={() => useTutorial.getState().openMenu()}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('tutorial.launch')}
+            >
+              <Ionicons name="help-circle-outline" size={22} color={palette.textDim} />
+            </Pressable>
+            <Pressable
+              onPress={openCollabScreen}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('collab.title')}
+            >
+              <Ionicons
+                name={collab ? 'people' : 'people-outline'}
+                size={22}
+                color={collab ? palette.accent : palette.textDim}
+              />
+            </Pressable>
+            <Pressable onPress={cycleAspect} hitSlop={8} style={styles.aspectButton}>
+              <Text style={styles.aspectText}>{project?.aspectRatio ?? ''}</Text>
+            </Pressable>
+          </>
+        )}
         {/* ⋯ projekt-menü: Mentés most / Mentés másként (másolat) */}
         <Pressable
           onPress={openProjectMenu}
@@ -779,28 +823,71 @@ export default function EditorScreen() {
     ) : null;
 
   /**
-   * Három elrendezés, méret-osztály szerint (lásd `@/constants/layout`):
+   * Elrendezés méret-osztály szerint (lásd `@/constants/layout`, MOBILE-UI §6–7):
    *
    *  expanded — iPad fekvő/desktop. Teljes vágó-elrendezés: fejléc végig felül,
    *    alatta előnézet+transport | DOKKOLT inspector, legalul teljes szélességű
-   *    idővonal. A panel és az idővonal EGYSZERRE látszik. (Az eszközök az alsó
-   *    Toolbarban vannak — nincs külön bal oldali rail.)
-   *  medium+fekvő — telefon fekvőben: kevés a magasság, ezért a vezérlők jobb
-   *    oszlopba kerülnek, a videó kapja a bal oldalt.
-   *  medium+álló — iPad állóban: függőleges rakás, az idővonal VÉGIG
-   *    látszik, a panel alulról jön fel fölé.
-   *  compact — telefon állóban: az eredeti rakás, a panel az idővonal helyén.
+   *    idővonal. A panel és az idővonal EGYSZERRE látszik.
+   *  medium+fekvő — telefon fekvőben: a videó kapja a bal oldalt, a vezérlők a
+   *    jobb oszlopba kerülnek; nyitott panelnél az idővonal MINI-sorrá húzódik
+   *    (nem tűnik el), alatta a panel teljes oszlop-magasságban.
+   *  medium+álló / compact — függőleges rakás a `layoutBudget` szerint (vászon-
+   *    garancia): Strip az eszköztár helyén, inline detentes Sheet, Focusban a
+   *    vászon a teljes body. iPad-állóban (`keepTimeline`) az idővonal teljes marad.
    */
+  const budget = layoutBudget({
+    bodyHeight: bodyH,
+    tier: surfaceTier ?? 'none',
+    detent: panelDetent,
+    trackScale: L.editor.trackScale,
+    timelineFullHeight: timelineH,
+    transportHeight: transportH,
+    keepTimeline: L.sizeClass === 'medium',
+  });
+  const focus = surfaceTier === 'focus';
+  const banners = (
+    <>
+      {missingBanner}
+      {collabBanner}
+      {sizeBanner}
+      {storageSafetyBanner}
+      {emptyHint}
+    </>
+  );
+  // a függőleges (telefon-álló / iPad-álló) rakás — a body-t MÉRJÜK, abból számol a budget
+  const stackedWork = (
+    <View style={styles.stackBody} onLayout={(e) => setBodyH(e.nativeEvent.layout.height)}>
+      <PreviewSurface mode="edit" />
+      {focus ? (
+        // 🎯 Focus: a króm a vászon FÖLÉ úszik, minden más rejtve
+        <PanelHost />
+      ) : (
+        <>
+          <View onLayout={(e) => setTransportH(e.nativeEvent.layout.height)}>
+            <TransportBar />
+          </View>
+          {budget.timelineMode === 'full' ? (
+            <View onLayout={(e) => setTimelineH(e.nativeEvent.layout.height)}>
+              <Timeline />
+            </View>
+          ) : budget.timelineMode === 'mini' ? (
+            <MiniTimeline />
+          ) : null}
+          {surfaceTier === 'sheet' || surfaceTier === 'strip' ? (
+            <PanelHost detents={budget.detents} />
+          ) : null}
+          {budget.toolbarVisible ? <Toolbar /> : null}
+        </>
+      )}
+    </View>
+  );
+
   let body: React.ReactNode;
   if (L.isExpanded) {
     body = (
       <>
         {header}
-        {missingBanner}
-        {collabBanner}
-        {sizeBanner}
-        {storageSafetyBanner}
-        {emptyHint}
+        {banners}
         <View style={styles.expandedBand}>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
@@ -829,58 +916,44 @@ export default function EditorScreen() {
         </View>
         <View style={styles.landscapeSide}>
           {header}
-          {missingBanner}
-          {collabBanner}
-          {sizeBanner}
-          {storageSafetyBanner}
-          {emptyHint}
+          {banners}
           <TransportBar />
           <View style={styles.landscapeSideBody}>
-            {panelVisible ? <PanelHost /> : <Timeline />}
+            {panelVisible ? (
+              <>
+                {/* az idővonal NEM tűnik el: mini-sor; a ⌃ bezárja a panelt */}
+                <MiniTimeline onExpand={() => useEditorStore.getState().setPanel(null)} />
+                <PanelHost variant="docked" />
+              </>
+            ) : (
+              <Timeline />
+            )}
           </View>
-          <Toolbar />
+          {panelVisible ? null : <Toolbar />}
         </View>
       </View>
     );
   } else if (L.sizeClass === 'medium') {
     body = (
       <>
-        {header}
-        {missingBanner}
-        {collabBanner}
-        {sizeBanner}
-        {storageSafetyBanner}
-        {emptyHint}
+        {focus ? null : header}
+        {focus ? null : banners}
         <View style={styles.expandedBand}>
-          {L.editor.sourceBinWidth > 0 ? (
+          {L.editor.sourceBinWidth > 0 && !focus ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
               <SourceBin compact scroll onInsert={(a) => useEditorStore.getState().insertSourceAsset(a)} />
             </View>
           ) : null}
-          <View style={styles.expandedCenter}>
-            <PreviewSurface mode="edit" />
-            <TransportBar />
-            <Timeline />
-          </View>
+          {stackedWork}
         </View>
-        {panelVisible ? <PanelHost /> : null}
-        <Toolbar />
       </>
     );
   } else {
     body = (
       <>
-        {header}
-        {missingBanner}
-        {collabBanner}
-        {sizeBanner}
-        {storageSafetyBanner}
-        {emptyHint}
-        <PreviewSurface mode="edit" />
-        <TransportBar />
-        {/* nyitott panel az idővonal helyén — így az előnézet kis kijelzőn sem zsugorodik el */}
-        {panelVisible ? <PanelHost /> : <Timeline />}
-        <Toolbar />
+        {focus ? null : header}
+        {focus ? null : banners}
+        {stackedWork}
       </>
     );
   }
@@ -898,6 +971,24 @@ export default function EditorScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {body}
+        <BottomSheet
+          visible={projectMenuOpen}
+          onClose={() => setProjectMenuOpen(false)}
+          accessibilityLabel={t('editorScreen.projectMenuTitle')}
+        >
+          <Text style={styles.menuTitle}>{t('editorScreen.projectMenuTitle')}</Text>
+          {projectMenuItems.map((item) => (
+            <Pressable
+              key={item.label}
+              onPress={item.onPress}
+              style={styles.menuRow}
+              accessibilityRole="button"
+            >
+              <Ionicons name={item.icon} size={20} color={palette.text} />
+              <Text style={styles.menuLabel}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </BottomSheet>
         <AudioLayer />
       </KeyboardAvoidingView>
       <ImageStudioModal />
@@ -1121,6 +1212,28 @@ const styles = StyleSheet.create({
   sourceDock: {
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: palette.border,
+  },
+  // 📐 a függőleges rakás mért body-ja (a layoutBudget bemenete)
+  stackBody: {
+    flex: 1,
+  },
+  menuTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    minHeight: 48,
+    paddingHorizontal: 20,
+  },
+  menuLabel: {
+    color: palette.text,
+    fontSize: 15,
   },
   landscapePreview: {
     flex: 1,

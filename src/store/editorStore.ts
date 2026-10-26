@@ -12,6 +12,7 @@
  */
 import { create } from 'zustand';
 
+import { videoPanelSpec } from '@/lib/panelSpecs';
 import { findClip } from '@/lib/projectUtils';
 import type { Clip } from '@/types/project';
 
@@ -58,6 +59,32 @@ export function selectSelectedClip(state: EditorState): Clip | null {
     return null;
   }
   return findClip(state.project, state.selectedClipId)?.clip ?? null;
+}
+
+/**
+ * 📐 A nyitott panel felület-szintje (MOBILE-UI §3): `null` = nincs látható panel.
+ * A Strip csak akkor él, ha a gyors változat értelmes (pl. hangerő-strip csak
+ * kijelölt hangklipre — klip nélkül a zene-hozzáadás lap jön sheet-ként).
+ */
+export function selectSurfaceTier(state: EditorState): 'strip' | 'sheet' | 'focus' | null {
+  if (!selectPanelVisible(state)) {
+    return null;
+  }
+  const spec = videoPanelSpec(state.activePanel);
+  if (!spec) {
+    return 'sheet';
+  }
+  if (spec.tier === 'focus') {
+    return 'focus';
+  }
+  if (spec.tier === 'strip' && !state.panelExpanded) {
+    const clip = selectSelectedClip(state);
+    if (state.activePanel === 'audio' && clip?.kind !== 'audio') {
+      return 'sheet';
+    }
+    return 'strip';
+  }
+  return 'sheet';
 }
 
 /** Látszik-e ténylegesen panel — a képernyő ez alapján cseréli az idővonalat a panelre. */

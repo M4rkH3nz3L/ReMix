@@ -119,6 +119,24 @@ describe('panelLayout — vászon-garancia', () => {
     expect(b.previewHeight).toBe(816 - b.panelHeight);
   });
 
+  it('MÉRT idővonal-magasság: ha túl magas, peek-nél is mini-sorrá húzódik (garancia)', () => {
+    const b = layoutBudget({ bodyHeight: 700, tier: 'sheet', detent: 'peek', timelineFullHeight: 360 });
+    expect(b.timelineMode).toBe('mini');
+    expect(b.previewHeight).toBeGreaterThanOrEqual(b.minPreview);
+  });
+
+  it('MÉRT idővonal-magasság: ha belefér, a becslés helyett azt használja', () => {
+    const b = layoutBudget({ bodyHeight: 816, tier: 'none', timelineFullHeight: 150, transportHeight: 40 });
+    expect(b.timelineHeight).toBe(150);
+    expect(b.previewHeight).toBe(816 - 40 - 150 - PANEL_METRICS.toolbar);
+  });
+
+  it('keepTimeline (iPad-álló): half-on is teljes idővonal, ha a vászon kifér', () => {
+    const b = layoutBudget({ bodyHeight: 1100, tier: 'sheet', detent: 'half', keepTimeline: true });
+    expect(b.timelineMode).toBe('full');
+    expect(b.previewHeight).toBeGreaterThanOrEqual(b.minPreview);
+  });
+
   it('kis body-n a túl közeli detentek összeolvadnak', () => {
     const d = sheetDetents(420);
     expect(d.half === d.full || d.full - d.half >= PANEL_METRICS.detentMergeGap).toBe(true);

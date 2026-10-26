@@ -1,7 +1,8 @@
 import { haptics, motion } from '@/design';
-import { type ComponentRef, useEffect, useRef, useState } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
+import { type ComponentProps, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -10,22 +11,25 @@ import { CameraRecorder } from '@/components/editor/CameraRecorder';
 import { HelpOverlay } from '@/components/editor/HelpOverlay';
 import { SelectionInfo } from '@/components/editor/SelectionInfo';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { ToolButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { captureFrame } from '@/lib/captureFrame';
-import { getLesson } from '@/lib/tutorial';
+import { getLesson, type TutorialTargetId } from '@/lib/tutorial';
 import { makeId } from '@/lib/id';
 import { pickImage, pickVideo } from '@/lib/media';
 import { ensureProxy } from '@/lib/proxy';
 import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
+import { toolbarFor, type ToolId } from '@/lib/toolbarSpec';
 import { clipEnd, compatibleTracksFor, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
-import { selectSelectedClip, useEditorStore } from '@/store/editorStore';
+import { selectSelectedClip, useEditorStore, type PanelId } from '@/store/editorStore';
 import { useTutorial } from '@/store/tutorialStore';
 import type { Asset, Clip, TrackType } from '@/types/project';
 
 /**
  * Kontextusfüggő eszköztár: kijelölés nélkül a hozzáadás-műveletek, kijelölt
- * klipnél a klip-műveletek (vágás, duplikálás, törlés + típus-specifikus panelek).
+ * klipnél a klip-műveletek. Kontextusonként max 4 elsődleges eszköz + „Több"
+ * (MOBILE-UI §6.4) — a „Kész" és a „Törlés" króm, nem számít bele a 4-be.
  */
 export function Toolbar() {
   const { t } = useTranslation();
@@ -407,9 +411,159 @@ export function Toolbar() {
     setPanel(activePanel === panel ? null : panel);
   };
 
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const copyStyleAction = () => {
+    if (!useEditorStore.getState().copyStyle()) {
+      return;
+    }
+    // FONTOS: a vágólapot a copyStyle UTÁN kell kiolvasni. A zustand
+    // minden `set`-nél ÚJ state-objektumot ad, így a hívás ELŐTT
+    // vett pillanatképen a styleClipboard még a régi (első
+    // használatkor `null`) — abból lett a „Cannot read property
+    // 'style' of null" összeomlás.
+    const clipboard = useEditorStore.getState().styleClipboard;
+    if (!clipboard) {
+      return;
+    }
+    haptics.selection();
+    Alert.alert(
+      t('editor.toolbar.styleCopiedTitle'),
+      t('editor.toolbar.styleCopiedMessage', { style: describeStyle(clipboard.style) })
+    );
+  };
+
+  const pasteStyleAction = () => {
+    const n = useEditorStore.getState().pasteStyle();
+    if (n > 0) {
+      haptics.snap();
+    } else {
+      Alert.alert(t('editor.toolbar.styleAlertTitle'), t('editor.toolbar.nothingToPaste'));
+    }
+  };
+
+  const frameCaptureAction = () => {
+    const state = useEditorStore.getState();
+    if (selected?.kind !== 'video') {
+      return;
+    }
+    captureFrame(selected, state.playhead)
+      .then((result) => {
+        if (!result) {
+          Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureNativeOnly'));
+          return;
+        }
+        const s = useEditorStore.getState();
+        s.addClip('video', result.clip, result.asset);
+        s.selectClip(result.clip.id);
+        // frissen elkapott kockát rögtön a Kép Stúdióban nyitjuk
+        s.openImageStudio(result.clip.id);
+      })
+      .catch(() => Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureFailed')));
+  };
+
+  const toggleMultiSelect = () => {
+    const on = !multiSelectMode;
+    setMultiSelectMode(on);
+    if (on) {
+      Alert.alert(t('editor.toolbar.multiSelectTitle'), t('editor.toolbar.multiSelectMessage'));
+    }
+  };
+
+  const toggleRipple = () => {
+    const on = !rippleMode;
+    setRippleMode(on);
+    if (on) {
+      Alert.alert(t('editor.toolbar.rippleModeOnTitle'), t('editor.toolbar.rippleModeOnMessage'));
+    }
+  };
+
+  /**
+   * 🧰 Az eszközök regisztere (MOBILE-UI §6.4) — MIT csinál egy eszköz. Hogy
+   * MIKOR és HOL (elöl vagy a „Több" alatt) jelenik meg, azt a pure
+   * `toolbarFor()` dönti el a kontextusból (`@/lib/toolbarSpec`, tesztelve).
+   */
+  const multi = multiSelectIds.length > 0;
+  const TOOLS: Record<ToolId, ToolDef> = {
+    // — kijelölés nélkül —
+    addVideo: { icon: 'videocam-outline', label: t('editor.toolbar.video'), onPress: addVideo, tutorialId: 'toolbar.addVideo' },
+    addText: { icon: 'text-outline', label: t('editor.toolbar.text'), onPress: addText, tutorialId: 'toolbar.text' },
+    music: { icon: 'musical-notes-outline', label: t('editor.toolbar.music'), panel: 'audio', tutorialId: 'toolbar.music' },
+    captions: { icon: 'chatbox-ellipses-outline', label: t('editor.toolbar.captions'), panel: 'captions', tutorialId: 'toolbar.captions' },
+    addImage: { icon: 'image-outline', label: t('editor.toolbar.image'), onPress: addImage },
+    addPip: { icon: 'albums-outline', label: 'PiP', onPress: addPip },
+    record: { icon: 'radio-button-on-outline', label: t('editor.toolbar.record'), onPress: () => setShowCamera(true) },
+    source: { icon: 'folder-open-outline', label: t('source.title'), onPress: () => setShowSource(true) },
+    sticker: { icon: 'happy-outline', label: t('editor.toolbar.sticker'), panel: 'sticker' },
+    transcript: { icon: 'reader-outline', label: t('editor.toolbar.transcript'), panel: 'transcript' },
+    addGrade: { icon: 'color-filter-outline', label: t('editor.toolbar.grade'), onPress: addAdjust, tutorialId: 'toolbar.grade' },
+    imagedoc: { icon: 'layers-outline', label: t('editor.toolbar.layers'), panel: 'imagedoc' },
+    library: { icon: 'server-outline', label: t('editor.toolbar.library'), panel: 'library' },
+    multicam: { icon: 'videocam-outline', label: t('editor.toolbar.multicam'), panel: 'multicam', tutorialId: 'toolbar.multicam' },
+    addHotspot: { icon: 'scan-outline', label: 'Hotspot', onPress: addHotspot },
+    assistant: { icon: 'sparkles-outline', label: 'AI', panel: 'assistant', tutorialId: 'toolbar.ai' },
+    creatorPreset: { icon: 'bookmarks-outline', label: t('editor.toolbar.creatorPreset'), panel: 'creatorPreset' },
+    workflow: { icon: 'git-branch-outline', label: t('editor.toolbar.workflow'), panel: 'workflow' },
+    help: { icon: 'help-circle-outline', label: t('editor.toolbar.help'), onPress: () => setShowHelp(true) },
+    // — kijelölt klip —
+    split: { icon: 'cut-outline', label: t('editor.toolbar.split'), onPress: split },
+    speed: { icon: 'speedometer-outline', label: t('editor.toolbar.speed'), panel: 'speed' },
+    filter: { icon: 'color-filter-outline', label: t('editor.toolbar.filter'), panel: 'filter' },
+    transition: { icon: 'contrast-outline', label: t('editor.toolbar.transition'), panel: 'transition' },
+    pip: { icon: 'ellipse-outline', label: t('editor.toolbar.frame'), panel: 'pip' },
+    frameCapture: { icon: 'camera-outline', label: t('editor.toolbar.frameCapture'), onPress: frameCaptureAction },
+    text: { icon: 'text-outline', label: t('editor.toolbar.text'), panel: 'text' },
+    shape: { icon: 'shapes-outline', label: t('editor.toolbar.shape'), panel: 'shape' },
+    grade: { icon: 'color-filter-outline', label: t('editor.toolbar.grade'), panel: 'adjust' },
+    mix: { icon: 'options-outline', label: t('editor.toolbar.mix'), panel: 'audio' },
+    action: { icon: 'link-outline', label: t('editor.toolbar.action'), panel: 'hotspot' },
+    precision: { icon: 'timer-outline', label: t('editor.toolbar.precision'), panel: 'precision' },
+    duplicate: {
+      icon: 'copy-outline',
+      label: multi ? t('editor.toolbar.duplicateCount', { count: batchCount }) : t('common.duplicate'),
+      onPress: duplicate,
+    },
+    copyClip: { icon: 'albums-outline', label: t('editor.toolbar.copyClip'), onPress: copyClipsAction },
+    cutClip: { icon: 'cut-outline', label: t('editor.toolbar.cutClip'), onPress: cutClipsAction },
+    pasteClip: { icon: 'clipboard-outline', label: t('editor.toolbar.pasteClip'), onPress: pasteClipsAction },
+    copyStyle: { icon: 'clipboard-outline', label: t('editor.toolbar.copyStyle'), onPress: copyStyleAction },
+    pasteStyle: {
+      icon: 'color-wand-outline',
+      label: multi ? t('editor.toolbar.pasteStyleCount', { count: batchCount }) : t('editor.toolbar.pasteStyle'),
+      onPress: pasteStyleAction,
+    },
+    moveTrack: { icon: 'swap-vertical-outline', label: t('editor.toolbar.moveTrack'), onPress: moveToNextTrack },
+    multiSelect: {
+      icon: multiSelectMode ? 'checkmark-done' : 'checkmark-done-outline',
+      label: multiSelectMode
+        ? t('editor.toolbar.multiSelectActive', { count: batchCount })
+        : t('editor.toolbar.multiSelect'),
+      onPress: toggleMultiSelect,
+      active: multiSelectMode,
+    },
+    ripple: {
+      icon: rippleMode ? 'git-commit' : 'git-commit-outline',
+      label: t('editor.toolbar.ripple'),
+      onPress: toggleRipple,
+      active: rippleMode,
+    },
+    link: { icon: 'link', label: t('editor.toolbar.link'), onPress: linkSelected },
+    precompose: { icon: 'cube-outline', label: t('editor.toolbar.precompose'), onPress: preCompose },
+    unlink: { icon: 'unlink', label: t('editor.toolbar.unlink'), onPress: () => selected && unlinkClip(selected.id) },
+  };
+
+  const layout = toolbarFor({
+    selectionKind: selected?.kind ?? null,
+    multi: multiSelectMode && multiSelectIds.length >= 1,
+    onPipTrack,
+    linked: isLinked,
+    hasClipClipboard: canPasteClips,
+    canPasteStyle,
+    canMoveTrack,
+  });
+
   // kontextuális toolbar cross-fade REMOUNT NÉLKÜL: a tool-készlet váltásakor
-  // (idle↔kijelölés / más klip-fajta) csak az OPACITY pulzál — így a vízszintes
-  // görgetés pozíciója NEM ugrik vissza 0-ra (a keyed remount okozta regresszió).
+  // (idle↔kijelölés / más klip-fajta) csak az OPACITY pulzál.
   const toolFade = useSharedValue(1);
   const toolSig = selected ? `${selected.kind}${multiSelectMode ? '-m' : ''}` : 'idle';
   useEffect(() => {
@@ -418,346 +572,93 @@ export function Toolbar() {
   }, [toolSig, toolFade]);
   const toolRowStyle = useAnimatedStyle(() => ({ opacity: toolFade.value }));
 
-  // 🎓 tutorial: a görgethető eszköztár a KIEMELT gombhoz görget, hogy a spotlight
-  // akkor is ráüljön, ha a target épp kilógott a sorból. A gombok a `rememberX`-szel
-  // jegyzik a tartalom-x-üket; az aktív lecke-lépés targetjére görgetünk.
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  const targetX = useRef<Record<string, number>>({});
-  const rememberX = (id: string) => (e: LayoutChangeEvent) => {
-    targetX.current[id] = e.nativeEvent.layout.x;
-  };
+  // 🎓 tutorial: ha az aktív lecke-lépés egy „Több" alá került eszközre mutat, az
+  // eszköz IDEIGLENESEN előrekerül a sorba — így a spotlight mindig ráül.
   const activeTutorialTarget = useTutorial((s) =>
     s.activeLessonId ? (getLesson(s.activeLessonId)?.steps[s.stepIndex]?.target ?? null) : null
   );
-  useEffect(() => {
-    if (!activeTutorialTarget) {
-      return;
-    }
-    const x = targetX.current[activeTutorialTarget];
-    if (x != null) {
-      scrollRef.current?.scrollTo({ x: Math.max(0, x - 24), animated: true });
-    }
-  }, [activeTutorialTarget]);
+  const promoted = activeTutorialTarget
+    ? layout.overflow.find((id) => TOOLS[id].tutorialId === activeTutorialTarget)
+    : undefined;
+  const rowTools = promoted ? [...layout.primary, promoted] : layout.primary;
+  const moreTools = promoted ? layout.overflow.filter((id) => id !== promoted) : layout.overflow;
+
+  const renderTool = (id: ToolId, onAfter?: () => void) => {
+    const def = TOOLS[id];
+    const button = (
+      <ToolButton
+        icon={def.icon}
+        label={def.label}
+        active={def.panel ? activePanel === def.panel : def.active}
+        onPress={() => {
+          onAfter?.();
+          if (def.panel) {
+            togglePanel(def.panel);
+          } else {
+            def.onPress?.();
+          }
+        }}
+      />
+    );
+    return def.tutorialId && !onAfter ? (
+      <TutorialTarget key={id} id={def.tutorialId}>
+        {button}
+      </TutorialTarget>
+    ) : (
+      <View key={id}>{button}</View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
       <SelectionInfo />
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false}>
-        {/* kontextuális toolbar: a tool-KÉSZLET váltásakor a tartalom átúszik
-            (opacity cross-fade), de a sor NEM remountol → a scroll-pozíció marad */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {/* 4 elsődleges eszköz + „Több" (MOBILE-UI §6.4); a sor NEM remountol → a
+            scroll-pozíció marad, a készlet-váltás csak átúszik */}
         <Animated.View style={[styles.toolRow, toolRowStyle]}>
-        {selected ? (
-          <>
+          {selected ? (
             <ToolButton icon="checkmark-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
+          ) : null}
+          {rowTools.map((id) => renderTool(id))}
+          {moreTools.length > 0 ? (
             <ToolButton
-              icon={multiSelectMode ? 'checkmark-done' : 'checkmark-done-outline'}
-              label={multiSelectMode ? t('editor.toolbar.multiSelectActive', { count: batchCount }) : t('editor.toolbar.multiSelect')}
-              active={multiSelectMode}
-              onPress={() => {
-                const on = !multiSelectMode;
-                setMultiSelectMode(on);
-                if (on) {
-                  Alert.alert(
-                    t('editor.toolbar.multiSelectTitle'),
-                    t('editor.toolbar.multiSelectMessage')
-                  );
-                }
-              }}
+              icon="ellipsis-horizontal-circle-outline"
+              label={t('editor.toolbar.more')}
+              onPress={() => setMoreOpen(true)}
             />
-            {multiSelectMode && multiSelectIds.length >= 1 ? (
-              <>
-                <ToolButton icon="link" label={t('editor.toolbar.link')} onPress={linkSelected} />
-                <ToolButton
-                  icon="cube-outline"
-                  label={t('editor.toolbar.precompose')}
-                  onPress={preCompose}
-                />
-              </>
-            ) : null}
-            {isLinked ? (
+          ) : null}
+          {selected ? (
+            <>
+              {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
+              <View style={styles.toolSep} />
               <ToolButton
-                icon="unlink"
-                label={t('editor.toolbar.unlink')}
-                onPress={() => selected && unlinkClip(selected.id)}
+                icon="trash-outline"
+                label={multi ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
+                danger
+                onPress={remove}
               />
-            ) : null}
-            {multiSelectIds.length === 0 ? (
-              <ToolButton icon="cut-outline" label={t('editor.toolbar.split')} onPress={split} />
-            ) : null}
-            <ToolButton
-              icon={rippleMode ? 'git-commit' : 'git-commit-outline'}
-              label={t('editor.toolbar.ripple')}
-              active={rippleMode}
-              onPress={() => {
-                const on = !rippleMode;
-                setRippleMode(on);
-                if (on) {
-                  Alert.alert(
-                    t('editor.toolbar.rippleModeOnTitle'),
-                    t('editor.toolbar.rippleModeOnMessage')
-                  );
-                }
-              }}
-            />
-            <ToolButton
-              icon="clipboard-outline"
-              label={t('editor.toolbar.copyStyle')}
-              onPress={() => {
-                if (!useEditorStore.getState().copyStyle()) {
-                  return;
-                }
-                // FONTOS: a vágólapot a copyStyle UTÁN kell kiolvasni. A zustand
-                // minden `set`-nél ÚJ state-objektumot ad, így a hívás ELŐTT
-                // vett pillanatképen a styleClipboard még a régi (első
-                // használatkor `null`) — abból lett a „Cannot read property
-                // 'style' of null" összeomlás.
-                const clipboard = useEditorStore.getState().styleClipboard;
-                if (!clipboard) {
-                  return;
-                }
-                haptics.selection();
-                Alert.alert(
-                  t('editor.toolbar.styleCopiedTitle'),
-                  t('editor.toolbar.styleCopiedMessage', { style: describeStyle(clipboard.style) })
-                );
-              }}
-            />
-            {canPasteStyle ? (
-              <ToolButton
-                icon="color-wand-outline"
-                label={multiSelectIds.length > 0 ? t('editor.toolbar.pasteStyleCount', { count: batchCount }) : t('editor.toolbar.pasteStyle')}
-                onPress={() => {
-                  const n = useEditorStore.getState().pasteStyle();
-                  if (n > 0) {
-                    haptics.snap();
-                  } else {
-                    Alert.alert(t('editor.toolbar.styleAlertTitle'), t('editor.toolbar.nothingToPaste'));
-                  }
-                }}
-              />
-            ) : null}
-            <ToolButton
-              icon="copy-outline"
-              label={multiSelectIds.length > 0 ? t('editor.toolbar.duplicateCount', { count: batchCount }) : t('common.duplicate')}
-              onPress={duplicate}
-            />
-            <ToolButton icon="albums-outline" label={t('editor.toolbar.copyClip')} onPress={copyClipsAction} />
-            <ToolButton icon="cut-outline" label={t('editor.toolbar.cutClip')} onPress={cutClipsAction} />
-            {canPasteClips ? (
-              <ToolButton icon="clipboard-outline" label={t('editor.toolbar.pasteClip')} onPress={pasteClipsAction} />
-            ) : null}
-            {canMoveTrack ? (
-              <ToolButton icon="swap-vertical-outline" label={t('editor.toolbar.moveTrack')} onPress={moveToNextTrack} />
-            ) : null}
-            <ToolButton
-              icon="timer-outline"
-              label={t('editor.toolbar.precision')}
-              active={activePanel === 'precision'}
-              onPress={() => togglePanel('precision')}
-            />
-            {selected.kind === 'text' ? (
-              <ToolButton
-                icon="text-outline"
-                label={t('editor.toolbar.text')}
-                active={activePanel === 'text'}
-                onPress={() => togglePanel('text')}
-              />
-            ) : null}
-            {selected.kind === 'video' || selected.kind === 'image' ? (
-              <>
-                <ToolButton
-                  icon="color-filter-outline"
-                  label={t('editor.toolbar.filter')}
-                  active={activePanel === 'filter'}
-                  onPress={() => togglePanel('filter')}
-                />
-                <ToolButton
-                  icon="contrast-outline"
-                  label={t('editor.toolbar.transition')}
-                  active={activePanel === 'transition'}
-                  onPress={() => togglePanel('transition')}
-                />
-                {onPipTrack ? (
-                  <ToolButton
-                    icon="ellipse-outline"
-                    label={t('editor.toolbar.frame')}
-                    active={activePanel === 'pip'}
-                    onPress={() => togglePanel('pip')}
-                  />
-                ) : null}
-              </>
-            ) : null}
-            {selected.kind === 'video' ? (
-              <>
-                <ToolButton
-                  icon="speedometer-outline"
-                  label={t('editor.toolbar.speed')}
-                  active={activePanel === 'speed'}
-                  onPress={() => togglePanel('speed')}
-                />
-                <ToolButton
-                  icon="camera-outline"
-                  label={t('editor.toolbar.frameCapture')}
-                  onPress={() => {
-                    const state = useEditorStore.getState();
-                    if (selected.kind !== 'video') {
-                      return;
-                    }
-                    captureFrame(selected, state.playhead)
-                      .then((result) => {
-                        if (!result) {
-                          Alert.alert(
-                            t('editor.toolbar.frameCaptureTitle'),
-                            t('editor.toolbar.frameCaptureNativeOnly')
-                          );
-                          return;
-                        }
-                        const s = useEditorStore.getState();
-                        s.addClip('video', result.clip, result.asset);
-                        s.selectClip(result.clip.id);
-                        // frissen elkapott kockát rögtön a Kép Stúdióban nyitjuk
-                        s.openImageStudio(result.clip.id);
-                      })
-                      .catch(() =>
-                        Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureFailed'))
-                      );
-                  }}
-                />
-              </>
-            ) : null}
-            {selected.kind === 'shape' ? (
-              <ToolButton
-                icon="shapes-outline"
-                label={t('editor.toolbar.shape')}
-                active={activePanel === 'shape'}
-                onPress={() => togglePanel('shape')}
-              />
-            ) : null}
-            {selected.kind === 'adjust' ? (
-              <ToolButton
-                icon="color-filter-outline"
-                label={t('editor.toolbar.grade')}
-                active={activePanel === 'adjust'}
-                onPress={() => togglePanel('adjust')}
-              />
-            ) : null}
-            {selected.kind === 'audio' ? (
-              <ToolButton
-                icon="options-outline"
-                label={t('editor.toolbar.mix')}
-                active={activePanel === 'audio'}
-                onPress={() => togglePanel('audio')}
-              />
-            ) : null}
-            {selected.kind === 'interactive' ? (
-              <ToolButton
-                icon="link-outline"
-                label={t('editor.toolbar.action')}
-                active={activePanel === 'hotspot'}
-                onPress={() => togglePanel('hotspot')}
-              />
-            ) : null}
-            {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
-            <View style={styles.toolSep} />
-            <ToolButton
-              icon="trash-outline"
-              label={multiSelectIds.length > 0 ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
-              danger
-              onPress={remove}
-            />
-          </>
-        ) : (
-          <>
-            <ToolButton
-              icon="git-branch-outline"
-              label={t('editor.toolbar.workflow')}
-              active={activePanel === 'workflow'}
-              onPress={() => togglePanel('workflow')}
-            />
-            <TutorialTarget id="toolbar.ai" onLayout={rememberX('toolbar.ai')}>
-              <ToolButton
-                icon="sparkles-outline"
-                label="AI"
-                active={activePanel === 'assistant'}
-                onPress={() => togglePanel('assistant')}
-              />
-            </TutorialTarget>
-            <ToolButton
-              icon="bookmarks-outline"
-              label={t('editor.toolbar.creatorPreset')}
-              active={activePanel === 'creatorPreset'}
-              onPress={() => togglePanel('creatorPreset')}
-            />
-            <ToolButton icon="radio-button-on-outline" label={t('editor.toolbar.record')} onPress={() => setShowCamera(true)} />
-            <ToolButton icon="folder-open-outline" label={t('source.title')} onPress={() => setShowSource(true)} />
-            <TutorialTarget id="toolbar.addVideo" onLayout={rememberX('toolbar.addVideo')}>
-              <ToolButton icon="videocam-outline" label={t('editor.toolbar.video')} onPress={addVideo} />
-            </TutorialTarget>
-            <ToolButton icon="albums-outline" label="PiP" onPress={addPip} />
-            <TutorialTarget id="toolbar.multicam" onLayout={rememberX('toolbar.multicam')}>
-              <ToolButton
-                icon="videocam-outline"
-                label={t('editor.toolbar.multicam')}
-                active={activePanel === 'multicam'}
-                onPress={() => togglePanel('multicam')}
-              />
-            </TutorialTarget>
-            <TutorialTarget id="toolbar.grade" onLayout={rememberX('toolbar.grade')}>
-              <ToolButton icon="color-filter-outline" label={t('editor.toolbar.grade')} onPress={addAdjust} />
-            </TutorialTarget>
-            <ToolButton icon="image-outline" label={t('editor.toolbar.image')} onPress={addImage} />
-            <TutorialTarget id="toolbar.text" onLayout={rememberX('toolbar.text')}>
-              <ToolButton icon="text-outline" label={t('editor.toolbar.text')} onPress={addText} />
-            </TutorialTarget>
-            <TutorialTarget id="toolbar.captions" onLayout={rememberX('toolbar.captions')}>
-              <ToolButton
-                icon="chatbox-ellipses-outline"
-                label={t('editor.toolbar.captions')}
-                active={activePanel === 'captions'}
-                onPress={() => togglePanel('captions')}
-              />
-            </TutorialTarget>
-            <ToolButton
-              icon="reader-outline"
-              label={t('editor.toolbar.transcript')}
-              active={activePanel === 'transcript'}
-              onPress={() => togglePanel('transcript')}
-            />
-            <ToolButton
-              icon="happy-outline"
-              label={t('editor.toolbar.sticker')}
-              active={activePanel === 'sticker'}
-              onPress={() => togglePanel('sticker')}
-            />
-            <TutorialTarget id="toolbar.music" onLayout={rememberX('toolbar.music')}>
-              <ToolButton
-                icon="musical-notes-outline"
-                label={t('editor.toolbar.music')}
-                active={activePanel === 'audio'}
-                onPress={() => togglePanel('audio')}
-              />
-            </TutorialTarget>
-            <ToolButton
-              icon="layers-outline"
-              label={t('editor.toolbar.layers')}
-              active={activePanel === 'imagedoc'}
-              onPress={() => togglePanel('imagedoc')}
-            />
-            <ToolButton
-              icon="server-outline"
-              label={t('editor.toolbar.library')}
-              active={activePanel === 'library'}
-              onPress={() => togglePanel('library')}
-            />
-            <ToolButton icon="scan-outline" label="Hotspot" onPress={addHotspot} />
-            <ToolButton icon="help-circle-outline" label={t('editor.toolbar.help')} onPress={() => setShowHelp(true)} />
-            {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
-                egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
-          </>
-        )}
+            </>
+          ) : null}
+          {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
+              egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
         </Animated.View>
       </ScrollView>
+      {/* ⋯ „Több" — ikonrács modális lapon (menü, nem élő szerkesztés → a scrim rendben) */}
+      <BottomSheet
+        visible={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        maxHeightFraction={0.6}
+        accessibilityLabel={t('editor.toolbar.more')}
+      >
+        <ScrollView contentContainerStyle={styles.moreGrid}>
+          {moreTools.map((id) => (
+            <View key={id} style={styles.moreCell}>
+              {renderTool(id, () => setMoreOpen(false))}
+            </View>
+          ))}
+        </ScrollView>
+      </BottomSheet>
       <CameraRecorder visible={showCamera} onClose={() => setShowCamera(false)} />
       {showSource ? (
         <SourceSheet onInsert={insertSource} onClose={() => setShowSource(false)} />
@@ -767,12 +668,34 @@ export function Toolbar() {
   );
 }
 
+/** egy eszköz definíciója: vagy panelt vált (`panel`), vagy akciót futtat (`onPress`) */
+interface ToolDef {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  panel?: NonNullable<PanelId>;
+  onPress?: () => void;
+  active?: boolean;
+  tutorialId?: TutorialTargetId;
+}
+
 const styles = StyleSheet.create({
   container: {
     backgroundColor: palette.surface,
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingVertical: 4,
+  },
+  // ⋯ „Több" ikonrács: 4 oszlop
+  moreGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  moreCell: {
+    width: '25%',
+    alignItems: 'center',
+    paddingVertical: 6,
   },
   // a vízszintes görgetősor egyetlen animált tartalom-doboza (fade a váltáskor)
   toolRow: {

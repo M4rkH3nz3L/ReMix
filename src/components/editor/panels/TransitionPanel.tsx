@@ -10,7 +10,7 @@ import type { ImageClip, TransitionOut, VideoClip } from '@/types/project';
 const STEP = 0.25;
 const MAX_FADE = 2;
 
-const TRANSITIONS: { id: TransitionOut['type'] }[] = [
+export const TRANSITIONS: { id: TransitionOut['type'] }[] = [
   // 🧊 3D-jellegű
   { id: 'zoom' },
   { id: 'spin' },

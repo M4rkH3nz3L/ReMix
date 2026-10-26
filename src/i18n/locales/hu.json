@@ -806,6 +806,9 @@
       "effectsNote": "Itt látszanak azok a hatások, amiket az élő előnézet nem tud mutatni: részecskék, mozgás-elmosás, égcsere, 3D matricák és szöveg, arc-elmosás, átmenetek."
     },
     "panelHost": {
+      "showTimeline": "Teljes idővonal",
+      "details": "Részletek",
+      "focusParams": "Paraméterek",
       "title_text": "Szöveg",
       "title_filter": "Szűrők",
       "title_speed": "Sebesség és hangerő",
@@ -881,6 +884,7 @@
       "discard": "Elvetés"
     },
     "toolbar": {
+      "more": "Több",
       "newTextDefault": "Új szöveg",
       "cannotSplitTitle": "Nem vágható itt",
       "cannotSplitMessage": "A lejátszófej nem a klip belsejében áll.",
@@ -1080,6 +1084,7 @@
     }
   },
   "editorScreen": {
+    "menuAspect": "Képarány: {{aspect}}",
     "remixedFrom": "Remixelve innen: {{name}}",
     "projectNotFound": "A projekt nem található.",
     "relinking": "Újracsatolás…",
@@ -1467,6 +1472,7 @@
       }
     },
     "audio": {
+      "muteShort": "Néma",
       "aiVoiceLabel": "AI-hang",
       "voiceoverLabel": "Voiceover",
       "downloadFailed": "A hang letöltése nem sikerült.",

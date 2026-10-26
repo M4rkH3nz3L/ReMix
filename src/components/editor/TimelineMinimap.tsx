@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { GestureResponderEvent, StyleSheet, Text, View } from 'react-native';
+import { GestureResponderEvent, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { palette, trackColors } from '@/constants/editor';
 import { projectDuration } from '@/lib/projectUtils';
@@ -18,11 +18,23 @@ import { useEditorStore } from '@/store/editorStore';
  * lejátszófejet — így az egész idővonal „végignézhető"; a középre rögzített
  * playhead miatt a meglévő auto-scroll effekt igazítja a nagy idővonalat.
  */
-export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: number }) {
+export function TimelineMinimap({
+  viewportW,
+  pps,
+  showSelection = false,
+  style,
+}: {
+  viewportW: number;
+  pps: number;
+  /** a kijelölt klip kiemelése (bármelyik sávon) — a mini-idővonal „mit szerkesztek?" jelzése */
+  showSelection?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
+  const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const [mapW, setMapW] = useState(0);
 
   if (!project) {
@@ -36,6 +48,10 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
   const videoClips = project.tracks.find((tk) => tk.type === 'video')?.clips ?? [];
   const markers = project.markers ?? [];
   const hasContent = videoClips.length > 0 || markers.length > 0;
+  const selectedClip =
+    showSelection && selectedClipId
+      ? project.tracks.flatMap((tk) => tk.clips).find((c) => c.id === selectedClipId)
+      : undefined;
 
   // viewport (a látható ablak) — a playheadre centrálva (középre rögzített fej)
   const windowSec = viewportW / pps;
@@ -61,7 +77,7 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
 
   return (
     <View
-      style={styles.strip}
+      style={[styles.strip, style]}
       onLayout={(e) => setMapW(e.nativeEvent.layout.width)}
       onStartShouldSetResponder={() => true}
       onResponderGrant={beginScrub}
@@ -90,6 +106,16 @@ export function TimelineMinimap({ viewportW, pps }: { viewportW: number; pps: nu
               }}
             />
           ))}
+          {/* a kijelölt klip kerete (mini-idővonal) */}
+          {selectedClip ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.selection,
+                { left: selectedClip.start * secToX, width: Math.max(3, selectedClip.duration * secToX) },
+              ]}
+            />
+          ) : null}
           {/* markerek */}
           {markers.map((m) => (
             <View
@@ -128,6 +154,14 @@ const styles = StyleSheet.create({
     borderColor: palette.accent,
     borderRadius: 4,
     backgroundColor: '#7c5cff22',
+  },
+  selection: {
+    position: 'absolute',
+    top: 1,
+    bottom: 1,
+    borderWidth: 2,
+    borderColor: palette.accent,
+    borderRadius: 3,
   },
   playhead: {
     position: 'absolute',

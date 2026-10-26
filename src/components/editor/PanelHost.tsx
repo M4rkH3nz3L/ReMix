@@ -4,6 +4,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 
+import { FocusChrome } from '@/components/editor/FocusChrome';
+import {
+  FilterQuick,
+  SpeedQuick,
+  TransitionQuick,
+  VolumeQuick,
+} from '@/components/editor/panels/QuickPanels';
+import { InlineSheet } from '@/components/ui/InlineSheet';
+
 import { AdjustPanel } from '@/components/editor/panels/AdjustPanel';
 import { AssistantPanel } from '@/components/editor/panels/AssistantPanel';
 import { PipPanel } from '@/components/editor/panels/PipPanel';
@@ -27,9 +36,11 @@ import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
 import { motion, radius } from '@/design';
 import { useLayout } from '@/hooks/useLayout';
+import type { Detent } from '@/lib/panelLayout';
 import {
   selectPanelVisible,
   selectSelectedClip,
+  selectSurfaceTier,
   useEditorStore,
 } from '@/store/editorStore';
 
@@ -37,16 +48,33 @@ import {
 // t('editor.panelHost.title_' + activePanel)
 
 /**
- * Az aktív szerkesztő-panel.
+ * Az aktív szerkesztő-panel — a felület-SZINT szerint (MOBILE-UI §3, regiszter:
+ * `@/lib/panelSpecs`):
  *
- *  • `sheet`  (telefon/tablet-álló): alulról feljövő lap az idővonal helyén.
- *  • `docked` (iPad fekvő/desktop): teljes magasságú inspector-oszlop JOBB
- *    oldalon — így a panel ÉS az idővonal egyszerre látszik, nem váltják ki
- *    egymást. Ez a klasszikus vágó-elrendezés (előnézet + inspector + idővonal).
+ *  • `strip`  — gyors beállítás az eszköztár HELYÉN (chip-sor + finomhangoló);
+ *               a „Részletek" ugyanazt a panelt sheet-szintre bontja.
+ *  • `sheet`  — NEM-modális, detentes inline lap (peek/half/full): a fölötte lévő
+ *               előnézet újraméreteződik, nem takarja semmi. A detenteket a
+ *               képernyő adja (`layoutBudget`), így a vászon-garancia egy helyen dől el.
+ *  • `focus`  — precíziós mód: a króm a vászon FÖLÉ úszik (a képernyő ilyenkor
+ *               mindent elrejt a vásznon kívül).
+ *  • `docked` (variant; iPad fekvő/desktop): teljes magasságú inspector-oszlop
+ *               JOBB oldalon — ott elég a hely, ezért mindig a teljes panel él.
  */
-export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' }) {
+export function PanelHost({
+  variant = 'sheet',
+  detents,
+}: {
+  variant?: 'sheet' | 'docked';
+  /** a Sheet detentjei px-ben (a képernyő `layoutBudget`-jéből); nélküle a régi fix lap */
+  detents?: Record<Detent, number>;
+}) {
   const activePanel = useEditorStore((s) => s.activePanel);
   const visible = useEditorStore(selectPanelVisible);
+  const tier = useEditorStore(selectSurfaceTier);
+  const panelDetent = useEditorStore((s) => s.panelDetent);
+  const setPanelDetent = useEditorStore((s) => s.setPanelDetent);
+  const expandPanel = useEditorStore((s) => s.expandPanel);
   const setPanel = useEditorStore((s) => s.setPanel);
   const selected = useEditorStore(selectSelectedClip);
   const L = useLayout();
@@ -130,11 +158,110 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
   }
 
   const docked = variant === 'docked';
-  // Telefon-állóban a panel ELFEDI az idővonalat → explicit „vissza a timeline-hoz"
-  // affordancia (a bezárás megtartja a kijelölést — `setPanel(null)` nem törli). §2.4
-  const backToTimeline = !docked && L.isCompact;
-  // lapként: állóban a képernyő ~38%-a (az előnézet kiférjen), fekvőben több.
-  // dokkoltan a magasságot a szülő oszlop adja (flex), nincs korlát.
+  const title = t('editor.panelHost.title_' + activePanel);
+  const close = () => setPanel(null);
+
+  // ⚡ STRIP — a gyors változat (ha a panelnek van; különben a teljes tartalom sheet-ben)
+  if (!docked && tier === 'strip') {
+    let quick = null;
+    if (activePanel === 'speed' && selected?.kind === 'video') {
+      quick = <SpeedQuick clip={selected} />;
+    } else if (activePanel === 'filter' && (selected?.kind === 'video' || selected?.kind === 'image')) {
+      quick = <FilterQuick clip={selected} />;
+    } else if (activePanel === 'transition' && (selected?.kind === 'video' || selected?.kind === 'image')) {
+      quick = <TransitionQuick clip={selected} />;
+    } else if (activePanel === 'audio' && selected?.kind === 'audio') {
+      quick = <VolumeQuick clip={selected} />;
+    }
+    if (quick) {
+      return (
+        <Animated.View
+          entering={SlideInDown.duration(motion.duration.base).easing(motion.easing.standard)}
+          style={[styles.strip, { paddingHorizontal: L.spacing.md }]}
+        >
+          <View style={styles.stripHead}>
+            <Text style={[styles.title, { fontSize: L.font(13) }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Pressable
+              onPress={expandPanel}
+              hitSlop={8}
+              style={styles.detailsButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('editor.panelHost.details')}
+            >
+              <Ionicons name="options-outline" size={14} color={palette.accent} />
+              <Text style={styles.detailsText}>{t('editor.panelHost.details')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={close}
+              hitSlop={10}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('editor.panelHost.closePanel')}
+            >
+              <Ionicons name="checkmark" size={20} color={palette.text} />
+            </Pressable>
+          </View>
+          <Animated.View key={activePanel} entering={FadeIn.duration(motion.duration.fast)}>
+            {quick}
+          </Animated.View>
+        </Animated.View>
+      );
+    }
+  }
+
+  // 🎯 FOCUS — a vászon fölé úszó króm (a képernyő minden mást elrejt)
+  if (!docked && tier === 'focus') {
+    return (
+      <FocusChrome title={title} onDone={close}>
+        {content}
+      </FocusChrome>
+    );
+  }
+
+  // 📄 SHEET — inline, detentes lap (ha a képernyő detenteket ad)
+  if (!docked && detents) {
+    return (
+      <InlineSheet
+        detents={detents}
+        detent={panelDetent}
+        onDetentChange={setPanelDetent}
+        onClose={close}
+        accessibilityLabel={title}
+        header={
+          <View style={[styles.header, { paddingHorizontal: L.spacing.lg }]}>
+            <Text style={[styles.title, { fontSize: L.font(13) }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Pressable
+              onPress={close}
+              hitSlop={12}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('editor.panelHost.closePanel')}
+            >
+              <Ionicons name="close" size={20} color={palette.textDim} />
+            </Pressable>
+          </View>
+        }
+      >
+        <ScrollView
+          style={{ paddingHorizontal: L.spacing.lg }}
+          contentContainerStyle={{ paddingBottom: L.spacing.lg }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View key={activePanel} entering={FadeIn.duration(motion.duration.fast)}>
+            {content}
+          </Animated.View>
+        </ScrollView>
+      </InlineSheet>
+    );
+  }
+
+  // (tartalék) fix lap — detentek nélküli hívónál; a telefonos képernyők a fenti
+  // inline Sheet-et kapják. Dokkoltan a szülő oszlop adja a magasságot.
+  // A bezárás megtartja a kijelölést — `setPanel(null)` nem törli. §2.4
   const sheetMaxHeight = L.isLandscape
     ? Math.round(L.height * 0.62)
     : Math.min(L.isCompact ? 320 : 420, Math.round(L.height * 0.38));
@@ -157,34 +284,15 @@ export function PanelHost({ variant = 'sheet' }: { variant?: 'sheet' | 'docked' 
     >
       {docked ? null : <View style={styles.grabber} />}
       <View style={[styles.header, { paddingHorizontal: L.spacing.lg }]}>
-        <Text style={[styles.title, { fontSize: L.font(13) }]}>
-          {t('editor.panelHost.title_' + activePanel)}
-        </Text>
+        <Text style={[styles.title, { fontSize: L.font(13) }]}>{title}</Text>
         <Pressable
-          onPress={() => setPanel(null)}
+          onPress={close}
           hitSlop={12}
-          style={backToTimeline ? styles.backButton : styles.closeButton}
+          style={styles.closeButton}
           accessibilityRole="button"
-          accessibilityLabel={
-            backToTimeline
-              ? t('editor.panelHost.backToTimeline')
-              : t('editor.panelHost.closePanel')
-          }
+          accessibilityLabel={t('editor.panelHost.closePanel')}
         >
-          {backToTimeline ? (
-            <>
-              <Ionicons name="chevron-down" size={16} color={palette.accent} />
-              <Text style={styles.backButtonText}>
-                {t('editor.panelHost.backToTimeline')}
-              </Text>
-            </>
-          ) : (
-            <Ionicons
-              name={docked ? 'close' : 'chevron-down'}
-              size={20}
-              color={palette.textDim}
-            />
-          )}
+          <Ionicons name={docked ? 'close' : 'chevron-down'} size={20} color={palette.textDim} />
         </Pressable>
       </View>
       <ScrollView
@@ -220,25 +328,40 @@ const styles = StyleSheet.create({
     borderRightWidth: 0,
     borderLeftWidth: 1,
   },
+  // ⚡ Strip: az eszköztár helyén, felső hairline-nal, lekerekítés nélkül
+  strip: {
+    backgroundColor: palette.surface,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  stripHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 30,
+    paddingHorizontal: 10,
+    marginLeft: 'auto',
+    borderRadius: 8,
+    backgroundColor: palette.accentSoft,
+  },
+  detailsText: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   closeButton: {
     width: 32,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: palette.accentSoft,
-  },
-  backButtonText: {
-    color: palette.accent,
-    fontSize: 12,
-    fontWeight: '700',
   },
   grabber: {
     alignSelf: 'center',

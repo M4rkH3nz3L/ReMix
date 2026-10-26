@@ -58,6 +58,13 @@ export interface LayoutBudgetInput {
   hasToolbar?: boolean;
   /** az idővonal sáv-magasság szorzója (`EditorMetrics.trackScale`) */
   trackScale?: number;
+  /** a teljes idővonal MÉRT magassága (onLayout) — ha van, ez felülírja a becslést */
+  timelineFullHeight?: number;
+  /** a transport-sáv MÉRT magassága */
+  transportHeight?: number;
+  /** nagy kijelzőn (iPad-álló) a Sheet nem húzza mini-sorrá az idővonalat —
+   *  csak ha a vászon-garancia másképp nem teljesülne */
+  keepTimeline?: boolean;
 }
 
 export interface LayoutBudget {
@@ -94,12 +101,12 @@ export function minPreviewFor(bodyHeight: number, keyboardOpen = false): number 
  */
 export function sheetDetents(
   bodyHeight: number,
-  opts: Pick<LayoutBudgetInput, 'hasTimeline' | 'hasTransport' | 'keyboardHeight'> = {}
+  opts: Pick<LayoutBudgetInput, 'hasTimeline' | 'hasTransport' | 'keyboardHeight' | 'transportHeight'> = {}
 ): Record<Detent, number> {
   const m = PANEL_METRICS;
   const kb = opts.keyboardHeight ?? 0;
   const body = Math.max(0, bodyHeight - kb);
-  const transport = opts.hasTransport === false ? 0 : m.transport;
+  const transport = opts.hasTransport === false ? 0 : (opts.transportHeight ?? m.transport);
   const mini = opts.hasTimeline === false ? 0 : m.timelineMini;
   const full = round(body - transport - mini - minPreviewFor(bodyHeight, kb > 0));
   let half = round(Math.min(bodyHeight * m.halfFrac, full));
@@ -120,7 +127,12 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
   const hasTimeline = input.hasTimeline !== false;
   const hasTransport = input.hasTransport !== false;
   const hasToolbar = input.hasToolbar !== false;
-  const detents = sheetDetents(body, { hasTimeline, hasTransport, keyboardHeight: kb });
+  const detents = sheetDetents(body, {
+    hasTimeline,
+    hasTransport,
+    keyboardHeight: kb,
+    transportHeight: input.transportHeight,
+  });
   const minPreview = minPreviewFor(body, kb > 0);
 
   if (input.tier === 'focus') {
@@ -137,9 +149,12 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     };
   }
 
-  const transportHeight = hasTransport ? m.transport : 0;
+  const transportHeight = hasTransport ? round(input.transportHeight ?? m.transport) : 0;
   const fullTimeline = hasTimeline
-    ? round(Math.min(m.timelineMax, body * m.timelineFrac) * (input.trackScale ?? 1))
+    ? round(
+        input.timelineFullHeight ??
+          Math.min(m.timelineMax, body * m.timelineFrac) * (input.trackScale ?? 1)
+      )
     : 0;
 
   let panelHeight = 0;
@@ -155,7 +170,7 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     const detent = input.detent ?? 'peek';
     panelHeight = detents[detent];
     toolbarVisible = false;
-    if (hasTimeline && (detent !== 'peek' || kb > 0)) {
+    if (hasTimeline && !input.keepTimeline && (detent !== 'peek' || kb > 0)) {
       timelineMode = 'mini';
     }
   }

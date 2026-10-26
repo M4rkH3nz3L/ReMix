@@ -806,6 +806,9 @@
       "effectsNote": "Hier siehst du Effekte, die die Live-Vorschau nicht zeigen kann: Partikel, Bewegungsunschärfe, Himmelaustausch, 3D-Sticker und -Text, Gesichtsunschärfe, Übergänge."
     },
     "panelHost": {
+      "showTimeline": "Volle Zeitleiste",
+      "details": "Details",
+      "focusParams": "Parameter",
       "title_text": "Text",
       "title_filter": "Filter",
       "title_speed": "Tempo & Lautstärke",
@@ -881,6 +884,7 @@
       "discard": "Verwerfen"
     },
     "toolbar": {
+      "more": "Mehr",
       "newTextDefault": "Neuer Text",
       "cannotSplitTitle": "Hier nicht trennbar",
       "cannotSplitMessage": "Der Abspielkopf ist nicht innerhalb des Clips.",
@@ -1080,6 +1084,7 @@
     }
   },
   "editorScreen": {
+    "menuAspect": "Seitenverhältnis: {{aspect}}",
     "remixedFrom": "Remix von {{name}}",
     "projectNotFound": "Projekt nicht gefunden.",
     "relinking": "Neu verknüpfen…",
@@ -1467,6 +1472,7 @@
       }
     },
     "audio": {
+      "muteShort": "Stumm",
       "aiVoiceLabel": "KI-Stimme",
       "voiceoverLabel": "Voiceover",
       "downloadFailed": "Audio konnte nicht heruntergeladen werden.",

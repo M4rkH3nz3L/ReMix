@@ -806,6 +806,9 @@
       "effectsNote": "Here you can see effects the live preview can't show: particles, motion blur, sky replacement, 3D stickers and text, face blur, transitions."
     },
     "panelHost": {
+      "showTimeline": "Full timeline",
+      "details": "Details",
+      "focusParams": "Parameters",
       "title_text": "Text",
       "title_filter": "Filters",
       "title_speed": "Speed & volume",
@@ -881,6 +884,7 @@
       "discard": "Discard"
     },
     "toolbar": {
+      "more": "More",
       "newTextDefault": "New text",
       "cannotSplitTitle": "Can't split here",
       "cannotSplitMessage": "The playhead isn't inside the clip.",
@@ -1080,6 +1084,7 @@
     }
   },
   "editorScreen": {
+    "menuAspect": "Aspect ratio: {{aspect}}",
     "remixedFrom": "Remixed from {{name}}",
     "projectNotFound": "Project not found.",
     "relinking": "Relinking…",
@@ -1467,6 +1472,7 @@
       }
     },
     "audio": {
+      "muteShort": "Mute",
       "aiVoiceLabel": "AI voice",
       "voiceoverLabel": "Voiceover",
       "downloadFailed": "Failed to download the audio.",

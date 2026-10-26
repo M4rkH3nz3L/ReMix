@@ -7,6 +7,7 @@
  * `proxyQuality` szándékosan NEM session-reset: projektváltáskor is megmarad.)
  */
 import { MAX_ZOOM, MIN_ZOOM } from '@/constants/editor';
+import { videoPanelSpec } from '@/lib/panelSpecs';
 import { setProxyConfig } from '@/lib/proxy';
 import { findClip } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
@@ -25,6 +26,9 @@ type ViewSlice = Pick<
   EditorState,
   | 'zoom'
   | 'activePanel'
+  | 'panelDetent'
+  | 'panelExpanded'
+  | 'panelDetentMemory'
   | 'trimMode'
   | 'rippleMode'
   | 'razorMode'
@@ -72,6 +76,8 @@ type ViewSlice = Pick<
   | 'setRotoMask'
   | 'setZoom'
   | 'setPanel'
+  | 'setPanelDetent'
+  | 'expandPanel'
   | 'toggleTrackFlag'
   | 'cycleTrackHeight'
   | 'isTrackVisible'
@@ -86,6 +92,9 @@ type ViewSlice = Pick<
 export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
   zoom: 1,
   activePanel: null,
+  panelDetent: 'peek',
+  panelExpanded: false,
+  panelDetentMemory: {},
   imageStudioClipId: null,
   audioStudioClipId: null,
   // 🎯 teljesítmény: NEM session-reset, hogy projektváltáskor is megmaradjon
@@ -210,7 +219,40 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
 
   setZoom: (zoom) => set({ zoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM) }),
 
-  setPanel: (panel) => set({ activePanel: panel }),
+  // 📐 panel-nyitáskor a detent a felhasználó utolsó választása (ha volt), különben a
+  // regiszter kezdő detentje; a Strip-panelek összecsukva (strip-szinten) nyílnak.
+  // (A Focus-szint NEM tárolt flag: a `selectSurfaceTier` a regiszterből számolja,
+  // így nem ragadhat be, ha egy másik slice nullázza az activePanel-t.)
+  setPanel: (panel) =>
+    set((s) => {
+      if (!panel) {
+        return { activePanel: null, panelExpanded: false };
+      }
+      const spec = videoPanelSpec(panel);
+      return {
+        activePanel: panel,
+        panelExpanded: false,
+        panelDetent: s.panelDetentMemory[panel] ?? spec?.initialDetent ?? 'peek',
+      };
+    }),
+  setPanelDetent: (detent) =>
+    set((s) => ({
+      panelDetent: detent,
+      panelDetentMemory: s.activePanel
+        ? { ...s.panelDetentMemory, [s.activePanel]: detent }
+        : s.panelDetentMemory,
+    })),
+  expandPanel: () =>
+    set((s) => {
+      if (!s.activePanel) {
+        return {};
+      }
+      const spec = videoPanelSpec(s.activePanel);
+      return {
+        panelExpanded: true,
+        panelDetent: s.panelDetentMemory[s.activePanel] ?? spec?.initialDetent ?? 'half',
+      };
+    }),
 
   openImageStudio: (clipId) => set({ imageStudioClipId: clipId }),
   closeImageStudio: () => set({ imageStudioClipId: null }),

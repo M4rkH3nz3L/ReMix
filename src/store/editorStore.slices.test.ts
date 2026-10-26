@@ -76,7 +76,7 @@ const METHOD_KEYS = [
   'setComparingOriginal', 'setCompareSplit', 'setInsightLane', 'setMaskEdit', 'setRotoMask',
   'setZoom', 'setPanel', 'toggleTrackFlag', 'cycleTrackHeight', 'isTrackVisible',
   'toggleAutoTrackHeight', 'isTrackAudible', 'openImageStudio', 'closeImageStudio',
-  'openAudioStudio', 'closeAudioStudio',
+  'openAudioStudio', 'closeAudioStudio', 'setPanelDetent', 'expandPanel',
 ] as const;
 
 const STATE_KEYS = [
@@ -89,6 +89,7 @@ const STATE_KEYS = [
   'videoVoiceActive', 'playhead', 'isPlaying', 'loop', 'beatTimes', 'downbeatTimes', 'variantPreview',
   'pickTarget', 'zoom', 'activePanel', 'past', 'future', 'pastLabels', 'futureLabels', 'dirty', 'events',
   'proxyEnabled', 'proxyQuality', 'imageStudioClipId', 'audioStudioClipId',
+  'panelDetent', 'panelExpanded', 'panelDetentMemory',
 ] as const;
 
 describe('publikus szerződés (slice-drift pajzs)', () => {

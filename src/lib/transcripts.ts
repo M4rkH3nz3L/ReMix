@@ -1,7 +1,11 @@
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
+import { transcriptionRoute } from '@/lib/aiRouting';
+import { modelRtf } from '@/lib/modelRegistryClient';
 import { transcribeToSrt } from '@/lib/render';
+import { bestUsableWhisperModelId, transcribeMediaOnDevice } from '@/lib/whisperClient';
+import { useEntitlement } from '@/store/entitlementStore';
 import type { ProgressUpdate } from '@/lib/progress';
 import { mapCuesToTimeline, parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
@@ -20,15 +24,43 @@ import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
  * szó-szintű cue-k (text-based editing) egyelőre worker-útasak.
  */
 
-/** egy fájl átirata: előbb on-device Whisper, aztán worker (`transcribeToSrt`) */
-async function transcribeUriPreferLocal(uri: string): Promise<SrtCue[]> {
-  // lusta import: a whisper-kliens csak akkor töltődik, ha tényleg átírunk
-  const { transcribeMediaOnDevice } = await import('@/lib/whisperClient');
-  const local = await transcribeMediaOnDevice(uri).catch(() => null);
-  if (local && local.lines.length > 0) {
-    return local.lines.map((l) => ({ start: l.start, end: l.end, text: l.text }));
+/**
+ * Egy fájl átirata a 06.1 routing szerint: `device-first` (on-device Whisper,
+ * worker-tartalékkal) vagy `server-first` (worker, eszköz-tartalékkal). A döntés
+ * a tier, az anyag hossza és a BP-9 sebesség-mérés (rtf) alapján születik — a
+ * másik út mindig tartalék, így worker vagy modell hiánya sem állítja meg.
+ */
+async function transcribeUriRouted(uri: string, durationSec: number): Promise<SrtCue[]> {
+  const modelId = bestUsableWhisperModelId();
+  const route = transcriptionRoute({
+    durationSec,
+    tier: useEntitlement.getState().effectiveTier(),
+    deviceModel: modelId != null,
+    rtf: modelId ? modelRtf(modelId) : undefined,
+  });
+  const viaDevice = async (): Promise<SrtCue[] | null> => {
+    if (!modelId) {
+      return null;
+    }
+    const local = await transcribeMediaOnDevice(uri, { modelId }).catch(() => null);
+    return local && local.lines.length > 0
+      ? local.lines.map((l) => ({ start: l.start, end: l.end, text: l.text }))
+      : null;
+  };
+  const viaServer = async (): Promise<SrtCue[]> => parseSrt(await transcribeToSrt(uri));
+  if (route === 'server-first') {
+    try {
+      return await viaServer();
+    } catch (e) {
+      const local = await viaDevice();
+      if (local) {
+        return local;
+      }
+      throw e;
+    }
   }
-  return parseSrt(await transcribeToSrt(uri));
+  const local = await viaDevice();
+  return local ?? viaServer();
 }
 
 /** e fölött nem indítunk automatikus átirat-készítést (mp, összes videó) */
@@ -137,7 +169,12 @@ export async function getTimelineTranscript(
       unit: tr('lib.transcripts.videoUnit'),
     });
     try {
-      const cues = await transcribeUriPreferLocal(uri);
+      // a forrás-hossz a routinghoz (a fájlra hivatkozó klipek legnagyobb forrás-ablaka)
+      const durationSec = Math.max(
+        0,
+        ...videoClips.filter((c) => c.uri === uri).map((c) => c.sourceDuration ?? c.duration)
+      );
+      const cues = await transcribeUriRouted(uri, durationSec);
       cueCache.set(uri, cues);
       cuesByUri.set(uri, cues);
     } catch {

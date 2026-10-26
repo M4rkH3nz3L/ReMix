@@ -444,6 +444,7 @@
     "modelStatus_engine_missing": "neuer Dev-Build nötig",
     "modelStatus_gated": "stärkeres Gerät nötig",
     "modelStatus_planned": "bald verfügbar",
+    "modelRtf": "{{rtf}}× Echtzeit",
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "Prüfung nötig",
     "catalog_remix-assistant": "Alle KI-Aufgaben (läuft in der Cloud, mit Kontingent)",

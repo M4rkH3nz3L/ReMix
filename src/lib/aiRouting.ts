@@ -87,3 +87,55 @@ export function routeAiTask(input: RouteInput): RouteDecision {
     ? { target: 'hybrid', reason: 'medium_paid_hybrid' }
     : { target: 'device', reason: 'medium_free_device' };
 }
+
+// ── 🎙️ átirat-útvonal (06.1 + BP-9): eszköz-első vagy worker-első ─────────────
+
+/** e fölött az eszközön számolt átirat-idő már túl hosszú (inkább a worker) */
+export const MAX_DEVICE_TRANSCRIBE_SEC = 10 * 60;
+
+export interface TranscriptionRouteInput {
+  /** az átírandó anyag hossza (mp) */
+  durationSec: number;
+  tier?: string;
+  network?: NetworkState;
+  /** van-e használható (letöltött + próbázott) eszköz-modell */
+  deviceModel: boolean;
+  /** a mért valós-idő-arány (BP-9 benchmark: feldolgozási idő / hanghossz); hiányzó = ismeretlen */
+  rtf?: number;
+}
+
+/** az anyag-hossz → méret-osztály a routinghoz */
+export function sizeForDuration(durationSec: number): SizeHint {
+  if (durationSec <= 60) {
+    return 'small';
+  }
+  return durationSec <= 10 * 60 ? 'medium' : 'large';
+}
+
+/**
+ * Az átirat sorrendje: `device-first` (eszköz, aztán worker tartalékként) vagy
+ * `server-first` (worker, aztán eszköz). A `routeAiTask` döntésére épül, plusz a
+ * BP-9 mérés: ha a becsült eszköz-idő (rtf × hossz) túl hosszú, és van hálózat,
+ * a worker megy elsőnek. Offline mindig az eszköz (ha van modell). Tiszta.
+ */
+export function transcriptionRoute(input: TranscriptionRouteInput): 'device-first' | 'server-first' {
+  const network = input.network ?? 'online';
+  if (!input.deviceModel) {
+    return 'server-first';
+  }
+  if (network === 'offline') {
+    return 'device-first';
+  }
+  if (typeof input.rtf === 'number' && input.rtf > 0 && input.rtf * input.durationSec > MAX_DEVICE_TRANSCRIBE_SEC) {
+    return 'server-first';
+  }
+  const decision = routeAiTask({
+    modality: 'transcribe',
+    size: sizeForDuration(input.durationSec),
+    network,
+    tier: input.tier,
+    device: { modalities: ['transcribe'] },
+  });
+  // a hibrid is eszköz-elő-passzal indul (a kvóta-spórolás miatt)
+  return decision.target === 'server' ? 'server-first' : 'device-first';
+}

@@ -5,11 +5,12 @@ import {
   catalogRuntime,
   markModelUsed,
   modelFileUri,
+  recordModelRtf,
   setModelSmokeResult,
 } from '@/lib/modelRegistryClient';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import type { TranscriptLine } from '@/lib/transcripts';
-import { bytesToBase64, floatPcmToBytes, makeTestTone } from '@/lib/wav';
+import { bytesToBase64, floatPcmToBytes, makeTestTone, WHISPER_SAMPLE_RATE } from '@/lib/wav';
 
 /**
  * 🎙️ On-device Whisper kliens (local-ai Fázis A) — a whisper.rn natív motor
@@ -168,12 +169,18 @@ export async function transcribeMediaOnDevice(
     return null;
   }
   try {
+    const started = Date.now();
     const { promise } = ctx.transcribeData(bytesToBase64(floatPcmToBytes(pcm)), {
       language: opts.language,
     });
     const result = await promise;
     if (result.isAborted) {
       return null;
+    }
+    // 📏 BP-9: a valódi átirat is pontosítja az eszköz-sebességet (≥ 3 mp hangnál)
+    const audioSec = pcm.length / WHISPER_SAMPLE_RATE;
+    if (audioSec >= 3) {
+      recordModelRtf(modelId, (Date.now() - started) / 1000 / audioSec);
     }
     const lines = toLines(result);
     return {
@@ -202,11 +209,18 @@ export async function runWhisperSmokeTest(modelId: string): Promise<boolean> {
     return false;
   }
   try {
-    const pcm = bytesToBase64(floatPcmToBytes(makeTestTone(1)));
+    // 5 mp-es minta: az 1 mp-esen a fix betöltési költség eltorzítaná a sebesség-mérést
+    const SAMPLE_SEC = 5;
+    const pcm = bytesToBase64(floatPcmToBytes(makeTestTone(SAMPLE_SEC)));
+    const started = Date.now();
     const { promise } = ctx.transcribeData(pcm, {});
     const result = await promise;
     const ok = Array.isArray(result.segments);
     setModelSmokeResult(modelId, ok ? 'pass' : 'fail');
+    if (ok) {
+      // 📏 BP-9 mikro-benchmark: valós-idő-arány (a routing ebből dönt)
+      recordModelRtf(modelId, (Date.now() - started) / 1000 / SAMPLE_SEC);
+    }
     return ok;
   } catch {
     setModelSmokeResult(modelId, 'fail');

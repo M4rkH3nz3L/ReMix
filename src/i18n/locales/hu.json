@@ -444,6 +444,7 @@
     "modelStatus_engine_missing": "új dev-build kell",
     "modelStatus_gated": "erősebb eszköz kell",
     "modelStatus_planned": "hamarosan",
+    "modelRtf": "{{rtf}}× valós idő",
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "vizsga szükséges",
     "catalog_remix-assistant": "Minden AI-feladat (felhőben fut, kvótával)",

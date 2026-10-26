@@ -1,5 +1,5 @@
 import { toEditorCommands, validateAiCommand } from '@/lib/aiCommands';
-import { parseLocalIntent, type LocalIntentContext } from '@/lib/localIntent';
+import { isSilenceCutIntent, parseLocalIntent, type LocalIntentContext } from '@/lib/localIntent';
 import type { Project, Track, VideoClip } from '@/types/project';
 
 /**
@@ -130,5 +130,27 @@ describe('parseLocalIntent — határok', () => {
     const a = parseLocalIntent('vágd ketté 4 mp-nél', ctx());
     const b = parseLocalIntent('vágd ketté 4 mp-nél', ctx());
     expect(a).toEqual(b);
+  });
+});
+
+describe('isSilenceCutIntent', () => {
+  it('a csend-vágás kérései felismerve (HU + EN)', () => {
+    for (const s of [
+      'vágd ki a csendeket',
+      'Vágd ki a csendes részeket a videóból',
+      'csendek ki',
+      'töröld a holtidőt',
+      'szedd ki a szüneteket',
+      'remove silence',
+      'cut the dead air',
+    ]) {
+      expect(isSilenceCutIntent(s)).toBe(true);
+    }
+  });
+
+  it('más kérés nem téveszthető össze vele', () => {
+    for (const s of ['vágd ketté 4 másodpercnél', 'írd ki: „csendes este”', 'csendes zenét szeretnék', '']) {
+      expect(isSilenceCutIntent(s)).toBe(false);
+    }
   });
 });

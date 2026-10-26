@@ -10,6 +10,7 @@ import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { aspectValue, palette } from '@/constants/editor';
 import { uploadFetch } from '@/lib/upload';
 import { askAssistant } from '@/lib/ai';
+import { isSilenceCutIntent } from '@/lib/localIntent';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { AiCharacterPicker } from '@/components/editor/AiCharacterPicker';
 import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
@@ -186,6 +187,12 @@ export function AssistantPanel() {
   const send = async (text: string) => {
     const state = useEditorStore.getState();
     if (!state.project || status) {
+      return;
+    }
+    // 🔇 „vágd ki a csendeket" → a csend-vágás (eszközön, ingyen; jóváhagyással,
+    // egy undo-lépésben) — nem a modellnek megy, hanem a determinisztikus útra
+    if (isSilenceCutIntent(text)) {
+      await cutDeadAir();
       return;
     }
     setStatus(t('panels.assistant.thinking'));

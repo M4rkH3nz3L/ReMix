@@ -86,3 +86,35 @@ describe('routeAiTask — determinizmus + alapértékek', () => {
     expect(routeAiTask({ modality: 'embed' }).target).toBe('server');
   });
 });
+
+describe('transcriptionRoute (06.1 + BP-9)', () => {
+  const { transcriptionRoute, sizeForDuration } = jest.requireActual('@/lib/aiRouting');
+
+  it('nincs eszköz-modell → worker-első; offline + modell → eszköz-első', () => {
+    expect(transcriptionRoute({ durationSec: 30, deviceModel: false })).toBe('server-first');
+    expect(transcriptionRoute({ durationSec: 3600, deviceModel: true, network: 'offline', tier: 'pro' })).toBe('device-first');
+  });
+
+  it('ingyenes user: rövid és hosszú anyagnál is eszköz-első (kvóta-spórolás)', () => {
+    expect(transcriptionRoute({ durationSec: 30, deviceModel: true, tier: 'free' })).toBe('device-first');
+    expect(transcriptionRoute({ durationSec: 1800, deviceModel: true, tier: 'free' })).toBe('device-first');
+  });
+
+  it('fizetős user + hosszú anyag → worker-első (minőség); rövid → eszköz', () => {
+    expect(transcriptionRoute({ durationSec: 1800, deviceModel: true, tier: 'pro' })).toBe('server-first');
+    expect(transcriptionRoute({ durationSec: 30, deviceModel: true, tier: 'pro' })).toBe('device-first');
+  });
+
+  it('BP-9: ha a mért sebességgel túl sokáig tartana az eszközön → worker-első', () => {
+    // 5 perc anyag, 3× lassabb a valós időnél → 15 perc > 10 perc plafon
+    expect(transcriptionRoute({ durationSec: 300, deviceModel: true, tier: 'free', rtf: 3 })).toBe('server-first');
+    // gyors eszköz (0,3×) → marad az eszköz
+    expect(transcriptionRoute({ durationSec: 300, deviceModel: true, tier: 'free', rtf: 0.3 })).toBe('device-first');
+  });
+
+  it('méret-osztályok', () => {
+    expect(sizeForDuration(60)).toBe('small');
+    expect(sizeForDuration(600)).toBe('medium');
+    expect(sizeForDuration(601)).toBe('large');
+  });
+});

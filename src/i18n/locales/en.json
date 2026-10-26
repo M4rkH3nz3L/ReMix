@@ -444,6 +444,7 @@
     "modelStatus_engine_missing": "needs a new dev build",
     "modelStatus_gated": "needs a stronger device",
     "modelStatus_planned": "coming soon",
+    "modelRtf": "{{rtf}}× real time",
     "examBadge": "🧪 {{passed}}/{{total}}",
     "examNeeded": "exam required",
     "catalog_remix-assistant": "All AI tasks (runs in the cloud, metered)",

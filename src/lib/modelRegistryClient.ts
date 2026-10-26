@@ -31,6 +31,8 @@ export const MODEL_CACHE_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 export interface CachedModelRecord extends CachedModel {
   file: string;
   smoke?: 'pass' | 'fail';
+  /** 📏 BP-9: mért valós-idő-arány (feldolgozási idő / hanghossz) — mozgóátlag */
+  rtf?: number;
 }
 
 export type DownloadResult =
@@ -202,6 +204,32 @@ export function setModelSmokeResult(id: string, result: 'pass' | 'fail'): void {
     return;
   }
   writeIndex(readIndex().map((r) => (r.id === id ? { ...r, smoke: result } : r)));
+}
+
+/**
+ * 📏 BP-9: a mért valós-idő-arány rögzítése (mozgóátlag: a régi 70%, az új 30%) —
+ * a próba és minden valódi átirat frissíti, így a routing az eszköz TÉNYLEGES
+ * sebességéből dönt.
+ */
+export function recordModelRtf(id: string, rtf: number): void {
+  if (Platform.OS === 'web' || !Number.isFinite(rtf) || rtf <= 0) {
+    return;
+  }
+  writeIndex(
+    readIndex().map((r) =>
+      r.id === id
+        ? { ...r, rtf: typeof r.rtf === 'number' ? Math.round((r.rtf * 0.7 + rtf * 0.3) * 1000) / 1000 : rtf }
+        : r
+    )
+  );
+}
+
+/** A modell mért valós-idő-aránya (nincs mérés → undefined). */
+export function modelRtf(id: string): number | undefined {
+  if (Platform.OS === 'web') {
+    return undefined;
+  }
+  return readIndex().find((r) => r.id === id)?.rtf;
 }
 
 /** Használat-jelzés az LRU-hoz (betöltéskor hívandó). */

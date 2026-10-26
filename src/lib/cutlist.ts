@@ -6,6 +6,7 @@ import { rangeList, timeList } from '@/lib/parseGuards';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 
+import { detectSilenceOnDevice } from '@/lib/audioDecode';
 import type { SilenceRange } from '@/lib/cutplan';
 
 /**
@@ -46,6 +47,14 @@ export async function detectSilence(uri: string): Promise<SilenceRange[] | null>
   const cached = memory.get(uri);
   if (cached) {
     return cached;
+  }
+  // 🔇 LOCAL-FIRST: az eszközön (ingyen, offline, worker nélkül) — ugyanaz a
+  // forrás-idejű formátum, mint a worker FFmpeg silencedetect-jéé; a worker
+  // csak akkor jön, ha a fájl helyben nem dekódolható
+  const local = await detectSilenceOnDevice(uri).catch(() => null);
+  if (local) {
+    memory.set(uri, local);
+    return local;
   }
   const base = renderServerUrl();
   try {

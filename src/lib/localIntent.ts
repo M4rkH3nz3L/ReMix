@@ -159,3 +159,21 @@ export function parseLocalIntent(
 
   return null;
 }
+
+/**
+ * 🔇 Csend-vágás szándék („vágd ki a csendeket", „csendek ki", „holtidő törlése",
+ * „remove silence") — nem egyszerű parancs, hanem elemzés-igényes folyamat
+ * (hangenergia → vágásterv), ezért külön jelzés: a hívó a csend-vágást indítja.
+ */
+export function isSilenceCutIntent(instruction: string): boolean {
+  // az IDÉZETT tartalom (felirat-szöveg, név) nem utasítás — „írd ki: „csendes este”"
+  const lower = (instruction ?? '')
+    .toLowerCase()
+    .replace(/[„"“'][^„"”“']*["”']?/g, ' ');
+  if (lower.length === 0 || lower.length > 200) {
+    return false;
+  }
+  const topic = /(csend|holtid|holt id|néma|nema|silence|dead ?air|szünet|szunet)/.test(lower);
+  const verb = /(vágd|vagd|vágj|töröld|torold|szedd|távolítsd|tavolitsd|dobd|cut|remove|trim|\bki\b|nélkül|nelkul)/.test(lower);
+  return topic && verb;
+}

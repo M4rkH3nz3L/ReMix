@@ -16,6 +16,7 @@ import {
   catalogRuntime,
   downloadModel,
   MODEL_CACHE_MAX_BYTES,
+  modelRtf,
   removeModel,
 } from '@/lib/modelRegistryClient';
 import { runWhisperSmokeTest } from '@/lib/whisperClient';
@@ -127,6 +128,10 @@ export function FactoryModelsCard() {
                   <Text style={styles.providerMeta} numberOfLines={2}>
                     {t('profile.catalog_' + entry.id)}
                     {entry.manifest ? ` · ${mb(entry.manifest.sizeBytes)}` : ''}
+                    {/* 📏 BP-9: az eszközön mért sebesség (a próba és a valódi átiratok átlaga) */}
+                    {availability === 'validated' && modelRtf(entry.id) != null
+                      ? ` · ${t('profile.modelRtf', { rtf: modelRtf(entry.id)!.toFixed(2) })}`
+                      : ''}
                   </Text>
                 </View>
               </View>

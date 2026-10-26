@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { detectSilenceRanges } from '@/lib/silenceDetect';
+import type { SilenceRange } from '@/lib/cutplan';
 import { downmixToMono, resampleLinear, WHISPER_SAMPLE_RATE } from '@/lib/wav';
 
 /**
@@ -31,4 +33,17 @@ export async function decodeToMono16k(uri: string): Promise<Float32Array | null>
   } catch {
     return null;
   }
+}
+
+/**
+ * 🔇 Csend-felismerés az ESZKÖZÖN (a worker FFmpeg silencedetect megfelelője):
+ * natív dekódolás → hangenergia-alapú csend-tartományok, forrás-időben. `null`,
+ * ha a fájl nem dekódolható / weben — a hívó a workerre esik vissza.
+ */
+export async function detectSilenceOnDevice(uri: string): Promise<SilenceRange[] | null> {
+  const pcm = await decodeToMono16k(uri);
+  if (!pcm || pcm.length === 0) {
+    return null;
+  }
+  return detectSilenceRanges(pcm, WHISPER_SAMPLE_RATE);
 }

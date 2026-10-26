@@ -574,6 +574,8 @@
     "seoSectionHint": "For the TikTok/Reels caption and YouTube search — all required.",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "What's the video about? With keywords…",
+    "descriptionPlaceholder_image": "What does the image show? With keywords…",
+    "descriptionPlaceholder_audio": "What's the audio about? With keywords…",
     "hashtagsLabel": "Hashtags",
     "hashtagsPlaceholder": "#reels #recipe (space or comma)",
     "keywordsLabel": "Keywords",
@@ -813,6 +815,7 @@
       "effectsNote": "Here you can see effects the live preview can't show: particles, motion blur, sky replacement, 3D stickers and text, face blur, transitions."
     },
     "panelHost": {
+      "hideKeyboard": "Hide keyboard",
       "focusCanvas": "Canvas",
       "showTimeline": "Full timeline",
       "details": "Details",
@@ -892,6 +895,7 @@
       "discard": "Discard"
     },
     "toolbar": {
+      "moreTitle": "More tools",
       "more": "More",
       "newTextDefault": "New text",
       "cannotSplitTitle": "Can't split here",

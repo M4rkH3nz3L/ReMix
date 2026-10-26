@@ -574,6 +574,8 @@
     "seoSectionHint": "Für die TikTok/Reels-Beschriftung und die YouTube-Suche — alle Pflicht.",
     "descriptionLabel": "Beschreibung",
     "descriptionPlaceholder": "Worum geht's im Video? Mit Schlüsselwörtern…",
+    "descriptionPlaceholder_image": "Was zeigt das Bild? Mit Schlüsselwörtern…",
+    "descriptionPlaceholder_audio": "Worum geht's im Audio? Mit Schlüsselwörtern…",
     "hashtagsLabel": "Hashtags",
     "hashtagsPlaceholder": "#reels #rezept (Leerzeichen oder Komma)",
     "keywordsLabel": "Schlüsselwörter",
@@ -813,6 +815,7 @@
       "effectsNote": "Hier siehst du Effekte, die die Live-Vorschau nicht zeigen kann: Partikel, Bewegungsunschärfe, Himmelaustausch, 3D-Sticker und -Text, Gesichtsunschärfe, Übergänge."
     },
     "panelHost": {
+      "hideKeyboard": "Tastatur ausblenden",
       "focusCanvas": "Leinwand",
       "showTimeline": "Volle Zeitleiste",
       "details": "Details",
@@ -892,6 +895,7 @@
       "discard": "Verwerfen"
     },
     "toolbar": {
+      "moreTitle": "Weitere Werkzeuge",
       "more": "Mehr",
       "newTextDefault": "Neuer Text",
       "cannotSplitTitle": "Hier nicht trennbar",

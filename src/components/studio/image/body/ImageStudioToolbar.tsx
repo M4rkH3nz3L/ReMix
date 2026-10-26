@@ -94,6 +94,9 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
   },
 ];
 
+/** kijelölésnél a csoport-sorrend: Stílus · Rendezés · Réteg · Hozzáadás (a TOOL_GROUPS indexei) */
+const SELECTED_ORDER = [2, 1, 3, 0] as const;
+
 /**
  * 📱 Eszköztár — a csoportosított, vízszintesen görgethető eszköz-sor. VISELKEDÉS-
  * MEGŐRZŐ kiemelés az `ImageStudioBody`-ból: azonos `TOOL_GROUPS`, render-sorrend
@@ -103,19 +106,26 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
 export function ImageStudioToolbar({
   onTool,
   toolDisabled,
+  hasSelection = false,
 }: {
   onTool: (key: ToolKey) => void;
   toolDisabled: (key: ToolKey) => boolean;
+  /** van kijelölt réteg → a réteg-műveletek (Stílus, Rendezés, Réteg) kerülnek ELŐRE */
+  hasSelection?: boolean;
 }) {
   const { t } = useTranslation();
+  // 🧭 kontextusfüggő sorrend (MOBILE-UI §6.4, T1/12): kijelöléskor nem a Hozzáadás áll elöl,
+  // hanem amit a kijelölt réteggel tenni lehet; a `key` váltás a görgetést is az elejére állítja
+  const groups = hasSelection ? SELECTED_ORDER.map((i) => TOOL_GROUPS[i]) : TOOL_GROUPS;
   return (
     <ScrollView
+      key={hasSelection ? 'selected' : 'idle'}
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.toolBar}
       contentContainerStyle={styles.toolBarContent}
     >
-      {TOOL_GROUPS.map((group, gi) => (
+      {groups.map((group, gi) => (
         <View key={group.labelKey} style={styles.toolGroupRow}>
           <View style={styles.toolGroup}>
             <Text style={styles.groupLabel}>{t(group.labelKey)}</Text>
@@ -145,7 +155,7 @@ export function ImageStudioToolbar({
               })}
             </View>
           </View>
-          {gi < TOOL_GROUPS.length - 1 ? <View style={styles.groupDivider} /> : null}
+          {gi < groups.length - 1 ? <View style={styles.groupDivider} /> : null}
         </View>
       ))}
     </ScrollView>

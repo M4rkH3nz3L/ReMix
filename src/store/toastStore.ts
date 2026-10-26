@@ -18,7 +18,9 @@ export interface ToastState {
   dismiss: (id?: number) => void;
 }
 
+/** akció nélküli toast lejárata; akcióval (pl. Visszavonás) hosszabb — legyen idő odanyúlni (T1/7) */
 export const TOAST_DURATION_MS = 4000;
+export const TOAST_ACTION_DURATION_MS = 6000;
 
 export const useToast = create<ToastState>((set, get) => ({
   id: 0,

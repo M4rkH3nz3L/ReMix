@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
 import { haptics, motion, palette, radius } from '@/design';
-import { TOAST_DURATION_MS, useToast } from '@/store/toastStore';
+import { TOAST_ACTION_DURATION_MS, TOAST_DURATION_MS, useToast } from '@/store/toastStore';
 
 /**
  * 🍞 A toast megjelenítője — a SZÜLŐ alján, fölé úszva (a szülő `position: relative`
@@ -21,9 +21,9 @@ export function Toast() {
     if (!message) {
       return;
     }
-    const timer = setTimeout(() => dismiss(id), TOAST_DURATION_MS);
+    const timer = setTimeout(() => dismiss(id), onAction ? TOAST_ACTION_DURATION_MS : TOAST_DURATION_MS);
     return () => clearTimeout(timer);
-  }, [id, message, dismiss]);
+  }, [id, message, onAction, dismiss]);
 
   if (!message) {
     return null;

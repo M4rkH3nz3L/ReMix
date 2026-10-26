@@ -1573,7 +1573,11 @@ export function ImageStudioBody({
             />
           ) : (
             // nyitott inline lap alatt az eszköztár rejtve (a lap fejléce a kilépés)
-            <ImageStudioToolbar onTool={onTool} toolDisabled={toolDisabled} />
+            <ImageStudioToolbar
+              onTool={onTool}
+              toolDisabled={toolDisabled}
+              hasSelection={!!selectedLayer}
+            />
           )}
         </View>
         <View

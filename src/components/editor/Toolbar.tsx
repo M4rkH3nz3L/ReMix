@@ -2,7 +2,7 @@ import { haptics, motion } from '@/design';
 import type { Ionicons } from '@expo/vector-icons';
 import { type ComponentProps, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -679,6 +679,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
         maxHeightFraction={0.6}
         accessibilityLabel={t('editor.toolbar.more')}
       >
+        <Text style={styles.moreTitle}>{t('editor.toolbar.moreTitle')}</Text>
         <ScrollView contentContainerStyle={styles.moreGrid}>
           {moreTools.map((id) => (
             <View key={id} style={styles.moreCell}>
@@ -712,6 +713,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingVertical: 4,
+  },
+  moreTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   // ⋯ „Több" ikonrács: 4 oszlop
   moreGrid: {

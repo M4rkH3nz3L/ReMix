@@ -117,6 +117,12 @@ describe('panelLayout — vászon-garancia', () => {
     expect(Math.abs(sum - 480)).toBeLessThanOrEqual(1);
   });
 
+  it('gépelés közben a peek legalább 180 pt (a beviteli mező kiférjen)', () => {
+    const d = sheetDetents(480, { keyboardVisible: true });
+    expect(d.peek).toBeGreaterThanOrEqual(PANEL_METRICS.peekKeyboardMin);
+    expect(sheetDetents(480).peek).toBeLessThan(PANEL_METRICS.peekKeyboardMin);
+  });
+
   it('idővonal nélküli stúdió (Kép): nincs idővonal/transport, a vászon többet kap', () => {
     const b = layoutBudget({
       bodyHeight: 816,

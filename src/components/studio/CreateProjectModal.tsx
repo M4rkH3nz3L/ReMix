@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { aspectRatios, palette } from '@/constants/editor';
 import { AUDIO_MASTER_TARGETS } from '@/lib/audioMaster';
@@ -109,18 +111,21 @@ export function CreateProjectModal(props: {
     onCreate,
     onCancel,
   } = props;
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView
-        style={styles.modalBackdrop}
+        // a kártya sosem csúszhat az állapotsor / Dynamic Island alá (billentyűzetnél sem, T1/9)
+        style={[styles.modalBackdrop, { paddingTop: insets.top + 8 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.modalCard}>
           <View style={styles.modalGrabber} />
           <Text style={styles.modalTitle}>{t('home.newProject')}</Text>
           <ScrollView
-            style={{ maxHeight: Math.round(L.height * 0.5) }}
+            // a görgethető rész ZSUGORODIK, ha kevés a hely (billentyűzet) — a fejléc és a gombok maradnak
+            style={{ maxHeight: Math.round(L.height * 0.5), flexShrink: 1 }}
             contentContainerStyle={styles.modalScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -170,7 +175,9 @@ export function CreateProjectModal(props: {
             <TextInput
               value={seoDescription}
               onChangeText={setSeoDescription}
-              placeholder={t('home.descriptionPlaceholder')}
+              placeholder={t(`home.descriptionPlaceholder_${kind}`, {
+                defaultValue: t('home.descriptionPlaceholder'),
+              })}
               placeholderTextColor={palette.textDim}
               style={[styles.input, styles.inputMultiline]}
               multiline
@@ -398,6 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
+    maxHeight: '100%',
     backgroundColor: palette.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

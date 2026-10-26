@@ -36,6 +36,8 @@ export const PANEL_METRICS = {
   minPreviewFrac: 0.3,
   minPreviewKeyboard: 160,
   peekMin: 140,
+  /** gépelés közben a peek legalább ennyi — a lap-fejléc + címke + beviteli mező kiférjen */
+  peekKeyboardMin: 180,
   peekFrac: 0.22,
   halfFrac: 0.45,
   /** két detent ennél közelebb → összeolvasztjuk (kis kijelzőn nincs értelme két „szintnek") */
@@ -117,7 +119,8 @@ export function sheetDetents(
   const mini = opts.hasTimeline === false ? 0 : m.timelineMini;
   const full = round(body - transport - mini - minPreviewFor(bodyHeight, kbOpen));
   let half = round(Math.min(bodyHeight * m.halfFrac, full));
-  let peek = round(Math.min(Math.max(m.peekMin, bodyHeight * m.peekFrac), half));
+  const peekMin = kbOpen ? m.peekKeyboardMin : m.peekMin;
+  let peek = round(Math.min(Math.max(peekMin, bodyHeight * m.peekFrac), half));
   if (full - half < m.detentMergeGap) {
     half = full;
   }

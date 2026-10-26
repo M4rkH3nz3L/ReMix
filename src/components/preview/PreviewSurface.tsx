@@ -796,7 +796,11 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
             </Animated.View>
           ) : (
             <View style={styles.empty}>
-              {mode === 'edit' ? (
+              {/* az üres-állapot súgó NEM folyhat rá a látható overlay-ekre (szöveg/forma/hotspot),
+                  és kis preview-n (billentyűzet, nyitott lap) sem fér el — ott elhagyjuk (T1/3) */}
+              {mode === 'edit' &&
+              boxH >= 220 &&
+              textClips.length + shapeClips.length + interactiveClips.length === 0 ? (
                 <Text style={styles.emptyText}>
                   {t('editor.preview.emptyNoClip')}
                   {'\n'}

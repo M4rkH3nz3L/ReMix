@@ -117,7 +117,7 @@ function firstMusicClip(project: Project | null | undefined) {
  * CapCut-mintájú idővonal: a lejátszófej középen áll, a tartalom görgetésével
  * léptetünk (scroll offset ↔ playhead). Kétujjas csippentés = zoom.
  */
-export function Timeline() {
+export function Timeline({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
   const L = useLayout();
   const project = useEditorStore((s) => s.project);
@@ -626,108 +626,112 @@ export function Timeline() {
       {/* ↔️ a vezérlők EGY sorban: ha nem fér ki (keskeny kijelző), VÍZSZINTESEN
           GÖRGETHETŐ — a Snap/Region SOHA nem törik külön új sorba. Normál kijelzőn
           a `minWidth:100%` + a trim `marginLeft:auto` ugyanúgy jobbra igazít. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.insightTabsBar}
-        contentContainerStyle={styles.insightTabs}
-      >
-        {(['story', 'pacing'] as const).map((k) => (
-          <Pressable
-            key={k}
-            onPress={() => setInsightLane(k)}
-            hitSlop={4}
-            style={[styles.insightTab, insightLane === k ? styles.insightTabActive : null]}
-          >
-            <Text
-              style={[
-                styles.insightTabText,
-                insightLane === k ? styles.insightTabTextActive : null,
-              ]}
+      {/* 📐 nyitott panel mellett (compact) a kiegészítő sorok — insight-sáv, sztori/tempó-sáv,
+          térkép — rejtve: a hely a preview-é, a sávok és a lejátszófej maradnak (MOBILE-UI T1/1) */}
+      {compact ? null : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.insightTabsBar}
+          contentContainerStyle={styles.insightTabs}
+        >
+          {(['story', 'pacing'] as const).map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => setInsightLane(k)}
+              hitSlop={4}
+              style={[styles.insightTab, insightLane === k ? styles.insightTabActive : null]}
             >
-              {t('editor.insight.' + k)}
-            </Text>
-          </Pressable>
-        ))}
-        {/* ✂️ trim-mód: normal → ripple → roll → slip → slide (a fogantyú/test-húzás viselkedése) */}
-        <Pressable
-          onPress={cycleTrimMode}
-          hitSlop={4}
-          style={[styles.snapBtn, { marginLeft: 'auto' }, trimMode !== 'normal' ? styles.iconBtnActive : null]}
-          accessibilityLabel={t('editor.trim.label')}
-        >
-          <Ionicons
-            name="git-compare-outline"
-            size={12}
-            color={trimMode === 'normal' ? palette.textDim : palette.accent}
-          />
-          <Text style={[styles.regionAddText, trimMode === 'normal' ? { color: palette.textDim } : { color: palette.accent }]}>
-            {t('editor.trim.' + trimMode)}
-          </Text>
-        </Pressable>
-        {/* ✂️ borotva-mód: koppintásra vág az idővonalon */}
-        <Pressable
-          onPress={toggleRazorMode}
-          hitSlop={4}
-          style={[styles.iconBtn, razorMode ? styles.iconBtnActive : null]}
-          accessibilityLabel={t('editor.razor.label')}
-        >
-          <Ionicons name="cut" size={13} color={razorMode ? palette.accent : palette.textDim} />
-        </Pressable>
-        {/* 🅸🅾 tartomány kezdet/vég a lejátszófejnél */}
-        <Pressable
-          onPress={setRangeIn}
-          hitSlop={4}
-          style={[styles.iconBtn, rangeIn != null ? styles.iconBtnActive : null]}
-          accessibilityLabel={t('editor.range.setIn')}
-        >
-          <Text style={[styles.ioText, rangeIn != null ? { color: palette.accent } : null]}>I</Text>
-        </Pressable>
-        <Pressable
-          onPress={setRangeOut}
-          hitSlop={4}
-          style={[styles.iconBtn, rangeOut != null ? styles.iconBtnActive : null]}
-          accessibilityLabel={t('editor.range.setOut')}
-        >
-          <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>O</Text>
-        </Pressable>
-        {/* 🧲 illesztés + 🏷️ régió — MINDIG egy sorban (nem törhet külön a kettő) */}
-        <View style={styles.snapRegionGroup}>
-          {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
+              <Text
+                style={[
+                  styles.insightTabText,
+                  insightLane === k ? styles.insightTabTextActive : null,
+                ]}
+              >
+                {t('editor.insight.' + k)}
+              </Text>
+            </Pressable>
+          ))}
+          {/* ✂️ trim-mód: normal → ripple → roll → slip → slide (a fogantyú/test-húzás viselkedése) */}
           <Pressable
-            onPress={cycleSnapStrength}
-            onLongPress={openSnapMenu}
+            onPress={cycleTrimMode}
             hitSlop={4}
-            style={styles.snapBtn}
-            accessibilityLabel={t('editor.snap.label')}
+            style={[styles.snapBtn, { marginLeft: 'auto' }, trimMode !== 'normal' ? styles.iconBtnActive : null]}
+            accessibilityLabel={t('editor.trim.label')}
           >
             <Ionicons
-              name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
+              name="git-compare-outline"
               size={12}
-              color={snapStrength === 'off' ? palette.textDim : palette.accent2}
+              color={trimMode === 'normal' ? palette.textDim : palette.accent}
             />
-            <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
-              {t('editor.snap.' + snapStrength)}
+            <Text style={[styles.regionAddText, trimMode === 'normal' ? { color: palette.textDim } : { color: palette.accent }]}>
+              {t('editor.trim.' + trimMode)}
             </Text>
           </Pressable>
-          {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
+          {/* ✂️ borotva-mód: koppintásra vág az idővonalon */}
           <Pressable
-            onPress={addRegion}
+            onPress={toggleRazorMode}
             hitSlop={4}
-            style={styles.regionAddBtn}
-            accessibilityLabel={t('editor.regions.add')}
+            style={[styles.iconBtn, razorMode ? styles.iconBtnActive : null]}
+            accessibilityLabel={t('editor.razor.label')}
           >
-            <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
-            <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
+            <Ionicons name="cut" size={13} color={razorMode ? palette.accent : palette.textDim} />
           </Pressable>
-        </View>
-      </ScrollView>
-      {insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
+          {/* 🅸🅾 tartomány kezdet/vég a lejátszófejnél */}
+          <Pressable
+            onPress={setRangeIn}
+            hitSlop={4}
+            style={[styles.iconBtn, rangeIn != null ? styles.iconBtnActive : null]}
+            accessibilityLabel={t('editor.range.setIn')}
+          >
+            <Text style={[styles.ioText, rangeIn != null ? { color: palette.accent } : null]}>I</Text>
+          </Pressable>
+          <Pressable
+            onPress={setRangeOut}
+            hitSlop={4}
+            style={[styles.iconBtn, rangeOut != null ? styles.iconBtnActive : null]}
+            accessibilityLabel={t('editor.range.setOut')}
+          >
+            <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>O</Text>
+          </Pressable>
+          {/* 🧲 illesztés + 🏷️ régió — MINDIG egy sorban (nem törhet külön a kettő) */}
+          <View style={styles.snapRegionGroup}>
+            {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
+            <Pressable
+              onPress={cycleSnapStrength}
+              onLongPress={openSnapMenu}
+              hitSlop={4}
+              style={styles.snapBtn}
+              accessibilityLabel={t('editor.snap.label')}
+            >
+              <Ionicons
+                name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
+                size={12}
+                color={snapStrength === 'off' ? palette.textDim : palette.accent2}
+              />
+              <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
+                {t('editor.snap.' + snapStrength)}
+              </Text>
+            </Pressable>
+            {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
+            <Pressable
+              onPress={addRegion}
+              hitSlop={4}
+              style={styles.regionAddBtn}
+              accessibilityLabel={t('editor.regions.add')}
+            >
+              <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
+              <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
+      {compact ? null : insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
       {/* 🗺️ állandó scrubber KÖZVETLENÜL az idővonal fölött: az egész projekt
           kicsinyített térképe — koppintás/húzás a lejátszófejet mozgatja végig,
           így az idővonal „végignézhető" (a középre rögzített fej auto-scrollja
           igazítja a nagy idővonalat). */}
-      <TimelineMinimap viewportW={viewportW} pps={pps} />
+      {compact ? null : <TimelineMinimap viewportW={viewportW} pps={pps} />}
       <GestureDetector gesture={pinch}>
         <View style={styles.outerRow}>
         {showHeaders ? (

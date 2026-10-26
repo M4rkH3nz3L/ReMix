@@ -47,7 +47,12 @@ export function TimelineMinimap({
   const secToX = mapW > 0 ? mapW / totalDur : 0;
   const videoClips = project.tracks.find((tk) => tk.type === 'video')?.clips ?? [];
   const markers = project.markers ?? [];
-  const hasContent = videoClips.length > 0 || markers.length > 0;
+  // a mini-idővonalon (showSelection) MINDEN sáv klipje tartalom — egy csak szöveget/hangot
+  // tartalmazó projekten se írja ki, hogy „nincs klip" (MOBILE-UI T1/2)
+  const otherClips = showSelection
+    ? project.tracks.filter((tk) => tk.type !== 'video').flatMap((tk) => tk.clips)
+    : [];
+  const hasContent = videoClips.length > 0 || markers.length > 0 || otherClips.length > 0;
   const selectedClip =
     showSelection && selectedClipId
       ? project.tracks.flatMap((tk) => tk.clips).find((c) => c.id === selectedClipId)
@@ -106,6 +111,17 @@ export function TimelineMinimap({
               }}
             />
           ))}
+          {/* a többi sáv klipjei halványan (mini-idővonal) */}
+          {otherClips.map((c) => (
+            <View
+              key={c.id}
+              pointerEvents="none"
+              style={[
+                styles.otherClip,
+                { left: c.start * secToX, width: Math.max(1, c.duration * secToX) },
+              ]}
+            />
+          ))}
           {/* a kijelölt klip kerete (mini-idővonal) */}
           {selectedClip ? (
             <View
@@ -154,6 +170,14 @@ const styles = StyleSheet.create({
     borderColor: palette.accent,
     borderRadius: 4,
     backgroundColor: '#7c5cff22',
+  },
+  otherClip: {
+    position: 'absolute',
+    top: 8,
+    bottom: 8,
+    borderRadius: 2,
+    backgroundColor: palette.textDim,
+    opacity: 0.45,
   },
   selection: {
     position: 'absolute',

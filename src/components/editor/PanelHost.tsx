@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 
@@ -37,6 +37,7 @@ import { WorkflowPanel } from '@/components/editor/panels/WorkflowPanel';
 import { palette } from '@/constants/editor';
 import { motion, radius } from '@/design';
 import { useBackLayer } from '@/hooks/useBackLayer';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useLayout } from '@/hooks/useLayout';
 import type { Detent } from '@/lib/panelLayout';
 import { videoPanelSpec } from '@/lib/panelSpecs';
@@ -77,6 +78,9 @@ export function PanelHost({
   const tier = useEditorStore(selectSurfaceTier);
   const panelDetent = useEditorStore((s) => s.panelDetent);
   const setPanelDetent = useEditorStore((s) => s.setPanelDetent);
+  // ⌨️ gépelés közben a lap peek-re húzódik (a preview-ban látszódjon, amit írsz), és
+  // a fejlécben billentyűzet-elrejtő gomb van — a többsoros mező Enter-e új sort ad (T1/4–5)
+  const keyboardVisible = useKeyboardVisible();
   const expandPanel = useEditorStore((s) => s.expandPanel);
   const panelFocus = useEditorStore((s) => s.panelFocus);
   const setPanelFocus = useEditorStore((s) => s.setPanelFocus);
@@ -241,7 +245,7 @@ export function PanelHost({
     return (
       <InlineSheet
         detents={detents}
-        detent={panelDetent}
+        detent={keyboardVisible ? 'peek' : panelDetent}
         onDetentChange={setPanelDetent}
         onClose={close}
         accessibilityLabel={title}
@@ -251,7 +255,18 @@ export function PanelHost({
             <Text style={[styles.title, styles.flexTitle, { fontSize: L.font(13) }]} numberOfLines={1}>
               {title}
             </Text>
-            {videoPanelSpec(activePanel)?.canFocus ? (
+            {keyboardVisible ? (
+              <Pressable
+                onPress={() => Keyboard.dismiss()}
+                hitSlop={8}
+                style={styles.detailsButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('editor.panelHost.hideKeyboard')}
+              >
+                <Ionicons name="chevron-down" size={14} color={palette.accent} />
+                <Text style={styles.detailsText}>{t('common.done')}</Text>
+              </Pressable>
+            ) : videoPanelSpec(activePanel)?.canFocus ? (
               // 🎯 a tárgy pozicionálása teljes vásznon (húzás/méretezés), lap nélkül
               <Pressable
                 onPress={() => setPanelFocus(true)}
@@ -280,6 +295,7 @@ export function PanelHost({
           style={{ paddingHorizontal: L.spacing.lg }}
           contentContainerStyle={{ paddingBottom: L.spacing.lg }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           onContentSizeChange={(_w, h) => setContentH(h)}
         >
           <Animated.View key={activePanel} entering={FadeIn.duration(motion.duration.fast)}>

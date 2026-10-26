@@ -872,7 +872,12 @@ export default function EditorScreen() {
   // a függőleges (telefon-álló / iPad-álló) rakás — a body-t MÉRJÜK, abból számol a budget
   const stackedWork = (
     <View style={styles.stackBody} onLayout={(e) => setBodyH(e.nativeEvent.layout.height)}>
-      <PreviewSurface mode="edit" />
+      {/* Focusban a preview a felső fókusz-sáv ALÁ kerül, hogy a saját sarokgombjai
+          (teljes képernyő, összehasonlítás) ne takaródjanak (T1/6). A burkoló mindig ott
+          van → a fókuszváltás nem mountolja újra a lejátszót. */}
+      <View style={[styles.stackBody, focus ? styles.focusPreview : null]}>
+        <PreviewSurface mode="edit" />
+      </View>
       {focus ? (
         // 🎯 Focus: a króm a vászon FÖLÉ úszik, minden más rejtve
         <PanelHost />
@@ -883,7 +888,7 @@ export default function EditorScreen() {
           </View>
           {budget.timelineMode === 'full' ? (
             <View onLayout={(e) => setTimelineH(e.nativeEvent.layout.height)}>
-              <Timeline />
+              <Timeline compact={surfaceTier !== null} />
             </View>
           ) : budget.timelineMode === 'mini' ? (
             <MiniTimeline />
@@ -1247,6 +1252,10 @@ const styles = StyleSheet.create({
   // 📐 a függőleges rakás mért body-ja (a layoutBudget bemenete)
   stackBody: {
     flex: 1,
+  },
+  // a FocusChrome felső sávja (44 + 2×8 margó) alá
+  focusPreview: {
+    paddingTop: 60,
   },
   toastAnchor: {
     position: 'relative',

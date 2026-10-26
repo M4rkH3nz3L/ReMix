@@ -574,6 +574,8 @@
     "seoSectionHint": "A TikTok/Reels felirathoz és a YouTube kereséshez — mindet meg kell adni.",
     "descriptionLabel": "Leírás",
     "descriptionPlaceholder": "Miről szól a videó? Kulcsszavakkal…",
+    "descriptionPlaceholder_image": "Mit ábrázol a kép? Kulcsszavakkal…",
+    "descriptionPlaceholder_audio": "Miről szól a hanganyag? Kulcsszavakkal…",
     "hashtagsLabel": "Hashtagek",
     "hashtagsPlaceholder": "#reels #recept (szóköz vagy vessző)",
     "keywordsLabel": "Kulcsszavak",
@@ -813,6 +815,7 @@
       "effectsNote": "Itt látszanak azok a hatások, amiket az élő előnézet nem tud mutatni: részecskék, mozgás-elmosás, égcsere, 3D matricák és szöveg, arc-elmosás, átmenetek."
     },
     "panelHost": {
+      "hideKeyboard": "Billentyűzet elrejtése",
       "focusCanvas": "Vászon",
       "showTimeline": "Teljes idővonal",
       "details": "Részletek",
@@ -892,6 +895,7 @@
       "discard": "Elvetés"
     },
     "toolbar": {
+      "moreTitle": "További eszközök",
       "more": "Több",
       "newTextDefault": "Új szöveg",
       "cannotSplitTitle": "Nem vágható itt",

@@ -3298,6 +3298,12 @@
       "temperature": "Melegség"
     }
   },
+  "localAi": {
+    "bootstrapTitle": "Helyi AI bekapcsolása",
+    "bootstrapBody": "A felirat és az átirat a telefonodon, internet nélkül, ingyen készülhet. Ehhez egyszer le kell tölteni a beszédfelismerő modellt ({{mb}} MB).",
+    "download": "Letöltés ({{mb}} MB)",
+    "later": "Később"
+  },
   "collab": {
     "alwaysOn": {
       "title": "A projekt-szoba élesedik…",

@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, LogBox, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import {
@@ -12,6 +12,8 @@ import {
   setBugSignedIn,
 } from '@/lib/bugReporter';
 import { useEditorStore } from '@/store/editorStore';
+import { t as tr } from 'i18next';
+import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
 
 // 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
 // (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
@@ -69,6 +71,27 @@ export default function RootLayout() {
         recent: (st.events ?? []).slice(-8).map((e) => `${e.actor}:${e.command.type}`),
       };
     });
+  }, []);
+  // 🧩 helyi AI alapból a telefonon: indulás után EGYSZER felajánlja a Whisper
+  // (felirat/átirat) letöltését — utána minden helyi AI-funkció offline megy
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void ensureLocalAiReady(
+        (mb) =>
+          new Promise<boolean>((resolve) => {
+            Alert.alert(
+              tr('localAi.bootstrapTitle'),
+              tr('localAi.bootstrapBody', { mb }),
+              [
+                { text: tr('localAi.later'), style: 'cancel', onPress: () => resolve(false) },
+                { text: tr('localAi.download', { mb }), onPress: () => resolve(true) },
+              ],
+              { cancelable: false }
+            );
+          })
+      );
+    }, 3000);
+    return () => clearTimeout(timer);
   }, []);
   // 🐞 a jelentésekhez: melyik képernyőn történt (+ navigációs breadcrumb)
   const pathname = usePathname();

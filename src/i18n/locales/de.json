@@ -3268,6 +3268,12 @@
       "temperature": "Wärme"
     }
   },
+  "localAi": {
+    "bootstrapTitle": "Lokale KI einschalten",
+    "bootstrapBody": "Untertitel und Transkripte können auf deinem Handy entstehen — offline und kostenlos. Dafür wird das Sprachmodell einmalig geladen ({{mb}} MB).",
+    "download": "Herunterladen ({{mb}} MB)",
+    "later": "Später"
+  },
   "collab": {
     "alwaysOn": {
       "title": "Projektraum wird eingerichtet…",

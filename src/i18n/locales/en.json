@@ -3298,6 +3298,12 @@
       "temperature": "Warmth"
     }
   },
+  "localAi": {
+    "bootstrapTitle": "Turn on local AI",
+    "bootstrapBody": "Captions and transcripts can be made on your phone, offline and free. This needs a one-time download of the speech model ({{mb}} MB).",
+    "download": "Download ({{mb}} MB)",
+    "later": "Later"
+  },
   "collab": {
     "alwaysOn": {
       "title": "Setting up the project room…",

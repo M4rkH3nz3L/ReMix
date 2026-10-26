@@ -9,6 +9,7 @@
 import { applyCommand, describeCommand } from '@/lib/commands';
 import type { ProjectEvent } from '@/lib/commands';
 import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
+import { coalesceKey, shouldCoalesce, type LastCommit } from '@/lib/historyCoalesce';
 import { makeId } from '@/lib/id';
 
 import { getLiveBroadcaster } from '../broadcasters';
@@ -42,6 +43,12 @@ type HistorySlice = Pick<
   | 'setRendered'
 >;
 
+/**
+ * 🔗 az utolsó (felhasználói) commit összevonási kulcsa + ideje — egy csúszka-húzás
+ * egy history-lépés legyen (`@/lib/historyCoalesce`). Undo/redo/betöltés megszakítja.
+ */
+let lastCommit: LastCommit | null = null;
+
 export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   project: null,
   past: [],
@@ -51,7 +58,8 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   dirty: false,
   events: [],
 
-  loadProject: (project, events) =>
+  loadProject: (project, events) => {
+    lastCommit = null;
     set({
       project,
       selectedClipId: null,
@@ -65,7 +73,8 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       dirty: false,
       events: events ?? [],
       ...SESSION_RESET,
-    }),
+    });
+  },
 
   restoreProject: (snapshot) => {
     const { project, past, pastLabels } = get();
@@ -137,6 +146,25 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       command: slimForLog(command),
       ...(isHeavyCommand(command) ? { slim: true as const } : {}),
     };
+    // 🔗 összevonás: ugyanannak a folytonos szerkesztésnek a következő lépése (csúszka-húzás,
+    // gyors léptetés) NEM új history-lépés — a húzás előtti állapot marad a visszaállítási pont
+    const key = actor === 'user' ? coalesceKey(command) : null;
+    const now = Date.now();
+    if (past.length > 0 && shouldCoalesce(lastCommit, key, now)) {
+      lastCommit = { key, at: now };
+      set({
+        project: next,
+        future: [],
+        futureLabels: [],
+        dirty: true,
+        events: [...events.slice(-EVENT_LIMIT + 1), event],
+      });
+      if (actor !== 'remote') {
+        getLiveBroadcaster()?.([command]);
+      }
+      return true;
+    }
+    lastCommit = key ? { key, at: now } : null;
     // 🕓 history-címke: a parancs saját `label`-je (pl. UPSERT_IMAGE_DOC), vagy a leírása
     const stepLabel = (command as { label?: string }).label || describeCommand(command);
     set({
@@ -156,6 +184,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   },
 
   applyBatch: (commands, actor = 'ai') => {
+    lastCommit = null;
     const { project, past, pastLabels, events, lockedTracks } = get();
     if (!project) {
       return 0;
@@ -207,6 +236,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   },
 
   undo: () => {
+    lastCommit = null;
     const { past, project, future, pastLabels, futureLabels } = get();
     if (!project || past.length === 0) {
       return;
@@ -228,6 +258,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   },
 
   redo: () => {
+    lastCommit = null;
     const { past, project, future, pastLabels, futureLabels } = get();
     if (!project || future.length === 0) {
       return;

@@ -817,6 +817,10 @@
       "effectsNote": "Here you can see effects the live preview can't show: particles, motion blur, sky replacement, 3D stickers and text, face blur, transitions."
     },
     "panelHost": {
+      "strip_speed": "Speed",
+      "strip_audio": "Volume",
+      "strip_filter": "Filter",
+      "strip_transition": "Transition",
       "hideKeyboard": "Hide keyboard",
       "focusCanvas": "Canvas",
       "showTimeline": "Full timeline",
@@ -1760,6 +1764,7 @@
       "captionsFormatsNote": "SRT: universal. WebVTT: web/HTML5 with line position. ASS: with styling (color, position, bold)."
     },
     "filter": {
+      "pickForStrength": "Pick a filter to adjust its strength",
       "sectionFilters": "Filters",
       "sectionEnhance": "Enhance",
       "sectionBackgroundFill": "Background fill",

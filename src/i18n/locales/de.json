@@ -817,6 +817,10 @@
       "effectsNote": "Hier siehst du Effekte, die die Live-Vorschau nicht zeigen kann: Partikel, Bewegungsunschärfe, Himmelaustausch, 3D-Sticker und -Text, Gesichtsunschärfe, Übergänge."
     },
     "panelHost": {
+      "strip_speed": "Tempo",
+      "strip_audio": "Lautstärke",
+      "strip_filter": "Filter",
+      "strip_transition": "Übergang",
       "hideKeyboard": "Tastatur ausblenden",
       "focusCanvas": "Leinwand",
       "showTimeline": "Volle Zeitleiste",
@@ -1760,6 +1764,7 @@
       "captionsFormatsNote": "SRT: universell. WebVTT: Web/HTML5 mit Zeilenposition. ASS: mit Styling (Farbe, Position, fett)."
     },
     "filter": {
+      "pickForStrength": "Wähle einen Filter, um die Stärke einzustellen",
       "sectionFilters": "Filter",
       "sectionEnhance": "Verbessern",
       "sectionBackgroundFill": "Hintergrundfüllung",

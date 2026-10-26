@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { TRANSITIONS } from '@/components/editor/panels/TransitionPanel';
 import { Chip, Stepper } from '@/components/ui/controls';
-import { filters, speedPresets } from '@/constants/editor';
+import { filters, palette, speedPresets } from '@/constants/editor';
 import { maxVideoDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -83,7 +83,12 @@ export function FilterQuick({ clip }: { clip: VideoClip | ImageClip }) {
           onDec={() => updateClip(clip.id, { filterIntensity: clamp(intensity - 0.1, 0.1, 1) })}
           onInc={() => updateClip(clip.id, { filterIntensity: clamp(intensity + 0.1, 0.1, 1) })}
         />
-      ) : null}
+      ) : (
+        // a sáv magassága állandó — szűrő-választáskor a preview NE ugorjon (élő teszt V3)
+        <View style={styles.reserved}>
+          <Text style={styles.reservedText}>{t('panels.filter.pickForStrength')}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -150,4 +155,7 @@ export function VolumeQuick({ clip }: { clip: AudioClip }) {
 
 const styles = StyleSheet.create({
   chips: { gap: 8, paddingVertical: 2, paddingRight: 8 },
+  // = a Stepper-sor magassága (32 pt gomb + 2×4 pt)
+  reserved: { height: 40, justifyContent: 'center' },
+  reservedText: { color: palette.textDim, fontSize: 12 },
 });

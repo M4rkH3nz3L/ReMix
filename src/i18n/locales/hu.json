@@ -817,6 +817,10 @@
       "effectsNote": "Itt látszanak azok a hatások, amiket az élő előnézet nem tud mutatni: részecskék, mozgás-elmosás, égcsere, 3D matricák és szöveg, arc-elmosás, átmenetek."
     },
     "panelHost": {
+      "strip_speed": "Sebesség",
+      "strip_audio": "Hangerő",
+      "strip_filter": "Szűrő",
+      "strip_transition": "Átmenet",
       "hideKeyboard": "Billentyűzet elrejtése",
       "focusCanvas": "Vászon",
       "showTimeline": "Teljes idővonal",
@@ -1760,6 +1764,7 @@
       "captionsFormatsNote": "SRT: univerzális. WebVTT: web/HTML5, sor-pozícióval. ASS: stílussal (szín, pozíció, félkövér)."
     },
     "filter": {
+      "pickForStrength": "Válassz szűrőt az erősség állításához",
       "sectionFilters": "Szűrők",
       "sectionEnhance": "Képjavítás",
       "sectionBackgroundFill": "Háttér-kitöltés",

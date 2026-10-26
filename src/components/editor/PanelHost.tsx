@@ -200,7 +200,8 @@ export function PanelHost({
         >
           <View style={styles.stripHead}>
             <Text style={[styles.title, { fontSize: L.font(13) }]} numberOfLines={1}>
-              {title}
+              {/* a gyors sáv a panel EGY részét mutatja → saját, pontos cím (pl. „Sebesség") */}
+              {t('editor.panelHost.strip_' + activePanel, { defaultValue: title })}
             </Text>
             <Pressable
               onPress={expandPanel}

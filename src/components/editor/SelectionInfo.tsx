@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { mediaDisplayName } from '@/lib/mediaDisplayName';
 import { findClip } from '@/lib/projectUtils';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -37,7 +38,8 @@ function clipName(clip: Clip): string {
     return clip.label;
   }
   if ('uri' in clip && typeof clip.uri === 'string') {
-    return decodeURIComponent(clip.uri.split('/').pop() ?? '');
+    // gép-generált galéria-fájlnév (UUID…) helyett nincs név — a sor a fajtát és a hosszt mutatja
+    return mediaDisplayName(clip.uri) ?? '';
   }
   return '';
 }

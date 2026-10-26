@@ -23,6 +23,7 @@ import { describeStyle, duplicateOffset } from '@/lib/batchEdit';
 import { toolbarFor, type ToolId } from '@/lib/toolbarSpec';
 import { clipEnd, compatibleTracksFor, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore, type PanelId } from '@/store/editorStore';
+import { useToast } from '@/store/toastStore';
 import { useTutorial } from '@/store/tutorialStore';
 import type { Asset, Clip, TrackType } from '@/types/project';
 
@@ -317,9 +318,18 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
       haptics.selection();
     }
   };
+  // ↶ a destruktív művelet után ott, ahol koppintott, egy koppintással visszavonható
+  const undoToast = (message: string) =>
+    useToast.getState().show(message, {
+      label: t('editor.toast.undo'),
+      onPress: () => useEditorStore.getState().undo(),
+    });
+
   const cutClipsAction = () => {
-    if (useEditorStore.getState().cutClips() > 0) {
+    const n = useEditorStore.getState().cutClips();
+    if (n > 0) {
       haptics.impact();
+      undoToast(t('editor.toast.clipsCut', { count: n }));
     }
   };
   const pasteClipsAction = () => {
@@ -371,6 +381,8 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
             onPress: () => {
               if (!useEditorStore.getState().rippleDelete(list)) {
                 Alert.alert(t('editor.toolbar.rippleDeleteTitle'), t('editor.toolbar.rippleDeleteFailed'));
+              } else {
+                undoToast(t('editor.toast.clipsDeleted', { count: list.length }));
               }
             },
           },
@@ -380,6 +392,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
     }
     if (ids.size === 1) {
       removeClip(selected.id);
+      undoToast(t('editor.toast.clipsDeleted', { count: 1 }));
       return;
     }
     // 🧩 kötegelt törlés — egy undo-lépésben, minden érintett sávról
@@ -401,6 +414,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
             const s2 = useEditorStore.getState();
             s2.dispatch({ type: 'REPLACE_TRACKS', tracks, label: t('editor.toolbar.clipsDeletedLabel', { count: ids.size }) }, 'user');
             s2.selectClip(null);
+            undoToast(t('editor.toast.clipsDeleted', { count: ids.size }));
           },
         },
       ]

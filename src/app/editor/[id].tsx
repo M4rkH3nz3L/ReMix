@@ -31,11 +31,13 @@ import { Toolbar } from '@/components/editor/Toolbar';
 import { TransportBar } from '@/components/editor/TransportBar';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Toast } from '@/components/ui/Toast';
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { VodProcessingOverlay } from '@/components/editor/VodProcessingOverlay';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
 import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { openProjectConversation } from '@/lib/chat';
@@ -91,6 +93,8 @@ export default function EditorScreen() {
   const [timelineH, setTimelineH] = useState<number | undefined>(undefined);
   const [transportH, setTransportH] = useState<number | undefined>(undefined);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  // ⌨️ szöveg-szerkesztés: a billentyűzet fölött a lapnak hely kell → mini-idővonal
+  const keyboardVisible = useKeyboardVisible();
   // a projekt-menü lezárulása UTÁN futó akció (lásd `menuAction`) — a korai return-ök ELÉ
   const pendingMenuAction = useRef<(() => void) | null>(null);
   const [missing, setMissing] = useState(false);
@@ -853,6 +857,7 @@ export default function EditorScreen() {
     timelineFullHeight: timelineH,
     transportHeight: transportH,
     keepTimeline: L.sizeClass === 'medium',
+    keyboardVisible,
   });
   const focus = surfaceTier === 'focus';
   const banners = (
@@ -886,7 +891,11 @@ export default function EditorScreen() {
           {surfaceTier === 'sheet' || surfaceTier === 'strip' ? (
             <PanelHost detents={budget.detents} />
           ) : null}
-          {budget.toolbarVisible ? <Toolbar /> : null}
+          {/* 🍞 a toast az eszköztár (vagy a lap) FÖLÖTT úszik — a horgony a rakás alja */}
+          <View style={styles.toastAnchor}>
+            <Toast />
+            {budget.toolbarVisible ? <Toolbar /> : null}
+          </View>
         </>
       )}
     </View>
@@ -921,6 +930,9 @@ export default function EditorScreen() {
         </View>
         <SelectionInfo />
         <Timeline />
+        <View style={styles.toastAnchor}>
+          <Toast />
+        </View>
       </>
     );
   } else if (L.sizeClass === 'medium' && L.isLandscape) {
@@ -944,7 +956,10 @@ export default function EditorScreen() {
               <Timeline />
             )}
           </View>
-          {panelVisible ? null : <Toolbar />}
+          <View style={styles.toastAnchor}>
+            <Toast />
+            {panelVisible ? null : <Toolbar />}
+          </View>
         </View>
       </View>
     );
@@ -1232,6 +1247,9 @@ const styles = StyleSheet.create({
   // 📐 a függőleges rakás mért body-ja (a layoutBudget bemenete)
   stackBody: {
     flex: 1,
+  },
+  toastAnchor: {
+    position: 'relative',
   },
   menuTitle: {
     color: palette.text,

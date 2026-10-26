@@ -48,8 +48,11 @@ export interface LayoutBudgetInput {
   tier: SurfaceTier;
   /** csak `sheet` szintnél számít */
   detent?: Detent;
-  /** nyitott billentyűzet magassága (0 = zárva) */
+  /** nyitott billentyűzet magassága (0 = zárva) — ha a body-ból még NINCS levonva */
   keyboardHeight?: number;
+  /** nyitva a billentyűzet, de a body-t már a KeyboardAvoidingView összenyomta
+   *  (iOS): nem vonjuk le újra, csak a viselkedés vált (mini-idővonal, enyhébb minimum) */
+  keyboardVisible?: boolean;
   /** van-e idővonal ebben a stúdióban (a Kép Stúdióban nincs) */
   hasTimeline?: boolean;
   /** van-e külön transport-sáv */
@@ -101,14 +104,18 @@ export function minPreviewFor(bodyHeight: number, keyboardOpen = false): number 
  */
 export function sheetDetents(
   bodyHeight: number,
-  opts: Pick<LayoutBudgetInput, 'hasTimeline' | 'hasTransport' | 'keyboardHeight' | 'transportHeight'> = {}
+  opts: Pick<
+    LayoutBudgetInput,
+    'hasTimeline' | 'hasTransport' | 'keyboardHeight' | 'transportHeight' | 'keyboardVisible'
+  > = {}
 ): Record<Detent, number> {
   const m = PANEL_METRICS;
   const kb = opts.keyboardHeight ?? 0;
+  const kbOpen = kb > 0 || !!opts.keyboardVisible;
   const body = Math.max(0, bodyHeight - kb);
   const transport = opts.hasTransport === false ? 0 : (opts.transportHeight ?? m.transport);
   const mini = opts.hasTimeline === false ? 0 : m.timelineMini;
-  const full = round(body - transport - mini - minPreviewFor(bodyHeight, kb > 0));
+  const full = round(body - transport - mini - minPreviewFor(bodyHeight, kbOpen));
   let half = round(Math.min(bodyHeight * m.halfFrac, full));
   let peek = round(Math.min(Math.max(m.peekMin, bodyHeight * m.peekFrac), half));
   if (full - half < m.detentMergeGap) {
@@ -124,6 +131,7 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
   const m = PANEL_METRICS;
   const body = Math.max(0, input.bodyHeight);
   const kb = Math.max(0, input.keyboardHeight ?? 0);
+  const kbOpen = kb > 0 || !!input.keyboardVisible;
   const hasTimeline = input.hasTimeline !== false;
   const hasTransport = input.hasTransport !== false;
   const hasToolbar = input.hasToolbar !== false;
@@ -131,9 +139,10 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     hasTimeline,
     hasTransport,
     keyboardHeight: kb,
+    keyboardVisible: input.keyboardVisible,
     transportHeight: input.transportHeight,
   });
-  const minPreview = minPreviewFor(body, kb > 0);
+  const minPreview = minPreviewFor(body, kbOpen);
 
   if (input.tier === 'focus') {
     return {
@@ -170,7 +179,7 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     const detent = input.detent ?? 'peek';
     panelHeight = detents[detent];
     toolbarVisible = false;
-    if (hasTimeline && !input.keepTimeline && (detent !== 'peek' || kb > 0)) {
+    if (hasTimeline && !input.keepTimeline && (detent !== 'peek' || kbOpen)) {
       timelineMode = 'mini';
     }
   }
@@ -202,6 +211,27 @@ export function layoutBudget(input: LayoutBudgetInput): LayoutBudget {
     toolbarVisible,
     toolbarHeight,
     detents,
+  };
+}
+
+/**
+ * 📏 Tartalomhoz igazított detentek: a lap egyik detentje se legyen magasabb, mint
+ * amennyit a tartalma kér (`fitHeight` = fogantyú + fejléc + tartalom). Egy rövid
+ * panel így nem kap üres helyet — a vászon nyeri meg. A detentek egyenlővé válhatnak
+ * (összeolvadnak); a peek sosem nő a tartalom fölé.
+ */
+export function fitDetents(
+  detents: Record<Detent, number>,
+  fitHeight: number | undefined
+): Record<Detent, number> {
+  if (!fitHeight || fitHeight <= 0) {
+    return detents;
+  }
+  const cap = Math.round(fitHeight);
+  return {
+    peek: Math.min(detents.peek, cap),
+    half: Math.min(detents.half, cap),
+    full: Math.min(detents.full, cap),
   };
 }
 

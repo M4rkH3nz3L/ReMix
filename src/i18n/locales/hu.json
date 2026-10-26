@@ -691,6 +691,13 @@
     }
   },
   "editor": {
+    "toast": {
+      "undo": "Visszavonás",
+      "clipsDeleted_one": "Klip törölve",
+      "clipsDeleted_other": "{{count}} klip törölve",
+      "clipsCut_one": "Klip kivágva",
+      "clipsCut_other": "{{count}} klip kivágva"
+    },
     "aiActivity": {
       "elapsedSeconds_one": "{{count}} mp",
       "elapsedSeconds_other": "{{count}} mp",

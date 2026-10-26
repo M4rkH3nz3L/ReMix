@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type AccessibilityActionEvent, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { gestures, haptics, motion, palette, radius } from '@/design';
-import { DETENTS, nearestDetent, type Detent } from '@/lib/panelLayout';
+import { DETENTS, fitDetents, nearestDetent, type Detent } from '@/lib/panelLayout';
 
 interface InlineSheetProps {
   /** a detentek px-magassága (a `layoutBudget().detents`) */
@@ -22,6 +22,8 @@ interface InlineSheetProps {
   onClose: () => void;
   /** a fogantyú alatti fejléc (cím + műveletek) — ez is húzható */
   header?: ReactNode;
+  /** a görgethető tartalom MÉRT magassága — a lap sosem magasabb ennél (+ fejléc) */
+  contentHeight?: number;
   children: ReactNode;
   style?: ViewStyle;
   accessibilityLabel?: string;
@@ -42,7 +44,8 @@ interface InlineSheetProps {
  *  • detent-váltáskor `haptics.snap` (E7: egységes mozgás és haptika).
  */
 export function InlineSheet({
-  detents,
+  detents: rawDetents,
+  contentHeight,
   detent,
   onDetentChange,
   onClose,
@@ -51,6 +54,12 @@ export function InlineSheet({
   style,
   accessibilityLabel,
 }: InlineSheetProps) {
+  // 📏 a fogantyú+fejléc mért magassága: a tartalomhoz igazított detentekhez (fitDetents)
+  const [topH, setTopH] = useState(0);
+  const detents = fitDetents(
+    rawDetents,
+    contentHeight && topH > 0 ? topH + contentHeight + 8 : undefined
+  );
   const target = detents[detent];
   // a belépő a 0-ról rugózik fel — az első render még 0 magas
   const height = useSharedValue(0);
@@ -147,7 +156,7 @@ export function InlineSheet({
   return (
     <Animated.View style={[styles.sheet, style, sheetStyle]}>
       <GestureDetector gesture={pan}>
-        <View>
+        <View onLayout={(e) => setTopH(e.nativeEvent.layout.height)}>
           <GestureDetector gesture={tap}>
             <View
               style={styles.handleZone}

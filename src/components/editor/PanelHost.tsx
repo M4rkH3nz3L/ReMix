@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -83,6 +84,8 @@ export function PanelHost({
   const selected = useEditorStore(selectSelectedClip);
   const L = useLayout();
   const { t } = useTranslation();
+  // 📏 a lap-tartalom mért magassága → a lap nem nő a tartalma fölé (fitDetents)
+  const [contentH, setContentH] = useState<number | undefined>(undefined);
   // ↩️ vissza: Focus-ból (lapról kért) a laphoz, egyébként a panel zárul
   useBackLayer(
     activePanel && visible
@@ -242,6 +245,7 @@ export function PanelHost({
         onDetentChange={setPanelDetent}
         onClose={close}
         accessibilityLabel={title}
+        contentHeight={contentH}
         header={
           <View style={[styles.header, { paddingHorizontal: L.spacing.lg }]}>
             <Text style={[styles.title, styles.flexTitle, { fontSize: L.font(13) }]} numberOfLines={1}>
@@ -276,6 +280,7 @@ export function PanelHost({
           style={{ paddingHorizontal: L.spacing.lg }}
           contentContainerStyle={{ paddingBottom: L.spacing.lg }}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={(_w, h) => setContentH(h)}
         >
           <Animated.View key={activePanel} entering={FadeIn.duration(motion.duration.fast)}>
             {content}

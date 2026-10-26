@@ -1,5 +1,6 @@
 import {
   DETENTS,
+  fitDetents,
   layoutBudget,
   minPreviewFor,
   nearestDetent,
@@ -108,6 +109,14 @@ describe('panelLayout — vászon-garancia', () => {
     expect(b.panelHeight).toBeGreaterThan(0);
   });
 
+  it('keyboardVisible (iOS, a body már összenyomva): mini-idővonal, NEM vonja le újra', () => {
+    const b = layoutBudget({ bodyHeight: 480, tier: 'sheet', detent: 'peek', keyboardVisible: true });
+    expect(b.timelineMode).toBe('mini');
+    expect(b.minPreview).toBe(PANEL_METRICS.minPreviewKeyboard);
+    const sum = b.previewHeight + b.transportHeight + b.timelineHeight + b.panelHeight;
+    expect(Math.abs(sum - 480)).toBeLessThanOrEqual(1);
+  });
+
   it('idővonal nélküli stúdió (Kép): nincs idővonal/transport, a vászon többet kap', () => {
     const b = layoutBudget({
       bodyHeight: 816,
@@ -148,6 +157,21 @@ describe('panelLayout — vászon-garancia', () => {
     const d = sheetDetents(420);
     expect(d.half === d.full || d.full - d.half >= PANEL_METRICS.detentMergeGap).toBe(true);
     expect(d.peek === d.half || d.half - d.peek >= PANEL_METRICS.detentMergeGap).toBe(true);
+  });
+
+  describe('fitDetents', () => {
+    const d = { peek: 180, half: 367, full: 527 };
+    it('rövid tartalom: minden detent a tartalom magasságára húzódik (összeolvad)', () => {
+      expect(fitDetents(d, 150)).toEqual({ peek: 150, half: 150, full: 150 });
+    });
+    it('közepes tartalom: csak a nagyobb detentek korlátozódnak', () => {
+      expect(fitDetents(d, 300)).toEqual({ peek: 180, half: 300, full: 300 });
+    });
+    it('hosszú tartalom / ismeretlen: változatlan', () => {
+      expect(fitDetents(d, 2000)).toEqual(d);
+      expect(fitDetents(d, undefined)).toEqual(d);
+      expect(fitDetents(d, 0)).toEqual(d);
+    });
   });
 
   describe('nearestDetent', () => {

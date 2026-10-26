@@ -691,6 +691,13 @@
     }
   },
   "editor": {
+    "toast": {
+      "undo": "Rückgängig",
+      "clipsDeleted_one": "Clip gelöscht",
+      "clipsDeleted_other": "{{count}} Clips gelöscht",
+      "clipsCut_one": "Clip ausgeschnitten",
+      "clipsCut_other": "{{count}} Clips ausgeschnitten"
+    },
     "aiActivity": {
       "elapsedSeconds_one": "{{count}} s",
       "elapsedSeconds_other": "{{count}} s",

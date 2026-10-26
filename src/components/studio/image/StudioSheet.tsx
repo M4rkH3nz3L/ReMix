@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { createContext, type ReactNode, useContext } from 'react';
+import { createContext, type ReactNode, useContext, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useBackLayer } from '@/hooks/useBackLayer';
@@ -47,6 +47,9 @@ export function StudioSheet({
   footer?: ReactNode;
 }) {
   const frame = useContext(StudioSheetFrameContext);
+  // 📏 tartalom + lábléc mért magassága → a lap nem nő a tartalma fölé
+  const [contentH, setContentH] = useState<number | undefined>(undefined);
+  const [footerH, setFooterH] = useState(0);
   // ↩️ az inline/dokkolt lapnak nincs Modal-ja → a vissza-verem zárja (a modálisnál a Modal)
   useBackLayer(frame?.inline ? onClose : null);
 
@@ -80,6 +83,7 @@ export function StudioSheet({
   if (frame?.inline) {
     return (
       <InlineSheet
+        contentHeight={contentH !== undefined ? contentH + footerH : undefined}
         detents={frame.detents}
         detent={frame.detent}
         onDetentChange={frame.onDetentChange}
@@ -92,10 +96,18 @@ export function StudioSheet({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={(_w, h) => setContentH(h)}
         >
           {children}
         </ScrollView>
-        {footer ? <View style={[styles.footer, styles.footerInline]}>{footer}</View> : null}
+        {footer ? (
+          <View
+            style={[styles.footer, styles.footerInline]}
+            onLayout={(e) => setFooterH(e.nativeEvent.layout.height + 14)}
+          >
+            {footer}
+          </View>
+        ) : null}
       </InlineSheet>
     );
   }

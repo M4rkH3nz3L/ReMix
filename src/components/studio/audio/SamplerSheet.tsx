@@ -15,7 +15,9 @@ import {
   type SamplerPattern,
 } from '@/lib/sampler';
 
-const CELL = 22;
+/** lépés-cella: 44 pt magas (Apple HIG érintési minimum) */
+const CELL_W = 30;
+const CELL_H = 44;
 
 /**
  * 🎛️🔊 SAMPLER (AUDIOT §5): a felhasználó SAJÁT mintáját (one-shot) egy step-rácsra helyezi.
@@ -117,7 +119,13 @@ export function SamplerSheet({
               <Pressable
                 key={step}
                 onPress={() => setPattern((p) => toggleSamplerStep(p, step))}
-                style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
+                style={[
+                  styles.cell,
+                  beatStart && styles.cellBeat,
+                  // ütemcsoport-térköz (4-esével), mint a dobgépen
+                  beatStart && step > 0 && styles.cellGroupGap,
+                  on && styles.cellOn,
+                ]}
               />
             );
           })}
@@ -153,9 +161,10 @@ const styles = StyleSheet.create({
   barsText: { color: palette.text, fontSize: 13, fontWeight: '700', minWidth: 52, textAlign: 'center' },
   info: { color: palette.textDim, fontSize: 12, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  cell: { width: CELL, height: CELL * 1.6, marginRight: 3, borderRadius: 4, borderWidth: 1, borderColor: `${palette.border}99`, backgroundColor: '#0b0d14' },
+  cell: { width: CELL_W, height: CELL_H, marginRight: 3, borderRadius: 4, borderWidth: 1, borderColor: `${palette.border}99`, backgroundColor: '#0b0d14' },
   cellBeat: { borderColor: palette.border, backgroundColor: '#11131c' },
   cellOn: { backgroundColor: palette.accent, borderColor: palette.accent },
+  cellGroupGap: { marginLeft: 6 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: palette.border },
   clearText: { color: palette.textDim, fontSize: 13, fontWeight: '700' },

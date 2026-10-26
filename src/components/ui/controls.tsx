@@ -105,6 +105,7 @@ export function ToolButton({
   active,
   danger,
   disabled,
+  fill,
 }: {
   icon: IoniconName;
   label: string;
@@ -112,6 +113,8 @@ export function ToolButton({
   active?: boolean;
   danger?: boolean;
   disabled?: boolean;
+  /** egyenlő szélességű sorban (flex): nincs min-szélesség, a felirat szükség esetén kisebb */
+  fill?: boolean;
 }) {
   const L = useLayout();
   const color = disabled
@@ -131,12 +134,21 @@ export function ToolButton({
       style={[
         styles.toolButton,
         // 44pt-os érintés-minimum (Apple HIG) + méret-osztályhoz igazított szélesség
-        { minWidth: L.editor.toolButtonMinWidth, minHeight: L.touchMin },
+        fill
+          ? [styles.toolButtonFill, { minHeight: L.touchMin }]
+          : { minWidth: L.editor.toolButtonMinWidth, minHeight: L.touchMin },
         active ? styles.toolButtonActive : null,
       ]}
     >
       <Ionicons name={icon} size={L.isCompact ? 20 : 23} color={color} />
-      <Text style={[styles.toolLabel, { color, fontSize: L.font(10) }]}>{label}</Text>
+      <Text
+        style={[styles.toolLabel, { color, fontSize: L.font(10) }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit={fill}
+        minimumFontScale={0.8}
+      >
+        {label}
+      </Text>
     </PressableScale>
   );
 }
@@ -257,6 +269,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     gap: 3,
     borderRadius: radius.lg,
+  },
+  // egyenlő szélességű sorban: a szülő flex-cellája adja a szélességet
+  toolButtonFill: {
+    paddingHorizontal: 2,
   },
   toolButtonActive: {
     backgroundColor: palette.accentSoft,

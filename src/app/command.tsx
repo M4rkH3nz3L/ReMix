@@ -122,7 +122,7 @@ export default function CommandPaletteScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <Ionicons name="search" size={18} color={palette.textDim} />

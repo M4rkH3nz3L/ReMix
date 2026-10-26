@@ -574,6 +574,8 @@
     "seoSectionHint": "Für die TikTok/Reels-Beschriftung und die YouTube-Suche — alle Pflicht.",
     "descriptionLabel": "Beschreibung",
     "descriptionPlaceholder": "Worum geht's im Video? Mit Schlüsselwörtern…",
+    "missingFields": "Fehlt: {{fields}}",
+    "missingFieldsHint": "Springt zum ersten fehlenden Feld",
     "descriptionPlaceholder_image": "Was zeigt das Bild? Mit Schlüsselwörtern…",
     "descriptionPlaceholder_audio": "Worum geht's im Audio? Mit Schlüsselwörtern…",
     "hashtagsLabel": "Hashtags",
@@ -2952,6 +2954,9 @@
     "filterAll": "Alle"
   },
   "studio": {
+    "pianoRoll": {
+      "failed": "Das Umwandeln in Audio hat gerade nicht geklappt. Prüfe deine Verbindung und versuche es erneut."
+    },
     "chooseKind": "Was möchtest du erstellen?",
     "kind": {
       "video": "Video",
@@ -3212,6 +3217,10 @@
       "master": "Master"
     },
     "audio": {
+      "autoBpmFail": "Das Tempo konnte nicht erkannt werden. Versuche es erneut oder stelle die BPM manuell ein.",
+      "emptyGuide": "Das Projekt ist leer. Füge Audio hinzu, komponiere oder nimm etwas auf.",
+      "emptyGuideAdd": "Hinzufügen",
+      "emptyGuideRecord": "Aufnehmen",
       "backToTracks": "Spuren",
       "pan": "Panorama",
       "panCenter": "Mitte",

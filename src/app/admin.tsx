@@ -212,7 +212,7 @@ export default function AdminScreen() {
 
   if (!canRole && !canUser && !canReview) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <Header t={t} />
         <View style={styles.center}>
           <Ionicons name="lock-closed-outline" size={40} color={palette.border} />
@@ -223,7 +223,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header t={t} />
       {loading ? (
         <View style={styles.center}>

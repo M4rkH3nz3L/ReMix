@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type Href, router } from 'expo-router';
+import { useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -39,9 +40,12 @@ import type { ProjectMeta } from '@/types/project';
 export default function ProjectsScreen() {
   const s = useStudio();
   const { t, L, columns, listRef, projects, storageMap, shared } = s;
+  // 📐 a rács-cella pontos szélessége (lista − padding − oszlopközök) / oszlopszám
+  const [listW, setListW] = useState(0);
+  const cellMax = listW > 0 ? (listW - 2 * L.spacing.lg - 10 * (columns - 1)) / columns : 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <StudioHeader onImport={s.importVided} />
 
       <UsageBanner />
@@ -54,6 +58,7 @@ export default function ProjectsScreen() {
         ref={listRef}
         data={projects}
         key={columns}
+        onLayout={(e) => setListW(e.nativeEvent.layout.width)}
         numColumns={columns}
         columnWrapperStyle={columns > 1 ? styles.listColumns : undefined}
         keyExtractor={(item) => item.id}
@@ -151,7 +156,8 @@ export default function ProjectsScreen() {
           const itemKind = item.kind ?? 'video';
           return (
             <Pressable
-              style={[styles.card, columns > 1 && styles.cardHalf]}
+              // a rács utolsó, magában álló kártyája se nyúljon a teljes szélességre (élő teszt L3)
+              style={[styles.card, columns > 1 && styles.cardHalf, columns > 1 && cellMax ? { maxWidth: cellMax } : null]}
               onPress={() => router.push(studioRoute(item.kind, item.id) as Href)}
               onLongPress={() => s.projectMenu(item)}
             >
@@ -211,6 +217,7 @@ export default function ProjectsScreen() {
         addSource={s.addSource}
         removeSource={s.removeSource}
         seoReady={s.seoReady}
+        missingFields={s.missingFields}
         onCreate={() => {
           s.create().catch(() => {
             /* a create() belül kezeli a hibát; a .catch csak a lebegő-promise-t zárja */

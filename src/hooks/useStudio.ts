@@ -7,6 +7,7 @@ import { gridColumns } from '@/constants/layout';
 import { createProjectFromTemplate } from '@/constants/templates';
 import type { VideoTemplate } from '@/constants/templates';
 import { useLayout } from '@/hooks/useLayout';
+import { missingCreateFields } from '@/lib/createProjectForm';
 import { isMyAccountDeleted, reactivateAccount } from '@/lib/account';
 import { BG_SWATCHES, clampDim, isHexColor, nearestAspect } from '@/lib/canvasPresets';
 import { listSharedWithMe, type SharedProject } from '@/lib/collab';
@@ -139,12 +140,15 @@ export function useStudio() {
     setSources((prev) => prev.filter((x) => x.id !== id));
   };
 
-  // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve
-  const seoReady =
-    name.trim().length > 0 &&
-    seoDescription.trim().length > 0 &&
-    parseHashtags(seoHashtags).length > 0 &&
-    parseKeywords(seoKeywords).length > 0;
+  // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve —
+  // a hiányzók LISTÁJA kell a képernyőnek is (megmondja, mi hiányzik, és odaugrik)
+  const missingFields = missingCreateFields({
+    name,
+    description: seoDescription,
+    hashtags: seoHashtags,
+    keywords: seoKeywords,
+  });
+  const seoReady = missingFields.length === 0;
 
   const create = async () => {
     const title = name.trim();
@@ -399,6 +403,7 @@ export function useStudio() {
     addSource,
     removeSource,
     seoReady,
+    missingFields,
     // átnevezés-űrlap állapot
     renaming,
     setRenaming,

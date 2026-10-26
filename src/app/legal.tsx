@@ -20,7 +20,7 @@ export default function LegalScreen() {
   const title = doc === 'terms' ? t('legal.termsTitle') : t('legal.privacyTitle');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={{ width: 32 }}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />

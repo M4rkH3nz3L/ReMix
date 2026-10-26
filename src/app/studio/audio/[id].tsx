@@ -62,14 +62,14 @@ export default function AudioStudioScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
         <ActivityIndicator color={palette.accent} />
       </SafeAreaView>
     );
   }
   if (!project || project.id !== id) {
     return (
-      <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
         <Ionicons name="alert-circle-outline" size={40} color={palette.border} />
         <Text style={styles.missing}>{t('studio.notFound')}</Text>
         <Pressable style={styles.backPill} onPress={() => goBackOrHome()}>
@@ -122,7 +122,7 @@ export default function AudioStudioScreen() {
     ]);
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
       <AudioStudioBody mode="project" title={project.name} onExit={() => goBackOrHome()} onExport={openExport} />
     </SafeAreaView>

@@ -19,7 +19,9 @@ import {
   type DrumPattern,
 } from '@/lib/drums';
 
-const CELL = 22;
+/** lépés-cella: 44 pt magas (Apple HIG érintési minimum) — a workspace-ben van rá hely */
+const CELL_W = 30;
+const CELL_H = 44;
 
 /**
  * 🥁 DOB-GÉP (AUDIOT §5): step-sequencer rács (hangok × 16-od lépések). Koppintás = ütés be/ki.
@@ -100,7 +102,13 @@ export function DrumMachineSheet({
                   <Pressable
                     key={step}
                     onPress={() => setPattern((p) => toggleStep(p, voice, step))}
-                    style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
+                    style={[
+                      styles.cell,
+                      beatStart && styles.cellBeat,
+                      // ütemcsoport-térköz (4-esével) — a rács ránézésre olvasható, mint egy hardveres dobgépen
+                      beatStart && step > 0 && styles.cellGroupGap,
+                      on && styles.cellOn,
+                    ]}
                   />
                 );
               })}
@@ -139,9 +147,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   rowLabel: { width: 52 },
   rowLabelText: { color: palette.text, fontSize: 12, fontWeight: '700' },
-  cell: { width: CELL, height: CELL, marginRight: 3, borderRadius: 4, borderWidth: 1, borderColor: `${palette.border}99`, backgroundColor: '#0b0d14' },
+  cell: { width: CELL_W, height: CELL_H, marginRight: 3, borderRadius: 4, borderWidth: 1, borderColor: `${palette.border}99`, backgroundColor: '#0b0d14' },
   cellBeat: { borderColor: palette.border, backgroundColor: '#11131c' },
   cellOn: { backgroundColor: palette.accent, borderColor: palette.accent },
+  cellGroupGap: { marginLeft: 6 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: palette.border },
   clearText: { color: palette.textDim, fontSize: 13, fontWeight: '700' },

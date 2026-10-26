@@ -131,7 +131,7 @@ export default function MfaScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.header}>
         <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />

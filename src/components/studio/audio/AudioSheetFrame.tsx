@@ -56,11 +56,10 @@ export function AudioSheetFrame({
 
   if (frame && spec.tier === 'workspace') {
     return (
+      // a stúdió-gyökér már a safe area-n BELÜL van → itt nincs újabb inset (T1/A3)
       <View style={[StyleSheet.absoluteFill, styles.workspace]}>
-        <SafeAreaView edges={['top', 'bottom']} style={styles.fill}>
-          <View style={[styles.fill, { paddingHorizontal: padH }]}>{children}</View>
-          <WorkspaceTransport onBack={onClose} />
-        </SafeAreaView>
+        <View style={[styles.fill, { paddingHorizontal: padH }]}>{children}</View>
+        <WorkspaceTransport onBack={onClose} />
       </View>
     );
   }

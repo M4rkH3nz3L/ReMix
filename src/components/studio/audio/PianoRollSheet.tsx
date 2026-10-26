@@ -19,7 +19,8 @@ import {
   type SynthWave,
 } from '@/lib/synth';
 
-const ROW_H = 20;
+/** a hang-sor magassága — a workspace-ben 28 pt (könnyebb eltalálni, mint a régi 20) */
+const ROW_H = 28;
 const CELL_W = 34;
 const GUTTER_W = 42;
 const WAVES: SynthWave[] = ['sine', 'square', 'triangle', 'sawtooth'];
@@ -157,7 +158,8 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   stepBtn: { padding: 5, borderWidth: 1, borderColor: palette.border, borderRadius: 8 },
   barsText: { color: palette.text, fontSize: 12, fontWeight: '700', minWidth: 46, textAlign: 'center' },
-  gridV: { maxHeight: 360 },
+  // a rács kitölti a workspace-t (a régi fix 360 pt helyett)
+  gridV: { flex: 1 },
   row: { flexDirection: 'row', height: ROW_H },
   gutter: { width: GUTTER_W, height: ROW_H, justifyContent: 'center', paddingLeft: 4, backgroundColor: '#0d0f16', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border },
   gutterBlack: { backgroundColor: '#070910' },

@@ -568,7 +568,7 @@ export default function AuthScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.topBar}>
         <Pressable
           onPress={() => setLangOpen(true)}

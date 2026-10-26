@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
@@ -18,6 +19,7 @@ import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { aspectRatios, palette } from '@/constants/editor';
 import { AUDIO_MASTER_TARGETS } from '@/lib/audioMaster';
 import { BG_SWATCHES, CANVAS_PRESETS, clampDim } from '@/lib/canvasPresets';
+import type { CreateFieldId } from '@/lib/createProjectForm';
 import { creatableKinds } from '@/lib/projectKinds';
 import { supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import type { Layout } from '@/hooks/useLayout';
@@ -75,6 +77,8 @@ export function CreateProjectModal(props: {
   removeSource: (id: string) => void;
   // gomb-állapot + akciók
   seoReady: boolean;
+  /** a hiányzó kötelező mezők (sorrendben) — a gomb alatt kiírjuk, koppintásra az elsőre ugrunk */
+  missingFields: CreateFieldId[];
   onCreate: () => void;
   onCancel: () => void;
 }) {
@@ -108,10 +112,24 @@ export function CreateProjectModal(props: {
     addSource,
     removeSource,
     seoReady,
+    missingFields,
     onCreate,
     onCancel,
   } = props;
   const insets = useSafeAreaInsets();
+  // a mezők refjei — a „Hiányzik: …" sorra koppintva az ELSŐ hiányzóra ugrunk (T1/11)
+  const fieldRefs = {
+    name: useRef<TextInput>(null),
+    description: useRef<TextInput>(null),
+    hashtags: useRef<TextInput>(null),
+    keywords: useRef<TextInput>(null),
+  };
+  const fieldLabel: Record<CreateFieldId, string> = {
+    name: t('home.titleLabel'),
+    description: t('home.descriptionLabel'),
+    hashtags: t('home.hashtagsLabel'),
+    keywords: t('home.keywordsLabel'),
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -160,6 +178,7 @@ export function CreateProjectModal(props: {
 
             <Text style={styles.fieldLabel}>{t('home.titleLabel')}</Text>
             <TextInput
+              ref={fieldRefs.name}
               value={name}
               onChangeText={setName}
               placeholder={t('home.projectNamePlaceholder')}
@@ -173,6 +192,7 @@ export function CreateProjectModal(props: {
 
             <Text style={styles.fieldLabel}>{t('home.descriptionLabel')}</Text>
             <TextInput
+              ref={fieldRefs.description}
               value={seoDescription}
               onChangeText={setSeoDescription}
               placeholder={t(`home.descriptionPlaceholder_${kind}`, {
@@ -185,6 +205,7 @@ export function CreateProjectModal(props: {
 
             <Text style={styles.fieldLabel}>{t('home.hashtagsLabel')}</Text>
             <TextInput
+              ref={fieldRefs.hashtags}
               value={seoHashtags}
               onChangeText={setSeoHashtags}
               placeholder={t('home.hashtagsPlaceholder')}
@@ -195,6 +216,7 @@ export function CreateProjectModal(props: {
 
             <Text style={styles.fieldLabel}>{t('home.keywordsLabel')}</Text>
             <TextInput
+              ref={fieldRefs.keywords}
               value={seoKeywords}
               onChangeText={setSeoKeywords}
               placeholder={t('home.keywordsPlaceholder')}
@@ -389,6 +411,20 @@ export function CreateProjectModal(props: {
             disabled={!seoReady}
             onPress={onCreate}
           />
+          {missingFields.length > 0 ? (
+            <Pressable
+              onPress={() => fieldRefs[missingFields[0]].current?.focus()}
+              hitSlop={8}
+              style={styles.missingRow}
+              accessibilityRole="button"
+              accessibilityHint={t('home.missingFieldsHint')}
+            >
+              <Ionicons name="alert-circle-outline" size={14} color={palette.warning} />
+              <Text style={styles.missingText} numberOfLines={2}>
+                {t('home.missingFields', { fields: missingFields.map((f) => fieldLabel[f]).join(' · ') })}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable onPress={onCancel} style={styles.cancel}>
             <Text style={styles.cancelText}>{t('common.cancel')}</Text>
           </Pressable>
@@ -399,6 +435,15 @@ export function CreateProjectModal(props: {
 }
 
 const styles = StyleSheet.create({
+  missingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    minHeight: 32,
+  },
+  missingText: { color: palette.warning, fontSize: 13, fontWeight: '600', flexShrink: 1 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: '#000000aa',

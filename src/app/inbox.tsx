@@ -77,7 +77,7 @@ export default function InboxScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('chat.inbox')}</Text>
         <Pressable

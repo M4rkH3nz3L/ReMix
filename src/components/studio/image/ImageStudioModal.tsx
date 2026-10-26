@@ -110,7 +110,7 @@ export function ImageStudioModal() {
       {open && imageClip ? (
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: '#05060a' }} edges={['top', 'bottom']}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#05060a' }} edges={['top', 'bottom', 'left', 'right']}>
               <ImageStudioBody
                 mode="scoped"
                 docId={imageClip.docId}

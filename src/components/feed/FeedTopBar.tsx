@@ -31,7 +31,7 @@ export function FeedTopBar({
 }) {
   const { t } = useTranslation();
   return (
-    <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.topBar} pointerEvents="box-none">
       {channelId ? (
         <View style={styles.channelBar}>
           <Pressable onPress={() => goBackOrHome()} hitSlop={12}>

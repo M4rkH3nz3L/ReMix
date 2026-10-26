@@ -54,7 +54,7 @@ export function AudioStudioModal() {
     <Modal visible={open} animationType="slide" onRequestClose={() => handleBack() || close()}>
       {open ? (
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#05060a' }} edges={['top', 'bottom']}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#05060a' }} edges={['top', 'bottom', 'left', 'right']}>
             <AudioStudioBody mode="scoped" title={project?.name ?? ''} onExit={close} />
           </SafeAreaView>
         </SafeAreaProvider>

@@ -658,6 +658,30 @@ export function AudioStudioBody({
               </View>
             </View>
           </ScrollView>
+          {/* 🧭 üres projekt: egyértelmű első lépés a sávok alatti üres területen (T1/A1) */}
+          {LANES.every((lane) => !project.tracks.find((tr) => tr.type === lane.type)?.clips.length) ? (
+            <View
+              pointerEvents="box-none"
+              style={[styles.emptyGuide, { top: RULER_H + LANES.length * LANE_H + 32 }]}
+            >
+              <Ionicons name="musical-notes-outline" size={28} color={palette.textDim} />
+              <Text style={styles.emptyGuideText}>{t('studio.audio.emptyGuide')}</Text>
+              <View style={styles.emptyGuideRow}>
+                <Pressable
+                  onPress={() => setAdding(true)}
+                  style={[styles.emptyGuideBtn, styles.emptyGuideBtnPrimary]}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={styles.emptyGuideBtnTextPrimary}>{t('studio.audio.emptyGuideAdd')}</Text>
+                </Pressable>
+                <Pressable onPress={toggleRecord} style={styles.emptyGuideBtn} accessibilityRole="button">
+                  <Ionicons name="mic-outline" size={16} color={palette.text} />
+                  <Text style={styles.emptyGuideBtnText}>{t('studio.audio.emptyGuideRecord')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
         </View>
         </GestureDetector>
         {sheetsInDock ? <View style={{ width: L.editor.inspectorWidth }}>{sheets}</View> : null}
@@ -818,6 +842,23 @@ const styles = StyleSheet.create({
   phBubbleText: { color: '#fff', fontSize: 9, fontWeight: '800', fontVariant: ['tabular-nums'] },
   fillCol: { flex: 1 },
   dockRow: { flex: 1, flexDirection: 'row' },
+  emptyGuide: { position: 'absolute', left: HEADER_W, right: 0, alignItems: 'center', gap: 10, paddingHorizontal: 24 },
+  emptyGuideText: { color: palette.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyGuideRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  emptyGuideBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+  },
+  emptyGuideBtnPrimary: { backgroundColor: palette.accent, borderColor: palette.accent },
+  emptyGuideBtnText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  emptyGuideBtnTextPrimary: { color: '#fff', fontSize: 14, fontWeight: '800' },
   // a transport-sor nem nő flexből (a sávok kapják a helyet)
   transportBar: { flexGrow: 0 },
   transport: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8 },

@@ -574,6 +574,8 @@
     "seoSectionHint": "A TikTok/Reels felirathoz és a YouTube kereséshez — mindet meg kell adni.",
     "descriptionLabel": "Leírás",
     "descriptionPlaceholder": "Miről szól a videó? Kulcsszavakkal…",
+    "missingFields": "Hiányzik: {{fields}}",
+    "missingFieldsHint": "Az első hiányzó mezőre ugrik",
     "descriptionPlaceholder_image": "Mit ábrázol a kép? Kulcsszavakkal…",
     "descriptionPlaceholder_audio": "Miről szól a hanganyag? Kulcsszavakkal…",
     "hashtagsLabel": "Hashtagek",
@@ -2952,6 +2954,9 @@
     "filterAll": "Mind"
   },
   "studio": {
+    "pianoRoll": {
+      "failed": "Most nem sikerült hanggá alakítani. Ellenőrizd az internetkapcsolatot, és próbáld újra."
+    },
     "chooseKind": "Mit készítesz?",
     "kind": {
       "video": "Videó",
@@ -3242,6 +3247,10 @@
       "master": "Master"
     },
     "audio": {
+      "autoBpmFail": "Nem sikerült felismerni a tempót. Próbáld újra, vagy állítsd be kézzel a BPM-et.",
+      "emptyGuide": "Még üres a projekt. Adj hozzá hangot, komponálj, vagy vegyél fel egyet.",
+      "emptyGuideAdd": "Hozzáadás",
+      "emptyGuideRecord": "Felvétel",
       "backToTracks": "Sávok",
       "pan": "Pásztázás",
       "panCenter": "Közép",

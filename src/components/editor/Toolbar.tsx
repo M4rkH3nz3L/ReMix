@@ -606,10 +606,14 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
   const rowTools = promoted ? [...layout.primary, promoted] : layout.primary;
   const moreTools = promoted ? layout.overflow.filter((id) => id !== promoted) : layout.overflow;
 
+  const rail = variant === 'rail';
   const renderTool = (id: ToolId, onAfter?: () => void) => {
     const def = TOOLS[id];
+    // a vízszintes sávban (nem a railen / nem a „Több" rácsban) egyenlő cellák
+    const fillCell = !rail && !onAfter;
     const button = (
       <ToolButton
+        fill={fillCell}
         icon={def.icon}
         label={def.label}
         active={def.panel ? activePanel === def.panel : def.active}
@@ -626,51 +630,68 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
       />
     );
     return def.tutorialId && !onAfter ? (
-      <TutorialTarget key={id} id={def.tutorialId}>
+      <TutorialTarget key={id} id={def.tutorialId} style={fillCell ? styles.cell : undefined}>
         {button}
       </TutorialTarget>
     ) : (
-      <View key={id}>{button}</View>
+      <View key={id} style={fillCell ? styles.cell : undefined}>
+        {button}
+      </View>
     );
   };
 
-  const rail = variant === 'rail';
+  const toolRow = (
+    <Animated.View style={[rail ? styles.toolColumn : styles.toolRow, toolRowStyle]}>
+      {selected ? (
+        <View style={rail ? undefined : styles.cell}>
+          <ToolButton
+            fill={!rail}
+            icon="checkmark-circle-outline"
+            label={t('common.done')}
+            onPress={() => selectClip(null)}
+          />
+        </View>
+      ) : null}
+      {rowTools.map((id) => renderTool(id))}
+      {moreTools.length > 0 ? (
+        <View style={rail ? undefined : styles.cell}>
+          <ToolButton
+            fill={!rail}
+            icon="ellipsis-horizontal-circle-outline"
+            label={t('editor.toolbar.more')}
+            onPress={() => setMoreOpen(true)}
+          />
+        </View>
+      ) : null}
+      {selected ? (
+        <>
+          {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
+          <View style={rail ? styles.toolSepH : styles.toolSep} />
+          <View style={rail ? undefined : styles.cell}>
+            <ToolButton
+              fill={!rail}
+              icon="trash-outline"
+              label={multi ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
+              danger
+              onPress={remove}
+            />
+          </View>
+        </>
+      ) : null}
+      {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
+          egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
+    </Animated.View>
+  );
+
   return (
     <View style={rail ? styles.railContainer : styles.container}>
       {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya
           (railnél a képernyő az idővonal fölé teszi — a keskeny oszlopba nem fér) */}
       {rail ? null : <SelectionInfo />}
-      <ScrollView horizontal={!rail} showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
-        {/* 4 elsődleges eszköz + „Több" (MOBILE-UI §6.4); a sor NEM remountol → a
-            scroll-pozíció marad, a készlet-váltás csak átúszik */}
-        <Animated.View style={[rail ? styles.toolColumn : styles.toolRow, toolRowStyle]}>
-          {selected ? (
-            <ToolButton icon="checkmark-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
-          ) : null}
-          {rowTools.map((id) => renderTool(id))}
-          {moreTools.length > 0 ? (
-            <ToolButton
-              icon="ellipsis-horizontal-circle-outline"
-              label={t('editor.toolbar.more')}
-              onPress={() => setMoreOpen(true)}
-            />
-          ) : null}
-          {selected ? (
-            <>
-              {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
-              <View style={rail ? styles.toolSepH : styles.toolSep} />
-              <ToolButton
-                icon="trash-outline"
-                label={multi ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
-                danger
-                onPress={remove}
-              />
-            </>
-          ) : null}
-          {/* Export SZÁNDÉKOSAN nincs itt: a fejléc jobb felső Export gombja az
-              egyetlen belépő (a duplikáció megszüntetve — lásd editor/[id].tsx). */}
-        </Animated.View>
-      </ScrollView>
+      {/* a vízszintes sáv max ~7 gombja EGYENLŐ cellákban, görgetés nélkül fér ki (fekvőben
+          is — élő teszt L1: a Törlés kilógott); a rail függőlegesen görgethető. A sor NEM
+          remountol a készlet-váltáskor, csak átúszik (MOBILE-UI §6.4). */}
+      {rail ? <ScrollView showsVerticalScrollIndicator={false}>{toolRow}</ScrollView> : toolRow}
       {/* ⋯ „Több" — ikonrács modális lapon (menü, nem élő szerkesztés → a scrim rendben) */}
       <BottomSheet
         visible={moreOpen}
@@ -752,10 +773,12 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     backgroundColor: palette.border,
   },
-  // a vízszintes görgetősor egyetlen animált tartalom-doboza (fade a váltáskor)
+  // a vízszintes sáv: egyenlő cellák a teljes szélességen
   toolRow: {
     flexDirection: 'row',
+    paddingHorizontal: 4,
   },
+  cell: { flex: 1, minWidth: 0 },
   // függőleges elválasztó a destruktív művelet (Törlés) elkülönítéséhez
   toolSep: {
     width: 1,

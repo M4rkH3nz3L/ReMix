@@ -574,6 +574,8 @@
     "seoSectionHint": "For the TikTok/Reels caption and YouTube search — all required.",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "What's the video about? With keywords…",
+    "missingFields": "Missing: {{fields}}",
+    "missingFieldsHint": "Jumps to the first missing field",
     "descriptionPlaceholder_image": "What does the image show? With keywords…",
     "descriptionPlaceholder_audio": "What's the audio about? With keywords…",
     "hashtagsLabel": "Hashtags",
@@ -2952,6 +2954,9 @@
     "filterAll": "All"
   },
   "studio": {
+    "pianoRoll": {
+      "failed": "Couldn't turn this into audio right now. Check your connection and try again."
+    },
     "chooseKind": "What are you creating?",
     "kind": {
       "video": "Video",
@@ -3242,6 +3247,10 @@
       "master": "Master"
     },
     "audio": {
+      "autoBpmFail": "Couldn't detect the tempo. Try again, or set the BPM manually.",
+      "emptyGuide": "The project is empty. Add audio, compose, or record something.",
+      "emptyGuideAdd": "Add",
+      "emptyGuideRecord": "Record",
       "backToTracks": "Tracks",
       "pan": "Pan",
       "panCenter": "Center",

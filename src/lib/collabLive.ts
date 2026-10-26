@@ -71,6 +71,35 @@ export function openLiveChannel(
   if (!sb) {
     return { broadcast: () => {}, sendCursor: () => {}, sendLock: () => {}, stop: () => {} };
   }
+  // 🛡️ A realtime-kliens `channel(topic)` a MÁR LÉTEZŐ azonos topicú csatornát adja vissza,
+  // a `removeChannel` pedig aszinkron. Gyors stop→újranyitásnál (reload, remount,
+  // projektváltás) így a régi, már feliratkozott csatornát kapnánk, amire a
+  // `.on('presence')` kivételt dob („cannot add presence callbacks … after subscribe()").
+  // Ezért ha még él, előbb megvárjuk a lebontását, és csak utána nyitunk újat.
+  const stale = sb.getChannels().find((c) => c.topic === `realtime:${topic}`);
+  if (stale) {
+    let inner: LiveChannel | null = null;
+    let stopped = false;
+    void sb
+      .removeChannel(stale)
+      .catch(() => 'error')
+      .then(() => {
+        // ha a lebontás nem sikerült, a topic még foglalt → nem próbálkozunk (nincs végtelen ciklus)
+        if (!stopped && !sb.getChannels().some((c) => c.topic === `realtime:${topic}`)) {
+          inner = openLiveChannel(topic, self, handlers);
+        }
+      });
+    return {
+      broadcast: (commands) => inner?.broadcast(commands),
+      sendCursor: (playhead) => inner?.sendCursor(playhead),
+      sendLock: (msg) => inner?.sendLock(msg),
+      stop: () => {
+        stopped = true;
+        inner?.stop();
+      },
+    };
+  }
+
   const channel = sb.channel(topic, {
     config: { presence: { key: self.id }, broadcast: { self: false } },
   });

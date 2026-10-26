@@ -806,6 +806,7 @@
       "effectsNote": "Itt látszanak azok a hatások, amiket az élő előnézet nem tud mutatni: részecskék, mozgás-elmosás, égcsere, 3D matricák és szöveg, arc-elmosás, átmenetek."
     },
     "panelHost": {
+      "focusCanvas": "Vászon",
       "showTimeline": "Teljes idővonal",
       "details": "Részletek",
       "focusParams": "Paraméterek",
@@ -3229,6 +3230,7 @@
       "master": "Master"
     },
     "audio": {
+      "backToTracks": "Sávok",
       "pan": "Pásztázás",
       "panCenter": "Közép",
       "addMedia": "Hang hozzáadása",

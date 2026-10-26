@@ -222,6 +222,8 @@ export interface EditorState {
   panelDetent: Detent;
   /** ⚡ Strip-panel „Részletek"-re kibontva (strip → sheet) */
   panelExpanded: boolean;
+  /** 🎯 a (canFocus) lap ideiglenesen Focus-ba váltva — a „Kész" visszahoz a laphoz */
+  panelFocus: boolean;
   /** 📐 a felhasználó utolsó detent-választása panelenként (session-szintű) */
   panelDetentMemory: Partial<Record<VideoPanelId, Detent>>;
   past: Project[];
@@ -402,6 +404,8 @@ export interface EditorState {
   setPanelDetent: (detent: Detent) => void;
   /** ⚡ Strip → Sheet („Részletek") */
   expandPanel: () => void;
+  /** 🎯 a lap ideiglenes Focus-módja (csak `canFocus` panelnél hat) */
+  setPanelFocus: (on: boolean) => void;
   /** 🖼️ Kép Stúdió (teljes képernyős, on-device képszerkesztő) cél-klipje */
   imageStudioClipId: string | null;
   openImageStudio: (clipId: string) => void;

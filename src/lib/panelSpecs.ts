@@ -23,6 +23,9 @@ export interface PanelSpec {
   initialDetent?: Detent;
   /** nem-élő feladat → Modal + scrim megengedett */
   modal?: boolean;
+  /** a lapról ideiglenesen Focus-ba váltható (a tárgy a vásznon pozicionálható:
+   *  húzás/méretezés teljes vásznon, a „Kész" visszahoz a laphoz) */
+  canFocus?: boolean;
 }
 
 /** A videó-szerkesztő panel-azonosítói (= `PanelId` a store-ban, `null` nélkül). */
@@ -59,9 +62,9 @@ export const VIDEO_PANEL_SPECS: Record<VideoPanelId, PanelSpec> = {
   pip: { tier: 'focus' },
   // 📄 részletes
   adjust: { tier: 'sheet', initialDetent: 'half' },
-  hotspot: { tier: 'sheet', initialDetent: 'peek' },
-  text: { tier: 'sheet', initialDetent: 'peek' },
-  shape: { tier: 'sheet', initialDetent: 'peek' },
+  hotspot: { tier: 'sheet', initialDetent: 'peek', canFocus: true },
+  text: { tier: 'sheet', initialDetent: 'peek', canFocus: true },
+  shape: { tier: 'sheet', initialDetent: 'peek', canFocus: true },
   sticker: { tier: 'sheet', initialDetent: 'peek' },
   captions: { tier: 'sheet', initialDetent: 'half' },
   transcript: { tier: 'sheet', initialDetent: 'half' },

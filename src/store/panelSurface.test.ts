@@ -71,6 +71,36 @@ describe('panel felület-szint (store)', () => {
     expect(selectSurfaceTier(store())).toBeNull();
   });
 
+  it('canFocus lap: ideiglenesen Focus-ba vált, a „Kész" visszahozza a laphoz', () => {
+    store().loadProject({
+      ...makeProject(),
+      tracks: [
+        ...makeProject().tracks,
+        track('interactive', [
+          {
+            id: 'h1', kind: 'interactive', start: 0, duration: 3, label: 'H',
+            rect: { x: 0.3, y: 0.3, w: 0.2, h: 0.2 }, action: { type: 'url', url: '' },
+          } as Clip,
+        ]),
+      ],
+    });
+    store().selectClip('h1');
+    store().setPanel('hotspot');
+    expect(selectSurfaceTier(store())).toBe('sheet');
+    store().setPanelFocus(true);
+    expect(selectSurfaceTier(store())).toBe('focus');
+    store().setPanelFocus(false);
+    expect(selectSurfaceTier(store())).toBe('sheet');
+  });
+
+  it('nem-canFocus panelnél a Focus-kérés hatástalan; panelváltás törli', () => {
+    store().setPanel('captions');
+    store().setPanelFocus(true);
+    expect(selectSurfaceTier(store())).toBe('sheet');
+    store().setPanel('library');
+    expect(store().panelFocus).toBe(false);
+  });
+
   it('a detent-választás panelenként megmarad (session)', () => {
     store().setPanel('captions');
     expect(store().panelDetent).toBe('half'); // regiszter kezdő

@@ -16,6 +16,7 @@ import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
 import { palette } from '@/constants/editor';
+import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
 import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
@@ -115,6 +116,9 @@ export function AudioStudioBody({
   const [rootH, setRootH] = useState(0);
   const [topBarH, setTopBarH] = useState(0);
   const [transportH, setTransportH] = useState<number | undefined>(undefined);
+  // 🖥️ iPad fekvő: a keverő/master/klip-szerk. a sávok MELLETT, dokkolt oszlopban (MOBILE-UI §7)
+  const L = useLayout();
+  const docked = L.isExpanded;
   const [albumSharing, setAlbumSharing] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
@@ -437,8 +441,48 @@ export function AudioStudioBody({
           detent: inlineDetent,
           onDetentChange: (d: Detent) =>
             inlineSheet && setDetentById((m) => ({ ...m, [inlineSheet]: d })),
+          docked,
         }
       : null;
+  // dokkolt módban a nyitott inline lap a sávok mellé kerül (a workspace/modális lapok maradnak)
+  const sheetsInDock = docked && inlineSheet !== null;
+
+  const sheets = (
+    <AudioStudioSheets
+      selClip={selClip}
+      fps={fps}
+      bpm={bpm}
+      editing={editing}
+      mastering={mastering}
+      mixerOpen={mixerOpen}
+      adding={adding}
+      tts={tts}
+      pianoRoll={pianoRoll}
+      pianoBusy={pianoBusy}
+      drumMachine={drumMachine}
+      drumBusy={drumBusy}
+      sampler={sampler}
+      samplerBusy={samplerBusy}
+      source={source}
+      albumOpen={albumOpen}
+      setEditing={setEditing}
+      setMastering={setMastering}
+      setMixerOpen={setMixerOpen}
+      setAdding={setAdding}
+      setTts={setTts}
+      setPianoRoll={setPianoRoll}
+      setDrumMachine={setDrumMachine}
+      setSampler={setSampler}
+      setSource={setSource}
+      setAlbumOpen={setAlbumOpen}
+      onBakeSynth={(notes, wave) => void bakeSynth(notes, wave)}
+      onBakeDrums={(hits, bars) => void bakeDrums(hits, bars)}
+      onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
+      onInsertSource={insertSource}
+      onShareAlbum={() => void shareAlbum()}
+      frame={sheetFrame}
+    />
+  );
 
   return (
     <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
@@ -496,125 +540,128 @@ export function AudioStudioBody({
       </View>
 
       {/* multi-track idővonal */}
-      <GestureDetector gesture={timelinePinch}>
-      <View style={styles.timelineWrap} onLayout={(e) => setTlH(e.nativeEvent.layout.height)}>
-        <View style={styles.headers}>
-          <View style={{ height: RULER_H }} />
-          {LANES.map((lane) => {
-            const muted = mutedTracks.includes(lane.type);
-            const solo = soloTracks.includes(lane.type);
-            return (
-              <View key={lane.type} style={styles.laneHeader}>
-                <View style={styles.laneHeadTop}>
-                  <Ionicons name={lane.icon} size={13} color={lane.color} />
-                  <Text style={styles.trackName} numberOfLines={1}>
-                    {t(lane.labelKey)}
-                  </Text>
-                </View>
-                <View style={styles.flagRow}>
-                  <Pressable onPress={() => toggleFlag(lane.type, 'mute')} hitSlop={6}>
-                    <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={13} color={muted ? palette.danger : palette.textDim} />
-                  </Pressable>
-                  <Pressable onPress={() => toggleFlag(lane.type, 'solo')} hitSlop={6}>
-                    <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ width: timelineW, height: contentH }}>
-            {/* másodperc-rács a teljes magasságon */}
-            {ticks.map((i) => (
-              <View
-                key={`g${i}`}
-                pointerEvents="none"
-                style={[
-                  styles.grid,
-                  { left: i * pxPerSec, height: contentH, backgroundColor: i % 5 === 0 ? palette.border : `${palette.border}66` },
-                ]}
-              />
-            ))}
-            {/* 🎵 beat-rács: az ütem-kezdő (downbeat) vonalak kiemelve */}
-            {beatTimes.map((sec, i) => {
-              const isDownbeat = Math.abs((sec % secPerBar) ) < 1e-3 || Math.abs((sec % secPerBar) - secPerBar) < 1e-3;
-              return (
-                <View
-                  key={`beat${i}`}
-                  pointerEvents="none"
-                  style={[
-                    styles.beatLine,
-                    { left: sec * pxPerSec, height: contentH, opacity: isDownbeat ? 0.5 : 0.22, width: isDownbeat ? 1.5 : 1 },
-                  ]}
-                />
-              );
-            })}
-            {/* 🥁📍 detektált beat-vonalak (az importált zene VALÓS beatjei) */}
-            {detectedBeats.map((sec, i) => (
-              <View
-                key={`db${i}`}
-                pointerEvents="none"
-                style={[styles.detectedBeat, { left: sec * pxPerSec, height: contentH }]}
-              />
-            ))}
-            {/* 🔁 loop-régió árnyék (rangeIn…rangeOut) */}
-            {rangeIn != null && rangeOut != null && rangeOut > rangeIn ? (
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.loopShade,
-                  { left: rangeIn * pxPerSec, width: (rangeOut - rangeIn) * pxPerSec, height: contentH },
-                ]}
-              />
-            ) : null}
-            {/* idővonalzó (timecode) */}
-            <View style={styles.ruler}>
-              {ticks.map((i) =>
-                i % 5 === 0 ? (
-                  <Text key={`t${i}`} style={[styles.rulerLabel, { left: i * pxPerSec + 3 }]}>
-                    {formatTime(i)}
-                  </Text>
-                ) : null
-              )}
-            </View>
-            {/* sávok */}
+      <View style={sheetsInDock ? styles.dockRow : styles.fillCol}>
+        <GestureDetector gesture={timelinePinch}>
+        <View style={styles.timelineWrap} onLayout={(e) => setTlH(e.nativeEvent.layout.height)}>
+          <View style={styles.headers}>
+            <View style={{ height: RULER_H }} />
             {LANES.map((lane) => {
-              const track = project.tracks.find((tr) => tr.type === lane.type);
-              const clips = (track?.clips ?? []).filter((c): c is AudioClip => c.kind === 'audio');
+              const muted = mutedTracks.includes(lane.type);
+              const solo = soloTracks.includes(lane.type);
               return (
-                <Pressable key={lane.type} style={[styles.lane, { backgroundColor: `${lane.color}10` }]} onPress={seekAt}>
-                  {clips.length === 0 ? (
-                    <Text style={styles.laneEmpty} numberOfLines={1}>
+                <View key={lane.type} style={styles.laneHeader}>
+                  <View style={styles.laneHeadTop}>
+                    <Ionicons name={lane.icon} size={13} color={lane.color} />
+                    <Text style={styles.trackName} numberOfLines={1}>
                       {t(lane.labelKey)}
                     </Text>
-                  ) : null}
-                  {clips.map((clip) => (
-                    <AudioTimelineClip
-                      key={clip.id}
-                      clip={clip}
-                      pxPerSec={pxPerSec}
-                      laneColor={lane.color}
-                      laneH={LANE_H}
-                      laneType={lane.type}
-                      laneTypes={LANE_TYPES}
-                      selected={clip.id === selectedClipId}
-                      snap={snapSecIn}
-                    />
-                  ))}
-                </Pressable>
+                  </View>
+                  <View style={styles.flagRow}>
+                    <Pressable onPress={() => toggleFlag(lane.type, 'mute')} hitSlop={6}>
+                      <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={13} color={muted ? palette.danger : palette.textDim} />
+                    </Pressable>
+                    <Pressable onPress={() => toggleFlag(lane.type, 'solo')} hitSlop={6}>
+                      <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
+                    </Pressable>
+                  </View>
+                </View>
               );
             })}
-            {/* playhead a teljes magasságon + idő-buborék */}
-            <View pointerEvents="none" style={[styles.playhead, { left: playhead * pxPerSec, height: contentH }]} />
-            <View pointerEvents="none" style={[styles.phBubble, { left: playhead * pxPerSec - 21 }]}>
-              <Text style={styles.phBubbleText}>{formatTime(playhead)}</Text>
-            </View>
           </View>
-        </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ width: timelineW, height: contentH }}>
+              {/* másodperc-rács a teljes magasságon */}
+              {ticks.map((i) => (
+                <View
+                  key={`g${i}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.grid,
+                    { left: i * pxPerSec, height: contentH, backgroundColor: i % 5 === 0 ? palette.border : `${palette.border}66` },
+                  ]}
+                />
+              ))}
+              {/* 🎵 beat-rács: az ütem-kezdő (downbeat) vonalak kiemelve */}
+              {beatTimes.map((sec, i) => {
+                const isDownbeat = Math.abs((sec % secPerBar) ) < 1e-3 || Math.abs((sec % secPerBar) - secPerBar) < 1e-3;
+                return (
+                  <View
+                    key={`beat${i}`}
+                    pointerEvents="none"
+                    style={[
+                      styles.beatLine,
+                      { left: sec * pxPerSec, height: contentH, opacity: isDownbeat ? 0.5 : 0.22, width: isDownbeat ? 1.5 : 1 },
+                    ]}
+                  />
+                );
+              })}
+              {/* 🥁📍 detektált beat-vonalak (az importált zene VALÓS beatjei) */}
+              {detectedBeats.map((sec, i) => (
+                <View
+                  key={`db${i}`}
+                  pointerEvents="none"
+                  style={[styles.detectedBeat, { left: sec * pxPerSec, height: contentH }]}
+                />
+              ))}
+              {/* 🔁 loop-régió árnyék (rangeIn…rangeOut) */}
+              {rangeIn != null && rangeOut != null && rangeOut > rangeIn ? (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.loopShade,
+                    { left: rangeIn * pxPerSec, width: (rangeOut - rangeIn) * pxPerSec, height: contentH },
+                  ]}
+                />
+              ) : null}
+              {/* idővonalzó (timecode) */}
+              <View style={styles.ruler}>
+                {ticks.map((i) =>
+                  i % 5 === 0 ? (
+                    <Text key={`t${i}`} style={[styles.rulerLabel, { left: i * pxPerSec + 3 }]}>
+                      {formatTime(i)}
+                    </Text>
+                  ) : null
+                )}
+              </View>
+              {/* sávok */}
+              {LANES.map((lane) => {
+                const track = project.tracks.find((tr) => tr.type === lane.type);
+                const clips = (track?.clips ?? []).filter((c): c is AudioClip => c.kind === 'audio');
+                return (
+                  <Pressable key={lane.type} style={[styles.lane, { backgroundColor: `${lane.color}10` }]} onPress={seekAt}>
+                    {clips.length === 0 ? (
+                      <Text style={styles.laneEmpty} numberOfLines={1}>
+                        {t(lane.labelKey)}
+                      </Text>
+                    ) : null}
+                    {clips.map((clip) => (
+                      <AudioTimelineClip
+                        key={clip.id}
+                        clip={clip}
+                        pxPerSec={pxPerSec}
+                        laneColor={lane.color}
+                        laneH={LANE_H}
+                        laneType={lane.type}
+                        laneTypes={LANE_TYPES}
+                        selected={clip.id === selectedClipId}
+                        snap={snapSecIn}
+                      />
+                    ))}
+                  </Pressable>
+                );
+              })}
+              {/* playhead a teljes magasságon + idő-buborék */}
+              <View pointerEvents="none" style={[styles.playhead, { left: playhead * pxPerSec, height: contentH }]} />
+              <View pointerEvents="none" style={[styles.phBubble, { left: playhead * pxPerSec - 21 }]}>
+                <Text style={styles.phBubbleText}>{formatTime(playhead)}</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+        </GestureDetector>
+        {sheetsInDock ? <View style={{ width: L.editor.inspectorWidth }}>{sheets}</View> : null}
       </View>
-      </GestureDetector>
 
       {/* transport — gazdag sor (undo/redo · ugrás · loop/In-Out · idő+ütem · BPM · zoom · snap) */}
       <ScrollView
@@ -680,7 +727,7 @@ export function AudioStudioBody({
       </ScrollView>
 
       {/* eszköz-sor — nyitott inline lapnál rejtve (a lap fejléce a kilépés; a transport marad) */}
-      {inlineSheet ? null : (
+      {inlineSheet && !docked ? null : (
         <AudioStudioToolbar
           hasSelection={!!selClip}
           isRecording={recorderState.isRecording}
@@ -693,40 +740,7 @@ export function AudioStudioBody({
         />
       )}
 
-      <AudioStudioSheets
-        selClip={selClip}
-        fps={fps}
-        bpm={bpm}
-        editing={editing}
-        mastering={mastering}
-        mixerOpen={mixerOpen}
-        adding={adding}
-        tts={tts}
-        pianoRoll={pianoRoll}
-        pianoBusy={pianoBusy}
-        drumMachine={drumMachine}
-        drumBusy={drumBusy}
-        sampler={sampler}
-        samplerBusy={samplerBusy}
-        source={source}
-        albumOpen={albumOpen}
-        setEditing={setEditing}
-        setMastering={setMastering}
-        setMixerOpen={setMixerOpen}
-        setAdding={setAdding}
-        setTts={setTts}
-        setPianoRoll={setPianoRoll}
-        setDrumMachine={setDrumMachine}
-        setSampler={setSampler}
-        setSource={setSource}
-        setAlbumOpen={setAlbumOpen}
-        onBakeSynth={(notes, wave) => void bakeSynth(notes, wave)}
-        onBakeDrums={(hits, bars) => void bakeDrums(hits, bars)}
-        onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
-        onInsertSource={insertSource}
-        onShareAlbum={() => void shareAlbum()}
-        frame={sheetFrame}
-      />
+      {sheetsInDock ? null : sheets}
     </View>
   );
 }
@@ -802,6 +816,8 @@ const styles = StyleSheet.create({
   playhead: { position: 'absolute', top: 0, width: 2, backgroundColor: '#fff' },
   phBubble: { position: 'absolute', top: 2, backgroundColor: palette.accent, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 },
   phBubbleText: { color: '#fff', fontSize: 9, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  fillCol: { flex: 1 },
+  dockRow: { flex: 1, flexDirection: 'row' },
   // a transport-sor nem nő flexből (a sávok kapják a helyet)
   transportBar: { flexGrow: 0 },
   transport: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8 },

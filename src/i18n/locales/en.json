@@ -806,6 +806,7 @@
       "effectsNote": "Here you can see effects the live preview can't show: particles, motion blur, sky replacement, 3D stickers and text, face blur, transitions."
     },
     "panelHost": {
+      "focusCanvas": "Canvas",
       "showTimeline": "Full timeline",
       "details": "Details",
       "focusParams": "Parameters",
@@ -3229,6 +3230,7 @@
       "master": "Master"
     },
     "audio": {
+      "backToTracks": "Tracks",
       "pan": "Pan",
       "panCenter": "Center",
       "addMedia": "Add audio",

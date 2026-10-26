@@ -37,6 +37,7 @@ import { palette } from '@/constants/editor';
 import { motion, radius } from '@/design';
 import { useLayout } from '@/hooks/useLayout';
 import type { Detent } from '@/lib/panelLayout';
+import { videoPanelSpec } from '@/lib/panelSpecs';
 import {
   selectPanelVisible,
   selectSelectedClip,
@@ -75,6 +76,8 @@ export function PanelHost({
   const panelDetent = useEditorStore((s) => s.panelDetent);
   const setPanelDetent = useEditorStore((s) => s.setPanelDetent);
   const expandPanel = useEditorStore((s) => s.expandPanel);
+  const panelFocus = useEditorStore((s) => s.panelFocus);
+  const setPanelFocus = useEditorStore((s) => s.setPanelFocus);
   const setPanel = useEditorStore((s) => s.setPanel);
   const selected = useEditorStore(selectSelectedClip);
   const L = useLayout();
@@ -214,7 +217,8 @@ export function PanelHost({
   // 🎯 FOCUS — a vászon fölé úszó króm (a képernyő minden mást elrejt)
   if (!docked && tier === 'focus') {
     return (
-      <FocusChrome title={title} onDone={close}>
+      // a lapról kért (canFocus) Focus „Kész"-e a laphoz visz vissza, nem zár
+      <FocusChrome title={title} onDone={panelFocus ? () => setPanelFocus(false) : close}>
         {content}
       </FocusChrome>
     );
@@ -231,9 +235,22 @@ export function PanelHost({
         accessibilityLabel={title}
         header={
           <View style={[styles.header, { paddingHorizontal: L.spacing.lg }]}>
-            <Text style={[styles.title, { fontSize: L.font(13) }]} numberOfLines={1}>
+            <Text style={[styles.title, styles.flexTitle, { fontSize: L.font(13) }]} numberOfLines={1}>
               {title}
             </Text>
+            {videoPanelSpec(activePanel)?.canFocus ? (
+              // 🎯 a tárgy pozicionálása teljes vásznon (húzás/méretezés), lap nélkül
+              <Pressable
+                onPress={() => setPanelFocus(true)}
+                hitSlop={8}
+                style={styles.detailsButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('editor.panelHost.focusCanvas')}
+              >
+                <Ionicons name="scan-outline" size={14} color={palette.accent} />
+                <Text style={styles.detailsText}>{t('editor.panelHost.focusCanvas')}</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={close}
               hitSlop={12}
@@ -375,8 +392,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     paddingVertical: 8,
   },
+  flexTitle: { flex: 1 },
   title: {
     color: palette.text,
     fontWeight: '700',

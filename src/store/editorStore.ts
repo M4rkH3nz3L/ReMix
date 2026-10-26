@@ -74,7 +74,7 @@ export function selectSurfaceTier(state: EditorState): 'strip' | 'sheet' | 'focu
   if (!spec) {
     return 'sheet';
   }
-  if (spec.tier === 'focus') {
+  if (spec.tier === 'focus' || (state.panelFocus && spec.canFocus)) {
     return 'focus';
   }
   if (spec.tier === 'strip' && !state.panelExpanded) {

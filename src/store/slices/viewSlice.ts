@@ -28,6 +28,7 @@ type ViewSlice = Pick<
   | 'activePanel'
   | 'panelDetent'
   | 'panelExpanded'
+  | 'panelFocus'
   | 'panelDetentMemory'
   | 'trimMode'
   | 'rippleMode'
@@ -78,6 +79,7 @@ type ViewSlice = Pick<
   | 'setPanel'
   | 'setPanelDetent'
   | 'expandPanel'
+  | 'setPanelFocus'
   | 'toggleTrackFlag'
   | 'cycleTrackHeight'
   | 'isTrackVisible'
@@ -94,6 +96,7 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
   activePanel: null,
   panelDetent: 'peek',
   panelExpanded: false,
+  panelFocus: false,
   panelDetentMemory: {},
   imageStudioClipId: null,
   audioStudioClipId: null,
@@ -226,12 +229,13 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
   setPanel: (panel) =>
     set((s) => {
       if (!panel) {
-        return { activePanel: null, panelExpanded: false };
+        return { activePanel: null, panelExpanded: false, panelFocus: false };
       }
       const spec = videoPanelSpec(panel);
       return {
         activePanel: panel,
         panelExpanded: false,
+        panelFocus: false,
         panelDetent: s.panelDetentMemory[panel] ?? spec?.initialDetent ?? 'peek',
       };
     }),
@@ -242,6 +246,8 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
         ? { ...s.panelDetentMemory, [s.activePanel]: detent }
         : s.panelDetentMemory,
     })),
+  setPanelFocus: (on) =>
+    set((s) => ({ panelFocus: on && !!videoPanelSpec(s.activePanel)?.canFocus })),
   expandPanel: () =>
     set((s) => {
       if (!s.activePanel) {

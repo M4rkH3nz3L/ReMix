@@ -10,9 +10,16 @@ import { captureRef } from 'react-native-view-shot';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
-import { ImageStudioSheets, type SheetKind } from '@/components/studio/image/body/ImageStudioSheets';
+import {
+  ImageStudioSheets,
+  isInlineSheet,
+  type SheetKind,
+} from '@/components/studio/image/body/ImageStudioSheets';
 import { ImageStudioToolbar, type ToolKey } from '@/components/studio/image/body/ImageStudioToolbar';
 import { palette } from '@/constants/editor';
+import { useLayout } from '@/hooks/useLayout';
+import { layoutBudget, type Detent } from '@/lib/panelLayout';
+import { IMAGE_SHEET_SPECS, type ImageSheetId } from '@/lib/panelSpecs';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canBoolean } from '@/lib/imageBoolean';
 import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
@@ -90,7 +97,26 @@ export function ImageStudioBody({
   const isPro = useEntitlement((s) => s.isPro());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<SheetKind>(null);
+  const [sheet, setSheetRaw] = useState<SheetKind>(null);
+  // 📐 MOBILE-UI §6.6: az inline lap detentje + a felhasználó utolsó választása laponként
+  const [sheetDetent, setSheetDetent] = useState<Detent>('peek');
+  const detentMemory = useRef<Partial<Record<ImageSheetId, Detent>>>({});
+  const [workH, setWorkH] = useState(0);
+  // 🖥️ iPad fekvő (expanded): az élő lapok jobb oldali dokkolt inspectorban
+  const L = useLayout();
+  const docked = L.isExpanded;
+  const setSheet = (next: SheetKind) => {
+    if (next) {
+      setSheetDetent(detentMemory.current[next] ?? IMAGE_SHEET_SPECS[next].initialDetent ?? 'peek');
+    }
+    setSheetRaw(next);
+  };
+  const onSheetDetent = (detent: Detent) => {
+    setSheetDetent(detent);
+    if (sheet) {
+      detentMemory.current[sheet] = detent;
+    }
+  };
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
@@ -1111,10 +1137,22 @@ export function ImageStudioBody({
     return null;
   }
 
+  // 🎯 precíziós mód (kivágás, toll, node, lasszó, pálca, ecset, vonalzó): a felső
+  // sáv és a lap-strip elrejtve → a vászon kapja a helyet; a mód-sáv a kilépés (§3.3)
+  const precisionMode =
+    !!cropRect || !!penPoints || !!pathEditId || lassoActive || wandActive || brushActive || guidesActive;
+  const sheetDetents = layoutBudget({
+    bodyHeight: workH,
+    tier: 'sheet',
+    detent: sheetDetent,
+    hasTimeline: false,
+    hasTransport: false,
+  }).detents;
+
   return (
     <View style={styles.root}>
       {/* felső sáv */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>
         <Pressable onPress={onExit} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
@@ -1182,7 +1220,7 @@ export function ImageStudioBody({
       </View>
 
       {/* 🖼️📄 galéria lap-strip (project mód): több kép → diavetítés/lapozható megosztás */}
-      {mode === 'project' && pages.length > 0 ? (
+      {mode === 'project' && pages.length > 0 && !precisionMode ? (
         <View style={styles.pageStrip}>
           <ScrollView
             horizontal
@@ -1252,281 +1290,301 @@ export function ImageStudioBody({
         </View>
       ) : null}
 
-      {/* vászon */}
-      {doc ? (
-        <ImageCanvas
-          doc={doc}
-          selectedId={effectiveSelectedId}
-          onSelect={setSelectedId}
-          onRequestEdit={(id) => {
-            setSelectedId(id);
-            setSheet('layers');
-          }}
-          commit={commit}
-          canvasRef={canvasRef}
-          capturing={capturing}
-          cropRect={cropRect}
-          onCropRectChange={setCropRect}
-          penPoints={penPoints}
-          onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
-          onPenClose={() => commitPen(true)}
-          pathEditId={pathEditId}
-          selectedNode={pathEditNode}
-          onSelectNode={setPathEditNode}
-          lassoActive={lassoActive}
-          onLassoComplete={commitLasso}
-          onLassoCancel={() => {
-            setLassoActive(false);
-            setMaskTarget(null);
-          }}
-          wandActive={wandActive}
-          onWandSeed={onWandSeed}
-          brushActive={brushActive}
-          brushColor={brushColor}
-          brushSize={brushSize}
-          brushRef={brushRef}
-          guidesActive={guidesActive}
-        />
-      ) : (
-        <View style={styles.loading}>
-          <ActivityIndicator color={palette.accent} />
-        </View>
-      )}
-
-      {/* kijelölés-jelző */}
-      <View style={styles.statusRow}>
-        <Ionicons
-          name={selectedLayer ? 'ellipse' : 'ellipse-outline'}
-          size={9}
-          color={selectedLayer ? palette.accent : palette.textDim}
-        />
-        <Text style={styles.statusText} numberOfLines={1}>
-          {guidesActive
-            ? t('studio.image.guides.hint')
-            : brushActive
-            ? t('studio.image.brush.hint')
-            : wandActive
-            ? t('studio.image.wand.hint')
-            : lassoActive
-            ? t('studio.image.lasso.hint')
-            : pathEditId
-              ? t('studio.image.pen.editHint')
-              : penPoints
-                ? t('studio.image.pen.hint')
-                : cropRect
-                  ? t('studio.image.crop.hint')
-                  : selectedLayer
-                    ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-                    : t('studio.image.tapToSelect')}
-        </Text>
-      </View>
-
-      {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
-      {cropRect ? (
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cropPresets}>
-            {CROP_PRESETS.map((p) => (
-              <Chip
-                key={p.labelKey ?? p.label}
-                label={p.labelKey ? t(p.labelKey) : p.label}
-                active={false}
-                onPress={() => doc && setCropRect(aspectCropRect(doc, p.ratio))}
-              />
-            ))}
-          </ScrollView>
-          <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
-            <Ionicons name="checkmark" size={16} color="#fff" />
-            <Text style={styles.cropApplyText}>{t('common.apply')}</Text>
-          </Pressable>
-        </View>
-      ) : penPoints ? (
-        /* ✏️ toll-sáv (toll-módban a toolbar HELYETT) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <Pressable
-            onPress={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
-            style={styles.cropBtn}
-            hitSlop={6}
-            disabled={!penPoints.length}
-          >
-            <Ionicons
-              name="arrow-undo-outline"
-              size={18}
-              color={penPoints.length ? palette.text : palette.border}
+      {/* 📐 munkaterület: vászon + mód-sávok + inline lap — a mért magasság a detentek alapja */}
+      <View
+        style={[styles.work, docked ? styles.workRow : null]}
+        onLayout={(e) => setWorkH(e.nativeEvent.layout.height)}
+      >
+        <View style={styles.work}>
+          {/* vászon */}
+          {doc ? (
+            <ImageCanvas
+              doc={doc}
+              selectedId={effectiveSelectedId}
+              onSelect={setSelectedId}
+              onRequestEdit={(id) => {
+                setSelectedId(id);
+                setSheet('layers');
+              }}
+              commit={commit}
+              canvasRef={canvasRef}
+              capturing={capturing}
+              cropRect={cropRect}
+              onCropRectChange={setCropRect}
+              penPoints={penPoints}
+              onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
+              onPenClose={() => commitPen(true)}
+              pathEditId={pathEditId}
+              selectedNode={pathEditNode}
+              onSelectNode={setPathEditNode}
+              lassoActive={lassoActive}
+              onLassoComplete={commitLasso}
+              onLassoCancel={() => {
+                setLassoActive(false);
+                setMaskTarget(null);
+              }}
+              wandActive={wandActive}
+              onWandSeed={onWandSeed}
+              brushActive={brushActive}
+              brushColor={brushColor}
+              brushSize={brushSize}
+              brushRef={brushRef}
+              guidesActive={guidesActive}
             />
-          </Pressable>
-          <View style={{ flex: 1 }} />
-          <Pressable
-            onPress={() => commitPen(true)}
-            style={[styles.penClose, penPoints.length < 3 ? styles.penDisabled : null]}
-            hitSlop={6}
-            disabled={penPoints.length < 3}
-          >
-            <Text style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => commitPen(false)}
-            style={[styles.cropApply, penPoints.length < 2 ? styles.penDisabled : null]}
-            hitSlop={6}
-            disabled={penPoints.length < 2}
-          >
-            <Ionicons name="checkmark" size={16} color="#fff" />
-            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
-          </Pressable>
-        </View>
-      ) : pathEditId ? (
-        /* ✏️ node-szerkesztő sáv (toll v2/v3 — a toolbar HELYETT) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <View style={{ flex: 1 }} />
-          {/* ✏️ v4: a kijelölt node törlése */}
-          <Pressable
-            onPress={deleteNode}
-            style={[styles.cropBtn, pathEditNode == null ? styles.penDisabled : null]}
-            hitSlop={6}
-            disabled={pathEditNode == null}
-          >
-            <Ionicons name="trash-outline" size={18} color={palette.danger} />
-          </Pressable>
-          {/* ✏️ v3: a kijelölt node görbévé / sarokká (bezier-fogók) */}
-          <Pressable
-            onPress={() => setNodeKind('smooth')}
-            style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
-            hitSlop={6}
-            disabled={pathEditNode == null}
-          >
-            <Text style={styles.penCloseText}>{t('studio.image.pen.smooth')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setNodeKind('corner')}
-            style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
-            hitSlop={6}
-            disabled={pathEditNode == null}
-          >
-            <Text style={styles.penCloseText}>{t('studio.image.pen.corner')}</Text>
-          </Pressable>
-          <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
-            <Ionicons name="checkmark" size={16} color="#fff" />
-            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
-          </Pressable>
-        </View>
-      ) : lassoActive ? (
-        /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setLassoActive(false)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <Text style={styles.lassoLabel} numberOfLines={1}>
-            {t('studio.image.lasso.hint')}
-          </Text>
-        </View>
-      ) : wandActive ? (
-        /* 🪄 varázspálca-sáv (fotóra koppintva szín-szelekció) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
-          <Text style={styles.lassoLabel} numberOfLines={1}>
-            {t('studio.image.wand.hint')}
-          </Text>
-        </View>
-      ) : brushActive ? (
-        /* 🖌️ ecset-sáv (szín + méret + Kész) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setBrushActive(false)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <View style={styles.brushRow}>
-            {BRUSH_COLORS.map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => setBrushColor(c)}
-                style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
-              />
-            ))}
-          </View>
-          <View style={styles.brushRow}>
-            {BRUSH_SIZES.map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => setBrushSize(s)}
-                style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
-              >
-                <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
-              </Pressable>
-            ))}
-          </View>
-          <Pressable onPress={commitBrush} style={styles.cropApply} hitSlop={6}>
-            <Ionicons name="checkmark" size={16} color="#fff" />
-            <Text style={styles.cropApplyText}>{t('common.done')}</Text>
-          </Pressable>
-        </View>
-      ) : guidesActive ? (
-        /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
-        <View style={styles.cropBar}>
-          <Pressable onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
-            <Ionicons name="close" size={20} color={palette.text} />
-          </Pressable>
-          <Pressable
-            onPress={() => doc && commit({ ...doc, guides: compositionGuides() }, t('studio.image.undoGuides'))}
-            style={styles.penClose}
-            hitSlop={6}
-          >
-            <Text style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
-            style={styles.penClose}
-            hitSlop={6}
-          >
-            <Text style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
-          </Pressable>
-          <Text style={styles.lassoLabel} numberOfLines={1}>
-            {t('studio.image.guides.hint')}
-          </Text>
-        </View>
-      ) : (
-        <ImageStudioToolbar onTool={onTool} toolDisabled={toolDisabled} />
-      )}
+          ) : (
+            <View style={styles.loading}>
+              <ActivityIndicator color={palette.accent} />
+            </View>
+          )}
 
-      <ImageStudioSheets
-        sheet={sheet}
-        doc={doc}
-        selectedLayer={selectedLayer}
-        effectiveSelectedId={effectiveSelectedId}
-        mode={mode}
-        pageCount={pages.length}
-        busy={busy}
-        commit={commit}
-        setSheet={setSheet}
-        setSelectedId={setSelectedId}
-        onAdd={add}
-        onAddShapeType={addShapeType}
-        onInsertSource={insertSource}
-        onDrawMask={startMaskDraw}
-        onRaster={(o) => void exportImage(o)}
-        onSvg={() => void exportSvg()}
-        onPdf={() => void exportPdf()}
-        onPsd={() => void exportPsdFile()}
-        canPsd={isPro}
-        onVideo={() => void insertIntoVideo()}
-        onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
-        onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
-      />
+          {/* kijelölés-jelző */}
+          <View style={styles.statusRow}>
+            <Ionicons
+              name={selectedLayer ? 'ellipse' : 'ellipse-outline'}
+              size={9}
+              color={selectedLayer ? palette.accent : palette.textDim}
+            />
+            <Text style={styles.statusText} numberOfLines={1}>
+              {guidesActive
+                ? t('studio.image.guides.hint')
+                : brushActive
+                ? t('studio.image.brush.hint')
+                : wandActive
+                ? t('studio.image.wand.hint')
+                : lassoActive
+                ? t('studio.image.lasso.hint')
+                : pathEditId
+                  ? t('studio.image.pen.editHint')
+                  : penPoints
+                    ? t('studio.image.pen.hint')
+                    : cropRect
+                      ? t('studio.image.crop.hint')
+                      : selectedLayer
+                        ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
+                        : t('studio.image.tapToSelect')}
+            </Text>
+          </View>
+
+          {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
+          {cropRect ? (
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cropPresets}>
+                {CROP_PRESETS.map((p) => (
+                  <Chip
+                    key={p.labelKey ?? p.label}
+                    label={p.labelKey ? t(p.labelKey) : p.label}
+                    active={false}
+                    onPress={() => doc && setCropRect(aspectCropRect(doc, p.ratio))}
+                  />
+                ))}
+              </ScrollView>
+              <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={styles.cropApplyText}>{t('common.apply')}</Text>
+              </Pressable>
+            </View>
+          ) : penPoints ? (
+            /* ✏️ toll-sáv (toll-módban a toolbar HELYETT) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <Pressable
+                onPress={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
+                style={styles.cropBtn}
+                hitSlop={6}
+                disabled={!penPoints.length}
+              >
+                <Ionicons
+                  name="arrow-undo-outline"
+                  size={18}
+                  color={penPoints.length ? palette.text : palette.border}
+                />
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              <Pressable
+                onPress={() => commitPen(true)}
+                style={[styles.penClose, penPoints.length < 3 ? styles.penDisabled : null]}
+                hitSlop={6}
+                disabled={penPoints.length < 3}
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => commitPen(false)}
+                style={[styles.cropApply, penPoints.length < 2 ? styles.penDisabled : null]}
+                hitSlop={6}
+                disabled={penPoints.length < 2}
+              >
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+              </Pressable>
+            </View>
+          ) : pathEditId ? (
+            /* ✏️ node-szerkesztő sáv (toll v2/v3 — a toolbar HELYETT) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              {/* ✏️ v4: a kijelölt node törlése */}
+              <Pressable
+                onPress={deleteNode}
+                style={[styles.cropBtn, pathEditNode == null ? styles.penDisabled : null]}
+                hitSlop={6}
+                disabled={pathEditNode == null}
+              >
+                <Ionicons name="trash-outline" size={18} color={palette.danger} />
+              </Pressable>
+              {/* ✏️ v3: a kijelölt node görbévé / sarokká (bezier-fogók) */}
+              <Pressable
+                onPress={() => setNodeKind('smooth')}
+                style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
+                hitSlop={6}
+                disabled={pathEditNode == null}
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.pen.smooth')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setNodeKind('corner')}
+                style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
+                hitSlop={6}
+                disabled={pathEditNode == null}
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.pen.corner')}</Text>
+              </Pressable>
+              <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+              </Pressable>
+            </View>
+          ) : lassoActive ? (
+            /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setLassoActive(false)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <Text style={styles.lassoLabel} numberOfLines={1}>
+                {t('studio.image.lasso.hint')}
+              </Text>
+            </View>
+          ) : wandActive ? (
+            /* 🪄 varázspálca-sáv (fotóra koppintva szín-szelekció) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
+              <Text style={styles.lassoLabel} numberOfLines={1}>
+                {t('studio.image.wand.hint')}
+              </Text>
+            </View>
+          ) : brushActive ? (
+            /* 🖌️ ecset-sáv (szín + méret + Kész) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setBrushActive(false)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <View style={styles.brushRow}>
+                {BRUSH_COLORS.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => setBrushColor(c)}
+                    style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
+                  />
+                ))}
+              </View>
+              <View style={styles.brushRow}>
+                {BRUSH_SIZES.map((s) => (
+                  <Pressable
+                    key={s}
+                    onPress={() => setBrushSize(s)}
+                    style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
+                  >
+                    <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable onPress={commitBrush} style={styles.cropApply} hitSlop={6}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+              </Pressable>
+            </View>
+          ) : guidesActive ? (
+            /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
+            <View style={styles.cropBar}>
+              <Pressable onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
+                <Ionicons name="close" size={20} color={palette.text} />
+              </Pressable>
+              <Pressable
+                onPress={() => doc && commit({ ...doc, guides: compositionGuides() }, t('studio.image.undoGuides'))}
+                style={styles.penClose}
+                hitSlop={6}
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
+                style={styles.penClose}
+                hitSlop={6}
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
+              </Pressable>
+              <Text style={styles.lassoLabel} numberOfLines={1}>
+                {t('studio.image.guides.hint')}
+              </Text>
+            </View>
+          ) : isInlineSheet(sheet) && !docked ? null : (
+            // nyitott inline lap alatt az eszköztár rejtve (a lap fejléce a kilépés)
+            <ImageStudioToolbar onTool={onTool} toolDisabled={toolDisabled} />
+          )}
+        </View>
+        <View
+          style={docked && isInlineSheet(sheet) ? [styles.dock, { width: L.editor.inspectorWidth }] : null}
+        >
+          <ImageStudioSheets
+            sheet={sheet}
+            doc={doc}
+            selectedLayer={selectedLayer}
+            effectiveSelectedId={effectiveSelectedId}
+            mode={mode}
+            pageCount={pages.length}
+            busy={busy}
+            commit={commit}
+            setSheet={setSheet}
+            setSelectedId={setSelectedId}
+            onAdd={add}
+            onAddShapeType={addShapeType}
+            onInsertSource={insertSource}
+            onDrawMask={startMaskDraw}
+            onRaster={(o) => void exportImage(o)}
+            onSvg={() => void exportSvg()}
+            onPdf={() => void exportPdf()}
+            onPsd={() => void exportPsdFile()}
+            canPsd={isPro}
+            onVideo={() => void insertIntoVideo()}
+            onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
+            onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
+            detents={workH > 0 ? sheetDetents : undefined}
+            detent={sheetDetent}
+            onDetentChange={onSheetDetent}
+            docked={docked}
+          />
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#05060a' },
+  work: { flex: 1 },
+  workRow: { flexDirection: 'row' },
+  dock: { alignSelf: 'stretch' },
+  hidden: { display: 'none' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   // 🖼️📄 galéria lap-strip
   pageStrip: {

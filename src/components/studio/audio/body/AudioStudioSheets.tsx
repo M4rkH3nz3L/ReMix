@@ -1,5 +1,6 @@
 import { SourceSheet } from '@/components/SourceSheet';
 import { AddMediaSheet } from '@/components/studio/audio/AddMediaSheet';
+import { AudioSheetFrameContext, type AudioSheetFrameValue } from '@/components/studio/audio/AudioSheetFrame';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
@@ -53,6 +54,7 @@ export function AudioStudioSheets({
   onBakeSampler,
   onInsertSource,
   onShareAlbum,
+  frame = null,
 }: {
   selClip: AudioClip | null;
   fps: number;
@@ -85,9 +87,11 @@ export function AudioStudioSheets({
   onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
+  /** 📐 inline/workspace keret (MOBILE-UI §6.7); null → minden lap a régi modális keretben */
+  frame?: AudioSheetFrameValue | null;
 }) {
   return (
-    <>
+    <AudioSheetFrameContext.Provider value={frame}>
       {editing && selClip ? <ClipEditSheet clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
       {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
       {mixerOpen ? (
@@ -133,6 +137,6 @@ export function AudioStudioSheets({
       ) : null}
       {source ? <SourceSheet onInsert={onInsertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => onShareAlbum()} /> : null}
-    </>
+    </AudioSheetFrameContext.Provider>
   );
 }

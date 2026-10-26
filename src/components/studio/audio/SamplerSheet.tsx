@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { pickAudio } from '@/lib/media';
 import {
@@ -71,83 +71,78 @@ export function SamplerSheet({
   const canBake = !!sampleUri && samplerHasHits(pattern);
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
-          <View style={styles.handleRow}>
-            <Text style={styles.title}>
-              <Ionicons name="color-filter" size={16} color={palette.accent} /> {t('studio.sampler.title', { defaultValue: 'Sampler' })}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={24} color={palette.textDim} />
-            </Pressable>
-          </View>
-
-          {/* minta-választó */}
-          <Pressable style={styles.pickRow} onPress={pick} disabled={picking}>
-            {picking ? (
-              <ActivityIndicator size="small" color={palette.accent} />
-            ) : (
-              <Ionicons name={sampleUri ? 'musical-note' : 'cloud-upload-outline'} size={18} color={palette.accent} />
-            )}
-            <Text style={styles.pickText} numberOfLines={1}>
-              {sampleUri ? sampleName : t('studio.sampler.pick', { defaultValue: 'Minta kiválasztása (one-shot)' })}
-            </Text>
-            {sampleUri ? <Ionicons name="checkmark-circle" size={16} color="#39d98a" /> : null}
-          </Pressable>
-
-          {/* vezérlők */}
-          <View style={styles.controls}>
-            <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="remove" size={16} color={palette.text} />
-            </Pressable>
-            <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-            <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="add" size={16} color={palette.text} />
-            </Pressable>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
-          </View>
-
-          {/* egysoros step-rács */}
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View style={styles.row}>
-              {cols.map((step) => {
-                const on = pattern[step];
-                const beatStart = step % 4 === 0;
-                return (
-                  <Pressable
-                    key={step}
-                    onPress={() => setPattern((p) => toggleSamplerStep(p, step))}
-                    style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
-                  />
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <Pressable onPress={() => setPattern(emptySampler(bars))} style={styles.clearBtn} disabled={!samplerHasHits(pattern)}>
-              <Ionicons name="trash-outline" size={15} color={samplerHasHits(pattern) ? palette.textDim : palette.border} />
-              <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => sampleUri && onBake(sampleUri, pattern, bars)}
-              disabled={busy || !canBake}
-              style={[styles.bakeBtn, (busy || !canBake) && styles.disabled]}
-            >
-              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
-              <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
-            </Pressable>
-          </View>
-        </SafeAreaView>
+    <AudioSheetFrame id="sampler" onClose={onClose} sheetStyle={styles.sheet}>
+      <View style={styles.handleRow}>
+        <Text style={styles.title}>
+          <Ionicons name="color-filter" size={16} color={palette.accent} /> {t('studio.sampler.title', { defaultValue: 'Sampler' })}
+        </Text>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Ionicons name="close" size={24} color={palette.textDim} />
+        </Pressable>
       </View>
-    </Modal>
+
+      {/* minta-választó */}
+      <Pressable style={styles.pickRow} onPress={pick} disabled={picking}>
+        {picking ? (
+          <ActivityIndicator size="small" color={palette.accent} />
+        ) : (
+          <Ionicons name={sampleUri ? 'musical-note' : 'cloud-upload-outline'} size={18} color={palette.accent} />
+        )}
+        <Text style={styles.pickText} numberOfLines={1}>
+          {sampleUri ? sampleName : t('studio.sampler.pick', { defaultValue: 'Minta kiválasztása (one-shot)' })}
+        </Text>
+        {sampleUri ? <Ionicons name="checkmark-circle" size={16} color="#39d98a" /> : null}
+      </Pressable>
+
+      {/* vezérlők */}
+      <View style={styles.controls}>
+        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="remove" size={16} color={palette.text} />
+        </Pressable>
+        <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
+        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="add" size={16} color={palette.text} />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
+      </View>
+
+      {/* egysoros step-rács */}
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={styles.row}>
+          {cols.map((step) => {
+            const on = pattern[step];
+            const beatStart = step % 4 === 0;
+            return (
+              <Pressable
+                key={step}
+                onPress={() => setPattern((p) => toggleSamplerStep(p, step))}
+                style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
+              />
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable onPress={() => setPattern(emptySampler(bars))} style={styles.clearBtn} disabled={!samplerHasHits(pattern)}>
+          <Ionicons name="trash-outline" size={15} color={samplerHasHits(pattern) ? palette.textDim : palette.border} />
+          <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => sampleUri && onBake(sampleUri, pattern, bars)}
+          disabled={busy || !canBake}
+          style={[styles.bakeBtn, (busy || !canBake) && styles.disabled]}
+        >
+          {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
+          <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
+        </Pressable>
+      </View>
+    </AudioSheetFrame>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, maxHeight: '86%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },

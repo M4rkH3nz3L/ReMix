@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { Slider } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
@@ -89,181 +89,176 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.wrap}>
-        <Pressable style={styles.tap} onPress={onClose} />
-        <SafeAreaView edges={['bottom']} style={styles.sheet}>
-          <View style={styles.head}>
-            <Text style={styles.title}>{t('studio.master.title')}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color={palette.textDim} />
-            </Pressable>
-          </View>
+    <AudioSheetFrame id="master" onClose={onClose} sheetStyle={styles.sheet} tapToClose>
+      <View style={styles.head}>
+        <Text style={styles.title}>{t('studio.master.title')}</Text>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Ionicons name="close" size={22} color={palette.textDim} />
+        </Pressable>
+      </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-            {/* — Mixer — */}
-            <Text style={styles.section}>{t('studio.master.mixer')}</Text>
-            <Slider
-              label={t('studio.master.masterVolume')}
-              value={masterVolume}
-              min={0}
-              max={1}
-              onChange={(v) => useEditorStore.getState().setMasterVolume(v)}
-              format={(v) => `${Math.round(v * 100)}%`}
-            />
-            {MIX_LANES.map((lane) => {
-              const muted = mutedTracks.includes(lane.type);
-              const solo = soloTracks.includes(lane.type);
-              const gain = project?.trackMix?.[lane.type]?.gain ?? 1;
-              return (
-                <View key={lane.type} style={styles.mixBlock}>
-                  <View style={styles.mixRow}>
-                    <Ionicons name={lane.icon} size={16} color={palette.accent} />
-                    <Text style={styles.mixLabel}>{t(lane.labelKey)}</Text>
-                    <Text style={styles.mixGain}>{Math.round(gain * 100)}%</Text>
-                    <Pressable
-                      onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}
-                      style={[styles.mixBtn, muted && { borderColor: palette.danger }]}
-                    >
-                      <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={15} color={muted ? palette.danger : palette.textDim} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')}
-                      style={[styles.mixBtn, solo && { borderColor: palette.accent }]}
-                    >
-                      <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
-                    </Pressable>
-                  </View>
-                  <Slider
-                    label=""
-                    value={gain}
-                    min={0}
-                    max={1}
-                    onChange={(g) =>
-                      useEditorStore.getState().dispatch({ type: 'SET_TRACK_GAIN', trackType: lane.type, gain: g }, 'user')
-                    }
-                    format={() => ''}
-                  />
-                </View>
-              );
-            })}
-            <Text style={styles.hint}>{t('studio.master.mixerHint')}</Text>
-
-            {/* — Master — */}
-            <View style={styles.divider} />
-            <Text style={styles.section}>{t('studio.master.masterChain')}</Text>
-            {analyzeSource ? (
-              <>
-                <Pressable onPress={onAnalyze} disabled={analyzing} style={styles.analyzeRow}>
-                  {analyzing ? (
-                    <ActivityIndicator color={palette.accent} size="small" />
-                  ) : (
-                    <Ionicons name="pulse-outline" size={15} color={palette.accent} />
-                  )}
-                  <Text style={styles.analyzeText}>{t('studio.master.analyze')}</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        {/* — Mixer — */}
+        <Text style={styles.section}>{t('studio.master.mixer')}</Text>
+        <Slider
+          label={t('studio.master.masterVolume')}
+          value={masterVolume}
+          min={0}
+          max={1}
+          onChange={(v) => useEditorStore.getState().setMasterVolume(v)}
+          format={(v) => `${Math.round(v * 100)}%`}
+        />
+        {MIX_LANES.map((lane) => {
+          const muted = mutedTracks.includes(lane.type);
+          const solo = soloTracks.includes(lane.type);
+          const gain = project?.trackMix?.[lane.type]?.gain ?? 1;
+          return (
+            <View key={lane.type} style={styles.mixBlock}>
+              <View style={styles.mixRow}>
+                <Ionicons name={lane.icon} size={16} color={palette.accent} />
+                <Text style={styles.mixLabel}>{t(lane.labelKey)}</Text>
+                <Text style={styles.mixGain}>{Math.round(gain * 100)}%</Text>
+                <Pressable
+                  onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}
+                  style={[styles.mixBtn, muted && { borderColor: palette.danger }]}
+                >
+                  <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={15} color={muted ? palette.danger : palette.textDim} />
                 </Pressable>
-                {stats ? (
-                  <View style={styles.meters}>
-                    <Meter label="LUFS" value={stats.lufs} target={m.lufs} min={-30} max={0} />
-                    <Meter label={t('studio.master.truePeak')} value={stats.truePeak} target={m.truePeak} min={-9} max={1} />
-                    <Meter label="LRA" value={stats.lra} min={0} max={20} />
-                    {stats.noise != null ? <Meter label={t('studio.master.noise')} value={stats.noise} min={-90} max={-20} /> : null}
-                    {stats.dynamicRange != null ? (
-                      <Meter label={t('studio.master.dynRange')} value={stats.dynamicRange} min={0} max={60} />
-                    ) : null}
-                  </View>
-                ) : null}
-                {spectrum ? (
-                  <Image source={{ uri: spectrum }} style={styles.spectrum} contentFit="cover" />
-                ) : null}
-              </>
-            ) : null}
-            <View style={styles.chipRow}>
-              {AUDIO_MASTER_TARGETS.map((target) => (
-                <Chip
-                  key={target}
-                  label={t(`studio.master.target.${target}`)}
-                  active={m.target === target}
-                  onPress={() => setM(target === 'custom' ? { ...m, target: 'custom' } : masterPreset(target))}
-                />
-              ))}
-            </View>
-            <Stepper
-              label={t('studio.master.lufs')}
-              value={`${m.lufs} LUFS`}
-              onDec={() => setField({ lufs: clamp(m.lufs - 1, -24, -6) })}
-              onInc={() => setField({ lufs: clamp(m.lufs + 1, -24, -6) })}
-            />
-            <Stepper
-              label={t('studio.master.truePeak')}
-              value={`${m.truePeak} dBTP`}
-              onDec={() => setField({ truePeak: clamp(Math.round((m.truePeak - 0.5) * 10) / 10, -3, 0) })}
-              onInc={() => setField({ truePeak: clamp(Math.round((m.truePeak + 0.5) * 10) / 10, -3, 0) })}
-            />
-            <View style={styles.chipRow}>
-              {DYNAMICS.map((d) => (
-                <Chip
-                  key={d}
-                  label={t(`studio.master.dynamics.${d}`)}
-                  active={m.dynamics === d}
-                  onPress={() => setField({ dynamics: d })}
-                />
-              ))}
-            </View>
-
-            {/* master-EQ + multiband */}
-            <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.eq')}</Text>
-            <Stepper
-              label={t('studio.master.eqLow')}
-              value={`${(m.eq?.low ?? 0) > 0 ? '+' : ''}${m.eq?.low ?? 0} dB`}
-              onDec={() => setEq('low', -1)}
-              onInc={() => setEq('low', 1)}
-            />
-            <Stepper
-              label={t('studio.master.eqMid')}
-              value={`${(m.eq?.mid ?? 0) > 0 ? '+' : ''}${m.eq?.mid ?? 0} dB`}
-              onDec={() => setEq('mid', -1)}
-              onInc={() => setEq('mid', 1)}
-            />
-            <Stepper
-              label={t('studio.master.eqHigh')}
-              value={`${(m.eq?.high ?? 0) > 0 ? '+' : ''}${m.eq?.high ?? 0} dB`}
-              onDec={() => setEq('high', -1)}
-              onInc={() => setEq('high', 1)}
-            />
-            <View style={[styles.chipRow, { marginTop: 8 }]}>
-              <Chip
-                label={t('studio.master.multiband')}
-                active={!!m.multiband}
-                onPress={() => setField({ multiband: !m.multiband })}
+                <Pressable
+                  onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')}
+                  style={[styles.mixBtn, solo && { borderColor: palette.accent }]}
+                >
+                  <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
+                </Pressable>
+              </View>
+              <Slider
+                label=""
+                value={gain}
+                min={0}
+                max={1}
+                onChange={(g) =>
+                  useEditorStore.getState().dispatch({ type: 'SET_TRACK_GAIN', trackType: lane.type, gain: g }, 'user')
+                }
+                format={() => ''}
               />
             </View>
+          );
+        })}
+        <Text style={styles.hint}>{t('studio.master.mixerHint')}</Text>
 
-            {/* 🎚️ sidechain-duck TRIGGER: melyik sáv hangja alatt halkuljanak az autoDuck-klipek */}
-            <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.duckTrigger', { defaultValue: 'Auto-duck trigger' })}</Text>
-            <View style={styles.chipRow}>
-              {([undefined, 'voiceover', 'music', 'sfx'] as const).map((tt) => (
-                <Chip
-                  key={tt ?? 'auto'}
-                  label={tt ? t('studio.master.track_' + tt, { defaultValue: tt }) : t('studio.master.duckAuto', { defaultValue: 'Beszéd (auto)' })}
-                  active={(m.duckTrigger ?? undefined) === tt}
-                  onPress={() => setField({ duckTrigger: tt })}
-                />
-              ))}
-            </View>
+        {/* — Master — */}
+        <View style={styles.divider} />
+        <Text style={styles.section}>{t('studio.master.masterChain')}</Text>
+        {analyzeSource ? (
+          <>
+            <Pressable onPress={onAnalyze} disabled={analyzing} style={styles.analyzeRow}>
+              {analyzing ? (
+                <ActivityIndicator color={palette.accent} size="small" />
+              ) : (
+                <Ionicons name="pulse-outline" size={15} color={palette.accent} />
+              )}
+              <Text style={styles.analyzeText}>{t('studio.master.analyze')}</Text>
+            </Pressable>
+            {stats ? (
+              <View style={styles.meters}>
+                <Meter label="LUFS" value={stats.lufs} target={m.lufs} min={-30} max={0} />
+                <Meter label={t('studio.master.truePeak')} value={stats.truePeak} target={m.truePeak} min={-9} max={1} />
+                <Meter label="LRA" value={stats.lra} min={0} max={20} />
+                {stats.noise != null ? <Meter label={t('studio.master.noise')} value={stats.noise} min={-90} max={-20} /> : null}
+                {stats.dynamicRange != null ? (
+                  <Meter label={t('studio.master.dynRange')} value={stats.dynamicRange} min={0} max={60} />
+                ) : null}
+              </View>
+            ) : null}
+            {spectrum ? (
+              <Image source={{ uri: spectrum }} style={styles.spectrum} contentFit="cover" />
+            ) : null}
+          </>
+        ) : null}
+        <View style={styles.chipRow}>
+          {AUDIO_MASTER_TARGETS.map((target) => (
+            <Chip
+              key={target}
+              label={t(`studio.master.target.${target}`)}
+              active={m.target === target}
+              onPress={() => setM(target === 'custom' ? { ...m, target: 'custom' } : masterPreset(target))}
+            />
+          ))}
+        </View>
+        <Stepper
+          label={t('studio.master.lufs')}
+          value={`${m.lufs} LUFS`}
+          onDec={() => setField({ lufs: clamp(m.lufs - 1, -24, -6) })}
+          onInc={() => setField({ lufs: clamp(m.lufs + 1, -24, -6) })}
+        />
+        <Stepper
+          label={t('studio.master.truePeak')}
+          value={`${m.truePeak} dBTP`}
+          onDec={() => setField({ truePeak: clamp(Math.round((m.truePeak - 0.5) * 10) / 10, -3, 0) })}
+          onInc={() => setField({ truePeak: clamp(Math.round((m.truePeak + 0.5) * 10) / 10, -3, 0) })}
+        />
+        <View style={styles.chipRow}>
+          {DYNAMICS.map((d) => (
+            <Chip
+              key={d}
+              label={t(`studio.master.dynamics.${d}`)}
+              active={m.dynamics === d}
+              onPress={() => setField({ dynamics: d })}
+            />
+          ))}
+        </View>
 
-            <View style={{ gap: 8, marginTop: 12 }}>
-              <PrimaryButton icon="pulse" label={t('studio.master.apply')} onPress={apply} />
-              {applied ? (
-                <Pressable onPress={turnOff} style={styles.offBtn}>
-                  <Text style={styles.offText}>{t('studio.master.turnOff')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
-    </Modal>
+        {/* master-EQ + multiband */}
+        <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.eq')}</Text>
+        <Stepper
+          label={t('studio.master.eqLow')}
+          value={`${(m.eq?.low ?? 0) > 0 ? '+' : ''}${m.eq?.low ?? 0} dB`}
+          onDec={() => setEq('low', -1)}
+          onInc={() => setEq('low', 1)}
+        />
+        <Stepper
+          label={t('studio.master.eqMid')}
+          value={`${(m.eq?.mid ?? 0) > 0 ? '+' : ''}${m.eq?.mid ?? 0} dB`}
+          onDec={() => setEq('mid', -1)}
+          onInc={() => setEq('mid', 1)}
+        />
+        <Stepper
+          label={t('studio.master.eqHigh')}
+          value={`${(m.eq?.high ?? 0) > 0 ? '+' : ''}${m.eq?.high ?? 0} dB`}
+          onDec={() => setEq('high', -1)}
+          onInc={() => setEq('high', 1)}
+        />
+        <View style={[styles.chipRow, { marginTop: 8 }]}>
+          <Chip
+            label={t('studio.master.multiband')}
+            active={!!m.multiband}
+            onPress={() => setField({ multiband: !m.multiband })}
+          />
+        </View>
+
+        {/* 🎚️ sidechain-duck TRIGGER: melyik sáv hangja alatt halkuljanak az autoDuck-klipek */}
+        <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.duckTrigger', { defaultValue: 'Auto-duck trigger' })}</Text>
+        <View style={styles.chipRow}>
+          {([undefined, 'voiceover', 'music', 'sfx'] as const).map((tt) => (
+            <Chip
+              key={tt ?? 'auto'}
+              label={tt ? t('studio.master.track_' + tt, { defaultValue: tt }) : t('studio.master.duckAuto', { defaultValue: 'Beszéd (auto)' })}
+              active={(m.duckTrigger ?? undefined) === tt}
+              onPress={() => setField({ duckTrigger: tt })}
+            />
+          ))}
+        </View>
+
+        <View style={{ gap: 8, marginTop: 12 }}>
+          <PrimaryButton icon="pulse" label={t('studio.master.apply')} onPress={apply} />
+          {applied ? (
+            <Pressable onPress={turnOff} style={styles.offBtn}>
+              <Text style={styles.offText}>{t('studio.master.turnOff')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+    </AudioSheetFrame>
   );
 }
 
@@ -296,8 +291,6 @@ function Meter({
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' },
-  tap: { flex: 1 },
   sheet: {
     backgroundColor: '#0b0d14',
     borderTopLeftRadius: 20,

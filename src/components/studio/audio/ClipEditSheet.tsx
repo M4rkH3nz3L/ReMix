@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { AUDIO_FX_PRESETS, presetFx } from '@/lib/audioFxPresets';
 import { renderClipSpectrum } from '@/lib/audioSpectrum';
@@ -149,225 +149,220 @@ export function ClipEditSheet({
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.wrap}>
-        <Pressable style={styles.tap} onPress={onClose} />
-        <SafeAreaView edges={['bottom']} style={styles.sheet}>
-          <View style={styles.head}>
-            <Text style={styles.title} numberOfLines={1}>
-              {clip.label || t('studio.audio.title')}
-            </Text>
-            <Pressable onPress={onDone} style={styles.doneBtn}>
-              <Ionicons name="checkmark" size={18} color="#fff" />
-              <Text style={styles.doneText}>{t('common.done')}</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-            <RegionBar
-              trimIn={trimIn}
-              duration={duration}
-              sourceDuration={sourceDuration}
-              fadeIn={fadeIn}
-              fadeOut={fadeOut}
-              playhead={clipPlayhead}
-              peaks={wave?.peaks ?? null}
-              waveDuration={wave?.duration ?? sourceDuration}
-              onChange={({ trimIn: ti, duration: d }) => {
-                setTrimIn(ti);
-                setDuration(d);
-                setFadeIn((v) => Math.min(v, d / 2));
-                setFadeOut((v) => Math.min(v, d / 2));
-              }}
-            />
-
-            <Slider
-              label={t('studio.audio.volume')}
-              value={volume}
-              min={0}
-              max={1}
-              onChange={setVolume}
-              format={(v) => `${Math.round(v * 100)}%`}
-            />
-            <Slider
-              label={t('studio.audio.pan')}
-              value={pan}
-              min={-1}
-              max={1}
-              onChange={setPan}
-              format={(v) =>
-                v === 0 ? t('studio.audio.panCenter') : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`
-              }
-            />
-            <Slider
-              label={t('studio.audio.fadeIn')}
-              value={fadeIn}
-              min={0}
-              max={maxFade}
-              onChange={setFadeIn}
-              format={(v) => `${v.toFixed(1)}s`}
-            />
-            <Slider
-              label={t('studio.audio.fadeOut')}
-              value={fadeOut}
-              min={0}
-              max={maxFade}
-              onChange={setFadeOut}
-              format={(v) => `${v.toFixed(1)}s`}
-            />
-
-            {/* 🎚️ hangerő-automáció (value/time görbe) — élő, mint az AudioPanelben */}
-            <Text style={styles.autoLabel}>{t('panels.audio.volumeAutomation')}</Text>
-            <KeyframeGraphEditor
-              keyframes={clip.keyframes?.volume ?? []}
-              duration={clip.duration}
-              min={0}
-              max={1}
-              fallback={clip.volume}
-              playhead={clamp(playhead - clip.start, 0, clip.duration)}
-              onChange={(next) =>
-                updateClip(clip.id, {
-                  keyframes: { ...clip.keyframes, volume: next.length > 0 ? next : undefined },
-                })
-              }
-              onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
-              formatValue={(v) => `${Math.round(v * 100)}%`}
-            />
-
-            {/* 🎚️ pásztázás-automáció (−1…1 görbe) — a render per-frame aeval-lal égeti be */}
-            <Text style={styles.autoLabel}>{t('studio.audio.panAutomation', { defaultValue: 'Pásztázás-automáció' })}</Text>
-            <KeyframeGraphEditor
-              keyframes={clip.keyframes?.pan ?? []}
-              duration={clip.duration}
-              min={-1}
-              max={1}
-              fallback={clip.pan ?? 0}
-              playhead={clamp(playhead - clip.start, 0, clip.duration)}
-              onChange={(next) =>
-                updateClip(clip.id, {
-                  keyframes: { ...clip.keyframes, pan: next.length > 0 ? next : undefined },
-                })
-              }
-              onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
-              formatValue={(v) => (Math.abs(v) < 0.02 ? 'C' : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`)}
-            />
-
-            <View style={styles.divider} />
-            <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
-            <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />
-            <ToggleRow icon="volume-low-outline" label={t('studio.audio.autoDuck')} value={autoDuck} onValueChange={setAutoDuck} />
-
-            <View style={styles.divider} />
-            <View style={styles.fxHead}>
-              <Ionicons name="pulse-outline" size={15} color={palette.accent} />
-              <Text style={styles.fxTitle}>{t('panels.audio.fxTitle')}</Text>
-              <Pressable onPress={() => void showSpectrum()} hitSlop={6} style={styles.specBtn} disabled={specBusy}>
-                {specBusy ? (
-                  <ActivityIndicator size="small" color={palette.accent} />
-                ) : (
-                  <Ionicons name="stats-chart-outline" size={14} color={palette.accent} />
-                )}
-                <Text style={styles.specBtnText}>{t('studio.audio.spectrum', { defaultValue: 'Spektrum' })}</Text>
-              </Pressable>
-              <View style={styles.proTag}>
-                <Text style={styles.proTagText}>PRO</Text>
-              </View>
-            </View>
-            {spectrumUri ? (
-              <Image source={{ uri: spectrumUri }} style={styles.spectrumImg} contentFit="contain" transition={120} />
-            ) : null}
-            {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
-              {AUDIO_FX_PRESETS.map((p) => (
-                <Pressable key={p.key} style={styles.presetChip} onPress={() => setFx(presetFx(p.key))}>
-                  <Ionicons name={p.icon as keyof typeof Ionicons.glyphMap} size={14} color={palette.accent} />
-                  <Text style={styles.presetChipText}>{t(`studio.audio.fxPreset.${p.key}`, { defaultValue: p.label })}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
-            <Slider
-              label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}
-              value={fx.pitchSemitones ?? 0}
-              min={-12}
-              max={12}
-              onChange={(v) => patchFx({ pitchSemitones: Math.round(v) })}
-              format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
-            />
-            {/* 🎵 harmónia-hang: eltolt másodhang a klip mellé (pl. +7 kvint, +4 terc) */}
-            <Slider
-              label={t('studio.audio.fxHarmony', { defaultValue: 'Harmónia-hang (félhang)' })}
-              value={fx.harmony ?? 0}
-              min={-12}
-              max={12}
-              onChange={(v) => patchFx({ harmony: Math.round(v) })}
-              format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
-            />
-            {/* 🎚️ szűrők: aluláteresztő (dörej) + felüláteresztő (sziszegés) — 0 = ki */}
-            <Slider
-              label={t('panels.audio.fxHighpass')}
-              value={fx.highpass ?? 0}
-              min={0}
-              max={300}
-              onChange={(v) => patchFx({ highpass: v < 20 ? 0 : Math.round(v) })}
-              format={(v) => (v < 20 ? t('common.off') : `${Math.round(v)} Hz`)}
-            />
-            <Slider
-              label={t('panels.audio.fxLowpass')}
-              value={fx.lowpass ?? 0}
-              min={0}
-              max={20000}
-              onChange={(v) => patchFx({ lowpass: v < 1000 ? 0 : Math.round(v / 100) * 100 })}
-              format={(v) => (v < 1000 ? t('common.off') : `${(v / 1000).toFixed(1)} kHz`)}
-            />
-            {/* 🎚️ 3-sávos EQ (−12…+12 dB) */}
-            <Slider label={t('panels.audio.fxEqLow')} value={eq.low} min={-12} max={12} onChange={(v) => setEq({ low: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
-            <Slider label={t('panels.audio.fxEqMid')} value={eq.mid} min={-12} max={12} onChange={(v) => setEq({ mid: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
-            <Slider label={t('panels.audio.fxEqHigh')} value={eq.high} min={-12} max={12} onChange={(v) => setEq({ high: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
-
-            <ToggleRow icon="remove-circle-outline" label={t('panels.audio.fxDenoise')} value={!!fx.denoise} onValueChange={(v) => patchFx({ denoise: v })} />
-            <ToggleRow icon="power-outline" label={t('studio.audio.fxGate', { defaultValue: 'Zajkapu' })} value={!!fx.gate} onValueChange={(v) => patchFx({ gate: v })} />
-            <ToggleRow icon="headset-outline" label={t('studio.audio.fxStereoWide', { defaultValue: 'Sztereó-szélesítés' })} value={!!fx.stereoWide} onValueChange={(v) => patchFx({ stereoWide: v })} />
-            <ToggleRow icon="cut-outline" label={t('panels.audio.fxDeEsser')} value={!!fx.deEsser} onValueChange={(v) => patchFx({ deEsser: v })} />
-            <ToggleRow icon="contract-outline" label={t('panels.audio.fxCompressor')} value={!!fx.compressor} onValueChange={(v) => patchFx({ compressor: v })} />
-            <ToggleRow icon="alert-outline" label={t('panels.audio.fxLimiter')} value={!!fx.limiter} onValueChange={(v) => patchFx({ limiter: v })} />
-            <ToggleRow icon="options-outline" label={t('panels.audio.fxNormalize')} value={!!fx.normalize} onValueChange={(v) => patchFx({ normalize: v })} />
-            <Slider
-              label={t('panels.audio.fxReverb')}
-              value={fx.reverb ?? 0}
-              min={0}
-              max={1}
-              onChange={(v) => patchFx({ reverb: v })}
-              format={(v) => `${Math.round(v * 100)}%`}
-            />
-            <Slider
-              label={t('panels.audio.fxDelay')}
-              value={fx.delay ?? 0}
-              min={0}
-              max={1}
-              onChange={(v) => patchFx({ delay: v })}
-              format={(v) => `${Math.round(v * 100)}%`}
-            />
-            <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>
-
-            {/* 🎚️ AI stem-szeparáció (Pro) */}
-            <View style={styles.divider} />
-            <Pressable onPress={onSeparate} disabled={separating} style={styles.stemsBtn}>
-              <Ionicons
-                name={separating ? 'hourglass-outline' : 'git-branch-outline'}
-                size={16}
-                color={palette.accent}
-              />
-              <Text style={styles.stemsText}>{t('studio.audio.stems')}</Text>
-              <View style={styles.proTag}>
-                <Text style={styles.proTagText}>PRO</Text>
-              </View>
-            </Pressable>
-            <Text style={styles.hint}>{t('studio.audio.stemsHint')}</Text>
-          </ScrollView>
-        </SafeAreaView>
+    <AudioSheetFrame id="clipEdit" onClose={onClose} sheetStyle={styles.sheet} tapToClose>
+      <View style={styles.head}>
+        <Text style={styles.title} numberOfLines={1}>
+          {clip.label || t('studio.audio.title')}
+        </Text>
+        <Pressable onPress={onDone} style={styles.doneBtn}>
+          <Ionicons name="checkmark" size={18} color="#fff" />
+          <Text style={styles.doneText}>{t('common.done')}</Text>
+        </Pressable>
       </View>
-    </Modal>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        <RegionBar
+          trimIn={trimIn}
+          duration={duration}
+          sourceDuration={sourceDuration}
+          fadeIn={fadeIn}
+          fadeOut={fadeOut}
+          playhead={clipPlayhead}
+          peaks={wave?.peaks ?? null}
+          waveDuration={wave?.duration ?? sourceDuration}
+          onChange={({ trimIn: ti, duration: d }) => {
+            setTrimIn(ti);
+            setDuration(d);
+            setFadeIn((v) => Math.min(v, d / 2));
+            setFadeOut((v) => Math.min(v, d / 2));
+          }}
+        />
+
+        <Slider
+          label={t('studio.audio.volume')}
+          value={volume}
+          min={0}
+          max={1}
+          onChange={setVolume}
+          format={(v) => `${Math.round(v * 100)}%`}
+        />
+        <Slider
+          label={t('studio.audio.pan')}
+          value={pan}
+          min={-1}
+          max={1}
+          onChange={setPan}
+          format={(v) =>
+            v === 0 ? t('studio.audio.panCenter') : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`
+          }
+        />
+        <Slider
+          label={t('studio.audio.fadeIn')}
+          value={fadeIn}
+          min={0}
+          max={maxFade}
+          onChange={setFadeIn}
+          format={(v) => `${v.toFixed(1)}s`}
+        />
+        <Slider
+          label={t('studio.audio.fadeOut')}
+          value={fadeOut}
+          min={0}
+          max={maxFade}
+          onChange={setFadeOut}
+          format={(v) => `${v.toFixed(1)}s`}
+        />
+
+        {/* 🎚️ hangerő-automáció (value/time görbe) — élő, mint az AudioPanelben */}
+        <Text style={styles.autoLabel}>{t('panels.audio.volumeAutomation')}</Text>
+        <KeyframeGraphEditor
+          keyframes={clip.keyframes?.volume ?? []}
+          duration={clip.duration}
+          min={0}
+          max={1}
+          fallback={clip.volume}
+          playhead={clamp(playhead - clip.start, 0, clip.duration)}
+          onChange={(next) =>
+            updateClip(clip.id, {
+              keyframes: { ...clip.keyframes, volume: next.length > 0 ? next : undefined },
+            })
+          }
+          onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
+          formatValue={(v) => `${Math.round(v * 100)}%`}
+        />
+
+        {/* 🎚️ pásztázás-automáció (−1…1 görbe) — a render per-frame aeval-lal égeti be */}
+        <Text style={styles.autoLabel}>{t('studio.audio.panAutomation', { defaultValue: 'Pásztázás-automáció' })}</Text>
+        <KeyframeGraphEditor
+          keyframes={clip.keyframes?.pan ?? []}
+          duration={clip.duration}
+          min={-1}
+          max={1}
+          fallback={clip.pan ?? 0}
+          playhead={clamp(playhead - clip.start, 0, clip.duration)}
+          onChange={(next) =>
+            updateClip(clip.id, {
+              keyframes: { ...clip.keyframes, pan: next.length > 0 ? next : undefined },
+            })
+          }
+          onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
+          formatValue={(v) => (Math.abs(v) < 0.02 ? 'C' : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`)}
+        />
+
+        <View style={styles.divider} />
+        <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
+        <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />
+        <ToggleRow icon="volume-low-outline" label={t('studio.audio.autoDuck')} value={autoDuck} onValueChange={setAutoDuck} />
+
+        <View style={styles.divider} />
+        <View style={styles.fxHead}>
+          <Ionicons name="pulse-outline" size={15} color={palette.accent} />
+          <Text style={styles.fxTitle}>{t('panels.audio.fxTitle')}</Text>
+          <Pressable onPress={() => void showSpectrum()} hitSlop={6} style={styles.specBtn} disabled={specBusy}>
+            {specBusy ? (
+              <ActivityIndicator size="small" color={palette.accent} />
+            ) : (
+              <Ionicons name="stats-chart-outline" size={14} color={palette.accent} />
+            )}
+            <Text style={styles.specBtnText}>{t('studio.audio.spectrum', { defaultValue: 'Spektrum' })}</Text>
+          </Pressable>
+          <View style={styles.proTag}>
+            <Text style={styles.proTagText}>PRO</Text>
+          </View>
+        </View>
+        {spectrumUri ? (
+          <Image source={{ uri: spectrumUri }} style={styles.spectrumImg} contentFit="contain" transition={120} />
+        ) : null}
+        {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+          {AUDIO_FX_PRESETS.map((p) => (
+            <Pressable key={p.key} style={styles.presetChip} onPress={() => setFx(presetFx(p.key))}>
+              <Ionicons name={p.icon as keyof typeof Ionicons.glyphMap} size={14} color={palette.accent} />
+              <Text style={styles.presetChipText}>{t(`studio.audio.fxPreset.${p.key}`, { defaultValue: p.label })}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
+        <Slider
+          label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}
+          value={fx.pitchSemitones ?? 0}
+          min={-12}
+          max={12}
+          onChange={(v) => patchFx({ pitchSemitones: Math.round(v) })}
+          format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
+        />
+        {/* 🎵 harmónia-hang: eltolt másodhang a klip mellé (pl. +7 kvint, +4 terc) */}
+        <Slider
+          label={t('studio.audio.fxHarmony', { defaultValue: 'Harmónia-hang (félhang)' })}
+          value={fx.harmony ?? 0}
+          min={-12}
+          max={12}
+          onChange={(v) => patchFx({ harmony: Math.round(v) })}
+          format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
+        />
+        {/* 🎚️ szűrők: aluláteresztő (dörej) + felüláteresztő (sziszegés) — 0 = ki */}
+        <Slider
+          label={t('panels.audio.fxHighpass')}
+          value={fx.highpass ?? 0}
+          min={0}
+          max={300}
+          onChange={(v) => patchFx({ highpass: v < 20 ? 0 : Math.round(v) })}
+          format={(v) => (v < 20 ? t('common.off') : `${Math.round(v)} Hz`)}
+        />
+        <Slider
+          label={t('panels.audio.fxLowpass')}
+          value={fx.lowpass ?? 0}
+          min={0}
+          max={20000}
+          onChange={(v) => patchFx({ lowpass: v < 1000 ? 0 : Math.round(v / 100) * 100 })}
+          format={(v) => (v < 1000 ? t('common.off') : `${(v / 1000).toFixed(1)} kHz`)}
+        />
+        {/* 🎚️ 3-sávos EQ (−12…+12 dB) */}
+        <Slider label={t('panels.audio.fxEqLow')} value={eq.low} min={-12} max={12} onChange={(v) => setEq({ low: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+        <Slider label={t('panels.audio.fxEqMid')} value={eq.mid} min={-12} max={12} onChange={(v) => setEq({ mid: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+        <Slider label={t('panels.audio.fxEqHigh')} value={eq.high} min={-12} max={12} onChange={(v) => setEq({ high: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+
+        <ToggleRow icon="remove-circle-outline" label={t('panels.audio.fxDenoise')} value={!!fx.denoise} onValueChange={(v) => patchFx({ denoise: v })} />
+        <ToggleRow icon="power-outline" label={t('studio.audio.fxGate', { defaultValue: 'Zajkapu' })} value={!!fx.gate} onValueChange={(v) => patchFx({ gate: v })} />
+        <ToggleRow icon="headset-outline" label={t('studio.audio.fxStereoWide', { defaultValue: 'Sztereó-szélesítés' })} value={!!fx.stereoWide} onValueChange={(v) => patchFx({ stereoWide: v })} />
+        <ToggleRow icon="cut-outline" label={t('panels.audio.fxDeEsser')} value={!!fx.deEsser} onValueChange={(v) => patchFx({ deEsser: v })} />
+        <ToggleRow icon="contract-outline" label={t('panels.audio.fxCompressor')} value={!!fx.compressor} onValueChange={(v) => patchFx({ compressor: v })} />
+        <ToggleRow icon="alert-outline" label={t('panels.audio.fxLimiter')} value={!!fx.limiter} onValueChange={(v) => patchFx({ limiter: v })} />
+        <ToggleRow icon="options-outline" label={t('panels.audio.fxNormalize')} value={!!fx.normalize} onValueChange={(v) => patchFx({ normalize: v })} />
+        <Slider
+          label={t('panels.audio.fxReverb')}
+          value={fx.reverb ?? 0}
+          min={0}
+          max={1}
+          onChange={(v) => patchFx({ reverb: v })}
+          format={(v) => `${Math.round(v * 100)}%`}
+        />
+        <Slider
+          label={t('panels.audio.fxDelay')}
+          value={fx.delay ?? 0}
+          min={0}
+          max={1}
+          onChange={(v) => patchFx({ delay: v })}
+          format={(v) => `${Math.round(v * 100)}%`}
+        />
+        <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>
+
+        {/* 🎚️ AI stem-szeparáció (Pro) */}
+        <View style={styles.divider} />
+        <Pressable onPress={onSeparate} disabled={separating} style={styles.stemsBtn}>
+          <Ionicons
+            name={separating ? 'hourglass-outline' : 'git-branch-outline'}
+            size={16}
+            color={palette.accent}
+          />
+          <Text style={styles.stemsText}>{t('studio.audio.stems')}</Text>
+          <View style={styles.proTag}>
+            <Text style={styles.proTagText}>PRO</Text>
+          </View>
+        </Pressable>
+        <Text style={styles.hint}>{t('studio.audio.stemsHint')}</Text>
+      </ScrollView>
+    </AudioSheetFrame>
   );
 }
 
@@ -386,8 +381,6 @@ export function selectedAudioClip(project: Project | null, selectedClipId: strin
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' },
-  tap: { flex: 1 },
   sheet: {
     backgroundColor: '#0b0d14',
     borderTopLeftRadius: 20,

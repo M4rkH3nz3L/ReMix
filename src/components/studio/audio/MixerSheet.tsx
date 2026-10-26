@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Slider } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
 import {
@@ -56,100 +56,95 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
-          <View style={styles.handleRow}>
-            <Text style={styles.title}>
-              <Ionicons name="options" size={16} color={palette.accent} /> {t('studio.mixer.title', { defaultValue: 'Mixer' })}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={24} color={palette.textDim} />
-            </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
-            {LANES.map((lane) => {
-              const track = project.tracks.find((tr) => tr.type === lane.type);
-              const clipCount = track ? track.clips.filter((c) => c.kind === 'audio').length : 0;
-              const gain = project.trackMix?.[lane.type]?.gain ?? 1;
-              const muted = mutedTracks.includes(lane.type);
-              const solo = soloTracks.includes(lane.type);
-              const ducked = track ? trackDucked(track.clips) : false;
-              return (
-                <View key={lane.type} style={styles.strip}>
-                  <View style={styles.stripHead}>
-                    <Ionicons name={lane.icon} size={15} color={lane.color} />
-                    <Text style={styles.stripName} numberOfLines={1}>
-                      {t(lane.labelKey)}
-                    </Text>
-                    <Text style={styles.clipCount}>{clipCount}</Text>
-                    <Text style={[styles.db, { color: lane.color }]}>{formatGainDb(gain)} dB</Text>
-                  </View>
-
-                  <Slider
-                    label=""
-                    value={gain}
-                    min={0}
-                    max={MAX_GAIN}
-                    onChange={(v) => setGain(lane.type, v)}
-                    format={(v) => `${formatGainDb(v)} dB`}
-                  />
-
-                  <View style={styles.btnRow}>
-                    <Pressable
-                      onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}
-                      style={[styles.chip, muted && styles.chipDanger]}
-                    >
-                      <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={14} color={muted ? '#fff' : palette.textDim} />
-                      <Text style={[styles.chipText, muted && { color: '#fff' }]}>{t('studio.mixer.mute', { defaultValue: 'Némít' })}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')}
-                      style={[styles.chip, solo && styles.chipAccent]}
-                    >
-                      <Text style={[styles.chipText, solo && { color: '#fff' }]}>S</Text>
-                      <Text style={[styles.chipText, solo && { color: '#fff' }]}>{t('studio.mixer.solo', { defaultValue: 'Szóló' })}</Text>
-                    </Pressable>
-                    {canDuckTrack(lane.type) ? (
-                      <Pressable
-                        onPress={() => toggleDuck(lane.type)}
-                        disabled={clipCount === 0}
-                        style={[styles.chip, ducked && styles.chipAccent, clipCount === 0 && styles.chipDisabled]}
-                      >
-                        <Ionicons name="volume-low-outline" size={14} color={ducked ? '#fff' : palette.textDim} />
-                        <Text style={[styles.chipText, ducked && { color: '#fff' }]}>{t('studio.mixer.duck', { defaultValue: 'Duck' })}</Text>
-                      </Pressable>
-                    ) : (
-                      <View style={[styles.chip, styles.chipGhost]}>
-                        <Ionicons name="key-outline" size={13} color={palette.textDim} />
-                        <Text style={styles.chipText}>{t('studio.mixer.sidechainKey', { defaultValue: 'Kulcs' })}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-
-            {/* Master-szalag → a Master-lánc (EQ/LUFS/limiter) a külön lapon */}
-            <Pressable style={styles.masterBtn} onPress={onOpenMaster}>
-              <Ionicons name="pulse-outline" size={16} color="#fff" />
-              <Text style={styles.masterText}>{t('studio.mixer.openMaster', { defaultValue: 'Master-lánc (EQ · LUFS · limiter)' })}</Text>
-            </Pressable>
-            <Text style={styles.hint}>
-              {t('studio.mixer.duckHint', {
-                defaultValue: 'A DUCK: a zene/sfx automatikusan lehalkul, amikor a voiceover szól (sidechain).',
-              })}
-            </Text>
-          </ScrollView>
-        </SafeAreaView>
+    <AudioSheetFrame id="mixer" onClose={onClose} sheetStyle={styles.sheet}>
+      <View style={styles.handleRow}>
+        <Text style={styles.title}>
+          <Ionicons name="options" size={16} color={palette.accent} /> {t('studio.mixer.title', { defaultValue: 'Mixer' })}
+        </Text>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Ionicons name="close" size={24} color={palette.textDim} />
+        </Pressable>
       </View>
-    </Modal>
+
+      <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+        {LANES.map((lane) => {
+          const track = project.tracks.find((tr) => tr.type === lane.type);
+          const clipCount = track ? track.clips.filter((c) => c.kind === 'audio').length : 0;
+          const gain = project.trackMix?.[lane.type]?.gain ?? 1;
+          const muted = mutedTracks.includes(lane.type);
+          const solo = soloTracks.includes(lane.type);
+          const ducked = track ? trackDucked(track.clips) : false;
+          return (
+            <View key={lane.type} style={styles.strip}>
+              <View style={styles.stripHead}>
+                <Ionicons name={lane.icon} size={15} color={lane.color} />
+                <Text style={styles.stripName} numberOfLines={1}>
+                  {t(lane.labelKey)}
+                </Text>
+                <Text style={styles.clipCount}>{clipCount}</Text>
+                <Text style={[styles.db, { color: lane.color }]}>{formatGainDb(gain)} dB</Text>
+              </View>
+
+              <Slider
+                label=""
+                value={gain}
+                min={0}
+                max={MAX_GAIN}
+                onChange={(v) => setGain(lane.type, v)}
+                format={(v) => `${formatGainDb(v)} dB`}
+              />
+
+              <View style={styles.btnRow}>
+                <Pressable
+                  onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}
+                  style={[styles.chip, muted && styles.chipDanger]}
+                >
+                  <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={14} color={muted ? '#fff' : palette.textDim} />
+                  <Text style={[styles.chipText, muted && { color: '#fff' }]}>{t('studio.mixer.mute', { defaultValue: 'Némít' })}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')}
+                  style={[styles.chip, solo && styles.chipAccent]}
+                >
+                  <Text style={[styles.chipText, solo && { color: '#fff' }]}>S</Text>
+                  <Text style={[styles.chipText, solo && { color: '#fff' }]}>{t('studio.mixer.solo', { defaultValue: 'Szóló' })}</Text>
+                </Pressable>
+                {canDuckTrack(lane.type) ? (
+                  <Pressable
+                    onPress={() => toggleDuck(lane.type)}
+                    disabled={clipCount === 0}
+                    style={[styles.chip, ducked && styles.chipAccent, clipCount === 0 && styles.chipDisabled]}
+                  >
+                    <Ionicons name="volume-low-outline" size={14} color={ducked ? '#fff' : palette.textDim} />
+                    <Text style={[styles.chipText, ducked && { color: '#fff' }]}>{t('studio.mixer.duck', { defaultValue: 'Duck' })}</Text>
+                  </Pressable>
+                ) : (
+                  <View style={[styles.chip, styles.chipGhost]}>
+                    <Ionicons name="key-outline" size={13} color={palette.textDim} />
+                    <Text style={styles.chipText}>{t('studio.mixer.sidechainKey', { defaultValue: 'Kulcs' })}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })}
+
+        {/* Master-szalag → a Master-lánc (EQ/LUFS/limiter) a külön lapon */}
+        <Pressable style={styles.masterBtn} onPress={onOpenMaster}>
+          <Ionicons name="pulse-outline" size={16} color="#fff" />
+          <Text style={styles.masterText}>{t('studio.mixer.openMaster', { defaultValue: 'Master-lánc (EQ · LUFS · limiter)' })}</Text>
+        </Pressable>
+        <Text style={styles.hint}>
+          {t('studio.mixer.duckHint', {
+            defaultValue: 'A DUCK: a zene/sfx automatikusan lehalkul, amikor a voiceover szól (sidechain).',
+          })}
+        </Text>
+      </ScrollView>
+    </AudioSheetFrame>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, maxHeight: '86%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },

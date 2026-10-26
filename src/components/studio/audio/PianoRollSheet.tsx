@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import {
@@ -59,99 +59,94 @@ export function PianoRollSheet({
   const tap = (midi: number, beat: number) => setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note')));
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
-          <View style={styles.handleRow}>
-            <Text style={styles.title}>
-              <Ionicons name="musical-notes" size={16} color={palette.accent} /> {t('studio.pianoRoll.title', { defaultValue: 'Zeneszerzés' })}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={24} color={palette.textDim} />
-            </Pressable>
-          </View>
-
-          {/* vezérlők */}
-          <View style={styles.controls}>
-            {WAVES.map((w) => (
-              <Pressable key={w} onPress={() => setWave(w)} style={[styles.waveBtn, wave === w && styles.waveBtnActive]}>
-                <Ionicons name={WAVE_ICON[w]} size={14} color={wave === w ? '#fff' : palette.textDim} />
-                <Text style={[styles.waveText, wave === w && { color: '#fff' }]}>{t(`studio.pianoRoll.wave.${w}`, { defaultValue: w })}</Text>
-              </Pressable>
-            ))}
-            <View style={styles.spacer} />
-            <Pressable onPress={() => setBars((b) => Math.max(1, b - 1))} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="remove" size={16} color={palette.text} />
-            </Pressable>
-            <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-            <Pressable onPress={() => setBars((b) => Math.min(8, b + 1))} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="add" size={16} color={palette.text} />
-            </Pressable>
-          </View>
-
-          {/* rács: függőleges (hangmagasság) + vízszintes (ütem) görgetés */}
-          <ScrollView style={styles.gridV} contentContainerStyle={{ paddingBottom: 4 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator>
-              <View>
-                {rows.map((midi) => {
-                  const black = isBlackKey(midi);
-                  return (
-                    <View key={midi} style={styles.row}>
-                      <View style={[styles.gutter, black && styles.gutterBlack]}>
-                        <Text style={styles.gutterText}>{noteLabel(midi)}</Text>
-                      </View>
-                      {cols.map((beat) => {
-                        const on = !!noteAt(notes, midi, beat);
-                        const barStart = beat % 4 === 0;
-                        return (
-                          <Pressable
-                            key={beat}
-                            onPress={() => tap(midi, beat)}
-                            style={[
-                              styles.cell,
-                              black && styles.cellBlack,
-                              barStart && styles.cellBar,
-                              on && styles.cellOn,
-                            ]}
-                          />
-                        );
-                      })}
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerInfo}>
-              {notes.length} {t('studio.pianoRoll.notes', { defaultValue: 'hang' })} · {durSec.toFixed(1)}s
-            </Text>
-            <Pressable onPress={() => setNotes([])} style={styles.clearBtn} disabled={notes.length === 0}>
-              <Ionicons name="trash-outline" size={15} color={notes.length === 0 ? palette.border : palette.textDim} />
-              <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onBake(notes, wave)}
-              disabled={busy || notes.length === 0}
-              style={[styles.bakeBtn, (busy || notes.length === 0) && styles.disabled]}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="checkmark" size={16} color="#fff" />
-              )}
-              <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
-            </Pressable>
-          </View>
-        </SafeAreaView>
+    <AudioSheetFrame id="pianoRoll" onClose={onClose} sheetStyle={styles.sheet}>
+      <View style={styles.handleRow}>
+        <Text style={styles.title}>
+          <Ionicons name="musical-notes" size={16} color={palette.accent} /> {t('studio.pianoRoll.title', { defaultValue: 'Zeneszerzés' })}
+        </Text>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Ionicons name="close" size={24} color={palette.textDim} />
+        </Pressable>
       </View>
-    </Modal>
+
+      {/* vezérlők */}
+      <View style={styles.controls}>
+        {WAVES.map((w) => (
+          <Pressable key={w} onPress={() => setWave(w)} style={[styles.waveBtn, wave === w && styles.waveBtnActive]}>
+            <Ionicons name={WAVE_ICON[w]} size={14} color={wave === w ? '#fff' : palette.textDim} />
+            <Text style={[styles.waveText, wave === w && { color: '#fff' }]}>{t(`studio.pianoRoll.wave.${w}`, { defaultValue: w })}</Text>
+          </Pressable>
+        ))}
+        <View style={styles.spacer} />
+        <Pressable onPress={() => setBars((b) => Math.max(1, b - 1))} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="remove" size={16} color={palette.text} />
+        </Pressable>
+        <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
+        <Pressable onPress={() => setBars((b) => Math.min(8, b + 1))} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="add" size={16} color={palette.text} />
+        </Pressable>
+      </View>
+
+      {/* rács: függőleges (hangmagasság) + vízszintes (ütem) görgetés */}
+      <ScrollView style={styles.gridV} contentContainerStyle={{ paddingBottom: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator>
+          <View>
+            {rows.map((midi) => {
+              const black = isBlackKey(midi);
+              return (
+                <View key={midi} style={styles.row}>
+                  <View style={[styles.gutter, black && styles.gutterBlack]}>
+                    <Text style={styles.gutterText}>{noteLabel(midi)}</Text>
+                  </View>
+                  {cols.map((beat) => {
+                    const on = !!noteAt(notes, midi, beat);
+                    const barStart = beat % 4 === 0;
+                    return (
+                      <Pressable
+                        key={beat}
+                        onPress={() => tap(midi, beat)}
+                        style={[
+                          styles.cell,
+                          black && styles.cellBlack,
+                          barStart && styles.cellBar,
+                          on && styles.cellOn,
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerInfo}>
+          {notes.length} {t('studio.pianoRoll.notes', { defaultValue: 'hang' })} · {durSec.toFixed(1)}s
+        </Text>
+        <Pressable onPress={() => setNotes([])} style={styles.clearBtn} disabled={notes.length === 0}>
+          <Ionicons name="trash-outline" size={15} color={notes.length === 0 ? palette.border : palette.textDim} />
+          <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onBake(notes, wave)}
+          disabled={busy || notes.length === 0}
+          style={[styles.bakeBtn, (busy || notes.length === 0) && styles.disabled]}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="checkmark" size={16} color="#fff" />
+          )}
+          <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
+        </Pressable>
+      </View>
+    </AudioSheetFrame>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, maxHeight: '90%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },

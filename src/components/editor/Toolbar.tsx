@@ -31,7 +31,7 @@ import type { Asset, Clip, TrackType } from '@/types/project';
  * klipnél a klip-műveletek. Kontextusonként max 4 elsődleges eszköz + „Több"
  * (MOBILE-UI §6.4) — a „Kész" és a „Törlés" króm, nem számít bele a 4-be.
  */
-export function Toolbar() {
+export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) {
   const { t } = useTranslation();
   const selected = useEditorStore(selectSelectedClip);
   const [showCamera, setShowCamera] = useState(false);
@@ -609,14 +609,16 @@ export function Toolbar() {
     );
   };
 
+  const rail = variant === 'rail';
   return (
-    <View style={styles.container}>
-      {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya */}
-      <SelectionInfo />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <View style={rail ? styles.railContainer : styles.container}>
+      {/* 🧭 „What am I editing?" — a kijelölt elem fajtája · neve · idő-tartománya
+          (railnél a képernyő az idővonal fölé teszi — a keskeny oszlopba nem fér) */}
+      {rail ? null : <SelectionInfo />}
+      <ScrollView horizontal={!rail} showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
         {/* 4 elsődleges eszköz + „Több" (MOBILE-UI §6.4); a sor NEM remountol → a
             scroll-pozíció marad, a készlet-váltás csak átúszik */}
-        <Animated.View style={[styles.toolRow, toolRowStyle]}>
+        <Animated.View style={[rail ? styles.toolColumn : styles.toolRow, toolRowStyle]}>
           {selected ? (
             <ToolButton icon="checkmark-circle-outline" label={t('common.done')} onPress={() => selectClip(null)} />
           ) : null}
@@ -631,7 +633,7 @@ export function Toolbar() {
           {selected ? (
             <>
               {/* elválasztó: a destruktív Törlés elkülönül a többi eszköztől */}
-              <View style={styles.toolSep} />
+              <View style={rail ? styles.toolSepH : styles.toolSep} />
               <ToolButton
                 icon="trash-outline"
                 label={multi ? t('editor.toolbar.deleteCount', { count: batchCount }) : t('common.delete')}
@@ -696,6 +698,25 @@ const styles = StyleSheet.create({
     width: '25%',
     alignItems: 'center',
     paddingVertical: 6,
+  },
+  // 🖥️ bal oldali rail (iPad fekvő / expanded, MOBILE-UI §7): keskeny, ikonközpontú oszlop
+  railContainer: {
+    flex: 1,
+    backgroundColor: palette.surface,
+    borderRightWidth: 1,
+    borderRightColor: palette.border,
+    paddingVertical: 6,
+  },
+  toolColumn: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  toolSepH: {
+    height: 1,
+    width: 28,
+    alignSelf: 'center',
+    marginVertical: 8,
+    backgroundColor: palette.border,
   },
   // a vízszintes görgetősor egyetlen animált tartalom-doboza (fade a váltáskor)
   toolRow: {

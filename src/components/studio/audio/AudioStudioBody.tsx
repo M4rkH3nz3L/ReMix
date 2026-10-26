@@ -16,6 +16,8 @@ import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
 import { palette } from '@/constants/editor';
+import { layoutBudget, type Detent } from '@/lib/panelLayout';
+import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
 import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
 import { buildAlbumVideoProject } from '@/lib/albumShare';
 import {
@@ -107,6 +109,12 @@ export function AudioStudioBody({
   const [detectedBeats, setDetectedBeats] = useState<number[]>([]);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
+  // 📐 MOBILE-UI §6.7: a nyitott inline lap (keverő/master/klip-szerk.) detentje laponként;
+  // a munkaterület (sávok) mért magassága a detentek alapja
+  const [detentById, setDetentById] = useState<Partial<Record<AudioSheetId, Detent>>>({});
+  const [rootH, setRootH] = useState(0);
+  const [topBarH, setTopBarH] = useState(0);
+  const [transportH, setTransportH] = useState<number | undefined>(undefined);
   const [albumSharing, setAlbumSharing] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
@@ -410,9 +418,31 @@ export function AudioStudioBody({
     }
   };
 
+  // a nyitott inline lap (a többi workspace vagy modális — azok nem nyomják össze a sávokat)
+  const inlineSheet: AudioSheetId | null =
+    editing && selClip ? 'clipEdit' : mastering ? 'master' : mixerOpen ? 'mixer' : null;
+  const inlineDetent: Detent = inlineSheet
+    ? (detentById[inlineSheet] ?? AUDIO_SHEET_SPECS[inlineSheet].initialDetent ?? 'half')
+    : 'peek';
+  const sheetFrame =
+    rootH > 0
+      ? {
+          detents: layoutBudget({
+            bodyHeight: rootH - topBarH,
+            tier: 'sheet',
+            detent: inlineDetent,
+            hasTimeline: false,
+            transportHeight: transportH,
+          }).detents,
+          detent: inlineDetent,
+          onDetentChange: (d: Detent) =>
+            inlineSheet && setDetentById((m) => ({ ...m, [inlineSheet]: d })),
+        }
+      : null;
+
   return (
-    <View style={styles.root}>
-      <View style={styles.topBar}>
+    <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
+      <View style={styles.topBar} onLayout={(e) => setTopBarH(e.nativeEvent.layout.height)}>
         <Pressable onPress={onExit} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
@@ -590,6 +620,8 @@ export function AudioStudioBody({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.transportBar}
+        onLayout={(e) => setTransportH(e.nativeEvent.layout.height)}
         contentContainerStyle={styles.transport}
         keyboardShouldPersistTaps="handled"
       >
@@ -647,17 +679,19 @@ export function AudioStudioBody({
         />
       </ScrollView>
 
-      {/* eszköz-sor */}
-      <AudioStudioToolbar
-        hasSelection={!!selClip}
-        isRecording={recorderState.isRecording}
-        onAdd={() => setAdding(true)}
-        onRecord={toggleRecord}
-        onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
-        onEdit={() => selClip && setEditing(true)}
-        onDelete={() => selClip && useEditorStore.getState().removeClip(selClip.id)}
-        onMixer={() => setMixerOpen(true)}
-      />
+      {/* eszköz-sor — nyitott inline lapnál rejtve (a lap fejléce a kilépés; a transport marad) */}
+      {inlineSheet ? null : (
+        <AudioStudioToolbar
+          hasSelection={!!selClip}
+          isRecording={recorderState.isRecording}
+          onAdd={() => setAdding(true)}
+          onRecord={toggleRecord}
+          onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
+          onEdit={() => selClip && setEditing(true)}
+          onDelete={() => selClip && useEditorStore.getState().removeClip(selClip.id)}
+          onMixer={() => setMixerOpen(true)}
+        />
+      )}
 
       <AudioStudioSheets
         selClip={selClip}
@@ -691,6 +725,7 @@ export function AudioStudioBody({
         onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
         onInsertSource={insertSource}
         onShareAlbum={() => void shareAlbum()}
+        frame={sheetFrame}
       />
     </View>
   );
@@ -767,6 +802,8 @@ const styles = StyleSheet.create({
   playhead: { position: 'absolute', top: 0, width: 2, backgroundColor: '#fff' },
   phBubble: { position: 'absolute', top: 2, backgroundColor: palette.accent, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 },
   phBubbleText: { color: '#fff', fontSize: 9, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  // a transport-sor nem nő flexből (a sávok kapják a helyet)
+  transportBar: { flexGrow: 0 },
   transport: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
   playBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', marginHorizontal: 2 },
   time: { color: palette.text, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },

@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import {
   DRUM_LABEL,
@@ -64,76 +64,71 @@ export function DrumMachineSheet({
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
-          <View style={styles.handleRow}>
-            <Text style={styles.title}>
-              <Ionicons name="grid" size={16} color={palette.accent} /> {t('studio.drums.title', { defaultValue: 'Dob-gép' })}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={24} color={palette.textDim} />
-            </Pressable>
-          </View>
-
-          <View style={styles.controls}>
-            <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="remove" size={16} color={palette.text} />
-            </Pressable>
-            <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-            <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
-              <Ionicons name="add" size={16} color={palette.text} />
-            </Pressable>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              {DRUM_VOICES.map((voice) => (
-                <View key={voice} style={styles.row}>
-                  <View style={styles.rowLabel}>
-                    <Text style={styles.rowLabelText}>{DRUM_LABEL[voice]}</Text>
-                  </View>
-                  {cols.map((step) => {
-                    const on = pattern[voice]?.[step];
-                    const beatStart = step % 4 === 0;
-                    return (
-                      <Pressable
-                        key={step}
-                        onPress={() => setPattern((p) => toggleStep(p, voice, step))}
-                        style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
-                      />
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <Pressable onPress={() => setPattern(emptyPattern(bars))} style={styles.clearBtn} disabled={!hasHits(pattern)}>
-              <Ionicons name="trash-outline" size={15} color={hasHits(pattern) ? palette.textDim : palette.border} />
-              <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => onBake(patternHits(pattern), bars)}
-              disabled={busy || !hasHits(pattern)}
-              style={[styles.bakeBtn, (busy || !hasHits(pattern)) && styles.disabled]}
-            >
-              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
-              <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.hint}>{STEPS_PER_BAR}{t('studio.drums.stepHint', { defaultValue: '-od lépések · a félkövér vonalak a beatek' })}</Text>
-        </SafeAreaView>
+    <AudioSheetFrame id="drumMachine" onClose={onClose} sheetStyle={styles.sheet}>
+      <View style={styles.handleRow}>
+        <Text style={styles.title}>
+          <Ionicons name="grid" size={16} color={palette.accent} /> {t('studio.drums.title', { defaultValue: 'Dob-gép' })}
+        </Text>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Ionicons name="close" size={24} color={palette.textDim} />
+        </Pressable>
       </View>
-    </Modal>
+
+      <View style={styles.controls}>
+        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="remove" size={16} color={palette.text} />
+        </Pressable>
+        <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
+        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
+          <Ionicons name="add" size={16} color={palette.text} />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View>
+          {DRUM_VOICES.map((voice) => (
+            <View key={voice} style={styles.row}>
+              <View style={styles.rowLabel}>
+                <Text style={styles.rowLabelText}>{DRUM_LABEL[voice]}</Text>
+              </View>
+              {cols.map((step) => {
+                const on = pattern[voice]?.[step];
+                const beatStart = step % 4 === 0;
+                return (
+                  <Pressable
+                    key={step}
+                    onPress={() => setPattern((p) => toggleStep(p, voice, step))}
+                    style={[styles.cell, beatStart && styles.cellBeat, on && styles.cellOn]}
+                  />
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable onPress={() => setPattern(emptyPattern(bars))} style={styles.clearBtn} disabled={!hasHits(pattern)}>
+          <Ionicons name="trash-outline" size={15} color={hasHits(pattern) ? palette.textDim : palette.border} />
+          <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onBake(patternHits(pattern), bars)}
+          disabled={busy || !hasHits(pattern)}
+          style={[styles.bakeBtn, (busy || !hasHits(pattern)) && styles.disabled]}
+        >
+          {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
+          <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.hint}>{STEPS_PER_BAR}{t('studio.drums.stepHint', { defaultValue: '-od lépések · a félkövér vonalak a beatek' })}</Text>
+    </AudioSheetFrame>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, maxHeight: '86%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },

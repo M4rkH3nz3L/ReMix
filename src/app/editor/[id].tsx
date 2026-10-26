@@ -21,6 +21,7 @@ import { SourceSheet } from '@/components/SourceSheet';
 import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
 import { AudioStudioModal } from '@/components/studio/audio/AudioStudioModal';
 import { MiniTimeline } from '@/components/editor/MiniTimeline';
+import { SelectionInfo } from '@/components/editor/SelectionInfo';
 import { PanelHost } from '@/components/editor/PanelHost';
 import { RemixGraphModal } from '@/components/editor/RemixGraphModal';
 import { MissingMediaSheet } from '@/components/editor/MissingMediaSheet';
@@ -826,8 +827,8 @@ export default function EditorScreen() {
    * Elrendezés méret-osztály szerint (lásd `@/constants/layout`, MOBILE-UI §6–7):
    *
    *  expanded — iPad fekvő/desktop. Teljes vágó-elrendezés: fejléc végig felül,
-   *    alatta előnézet+transport | DOKKOLT inspector, legalul teljes szélességű
-   *    idővonal. A panel és az idővonal EGYSZERRE látszik.
+   *    alatta bal eszköz-RAIL | előnézet+transport | DOKKOLT inspector, legalul
+   *    teljes szélességű idővonal. A panel és az idővonal EGYSZERRE látszik.
    *  medium+fekvő — telefon fekvőben: a videó kapja a bal oldalt, a vezérlők a
    *    jobb oszlopba kerülnek; nyitott panelnél az idővonal MINI-sorrá húzódik
    *    (nem tűnik el), alatta a panel teljes oszlop-magasságban.
@@ -889,6 +890,11 @@ export default function EditorScreen() {
         {header}
         {banners}
         <View style={styles.expandedBand}>
+          {/* 🧰 bal eszköz-rail: az alsó eszköztár helyett (MOBILE-UI §7) — így a
+              vászon és az idővonal magasságot nyer, az eszközök hüvelykujj-közelben */}
+          <View style={{ width: L.editor.railWidth }}>
+            <Toolbar variant="rail" />
+          </View>
           {L.editor.sourceBinWidth > 0 ? (
             <View style={[styles.sourceDock, { width: L.editor.sourceBinWidth }]}>
               <SourceBin compact scroll onInsert={(a) => useEditorStore.getState().insertSourceAsset(a)} />
@@ -904,8 +910,8 @@ export default function EditorScreen() {
             </View>
           ) : null}
         </View>
+        <SelectionInfo />
         <Timeline />
-        <Toolbar />
       </>
     );
   } else if (L.sizeClass === 'medium' && L.isLandscape) {

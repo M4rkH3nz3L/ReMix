@@ -11,17 +11,25 @@ import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
 import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
+import { StudioSheetFrameContext } from '@/components/studio/image/StudioSheet';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canBoolean } from '@/lib/imageBoolean';
-import type { ImageSheetId } from '@/lib/panelSpecs';
+import type { Detent } from '@/lib/panelLayout';
+import { IMAGE_SHEET_SPECS, type ImageSheetId } from '@/lib/panelSpecs';
 import type { Asset, ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 /** 🗂️ melyik szerkesztő-lap van nyitva — a body `sheet` állapotának típusa */
 export type SheetKind = ImageSheetId | null;
 
+/** Nyitva van-e inline (nem-modális) lap — a body ilyenkor elrejti az eszköztárat. */
+export function isInlineSheet(sheet: SheetKind): boolean {
+  return !!sheet && !IMAGE_SHEET_SPECS[sheet].modal;
+}
+
 /**
  * 🗂️ Sheet-host — a `sheet` állapottól függő szerkesztő-lapok feltételes
- * renderelése. VISELKEDÉS-MEGŐRZŐ kiemelés az `ImageStudioBody`-ból: pontosan
+ * renderelése. A keretet (inline detentes vs. modális) a panel-regiszter dönti el
+ * (`IMAGE_SHEET_SPECS`, MOBILE-UI §5.2) — a `StudioSheet` a kontextusból olvassa. VISELKEDÉS-MEGŐRZŐ kiemelés az `ImageStudioBody`-ból: pontosan
  * ugyanaz a feltétel-lánc, render-sorrend és prop-átadás, mint korábban a body
  * JSX-ében — minden handler/érték PROPBÓL érkezik (a body adja át).
  */
@@ -48,6 +56,10 @@ export function ImageStudioSheets({
   onVideo,
   onShareSlideshow,
   onShareCarousel,
+  detents,
+  detent,
+  onDetentChange,
+  docked = false,
 }: {
   sheet: SheetKind;
   doc: ImageDoc | null;
@@ -72,14 +84,28 @@ export function ImageStudioSheets({
   onVideo: () => void;
   onShareSlideshow?: () => void;
   onShareCarousel?: () => void;
+  /** 📐 az inline lap detentjei (a body `layoutBudget`-jéből); nélküle minden lap modális */
+  detents?: Record<Detent, number>;
+  detent: Detent;
+  onDetentChange: (detent: Detent) => void;
+  /** iPad fekvő: az élő lapok jobb oldali dokkolt oszlopban (MOBILE-UI §7) */
+  docked?: boolean;
 }) {
+  const frame =
+    detents && sheet
+      ? { inline: isInlineSheet(sheet), docked, detents, detent, onDetentChange }
+      : null;
   return (
-    <>
+    <StudioSheetFrameContext.Provider value={frame}>
       {sheet === 'layers' && doc ? (
         <LayerPanel
           doc={doc}
           selectedId={effectiveSelectedId}
-          onSelect={setSelectedId}
+          onSelect={(id) => {
+            setSelectedId(id);
+            // réteg-választás után a lap lehúzódik (peek) → azonnal a vásznon dolgozhatsz
+            onDetentChange('peek');
+          }}
           onAdd={onAdd}
           commit={commit}
           onClose={() => setSheet(null)}
@@ -154,6 +180,6 @@ export function ImageStudioSheets({
           onClose={() => setSheet(null)}
         />
       ) : null}
-    </>
+    </StudioSheetFrameContext.Provider>
   );
 }

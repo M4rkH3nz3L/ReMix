@@ -19,16 +19,31 @@ const KIND_ICON = Object.fromEntries(
  *  kép/hang projektnél a fajta-ikon — nincs videó-bélyegkép, amit kirakni) */
 const thumbCache = new Map<string, string | null>();
 
-export function ProjectThumb({ id, kind }: { id: string; kind: ProjectKind }) {
-  const [uri, setUri] = useState<string | null>(thumbCache.get(id) ?? null);
+export function ProjectThumb({
+  id,
+  kind,
+  version = '',
+}: {
+  id: string;
+  kind: ProjectKind;
+  /** a projekt `updatedAt`-je — a cache-kulcs része, így a tartalom változása után frissül */
+  version?: string;
+}) {
+  const cacheKey = `${id}@${version}`;
+  const [uri, setUri] = useState<string | null>(thumbCache.get(cacheKey) ?? null);
   useEffect(() => {
-    // csak videó-projektnél van értelme filmstrip-kockát keresni
-    if (kind !== 'video' || thumbCache.has(id)) {
+    // videónál a filmstrip első kockája, képnél az első fotó-réteg; hangnál ikon
+    if (kind === 'audio' || thumbCache.has(cacheKey)) {
       return;
     }
     let alive = true;
     loadProject(id)
       .then(async (p) => {
+        if (kind === 'image') {
+          // 🖼️ kép-projekt: az első lap első fotó-rétege (élő teszt H1 — eddig csak ikon)
+          const photo = p?.imageDocs?.[0]?.layers.find((l) => l.kind === 'photo');
+          return photo && photo.kind === 'photo' ? photo.uri : null;
+        }
         const clip = p?.tracks
           .find((t) => t.type === 'video')
           ?.clips.find((c) => c.kind === 'video');
@@ -39,7 +54,7 @@ export function ProjectThumb({ id, kind }: { id: string; kind: ProjectKind }) {
         return thumb;
       })
       .then((thumb) => {
-        thumbCache.set(id, thumb ?? null);
+        thumbCache.set(cacheKey, thumb ?? null);
         if (alive) {
           setUri(thumb ?? null);
         }
@@ -48,8 +63,8 @@ export function ProjectThumb({ id, kind }: { id: string; kind: ProjectKind }) {
     return () => {
       alive = false;
     };
-  }, [id, kind]);
-  if (kind === 'video' && uri) {
+  }, [id, kind, cacheKey]);
+  if (kind !== 'audio' && uri) {
     return <Image source={{ uri }} style={styles.cardThumb} contentFit="cover" />;
   }
   return (

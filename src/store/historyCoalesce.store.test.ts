@@ -72,4 +72,21 @@ describe('undo-összevonás (store)', () => {
     store().undo();
     expect(volumeOf('v1')).toBe(1);
   });
+
+  it('undo után a kijelölés MEGMARAD, ha a klip létezik (élő teszt U1)', () => {
+    store().selectClip('v1');
+    store().updateClip('v1', { volume: 0.4 });
+    store().undo();
+    expect(store().selectedClipId).toBe('v1');
+    store().redo();
+    expect(store().selectedClipId).toBe('v1');
+  });
+
+  it('ha a visszavonás eltünteti a kijelölt klipet, a kijelölés kiesik', () => {
+    store().addClip('video', { ...videoClip('v3'), start: 10 });
+    store().selectClip('v3');
+    store().undo();
+    expect(store().selectedClipId).toBeNull();
+    expect(store().multiSelectIds).toEqual([]);
+  });
 });

@@ -161,7 +161,7 @@ export default function ProjectsScreen() {
               onPress={() => router.push(studioRoute(item.kind, item.id) as Href)}
               onLongPress={() => s.projectMenu(item)}
             >
-              <ProjectThumb id={item.id} kind={itemKind} />
+              <ProjectThumb id={item.id} kind={itemKind} version={item.updatedAt} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName} numberOfLines={1}>
                   {item.name}

@@ -11,6 +11,8 @@ import type { ProjectEvent } from '@/lib/commands';
 import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
 import { coalesceKey, shouldCoalesce, type LastCommit } from '@/lib/historyCoalesce';
 import { makeId } from '@/lib/id';
+import { findClip } from '@/lib/projectUtils';
+import type { Project } from '@/types/project';
 
 import { getLiveBroadcaster } from '../broadcasters';
 import {
@@ -48,6 +50,24 @@ type HistorySlice = Pick<
  * egy history-lépés legyen (`@/lib/historyCoalesce`). Undo/redo/betöltés megszakítja.
  */
 let lastCommit: LastCommit | null = null;
+
+/**
+ * Undo/redo utáni kijelölés: ami a célállapotban is létezik, az marad kijelölve; a
+ * megszűnt klipek (törölt/összevont) kiesnek — így nem maradnak árva köteg-id-k.
+ */
+function keptSelection(
+  state: Pick<EditorState, 'selectedClipId' | 'multiSelectIds' | 'multiSelectMode'>,
+  target: Project
+): Pick<EditorState, 'selectedClipId' | 'multiSelectIds' | 'multiSelectMode'> {
+  const exists = (id: string) => findClip(target, id) !== null;
+  const selectedClipId = state.selectedClipId && exists(state.selectedClipId) ? state.selectedClipId : null;
+  const multiSelectIds = selectedClipId ? state.multiSelectIds.filter(exists) : [];
+  return {
+    selectedClipId,
+    multiSelectIds,
+    multiSelectMode: state.multiSelectMode && multiSelectIds.length > 0,
+  };
+}
 
 export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   project: null,
@@ -249,11 +269,9 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       pastLabels: pastLabels.slice(0, -1),
       futureLabels: [pastLabels[pastLabels.length - 1] ?? '', ...futureLabels].slice(0, HISTORY_LIMIT),
       dirty: true,
-      // a kijelöléssel EGYÜTT a köteg is elévül: az undo után a klip-készlet
-      // már más lehet (törölt/összevont klipek), árva köteg-id-k maradnának
-      selectedClipId: null,
-      multiSelectIds: [],
-      multiSelectMode: false,
+      // a kijelölés MEGMARAD, ha a klip a visszaállított állapotban is létezik (a
+      // felhasználó ugyanott folytathatja — élő teszt U1); a megszűnt klipek kiesnek
+      ...keptSelection(get(), previous),
     });
   },
 
@@ -272,11 +290,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       pastLabels: [...pastLabels.slice(-HISTORY_LIMIT + 1), nextLabel ?? ''],
       futureLabels: restLabels,
       dirty: true,
-      // a kijelöléssel EGYÜTT a köteg is elévül: az undo után a klip-készlet
-      // már más lehet (törölt/összevont klipek), árva köteg-id-k maradnának
-      selectedClipId: null,
-      multiSelectIds: [],
-      multiSelectMode: false,
+      ...keptSelection(get(), next),
     });
   },
 

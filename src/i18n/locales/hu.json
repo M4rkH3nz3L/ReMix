@@ -3007,6 +3007,7 @@
       "adjustTitle": "Képjavítás",
       "adjustTone": "Tónus (PRO)",
       "adjustStack": {
+        "quick": "Gyors",
         "title": "Korrekciók",
         "add": "Korrekció hozzáadása",
         "amount": "Erősség",

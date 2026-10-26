@@ -113,6 +113,24 @@ export function InlineSheet({
 
   // ♿ akadálymentes detent-váltás (VoiceOver/TalkBack „adjustable")
   const order = DETENTS.filter((d, i) => i === 0 || detents[d] !== detents[DETENTS[i - 1]]);
+
+  // 👆 a fogantyúra KOPPINTÁS a következő detentre lép (peek → half → full → peek) —
+  // iOS-en ezt várja a kéz; a húzás ettől függetlenül él
+  const cycleDetent = () => {
+    if (order.length < 2) {
+      return;
+    }
+    const next = order[(order.indexOf(detent) + 1) % order.length];
+    haptics.snap();
+    onDetentChange(next);
+  };
+  const tap = Gesture.Tap()
+    .maxDistance(6)
+    .onEnd((_e, success) => {
+      if (success) {
+        runOnJS(cycleDetent)();
+      }
+    });
   const onA11yAction = (e: AccessibilityActionEvent) => {
     const i = order.indexOf(detent);
     if (e.nativeEvent.actionName === 'increment' && i < order.length - 1) {
@@ -130,17 +148,19 @@ export function InlineSheet({
     <Animated.View style={[styles.sheet, style, sheetStyle]}>
       <GestureDetector gesture={pan}>
         <View>
-          <View
-            style={styles.handleZone}
-            accessible
-            accessibilityRole="adjustable"
-            accessibilityLabel={accessibilityLabel}
-            accessibilityValue={{ text: detent }}
-            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-            onAccessibilityAction={onA11yAction}
-          >
-            <View style={styles.grabber} />
-          </View>
+          <GestureDetector gesture={tap}>
+            <View
+              style={styles.handleZone}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel={accessibilityLabel}
+              accessibilityValue={{ text: detent }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={onA11yAction}
+            >
+              <View style={styles.grabber} />
+            </View>
+          </GestureDetector>
           {header}
         </View>
       </GestureDetector>
@@ -160,8 +180,8 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderColor: palette.border,
   },
-  // a húzható fogantyú-zóna: bőven a 44 pt-os minimum fölött a fejléccel együtt
-  handleZone: { alignItems: 'center', paddingTop: 8, paddingBottom: 6 },
+  // a fogantyú-zóna: koppintható/húzható — 24 pt magas, a fejléccel együtt bőven 44 pt fölött
+  handleZone: { alignItems: 'center', paddingTop: 10, paddingBottom: 10 },
   grabber: {
     width: 40,
     height: 4,

@@ -3007,6 +3007,7 @@
       "adjustTitle": "Adjust",
       "adjustTone": "Tone (PRO)",
       "adjustStack": {
+        "quick": "Quick",
         "title": "Adjustments",
         "add": "Add adjustment",
         "amount": "Strength",

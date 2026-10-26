@@ -9,6 +9,7 @@ import { captureRef } from 'react-native-view-shot';
 
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
+import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import {
   ImageStudioSheets,
@@ -133,6 +134,8 @@ export function ImageStudioBody({
   const [brushColor, setBrushColor] = useState('#ff2d95');
   const [brushSize, setBrushSize] = useState(8);
   const [guidesActive, setGuidesActive] = useState(false);
+  // ⚡ gyors korrekció-sáv (az eszköztár helyén) — a „Részletek" a teljes verem-lapot nyitja
+  const [quickAdjust, setQuickAdjust] = useState(false);
   // ↩️ precíziós módban a vissza a MÓDBÓL lép ki (nem a stúdióból) — mint a sáv ✕-e
   useBackLayer(
     cropRect || penPoints || pathEditId || lassoActive || wandActive || brushActive || guidesActive
@@ -215,6 +218,8 @@ export function ImageStudioBody({
   // a kijelölés levezetve — ha a réteg eltűnik (törlés/undo), null-ra esik
   const selectedLayer = doc?.layers.find((l) => l.id === selectedId) ?? null;
   const effectiveSelectedId = selectedLayer ? selectedId : null;
+  // ↩️ a gyors korrekció-sáv csak fotó-kijelölésnél látszik — a vissza is csak akkor nyeli el
+  useBackLayer(quickAdjust && selectedLayer?.kind === 'photo' ? () => setQuickAdjust(false) : null);
 
   // ── 🖼️📄 Galéria-lapok (project mód): új/duplikál/töröl/mozgat az aktív lapon ──
   const addPage = () => {
@@ -584,7 +589,9 @@ export function ImageStudioBody({
         break;
       case 'adjust':
         if (selectedLayer?.kind === 'photo') {
-          setSheet('adjust');
+          // ⚡ előbb a gyors sáv (a kép teljes méretben látszik); a teljes verem a „Részletek"-ből
+          setSheet(null);
+          setQuickAdjust(true);
         } else {
           Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
         }
@@ -1553,7 +1560,18 @@ export function ImageStudioBody({
                 {t('studio.image.guides.hint')}
               </Text>
             </View>
-          ) : isInlineSheet(sheet) && !docked ? null : (
+          ) : isInlineSheet(sheet) && !docked ? null : quickAdjust && doc && selectedLayer?.kind === 'photo' ? (
+            <ImageAdjustStrip
+              doc={doc}
+              layer={selectedLayer}
+              commit={commit}
+              onDetails={() => {
+                setQuickAdjust(false);
+                setSheet('adjust');
+              }}
+              onClose={() => setQuickAdjust(false)}
+            />
+          ) : (
             // nyitott inline lap alatt az eszköztár rejtve (a lap fejléce a kilépés)
             <ImageStudioToolbar onTool={onTool} toolDisabled={toolDisabled} />
           )}

@@ -3005,6 +3005,7 @@
       "adjustTitle": "Anpassen",
       "adjustTone": "Ton (PRO)",
       "adjustStack": {
+        "quick": "Schnell",
         "title": "Korrekturen",
         "add": "Korrektur hinzufügen",
         "amount": "Stärke",

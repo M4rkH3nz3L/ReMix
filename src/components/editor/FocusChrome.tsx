@@ -7,6 +7,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { palette } from '@/constants/editor';
 import { motion, radius } from '@/design';
+import { useEditorStore } from '@/store/editorStore';
 
 /**
  * 🎯 Focus-króm — a precíziós mód kerete (MOBILE-UI §3.3).
@@ -33,6 +34,10 @@ export function FocusChrome({
 }) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -45,6 +50,27 @@ export function FocusChrome({
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
+        {/* ↶↷ a transport Focusban rejtve → a visszavonás itt is kéznél van */}
+        <Pressable
+          onPress={undo}
+          disabled={!canUndo}
+          hitSlop={8}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('editor.help.shortcut.undo')}
+        >
+          <Ionicons name="arrow-undo-outline" size={18} color={canUndo ? palette.text : palette.border} />
+        </Pressable>
+        <Pressable
+          onPress={redo}
+          disabled={!canRedo}
+          hitSlop={8}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('editor.help.shortcut.redo')}
+        >
+          <Ionicons name="arrow-redo-outline" size={18} color={canRedo ? palette.text : palette.border} />
+        </Pressable>
         <Pressable
           onPress={onDone}
           hitSlop={10}
@@ -97,6 +123,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   title: { flex: 1, color: palette.text, fontSize: 13, fontWeight: '700' },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   done: {
     flexDirection: 'row',
     alignItems: 'center',

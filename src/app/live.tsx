@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
+import { IS_WEB_VIEWER } from '@/lib/webGate';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -86,37 +87,40 @@ export default function LiveScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {/* 🎬 Élő indítása — hero-kártya */}
-        <LinearGradient
-          colors={['#241a3a', '#0c0d12']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.heroIcon}>
-            <Ionicons name="radio" size={30} color="#fff" />
-          </View>
-          <Text style={styles.heroTitle}>{t('live.heroTitle')}</Text>
-          <Text style={styles.heroBody}>{t('live.heroBody')}</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder={t('live.titlePlaceholder')}
-            placeholderTextColor="#ffffff88"
-            style={styles.titleInput}
-            maxLength={120}
-            editable={!busy}
-          />
-          <Pressable
-            style={[styles.goLiveBtn, busy && { opacity: 0.6 }]}
-            onPress={onGoLive}
-            disabled={busy}
-            accessibilityRole="button"
+        {/* 🎬 Élő indítása — hero-kártya. 🌐 Weben élőt indítani nem lehet (a Live
+            Studio az appban van) — ott csak nézni. */}
+        {!IS_WEB_VIEWER && (
+          <LinearGradient
+            colors={['#241a3a', '#0c0d12']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
           >
-            <Ionicons name="videocam" size={18} color="#fff" />
-            <Text style={styles.goLiveText}>{t('live.goLive')}</Text>
-          </Pressable>
-        </LinearGradient>
+            <View style={styles.heroIcon}>
+              <Ionicons name="radio" size={30} color="#fff" />
+            </View>
+            <Text style={styles.heroTitle}>{t('live.heroTitle')}</Text>
+            <Text style={styles.heroBody}>{t('live.heroBody')}</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder={t('live.titlePlaceholder')}
+              placeholderTextColor="#ffffff88"
+              style={styles.titleInput}
+              maxLength={120}
+              editable={!busy}
+            />
+            <Pressable
+              style={[styles.goLiveBtn, busy && { opacity: 0.6 }]}
+              onPress={onGoLive}
+              disabled={busy}
+              accessibilityRole="button"
+            >
+              <Ionicons name="videocam" size={18} color="#fff" />
+              <Text style={styles.goLiveText}>{t('live.goLive')}</Text>
+            </Pressable>
+          </LinearGradient>
+        )}
 
         {/* 📡 Most élőben */}
         <Text style={styles.sectionTitle}>{t('live.nowTitle')}</Text>

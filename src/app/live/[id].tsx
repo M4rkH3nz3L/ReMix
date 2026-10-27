@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
+import { IS_WEB_VIEWER } from '@/lib/webGate';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -191,7 +192,8 @@ export default function LiveRoomScreen() {
   const endedRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
-  const isHost = session != null && session.hostId === me;
+  // 🌐 weben nincs közvetítés (csak nézés) — a saját élőjét is nézőként látja
+  const isHost = !IS_WEB_VIEWER && session != null && session.hostId === me;
 
   const addFloat = useCallback((emoji: string) => {
     // esemény-handler (nem render) → itt szabad a Math.random

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NotificationSheet } from '@/components/NotificationSheet';
 import { palette } from '@/constants/editor';
+import { IS_WEB_VIEWER } from '@/lib/webGate';
 import { useAuth } from '@/store/authStore';
 import { useChat } from '@/store/chatStore';
 import { useNotifications } from '@/store/notificationStore';
@@ -17,6 +18,9 @@ import { useNotifications } from '@/store/notificationStore';
  * ÉRTESÍTŐK (értesítés-lista, olvasatlan-badge-dzsel). Az értesítések így
  * esztétikusan a menüben élnek — nem külön a projekt-oldalon. A feeden áttetsző
  * (a videó fölött lebeg), a világos felületeken tömör.
+ *
+ * 🌐 Böngészőben nincs STUDIO fül (a stúdiók csak az appban vannak); kijelentkezve
+ * a személyes fülek helyett egyetlen „Belépés" gomb látszik.
  */
 
 export const BOTTOM_NAV_HEIGHT = 56;
@@ -27,6 +31,7 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const myId = useAuth((s) => s.user?.id ?? null);
+  const signedIn = useAuth((s) => s.session != null && !s.mfaPending);
   const unread = useNotifications((s) => s.unread);
   const chatUnread = useChat((s) => s.unreadTotal);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -75,44 +80,58 @@ export function BottomNav({ active, translucent }: { active: NavKey; translucent
         ]}
       >
         {item('feed', active === 'feed' ? 'play' : 'play-outline', t('nav.feed'))}
-        {item('studio', active === 'studio' ? 'grid' : 'grid-outline', t('nav.studio'))}
-        <Pressable
-          style={styles.item}
-          onPress={() => go('chat')}
-          accessibilityRole="button"
-          accessibilityLabel={t('nav.chat')}
-        >
-          <View>
-            <Ionicons
-              name={active === 'chat' ? 'chatbubble' : 'chatbubble-outline'}
-              size={23}
-              color={chatColor}
-            />
-            {chatUnread > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
+        {!IS_WEB_VIEWER && item('studio', active === 'studio' ? 'grid' : 'grid-outline', t('nav.studio'))}
+        {!signedIn ? (
+          <Pressable
+            style={styles.item}
+            onPress={() => router.push('/auth')}
+            accessibilityRole="button"
+            accessibilityLabel={t('web.signIn')}
+          >
+            <Ionicons name="log-in-outline" size={24} color={inactive} />
+            <Text style={[styles.label, { color: inactive }]}>{t('web.signIn')}</Text>
+          </Pressable>
+        ) : (
+          <>
+            <Pressable
+              style={styles.item}
+              onPress={() => go('chat')}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.chat')}
+            >
+              <View>
+                <Ionicons
+                  name={active === 'chat' ? 'chatbubble' : 'chatbubble-outline'}
+                  size={23}
+                  color={chatColor}
+                />
+                {chatUnread > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-          <Text style={[styles.label, { color: chatColor }]}>{t('nav.chat')}</Text>
-        </Pressable>
-        {item('channel', active === 'channel' ? 'person' : 'person-outline', t('nav.channel'))}
-        <Pressable
-          style={styles.item}
-          onPress={() => setNotifOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={t('nav.notifications')}
-        >
-          <View>
-            <Ionicons name="notifications-outline" size={24} color={notifColor} />
-            {unread > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+              <Text style={[styles.label, { color: chatColor }]}>{t('nav.chat')}</Text>
+            </Pressable>
+            {item('channel', active === 'channel' ? 'person' : 'person-outline', t('nav.channel'))}
+            <Pressable
+              style={styles.item}
+              onPress={() => setNotifOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.notifications')}
+            >
+              <View>
+                <Ionicons name="notifications-outline" size={24} color={notifColor} />
+                {unread > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-          <Text style={[styles.label, { color: notifColor }]}>{t('nav.notifications')}</Text>
-        </Pressable>
+              <Text style={[styles.label, { color: notifColor }]}>{t('nav.notifications')}</Text>
+            </Pressable>
+          </>
+        )}
       </View>
 
       <NotificationSheet visible={notifOpen} onClose={() => setNotifOpen(false)} />

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { IS_WEB_VIEWER } from '@/lib/webGate';
 import type { FeedMode } from '@/types/social';
 
 import { styles } from './feedStyles';
@@ -32,9 +33,12 @@ export function FeedEmpty({ mode }: { mode: FeedMode }) {
       <Text style={styles.emptyText}>
         {mode === 'following' ? t('feed.emptyFollowing') : t('feed.empty')}
       </Text>
-      <Pressable style={styles.emptyCta} onPress={() => router.push('/studio')}>
-        <Text style={styles.emptyCtaText}>{t('feed.createCta')}</Text>
-      </Pressable>
+      {/* 🌐 weben nincs stúdió → nincs „készíts egyet" CTA */}
+      {!IS_WEB_VIEWER && (
+        <Pressable style={styles.emptyCta} onPress={() => router.push('/studio')}>
+          <Text style={styles.emptyCtaText}>{t('feed.createCta')}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

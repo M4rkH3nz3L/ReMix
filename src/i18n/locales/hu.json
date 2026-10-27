@@ -3526,6 +3526,7 @@
     }
   },
   "time": {
+    "yesterday": "tegnap {{time}}",
     "ago_now": "most",
     "ago_minute": "{{count}} p",
     "ago_hour": "{{count}} ó",

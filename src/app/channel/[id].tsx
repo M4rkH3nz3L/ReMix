@@ -364,19 +364,33 @@ export default function ChannelScreen() {
                 </View>
               ) : null}
               {data?.isMe ? (
-                <View style={styles.actionRow}>
-                  <Pressable style={styles.editBtn} onPress={() => router.push('/profile')}>
-                    <Ionicons name="settings-outline" size={16} color={palette.text} />
-                    <Text style={styles.editBtnText}>{t('channel.editProfile')}</Text>
-                  </Pressable>
-                  <Pressable style={styles.editBtn} onPress={() => router.push('/collections')}>
-                    <Ionicons name="folder-outline" size={16} color={palette.text} />
-                    <Text style={styles.editBtnText}>{t('collections.title')}</Text>
-                  </Pressable>
-                  <Pressable style={styles.editBtn} onPress={() => router.push('/dashboard')}>
-                    <Ionicons name="stats-chart-outline" size={16} color={palette.text} />
-                    <Text style={styles.editBtnText}>{t('dashboard.title')}</Text>
-                  </Pressable>
+                // három EGYENLŐ cella oldalmargóval — telefonon semmi nem lóg ki (élő teszt CH1)
+                <View style={styles.ownActionRow}>
+                  {(
+                    [
+                      { icon: 'settings-outline', label: t('channel.editProfile'), to: '/profile' },
+                      { icon: 'folder-outline', label: t('collections.title'), to: '/collections' },
+                      { icon: 'stats-chart-outline', label: t('dashboard.title'), to: '/dashboard' },
+                    ] as const
+                  ).map((a) => (
+                    <Pressable
+                      key={a.to}
+                      style={styles.ownActionBtn}
+                      onPress={() => router.push(a.to)}
+                      accessibilityRole="button"
+                      accessibilityLabel={a.label}
+                    >
+                      <Ionicons name={a.icon} size={18} color={palette.text} />
+                      <Text
+                        style={styles.ownActionText}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                      >
+                        {a.label}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
               ) : (
                 <View style={styles.actionRow}>
@@ -573,6 +587,27 @@ const styles = StyleSheet.create({
   followBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   followingBtnText: { color: palette.text },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  ownActionRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 16,
+  },
+  ownActionBtn: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 56,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    backgroundColor: palette.surfaceHigh,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  ownActionText: { color: palette.text, fontSize: 12, fontWeight: '700' },
   msgBtn: {
     width: 42,
     height: 42,
@@ -583,19 +618,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editBtn: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 999,
-    paddingHorizontal: 22,
-    paddingVertical: 9,
-  },
-  editBtnText: { color: palette.text, fontSize: 14, fontWeight: '700' },
   gridRow: { gap: 3, paddingHorizontal: 3 },
   gridItem: {
     flex: 1 / 3,

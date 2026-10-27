@@ -3526,6 +3526,7 @@
     }
   },
   "time": {
+    "yesterday": "yesterday {{time}}",
     "ago_now": "now",
     "ago_minute": "{{count}}m",
     "ago_hour": "{{count}}h",

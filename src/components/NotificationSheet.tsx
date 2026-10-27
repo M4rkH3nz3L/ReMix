@@ -7,25 +7,23 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { palette } from '@/constants/editor';
-import type { NotificationType } from '@/lib/notifications';
+import { notificationIconKind, notificationTimeLabel, type NotifIconKind } from '@/lib/notificationDisplay';
 import { useNotifications } from '@/store/notificationStore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-const TYPE_ICON: Record<NotificationType, IoniconName> = {
-  info: 'information-circle-outline',
+/** ikon a TÉNYLEGES jelentés szerint (a „system" zsák szétbontva — `notificationIconKind`) */
+const KIND_ICON: Record<NotifIconKind, IoniconName> = {
+  follow: 'person-add-outline',
+  live: 'radio-outline',
+  security: 'shield-checkmark-outline',
   comment: 'chatbubble-ellipses-outline',
-  invite: 'person-add-outline',
+  invite: 'people-outline',
   mention: 'at-outline',
   render: 'film-outline',
-  system: 'settings-outline',
+  message: 'chatbubble-outline',
+  info: 'information-circle-outline',
 };
-
-/** ISO → HH:MM */
-function shortTime(iso: string): string {
-  const m = /T(\d{2}):(\d{2})/.exec(iso);
-  return m ? `${m[1]}:${m[2]}` : '';
-}
 
 /**
  * 🔔 Értesítés-lista (alsó lap). A csengő + olvasatlan-badge az alsó menüben
@@ -36,6 +34,13 @@ function shortTime(iso: string): string {
  */
 export function NotificationSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { t } = useTranslation();
+  // ⏱️ HELYI idő (a régi az ISO-ból vágott UTC óra:perc volt, dátum nélkül — élő teszt N1)
+  const timeLabel = (iso: string) => {
+    const l = notificationTimeLabel(iso);
+    if (l.kind === 'yesterday') return t('time.yesterday', { time: l.text });
+    if (l.kind === 'daysAgo') return t('time.ago_day', { count: l.count });
+    return l.text;
+  };
   const items = useNotifications((s) => s.items);
   const unread = useNotifications((s) => s.unread);
   const markOneRead = useNotifications((s) => s.markOneRead);
@@ -79,7 +84,7 @@ export function NotificationSheet({ visible, onClose }: { visible: boolean; onCl
                 onPress={() => openItem(item.id, item.route)}
               >
                 <Ionicons
-                  name={TYPE_ICON[item.type] ?? 'information-circle-outline'}
+                  name={KIND_ICON[notificationIconKind(item)]}
                   size={18}
                   color={item.read ? palette.textDim : palette.accent}
                 />
@@ -93,7 +98,7 @@ export function NotificationSheet({ visible, onClose }: { visible: boolean; onCl
                     </Text>
                   ) : null}
                 </View>
-                <Text style={styles.time}>{shortTime(item.createdAt)}</Text>
+                <Text style={styles.time}>{timeLabel(item.createdAt)}</Text>
               </Pressable>
             )}
           />

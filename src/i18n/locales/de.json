@@ -2375,6 +2375,7 @@
       "tapHint": "Tipp auf die Wörter, um sie zu markieren (der Abspielkopf springt dorthin) — das Löschen läuft als Ripple-Schnitt und ist umkehrbar."
     },
     "transition": {
+      "pickForLength": "Wähle einen Übergang, um die Länge einzustellen",
       "fadeSectionTitle": "Überblendung",
       "fadeIn": "Einblenden (Fade in)",
       "fadeOut": "Ausblenden (Fade out)",

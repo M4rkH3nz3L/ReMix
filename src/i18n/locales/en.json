@@ -2375,6 +2375,7 @@
       "tapHint": "Tap the words to select them (the playhead jumps there) — deletion runs as a ripple cut and can be undone."
     },
     "transition": {
+      "pickForLength": "Pick a transition to adjust its length",
       "fadeSectionTitle": "Fade",
       "fadeIn": "Fade in",
       "fadeOut": "Fade out",

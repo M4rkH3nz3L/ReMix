@@ -122,7 +122,12 @@ export function TransitionQuick({ clip }: { clip: VideoClip | ImageClip }) {
           onDec={() => updateClip(clip.id, { transitionOut: { ...to, duration: clamp(dur - 0.1, 0.1, 2) } })}
           onInc={() => updateClip(clip.id, { transitionOut: { ...to, duration: clamp(dur + 0.1, 0.1, 2) } })}
         />
-      ) : null}
+      ) : (
+        // állandó sávmagasság — választáskor a preview ne ugorjon (mint a szűrőnél)
+        <View style={styles.reserved}>
+          <Text style={styles.reservedText}>{t('panels.transition.pickForLength')}</Text>
+        </View>
+      )}
     </View>
   );
 }

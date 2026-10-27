@@ -820,7 +820,7 @@
       "strip_speed": "Sebesség",
       "strip_audio": "Hangerő",
       "strip_filter": "Szűrő",
-      "strip_transition": "Átmenet",
+      "strip_transition": "Áttűnés",
       "hideKeyboard": "Billentyűzet elrejtése",
       "focusCanvas": "Vászon",
       "showTimeline": "Teljes idővonal",
@@ -2375,6 +2375,7 @@
       "tapHint": "Koppints a szavakra a kijelöléshez (a lejátszófej odaugrik) — a törlés ripple-vágásként fut le, és visszavonható."
     },
     "transition": {
+      "pickForLength": "Válassz áttűnést a hossz állításához",
       "fadeSectionTitle": "Áttűnés",
       "fadeIn": "Bejövő (fade in)",
       "fadeOut": "Kimenő (fade out)",

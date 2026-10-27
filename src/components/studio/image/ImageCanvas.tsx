@@ -490,8 +490,9 @@ export function ImageCanvas({
             </GestureDetector>
           ) : null}
 
-          {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re */}
-          {!capturing ? (
+          {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re.
+              Kivágás közben rejtve: a vágókeret jobb-felső sarokfogóját takarnák (élő teszt K1) */}
+          {!capturing && !cropRect ? (
             <View style={styles.zoomBar} pointerEvents="box-none">
               <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} hitSlop={6} accessibilityLabel="zoom in">
                 <Ionicons name="add" size={18} color={palette.text} />

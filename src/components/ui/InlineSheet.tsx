@@ -24,6 +24,8 @@ interface InlineSheetProps {
   header?: ReactNode;
   /** a görgethető tartalom MÉRT magassága — a lap sosem magasabb ennél (+ fejléc) */
   contentHeight?: number;
+  /** a peek alsó határa a fejléc ALATT (pl. lábléc + ~1,5 sor) — ne takarja a lábléc a tartalmat */
+  minPeekBody?: number;
   children: ReactNode;
   style?: ViewStyle;
   accessibilityLabel?: string;
@@ -46,6 +48,7 @@ interface InlineSheetProps {
 export function InlineSheet({
   detents: rawDetents,
   contentHeight,
+  minPeekBody,
   detent,
   onDetentChange,
   onClose,
@@ -56,10 +59,16 @@ export function InlineSheet({
 }: InlineSheetProps) {
   // 📏 a fogantyú+fejléc mért magassága: a tartalomhoz igazított detentekhez (fitDetents)
   const [topH, setTopH] = useState(0);
-  const detents = fitDetents(
+  const fitted = fitDetents(
     rawDetents,
     contentHeight && topH > 0 ? topH + contentHeight + 8 : undefined
   );
+  // 📏 lábléces lapnál a peek se legyen kisebb, mint fejléc + lábléc + ~1,5 sor
+  // (élő teszt K2: a Rétegek-lap gombsora rálógott a második sorra); a half fölé nem nő
+  const detents =
+    minPeekBody && topH > 0
+      ? { ...fitted, peek: Math.min(Math.max(fitted.peek, topH + minPeekBody), fitted.half) }
+      : fitted;
   const target = detents[detent];
   // a belépő a 0-ról rugózik fel — az első render még 0 magas
   const height = useSharedValue(0);

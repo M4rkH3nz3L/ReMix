@@ -84,6 +84,7 @@ export function StudioSheet({
     return (
       <InlineSheet
         contentHeight={contentH !== undefined ? contentH + footerH : undefined}
+        minPeekBody={footer ? footerH + 84 : undefined}
         detents={frame.detents}
         detent={frame.detent}
         onDetentChange={frame.onDetentChange}
@@ -158,5 +159,14 @@ const styles = StyleSheet.create({
   inlineScroll: { flex: 1, paddingHorizontal: 16 },
   scrollContent: { paddingBottom: 8, gap: 12 },
   footer: { marginTop: 10 },
-  footerInline: { paddingHorizontal: 16, paddingBottom: 10, marginTop: 4 },
+  // a lábléc saját sáv (háttér + hairline): ha a lista mögötte görget, nem keveredik vele
+  footerInline: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    marginTop: 0,
+    backgroundColor: palette.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.border,
+  },
 });

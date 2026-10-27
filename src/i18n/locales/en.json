@@ -2744,6 +2744,8 @@
       "splitClip": "clip split at {{time}} s",
       "setAspect": "aspect ratio: {{aspectRatio}}",
       "renameProject": "project renamed: {{name}}",
+      "projectSyncOn": "ReMix Storage sync turned on",
+      "projectSyncOff": "ReMix Storage sync turned off",
       "setParticles": "particles: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "particles off",
@@ -3928,6 +3930,40 @@
       "storage_unconfigured": "ReMix Storage is unavailable right now (not configured on the server).",
       "unauthorized": "Sign in to use ReMix Storage.",
       "failed": "The operation failed."
+    },
+    "projectStorage": "Storage & sync",
+    "projectsFolderSub": "Your project folders — removable only by deleting the project",
+    "projectFolderSub": "Project: {{name}}",
+    "openProject": "Open project",
+    "remoteProjectCopy": "This is the cloud copy of the project folder — synced from your phone (one-way).",
+    "fromMyStorage": "From My Storage",
+    "pickerTitle": "Pick from My Storage",
+    "pickerEmpty": "Nothing to pick here.",
+    "pickerAdd_one": "Add ({{count}})",
+    "pickerAdd_other": "Add ({{count}})",
+    "protect": {
+      "title": "Protected item",
+      "container": "The “Projektek” folder holds your projects — it can’t be deleted or renamed.",
+      "project": "This is the folder of the project “{{name}}”. It can only be removed by deleting the project (Studio → long-press the project → Delete).",
+      "inUse": "This file is used by the project “{{name}}”, so it can’t be deleted or renamed. Remove it from the project first."
+    },
+    "sync": {
+      "title": "Sync to ReMix Storage",
+      "folderTitle": "Project folder on this phone",
+      "folderLocked": "The project lives on your phone. This folder can only be removed by deleting the project.",
+      "explain": "One-way: new and changed files in the phone folder are uploaded to the cloud after saving. Nothing is deleted from the cloud automatically.",
+      "noSpaceTitle": "Not enough space in ReMix Storage",
+      "noSpaceBody": "{{need}} would be uploaded from the project folder, but only {{free}} is free ({{missing}} missing). Free up space or add more storage.",
+      "now": "Sync now",
+      "phase": {
+        "off": "Off",
+        "pending": "Waiting…",
+        "syncing": "Syncing · {{done}}/{{total}} · {{pct}}%",
+        "synced": "Synced — verified",
+        "failed": "Failed — try again",
+        "quota": "Storage full ({{missing}} missing)",
+        "offline": "Offline — will retry on next save"
+      }
     }
   }
 }

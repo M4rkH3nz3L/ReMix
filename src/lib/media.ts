@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { classifyAudioIntake, type AudioIntakeResult } from '@/lib/audioIntake';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
@@ -9,6 +9,7 @@ import { intakeOps } from '@/lib/imageIntake';
 import { parseCubeLut } from '@/lib/lutImport';
 import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 export interface PickedVideo {
   uri: string;
@@ -32,9 +33,9 @@ export interface PickedAudio {
  * médiát ezért átmásoljuk az app dokumentum-mappájába. Hiba esetén az eredeti
  * URI-val megyünk tovább (a draft attól még működik).
  */
-function persistToLibrary(uri: string): string {
+export function persistToLibrary(uri: string): string {
   try {
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }
@@ -58,7 +59,7 @@ export async function downloadToCache(url: string, name?: string): Promise<strin
     return null;
   }
   try {
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

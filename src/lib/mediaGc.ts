@@ -14,13 +14,14 @@
  * Expo-mentes, tiszta → önmagában tesztelt; az FS-törlés a `mediaGcClient`-ben.
  */
 
-/** az app-kezelt média-mappák (a `Paths.document` alatt) */
+/** az app-kezelt (lapos) média-mappák (a `Paths.document` alatt) */
 const APP_MEDIA_DIRS = ['media', 'mediacache'] as const;
-export type AppMediaDir = (typeof APP_MEDIA_DIRS)[number];
+/** `Files` = a projekt-mappák (`Files/Projektek/<folder>/…`) — a név itt al-utat is tartalmaz */
+export type AppMediaDir = (typeof APP_MEDIA_DIRS)[number] | 'Files';
 
 export interface MediaFileKey {
   dir: AppMediaDir;
-  /** fájlnév a mappán belül (a mappák laposak, a nevek egyediek) */
+  /** fájlnév a mappán belül (`media`/`mediacache` lapos; `Files`-nál `Projektek/<folder>/<út>`) */
   name: string;
 }
 
@@ -36,6 +37,17 @@ function keyString(k: MediaFileKey): string {
 export function mediaFileKeyOf(uri: string): MediaFileKey | null {
   if (!/^file:\/\//i.test(uri)) {
     return null;
+  }
+  // 📁 projekt-mappás fájl: `…/Files/Projektek/<folder>/<út>` (konténer-független)
+  const pm = uri.match(/\/Files\/(Projektek\/[^"'\\]+)$/);
+  if (pm) {
+    let name = pm[1];
+    try {
+      name = decodeURIComponent(name);
+    } catch {
+      // marad a nyers név
+    }
+    return name.includes('..') ? null : { dir: 'Files', name };
   }
   for (const dir of APP_MEDIA_DIRS) {
     const m = uri.match(new RegExp(`/${dir}/([^/\\\\"']+)$`));

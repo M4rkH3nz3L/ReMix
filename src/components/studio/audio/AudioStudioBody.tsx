@@ -52,6 +52,7 @@ import { beatsToTimelineLines } from '@/lib/beatMarkers';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
+import { persistToLibrary } from '@/lib/media';
 
 const LANE_H = 70;
 const RULER_H = 24;
@@ -176,7 +177,8 @@ export function AudioStudioBody({
       // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
       // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
-      const uri = recorder.uri;
+      // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
+      const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
       if (uri) {
         useEditorStore.getState().addClip(
           'voiceover',

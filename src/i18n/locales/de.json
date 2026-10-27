@@ -2744,6 +2744,8 @@
       "splitClip": "Clip bei {{time}} s geteilt",
       "setAspect": "Seitenverhältnis: {{aspectRatio}}",
       "renameProject": "Projekt umbenannt: {{name}}",
+      "projectSyncOn": "ReMix-Storage-Sync eingeschaltet",
+      "projectSyncOff": "ReMix-Storage-Sync ausgeschaltet",
       "setParticles": "Partikel: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (Beat-Sync)",
       "particlesOff": "Partikel aus",
@@ -3898,6 +3900,40 @@
       "storage_unconfigured": "ReMix Storage ist gerade nicht verfügbar (auf dem Server nicht eingerichtet).",
       "unauthorized": "Melde dich an, um ReMix Storage zu nutzen.",
       "failed": "Der Vorgang ist fehlgeschlagen."
+    },
+    "projectStorage": "Speicher & Sync",
+    "projectsFolderSub": "Deine Projektordner — nur durch Löschen des Projekts entfernbar",
+    "projectFolderSub": "Projekt: {{name}}",
+    "openProject": "Projekt öffnen",
+    "remoteProjectCopy": "Das ist die Cloud-Kopie des Projektordners — vom Handy synchronisiert (einseitig).",
+    "fromMyStorage": "Aus Mein Speicher",
+    "pickerTitle": "Aus Mein Speicher wählen",
+    "pickerEmpty": "Hier gibt es nichts zur Auswahl.",
+    "pickerAdd_one": "Hinzufügen ({{count}})",
+    "pickerAdd_other": "Hinzufügen ({{count}})",
+    "protect": {
+      "title": "Geschütztes Element",
+      "container": "Der Ordner „Projektek“ enthält deine Projekte — er kann nicht gelöscht oder umbenannt werden.",
+      "project": "Das ist der Ordner des Projekts „{{name}}“. Er lässt sich nur durch Löschen des Projekts entfernen (Studio → Projekt lange drücken → Löschen).",
+      "inUse": "Diese Datei wird vom Projekt „{{name}}“ verwendet und kann daher nicht gelöscht oder umbenannt werden. Entferne sie zuerst aus dem Projekt."
+    },
+    "sync": {
+      "title": "Sync mit ReMix Storage",
+      "folderTitle": "Projektordner auf diesem Handy",
+      "folderLocked": "Das Projekt lebt auf deinem Handy. Dieser Ordner lässt sich nur durch Löschen des Projekts entfernen.",
+      "explain": "Einseitig: neue und geänderte Dateien im Handy-Ordner werden nach dem Speichern in die Cloud geladen. Aus der Cloud wird nichts automatisch gelöscht.",
+      "noSpaceTitle": "Nicht genug Platz in ReMix Storage",
+      "noSpaceBody": "Aus dem Projektordner würden {{need}} hochgeladen, frei sind aber nur {{free}} ({{missing}} fehlen). Gib Platz frei oder erweitere deinen Speicher.",
+      "now": "Jetzt synchronisieren",
+      "phase": {
+        "off": "Aus",
+        "pending": "Wartet…",
+        "syncing": "Synchronisiert · {{done}}/{{total}} · {{pct}}%",
+        "synced": "Synchronisiert — geprüft",
+        "failed": "Fehlgeschlagen — erneut versuchen",
+        "quota": "Speicher voll ({{missing}} fehlen)",
+        "offline": "Offline — nächster Versuch beim Speichern"
+      }
     }
   }
 }

@@ -1,9 +1,10 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { ensureCloud } from '@/lib/backend';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🪄 AI háttér-eltávolítás kliens (P1 v1, fotón): a worker /bgremove végpontja
@@ -39,7 +40,7 @@ export async function requestCutout(uri: string): Promise<CutoutResult | null> {
     if (Platform.OS === 'web') {
       return { id: body.id, cached: body.cached, uri: remote };
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

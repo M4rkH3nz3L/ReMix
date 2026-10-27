@@ -6,6 +6,7 @@ import { docMediaUris } from '@/lib/imageDoc';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import type { ImageDoc } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🎨 Kép-dokumentum rasterizálása a workerrel.
@@ -51,7 +52,7 @@ export async function renderSvgPdf(svg: string, width: number, height: number): 
     return null;
   }
   try {
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }
@@ -237,7 +238,7 @@ export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<stri
 
   // a kész .psd-t a document/media-ba töltjük (a többi export-letöltés mintája)
   try {
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }
@@ -265,7 +266,7 @@ export async function renderImageDoc(
     return null;
   }
   try {
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

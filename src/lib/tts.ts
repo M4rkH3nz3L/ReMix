@@ -1,11 +1,12 @@
 import { t as tr } from 'i18next';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { makeId } from '@/lib/id';
 import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { fetchRead } from '@/lib/netRetry';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * TTS-kliens (AI-hang): a dev-worker `say`-alapú szöveg→beszéd végpontja.
@@ -66,7 +67,7 @@ export async function generateTts(
   if (Platform.OS === 'web') {
     return { uri: remoteUrl, duration: body.duration ?? 0 };
   }
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   try {
     dir.create();
   } catch {

@@ -1,9 +1,10 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 
 import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { YtImport, YtKind } from '@/lib/youtube';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🆓 ON-DEVICE YouTube-import (worker és Pro NÉLKÜL).
@@ -189,7 +190,7 @@ export async function importYouTubeLocal(
   }
 
   const ext = kind === 'audio' ? 'm4a' : 'mp4';
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   try {
     dir.create();
   } catch {

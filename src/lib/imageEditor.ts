@@ -1,7 +1,8 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File } from 'expo-file-system';
 import { FlipType, ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { makeId } from '@/lib/id';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🖼️ Kép Stúdió — on-device (ESZKÖZÖN futó) képszerkesztő műveletek.
@@ -31,7 +32,7 @@ export interface BakedImage {
 }
 
 function mediaDir(): Directory {
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   if (!dir.exists) {
     dir.create();
   }

@@ -11,6 +11,7 @@ import { makeId } from '@/lib/id';
 import { pickAudio, pickImage, pickVideo } from '@/lib/media';
 import { migrateProject, relinkUri } from '@/lib/projectUtils';
 import type { Clip, Project } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * `.remix` projektfájl (full-plan F2): a projekt + asset-referenciák, nyers
@@ -185,7 +186,7 @@ export async function findAutoRelinkPairs(
   }
   let dir: Directory;
   try {
-    dir = new Directory(Paths.document, 'media');
+    dir = projectMediaDir();
     if (!dir.exists) {
       return [];
     }

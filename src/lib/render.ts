@@ -26,6 +26,7 @@ import { withFingerprints } from '@/lib/fingerprint';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, RenderedVersion } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * Render-kliens. Két út:
@@ -786,7 +787,7 @@ export async function downloadTrack(track: LibraryTrack): Promise<string> {
     // weben nincs fájlrendszer — az expo-audio közvetlenül streameli az URL-t
     return `${cloudBaseUrl()}${track.url}`;
   }
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   if (!dir.exists) {
     dir.create();
   }

@@ -1,9 +1,10 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { TextClip } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 export interface BakedText {
   uri: string;
@@ -46,7 +47,7 @@ export async function bakeTextToImage(clip: TextClip, aspect: number): Promise<B
     if (!body.pngBase64) {
       return null;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

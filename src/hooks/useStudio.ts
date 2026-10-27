@@ -239,6 +239,10 @@ export function useStudio() {
           createdAt: new Date().toISOString(),
           // 🔀 remix-lineage: az új projekt az eredetiből készült
           remixOf: { projectId: p.id, name: p.name },
+          // 📁 a másolat SAJÁT mappát kap a betöltéskor (a fájlokat átmásolja), a
+          // szinkron projektenként külön döntés → alapból ki
+          folder: undefined,
+          syncToRemix: undefined,
         });
       })
       .then(refresh)
@@ -295,6 +299,10 @@ export function useStudio() {
       { text: t('common.rename'), onPress: () => startRename(meta) },
       { text: t('common.duplicate'), onPress: () => duplicate(meta) },
       { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },
+      {
+        text: t('storage.projectStorage'),
+        onPress: () => router.push({ pathname: '/storage', params: { project: meta.id } } as Href),
+      },
       { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(meta) },
       { text: t('common.cancel'), style: 'cancel' },
     ]);

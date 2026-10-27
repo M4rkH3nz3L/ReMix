@@ -1,8 +1,9 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { fetchRead } from '@/lib/netRetry';
 import { renderServerUrl } from '@/lib/render';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🧊 3D stickers kliens (3D V1): a worker CC0 glTF-modelleket renderel
@@ -66,7 +67,7 @@ export async function downloadSticker3d(
     if (Platform.OS === 'web') {
       return remote;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

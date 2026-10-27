@@ -1,8 +1,9 @@
 import { Canvas, ImageFormat, Path, useCanvasRef } from '@shopify/react-native-skia';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { forwardRef, useImperativeHandle, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 export interface BrushHandle {
   /** a vászon pillanatképe PNG-fájlként (uri) vagy null */
@@ -58,7 +59,7 @@ export const BrushOverlay = forwardRef<BrushHandle, { box: { w: number; h: numbe
               return null;
             }
             const bytes = img.encodeToBytes(ImageFormat.PNG);
-            const dir = new Directory(Paths.document, 'media');
+            const dir = projectMediaDir();
             if (!dir.exists) {
               dir.create();
             }

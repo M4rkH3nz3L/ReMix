@@ -2744,6 +2744,8 @@
       "splitClip": "klip kettévágva {{time}} mp-nél",
       "setAspect": "képarány: {{aspectRatio}}",
       "renameProject": "projekt átnevezve: {{name}}",
+      "projectSyncOn": "ReMix Storage-szinkron bekapcsolva",
+      "projectSyncOff": "ReMix Storage-szinkron kikapcsolva",
       "setParticles": "részecskék: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "részecskék kikapcsolva",
@@ -3928,6 +3930,40 @@
       "storage_unconfigured": "A ReMix Storage most nem érhető el (a szerveren nincs beállítva).",
       "unauthorized": "A ReMix Storage-hoz jelentkezz be.",
       "failed": "A művelet nem sikerült."
+    },
+    "projectStorage": "Tárhely és szinkron",
+    "projectsFolderSub": "A projektjeid mappái — csak a projekt törlésével törölhetők",
+    "projectFolderSub": "Projekt: {{name}}",
+    "openProject": "Projekt megnyitása",
+    "remoteProjectCopy": "Ez a projekt mappájának felhős másolata — a telefonról szinkronizálódik (egyirányú).",
+    "fromMyStorage": "Tárhelyemből",
+    "pickerTitle": "Válassz a Tárhelyemből",
+    "pickerEmpty": "Nincs itt választható fájl.",
+    "pickerAdd_one": "Hozzáadás ({{count}})",
+    "pickerAdd_other": "Hozzáadás ({{count}})",
+    "protect": {
+      "title": "Védett elem",
+      "container": "A „Projektek” mappa a projektjeidet tartja — nem törölhető és nem nevezhető át.",
+      "project": "Ez a(z) „{{name}}” projekt mappája. Csak a projekt törlésével törölhető (Stúdió → a projekt hosszan nyomva → Törlés).",
+      "inUse": "Ezt a fájlt a(z) „{{name}}” projekt használja, ezért nem törölhető és nem nevezhető át. Előbb vedd ki a projektből."
+    },
+    "sync": {
+      "title": "Szinkron a ReMix Storage-ba",
+      "folderTitle": "A projekt mappája a telefonon",
+      "folderLocked": "A projekt a telefonodon él. Ez a mappa csak a projekt törlésével törölhető.",
+      "explain": "Egyirányú: a telefonon lévő mappa új és módosult fájljai mentés után felkerülnek a felhőbe. A felhőből semmi nem törlődik automatikusan.",
+      "noSpaceTitle": "Nincs elég hely a ReMix Storage-ban",
+      "noSpaceBody": "A projekt mappájából {{need}} kerülne fel, de csak {{free}} szabad ({{missing}} hiányzik). Szabadíts fel helyet, vagy bővítsd a tárhelyed.",
+      "now": "Szinkronizálás most",
+      "phase": {
+        "off": "Kikapcsolva",
+        "pending": "Várakozik…",
+        "syncing": "Szinkronizál · {{done}}/{{total}} · {{pct}}%",
+        "synced": "Szinkronizálva — ellenőrizve",
+        "failed": "Sikertelen — próbáld újra",
+        "quota": "Betelt a tárhely ({{missing}} hiányzik)",
+        "offline": "Offline — a következő mentéskor újrapróbálja"
+      }
     }
   }
 }

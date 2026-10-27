@@ -14,7 +14,7 @@ import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/cont
 import { palette } from '@/constants/editor';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { makeId } from '@/lib/id';
-import { pickAudio } from '@/lib/media';
+import { pickAudio, persistToLibrary } from '@/lib/media';
 import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
 import { projectMusicTarget, rankLibrary, trackMatchScore } from '@/lib/musicMatch';
@@ -253,7 +253,8 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
     if (recorderState.isRecording) {
       const seconds = Math.max(recorderState.durationMillis / 1000, 0.5);
       await recorder.stop();
-      const uri = recorder.uri;
+      // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
+      const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
       if (uri) {
         addClip(
           'voiceover',

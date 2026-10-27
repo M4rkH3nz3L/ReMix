@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { type Href, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,11 +21,15 @@ import {
   type SheetAction,
   TransferList,
 } from '@/components/storage/StorageParts';
+import { ProjectSyncSection } from '@/components/storage/ProjectSyncSection';
 import { RenameModal } from '@/components/studio/RenameModal';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { useStorageBrowser } from '@/hooks/useStorageBrowser';
 import { goBackOrHome } from '@/lib/nav';
+import { PROJECTS_DIR, projectFolderPath } from '@/lib/projectFolder';
+import { studioRoute } from '@/lib/projectUtils';
+import { loadProject } from '@/lib/storage';
 import { type KindFilter, type StorageEntry, breadcrumbs } from '@/lib/remixFiles';
 import { formatBytes } from '@/lib/storageQuota';
 
@@ -42,6 +46,36 @@ export default function StorageScreen() {
   const { t } = s;
   const [action, setAction] = useState<StorageEntry | null>(null);
   const selecting = s.selected.size > 0;
+  const { project: projectParam } = useLocalSearchParams<{ project?: string }>();
+  const { open, go } = s;
+
+  // „Tárhely és szinkron" a projekt-menüből → egyenesen a projekt mappájába
+  useEffect(() => {
+    if (!projectParam) {
+      return;
+    }
+    void loadProject(String(projectParam)).then((p) => {
+      if (p?.folder) {
+        open('device');
+        go(projectFolderPath(p.folder));
+      }
+    });
+  }, [projectParam, open, go]);
+
+  /** a projekt-mappák címkéje + lakatja */
+  const decorate = (e: StorageEntry): { subtitle?: string; locked?: boolean } => {
+    if (!e.isFolder) {
+      return {};
+    }
+    if (e.path === PROJECTS_DIR) {
+      return { subtitle: t('storage.projectsFolderSub'), locked: true };
+    }
+    const owner = s.projectAt(e.path);
+    if (owner && e.path === projectFolderPath(owner.folder as string)) {
+      return { subtitle: t('storage.projectFolderSub', { name: owner.name }), locked: true };
+    }
+    return {};
+  };
 
   const soon = () =>
     Alert.alert(t('storage.soonTitle'), t('storage.soonBody'), [
@@ -74,7 +108,7 @@ export default function StorageScreen() {
     }
     list.push({ key: 'select', icon: 'checkmark-circle-outline', label: t('storage.select'), onPress: () => s.toggleSelect(e.path) });
     list.push({ key: 'rename', icon: 'create-outline', label: t('common.rename'), onPress: () => s.startRename(e) });
-    list.push({ key: 'delete', icon: 'trash-outline', label: t('common.delete'), destructive: true, onPress: () => s.confirmDelete([e.path]) });
+    list.push({ key: 'delete', icon: 'trash-outline', label: t('common.delete'), destructive: true, onPress: () => void s.confirmDelete([e.path]) });
     return list;
   };
 
@@ -155,6 +189,10 @@ export default function StorageScreen() {
   const isDevice = s.location === 'device';
   const rootName = t(isDevice ? 'storage.locations.device' : 'storage.locations.remix');
   const crumbs = breadcrumbs(s.path);
+  // a projekt-mappa gyökerén állunk-e → projekt-kártya a lista tetején
+  const pathOwner = s.projectAt(s.path);
+  const currentProject =
+    pathOwner && s.path === projectFolderPath(pathOwner.folder as string) ? pathOwner : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
@@ -218,7 +256,7 @@ export default function StorageScreen() {
               <Ionicons name="cloud-download-outline" size={22} color={palette.text} />
             </Pressable>
           )}
-          <Pressable onPress={() => s.confirmDelete([...s.selected])} hitSlop={6}>
+          <Pressable onPress={() => void s.confirmDelete([...s.selected])} hitSlop={6}>
             <Ionicons name="trash-outline" size={22} color={palette.danger} />
           </Pressable>
           <Pressable onPress={s.clearSelection} hitSlop={6}>
@@ -239,6 +277,29 @@ export default function StorageScreen() {
       )}
 
       <FlatList
+        ListHeaderComponent={
+          currentProject ? (
+            <View style={styles.projectHead}>
+              <View style={styles.projectTitleRow}>
+                <Ionicons name="layers-outline" size={18} color={palette.accent} />
+                <Text style={styles.projectTitle} numberOfLines={1}>
+                  {currentProject.name}
+                </Text>
+                <Pressable
+                  onPress={() => router.push(studioRoute(currentProject.kind, currentProject.id) as Href)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.link}>{t('storage.openProject')}</Text>
+                </Pressable>
+              </View>
+              {isDevice ? (
+                <ProjectSyncSection projectId={currentProject.id} />
+              ) : (
+                <Text style={styles.whereText}>{t('storage.remoteProjectCopy')}</Text>
+              )}
+            </View>
+          ) : null
+        }
         key={s.grid ? 'grid' : 'list'}
         data={s.visible}
         numColumns={s.grid ? 3 : 1}
@@ -250,6 +311,7 @@ export default function StorageScreen() {
           <EntryRow
             entry={item}
             grid={s.grid}
+            {...decorate(item)}
             selected={s.selected.has(item.path)}
             onPress={() => onEntryPress(item)}
             onLongPress={() => s.toggleSelect(item.path)}
@@ -355,6 +417,9 @@ const styles = StyleSheet.create({
   },
   selectionText: { color: palette.text, fontSize: 14, fontWeight: '700', flex: 1 },
   list: { padding: 12, paddingBottom: 48, gap: 2 },
+  projectHead: { gap: 10, marginBottom: 10 },
+  projectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  projectTitle: { color: palette.text, fontSize: 16, fontWeight: '800', flex: 1 },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 48 },
   emptyText: { color: palette.textDim, fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
   link: { color: palette.accent, fontSize: 14, fontWeight: '700' },

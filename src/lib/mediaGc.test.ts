@@ -90,3 +90,20 @@ describe('planMediaDeletion', () => {
     expect(a).toHaveLength(1);
   });
 });
+
+describe('projekt-mappás média (Files/Projektek/<folder>)', () => {
+  test('kulcs konténer-függetlenül, al-úttal; kitörő út → null', () => {
+    expect(mediaFileKeyOf('file:///A/Documents/Files/Projektek/nyar/klip%201.mp4')).toEqual({
+      dir: 'Files',
+      name: 'Projektek/nyar/klip 1.mp4',
+    });
+    expect(mediaFileKeyOf('file:///A/Documents/Files/Projektek/../x.mp4')).toBeNull();
+  });
+
+  test('törlés-terv: a duplikátum által is hivatkozott projekt-fájl marad', () => {
+    const a = 'file:///A/Documents/Files/Projektek/nyar/a.mp4';
+    const b = 'file:///B/Documents/Files/Projektek/nyar/b.mp4';
+    const plan = planMediaDeletion([JSON.stringify({ uris: [a, b] })], [JSON.stringify({ uri: b })]);
+    expect(plan).toEqual([{ dir: 'Files', name: 'Projektek/nyar/a.mp4' }]);
+  });
+});

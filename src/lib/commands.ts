@@ -37,6 +37,8 @@ export type EditorCommand =
   | { type: 'SET_ASPECT'; aspectRatio: AspectRatio }
   | { type: 'SET_FPS'; fps: number }
   | { type: 'RENAME_PROJECT'; name: string }
+  /** ☁️ a projekt-mappa ReMix Storage-szinkronjának be/ki kapcsolása (projekt-beállítás) */
+  | { type: 'SET_PROJECT_SYNC'; enabled: boolean }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
   | { type: 'REMOVE_ASSET'; assetId: string }
@@ -237,6 +239,13 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, name };
+    }
+
+    case 'SET_PROJECT_SYNC': {
+      if (Boolean(project.syncToRemix) === cmd.enabled) {
+        return null;
+      }
+      return { ...project, syncToRemix: cmd.enabled };
     }
 
     case 'SET_PARTICLES': {
@@ -504,6 +513,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setFps', { fps: cmd.fps });
     case 'RENAME_PROJECT':
       return tr('lib.commands.renameProject', { name: cmd.name });
+    case 'SET_PROJECT_SYNC':
+      return tr(cmd.enabled ? 'lib.commands.projectSyncOn' : 'lib.commands.projectSyncOff');
     case 'SET_PARTICLES':
       return cmd.particles
         ? tr('lib.commands.setParticles', {

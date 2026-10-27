@@ -200,7 +200,8 @@ export function deviceList(dir: string): StorageEntry[] {
   }
   return d
     .list()
-    .filter((n) => !n.name.endsWith('.part'))
+    // rejtett (pl. a projekt-mappa `.remix-project` tulajdonos-jelölője) és félkész letöltés nem látszik
+    .filter((n) => !n.name.endsWith('.part') && !n.name.startsWith('.'))
     .map((n) => {
       if (n instanceof Directory) {
         return { location: 'device' as const, path: joinPath(dir, n.name), name: n.name, isFolder: true, uri: n.uri };

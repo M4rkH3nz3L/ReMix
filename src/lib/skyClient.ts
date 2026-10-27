@@ -1,9 +1,10 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🌅 Sky Replacement kliens (CC V2): a worker mélység-alapú ég-maszkkal
@@ -39,7 +40,7 @@ export async function replaceSky(uri: string, preset: SkyPreset): Promise<string
     if (!body.pngBase64) {
       return null;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

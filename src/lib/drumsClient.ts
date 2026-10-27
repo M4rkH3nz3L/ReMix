@@ -1,8 +1,9 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 
 import { type DrumHit, patternDurationSec } from '@/lib/drums';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🥁 A dob-minta ütéseinek renderelése hang-fájllá a worker `/drums`-án (szintetizált dob-hangok),
@@ -24,7 +25,7 @@ export async function renderDrumsToClip(
     if (!res.ok) {
       return null;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

@@ -31,7 +31,11 @@ import {
   remixMove,
   remixUpload,
 } from '@/lib/remixFilesClient';
+import { PROJECTS_DIR, projectFolderPath, protectionOf } from '@/lib/projectFolder';
+import { referencedDevicePaths } from '@/lib/projectFolderClient';
+import { listProjects, loadProject } from '@/lib/storage';
 import { type StorageUsage, fetchStorageUsage } from '@/lib/storageQuota';
+import type { ProjectMeta } from '@/types/project';
 
 export type BrowsableLocation = 'device' | 'remix';
 
@@ -79,6 +83,8 @@ export function useStorageBrowser() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [device, setDevice] = useState({ used: 0, free: 0, total: 0 });
+  /** élő projektek a mappájuk szerint (a Tárhelyem-védelemhez és a címkékhez) */
+  const [projects, setProjects] = useState<Map<string, ProjectMeta>>(new Map());
 
   const errorText = useCallback(
     (err: unknown) => {
@@ -101,6 +107,9 @@ export function useStorageBrowser() {
       .catch(() => {
         // eszköz-statisztika best-effort
       });
+    void listProjects()
+      .then((metas) => setProjects(new Map(metas.filter((m) => m.folder).map((m) => [m.folder as string, m]))))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -172,6 +181,48 @@ export function useStorageBrowser() {
     setSortKey((k) => order[(order.indexOf(k) + 1) % order.length]);
   }, []);
 
+  /** a projekt, amelyiknek a mappája az adott út (vagy amelyik mappájában van) */
+  const projectAt = useCallback(
+    (p: string): ProjectMeta | null => {
+      if (!p.startsWith(`${PROJECTS_DIR}/`)) {
+        return null;
+      }
+      return projects.get(p.slice(PROJECTS_DIR.length + 1).split('/')[0]) ?? null;
+    },
+    [projects]
+  );
+
+  /**
+   * 🔒 Védelem: a `Projektek` gyűjtő és egy élő projekt mappája CSAK a projekt
+   * törlésével tűnik el; a projekt által HASZNÁLT fájl sem törölhető/nevezhető át.
+   * A tiltás okát adja vissza (i18n-szöveg), vagy null-t.
+   */
+  const blockedReason = useCallback(
+    async (paths: string[]): Promise<string | null> => {
+      const folders = new Set(projects.keys());
+      for (const p of paths) {
+        const owner = projectAt(p);
+        let used: Set<string> = new Set();
+        if (location === 'device' && owner && p !== projectFolderPath(owner.folder as string)) {
+          const full = await loadProject(owner.id).catch(() => null);
+          used = full ? referencedDevicePaths(JSON.stringify(full)) : new Set();
+        }
+        const prot = protectionOf(p, folders, used);
+        if (prot === 'container') {
+          return t('storage.protect.container');
+        }
+        if (prot === 'project') {
+          return t('storage.protect.project', { name: owner?.name ?? '' });
+        }
+        if (prot === 'inUse') {
+          return t('storage.protect.inUse', { name: owner?.name ?? '' });
+        }
+      }
+      return null;
+    },
+    [projects, projectAt, location, t]
+  );
+
   // ── név-dialógus (új mappa / átnevezés) ──
   const startMkdir = useCallback(() => setDialog({ mode: 'mkdir', value: '' }), []);
   const startRename = useCallback((target: StorageEntry) => setDialog({ mode: 'rename', value: target.name, target }), []);
@@ -194,6 +245,12 @@ export function useStorageBrowser() {
           await remixMkdir(path, name);
         }
       } else if (dialog.target && name !== dialog.target.name) {
+        const blocked = await blockedReason([dialog.target.path]);
+        if (blocked) {
+          setDialog(null);
+          Alert.alert(t('storage.protect.title'), blocked);
+          return;
+        }
         if (location === 'device') {
           deviceRename(dialog.target.path, name);
         } else {
@@ -205,12 +262,17 @@ export function useStorageBrowser() {
     } catch (err) {
       Alert.alert(t('storage.title'), errorText(err));
     }
-  }, [dialog, location, path, reload, t, errorText]);
+  }, [dialog, location, path, reload, t, errorText, blockedReason]);
 
   // ── törlés (megerősítéssel; egyértelmű, HOL törlődik) ──
   const confirmDelete = useCallback(
-    (paths: string[]) => {
+    async (paths: string[]) => {
       if (!location || !paths.length) {
+        return;
+      }
+      const blocked = await blockedReason(paths);
+      if (blocked) {
+        Alert.alert(t('storage.protect.title'), blocked);
         return;
       }
       Alert.alert(
@@ -239,7 +301,7 @@ export function useStorageBrowser() {
         ]
       );
     },
-    [location, t, errorText, reload, refreshStats]
+    [location, t, errorText, reload, refreshStats, blockedReason]
   );
 
   // ── átviteli sor (soros, egyszerre egy) ──
@@ -385,6 +447,8 @@ export function useStorageBrowser() {
     share,
     usage,
     device,
+    projects,
+    projectAt,
     open,
     go,
     up,

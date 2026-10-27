@@ -1,4 +1,4 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
@@ -7,6 +7,7 @@ import { workerAuthHeaders } from '@/lib/workerAuth';
 import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
 import { importYouTubeLocal } from '@/lib/youtubeLocal';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * URL-import kliens (YouTube stb.): a felhő-worker yt-dlp-alapú végpontja.
@@ -96,7 +97,7 @@ export async function importYouTubeMedia(
     };
   }
   const ext = (body.name as string).split('.').pop() || 'mp4';
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   try {
     dir.create();
   } catch {

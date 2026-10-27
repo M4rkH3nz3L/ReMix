@@ -18,6 +18,17 @@ import { t as tr } from 'i18next';
 import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
 import { PUBLIC_WEB_SCREENS } from '@/lib/webSurface';
+import { setActiveProjectFolder } from '@/lib/projectFolderClient';
+
+// 📁 A nyitott projekt mappája az aktív média-cél (Files/Projektek/<folder>): minden
+// import/felvétel/generált média ide kerül — bármelyik stúdió tölti is be a projektet.
+// CSAK stúdió-útvonalon él (nem minden stúdió üríti kilépéskor a store-t → pl. egy
+// profilkép ne a legutóbbi projekt mappájába kerüljön).
+const PROJECT_ROUTE = /^\/(editor|studio\/(image|audio|model3d)|live\/studio)\//;
+let onProjectRoute = false;
+const syncActiveFolder = () =>
+  setActiveProjectFolder(onProjectRoute ? useEditorStore.getState().project?.folder : null);
+useEditorStore.subscribe(syncActiveFolder);
 
 // 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
 // (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
@@ -115,6 +126,8 @@ export default function RootLayout() {
   const pathname = usePathname();
   useEffect(() => {
     setBugRoute(pathname);
+    onProjectRoute = PROJECT_ROUTE.test(pathname);
+    syncActiveFolder();
   }, [pathname]);
   // 💳 Free/Pro szint betöltése a tárolóból (a felhő-funkciók kapuja)
   const hydrateEntitlement = useEntitlement((s) => s.hydrate);

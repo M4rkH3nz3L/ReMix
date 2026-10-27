@@ -48,7 +48,7 @@ export function deleteMediaFiles(keys: readonly MediaFileKey[]): number {
   let deleted = 0;
   for (const key of keys) {
     try {
-      const f = new File(new Directory(Paths.document, key.dir), key.name);
+      const f = new File(Paths.document, key.dir, ...key.name.split('/'));
       if (f.exists) {
         f.delete();
         deleted += 1;

@@ -1666,6 +1666,14 @@ export interface Project {
   live?: LiveDoc;
   /** 🧊 3D-modell dokumentum (`kind: 'model3d'` esetén; additív/opcionális). Lásd `@/types/model3d`. */
   model3d?: Model3DDoc;
+  /**
+   * 📁 A projekt saját mappája az Eszközömben (`Files/Projektek/<folder>`) — a
+   * projekt nevéből képzett ékezetmentes név, a létrehozáskor rögzül (átnevezéskor
+   * NEM változik). A projekt-média ide kerül; csak a projekttel együtt törlődik.
+   */
+  folder?: string;
+  /** ☁️ a projekt-mappa egyirányú szinkronja a ReMix Storage-ba (projekt-beállítás) */
+  syncToRemix?: boolean;
   createdAt: string;
   updatedAt: string;
   /** 1: assets nélkül · 2: asset-registry · 3: sáv-bővítés · 4: kulcskockák ·
@@ -1681,5 +1689,8 @@ export interface ProjectMeta {
   aspectRatio: AspectRatio;
   duration: number;
   clipCount: number;
+  /** 📁 a projekt Eszközöm-mappája (a Tárhelyem védelméhez) */
+  folder?: string;
+  syncToRemix?: boolean;
   updatedAt: string;
 }

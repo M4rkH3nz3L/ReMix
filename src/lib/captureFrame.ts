@@ -1,4 +1,4 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { makeId } from '@/lib/id';
 import { sourceTimeAt } from '@/lib/projectUtils';
 import type { Asset, ImageClip, VideoClip } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * Capture Frame (Creative Canvas): a playhead alatti videó-képkocka
@@ -26,7 +27,7 @@ export async function captureFrame(
     quality: 1,
   });
   // tartós helyre másolás — a thumbnail-cache ideiglenes
-  const dir = new Directory(Paths.document, 'media');
+  const dir = projectMediaDir();
   if (!dir.exists) {
     dir.create();
   }

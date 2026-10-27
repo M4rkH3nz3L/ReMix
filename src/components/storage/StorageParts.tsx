@@ -124,12 +124,18 @@ export function EntryRow({
   entry,
   selected,
   grid,
+  subtitle,
+  locked,
   onPress,
   onLongPress,
 }: {
   entry: StorageEntry;
   selected: boolean;
   grid: boolean;
+  /** pl. a projekt-mappánál a projekt neve */
+  subtitle?: string;
+  /** 🔒 védett (csak a projekt törlésével törölhető) */
+  locked?: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -146,7 +152,16 @@ export function EntryRow({
         <Text style={styles.tileName} numberOfLines={2}>
           {entry.name}
         </Text>
-        {selected ? <Ionicons name="checkmark-circle" size={18} color={palette.accent} style={styles.tileCheck} /> : null}
+        {subtitle ? (
+          <Text style={styles.rowMeta} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+        {selected ? (
+          <Ionicons name="checkmark-circle" size={18} color={palette.accent} style={styles.tileCheck} />
+        ) : locked ? (
+          <Ionicons name="lock-closed" size={14} color={palette.textDim} style={styles.tileCheck} />
+        ) : null}
       </Pressable>
     );
   }
@@ -163,8 +178,13 @@ export function EntryRow({
         <Text style={styles.rowName} numberOfLines={1}>
           {entry.name}
         </Text>
-        {entry.isFolder ? null : <Text style={styles.rowMeta}>{metaLine(entry)}</Text>}
+        {subtitle || !entry.isFolder ? (
+          <Text style={styles.rowMeta} numberOfLines={1}>
+            {subtitle ?? metaLine(entry)}
+          </Text>
+        ) : null}
       </View>
+      {locked ? <Ionicons name="lock-closed" size={14} color={palette.textDim} /> : null}
       {selected ? (
         <Ionicons name="checkmark-circle" size={20} color={palette.accent} />
       ) : entry.isFolder ? (

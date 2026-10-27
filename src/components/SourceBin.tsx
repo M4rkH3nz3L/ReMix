@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { StoragePickerSheet } from '@/components/storage/StoragePickerSheet';
 import { palette } from '@/constants/editor';
 import { assetDisplayState, assetStateBadge, canDownload } from '@/lib/assetState';
 import { assetSyncState, syncStateBadge } from '@/lib/fileConflict';
@@ -11,6 +12,8 @@ import { downloadToCache } from '@/lib/media';
 import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { projectKind } from '@/lib/projectUtils';
 import { assetInUse, countSourceKinds, pickSourceAsset, supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
+import type { StorageEntry } from '@/lib/remixFiles';
+import { importFromStorage } from '@/lib/storageImport';
 import { formatBytes } from '@/lib/storageQuota';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -46,6 +49,8 @@ export function SourceBin({
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState<SourceKind | 'all'>('all');
   if (!project) {
     return null;
@@ -65,6 +70,27 @@ export function SourceBin({
         }
       })
       .catch(() => {});
+  };
+
+  // 🗂️ import a Tárhelyemből (Eszközöm / ReMix Storage) — a fájl a projekt mappájába kerül
+  const importFromMyStorage = (entries: StorageEntry[]) => {
+    setPickerOpen(false);
+    if (!entries.length) {
+      return;
+    }
+    setImporting(true);
+    (async () => {
+      for (const e of entries) {
+        try {
+          const asset = await importFromStorage(e);
+          if (asset) {
+            useEditorStore.getState().dispatch({ type: 'ADD_ASSET', asset }, 'user');
+          }
+        } catch {
+          // egy fájl hibája nem állítja meg a többit
+        }
+      }
+    })().finally(() => setImporting(false));
   };
 
   // 🡇 külső (felhő) forrás letöltése HELYI másolatként a binbe (ADD_ASSET).
@@ -108,6 +134,20 @@ export function SourceBin({
             <Text style={styles.importBtnText}>{t(`studio.kind.${sk}`)}</Text>
           </Pressable>
         ))}
+        <Pressable style={styles.importBtn} onPress={() => setPickerOpen(true)} disabled={importing}>
+          {importing ? (
+            <ActivityIndicator size="small" color={palette.accent} />
+          ) : (
+            <Ionicons name="folder-open-outline" size={14} color={palette.accent} />
+          )}
+          <Text style={styles.importBtnText}>{t('storage.fromMyStorage')}</Text>
+        </Pressable>
+        <StoragePickerSheet
+          visible={pickerOpen}
+          kinds={kinds}
+          onClose={() => setPickerOpen(false)}
+          onPick={importFromMyStorage}
+        />
       </View>
 
       {filterKinds.length > 1 ? (

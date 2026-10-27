@@ -1,8 +1,9 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🏔️ 2.5D Photo-to-3D kliens (🧊 3D V1): a worker /depth/parallax végpontja a
@@ -88,7 +89,7 @@ export async function requestDepthFocus(uri: string): Promise<DepthFocusResult |
     if (Platform.OS === 'web') {
       return { ...body, previewUri: remote };
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

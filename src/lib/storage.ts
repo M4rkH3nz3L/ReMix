@@ -38,7 +38,37 @@ function metaOf(project: Project): ProjectMeta {
     duration: projectDuration(project),
     clipCount: project.tracks.reduce((n, t) => n + t.clips.length, 0),
     updatedAt: project.updatedAt,
+    ...(project.folder ? { folder: project.folder } : {}),
+    ...(project.syncToRemix ? { syncToRemix: true } : {}),
   };
+}
+
+/** a TÖBBI tárolt dokumentum (projekt/verzió/recovery/napló) nyers JSON-ja — a média-hivatkozás-számláláshoz */
+async function otherStoredDocs(exceptId: string): Promise<(string | null)[]> {
+  const keys = (await AsyncStorage.getAllKeys()).filter(
+    (k) => MEDIA_REF_PREFIXES.some((p) => k.startsWith(p)) && !k.endsWith(`.${exceptId}`),
+  );
+  return (await AsyncStorage.multiGet(keys)).map(([, raw]) => raw);
+}
+
+/**
+ * 📁 A projekt saját Eszközöm-mappájának biztosítása (best-effort — a FS-hiba sosem
+ * akasztja meg a betöltést/mentést). Lásd `projectFolderClient.prepareProjectFolder`.
+ */
+async function withProjectFolder(project: Project): Promise<{ project: Project; changed: boolean }> {
+  try {
+    const { prepareProjectFolder } = await import('@/lib/projectFolderClient');
+    return await prepareProjectFolder(project, () => otherStoredDocs(project.id));
+  } catch {
+    return { project, changed: false };
+  }
+}
+
+/** mentés utáni háttér-feladatok (terv-fájl a projekt-mappába + ReMix Storage-szinkron, ha be van kapcsolva) */
+function afterSave(project: Project): void {
+  import('@/lib/projectSyncClient')
+    .then(({ onProjectSaved }) => onProjectSaved(project))
+    .catch(() => {});
 }
 
 /** a sérült index jelzése (a „nincs projekt" esettől megkülönböztetve) */
@@ -152,12 +182,20 @@ export async function loadProject(id: string): Promise<Project | null> {
   if (!raw) {
     return null;
   }
+  let project: Project;
   try {
     // régi sémák automatikus felhozása (v1 → v2: asset-registry)
-    return migrateProject(JSON.parse(raw) as Project);
+    project = migrateProject(JSON.parse(raw) as Project);
   } catch {
     return null;
   }
+  // 📁 a projekt a TELEFONON él, saját mappában — a szerkesztő már a mappás
+  // (átvett médiájú) projektet kapja, így a memóriában sosem marad régi uri
+  const prepared = await withProjectFolder(project);
+  if (prepared.changed) {
+    await saveProject(prepared.project);
+  }
+  return prepared.project;
 }
 
 export async function saveProject(project: Project): Promise<void> {
@@ -171,6 +209,7 @@ export async function saveProject(project: Project): Promise<void> {
     [projectKey(stamped.id), JSON.stringify(stamped)],
     [INDEX_KEY, JSON.stringify(nextIndex)],
   ]);
+  afterSave(stamped);
 }
 
 /** a média-GC-ben hivatkozásnak számító kulcs-előtagok (projekt+verziók+recovery+napló) */
@@ -215,8 +254,25 @@ export async function deleteProject(id: string): Promise<void> {
       const { deleteMediaFiles } = await import('@/lib/mediaGcClient');
       deleteMediaFiles(plan);
     }
+    // 📁 a projekt-mappa a projekttel együtt megy (a máshol még hivatkozott fájl marad)
+    const folder = folderOf(deletedDocs[0]);
+    if (folder) {
+      const { removeProjectFolder } = await import('@/lib/projectFolderClient');
+      removeProjectFolder(folder, remainingDocs);
+      const { removeRemoteProjectFolder } = await import('@/lib/projectSyncClient');
+      void removeRemoteProjectFolder(folder);
+    }
   } catch {
     // árva fájl maradhat — a következő törlés/GC elviszi
+  }
+}
+
+function folderOf(raw: string | null | undefined): string | null {
+  try {
+    const folder = raw ? (JSON.parse(raw) as Project).folder : undefined;
+    return typeof folder === 'string' && folder ? folder : null;
+  } catch {
+    return null;
   }
 }
 
@@ -238,6 +294,7 @@ export async function saveProjectAndEvents(
     [INDEX_KEY, JSON.stringify(nextIndex)],
     [eventsKey(stamped.id), JSON.stringify(events)],
   ]);
+  afterSave(stamped);
 }
 
 /**
@@ -251,13 +308,18 @@ export async function duplicateProject(id: string, copyLabel = 'másolat'): Prom
     return null;
   }
   const now = new Date().toISOString();
-  const copy: Project = {
+  const draft: Project = {
     ...src,
     id: makeId('prj'),
     name: `${src.name} ${copyLabel}`.trim(),
+    // a másolat SAJÁT mappát kap (a forrás fájljait átmásolja), és a szinkron
+    // projektenként külön döntés → alapból ki
+    folder: undefined,
+    syncToRemix: undefined,
     createdAt: now,
     updatedAt: now,
   };
+  const { project: copy } = await withProjectFolder(draft);
   await saveProject(copy);
   return copy;
 }

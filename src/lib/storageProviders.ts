@@ -1,10 +1,11 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Asset } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * StorageProvider-réteg (full-plan F2): a média bárhol lehet — a szerkesztő a
@@ -92,7 +93,7 @@ const serverLibraryProvider: StorageProvider = {
       // weben nincs fájlrendszer — a lejátszók az URL-t streamelik (External)
       return { uri: remote, provider: 'remote' };
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }
@@ -150,7 +151,7 @@ function remoteSourceProvider(source: {
       if (Platform.OS === 'web') {
         return { uri: remote, provider: 'remote' };
       }
-      const dir = new Directory(Paths.document, 'media');
+      const dir = projectMediaDir();
       if (!dir.exists) {
         dir.create();
       }

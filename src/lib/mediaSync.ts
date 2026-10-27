@@ -5,6 +5,7 @@ import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { uploadMediaResult } from '@/lib/render';
 import { findMissingMedia, type MissingMedia, type RelinkPair } from '@/lib/videdFile';
 import type { Asset, Project } from '@/types/project';
+import { projectFolderDir } from '@/lib/projectFolderClient';
 
 /**
  * 🗄️ Média-szinkron — a projekt médiafájljainak SZERVER-tárolása és a hiányzó
@@ -191,7 +192,8 @@ export async function restoreSelectedMedia(
   const targets = selectableRestoreTargets(project, selectedUris, remoteByUri);
   let dir: Directory;
   try {
-    dir = new Directory(Paths.document, 'mediacache');
+    // 📁 a visszaállított média a projekt SAJÁT mappájába kerül (mappa nélkül: közös cache)
+    dir = project.folder ? projectFolderDir(project.folder) : new Directory(Paths.document, 'mediacache');
     if (!dir.exists) {
       dir.create({ intermediates: true });
     }
@@ -245,7 +247,8 @@ export async function restoreMissingMedia(
   }
   let dir: Directory;
   try {
-    dir = new Directory(Paths.document, 'mediacache');
+    // 📁 a visszaállított média a projekt SAJÁT mappájába kerül (mappa nélkül: közös cache)
+    dir = project.folder ? projectFolderDir(project.folder) : new Directory(Paths.document, 'mediacache');
     if (!dir.exists) {
       dir.create({ intermediates: true });
     }

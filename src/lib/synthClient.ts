@@ -1,8 +1,9 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import { synthDurationSec, type SynthNote, type SynthWave } from '@/lib/synth';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /**
  * 🎹 A piano-roll hangjegyeinek renderelése hang-fájllá a worker `/synth`-jén (MIDI → generált
@@ -25,7 +26,7 @@ export async function renderSynthToClip(
     if (!res.ok) {
       return null;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     if (!dir.exists) {
       dir.create();
     }

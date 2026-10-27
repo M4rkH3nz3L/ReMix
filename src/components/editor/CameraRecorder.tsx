@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +11,7 @@ import { trackEnd, trackOf } from '@/lib/projectUtils';
 import { ensureProxy } from '@/lib/proxy';
 import { useEditorStore } from '@/store/editorStore';
 import type { FilterId } from '@/types/project';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 const MAX_SEC = 60; // short-video felső korlát (auto-stop)
 const SPEEDS = [0.5, 1, 2, 3] as const;
@@ -98,7 +99,7 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     if (!project) {
       return;
     }
-    const dir = new Directory(Paths.document, 'media');
+    const dir = projectMediaDir();
     try {
       dir.create();
     } catch {

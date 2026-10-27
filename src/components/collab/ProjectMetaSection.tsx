@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ProjectSyncSection } from '@/components/storage/ProjectSyncSection';
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { logProjectActivity } from '@/lib/chat';
@@ -132,6 +133,9 @@ export function ProjectMetaSection({
         }}
         disabled={busy || !dirty}
       />
+      {/* 📁☁️ a projekt telefonos mappája + szinkron a ReMix Storage-ba */}
+      <Text style={styles.label}>{t('storage.projectStorage')}</Text>
+      <ProjectSyncSection projectId={project.id} />
     </View>
   );
 }

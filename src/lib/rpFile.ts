@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { withFingerprints } from '@/lib/fingerprint';
 import { makeId } from '@/lib/id';
 import { extractMediaUriEntries, type MediaFileKey } from '@/lib/mediaGc';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 import type { ProgressUpdate } from '@/lib/progress';
 import { migrateProject, relinkUri } from '@/lib/projectUtils';
 import { utf8ToBytes } from '@/lib/sha256';
@@ -70,7 +71,7 @@ function collectMediaFiles(project: Project): { uri: string; key: string; file: 
     }
     try {
       // a KULCS szerinti aktuális konténer-útvonalon keressük (reinstall-biztos)
-      const file = new File(new Directory(Paths.document, key.dir), key.name);
+      const file = new File(Paths.document, key.dir, ...key.name.split('/'));
       if (file.exists) {
         seenKeys.add(ks);
         out.push({ uri, key: ks, file });
@@ -250,14 +251,23 @@ function readRpEntries(src: File): ZipEntry[] {
 }
 
 /** egy média-entry kibontása az app tárába (dedup/átnevezés) → entry-név + új uri */
-function extractMediaEntryToStore(src: File, entry: ZipEntry): { key: string; uri: string } | null {
+function extractMediaEntryToStore(
+  src: File,
+  entry: ZipEntry,
+  targetDir?: Directory,
+): { key: string; uri: string } | null {
   const slash = entry.name.indexOf('/');
-  const dirName = entry.name.slice(0, slash);
-  const fileName = entry.name.slice(slash + 1);
+  let dirName = entry.name.slice(0, slash);
+  let fileName = entry.name.slice(slash + 1);
+  if (dirName === 'Files') {
+    // 📁 projekt-mappás fájl → laposan (a projekt betöltése a SAJÁT mappájába veszi át)
+    fileName = fileName.slice(fileName.lastIndexOf('/') + 1);
+    dirName = 'media';
+  }
   if (!fileName || fileName.includes('/') || fileName.includes('..')) {
     return null; // védekezés a kitörős entry-nevek ellen
   }
-  const dir = new Directory(Paths.document, dirName);
+  const dir = targetDir ?? new Directory(Paths.document, dirName);
   if (!dir.exists) {
     dir.create();
   }
@@ -273,6 +283,11 @@ function extractMediaEntryToStore(src: File, entry: ZipEntry): { key: string; ur
   return { key: entry.name, uri: target.uri };
 }
 
+/** média-bejegyzés-e (régi lapos mappák + projekt-mappás `Files/Projektek/…`) */
+function isMediaEntry(name: string): boolean {
+  return name.startsWith('media/') || name.startsWith('mediacache/') || name.startsWith('Files/Projektek/');
+}
+
 /** a csomag média-bejegyzései (a szelektív visszaállítás listájához) */
 export interface RpMediaEntry {
   /** entry-név: `media/<fájlnév>` vagy `mediacache/<fájlnév>` */
@@ -286,8 +301,8 @@ export interface RpMediaEntry {
 export function listRpMediaEntries(uri: string): RpMediaEntry[] {
   const entries = readRpEntries(new File(uri));
   return entries
-    .filter((e) => e.name.startsWith('media/') || e.name.startsWith('mediacache/'))
-    .map((e) => ({ name: e.name, fileName: e.name.slice(e.name.indexOf('/') + 1), size: e.size }));
+    .filter((e) => isMediaEntry(e.name))
+    .map((e) => ({ name: e.name, fileName: e.name.slice(e.name.lastIndexOf('/') + 1), size: e.size }));
 }
 
 /**
@@ -303,7 +318,8 @@ export function extractRpMediaSelected(uri: string, names: readonly string[]): M
     if (!wanted.has(entry.name)) {
       continue;
     }
-    const res = extractMediaEntryToStore(src, entry);
+    // a visszaállítás a NYITOTT projekt mappájába megy (projekten kívül a közös media-ba)
+    const res = extractMediaEntryToStore(src, entry, projectMediaDir());
     if (res) {
       out.set(res.key, res.uri);
     }
@@ -379,9 +395,7 @@ export async function importRpFromUri(
   let project = migrateProject(rawProject);
 
   // média-kibontás + kulcs → új uri térkép
-  const mediaEntries = entries.filter(
-    (e) => e.name.startsWith('media/') || e.name.startsWith('mediacache/'),
-  );
+  const mediaEntries = entries.filter((e) => isMediaEntry(e.name));
   const newUriByKey = new Map<string, string>();
   for (let i = 0; i < mediaEntries.length; i += 1) {
     const entry = mediaEntries[i];

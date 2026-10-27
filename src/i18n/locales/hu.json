@@ -2980,6 +2980,7 @@
       "live": "Élő"
     },
     "kindDesc": {
+      "model3d": "LiDAR-szken 3D-modellé",
       "video": "Idővonalas videószerkesztő",
       "image": "Réteg-alapú képszerkesztő",
       "audio": "Hang- és zeneszerkesztő"
@@ -3528,6 +3529,83 @@
       "upload": "„{{name}}” — a kész videó feltöltése",
       "completed": "„{{name}}” elkészült",
       "failed": "„{{name}}” — a renderelés megszakadt"
+    }
+  },
+  "model3d": {
+    "title": "3D Stúdió",
+    "mode": {
+      "object": "Tárgy-szken",
+      "objectDesc": "Kézbe vehető tárgy — körbejárva, valós méretben",
+      "room": "Tér-szken",
+      "roomDesc": "Szoba falakkal, nyílásokkal, alaprajzzal",
+      "soon": "Hamarosan"
+    },
+    "empty": {
+      "title": "Szkennelj egy tárgyat",
+      "body": "Tedd a tárgyat jól megvilágított, sima felületre, és járd körbe lassan. A LiDAR valós méretű 3D-modellt készít belőle — a telefonon, ingyen."
+    },
+    "capture": {
+      "hint_initializing": "Kamera indítása…",
+      "hint_ready": "Irányítsd a kamerát a tárgyra, majd koppints a Kijelölésre",
+      "hint_detecting": "Igazítsd a keretet a tárgy köré, aztán indítsd a rögzítést",
+      "hint_capturing": "Lassan, egyenletesen járd körbe a tárgyat",
+      "hint_finishing": "Befejezés…",
+      "hint_failed": "A rögzítés megszakadt. Próbáld újra jobb fényben.",
+      "select": "Kijelölés",
+      "start": "Rögzítés indítása",
+      "finish": "Kész",
+      "newPass": "Új kör",
+      "cancel": "Mégse",
+      "cancelTitle": "Elveted a szkent?",
+      "cancelBody": "Az eddig készült felvételek törlődnek.",
+      "discard": "Elvetés",
+      "keep": "Folytatom"
+    },
+    "feedback": {
+      "objectTooClose": "Lépj kicsit hátrébb",
+      "objectTooFar": "Menj közelebb",
+      "movingTooFast": "Lassabban mozgasd a telefont",
+      "environmentLowLight": "Kevés a fény",
+      "environmentTooDark": "Túl sötét van",
+      "outOfFieldOfView": "Tartsd a tárgyat a képben",
+      "objectNotDetected": "Nem látom a tárgyat",
+      "overCapturing": "Ebből a szögből elég — haladj tovább",
+      "objectNotFlippable": "Ezt a tárgyat ne fordítsd meg"
+    },
+    "reconstruct": {
+      "title": "3D-modell készül…",
+      "hint": "Ez néhány percig tart. A telefon közben melegedhet — ez normális.",
+      "cancel": "Megszakítás",
+      "done": "Kész a 3D-modell"
+    },
+    "viewer": {
+      "autoRotate": "Forgatás",
+      "background": "Háttér",
+      "newScan": "Új szken",
+      "stats": "{{tris}} háromszög · {{size}}",
+      "hint": "Húzd az ujjad a forgatáshoz, csippents a nagyításhoz, dupla koppintás: alapnézet"
+    },
+    "error": {
+      "cancelled": "Megszakítva.",
+      "unsupported": "Ez a funkció ezen a készüléken nem érhető el.",
+      "badInput": "A fájl nem olvasható.",
+      "failed": "Most nem sikerült elkészíteni a modellt. Próbáld újra több fénnyel, lassabb mozgással."
+    },
+    "render": {
+      "errAspect": "Érvénytelen képarány.",
+      "errAlphaVideo": "Átlátszó hátteret csak képhez vagy overlay-klipnél lehet kérni.",
+      "errSeconds": "A videó hossza 1–60 másodperc lehet.",
+      "errFps": "A képkockasebesség 12–60 fps lehet."
+    },
+    "export": {
+      "useAr": "AR-nézet, Apple-eszközök",
+      "useEditing": "3D-szerkesztő programok",
+      "usePrint": "3D-nyomtatás",
+      "usePointCloud": "Pontfelhő",
+      "useWeb": "Web és feed",
+      "warnNoTexture": "Ebbe a formátumba a színek/textúra nem kerülnek bele.",
+      "warnPointCloudToMesh": "A pontfelhőből háló lesz — a részletek egy része elveszhet.",
+      "warnHeavyPrint": "Nagyon részletes háló — a szeletelő program lassú lehet."
     }
   },
   "time": {

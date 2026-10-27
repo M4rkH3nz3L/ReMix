@@ -40,8 +40,9 @@ export const PROJECT_KINDS: Record<ProjectKind, ProjectKindMeta> = {
   //    („Go live") jön létre, ezért `editable: false` → kimarad a generikus
   //    „Új projekt" választóból (creatableKinds). A route a lista-megnyitáshoz él.
   live: { id: 'live', emoji: '🎥', icon: 'radio', label: 'studio.kind.live', editable: false, route: (id) => `/live/studio/${id}` },
-  // ── 🧊 3D Stúdió — CSAK LiDAR-os eszközön (3D-Studio.md §1.1); a stúdió elkészültéig rejtve.
-  model3d: { id: 'model3d', emoji: '🧊', icon: 'cube', label: 'studio.kind.model3d', editable: false, route: (id) => `/studio/model3d/${id}` },
+  // ── 🧊 3D Stúdió — CSAK LiDAR-os eszközön (3D-Studio.md §1.1): a kész stúdió (3D-1) a
+  //    `isKindAvailable` kapun át jelenik meg; LiDAR nélkül sehol (választó, lista, ⌘K, útvonal).
+  model3d: { id: 'model3d', emoji: '🧊', icon: 'cube', label: 'studio.kind.model3d', editable: true, route: (id) => `/studio/model3d/${id}` },
 };
 
 /** Minden fajta, definíciós sorrendben. */

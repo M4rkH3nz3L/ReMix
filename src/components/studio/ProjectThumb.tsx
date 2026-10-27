@@ -39,6 +39,10 @@ export function ProjectThumb({
     let alive = true;
     loadProject(id)
       .then(async (p) => {
+        if (kind === 'model3d') {
+          // 🧊 a szken után készült poszter-kép (a modell egy nézetből renderelve)
+          return p?.model3d?.poster ?? null;
+        }
         if (kind === 'image') {
           // 🖼️ kép-projekt: az első lap első fotó-rétege (élő teszt H1 — eddig csak ikon)
           const photo = p?.imageDocs?.[0]?.layers.find((l) => l.kind === 'photo');

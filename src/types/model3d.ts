@@ -152,6 +152,8 @@ export interface Model3DDoc {
   measurements: Model3DMeasurement[];
   annotations: Model3DAnnotation[];
   capture?: Model3DCapture;
+  /** a modell poszter-képe (PNG a `media/`-ban) — projektkártya, feed, megosztás */
+  poster?: string;
 }
 
 /**

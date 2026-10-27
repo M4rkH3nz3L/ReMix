@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.h3nz3l.remix",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Remix uses the camera so you can record video straight into your project.",
+        "NSCameraUsageDescription": "Remix uses the camera so you can record video straight into your project and scan objects into 3D models.",
         "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos.",
         "NSPhotoLibraryUsageDescription": "Remix imports videos and photos from your library so you can edit them.",
         "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library.",

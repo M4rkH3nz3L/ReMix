@@ -2980,6 +2980,7 @@
       "live": "Live"
     },
     "kindDesc": {
+      "model3d": "LiDAR scan to 3D model",
       "video": "Timeline video editor",
       "image": "Layer-based image editor",
       "audio": "Sound & music editor"
@@ -3528,6 +3529,83 @@
       "upload": "“{{name}}” — uploading the finished video",
       "completed": "“{{name}}” is ready",
       "failed": "“{{name}}” — rendering was interrupted"
+    }
+  },
+  "model3d": {
+    "title": "3D Studio",
+    "mode": {
+      "object": "Object scan",
+      "objectDesc": "Hand-sized object — walk around it, true scale",
+      "room": "Room scan",
+      "roomDesc": "Room with walls, openings and floor plan",
+      "soon": "Coming soon"
+    },
+    "empty": {
+      "title": "Scan an object",
+      "body": "Put the object on a plain, well-lit surface and walk around it slowly. LiDAR turns it into a true-scale 3D model — on your phone, for free."
+    },
+    "capture": {
+      "hint_initializing": "Starting camera…",
+      "hint_ready": "Point the camera at the object, then tap Select",
+      "hint_detecting": "Fit the box around the object, then start capturing",
+      "hint_capturing": "Walk slowly and steadily around the object",
+      "hint_finishing": "Finishing…",
+      "hint_failed": "Capture stopped. Try again in better light.",
+      "select": "Select",
+      "start": "Start capture",
+      "finish": "Done",
+      "newPass": "New pass",
+      "cancel": "Cancel",
+      "cancelTitle": "Discard this scan?",
+      "cancelBody": "The images captured so far will be deleted.",
+      "discard": "Discard",
+      "keep": "Keep scanning"
+    },
+    "feedback": {
+      "objectTooClose": "Step back a little",
+      "objectTooFar": "Move closer",
+      "movingTooFast": "Move the phone more slowly",
+      "environmentLowLight": "Not enough light",
+      "environmentTooDark": "It's too dark",
+      "outOfFieldOfView": "Keep the object in frame",
+      "objectNotDetected": "I can't see the object",
+      "overCapturing": "Enough from this angle — keep moving",
+      "objectNotFlippable": "Don't flip this object"
+    },
+    "reconstruct": {
+      "title": "Building your 3D model…",
+      "hint": "This takes a few minutes. Your phone may get warm — that's normal.",
+      "cancel": "Stop",
+      "done": "Your 3D model is ready"
+    },
+    "viewer": {
+      "autoRotate": "Spin",
+      "background": "Background",
+      "newScan": "New scan",
+      "stats": "{{tris}} triangles · {{size}}",
+      "hint": "Drag to rotate, pinch to zoom, double-tap to reset"
+    },
+    "error": {
+      "cancelled": "Cancelled.",
+      "unsupported": "This feature isn't available on this device.",
+      "badInput": "The file can't be read.",
+      "failed": "Couldn't build the model right now. Try again with more light and slower movement."
+    },
+    "render": {
+      "errAspect": "Invalid aspect ratio.",
+      "errAlphaVideo": "A transparent background is only available for images and overlay clips.",
+      "errSeconds": "Video length must be 1–60 seconds.",
+      "errFps": "Frame rate must be 12–60 fps."
+    },
+    "export": {
+      "useAr": "AR view, Apple devices",
+      "useEditing": "3D editing apps",
+      "usePrint": "3D printing",
+      "usePointCloud": "Point cloud",
+      "useWeb": "Web and feed",
+      "warnNoTexture": "Colors/textures aren't included in this format.",
+      "warnPointCloudToMesh": "The point cloud becomes a mesh — some detail may be lost.",
+      "warnHeavyPrint": "Very detailed mesh — the slicer may be slow."
     }
   },
   "time": {

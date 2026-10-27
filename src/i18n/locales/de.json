@@ -2980,6 +2980,7 @@
       "live": "Live"
     },
     "kindDesc": {
+      "model3d": "LiDAR-Scan zum 3D-Modell",
       "video": "Zeitleisten-Videoeditor",
       "image": "Ebenenbasierter Bildeditor",
       "audio": "Ton- & Musikeditor"
@@ -3498,6 +3499,83 @@
       "upload": "„{{name}}“ — fertiges Video wird hochgeladen",
       "completed": "„{{name}}“ ist fertig",
       "failed": "„{{name}}“ — Rendern wurde abgebrochen"
+    }
+  },
+  "model3d": {
+    "title": "3D-Studio",
+    "mode": {
+      "object": "Objekt-Scan",
+      "objectDesc": "Handliches Objekt — rundherum, in echter Größe",
+      "room": "Raum-Scan",
+      "roomDesc": "Raum mit Wänden, Öffnungen und Grundriss",
+      "soon": "Demnächst"
+    },
+    "empty": {
+      "title": "Scanne ein Objekt",
+      "body": "Stell das Objekt auf eine glatte, gut beleuchtete Fläche und geh langsam darum herum. LiDAR erstellt daraus ein 3D-Modell in echter Größe — auf dem Handy, kostenlos."
+    },
+    "capture": {
+      "hint_initializing": "Kamera startet…",
+      "hint_ready": "Richte die Kamera auf das Objekt und tippe auf Auswählen",
+      "hint_detecting": "Passe den Rahmen an das Objekt an und starte die Aufnahme",
+      "hint_capturing": "Geh langsam und gleichmäßig um das Objekt herum",
+      "hint_finishing": "Wird abgeschlossen…",
+      "hint_failed": "Die Aufnahme wurde unterbrochen. Versuch es bei besserem Licht erneut.",
+      "select": "Auswählen",
+      "start": "Aufnahme starten",
+      "finish": "Fertig",
+      "newPass": "Neue Runde",
+      "cancel": "Abbrechen",
+      "cancelTitle": "Scan verwerfen?",
+      "cancelBody": "Die bisherigen Aufnahmen werden gelöscht.",
+      "discard": "Verwerfen",
+      "keep": "Weiter scannen"
+    },
+    "feedback": {
+      "objectTooClose": "Geh etwas zurück",
+      "objectTooFar": "Geh näher heran",
+      "movingTooFast": "Beweg das Handy langsamer",
+      "environmentLowLight": "Zu wenig Licht",
+      "environmentTooDark": "Es ist zu dunkel",
+      "outOfFieldOfView": "Halte das Objekt im Bild",
+      "objectNotDetected": "Objekt nicht erkannt",
+      "overCapturing": "Aus diesem Winkel reicht es — weiter",
+      "objectNotFlippable": "Dieses Objekt nicht umdrehen"
+    },
+    "reconstruct": {
+      "title": "3D-Modell wird erstellt…",
+      "hint": "Das dauert einige Minuten. Das Handy kann warm werden — das ist normal.",
+      "cancel": "Abbrechen",
+      "done": "Dein 3D-Modell ist fertig"
+    },
+    "viewer": {
+      "autoRotate": "Drehen",
+      "background": "Hintergrund",
+      "newScan": "Neuer Scan",
+      "stats": "{{tris}} Dreiecke · {{size}}",
+      "hint": "Ziehen zum Drehen, Zoomen mit zwei Fingern, Doppeltippen zum Zurücksetzen"
+    },
+    "error": {
+      "cancelled": "Abgebrochen.",
+      "unsupported": "Diese Funktion ist auf diesem Gerät nicht verfügbar.",
+      "badInput": "Die Datei kann nicht gelesen werden.",
+      "failed": "Das Modell konnte gerade nicht erstellt werden. Versuch es mit mehr Licht und langsamerer Bewegung."
+    },
+    "render": {
+      "errAspect": "Ungültiges Seitenverhältnis.",
+      "errAlphaVideo": "Transparenter Hintergrund nur für Bilder und Overlay-Clips.",
+      "errSeconds": "Die Videolänge muss 1–60 Sekunden sein.",
+      "errFps": "Die Bildrate muss 12–60 fps sein."
+    },
+    "export": {
+      "useAr": "AR-Ansicht, Apple-Geräte",
+      "useEditing": "3D-Bearbeitungsprogramme",
+      "usePrint": "3D-Druck",
+      "usePointCloud": "Punktwolke",
+      "useWeb": "Web und Feed",
+      "warnNoTexture": "Farben/Texturen sind in diesem Format nicht enthalten.",
+      "warnPointCloudToMesh": "Die Punktwolke wird zum Netz — Details können verloren gehen.",
+      "warnHeavyPrint": "Sehr detailliertes Netz — der Slicer kann langsam sein."
     }
   },
   "time": {

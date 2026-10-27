@@ -1,0 +1,6 @@
+{
+  "platforms": ["apple"],
+  "apple": {
+    "modules": ["Remix3DModule", "Remix3DModelViewModule", "Remix3DCaptureViewModule"]
+  }
+}

@@ -3508,7 +3508,9 @@
       "objectDesc": "Handliches Objekt — rundherum, in echter Größe",
       "room": "Raum-Scan",
       "roomDesc": "Raum mit Wänden, Öffnungen und Grundriss",
-      "soon": "Demnächst"
+      "soon": "Demnächst",
+      "freeform": "Freier Scan — Live-Netz",
+      "freeformDesc": "Raum, Möbel, größere Objekte — das Netz entsteht live im Bild"
     },
     "empty": {
       "title": "Scanne ein Objekt",
@@ -3555,7 +3557,11 @@
       "background": "Hintergrund",
       "newScan": "Neuer Scan",
       "stats": "{{tris}} Dreiecke · {{size}}",
-      "hint": "Ziehen zum Drehen, Zoomen mit zwei Fingern, Doppeltippen zum Zurücksetzen"
+      "hint": "Ziehen zum Drehen, Zoomen mit zwei Fingern, Doppeltippen zum Zurücksetzen",
+      "wireframe": "Netz",
+      "wireframe_off": "Netz: aus",
+      "wireframe_overlay": "Netz auf der Fläche",
+      "wireframe_only": "Nur Netz"
     },
     "error": {
       "cancelled": "Abgebrochen.",
@@ -3578,6 +3584,19 @@
       "warnNoTexture": "Farben/Texturen sind in diesem Format nicht enthalten.",
       "warnPointCloudToMesh": "Die Punktwolke wird zum Netz — Details können verloren gehen.",
       "warnHeavyPrint": "Sehr detailliertes Netz — der Slicer kann langsam sein."
+    },
+    "mesh": {
+      "tracking_normal": "Langsam abfahren — das Netz entsteht live",
+      "tracking_initializing": "Beweg das Handy langsam, damit sich die Kamera orientiert",
+      "tracking_excessiveMotion": "Langsamer!",
+      "tracking_insufficientFeatures": "Zu wenig Details — richte es auf eine strukturiertere Fläche",
+      "tracking_relocalizing": "Geh zurück zu einem bereits gescannten Bereich",
+      "tracking_notAvailable": "Tracking nicht verfügbar",
+      "tracking_limited": "Beweg das Handy langsam",
+      "dark": "Zu wenig Licht — schalte eine Lampe ein",
+      "triangles": "{{count}} Dreiecke",
+      "done": "Fertig",
+      "saving": "Netz wird gespeichert…"
     }
   },
   "time": {

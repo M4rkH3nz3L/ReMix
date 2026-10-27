@@ -3538,7 +3538,9 @@
       "objectDesc": "Hand-sized object — walk around it, true scale",
       "room": "Room scan",
       "roomDesc": "Room with walls, openings and floor plan",
-      "soon": "Coming soon"
+      "soon": "Coming soon",
+      "freeform": "Free scan — live mesh",
+      "freeformDesc": "Room, furniture, larger objects — the mesh builds live on screen"
     },
     "empty": {
       "title": "Scan an object",
@@ -3585,7 +3587,11 @@
       "background": "Background",
       "newScan": "New scan",
       "stats": "{{tris}} triangles · {{size}}",
-      "hint": "Drag to rotate, pinch to zoom, double-tap to reset"
+      "hint": "Drag to rotate, pinch to zoom, double-tap to reset",
+      "wireframe": "Mesh",
+      "wireframe_off": "Mesh: off",
+      "wireframe_overlay": "Mesh on surface",
+      "wireframe_only": "Mesh only"
     },
     "error": {
       "cancelled": "Cancelled.",
@@ -3608,6 +3614,19 @@
       "warnNoTexture": "Colors/textures aren't included in this format.",
       "warnPointCloudToMesh": "The point cloud becomes a mesh — some detail may be lost.",
       "warnHeavyPrint": "Very detailed mesh — the slicer may be slow."
+    },
+    "mesh": {
+      "tracking_normal": "Sweep slowly — the mesh builds live",
+      "tracking_initializing": "Move the phone slowly so the camera can find its bearings",
+      "tracking_excessiveMotion": "Slower!",
+      "tracking_insufficientFeatures": "Not enough detail — point at a more textured surface",
+      "tracking_relocalizing": "Go back to an area you already scanned",
+      "tracking_notAvailable": "Tracking unavailable",
+      "tracking_limited": "Move the phone slowly",
+      "dark": "Not enough light — turn on a lamp",
+      "triangles": "{{count}} triangles",
+      "done": "Done",
+      "saving": "Saving mesh…"
     }
   },
   "time": {

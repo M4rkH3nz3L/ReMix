@@ -67,6 +67,18 @@ final class Remix3DModelView: ExpoView {
     }
   }
 
+  /// háló-megjelenítés: "off" | "overlay" (a felületen) | "only" (csak a háló)
+  func setWireframe(_ mode: String?) {
+    switch mode {
+    case "overlay":
+      scnView.debugOptions = [.showWireframe]
+    case "only":
+      scnView.debugOptions = [.renderAsWireframe]
+    default:
+      scnView.debugOptions = []
+    }
+  }
+
   func snapshot(width: Int, height: Int, transparent: Bool) throws -> Data {
     guard let scene = scnView.scene else { throw Remix3DError.badInput("noScene") }
     return try Remix3DRender.snapshot(scene: scene, pointOfView: scnView.pointOfView, yaw: 0, pitch: 0, width: width, height: height, transparent: transparent)
@@ -81,6 +93,7 @@ public class Remix3DModelViewModule: Module {
       Prop("modelUri") { (view: Remix3DModelView, uri: String?) in view.setModelUri(uri) }
       Prop("background") { (view: Remix3DModelView, hex: String?) in view.setBackground(hex) }
       Prop("autoRotate") { (view: Remix3DModelView, on: Bool) in view.setAutoRotate(on) }
+      Prop("wireframe") { (view: Remix3DModelView, mode: String?) in view.setWireframe(mode) }
       // a SceneKit-nézet állapotát (kamera) a fő szálon olvassuk
       AsyncFunction("snapshot") { (view: Remix3DModelView, outputPath: String, width: Int, height: Int, transparent: Bool) -> String in
         let data = try MainActor.assumeIsolated { try view.snapshot(width: width, height: height, transparent: transparent) }

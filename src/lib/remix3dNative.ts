@@ -23,6 +23,27 @@ export interface CaptureViewHandle {
   command(name: 'detect' | 'capture' | 'newPass' | 'finish' | 'cancel'): Promise<boolean>;
 }
 
+export interface MeshScanStateEvent {
+  tracking: 'normal' | 'notAvailable' | 'excessiveMotion' | 'insufficientFeatures' | 'initializing' | 'relocalizing' | 'limited';
+  triangles: number;
+  /** ARKit környezeti fény (lumen-szerű, ~1000 = normál beltér) */
+  light: number;
+}
+
+export interface MeshScanHandle {
+  start(): Promise<void>;
+  pause(): Promise<void>;
+  exportMesh(outputPath: string): Promise<{
+    uri: string;
+    triangles: number;
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }>;
+}
+
+/** a kész háló megjelenítése: nincs / a felületen / csak a háló */
+export type WireframeMode = 'off' | 'overlay' | 'only';
+
 export interface ModelViewHandle {
   snapshot(outputPath: string, width: number, height: number, transparent: boolean): Promise<string>;
 }
@@ -32,22 +53,49 @@ type CaptureViewProps = ViewProps & {
   onCaptureState?: (e: { nativeEvent: CaptureStateEvent }) => void;
 };
 
+type MeshScanViewProps = ViewProps & {
+  ref?: Ref<MeshScanHandle>;
+  onScanState?: (e: { nativeEvent: MeshScanStateEvent }) => void;
+};
+
 type ModelViewProps = ViewProps & {
   ref?: Ref<ModelViewHandle>;
   modelUri?: string;
+  wireframe?: WireframeMode;
   background?: string | null;
   autoRotate?: boolean;
   onLoad?: (e: { nativeEvent: { radius: number } }) => void;
   onError?: (e: { nativeEvent: { code: string; message?: string } }) => void;
 };
 
-export const Remix3DCaptureView: ComponentType<CaptureViewProps> | null = Remix3D
-  ? (requireNativeView('Remix3DCaptureView') as ComponentType<CaptureViewProps>)
-  : null;
+/**
+ * Natív nézet biztonságos feloldása: régebbi natív build (amiben az adott nézet még
+ * nincs) vagy hiányzó modul esetén `null` — a hívó a funkciót egyszerűen nem kínálja,
+ * a képernyő nem omlik össze (a JS a natív buildnél frissebb is lehet: hot reload).
+ */
+function optionalView<P>(name: string): ComponentType<P> | null {
+  if (!Remix3D) {
+    return null;
+  }
+  // a `requireNativeView` hiányzó nézetnél NEM dob, csak figyelmeztet, és a render bukna →
+  // előbb a natív nézet-konfigurációt kérdezzük meg (expo-modules-core ugyanígy dönt)
+  const expoGlobal = (globalThis as { expo?: { getViewConfig?: (m: string, v?: string) => unknown } }).expo;
+  if (!expoGlobal?.getViewConfig?.(name)) {
+    return null;
+  }
+  try {
+    return requireNativeView(name) as ComponentType<P>;
+  } catch {
+    return null;
+  }
+}
 
-export const Remix3DModelView: ComponentType<ModelViewProps> | null = Remix3D
-  ? (requireNativeView('Remix3DModelView') as ComponentType<ModelViewProps>)
-  : null;
+export const Remix3DCaptureView = optionalView<CaptureViewProps>('Remix3DCaptureView');
+
+/** szabad szken élő LiDAR-hálóval (ARKit scene reconstruction) */
+export const Remix3DMeshScanView = optionalView<MeshScanViewProps>('Remix3DMeshScanView');
+
+export const Remix3DModelView = optionalView<ModelViewProps>('Remix3DModelView');
 
 /**
  * A natív hiba-üzenet (`unsupported:x` / `badInput:x` / `failed:x` / `cancelled`)

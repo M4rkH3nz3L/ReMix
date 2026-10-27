@@ -18,14 +18,23 @@ import {
   Remix3D,
   Remix3DCaptureView,
   Remix3DModelView,
+  Remix3DMeshScanView,
   remix3dErrorKey,
   type CaptureStateEvent,
   type CaptureViewHandle,
+  type MeshScanHandle,
+  type MeshScanStateEvent,
+  type WireframeMode,
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
 import type { Model3DDoc, Model3DMesh } from '@/types/model3d';
 
-type Phase = 'empty' | 'capturing' | 'reconstructing' | 'viewer';
+type Phase = 'empty' | 'capturing' | 'meshScanning' | 'reconstructing' | 'viewer';
+
+/** a háló-megjelenítés ciklusa a nézőben */
+const WIREFRAME_CYCLE: WireframeMode[] = ['off', 'overlay', 'only'];
+/** ARKit környezeti fény alatta „kevés a fény" (normál beltér ~1000) */
+const DARK_LIGHT = 300;
 
 /** a háttér-ciklus: sötét → világos → átlátszó (a néző a SceneKit-háttérrel) */
 const BACKGROUNDS: (string | null)[] = ['#111420', '#f2f2f5', null];
@@ -50,10 +59,16 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
-  const phase: Phase = phaseState === 'empty' && asset ? 'viewer' : phaseState;
+  // „Új szken" meglévő modellnél: a módválasztó EXPLICIT kérésre látszik (különben a néző)
+  const [picking, setPicking] = useState(false);
+  const phase: Phase = phaseState === 'empty' && asset && !picking ? 'viewer' : phaseState;
   const [capState, setCapState] = useState<CaptureStateEvent>({ state: 'initializing', feedback: [] });
   const [progress, setProgress] = useState(0);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [wireframe, setWireframe] = useState<WireframeMode>('off');
+  const [scanState, setScanState] = useState<MeshScanStateEvent>({ tracking: 'initializing', triangles: 0, light: 1000 });
+  const [savingMesh, setSavingMesh] = useState(false);
+  const meshRef = useRef<MeshScanHandle>(null);
   const captureRef = useRef<CaptureViewHandle>(null);
   // ⏱️ ha a kamera nem tud tájékozódni (sötét, takart, mozdulatlan), az „inicializálás"
   // nem ér véget — néhány mp után érthető útmutatás a pörgő jelző helyett (élő teszt)
@@ -89,10 +104,80 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
 
   // ↩️ rögzítés közben a vissza megerősítéssel vet el; rekonstrukció közben megszakít
   useBackLayer(
+    phase === 'meshScanning'
+      ? () => {
+          void meshRef.current?.pause();
+          setPhase(asset ? 'viewer' : 'empty');
+        }
+      : null
+  );
+  useBackLayer(
     phase === 'capturing' ? confirmCancel : phase === 'reconstructing' ? () => void Remix3D?.cancelReconstruct() : null
   );
 
+  // ── 🕸️ szabad szken: élő LiDAR-háló a kameraképen ─────────────────────────
+  const startMeshScan = () => {
+    setPicking(false);
+    setScanState({ tracking: 'initializing', triangles: 0, light: 1000 });
+    setPhase('meshScanning');
+    requestAnimationFrame(() => {
+      void meshRef.current?.start().catch((e) => Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))));
+    });
+  };
+
+  const finishMeshScan = async () => {
+    if (!project || !meshRef.current || savingMesh) {
+      return;
+    }
+    setSavingMesh(true);
+    const assetId = makeId('ast');
+    try {
+      new Directory(Paths.document, 'media').create({ intermediates: true, idempotent: true });
+      // USDZ, ha a ModelIO ezen az eszközön tud ilyet írni; különben OBJ (textúra nélkül egy fájl)
+      let format: 'usdz' | 'obj' = 'usdz';
+      let target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, name: project.name, textured: false });
+      let res;
+      try {
+        res = await meshRef.current.exportMesh(target.uri);
+      } catch (e) {
+        if (remix3dErrorKey(e) !== 'model3d.error.unsupported') throw e;
+        format = 'obj';
+        target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, name: project.name, textured: false });
+        res = await meshRef.current.exportMesh(target.uri);
+      }
+      void meshRef.current.pause();
+      const posterUri = `${Paths.document.uri.replace(/\/?$/, '/')}media/m3d_${assetId}_poster.png`;
+      const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
+      const m: Model3DMesh = {
+        id: makeId('mesh'),
+        assetId,
+        format,
+        triangles: res.triangles,
+        bounds: { min: res.min, max: res.max },
+        textured: false,
+      };
+      const base: Model3DDoc = doc ?? createModel3DDoc();
+      const { doc: next } = addMesh({ ...base, capture: undefined }, m, project.name);
+      useEditorStore.getState().applyBatch(
+        [
+          { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          { type: 'SET_MODEL3D_DOC', doc: { ...next, ...(poster ? { poster } : {}) }, label: t('model3d.reconstruct.done') },
+        ],
+        'user'
+      );
+      // a nyers szken-háló a hálós nézettel nyílik — látszik a szerkezete
+      setWireframe('overlay');
+      haptics.success();
+      setPhase('viewer');
+    } catch (e) {
+      Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
+    } finally {
+      setSavingMesh(false);
+    }
+  };
+
   const startCapture = () => {
+    setPicking(false);
     const dir = captureDirFor(projectId);
     try {
       dir.delete();
@@ -175,6 +260,56 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   // ── nem LiDAR / nincs natív modul: ide az útvonal-őr miatt nem jutunk, de biztonságból ──
   if (!Remix3D || !Remix3DModelView || !Remix3DCaptureView) {
     return null;
+  }
+
+  // ── 🕸️ SZABAD SZKEN (Focus: élő háló a kameraképen) ─────────────────────────
+  if (phase === 'meshScanning' && Remix3DMeshScanView) {
+    const MeshView = Remix3DMeshScanView;
+    const dark = scanState.light < DARK_LIGHT;
+    const hint = dark ? t('model3d.mesh.dark') : t(`model3d.mesh.tracking_${scanState.tracking}`);
+    return (
+      <View style={styles.fill}>
+        <MeshView ref={meshRef} style={StyleSheet.absoluteFill} onScanState={(ev) => setScanState(ev.nativeEvent)} />
+        <SafeAreaView style={styles.fill} pointerEvents="box-none" edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.capTop} pointerEvents="box-none">
+            <Pressable
+              onPress={() => {
+                void meshRef.current?.pause();
+                setPhase(asset ? 'viewer' : 'empty');
+              }}
+              hitSlop={10}
+              style={styles.capBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('model3d.capture.cancel')}
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+            <View style={styles.fill} />
+            <View style={styles.meshCount}>
+              <Text style={styles.meshCountText}>{t('model3d.mesh.triangles', { count: scanState.triangles })}</Text>
+            </View>
+          </View>
+          <View style={styles.fill} pointerEvents="none" />
+          <View style={styles.capBottom}>
+            <Text style={styles.capHint} accessibilityLiveRegion="polite">
+              {savingMesh ? t('model3d.mesh.saving') : hint}
+            </Text>
+            {savingMesh ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Pressable
+                onPress={() => void finishMeshScan()}
+                disabled={scanState.triangles === 0}
+                style={[styles.capPrimary, scanState.triangles === 0 ? styles.disabled : null]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.capPrimaryText}>{t('model3d.mesh.done')}</Text>
+              </Pressable>
+            )}
+          </View>
+        </SafeAreaView>
+      </View>
+    );
   }
 
   // ── 🎯 RÖGZÍTÉS (Focus: teljes képernyő, élő útmutatás) ─────────────────────
@@ -282,6 +417,16 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           <Text style={styles.emoji}>🧊</Text>
           <Text style={styles.bigText}>{t('model3d.empty.title')}</Text>
           <Text style={[styles.dim, styles.centerText]}>{t('model3d.empty.body')}</Text>
+          {modes.includes('freeform') && Remix3DMeshScanView ? (
+            <Pressable onPress={startMeshScan} style={styles.modeCard} accessibilityRole="button">
+              <Ionicons name="grid-outline" size={26} color={palette.accent} />
+              <View style={styles.fill}>
+                <Text style={styles.modeTitle}>{t('model3d.mode.freeform')}</Text>
+                <Text style={styles.dim}>{t('model3d.mode.freeformDesc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
+            </Pressable>
+          ) : null}
           {modes.includes('object') ? (
             <Pressable onPress={startCapture} style={styles.modeCard} accessibilityRole="button">
               <Ionicons name="cube-outline" size={26} color={palette.accent} />
@@ -311,7 +456,13 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       {header}
       <View style={[styles.viewer, { backgroundColor: bg ?? palette.bg }]}>
-        <ModelView style={StyleSheet.absoluteFill} modelUri={asset.uri} background={bg} autoRotate={autoRotate} />
+        <ModelView
+          style={StyleSheet.absoluteFill}
+          modelUri={asset.uri}
+          background={bg}
+          autoRotate={autoRotate}
+          wireframe={wireframe}
+        />
       </View>
       <Text style={[styles.dim, styles.centerText, styles.stats]}>
         {t('model3d.viewer.stats', {
@@ -323,7 +474,20 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       <View style={styles.toolbar}>
         <Tool icon={autoRotate ? 'pause-circle-outline' : 'sync-outline'} label={t('model3d.viewer.autoRotate')} active={autoRotate} onPress={() => setAutoRotate((v) => !v)} />
         <Tool icon="contrast-outline" label={t('model3d.viewer.background')} onPress={cycleBackground} />
-        <Tool icon="scan-outline" label={t('model3d.viewer.newScan')} onPress={startCapture} />
+        <Tool
+          icon="grid-outline"
+          label={t(`model3d.viewer.wireframe_${wireframe}`)}
+          active={wireframe !== 'off'}
+          onPress={() => setWireframe(WIREFRAME_CYCLE[(WIREFRAME_CYCLE.indexOf(wireframe) + 1) % WIREFRAME_CYCLE.length])}
+        />
+        <Tool
+          icon="scan-outline"
+          label={t('model3d.viewer.newScan')}
+          onPress={() => {
+            setPicking(true);
+            setPhase('empty');
+          }}
+        />
       </View>
     </SafeAreaView>
   );
@@ -375,7 +539,10 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', paddingHorizontal: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: palette.border, marginTop: 10 },
   tool: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 },
   toolLabel: { color: palette.text, fontSize: 11, fontWeight: '600' },
-  capTop: { flexDirection: 'row', padding: 12 },
+  capTop: { flexDirection: 'row', alignItems: 'center', padding: 12 },
+  meshCount: { paddingHorizontal: 12, height: 32, justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)' },
+  meshCountText: { color: '#fff', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  disabled: { opacity: 0.4 },
   capBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   capBottom: { padding: 16, gap: 12, alignItems: 'center' },
   capHint: {

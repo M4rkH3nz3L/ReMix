@@ -3538,7 +3538,9 @@
       "objectDesc": "Kézbe vehető tárgy — körbejárva, valós méretben",
       "room": "Tér-szken",
       "roomDesc": "Szoba falakkal, nyílásokkal, alaprajzzal",
-      "soon": "Hamarosan"
+      "soon": "Hamarosan",
+      "freeform": "Szabad szken — élő hálóval",
+      "freeformDesc": "Tér, bútor, nagyobb tárgy — a háló élőben épül a képen"
     },
     "empty": {
       "title": "Szkennelj egy tárgyat",
@@ -3585,7 +3587,11 @@
       "background": "Háttér",
       "newScan": "Új szken",
       "stats": "{{tris}} háromszög · {{size}}",
-      "hint": "Húzd az ujjad a forgatáshoz, csippents a nagyításhoz, dupla koppintás: alapnézet"
+      "hint": "Húzd az ujjad a forgatáshoz, csippents a nagyításhoz, dupla koppintás: alapnézet",
+      "wireframe": "Háló",
+      "wireframe_off": "Háló: ki",
+      "wireframe_overlay": "Háló a felületen",
+      "wireframe_only": "Csak a háló"
     },
     "error": {
       "cancelled": "Megszakítva.",
@@ -3608,6 +3614,19 @@
       "warnNoTexture": "Ebbe a formátumba a színek/textúra nem kerülnek bele.",
       "warnPointCloudToMesh": "A pontfelhőből háló lesz — a részletek egy része elveszhet.",
       "warnHeavyPrint": "Nagyon részletes háló — a szeletelő program lassú lehet."
+    },
+    "mesh": {
+      "tracking_normal": "Lassan pásztázd végig — a háló élőben épül",
+      "tracking_initializing": "Mozgasd lassan a telefont, hogy a kamera tájékozódjon",
+      "tracking_excessiveMotion": "Lassabban!",
+      "tracking_insufficientFeatures": "Kevés a részlet — irányítsd mintásabb felületre",
+      "tracking_relocalizing": "Térj vissza oda, ahol már szkenneltél",
+      "tracking_notAvailable": "A követés nem elérhető",
+      "tracking_limited": "Mozgasd lassan a telefont",
+      "dark": "Kevés a fény — kapcsolj fel lámpát",
+      "triangles": "{{count}} háromszög",
+      "done": "Kész",
+      "saving": "Háló mentése…"
     }
   },
   "time": {

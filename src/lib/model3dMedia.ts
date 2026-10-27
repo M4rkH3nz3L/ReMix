@@ -13,11 +13,15 @@
 import type { MeshFormat } from '@/types/model3d';
 import type { Asset } from '@/types/project';
 
-/** a tárolható (egy-fájlos) formátumok — az OBJ (több fájl) csak exportnak megy */
+/** a mindig egy-fájlos formátumok */
 export const STORABLE_FORMATS: readonly MeshFormat[] = ['usdz', 'ply', 'glb', 'stl'];
 
-export function isStorableFormat(format: MeshFormat): boolean {
-  return STORABLE_FORMATS.includes(format);
+/**
+ * Tárolható-e egyetlen fájlként. Az OBJ textúrával több fájl (.obj + .mtl + képek) →
+ * csak exportnak megy; TEXTÚRA NÉLKÜL (pl. a szabad szken nyers hálója) egy fájl → tárolható.
+ */
+export function isStorableFormat(format: MeshFormat, textured = true): boolean {
+  return STORABLE_FORMATS.includes(format) || (format === 'obj' && !textured);
 }
 
 /** egyedi, lapos fájlnév a `media/` mappában */
@@ -36,8 +40,10 @@ export function model3dAsset(input: {
   documentDir: string;
   name: string;
   size?: number;
+  /** textúrás-e (alapból igen — a fotogrammetria USDZ-je) */
+  textured?: boolean;
 }): Asset {
-  if (!isStorableFormat(input.format)) {
+  if (!isStorableFormat(input.format, input.textured ?? true)) {
     throw new Error(`model3dAsset: a(z) ${input.format} nem tárolható egy fájlként`);
   }
   const dir = input.documentDir.endsWith('/') ? input.documentDir : `${input.documentDir}/`;

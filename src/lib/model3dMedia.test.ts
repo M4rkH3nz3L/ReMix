@@ -23,8 +23,10 @@ describe('model3dMedia — a 3D-fájlt a GC és a .rp is látja (§15.8)', () =>
     expect(plan.map((p) => `${p.dir}/${p.name}`)).toContain('media/m3d_ast_9.usdz');
   });
 
-  it('az OBJ (több fájl) nem tárolható asset — csak export', () => {
+  it('a textúrás OBJ (több fájl) nem tárolható; a textúra nélküli (szabad szken) igen', () => {
     expect(isStorableFormat('obj')).toBe(false);
     expect(() => model3dAsset({ assetId: 'a', format: 'obj', documentDir: DOC, name: 'x' })).toThrow();
+    expect(isStorableFormat('obj', false)).toBe(true);
+    expect(model3dAsset({ assetId: 'a', format: 'obj', documentDir: DOC, name: 'x', textured: false }).uri).toBe(`${DOC}media/m3d_a.obj`);
   });
 });

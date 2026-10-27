@@ -175,7 +175,8 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>
           <ClipWaveform clip={clip} widthPx={w} heightPx={laneH - 22} color={laneColor} />
         </View>
-        <Text style={styles.clipLabel} numberOfLines={1}>
+        {/* kijelölve a 16 pt-os trim-fogók ne takarják a címke elejét/végét (élő teszt H-a) */}
+        <Text style={[styles.clipLabel, selected ? styles.clipLabelSelected : null]} numberOfLines={1}>
           {clip.label}
         </Text>
         {selected ? (
@@ -201,6 +202,7 @@ const styles = StyleSheet.create({
   clip: { position: 'absolute', top: 6, bottom: 6, borderRadius: 8, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center' },
   clipFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   clipLabel: { color: palette.text, fontSize: 10, fontWeight: '700', paddingHorizontal: 6 },
+  clipLabelSelected: { paddingHorizontal: 20 },
   handle: { position: 'absolute', top: 0, bottom: 0, width: 16, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   handleLeft: { left: 0 },
   handleRight: { right: 0 },

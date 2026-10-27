@@ -208,14 +208,6 @@ export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 4;
 
 /** ennél rövidebbre nem vágható klip (mp) */
-/**
- * A szerkesztés képkocka-rácsa. A worker alapértelmezett render-FPS-e is 30
- * (server/render.js) — a képkocka-pontos léptetés erre igazít, hogy amit a
- * panelen beállítasz, az a renderben is kockára essen.
- */
-export const EDIT_FPS = 30;
-export const FRAME = 1 / EDIT_FPS;
-
 export const MIN_CLIP_DURATION = 0.2;
 
 /** mágneses illesztés küszöbe pixelben */

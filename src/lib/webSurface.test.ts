@@ -37,6 +37,7 @@ describe('webSurface', () => {
     expect(isStudioRoute('/collab/p1')).toBe(true);
     expect(isStudioRoute('/live/studio/p1')).toBe(true);
     expect(isStudioRoute('/editor/')).toBe(true);
+    expect(isStudioRoute('/storage')).toBe(true);
   });
 
   it('a publikus/nézegető útvonalak NEM stúdiók', () => {

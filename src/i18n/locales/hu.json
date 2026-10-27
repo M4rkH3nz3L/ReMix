@@ -536,6 +536,7 @@
   "home": {
     "appName": "Remix",
     "newProject": "Új projekt",
+    "myStorage": "Tárhelyem",
     "newVideoDefault": "Új videó",
     "copySuffix": " (másolat)",
     "demos": "Demók",
@@ -3845,5 +3846,88 @@
     "appOnlyBody": "A böngészős ReMix nézegetésre való: videók, csatornák és élő adások. A stúdiók (videó, kép, hang, élő közvetítés) a mobilappban érhetők el.",
     "backToFeed": "Vissza a feedre",
     "signIn": "Belépés"
+  },
+  "storage": {
+    "title": "Tárhelyem",
+    "subtitle": "Minden tárhelyed egy helyen: a telefonod és a ReMix felhőtárhelye. A külső tárhelyek (Drive, Dropbox, NAS) hamarosan ide is bekerülnek.",
+    "external": "Külső tárhelyek",
+    "locations": {
+      "remix": "ReMix Storage",
+      "remixSub": "Saját felhőtárhely · Cloudflare R2",
+      "device": "Eszközöm",
+      "deviceSub": "Helyi fájlok · {{used}} itt · {{free}} szabad a telefonon",
+      "externalSub": "Külső felhő",
+      "nas": "Saját NAS",
+      "nasSub": "Saját hálózati tárhely (WebDAV)"
+    },
+    "status": {
+      "connected": "Csatlakoztatva",
+      "signIn": "Jelentkezz be",
+      "available": "Elérhető",
+      "soon": "Hamarosan"
+    },
+    "soonTitle": "Hamarosan a Tárhelyemben",
+    "soonBody": "Külső tárhelyet (Drive, Dropbox, WebDAV, S3) már most is beköthetsz a Profil → Tárhely részen. A böngészésük itt, a Tárhelyemben a következő fázisban érkezik.",
+    "openProfile": "Profil megnyitása",
+    "whereDevice": "Ezek a fájlok a telefonodon vannak — internet nélkül is elérhetők, és nem terhelik a felhő-kvótát.",
+    "whereRemix": "Ezek a fájlok a ReMix felhőben (R2) vannak — a törlés innen végleges, és a tárhely-kvótádba számítanak.",
+    "search": "Keresés…",
+    "sort": {
+      "name": "Név",
+      "modified": "Dátum",
+      "size": "Méret",
+      "kind": "Típus"
+    },
+    "kinds": {
+      "all": "Mind",
+      "video": "Videó",
+      "image": "Kép",
+      "audio": "Hang",
+      "project": "Projekt",
+      "document": "Dokumentum"
+    },
+    "selected_one": "{{count}} kijelölve",
+    "selected_other": "{{count}} kijelölve",
+    "newFolder": "Új mappa",
+    "importFiles": "Importálás",
+    "uploadFiles": "Feltöltés",
+    "namePlaceholder": "Név",
+    "empty": "Ez a mappa üres.",
+    "noMatch": "Nincs találat.",
+    "onDevice": "a telefonon",
+    "inRemix": "a ReMix felhőben",
+    "copyToRemix": "Másolás a ReMix Storage-ba",
+    "downloadToDevice": "Letöltés az Eszközömre",
+    "select": "Kijelölés",
+    "deleteTitle_one": "{{count}} elem törlése?",
+    "deleteTitle_other": "{{count}} elem törlése?",
+    "deleteDeviceBody": "A fájlok a telefonodról törlődnek. A ReMix felhőben lévő másolatokat ez nem érinti.",
+    "deleteRemixBody": "A fájlok végleg törlődnek a ReMix felhőből (R2), a hely felszabadul. A telefonodon lévő példányokat ez nem érinti.",
+    "nameErrors": {
+      "empty": "Adj meg egy nevet.",
+      "invalid": "A név nem tartalmazhat „/” jelet, és nem lehet „.” vagy „..”.",
+      "tooLong": "A név legfeljebb 120 karakter lehet."
+    },
+    "transfers": {
+      "title": "Átvitelek",
+      "clear": "Készek törlése",
+      "pending": "Várakozik",
+      "active": "Folyamatban · {{pct}}%",
+      "done": "Kész — ellenőrizve",
+      "failed": "Sikertelen",
+      "alreadyThere": "Már fent volt — nem lett duplikálva"
+    },
+    "errors": {
+      "quota_exceeded": "Betelt a ReMix tárhelyed. Szabadíts fel helyet, vagy bővítsd a Profil → Tárhely részen.",
+      "checksum_mismatch": "A fájl sérülten érkezett meg — próbáld újra.",
+      "verify_failed": "A feltöltött példány ellenőrzése nem sikerült — próbáld újra.",
+      "exists": "Már létezik ilyen nevű elem.",
+      "not_found": "A fájl vagy mappa már nem létezik.",
+      "bad_path": "Érvénytelen név vagy útvonal.",
+      "too_many": "Túl sok elem egyszerre — végezd részenként.",
+      "storage_unconfigured": "A ReMix Storage most nem érhető el (a szerveren nincs beállítva).",
+      "unauthorized": "A ReMix Storage-hoz jelentkezz be.",
+      "failed": "A művelet nem sikerült."
+    }
   }
 }

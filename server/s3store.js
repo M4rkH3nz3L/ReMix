@@ -71,4 +71,4 @@ async function deleteFile(key) {
   await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-module.exports = { s3Enabled, uploadFile, downloadFile, deleteFile, publicUrl, BUCKET };
+module.exports = { s3Enabled, client, uploadFile, downloadFile, deleteFile, publicUrl, BUCKET };

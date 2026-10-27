@@ -23,8 +23,13 @@ export function RenameModal({
   onChangeValue,
   onSave,
   onCancel,
+  title,
+  placeholder,
 }: {
   visible: boolean;
+  /** alap: projekt-átnevezés; a Tárhelyem mappa-/fájlnévre is használja */
+  title?: string;
+  placeholder?: string;
   value: string;
   onChangeValue: (v: string) => void;
   onSave: () => void;
@@ -39,11 +44,11 @@ export function RenameModal({
       >
         <View style={styles.modalCard}>
           <View style={styles.modalGrabber} />
-          <Text style={styles.modalTitle}>{t('home.renameTitle')}</Text>
+          <Text style={styles.modalTitle}>{title ?? t('home.renameTitle')}</Text>
           <TextInput
             value={value}
             onChangeText={onChangeValue}
-            placeholder={t('home.projectNamePlaceholder')}
+            placeholder={placeholder ?? t('home.projectNamePlaceholder')}
             placeholderTextColor={palette.textDim}
             style={styles.input}
             autoFocus

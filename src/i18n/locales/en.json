@@ -536,6 +536,7 @@
   "home": {
     "appName": "Remix",
     "newProject": "New project",
+    "myStorage": "My Storage",
     "newVideoDefault": "New video",
     "copySuffix": " (copy)",
     "demos": "Demos",
@@ -3845,5 +3846,88 @@
     "appOnlyBody": "ReMix on the web is for watching: videos, channels and live streams. The studios (video, image, audio, going live) are available in the mobile app.",
     "backToFeed": "Back to the feed",
     "signIn": "Sign in"
+  },
+  "storage": {
+    "title": "My Storage",
+    "subtitle": "All your storage in one place: your phone and your ReMix cloud storage. External storage (Drive, Dropbox, NAS) is coming here soon.",
+    "external": "External storage",
+    "locations": {
+      "remix": "ReMix Storage",
+      "remixSub": "Your cloud storage · Cloudflare R2",
+      "device": "My Device",
+      "deviceSub": "Local files · {{used}} here · {{free}} free on the phone",
+      "externalSub": "External cloud",
+      "nas": "My NAS",
+      "nasSub": "Your network storage (WebDAV)"
+    },
+    "status": {
+      "connected": "Connected",
+      "signIn": "Sign in",
+      "available": "Available",
+      "soon": "Coming soon"
+    },
+    "soonTitle": "Coming to My Storage",
+    "soonBody": "You can already connect external storage (Drive, Dropbox, WebDAV, S3) under Profile → Storage. Browsing them here in My Storage comes in the next phase.",
+    "openProfile": "Open profile",
+    "whereDevice": "These files are on your phone — available offline and not counted against your cloud quota.",
+    "whereRemix": "These files are in the ReMix cloud (R2) — deleting here is permanent, and they count against your storage quota.",
+    "search": "Search…",
+    "sort": {
+      "name": "Name",
+      "modified": "Date",
+      "size": "Size",
+      "kind": "Type"
+    },
+    "kinds": {
+      "all": "All",
+      "video": "Video",
+      "image": "Image",
+      "audio": "Audio",
+      "project": "Project",
+      "document": "Document"
+    },
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "newFolder": "New folder",
+    "importFiles": "Import",
+    "uploadFiles": "Upload",
+    "namePlaceholder": "Name",
+    "empty": "This folder is empty.",
+    "noMatch": "No matches.",
+    "onDevice": "on this phone",
+    "inRemix": "in the ReMix cloud",
+    "copyToRemix": "Copy to ReMix Storage",
+    "downloadToDevice": "Download to My Device",
+    "select": "Select",
+    "deleteTitle_one": "Delete {{count}} item?",
+    "deleteTitle_other": "Delete {{count}} items?",
+    "deleteDeviceBody": "The files will be deleted from your phone. Copies in the ReMix cloud are not affected.",
+    "deleteRemixBody": "The files will be permanently deleted from the ReMix cloud (R2) and the space freed. Copies on your phone are not affected.",
+    "nameErrors": {
+      "empty": "Enter a name.",
+      "invalid": "The name can’t contain “/” and can’t be “.” or “..”.",
+      "tooLong": "The name can be at most 120 characters."
+    },
+    "transfers": {
+      "title": "Transfers",
+      "clear": "Clear finished",
+      "pending": "Waiting",
+      "active": "In progress · {{pct}}%",
+      "done": "Done — verified",
+      "failed": "Failed",
+      "alreadyThere": "Already uploaded — not duplicated"
+    },
+    "errors": {
+      "quota_exceeded": "Your ReMix storage is full. Free up space or add more under Profile → Storage.",
+      "checksum_mismatch": "The file arrived corrupted — please try again.",
+      "verify_failed": "Verifying the uploaded copy failed — please try again.",
+      "exists": "An item with this name already exists.",
+      "not_found": "The file or folder no longer exists.",
+      "bad_path": "Invalid name or path.",
+      "too_many": "Too many items at once — do it in smaller batches.",
+      "storage_unconfigured": "ReMix Storage is unavailable right now (not configured on the server).",
+      "unauthorized": "Sign in to use ReMix Storage.",
+      "failed": "The operation failed."
+    }
   }
 }

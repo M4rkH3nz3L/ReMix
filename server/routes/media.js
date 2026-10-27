@@ -17,9 +17,10 @@ const { mediaGuard } = require('../security/uploadPolicy');
 const { upload } = require('../lib/upload');
 const { composeThumbnail } = require('../thumbs');
 const { voiceChain } = require('../voicechain');
-const { uploadMedia: mediaStoreUpload, BUCKET: MEDIA_BUCKET } = require('../mediastore');
+const { mediaStoreEnabled, uploadMedia: mediaStoreUpload, BUCKET: MEDIA_BUCKET } = require('../mediastore');
 const { QuotaExceededError, quotaAvailable, recordObject, wouldExceed } = require('../quota');
 const { stemsConfigured, separateStems } = require('../stems');
+const userStorage = require('../userStorage');
 
 const WHISPER_MODEL = process.env.WHISPER_MODEL || path.join(__dirname, '..', 'models', 'ggml-base.bin');
 

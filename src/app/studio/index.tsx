@@ -52,6 +52,15 @@ export default function ProjectsScreen() {
 
       <View style={styles.ctaWrap}>
         <PrimaryButton icon="add" label={t('home.newProject')} onPress={() => s.setCreating(true)} />
+        {/* 🗂️ Tárhelyem: eszköz + ReMix Storage (R2) egy helyen */}
+        <Pressable
+          onPress={() => router.push('/storage' as Href)}
+          style={({ pressed }) => [styles.storageBtn, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+        >
+          <Ionicons name="folder-open-outline" size={16} color={palette.text} />
+          <Text style={styles.storageBtnText}>{t('home.myStorage')}</Text>
+        </Pressable>
       </View>
 
       <FlatList
@@ -247,6 +256,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
+    gap: 8,
+  },
+  storageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+  },
+  storageBtnText: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
   sectionRow: {
     flexDirection: 'row',

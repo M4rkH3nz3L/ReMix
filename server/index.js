@@ -230,6 +230,9 @@ app.use(require('./routes/analysis'));
 // 🗄️ Külső tárhely-providerek (Drive/Dropbox/WebDAV/S3) — domain-router (§01.1).
 app.use(require('./routes/storage'));
 
+// 🗂️ ReMix Storage — a user saját mappás fájl-tára (R2) — domain-router (§01.1).
+app.use(require('./routes/files'));
+
 // médiatár: a server/library mappa videó/kép/hang fájljai (app „Tár" panel)
 // 📚 Média-tár + zene route-ok — domain-router (§01.1).
 app.use(require('./routes/library'));

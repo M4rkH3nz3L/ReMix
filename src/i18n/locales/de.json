@@ -536,6 +536,7 @@
   "home": {
     "appName": "Remix",
     "newProject": "Neues Projekt",
+    "myStorage": "Mein Speicher",
     "newVideoDefault": "Neues Video",
     "copySuffix": " (Kopie)",
     "demos": "Demos",
@@ -3815,5 +3816,88 @@
     "appOnlyBody": "ReMix im Browser ist zum Ansehen da: Videos, Kanäle und Livestreams. Die Studios (Video, Bild, Audio, Live gehen) gibt es in der mobilen App.",
     "backToFeed": "Zurück zum Feed",
     "signIn": "Anmelden"
+  },
+  "storage": {
+    "title": "Mein Speicher",
+    "subtitle": "Dein gesamter Speicher an einem Ort: dein Handy und dein ReMix-Cloudspeicher. Externe Speicher (Drive, Dropbox, NAS) kommen bald hinzu.",
+    "external": "Externe Speicher",
+    "locations": {
+      "remix": "ReMix Storage",
+      "remixSub": "Eigener Cloudspeicher · Cloudflare R2",
+      "device": "Mein Gerät",
+      "deviceSub": "Lokale Dateien · {{used}} hier · {{free}} frei auf dem Handy",
+      "externalSub": "Externe Cloud",
+      "nas": "Mein NAS",
+      "nasSub": "Eigener Netzwerkspeicher (WebDAV)"
+    },
+    "status": {
+      "connected": "Verbunden",
+      "signIn": "Anmelden",
+      "available": "Verfügbar",
+      "soon": "Demnächst"
+    },
+    "soonTitle": "Demnächst in Mein Speicher",
+    "soonBody": "Externe Speicher (Drive, Dropbox, WebDAV, S3) kannst du schon jetzt unter Profil → Speicher verbinden. Das Durchsuchen hier in Mein Speicher folgt in der nächsten Phase.",
+    "openProfile": "Profil öffnen",
+    "whereDevice": "Diese Dateien liegen auf deinem Handy — offline verfügbar und ohne Cloud-Kontingent.",
+    "whereRemix": "Diese Dateien liegen in der ReMix-Cloud (R2) — Löschen ist hier endgültig, und sie zählen zu deinem Speicherkontingent.",
+    "search": "Suchen…",
+    "sort": {
+      "name": "Name",
+      "modified": "Datum",
+      "size": "Größe",
+      "kind": "Typ"
+    },
+    "kinds": {
+      "all": "Alle",
+      "video": "Video",
+      "image": "Bild",
+      "audio": "Audio",
+      "project": "Projekt",
+      "document": "Dokument"
+    },
+    "selected_one": "{{count}} ausgewählt",
+    "selected_other": "{{count}} ausgewählt",
+    "newFolder": "Neuer Ordner",
+    "importFiles": "Importieren",
+    "uploadFiles": "Hochladen",
+    "namePlaceholder": "Name",
+    "empty": "Dieser Ordner ist leer.",
+    "noMatch": "Keine Treffer.",
+    "onDevice": "auf dem Handy",
+    "inRemix": "in der ReMix-Cloud",
+    "copyToRemix": "In ReMix Storage kopieren",
+    "downloadToDevice": "Auf Mein Gerät laden",
+    "select": "Auswählen",
+    "deleteTitle_one": "{{count}} Element löschen?",
+    "deleteTitle_other": "{{count}} Elemente löschen?",
+    "deleteDeviceBody": "Die Dateien werden von deinem Handy gelöscht. Kopien in der ReMix-Cloud bleiben erhalten.",
+    "deleteRemixBody": "Die Dateien werden endgültig aus der ReMix-Cloud (R2) gelöscht und der Platz freigegeben. Kopien auf deinem Handy bleiben erhalten.",
+    "nameErrors": {
+      "empty": "Gib einen Namen ein.",
+      "invalid": "Der Name darf kein „/“ enthalten und nicht „.“ oder „..“ sein.",
+      "tooLong": "Der Name darf höchstens 120 Zeichen lang sein."
+    },
+    "transfers": {
+      "title": "Übertragungen",
+      "clear": "Fertige entfernen",
+      "pending": "Wartet",
+      "active": "Läuft · {{pct}}%",
+      "done": "Fertig — geprüft",
+      "failed": "Fehlgeschlagen",
+      "alreadyThere": "Bereits hochgeladen — kein Duplikat"
+    },
+    "errors": {
+      "quota_exceeded": "Dein ReMix-Speicher ist voll. Gib Platz frei oder erweitere ihn unter Profil → Speicher.",
+      "checksum_mismatch": "Die Datei kam beschädigt an — bitte erneut versuchen.",
+      "verify_failed": "Die Prüfung der hochgeladenen Kopie ist fehlgeschlagen — bitte erneut versuchen.",
+      "exists": "Ein Element mit diesem Namen existiert bereits.",
+      "not_found": "Die Datei oder der Ordner existiert nicht mehr.",
+      "bad_path": "Ungültiger Name oder Pfad.",
+      "too_many": "Zu viele Elemente auf einmal — bitte in kleineren Schritten.",
+      "storage_unconfigured": "ReMix Storage ist gerade nicht verfügbar (auf dem Server nicht eingerichtet).",
+      "unauthorized": "Melde dich an, um ReMix Storage zu nutzen.",
+      "failed": "Der Vorgang ist fehlgeschlagen."
+    }
   }
 }

@@ -8,8 +8,9 @@
  * kijelentkezve CSAK a publikus tartalom nézhető.
  */
 
-/** A stúdió-útvonalak előtagjai — ezek weben a „Szerkesztés az appban" csonkra futnak. */
-export const STUDIO_ROUTE_PREFIXES = ['/studio', '/editor', '/collab', '/live/studio'] as const;
+/** A stúdió-útvonalak előtagjai — ezek weben a „Szerkesztés az appban" csonkra futnak.
+ *  A `/storage` (Tárhelyem fájlkezelő) a stúdiók munkaterülete, ezért szintén csak appban. */
+export const STUDIO_ROUTE_PREFIXES = ['/studio', '/editor', '/collab', '/live/studio', '/storage'] as const;
 
 /** Stúdió-útvonal-e (pl. `/editor/p1`, `/studio`, `/studio/image/p1`, `/live/studio/p1`). */
 export function isStudioRoute(pathname: string): boolean {

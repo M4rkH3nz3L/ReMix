@@ -78,4 +78,38 @@ async function wouldExceed(userId, incomingBytes) {
   return { exceeded: used + Math.max(0, Number(incomingBytes) || 0) > quota, usage };
 }
 
-module.exports = { QuotaExceededError, quotaAvailable, usageFor, recordObject, wouldExceed };
+/**
+ * Törölt objektum kivétele a naplóból (a hely felszabadul). Csak a user SAJÁT
+ * sorát érinti (user_id + bucket + key). Service_role nélkül no-op.
+ */
+async function forgetObject(userId, bucket, key) {
+  const sb = adminClient();
+  const uid = String(userId || '').trim();
+  if (!sb || !uid) {
+    return;
+  }
+  const { error } = await sb.from('storage_objects').delete().eq('user_id', uid).eq('bucket', bucket).eq('key', key);
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Átnevezett/áthelyezett objektum kulcsának követése (a bájt változatlan). */
+async function moveObject(userId, bucket, fromKey, toKey) {
+  const sb = adminClient();
+  const uid = String(userId || '').trim();
+  if (!sb || !uid) {
+    return;
+  }
+  const { error } = await sb
+    .from('storage_objects')
+    .update({ key: toKey })
+    .eq('user_id', uid)
+    .eq('bucket', bucket)
+    .eq('key', fromKey);
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+module.exports = { QuotaExceededError, quotaAvailable, usageFor, recordObject, wouldExceed, forgetObject, moveObject };

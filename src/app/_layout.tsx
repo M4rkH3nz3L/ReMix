@@ -12,6 +12,7 @@ import {
   setBugSignedIn,
 } from '@/lib/bugReporter';
 import { handleBack } from '@/lib/backStack';
+import { loadDevice3DCaps } from '@/lib/deviceCapsClient';
 import { useEditorStore } from '@/store/editorStore';
 import { t as tr } from 'i18next';
 import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
@@ -72,6 +73,8 @@ export default function RootLayout() {
   // legelső effekt, hogy az indulás közbeni hibák is jelentődjenek
   useEffect(() => {
     installGlobalBugHandlers();
+    // 📡 3D-képességek (LiDAR) egyszeri lekérdezése — a 3D Stúdió láthatóságának forrása
+    void loadDevice3DCaps();
     // a jelentésekhez: a nyitott projekt + az utolsó parancs-TÍPUSOK (tartalom nélkül)
     setBugEditorContextProvider(() => {
       const st = useEditorStore.getState();

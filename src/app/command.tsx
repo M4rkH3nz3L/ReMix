@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
 import { listProjects } from '@/lib/storage';
+import { visibleProjects } from '@/lib/projectKinds';
 import { studioRoute } from '@/lib/projectUtils';
 import { loadWorkspace } from '@/lib/workspaceClient';
 import { workspaceSearchDocs } from '@/lib/workspace';
@@ -65,7 +66,8 @@ export default function CommandPaletteScreen() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const metas = await listProjects().catch(() => []);
+      // 🔒 LiDAR nélkül a 3D-projektek a ⌘K-ban sem jelennek meg (3D-Studio.md §1.1)
+      const metas = visibleProjects(await listProjects().catch(() => []));
       const projectDocs: SearchDoc[] = metas.map((m) => ({
         id: m.id,
         scope: 'project',

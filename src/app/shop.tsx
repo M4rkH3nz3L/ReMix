@@ -36,6 +36,7 @@ import {
   type ShopKind,
 } from '@/lib/shop';
 import { listProjects, loadProject } from '@/lib/storage';
+import { visibleProjects } from '@/lib/projectKinds';
 import type { ProjectMeta } from '@/types/project';
 
 const KIND_EMOJI: Record<ShopKind, string> = {
@@ -175,7 +176,8 @@ export default function ShopScreen() {
 
   const openPublish = () => {
     listProjects()
-      .then((ps) => {
+      .then((all) => {
+        const ps = visibleProjects(all);
         setMyProjects(ps);
         setPubProjectId(ps[0]?.id ?? null);
         setPubTitle(ps[0]?.name ?? '');

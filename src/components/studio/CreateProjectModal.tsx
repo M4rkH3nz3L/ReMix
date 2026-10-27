@@ -28,12 +28,16 @@ import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind } from '@/types
 /** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
 const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
 
-/** 🎛️ Az „Új projekt" választója = a LÉTREHOZHATÓ (kész stúdiójú) fajták —
- *  a katalógusból (`@/lib/projectKinds`), hogy sose kínáljon félkész stúdiót. */
-const STUDIO_KINDS: { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] = creatableKinds().map((m) => ({
-  id: m.id,
-  icon: `${m.icon}-outline` as keyof typeof Ionicons.glyphMap,
-}));
+/** 🎛️ Az „Új projekt" választója = a LÉTREHOZHATÓ (kész stúdiójú) ÉS ezen az eszközön
+ *  elérhető fajták — a katalógusból (`@/lib/projectKinds`), hogy sose kínáljon félkész
+ *  stúdiót, és LiDAR nélkül a 3D-t se (3D-Studio.md §1.1). Renderkor számolva, mert a
+ *  képesség-lekérdezés az indításkor aszinkron fut le. */
+function studioKinds(): { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] {
+  return creatableKinds().map((m) => ({
+    id: m.id,
+    icon: `${m.icon}-outline` as keyof typeof Ionicons.glyphMap,
+  }));
+}
 
 /**
  * ➕ Az „Új projekt" alsó-sheet modal — a teljes létrehozás-űrlap: stúdió-fajta
@@ -152,7 +156,7 @@ export function CreateProjectModal(props: {
                 szerkesztő nyílik meg (ez a 3 együtt maga a Studio) */}
             <Text style={styles.fieldLabel}>{t('studio.chooseKind')}</Text>
             <View style={styles.kindRow}>
-              {STUDIO_KINDS.map((k) => {
+              {studioKinds().map((k) => {
                 const active = kind === k.id;
                 return (
                   <Pressable

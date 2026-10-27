@@ -1,3 +1,4 @@
+import { device3DCaps, has3DStudio, type Device3DCaps } from '@/lib/deviceCaps';
 import type { ProjectKind } from '@/types/project';
 
 /**
@@ -51,9 +52,26 @@ export function isEditableKind(kind: ProjectKind | undefined): boolean {
   return PROJECT_KINDS[kind ?? 'video'].editable;
 }
 
-/** A UI-ból LÉTREHOZHATÓ fajták (a create-választóhoz) — csak a kész stúdiók. */
-export function creatableKinds(): ProjectKindMeta[] {
-  return ALL_PROJECT_KINDS.map((k) => PROJECT_KINDS[k]).filter((m) => m.editable);
+/**
+ * 🔒 Létezik-e a fajta EZEN az eszközön (3D-Studio.md §1.1). A `model3d` csak
+ * LiDAR-os eszközön — máshol a fajta a UI-ban SEHOL nem jelenik meg (választó,
+ * projektlista, ⌘K, útvonal). A többi fajtát nem korlátozza a hardver.
+ */
+export function isKindAvailable(kind: ProjectKind | undefined, caps: Device3DCaps = device3DCaps()): boolean {
+  return (kind ?? 'video') !== 'model3d' || has3DStudio(caps);
+}
+
+/** A UI-ból LÉTREHOZHATÓ fajták (a create-választóhoz) — csak a kész ÉS ezen az eszközön elérhető stúdiók. */
+export function creatableKinds(caps: Device3DCaps = device3DCaps()): ProjectKindMeta[] {
+  return ALL_PROJECT_KINDS.map((k) => PROJECT_KINDS[k]).filter((m) => m.editable && isKindAvailable(m.id, caps));
+}
+
+/**
+ * A listázható projektek: az ezen az eszközön nem elérhető fajtájúak (pl. LiDAR
+ * nélkül a 3D) REJTVE — nem törölve; a felhőben/másik eszközön megmaradnak.
+ */
+export function visibleProjects<T extends { kind?: ProjectKind }>(items: T[], caps: Device3DCaps = device3DCaps()): T[] {
+  return items.filter((p) => isKindAvailable(p.kind, caps));
 }
 
 /** A fajta metaadata (a hiányzó/ismeretlen kind = videó). */

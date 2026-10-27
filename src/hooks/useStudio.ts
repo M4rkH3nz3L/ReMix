@@ -23,6 +23,7 @@ import {
   type CreateProjectConfig,
 } from '@/lib/projectUtils';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
+import { visibleProjects } from '@/lib/projectKinds';
 import { projectStorageMap } from '@/lib/storageQuota';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
 import { guardPro } from '@/store/paywallStore';
@@ -71,7 +72,8 @@ export function useStudio() {
 
   const refresh = useCallback(() => {
     // ⚡ fókuszkor csak a HELYI lista (olcsó); a felhő-visszatöltés egyszer, mountkor fut
-    listProjects().then(setProjects).catch(() => {});
+    // 🔒 az ezen az eszközön nem elérhető fajták (LiDAR nélkül a 3D) rejtve — nem törölve
+    listProjects().then((all) => setProjects(visibleProjects(all))).catch(() => {});
     // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
     listSharedWithMe().then(setShared).catch(() => {});
     // 🗄️ per-projekt MI-tárhely-használat (a MI tárolónkon foglalt pontos bájt)

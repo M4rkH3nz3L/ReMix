@@ -10,17 +10,9 @@ import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { GroupCreateSheet } from '@/components/chat/GroupCreateSheet';
 import { palette } from '@/constants/editor';
 import { groupTitle, type Conversation } from '@/lib/chat';
+import { timeAgoParts } from '@/lib/timeAgo';
 import { useChat } from '@/store/chatStore';
 
-/** Rövid, relatív idő (most/perc/óra/nap). */
-function timeAgo(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'most';
-  if (s < 3600) return `${Math.floor(s / 60)}p`;
-  if (s < 86400) return `${Math.floor(s / 3600)}ó`;
-  if (s < 604800) return `${Math.floor(s / 86400)}n`;
-  return `${Math.floor(s / 604800)}h`;
-}
 
 /** 📥 Inbox — a beszélgetéseim (DM + projekt-chat), olvasatlan-jelzéssel. */
 export default function InboxScreen() {
@@ -44,20 +36,26 @@ export default function InboxScreen() {
   const row = ({ item }: { item: Conversation }) => {
     const isProject = item.kind === 'project';
     const isGroup = item.kind === 'group';
+    // a projekt-chat a projekt NEVÉT viseli (több projekt-csevegés ne legyen egyforma)
     const title = isProject
-      ? t('chat.projectConversation')
+      ? item.projectName || t('chat.projectConversation')
       : isGroup
         ? groupTitle(item, t('chat.group'))
         : item.peer?.name || t('chat.someone');
+    // a DM partnere, vagy az egytagú csoport egyetlen másik tagja → személyes avatar
+    const avatarPeer = isGroup ? item.members?.[0] : item.peer;
+    const ago = timeAgoParts(item.lastMessageAt);
     return (
       <Pressable style={styles.row} onPress={() => open(item)} accessibilityRole="button">
         <View style={styles.avatar}>
-          {isProject || isGroup ? (
+          {isProject ? (
+            <Ionicons name="film-outline" size={22} color="#fff" />
+          ) : isGroup && (item.members?.length ?? 0) !== 1 ? (
             <Ionicons name="people" size={22} color="#fff" />
-          ) : item.peer?.avatar ? (
-            <Image source={{ uri: item.peer.avatar }} style={styles.avatarImg} contentFit="cover" />
+          ) : avatarPeer?.avatar ? (
+            <Image source={{ uri: avatarPeer.avatar }} style={styles.avatarImg} contentFit="cover" />
           ) : (
-            <Text style={styles.avatarText}>{(title || '?').slice(0, 1).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{(avatarPeer?.name || title || '?').slice(0, 1).toUpperCase()}</Text>
           )}
         </View>
         <View style={styles.rowMid}>
@@ -69,7 +67,7 @@ export default function InboxScreen() {
           </Text>
         </View>
         <View style={styles.rowEnd}>
-          <Text style={styles.rowTime}>{timeAgo(item.lastMessageAt)}</Text>
+          <Text style={styles.rowTime}>{t(`time.ago_${ago.unit}`, { count: ago.count })}</Text>
           {item.hasUnread ? <View style={styles.dot} /> : null}
         </View>
       </Pressable>

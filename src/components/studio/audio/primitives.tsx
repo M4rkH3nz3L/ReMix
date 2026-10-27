@@ -81,10 +81,13 @@ export function Slider({
   const frac = max > min ? clamp((value - min) / (max - min), 0, 1) : 0;
   return (
     <View style={styles.sliderRow}>
-      <View style={styles.sliderHead}>
-        <Text style={styles.sliderLabel}>{label}</Text>
-        <Text style={styles.sliderVal}>{format(value)}</Text>
-      </View>
+      {/* üres címke = a hívó maga mutatja az értéket (pl. a Mixer sáv-fejléce) → nincs dupla érték */}
+      {label ? (
+        <View style={styles.sliderHead}>
+          <Text style={styles.sliderLabel}>{label}</Text>
+          <Text style={styles.sliderVal}>{format(value)}</Text>
+        </View>
+      ) : null}
       <GestureDetector gesture={pan}>
         <View
           style={styles.track}

@@ -3525,6 +3525,13 @@
       "failed": "„{{name}}” — a renderelés megszakadt"
     }
   },
+  "time": {
+    "ago_now": "most",
+    "ago_minute": "{{count}} p",
+    "ago_hour": "{{count}} ó",
+    "ago_day": "{{count}} napja",
+    "ago_week": "{{count}} hete"
+  },
   "chat": {
     "inbox": "Üzenetek",
     "inboxEmpty": "Még nincs beszélgetésed. Nyiss egyet egy csatornán az Üzenet gombbal.",

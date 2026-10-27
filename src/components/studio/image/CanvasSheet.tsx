@@ -168,12 +168,10 @@ export function CanvasSheet({
       />
 
       {/* 🎞️ dokumentum-szintű filmszemcse (a teljes kész képre) */}
-      <Text style={styles.section}>{t('studio.image.grain', { defaultValue: 'Filmszemcse' })}</Text>
-      <Slider label="" value={grain} min={0} max={1} onChange={setGrain} format={(v) => `${Math.round(v * 100)}%`} />
+      <Slider label={t('studio.image.grain', { defaultValue: 'Filmszemcse' })} value={grain} min={0} max={1} onChange={setGrain} format={(v) => `${Math.round(v * 100)}%`} />
 
       {/* 🔦 dokumentum-szintű vignetta (a sarkokat sötétíti) */}
-      <Text style={styles.section}>{t('studio.image.vignette', { defaultValue: 'Vignetta' })}</Text>
-      <Slider label="" value={vignette} min={0} max={1} onChange={setVignette} format={(v) => `${Math.round(v * 100)}%`} />
+      <Slider label={t('studio.image.vignette', { defaultValue: 'Vignetta' })} value={vignette} min={0} max={1} onChange={setVignette} format={(v) => `${Math.round(v * 100)}%`} />
 
       {/* 🎬 dokumentum-szintű GLOBÁLIS look (grade + korrekció) a TELJES képre */}
       <Text style={styles.section}>{t('studio.image.globalLook', { defaultValue: 'Globális look' })}</Text>

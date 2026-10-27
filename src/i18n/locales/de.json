@@ -3495,6 +3495,13 @@
       "failed": "„{{name}}“ — Rendern wurde abgebrochen"
     }
   },
+  "time": {
+    "ago_now": "jetzt",
+    "ago_minute": "{{count}} Min.",
+    "ago_hour": "{{count}} Std.",
+    "ago_day": "{{count}} T.",
+    "ago_week": "{{count}} W."
+  },
   "chat": {
     "inbox": "Nachrichten",
     "inboxEmpty": "Noch keine Unterhaltungen. Starte eine auf einem Kanal mit „Nachricht“.",

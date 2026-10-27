@@ -3525,6 +3525,13 @@
       "failed": "“{{name}}” — rendering was interrupted"
     }
   },
+  "time": {
+    "ago_now": "now",
+    "ago_minute": "{{count}}m",
+    "ago_hour": "{{count}}h",
+    "ago_day": "{{count}}d",
+    "ago_week": "{{count}}w"
+  },
   "chat": {
     "inbox": "Messages",
     "inboxEmpty": "No conversations yet. Start one from a channel with the Message button.",

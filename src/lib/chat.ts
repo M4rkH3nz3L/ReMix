@@ -1,4 +1,5 @@
 import { reachableMediaUrl } from '@/lib/mediaUrl';
+import { listProjects } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -37,6 +38,8 @@ export interface Conversation {
   peer?: ChatPeer;
   /** csoportnál a TÖBBI tag (avatar-stack + cím); DM/projektnél nincs */
   members?: ChatPeer[];
+  /** projekt-chatnél a projekt neve (felhőből vagy a helyi listából); ha ismeretlen, nincs */
+  projectName?: string;
   /** van-e nem-olvasott üzenet (a saját last_read_at-hez képest, más feladótól) */
   hasUnread: boolean;
 }
@@ -287,6 +290,10 @@ export async function listConversations(): Promise<Conversation[]> {
     });
   }
   const peers = await resolvePeers([...othersByConv.values()].flat());
+  // 🏷️ projekt-chat neve: több projekt-csevegés ne legyen mind „Projekt-csevegés"
+  const projectNames = await resolveProjectNames(
+    rows.filter((r) => r.kind === 'project' && r.project_id).map((r) => r.project_id as string)
+  );
   const peerOf = (id: string): ChatPeer => peers.get(id) ?? { id, name: null, avatar: null };
 
   return rows.map((r) => {
@@ -307,9 +314,48 @@ export async function listConversations(): Promise<Conversation[]> {
       lastSenderId: r.last_sender_id,
       peer: r.kind === 'dm' && others[0] ? peerOf(others[0]) : undefined,
       members: r.kind === 'group' ? others.map(peerOf) : undefined,
+      projectName: r.project_id ? projectNames.get(r.project_id) : undefined,
       hasUnread,
     };
   });
+}
+
+/**
+ * Projekt-id → név: előbb a felhő (`cloud_projects`, a tag olvashatja — RLS), a
+ * hiányzókra a helyi projektlista. Best-effort: hiba esetén üres térkép (a hívó
+ * a „Projekt-csevegés" általános címre esik vissza).
+ */
+async function resolveProjectNames(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) {
+    return out;
+  }
+  try {
+    const { data } = await requireSupabase()
+      .from('cloud_projects')
+      .select('project_id, name')
+      .in('project_id', unique);
+    (data ?? []).forEach((r: { project_id: string; name: string | null }) => {
+      if (r.name) {
+        out.set(r.project_id, r.name);
+      }
+    });
+  } catch {
+    // offline / nincs jog → a helyi lista pótolja
+  }
+  if (out.size < unique.length) {
+    try {
+      (await listProjects()).forEach((m) => {
+        if (unique.includes(m.id) && !out.has(m.id)) {
+          out.set(m.id, m.name);
+        }
+      });
+    } catch {
+      // nincs helyi tár (teszt/web) → marad, ami van
+    }
+  }
+  return out;
 }
 
 /** A csoport megjelenített neve: a beállított cím, vagy a tagok nevéből képezve. */

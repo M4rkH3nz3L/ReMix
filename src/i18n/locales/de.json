@@ -3515,6 +3515,8 @@
       "body": "Stell das Objekt auf eine glatte, gut beleuchtete Fläche und geh langsam darum herum. LiDAR erstellt daraus ein 3D-Modell in echter Größe — auf dem Handy, kostenlos."
     },
     "capture": {
+      "hint_slowStart": "Beweg das Handy langsam und richte es auf eine gut beleuchtete, strukturierte Fläche, damit sich die Kamera orientieren kann.",
+      "hint_stuck": "Startet es immer noch nicht? Prüf die Kamera-App — ist das Bild dort auch schwarz, starte das Handy neu.",
       "hint_initializing": "Kamera startet…",
       "hint_ready": "Richte die Kamera auf das Objekt und tippe auf Auswählen",
       "hint_detecting": "Passe den Rahmen an das Objekt an und starte die Aufnahme",

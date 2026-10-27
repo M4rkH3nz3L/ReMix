@@ -3545,6 +3545,8 @@
       "body": "Tedd a tárgyat jól megvilágított, sima felületre, és járd körbe lassan. A LiDAR valós méretű 3D-modellt készít belőle — a telefonon, ingyen."
     },
     "capture": {
+      "hint_slowStart": "Mozgasd lassan a telefont, és irányítsd egy jól megvilágított, mintás felületre — a kamera így tud tájékozódni.",
+      "hint_stuck": "Még mindig nem indul? Nézd meg a Kamera appban, hogy van-e kép — ha ott is fekete, indítsd újra a telefont.",
       "hint_initializing": "Kamera indítása…",
       "hint_ready": "Irányítsd a kamerát a tárgyra, majd koppints a Kijelölésre",
       "hint_detecting": "Igazítsd a keretet a tárgy köré, aztán indítsd a rögzítést",

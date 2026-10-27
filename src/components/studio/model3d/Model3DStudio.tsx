@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Directory, Paths } from 'expo-file-system';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,6 +55,20 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const [progress, setProgress] = useState(0);
   const [autoRotate, setAutoRotate] = useState(true);
   const captureRef = useRef<CaptureViewHandle>(null);
+  // ⏱️ ha a kamera nem tud tájékozódni (sötét, takart, mozdulatlan), az „inicializálás"
+  // nem ér véget — néhány mp után érthető útmutatás a pörgő jelző helyett (élő teszt)
+  const [initElapsed, setInitElapsed] = useState(0);
+  useEffect(() => {
+    if (phaseState !== 'capturing' || capState.state !== 'initializing') {
+      return;
+    }
+    const started = Date.now();
+    const timer = setInterval(() => setInitElapsed(Date.now() - started), 1000);
+    return () => {
+      clearInterval(timer);
+      setInitElapsed(0);
+    };
+  }, [phaseState, capState.state]);
   const reconstructing = useRef(false);
 
   const discardCapture = () => {
@@ -167,7 +181,17 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   if (phase === 'capturing') {
     const CaptureView = Remix3DCaptureView;
     const fb = capState.feedback[0];
-    const hint = fb ? t(`model3d.feedback.${fb}`, { defaultValue: t(`model3d.capture.hint_${capState.state}`) }) : t(`model3d.capture.hint_${capState.state}`, { defaultValue: '' });
+    const stuckHint =
+      capState.state === 'initializing' && initElapsed >= 20000
+        ? t('model3d.capture.hint_stuck')
+        : capState.state === 'initializing' && initElapsed >= 5000
+          ? t('model3d.capture.hint_slowStart')
+          : null;
+    const hint =
+      stuckHint ??
+      (fb
+        ? t(`model3d.feedback.${fb}`, { defaultValue: t(`model3d.capture.hint_${capState.state}`) })
+        : t(`model3d.capture.hint_${capState.state}`, { defaultValue: '' }));
     const primaryLabel =
       capState.state === 'ready'
         ? t('model3d.capture.select')

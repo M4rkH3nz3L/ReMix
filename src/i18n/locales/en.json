@@ -3545,6 +3545,8 @@
       "body": "Put the object on a plain, well-lit surface and walk around it slowly. LiDAR turns it into a true-scale 3D model — on your phone, for free."
     },
     "capture": {
+      "hint_slowStart": "Move the phone slowly and point it at a well-lit, textured surface so the camera can find its bearings.",
+      "hint_stuck": "Still not starting? Check the Camera app — if the image is black there too, restart the phone.",
       "hint_initializing": "Starting camera…",
       "hint_ready": "Point the camera at the object, then tap Select",
       "hint_detecting": "Fit the box around the object, then start capturing",

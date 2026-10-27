@@ -2694,6 +2694,9 @@
     "capabilities": {
       "label": {
         "localRender": "Export on device",
+        "lidarScan": "LiDAR 3D scan",
+        "model3dExport": "3D export",
+        "model3dCloud": "3D cloud processing (GLB)",
         "screenRecord": "Screen / game recording",
         "cloudRender": "Cloud HD/4K render",
         "autoCaption": "Automatic captions",

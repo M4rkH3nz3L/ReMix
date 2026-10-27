@@ -19,7 +19,7 @@ import type { Asset } from '@/types/project';
 export interface StorageEntry {
   id: string;
   name: string;
-  kind: 'video' | 'image' | 'audio';
+  kind: 'video' | 'image' | 'audio' | 'model';
   /** mp — videó/hang esetén */
   duration?: number;
   /** bájt */

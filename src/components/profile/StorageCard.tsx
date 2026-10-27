@@ -335,7 +335,7 @@ export function StorageCard() {
                     <View style={styles.fileList}>
                       {files.slice(0, 20).map((f) => (
                         <Text key={f.id} style={styles.fileRow} numberOfLines={1}>
-                          {f.kind === 'video' ? '🎬' : f.kind === 'audio' ? '🎵' : '🖼️'} {f.name}
+                          {f.kind === 'video' ? '🎬' : f.kind === 'audio' ? '🎵' : f.kind === 'model' ? '🧊' : '🖼️'} {f.name}
                           {f.size ? ` · ${formatBytes(f.size)}` : ''}
                         </Text>
                       ))}

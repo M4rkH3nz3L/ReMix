@@ -11,6 +11,7 @@ import { visibleProjects } from '@/lib/projectKinds';
 import { studioRoute } from '@/lib/projectUtils';
 import { loadWorkspace } from '@/lib/workspaceClient';
 import { workspaceSearchDocs } from '@/lib/workspace';
+import type { ProjectKind } from '@/types/project';
 import {
   groupByScope,
   parseQuery,
@@ -104,7 +105,7 @@ export default function CommandPaletteScreen() {
 
   const onSelect = (r: SearchResult) => {
     if (r.scope === 'project') {
-      const kind = (r.meta?.kind as 'video' | 'image' | 'audio' | undefined) ?? 'video';
+      const kind = (r.meta?.kind as ProjectKind | undefined) ?? 'video';
       router.push(studioRoute(kind, r.id) as never);
     }
   };

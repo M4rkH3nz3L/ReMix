@@ -26,7 +26,9 @@ export type NodeType =
   | 'brand'
   | 'template'
   | 'music'
-  | 'ai';
+  | 'ai'
+  /** 🧊 3D-modell (LiDAR-szken / importált háló) — 3D-Studio.md §15.2 */
+  | 'model3d';
 
 export type EdgeType =
   | 'owns' // person → project/asset/brand/template
@@ -75,6 +77,8 @@ export function assetNodeType(kind: AssetKind): NodeType {
       return 'design';
     case 'ai':
       return 'ai';
+    case 'model3d':
+      return 'model3d';
     default:
       return 'asset';
   }

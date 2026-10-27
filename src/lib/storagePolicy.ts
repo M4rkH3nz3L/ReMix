@@ -40,7 +40,8 @@ export function canBackupMedia(tier: Tier, hasOwnStorageTarget: boolean): boolea
 }
 
 function isMediaAsset(a: Asset): boolean {
-  return a.kind === 'video' || a.kind === 'image' || a.kind === 'audio';
+  // 🧊 a 3D-hálók/textúrák is média: a felhő-mentés és az adatvesztés-figyelmeztetés számol velük
+  return a.kind === 'video' || a.kind === 'image' || a.kind === 'audio' || a.kind === 'model';
 }
 
 /** Csak az eszközön lévő (felhő-másolat nélküli, nem-http) média-asset. */

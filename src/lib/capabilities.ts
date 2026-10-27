@@ -22,6 +22,8 @@ export type CapabilityId =
   // ── ESZKÖZÖN, INGYEN ────────────────────────────────────────────────
   | 'localRender' // alap MP4 export a telefonon (natív AVFoundation/MediaCodec)
   | 'screenRecord' // 🎮 képernyő-/game-felvétel (ReplayKit / MediaProjection) — eszközön, ingyen
+  | 'lidarScan' // 🧊 LiDAR 3D-szken + rekonstrukció a készüléken (Object Capture/RoomPlan/ARKit) — ingyen
+  | 'model3dExport' // 🧊 3D-export a készüléken (USDZ/OBJ/STL/PLY) + kép/videó a modellből — ingyen
   // ── FELHŐ-WORKER, PRO ───────────────────────────────────────────────
   | 'cloudRender' // felhő HD/4K render (queue + S3), gyorsabb, nagyobb felbontás
   | 'autoCaption' // Whisper: beszéd → felirat
@@ -44,6 +46,7 @@ export type CapabilityId =
   | 'tts' // szöveg → beszéd / Voice Studio
   | 'writeAssist' // ✍️ Writer Studio AI: rewrite/tone/summarize/expand/translate/outline
   | 'pitchCorrect' // 🎤 Vocal Studio: pitch-correction / harmónia-render (Rubber Band / world a workeren)
+  | 'model3dCloud' // 🧊 GLB-konverzió, feed-optimalizálás, felhős háló-feldolgozás (worker)
   // ── 🤖 S-GENAI generatív média (mind cloud + Pro, provider-adapterrel) ──────
   | 'genImage' // text→kép / kép→kép / inpaint / outpaint
   | 'genVideo' // text/kép→videó
@@ -75,6 +78,8 @@ type CapabilityMeta =
 export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   localRender: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.localRender' },
   screenRecord: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.screenRecord' },
+  lidarScan: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.lidarScan' },
+  model3dExport: { where: 'local', minTier: 'free', label: 'lib.capabilities.label.model3dExport' },
 
   cloudRender: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.cloudRender' },
   autoCaption: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.autoCaption' },
@@ -92,6 +97,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   collab: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.collab' },
   bgRemove: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.depth3d' },
+  model3dCloud: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.model3dCloud' },
   faceTools: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.faceTools' },
   reframe: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.reframe' },
   objectTrack: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.objectTrack' },

@@ -27,12 +27,14 @@ const kindIcons = {
   video: 'videocam-outline',
   image: 'image-outline',
   audio: 'musical-notes-outline',
+  model: 'cube-outline',
 } as const;
 
 const kindColors = {
   video: trackColors.video,
   image: trackColors.video,
   audio: trackColors.music,
+  model: trackColors.video,
 } as const;
 
 function formatSize(bytes?: number): string {
@@ -357,7 +359,9 @@ export function LibraryPanel() {
       />
       {providers.map((provider) => {
         const st = states[provider.id] ?? { state: 'loading' as const };
-        const visible = st.state === 'ready' ? st.entries.filter((e) => matches(e.name)) : [];
+        // 🧊 a 3D-fájl nem idővonal-média (a 3D Stúdióban használható) → itt nem kínáljuk
+        const visible =
+          st.state === 'ready' ? st.entries.filter((e) => e.kind !== 'model' && matches(e.name)) : [];
         if (st.state === 'ready' && query && visible.length === 0) {
           return null; // szűrésnél az üres források nem foglalnak helyet
         }

@@ -81,7 +81,7 @@ function parseEntry(o: Record<string, unknown>): StorageEntry | null {
   const name = str(o.name);
   const url = str(o.url);
   const kind = str(o.kind);
-  if (!id || !name || !url || (kind !== 'video' && kind !== 'image' && kind !== 'audio')) {
+  if (!id || !name || !url || (kind !== 'video' && kind !== 'image' && kind !== 'audio' && kind !== 'model')) {
     return null;
   }
   const entry: StorageEntry = { id, name, url, kind };

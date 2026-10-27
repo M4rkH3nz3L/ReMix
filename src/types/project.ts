@@ -5,6 +5,7 @@
  */
 
 import type { LiveDoc } from './live';
+import type { Model3DDoc } from './model3d';
 import type { PhotoDevelop } from '@/lib/photoDevelop';
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
@@ -39,7 +40,10 @@ export type ProjectKind =
   //    `/live/studio/[id]` route (lásd devs/tasks/LIVE.md). A Live-hubból
   //    („Go live") jön létre, NEM a generikus „Új projekt" választóból
   //    (ezért nem `creatable` a projectKinds-ban). ──────────────────────────
-  | 'live';
+  | 'live'
+  // ── 🧊 3D Stúdió (LiDAR-szken → 3D-modell) — CSAK LiDAR-os eszközön létezik
+  //    (3D-Studio.md §1.1); amíg a stúdió nincs kész, `editable: false`. ─────
+  | 'model3d';
 
 /**
  * Sávok (full-plan F0.5): a tartalom-típusok kapnak sávot; a transition/filter/
@@ -220,7 +224,8 @@ export interface Text3D {
  */
 export interface Asset {
   id: string;
-  kind: 'video' | 'image' | 'audio';
+  /** `model`: 3D-háló / textúra / pontfelhő (USDZ, OBJ, PLY, STL, GLB) — 3D-Studio.md §15.8 */
+  kind: 'video' | 'image' | 'audio' | 'model';
   /** aktuális elérés (helyi másolat vagy stream-URL) */
   uri: string;
   provider: 'local' | 'library' | 'remote';
@@ -1659,6 +1664,8 @@ export interface Project {
   /** 🎥 Live-produkció dokumentum (`kind: 'live'` esetén; additív/opcionális —
    *  a régi projektek `live` nélkül érvényesek). Lásd `@/types/live` + LIVE.md. */
   live?: LiveDoc;
+  /** 🧊 3D-modell dokumentum (`kind: 'model3d'` esetén; additív/opcionális). Lásd `@/types/model3d`. */
+  model3d?: Model3DDoc;
   createdAt: string;
   updatedAt: string;
   /** 1: assets nélkül · 2: asset-registry · 3: sáv-bővítés · 4: kulcskockák ·

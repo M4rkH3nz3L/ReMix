@@ -3,6 +3,7 @@ import { t as tr } from 'i18next';
 import { relinkAsset } from '@/lib/assetResolve';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
+import type { Model3DDoc } from '@/types/model3d';
 import type {
   AlbumDoc,
   AspectRatio,
@@ -88,7 +89,14 @@ export type EditorCommand =
    * aktív szám sávjait tölti be. Így a szám-váltás/add/remove is egyetlen undo-lépés, és az
    * audio-editor változatlanul a `project.tracks`-ot (= az aktív számot) szerkeszti.
    */
-  | { type: 'APPLY_ALBUM'; album: AlbumDoc; label?: string };
+  | { type: 'APPLY_ALBUM'; album: AlbumDoc; label?: string }
+  /**
+   * 🧊 3D-dokumentum beírása (létrehozás ÉS módosítás) — a `SET_LIVE_DOC` mintájára:
+   * a csomópont-/anyag-/mérés-műveletek pure függvények (`model3dDoc.ts`), az
+   * eredményt EZ a parancs teszi a `project.model3d`-be → undo-zható, broadcastolható.
+   * A hálók NEM itt élnek (csak `assetId`-hivatkozás) — a parancs kicsi marad.
+   */
+  | { type: 'SET_MODEL3D_DOC'; doc: Model3DDoc; label?: string };
 
 export type EventActor = 'user' | 'ai' | 'system' | 'remote';
 
@@ -324,6 +332,13 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, live: cmd.doc };
     }
 
+    case 'SET_MODEL3D_DOC': {
+      if (JSON.stringify(project.model3d ?? null) === JSON.stringify(cmd.doc)) {
+        return null; // semmi nem változott — ne szemetelje a history-t
+      }
+      return { ...project, model3d: cmd.doc };
+    }
+
     case 'SET_BPM': {
       const bpm = Math.max(20, Math.min(300, Math.round(cmd.bpm)));
       if ((project.bpm ?? 120) === bpm) {
@@ -542,6 +557,14 @@ export function describeCommand(cmd: EditorCommand): string {
         count: cmd.order.length,
         defaultValue: `Lapok átrendezése (${cmd.order.length})`,
       });
+    case 'SET_MODEL3D_DOC':
+      return (
+        cmd.label ??
+        tr('lib.commands.setModel3dDoc', {
+          nodes: cmd.doc.nodes.length,
+          defaultValue: `3D: ${cmd.doc.nodes.length} objektum`,
+        })
+      );
     case 'SET_LIVE_DOC':
       return (
         cmd.label ??

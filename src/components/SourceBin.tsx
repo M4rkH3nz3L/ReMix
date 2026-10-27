@@ -16,10 +16,11 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset } from '@/types/project';
 
-const KIND_ICON: Record<SourceKind, keyof typeof Ionicons.glyphMap> = {
+const KIND_ICON: Record<Asset['kind'], keyof typeof Ionicons.glyphMap> = {
   video: 'videocam',
   image: 'image',
   audio: 'musical-notes',
+  model: 'cube',
 };
 
 /**

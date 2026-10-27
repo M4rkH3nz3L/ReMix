@@ -23,6 +23,9 @@ export function coalesceKey(command: EditorCommand): string | null {
       return `clip:${command.clipId}:${Object.keys(command.patch).sort().join(',')}`;
     case 'UPSERT_IMAGE_DOC':
       return `imagedoc:${command.doc.id}:${command.label ?? ''}`;
+    case 'SET_MODEL3D_DOC':
+      // ugyanaz a művelet-címke (pl. „Méret") egymás után = egy húzás → egy lépés
+      return command.label ? `model3d:${command.doc.id}:${command.label}` : null;
     default:
       return null;
   }

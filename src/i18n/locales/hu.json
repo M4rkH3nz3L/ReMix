@@ -2761,6 +2761,7 @@
       "reorderImageDocs": "Lapok átrendezése ({{count}})",
       "applyAlbum": "Album ({{count}} szám)",
       "setBpm": "BPM: {{bpm}}",
+      "setModel3dDoc": "3D-modell frissítve ({{nodes}} objektum)",
       "setLiveDoc": "élő produkció frissítve ({{scenes}} jelenet)",
       "replaceTracks_one": "{{count}} sáv újraépítve",
       "replaceTracks_other": "{{count}} sáv újraépítve",
@@ -2965,6 +2966,7 @@
     },
     "chooseKind": "Mit készítesz?",
     "kind": {
+      "model3d": "3D",
       "video": "Videó",
       "image": "Kép",
       "audio": "Hang",

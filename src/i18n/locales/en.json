@@ -2761,6 +2761,7 @@
       "reorderImageDocs": "Reorder pages ({{count}})",
       "applyAlbum": "Album ({{count}} tracks)",
       "setBpm": "BPM: {{bpm}}",
+      "setModel3dDoc": "3D model updated ({{nodes}} objects)",
       "setLiveDoc": "live production updated ({{scenes}} scene(s))",
       "replaceTracks_one": "{{count}} track rebuilt",
       "replaceTracks_other": "{{count}} tracks rebuilt",
@@ -2965,6 +2966,7 @@
     },
     "chooseKind": "What are you creating?",
     "kind": {
+      "model3d": "3D",
       "video": "Video",
       "image": "Image",
       "audio": "Audio",

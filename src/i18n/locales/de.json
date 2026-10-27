@@ -2761,6 +2761,7 @@
       "reorderImageDocs": "Seiten neu anordnen ({{count}})",
       "applyAlbum": "Album ({{count}} Titel)",
       "setBpm": "BPM: {{bpm}}",
+      "setModel3dDoc": "3D-Modell aktualisiert ({{nodes}} Objekte)",
       "setLiveDoc": "Live-Produktion aktualisiert ({{scenes}} Szene(n))",
       "replaceTracks_one": "{{count}} Spur neu aufgebaut",
       "replaceTracks_other": "{{count}} Spuren neu aufgebaut",
@@ -2965,6 +2966,7 @@
     },
     "chooseKind": "Was möchtest du erstellen?",
     "kind": {
+      "model3d": "3D",
       "video": "Video",
       "image": "Bild",
       "audio": "Audio",

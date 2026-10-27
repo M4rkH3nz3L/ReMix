@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } fr
 
 import { palette } from '@/constants/editor';
 import { InsufficientCreditsError, creditBalance } from '@/lib/shop';
+import { requireSignIn } from '@/lib/webGate';
 import {
   type Gift,
   GiftNotFoundError,
@@ -49,7 +50,7 @@ export function GiftSheet({
   }, [visible]);
 
   const onPick = (gift: Gift) => {
-    if (busy || !toUsername) {
+    if (busy || !toUsername || !requireSignIn()) {
       return;
     }
     Alert.alert(

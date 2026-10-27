@@ -14,6 +14,8 @@ import {
 import { useEditorStore } from '@/store/editorStore';
 import { t as tr } from 'i18next';
 import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
+import { IS_WEB_VIEWER } from '@/lib/webGate';
+import { PUBLIC_WEB_SCREENS } from '@/lib/webSurface';
 
 // 🔇 Ismert, DEV-only benign warning elnémítása. A session async hidratálása
 // (authStore `onAuthStateChange` → entitlement/roles store-set, `loginNeedsMfa().then(set)`)
@@ -75,6 +77,10 @@ export default function RootLayout() {
   // 🧩 helyi AI alapból a telefonon: indulás után EGYSZER felajánlja a Whisper
   // (felirat/átirat) letöltését — utána minden helyi AI-funkció offline megy
   useEffect(() => {
+    // 🌐 weben nincs helyi AI (a stúdiók is csak az appban vannak)
+    if (IS_WEB_VIEWER) {
+      return;
+    }
     const timer = setTimeout(() => {
       void ensureLocalAiReady(
         (mb) =>
@@ -137,7 +143,7 @@ export default function RootLayout() {
 
   // 📲 push: bejelentkezve engedélyt kérünk + (ha lehet) push-tokent mentünk
   useEffect(() => {
-    if (userId) {
+    if (userId && !IS_WEB_VIEWER) {
       void registerForPush(userId);
     }
   }, [userId]);
@@ -202,16 +208,23 @@ export default function RootLayout() {
       <ErrorBoundary>
         {authHydrated ? (
           // 🔐 útvonal-kapuzás: bejelentkezve a projektek/szerkesztő, egyébként
-          // csak az auth-képernyő elérhető (Expo Router `Stack.Protected`)
+          // csak az auth-képernyő (+ weben a publikus tartalom) érhető el
+          // (Expo Router `Stack.Protected`)
           <Stack
             screenOptions={{
               headerShown: false,
               contentStyle: { backgroundColor: palette.bg },
             }}
           >
-            <Stack.Protected guard={authed}>
+            {/* 🌐 publikus tartalom: natívon login mögött; a BÖNGÉSZŐS változatban
+                kijelentkezve is nézhető (SEO/AEO + böngészés) — lásd webSurface.ts */}
+            <Stack.Protected guard={authed || IS_WEB_VIEWER}>
               {/* 🏠 a gyökér (`/`) a FEED (home); a projektek listája a `/studio` */}
-              <Stack.Screen name="index" />
+              {PUBLIC_WEB_SCREENS.map((name) => (
+                <Stack.Screen key={name} name={name} />
+              ))}
+            </Stack.Protected>
+            <Stack.Protected guard={authed}>
               <Stack.Screen name="studio/index" />
               <Stack.Screen name="profile" />
               <Stack.Screen name="mfa" />
@@ -223,15 +236,9 @@ export default function RootLayout() {
               <Stack.Screen name="editor/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="studio/image/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="studio/audio/[id]" options={{ gestureEnabled: false }} />
-              <Stack.Screen name="player/[id]" />
               <Stack.Screen name="collab/[id]" options={{ gestureEnabled: false }} />
-              <Stack.Screen name="shop" />
-              <Stack.Screen name="search" />
               <Stack.Screen name="command" />
-              <Stack.Screen name="live" />
-              <Stack.Screen name="live/[id]" />
               <Stack.Screen name="live/studio/[id]" options={{ gestureEnabled: false }} />
-              <Stack.Screen name="channel/[id]" />
               <Stack.Screen name="inbox" />
               <Stack.Screen name="chat/[id]" />
             </Stack.Protected>

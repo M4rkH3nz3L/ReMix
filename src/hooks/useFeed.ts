@@ -27,6 +27,7 @@ import { blockUser, filterBlocked, listMyBlockedIds } from '@/lib/blocks';
 import type { FeedMode, FeedPost } from '@/types/social';
 import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
+import { requireApp, requireSignIn } from '@/lib/webGate';
 import type { InteractiveClip } from '@/types/project';
 
 /** Egy poszt interaktív (hotspot) klipjei a poszton hordozott interaktív rétegből. */
@@ -291,6 +292,9 @@ export function useFeed() {
 
   const onLike = (post: FeedPost) => {
     bumpChrome();
+    if (!requireSignIn()) {
+      return;
+    }
     const liked = !post.viewerLiked;
     const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
@@ -356,6 +360,9 @@ export function useFeed() {
 
   const onSave = (post: FeedPost) => {
     bumpChrome();
+    if (!requireSignIn()) {
+      return;
+    }
     const saved = !post.viewerSaved;
     const apply = (on: boolean) => (p: FeedPost) => ({
       ...p,
@@ -372,7 +379,8 @@ export function useFeed() {
 
   const onRemix = (post: FeedPost) => {
     bumpChrome();
-    if (busy) {
+    // 🌐 weben nincs szerkesztő → még a projekt-másolat ELŐTT megállunk
+    if (busy || !requireApp() || !requireSignIn()) {
       return;
     }
     if (!post.remixable || !post.videoUri) {
@@ -455,6 +463,9 @@ export function useFeed() {
   // 🚩 moderációs menü (nem-saját poszt): jelentés VAGY a szerző blokkolása
   const onReportPost = (post: FeedPost) => {
     bumpChrome();
+    if (!requireSignIn()) {
+      return;
+    }
     Alert.alert(t('report.title'), undefined, [
       { text: t('report.label'), onPress: () => reportWithReason(post) },
       { text: t('report.blockAction'), style: 'destructive' as const, onPress: () => onBlockUser(post) },
@@ -464,6 +475,9 @@ export function useFeed() {
 
   const onFollow = (post: FeedPost) => {
     bumpChrome();
+    if (!requireSignIn()) {
+      return;
+    }
     toggleFollow(post.creator.id, true)
       .then(() =>
         Alert.alert(t('feed.title'), t('feed.followed', { name: post.creator.displayName }))

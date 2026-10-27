@@ -3692,5 +3692,11 @@
     "blockConfirm": "Blokkolod: {{name}}? Nem látod majd a posztjait és kommentjeit.",
     "blockDone": "{{name}} blokkolva.",
     "thisUser": "ez a felhasználó"
+  },
+  "web": {
+    "appOnlyTitle": "Szerkesztés az appban",
+    "appOnlyBody": "A böngészős ReMix nézegetésre való: videók, csatornák és élő adások. A stúdiók (videó, kép, hang, élő közvetítés) a mobilappban érhetők el.",
+    "backToFeed": "Vissza a feedre",
+    "signIn": "Belépés"
   }
 }

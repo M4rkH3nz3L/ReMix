@@ -3692,5 +3692,11 @@
     "blockConfirm": "Block {{name}}? You won't see their posts or comments.",
     "blockDone": "{{name}} is blocked.",
     "thisUser": "this user"
+  },
+  "web": {
+    "appOnlyTitle": "Edit in the app",
+    "appOnlyBody": "ReMix on the web is for watching: videos, channels and live streams. The studios (video, image, audio, going live) are available in the mobile app.",
+    "backToFeed": "Back to the feed",
+    "signIn": "Sign in"
   }
 }

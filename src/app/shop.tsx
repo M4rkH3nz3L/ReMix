@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
+import { requireApp, requireSignIn } from '@/lib/webGate';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -110,6 +111,10 @@ export default function ShopScreen() {
 
   // tab/típus váltás → spinner (eseménykezelőben a setState engedélyezett)
   const changeTab = (next: Tab) => {
+    // a vásárlásaim/eladás személyes → kijelentkezve bejelentkezést kér
+    if (next !== 'browse' && !requireSignIn()) {
+      return;
+    }
     setLoading(true);
     setTab(next);
   };
@@ -119,6 +124,10 @@ export default function ShopScreen() {
   };
 
   const openInEditor = (payload: unknown) => {
+    // 🌐 weben nincs szerkesztő → a megvett tétel az appban használható
+    if (!requireApp()) {
+      return;
+    }
     importPayloadAsProject(payload)
       .then((pid) => {
         if (pid) {
@@ -133,7 +142,7 @@ export default function ShopScreen() {
   };
 
   const onBuy = (item: ShopItem) => {
-    if (busy) {
+    if (busy || !requireSignIn()) {
       return;
     }
     setBusy(true);

@@ -29,6 +29,7 @@ import {
 import type { FeedPost } from '@/types/social';
 import { useRoles } from '@/store/roleStore';
 import { REPORT_REASONS, reportComment } from '@/lib/reports';
+import { requireSignIn } from '@/lib/webGate';
 import { filterBlocked, listMyBlockedIds, listMyRestrictedIds, restrictUser, unrestrictUser } from '@/lib/blocks';
 
 /** Rövid relatív idő (pl. „3p", „2ó", „5n") — nincs külső függőség. */
@@ -167,7 +168,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
 
   const onSend = () => {
     const body = text.trim();
-    if (!post || !body || sending) {
+    if (!post || !body || sending || !requireSignIn()) {
       return;
     }
     setSending(true);

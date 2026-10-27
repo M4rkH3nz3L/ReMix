@@ -3662,5 +3662,11 @@
     "blockConfirm": "{{name}} blockieren? Du siehst keine Beiträge und Kommentare mehr.",
     "blockDone": "{{name}} ist blockiert.",
     "thisUser": "diesen Nutzer"
+  },
+  "web": {
+    "appOnlyTitle": "In der App bearbeiten",
+    "appOnlyBody": "ReMix im Browser ist zum Ansehen da: Videos, Kanäle und Livestreams. Die Studios (Video, Bild, Audio, Live gehen) gibt es in der mobilen App.",
+    "backToFeed": "Zurück zum Feed",
+    "signIn": "Anmelden"
   }
 }

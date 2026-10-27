@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
+import { requireApp } from '@/lib/webGate';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -210,6 +211,7 @@ export default function ChannelScreen() {
         {
           text: t('feed.remix'),
           onPress: () =>
+            requireApp() &&
             remixFromPost(post).then((pid) => {
               if (pid) {
                 router.push(`/editor/${pid}`);

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { loadSyncPrefs, saveSyncPrefs } from '@/lib/networkPolicy';
 import { projectFolderPath } from '@/lib/projectFolder';
 import { projectFolderBytes } from '@/lib/projectFolderClient';
 import {
@@ -28,6 +29,11 @@ export function ProjectSyncSection({ projectId, onChanged }: { projectId: string
   const [bytes, setBytes] = useState(0);
   const [busy, setBusy] = useState(false);
   const sync = useProjectSyncState(projectId);
+  const [wifiOnly, setWifiOnly] = useState(true);
+
+  useEffect(() => {
+    void loadSyncPrefs().then((p) => setWifiOnly(p.wifiOnly));
+  }, []);
 
   const reload = useCallback(() => {
     void loadProject(projectId).then((p) => {
@@ -118,6 +124,24 @@ export function ProjectSyncSection({ projectId, onChanged }: { projectId: string
       </View>
 
       {enabled ? (
+        <View style={styles.row}>
+          <Ionicons name="wifi-outline" size={18} color={palette.textDim} />
+          <View style={styles.body}>
+            <Text style={styles.meta}>{t('storage.sync.wifiOnly')}</Text>
+            <Text style={styles.hint}>{t('storage.sync.wifiOnlyHint')}</Text>
+          </View>
+          <Switch
+            value={wifiOnly}
+            onValueChange={(v) => {
+              setWifiOnly(v);
+              void saveSyncPrefs({ wifiOnly: v });
+            }}
+            trackColor={{ true: palette.accent, false: palette.border }}
+          />
+        </View>
+      ) : null}
+
+      {enabled ? (
         <View style={styles.statusRow}>
           <Text style={[styles.status, { color: statusColor }]}>
             {t(`storage.sync.phase.${phase}`, {
@@ -129,7 +153,7 @@ export function ProjectSyncSection({ projectId, onChanged }: { projectId: string
             {phase === 'synced' && sync.lastSyncedAt ? ` · ${new Date(sync.lastSyncedAt).toLocaleString()}` : ''}
           </Text>
           {phase !== 'syncing' ? (
-            <Pressable onPress={() => void requestProjectSync(project)} hitSlop={8}>
+            <Pressable onPress={() => void requestProjectSync(project, { manual: true })} hitSlop={8}>
               <Text style={styles.link}>{t('storage.sync.now')}</Text>
             </Pressable>
           ) : null}

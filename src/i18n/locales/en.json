@@ -3924,7 +3924,10 @@
       "too_many": "Too many items at once — do it in smaller batches.",
       "storage_unconfigured": "ReMix Storage is unavailable right now (not configured on the server).",
       "unauthorized": "Sign in to use ReMix Storage.",
-      "failed": "The operation failed."
+      "failed": "The operation failed.",
+      "upload_not_found": "The upload session expired — the upload restarts.",
+      "parts_missing": "The upload isn’t complete yet — continuing…",
+      "bad_part": "An uploaded chunk was corrupted — please try again."
     },
     "projectStorage": "Storage & sync",
     "projectsFolderSub": "Your project folders — removable only by deleting the project",
@@ -3957,8 +3960,11 @@
         "synced": "Synced — verified",
         "failed": "Failed — try again",
         "quota": "Storage full ({{missing}} missing)",
-        "offline": "Offline — will retry on next save"
-      }
+        "offline": "Offline — will retry on next save",
+        "waitingWifi": "Waiting for Wi-Fi — resumes automatically"
+      },
+      "wifiOnly": "Automatic sync on Wi-Fi only",
+      "wifiOnlyHint": "Applies to all projects. On mobile data the after-save sync waits; “Sync now” always works."
     },
     "trash": {
       "title": "Trash",

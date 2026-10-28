@@ -2,7 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t as tr } from 'i18next';
 import { useSyncExternalStore } from 'react';
 
-import { RemixFilesError, downloadUrlToDevice, remixDownloadToDevice, remixUpload } from '@/lib/remixFilesClient';
+import { File } from 'expo-file-system';
+
+import {
+  CHUNKED_UPLOAD_MIN_BYTES,
+  RemixFilesError,
+  downloadUrlToDevice,
+  remixDownloadToDevice,
+  remixUpload,
+  remixUploadChunked,
+} from '@/lib/remixFilesClient';
 
 /**
  * 🔁 A Tárhelyem átviteli sora (Sync Center csírája) — KÉPERNYŐ-FÜGGETLEN modul:
@@ -26,6 +35,8 @@ export interface Transfer {
   error?: string;
   /** a szerver felismerte, hogy már fent van (idempotens újrapróbálás) */
   deduplicated?: boolean;
+  /** 🧩 darabolt feltöltés munkamenete (tartósan tárolva → újraindítás után folytatódik) */
+  uploadId?: string;
 }
 
 const KEY = 'remix.transfers.v1';
@@ -95,6 +106,25 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Feltöltés: nagy fájl darabolva + folytathatóan (az `uploadId` a tárolt sorban él), kicsi egyben. */
+async function uploadOne(item: Transfer, onProgress: (f: number) => void): Promise<boolean> {
+  let size = 0;
+  try {
+    size = new File(item.source).size ?? 0;
+  } catch {
+    size = 0;
+  }
+  if (size < CHUNKED_UPLOAD_MIN_BYTES && !item.uploadId) {
+    return (await remixUpload(item.source, item.targetDir, item.name, onProgress)).deduplicated;
+  }
+  const r = await remixUploadChunked(item.source, item.targetDir, item.name, {
+    uploadId: item.uploadId,
+    onSession: (uploadId) => patch(item.id, { uploadId }),
+    onProgress,
+  });
+  return r.deduplicated;
+}
+
 /** A következő várakozó elem indítása (soros). */
 function pump(): void {
   if (running) {
@@ -110,7 +140,7 @@ function pump(): void {
   const onProgress = (f: number) => patch(next.id, { progress: f }, false);
   const job =
     next.direction === 'up'
-      ? remixUpload(next.source, next.targetDir, next.name, onProgress).then((r) => r.deduplicated)
+      ? uploadOne(next, onProgress)
       : next.direction === 'fetch'
         ? downloadUrlToDevice(next.source, next.targetDir, next.name, onProgress).then(() => false)
         : remixDownloadToDevice(next.source, next.targetDir, onProgress).then(() => false);

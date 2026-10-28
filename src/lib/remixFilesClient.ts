@@ -1,4 +1,5 @@
-import { Directory, File, Paths, UploadType } from 'expo-file-system';
+import { Directory, File, FileMode, Paths, UploadType } from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
@@ -150,6 +151,91 @@ export async function remixUpload(
     await failFrom({ status: res.status, text: async () => res.body });
   }
   return JSON.parse(res.body);
+}
+
+/** E fölött darabolt, folytatható feltöltés (a kisebb fájl egy kérésben megy). */
+export const CHUNKED_UPLOAD_MIN_BYTES = 16 * 1024 * 1024;
+
+type UploadResult = { name: string; path: string; size: number; deduplicated: boolean };
+
+/**
+ * 🧩 Darabolt, FOLYTATHATÓ feltöltés nagy fájlokhoz. Az `uploadId`-t a hívó tartósan
+ * tárolja (`onSession`) → app-újraindítás / hálózat-szakadás után ugyanazzal hívva a
+ * szerver megmondja, mely darabok vannak már fent, és csak a hiányzók mennek. Az MD5-öt
+ * az eszköz számolja; a szerver a lezáráskor a teljes tartalmat ellenőrzi.
+ */
+export async function remixUploadChunked(
+  uri: string,
+  dir: string,
+  name: string,
+  opts: {
+    uploadId?: string;
+    onSession?: (uploadId: string | undefined) => void;
+    onProgress?: (fraction: number) => void;
+    signal?: AbortSignal;
+  } = {}
+): Promise<UploadResult> {
+  const file = new File(uri);
+  const size = file.size ?? 0;
+  const base = cloudBaseUrl();
+  const auth = await workerAuthHeaders();
+
+  // munkamenet: a meglévő folytatása, vagy új (lejárt/ismeretlen → új)
+  let status: { uploadId: string; partSize: number; parts: number; done: number[] } | null = null;
+  if (opts.uploadId) {
+    const res = await fetch(`${base}/files/upload/${opts.uploadId}`, { headers: auth });
+    if (res.ok) {
+      status = await res.json();
+    } else if (res.status !== 404) {
+      await failFrom(res);
+    }
+  }
+  if (!status) {
+    const md5 = file.info({ md5: true }).md5 ?? '';
+    const init = await post<
+      { uploadId: string; partSize: number; parts: number } | (UploadResult & { deduplicated: true })
+    >('/files/upload/init', { path: dir, name, size, md5, contentType: file.type || undefined });
+    if ('deduplicated' in init && init.deduplicated) {
+      opts.onSession?.(undefined);
+      return init;
+    }
+    const s0 = init as { uploadId: string; partSize: number; parts: number };
+    opts.onSession?.(s0.uploadId);
+    status = { ...s0, done: [] };
+  }
+
+  const done = new Set(status.done);
+  const report = () => opts.onProgress?.(Math.min(1, (done.size * status.partSize) / Math.max(1, size)));
+  report();
+  const handle = file.open(FileMode.ReadOnly);
+  try {
+    for (let n = 1; n <= status.parts; n++) {
+      if (done.has(n)) {
+        continue;
+      }
+      if (opts.signal?.aborted) {
+        throw new Error('aborted');
+      }
+      handle.offset = (n - 1) * status.partSize;
+      const bytes = handle.readBytes(Math.min(status.partSize, size - (n - 1) * status.partSize));
+      const res = (await expoFetch(`${base}/files/upload/${status.uploadId}/part/${n}`, {
+        method: 'PUT',
+        headers: { ...auth, 'Content-Type': 'application/octet-stream' },
+        body: bytes,
+        signal: opts.signal,
+      })) as unknown as Response;
+      if (!res.ok) {
+        await failFrom(res);
+      }
+      done.add(n);
+      report();
+    }
+  } finally {
+    handle.close();
+  }
+  const out = await post<UploadResult>(`/files/upload/${status.uploadId}/complete`, {});
+  opts.onSession?.(undefined);
+  return out;
 }
 
 /** Letöltés a felhőből az Eszközöm mappájába (`deviceDir`); a végleges eszköz-utat adja. */

@@ -3924,7 +3924,10 @@
       "too_many": "Túl sok elem egyszerre — végezd részenként.",
       "storage_unconfigured": "A ReMix Storage most nem érhető el (a szerveren nincs beállítva).",
       "unauthorized": "A ReMix Storage-hoz jelentkezz be.",
-      "failed": "A művelet nem sikerült."
+      "failed": "A művelet nem sikerült.",
+      "upload_not_found": "A feltöltés-munkamenet lejárt — a feltöltés újraindul.",
+      "parts_missing": "A feltöltés még nem teljes — folytatás…",
+      "bad_part": "Egy feltöltött darab sérült — próbáld újra."
     },
     "projectStorage": "Tárhely és szinkron",
     "projectsFolderSub": "A projektjeid mappái — csak a projekt törlésével törölhetők",
@@ -3957,8 +3960,11 @@
         "synced": "Szinkronizálva — ellenőrizve",
         "failed": "Sikertelen — próbáld újra",
         "quota": "Betelt a tárhely ({{missing}} hiányzik)",
-        "offline": "Offline — a következő mentéskor újrapróbálja"
-      }
+        "offline": "Offline — a következő mentéskor újrapróbálja",
+        "waitingWifi": "Wi-Fi-re vár — Wi-Fi-n magától folytatódik"
+      },
+      "wifiOnly": "Automatikus szinkron csak Wi-Fi-n",
+      "wifiOnlyHint": "Minden projektre érvényes. Mobilneten a mentés utáni szinkron vár; a „Szinkronizálás most” mindig mehet."
     },
     "trash": {
       "title": "Lomtár",

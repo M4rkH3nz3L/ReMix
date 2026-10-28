@@ -12,8 +12,16 @@
 //   GET  /files/trash             → { items[], retentionDays, bytes } (lejártak takarítva)
 //   POST /files/trash/restore     { ids[] } → { restored[] }
 //   POST /files/trash/purge       { ids[] | all:true } → { removed, bytes }
+//   🧩 darabolt, folytatható feltöltés (nagy fájlok):
+//   POST   /files/upload/init           { path, name, size, md5, contentType? } → { uploadId, partSize, parts } | { deduplicated }
+//   GET    /files/upload/:id            → { done[], parts, partSize, size }
+//   PUT    /files/upload/:id/part/:n    (nyers bináris darab) → { partNumber }
+//   POST   /files/upload/:id/complete   → { name, path, size, md5 }
+//   DELETE /files/upload/:id            → { aborted }
 
+const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const express = require('express');
 
@@ -22,7 +30,7 @@ const { rateLimit } = require('../security/rateLimit');
 const { upload } = require('../lib/upload');
 const { BUCKET } = require('../mediastore');
 const quota = require('../quota');
-const { UserFilesError, createUserFiles, filesBucket, resolveBackend } = require('../userFiles');
+const { PART_SIZE, UserFilesError, createUserFiles, filesBucket, resolveBackend } = require('../userFiles');
 
 const router = express.Router();
 
@@ -57,7 +65,12 @@ const handle = (fn) => async (req, res) => {
       return;
     }
     if (err instanceof UserFilesError) {
-      res.status(err.status).json({ error: err.message, code: err.code, ...(err.usage ? { usage: err.usage } : {}) });
+      res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        ...(err.usage ? { usage: err.usage } : {}),
+        ...(err.missing ? { missing: err.missing } : {}),
+      });
       return;
     }
     if (err instanceof quota.QuotaExceededError) {
@@ -201,6 +214,62 @@ router.post(
   express.json({ limit: '4kb' }),
   handle(async (req, res, uid) => {
     res.json(await service().move(uid, req.body?.from, req.body?.to));
+  })
+);
+
+router.post(
+  '/files/upload/init',
+  requireAuth,
+  rateLimit('upload'),
+  express.json({ limit: '8kb' }),
+  handle(async (req, res, uid) => {
+    const b = req.body ?? {};
+    res.json(
+      await service().uploadInit(uid, b.path, { name: b.name, size: b.size, md5: b.md5, contentType: b.contentType })
+    );
+  })
+);
+
+router.get(
+  '/files/upload/:id',
+  requireAuth,
+  handle(async (req, res, uid) => {
+    res.json(await service().uploadStatus(uid, req.params.id));
+  })
+);
+
+// a darab NYERS bináris body-ként jön (nem multipart) — a méret-plafon a darabméret + tartalék
+router.put(
+  '/files/upload/:id/part/:n',
+  requireAuth,
+  rateLimit('upload'),
+  express.raw({ type: () => true, limit: PART_SIZE + 1024 * 1024 }),
+  handle(async (req, res, uid) => {
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const tmp = path.join(os.tmpdir(), `remix-part-${crypto.randomBytes(8).toString('hex')}`);
+    fs.writeFileSync(tmp, body);
+    try {
+      res.json(await service().uploadPart(uid, req.params.id, req.params.n, tmp));
+    } finally {
+      fs.rm(tmp, { force: true }, () => {});
+    }
+  })
+);
+
+router.post(
+  '/files/upload/:id/complete',
+  requireAuth,
+  rateLimit('upload'),
+  handle(async (req, res, uid) => {
+    res.json(await service().uploadComplete(uid, req.params.id));
+  })
+);
+
+router.delete(
+  '/files/upload/:id',
+  requireAuth,
+  handle(async (req, res, uid) => {
+    res.json(await service().uploadAbort(uid, req.params.id));
   })
 );
 

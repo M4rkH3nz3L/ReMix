@@ -3894,7 +3894,10 @@
       "too_many": "Zu viele Elemente auf einmal — bitte in kleineren Schritten.",
       "storage_unconfigured": "ReMix Storage ist gerade nicht verfügbar (auf dem Server nicht eingerichtet).",
       "unauthorized": "Melde dich an, um ReMix Storage zu nutzen.",
-      "failed": "Der Vorgang ist fehlgeschlagen."
+      "failed": "Der Vorgang ist fehlgeschlagen.",
+      "upload_not_found": "Die Upload-Sitzung ist abgelaufen — der Upload startet neu.",
+      "parts_missing": "Der Upload ist noch nicht vollständig — wird fortgesetzt…",
+      "bad_part": "Ein hochgeladenes Teilstück war beschädigt — bitte erneut versuchen."
     },
     "projectStorage": "Speicher & Sync",
     "projectsFolderSub": "Deine Projektordner — nur durch Löschen des Projekts entfernbar",
@@ -3927,8 +3930,11 @@
         "synced": "Synchronisiert — geprüft",
         "failed": "Fehlgeschlagen — erneut versuchen",
         "quota": "Speicher voll ({{missing}} fehlen)",
-        "offline": "Offline — nächster Versuch beim Speichern"
-      }
+        "offline": "Offline — nächster Versuch beim Speichern",
+        "waitingWifi": "Wartet auf WLAN — läuft dort automatisch weiter"
+      },
+      "wifiOnly": "Automatischer Sync nur im WLAN",
+      "wifiOnlyHint": "Gilt für alle Projekte. Im Mobilfunk wartet der Sync nach dem Speichern; „Jetzt synchronisieren“ geht immer."
     },
     "trash": {
       "title": "Papierkorb",

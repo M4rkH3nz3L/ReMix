@@ -256,3 +256,79 @@ describe('Lomtár (lokális backend)', () => {
     await expect(svc.restoreTrash('u1', '../x')).rejects.toMatchObject({ status: 400 });
   });
 });
+
+describe('darabolt, folytatható feltöltés (lokális backend)', () => {
+  let svc;
+  let ledger;
+  let tmp;
+  const md5 = (buf) => require('crypto').createHash('md5').update(buf).digest('hex');
+  const part = (buf) => {
+    const p = path.join(tmp, `p${Math.random().toString(36).slice(2)}`);
+    fs.writeFileSync(p, buf);
+    return p;
+  };
+  beforeEach(() => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'uf-mp-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'uf-mp-src-'));
+    ledger = {
+      rows: new Map(),
+      wouldExceed: async () => ({ exceeded: false }),
+      async recordObject(_u, { key, bytes }) {
+        this.rows.set(key, bytes);
+      },
+      forgetObject: async () => {},
+      moveObject: async () => {},
+    };
+    svc = createUserFiles({ backend: localBackend(root), ledger, partSize: 4 });
+  });
+
+  test('init → darabok (félbeszakítva, majd folytatva) → complete; csak a végén látszik', async () => {
+    const data = Buffer.from('0123456789'); // 4+4+2
+    const init = await svc.uploadInit('u1', 'Nagy', { name: 'film.mp4', size: data.length, md5: md5(data) });
+    expect(init).toMatchObject({ partSize: 4, parts: 3 });
+    await svc.uploadPart('u1', init.uploadId, 1, part(data.subarray(0, 4)));
+    // „app-újraindítás” után: mi van már fent?
+    expect((await svc.uploadStatus('u1', init.uploadId)).done).toEqual([1]);
+    expect((await svc.list('u1', '')).folders).toEqual([]); // félkész feltöltés nem látszik
+    await expect(svc.uploadComplete('u1', init.uploadId)).rejects.toMatchObject({ code: 'parts_missing' });
+    await svc.uploadPart('u1', init.uploadId, 3, part(data.subarray(8)));
+    await svc.uploadPart('u1', init.uploadId, 2, part(data.subarray(4, 8)));
+    const done = await svc.uploadComplete('u1', init.uploadId);
+    expect(done).toMatchObject({ name: 'film.mp4', path: 'Nagy/film.mp4', size: 10 });
+    expect(ledger.rows.get('files/u1/Nagy/film.mp4')).toBe(10);
+    const f = await svc.open('u1', 'Nagy/film.mp4');
+    const chunks = [];
+    for await (const c of f.body) {
+      chunks.push(c);
+    }
+    expect(Buffer.concat(chunks).toString()).toBe('0123456789');
+    await expect(svc.uploadStatus('u1', init.uploadId)).rejects.toMatchObject({ status: 404 });
+  });
+
+  test('hibás darabméret → 400; MD5-eltérés → 422 és semmi nem marad', async () => {
+    const data = Buffer.from('abcdefgh');
+    const init = await svc.uploadInit('u1', '', { name: 'x.bin', size: 8, md5: md5(Buffer.from('mas')) });
+    await expect(svc.uploadPart('u1', init.uploadId, 1, part(Buffer.from('abc')))).rejects.toMatchObject({ code: 'bad_part' });
+    await svc.uploadPart('u1', init.uploadId, 1, part(data.subarray(0, 4)));
+    await svc.uploadPart('u1', init.uploadId, 2, part(data.subarray(4)));
+    await expect(svc.uploadComplete('u1', init.uploadId)).rejects.toMatchObject({ status: 422 });
+    expect((await svc.list('u1', '')).files).toEqual([]);
+    expect(ledger.rows.size).toBe(0);
+  });
+
+  test('azonos fájl már fent → dedup init-kor; ütköző név → (1); lejárt munkamenet takarítva', async () => {
+    const data = Buffer.from('hello');
+    const src = part(data);
+    await svc.upload('u1', '', { localPath: src, name: 'a.txt' });
+    expect(await svc.uploadInit('u1', '', { name: 'a.txt', size: 5, md5: md5(data) })).toMatchObject({ deduplicated: true });
+    const other = Buffer.from('world');
+    const init = await svc.uploadInit('u1', '', { name: 'a.txt', size: 5, md5: md5(other) });
+    await svc.uploadPart('u1', init.uploadId, 1, part(other.subarray(0, 4)));
+    await svc.uploadPart('u1', init.uploadId, 2, part(other.subarray(4)));
+    expect((await svc.uploadComplete('u1', init.uploadId)).name).toBe('a (1).txt');
+    const stale = await svc.uploadInit('u1', '', { name: 'b.txt', size: 5, md5: md5(other) });
+    await svc.uploadInit('u1', '', { name: 'c.txt', size: 5, md5: md5(other) }, Date.now() + 8 * 86400000);
+    await expect(svc.uploadStatus('u1', stale.uploadId)).rejects.toMatchObject({ status: 404 });
+    await expect(svc.uploadStatus('u1', '../../x')).rejects.toMatchObject({ status: 400 });
+  });
+});

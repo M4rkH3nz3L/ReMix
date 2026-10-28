@@ -28,6 +28,10 @@ const MAX_TREE = 1000;
 /** 🗑️ a Lomtár megőrzési ideje (nap) — utána a listázáskor véglegesen törlődik */
 const TRASH_RETENTION_DAYS = 30;
 const TRASH_META = '.meta.json';
+/** 🧩 darabolt (multipart) feltöltés darabmérete — az S3 minimuma 5 MiB (az utolsó kisebb lehet) */
+const PART_SIZE = 8 * 1024 * 1024;
+/** a félbehagyott feltöltés-munkamenetek ennyi nap után takarítódnak */
+const UPLOAD_SESSION_DAYS = 7;
 
 class UserFilesError extends Error {
   constructor(status, code, message) {
@@ -100,6 +104,11 @@ function userRoot(uid) {
 /** A user Lomtár-prefixe (a fájlok mellett, a user gyökerén KÍVÜL — a böngészőben nem látszik). */
 function userTrash(uid) {
   return `trash/${userRoot(uid).slice('files/'.length)}`;
+}
+
+/** A user feltöltés-munkamenet prefixe (a böngészőben nem látszik). */
+function userUploads(uid) {
+  return `uploads/${userRoot(uid).slice('files/'.length)}`;
 }
 
 /** Ütköző név feloldása: `video.mp4` → `video (1).mp4` → `video (2).mp4` … */
@@ -237,6 +246,44 @@ function localBackend(rootDir) {
       const p = abs(key);
       return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
     },
+    // multipart: a darabok egy rejtett munka-mappában (`.mp/<id>/<n>`), lezáráskor összefűzve
+    async mpInit() {
+      const id = crypto.randomBytes(8).toString('hex');
+      fs.mkdirSync(path.join(rootDir, '.mp', id), { recursive: true });
+      return id;
+    },
+    async mpPart(_key, id, partNumber, localPath) {
+      const dir = path.join(rootDir, '.mp', id);
+      if (!fs.existsSync(dir)) {
+        throw notFound();
+      }
+      fs.copyFileSync(localPath, path.join(dir, String(partNumber)));
+      return md5OfFile(localPath);
+    },
+    async mpListParts(_key, id) {
+      const dir = path.join(rootDir, '.mp', id);
+      if (!fs.existsSync(dir)) {
+        return null;
+      }
+      return fs
+        .readdirSync(dir)
+        .map((n) => ({ partNumber: Number(n), size: fs.statSync(path.join(dir, n)).size }))
+        .filter((x) => Number.isInteger(x.partNumber))
+        .sort((a, b) => a.partNumber - b.partNumber);
+    },
+    async mpComplete(key, id, parts) {
+      const dir = path.join(rootDir, '.mp', id);
+      const dest = abs(key);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, '');
+      for (const pt of parts) {
+        fs.appendFileSync(dest, fs.readFileSync(path.join(dir, String(pt.partNumber))));
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
+    async mpAbort(_key, id) {
+      fs.rmSync(path.join(rootDir, '.mp', id), { recursive: true, force: true });
+    },
   };
 }
 
@@ -353,6 +400,60 @@ function s3Backend() {
         throw err;
       }
     },
+    // multipart: valódi S3/R2 multipart-feltöltés (a darabokat az R2 tartja; ListParts a folytatáshoz)
+    async mpInit(key, contentType) {
+      const r = await send(
+        new sdk.CreateMultipartUploadCommand({ Bucket, Key: key, ContentType: contentType || 'application/octet-stream' })
+      );
+      return r.UploadId;
+    },
+    async mpPart(key, id, partNumber, localPath) {
+      const md5 = await md5OfFile(localPath);
+      const r = await send(
+        new sdk.UploadPartCommand({
+          Bucket,
+          Key: key,
+          UploadId: id,
+          PartNumber: partNumber,
+          Body: fs.readFileSync(localPath),
+          // a worker→R2 szakasz integritása: az R2 elutasítja, ha a darab sérült
+          ContentMD5: Buffer.from(md5, 'hex').toString('base64'),
+        })
+      );
+      return String(r.ETag || '').replace(/"/g, '');
+    },
+    async mpListParts(key, id) {
+      try {
+        const out = [];
+        let marker;
+        do {
+          const r = await send(new sdk.ListPartsCommand({ Bucket, Key: key, UploadId: id, PartNumberMarker: marker }));
+          for (const pt of r.Parts ?? []) {
+            out.push({ partNumber: pt.PartNumber, size: Number(pt.Size || 0), etag: String(pt.ETag || '').replace(/"/g, '') });
+          }
+          marker = r.IsTruncated ? r.NextPartNumberMarker : undefined;
+        } while (marker);
+        return out;
+      } catch (err) {
+        if (err?.name === 'NoSuchUpload' || isMissing(err)) {
+          return null;
+        }
+        throw err;
+      }
+    },
+    async mpComplete(key, id, parts) {
+      await send(
+        new sdk.CompleteMultipartUploadCommand({
+          Bucket,
+          Key: key,
+          UploadId: id,
+          MultipartUpload: { Parts: parts.map((pt) => ({ PartNumber: pt.partNumber, ETag: pt.etag })) },
+        })
+      );
+    },
+    async mpAbort(key, id) {
+      await send(new sdk.AbortMultipartUploadCommand({ Bucket, Key: key, UploadId: id })).catch(() => {});
+    },
   };
 }
 
@@ -384,7 +485,7 @@ function resolveBackend() {
  *   (`recordObject`, `forgetObject`, `moveObject`, `wouldExceed`); dev-ben/tesztben
  *   lehet no-op. A `bucket` a főkönyvi címke (a mediastore BUCKET-je).
  */
-function createUserFiles({ backend, ledger, bucket = 'renders' }) {
+function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_SIZE }) {
   if (!backend) {
     throw new UserFilesError(503, 'storage_unconfigured', 'A ReMix Storage nincs konfigurálva.');
   }
@@ -694,12 +795,191 @@ function createUserFiles({ backend, ledger, bucket = 'renders' }) {
     return { ...s, name: baseName(p) };
   }
 
-  return { list, mkdir, upload, remove, move, open, trash, listTrash, restoreTrash, purgeTrash };
+  // ── 🧩 Darabolt, folytatható feltöltés ──────────────────────────────────────
+  // init → (part × N, bármikor folytatható; status megmondja, mi van már fent) →
+  // complete (méret + teljes MD5 ellenőrzés, végleges név, kvóta-rögzítés) | abort.
+  // A darabok egy rejtett staging-kulcsra mennek; a munkamenet a user prefixe alatt él.
+
+  const cleanSession = (sid) => {
+    const v = String(sid ?? '');
+    if (!/^[a-f0-9]{32}$/.test(v)) {
+      throw badPath('Érvénytelen feltöltés-azonosító.');
+    }
+    return v;
+  };
+
+  async function readSession(uid, sid) {
+    const raw = await backend.readText(`${userUploads(uid)}${cleanSession(sid)}.json`);
+    if (!raw) {
+      throw new UserFilesError(404, 'upload_not_found', 'A feltöltés-munkamenet lejárt vagy nem létezik.');
+    }
+    return JSON.parse(raw);
+  }
+
+  const partCount = (size) => Math.max(1, Math.ceil(size / partSize));
+  const partLength = (size, n) => (n < partCount(size) ? partSize : size - (partCount(size) - 1) * partSize);
+
+  /** a régi (félbehagyott) munkamenetek takarítása — best-effort */
+  async function sweepSessions(uid, now) {
+    const { files } = await backend.list(userUploads(uid)).catch(() => ({ files: [] }));
+    for (const f of files.filter((x) => x.name.endsWith('.json'))) {
+      const raw = await backend.readText(`${userUploads(uid)}${f.name}`).catch(() => null);
+      const sess = raw ? JSON.parse(raw) : null;
+      if (!sess || now - Date.parse(sess.createdAt) > UPLOAD_SESSION_DAYS * 86400000) {
+        if (sess) {
+          await backend.mpAbort(sess.staging, sess.backendId).catch(() => {});
+        }
+        await backend.remove(`${userUploads(uid)}${f.name}`).catch(() => {});
+      }
+    }
+  }
+
+  async function uploadInit(uid, rawDir, { name: rawName, size, md5, contentType }, now = Date.now()) {
+    const dir = normalizePath(rawDir);
+    const name = cleanSegment(rawName);
+    const bytes = Math.trunc(Number(size));
+    if (!(bytes > 0)) {
+      throw badPath('Érvénytelen méret.');
+    }
+    const sum = String(md5 ?? '').toLowerCase();
+    if (!/^[0-9a-f]{32}$/.test(sum)) {
+      throw badPath('Hiányzó vagy érvénytelen MD5.');
+    }
+    normalizePath(joinPath(dir, name));
+    await sweepSessions(uid, now);
+    // idempotencia: ugyanaz a fájl már fent van → nincs új feltöltés
+    const prefix = dir ? `${userRoot(uid)}${dir}/` : userRoot(uid);
+    const existing = await backend.list(prefix);
+    if (existing.files.some((f) => f.name === name && f.size === bytes)) {
+      const head = await backend.head(`${prefix}${name}`);
+      if (head && head.etag === sum) {
+        return { deduplicated: true, name, path: joinPath(dir, name), size: bytes, md5: sum };
+      }
+    }
+    const pre = await ledger.wouldExceed(uid, bytes);
+    if (pre.exceeded) {
+      throw Object.assign(new UserFilesError(507, 'quota_exceeded', 'Betelt a tárhelyed.'), { usage: pre.usage });
+    }
+    const sid = crypto.randomBytes(16).toString('hex');
+    const staging = `${userUploads(uid)}${sid}.data`;
+    const backendId = await backend.mpInit(staging, contentType);
+    const session = { dir, name, size: bytes, md5: sum, contentType: contentType || null, staging, backendId, partSize, createdAt: new Date(now).toISOString() };
+    await backend.putText(`${userUploads(uid)}${sid}.json`, JSON.stringify(session));
+    return { uploadId: sid, partSize, parts: partCount(bytes) };
+  }
+
+  async function uploadStatus(uid, sid) {
+    const sess = await readSession(uid, sid);
+    const parts = (await backend.mpListParts(sess.staging, sess.backendId)) ?? [];
+    return {
+      uploadId: cleanSession(sid),
+      size: sess.size,
+      partSize: sess.partSize,
+      parts: partCount(sess.size),
+      // csak a HELYES méretű darab számít késznek (a csonka újraküldendő)
+      done: parts.filter((pt) => pt.size === partLength(sess.size, pt.partNumber)).map((pt) => pt.partNumber),
+    };
+  }
+
+  async function uploadPart(uid, sid, rawN, localPath) {
+    const sess = await readSession(uid, sid);
+    const n = Number(rawN);
+    if (!Number.isInteger(n) || n < 1 || n > partCount(sess.size)) {
+      throw badPath('Érvénytelen darab-sorszám.');
+    }
+    const got = fs.statSync(localPath).size;
+    if (got !== partLength(sess.size, n)) {
+      throw new UserFilesError(400, 'bad_part', `A darab mérete hibás (${got} ≠ ${partLength(sess.size, n)}).`);
+    }
+    await backend.mpPart(sess.staging, sess.backendId, n, localPath);
+    return { partNumber: n };
+  }
+
+  async function uploadComplete(uid, sid) {
+    const sess = await readSession(uid, sid);
+    const parts = (await backend.mpListParts(sess.staging, sess.backendId)) ?? [];
+    const total = partCount(sess.size);
+    const ok = new Map(parts.filter((pt) => pt.size === partLength(sess.size, pt.partNumber)).map((pt) => [pt.partNumber, pt]));
+    const missing = [];
+    for (let i = 1; i <= total; i++) {
+      if (!ok.has(i)) {
+        missing.push(i);
+      }
+    }
+    if (missing.length) {
+      throw Object.assign(new UserFilesError(409, 'parts_missing', 'Még nem érkezett meg minden darab.'), { missing });
+    }
+    await backend.mpComplete(sess.staging, sess.backendId, [...ok.values()].sort((a, b) => a.partNumber - b.partNumber));
+    // ✅ teljes ellenőrzés: méret + a TELJES tartalom MD5-je (a kliens init-kori MD5-jével)
+    const head = await backend.head(sess.staging);
+    const stream = await backend.stream(sess.staging);
+    const sum = stream
+      ? await new Promise((resolve, reject) => {
+          const h = crypto.createHash('md5');
+          stream.body.on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
+        })
+      : null;
+    if (!head || head.size !== sess.size || sum !== sess.md5) {
+      await backend.remove(sess.staging).catch(() => {});
+      await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+      throw new UserFilesError(422, 'checksum_mismatch', 'A fájl sérülten érkezett meg — próbáld újra.');
+    }
+    // végleges név (ütközés → „név (1)”), másolás a helyére, ellenőrzés, staging törlése
+    const prefix = sess.dir ? `${userRoot(uid)}${sess.dir}/` : userRoot(uid);
+    const existing = await backend.list(prefix);
+    const finalName = nextFreeName(sess.name, new Set([...existing.files.map((f) => f.name), ...existing.folders]));
+    const p = joinPath(sess.dir, finalName);
+    const key = `${userRoot(uid)}${p}`;
+    await backend.copy(sess.staging, key);
+    const done = await backend.head(key);
+    if (!done || done.size !== sess.size) {
+      await backend.remove(key).catch(() => {});
+      throw new UserFilesError(502, 'verify_failed', 'A feltöltött példány ellenőrzése nem sikerült.');
+    }
+    try {
+      await ledger.recordObject(uid, { projectId: null, bucket, key, bytes: sess.size, source: 'server' });
+    } catch (err) {
+      await backend.remove(key).catch(() => {});
+      throw err;
+    }
+    await backend.remove(sess.staging).catch(() => {});
+    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+    return { name: finalName, path: p, size: sess.size, md5: sess.md5, deduplicated: false };
+  }
+
+  async function uploadAbort(uid, sid) {
+    const sess = await readSession(uid, sid).catch(() => null);
+    if (sess) {
+      await backend.mpAbort(sess.staging, sess.backendId).catch(() => {});
+      await backend.remove(sess.staging).catch(() => {});
+    }
+    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+    return { aborted: true };
+  }
+
+  return {
+    list,
+    mkdir,
+    upload,
+    remove,
+    move,
+    open,
+    trash,
+    listTrash,
+    restoreTrash,
+    purgeTrash,
+    uploadInit,
+    uploadStatus,
+    uploadPart,
+    uploadComplete,
+    uploadAbort,
+  };
 }
 
 module.exports = {
   MARKER,
   TRASH_RETENTION_DAYS,
+  PART_SIZE,
   UserFilesError,
   normalizePath,
   cleanSegment,

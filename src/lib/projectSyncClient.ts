@@ -11,8 +11,17 @@ import {
 } from '@/lib/projectFolder';
 import { listProjectFolderFiles, projectFolderDir } from '@/lib/projectFolderClient';
 import { joinPath, parentPath } from '@/lib/remixFiles';
-import { RemixFilesError, remixDelete, remixList, remixUpload } from '@/lib/remixFilesClient';
+import {
+  CHUNKED_UPLOAD_MIN_BYTES,
+  RemixFilesError,
+  remixDelete,
+  remixList,
+  remixUpload,
+  remixUploadChunked,
+} from '@/lib/remixFilesClient';
+import { connectionKind, loadSyncPrefs, onWifiAvailable } from '@/lib/networkPolicy';
 import { fetchStorageUsage } from '@/lib/storageQuota';
+import { syncDecision } from '@/lib/syncPolicy';
 import { VIDED_FORMAT } from '@/lib/videdFile';
 import type { Project } from '@/types/project';
 
@@ -26,10 +35,21 @@ import type { Project } from '@/types/project';
  * A projekt-tervet (`<folder>.remix`) minden mentés a mappába írja, így a mappa
  * önmagában is hordozható.
  *
- * Állapotok: off · pending · syncing · synced · failed · quota · offline.
+ * Állapotok: off · pending · syncing · synced · failed · quota · offline · waitingWifi.
+ * 📶 Az AUTOMATIKUS kör (mentés után) a „csak Wi-Fi-n” beállítást követi; a kézi
+ * („Szinkronizálás most”, bekapcsolás) mindig mehet.
  */
 
-export type ProjectSyncPhase = 'off' | 'pending' | 'syncing' | 'synced' | 'failed' | 'quota' | 'offline';
+export type ProjectSyncPhase =
+  | 'off'
+  | 'pending'
+  | 'syncing'
+  | 'synced'
+  | 'failed'
+  | 'quota'
+  | 'offline'
+  /** automatikus kör mobilneten, „csak Wi-Fi-n” mellett — Wi-Fi-re váltáskor indul */
+  | 'waitingWifi';
 
 export interface ProjectSyncState {
   phase: ProjectSyncPhase;
@@ -190,22 +210,58 @@ export async function checkSyncCapacity(project: Project): Promise<{
   };
 }
 
-/** Szinkron-kör kérése (soros: egyszerre egy projekt; a kérések sorba állnak). */
-export function requestProjectSync(project: Project): Promise<void> {
+/** a „Wi-Fi-re vár” projektek — Wi-Fi megjelenésekor újra sorba állnak */
+const waitingWifi = new Set<string>();
+let wifiListening = false;
+
+function listenForWifi(): void {
+  if (wifiListening) {
+    return;
+  }
+  wifiListening = true;
+  void onWifiAvailable(() => {
+    for (const id of [...waitingWifi]) {
+      const p = latest.get(id);
+      waitingWifi.delete(id);
+      if (p) {
+        void requestProjectSync(p);
+      }
+    }
+  });
+}
+
+/**
+ * Szinkron-kör kérése (soros: egyszerre egy projekt; a kérések sorba állnak).
+ * `manual` = a user kifejezett kérése (a „csak Wi-Fi-n” szabály nem tartja vissza).
+ */
+export function requestProjectSync(project: Project, opts: { manual?: boolean } = {}): Promise<void> {
   if (!project.folder || !project.syncToRemix) {
     return Promise.resolve();
   }
   latest.set(project.id, project);
   setState(project.id, { phase: 'pending', error: undefined });
-  running = running.then(() => runSync(project.id)).catch(() => {});
+  running = running.then(() => runSync(project.id, Boolean(opts.manual))).catch(() => {});
   return running;
 }
 
-async function runSync(projectId: string): Promise<void> {
+async function runSync(projectId: string, manual: boolean): Promise<void> {
   const project = latest.get(projectId);
   if (!project?.folder || !project.syncToRemix) {
     return;
   }
+  // 📶 hálózat-szabály (a pure döntés a syncPolicy-ben)
+  const decision = syncDecision(await connectionKind(), await loadSyncPrefs(), manual);
+  if (decision === 'waitWifi') {
+    waitingWifi.add(projectId);
+    listenForWifi();
+    setState(projectId, { phase: 'waitingWifi' });
+    return;
+  }
+  if (decision === 'offline') {
+    setState(projectId, { phase: 'offline' });
+    return;
+  }
+  waitingWifi.delete(projectId);
   const remoteDir = projectFolderPath(project.folder);
   try {
     writePlanFile(project);
@@ -230,9 +286,15 @@ async function runSync(projectId: string): Promise<void> {
       if (!uri) {
         continue;
       }
-      await remixUpload(uri, joinPath(remoteDir, parentPath(f.path)), f.path.slice(f.path.lastIndexOf('/') + 1), (p) =>
-        setState(projectId, { progress: p })
-      );
+      const target = joinPath(remoteDir, parentPath(f.path));
+      const name = f.path.slice(f.path.lastIndexOf('/') + 1);
+      const onProgress = (p: number) => setState(projectId, { progress: p });
+      // nagy fájl darabolva (a megszakadt darab-feltöltést a szerver 7 nap után takarítja)
+      if (f.size >= CHUNKED_UPLOAD_MIN_BYTES) {
+        await remixUploadChunked(uri, target, name, { onProgress });
+      } else {
+        await remixUpload(uri, target, name, onProgress);
+      }
       done += 1;
       setState(projectId, { done, progress: 0 });
     }
@@ -289,7 +351,7 @@ export async function setProjectSyncEnabled(projectId: string, enabled: boolean)
   }
   await saveProject(next);
   if (enabled) {
-    void requestProjectSync(next);
+    void requestProjectSync(next, { manual: true });
   } else {
     setState(projectId, { phase: 'off' });
   }

@@ -73,6 +73,29 @@ describe('files domain-router (e2e)', () => {
     expect((await res.json()).items).toEqual([]);
   });
 
+  test('darabolt feltöltés: init → állapot → darab → lezárás', async () => {
+    const data = Buffer.from('chunked upload body');
+    const md5 = require('crypto').createHash('md5').update(data).digest('hex');
+    let res = await fetch(`${base}/files/upload/init`, json({ userId: 'u9', path: 'Nagy', name: 'v.mp4', size: data.length, md5 }));
+    const init = await res.json();
+    expect(init.parts).toBe(1);
+    res = await fetch(`${base}/files/upload/${init.uploadId}?userId=u9`);
+    expect((await res.json()).done).toEqual([]);
+    res = await fetch(`${base}/files/upload/${init.uploadId}/complete?userId=u9`, { method: 'POST' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).missing).toEqual([1]);
+    res = await fetch(`${base}/files/upload/${init.uploadId}/part/1?userId=u9`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: data,
+    });
+    expect(res.status).toBe(200);
+    res = await fetch(`${base}/files/upload/${init.uploadId}/complete?userId=u9`, { method: 'POST' });
+    expect(await res.json()).toMatchObject({ path: 'Nagy/v.mp4', size: data.length, md5 });
+    res = await fetch(`${base}/files/download?userId=u9&path=${encodeURIComponent('Nagy/v.mp4')}`);
+    expect(await res.text()).toBe('chunked upload body');
+  });
+
   test('kiszökő út → 400, nem létező → 404', async () => {
     expect((await fetch(`${base}/files/list?userId=u&path=..%2Fx`)).status).toBe(400);
     expect((await fetch(`${base}/files/download?userId=u&path=nincs.mp4`)).status).toBe(404);

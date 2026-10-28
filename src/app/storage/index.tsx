@@ -3,7 +3,6 @@ import { type Href, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -21,17 +20,19 @@ import {
   type SheetAction,
   TransferList,
 } from '@/components/storage/StorageParts';
+import { FolderPickerSheet } from '@/components/storage/FolderPickerSheet';
 import { ProjectSyncSection } from '@/components/storage/ProjectSyncSection';
 import { TrashView } from '@/components/storage/TrashView';
 import { RenameModal } from '@/components/studio/RenameModal';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { useStorageBrowser } from '@/hooks/useStorageBrowser';
+import { EXTERNAL_PROVIDERS } from '@/lib/externalStorage';
 import { goBackOrHome } from '@/lib/nav';
 import { PROJECTS_DIR, projectFolderPath } from '@/lib/projectFolder';
 import { studioRoute } from '@/lib/projectUtils';
 import { loadProject } from '@/lib/storage';
-import { type KindFilter, type StorageEntry, breadcrumbs } from '@/lib/remixFiles';
+import { type KindFilter, type StorageEntry, breadcrumbs, fileKindOf, studioForKind } from '@/lib/remixFiles';
 import { formatBytes } from '@/lib/storageQuota';
 
 const KINDS: KindFilter[] = ['all', 'video', 'image', 'audio', 'project', 'document'];
@@ -47,6 +48,8 @@ export default function StorageScreen() {
   const { t } = s;
   const [action, setAction] = useState<StorageEntry | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
+  /** az áthelyezésre váró elemek (a mappa-választó nyitva) */
+  const [moving, setMoving] = useState<string[] | null>(null);
   const selecting = s.selected.size > 0;
   const { project: projectParam } = useLocalSearchParams<{ project?: string }>();
   const { open, go } = s;
@@ -79,12 +82,6 @@ export default function StorageScreen() {
     return {};
   };
 
-  const soon = () =>
-    Alert.alert(t('storage.soonTitle'), t('storage.soonBody'), [
-      { text: t('common.close'), style: 'cancel' },
-      { text: t('storage.openProfile'), onPress: () => router.push('/profile') },
-    ]);
-
   const onEntryPress = (e: StorageEntry) => {
     if (selecting) {
       s.toggleSelect(e.path);
@@ -108,8 +105,26 @@ export default function StorageScreen() {
         onPress: () => s.downloadToDevice([e]),
       });
     }
+    const studio = studioForKind(fileKindOf(e.name));
+    if (studio && (e.location === 'device' || e.location === 'remix')) {
+      list.unshift({
+        key: 'studio',
+        icon: 'sparkles-outline',
+        label: t('storage.newProjectFrom', { studio: t(`studio.kind.${studio}`) }),
+        onPress: () =>
+          router.push({
+            pathname: '/studio',
+            params: { openLoc: e.location, openPath: e.path, ...(e.uri ? { openUri: e.uri } : {}) },
+          } as Href),
+      });
+    }
     list.push({ key: 'select', icon: 'checkmark-circle-outline', label: t('storage.select'), onPress: () => s.toggleSelect(e.path) });
+    if (e.location === 'external') {
+      // a külső forrás CSAK olvasható: a nem támogatott műveletek nem is látszanak
+      return list;
+    }
     list.push({ key: 'rename', icon: 'create-outline', label: t('common.rename'), onPress: () => s.startRename(e) });
+    list.push({ key: 'move', icon: 'folder-open-outline', label: t('storage.move'), onPress: () => setMoving([e.path]) });
     list.push({ key: 'delete', icon: 'trash-outline', label: t('common.delete'), destructive: true, onPress: () => void s.confirmDelete([e.path]) });
     return list;
   };
@@ -177,32 +192,24 @@ export default function StorageScreen() {
             onPress={() => s.open('device')}
           />
           <Text style={styles.sectionLabel}>{t('storage.external')}</Text>
+          {s.providers.map((p) => (
+            <LocationCard
+              key={p.id}
+              icon={(EXTERNAL_PROVIDERS.find((x) => x.type === p.type)?.icon ?? 'cloud-outline') as never}
+              title={p.label}
+              subtitle={EXTERNAL_PROVIDERS.find((x) => x.type === p.type)?.label ?? p.type}
+              status={t(p.status === 'connected' ? 'storage.status.connected' : 'storage.status.reconnect')}
+              statusTone={p.status === 'connected' ? 'ok' : 'warn'}
+              onPress={() => s.open('external', p)}
+            />
+          ))}
           <LocationCard
-            icon="logo-google"
-            title="Google Drive"
-            subtitle={t('storage.locations.externalSub')}
-            status={t('storage.status.soon')}
+            icon="add-circle-outline"
+            title={t('storage.connectExternal')}
+            subtitle={t('storage.connectExternalSub')}
+            status=""
             statusTone="dim"
-            disabled
-            onPress={soon}
-          />
-          <LocationCard
-            icon="logo-dropbox"
-            title="Dropbox"
-            subtitle={t('storage.locations.externalSub')}
-            status={t('storage.status.soon')}
-            statusTone="dim"
-            disabled
-            onPress={soon}
-          />
-          <LocationCard
-            icon="server-outline"
-            title={t('storage.locations.nas')}
-            subtitle={t('storage.locations.nasSub')}
-            status={t('storage.status.soon')}
-            statusTone="dim"
-            disabled
-            onPress={soon}
+            onPress={() => router.push('/profile')}
           />
           <TransferList transfers={s.transfers} onRetry={s.retry} onClear={s.clearFinished} />
         </ScrollView>
@@ -212,7 +219,10 @@ export default function StorageScreen() {
 
   // ── böngésző ──
   const isDevice = s.location === 'device';
-  const rootName = t(isDevice ? 'storage.locations.device' : 'storage.locations.remix');
+  const isExternal = s.location === 'external';
+  const rootName = isExternal
+    ? (s.external?.label ?? t('storage.external'))
+    : t(isDevice ? 'storage.locations.device' : 'storage.locations.remix');
   const crumbs = breadcrumbs(s.path);
   // a projekt-mappa gyökerén állunk-e → projekt-kártya a lista tetején
   const pathOwner = s.projectAt(s.path);
@@ -240,7 +250,11 @@ export default function StorageScreen() {
       {/* HOL vannak ezek a fájlok — egy törlés/átnevezés itt valódi változás */}
       <View style={styles.whereBadge}>
         <Ionicons name={isDevice ? 'phone-portrait-outline' : 'cloud-outline'} size={14} color={palette.textDim} />
-        <Text style={styles.whereText}>{t(isDevice ? 'storage.whereDevice' : 'storage.whereRemix')}</Text>
+        <Text style={styles.whereText}>
+          {isExternal
+            ? t('storage.whereExternal', { name: rootName })
+            : t(isDevice ? 'storage.whereDevice' : 'storage.whereRemix')}
+        </Text>
       </View>
 
       <View style={styles.toolbar}>
@@ -281,14 +295,21 @@ export default function StorageScreen() {
               <Ionicons name="cloud-download-outline" size={22} color={palette.text} />
             </Pressable>
           )}
-          <Pressable onPress={() => void s.confirmDelete([...s.selected])} hitSlop={6}>
-            <Ionicons name="trash-outline" size={22} color={palette.danger} />
-          </Pressable>
+          {isExternal ? null : (
+            <>
+              <Pressable onPress={() => setMoving([...s.selected])} hitSlop={6}>
+                <Ionicons name="folder-open-outline" size={22} color={palette.text} />
+              </Pressable>
+              <Pressable onPress={() => void s.confirmDelete([...s.selected])} hitSlop={6}>
+                <Ionicons name="trash-outline" size={22} color={palette.danger} />
+              </Pressable>
+            </>
+          )}
           <Pressable onPress={s.clearSelection} hitSlop={6}>
             <Ionicons name="close" size={22} color={palette.textDim} />
           </Pressable>
         </View>
-      ) : (
+      ) : isExternal ? null : (
         <View style={styles.actionsRow}>
           <Pressable onPress={s.startMkdir} style={styles.actionBtn}>
             <Ionicons name="folder-open-outline" size={16} color={palette.text} />
@@ -364,10 +385,23 @@ export default function StorageScreen() {
 
       <ActionSheet
         entry={action}
-        hint={t(isDevice ? 'storage.onDevice' : 'storage.inRemix')}
+        hint={isExternal ? rootName : t(isDevice ? 'storage.onDevice' : 'storage.inRemix')}
         actions={action ? actionsFor(action) : []}
         onClose={() => setAction(null)}
       />
+      {s.location === 'device' || s.location === 'remix' ? (
+        <FolderPickerSheet
+          visible={moving !== null}
+          location={s.location}
+          moving={moving ?? []}
+          onClose={() => setMoving(null)}
+          onPick={(dir) => {
+            const paths = moving ?? [];
+            setMoving(null);
+            void s.moveTo(paths, dir);
+          }}
+        />
+      ) : null}
       <RenameModal
         visible={s.dialog !== null}
         title={t(s.dialog?.mode === 'mkdir' ? 'storage.newFolder' : 'common.rename')}

@@ -3857,19 +3857,14 @@
       "remix": "ReMix Storage",
       "remixSub": "Your cloud storage · Cloudflare R2",
       "device": "My Device",
-      "deviceSub": "Local files · {{used}} here · {{free}} free on the phone",
-      "externalSub": "External cloud",
-      "nas": "My NAS",
-      "nasSub": "Your network storage (WebDAV)"
+      "deviceSub": "Local files · {{used}} here · {{free}} free on the phone"
     },
     "status": {
       "connected": "Connected",
       "signIn": "Sign in",
       "available": "Available",
-      "soon": "Coming soon"
+      "reconnect": "Reconnect needed"
     },
-    "soonTitle": "Coming to My Storage",
-    "soonBody": "You can already connect external storage (Drive, Dropbox, WebDAV, S3) under Profile → Storage. Browsing them here in My Storage comes in the next phase.",
     "openProfile": "Open profile",
     "whereDevice": "These files are on your phone — available offline and not counted against your cloud quota.",
     "whereRemix": "These files are in the ReMix cloud (R2) — deleting here is permanent, and they count against your storage quota.",
@@ -3980,6 +3975,14 @@
       "cardSub_one": "{{count}} item · {{size}} · restorable",
       "cardSub_other": "{{count}} items · {{size}} · restorable",
       "retention": "30 days"
-    }
+    },
+    "move": "Move…",
+    "moveTitle": "Move here",
+    "moveHere": "Move to: {{folder}}",
+    "noSubfolders": "No subfolders.",
+    "newProjectFrom": "New project from this · {{studio}} studio",
+    "whereExternal": "These files are in your {{name}} storage — read-only here; downloading makes a copy on your phone.",
+    "connectExternal": "Connect external storage",
+    "connectExternalSub": "Google Drive, Dropbox, OneDrive, WebDAV / NAS, S3 — under Profile → Storage"
   }
 }

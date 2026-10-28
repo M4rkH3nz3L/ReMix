@@ -3857,19 +3857,14 @@
       "remix": "ReMix Storage",
       "remixSub": "Saját felhőtárhely · Cloudflare R2",
       "device": "Eszközöm",
-      "deviceSub": "Helyi fájlok · {{used}} itt · {{free}} szabad a telefonon",
-      "externalSub": "Külső felhő",
-      "nas": "Saját NAS",
-      "nasSub": "Saját hálózati tárhely (WebDAV)"
+      "deviceSub": "Helyi fájlok · {{used}} itt · {{free}} szabad a telefonon"
     },
     "status": {
       "connected": "Csatlakoztatva",
       "signIn": "Jelentkezz be",
       "available": "Elérhető",
-      "soon": "Hamarosan"
+      "reconnect": "Újracsatlakozás kell"
     },
-    "soonTitle": "Hamarosan a Tárhelyemben",
-    "soonBody": "Külső tárhelyet (Drive, Dropbox, WebDAV, S3) már most is beköthetsz a Profil → Tárhely részen. A böngészésük itt, a Tárhelyemben a következő fázisban érkezik.",
     "openProfile": "Profil megnyitása",
     "whereDevice": "Ezek a fájlok a telefonodon vannak — internet nélkül is elérhetők, és nem terhelik a felhő-kvótát.",
     "whereRemix": "Ezek a fájlok a ReMix felhőben (R2) vannak — a törlés innen végleges, és a tárhely-kvótádba számítanak.",
@@ -3980,6 +3975,14 @@
       "cardSub_one": "{{count}} elem · {{size}} · visszaállítható",
       "cardSub_other": "{{count}} elem · {{size}} · visszaállítható",
       "retention": "30 nap"
-    }
+    },
+    "move": "Áthelyezés…",
+    "moveTitle": "Áthelyezés ide",
+    "moveHere": "Áthelyezés ide: {{folder}}",
+    "noSubfolders": "Nincs almappa.",
+    "newProjectFrom": "Új projekt ebből · {{studio}} stúdió",
+    "whereExternal": "Ezek a fájlok a(z) {{name}} tárhelyeden vannak — itt csak olvashatók; a letöltés másolatot készít a telefonodra.",
+    "connectExternal": "Külső tárhely csatlakoztatása",
+    "connectExternalSub": "Google Drive, Dropbox, OneDrive, WebDAV / NAS, S3 — a Profil → Tárhely részen"
   }
 }

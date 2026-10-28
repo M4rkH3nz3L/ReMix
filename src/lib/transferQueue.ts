@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t as tr } from 'i18next';
 import { useSyncExternalStore } from 'react';
 
-import { RemixFilesError, remixDownloadToDevice, remixUpload } from '@/lib/remixFilesClient';
+import { RemixFilesError, downloadUrlToDevice, remixDownloadToDevice, remixUpload } from '@/lib/remixFilesClient';
 
 /**
  * 🔁 A Tárhelyem átviteli sora (Sync Center csírája) — KÉPERNYŐ-FÜGGETLEN modul:
@@ -14,9 +14,10 @@ import { RemixFilesError, remixDownloadToDevice, remixUpload } from '@/lib/remix
 
 export interface Transfer {
   id: string;
-  direction: 'up' | 'down';
+  /** up = eszköz→ReMix · down = ReMix→eszköz · fetch = külső forrás (URL)→eszköz */
+  direction: 'up' | 'down' | 'fetch';
   name: string;
-  /** feltöltésnél az eszköz-uri, letöltésnél a felhő-út */
+  /** feltöltésnél az eszköz-uri, letöltésnél a felhő-út, `fetch`-nél a (tokenes) URL */
   source: string;
   /** feltöltésnél a felhő-mappa, letöltésnél az eszköz-mappa */
   targetDir: string;
@@ -110,7 +111,9 @@ function pump(): void {
   const job =
     next.direction === 'up'
       ? remixUpload(next.source, next.targetDir, next.name, onProgress).then((r) => r.deduplicated)
-      : remixDownloadToDevice(next.source, next.targetDir, onProgress).then(() => false);
+      : next.direction === 'fetch'
+        ? downloadUrlToDevice(next.source, next.targetDir, next.name, onProgress).then(() => false)
+        : remixDownloadToDevice(next.source, next.targetDir, onProgress).then(() => false);
   job
     .then((deduplicated) => patch(next.id, { status: 'done', progress: 1, deduplicated }))
     .catch((err) => patch(next.id, { status: 'failed', error: errorText(err) }))

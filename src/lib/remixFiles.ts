@@ -6,8 +6,8 @@
  * egyértelművé teszi, HOL van a fájl — egy külső/felhős törlés valódi törlés.
  */
 
-/** A tárhely-helyek. A `device` és a `remix` él; a többi a roadmap (lásd devs/tasks/Storage/06). */
-export type StorageLocationId = 'device' | 'remix' | 'gdrive' | 'dropbox' | 'nas';
+/** `external` = a user bekötött külső forrása (Drive/Dropbox/WebDAV/S3 — a `sourceId` azonosítja) */
+export type StorageLocationId = 'device' | 'remix' | 'external';
 
 /** Fájltípus-csoport a szűréshez és a „melyik stúdióba nyíljon" döntéshez. */
 export type FileKind = 'video' | 'image' | 'audio' | 'project' | 'document' | 'other';
@@ -24,6 +24,9 @@ export interface StorageEntry {
   modified?: string | null;
   /** eszközön a natív `file://` uri (megnyitáshoz/feltöltéshez) */
   uri?: string;
+  /** külső forrásnál: a forrás azonosítója és a (tokenes) letöltő-URL */
+  sourceId?: string;
+  url?: string;
 }
 
 export type SortKey = 'name' | 'size' | 'modified' | 'kind';

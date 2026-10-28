@@ -2,6 +2,7 @@ import { Directory, File, Paths, UploadType } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
+import { listProviderFiles } from '@/lib/externalStorage';
 import { type StorageEntry, joinPath, parentPath } from '@/lib/remixFiles';
 import { workerAuthHeaders, workerJsonHeaders } from '@/lib/workerAuth';
 
@@ -157,18 +158,37 @@ export async function remixDownloadToDevice(
   deviceDir: string,
   onProgress?: (fraction: number) => void
 ): Promise<string> {
-  const name = path.slice(path.lastIndexOf('/') + 1);
+  return downloadUrlToDevice(
+    `${cloudBaseUrl()}/files/download?path=${encodeURIComponent(path)}`,
+    deviceDir,
+    path.slice(path.lastIndexOf('/') + 1),
+    onProgress,
+    await workerAuthHeaders()
+  );
+}
+
+/**
+ * 🡇 Bármely (hitelesített vagy capability-tokenes) URL letöltése az Eszközöm `deviceDir`
+ * mappájába: `.part` ideiglenes névre, sikerkor átnevezés (félkész fájl nem látszik
+ * késznek); ütköző név → `név (1)`. A végleges Tárhelyem-relatív utat adja.
+ */
+export async function downloadUrlToDevice(
+  url: string,
+  deviceDir: string,
+  name: string,
+  onProgress?: (fraction: number) => void,
+  headers?: Record<string, string>
+): Promise<string> {
   const dir = deviceDirectory(deviceDir);
   if (!dir.exists) {
     dir.create({ intermediates: true, idempotent: true });
   }
   const finalName = freeName(dir, name);
   const target = new File(dir, finalName);
-  // a részleges letöltés ne maradjon „kész" fájlként: ideiglenes névre, majd átnevezés
   const partial = new File(dir, `${finalName}.part`);
   try {
-    await File.downloadFileAsync(`${cloudBaseUrl()}/files/download?path=${encodeURIComponent(path)}`, partial, {
-      headers: await workerAuthHeaders(),
+    await File.downloadFileAsync(url, partial, {
+      ...(headers ? { headers } : {}),
       idempotent: true,
       onProgress: onProgress
         ? ({ bytesWritten, totalBytes }) => onProgress(totalBytes > 0 ? bytesWritten / totalBytes : 0)
@@ -182,6 +202,25 @@ export async function remixDownloadToDevice(
     throw err;
   }
   return joinPath(deviceDir, target.name);
+}
+
+// ── Külső tárhely (Drive / Dropbox / WebDAV / S3 — a worker proxyján át) ─────────
+
+/**
+ * Egy bekötött külső forrás fájljai (CSAK olvasható nézet: a worker a média-fájlokat
+ * laposan listázza, ≤200 elem). Az `url` capability-tokenes, abszolút letöltő-URL.
+ */
+export async function externalList(sourceId: string): Promise<StorageEntry[]> {
+  const entries = await listProviderFiles(sourceId);
+  return entries.map((e) => ({
+    location: 'external' as const,
+    sourceId,
+    path: e.path ?? e.name,
+    name: e.name,
+    isFolder: false,
+    size: e.size,
+    url: /^https?:\/\//i.test(e.url) ? e.url : `${cloudBaseUrl()}${e.url}`,
+  }));
 }
 
 // ── Eszközöm (a telefon) ──────────────────────────────────────────────────────
@@ -272,6 +311,22 @@ export function deviceRename(path: string, newName: string): void {
     throw new RemixFilesError('exists', 409, 'exists');
   }
   deviceNode(path).rename(newName.trim());
+}
+
+/** Áthelyezés az Eszközömön belül egy másik mappába (a név marad; ütközés → `exists`). */
+export function deviceMove(path: string, toDir: string): void {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  if (toDir === path || toDir.startsWith(`${path}/`)) {
+    throw new RemixFilesError('bad_path', 400, 'bad_path');
+  }
+  const target = deviceDirectory(toDir);
+  if (!target.exists) {
+    target.create({ intermediates: true, idempotent: true });
+  }
+  if (target.list().some((n) => n.name === name)) {
+    throw new RemixFilesError('exists', 409, 'exists');
+  }
+  deviceNode(path).moveSync(target);
 }
 
 /** A rendszer fájlválasztójával kiválasztott fájlok bemásolása a `dir` mappába. */

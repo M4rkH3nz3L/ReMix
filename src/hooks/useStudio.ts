@@ -1,4 +1,4 @@
-import { type Href, router, useFocusEffect } from 'expo-router';
+import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList } from 'react-native';
@@ -15,6 +15,8 @@ import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from 
 import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
 import { makeId } from '@/lib/id';
 import { pickSourceAsset, type SourceKind } from '@/lib/projectSource';
+import { fileKindOf, studioForKind } from '@/lib/remixFiles';
+import { importFromStorage } from '@/lib/storageImport';
 import {
   createEmptyProject,
   parseHashtags,
@@ -125,6 +127,43 @@ export function useStudio() {
     setAudioTarget('music');
     setSources([]);
   };
+
+  // 🗂️→🎬 „Új projekt ebből" a Tárhelyemből: a fájl forrásként, a fajtájának megfelelő
+  // stúdióval és a fájlnévből képzett névvel nyitja az Új projekt űrlapot (a SEO-mezőket
+  // a user tölti ki). A fájl a projekt első megnyitásakor a projekt-mappájába kerül.
+  const openParams = useLocalSearchParams<{ openLoc?: string; openPath?: string; openUri?: string }>();
+  const handledOpen = useRef<string | null>(null);
+  useEffect(() => {
+    const { openLoc, openPath, openUri } = openParams;
+    if (!openPath || (openLoc !== 'device' && openLoc !== 'remix')) {
+      return;
+    }
+    const key = `${openLoc}:${openPath}`;
+    if (handledOpen.current === key) {
+      return;
+    }
+    handledOpen.current = key;
+    const fileName = openPath.slice(openPath.lastIndexOf('/') + 1);
+    const studio = studioForKind(fileKindOf(fileName));
+    if (!studio) {
+      return;
+    }
+    void importFromStorage({ location: openLoc, path: openPath, name: fileName, isFolder: false, uri: openUri })
+      .then((asset) => {
+        if (!asset) {
+          return;
+        }
+        resetCreateForm();
+        setKind(studio);
+        setName(fileName.replace(/\.[^.]+$/, ''));
+        setSources([asset]);
+        setCreating(true);
+      })
+      .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+      .finally(() => router.setParams({ openLoc: undefined, openPath: undefined, openUri: undefined }));
+    // a resetCreateForm stabil setterekből áll; a paraméter-kulcs a valódi trigger
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParams.openLoc, openParams.openPath, openParams.openUri]);
 
   // 🗂️ egy támogatott forrás-fájl hozzáadása a leendő projekt forrás-mappájához
   const addSource = (sk: SourceKind) => {

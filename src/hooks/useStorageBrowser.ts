@@ -20,6 +20,7 @@ import {
   deviceImport,
   deviceList,
   deviceMkdir,
+  deviceMove,
   deviceRename,
   deviceSpace,
   deviceUri,
@@ -27,9 +28,11 @@ import {
   remixDelete,
   remixList,
   remixMkdir,
+  externalList,
   remixMove,
   remixTrashList,
 } from '@/lib/remixFilesClient';
+import { type ConnectedProvider, fetchConnectedProviders } from '@/lib/externalStorage';
 import { PROJECTS_DIR, projectFolderPath, protectionOf } from '@/lib/projectFolder';
 import { referencedDevicePaths } from '@/lib/projectFolderClient';
 import { listProjects, loadProject } from '@/lib/storage';
@@ -43,7 +46,8 @@ import {
 } from '@/lib/transferQueue';
 import type { ProjectMeta } from '@/types/project';
 
-export type BrowsableLocation = 'device' | 'remix';
+/** `external` = egy bekötött külső forrás (CSAK olvasható; a `external` állapot mondja meg, melyik) */
+export type BrowsableLocation = 'device' | 'remix' | 'external';
 
 export type { Transfer } from '@/lib/transferQueue';
 
@@ -79,6 +83,9 @@ export function useStorageBrowser() {
   const [projects, setProjects] = useState<Map<string, ProjectMeta>>(new Map());
   /** 🗑️ a ReMix Storage Lomtárának összesítője (null = nem elérhető / kijelentkezve) */
   const [trash, setTrash] = useState<{ count: number; bytes: number } | null>(null);
+  /** a bekötött külső források (Drive/Dropbox/WebDAV/S3) + a megnyitott */
+  const [providers, setProviders] = useState<ConnectedProvider[]>([]);
+  const [external, setExternal] = useState<ConnectedProvider | null>(null);
 
   const errorText = useCallback(
     (err: unknown) => {
@@ -101,6 +108,9 @@ export function useStorageBrowser() {
       .catch(() => {
         // eszköz-statisztika best-effort
       });
+    void fetchConnectedProviders()
+      .then(setProviders)
+      .catch(() => setProviders([]));
     void remixTrashList()
       .then((r) => setTrash({ count: r.items.length, bytes: r.bytes }))
       .catch(() => setTrash(null));
@@ -120,14 +130,22 @@ export function useStorageBrowser() {
     setLoading(true);
     setError(null);
     try {
-      setEntries(location === 'device' ? deviceList(path) : await remixList(path));
+      setEntries(
+        location === 'device'
+          ? deviceList(path)
+          : location === 'external'
+            ? external
+              ? await externalList(external.id)
+              : []
+            : await remixList(path)
+      );
     } catch (err) {
       setEntries([]);
       setError(errorText(err));
     } finally {
       setLoading(false);
     }
-  }, [location, path, errorText]);
+  }, [location, path, errorText, external]);
 
   useEffect(() => {
     // a betöltés halasztva indul (nem szinkron setState az effektben)
@@ -139,7 +157,8 @@ export function useStorageBrowser() {
     [entries, kind, query, sortKey, sortDesc]
   );
 
-  const open = useCallback((loc: BrowsableLocation | null) => {
+  const open = useCallback((loc: BrowsableLocation | null, provider?: ConnectedProvider) => {
+    setExternal(loc === 'external' ? (provider ?? null) : null);
     setLocation(loc);
     setPath('');
     setSelected(new Set());
@@ -301,6 +320,34 @@ export function useStorageBrowser() {
     [location, t, errorText, reload, refreshStats, blockedReason]
   );
 
+  /** 📂 Áthelyezés egy másik mappába (ugyanazon a helyen); a védett elemek nem mozdulnak. */
+  const moveTo = useCallback(
+    async (paths: string[], dir: string) => {
+      if (!location || !paths.length) {
+        return;
+      }
+      const blocked = await blockedReason(paths);
+      if (blocked) {
+        Alert.alert(t('storage.protect.title'), blocked);
+        return;
+      }
+      try {
+        for (const p of paths) {
+          if (location === 'device') {
+            deviceMove(p, dir);
+          } else {
+            await remixMove(p, joinPath(dir, p.slice(p.lastIndexOf('/') + 1)));
+          }
+        }
+      } catch (err) {
+        Alert.alert(t('storage.title'), errorText(err));
+      }
+      setSelected(new Set());
+      await reload();
+    },
+    [location, blockedReason, t, errorText, reload]
+  );
+
   // ── átviteli sor: a képernyőtől független, tartós modul (`transferQueue`) ──
   const enqueue = enqueueTransfers;
   const retry = retryTransfer;
@@ -335,11 +382,16 @@ export function useStorageBrowser() {
       enqueue(
         items
           .filter((e) => !e.isFolder)
-          .map((e) => ({ direction: 'down' as const, name: e.name, source: e.path, targetDir: parentPath(e.path) }))
+          .map((e) =>
+            e.location === 'external' && e.url
+              ? // külső forrásból → Eszközöm › Letöltések › <forrás neve>
+                { direction: 'fetch' as const, name: e.name, source: e.url, targetDir: `Letöltések/${(external?.label ?? 'Külső').replace(/[/\\]+/g, '-')}` }
+              : { direction: 'down' as const, name: e.name, source: e.path, targetDir: parentPath(e.path) }
+          )
       );
       setSelected(new Set());
     },
-    [enqueue]
+    [enqueue, external]
   );
 
   /** „Hozzáadás": eszközön a rendszer-fájlválasztóból bemásol; felhőben a választott fájlokat feltölti. */
@@ -401,6 +453,7 @@ export function useStorageBrowser() {
     startRename,
     submitDialog,
     confirmDelete,
+    moveTo,
     transfers,
     retry,
     clearFinished,
@@ -411,6 +464,8 @@ export function useStorageBrowser() {
     usage,
     device,
     trash,
+    providers,
+    external,
     refreshStats,
     projects,
     projectAt,

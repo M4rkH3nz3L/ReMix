@@ -3827,19 +3827,14 @@
       "remix": "ReMix Storage",
       "remixSub": "Eigener Cloudspeicher · Cloudflare R2",
       "device": "Mein Gerät",
-      "deviceSub": "Lokale Dateien · {{used}} hier · {{free}} frei auf dem Handy",
-      "externalSub": "Externe Cloud",
-      "nas": "Mein NAS",
-      "nasSub": "Eigener Netzwerkspeicher (WebDAV)"
+      "deviceSub": "Lokale Dateien · {{used}} hier · {{free}} frei auf dem Handy"
     },
     "status": {
       "connected": "Verbunden",
       "signIn": "Anmelden",
       "available": "Verfügbar",
-      "soon": "Demnächst"
+      "reconnect": "Neu verbinden nötig"
     },
-    "soonTitle": "Demnächst in Mein Speicher",
-    "soonBody": "Externe Speicher (Drive, Dropbox, WebDAV, S3) kannst du schon jetzt unter Profil → Speicher verbinden. Das Durchsuchen hier in Mein Speicher folgt in der nächsten Phase.",
     "openProfile": "Profil öffnen",
     "whereDevice": "Diese Dateien liegen auf deinem Handy — offline verfügbar und ohne Cloud-Kontingent.",
     "whereRemix": "Diese Dateien liegen in der ReMix-Cloud (R2) — Löschen ist hier endgültig, und sie zählen zu deinem Speicherkontingent.",
@@ -3950,6 +3945,14 @@
       "cardSub_one": "{{count}} Element · {{size}} · wiederherstellbar",
       "cardSub_other": "{{count}} Elemente · {{size}} · wiederherstellbar",
       "retention": "30 Tage"
-    }
+    },
+    "move": "Verschieben…",
+    "moveTitle": "Hierher verschieben",
+    "moveHere": "Verschieben nach: {{folder}}",
+    "noSubfolders": "Keine Unterordner.",
+    "newProjectFrom": "Neues Projekt daraus · {{studio}}-Studio",
+    "whereExternal": "Diese Dateien liegen in deinem Speicher {{name}} — hier nur lesbar; Herunterladen legt eine Kopie auf deinem Handy an.",
+    "connectExternal": "Externen Speicher verbinden",
+    "connectExternalSub": "Google Drive, Dropbox, OneDrive, WebDAV / NAS, S3 — unter Profil → Speicher"
   }
 }

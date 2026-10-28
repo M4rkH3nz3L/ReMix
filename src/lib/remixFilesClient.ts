@@ -83,8 +83,37 @@ export async function remixMkdir(dir: string, name: string): Promise<void> {
   await post('/files/folder', { path: dir, name: name.trim() });
 }
 
-export async function remixDelete(paths: string[]): Promise<{ removed: number; bytes: number }> {
-  return post('/files/delete', { paths });
+/** Törlés a ReMix Storage-ból — alapból a 🗑️ Lomtárba (30 napig visszaállítható); `permanent` → végleges. */
+export async function remixDelete(
+  paths: string[],
+  permanent = false
+): Promise<{ removed: number; bytes: number; trashed: boolean }> {
+  return post('/files/delete', { paths, ...(permanent ? { permanent: true } : {}) });
+}
+
+export interface TrashItem {
+  id: string;
+  /** az eredeti (visszaállítási) út */
+  path: string;
+  name: string;
+  isFolder: boolean;
+  bytes: number;
+  count: number;
+  deletedAt: string;
+  expiresAt: string;
+}
+
+/** A Lomtár tartalma (a lejárt elemeket a szerver ilyenkor véglegesen kitakarítja). */
+export async function remixTrashList(): Promise<{ items: TrashItem[]; retentionDays: number; bytes: number }> {
+  return call('/files/trash', { headers: await workerAuthHeaders() });
+}
+
+export async function remixTrashRestore(ids: string[]): Promise<{ restored: { path: string; name: string }[] }> {
+  return post('/files/trash/restore', { ids });
+}
+
+export async function remixTrashPurge(ids: string[] | 'all'): Promise<{ removed: number; bytes: number }> {
+  return post('/files/trash/purge', ids === 'all' ? { all: true } : { ids });
 }
 
 export async function remixMove(from: string, to: string): Promise<void> {

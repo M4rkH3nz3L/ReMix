@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert } from 'react-native';
 
@@ -25,35 +25,27 @@ import {
   deviceUri,
   deviceUsedBytes,
   remixDelete,
-  remixDownloadToDevice,
   remixList,
   remixMkdir,
   remixMove,
-  remixUpload,
+  remixTrashList,
 } from '@/lib/remixFilesClient';
 import { PROJECTS_DIR, projectFolderPath, protectionOf } from '@/lib/projectFolder';
 import { referencedDevicePaths } from '@/lib/projectFolderClient';
 import { listProjects, loadProject } from '@/lib/storage';
 import { type StorageUsage, fetchStorageUsage } from '@/lib/storageQuota';
+import {
+  clearFinishedTransfers,
+  enqueueTransfers,
+  onTransferSettled,
+  retryTransfer,
+  useTransfers,
+} from '@/lib/transferQueue';
 import type { ProjectMeta } from '@/types/project';
 
 export type BrowsableLocation = 'device' | 'remix';
 
-/** Egy átvitel a Sync-sorban. Állapotok a spec szerint: várakozik / folyamatban / kész / sikertelen. */
-export interface Transfer {
-  id: string;
-  direction: 'up' | 'down';
-  name: string;
-  /** feltöltésnél az eszköz-uri, letöltésnél a felhő-út */
-  source: string;
-  /** feltöltésnél a felhő-mappa, letöltésnél az eszköz-mappa */
-  targetDir: string;
-  progress: number;
-  status: 'pending' | 'active' | 'done' | 'failed';
-  error?: string;
-  /** a szerver felismerte, hogy már fent van (idempotens újrapróbálás) */
-  deduplicated?: boolean;
-}
+export type { Transfer } from '@/lib/transferQueue';
 
 interface NameDialog {
   mode: 'mkdir' | 'rename';
@@ -80,11 +72,13 @@ export function useStorageBrowser() {
   const [grid, setGrid] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<NameDialog | null>(null);
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const transfers = useTransfers();
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [device, setDevice] = useState({ used: 0, free: 0, total: 0 });
   /** élő projektek a mappájuk szerint (a Tárhelyem-védelemhez és a címkékhez) */
   const [projects, setProjects] = useState<Map<string, ProjectMeta>>(new Map());
+  /** 🗑️ a ReMix Storage Lomtárának összesítője (null = nem elérhető / kijelentkezve) */
+  const [trash, setTrash] = useState<{ count: number; bytes: number } | null>(null);
 
   const errorText = useCallback(
     (err: unknown) => {
@@ -107,6 +101,9 @@ export function useStorageBrowser() {
       .catch(() => {
         // eszköz-statisztika best-effort
       });
+    void remixTrashList()
+      .then((r) => setTrash({ count: r.items.length, bytes: r.bytes }))
+      .catch(() => setTrash(null));
     void listProjects()
       .then((metas) => setProjects(new Map(metas.filter((m) => m.folder).map((m) => [m.folder as string, m]))))
       .catch(() => {});
@@ -304,54 +301,20 @@ export function useStorageBrowser() {
     [location, t, errorText, reload, refreshStats, blockedReason]
   );
 
-  // ── átviteli sor (soros, egyszerre egy) ──
-  const enqueue = useCallback((items: Omit<Transfer, 'id' | 'progress' | 'status'>[]) => {
-    setTransfers((prev) => [
-      ...prev,
-      ...items.map((it, i) => ({
-        ...it,
-        id: `${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-        progress: 0,
-        status: 'pending' as const,
-      })),
-    ]);
-  }, []);
+  // ── átviteli sor: a képernyőtől független, tartós modul (`transferQueue`) ──
+  const enqueue = enqueueTransfers;
+  const retry = retryTransfer;
+  const clearFinished = clearFinishedTransfers;
 
-  const patch = useCallback((id: string, p: Partial<Transfer>) => {
-    setTransfers((prev) => prev.map((x) => (x.id === id ? { ...x, ...p } : x)));
-  }, []);
-
-  const running = useRef(false);
-  useEffect(() => {
-    if (running.current) {
-      return;
-    }
-    const next = transfers.find((x) => x.status === 'pending');
-    if (!next) {
-      return;
-    }
-    running.current = true;
-    const onProgress = (f: number) => patch(next.id, { progress: f });
-    Promise.resolve()
-      .then(() => {
-        patch(next.id, { status: 'active', progress: 0, error: undefined });
-        return next.direction === 'up'
-          ? remixUpload(next.source, next.targetDir, next.name, onProgress).then((r) => ({ deduplicated: r.deduplicated }))
-          : remixDownloadToDevice(next.source, next.targetDir, onProgress).then(() => ({ deduplicated: false }));
-      })
-      .then((r) => patch(next.id, { status: 'done', progress: 1, deduplicated: r.deduplicated }))
-      .catch((err) => patch(next.id, { status: 'failed', error: errorText(err) }))
-      .finally(() => {
-        running.current = false;
+  // befejezett átvitel után a lista + a statisztika frissül (ha a képernyő nyitva van)
+  useEffect(
+    () =>
+      onTransferSettled(() => {
         refreshStats();
         void reload();
-        // a következő elem indítása: üres patch → új render → az effekt újrafut
-        setTransfers((prev) => [...prev]);
-      });
-  }, [transfers, patch, errorText, refreshStats, reload]);
-
-  const retry = useCallback((id: string) => patch(id, { status: 'pending', progress: 0, error: undefined }), [patch]);
-  const clearFinished = useCallback(() => setTransfers((prev) => prev.filter((x) => x.status !== 'done')), []);
+      }),
+    [refreshStats, reload]
+  );
 
   /** Eszköz → ReMix Storage: a fájl a felhőben UGYANABBA a relatív mappába kerül (másolat, nem szinkron). */
   const copyToRemix = useCallback(
@@ -447,6 +410,8 @@ export function useStorageBrowser() {
     share,
     usage,
     device,
+    trash,
+    refreshStats,
     projects,
     projectAt,
     open,

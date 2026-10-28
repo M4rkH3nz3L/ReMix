@@ -186,3 +186,73 @@ describe('createUserFiles (lokális backend)', () => {
     await expect(svc.open('u1', 'nincs.txt')).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe('Lomtár (lokális backend)', () => {
+  let svc;
+  let ledger;
+  let tmp;
+  const src = (name, body) => {
+    const p = path.join(tmp, name);
+    fs.writeFileSync(p, body);
+    return p;
+  };
+  beforeEach(() => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'uf-trash-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'uf-trash-src-'));
+    ledger = {
+      rows: new Map(),
+      wouldExceed: async () => ({ exceeded: false }),
+      async recordObject(_u, { key, bytes }) {
+        this.rows.set(key, bytes);
+      },
+      async forgetObject(_u, _b, key) {
+        this.rows.delete(key);
+      },
+      async moveObject(_u, _b, from, to) {
+        this.rows.set(to, this.rows.get(from));
+        this.rows.delete(from);
+      },
+    };
+    svc = createUserFiles({ backend: localBackend(root), ledger });
+  });
+
+  test('törlés → Lomtár (kvótában marad) → visszaállítás az eredeti helyre', async () => {
+    await svc.mkdir('u1', '', 'Klipek');
+    await svc.upload('u1', 'Klipek', { localPath: src('a.mp4', 'hello'), name: 'a.mp4' });
+    const t = await svc.trash('u1', 'Klipek/a.mp4');
+    expect(t).toMatchObject({ removed: 1, bytes: 5 });
+    expect((await svc.list('u1', 'Klipek')).files).toEqual([]);
+    const { items } = await svc.listTrash('u1');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ path: 'Klipek/a.mp4', name: 'a.mp4', bytes: 5, isFolder: false });
+    expect([...ledger.rows.values()]).toEqual([5]); // a Lomtár is a kvótába számít
+    await svc.restoreTrash('u1', items[0].id);
+    expect((await svc.list('u1', 'Klipek')).files.map((f) => f.name)).toEqual(['a.mp4']);
+    expect((await svc.listTrash('u1')).items).toEqual([]);
+    expect(ledger.rows.get('files/u1/Klipek/a.mp4')).toBe(5);
+  });
+
+  test('mappa a Lomtárba; visszaállításkor ütköző név → (1)', async () => {
+    await svc.mkdir('u1', '', 'X');
+    await svc.upload('u1', 'X', { localPath: src('b.wav', 'abc'), name: 'b.wav' });
+    await svc.trash('u1', 'X');
+    await svc.mkdir('u1', '', 'X');
+    const { items } = await svc.listTrash('u1');
+    expect(items[0]).toMatchObject({ isFolder: true, count: 1 });
+    const r = await svc.restoreTrash('u1', items[0].id);
+    expect(r.name).toBe('X (1)');
+    expect((await svc.list('u1', 'X (1)')).files.map((f) => f.name)).toEqual(['b.wav']);
+  });
+
+  test('végleges törlés + lejárt elemek automatikus takarítása', async () => {
+    await svc.upload('u1', '', { localPath: src('c.png', '1234'), name: 'c.png' });
+    await svc.upload('u1', '', { localPath: src('d.png', '12'), name: 'd.png' });
+    const { id } = await svc.trash('u1', 'c.png');
+    await svc.trash('u1', 'd.png');
+    expect(await svc.purgeTrash('u1', [id])).toEqual({ removed: 1, bytes: 4 });
+    const later = Date.now() + 31 * 86400000;
+    expect((await svc.listTrash('u1', later)).items).toEqual([]);
+    expect(ledger.rows.size).toBe(0);
+    await expect(svc.restoreTrash('u1', '../x')).rejects.toMatchObject({ status: 400 });
+  });
+});

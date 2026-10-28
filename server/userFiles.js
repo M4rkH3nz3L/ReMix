@@ -25,6 +25,9 @@ const MAX_DEPTH = 20;
 const MAX_PATH = 512;
 /** egy mappa-törlés/átnevezés legfeljebb ennyi objektumot érint (védőkorlát) */
 const MAX_TREE = 1000;
+/** 🗑️ a Lomtár megőrzési ideje (nap) — utána a listázáskor véglegesen törlődik */
+const TRASH_RETENTION_DAYS = 30;
+const TRASH_META = '.meta.json';
 
 class UserFilesError extends Error {
   constructor(status, code, message) {
@@ -94,6 +97,11 @@ function userRoot(uid) {
   return `files/${id}/`;
 }
 
+/** A user Lomtár-prefixe (a fájlok mellett, a user gyökerén KÍVÜL — a böngészőben nem látszik). */
+function userTrash(uid) {
+  return `trash/${userRoot(uid).slice('files/'.length)}`;
+}
+
 /** Ütköző név feloldása: `video.mp4` → `video (1).mp4` → `video (2).mp4` … */
 function nextFreeName(name, taken) {
   if (!taken.has(name)) {
@@ -127,6 +135,7 @@ function md5OfFile(localPath) {
 // head(key)       → { size, modified, etag } | null
 // put(key, localPath, contentType) · putEmpty(key) · remove(key) · copy(from, to)
 // stream(key)     → { body: Readable, size, contentType } | null
+// putText(key, text) · readText(key) → string | null   (kis metaadat-fájlokhoz)
 
 function localBackend(rootDir) {
   const abs = (key) => {
@@ -219,13 +228,24 @@ function localBackend(rootDir) {
       }
       return { body: fs.createReadStream(p), size: fs.statSync(p).size, contentType: null };
     },
+    async putText(key, text) {
+      const dest = abs(key);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, text);
+    },
+    async readText(key) {
+      const p = abs(key);
+      return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
+    },
   };
 }
 
 function s3Backend() {
   const sdk = require('@aws-sdk/client-s3');
   const send = (cmd) => s3.client().send(cmd);
-  const Bucket = s3.BUCKET;
+  // 🔒 a user-fájlok SAJÁT (privát, publikus domain nélküli) bucketbe mehetnek — ugyanaz
+  // az R2-fiók/kulcs; hiányában a közös média-bucket (amin publikus r2.dev domain lehet)
+  const Bucket = filesBucket();
   const isMissing = (err) => err?.name === 'NotFound' || err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404;
   return {
     kind: 's3',
@@ -286,13 +306,21 @@ function s3Backend() {
       }
     },
     async put(key, localPath, contentType) {
-      await s3.uploadFile(key, localPath, contentType);
+      await send(
+        new sdk.PutObjectCommand({
+          Bucket,
+          Key: key,
+          Body: fs.createReadStream(localPath),
+          ContentLength: fs.statSync(localPath).size,
+          ContentType: contentType || 'application/octet-stream',
+        })
+      );
     },
     async putEmpty(key) {
       await send(new sdk.PutObjectCommand({ Bucket, Key: key, Body: '', ContentLength: 0 }));
     },
     async remove(key) {
-      await s3.deleteFile(key);
+      await send(new sdk.DeleteObjectCommand({ Bucket, Key: key }));
     },
     async copy(from, to) {
       const src = `${Bucket}/${from.split('/').map(encodeURIComponent).join('/')}`;
@@ -309,7 +337,28 @@ function s3Backend() {
         throw err;
       }
     },
+    async putText(key, text) {
+      await send(
+        new sdk.PutObjectCommand({ Bucket, Key: key, Body: text, ContentType: 'application/json', ContentLength: Buffer.byteLength(text) })
+      );
+    },
+    async readText(key) {
+      try {
+        const r = await send(new sdk.GetObjectCommand({ Bucket, Key: key }));
+        return await r.Body.transformToString();
+      } catch (err) {
+        if (isMissing(err)) {
+          return null;
+        }
+        throw err;
+      }
+    },
   };
+}
+
+/** A user-fájlok bucketje: `S3_FILES_BUCKET` (privát), különben a közös `S3_BUCKET`. */
+function filesBucket() {
+  return (process.env.S3_FILES_BUCKET || '').trim() || s3.BUCKET;
 }
 
 /** A futás-időben érvényes backend (a env-et lustán olvassuk → tesztelhető). */
@@ -460,6 +509,46 @@ function createUserFiles({ backend, ledger, bucket = 'renders' }) {
     return { removed: tree.filter((o) => !o.key.endsWith(`/${MARKER}`)).length, bytes };
   }
 
+  /**
+   * Egy fájl (vagy mappa-fa) forrás→cél kulcspárjai. `fromKey` = a teljes kulcs
+   * (fájl) vagy mappa-prefix (perjel nélkül); `toBase` ugyanígy.
+   */
+  async function pairsFor(fromKey, toBase) {
+    const file = await backend.head(fromKey);
+    if (file) {
+      return { pairs: [{ from: fromKey, to: toBase, size: file.size }], isFolder: false };
+    }
+    const tree = await backend.listAll(`${fromKey}/`);
+    if (!tree.length) {
+      throw notFound();
+    }
+    if (tree.length > MAX_TREE) {
+      throw new UserFilesError(413, 'too_many', 'Túl sok elem egyszerre — végezd részenként.');
+    }
+    return {
+      pairs: tree.map((obj) => ({ from: obj.key, to: `${toBase}/${obj.key.slice(fromKey.length + 1)}`, size: obj.size })),
+      isFolder: true,
+    };
+  }
+
+  /**
+   * Áthelyezés ADATVESZTÉS NÉLKÜL: MINDENT átmásolunk és ellenőrzünk, a forrás csak
+   * ezután törlődik; a kvóta-főkönyv követi a kulcsot (a bájt nem változik).
+   */
+  async function relocate(uid, pairs) {
+    for (const pr of pairs) {
+      await backend.copy(pr.from, pr.to);
+      const head = await backend.head(pr.to);
+      if (!head || head.size !== pr.size) {
+        throw new UserFilesError(502, 'verify_failed', 'Az áthelyezett példány ellenőrzése nem sikerült.');
+      }
+    }
+    for (const pr of pairs) {
+      await ledger.moveObject(uid, bucket, pr.from, pr.to);
+      await backend.remove(pr.from);
+    }
+  }
+
   /** Átnevezés / áthelyezés (fájl vagy mappa): másolás → ellenőrzés → régi törlése. */
   async function move(uid, rawFrom, rawTo) {
     const from = normalizePath(rawFrom);
@@ -481,36 +570,116 @@ function createUserFiles({ backend, ledger, bucket = 'renders' }) {
     if (destTaken) {
       throw new UserFilesError(409, 'exists', 'Már létezik ilyen nevű elem.');
     }
-    const fromKey = `${root}${from}`;
-    const pairs = [];
-    const file = await backend.head(fromKey);
-    if (file) {
-      pairs.push({ from: fromKey, to: `${root}${to}`, size: file.size });
-    } else {
-      const tree = await backend.listAll(`${fromKey}/`);
-      if (!tree.length) {
-        throw notFound();
-      }
-      if (tree.length > MAX_TREE) {
-        throw new UserFilesError(413, 'too_many', 'Túl sok elem egyszerre.');
-      }
-      for (const obj of tree) {
-        pairs.push({ from: obj.key, to: `${root}${to}/${obj.key.slice(fromKey.length + 1)}`, size: obj.size });
-      }
-    }
-    // 1) MINDENT átmásolunk és ellenőrzünk — a forrás csak ezután törlődik
-    for (const pr of pairs) {
-      await backend.copy(pr.from, pr.to);
-      const head = await backend.head(pr.to);
-      if (!head || head.size !== pr.size) {
-        throw new UserFilesError(502, 'verify_failed', 'Az áthelyezett példány ellenőrzése nem sikerült.');
-      }
-    }
-    for (const pr of pairs) {
-      await ledger.moveObject(uid, bucket, pr.from, pr.to);
-      await backend.remove(pr.from);
-    }
+    const { pairs } = await pairsFor(`${root}${from}`, `${root}${to}`);
+    await relocate(uid, pairs);
     return { path: to, name: baseName(to) };
+  }
+
+  // ── 🗑️ Lomtár ────────────────────────────────────────────────────────────────
+  // A törölt elem a `trash/<uid>/<id>/<eredeti út>` alá kerül + egy `.meta.json`
+  // (eredeti út, idő, méret). A Lomtár a kvótába számít; 30 nap után a listázás
+  // véglegesen kitakarítja. Visszaállításkor ütköző név → `név (1)`.
+
+  async function trash(uid, rawPath) {
+    const p = normalizePath(rawPath);
+    if (!p) {
+      throw badPath('A gyökér nem törölhető.');
+    }
+    const id = `${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+    const base = `${userTrash(uid)}${id}`;
+    const { pairs, isFolder } = await pairsFor(`${userRoot(uid)}${p}`, `${base}/${p}`);
+    const bytes = pairs.reduce((a, pr) => a + pr.size, 0);
+    const count = pairs.filter((pr) => !pr.from.endsWith(`/${MARKER}`)).length;
+    await backend.putText(
+      `${base}/${TRASH_META}`,
+      JSON.stringify({ path: p, isFolder, bytes, count, deletedAt: new Date().toISOString() })
+    );
+    await relocate(uid, pairs);
+    return { id, removed: count, bytes };
+  }
+
+  async function purgeTrashItem(uid, id) {
+    const prefix = `${userTrash(uid)}${id}/`;
+    let bytes = 0;
+    for (const obj of await backend.listAll(prefix)) {
+      await backend.remove(obj.key);
+      await ledger.forgetObject(uid, bucket, obj.key);
+      if (!obj.key.endsWith(`/${TRASH_META}`)) {
+        bytes += obj.size; // a metaadat-fájl nem a user bájtja
+      }
+    }
+    return bytes;
+  }
+
+  const cleanId = (id) => {
+    const v = String(id ?? '');
+    if (!/^[a-z0-9]+-[a-f0-9]{6}$/.test(v)) {
+      throw badPath('Érvénytelen Lomtár-azonosító.');
+    }
+    return v;
+  };
+
+  async function listTrash(uid, now = Date.now()) {
+    const { folders } = await backend.list(userTrash(uid));
+    const items = [];
+    for (const id of folders) {
+      const raw = await backend.readText(`${userTrash(uid)}${id}/${TRASH_META}`).catch(() => null);
+      let meta = null;
+      try {
+        meta = raw ? JSON.parse(raw) : null;
+      } catch {
+        meta = null;
+      }
+      const deletedAt = meta?.deletedAt ? Date.parse(meta.deletedAt) : now;
+      const expiresAt = deletedAt + TRASH_RETENTION_DAYS * 86400000;
+      if (!meta || expiresAt <= now) {
+        await purgeTrashItem(uid, id); // lejárt / sérült bejegyzés → végleges törlés
+        continue;
+      }
+      items.push({
+        id,
+        path: meta.path,
+        name: baseName(meta.path),
+        isFolder: Boolean(meta.isFolder),
+        bytes: Number(meta.bytes || 0),
+        count: Number(meta.count || 0),
+        deletedAt: meta.deletedAt,
+        expiresAt: new Date(expiresAt).toISOString(),
+      });
+    }
+    items.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+    return { items, retentionDays: TRASH_RETENTION_DAYS, bytes: items.reduce((a, i) => a + i.bytes, 0) };
+  }
+
+  async function restoreTrash(uid, rawId) {
+    const id = cleanId(rawId);
+    const base = `${userTrash(uid)}${id}`;
+    const raw = await backend.readText(`${base}/${TRASH_META}`);
+    if (!raw) {
+      throw notFound();
+    }
+    const meta = JSON.parse(raw);
+    const orig = normalizePath(meta.path);
+    // ütközés az eredeti helyen → szabad név ugyanabban a szülő-mappában
+    const parent = parentOf(orig);
+    const siblings = await backend.list(parent ? `${userRoot(uid)}${parent}/` : userRoot(uid));
+    const name = nextFreeName(baseName(orig), new Set([...siblings.folders, ...siblings.files.map((f) => f.name)]));
+    const target = joinPath(parent, name);
+    const { pairs } = await pairsFor(`${base}/${orig}`, `${userRoot(uid)}${target}`);
+    await relocate(uid, pairs);
+    await backend.remove(`${base}/${TRASH_META}`);
+    return { path: target, name };
+  }
+
+  async function purgeTrash(uid, ids) {
+    let bytes = 0;
+    let removed = 0;
+    const list = ids === 'all' ? (await backend.list(userTrash(uid))).folders : ids.map(cleanId);
+    for (const id of list) {
+      bytes += await purgeTrashItem(uid, id);
+      removed += 1;
+    }
+    return { removed, bytes };
   }
 
   async function open(uid, rawPath) {
@@ -525,11 +694,12 @@ function createUserFiles({ backend, ledger, bucket = 'renders' }) {
     return { ...s, name: baseName(p) };
   }
 
-  return { list, mkdir, upload, remove, move, open };
+  return { list, mkdir, upload, remove, move, open, trash, listTrash, restoreTrash, purgeTrash };
 }
 
 module.exports = {
   MARKER,
+  TRASH_RETENTION_DAYS,
   UserFilesError,
   normalizePath,
   cleanSegment,
@@ -540,5 +710,6 @@ module.exports = {
   md5OfFile,
   localBackend,
   resolveBackend,
+  filesBucket,
   createUserFiles,
 };

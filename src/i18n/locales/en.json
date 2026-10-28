@@ -3904,7 +3904,7 @@
     "deleteTitle_one": "Delete {{count}} item?",
     "deleteTitle_other": "Delete {{count}} items?",
     "deleteDeviceBody": "The files will be deleted from your phone. Copies in the ReMix cloud are not affected.",
-    "deleteRemixBody": "The files will be permanently deleted from the ReMix cloud (R2) and the space freed. Copies on your phone are not affected.",
+    "deleteRemixBody": "The files go to the ReMix Trash: restorable for 30 days, then permanently deleted. Copies on your phone are not affected.",
     "nameErrors": {
       "empty": "Enter a name.",
       "invalid": "The name can’t contain “/” and can’t be “.” or “..”.",
@@ -3964,6 +3964,22 @@
         "quota": "Storage full ({{missing}} missing)",
         "offline": "Offline — will retry on next save"
       }
+    },
+    "trash": {
+      "title": "Trash",
+      "hint": "Items deleted from ReMix Storage stay here for {{days}} days and can be restored to their original place. Trash counts against your storage — deleting permanently frees space.",
+      "summary_one": "{{count}} item · {{size}}",
+      "summary_other": "{{count}} items · {{size}}",
+      "empty": "Empty trash",
+      "emptyTitle": "Empty the trash?",
+      "purgeTitle": "Delete permanently?",
+      "purgeBody": "The item will be permanently deleted from the ReMix cloud and can’t be restored.",
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "isEmpty": "Trash is empty.",
+      "cardSub_one": "{{count}} item · {{size}} · restorable",
+      "cardSub_other": "{{count}} items · {{size}} · restorable",
+      "retention": "30 days"
     }
   }
 }

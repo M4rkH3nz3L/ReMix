@@ -42,15 +42,18 @@ export function model3dAsset(input: {
   size?: number;
   /** textúrás-e (alapból igen — a fotogrammetria USDZ-je) */
   textured?: boolean;
+  /** 📁 a cél-mappa URI-ja (a projekt mappája); hiányában a régi `<documentDir>/media/` */
+  mediaDirUri?: string;
 }): Asset {
   if (!isStorableFormat(input.format, input.textured ?? true)) {
     throw new Error(`model3dAsset: a(z) ${input.format} nem tárolható egy fájlként`);
   }
-  const dir = input.documentDir.endsWith('/') ? input.documentDir : `${input.documentDir}/`;
+  const base = input.mediaDirUri ?? `${input.documentDir.replace(/\/?$/, '/')}media`;
+  const dir = base.endsWith('/') ? base : `${base}/`;
   return {
     id: input.assetId,
     kind: 'model',
-    uri: `${dir}media/${model3dMediaFileName(input.assetId, input.format)}`,
+    uri: `${dir}${model3dMediaFileName(input.assetId, input.format)}`,
     provider: 'local',
     name: input.name,
     ...(input.size !== undefined ? { size: input.size } : {}),

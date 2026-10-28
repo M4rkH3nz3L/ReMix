@@ -3874,7 +3874,7 @@
     "deleteTitle_one": "{{count}} Element löschen?",
     "deleteTitle_other": "{{count}} Elemente löschen?",
     "deleteDeviceBody": "Die Dateien werden von deinem Handy gelöscht. Kopien in der ReMix-Cloud bleiben erhalten.",
-    "deleteRemixBody": "Die Dateien werden endgültig aus der ReMix-Cloud (R2) gelöscht und der Platz freigegeben. Kopien auf deinem Handy bleiben erhalten.",
+    "deleteRemixBody": "Die Dateien landen im ReMix-Papierkorb: 30 Tage wiederherstellbar, danach endgültig gelöscht. Kopien auf deinem Handy bleiben erhalten.",
     "nameErrors": {
       "empty": "Gib einen Namen ein.",
       "invalid": "Der Name darf kein „/“ enthalten und nicht „.“ oder „..“ sein.",
@@ -3934,6 +3934,22 @@
         "quota": "Speicher voll ({{missing}} fehlen)",
         "offline": "Offline — nächster Versuch beim Speichern"
       }
+    },
+    "trash": {
+      "title": "Papierkorb",
+      "hint": "Aus ReMix Storage gelöschte Elemente bleiben {{days}} Tage hier und lassen sich an ihren ursprünglichen Ort zurücklegen. Der Papierkorb zählt zu deinem Speicher — endgültiges Löschen gibt Platz frei.",
+      "summary_one": "{{count}} Element · {{size}}",
+      "summary_other": "{{count}} Elemente · {{size}}",
+      "empty": "Papierkorb leeren",
+      "emptyTitle": "Papierkorb leeren?",
+      "purgeTitle": "Endgültig löschen?",
+      "purgeBody": "Das Element wird endgültig aus der ReMix-Cloud gelöscht und kann nicht wiederhergestellt werden.",
+      "daysLeft_one": "noch {{count}} Tag",
+      "daysLeft_other": "noch {{count}} Tage",
+      "isEmpty": "Der Papierkorb ist leer.",
+      "cardSub_one": "{{count}} Element · {{size}} · wiederherstellbar",
+      "cardSub_other": "{{count}} Elemente · {{size}} · wiederherstellbar",
+      "retention": "30 Tage"
     }
   }
 }

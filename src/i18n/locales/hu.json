@@ -3904,7 +3904,7 @@
     "deleteTitle_one": "{{count}} elem törlése?",
     "deleteTitle_other": "{{count}} elem törlése?",
     "deleteDeviceBody": "A fájlok a telefonodról törlődnek. A ReMix felhőben lévő másolatokat ez nem érinti.",
-    "deleteRemixBody": "A fájlok végleg törlődnek a ReMix felhőből (R2), a hely felszabadul. A telefonodon lévő példányokat ez nem érinti.",
+    "deleteRemixBody": "A fájlok a ReMix Lomtárába kerülnek: 30 napig visszaállíthatók, utána véglegesen törlődnek. A telefonodon lévő példányokat ez nem érinti.",
     "nameErrors": {
       "empty": "Adj meg egy nevet.",
       "invalid": "A név nem tartalmazhat „/” jelet, és nem lehet „.” vagy „..”.",
@@ -3964,6 +3964,22 @@
         "quota": "Betelt a tárhely ({{missing}} hiányzik)",
         "offline": "Offline — a következő mentéskor újrapróbálja"
       }
+    },
+    "trash": {
+      "title": "Lomtár",
+      "hint": "A ReMix Storage-ból törölt elemek {{days}} napig itt maradnak, és visszaállíthatók az eredeti helyükre. A Lomtár a tárhelyedbe számít — a végleges törlés szabadít fel helyet.",
+      "summary_one": "{{count}} elem · {{size}}",
+      "summary_other": "{{count}} elem · {{size}}",
+      "empty": "Lomtár ürítése",
+      "emptyTitle": "Üríted a Lomtárat?",
+      "purgeTitle": "Végleges törlés?",
+      "purgeBody": "Az elem véglegesen törlődik a ReMix felhőből, nem állítható vissza.",
+      "daysLeft_one": "még {{count}} nap",
+      "daysLeft_other": "még {{count}} nap",
+      "isEmpty": "A Lomtár üres.",
+      "cardSub_one": "{{count}} elem · {{size}} · visszaállítható",
+      "cardSub_other": "{{count}} elem · {{size}} · visszaállítható",
+      "retention": "30 nap"
     }
   }
 }

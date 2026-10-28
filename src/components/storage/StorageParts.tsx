@@ -6,7 +6,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { type FileKind, type StorageEntry, fileKindOf, quotaLevel } from '@/lib/remixFiles';
 import { formatBytes } from '@/lib/storageQuota';
-import type { Transfer } from '@/hooks/useStorageBrowser';
+import type { Transfer } from '@/lib/transferQueue';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 

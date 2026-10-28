@@ -28,6 +28,7 @@ import {
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
 import type { Model3DDoc, Model3DMesh } from '@/types/model3d';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 
 type Phase = 'empty' | 'capturing' | 'meshScanning' | 'reconstructing' | 'viewer';
 
@@ -132,21 +133,20 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     setSavingMesh(true);
     const assetId = makeId('ast');
     try {
-      new Directory(Paths.document, 'media').create({ intermediates: true, idempotent: true });
       // USDZ, ha a ModelIO ezen az eszközön tud ilyet írni; különben OBJ (textúra nélkül egy fájl)
       let format: 'usdz' | 'obj' = 'usdz';
-      let target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, name: project.name, textured: false });
+      let target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
       let res;
       try {
         res = await meshRef.current.exportMesh(target.uri);
       } catch (e) {
         if (remix3dErrorKey(e) !== 'model3d.error.unsupported') throw e;
         format = 'obj';
-        target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, name: project.name, textured: false });
+        target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
         res = await meshRef.current.exportMesh(target.uri);
       }
       void meshRef.current.pause();
-      const posterUri = `${Paths.document.uri.replace(/\/?$/, '/')}media/m3d_${assetId}_poster.png`;
+      const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
       const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
@@ -201,12 +201,11 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     setProgress(0);
     const sub = Remix3D.addListener('onReconstructProgress', (e) => setProgress(e.progress));
     const assetId = makeId('ast');
-    const target = model3dAsset({ assetId, format: 'usdz', documentDir: Paths.document.uri, name: project.name });
+    const target = model3dAsset({ assetId, format: 'usdz', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name });
     try {
-      new Directory(Paths.document, 'media').create({ intermediates: true, idempotent: true });
       const uri = await Remix3D.reconstruct(captureDirFor(projectId).uri, target.uri, 'medium');
       const info = await Remix3D.inspectModel(uri);
-      const posterUri = `${Paths.document.uri.replace(/\/?$/, '/')}media/m3d_${assetId}_poster.png`;
+      const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
       const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),

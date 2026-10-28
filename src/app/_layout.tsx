@@ -19,6 +19,7 @@ import { ensureLocalAiReady } from '@/lib/localAiBootstrap';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
 import { PUBLIC_WEB_SCREENS } from '@/lib/webSurface';
 import { setActiveProjectFolder } from '@/lib/projectFolderClient';
+import { hydrateTransfers } from '@/lib/transferQueue';
 
 // 📁 A nyitott projekt mappája az aktív média-cél (Files/Projektek/<folder>): minden
 // import/felvétel/generált média ide kerül — bármelyik stúdió tölti is be a projektet.
@@ -138,6 +139,12 @@ export default function RootLayout() {
   // guard egy verifikált-TOTP usert már AAL1-en beengedne → MFA-bypass. (Faktor nélküli
   // usernél mfaPending mindig false → a viselkedés változatlan.)
   const authed = useAuth((s) => s.session != null && !s.mfaPending);
+  // 🔁 a Tárhelyem félbemaradt átviteleinek folytatása (app-újraindítás után is) — belépve
+  useEffect(() => {
+    if (authed && Platform.OS !== 'web') {
+      void hydrateTransfers();
+    }
+  }, [authed]);
   // 🐞 a hibajelentésekhez: bejelentkezett-e (a user-id-t a szerver a tokenből veszi)
   useEffect(() => {
     setBugSignedIn(authed);

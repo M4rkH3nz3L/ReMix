@@ -22,6 +22,7 @@ import {
   TransferList,
 } from '@/components/storage/StorageParts';
 import { ProjectSyncSection } from '@/components/storage/ProjectSyncSection';
+import { TrashView } from '@/components/storage/TrashView';
 import { RenameModal } from '@/components/studio/RenameModal';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
@@ -45,6 +46,7 @@ export default function StorageScreen() {
   const s = useStorageBrowser();
   const { t } = s;
   const [action, setAction] = useState<StorageEntry | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
   const selecting = s.selected.size > 0;
   const { project: projectParam } = useLocalSearchParams<{ project?: string }>();
   const { open, go } = s;
@@ -123,6 +125,19 @@ export default function StorageScreen() {
     </View>
   );
 
+  // ── 🗑️ Lomtár ──
+  if (trashOpen) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+        {header(t('storage.trash.title'), () => {
+          setTrashOpen(false);
+          s.refreshStats();
+        })}
+        <TrashView onChanged={s.refreshStats} />
+      </SafeAreaView>
+    );
+  }
+
   // ── áttekintő: a helyek ──
   if (!s.location) {
     const u = s.usage;
@@ -141,6 +156,16 @@ export default function StorageScreen() {
             quota={u?.quotaBytes}
             onPress={() => s.open('remix')}
           />
+          {s.trash ? (
+            <LocationCard
+              icon="trash-outline"
+              title={t('storage.trash.title')}
+              subtitle={t('storage.trash.cardSub', { count: s.trash.count, size: formatBytes(s.trash.bytes) })}
+              status={t('storage.trash.retention')}
+              statusTone="dim"
+              onPress={() => setTrashOpen(true)}
+            />
+          ) : null}
           <LocationCard
             icon="phone-portrait-outline"
             title={t('storage.locations.device')}

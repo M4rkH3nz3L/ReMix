@@ -59,8 +59,18 @@ describe('files domain-router (e2e)', () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('hello world');
 
+    // törlés → Lomtár → visszaállítás → végleges törlés
     res = await fetch(`${base}/files/delete`, json({ userId: 'user1', paths: ['Projekt anyag'] }));
-    expect(await res.json()).toEqual({ removed: 1, bytes: 11 });
+    expect(await res.json()).toEqual({ removed: 1, bytes: 11, trashed: true });
+    res = await fetch(`${base}/files/trash?${q}`);
+    const trash = await res.json();
+    expect(trash.items.map((i) => i.path)).toEqual(['Projekt anyag']);
+    res = await fetch(`${base}/files/trash/restore`, json({ userId: 'user1', ids: [trash.items[0].id] }));
+    expect((await res.json()).restored[0].path).toBe('Projekt anyag');
+    res = await fetch(`${base}/files/delete`, json({ userId: 'user1', paths: ['Projekt anyag'], permanent: true }));
+    expect(await res.json()).toEqual({ removed: 1, bytes: 11, trashed: false });
+    res = await fetch(`${base}/files/trash?${q}`);
+    expect((await res.json()).items).toEqual([]);
   });
 
   test('kiszökő út → 400, nem létező → 404', async () => {

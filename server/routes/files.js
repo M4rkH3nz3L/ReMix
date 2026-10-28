@@ -7,8 +7,11 @@
 //   POST /files/folder            { path, name } → { name, path }
 //   POST /files/upload            multipart `media` + path [+ md5] → { name, path, size, md5 }
 //   GET  /files/download?path=    → a fájl bájtjai (stream)
-//   POST /files/delete            { paths[] } → { removed, bytes }
+//   POST /files/delete            { paths[], permanent? } → { removed, bytes } (alap: Lomtárba)
 //   POST /files/move              { from, to } → { path, name } (átnevezés is)
+//   GET  /files/trash             → { items[], retentionDays, bytes } (lejártak takarítva)
+//   POST /files/trash/restore     { ids[] } → { restored[] }
+//   POST /files/trash/purge       { ids[] | all:true } → { removed, bytes }
 
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +22,7 @@ const { rateLimit } = require('../security/rateLimit');
 const { upload } = require('../lib/upload');
 const { BUCKET } = require('../mediastore');
 const quota = require('../quota');
-const { UserFilesError, createUserFiles, resolveBackend } = require('../userFiles');
+const { UserFilesError, createUserFiles, filesBucket, resolveBackend } = require('../userFiles');
 
 const router = express.Router();
 
@@ -32,7 +35,11 @@ const ledger = {
 };
 
 function service() {
-  return createUserFiles({ backend: resolveBackend(), ledger, bucket: BUCKET });
+  // főkönyvi címke: a privát files-bucket neve, ha be van állítva; különben a régi
+  // média-címke (a már rögzített sorok így továbbra is párosulnak törléskor)
+  const backend = resolveBackend();
+  const label = backend?.kind === 's3' && (process.env.S3_FILES_BUCKET || '').trim() ? filesBucket() : BUCKET;
+  return createUserFiles({ backend, ledger, bucket: label });
 }
 
 /** Async handler + egységes hibaválasz (Express 4 nem kapja el az async-dobást). */
@@ -131,14 +138,59 @@ router.post(
       return;
     }
     const svc = service();
+    // 🗑️ alapból a Lomtárba (30 napig visszaállítható); `permanent` → azonnali végleges törlés
+    const permanent = req.body?.permanent === true;
     let removed = 0;
     let bytes = 0;
     for (const p of paths) {
-      const r = await svc.remove(uid, p);
+      const r = permanent ? await svc.remove(uid, p) : await svc.trash(uid, p);
       removed += r.removed;
       bytes += r.bytes;
     }
-    res.json({ removed, bytes });
+    res.json({ removed, bytes, trashed: !permanent });
+  })
+);
+
+router.get(
+  '/files/trash',
+  requireAuth,
+  handle(async (_req, res, uid) => {
+    res.json(await service().listTrash(uid));
+  })
+);
+
+router.post(
+  '/files/trash/restore',
+  requireAuth,
+  rateLimit('messaging'),
+  express.json({ limit: '16kb' }),
+  handle(async (req, res, uid) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 200) : [];
+    if (!ids.length) {
+      res.status(400).json({ error: 'Nincs kijelölt elem.' });
+      return;
+    }
+    const svc = service();
+    const restored = [];
+    for (const id of ids) {
+      restored.push(await svc.restoreTrash(uid, id));
+    }
+    res.json({ restored });
+  })
+);
+
+router.post(
+  '/files/trash/purge',
+  requireAuth,
+  rateLimit('messaging'),
+  express.json({ limit: '16kb' }),
+  handle(async (req, res, uid) => {
+    const ids = req.body?.all === true ? 'all' : Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 200) : [];
+    if (ids !== 'all' && !ids.length) {
+      res.status(400).json({ error: 'Nincs kijelölt elem.' });
+      return;
+    }
+    res.json(await service().purgeTrash(uid, ids));
   })
 );
 

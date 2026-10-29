@@ -3572,7 +3572,8 @@
       "wireframe": "Netz",
       "wireframe_off": "Netz: aus",
       "wireframe_overlay": "Netz auf der Fläche",
-      "wireframe_only": "Nur Netz"
+      "wireframe_only": "Nur Netz",
+      "loadFailed": "Die Modelldatei konnte nicht geladen werden. Fehlt sie auf dem Telefon, stelle sie aus der Cloud-Sicherung wieder her (Mein Speicher)."
     },
     "error": {
       "needsNewBuild": "Dafür ist eine neuere App-Version nötig (neuer Build).",

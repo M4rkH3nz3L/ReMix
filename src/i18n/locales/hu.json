@@ -3602,7 +3602,8 @@
       "wireframe": "Háló",
       "wireframe_off": "Háló: ki",
       "wireframe_overlay": "Háló a felületen",
-      "wireframe_only": "Csak a háló"
+      "wireframe_only": "Csak a háló",
+      "loadFailed": "A modellfájl nem tölthető be. Ha a telefonról hiányzik, a felhő-mentésből visszaállítható (Tárhelyem)."
     },
     "error": {
       "needsNewBuild": "Ehhez az app újabb változata kell (új build).",

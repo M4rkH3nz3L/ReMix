@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ProjectEvent } from '@/lib/commands';
+import { rebaseDocumentUris } from '@/lib/docUri';
 import { makeId } from '@/lib/id';
 import { migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
 import { addTombstones, removeTombstones } from '@/lib/projectTombstones';
@@ -61,6 +62,21 @@ async function withProjectFolder(project: Project): Promise<{ project: Project; 
     return await prepareProjectFolder(project, () => otherStoredDocs(project.id));
   } catch {
     return { project, changed: false };
+  }
+}
+
+/**
+ * 📂 A tárolt JSON régi iOS-konténeres `file://` uri-jainak átírása az AKTUÁLIS
+ * Documents-mappára (újratelepítés/frissítés után a konténer-azonosító változhat —
+ * lásd `docUri.ts`). Best-effort: FS-modul nélkül (teszt/web) változatlan.
+ */
+async function rebaseStoredUris(raw: string): Promise<{ raw: string; rebased: boolean }> {
+  try {
+    const { Paths } = await import('expo-file-system');
+    const next = rebaseDocumentUris(raw, Paths.document.uri);
+    return { raw: next, rebased: next !== raw };
+  } catch {
+    return { raw, rebased: false };
   }
 }
 
@@ -178,10 +194,12 @@ async function clearTombstone(id: string): Promise<void> {
 }
 
 export async function loadProject(id: string): Promise<Project | null> {
-  const raw = await AsyncStorage.getItem(projectKey(id));
-  if (!raw) {
+  const stored = await AsyncStorage.getItem(projectKey(id));
+  if (!stored) {
     return null;
   }
+  // 📂 a régi app-konténerre mutató média-uri-k → az aktuálisra (különben a média „eltűnik")
+  const { raw, rebased } = await rebaseStoredUris(stored);
   let project: Project;
   try {
     // régi sémák automatikus felhozása (v1 → v2: asset-registry)
@@ -192,7 +210,7 @@ export async function loadProject(id: string): Promise<Project | null> {
   // 📁 a projekt a TELEFONON él, saját mappában — a szerkesztő már a mappás
   // (átvett médiájú) projektet kapja, így a memóriában sosem marad régi uri
   const prepared = await withProjectFolder(project);
-  if (prepared.changed) {
+  if (prepared.changed || rebased) {
     await saveProject(prepared.project);
   }
   return prepared.project;
@@ -326,11 +344,12 @@ export async function duplicateProject(id: string, copyLabel = 'másolat'): Prom
 
 /** 🕓 A projekt mentett verziói (külön kulcson, mint az események). */
 export async function loadVersions(projectId: string): Promise<ProjectVersion[]> {
-  const raw = await AsyncStorage.getItem(versionsKey(projectId));
-  if (!raw) {
+  const stored = await AsyncStorage.getItem(versionsKey(projectId));
+  if (!stored) {
     return [];
   }
   try {
+    const { raw } = await rebaseStoredUris(stored);
     const list = JSON.parse(raw) as ProjectVersion[];
     return Array.isArray(list) ? list : [];
   } catch {
@@ -428,11 +447,12 @@ export async function writeRecovery(project: Project, events: ProjectEvent[]): P
 }
 
 export async function readRecovery(id: string): Promise<RecoverySnapshot | null> {
-  const raw = await AsyncStorage.getItem(recoveryKey(id));
-  if (!raw) {
+  const stored = await AsyncStorage.getItem(recoveryKey(id));
+  if (!stored) {
     return null;
   }
   try {
+    const { raw } = await rebaseStoredUris(stored);
     const snap = JSON.parse(raw) as RecoverySnapshot;
     if (!snap || !snap.project || typeof snap.at !== 'string') {
       return null;

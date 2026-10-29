@@ -3602,7 +3602,8 @@
       "wireframe": "Mesh",
       "wireframe_off": "Mesh: off",
       "wireframe_overlay": "Mesh on surface",
-      "wireframe_only": "Mesh only"
+      "wireframe_only": "Mesh only",
+      "loadFailed": "The model file couldn't be loaded. If it's missing from the phone, restore it from the cloud backup (My Storage)."
     },
     "error": {
       "needsNewBuild": "This needs a newer version of the app (new build).",

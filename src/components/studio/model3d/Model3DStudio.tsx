@@ -61,6 +61,9 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const mesh = current?.mesh;
   const asset = current?.asset;
   const [exportOpen, setExportOpen] = useState(false);
+  // 🩹 a néző nem tudta betölteni a modellfájlt (hiányzik / sérült) → ne üres vászon legyen
+  const [loadFailedUri, setLoadFailedUri] = useState<string | null>(null);
+  const loadFailed = !!asset && loadFailedUri === asset.uri;
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
@@ -469,7 +472,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           background={bg}
           autoRotate={autoRotate}
           wireframe={wireframe}
+          onLoad={() => setLoadFailedUri(null)}
+          onError={() => setLoadFailedUri(asset.uri)}
         />
+        {loadFailed ? (
+          <View style={styles.loadFailed} pointerEvents="none">
+            <Text style={[styles.dim, styles.centerText]}>{t('model3d.viewer.loadFailed')}</Text>
+          </View>
+        ) : null}
       </View>
       <Text style={[styles.dim, styles.centerText, styles.stats]}>
         {t('model3d.viewer.stats', {
@@ -529,6 +539,7 @@ const styles = StyleSheet.create({
   title: { color: palette.text, fontSize: 17, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 24 },
   centerText: { textAlign: 'center' },
+  loadFailed: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emoji: { fontSize: 48 },
   bigText: { color: palette.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   dim: { color: palette.textDim, fontSize: 13, lineHeight: 19 },

@@ -31,6 +31,8 @@ export interface StillOptions {
   pitch?: number;
   size?: number;
   transparent?: boolean;
+  /** a gyorsítótárba írja (csak megosztáshoz — ne gyűljön a projekt mappájában) */
+  toCache?: boolean;
 }
 
 /** 🖼️ Állókép a modellből → PNG uri (alap: átlátszó háttér, enyhén felülről). */
@@ -38,7 +40,7 @@ export async function renderModelStill(modelUri: string, opts: StillOptions = {}
   if (!Remix3D) {
     throw new Error('model3d.error.unsupported');
   }
-  const out = new File(projectMediaDir(), `m3d_still_${makeId('img')}.png`);
+  const out = new File(opts.toCache ? Paths.cache : projectMediaDir(), `m3d_still_${makeId('img')}.png`);
   const size = opts.size ?? 1024;
   return Remix3D.snapshotFile(
     modelUri,
@@ -59,6 +61,8 @@ export interface TurntableOptions {
   pitch?: number;
   /** `#rrggbb` háttér (null → a stúdió sötét alapja) */
   background?: string | null;
+  /** a gyorsítótárba írja (csak megosztáshoz — ne gyűljön a projekt mappájában) */
+  toCache?: boolean;
 }
 
 /**
@@ -87,7 +91,7 @@ export async function renderModelTurntable(
   if (!plan) {
     throw new Error(errors[0] ?? 'model3d.render.errAspect');
   }
-  const out = new File(projectMediaDir(), `m3d_turntable_${makeId('vid')}.mp4`);
+  const out = new File(opts.toCache ? Paths.cache : projectMediaDir(), `m3d_turntable_${makeId('vid')}.mp4`);
   const sub = onProgress ? Remix3D.addListener('onRenderProgress', (e) => onProgress(e.progress)) : null;
   try {
     const uri = await Remix3D.renderTurntable(

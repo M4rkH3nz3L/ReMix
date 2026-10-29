@@ -3600,7 +3600,13 @@
       "title": "3D-modell készül…",
       "hint": "Ez néhány percig tart. A telefon közben melegedhet — ez normális.",
       "cancel": "Megszakítás",
-      "done": "Kész a 3D-modell"
+      "done": "Kész a 3D-modell",
+      "retry": "Újrapróbálás",
+      "discard": "Képek elvetése",
+      "leaveTitle": "Megszakítod a modell készítését?",
+      "leaveBody": "A 3D-modell még készül. Ha most kilépsz, a feldolgozás leáll.",
+      "leave": "Kilépés",
+      "stay": "Maradok"
     },
     "viewer": {
       "autoRotate": "Forgatás",
@@ -3631,6 +3637,10 @@
       "title": "Export",
       "still": "Kép a modellből",
       "stillSub": "Átlátszó hátterű PNG — megosztás vagy mentés",
+      "currentView": "Kép a jelenlegi nézetből",
+      "currentViewSub": "Abból a szögből, ahogy most forgattad — átlátszó PNG",
+      "shareUnavailable": "A megosztás ezen a készüléken most nem érhető el.",
+      "aspect": "Képarány",
       "turntable": "Forgó videó (6 mp)",
       "turntableSub": "360°-os körbeforgás, MP4 — megosztás vagy mentés",
       "fileTitle": "Modell-fájl",

@@ -242,6 +242,32 @@ export function listProjectFolderFiles(folder: string): FolderFile[] {
   return out;
 }
 
+/**
+ * 🧊 A 3D-projekt mappájából a már SEHOL nem hivatkozott 3D-fájlok törlése (régi szken
+ * „Új szken" után, elavult poszter, korábbi export-állókép). Csak az `m3d_` előtagú
+ * fájlok; a név bármely megadott dokumentumban (projekt / verziók / recovery) megtalálható
+ * → marad. Best-effort, a felszabadított bájtokat adja.
+ */
+export function pruneUnreferencedModelFiles(folder: string, docs: readonly (string | null | undefined)[]): number {
+  if (Platform.OS === 'web' || !folder) {
+    return 0;
+  }
+  let freed = 0;
+  for (const f of listProjectFolderFiles(folder)) {
+    const name = f.path.split('/').pop() ?? '';
+    if (!name.startsWith('m3d_') || docs.some((d) => d?.includes(name))) {
+      continue;
+    }
+    try {
+      new File(f.uri).delete();
+      freed += f.size;
+    } catch {
+      // a takarítás nem kritikus
+    }
+  }
+  return freed;
+}
+
 /** A projekt-mappa mérete (bájt). */
 export function projectFolderBytes(folder: string): number {
   return listProjectFolderFiles(folder).reduce((a, f) => a + f.size, 0);

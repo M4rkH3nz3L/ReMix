@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { EXPORT_FORMATS, exportWarnings } from '@/lib/model3dExport';
 import {
@@ -21,6 +22,9 @@ type IoniconName = keyof typeof Ionicons.glyphMap;
 /** a készüléken exportálható formátumok (a GLB szerver-oldali → 3D-6) */
 const LOCAL_FORMATS: MeshFormat[] = (Object.keys(EXPORT_FORMATS) as MeshFormat[]).filter((f) => EXPORT_FORMATS[f].local);
 
+/** a forgó videó választható képarányai (a közösségi platformok szokásos formái) */
+const VIDEO_ASPECTS = ['9:16', '1:1', '16:9'] as const;
+
 /**
  * 📤 A 3D-modell kivitele: 🖼️ állókép (átlátszó PNG, a projekt mappájába), 🎬 360°-os
  * forgó videó (MP4, haladással és megszakítással), 📦 modell-fájl (USDZ/OBJ/STL/PLY,
@@ -34,9 +38,12 @@ export function Model3DExportSheet({
   mesh,
   projectName,
   background,
+  onCurrentView,
 }: {
   visible: boolean;
   onClose: () => void;
+  /** 📸 állókép a néző AKTUÁLIS nézetéből (PNG uri) — ha a néző elérhető */
+  onCurrentView?: () => Promise<string>;
   modelUri: string;
   mesh: Model3DMesh;
   projectName: string;
@@ -45,11 +52,13 @@ export function Model3DExportSheet({
   const { t } = useTranslation();
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [aspect, setAspect] = useState<(typeof VIDEO_ASPECTS)[number]>('9:16');
 
   const share = async (uri: string, mimeType?: string) => {
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, mimeType ? { mimeType } : undefined);
+    if (!(await Sharing.isAvailableAsync())) {
+      throw new Error('model3d.export.shareUnavailable');
     }
+    await Sharing.shareAsync(uri, mimeType ? { mimeType } : undefined);
   };
 
   const run = async (key: string, job: () => Promise<void>) => {
@@ -72,15 +81,21 @@ export function Model3DExportSheet({
 
   const still = () =>
     run('still', async () => {
-      const uri = await renderModelStill(modelUri, { transparent: true });
+      const uri = await renderModelStill(modelUri, { transparent: true, toCache: true });
       await share(uri, 'image/png');
+    });
+
+  const currentView = () =>
+    run('current', async () => {
+      if (!onCurrentView) return;
+      await share(await onCurrentView(), 'image/png');
     });
 
   const video = () =>
     run('video', async () => {
       const { uri } = await renderModelTurntable(
         modelUri,
-        { aspectRatio: '9:16', seconds: 6, fps: 30, background },
+        { aspectRatio: aspect, seconds: 6, fps: 30, background, toCache: true },
         setProgress
       );
       await share(uri, 'video/mp4');
@@ -110,6 +125,9 @@ export function Model3DExportSheet({
           <View style={styles.grabber} />
           <Text style={styles.head}>{t('model3d.export.title')}</Text>
           <Row busy={busy} progress={progress} cancelLabel={t('common.cancel')} k="still" icon="image-outline" title={t('model3d.export.still')} sub={t('model3d.export.stillSub')} onPress={() => void still()} />
+          {onCurrentView ? (
+            <Row busy={busy} progress={progress} cancelLabel={t('common.cancel')} k="current" icon="camera-outline" title={t('model3d.export.currentView')} sub={t('model3d.export.currentViewSub')} onPress={() => void currentView()} />
+          ) : null}
           <Row
             busy={busy}
             progress={progress}
@@ -121,6 +139,13 @@ export function Model3DExportSheet({
             onPress={() => void video()}
             disabled={!turntableAvailable()}
           />
+          {turntableAvailable() ? (
+            <View style={styles.aspectRow} accessibilityLabel={t('model3d.export.aspect')}>
+              {VIDEO_ASPECTS.map((a) => (
+                <Chip key={a} label={a} active={aspect === a} onPress={() => !busy && setAspect(a)} />
+              ))}
+            </View>
+          ) : null}
           <Text style={styles.section}>{t('model3d.export.fileTitle')}</Text>
           {LOCAL_FORMATS.map((f) => (
             <Row key={f} busy={busy} progress={progress} cancelLabel={t('common.cancel')} k={f} icon="cube-outline" title={f.toUpperCase()} sub={t(EXPORT_FORMATS[f].useKey)} onPress={() => file(f)} />
@@ -158,6 +183,10 @@ function Row({
     <Pressable
       onPress={onPress}
       disabled={disabled || busy !== null}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={sub}
+      accessibilityState={{ disabled: !!disabled || busy !== null, busy: busy === k }}
       style={({ pressed }) => [styles.row, (disabled || (busy && busy !== k)) && styles.dim, pressed && styles.pressed]}
     >
       <Ionicons name={icon} size={22} color={palette.accent} />
@@ -172,7 +201,7 @@ function Row({
       </View>
       {busy === k ? (
         k === 'video' ? (
-          <Pressable onPress={cancelModelRender} hitSlop={8}>
+          <Pressable onPress={cancelModelRender} style={styles.cancelBtn} accessibilityRole="button" accessibilityLabel={cancelLabel}>
             <Text style={styles.cancel}>{cancelLabel}</Text>
           </Pressable>
         ) : (
@@ -205,5 +234,7 @@ const styles = StyleSheet.create({
   track: { height: 5, borderRadius: 3, backgroundColor: palette.surfaceHigh, overflow: 'hidden', marginTop: 6 },
   fill: { height: 5, borderRadius: 3, backgroundColor: palette.accent },
   cancel: { color: palette.danger, fontSize: 13, fontWeight: '700' },
+  cancelBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  aspectRow: { flexDirection: 'row', gap: 8, paddingLeft: 36, paddingBottom: 6 },
   hint: { color: palette.textDim, fontSize: 12, lineHeight: 16, marginTop: 10 },
 });

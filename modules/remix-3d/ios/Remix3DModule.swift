@@ -131,6 +131,12 @@ public class Remix3DModule: Module {
         try FileManager.default.copyItem(at: input, to: output)
         return output.absoluteString
       }
+      // 🖨️ STL: saját bináris író MILLIMÉTERBEN (a szeletelők mm-t várnak; a ModelIO
+      // méterben írna → a nyomat 1000× kisebb lenne), a csomópont-transzformokkal együtt
+      if ext == "stl" {
+        try Remix3DRender.writeBinarySTL(asset: MDLAsset(url: input), to: output, scale: 1000)
+        return output.absoluteString
+      }
       guard MDLAsset.canExportFileExtension(ext) else {
         throw Remix3DError.unsupported("export:\(ext)")
       }
@@ -184,12 +190,12 @@ public class Remix3DModule: Module {
     // ── háló-statisztika (háromszögszám + befoglaló doboz, méterben) ─────────
     AsyncFunction("inspectModel") { (modelPath: String) -> [String: Any] in
       let asset = MDLAsset(url: try fileURL(modelPath))
+      // a fotogrammetria USDZ-je a hálókat egy Xform ALÁ teszi → a felső szint üres lenne
+      // (ezért mentett a doc 0 háromszöget); a teljes hierarchiát bejárjuk
       var triangles = 0
-      for i in 0..<asset.count {
-        if let mesh = asset.object(at: i) as? MDLMesh {
-          for sub in mesh.submeshes as? [MDLSubmesh] ?? [] {
-            triangles += sub.indexCount / 3
-          }
+      for case let mesh as MDLMesh in asset.childObjects(of: MDLMesh.self) {
+        for sub in mesh.submeshes as? [MDLSubmesh] ?? [] {
+          triangles += sub.indexCount / 3
         }
       }
       let b = asset.boundingBox
@@ -204,9 +210,30 @@ public class Remix3DModule: Module {
 
 /// Közös SceneKit-renderelés (a néző és a fájl-pillanatkép ugyanazt használja → WYSIWYG).
 enum Remix3DRender {
+  /// függőleges látószög (fok) — a néző, az állókép és a forgó videó ugyanazzal dolgozik
+  static let fieldOfView: Double = 45
+
+  /// közös kamera: kis zNear + automatikus z-tartomány (a SceneKit alap 1 m-es zNear-je
+  /// a 30 cm-nél kisebb tárgyat levágná)
+  static func makeCamera() -> SCNCamera {
+    let c = SCNCamera()
+    c.fieldOfView = CGFloat(fieldOfView)
+    c.zNear = 0.001
+    c.automaticallyAdjustsZRange = true
+    return c
+  }
+
+  /// a kamera távolsága úgy, hogy a gömb a SZŰKEBB látószögbe is beférjen (portré
+  /// képaránynál a vízszintes a szűkebb — e nélkül a 9:16-os videó oldalt vágott)
+  static func orbitDistance(radius: Float, aspect: Double) -> Double {
+    let vHalf = (fieldOfView * .pi / 180.0) / 2
+    let hHalf = atan(tan(vHalf) * max(aspect, 0.05))
+    return Double(max(radius, 0.005)) * 1.15 / sin(min(vHalf, hHalf))
+  }
+
   /// az orbit-kamera helye a befoglaló gömb körül (a JS `model3dOrbit` konvenciója: +Y fel)
-  static func orbitPosition(center: SCNVector3, radius: Float, yaw: Double, pitch: Double) -> SCNVector3 {
-    let d = Double(max(radius, 0.01)) * 1.15 / sin((45.0 * .pi / 180.0) / 2)
+  static func orbitPosition(center: SCNVector3, radius: Float, yaw: Double, pitch: Double, aspect: Double = 1) -> SCNVector3 {
+    let d = orbitDistance(radius: radius, aspect: aspect)
     let cp = cos(pitch)
     return SCNVector3(
       Float(Double(center.x) + d * cp * sin(yaw)),
@@ -281,11 +308,11 @@ enum Remix3DRender {
     renderer.autoenablesDefaultLighting = true
     let (center, radius) = scene.rootNode.boundingSphere
     let cam = SCNNode()
-    cam.camera = SCNCamera()
-    cam.camera?.fieldOfView = 45
+    cam.camera = makeCamera()
     scene.rootNode.addChildNode(cam)
     defer { cam.removeFromParentNode() }
     renderer.pointOfView = cam
+    let aspect = Double(w) / Double(h)
 
     try? FileManager.default.removeItem(at: outURL)
     let writer = try AVAssetWriter(outputURL: outURL, fileType: .mp4)
@@ -314,7 +341,7 @@ enum Remix3DRender {
         throw Remix3DError.cancelled
       }
       let yaw = 2 * Double.pi * Double(i) / Double(frames)
-      cam.position = orbitPosition(center: center, radius: radius, yaw: yaw, pitch: pitch)
+      cam.position = orbitPosition(center: center, radius: radius, yaw: yaw, pitch: pitch, aspect: aspect)
       cam.look(at: center)
       let image = renderer.snapshot(atTime: Double(i) / Double(rate), with: CGSize(width: w, height: h), antialiasingMode: .multisampling4X)
       guard let pb = pixelBuffer(image, width: w, height: h, pool: adaptor.pixelBufferPool) else {
@@ -351,9 +378,8 @@ enum Remix3DRender {
       // fix orbit-kamera a befoglaló gömb köré (a JS `model3dOrbit` konvenciója: +Y fel)
       let (center, radius) = scene.rootNode.boundingSphere
       let cam = SCNNode()
-      cam.camera = SCNCamera()
-      cam.camera?.fieldOfView = 45
-      cam.position = orbitPosition(center: center, radius: radius, yaw: yaw, pitch: pitch)
+      cam.camera = makeCamera()
+      cam.position = orbitPosition(center: center, radius: radius, yaw: yaw, pitch: pitch, aspect: Double(width) / Double(max(height, 1)))
       cam.look(at: center)
       scene.rootNode.addChildNode(cam)
       defer { cam.removeFromParentNode() }
@@ -365,5 +391,56 @@ enum Remix3DRender {
     let image = renderer.snapshot(atTime: 0, with: CGSize(width: width, height: height), antialiasingMode: .multisampling4X)
     guard let data = image.pngData() else { throw Remix3DError.failed("png") }
     return data
+  }
+
+  /// 🖨️ bináris STL — minden háló minden háromszöge, a csomópont-transzformokkal világ-
+  /// koordinátába, `scale`-lel szorozva (1000 → mm). A normál a háromszögből számolódik.
+  static func writeBinarySTL(asset: MDLAsset, to url: URL, scale: Float) throws {
+    var tris: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)] = []
+    for case let mesh as MDLMesh in asset.childObjects(of: MDLMesh.self) {
+      guard let pos = mesh.vertexAttributeData(forAttributeNamed: MDLVertexAttributePosition, as: .float3) else { continue }
+      let world = MDLTransform.globalTransform(with: mesh, atTime: 0)
+      func vertex(_ i: Int) -> SIMD3<Float> {
+        let p = pos.dataStart.advanced(by: i * pos.stride).assumingMemoryBound(to: Float.self)
+        let v = world * SIMD4<Float>(p[0], p[1], p[2], 1)
+        return SIMD3<Float>(v.x, v.y, v.z) * scale
+      }
+      for sub in mesh.submeshes as? [MDLSubmesh] ?? [] where sub.geometryType == .triangles {
+        let buf = sub.indexBuffer.map()
+        var idx: [Int] = []
+        idx.reserveCapacity(sub.indexCount)
+        for k in 0..<sub.indexCount {
+          switch sub.indexType {
+          case .uInt32: idx.append(Int(buf.bytes.load(fromByteOffset: k * 4, as: UInt32.self)))
+          case .uInt16: idx.append(Int(buf.bytes.load(fromByteOffset: k * 2, as: UInt16.self)))
+          default: idx.append(Int(buf.bytes.load(fromByteOffset: k, as: UInt8.self)))
+          }
+        }
+        var t = 0
+        while t + 2 < idx.count {
+          tris.append((vertex(idx[t]), vertex(idx[t + 1]), vertex(idx[t + 2])))
+          t += 3
+        }
+      }
+    }
+    guard !tris.isEmpty else { throw Remix3DError.failed("emptyMesh") }
+    var data = Data(count: 80)
+    var count = UInt32(tris.count).littleEndian
+    withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
+    func put(_ v: SIMD3<Float>) {
+      for c in [v.x, v.y, v.z] {
+        var le = c.bitPattern.littleEndian
+        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+      }
+    }
+    for (a, b, c) in tris {
+      let n = simd_cross(b - a, c - a)
+      let len = simd_length(n)
+      put(len > 0 ? n / len : SIMD3<Float>(0, 0, 0))
+      put(a); put(b); put(c)
+      data.append(contentsOf: [0, 0])
+    }
+    try? FileManager.default.removeItem(at: url)
+    try data.write(to: url)
   }
 }

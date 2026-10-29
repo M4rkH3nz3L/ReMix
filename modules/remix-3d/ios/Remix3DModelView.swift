@@ -13,6 +13,15 @@ final class Remix3DModelView: ExpoView {
   private let scnView = SCNView()
   private var turntable: SCNNode?
   private var loadedUri: String?
+  /// a SAJÁT kamera: a modell befoglaló gömbjére és a nézet képarányára illesztve
+  /// (a SceneKit automatikus kamerája túl közelről / oldalt vágva mutatta a modellt)
+  private let cameraNode = SCNNode()
+  private var modelCenter = SCNVector3Zero
+  private var modelRadius: Float = 0
+  /// a betöltés után még nem volt érvényes méret (0×0) → az első layoutnál illesztünk
+  private var needsFit = false
+  /// az automatikus forgás kért állapota (új modellnél / a betöltés előtt is megmarad)
+  private var autoRotateOn = false
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -21,12 +30,27 @@ final class Remix3DModelView: ExpoView {
     scnView.autoenablesDefaultLighting = true
     scnView.antialiasingMode = .multisampling4X
     scnView.backgroundColor = .clear
+    cameraNode.camera = Remix3DRender.makeCamera()
     addSubview(scnView)
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
     scnView.frame = bounds
+    if needsFit && bounds.width > 0 && bounds.height > 0 {
+      fitCamera()
+    }
+  }
+
+  /// a kamera a modell köré, a nézet képarányához illesztve (a szűkebb látószöggel)
+  private func fitCamera() {
+    guard bounds.width > 0, bounds.height > 0 else { return }
+    let aspect = Double(bounds.width / bounds.height)
+    cameraNode.position = Remix3DRender.orbitPosition(center: modelCenter, radius: modelRadius, yaw: .pi / 6, pitch: .pi / 9, aspect: aspect)
+    cameraNode.look(at: modelCenter)
+    scnView.pointOfView = cameraNode
+    scnView.defaultCameraController.target = modelCenter
+    needsFit = false
   }
 
   func setModelUri(_ uri: String?) {
@@ -44,10 +68,21 @@ final class Remix3DModelView: ExpoView {
         child.removeFromParentNode()
         table.addChildNode(child)
       }
+      // a forgás a modell KÖZEPE körül (a szabad szken AR-világkoordinátában van — az origó
+      // körüli forgás kilendítené a képből); a pivot + pozíció együtt nem mozdítja a modellt
+      let (center, radius) = table.boundingSphere
+      table.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
+      table.position = center
       scene.rootNode.addChildNode(table)
+      cameraNode.removeFromParentNode()
+      scene.rootNode.addChildNode(cameraNode)
       turntable = table
+      modelCenter = center
+      modelRadius = radius
       scnView.scene = scene
-      let (_, radius) = table.boundingSphere
+      needsFit = true
+      fitCamera()
+      applyAutoRotate()
       onLoad(["radius": radius])
     } catch {
       onError(["code": "failed", "message": error.localizedDescription])
@@ -59,9 +94,14 @@ final class Remix3DModelView: ExpoView {
   }
 
   func setAutoRotate(_ on: Bool) {
+    autoRotateOn = on
+    applyAutoRotate()
+  }
+
+  private func applyAutoRotate() {
     guard let table = turntable else { return }
     table.removeAction(forKey: "turntable")
-    if on {
+    if autoRotateOn {
       let spin = SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 12))
       table.runAction(spin, forKey: "turntable")
     }

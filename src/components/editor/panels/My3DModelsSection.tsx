@@ -60,9 +60,13 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
       return;
     }
     const uri = await withProgress(t('panels.sticker.my3dRendering'), () => renderModelStill(modelUri, { transparent: true }));
-    const { playhead, addClip, selectClip } = useEditorStore.getState();
+    const { playhead, addClip, selectClip, project } = useEditorStore.getState();
     const id = makeId('clip');
-    const w = 0.4;
+    // a négyzetes PNG a vásznon is négyzet maradjon: h = w × (vászon-szélesség / -magasság)
+    // (eddig fixen 9:16-ra számolt → 16:9-es projektben torzult)
+    const [aw, ah] = (project?.aspectRatio ?? '9:16').split(':').map(Number);
+    const canvasRatio = aw > 0 && ah > 0 ? aw / ah : 9 / 16;
+    const w = Math.min(0.4, 0.8 / canvasRatio);
     addClip(
       'overlay',
       {
@@ -73,7 +77,7 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
         shape: 'rectangle',
         position: { x: 0.5, y: 0.45 },
         w,
-        h: w * 0.5625,
+        h: w * canvasRatio,
         fill: 'transparent',
         imageUri: uri,
         // mint a 3D-matricáknál: az árnyéktól „ül” a jelenetben

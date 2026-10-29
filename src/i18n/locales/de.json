@@ -3570,7 +3570,13 @@
       "title": "3D-Modell wird erstellt…",
       "hint": "Das dauert einige Minuten. Das Handy kann warm werden — das ist normal.",
       "cancel": "Abbrechen",
-      "done": "Dein 3D-Modell ist fertig"
+      "done": "Dein 3D-Modell ist fertig",
+      "retry": "Erneut versuchen",
+      "discard": "Fotos verwerfen",
+      "leaveTitle": "Modellerstellung abbrechen?",
+      "leaveBody": "Das 3D-Modell wird noch erstellt. Wenn du jetzt gehst, stoppt die Verarbeitung.",
+      "leave": "Verlassen",
+      "stay": "Bleiben"
     },
     "viewer": {
       "autoRotate": "Drehen",
@@ -3601,6 +3607,10 @@
       "title": "Export",
       "still": "Bild aus dem Modell",
       "stillSub": "PNG mit transparentem Hintergrund — teilen oder speichern",
+      "currentView": "Bild aus der aktuellen Ansicht",
+      "currentViewSub": "Aus dem Winkel, in den du es gedreht hast — transparentes PNG",
+      "shareUnavailable": "Teilen ist auf diesem Gerät gerade nicht verfügbar.",
+      "aspect": "Seitenverhältnis",
       "turntable": "Drehvideo (6 s)",
       "turntableSub": "360°-Drehung, MP4 — teilen oder speichern",
       "fileTitle": "Modelldatei",

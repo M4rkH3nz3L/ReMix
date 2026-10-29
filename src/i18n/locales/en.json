@@ -3600,7 +3600,13 @@
       "title": "Building your 3D model…",
       "hint": "This takes a few minutes. Your phone may get warm — that's normal.",
       "cancel": "Stop",
-      "done": "Your 3D model is ready"
+      "done": "Your 3D model is ready",
+      "retry": "Try again",
+      "discard": "Discard photos",
+      "leaveTitle": "Stop building the model?",
+      "leaveBody": "The 3D model is still being built. If you leave now, processing stops.",
+      "leave": "Leave",
+      "stay": "Stay"
     },
     "viewer": {
       "autoRotate": "Spin",
@@ -3631,6 +3637,10 @@
       "title": "Export",
       "still": "Image from model",
       "stillSub": "PNG with transparent background — share or save",
+      "currentView": "Image from the current view",
+      "currentViewSub": "From the angle you rotated it to — transparent PNG",
+      "shareUnavailable": "Sharing is not available on this device right now.",
+      "aspect": "Aspect ratio",
       "turntable": "Turntable video (6 s)",
       "turntableSub": "360° spin, MP4 — share or save",
       "fileTitle": "Model file",

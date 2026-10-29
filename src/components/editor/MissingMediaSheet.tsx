@@ -21,6 +21,7 @@ const KIND_ICON: Record<MissingMedia['kind'], keyof typeof Ionicons.glyphMap> = 
   video: 'videocam',
   image: 'image',
   audio: 'musical-notes',
+  model: 'cube',
 };
 
 export function MissingMediaSheet({

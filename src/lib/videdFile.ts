@@ -72,7 +72,7 @@ function parseVided(text: string): Project {
 
 export interface MissingMedia {
   uri: string;
-  kind: 'video' | 'image' | 'audio';
+  kind: 'video' | 'image' | 'audio' | 'model';
   label: string;
 }
 
@@ -124,6 +124,12 @@ export function findMissingMedia(project: Project): MissingMedia[] {
       if (clip.kind === 'shape' && clip.imageUri) {
         check(clip.imageUri, 'image', clip.imageUri.split('/').pop() ?? clip.imageUri);
       }
+    }
+  }
+  // 🧊 a 3D-modell fájlja és a 🖼️ választott borítókép is a projekt médiája (nincs klipjük)
+  for (const asset of project.assets) {
+    if (asset.kind === 'model' || asset.id === project.coverAssetId) {
+      check(asset.uri, asset.kind === 'model' ? 'model' : 'image', asset.name ?? asset.uri.split('/').pop() ?? asset.uri);
     }
   }
   return [...seen.values()];

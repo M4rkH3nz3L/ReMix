@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Directory, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -25,11 +25,21 @@ import {
   type CaptureViewHandle,
   type MeshScanHandle,
   type MeshScanStateEvent,
+  type ModelViewHandle,
   type WireframeMode,
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
 import type { Model3DDoc, Model3DMesh } from '@/types/model3d';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+
+/** létezik-e a helyi fájl (pl. a poszter — újratelepítés / törlés után hiányozhat) */
+function fileExists(uri: string): boolean {
+  try {
+    return new File(uri).exists;
+  } catch {
+    return false;
+  }
+}
 
 type Phase = 'empty' | 'capturing' | 'meshScanning' | 'reconstructing' | 'viewer';
 
@@ -66,6 +76,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const loadFailed = !!asset && loadFailedUri === asset.uri;
   // 🖼️ poszter-pótlás: a régebbi / sikertelen-poszteres modellnek is legyen előnézeti képe
   const posterTried = useRef<string | null>(null);
+  const viewRef = useRef<ModelViewHandle>(null);
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
@@ -155,6 +166,10 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         res = await meshRef.current.exportMesh(target.uri);
       }
       void meshRef.current.pause();
+      // 🔒 közben elhagyták a stúdiót / másik projekt nyílt → az eredmény NEM íródhat máshova
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
       const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
       const m: Model3DMesh = {
@@ -172,7 +187,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         [
           { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
-          { type: 'SET_MODEL3D_DOC', doc: { ...next, ...(poster ? { poster } : {}) }, label: t('model3d.reconstruct.done') },
+          { type: 'SET_MODEL3D_DOC', doc: { ...next, poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
         ],
         'user'
       );
@@ -203,6 +218,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     });
   };
 
+  const discardImages = () => {
+    try {
+      captureDirFor(projectId).delete();
+    } catch {
+      // a képkészlet ideiglenes — ha nem törölhető, a cache-ürítés viszi
+    }
+  };
+
   const reconstruct = async () => {
     if (!Remix3D || reconstructing.current || !project) {
       return;
@@ -215,6 +238,10 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     const target = model3dAsset({ assetId, format: 'usdz', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name });
     try {
       const uri = await Remix3D.reconstruct(captureDirFor(projectId).uri, target.uri, 'medium');
+      // 🔒 a rekonstrukció alatt elhagyták a stúdiót → az eredmény nem íródhat más projektbe
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
       const info = await Remix3D.inspectModel(uri);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
       const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
@@ -233,24 +260,59 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         [
           { type: 'ADD_ASSET', asset: { ...target, uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
-          { type: 'SET_MODEL3D_DOC', doc: { ...next, ...(poster ? { poster } : {}) }, label: t('model3d.reconstruct.done') },
+          { type: 'SET_MODEL3D_DOC', doc: { ...next, poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
         ],
         'user'
       );
+      discardImages();
       haptics.success();
       setPhase('viewer');
     } catch (e) {
-      Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
       setPhase(asset ? 'viewer' : 'empty');
+      const key = remix3dErrorKey(e);
+      if (key === 'model3d.error.cancelled') {
+        // a user szakította meg → nem hiba, a képek sem kellenek
+        discardImages();
+      } else {
+        // a képek MEGMARADNAK → újrapróbálható (a fotózást nem kell megismételni)
+        Alert.alert(t('model3d.title'), t(key), [
+          { text: t('model3d.reconstruct.discard'), style: 'destructive', onPress: discardImages },
+          { text: t('model3d.reconstruct.retry'), onPress: () => void reconstruct() },
+        ]);
+      }
     } finally {
       sub.remove();
       reconstructing.current = false;
-      try {
-        captureDirFor(projectId).delete();
-      } catch {
-        // a képkészlet ideiglenes — ha nem törölhető, a cache-ürítés viszi
-      }
     }
+  };
+
+  // a stúdió elhagyásakor a futó rekonstrukció leáll (különben a háttérben dolgozna tovább)
+  useEffect(
+    () => () => {
+      if (reconstructing.current) {
+        void Remix3D?.cancelReconstruct();
+      }
+    },
+    []
+  );
+
+  // ↩️ a fejléc vissza-gombja rekonstrukció közben megerősítést kér
+  const goBack = () => {
+    if (!reconstructing.current) {
+      goBackOrHome();
+      return;
+    }
+    Alert.alert(t('model3d.reconstruct.leaveTitle'), t('model3d.reconstruct.leaveBody'), [
+      { text: t('model3d.reconstruct.stay'), style: 'cancel' },
+      {
+        text: t('model3d.reconstruct.leave'),
+        style: 'destructive',
+        onPress: () => {
+          void Remix3D?.cancelReconstruct();
+          goBackOrHome();
+        },
+      },
+    ]);
   };
 
   const onCaptureState = (e: CaptureStateEvent) => {
@@ -386,7 +448,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
 
   const header = (
     <View style={styles.header}>
-      <Pressable onPress={() => goBackOrHome()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')}>
+      <Pressable onPress={goBack} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')}>
         <Ionicons name="chevron-back" size={26} color={palette.text} />
       </Pressable>
       <View style={styles.headerTitle}>
@@ -469,6 +531,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       {header}
       <View style={[styles.viewer, { backgroundColor: bg ?? palette.bg }]}>
         <ModelView
+          ref={viewRef}
           style={StyleSheet.absoluteFill}
           modelUri={asset.uri}
           background={bg}
@@ -476,14 +539,27 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           wireframe={wireframe}
           onLoad={() => {
             setLoadFailedUri(null);
+            // 🔢 a régebbi szkenek 0 háromszöggel mentődtek (a natív számláló a felső szintet
+            // nézte) → a javított számlálóval egyszer pótoljuk
+            if (mesh.triangles === 0 && Remix3D) {
+              const meshId = mesh.id;
+              Remix3D.inspectModel(asset.uri)
+                .then((info) => {
+                  const latest = useEditorStore.getState().project?.model3d;
+                  if (!latest || info.triangles <= 0) return;
+                  const meshes = latest.meshes.map((x) => (x.id === meshId ? { ...x, triangles: info.triangles } : x));
+                  useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, meshes } }, 'system');
+                })
+                .catch(() => {});
+            }
             // nincs poszter → egyszer (modellenként) elkészítjük a lista előnézeti képét
-            if (doc && !doc.poster && Remix3D && posterTried.current !== asset.uri) {
+            if (doc && (!doc.poster || !fileExists(doc.poster)) && Remix3D && posterTried.current !== asset.uri) {
               posterTried.current = asset.uri;
               const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster.png`;
               Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false)
                 .then((poster) => {
                   const latest = useEditorStore.getState().project?.model3d;
-                  if (poster && latest && !latest.poster) {
+                  if (poster && latest) {
                     useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, poster } }, 'system');
                   }
                 })
@@ -531,6 +607,10 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         mesh={mesh}
         projectName={project?.name ?? 'model'}
         background={bg}
+        onCurrentView={async () => {
+          if (!viewRef.current) throw new Error('model3d.error.unsupported');
+          return viewRef.current.snapshot(new File(Paths.cache, `m3d_view_${makeId('img')}.png`).uri, 1440, 1440, true);
+        }}
       />
     </SafeAreaView>
   );

@@ -4,10 +4,48 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Model3DStudio } from '@/components/studio/model3d/Model3DStudio';
 import { palette } from '@/constants/editor';
-import { backupProjectToCloud } from '@/lib/cloudSync';
+import { backupProjectToCloud, pullProject } from '@/lib/cloudSync';
+import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
+import { pruneUnreferencedModelFiles } from '@/lib/projectFolderClient';
 import { isEditableKind, isKindAvailable } from '@/lib/projectKinds';
-import { loadEvents, loadProject, saveProject } from '@/lib/storage';
+import { loadEvents, loadProject, loadVersions, readRecovery, saveProject } from '@/lib/storage';
+import { findMissingMedia, relinkCommandsFor } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
+import type { Project } from '@/types/project';
+
+/**
+ * ☁️→📱 Hiányzó modell-/borító-fájl visszaállítása a felhő-mentésből (újratelepítés /
+ * másik eszköz után). A relink a command buson megy, csak ha MÉG ez a projekt van nyitva.
+ */
+async function recoverMissingModel(proj: Project): Promise<void> {
+  if (findMissingMedia(proj).length === 0) {
+    return;
+  }
+  let remoteByUri = mediaRemoteMap(proj);
+  if (Object.keys(remoteByUri).length === 0) {
+    const cloud = await pullProject(proj.id).catch(() => null);
+    if (cloud) {
+      remoteByUri = mediaRemoteMap(cloud);
+    }
+  }
+  const { pairs } = await restoreMissingMedia(proj, remoteByUri);
+  const store = useEditorStore.getState();
+  if (pairs.length === 0 || store.project?.id !== proj.id) {
+    return;
+  }
+  store.applyBatch(relinkCommandsFor(store.project, pairs), 'system');
+  await saveProject(useEditorStore.getState().project!);
+}
+
+/** kilépéskor: mentés → felhő → a már nem hivatkozott 3D-fájlok takarítása a mappából */
+async function persistAndPrune(p: Project): Promise<void> {
+  await saveProject(p);
+  await backupProjectToCloud(p);
+  if (p.folder) {
+    const [versions, recovery] = await Promise.all([loadVersions(p.id), readRecovery(p.id)]);
+    pruneUnreferencedModelFiles(p.folder, [JSON.stringify(p), JSON.stringify(versions), JSON.stringify(recovery)]);
+  }
+}
 
 /** a változások mentése ennyi nyugalom után (a csúszka-húzás ne írjon minden képkockán) */
 const AUTOSAVE_MS = 800;
@@ -42,6 +80,7 @@ export default function Model3DStudioRoute() {
       .then(([loaded, events]) => {
         if (alive && loaded) {
           useEditorStore.getState().loadProject(loaded, events);
+          void recoverMissingModel(loaded).catch(() => {});
         }
       })
       .catch(() => {})
@@ -50,9 +89,7 @@ export default function Model3DStudioRoute() {
       alive = false;
       const p = useEditorStore.getState().project;
       if (p && p.id === id) {
-        saveProject(p)
-          .then(() => backupProjectToCloud(p))
-          .catch(() => {});
+        void persistAndPrune(p).catch(() => {});
       }
     };
   }, [id, allowed]);

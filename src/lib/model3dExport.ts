@@ -20,7 +20,9 @@ export interface FormatSpec {
 
 export const EXPORT_FORMATS: Record<MeshFormat, FormatSpec> = {
   usdz: { format: 'usdz', local: true, textures: true, pointCloud: false, useKey: 'model3d.export.useAr' },
-  obj: { format: 'obj', local: true, textures: true, pointCloud: false, useKey: 'model3d.export.useEditing' },
+  // a készüléken (ModelIO) az OBJ egyetlen fájlként, TEXTÚRA NÉLKÜL készül (.mtl + képek nélkül)
+  // → őszinte figyelmeztetés a textúrás modellnél; textúrával a USDZ a jó választás
+  obj: { format: 'obj', local: true, textures: false, pointCloud: false, useKey: 'model3d.export.useEditing' },
   stl: { format: 'stl', local: true, textures: false, pointCloud: false, useKey: 'model3d.export.usePrint' },
   ply: { format: 'ply', local: true, textures: false, pointCloud: true, useKey: 'model3d.export.usePointCloud' },
   glb: { format: 'glb', local: false, textures: true, pointCloud: false, useKey: 'model3d.export.useWeb' },

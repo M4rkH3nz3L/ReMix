@@ -1,4 +1,5 @@
 import {
+  isToolAvailable,
   MAX_PRIMARY_TOOLS,
   toolbarFor,
   type ToolClipKind,
@@ -124,4 +125,33 @@ describe('toolbarSpec — 4 elsődleges + Több', () => {
     const withPaste = toolbarFor({ ...base, selectionKind: 'video', multi: true, canPasteStyle: true });
     expect(withPaste.primary).toContain('pasteStyle');
   });
+
+  describe('szerkesztési módok (D5)', () => {
+    it('a haladó mód = a mód nélküli (teljes) eszköztár', () => {
+      for (const ctx of allContexts()) {
+        expect(toolbarFor({ ...ctx, mode: 'advanced' })).toEqual(toolbarFor(ctx));
+      }
+    });
+
+    it('gyors mód: kevesebb eszköz, de a fajta fő műveletei megmaradnak', () => {
+      for (const ctx of allContexts()) {
+        const quick = toolbarFor({ ...ctx, mode: 'quick' });
+        const full = toolbarFor(ctx);
+        const q = [...quick.primary, ...quick.overflow];
+        const f = [...full.primary, ...full.overflow];
+        expect(q.length).toBeLessThanOrEqual(f.length);
+        expect(q.every((id) => isToolAvailable(id, ctx))).toBe(true);
+        if (ctx.selectionKind !== null && !ctx.multi) {
+          expect(quick.primary).toEqual(full.primary);
+        }
+      }
+      expect(toolbarFor({ ...base, mode: 'quick' }).overflow).not.toContain('multicam');
+    });
+
+    it('AI mód: az asszisztens az első eszköz', () => {
+      expect(toolbarFor({ ...base, mode: 'ai' }).primary[0]).toBe('assistant');
+      expect(toolbarFor({ ...base, mode: 'ai' }).primary).toContain('transcript');
+    });
+  });
 });
+

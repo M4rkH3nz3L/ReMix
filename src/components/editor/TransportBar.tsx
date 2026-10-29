@@ -31,6 +31,7 @@ export function TransportBar() {
   const router = useRouter();
   const projectId = useEditorStore((s) => s.project?.id);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [detailTrigger, setDetailTrigger] = useState(0);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const loop = useEditorStore((s) => s.loop);
@@ -139,60 +140,75 @@ export function TransportBar() {
   // ⏯️ shuttle-kijelző: |sebesség| ≠ 1 esetén jelöli (pl. „2×", „-4×")
   const rateLabel = isPlaying && Math.abs(playbackRate) !== 1 ? `${playbackRate}×` : null;
 
+  /** ⋯ a ritkább transport-műveletek egy menüben (D3: a sáv 13 vezérlője 7-re szűkült) */
+  const openMore = () => {
+    const items: { text: string; onPress?: () => void; style?: 'cancel' }[] = [
+      { text: t('editor.transportBar.toStart'), onPress: () => setPlayhead(0) },
+      { text: t('editor.transportBar.shuttleBack'), onPress: () => shuttle(-1) },
+      { text: t('editor.transportBar.shuttleFwd'), onPress: () => shuttle(1) },
+      {
+        text: loop ? t('editor.transportBar.loopOff') : t('editor.transportBar.loopOn'),
+        onPress: () => setLoop(!loop),
+      },
+      { text: t('editor.detailPreview.title'), onPress: () => setDetailTrigger((n) => n + 1) },
+      ...(projectId
+        ? [{ text: t('editor.transportBar.fullscreen'), onPress: () => router.push(`/player/${projectId}`) }]
+        : []),
+      { text: t('editor.history.title'), onPress: () => setHistoryOpen(true) },
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ];
+    Alert.alert(t('editor.transportBar.moreTitle'), undefined, items);
+  };
+
   return (
     <View style={styles.container}>
-      <Pressable onPress={undo} disabled={!canUndo} hitSlop={6} style={styles.side}>
-        <Ionicons
-          name="arrow-undo-outline"
-          size={18}
-          color={canUndo ? palette.text : palette.border}
-        />
-      </Pressable>
-      <Pressable onPress={redo} disabled={!canRedo} hitSlop={6} style={styles.side}>
-        <Ionicons
-          name="arrow-redo-outline"
-          size={18}
-          color={canRedo ? palette.text : palette.border}
-        />
-      </Pressable>
-      {/* 🕓 szerkesztési előzmények (#38): mi történt, mit csinált az AI */}
       <Pressable
-        onPress={() => setHistoryOpen(true)}
-        hitSlop={6}
+        onPress={undo}
+        disabled={!canUndo}
         style={styles.side}
         accessibilityRole="button"
-        accessibilityLabel={t('editor.history.title')}
+        accessibilityLabel={t('editor.transportBar.undo')}
+        accessibilityState={{ disabled: !canUndo }}
       >
-        <Ionicons name="time-outline" size={18} color={palette.textDim} />
+        <Ionicons name="arrow-undo-outline" size={20} color={canUndo ? palette.text : palette.border} />
+      </Pressable>
+      <Pressable
+        onPress={redo}
+        disabled={!canRedo}
+        style={styles.side}
+        accessibilityRole="button"
+        accessibilityLabel={t('editor.transportBar.redo')}
+        accessibilityState={{ disabled: !canRedo }}
+      >
+        <Ionicons name="arrow-redo-outline" size={20} color={canRedo ? palette.text : palette.border} />
       </Pressable>
 
       <View style={styles.center}>
-        {/* ⏱️ időkijelző a gombok FÖLÖTT (külön sorban) — így mobilon is kifér a
-            transport-gombsor, nem szorul ki / lóg össze a szomszéd ikonokkal */}
+        {/* ⏱️ időkijelző a gombok FÖLÖTT (külön sorban) */}
         <Text style={styles.time} numberOfLines={1}>
           {rateLabel ? <Text style={styles.rate}>{rateLabel} </Text> : null}
+          {loop ? <Text style={styles.rate}>⟲ </Text> : null}
           {formatTimecode(playhead, fps)}{' '}
           <Text style={styles.timeDim}>/ {formatTimecode(duration, fps)}</Text>
         </Text>
         <View style={styles.transportRow}>
-          <Pressable onPress={() => setPlayhead(0)} hitSlop={6}>
-            <Ionicons name="play-skip-back" size={16} color={palette.text} />
+          {/* ⏭️ képkocka-pontos léptetés */}
+          <Pressable
+            onPress={() => stepFrame(-1)}
+            style={styles.side}
+            accessibilityRole="button"
+            accessibilityLabel={t('editor.transportBar.frameBack')}
+          >
+            <Ionicons name="play-back" size={18} color={palette.textDim} />
           </Pressable>
-          {/* ⏭️ képkocka-pontos léptetés (a 0,1 mp-es ugrás helyett) */}
-          <Pressable onPress={() => stepFrame(-1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameBack')}>
-            <Ionicons name="play-back" size={14} color={palette.textDim} />
-          </Pressable>
-          {/* ◀ J: shuttle vissza (ismételve gyorsít) */}
-          <Pressable onPress={() => shuttle(-1)} hitSlop={6} accessibilityLabel="J">
-            <Ionicons
-              name="chevron-back"
-              size={18}
-              color={isPlaying && playbackRate < 0 ? palette.accent : palette.textDim}
-            />
-          </Pressable>
-          {/* K: lejátszás/szünet */}
+          {/* K: lejátszás/szünet (a J/L shuttle a ⋯ menüben és billentyűn) */}
           <TutorialTarget id="transport.playPause">
-            <Pressable onPress={togglePlay} style={styles.playPressable}>
+            <Pressable
+              onPress={togglePlay}
+              style={styles.playPressable}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? t('editor.transportBar.pause') : t('editor.transportBar.play')}
+            >
               <LinearGradient
                 colors={[...accentGradient]}
                 start={{ x: 0, y: 0 }}
@@ -203,51 +219,42 @@ export function TransportBar() {
               </LinearGradient>
             </Pressable>
           </TutorialTarget>
-          {/* ▶ L: shuttle előre (ismételve gyorsít) */}
-          <Pressable onPress={() => shuttle(1)} hitSlop={6} accessibilityLabel="L">
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={isPlaying && playbackRate > 1 ? palette.accent : palette.textDim}
-            />
-          </Pressable>
-          <Pressable onPress={() => stepFrame(1)} hitSlop={6} accessibilityLabel={t('editor.transportBar.frameFwd')}>
-            <Ionicons name="play-forward" size={14} color={palette.textDim} />
+          <Pressable
+            onPress={() => stepFrame(1)}
+            style={styles.side}
+            accessibilityRole="button"
+            accessibilityLabel={t('editor.transportBar.frameFwd')}
+          >
+            <Ionicons name="play-forward" size={18} color={palette.textDim} />
           </Pressable>
         </View>
       </View>
 
       {/* 🔖 szerkezeti jelölő a lejátszófejnél */}
-      <Pressable onPress={toggleMarker} hitSlop={6} style={styles.side}>
+      <Pressable
+        onPress={toggleMarker}
+        style={styles.side}
+        accessibilityRole="button"
+        accessibilityLabel={t('editor.transportBar.markerTitle')}
+      >
         <Ionicons
           name={nearMarker ? 'bookmark' : 'bookmark-outline'}
-          size={18}
+          size={20}
           color={nearMarker ? palette.accent2 : palette.textDim}
         />
       </Pressable>
-      {/* 🖥️ teljes nézet: a projekt megnyitása a teljes lejátszóban (a preview külön play-gombja helyett) */}
-      {projectId ? (
-        <Pressable
-          onPress={() => router.push(`/player/${projectId}`)}
-          hitSlop={6}
-          style={styles.side}
-          accessibilityRole="button"
-          accessibilityLabel={t('editor.transportBar.fullscreen')}
-        >
-          <Ionicons name="expand-outline" size={18} color={palette.textDim} />
-        </Pressable>
-      ) : null}
-      {/* 🎬 részlet-előnézet: a playhead körüli pár mp valódi renderje */}
-      <DetailPreview />
-      <Pressable onPress={() => setLoop(!loop)} hitSlop={6} style={styles.side}>
-        <Ionicons
-          name="repeat"
-          size={18}
-          color={loop ? palette.accent : palette.textDim}
-        />
+      {/* ⋯ ritkább műveletek: elejére, J/L shuttle, ismétlés, részlet-előnézet, teljes nézet, előzmények */}
+      <Pressable
+        onPress={openMore}
+        style={styles.side}
+        accessibilityRole="button"
+        accessibilityLabel={t('editor.transportBar.moreTitle')}
+      >
+        <Ionicons name="ellipsis-horizontal-circle-outline" size={22} color={palette.textDim} />
       </Pressable>
-      {/* ⚡ csak nyitva mountoljuk: zárva is a TransportBar minden renderjével
-          lefutott volna a benne lévő `[...events].reverse()` (max 300 elem) */}
+      {/* 🎬 részlet-előnézet: a ⋯ menüből indul (gomb nélkül — futás közben pörgő jelző) */}
+      <DetailPreview trigger={detailTrigger} showButton={false} />
+      {/* ⚡ csak nyitva mountoljuk */}
       {historyOpen ? <HistoryModal visible onClose={() => setHistoryOpen(false)} /> : null}
     </View>
   );
@@ -258,15 +265,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: palette.bg,
-    // szűk rések: a sávon 9 elem osztozik (undo/redo · transport + idő ·
-    // jelölő · részlet-előnézet · loop) — tágabb réssel a szélső gombok
-    // kiszorulnának, az időkijelzőre pedig rálógna a szomszéd ikon
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 6,
+    // 7 vezérlő (undo · redo · ◀kocka · play · kocka▶ · jelölő · ⋯), mind ≥44pt —
+    // a ritkák (elejére, J/L, ismétlés, részlet-előnézet, teljes nézet, előzmények) a ⋯-ben
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    gap: 0,
   },
+  // ≥44pt érintési cél (HIG) — a régi 18px-es ikon + 3px padding ~24pt volt
   side: {
-    padding: 3,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   center: {
     // OSZLOP: felül az idő, alatta a transport-gombsor (mobilon így kifér)
@@ -278,7 +288,7 @@ const styles = StyleSheet.create({
   transportRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 2,
   },
   rate: {
     color: palette.accent,

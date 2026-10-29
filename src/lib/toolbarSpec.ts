@@ -65,7 +65,17 @@ export type ToolId =
   | 'precompose'
   | 'unlink';
 
+/**
+ * 🎚️ Szerkesztési mód (PRO-VIDEO-EDITOR D5): Gyors = csak a leggyakoribb műveletek
+ * (kezdőknek, gyors vágás), Haladó = minden eszköz (az eddigi eszköztár), AI = az
+ * AI-munkafolyamatok elöl. A klip-kijelölés eszközei Gyors módban rövidülnek.
+ */
+export type EditMode = 'quick' | 'advanced' | 'ai';
+export const EDIT_MODES: readonly EditMode[] = ['quick', 'advanced', 'ai'];
+
 export interface ToolContext {
+  /** a szerkesztési mód; hiányzó = haladó (a teljes eszköztár) */
+  mode?: EditMode;
   /** a kijelölt klip fajtája; null = nincs kijelölés */
   selectionKind: ToolClipKind | null;
   /** multi-kijelölés mód aktív ÉS van legalább egy további kijelölt klip */
@@ -111,6 +121,25 @@ const IDLE_ORDER: ToolId[] = [
   'workflow',
   'help',
 ];
+
+/** Gyors mód, kijelölés nélkül: a hozzáadás alapjai. */
+const QUICK_IDLE: ToolId[] = ['addVideo', 'addText', 'music', 'captions', 'addImage', 'sticker', 'record', 'source', 'help'];
+
+/** AI mód, kijelölés nélkül: az AI-munkafolyamatok elöl, utánuk a hozzáadás alapjai. */
+const AI_IDLE: ToolId[] = [
+  'assistant',
+  'captions',
+  'transcript',
+  'workflow',
+  'creatorPreset',
+  'addVideo',
+  'addText',
+  'music',
+  'help',
+];
+
+/** Gyors mód, kijelölt klip: a fajta elsődlegesein túl csak a legalapvetőbb műveletek. */
+const QUICK_SELECTED: ToolId[] = ['duplicate', 'copyClip', 'pasteClip'];
 
 /** Fajtánként az elsődleges eszközök (prioritási sorrendben). */
 const KIND_PRIMARY: Record<ToolClipKind, ToolId[]> = {
@@ -194,7 +223,10 @@ export function toolbarFor(ctx: ToolContext): ToolbarLayout {
   const kind = ctx.selectionKind;
   let ordered: ToolId[];
   if (kind === null) {
-    ordered = IDLE_ORDER;
+    ordered = ctx.mode === 'quick' ? QUICK_IDLE : ctx.mode === 'ai' ? AI_IDLE : IDLE_ORDER;
+  } else if (ctx.mode === 'quick') {
+    const head = ctx.multi ? MULTI_PRIMARY : KIND_PRIMARY[kind];
+    ordered = unique([...head, ...KIND_PRIMARY[kind], ...QUICK_SELECTED]);
   } else {
     const head = ctx.multi ? MULTI_PRIMARY : KIND_PRIMARY[kind];
     ordered = unique([...head, ...KIND_PRIMARY[kind], ...(KIND_EXTRA[kind] ?? []), ...COMMON_SELECTED]);

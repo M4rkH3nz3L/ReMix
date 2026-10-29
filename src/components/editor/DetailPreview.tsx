@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -23,7 +23,7 @@ import { withProgress } from '@/store/progressStore';
  * A render kis felbontáson (480p) megy: a CÉL a hatás ellenőrzése, nem a
  * végleges minőség — így az iteráció gyors marad.
  */
-export function DetailPreview() {
+export function DetailPreview({ trigger = 0, showButton = true }: { trigger?: number; showButton?: boolean } = {}) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<string | null>(null);
   const [uri, setUri] = useState<string | null>(null);
@@ -79,6 +79,17 @@ export function DetailPreview() {
     }
   };
 
+  // ⋯ külső indítás (a transport „Több" menüjéből): minden új `trigger`-érték egy futás
+  const lastTrigger = useRef(trigger);
+  useEffect(() => {
+    if (trigger !== lastTrigger.current) {
+      lastTrigger.current = trigger;
+      void run();
+    }
+    // a `run` minden renderben új — csak a trigger-váltás számít
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger]);
+
   const close = () => {
     try {
       player.pause();
@@ -91,20 +102,26 @@ export function DetailPreview() {
 
   return (
     <>
-      <Pressable
-        onPress={() => {
-          void run();
-        }}
-        hitSlop={6}
-        style={styles.side}
-        disabled={Boolean(status)}
-      >
-        {status ? (
-          <ActivityIndicator size="small" color={palette.accent} />
-        ) : (
-          <Ionicons name="eye-outline" size={18} color={palette.textDim} />
-        )}
-      </Pressable>
+      {showButton ? (
+        <Pressable
+          onPress={() => {
+            void run();
+          }}
+          hitSlop={6}
+          style={styles.side}
+          disabled={Boolean(status)}
+          accessibilityRole="button"
+          accessibilityLabel={t('editor.detailPreview.title')}
+        >
+          {status ? (
+            <ActivityIndicator size="small" color={palette.accent} />
+          ) : (
+            <Ionicons name="eye-outline" size={18} color={palette.textDim} />
+          )}
+        </Pressable>
+      ) : status ? (
+        <ActivityIndicator size="small" color={palette.accent} />
+      ) : null}
 
       <Modal visible={Boolean(uri)} animationType="fade" transparent onRequestClose={close}>
         <View style={styles.backdrop}>

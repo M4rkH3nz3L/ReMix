@@ -701,6 +701,15 @@
     }
   },
   "editor": {
+    "mode": {
+      "label": "Szerkesztési mód",
+      "quick": "Gyors",
+      "advanced": "Haladó",
+      "ai": "AI",
+      "hint_quick": "Csak a leggyakoribb eszközök, egyszerű idővonal",
+      "hint_advanced": "Minden eszköz és idővonal-vezérlő",
+      "hint_ai": "Az AI-eszközök kerülnek előre"
+    },
     "toast": {
       "undo": "Visszavonás",
       "clipsDeleted_one": "Klip törölve",
@@ -722,6 +731,8 @@
       "tapToRecord": "Koppints a felvételhez (max 60 mp)"
     },
     "preview": {
+      "safeZonesHint": "Biztonsági zónák: megmutatja, hol takarja a platform felülete (gombok, felirat) a videót.",
+      "compareHint": "Nyomva tartva az eredeti, szerkesztés nélküli kép látszik",
       "safeZones": "Biztonságos zóna",
       "compareOriginal": "Tartsd nyomva az eredetihez",
       "original": "Eredeti",
@@ -868,6 +879,8 @@
       "relinkOne": "Csatold"
     },
     "timeline": {
+      "extrasHide": "Sztori/tempó-sáv és térkép elrejtése",
+      "extrasShow": "Sztori/tempó-sáv és térkép mutatása",
       "trackMenuMessage": "A némítás és a solo CSAK az előnézetre hat — az exportált videó nem változik tőlük. Végleges elnémításhoz a klip hangerejét állítsd.",
       "mute": "🔇 Némítás",
       "unmute": "🔊 Némítás vissza",
@@ -1010,6 +1023,16 @@
       }
     },
     "transportBar": {
+      "moreTitle": "További lejátszás-műveletek",
+      "toStart": "Ugrás az elejére",
+      "shuttleBack": "Gyors visszajátszás (J)",
+      "shuttleFwd": "Gyors előrejátszás (L)",
+      "loopOn": "Ismétlés bekapcsolása",
+      "loopOff": "Ismétlés kikapcsolása",
+      "undo": "Visszavonás",
+      "redo": "Újra",
+      "play": "Lejátszás",
+      "pause": "Szünet",
       "markerTitle": "Jelölő",
       "recolorMarker": "Átszínezés",
       "deleteMarkerConfirm": "„{{label}}” törlése?",
@@ -1066,6 +1089,8 @@
       "neon": "Neon"
     },
     "range": {
+      "inShort": "Be",
+      "outShort": "Ki",
       "title": "Tartomány",
       "message": "Mit tegyünk a kijelölt tartománnyal?",
       "region": "Régió a tartományból",
@@ -1108,6 +1133,14 @@
     }
   },
   "editorScreen": {
+    "aiAssistant": "AI-asszisztens",
+    "foreignSource": "Ez a videó valószínűleg innen származik: {{platform}}. Más alkotó tartalmát csak engedéllyel használd; a vízjeles videót a platformok gyengébben ajánlják.",
+    "platform_tiktok": "TikTok",
+    "platform_instagram": "Instagram",
+    "platform_youtube": "YouTube",
+    "platform_facebook": "Facebook",
+    "platform_snapchat": "Snapchat",
+    "platform_capcut": "CapCut",
     "menuAspect": "Képarány: {{aspect}}",
     "remixedFrom": "Remixelve innen: {{name}}",
     "projectNotFound": "A projekt nem található.",
@@ -1670,6 +1703,16 @@
       "profanityRemove": "Törlés"
     },
     "export": {
+      "lint": {
+        "ok": "Tartalom-ellenőrzés: minden rendben.",
+        "title": "Export előtt nézd át ({{count}})",
+        "jump": "A klipre ugrik",
+        "empty": "A projekt üres — nincs mit exportálni.",
+        "placeholderText": "Ott maradt a sablon szövege: „{{detail}}”",
+        "emptyText": "Üres szövegklip",
+        "missingMedia": "Hiányzó (offline) média: {{detail}}",
+        "silent": "Minden hang némítva — a videó hang nélkül készül el."
+      },
       "writingHeadlines": "Címek írása…",
       "aiHeadlinesTitle": "AI-címek",
       "headlinesUnavailable": "A címjavaslat nem érhető el — fut a worker + AI?",

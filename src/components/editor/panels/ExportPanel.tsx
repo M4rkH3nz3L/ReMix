@@ -37,6 +37,7 @@ import {
 import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
 import { CloudMediaSection } from '@/components/editor/panels/CloudMediaSection';
+import { ExportLintList } from '@/components/editor/panels/ExportLintList';
 import { localRenderGaps } from '@/lib/renderParity';
 import { shareRpFile } from '@/lib/rpFile';
 import { shareVidedFile } from '@/lib/videdFile';
@@ -435,6 +436,9 @@ export function ExportPanel() {
           <Ionicons name="chevron-forward" size={16} color={palette.textDim} />
         </Pressable>
       )}
+
+      {/* 🧹 export előtti tartalom-ellenőrzés (helyőrző, offline média, néma kimenet) */}
+      <ExportLintList project={project} />
 
       <PrimaryButton
         label={t('feed.shareToFeed')}

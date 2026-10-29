@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
@@ -23,8 +24,10 @@ import { useLayout } from '@/hooks/useLayout';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { projectDuration } from '@/lib/projectUtils';
 import { formatRuler } from '@/lib/time';
+import { EDIT_MODES } from '@/lib/toolbarSpec';
 import { clipInWindow, windowFor } from '@/lib/virtualize';
 import { useCollabLive } from '@/store/collabLiveStore';
+import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project, TrackType } from '@/types/project';
 
@@ -144,6 +147,13 @@ export function Timeline({ compact = false }: { compact?: boolean } = {}) {
   const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
   const searchMatchTimes = useEditorStore((s) => s.searchMatchTimes);
   const insightLane = useEditorStore((s) => s.insightLane);
+  // 🎚️ kezelési beállítások (eszköz-szintű): szerkesztési mód + kiegészítő sorok
+  const editMode = useEditorPrefs((st) => st.editMode);
+  const setEditMode = useEditorPrefs((st) => st.setEditMode);
+  const timelineExtras = useEditorPrefs((st) => st.timelineExtras);
+  const setTimelineExtras = useEditorPrefs((st) => st.setTimelineExtras);
+  // a vezérlősor görgetés-állapota (a jobb oldali „van még” jelzéshez)
+  const [controls, setControls] = useState({ w: 0, content: 0, x: 0 });
   const setInsightLane = useEditorStore((s) => s.setInsightLane);
   const addRegion = useEditorStore((s) => s.addRegion);
   const removeRegion = useEditorStore((s) => s.removeRegion);
@@ -629,109 +639,171 @@ export function Timeline({ compact = false }: { compact?: boolean } = {}) {
       {/* 📐 nyitott panel mellett (compact) a kiegészítő sorok — insight-sáv, sztori/tempó-sáv,
           térkép — rejtve: a hely a preview-é, a sávok és a lejátszófej maradnak (MOBILE-UI T1/1) */}
       {compact ? null : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.insightTabsBar}
-          contentContainerStyle={styles.insightTabs}
-        >
-          {(['story', 'pacing'] as const).map((k) => (
-            <Pressable
-              key={k}
-              onPress={() => setInsightLane(k)}
-              hitSlop={4}
-              style={[styles.insightTab, insightLane === k ? styles.insightTabActive : null]}
-            >
-              <Text
-                style={[
-                  styles.insightTabText,
-                  insightLane === k ? styles.insightTabTextActive : null,
-                ]}
+        <View style={styles.controlsWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.insightTabsBar}
+            contentContainerStyle={styles.insightTabs}
+            onLayout={(e) => setControls((c) => ({ ...c, w: e.nativeEvent.layout.width }))}
+            onContentSizeChange={(w) => setControls((c) => ({ ...c, content: w }))}
+            onScroll={(e) => {
+              const x = e.nativeEvent.contentOffset.x;
+              setControls((c) => (Math.abs(c.x - x) > 4 ? { ...c, x } : c));
+            }}
+            scrollEventThrottle={64}
+          >
+            {/* 🎚️ szerkesztési mód: Gyors / Haladó / AI (D5) — a Gyors mód elrejti a haladó
+                idővonal-vezérlőket és a kiegészítő sorokat, az eszköztár is rövidül */}
+            <View style={styles.modeSeg} accessibilityRole="tablist" accessibilityLabel={t('editor.mode.label')}>
+              {EDIT_MODES.map((m) => (
+                <Pressable
+                  key={m}
+                  onPress={() => setEditMode(m)}
+                  hitSlop={6}
+                  style={[styles.modeBtn, editMode === m ? styles.modeBtnActive : null]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: editMode === m }}
+                  accessibilityHint={t(`editor.mode.hint_${m}`)}
+                >
+                  <Text style={[styles.modeText, editMode === m ? styles.modeTextActive : null]}>
+                    {t(`editor.mode.${m}`)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {editMode === 'quick' ? null : (
+              <>
+                {/* 🔎 insight-sáv: sztori / tempó (NEM szerkesztési mód — elemző sáv) */}
+                {(['story', 'pacing'] as const).map((k) => (
+                  <Pressable
+                    key={k}
+                    onPress={() => {
+                      setInsightLane(k);
+                      setTimelineExtras(true);
+                    }}
+                    hitSlop={6}
+                    style={[styles.insightTab, timelineExtras && insightLane === k ? styles.insightTabActive : null]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: timelineExtras && insightLane === k }}
+                  >
+                    <Text
+                      style={[
+                        styles.insightTabText,
+                        timelineExtras && insightLane === k ? styles.insightTabTextActive : null,
+                      ]}
+                    >
+                      {t('editor.insight.' + k)}
+                    </Text>
+                  </Pressable>
+                ))}
+                {/* ⌃ a kiegészítő sorok (sztori/tempó-sáv + térkép) EGY gesztussal csukhatók (D6) */}
+                <Pressable
+                  onPress={() => setTimelineExtras(!timelineExtras)}
+                  hitSlop={6}
+                  style={styles.iconBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(timelineExtras ? 'editor.timeline.extrasHide' : 'editor.timeline.extrasShow')}
+                >
+                  <Ionicons name={timelineExtras ? 'chevron-up' : 'chevron-down'} size={13} color={palette.textDim} />
+                </Pressable>
+              {/* ✂️ trim-mód: normal → ripple → roll → slip → slide (a fogantyú/test-húzás viselkedése) */}
+              <Pressable
+                onPress={cycleTrimMode}
+                hitSlop={4}
+                style={[styles.snapBtn, { marginLeft: 'auto' }, trimMode !== 'normal' ? styles.iconBtnActive : null]}
+                accessibilityLabel={t('editor.trim.label')}
               >
-                {t('editor.insight.' + k)}
-              </Text>
-            </Pressable>
-          ))}
-          {/* ✂️ trim-mód: normal → ripple → roll → slip → slide (a fogantyú/test-húzás viselkedése) */}
-          <Pressable
-            onPress={cycleTrimMode}
-            hitSlop={4}
-            style={[styles.snapBtn, { marginLeft: 'auto' }, trimMode !== 'normal' ? styles.iconBtnActive : null]}
-            accessibilityLabel={t('editor.trim.label')}
-          >
-            <Ionicons
-              name="git-compare-outline"
-              size={12}
-              color={trimMode === 'normal' ? palette.textDim : palette.accent}
-            />
-            <Text style={[styles.regionAddText, trimMode === 'normal' ? { color: palette.textDim } : { color: palette.accent }]}>
-              {t('editor.trim.' + trimMode)}
-            </Text>
-          </Pressable>
-          {/* ✂️ borotva-mód: koppintásra vág az idővonalon */}
-          <Pressable
-            onPress={toggleRazorMode}
-            hitSlop={4}
-            style={[styles.iconBtn, razorMode ? styles.iconBtnActive : null]}
-            accessibilityLabel={t('editor.razor.label')}
-          >
-            <Ionicons name="cut" size={13} color={razorMode ? palette.accent : palette.textDim} />
-          </Pressable>
-          {/* 🅸🅾 tartomány kezdet/vég a lejátszófejnél */}
-          <Pressable
-            onPress={setRangeIn}
-            hitSlop={4}
-            style={[styles.iconBtn, rangeIn != null ? styles.iconBtnActive : null]}
-            accessibilityLabel={t('editor.range.setIn')}
-          >
-            <Text style={[styles.ioText, rangeIn != null ? { color: palette.accent } : null]}>I</Text>
-          </Pressable>
-          <Pressable
-            onPress={setRangeOut}
-            hitSlop={4}
-            style={[styles.iconBtn, rangeOut != null ? styles.iconBtnActive : null]}
-            accessibilityLabel={t('editor.range.setOut')}
-          >
-            <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>O</Text>
-          </Pressable>
-          {/* 🧲 illesztés + 🏷️ régió — MINDIG egy sorban (nem törhet külön a kettő) */}
-          <View style={styles.snapRegionGroup}>
-            {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
-            <Pressable
-              onPress={cycleSnapStrength}
-              onLongPress={openSnapMenu}
-              hitSlop={4}
-              style={styles.snapBtn}
-              accessibilityLabel={t('editor.snap.label')}
+                <Ionicons
+                  name="git-compare-outline"
+                  size={12}
+                  color={trimMode === 'normal' ? palette.textDim : palette.accent}
+                />
+                <Text style={[styles.regionAddText, trimMode === 'normal' ? { color: palette.textDim } : { color: palette.accent }]}>
+                  {t('editor.trim.' + trimMode)}
+                </Text>
+              </Pressable>
+              {/* ✂️ borotva-mód: koppintásra vág az idővonalon */}
+              <Pressable
+                onPress={toggleRazorMode}
+                hitSlop={4}
+                style={[styles.iconBtn, razorMode ? styles.iconBtnActive : null]}
+                accessibilityLabel={t('editor.razor.label')}
+              >
+                <Ionicons name="cut" size={13} color={razorMode ? palette.accent : palette.textDim} />
+              </Pressable>
+              {/* ⇥⇤ tartomány kezdet/vég a lejátszófejnél — ikon + Be/Ki felirat (a csupasz I/O betű helyett, D4) */}
+              <Pressable
+                onPress={setRangeIn}
+                hitSlop={4}
+                style={[styles.iconBtn, rangeIn != null ? styles.iconBtnActive : null]}
+                accessibilityLabel={t('editor.range.setIn')}
+              >
+                <Ionicons name="log-in-outline" size={13} color={rangeIn != null ? palette.accent : palette.textDim} />
+                <Text style={[styles.ioText, rangeIn != null ? { color: palette.accent } : null]}>{t('editor.range.inShort')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={setRangeOut}
+                hitSlop={4}
+                style={[styles.iconBtn, rangeOut != null ? styles.iconBtnActive : null]}
+                accessibilityLabel={t('editor.range.setOut')}
+              >
+                <Ionicons name="log-out-outline" size={13} color={rangeOut != null ? palette.accent : palette.textDim} />
+                <Text style={[styles.ioText, rangeOut != null ? { color: palette.accent } : null]}>{t('editor.range.outShort')}</Text>
+              </Pressable>
+              {/* 🧲 illesztés + 🏷️ régió — MINDIG egy sorban (nem törhet külön a kettő) */}
+              <View style={styles.snapRegionGroup}>
+                {/* 🧲 illesztés-erősség: normál → erős → ki (hosszú nyomás: célpont-menü) */}
+                <Pressable
+                  onPress={cycleSnapStrength}
+                  onLongPress={openSnapMenu}
+                  hitSlop={4}
+                  style={styles.snapBtn}
+                  accessibilityLabel={t('editor.snap.label')}
+                >
+                  <Ionicons
+                    name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
+                    size={12}
+                    color={snapStrength === 'off' ? palette.textDim : palette.accent2}
+                  />
+                  <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
+                    {t('editor.snap.' + snapStrength)}
+                  </Text>
+                </Pressable>
+                {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
+                <Pressable
+                  onPress={addRegion}
+                  hitSlop={4}
+                  style={styles.regionAddBtn}
+                  accessibilityLabel={t('editor.regions.add')}
+                >
+                  <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
+                  <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
+                </Pressable>
+              </View>
+              </>
+            )}
+          </ScrollView>
+          {/* ➡️ görgetés-jelzés: ha jobbra még van vezérlő, elhalványuló szél + nyíl (D4) */}
+          {controls.content - controls.x - controls.w > 6 ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={[`${palette.bg}00`, palette.bg]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.moreFade}
             >
-              <Ionicons
-                name={snapStrength === 'off' ? 'magnet-outline' : 'magnet'}
-                size={12}
-                color={snapStrength === 'off' ? palette.textDim : palette.accent2}
-              />
-              <Text style={[styles.regionAddText, snapStrength === 'off' ? { color: palette.textDim } : null]}>
-                {t('editor.snap.' + snapStrength)}
-              </Text>
-            </Pressable>
-            {/* 🏷️ régió a kijelölt klipből / a lejátszófejnél */}
-            <Pressable
-              onPress={addRegion}
-              hitSlop={4}
-              style={styles.regionAddBtn}
-              accessibilityLabel={t('editor.regions.add')}
-            >
-              <Ionicons name="bookmarks-outline" size={12} color={palette.accent2} />
-              <Text style={styles.regionAddText}>{t('editor.regions.add')}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
+              <Ionicons name="chevron-forward" size={14} color={palette.textDim} />
+            </LinearGradient>
+          ) : null}
+        </View>
       )}
-      {compact ? null : insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
+      {compact || editMode === 'quick' || !timelineExtras ? null : insightLane === 'pacing' ? <PacingLane /> : <StoryLane />}
       {/* 🗺️ állandó scrubber KÖZVETLENÜL az idővonal fölött: az egész projekt
           kicsinyített térképe — koppintás/húzás a lejátszófejet mozgatja végig,
           így az idővonal „végignézhető" (a középre rögzített fej auto-scrollja
-          igazítja a nagy idővonalat). */}
-      {compact ? null : <TimelineMinimap viewportW={viewportW} pps={pps} />}
+          igazítja a nagy idővonalat). Gyors módban / összecsukva rejtve (D6). */}
+      {compact || editMode === 'quick' || !timelineExtras ? null : <TimelineMinimap viewportW={viewportW} pps={pps} />}
       <GestureDetector gesture={pinch}>
         <View style={styles.outerRow}>
         {showHeaders ? (
@@ -1066,30 +1138,68 @@ export function Timeline({ compact = false }: { compact?: boolean } = {}) {
                 pointerEvents="box-none"
                 style={[styles.trackLabelRow, { height: th(type) }]}
               >
-                <Pressable
-                  hitSlop={6}
-                  onPress={() => openTrackMenu(type)}
-                  style={[styles.trackLabelChip, { borderColor: trackColors[type] }]}
-                >
-                  <Text style={[styles.trackLabelText, { color: trackColors[type], fontSize: L.font(8) }]}>
-                    {t(trackLabels[type])}
-                  </Text>
-                  {mutedTracks.includes(type) ? (
-                    <Ionicons name="volume-mute" size={9} color={palette.accent2} />
+                <View style={styles.trackLabelGroup} pointerEvents="box-none">
+                  <Pressable
+                    hitSlop={6}
+                    onPress={() => openTrackMenu(type)}
+                    style={[styles.trackLabelChip, { borderColor: trackColors[type] }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t(trackLabels[type])}
+                    accessibilityHint={t('editor.timeline.trackMenuMessage')}
+                  >
+                    <Text style={[styles.trackLabelText, { color: trackColors[type], fontSize: L.font(10) }]}>
+                      {t(trackLabels[type])}
+                    </Text>
+                    {soloTracks.includes(type) ? <Ionicons name="star" size={10} color={palette.accent} /> : null}
+                    {collapsedTracks.includes(type) ? (
+                      <Ionicons name="chevron-expand" size={10} color={palette.textDim} />
+                    ) : null}
+                  </Pressable>
+                  {/* 🔇/👁️ + 🔒 közvetlenül látható, érinthető sáv-vezérlők (D7) — a ritkábbak
+                      (szóló, összecsukás, magasság) a címke-menüben maradnak */}
+                  {AUDIBLE_TRACKS.includes(type) ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => toggleTrackFlag(type, 'mute')}
+                      style={styles.trackIconBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={mutedTracks.includes(type) ? t('editor.timeline.unmute') : t('editor.timeline.mute')}
+                    >
+                      <Ionicons
+                        name={mutedTracks.includes(type) ? 'volume-mute' : 'volume-medium-outline'}
+                        size={13}
+                        color={mutedTracks.includes(type) ? palette.accent2 : palette.textDim}
+                      />
+                    </Pressable>
+                  ) : VISUAL_TRACKS.includes(type) ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => toggleTrackFlag(type, 'hidden')}
+                      style={styles.trackIconBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={hiddenTracks.includes(type) ? t('editor.timeline.show') : t('editor.timeline.hide')}
+                    >
+                      <Ionicons
+                        name={hiddenTracks.includes(type) ? 'eye-off-outline' : 'eye-outline'}
+                        size={13}
+                        color={hiddenTracks.includes(type) ? palette.accent2 : palette.textDim}
+                      />
+                    </Pressable>
                   ) : null}
-                  {soloTracks.includes(type) ? (
-                    <Ionicons name="star" size={9} color={palette.accent} />
-                  ) : null}
-                  {lockedTracks.includes(type) ? (
-                    <Ionicons name="lock-closed" size={9} color={palette.accent2} />
-                  ) : null}
-                  {collapsedTracks.includes(type) ? (
-                    <Ionicons name="chevron-expand" size={9} color={palette.textDim} />
-                  ) : null}
-                  {hiddenTracks.includes(type) ? (
-                    <Ionicons name="eye-off-outline" size={9} color={palette.accent2} />
-                  ) : null}
-                </Pressable>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => toggleTrackFlag(type, 'lock')}
+                    style={styles.trackIconBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={lockedTracks.includes(type) ? t('editor.timeline.unlock') : t('editor.timeline.lock')}
+                  >
+                    <Ionicons
+                      name={lockedTracks.includes(type) ? 'lock-closed' : 'lock-open-outline'}
+                      size={13}
+                      color={lockedTracks.includes(type) ? palette.accent2 : palette.textDim}
+                    />
+                  </Pressable>
+                </View>
               </View>
             ))}
           </View>
@@ -1223,6 +1333,7 @@ const styles = StyleSheet.create({
   snapBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 28,
     gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1241,6 +1352,7 @@ const styles = StyleSheet.create({
   regionAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 28,
     gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1268,9 +1380,12 @@ const styles = StyleSheet.create({
     minWidth: '100%',
   },
   iconBtn: {
+    flexDirection: 'row',
+    gap: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 24,
+    minWidth: 28,
+    minHeight: 28,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1285,6 +1400,42 @@ const styles = StyleSheet.create({
     color: palette.textDim,
     fontSize: 11,
     fontWeight: '800',
+  },
+  controlsWrap: {
+    position: 'relative',
+  },
+  moreFade: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 3,
+    width: 36,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  modeSeg: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    overflow: 'hidden',
+  },
+  modeBtn: {
+    paddingHorizontal: 9,
+    minHeight: 28,
+    justifyContent: 'center',
+    backgroundColor: palette.surfaceHigh,
+  },
+  modeBtnActive: {
+    backgroundColor: palette.accentSoft,
+  },
+  modeText: {
+    color: palette.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  modeTextActive: {
+    color: palette.accent,
   },
   razorLayer: {
     position: 'absolute',
@@ -1337,6 +1488,8 @@ const styles = StyleSheet.create({
   insightTab: {
     paddingHorizontal: 8,
     paddingVertical: 2,
+    minHeight: 28,
+    justifyContent: 'center',
     borderRadius: 6,
     borderWidth: 1,
     borderColor: palette.border,
@@ -1348,7 +1501,7 @@ const styles = StyleSheet.create({
   },
   insightTabText: {
     color: palette.textDim,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1422,6 +1575,19 @@ const styles = StyleSheet.create({
   },
   trackLabelText: {
     fontWeight: '700',
+  },
+  trackLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trackIconBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${palette.bg}cc`,
   },
   playhead: {
     position: 'absolute',

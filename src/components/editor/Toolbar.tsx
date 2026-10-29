@@ -24,6 +24,7 @@ import { toolbarFor, type ToolId } from '@/lib/toolbarSpec';
 import { clipEnd, compatibleTracksFor, findClip, trackEnd, trackOf } from '@/lib/projectUtils';
 import { selectSelectedClip, useEditorStore, type PanelId } from '@/store/editorStore';
 import { useToast } from '@/store/toastStore';
+import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { useTutorial } from '@/store/tutorialStore';
 import type { Asset, Clip, TrackType } from '@/types/project';
 
@@ -35,6 +36,8 @@ import type { Asset, Clip, TrackType } from '@/types/project';
 export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) {
   const { t } = useTranslation();
   const selected = useEditorStore(selectSelectedClip);
+  // 🎚️ Gyors / Haladó / AI mód (D5) — az eszköztár készlete ettől függ
+  const editMode = useEditorPrefs((st) => st.editMode);
   const [showCamera, setShowCamera] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -576,6 +579,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
   };
 
   const layout = toolbarFor({
+    mode: editMode,
     selectionKind: selected?.kind ?? null,
     multi: multiSelectMode && multiSelectIds.length >= 1,
     onPipTrack,

@@ -54,6 +54,7 @@ import {
 } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
+import { useToast } from '@/store/toastStore';
 import type {
   CanvasTransform,
   ImageClip,
@@ -1142,15 +1143,20 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       {/* safe-zone kapcsoló (bal felső sarok, csak szerkesztésben) */}
       {mode === 'edit' && project ? (
         <Pressable
-          onPress={toggleSafeZones}
+          onPress={() => {
+            // bekapcsoláskor egy mondat, MIT mutat (az ikon önmagában nem egyértelmű — D9)
+            if (!showSafeZones) useToast.getState().show(t('editor.preview.safeZonesHint'));
+            toggleSafeZones();
+          }}
           hitSlop={8}
           style={[styles.safeToggle, showSafeZones ? styles.safeToggleOn : null]}
-          accessibilityRole="button"
-          accessibilityState={{ selected: showSafeZones }}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: showSafeZones }}
           accessibilityLabel={t('editor.preview.safeZones')}
+          accessibilityHint={t('editor.preview.safeZonesHint')}
         >
           <Ionicons
-            name="scan-outline"
+            name="phone-portrait-outline"
             size={16}
             color={showSafeZones ? palette.accent : palette.textDim}
           />
@@ -1166,6 +1172,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           style={[styles.compareBtn, comparingOriginal ? styles.compareBtnOn : null]}
           accessibilityRole="button"
           accessibilityLabel={t('editor.preview.compareOriginal')}
+          accessibilityHint={t('editor.preview.compareHint')}
         >
           <Ionicons
             name="git-compare-outline"

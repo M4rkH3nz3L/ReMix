@@ -47,6 +47,7 @@ import { isProjectEmpty } from '@/lib/projectUtils';
 import { prewarmProxies } from '@/lib/proxy';
 import { pruneProxyCache, pruneRenderCache } from '@/lib/cacheManager';
 import { canCloudBackupMedia, projectMediaSafety } from '@/lib/storagePolicy';
+import { sourcePlatformOf } from '@/lib/sourceWatermark';
 import {
   clearRecovery,
   duplicateProject,
@@ -75,6 +76,7 @@ import {
 } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
+import { useToast } from '@/store/toastStore';
 import { useTutorial } from '@/store/tutorialStore';
 
 const AUTOSAVE_MS = 800;
@@ -178,6 +180,28 @@ export default function EditorScreen() {
       alive = false;
     };
   }, [missingMedia.length, id]);
+
+  // 🏷️ más platformról letöltött forrás (vízjel, idegen jog) — IMPORTKOR egyszer szólunk (D11).
+  // A betöltéskor már meglévő assetek nem jeleznek (azokról már döntött a user).
+  const knownAssetIds = useRef<{ projectId: string; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    if (!project || project.id !== id) {
+      return;
+    }
+    const known = knownAssetIds.current;
+    if (!known || known.projectId !== id) {
+      knownAssetIds.current = { projectId: id, ids: new Set(project.assets.map((a) => a.id)) };
+      return;
+    }
+    for (const a of project.assets) {
+      if (known.ids.has(a.id)) continue;
+      known.ids.add(a.id);
+      const platform = a.kind === 'video' || a.kind === 'image' ? sourcePlatformOf(a.name ?? a.uri) : null;
+      if (platform) {
+        useToast.getState().show(t('editorScreen.foreignSource', { platform: t(`editorScreen.platform_${platform}`) }));
+      }
+    }
+  }, [project, id, t]);
 
   // 💬 projekt-szoba: MINDIG elérhető — a „nincs kollaboráció" csak annyit jelent,
   // hogy még nincs behívva senki. Tulajként az első megnyitás hozza létre a szobát
@@ -671,7 +695,20 @@ export default function EditorScreen() {
       <View style={styles.headerActions}>
         {/* 👥 élő résztvevők (realtime presence) — csak ha más is bent van */}
         <CollabPresence />
-        {/* 💬 projekt-szoba — MINDIG elérhető (tulajként az első megnyitás hozza létre) */}
+        {/* ✨ AI-asszisztens — a fő megkülönböztető EGY koppintásra (D2; korábban „Több → AI") */}
+        <Pressable
+          onPress={() => {
+            const st = useEditorStore.getState();
+            st.setPanel(st.activePanel === 'assistant' ? null : 'assistant');
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('editorScreen.aiAssistant')}
+        >
+          <Ionicons name="sparkles" size={21} color={palette.accent} />
+        </Pressable>
+        {/* 👥 projekt-szoba (csapat-chat) — MINDIG elérhető (tulajként az első megnyitás
+            hozza létre). Csoport-ikon: a buborék az AI-val volt összetéveszthető (D2). */}
         <Pressable
           onPress={openCollabChat}
           hitSlop={8}
@@ -679,8 +716,8 @@ export default function EditorScreen() {
           accessibilityLabel={t('chat.projectConversation')}
         >
           <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={21}
+            name="people-circle-outline"
+            size={23}
             color={collab ? palette.accent2 : palette.textDim}
           />
         </Pressable>

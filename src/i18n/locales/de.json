@@ -701,6 +701,15 @@
     }
   },
   "editor": {
+    "mode": {
+      "label": "Bearbeitungsmodus",
+      "quick": "Schnell",
+      "advanced": "Profi",
+      "ai": "KI",
+      "hint_quick": "Nur die häufigsten Werkzeuge, einfache Timeline",
+      "hint_advanced": "Alle Werkzeuge und Timeline-Steuerungen",
+      "hint_ai": "KI-Werkzeuge stehen vorne"
+    },
     "toast": {
       "undo": "Rückgängig",
       "clipsDeleted_one": "Clip gelöscht",
@@ -722,6 +731,8 @@
       "tapToRecord": "Tippen zum Aufnehmen (max. 60 s)"
     },
     "preview": {
+      "safeZonesHint": "Sichere Zonen: zeigt, wo die Plattform-Oberfläche (Buttons, Beschriftung) das Video verdeckt.",
+      "compareHint": "Gedrückt halten, um das unbearbeitete Original zu sehen",
       "safeZones": "Sichere Zonen",
       "compareOriginal": "Halten für Vergleich mit Original",
       "original": "Original",
@@ -868,6 +879,8 @@
       "relinkOne": "Verknüpfen"
     },
     "timeline": {
+      "extrasHide": "Story-/Tempo-Spur und Karte ausblenden",
+      "extrasShow": "Story-/Tempo-Spur und Karte einblenden",
       "trackMenuMessage": "Stumm und Solo wirken sich NUR auf die Vorschau aus — das exportierte Video wird dadurch nicht verändert. Zum dauerhaften Stummschalten passe die Lautstärke des Clips an.",
       "mute": "🔇 Stumm",
       "unmute": "🔊 Stumm aus",
@@ -1010,6 +1023,16 @@
       }
     },
     "transportBar": {
+      "moreTitle": "Weitere Wiedergabe-Aktionen",
+      "toStart": "Zum Anfang",
+      "shuttleBack": "Schnell zurück (J)",
+      "shuttleFwd": "Schnell vorwärts (L)",
+      "loopOn": "Wiederholung einschalten",
+      "loopOff": "Wiederholung ausschalten",
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "play": "Abspielen",
+      "pause": "Pause",
       "markerTitle": "Marker",
       "recolorMarker": "Umfärben",
       "deleteMarkerConfirm": "„{{label}}“ löschen?",
@@ -1066,6 +1089,8 @@
       "neon": "Neon"
     },
     "range": {
+      "inShort": "In",
+      "outShort": "Out",
       "title": "Bereich",
       "message": "Was mit dem gewählten Bereich tun?",
       "region": "Region aus Bereich",
@@ -1108,6 +1133,14 @@
     }
   },
   "editorScreen": {
+    "aiAssistant": "KI-Assistent",
+    "foreignSource": "Dieses Video stammt wahrscheinlich von {{platform}}. Nutze Inhalte anderer nur mit Erlaubnis; Plattformen stufen Videos mit Wasserzeichen herab.",
+    "platform_tiktok": "TikTok",
+    "platform_instagram": "Instagram",
+    "platform_youtube": "YouTube",
+    "platform_facebook": "Facebook",
+    "platform_snapchat": "Snapchat",
+    "platform_capcut": "CapCut",
     "menuAspect": "Seitenverhältnis: {{aspect}}",
     "remixedFrom": "Remix von {{name}}",
     "projectNotFound": "Projekt nicht gefunden.",
@@ -1670,6 +1703,16 @@
       "profanityRemove": "Entfernen"
     },
     "export": {
+      "lint": {
+        "ok": "Inhaltsprüfung: alles in Ordnung.",
+        "title": "Vor dem Export prüfen ({{count}})",
+        "jump": "Springt zum Clip",
+        "empty": "Das Projekt ist leer — nichts zu exportieren.",
+        "placeholderText": "Vorlagentext ist noch drin: „{{detail}}“",
+        "emptyText": "Leerer Textclip",
+        "missingMedia": "Fehlende (offline) Medien: {{detail}}",
+        "silent": "Der gesamte Ton ist stumm — das Video wird ohne Ton exportiert."
+      },
       "writingHeadlines": "Titel werden geschrieben…",
       "aiHeadlinesTitle": "KI-Titel",
       "headlinesUnavailable": "Titelvorschläge nicht verfügbar — läuft der Worker + KI?",

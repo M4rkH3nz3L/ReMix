@@ -701,6 +701,15 @@
     }
   },
   "editor": {
+    "mode": {
+      "label": "Editing mode",
+      "quick": "Quick",
+      "advanced": "Advanced",
+      "ai": "AI",
+      "hint_quick": "Only the most common tools, simple timeline",
+      "hint_advanced": "Every tool and timeline control",
+      "hint_ai": "AI tools come first"
+    },
     "toast": {
       "undo": "Undo",
       "clipsDeleted_one": "Clip deleted",
@@ -722,6 +731,8 @@
       "tapToRecord": "Tap to record (max 60 s)"
     },
     "preview": {
+      "safeZonesHint": "Safe zones: shows where the platform's UI (buttons, caption) covers the video.",
+      "compareHint": "Hold to see the original, unedited image",
       "safeZones": "Safe zones",
       "compareOriginal": "Hold to compare with original",
       "original": "Original",
@@ -868,6 +879,8 @@
       "relinkOne": "Relink"
     },
     "timeline": {
+      "extrasHide": "Hide story/pacing lane and map",
+      "extrasShow": "Show story/pacing lane and map",
       "trackMenuMessage": "Mute and solo affect ONLY the preview — the exported video is not changed by them. For permanent muting, adjust the clip's volume.",
       "mute": "🔇 Mute",
       "unmute": "🔊 Unmute",
@@ -1010,6 +1023,16 @@
       }
     },
     "transportBar": {
+      "moreTitle": "More playback actions",
+      "toStart": "Go to start",
+      "shuttleBack": "Shuttle back (J)",
+      "shuttleFwd": "Shuttle forward (L)",
+      "loopOn": "Turn loop on",
+      "loopOff": "Turn loop off",
+      "undo": "Undo",
+      "redo": "Redo",
+      "play": "Play",
+      "pause": "Pause",
       "markerTitle": "Marker",
       "recolorMarker": "Recolor",
       "deleteMarkerConfirm": "Delete „{{label}}”?",
@@ -1066,6 +1089,8 @@
       "neon": "Neon"
     },
     "range": {
+      "inShort": "In",
+      "outShort": "Out",
       "title": "Range",
       "message": "What to do with the selected range?",
       "region": "Region from range",
@@ -1108,6 +1133,14 @@
     }
   },
   "editorScreen": {
+    "aiAssistant": "AI assistant",
+    "foreignSource": "This video likely comes from {{platform}}. Only use other creators' content with permission; platforms down-rank watermarked videos.",
+    "platform_tiktok": "TikTok",
+    "platform_instagram": "Instagram",
+    "platform_youtube": "YouTube",
+    "platform_facebook": "Facebook",
+    "platform_snapchat": "Snapchat",
+    "platform_capcut": "CapCut",
     "menuAspect": "Aspect ratio: {{aspect}}",
     "remixedFrom": "Remixed from {{name}}",
     "projectNotFound": "Project not found.",
@@ -1670,6 +1703,16 @@
       "profanityRemove": "Remove"
     },
     "export": {
+      "lint": {
+        "ok": "Content check: all good.",
+        "title": "Review before export ({{count}})",
+        "jump": "Jumps to the clip",
+        "empty": "The project is empty — nothing to export.",
+        "placeholderText": "Template text left in: “{{detail}}”",
+        "emptyText": "Empty text clip",
+        "missingMedia": "Missing (offline) media: {{detail}}",
+        "silent": "All audio is muted — the video will export without sound."
+      },
       "writingHeadlines": "Writing headlines…",
       "aiHeadlinesTitle": "AI headlines",
       "headlinesUnavailable": "Headline suggestions unavailable — is the worker + AI running?",

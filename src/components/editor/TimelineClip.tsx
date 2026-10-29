@@ -463,6 +463,10 @@ function TimelineClipInner({
     zIndex: lift.value > 0 ? 30 : 0,
   }));
 
+  // 🎞️ filmszalagos klip + általános (információ nélküli) címke → a címke csak kijelöléskor (D10)
+  const mediaThumb = clip.kind === 'video' || clip.kind === 'image';
+  const genericMediaLabel = clip.kind === 'image' || (clip.kind === 'video' && !clip.comp && clip.speed === 1);
+
   return (
     <GestureDetector gesture={Gesture.Race(movePan, tap)}>
       <Animated.View
@@ -515,25 +519,31 @@ function TimelineClipInner({
             ) : null}
           </View>
         ) : null}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.label,
-            {
-              color:
-                selected || clip.kind === 'text' || clip.kind === 'audio'
-                  ? '#fff'
-                  : `${color}`,
-            },
-            // média-háttér (filmstrip/hullámforma) fölött chip tartja olvashatónak
-            clip.kind !== 'text' && clip.kind !== 'interactive' ? styles.labelChip : null,
-            // hangklipen a fájlnév kis címke a bal-felső sarokban — a
-            // hullámforma marad a főszereplő (látványterv szerint)
-            clip.kind === 'audio' ? styles.labelAudio : null,
-          ]}
-        >
-          {clipLabel(clip, t)}
-        </Text>
+        {/* 🎞️ a filmszalagos klipen az általános „Videó/Kép" felirat CSAK kijelöléskor látszik —
+            különben a bélyegképet takarná (D10); az informatív címke (sebesség, összetett klip)
+            kicsi, áttetsző sarok-chip */}
+        {mediaThumb && genericMediaLabel && !selected ? null : (
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.label,
+              {
+                color:
+                  selected || clip.kind === 'text' || clip.kind === 'audio'
+                    ? '#fff'
+                    : `${color}`,
+              },
+              // média-háttér (filmstrip/hullámforma) fölött chip tartja olvashatónak
+              clip.kind !== 'text' && clip.kind !== 'interactive' ? styles.labelChip : null,
+              // hangklipen a fájlnév kis címke a bal-felső sarokban — a
+              // hullámforma marad a főszereplő (látványterv szerint)
+              clip.kind === 'audio' ? styles.labelAudio : null,
+              mediaThumb ? styles.labelMedia : null,
+            ]}
+          >
+            {clipLabel(clip, t)}
+          </Text>
+        )}
         {selected ? (
           <>
             <GestureDetector gesture={trimLeftPan}>
@@ -634,6 +644,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
     overflow: 'hidden',
+  },
+  labelMedia: {
+    position: 'absolute',
+    top: 2,
+    left: 4,
+    fontSize: 9,
+    fontWeight: '700',
+    backgroundColor: '#07080d88',
   },
   labelAudio: {
     position: 'absolute',

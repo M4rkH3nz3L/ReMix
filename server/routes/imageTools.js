@@ -37,7 +37,7 @@ const router = express.Router();
  * → PNG. A formákat/feliratokat ugyanaz a generátor rajzolja, mint az
  * idővonalon, így a kép és a videó megjelenése garantáltan egyezik.
  */
-router.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/imagedoc', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   let doc;
   let uriMap;
   try {
@@ -98,7 +98,7 @@ router.post('/imagedoc', upload.any(), requireAuth, rateLimit('analysis'), (req,
  * A dev `ALLOW_INSECURE_DEV` bypass a `proOnly`/`enforceQuota`-ban automatikus
  * (a többi gate-tel konzisztens).
  */
-router.post('/psd/import', uploadImage.any(), ...proOnly, mediaGuard('psd'), async (req, res) => {
+router.post('/psd/import', ...proOnly, uploadImage.any(), mediaGuard('psd'), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'Hiányzó PSD-fájl.' });
@@ -182,7 +182,7 @@ function psdMakeId() {
  * `cloudJobs`-kvótát OLDAL-SZÁM szerint mérjük (enforceQuota(pages) + trackUsage(pages)),
  * nem fix 1 job/import. A dev `ALLOW_INSECURE_DEV` bypass a gate-ekben automatikus.
  */
-router.post('/pdf/import', uploadImage.any(), ...proOnly, mediaGuard('pdf'), async (req, res) => {
+router.post('/pdf/import', ...proOnly, uploadImage.any(), mediaGuard('pdf'), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'Hiányzó PDF-fájl.' });
@@ -413,7 +413,7 @@ router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (r
 // 📄 SVG → nyomdakész vektor-PDF (a kliens imageDocToSvg kimenete → Chromium page.pdf).
 // Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott fotóktól nagy lehet — a mező-méret-limit
 // nem gond), a vászon-méret (width/height px) mezőben jön.
-router.post('/svg/pdf', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/svg/pdf', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const svgFile = (req.files ?? []).find((f) => f.fieldname === 'svg');
   let svg = '';
   try {
@@ -439,7 +439,7 @@ router.post('/svg/pdf', upload.any(), requireAuth, rateLimit('analysis'), (req, 
     });
 });
 
-router.post('/color/stats', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
+router.post('/color/stats', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -462,7 +462,7 @@ router.post('/color/stats', upload.any(), requireAuth, rateLimit('analysis'), me
 });
 
 // 🎨 Színpipetta: pixel-szín a médiakockán a (x,y) vászon-normalizált ponton
-router.post('/color/pixel', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
+router.post('/color/pixel', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -508,7 +508,7 @@ router.post('/color/lut-export', express.json({ limit: '256kb' }), requireAuth, 
 });
 
 // 🩻 Videoszkóp: egy médiakocka waveform/parade/vectorscope/histogram képe PNG-ben
-router.post('/color/scope', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
+router.post('/color/scope', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -551,7 +551,7 @@ router.post('/text/bake', express.json({ limit: '256kb' }), requireAuth, rateLim
 
 // 🪄 AI background removal (P1 v1, fotón): u2net CPU-n → téma-kivágás
 // átlátszó háttérrel (md5-cache) — a kliens overlay-képként használja.
-router.post('/bgremove', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
+router.post('/bgremove', ...proOnly, upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -627,7 +627,7 @@ router.get('/stickers3d/:id.png', (req, res) => {
 // lokálisan CPU-n) → fg/mid/bg parallax-rétegek. Md5 szerint cache-elt — a
 // rétegeket a render közvetlenül az assets/depth mappából olvassa, az app az
 // előnézethez a GET útvonalon éri el.
-router.post('/depth/parallax', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
+router.post('/depth/parallax', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });
@@ -657,7 +657,7 @@ router.post('/depth/parallax', upload.any(), requireAuth, rateLimit('analysis'),
 });
 
 // 🌫️/🎬 depth-extrák: portré-blur + rack-focus változatok (közös mélység-cache)
-router.post('/depth/focus', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('image'), (req, res) => {
+router.post('/depth/focus', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });

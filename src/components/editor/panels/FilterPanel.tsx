@@ -130,6 +130,21 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
     }
   };
 
+  // 🎬 B19: a PiP-rétegen a render a szűrőt, az opacitást, a forgatást, a keretet és a
+  // fordított lejátszást tudja — a többi beállítás a kész videóból CSENDBEN hiányozna,
+  // ezért PiP-klipnél nem is kínáljuk fel (őszinte UI)
+  const onPip = useEditorStore.getState().project?.tracks.some(
+    (tk) => tk.type === 'pip' && tk.clips.some((c) => c.id === clip.id)
+  );
+  if (onPip) {
+    return (
+      <View>
+        <FiltersSection clip={clip} />
+        <Text style={styles.pipNote}>{t('panels.filter.pipLimited')}</Text>
+      </View>
+    );
+  }
+
   return (
     <View>
       {clip.kind === 'image' ? <ImageStudioSection clip={clip} /> : null}
@@ -384,6 +399,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
 }
 
 const styles = StyleSheet.create({
+  pipNote: { color: palette.textDim, fontSize: 12, lineHeight: 17, marginTop: 8 },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',

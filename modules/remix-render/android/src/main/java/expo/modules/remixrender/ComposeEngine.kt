@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.opengl.GLES20
 import expo.modules.remixrender.gl.InputSurface
 import expo.modules.remixrender.gl.OutputSurface
 import expo.modules.remixrender.gl.OverlayRender
@@ -18,8 +19,9 @@ import java.nio.ByteBuffer
  * ([AudioMixer]) — a szegmensek saját hangja + a külön zene/voiceover sávok —
  * egyetlen AAC-be keverve, időzítve. Ez az iOS AVFoundation-kompozit párja.
  *
- * A szegmensek az `atSec` idővonalon, sorrendben, egymáshoz csatolva (a gap-ek
- * fekete-kitöltése külön, követő lépés — a tipikus idővonal folytonos).
+ * A szegmensek a SAJÁT `atSec` idővonal-helyükön (az idővonal nullpontja a 0 — mint a
+ * preview-ban); a rések (a klipek közt és az elején) FEKETE képkockákkal telnek, az
+ * overlay-k (felirat, vízjel) ott is látszanak (PRO-VIDEO B11).
  */
 object ComposeEngine {
   private const val TIMEOUT_US = 10_000L
@@ -85,14 +87,9 @@ object ComposeEngine {
     segs.sortBy { it.atUs }
     if (segs.isEmpty()) throw IllegalStateException("Nincs videó-szegmens a kompozithoz.")
 
-    // közös idővonal-nullpont (videó + hang legkorábbi kezdete)
-    var firstAtUs = segs.first().atUs
-    if (audio != null) {
-      for (i in 0 until audio.length()) {
-        val a = (audio.getJSONObject(i).optDouble("atSec", 0.0) * 1_000_000.0).toLong()
-        if (a < firstAtUs) firstAtUs = a
-      }
-    }
+    // közös idővonal-nullpont = a projekt 0-ja (a preview ezt mutatja; az overlay-k is
+    // abszolút időt hordoznak — a korábbi „legkorábbi klip" nullpont elcsúsztatta őket)
+    val firstAtUs = 0L
     var totalDurUs = 0L
     for (s in segs) totalDurUs = maxOf(totalDurUs, s.atUs - firstAtUs + s.timelineDurUs)
     if (audio != null) {
@@ -169,13 +166,36 @@ object ComposeEngine {
         }
       }
 
-      // ── szegmensek dekódolása sorban, folytonos PTS-sel ──
+      // ⬛ rés-kitöltés: fekete kockák [fromUs, toUs) között, a projekt fps-ével (+ overlay-k)
+      val frameUs = 1_000_000L / maxOf(1, fps)
+      fun fillGap(fromUs: Long, toUs: Long) {
+        var t = fromUs
+        while (t < toUs - frameUs / 2) {
+          if (isCancelled()) throw RenderCancelledException()
+          GLES20.glViewport(0, 0, canvasW, canvasH)
+          GLES20.glClearColor(0f, 0f, 0f, 1f)
+          GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+          overlayRender.drawAt(t)
+          inputSurface.setPresentationTime(t * 1000L)
+          inputSurface.swapBuffers()
+          drainEncoder(false)
+          t += frameUs
+        }
+      }
+
+      // ── szegmensek dekódolása sorban, a saját idővonal-helyükön ──
+      var timelineUs = 0L
       for (seg in segs) {
         if (isCancelled()) throw RenderCancelledException()
+        val segStart = seg.atUs - firstAtUs
+        if (segStart > timelineUs + frameUs / 2) fillGap(timelineUs, segStart)
         decodeSegment(seg, canvasW, canvasH, firstAtUs, outputSurface, inputSurface, totalDurUs, isCancelled, onProgress, overlayRender) {
           drainEncoder(false)
         }
+        timelineUs = maxOf(timelineUs, segStart + seg.timelineDurUs)
       }
+      // a hang (zene) tovább tarthat az utolsó videónál → a vég is fekete, nem befagyott kocka
+      if (totalDurUs > timelineUs + frameUs / 2) fillGap(timelineUs, totalDurUs)
       enc.signalEndOfInputStream()
       drainEncoder(true)
 

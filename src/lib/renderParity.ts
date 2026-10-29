@@ -1,5 +1,5 @@
 import { textClipUnsupportedOnDevice } from '@/lib/overlayPlan';
-import type { Clip, Project, VideoClip } from '@/types/project';
+import type { AudioClip, Clip, Project, VideoClip } from '@/types/project';
 
 /**
  * 🎯 Eszközön-render PARITÁS-KAPU — tiszta mag (WYSIWYG-szabály).
@@ -38,7 +38,17 @@ export type LocalRenderGap =
   | 'reversed'
   | 'nestedComp'
   | 'particles'
-  | 'audioMaster';
+  | 'audioMaster'
+  // 🧩 B10: a natív motor EGY videósávot fűz — a PiP/overlay-sáv videója rés
+  | 'pip'
+  // 🎞️ B15: videó-feldolgozás, amit csak a felhő-render tud
+  | 'videoFx'
+  // 🎙️ B15: hangfeldolgozás (Voice Studio, effekt-lánc, ducking) és hang-mozgás
+  | 'voiceFx'
+  | 'audioFx'
+  | 'audioFade'
+  | 'pan'
+  | 'audioAutomation';
 
 /** az identitás-transzform (alap pozíció/skála) nem számít eltérésnek */
 function isNonDefaultTransform(t: VideoClip['transform']): boolean {
@@ -103,6 +113,44 @@ function videoClipGaps(clip: VideoClip, platform: RenderPlatform, out: Set<Local
   if (clip.comp) {
     out.add('nestedComp');
   }
+  // 🎞️ B15: a felhő-render ffmpeg-láncai — a natív motor ezeket CSENDBEN elhagyná
+  if (
+    clip.stabilize?.automatic ||
+    (clip.timeInterp && clip.timeInterp !== 'none' && clip.speed !== 1) ||
+    (clip.motionBlur ?? 0) > 0 ||
+    clip.faceBlur ||
+    clip.selective ||
+    clip.lighting ||
+    clip.tilt3d ||
+    clip.backgroundFill === 'blur'
+  ) {
+    out.add('videoFx');
+  }
+  if (clip.voiceEnhance || clip.deReverb) {
+    out.add('voiceFx');
+  }
+}
+
+/** 🎙️ B15: a hangklip a natív keverőben csak hangerővel + vágással megy */
+function audioClipGaps(clip: AudioClip, out: Set<LocalRenderGap>): void {
+  if ((clip.fadeIn ?? 0) > 0 || (clip.fadeOut ?? 0) > 0) {
+    out.add('audioFade');
+  }
+  if (typeof clip.pan === 'number' && Math.abs(clip.pan) > 1e-6) {
+    out.add('pan');
+  }
+  if (clip.audioFx && Object.values(clip.audioFx).some((v) => v !== undefined && v !== null && v !== false)) {
+    out.add('audioFx');
+  }
+  if (clip.autoDuck) {
+    out.add('audioFx');
+  }
+  if (clip.voiceEnhance || clip.deReverb) {
+    out.add('voiceFx');
+  }
+  if ((clip.keyframes?.volume?.length ?? 0) > 0 || (clip.keyframes?.pan?.length ?? 0) > 0) {
+    out.add('audioAutomation');
+  }
 }
 
 function clipKindGap(clip: Clip, platform: RenderPlatform): LocalRenderGap | null {
@@ -140,7 +188,14 @@ export function localRenderGaps(project: Project, platform: RenderPlatform): Loc
         continue;
       }
       if (clip.kind === 'video') {
+        // a natív terv CSAK a fő videósávot fűzi — más sáv videója (PiP/overlay)
+        // vágásként jelenne meg (B10) → felhő-út
+        if (track.type !== 'video') {
+          out.add('pip');
+        }
         videoClipGaps(clip, platform, out);
+      } else if (clip.kind === 'audio') {
+        audioClipGaps(clip, out);
       }
     }
   }

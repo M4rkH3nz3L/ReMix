@@ -27,6 +27,8 @@ const CANVAS = {
   '9:16': { w: 1080, h: 1920 },
   '16:9': { w: 1920, h: 1080 },
   '1:1': { w: 1080, h: 1080 },
+  // 📸 Instagram-feed (batch-export preset) — eddig csendben 9:16 lett (B14)
+  '4:5': { w: 1080, h: 1350 },
 };
 
 // 🎨 blend-mód → ffmpeg `blend=all_mode` név (a többi 1:1; a preview CSS-neve külön)
@@ -356,6 +358,49 @@ function videoEncoderArgs(settings, fps, crf) {
     args.push('-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709');
   }
   return args;
+}
+
+const _filterCache = new Map();
+/** van-e az ffmpeg-ben a megadott szűrő (pl. zscale) — egyszer lekérdezve, cache-elve */
+function ffmpegHasFilter(name) {
+  if (!_filterCache.has(name)) {
+    let ok = false;
+    try {
+      const out = require('child_process').execFileSync('ffmpeg', ['-hide_banner', '-filters'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      ok = new RegExp(`\\s${name}\\s`).test(out);
+    } catch {
+      ok = false;
+    }
+    _filterCache.set(name, ok);
+  }
+  return _filterCache.get(name);
+}
+
+/**
+ * 🌈 B22: a kimenet VALÓDI szín-konverziója (nem csak címke). Eddig a HDR/Rec.2020
+ * export csak a szín-tageket állította → HDR-nek / BT.2020-nak jelölt SDR-pixelek lettek
+ * (kifakult / túlszaturált lejátszás). Most:
+ *  • HDR (PQ): SDR → lineáris (203 nit referencia-fehér, ITU-R BT.2408) → BT.2020 → PQ,
+ *    10 bit — zscale (zimg) kell hozzá; ha a szerver ffmpeg-je nem tudja, ÉRTHETŐ hiba;
+ *  • Rec.2020 (SDR): BT.709 → BT.2020 primer-konverzió (az ffmpeg natív `colorspace`);
+ *  • alap: Rec.709 (változatlan).
+ */
+function outputColorFilter(settings, hasFilter = ffmpegHasFilter) {
+  if (settings.hdr === true) {
+    if (!hasFilter('zscale')) {
+      throw new Error(
+        'A HDR (PQ) exporthoz a render-szerver ffmpeg-jében zscale (zimg) szükséges — kapcsold ki a HDR-t, vagy frissítsd a szervert.'
+      );
+    }
+    return 'zscale=tin=bt709:pin=bt709:min=bt709:t=linear:npl=203,format=gbrpf32le,zscale=p=bt2020:t=smpte2084:m=bt2020nc:npl=203,format=yuv420p10le';
+  }
+  if (settings.colorSpace === 'rec2020') {
+    return 'colorspace=all=bt2020:iall=bt709:fast=0:format=yuv420p10';
+  }
+  return 'format=yuv420p';
 }
 
 /** 🎚️ Pro export hang-enkóder args: AAC + bitráta/mintavétel/csatorna. */
@@ -1092,7 +1137,11 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     ? parseInt(settings.fps, 10)
     : 30;
   const CRF = { low: 28, medium: 23, high: 19 }[settings.quality] ?? 20;
-  const base = CANVAS[project.aspectRatio] ?? CANVAS['9:16'];
+  const base = CANVAS[project.aspectRatio];
+  if (!base) {
+    // ismeretlen képarány → érthető hiba, NEM csendes 9:16 (B14)
+    throw new Error(`Ismeretlen képarány: ${project.aspectRatio}`);
+  }
   const scale = shortSide / Math.min(base.w, base.h);
   const even = (v) => Math.round((v * scale) / 2) * 2;
   const canvas = { w: even(base.w), h: even(base.h) };
@@ -2503,11 +2552,13 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       const speed = clip.speed || 1;
       const srcDur = (clip.duration * speed).toFixed(3);
       const idx = addInput(['-ss', (clip.trimIn || 0).toFixed(3), '-t', srcDur, '-i', clip.uri], `pipv|${clip.id}`);
+      // ⏪ B19: a fordított PiP-klip a renderben is visszafelé szól/látszik
+      const rev = clip.reversed ? 'reverse,' : '';
       graph.push(
-        `[${idx}:v]setpts=(PTS-STARTPTS)/${speed}+${start.toFixed(3)}/TB,fps=${FPS},scale=${contentW}:-2[${srcLabel}]`
+        `[${idx}:v]${rev}setpts=(PTS-STARTPTS)/${speed}+${start.toFixed(3)}/TB,fps=${FPS},scale=${contentW}:-2[${srcLabel}]`
       );
       if ((clip.volume ?? 1) > 0 && (await hasAudioStream(clip.uri))) {
-        pipAudio.push({ idx, start, speed, volume: clip.volume ?? 1 });
+        pipAudio.push({ idx, start, speed, volume: clip.volume ?? 1, reversed: !!clip.reversed });
       }
     } else {
       const idx = addInput(['-loop', '1', '-t', clip.duration.toFixed(3), '-i', clip.uri], `pipi|${clip.id}`);
@@ -2518,6 +2569,12 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     // keret + lekerekítés lánc (ha van); a W,H a geq-ben a keretezett méret
     let ovlLabel = srcLabel;
     const fsteps = [];
+    // 🎨 B19: a PiP saját szűrő-tintje (a fő klipek drawbox-mintájára, a PiP méretén)
+    const pf = FILTERS[clip.filterId];
+    if (pf) {
+      const op = pf.opacity * (clip.filterIntensity ?? 1);
+      fsteps.push(`drawbox=x=0:y=0:w=iw:h=ih:color=0x${pf.color}@${op.toFixed(3)}:t=fill`);
+    }
     if (bw > 0) {
       const hex = (frame.borderColor || '#ffffff').replace('#', '');
       fsteps.push(`pad=iw+${2 * bw}:ih+${2 * bw}:${bw}:${bw}:0x${hex}`);
@@ -2526,6 +2583,17 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       const R = `(${frac.toFixed(4)}*min(W,H))`;
       const alpha = `255*clip(${R}-hypot(max(0,${R}-min(X,W-1-X)),max(0,${R}-min(Y,H-1-Y)))+0.5,0,1)`;
       fsteps.push('format=yuva420p', `geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='${alpha}'`);
+    }
+    // 🔄 B19: forgatás (a doboz-közép körül, átlátszó sarkokkal) + 🌫️ opacitás —
+    // a preview (PipLayer) eddig mutatta, a kész videóból hiányzott
+    const rotDeg = Number(tr.rotation) || 0;
+    if (rotDeg) {
+      const rad = ((rotDeg * Math.PI) / 180).toFixed(6);
+      fsteps.push('format=rgba', `rotate=${rad}:c=none:ow=rotw(${rad}):oh=roth(${rad})`);
+    }
+    const pipOpacity = typeof clip.opacity === 'number' ? Math.max(0, Math.min(1, clip.opacity)) : 1;
+    if (pipOpacity < 1) {
+      fsteps.push('format=rgba', `colorchannelmixer=aa=${pipOpacity.toFixed(3)}`);
     }
     if (fsteps.length > 0) {
       const framed = `pipf${pipN}`;
@@ -2631,7 +2699,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     adjN++;
   }
 
-  graph.push(`[${vLabel}]format=yuv420p[vout]`);
+  // a kimeneti szín-tér pixel-szinten (B22) — a tagek ehhez igazodnak (videoEncoderArgs)
+  graph.push(`[${vLabel}]${outputColorFilter(settings)}[vout]`);
 
   // hang: néma alap + hozzájárulások; a beszéd (videó-hang + voiceover) külön
   // buszra gyűlik, hogy az autoDuck-os zene sidechain-nel halkulhasson alatta
@@ -2827,7 +2896,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     const ms = Math.round(pa.start * 1000);
     const tempo = pa.speed >= 0.5 && pa.speed <= 2 ? `,atempo=${pa.speed}` : '';
     graph.push(
-      `[${pa.idx}:a]asetpts=PTS-STARTPTS${tempo},adelay=${ms}|${ms},volume=${pa.volume}[pipa${k}]`
+      `[${pa.idx}:a]${pa.reversed ? 'areverse,' : ''}asetpts=PTS-STARTPTS${tempo},adelay=${ms}|${ms},volume=${pa.volume}[pipa${k}]`
     );
     audioLabels.push(`pipa${k}`);
   }
@@ -2891,6 +2960,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
 module.exports = {
   renderProject,
+  outputColorFilter,
   projectDuration,
   adjustChain,
   gradeChain,

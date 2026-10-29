@@ -38,4 +38,38 @@ const uploadImage = makeUpload(40 * MB);
 const uploadVideo = makeUpload(500 * MB);
 const uploadAudio = makeUpload(100 * MB);
 
-module.exports = { upload, uploadImage, uploadVideo, uploadAudio, makeUpload, storage };
+// 🧹 B25: tmp-söprés — a kérésenkénti `vided-render-*` munkakönyvtárak, amiket egy
+// elhasalt / félbeszakadt kérés ott hagyott (eddig örökre gyűltek → disk-fill). A
+// feltöltés mostantól a hitelesítés MÖGÖTT fut, így idegen kérés nem is hoz létre ilyet.
+const WORKDIR_PREFIX = 'vided-render-';
+const STALE_MS = 6 * 60 * 60 * 1000;
+
+function sweepStaleWorkDirs(now = Date.now(), maxAgeMs = STALE_MS, root = os.tmpdir()) {
+  let removed = 0;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root);
+  } catch {
+    return 0;
+  }
+  for (const name of entries) {
+    if (!name.startsWith(WORKDIR_PREFIX)) continue;
+    const dir = path.join(root, name);
+    try {
+      const st = fs.statSync(dir);
+      if (st.isDirectory() && now - st.mtimeMs > maxAgeMs) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        removed++;
+      }
+    } catch {
+      // párhuzamosan törölt / nem olvasható → kihagyjuk
+    }
+  }
+  return removed;
+}
+
+if (!process.env.JEST_WORKER_ID) {
+  setInterval(() => sweepStaleWorkDirs(), 30 * 60 * 1000).unref();
+}
+
+module.exports = { upload, uploadImage, uploadVideo, uploadAudio, makeUpload, storage, sweepStaleWorkDirs };

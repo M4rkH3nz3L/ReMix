@@ -3,7 +3,7 @@ import { t as tr } from 'i18next';
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { ensureClipAssets } from '@/lib/assetResolve';
 import { makeId } from '@/lib/id';
-import { splitKeyframes } from '@/lib/keyframes';
+import { cropKeyframes } from '@/lib/keyframes';
 import { masterPreset } from '@/lib/audioMaster';
 import { createImageDoc, type ImageDocBackground } from '@/lib/imageDoc';
 import { createLiveDoc } from '@/lib/liveDoc';
@@ -16,6 +16,7 @@ import type {
   Asset,
   AudioMasterTarget,
   Clip,
+  ClipKeyframes,
   ImageClip,
   Project,
   ProjectKind,
@@ -526,38 +527,39 @@ export function sourceTimeAt(clip: VideoClip, t: number): number {
   return clip.trimIn + local * clip.speed;
 }
 
+/**
+ * ✂️ A klip egy idővonal-szakasza `[from, to]` (abszolút idő, a klipen belül) — ÚJ
+ * klip ugyanazzal az id-val (a hívó dönt az új id-ról). A forrás-be-pont (`trimIn`)
+ * minden fajtán a szakasz elejére ugrik (videó: sebesség- és ⏪ reversed-tudatosan,
+ * hang: 1:1), a kulcskockák a szakaszhoz igazodnak (`cropKeyframes`). A vágás, a
+ * range-törlés és a hasonló műveletek EZT használják — korábban csak a videó
+ * `trimIn`-je és csak a videó/kép kulcskockái követték a vágást (B1/B3/B4).
+ */
+export function cropClip(clip: Clip, from: number, to: number): Clip {
+  const a = from - clip.start;
+  const b = to - clip.start;
+  const out = { ...clip, start: from, duration: b - a } as Clip;
+  if (out.kind === 'video' && clip.kind === 'video') {
+    out.trimIn = clip.reversed
+      ? clip.trimIn + (clip.duration - b) * clip.speed
+      : clip.trimIn + a * clip.speed;
+  } else if (out.kind === 'audio' && clip.kind === 'audio' && (a !== 0 || clip.trimIn !== undefined)) {
+    out.trimIn = (clip.trimIn ?? 0) + a;
+  }
+  if ('keyframes' in clip && clip.keyframes) {
+    (out as { keyframes?: ClipKeyframes }).keyframes = cropKeyframes(clip.keyframes, a, b - a);
+  }
+  return out;
+}
+
 /** Klip kettévágása a t időpontban; null, ha t nem esik szigorúan a klip belsejébe. */
 export function splitClip(clip: Clip, t: number): [Clip, Clip] | null {
   const offset = t - clip.start;
   if (offset < MIN_CLIP_DURATION || clip.duration - offset < MIN_CLIP_DURATION) {
     return null;
   }
-  const first: Clip = { ...clip, duration: offset };
-  const second: Clip = {
-    ...clip,
-    id: makeId('clip'),
-    start: t,
-    duration: clip.duration - offset,
-  };
-  if (clip.kind === 'video' && first.kind === 'video' && second.kind === 'video') {
-    if (clip.reversed) {
-      // ⏪ reversed: a klip a [trimIn, trimIn + duration*speed] forrás-szakaszt
-      // játssza VISSZAFELÉ (lásd sourceTimeAt). Vágáskor a MÁSODIK (időben későbbi)
-      // fél éri el a trimIn-t (változatlan), az ELSŐ fél a felső szakaszt kapja.
-      first.trimIn = clip.trimIn + (clip.duration - offset) * clip.speed;
-    } else {
-      second.trimIn = clip.trimIn + offset * clip.speed;
-    }
-  }
-  if (
-    (clip.kind === 'video' || clip.kind === 'image') &&
-    (first.kind === 'video' || first.kind === 'image') &&
-    (second.kind === 'video' || second.kind === 'image')
-  ) {
-    const [before, after] = splitKeyframes(clip.keyframes, offset);
-    first.keyframes = before;
-    second.keyframes = after;
-  }
+  const first = cropClip(clip, clip.start, t);
+  const second = { ...cropClip(clip, t, clip.start + clip.duration), id: makeId('clip') } as Clip;
   return [first, second];
 }
 

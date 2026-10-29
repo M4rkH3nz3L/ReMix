@@ -124,3 +124,36 @@ describe('localRenderGaps', () => {
     expect(localRenderGaps(p, 'android')).toEqual(['opacity', 'reversed']);
   });
 });
+
+describe('PRO-VIDEO B10/B15 — a natív motor csendben nem hagyhat el semmit', () => {
+  const audioTrack = (clip: Record<string, unknown>): Track =>
+    ({
+      id: 'ta',
+      type: 'music',
+      name: 'M',
+      clips: [{ kind: 'audio', id: 'a1', start: 0, duration: 5, uri: 'file:///m.m4a', label: 'm', volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', ...clip }],
+    }) as Track;
+
+  it('B10: PiP-sávon lévő videó → „pip" rés (különben vágásként fűzné be)', () => {
+    const pip: Track = { id: 'tp', type: 'pip', name: 'PiP', clips: [videoClip({ id: 'p1' })] };
+    expect(localRenderGaps(project([videoClip()], [pip]), 'ios')).toContain('pip');
+  });
+
+  it('B15: videó-feldolgozás (stabilizálás, lassítás-interpoláció, elmosott háttér, Voice Studio)', () => {
+    expect(localRenderGaps(project([videoClip({ stabilize: { automatic: true } })]), 'ios')).toContain('videoFx');
+    expect(localRenderGaps(project([videoClip({ speed: 0.5, timeInterp: 'flow' })]), 'ios')).toContain('videoFx');
+    expect(localRenderGaps(project([videoClip({ backgroundFill: 'blur' })]), 'ios')).toContain('videoFx');
+    expect(localRenderGaps(project([videoClip({ voiceEnhance: true })]), 'ios')).toContain('voiceFx');
+    // 1×-es sebességnél a timeInterp hatástalan → nem rés
+    expect(localRenderGaps(project([videoClip({ timeInterp: 'flow' })]), 'ios')).toEqual([]);
+  });
+
+  it('B15: hangklip — fade, pan, effekt-lánc, ducking, automáció', () => {
+    const gaps = (c: Record<string, unknown>) => localRenderGaps(project([videoClip()], [audioTrack(c)]), 'ios');
+    expect(gaps({})).toEqual([]);
+    expect(gaps({ fadeIn: 1 })).toContain('audioFade');
+    expect(gaps({ pan: -0.5 })).toContain('pan');
+    expect(gaps({ autoDuck: true })).toContain('audioFx');
+    expect(gaps({ keyframes: { volume: [{ time: 0, value: 0, easing: 'linear' }] } })).toContain('audioAutomation');
+  });
+});

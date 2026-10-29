@@ -17,7 +17,8 @@ import type {
 /** két kulcskocka ennyin belül "ugyanaz az időpont" (csere, nem beszúrás) */
 export const KF_EPS = 0.05;
 
-export const KEYFRAME_CHANNELS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume'] as const;
+// a `pan` (hangklip-pásztázás) is csatorna — nélküle a vágás / törlés csendben eldobta (B4)
+export const KEYFRAME_CHANNELS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume', 'pan'] as const;
 export type KeyframeChannel = (typeof KEYFRAME_CHANNELS)[number];
 
 const EASE_FNS: Record<Exclude<KeyframeEasing, 'bezier'>, (p: number) => number> = {
@@ -213,34 +214,62 @@ export function shiftPositionKeyframes(
 }
 
 /**
- * Kulcskockák szétosztása klip-kettévágásnál: az első rész a vágás előttieket
- * tartja meg, a második a vágás utániakat a vágáshoz igazított idővel.
+ * ✂️ Egy klip-szakasz kulcskockái (B4/B5): a klip `[from, from + duration]` darabja
+ * (klip-relatív idő) lesz az új klip. Az idők `from`-mal eltolódnak; ha a szakasz
+ * előtt is volt kulcskocka, a 0-ba a HATÁRON interpolált érték kerül (különben a görbe
+ * ugrana); a szakasz vége utáni ELSŐ kulcskocka megmarad (az interpoláció a végéig
+ * pontos), a többi kiesik. `from < 0` = balra nyújtás (minden később kerül).
+ */
+export function cropKeyframes(
+  k: ClipKeyframes | undefined,
+  from: number,
+  duration: number
+): ClipKeyframes | undefined {
+  if (!k) {
+    return undefined;
+  }
+  const next: ClipKeyframes = {};
+  let any = false;
+  for (const channel of KEYFRAME_CHANNELS) {
+    const kfs = k[channel];
+    if (!kfs || kfs.length === 0) {
+      continue;
+    }
+    const out: Keyframe[] = [];
+    // a `from` előtti utolsó kulcskocka → határ-kulcskocka a 0-ban (ugyanazzal az easinggel)
+    const prior = [...kfs].reverse().find((kf) => kf.time < from - KF_EPS);
+    if (prior) {
+      out.push({ ...prior, time: 0, value: sampleChannel(kfs, from, kfs[0].value) });
+    }
+    let tailKept = false;
+    for (const kf of kfs) {
+      const t = kf.time - from;
+      if (t < -KF_EPS || (prior && t <= KF_EPS)) {
+        continue;
+      }
+      if (t > duration + KF_EPS) {
+        if (tailKept) break;
+        tailKept = true;
+      }
+      out.push({ ...kf, time: Math.max(0, t) });
+    }
+    if (out.length > 0) {
+      next[channel] = out;
+      any = true;
+    }
+  }
+  return any ? next : undefined;
+}
+
+/**
+ * Kulcskockák szétosztása klip-kettévágásnál (`offset` = a vágás klip-relatív ideje,
+ * `duration` = az eredeti klip hossza): mindkét fél a saját szakaszát kapja, a
+ * vágópontban az interpolált értékkel — az animáció/automáció nem ugrik és nem vész el.
  */
 export function splitKeyframes(
   k: ClipKeyframes | undefined,
-  offset: number
+  offset: number,
+  duration = Number.POSITIVE_INFINITY
 ): [ClipKeyframes | undefined, ClipKeyframes | undefined] {
-  if (!k) {
-    return [undefined, undefined];
-  }
-  const first: ClipKeyframes = {};
-  const second: ClipKeyframes = {};
-  let anyFirst = false;
-  let anySecond = false;
-  for (const channel of KEYFRAME_CHANNELS) {
-    const kfs = k[channel] ?? [];
-    const before = kfs.filter((kf) => kf.time <= offset);
-    const after = kfs
-      .filter((kf) => kf.time > offset)
-      .map((kf) => ({ ...kf, time: kf.time - offset }));
-    if (before.length > 0) {
-      first[channel] = before;
-      anyFirst = true;
-    }
-    if (after.length > 0) {
-      second[channel] = after;
-      anySecond = true;
-    }
-  }
-  return [anyFirst ? first : undefined, anySecond ? second : undefined];
+  return [cropKeyframes(k, 0, offset), cropKeyframes(k, offset, duration - offset)];
 }

@@ -13,7 +13,7 @@ import { askAssistant } from '@/lib/ai';
 import { isSilenceCutIntent } from '@/lib/localIntent';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { AiCharacterPicker } from '@/components/editor/AiCharacterPicker';
-import { buildAiContext, toEditorCommands } from '@/lib/aiCommands';
+import { buildAiContext, partitionAiCommands, toEditorCommands } from '@/lib/aiCommands';
 import type { AiCommand } from '@/lib/aiCommands';
 import { describeAiPlan } from '@/lib/aiPlan';
 import type { AiPlanItem } from '@/lib/aiPlan';
@@ -36,6 +36,7 @@ import { findBrollSpots } from '@/lib/brollClient';
 import { findHighlights } from '@/lib/highlightsClient';
 import type { Highlight } from '@/lib/highlightsClient';
 import { analyzeQuality } from '@/lib/qualityClient';
+import { buildMultiRangeDeletePlan } from '@/lib/rangeEdit';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
@@ -44,6 +45,7 @@ import { HooksSection } from '@/components/editor/panels/assistant/HooksSection'
 import { LookPacksSection } from '@/components/editor/panels/assistant/LookPacksSection';
 import { SmartSearchSection } from '@/components/editor/panels/assistant/SmartSearchSection';
 import { SoundDesignSection } from '@/components/editor/panels/assistant/SoundDesignSection';
+import type { Project } from '@/types/project';
 
 const QUICK_ACTIONS = ['makeEngaging', 'shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
@@ -61,6 +63,27 @@ const SOCIAL_PRESETS: { id: string; label: string; aspect: '16:9' | '9:16' | '1:
  * készít → jóváhagyás után a Command Bus-on fut le (actor: 'ai'), teljes
  * undo-val. Az AI sosem írja közvetlenül a projektet.
  */
+/**
+ * ↩️ A projekt visszaállítása egy korábbi pillanatképre: undo-val, amíg a history-ban
+ * megvan (a referencia pontosan visszaáll); ha a pillanatkép már kiesett a history-ból
+ * (teli, 50 lépés), egyetlen `RESTORE_SNAPSHOT` parancs állítja vissza (B8).
+ */
+function revertProjectTo(base: Project | null): void {
+  if (!base) return;
+  let guard = 0;
+  while (
+    useEditorStore.getState().project !== base &&
+    useEditorStore.getState().past.includes(base) &&
+    guard++ < 200
+  ) {
+    useEditorStore.getState().undo();
+  }
+  const cur = useEditorStore.getState().project;
+  if (cur && cur !== base && cur.id === base.id) {
+    useEditorStore.getState().dispatch({ type: 'RESTORE_SNAPSHOT', project: base }, 'user');
+  }
+}
+
 export function AssistantPanel() {
   const { t } = useTranslation();
   const [instruction, setInstruction] = useState('');
@@ -74,7 +97,10 @@ export function AssistantPanel() {
   const [previewCount, setPreviewCount] = useState(0);
   // az undo-verem hossza a preview ELŐTT — a revert EDDIG göngyölít vissza (a köteg
   // + a preview alatt esetleg tett szerkesztések), NEM vak undo() a user editjén
-  const previewBaseLen = useRef(0);
+  // a preview ELŐTTI projekt-pillanatkép (referencia) — a history-hossz helyett ehhez
+  // göngyölünk vissza: teli (50 lépéses) history-nál a hossz nem nő, a régi összevetés
+  // halott „Visszavonás"-t adott (B8)
+  const previewBase = useRef<Project | null>(null);
   const previewingRef = useRef(false);
   // worker-diagnosztika: mit hív a kliens, és eléri-e (a „nem érhető el”
   // hibák oka azonnal látszik: rossz URL vs. nem futó worker vs. hálózat)
@@ -301,12 +327,15 @@ export function AssistantPanel() {
           {
             text: t('panels.assistant.applyAction'),
             onPress: () => {
-              const ok = useEditorStore
-                .getState()
-                .dispatch(
-                  { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
-                  'ai'
-                );
+              // B16: MINDEN sáv ripple-ödik a kivágott szakaszokkal (felirat, szöveg, PiP, hang) —
+              // a háttérzene folyamatos marad, csak tolódik; zárolt sáv érintetlen
+              const st = useEditorStore.getState();
+              const patches = st.project
+                ? buildMultiRangeDeletePlan(st.project, plan.removedRanges, st.lockedTracks)
+                : null;
+              const ok = patches
+                ? st.dispatch({ type: 'REPLACE_TRACKS', tracks: patches, label: t('panels.assistant.deadAirRemoveTitle') }, 'ai')
+                : st.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips }, 'ai');
               setApplied(
                 ok
                   ? t('panels.assistant.deadAirDone', {
@@ -914,7 +943,7 @@ export function AssistantPanel() {
     if (!project) {
       return;
     }
-    const commands = toEditorCommands(reply.commands, project, reply.message);
+    const commands = toEditorCommands(partitionAiCommands(reply.commands, project).accepted, project, reply.message);
     // #57 smart undo: a teljes AI-köteg EGY undo-lépés (nem parancsonként külön)
     const ok = useEditorStore.getState().applyBatch(commands, 'ai');
     setReply(null);
@@ -940,11 +969,11 @@ export function AssistantPanel() {
     if (!project) {
       return;
     }
-    const commands = toEditorCommands(reply.commands, project, reply.message);
-    const basePastLen = useEditorStore.getState().past.length;
+    const commands = toEditorCommands(partitionAiCommands(reply.commands, project).accepted, project, reply.message);
+    const baseProject = useEditorStore.getState().project;
     const ok = useEditorStore.getState().applyBatch(commands, 'ai');
     if (ok > 0) {
-      previewBaseLen.current = basePastLen;
+      previewBase.current = baseProject;
       setPreviewCount(ok);
       setPreviewing(true);
       haptics.selection();
@@ -962,12 +991,7 @@ export function AssistantPanel() {
   // a projektet a preview ELŐTTI állapotra göngyölíti vissza a command-buson át
   // (nem vak undo()): a köteget ÉS a preview alatt tett szerkesztéseket is
   // visszavonja, így sosem a user egy random editjét törli.
-  const revertToBase = () => {
-    let guard = 0;
-    while (useEditorStore.getState().past.length > previewBaseLen.current && guard++ < 200) {
-      useEditorStore.getState().undo();
-    }
-  };
+  const revertToBase = () => revertProjectTo(previewBase.current);
   const revertPreview = () => {
     revertToBase();
     setPreviewing(false);
@@ -982,10 +1006,7 @@ export function AssistantPanel() {
   useEffect(
     () => () => {
       if (previewingRef.current) {
-        let guard = 0;
-        while (useEditorStore.getState().past.length > previewBaseLen.current && guard++ < 200) {
-          useEditorStore.getState().undo();
-        }
+        revertProjectTo(previewBase.current);
       }
     },
     []
@@ -1022,6 +1043,11 @@ export function AssistantPanel() {
     { label: t('panels.assistant.cmdCaption'), run: () => send(t('panels.assistant.promptCaption')) },
     { label: t('panels.assistant.cmdTitleHook'), run: () => send(t('panels.assistant.promptTitleHook')) },
   ];
+
+  // 🤖 B17: a válasz parancsai a VALÓDI projekt ellen szétválogatva — a lista, a darabszám
+  // és a végrehajtás is ebből jön (eddig a nyers listát mutattuk, a kiszűrtekkel együtt)
+  const planProject = useEditorStore.getState().project;
+  const plan = reply && planProject ? partitionAiCommands(reply.commands, planProject) : null;
 
   return (
     <View>
@@ -1260,15 +1286,28 @@ export function AssistantPanel() {
       {reply ? (
         <PanelSection title={t('panels.assistant.sectionSuggestion')}>
           <Text style={styles.message}>{reply.message}</Text>
-          {reply.commands.length > 0 ? (
+          {/* 🚫 B17: ami a validáción kiesett / csonkult — okkal, hogy a jóváhagyott terv = a végrehajtás */}
+          {plan && plan.rejected.length > 0 ? (
+            <View style={styles.rejectBox}>
+              <Text style={styles.rejectHead}>
+                {t('panels.assistant.rejectedHeader', { count: plan.rejected.length })}
+              </Text>
+              {plan.rejected.map((r, i) => (
+                <Text key={i} style={styles.rejectRow}>
+                  • {r.command.type}: {t(`panels.assistant.reject_${r.code}`, { detail: r.detail ?? '' })}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {plan && plan.accepted.length > 0 ? (
             <>
               {/* 🤖 Terv-preview (control layer): tételes, FELOLDOTT diff — melyik
                   klip, mi változik miről mire; ▶-vel a régióra ugorva alkalmazás ELŐTT */}
               <Text style={styles.changeHeader}>
-                {t('panels.assistant.planHeader', { count: reply.commands.length })}
+                {t('panels.assistant.planHeader', { count: plan.accepted.length })}
               </Text>
               {describeAiPlan(
-                reply.commands,
+                plan.accepted,
                 useEditorStore.getState().project!,
                 t
               ).map((item, i) => (
@@ -1313,7 +1352,7 @@ export function AssistantPanel() {
                   />
                   <PrimaryButton
                     icon="checkmark"
-                    label={t('panels.assistant.applyCommandsBtn', { count: reply.commands.length })}
+                    label={t('panels.assistant.applyCommandsBtn', { count: plan.accepted.length })}
                     onPress={apply}
                   />
                   <Text style={styles.note}>{t('panels.assistant.planApproveNote')}</Text>
@@ -1336,6 +1375,16 @@ export function AssistantPanel() {
 }
 
 const styles = StyleSheet.create({
+  rejectBox: {
+    borderWidth: 1,
+    borderColor: palette.warning,
+    borderRadius: 8,
+    padding: 8,
+    gap: 2,
+    marginVertical: 6,
+  },
+  rejectHead: { color: palette.warning, fontSize: 12, fontWeight: '800' },
+  rejectRow: { color: palette.textDim, fontSize: 12, lineHeight: 16 },
   variantCard: {
     backgroundColor: palette.surfaceHigh,
     borderRadius: 10,

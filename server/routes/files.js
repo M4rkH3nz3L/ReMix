@@ -100,7 +100,7 @@ router.post(
   })
 );
 
-router.post('/files/upload', upload.any(), requireAuth, rateLimit('upload'), async (req, res) => {
+router.post('/files/upload', requireAuth, rateLimit('upload'), upload.any(), async (req, res) => {
   const f = (req.files ?? [])[0];
   try {
     if (!f) {

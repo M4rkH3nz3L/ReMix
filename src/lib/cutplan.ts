@@ -160,6 +160,12 @@ export interface CutPlan {
   cuts: number;
   /** ennyi idő esik ki az idővonalból (mp) */
   removedSeconds: number;
+  /**
+   * a kivágott szakaszok az EREDETI idővonalon (rendezve, átfedés nélkül) — ezekkel a
+   * többi sáv (felirat, szöveg, PiP, hang) is ripple-ödik (`buildMultiRangeDeletePlan`,
+   * PRO-VIDEO B16 — eddig csak a videósáv változott, a felirat és a zene elcsúszott)
+   */
+  removedRanges: SilenceRange[];
 }
 
 /**
@@ -193,6 +199,10 @@ export function buildRangeCutPlan(
   let cursor = ordered[0].start;
   let cuts = 0;
   let removed = 0;
+  const removedRanges: SilenceRange[] = [];
+  /** forrás-idő → az EREDETI idővonal ideje a klipen */
+  const toTimeline = (clip: { start: number; trimIn: number; speed: number }, src: number) =>
+    clip.start + (src - clip.trimIn) / clip.speed;
 
   for (const clip of ordered) {
     if (clip.kind !== 'video') {
@@ -232,6 +242,7 @@ export function buildRangeCutPlan(
       // a teljes klip csend — kimarad
       cuts += 1;
       removed += clip.duration;
+      removedRanges.push({ start: clip.start, end: clip.start + clip.duration });
       continue;
     }
 
@@ -245,6 +256,17 @@ export function buildRangeCutPlan(
 
     cuts += cutRanges.length;
     removed += clip.duration - keptDuration;
+    // a megmaradók KÖZTI (és szélső) részek az eredeti idővonalon
+    let from = winStart;
+    for (const k of kept) {
+      if (k.start - from > 1e-6) {
+        removedRanges.push({ start: toTimeline(clip, from), end: toTimeline(clip, k.start) });
+      }
+      from = k.end;
+    }
+    if (winEnd - from > 1e-6) {
+      removedRanges.push({ start: toTimeline(clip, from), end: toTimeline(clip, winEnd) });
+    }
     for (const k of kept) {
       const duration = (k.end - k.start) / clip.speed;
       out.push({
@@ -261,5 +283,5 @@ export function buildRangeCutPlan(
   if (removed < 0.05) {
     return null;
   }
-  return { clips: out, cuts, removedSeconds: removed };
+  return { clips: out, cuts, removedSeconds: removed, removedRanges: removedRanges.sort((a, b) => a.start - b.start) };
 }

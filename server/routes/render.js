@@ -27,7 +27,7 @@ const { trackUsage, userTier, enforceQuota } = require('../usage');
 const router = express.Router();
 const jobs = new Map(); // id → { state, file?, error?, dir, userId?, abort? }
 
-router.post('/render', upload.any(), ...paidOnly, (req, res) => {
+router.post('/render', ...paidOnly, upload.any(), (req, res) => {
   let project;
   let uriMap;
   try {
@@ -242,7 +242,7 @@ router.post('/render', upload.any(), ...paidOnly, (req, res) => {
 // dekódolható munka-példány készül — az app előnézete ezt játssza, a render
 // az eredetivel fut. Ha a forrás eleve ≤1280 px, {skip:true} a válasz.
 // Állapot/letöltés a közös job-végpontokon (/render/:id).
-router.post('/proxy', upload.any(), requireAuth, rateLimit('render'), (req, res) => {
+router.post('/proxy', requireAuth, rateLimit('render'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -273,7 +273,9 @@ router.post('/proxy', upload.any(), requireAuth, rateLimit('render'), (req, res)
         return;
       }
       const id = crypto.randomBytes(8).toString('hex');
-      jobs.set(id, { state: 'processing', dir: workDir });
+      // 🔒 B26: a proxy-job is a hívóé (eddig tulajdonos nélkül → ID birtokában bárki letölthette)
+      const owner = req.user?.id || null;
+      jobs.set(id, { state: 'processing', dir: workDir, userId: owner });
       res.json({ id });
 
       const out = path.join(workDir, 'proxy.mp4');
@@ -287,9 +289,9 @@ router.post('/proxy', upload.any(), requireAuth, rateLimit('render'), (req, res)
         (err) => {
           if (err) {
             console.error(`[${id}] proxy hiba:`, err.message);
-            jobs.set(id, { state: 'error', error: 'A proxy-készítés nem sikerült.', dir: workDir });
+            jobs.set(id, { state: 'error', error: 'A proxy-készítés nem sikerült.', dir: workDir, userId: owner });
           } else {
-            jobs.set(id, { state: 'done', file: out, dir: workDir });
+            jobs.set(id, { state: 'done', file: out, dir: workDir, userId: owner });
           }
         }
       );
@@ -300,7 +302,7 @@ router.post('/proxy', upload.any(), requireAuth, rateLimit('render'), (req, res)
 // Collect Project: projekt + minden média egy zip-archívumban (átadás/archívum).
 // A médiafájlok a media/ mappába kerülnek, a projekt uri-jai relatív útra
 // íródnak át; állapot/letöltés a közös job-végpontokon (/render/:id).
-router.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, res) => {
+router.post('/collect', requireAuth, rateLimit('render'), upload.any(), (req, res) => {
   let project;
   let uriMap;
   try {
@@ -353,7 +355,9 @@ router.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, re
   );
 
   const id = crypto.randomBytes(8).toString('hex');
-  jobs.set(id, { state: 'processing', dir: workDir });
+  // 🔒 B26: a collect-csomag (a teljes projekt médiástul) is a hívóé
+  const owner = req.user?.id || null;
+  jobs.set(id, { state: 'processing', dir: workDir, userId: owner });
   res.json({ id });
 
   const out = path.join(workDir, 'collect.zip');
@@ -364,9 +368,9 @@ router.post('/collect', upload.any(), requireAuth, rateLimit('render'), (req, re
     (err) => {
       if (err) {
         console.error(`[${id}] collect hiba:`, err.message);
-        jobs.set(id, { state: 'error', error: 'A csomagolás nem sikerült.', dir: workDir });
+        jobs.set(id, { state: 'error', error: 'A csomagolás nem sikerült.', dir: workDir, userId: owner });
       } else {
-        jobs.set(id, { state: 'done', file: out, dir: workDir });
+        jobs.set(id, { state: 'done', file: out, dir: workDir, userId: owner });
       }
     }
   );
@@ -529,12 +533,12 @@ function denyRenderJob(req, res, ownerId) {
 
 // 🔒 BOLA-fix (07): a hívót a renderJobAuth azonosítja (token header/`?t=`), és
 // TULAJDONOLT jobhoz csak az egyező user fér — idegenre 404 (a job létezését se
-// szivárogtatjuk). Tulajdonos-nélküli (proxy/collect) jobnál nincs korlát.
+// szivárogtatjuk). Tulajdonos-nélküli jobhoz csak insecure-dev módban (B26).
 router.get('/render/:id', renderJobAuth, async (req, res) => {
   // a rövid (lokális) render a jobs-mapben van; a hosszú (felhő) a queue-ban
   const job = jobs.get(req.params.id);
   if (job) {
-    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+    if (!canAccessRenderJob(job.userId, req.user?.id, INSECURE_DEV)) {
       denyRenderJob(req, res, job.userId);
       return;
     }
@@ -544,7 +548,7 @@ router.get('/render/:id', renderJobAuth, async (req, res) => {
   if (queueEnabled()) {
     const j = await getRenderJob(req.params.id).catch(() => null);
     if (j) {
-      if (!canAccessRenderJob(j.userId, req.user?.id)) {
+      if (!canAccessRenderJob(j.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, j.userId);
         return;
       }
@@ -563,7 +567,7 @@ router.get('/render/:id', renderJobAuth, async (req, res) => {
 router.get('/render/:id/file', renderJobAuth, async (req, res) => {
   const job = jobs.get(req.params.id);
   if (job) {
-    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+    if (!canAccessRenderJob(job.userId, req.user?.id, INSECURE_DEV)) {
       denyRenderJob(req, res, job.userId);
       return;
     }
@@ -577,7 +581,7 @@ router.get('/render/:id/file', renderJobAuth, async (req, res) => {
   if (queueEnabled()) {
     const j = await getRenderJob(req.params.id).catch(() => null);
     if (j) {
-      if (!canAccessRenderJob(j.userId, req.user?.id)) {
+      if (!canAccessRenderJob(j.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, j.userId);
         return;
       }
@@ -600,7 +604,7 @@ router.get('/render/:id/file', renderJobAuth, async (req, res) => {
 router.post('/render/:id/cancel', renderJobAuth, async (req, res) => {
   const job = jobs.get(req.params.id);
   if (job) {
-    if (!canAccessRenderJob(job.userId, req.user?.id)) {
+    if (!canAccessRenderJob(job.userId, req.user?.id, INSECURE_DEV)) {
       denyRenderJob(req, res, job.userId);
       return;
     }
@@ -615,7 +619,7 @@ router.post('/render/:id/cancel', renderJobAuth, async (req, res) => {
   if (queueEnabled()) {
     const r = await cancelRenderJob(req.params.id).catch(() => null);
     if (r && r.found) {
-      if (!canAccessRenderJob(r.userId, req.user?.id)) {
+      if (!canAccessRenderJob(r.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, r.userId);
         return;
       }

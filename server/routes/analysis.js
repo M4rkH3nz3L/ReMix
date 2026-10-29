@@ -26,7 +26,7 @@ const router = express.Router();
 // Jelenet-detektálás (Editor AI, szemantikus index): FFmpeg scene-score —
 // a válasz a FORRÁS-időben értett jelenetváltás-időpontok listája + a fájl
 // hossza. A küszöb (threshold, 0-1) a body-ban felülírható.
-router.post('/scenes', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/scenes', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -82,7 +82,7 @@ router.post('/scenes', upload.any(), requireAuth, rateLimit('analysis'), (req, r
 
 // Beat-analízis (P0-2 Beat Sync): BPM + beat/downbeat-rács + energia-görbe a
 // FORRÁS-időben. Függőség nélküli onset/autokorrelációs elemzés (beats.js).
-router.post('/beats', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/beats', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -107,7 +107,7 @@ router.post('/beats', upload.any(), requireAuth, rateLimit('analysis'), (req, re
 
 // Pont-követés (P0-6 tracking): a megadott vászon-pont követése a szakaszon —
 // NCC template-tracker (track.js), a válasz vászon-normalizált pont-sor.
-router.post('/track', upload.any(), ...proOnly, (req, res) => {
+router.post('/track', ...proOnly, upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -140,7 +140,7 @@ router.post('/track', upload.any(), ...proOnly, (req, res) => {
 // Smart Search (P0-8): jelenet-keyframe-ek vision-címkézése — a kliens küldi
 // a forrás-időpontokat, a válasz időpontonként magyar leírás + címkék
 // (tartalom-hash lemez-cache-sel; a modell letöltése: ollama pull qwen2.5vl:7b).
-router.post('/vision/index', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/vision/index', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -191,7 +191,7 @@ router.post('/vision/query', express.json({ limit: '1mb' }), requireAuth, rateLi
 
 // Thumbnail Studio (Creative Canvas): a legjobb borítókép-kockák kiválasztása
 // (élesség+kontraszt pontozás) — a válasz base64 JPEG-ek listája.
-router.post('/thumbnails', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('video'), (req, res) => {
+router.post('/thumbnails', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -221,7 +221,7 @@ router.post('/thumbnails', upload.any(), requireAuth, rateLimit('analysis'), med
 
 // Auto Reframe (P0-7): a téma középpont-útja a szakaszon (mozgás-centroid) —
 // forrás-normalizált pontok + forrás-méret; a kliens fordít crop-kulcskockákra.
-router.post('/reframe', upload.any(), ...proOnly, mediaGuard('video'), (req, res) => {
+router.post('/reframe', ...proOnly, upload.any(), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -250,7 +250,7 @@ router.post('/reframe', upload.any(), ...proOnly, mediaGuard('video'), (req, res
 // Csend-detektálás (Editor AI cut-listák): FFmpeg silencedetect — a válasz a
 // FORRÁS-időben értett csend-intervallumok listája + a fájl hossza. Hang
 // nélküli fájlra üres lista jön (nem hiba).
-router.post('/silence', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/silence', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });

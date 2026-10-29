@@ -42,7 +42,7 @@ import { maskFromStroke } from '@/lib/maskEdit';
 import { makeId } from '@/lib/id';
 import { ensureProxy, getProxyUriSync } from '@/lib/proxy';
 import { snapPosition } from '@/lib/snapping';
-import { clipColorMatrix, effectImageFilters, isIdentityMatrix } from '@/lib/skiaEffects';
+import { clipColorMatrix, effectImageFilters, isIdentityMatrix, skiaUncoveredAdjust } from '@/lib/skiaEffects';
 import {
   activeAdjustClips,
   activeVisualClip,
@@ -921,9 +921,12 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           {/* képjavítás-közelítés (Creative Canvas): fényerő/hőmérséklet/
               szaturáció rétegekkel — a pontos korrekció a renderben készül */}
           {(() => {
-            const adjust = (videoClip ?? imageClip)?.adjust;
-            // 🎨 ha a klip grade-jét már a Skia-réteg rajzolja (kép VAGY videó), NE duplázzuk rá a tint-közelítést
-            if (!adjust || comparingOriginal || imageSkiaActive || videoSkiaActive) {
+            const rawAdjust = (videoClip ?? imageClip)?.adjust;
+            // 🎨 ha a klip grade-jét már a Skia-réteg rajzolja (kép VAGY videó), a MÁTRIXOS
+            // mezőket nem duplázzuk — de a mátrixon kívülieket (tónus-régiók, balance) a
+            // közelítés továbbra is mutatja (B21: eddig a Skia mindent elnyomott)
+            const adjust = imageSkiaActive || videoSkiaActive ? skiaUncoveredAdjust(rawAdjust) : rawAdjust;
+            if (!adjust || comparingOriginal) {
               return null;
             }
             return adjustTintLayers(adjust).map((l, i) => (

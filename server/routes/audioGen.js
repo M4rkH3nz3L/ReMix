@@ -44,7 +44,7 @@ router.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, validate(sy
 });
 
 // 📊 Spektrogram (AUDIOT §7): feltöltött hangból frekvencia-kép → PNG. Elemző.
-router.post('/audio/spectrum', uploadAudio.any(), requireAuth, async (req, res) => {
+router.post('/audio/spectrum', requireAuth, uploadAudio.any(), async (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Nincs hang-fájl.' });
@@ -66,7 +66,7 @@ router.post('/audio/spectrum', uploadAudio.any(), requireAuth, async (req, res) 
 });
 
 // 🎛️🔊 Sampler-render (AUDIOT §5): feltöltött minta a step-rács lépéseire. Multipart.
-router.post('/sampler', uploadAudio.any(), ...paidOnly, validateJsonField('steps', samplerSteps), async (req, res) => {
+router.post('/sampler', ...paidOnly, validateJsonField('steps', samplerSteps), uploadAudio.any(), async (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Nincs minta-fájl.' });

@@ -407,17 +407,33 @@ function escapeHtmlLite(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/**
+ * 🔄 B18: a szöveg-réteg forgatása + tükrözése — a preview (TextOverlay) sorrendjében:
+ * `rotate(R) scaleX(-1) scaleY(-1)` (a tükrözés a forgatás ELŐTT hat). A PNG-be ég,
+ * a render a PNG KÖZEPÉT teszi a pozícióra → a forgatott doboz közepe is a helyén marad.
+ */
+function textTransformCss(clip) {
+  const parts = [];
+  if (clip.rotation) parts.push(`rotate(${Number(clip.rotation)}deg)`);
+  if (clip.flipH) parts.push('scaleX(-1)');
+  if (clip.flipV) parts.push('scaleY(-1)');
+  return parts.join(' ');
+}
+
 async function renderTextPngs(textClips, canvas, outDir) {
   if (textClips.length === 0) {
     return [];
   }
+  // a forgatott doboz túlnyúlhat a vásznon → ilyenkor a raszter-ablak az átló négyzete
+  const needsRoom = textClips.some((c) => textTransformCss(c));
+  const roomSide = Math.ceil(Math.hypot(canvas.w, canvas.h));
   const executablePath = findChromium();
   if (!executablePath) {
     throw new Error('Nincs elérhető Chromium a felirat-rasterizáláshoz (CHROMIUM_PATH?)');
   }
   const browser = await chromium.launch({ executablePath });
   const page = await browser.newPage({
-    viewport: { width: canvas.w, height: canvas.h },
+    viewport: needsRoom ? { width: roomSide, height: roomSide } : { width: canvas.w, height: canvas.h },
     deviceScaleFactor: 1,
   });
   const results = [];
@@ -477,7 +493,10 @@ async function renderTextPngs(textClips, canvas, outDir) {
         continue;
       }
 
-      const html = `<!doctype html><html><body style="margin:0;background:transparent;display:flex;align-items:flex-start;justify-content:flex-start;">
+      const tf = textTransformCss(clip);
+      const html = `<!doctype html><html><body style="margin:0;background:transparent;display:flex;${
+        tf ? 'align-items:center;justify-content:center;width:100vw;height:100vh;' : 'align-items:flex-start;justify-content:flex-start;'
+      }">
         <style>${fontFaceCss(clip.fontFamily)}</style>
         <div id="t" style="
           display:inline-block;
@@ -493,6 +512,7 @@ async function renderTextPngs(textClips, canvas, outDir) {
           ${presetCss(clip, fontPx)}
           ${typographyCss(clip)}
           ${textStyleCss(clip, fontPx)}
+          ${tf ? `transform:${tf};transform-origin:50% 50%;` : ''}
         "></div>
       </body></html>`;
       const states = statesFor(clip);
@@ -1073,6 +1093,7 @@ async function bakeTextPng(clip, canvas) {
 }
 
 module.exports = {
+  textTransformCss,
   renderTextPngs,
   renderShapePngs,
   bakeTextPng,

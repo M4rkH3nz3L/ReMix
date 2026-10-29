@@ -1,5 +1,4 @@
-import { Platform } from 'react-native';
-
+import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { detectSilenceRanges } from '@/lib/silenceDetect';
 import type { SilenceRange } from '@/lib/cutplan';
 import { downmixToMono, resampleLinear, WHISPER_SAMPLE_RATE } from '@/lib/wav';
@@ -11,19 +10,21 @@ import { downmixToMono, resampleLinear, WHISPER_SAMPLE_RATE } from '@/lib/wav';
  * a formátum nem dekódolható / weben fut — a hívó a worker-útra esik vissza.
  */
 export async function decodeToMono16k(uri: string): Promise<Float32Array | null> {
-  if (Platform.OS === 'web') {
+  // a közös guard (B24): ugyanaz az állapot, mint a waveform-é — a user-indította hívás
+  // (átirat / csend-keresés) iOS-en is próbálkozhat, a sikere „bizonyítja" a modult
+  const api = await loadAudioApi();
+  if (!api) {
     return null;
   }
   try {
-    // dinamikus import: jest alatt nem tölt natív modult
-    const { AudioContext } = await import('react-native-audio-api');
-    const ctx = new AudioContext({ sampleRate: WHISPER_SAMPLE_RATE });
+    const ctx = new api.AudioContext({ sampleRate: WHISPER_SAMPLE_RATE });
     try {
       const buffer = await ctx.decodeAudioData(uri.replace(/^file:\/\//, ''));
       const channels: Float32Array[] = [];
       for (let c = 0; c < buffer.numberOfChannels; c += 1) {
         channels.push(buffer.getChannelData(c) as Float32Array);
       }
+      markAudioApi(true);
       const mono = downmixToMono(channels);
       // a dekóder elvben a kontextus rátájára hoz — ha mégsem, itt igazítjuk
       return resampleLinear(mono, buffer.sampleRate, WHISPER_SAMPLE_RATE);

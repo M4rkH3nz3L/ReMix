@@ -1,5 +1,5 @@
 import type { EditorCommand } from '@/lib/commands';
-import type { Clip } from '@/types/project';
+import type { Clip, Project } from '@/types/project';
 
 /**
  * 📉 Az eseménynaplóba szánt, KÖNNYÍTETT command.
@@ -40,6 +40,7 @@ const stubs = (clips: Clip[]): Clip[] => clips.map(stub);
 export function isHeavyCommand(cmd: EditorCommand): boolean {
   return (
     cmd.type === 'REPLACE_TRACKS' ||
+    cmd.type === 'RESTORE_SNAPSHOT' ||
     cmd.type === 'REPLACE_TRACK_CLIPS' ||
     cmd.type === 'ADD_CLIPS' ||
     cmd.type === 'ADD_CLIP' ||
@@ -62,6 +63,9 @@ export function slimForLog(cmd: EditorCommand): EditorCommand {
       };
     case 'REPLACE_TRACK_CLIPS':
       return { type: 'REPLACE_TRACK_CLIPS', trackType: cmd.trackType, clips: stubs(cmd.clips) };
+    case 'RESTORE_SNAPSHOT':
+      // a napló a teljes projektet nem tárolja — csak a címkét (a leírás ennyit használ)
+      return { type: 'RESTORE_SNAPSHOT', project: { id: cmd.project.id } as Project, ...(cmd.label === undefined ? {} : { label: cmd.label }) };
     case 'ADD_CLIPS':
       return { type: 'ADD_CLIPS', trackType: cmd.trackType, clips: stubs(cmd.clips) } as EditorCommand;
     case 'ADD_CLIP':

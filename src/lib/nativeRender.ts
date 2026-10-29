@@ -129,15 +129,20 @@ function evenDim(n: number): number {
 }
 
 /** Kimeneti méret a képarányból + a rövidebb oldalból (settings.resolution). */
-function outputSize(project: Project, shortSide: number): { width: number; height: number } {
-  switch (project.aspectRatio) {
+export function outputSize(project: Pick<Project, 'aspectRatio'>, shortSide: number): { width: number; height: number } {
+  // a batch-export platform-presetje (Instagram) 4:5-öt is kér — a projekt-típuson
+  // kívüli érték, ezért string-ként vizsgáljuk (B14: eddig csendben 9:16 lett)
+  switch (project.aspectRatio as string) {
     case '16:9':
       return { width: evenDim((shortSide * 16) / 9), height: evenDim(shortSide) };
     case '1:1':
       return { width: evenDim(shortSide), height: evenDim(shortSide) };
+    case '4:5':
+      return { width: evenDim(shortSide), height: evenDim((shortSide * 5) / 4) };
     case '9:16':
-    default:
       return { width: evenDim(shortSide), height: evenDim((shortSide * 16) / 9) };
+    default:
+      throw new Error(`Ismeretlen képarány: ${String(project.aspectRatio)}`);
   }
 }
 
@@ -161,7 +166,9 @@ export function buildRenderPlan(
       // http-guard is ezt nézi). Ma megegyezik a klip uri-cache-ével, relink
       // után (Fázis 3) viszont az asset frissebb uri-ja érvényesül itt is.
       const uri = resolveClipUri(project, clip);
-      if (clip.kind === 'video' && uri && !uri.startsWith('http')) {
+      // csak a FŐ videósáv fűzhető egymás után — a PiP/overlay-sáv videója a
+      // paritás-kapun át a felhőre megy (B10: eddig vágásként került a kimenetbe)
+      if (clip.kind === 'video' && track.type === 'video' && uri && !uri.startsWith('http')) {
         video.push({
           uri,
           atSec: clip.start,

@@ -1,4 +1,4 @@
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
@@ -57,36 +57,20 @@ function peaksFromChannel(
   return peaks.length > 0 ? { duration, peaksPerSecond: pps, peaks } : null;
 }
 
-/**
- * A natív dekóder állapota. A `react-native-audio-api` NATÍV modul: Expo Go-ban
- * (és rá nem buildelt dev-kliensben) NINCS jelen, és MÁR AZ IMPORTKOR dob
- * (modul-szintű install-ellenőrzés) — a lusta import() ezt csak elhalasztja, de
- * minden hívásnál újra megtörténne (hibaspam). Ezért: Expo Go-ban meg se
- * próbáljuk, és az első hiány után végleg lemondunk róla (csendes visszaesés a
- * sima sávra). Valódi (natív) buildben a modul jelen van → valódi hullámforma.
- */
-let nativeDecoder: 'unknown' | 'ok' | 'missing' = 'unknown';
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
 /** ESZKÖZÖN (natív) dekódolás → csúcsok, worker nélkül (react-native-audio-api). */
 async function computeNativeWaveform(uri: string): Promise<WaveformData | null> {
-  // ⚠️ iOS ideiglenes kihagyás: a `react-native-audio-api` `install`-ja a jelenlegi
-  //    `react-native-worklets` (0.10.1) ABI-val SZEGFAULTOL (getUIWorkletRuntime) —
-  //    ez NATÍV crash, amit a lenti try/catch NEM fog el (nem JS-hiba). Amíg nincs
-  //    kompatibilis build (react-native-audio-api 0.13.6+ + prebuild/rebuild), iOS-en
-  //    a worker-fallbackre esünk vissza (a waveform csendben címkés marad worker nélkül).
-  if (nativeDecoder === 'missing' || isExpoGo || Platform.OS === 'ios') {
-    return null; // nincs natív modul (vagy iOS-kihagyás) — nincs import-kísérlet
+  // a közös guard dönt (B24): iOS-en a háttér-hívás csak bizonyított modullal megy
+  const api = await loadAudioApi({ background: true });
+  if (!api) {
+    return null;
   }
   try {
-    const { decodeAudioData } = await import('react-native-audio-api');
     // alacsony mintavétel: a görbéhez elég, gyors és kevés memória
-    const audio = await decodeAudioData(uri, 8000);
-    nativeDecoder = 'ok';
+    const audio = await api.decodeAudioData(uri, 8000);
+    markAudioApi(true);
     return peaksFromChannel(audio.getChannelData(0), audio.sampleRate, audio.duration, 20);
   } catch {
-    nativeDecoder = 'missing'; // többé ne próbálkozzunk (nincs spam)
-    return null;
+    return null; // az adott fájl nem dekódolható → worker-fallback
   }
 }
 

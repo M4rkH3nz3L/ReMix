@@ -920,6 +920,7 @@
       "discard": "Verwerfen"
     },
     "toolbar": {
+      "splitHere": "Hier teilen",
       "moreTitle": "Weitere Werkzeuge",
       "more": "Mehr",
       "newTextDefault": "Neuer Text",
@@ -1236,6 +1237,17 @@
       "balCh_b": "Blau"
     },
     "assistant": {
+      "rejectedHeader": "Herausgefilterte Vorschläge ({{count}}) — diese werden NICHT ausgeführt",
+      "reject_missingTarget": "Ziel fehlt (Clip oder Zeit)",
+      "reject_unknownClip": "verweist auf einen nicht vorhandenen Clip",
+      "reject_noAllowedField": "enthält keine änderbare Einstellung",
+      "reject_outOfRange": "der Schnitt läge außerhalb des Clips",
+      "reject_badTrack": "ungültige Spur",
+      "reject_empty": "nichts hinzuzufügen",
+      "reject_badAspect": "ungültiges Seitenverhältnis",
+      "reject_badName": "ungültiger Name (1–100 Zeichen)",
+      "reject_unknownType": "unbekannte oder nicht erlaubte Aktion",
+      "reject_droppedFields": "diese Felder darf sie nicht ändern: {{detail}} (der Rest wird ausgeführt)",
       "modelSection": "Modell",
       "modelAuto": "Auto",
       "modelHint": "Füge KI-Modelle in deinem Profil hinzu und wähle hier eines aus.",
@@ -1813,6 +1825,7 @@
       "captionsFormatsNote": "SRT: universell. WebVTT: Web/HTML5 mit Zeilenposition. ASS: mit Styling (Farbe, Position, fett)."
     },
     "filter": {
+      "pipLimited": "Bei einem PiP-Clip gelten im fertigen Video Filter, Deckkraft, Drehung, Rahmen und Rückwärtswiedergabe — andere Effekte nur auf der Hauptvideospur.",
       "pickForStrength": "Wähle einen Filter, um die Stärke einzustellen",
       "sectionFilters": "Filter",
       "sectionEnhance": "Verbessern",
@@ -2791,6 +2804,7 @@
       "assetName": "Einzelbild"
     },
     "commands": {
+      "restoreSnapshot": "Zustand wiederherstellen",
       "addClip": "{{kind}}-Clip hinzugefügt ({{trackType}}-Spur)",
       "addClips_one": "{{count}} Clip hinzugefügt ({{trackType}}-Spur)",
       "addClips_other": "{{count}} Clips hinzugefügt ({{trackType}}-Spur)",
@@ -2874,6 +2888,7 @@
       "unitClip": "Clip"
     },
     "render": {
+      "phaseDownloadSources": "Quellen werden geladen…",
       "cancelled": "Der Vorgang wurde abgebrochen.",
       "mp4NativeOnly": "Das MP4-Rendering ist in der nativen App verfügbar (iOS/Android).",
       "phaseRenderingOnDevice": "Rendern auf dem Gerät",
@@ -3798,6 +3813,11 @@
     "manageGroup": "Gruppe verwalten"
   },
   "feed": {
+    "remixAllowTitle": "Remixe erlauben?",
+    "remixAllowPrompt": "Dürfen andere dein Video in ihrem eigenen Remix verwenden? (Ein Remix nennt immer das Original.)",
+    "remixAllowYes": "Ja, Remixe erlauben",
+    "remixAllowNo": "Nein",
+    "remixNotAllowed": "Der ursprüngliche Ersteller erlaubt keine Remixe — dieser Remix kann nicht veröffentlicht werden.",
     "title": "Feed",
     "forYou": "Für dich",
     "trending": "Trends",

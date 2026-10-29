@@ -57,7 +57,7 @@ async function deleteObject(key) {
 }
 
 // 📤 csomag feltöltése (felülírja a projekt korábbi csomagját; söpri a lejártakat)
-router.post('/transfer', upload.any(), requireAuth, rateLimit('upload'), async (req, res) => {
+router.post('/transfer', requireAuth, rateLimit('upload'), upload.any(), async (req, res) => {
   const f = (req.files ?? [])[0];
   const cleanup = () => {
     try {

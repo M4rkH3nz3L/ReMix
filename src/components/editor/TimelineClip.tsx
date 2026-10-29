@@ -17,6 +17,8 @@ import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { MIN_CLIP_DURATION, SNAP_PX, palette, trackColors } from '@/constants/editor';
 import { makeId } from '@/lib/id';
 import { getProxyUriSync } from '@/lib/proxy';
+import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
+import { cropKeyframes } from '@/lib/keyframes';
 import { sourceTimeAt, trimClipLeft, trimClipRight } from '@/lib/projectUtils';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import { clamp, formatTime } from '@/lib/time';
@@ -254,15 +256,19 @@ function TimelineClipInner({
     const rawStart = clip.start + dx / pps;
     const snappedStart = snapEdge(rawStart);
     const deltaSec = clamp(snappedStart - clip.start, -clip.start, clip.duration - MIN_CLIP_DURATION);
-    if (clip.kind === 'video') {
-      // ⏪ reversed-tudatos forrás-ablak (a trimClipLeft kezeli a forrás-clampet is)
-      updateClip(clip.id, trimClipLeft(clip, deltaSec));
-      return;
-    }
-    updateClip(clip.id, {
-      start: clip.start + deltaSec,
-      duration: clip.duration - deltaSec,
-    });
+    // a forrás-ablak fajtánként: videó ⏪ reversed-tudatosan, HANG a trimIn-nel együtt (B2 —
+    // korábban a hang csak „elcsúszott"); a kulcskockák a tényleges eltolással követik (B5)
+    const patch =
+      clip.kind === 'video'
+        ? trimClipLeft(clip, deltaSec)
+        : clip.kind === 'audio'
+          ? trimAudioLeft(clip, deltaSec)
+          : { start: clip.start + deltaSec, duration: clip.duration - deltaSec };
+    const keyframes =
+      'keyframes' in clip && clip.keyframes
+        ? { keyframes: cropKeyframes(clip.keyframes, patch.start - clip.start, patch.duration) }
+        : {};
+    updateClip(clip.id, { ...patch, ...keyframes });
   };
 
   const commitTrimRight = (dx: number) => {
@@ -280,7 +286,10 @@ function TimelineClipInner({
     const patch =
       clip.kind === 'video'
         ? trimClipRight(clip, desired)
-        : { duration: clamp(desired, MIN_CLIP_DURATION, Number.POSITIVE_INFINITY), trimIn: undefined };
+        : clip.kind === 'audio'
+          ? // a hang nem nyújtható a valós forrás végén túl
+            { ...trimAudioRight(clip, desired), trimIn: undefined }
+          : { duration: clamp(desired, MIN_CLIP_DURATION, Number.POSITIVE_INFINITY), trimIn: undefined };
     // ⏭️ ripple: a hossz-változás tolja a mögötte lévőket (minden sávon). Explicit
     // ripple trim-mód VAGY a globális ripple-kapcsoló bekapcsolja.
     const ripple = trimMode === 'ripple' || (trimMode === 'normal' && state.rippleMode);
@@ -375,7 +384,7 @@ function TimelineClipInner({
     const splitAt = onClip ? st.playhead : clip.start + clip.duration / 2;
     Alert.alert(t('editor.track.' + trackType), undefined, [
       {
-        text: t('editor.toolbar.splitHere', { defaultValue: 'Vágás itt' }),
+        text: t('editor.toolbar.splitHere'),
         onPress: () => st.splitClipAt(clip.id, splitAt),
       },
       {

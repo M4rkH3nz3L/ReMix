@@ -3,6 +3,7 @@ package expo.modules.remixrender
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -58,10 +59,6 @@ class RemixRenderModule : Module() {
       throw IllegalArgumentException("Nincs helyi videóklip az eszközön-renderhez.")
     }
 
-    if (plan.optBoolean("watermark", false)) {
-      throw IllegalStateException("A vízjel beégetése jelenleg a felhő-renderre esik.")
-    }
-
     val outFile = File(toPath(outputPath)).absolutePath
     val planW = plan.optInt("width", 0)
     val planH = plan.optInt("height", 0)
@@ -76,12 +73,24 @@ class RemixRenderModule : Module() {
     val multi = video.length() > 1
     // 🖼️ overlay-k (szöveg/felirat PNG-k): jelenlétük KÖTELEZŐEN a kompozit-útra
     // visz — a remux/transzkód gyors-utak nem tudnak rárajzolni.
-    val overlays = plan.optJSONArray("overlays")
+    var overlays = plan.optJSONArray("overlays")
+    // 🏷️ vízjel (Free): teljes-vásznas PNG-overlay a kompozit-úton (B9 — eddig kivétel)
+    var watermarkPng: File? = null
+    if (plan.optBoolean("watermark", false)) {
+      val w = if (planW % 2 == 0) planW else planW + 1
+      val h = if (planH % 2 == 0) planH else planH + 1
+      watermarkPng = Watermark.writePng(w, h, File(outFile).parentFile ?: File("."))
+      overlays = (overlays ?: JSONArray()).put(Watermark.overlayItem(watermarkPng))
+    }
     val hasOverlays = overlays != null && overlays.length() > 0
 
-    // Multi-segment / külön hang-sáv / egyedi hangerő / overlay → kompozit (Fázis C).
+    // Multi-segment / külön hang-sáv / egyedi hangerő / overlay (vízjel is) → kompozit (Fázis C).
     if (multi || extraAudio || hasOverlays || seg.optDouble("volume", 1.0) != 1.0) {
-      return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, enc, isCancelled, outFile, progress, overlays)
+      try {
+        return "file://" + ComposeEngine.compose(video, audio, planW, planH, fps, enc, isCancelled, outFile, progress, overlays)
+      } finally {
+        watermarkPng?.delete()
+      }
     }
 
     // ── egy klip, nincs külön hang, teljes hangerő → A/B gyors út ──

@@ -15,9 +15,12 @@ describe('renderAuth — canAccessRenderJob (BOLA)', () => {
     expect(canAccessRenderJob('u1', '')).toBe(false);
   });
 
-  it('tulajdonos nélküli job (dev/legacy) → nem korlátozott', () => {
-    expect(canAccessRenderJob(null, 'u1')).toBe(true);
-    expect(canAccessRenderJob(undefined, null)).toBe(true);
-    expect(canAccessRenderJob('', 'u1')).toBe(true);
+  it('tulajdonos nélküli job → prod-ban elzárva, insecure-dev-ben elérhető (B26)', () => {
+    // B26: prod-ban a tulajdonos nélküli job ELZÁRVA; csak insecure-dev-ben elérhető
+    expect(canAccessRenderJob(null, 'u1')).toBe(false);
+    expect(canAccessRenderJob(undefined, null)).toBe(false);
+    expect(canAccessRenderJob('', 'u1')).toBe(false);
+    expect(canAccessRenderJob(null, 'u1', true)).toBe(true);
+    expect(canAccessRenderJob(undefined, null, true)).toBe(true);
   });
 });

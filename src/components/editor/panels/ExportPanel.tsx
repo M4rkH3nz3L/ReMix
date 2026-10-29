@@ -290,17 +290,25 @@ export function ExportPanel() {
     if (renderStatus) {
       return;
     }
+    // 2. lépés: 🔀 az alkotó dönt a remix-engedélyről (B27 — eddig mindig engedélyezett volt)
+    const askRemix = (visibility: PostVisibility) =>
+      Alert.alert(t('feed.remixAllowTitle'), t('feed.remixAllowPrompt'), [
+        { text: t('feed.remixAllowYes'), onPress: () => doShareToFeed(visibility, true) },
+        { text: t('feed.remixAllowNo'), onPress: () => doShareToFeed(visibility, false) },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]);
     Alert.alert(t('feed.visibilityTitle'), t('feed.visibilityPrompt'), [
-      { text: t('feed.visPublic'), onPress: () => doShareToFeed('public') },
-      { text: t('feed.visFollowers'), onPress: () => doShareToFeed('followers') },
-      { text: t('feed.visPrivate'), onPress: () => doShareToFeed('private') },
+      { text: t('feed.visPublic'), onPress: () => askRemix('public') },
+      { text: t('feed.visFollowers'), onPress: () => askRemix('followers') },
+      // privát poszt eleve nem remixelhető-látható → nem kérdezünk
+      { text: t('feed.visPrivate'), onPress: () => doShareToFeed('private', false) },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
   // a választott láthatósággal renderel + posztol. A renderelt változat a
   // projekten marad (újramegosztáshoz).
-  const doShareToFeed = (visibility: PostVisibility) => {
+  const doShareToFeed = (visibility: PostVisibility, remixable = true) => {
     if (renderStatus) {
       return;
     }
@@ -310,6 +318,7 @@ export function ExportPanel() {
         withProgress(t('feed.rendering'), (report) =>
           publishRenderedProject(project, report, {
             visibility,
+            remixable,
             ...(isPro ? { renderMode: engine } : {}),
           }).then((res) => {
             useEditorStore.getState().setRendered(res.project.rendered);

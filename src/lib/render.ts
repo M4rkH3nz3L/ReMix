@@ -5,6 +5,7 @@ import { Linking, Platform } from 'react-native';
 
 import { flattenClipUris } from '@/lib/assetResolve';
 import { cloudBaseUrl, ensureCloud, isProRequiredError, renderServerUrl } from '@/lib/backend';
+import { localizeRemoteMedia } from '@/lib/remoteMediaClient';
 import { exportPolicy } from '@/lib/exportPolicy';
 import {
   canRenderLocally,
@@ -246,6 +247,9 @@ export async function renderMp4(
   }
   const mode = opts?.mode ?? 'auto';
   const effective = settings ?? DEFAULT_SETTINGS;
+  // 🌐 B28: a távoli (remix) forrásokat ELŐBB a projekt mappájába töltjük — az
+  // eszközön-render a http-t kihagyná, a felhő „hiányzó klipre” 400-at adna
+  project = await localizeRemoteMedia(project, onProgress);
 
   // 🗃️ Render-cache: ha a projekt + beállítás változatlan a legutóbbi renderhez
   // képest, a kész fájlt azonnal visszaadjuk (nincs újra-render). A kulcs a

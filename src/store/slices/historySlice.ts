@@ -11,6 +11,7 @@ import type { ProjectEvent } from '@/lib/commands';
 import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
 import { coalesceKey, shouldCoalesce, type LastCommit } from '@/lib/historyCoalesce';
 import { makeId } from '@/lib/id';
+import { undoSyncCommands } from '@/lib/historySync';
 import { findClip } from '@/lib/projectUtils';
 import type { Project } from '@/types/project';
 
@@ -23,6 +24,14 @@ import {
   type EditorState,
 } from '../editorState';
 import type { EditorSlice } from './types';
+
+/** 👥 állapot-ugrás (undo/redo) broadcastja a társ-szerkesztőknek */
+function broadcastStateJump(from: Project, to: Project): void {
+  const send = getLiveBroadcaster();
+  if (!send) return;
+  const commands = undoSyncCommands(from, to);
+  if (commands.length > 0) send(commands);
+}
 
 type HistorySlice = Pick<
   EditorState,
@@ -273,6 +282,8 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       // felhasználó ugyanott folytathatja — élő teszt U1); a megszűnt klipek kiesnek
       ...keptSelection(get(), previous),
     });
+    // 👥 élő collab: a visszavonás a társaknál is (célzott parancsok / pillanatkép — B7)
+    broadcastStateJump(project, previous);
   },
 
   redo: () => {
@@ -292,6 +303,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
       dirty: true,
       ...keptSelection(get(), next),
     });
+    broadcastStateJump(project, next);
   },
 
   // 🕓 ugrás a history-ban: delta<0 → |delta| undo, delta>0 → delta redo (lépésenként, biztonsággal)
@@ -308,7 +320,9 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
     }
   },
 
-  markSaved: () => set({ dirty: false }),
+  // 💾 B6: csak akkor „mentett", ha a mentett pillanatkép MÉG az aktuális állapot — a
+  // mentés ALATT tett módosítás piszkos marad (különben bezáráskor elveszhetne)
+  markSaved: (saved) => set((s) => (saved && s.project !== saved ? s : { dirty: false })),
 
   setRendered: (rendered) =>
     set((s) => (s.project ? { project: { ...s.project, rendered } } : s)),

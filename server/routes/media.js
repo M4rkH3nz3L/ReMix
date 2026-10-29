@@ -28,7 +28,7 @@ const router = express.Router();
 
 // --- thumbnail-compose + voice-preview ---
 // 🎬 headline ráégetése a kiválasztott borítóra (Chromium-raszter + overlay)
-router.post('/thumbnails/compose', upload.any(), requireAuth, rateLimit('analysis'), (req, res) => {
+router.post('/thumbnails/compose', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   const headline = String(req.body.headline ?? '').trim();
   if (!file || !headline) {
@@ -64,7 +64,7 @@ router.post('/thumbnails/compose', upload.any(), requireAuth, rateLimit('analysi
  * A teljes hangot dolgozzuk fel (nem szeletet): így az előnézet bárhová
  * tekerhető, és a kliens fájlonként+beállításonként cache-eli.
  */
-router.post('/voice/preview', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), (req, res) => {
+router.post('/voice/preview', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -97,7 +97,7 @@ router.post('/voice/preview', upload.any(), requireAuth, rateLimit('analysis'), 
 // --- captions / waveform / media-upload / audio-analyze / audio-stems ---
 // Auto-caption: médiafájl → hang kinyerése → Whisper → SRT.
 // A kliens a kapott SRT-t a meglévő import-útvonalon dolgozza fel.
-router.post('/captions', upload.any(), ...proOnly, (req, res) => {
+router.post('/captions', ...proOnly, upload.any(), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -159,7 +159,7 @@ router.post('/captions', upload.any(), ...proOnly, (req, res) => {
 
 // Hullámforma az idővonalhoz: hangfájl → mono 8 kHz PCM → csúcslista.
 // A kliens lemezre cache-eli, egy fájl csak egyszer jön fel.
-router.post('/waveform', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), (req, res) => {
+router.post('/waveform', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('audio'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -222,7 +222,7 @@ router.post('/waveform', upload.any(), requireAuth, rateLimit('analysis'), media
 
 // 🎞️ Média-feltöltés (renderelt videó / borító) → publikus Storage-URL. A kliens
 // a renderelt fájlt küldi (multipart), a feed ezt a URL-t játssza (cross-device).
-router.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
+router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });
@@ -312,7 +312,7 @@ router.post('/media/upload', upload.any(), requireAuth, async (req, res) => {
 // 🎚️ Hang-analízis (AUDIO-MASTER Analyze): egy feltöltött hangon az ffmpeg
 // `loudnorm` MÉRŐ-menete (print_format=json) → Integrated LUFS / True Peak / LRA,
 // + egy `showspectrumpic` spektrum-kép (best-effort, a média-tárba).
-router.post('/audio/analyze', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('audio'), async (req, res) => {
+router.post('/audio/analyze', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('audio'), async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });
@@ -394,7 +394,7 @@ router.post('/audio/analyze', upload.any(), requireAuth, rateLimit('analysis'), 
 // 🎚️ Stem-szeparáció (AI audio, Phase D) — Pro + Demucs (env-kapuzva). A feltöltött
 // hangot vocals/drums/bass/other WAV-okra bontja, feltölti a média-tárba, és
 // visszaadja a stemek URL-jeit. A kliens ezekből ÚJ hangklipeket rak a sávokra.
-router.post('/audio/stems', upload.any(), ...proOnly, async (req, res) => {
+router.post('/audio/stems', ...proOnly, upload.any(), async (req, res) => {
   if (!stemsConfigured()) {
     res.status(503).json({ error: 'A stem-szeparáció nincs konfigurálva (Demucs).' });
     return;

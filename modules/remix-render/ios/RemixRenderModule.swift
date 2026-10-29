@@ -55,6 +55,7 @@ enum RenderError: Error, LocalizedError {
   case noVideo
   case noTracks(String)
   case exportFailed(String)
+  case badSegment(String)
   case cancelled
 
   var errorDescription: String? {
@@ -63,6 +64,7 @@ enum RenderError: Error, LocalizedError {
     case .noVideo: return "Nincs helyi videóklip az eszközön-renderhez."
     case .noTracks(let s): return "A forrás nem tartalmaz sávot: \(s)"
     case .exportFailed(let s): return "Az export nem sikerült: \(s)"
+    case .badSegment(let s): return "Egy klip nem olvasható, az export leállt (nem hagyjuk ki csendben): \(s)"
     case .cancelled: return "A render megszakítva."
     }
   }
@@ -146,11 +148,16 @@ public class RemixRenderModule: Module {
     // klip-hangerő (0 = némítva) — eddig elnyelődött, a néma klip is szólt
     let mainAudioParams = AVMutableAudioMixInputParameters(track: compAudio)
     var mixParams: [AVMutableAudioMixInputParameters] = []
-    var cursor = CMTime.zero // a videó-idővonal aktuális vége (egymás után fűzünk)
+    var cursor = CMTime.zero // a videó-idővonal aktuális vége
+    let fileName = { (uri: String) in (uri as NSString).lastPathComponent }
 
     for seg in plan.video {
       let asset = AVURLAsset(url: fileURL(seg.uri))
-      guard let srcVideo = asset.tracks(withMediaType: .video).first else { continue }
+      // B12: hiányzó / olvashatatlan szegmens → HIBA (eddig `continue` — a kész videóból
+      // csendben kimaradt egy rész)
+      guard let srcVideo = asset.tracks(withMediaType: .video).first else {
+        throw RenderError.badSegment(fileName(seg.uri))
+      }
 
       let speed = seg.speed > 0 ? seg.speed : 1.0
       let sourceConsumed = seg.durationSec * speed
@@ -159,15 +166,32 @@ public class RemixRenderModule: Module {
         start: start,
         duration: CMTime(seconds: sourceConsumed, preferredTimescale: timescale))
 
+      // B11: a klip a SAJÁT idővonal-helyére kerül (`atSec`) — a rés fekete (üres
+      // tartomány + háttér-utasítás), nem fűzzük egymáshoz a klipeket (eddig a rések
+      // eltűntek → más hossz/időzítés, mint a preview, csúszó hang és felirat)
+      let atTime = CMTime(seconds: max(0, seg.atSec), preferredTimescale: timescale)
+      if CMTimeCompare(atTime, cursor) > 0 {
+        let gap = CMTimeRange(start: cursor, end: atTime)
+        compVideo.insertEmptyTimeRange(gap)
+        let gapInst = AVMutableVideoCompositionInstruction()
+        gapInst.timeRange = gap
+        gapInst.backgroundColor = UIColor.black.cgColor
+        instructions.append(gapInst)
+        cursor = atTime
+      }
       let insertAt = cursor
       do {
         try compVideo.insertTimeRange(srcRange, of: srcVideo, at: insertAt)
       } catch {
-        continue
+        throw RenderError.badSegment("\(fileName(seg.uri)) — \(error.localizedDescription)")
       }
-      // a beszúrt szegmens saját hangja (ha van), azonos időzítéssel
+      // a beszúrt szegmens saját hangja (ha van — a néma videó legális), azonos időzítéssel
       if let srcAudio = asset.tracks(withMediaType: .audio).first {
-        try? compAudio.insertTimeRange(srcRange, of: srcAudio, at: insertAt)
+        do {
+          try compAudio.insertTimeRange(srcRange, of: srcAudio, at: insertAt)
+        } catch {
+          throw RenderError.badSegment("\(fileName(seg.uri)) (hang) — \(error.localizedDescription)")
+        }
       }
       mainAudioParams.setVolume(Float(max(0, min(1, seg.volume))), at: insertAt)
 
@@ -201,14 +225,22 @@ public class RemixRenderModule: Module {
     // külön hang-szegmensek (zene/voiceover/SFX) — az abszolút idejükre helyezve
     for seg in plan.audio {
       let asset = AVURLAsset(url: fileURL(seg.uri))
-      guard let srcAudio = asset.tracks(withMediaType: .audio).first else { continue }
+      guard let srcAudio = asset.tracks(withMediaType: .audio).first else {
+        throw RenderError.badSegment(fileName(seg.uri))
+      }
       guard let extra = composition.addMutableTrack(
-        withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+        withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+        throw RenderError.noTracks("audio")
+      }
       let srcRange = CMTimeRange(
         start: CMTime(seconds: max(0, seg.inSec), preferredTimescale: timescale),
         duration: CMTime(seconds: seg.durationSec, preferredTimescale: timescale))
       let at = CMTime(seconds: max(0, seg.atSec), preferredTimescale: timescale)
-      try? extra.insertTimeRange(srcRange, of: srcAudio, at: at)
+      do {
+        try extra.insertTimeRange(srcRange, of: srcAudio, at: at)
+      } catch {
+        throw RenderError.badSegment("\(fileName(seg.uri)) — \(error.localizedDescription)")
+      }
       let params = AVMutableAudioMixInputParameters(track: extra)
       params.setVolume(Float(max(0, min(1, seg.volume))), at: .zero)
       mixParams.append(params)
@@ -273,14 +305,9 @@ public class RemixRenderModule: Module {
     let mix = AVMutableAudioMix()
     mix.inputParameters = mixParams
     export.audioMix = mix
-    // cél-bitráta → fájlméret-plafon (az export-session nem fogad nyers bitrátát;
-    // a plafon alá az enkóder maga lő be — kis ráhagyás a konténer-fejlécnek)
-    if let bitRate = plan.bitRate, bitRate > 0 {
-      let seconds = CMTimeGetSeconds(cursor)
-      if seconds.isFinite && seconds > 0 {
-        export.fileLengthLimit = Int64(Double(bitRate) / 8.0 * seconds * 1.08)
-      }
-    }
+    // B13: NINCS fájlméret-plafon. A korábbi `fileLengthLimit = bitráta × hossz × 1.08`
+    // VBR-nél (minden platform-preset az) levágta a videó VÉGÉT. Az export-session nem
+    // fogad nyers bitrátát — a preset minősége dönt; a csonka videónál ez a kisebb rossz.
 
     // megszakítás: a sessiont regisztráljuk, hogy a `cancel()` elérje; ha a
     // kérés már az indítás előtt megjött, el se kezdjük

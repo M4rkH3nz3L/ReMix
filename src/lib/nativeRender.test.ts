@@ -137,3 +137,20 @@ describe('buildRenderPlan — az ASSET a forrás-igazság (ADR-012 Fázis 2b)', 
     expect(buildRenderPlan(project, DEFAULT_SETTINGS).video).toHaveLength(0);
   });
 });
+
+describe('PRO-VIDEO B10/B14 — a natív terv', () => {
+  it('B10: csak a FŐ videósávot fűzi (a PiP-klip nem kerül a láncba)', () => {
+    const p = projectWithClips([videoClip('main', 0, 5)]);
+    p.tracks.push({ id: 'pip', type: 'pip', name: 'PiP', clips: [videoClip('pip', 1, 2)] });
+    expect(buildRenderPlan(p, DEFAULT_SETTINGS).video.map((v) => v.uri)).toEqual(['file:///clip-main.mp4']);
+    expect(canRenderLocally(p, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it('B14: 4:5 (Instagram) valódi 1080×1350, nem csendes 9:16; ismeretlen arány → hiba', () => {
+    const p = { ...projectWithClips([videoClip('a', 0, 5)]), aspectRatio: '4:5' } as unknown as Project;
+    const plan = buildRenderPlan(p, DEFAULT_SETTINGS);
+    expect([plan.width, plan.height]).toEqual([1080, 1350]);
+    const bad = { ...p, aspectRatio: '21:9' } as unknown as Project;
+    expect(() => buildRenderPlan(bad, DEFAULT_SETTINGS)).toThrow(/képarány/);
+  });
+});

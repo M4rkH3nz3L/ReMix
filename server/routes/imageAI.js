@@ -20,7 +20,7 @@ const router = express.Router();
 
 // 🙂 Arc-detektálás egy képkockán (UltraFace, CPU) — a dobozok a megadott
 // vászon-arányra normalizálva jönnek (a tracker/pozicionálás nyelvén).
-router.post('/faces', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
+router.post('/faces', ...proOnly, upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -50,7 +50,7 @@ router.post('/faces', upload.any(), ...proOnly, mediaGuard('image'), (req, res) 
 });
 
 // 🏆 Best-shot pontozás (P0-1): forrás-időpontok vizuális minősége az Auto Edithez
-router.post('/shotscore', upload.any(), requireAuth, rateLimit('analysis'), mediaGuard('video'), (req, res) => {
+router.post('/shotscore', requireAuth, rateLimit('analysis'), upload.any(), mediaGuard('video'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó médiafájl.' });
@@ -87,7 +87,7 @@ router.get('/sky/presets', (_req, res) => {
   res.json({ presets: listSkies() });
 });
 
-router.post('/sky', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
+router.post('/sky', ...proOnly, upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   const preset = String(req.body.preset ?? 'sunset');
   if (!file) {
@@ -114,7 +114,7 @@ router.post('/sky', upload.any(), ...proOnly, mediaGuard('image'), (req, res) =>
 });
 
 // 🔍 Upscale / Enhance (CC V2): fotó felnagyítása szuper-felbontással
-router.post('/upscale', upload.any(), ...proOnly, mediaGuard('image'), (req, res) => {
+router.post('/upscale', ...proOnly, upload.any(), mediaGuard('image'), (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Hiányzó képfájl.' });

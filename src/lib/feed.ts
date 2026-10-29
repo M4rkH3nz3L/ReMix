@@ -1,3 +1,4 @@
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
@@ -508,6 +509,8 @@ export async function publishPost(
     videoUrl?: string | null;
     remixOfPostId?: string;
     remixOfCreator?: string;
+    /** 🔀 az alkotó engedélye: remixelhető-e a poszt (B27 — eddig mindig true volt) */
+    remixable?: boolean;
     /** 🖐️ carousel kép-poszt (kép-projekt lapozható megosztása): a lapok feltöltött URL-jei */
     carouselUrls?: string[];
   }
@@ -543,7 +546,7 @@ export async function publishPost(
     duration_sec: Math.round(projectDuration(project) * 10) / 10,
     project_snapshot: interactiveSnapshot,
     visibility: opts?.visibility ?? 'public',
-    remixable: true,
+    remixable: opts?.remixable ?? true,
     remix_of_post_id: opts?.remixOfPostId ?? null,
     remix_of_creator: opts?.remixOfCreator ?? null,
     creator_username: username,
@@ -551,6 +554,10 @@ export async function publishPost(
   };
   const { data, error } = await sb.from('posts').insert(row).select(POST_COLUMNS).single();
   if (error) {
+    // a szerver-oldali remix-kapu (posts_enforce_remix trigger) érthető üzenettel
+    if (/remix_not_allowed/.test(error.message)) {
+      throw new Error(tr('feed.remixNotAllowed'));
+    }
     throw new Error(error.message);
   }
   return toPost(data as PostRow, new Set(), new Set());
@@ -589,6 +596,8 @@ export async function publishRenderedProject(
     visibility?: PostVisibility;
     /** Pro: a render-motor választása (eszköz/felhő); hiányzó = auto */
     renderMode?: RenderMode;
+    /** 🔀 remixelhető-e (az alkotó dönt — B27) */
+    remixable?: boolean;
   }
 ): Promise<{ post: FeedPost; project: Project }> {
   let updated = project;
@@ -654,6 +663,7 @@ export async function publishRenderedProject(
     // ha ez remix-projekt, csatoljuk a forrás-poszthoz (remix_of_post_id → lineage)
     remixOfPostId: updated.remixOf?.postId,
     remixOfCreator: updated.remixOf?.name,
+    remixable: opts?.remixable ?? true,
   });
   return { post, project: updated };
 }

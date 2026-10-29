@@ -165,7 +165,19 @@ const VALID_ASPECTS: ReadonlySet<string> = new Set(['16:9', '9:16', '1:1']);
 const VALID_TEXT_TRACKS: ReadonlySet<string> = new Set(['text', 'captions', 'overlay']);
 
 /** Egy AI-parancs ellenőrzésének eredménye. */
-export type AiCommandCheck = { ok: true } | { ok: false; reason: string };
+/** az elutasítás oka gépi kóddal (a UI lokalizálja) + fejlesztői szöveggel */
+export type AiRejectCode =
+  | 'missingTarget'
+  | 'unknownClip'
+  | 'noAllowedField'
+  | 'outOfRange'
+  | 'badTrack'
+  | 'empty'
+  | 'badAspect'
+  | 'badName'
+  | 'unknownType'
+  | 'droppedFields';
+export type AiCommandCheck = { ok: true } | { ok: false; code: AiRejectCode; reason: string };
 
 /**
  * 🔒 AI ≠ authorization boundary (devs/tasks/remix/06). Az AI által GENERÁLT
@@ -179,65 +191,103 @@ export function validateAiCommand(cmd: AiCommand, project: Project): AiCommandCh
   switch (cmd.type) {
     case 'UPDATE_CLIP': {
       if (!cmd.clipId) {
-        return { ok: false, reason: 'UPDATE_CLIP: hiányzó clipId' };
+        return { ok: false, code: 'missingTarget', reason: 'UPDATE_CLIP: hiányzó clipId' };
       }
       if (!findClip(project, cmd.clipId)) {
-        return { ok: false, reason: `UPDATE_CLIP: nincs ilyen klip (${cmd.clipId})` };
+        return { ok: false, code: 'unknownClip', reason: `UPDATE_CLIP: nincs ilyen klip (${cmd.clipId})` };
       }
       const fields = cmd.patch
         ? Object.keys(cmd.patch).filter((k) => PATCHABLE_FIELDS.has(k))
         : [];
       if (fields.length === 0) {
-        return { ok: false, reason: 'UPDATE_CLIP: nincs engedélyezett mező a patch-ben' };
+        return { ok: false, code: 'noAllowedField', reason: 'UPDATE_CLIP: nincs engedélyezett mező a patch-ben' };
       }
       return { ok: true };
     }
     case 'REMOVE_CLIP':
       if (!cmd.clipId) {
-        return { ok: false, reason: 'REMOVE_CLIP: hiányzó clipId' };
+        return { ok: false, code: 'missingTarget', reason: 'REMOVE_CLIP: hiányzó clipId' };
       }
       if (!findClip(project, cmd.clipId)) {
-        return { ok: false, reason: `REMOVE_CLIP: nincs ilyen klip (${cmd.clipId})` };
+        return { ok: false, code: 'unknownClip', reason: `REMOVE_CLIP: nincs ilyen klip (${cmd.clipId})` };
       }
       return { ok: true };
     case 'SPLIT_CLIP': {
       if (!cmd.clipId || typeof cmd.time !== 'number') {
-        return { ok: false, reason: 'SPLIT_CLIP: hiányzó clipId/time' };
+        return { ok: false, code: 'missingTarget', reason: 'SPLIT_CLIP: hiányzó clipId/time' };
       }
       const found = findClip(project, cmd.clipId);
       if (!found) {
-        return { ok: false, reason: `SPLIT_CLIP: nincs ilyen klip (${cmd.clipId})` };
+        return { ok: false, code: 'unknownClip', reason: `SPLIT_CLIP: nincs ilyen klip (${cmd.clipId})` };
       }
       if (cmd.time <= found.clip.start || cmd.time >= clipEnd(found.clip)) {
-        return { ok: false, reason: 'SPLIT_CLIP: a vágási idő a klip határain kívül esik' };
+        return { ok: false, code: 'outOfRange', reason: 'SPLIT_CLIP: a vágási idő a klip határain kívül esik' };
       }
       return { ok: true };
     }
     case 'ADD_TEXT_CLIPS':
       if (!cmd.trackType || !VALID_TEXT_TRACKS.has(cmd.trackType)) {
-        return { ok: false, reason: 'ADD_TEXT_CLIPS: érvénytelen trackType' };
+        return { ok: false, code: 'badTrack', reason: 'ADD_TEXT_CLIPS: érvénytelen trackType' };
       }
       if (!cmd.clips || cmd.clips.length === 0) {
-        return { ok: false, reason: 'ADD_TEXT_CLIPS: nincs hozzáadandó klip' };
+        return { ok: false, code: 'empty', reason: 'ADD_TEXT_CLIPS: nincs hozzáadandó klip' };
       }
       return { ok: true };
     case 'SET_ASPECT':
       if (!cmd.aspectRatio || !VALID_ASPECTS.has(cmd.aspectRatio)) {
-        return { ok: false, reason: 'SET_ASPECT: érvénytelen képarány' };
+        return { ok: false, code: 'badAspect', reason: 'SET_ASPECT: érvénytelen képarány' };
       }
       return { ok: true };
     case 'RENAME_PROJECT': {
       const name = (cmd.name ?? '').trim();
       if (name.length === 0 || name.length > 100) {
-        return { ok: false, reason: 'RENAME_PROJECT: érvénytelen név (1–100 karakter)' };
+        return { ok: false, code: 'badName', reason: 'RENAME_PROJECT: érvénytelen név (1–100 karakter)' };
       }
       return { ok: true };
     }
     default:
       // runtime-ban érkezhet ismeretlen/privilegizált típus (a hálózati adat nem
       // típus-ellenőrzött) — ezt határozottan elutasítjuk
-      return { ok: false, reason: `Ismeretlen vagy nem engedélyezett parancstípus` };
+      return { ok: false, code: 'unknownType', reason: `Ismeretlen vagy nem engedélyezett parancstípus` };
   }
+}
+
+export interface AiCommandPartition {
+  /** ami TÉNYLEG lefut (az UPDATE_CLIP patch már csak az engedélyezett mezőkkel) */
+  accepted: AiCommand[];
+  /** ami kiesett vagy csonkult — a jóváhagyó listán okkal együtt látszik */
+  rejected: { command: AiCommand; code: AiRejectCode; detail?: string }[];
+}
+
+/**
+ * 🤖 PRO-VIDEO B17 — a jóváhagyó lista ugyanazt mutassa, ami lefut: a parancsok
+ * szétválogatása a valódi projekt ellen (a `toEditorCommands` ugyanezt a kaput
+ * használja). Az UPDATE_CLIP nem engedélyezett mezői leválnak (és jelezve vannak).
+ */
+export function partitionAiCommands(commands: AiCommand[], project: Project): AiCommandPartition {
+  const accepted: AiCommand[] = [];
+  const rejected: AiCommandPartition['rejected'] = [];
+  for (const cmd of commands) {
+    const check = validateAiCommand(cmd, project);
+    if (!check.ok) {
+      rejected.push({ command: cmd, code: check.code });
+      continue;
+    }
+    if (cmd.type === 'UPDATE_CLIP' && cmd.patch) {
+      const keys = Object.keys(cmd.patch);
+      const dropped = keys.filter((k) => !PATCHABLE_FIELDS.has(k));
+      if (dropped.length > 0) {
+        rejected.push({ command: cmd, code: 'droppedFields', detail: dropped.join(', ') });
+        accepted.push({
+          ...cmd,
+          patch: Object.fromEntries(Object.entries(cmd.patch).filter(([k]) => PATCHABLE_FIELDS.has(k))),
+        } as AiCommand);
+        continue;
+      }
+    }
+    accepted.push(cmd);
+  }
+  return { accepted, rejected };
 }
 
 /**

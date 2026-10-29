@@ -515,7 +515,8 @@ export default function EditorScreen() {
       // ⚛️ ATOMI: projekt + index + események egy írásban (vagy mind, vagy semmi)
       saveProjectAndEvents(snap, state.events)
         .then(() => {
-          state.markSaved();
+          // a snap-et adjuk át: ha a mentés alatt szerkesztettek, piszkos marad (B6)
+          useEditorStore.getState().markSaved(snap);
           setSaveFailed(false);
           setSaveAttempt(0);
           clearRecovery(snap.id); // a munka biztonságban → a recovery-kulcs törölhető
@@ -596,7 +597,7 @@ export default function EditorScreen() {
     writeRecovery(p, state.events);
     saveProjectAndEvents(p, state.events)
       .then(() => {
-        state.markSaved();
+        useEditorStore.getState().markSaved(p);
         setSaveFailed(false);
         setSaveAttempt(0);
         clearRecovery(p.id);

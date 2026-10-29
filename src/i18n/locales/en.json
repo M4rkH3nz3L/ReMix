@@ -920,6 +920,7 @@
       "discard": "Discard"
     },
     "toolbar": {
+      "splitHere": "Split here",
       "moreTitle": "More tools",
       "more": "More",
       "newTextDefault": "New text",
@@ -1236,6 +1237,17 @@
       "balCh_b": "Blue"
     },
     "assistant": {
+      "rejectedHeader": "Filtered suggestions ({{count}}) — these will NOT run",
+      "reject_missingTarget": "missing target (clip or time)",
+      "reject_unknownClip": "refers to a clip that doesn't exist",
+      "reject_noAllowedField": "contains no editable setting",
+      "reject_outOfRange": "the cut would fall outside the clip",
+      "reject_badTrack": "invalid track",
+      "reject_empty": "nothing to add",
+      "reject_badAspect": "invalid aspect ratio",
+      "reject_badName": "invalid name (1–100 characters)",
+      "reject_unknownType": "unknown or disallowed action",
+      "reject_droppedFields": "can't change these fields: {{detail}} (the rest will run)",
       "modelSection": "Model",
       "modelAuto": "Auto",
       "modelHint": "Add AI models in your profile, then pick one here.",
@@ -1813,6 +1825,7 @@
       "captionsFormatsNote": "SRT: universal. WebVTT: web/HTML5 with line position. ASS: with styling (color, position, bold)."
     },
     "filter": {
+      "pipLimited": "On a PiP clip the final video applies the filter, opacity, rotation, frame and reverse playback — other effects work on the main video track only.",
       "pickForStrength": "Pick a filter to adjust its strength",
       "sectionFilters": "Filters",
       "sectionEnhance": "Enhance",
@@ -2791,6 +2804,7 @@
       "assetName": "Frame"
     },
     "commands": {
+      "restoreSnapshot": "Restore state",
       "addClip": "{{kind}} clip added ({{trackType}} track)",
       "addClips_one": "{{count}} clip added ({{trackType}} track)",
       "addClips_other": "{{count}} clips added ({{trackType}} track)",
@@ -2874,6 +2888,7 @@
       "unitClip": "clip"
     },
     "render": {
+      "phaseDownloadSources": "Downloading sources…",
       "cancelled": "The operation was cancelled.",
       "mp4NativeOnly": "MP4 rendering is available in the native app (iOS/Android).",
       "phaseRenderingOnDevice": "Rendering on device",
@@ -3828,6 +3843,11 @@
     "manageGroup": "Manage group"
   },
   "feed": {
+    "remixAllowTitle": "Allow remixes?",
+    "remixAllowPrompt": "Can others use your video in their own remix? (A remix always credits the original.)",
+    "remixAllowYes": "Yes, allow remixes",
+    "remixAllowNo": "No",
+    "remixNotAllowed": "The original creator doesn't allow remixes — this remix can't be published.",
     "title": "Feed",
     "forYou": "For You",
     "trending": "Trending",

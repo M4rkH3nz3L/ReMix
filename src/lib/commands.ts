@@ -57,6 +57,12 @@ export type EditorCommand =
       label?: string;
     }
   | { type: 'RELINK_URI'; oldUri: string; newUri: string }
+  /**
+   * 👥 Teljes állapot-szinkron (élő collab): a visszavonás/újra a társ-szerkesztőknél is
+   * ugyanoda álljon, ha az eltérés nem fejezhető ki célzott parancsokkal
+   * (`undoSyncCommands`). Az eszköz-szintű mezők (mappa, szinkron) helyiek maradnak.
+   */
+  | { type: 'RESTORE_SNAPSHOT'; project: Project; label?: string }
   | { type: 'RELINK_ASSET'; assetId: string; newUri: string }
   /** ✨ projekt-szintű részecske-réteg be/ki (null = kikapcsol) */
   | { type: 'SET_PARTICLES'; particles: ParticlesConfig | null }
@@ -453,6 +459,12 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, links: next.length > 0 ? next : undefined };
     }
 
+    case 'RESTORE_SNAPSHOT': {
+      if (cmd.project.id !== project.id) {
+        return null;
+      }
+      return { ...cmd.project, folder: project.folder, syncToRemix: project.syncToRemix };
+    }
     case 'REPLACE_TRACKS': {
       const byType = new Map(cmd.tracks.map((t) => [t.trackType, t.clips]));
       if (byType.size === 0) {
@@ -618,6 +630,8 @@ export function describeCommand(cmd: EditorCommand): string {
       );
     case 'REPLACE_TRACKS':
       return cmd.label ?? tr('lib.commands.replaceTracks', { count: cmd.tracks.length });
+    case 'RESTORE_SNAPSHOT':
+      return cmd.label ?? tr('lib.commands.restoreSnapshot');
     case 'RELINK_URI':
       return tr('lib.commands.relinkUri', {
         file: cmd.newUri.split('/').pop() ?? cmd.newUri,

@@ -13,6 +13,7 @@ import {
   timelineWords,
 } from '@/lib/textedit';
 import { getProjectWordCues } from '@/lib/transcripts';
+import { buildMultiRangeDeletePlan } from '@/lib/rangeEdit';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
 
@@ -101,12 +102,15 @@ export function TranscriptPanel() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
-            const ok = useEditorStore
-              .getState()
-              .dispatch(
-                { type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips },
-                'user'
-              );
+            // B16: MINDEN sáv ripple-ödik a kivágott szakaszokkal (felirat, szöveg, PiP, hang) —
+            // a háttérzene folyamatos marad, csak tolódik; zárolt sáv érintetlen
+            const st = useEditorStore.getState();
+            const patches = st.project
+              ? buildMultiRangeDeletePlan(st.project, plan.removedRanges, st.lockedTracks)
+              : null;
+            const ok = patches
+              ? st.dispatch({ type: 'REPLACE_TRACKS', tracks: patches, label: t('panels.transcript.deleteSelectedTitle') }, 'user')
+              : st.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'video', clips: plan.clips }, 'user');
             setSelected(new Set());
             setApplied(
               ok

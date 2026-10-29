@@ -920,6 +920,7 @@
       "discard": "Elvetés"
     },
     "toolbar": {
+      "splitHere": "Vágás itt",
       "moreTitle": "További eszközök",
       "more": "Több",
       "newTextDefault": "Új szöveg",
@@ -1236,6 +1237,17 @@
       "balCh_b": "Kék"
     },
     "assistant": {
+      "rejectedHeader": "Kiszűrt javaslatok ({{count}}) — ezek NEM futnak le",
+      "reject_missingTarget": "hiányzik a cél (klip vagy idő)",
+      "reject_unknownClip": "nem létező klipre hivatkozik",
+      "reject_noAllowedField": "nincs benne módosítható beállítás",
+      "reject_outOfRange": "a vágás a klipen kívül esne",
+      "reject_badTrack": "érvénytelen sáv",
+      "reject_empty": "nincs mit hozzáadni",
+      "reject_badAspect": "érvénytelen képarány",
+      "reject_badName": "érvénytelen név (1–100 karakter)",
+      "reject_unknownType": "ismeretlen vagy nem engedélyezett művelet",
+      "reject_droppedFields": "ezeket a mezőket nem módosíthatja: {{detail}} (a többi lefut)",
       "modelSection": "Modell",
       "modelAuto": "Auto",
       "modelHint": "Adj hozzá AI-modelleket a profilodban, majd válassz itt egyet.",
@@ -1813,6 +1825,7 @@
       "captionsFormatsNote": "SRT: univerzális. WebVTT: web/HTML5, sor-pozícióval. ASS: stílussal (szín, pozíció, félkövér)."
     },
     "filter": {
+      "pipLimited": "PiP-klipen a kész videóban a szűrő, az átlátszóság, a forgatás, a keret és a fordított lejátszás érvényes — a többi effekt csak a fő videósávon.",
       "pickForStrength": "Válassz szűrőt az erősség állításához",
       "sectionFilters": "Szűrők",
       "sectionEnhance": "Képjavítás",
@@ -2791,6 +2804,7 @@
       "assetName": "Képkocka"
     },
     "commands": {
+      "restoreSnapshot": "Állapot visszaállítása",
       "addClip": "{{kind}} klip hozzáadva ({{trackType}} sáv)",
       "addClips_one": "{{count}} klip hozzáadva ({{trackType}} sáv)",
       "addClips_other": "{{count}} klip hozzáadva ({{trackType}} sáv)",
@@ -2874,6 +2888,7 @@
       "unitClip": "klip"
     },
     "render": {
+      "phaseDownloadSources": "Források letöltése…",
       "cancelled": "A művelet megszakítva.",
       "mp4NativeOnly": "Az MP4-render a natív appból érhető el (iOS/Android).",
       "phaseRenderingOnDevice": "Renderelés az eszközön",
@@ -3828,6 +3843,11 @@
     "manageGroup": "Csoport kezelése"
   },
   "feed": {
+    "remixAllowTitle": "Remixelhető legyen?",
+    "remixAllowPrompt": "Mások felhasználhatják-e a videódat a saját remixükben? (A remix mindig megjelöli az eredetit.)",
+    "remixAllowYes": "Igen, remixelhető",
+    "remixAllowNo": "Nem",
+    "remixNotAllowed": "Az eredeti alkotó nem engedélyezte a remixet — ez a remix nem publikálható.",
     "title": "Feed",
     "forYou": "Neked",
     "trending": "Felkapott",

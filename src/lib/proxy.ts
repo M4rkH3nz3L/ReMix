@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
  * Vágási proxy (full-plan F2): a nagy felbontású videókhoz a worker 720p-s
@@ -77,11 +78,11 @@ function hashKey(input: string): string {
   return h.toString(36);
 }
 
-async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
+async function fetchWithTimeout(url: string, ms: number, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -164,10 +165,15 @@ export function ensureProxy(uri: string): Promise<string | null> {
 
         for (let i = 0; i < MAX_POLLS; i++) {
           await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-          const res = await fetchWithTimeout(`${base}/render/${body.id}`, 5000);
+          // 🔒 B26: a proxy-job is a hívóé → a poll és a letöltés a saját tokennel megy
+          const res = await fetchWithTimeout(`${base}/render/${body.id}`, 5000, {
+            headers: await workerAuthHeaders(),
+          });
           const status = await res.json();
           if (status.state === 'done') {
-            const file = await File.downloadFileAsync(`${base}/render/${body.id}/file`, target);
+            const file = await File.downloadFileAsync(`${base}/render/${body.id}/file`, target, {
+              headers: await workerAuthHeaders(),
+            });
             memory.set(uri, file.uri);
             return file.uri;
           }

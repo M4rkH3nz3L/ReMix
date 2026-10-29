@@ -1,4 +1,5 @@
 import {
+  skiaUncoveredAdjust,
   EFFECT_PREVIEW_SUPPORT,
   IDENTITY_MATRIX,
   clipColorMatrix,
@@ -148,7 +149,18 @@ describe('skiaEffects — ImageFilter-leírók + támogatás-tábla', () => {
     expect(EFFECT_PREVIEW_SUPPORT.sepia).toBe('colorMatrix');
     expect(EFFECT_PREVIEW_SUPPORT.invert).toBe('colorMatrix');
     expect(EFFECT_PREVIEW_SUPPORT.blur).toBe('blur');
+    // B20: a Skia nem élesít → render-only jelvény (nem félrevezető „preview-támogatott")
+    expect(EFFECT_PREVIEW_SUPPORT.sharpen).toBe('render-only');
     expect(EFFECT_PREVIEW_SUPPORT.vignette).toBe('render-only');
     expect(EFFECT_PREVIEW_SUPPORT.scanlines).toBe('render-only');
+  });
+});
+
+describe('skiaUncoveredAdjust (B21)', () => {
+  it('a mátrixos mezők kiesnek, a tónus/balance megmarad; csak mátrixos → undefined', () => {
+    expect(skiaUncoveredAdjust({ brightness: 0.2, saturation: -0.3 })).toBeUndefined();
+    expect(skiaUncoveredAdjust({ brightness: 0.2, shadows: 0.4 })).toEqual({ shadows: 0.4 });
+    const bal = { mid: { r: 0.2, g: 0, b: 0 } };
+    expect(skiaUncoveredAdjust({ contrast: 0.1, balance: bal })).toEqual({ balance: bal });
   });
 });

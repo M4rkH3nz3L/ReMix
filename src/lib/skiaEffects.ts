@@ -178,6 +178,28 @@ export function gradeColorMatrix(adjust: ClipAdjust | undefined): number[] {
   return chain.length ? composeAll(chain) : IDENTITY_MATRIX;
 }
 
+/**
+ * 🎨 B21: a `ClipAdjust` azon része, amit a Skia-mátrix NEM fed le (tónus-régiók,
+ * HSL-luminancia, 3-way balance) — ha a Skia-réteg aktív, a tint-közelítés EZEKRE még
+ * kell (eddig a Skia bármely mezője az egész közelítést elnyomta → a preview kevesebbet
+ * mutatott). A mátrixos mezők kiesnek, hogy ne duplázódjanak.
+ */
+export function skiaUncoveredAdjust(adjust: ClipAdjust | undefined): ClipAdjust | undefined {
+  if (!adjust) return undefined;
+  const {
+    exposure: _e,
+    brightness: _b,
+    contrast: _c,
+    temperature: _t,
+    tint: _ti,
+    saturation: _s,
+    hslSaturation: _hs,
+    hue: _h,
+    ...rest
+  } = adjust;
+  return Object.values(rest).some((v) => v !== undefined && v !== 0) ? (rest as ClipAdjust) : undefined;
+}
+
 // ── effekt-lánc (ColorMatrix-ra képezhető rész) ──────────────────────────────
 
 /** Mely effektek képződnek Skia-preview-ra, és hogyan (a UI „render-only" jelzéshez is). */
@@ -186,7 +208,9 @@ export const EFFECT_PREVIEW_SUPPORT: Record<VideoEffectType, 'colorMatrix' | 'bl
   sepia: 'colorMatrix',
   invert: 'colorMatrix',
   blur: 'blur',
-  sharpen: 'sharpen',
+  // B20: a Skia-réteg NEM rajzol élesítést (csak a blur-t) → őszintén „render-only"
+  // jelvényt kap; a pontos élesítés a renderben ég be
+  sharpen: 'render-only',
   // nem-lineáris / textúra / régió-szelektív → a renderben ég be
   vignette: 'render-only',
   grain: 'render-only',

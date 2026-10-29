@@ -418,7 +418,11 @@ export interface EditorState {
   redo: () => void;
   /** 🕓 ugrás a history-ban: delta<0 = ennyi undo, delta>0 = ennyi redo (egy állapot-cserében) */
   jumpHistory: (delta: number) => void;
-  markSaved: () => void;
+  /**
+   * mentés kész → nem piszkos. A `saved` a MENTETT pillanatkép: ha közben új állapot
+   * jött, a projekt piszkos marad (B6). Paraméter nélkül feltétel nélkül tiszta.
+   */
+  markSaved: (saved?: Project) => void;
   /** a renderelt változat rögzítése a projekten (artefaktum — nem undo/dirty) */
   setRendered: (rendered: Project['rendered']) => void;
 }

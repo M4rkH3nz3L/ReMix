@@ -334,7 +334,9 @@ export function useStudio() {
 
   const projectMenu = (meta: ProjectMeta) => {
     Alert.alert(meta.name, undefined, [
-      { text: t('feed.shareToFeed'), onPress: () => shareToFeed(meta) },
+      // 🧊 a 3D-projektnek nincs idővonala → a feed-megosztás (render) üres lenne; a modell
+      // képként/videóként a 3D Stúdió Export lapjáról vagy a videószerkesztőből osztható
+      ...(meta.kind === 'model3d' ? [] : [{ text: t('feed.shareToFeed'), onPress: () => shareToFeed(meta) }]),
       { text: t('common.rename'), onPress: () => startRename(meta) },
       { text: t('common.duplicate'), onPress: () => duplicate(meta) },
       { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },

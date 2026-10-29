@@ -2205,6 +2205,14 @@
       "freezeNote": "A lejátszófejnél állókockát szúr be: a kép megáll, a többi klip arrébb csúszik, az átívelő hang viszont tovább szól."
     },
     "sticker": {
+      "my3dTitle": "Saját 3D-modelljeim",
+      "my3dEmpty": "Ebben a 3D-projektben még nincs kész modell.",
+      "my3dRendering": "3D-kép készül…",
+      "my3dRenderingVideo": "Forgó 3D-videó készül…",
+      "my3dHow": "Hogyan kerüljön a videóba?",
+      "my3dStill": "Állókép (átlátszó)",
+      "my3dTurntable": "Forgó videó ({{seconds}} mp)",
+      "my3dHint": "A LiDAR-szkenjeid a 3D Stúdióból. A kép/videó ennek a videónak a mappájába készül.",
       "object3dTitle": "3D objektum",
       "object3dDownloadFailed": "A letöltés nem sikerült — fut a worker?",
       "faceStickerTitle": "Arc-matrica",
@@ -3597,6 +3605,7 @@
       "wireframe_only": "Csak a háló"
     },
     "error": {
+      "needsNewBuild": "Ehhez az app újabb változata kell (új build).",
       "cancelled": "Megszakítva.",
       "unsupported": "Ez a funkció ezen a készüléken nem érhető el.",
       "badInput": "A fájl nem olvasható.",
@@ -3609,6 +3618,14 @@
       "errFps": "A képkockasebesség 12–60 fps lehet."
     },
     "export": {
+      "title": "Export",
+      "still": "Kép a modellből",
+      "stillSub": "Átlátszó hátterű PNG — megosztás vagy mentés",
+      "turntable": "Forgó videó (6 mp)",
+      "turntableSub": "360°-os körbeforgás, MP4 — megosztás vagy mentés",
+      "fileTitle": "Modell-fájl",
+      "continue": "Folytatás",
+      "videoHint": "Videóba illesztés: a videószerkesztő Matrica panelén, „Saját 3D-modelljeim”.",
       "useAr": "AR-nézet, Apple-eszközök",
       "useEditing": "3D-szerkesztő programok",
       "usePrint": "3D-nyomtatás",

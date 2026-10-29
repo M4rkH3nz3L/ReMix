@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { My3DModelsSection } from '@/components/editor/panels/My3DModelsSection';
 import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { aspectValue, palette } from '@/constants/editor';
 import { BRUSH_COLORS, BRUSH_STYLES } from '@/lib/draw';
@@ -466,6 +467,9 @@ export function StickerPanel() {
           </Text>
         </PanelSection>
       ) : null}
+
+      {/* 🧊 a user saját LiDAR-szkenjei (3D Stúdió) — állókép vagy forgó videó */}
+      <My3DModelsSection onInserted={() => setPanel('shape')} />
 
       <PanelSection title={t('panels.sticker.faceStickerSectionTitle')}>
         <View style={styles.shapeRow3d}>

@@ -103,6 +103,8 @@ export const Remix3DModelView = optionalView<ModelViewProps>('Remix3DModelView')
  */
 export function remix3dErrorKey(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err ?? '');
+  // a JS-oldal már i18n-kulcsot dobott (pl. model3d.error.needsNewBuild / model3d.render.*)
+  if (/^model3d\.[\w.]+$/.test(msg)) return msg;
   if (msg.includes('cancelled')) return 'model3d.error.cancelled';
   if (msg.includes('unsupported')) return 'model3d.error.unsupported';
   if (msg.includes('badInput')) return 'model3d.error.badInput';

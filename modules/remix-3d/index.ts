@@ -26,5 +26,20 @@ export interface Remix3DNative {
     min: { x: number; y: number; z: number };
     max: { x: number; y: number; z: number };
   }>;
-  addListener(event: 'onReconstructProgress', listener: (e: { progress: number }) => void): { remove: () => void };
+  /** 🎬 360°-os forgó felvétel → H.264 MP4 (a készüléken); haladás: `onRenderProgress` */
+  renderTurntable(
+    modelPath: string,
+    outputPath: string,
+    width: number,
+    height: number,
+    seconds: number,
+    fps: number,
+    pitch: number,
+    background: string | null
+  ): Promise<string>;
+  cancelRender(): Promise<boolean>;
+  addListener(
+    event: 'onReconstructProgress' | 'onRenderProgress',
+    listener: (e: { progress: number }) => void
+  ): { remove: () => void };
 }

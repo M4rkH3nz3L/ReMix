@@ -8,6 +8,7 @@ import {
   referencedAssetIds,
   removeNode,
   removeView,
+  replaceModel,
   saveView,
   sceneBounds,
   setCapture,
@@ -149,5 +150,18 @@ describe('roomPlanSummary', () => {
   it('ha a natív padló adott, azt használja', () => {
     const floor = [{ x: 0, z: 0 }, { x: 5, z: 0 }, { x: 5, z: 2 }, { x: 0, z: 2 }];
     expect(summarizeRoom({ ...room, floor }).floorArea).toBeCloseTo(10);
+  });
+});
+
+describe('replaceModel („Új szken”)', () => {
+  it('az új háló lecseréli a régit; a felszabadult assetek visszajönnek', () => {
+    let doc = addMesh(createModel3DDoc(), mesh('m1'), 'Első').doc;
+    doc = addMesh(doc, mesh('m2'), 'Második').doc;
+    const next = replaceModel(doc, { ...mesh('m3'), assetId: 'ast_m3' }, 'Új');
+    expect(next.doc.meshes.map((m) => m.id)).toEqual(['m3']);
+    expect(next.doc.nodes).toHaveLength(1);
+    expect(next.doc.nodes[0].meshId).toBe('m3');
+    expect(next.removedAssetIds).toEqual(doc.meshes.map((m) => m.assetId));
+    expect(referencedAssetIds(next.doc)).toEqual(['ast_m3']);
   });
 });

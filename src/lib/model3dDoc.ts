@@ -55,6 +55,22 @@ export function addMesh(doc: Model3DDoc, mesh: Model3DMesh, name: string): { doc
   return { doc: { ...doc, meshes: [...doc.meshes, mesh], nodes: [...doc.nodes, node] }, nodeId: node.id };
 }
 
+/**
+ * „Új szken”: az ÚJ háló LECSERÉLI a meglévő modellt (a stúdió egy modellt kezel) —
+ * a régi csomópontok/hálók/anyagok kiesnek. A felszabadult asset-id-ket is visszaadja,
+ * hogy a hívó ugyanabban az undo-lépésben a projekt asset-listájából is kivegye őket.
+ */
+export function replaceModel(
+  doc: Model3DDoc,
+  mesh: Model3DMesh,
+  name: string
+): { doc: Model3DDoc; nodeId: string; removedAssetIds: string[] } {
+  const removedAssetIds = doc.meshes.map((m) => m.assetId).filter((id) => id !== mesh.assetId);
+  const cleared: Model3DDoc = { ...doc, nodes: [], meshes: [], materials: [], measurements: [], annotations: [] };
+  const { doc: next, nodeId } = addMesh(cleared, mesh, name);
+  return { doc: next, nodeId, removedAssetIds };
+}
+
 const mapNode = (doc: Model3DDoc, id: string, f: (n: Model3DNode) => Model3DNode): Model3DDoc => ({
   ...doc,
   nodes: doc.nodes.map((n) => (n.id === id ? f(n) : n)),

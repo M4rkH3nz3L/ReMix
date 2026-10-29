@@ -59,3 +59,22 @@ export function model3dAsset(input: {
     ...(input.size !== undefined ? { size: input.size } : {}),
   };
 }
+
+/**
+ * Az AKTUÁLIS modell (a legutóbbi szken) hálója + fájl-assetje — a néző, az export és a
+ * videós felhasználás ezt használja. (A doc `meshes` listája bővül; a régi szkenek
+ * a „Új szken” cseréjénél kikerülnek, de a régebbi doc-okban is a legutolsó a mérvadó.)
+ */
+export function currentModel<M extends { assetId: string }>(
+  meshes: readonly M[] | undefined,
+  assets: readonly Asset[]
+): { mesh: M; asset: Asset } | null {
+  for (let i = (meshes?.length ?? 0) - 1; i >= 0; i--) {
+    const mesh = (meshes as readonly M[])[i];
+    const asset = assets.find((a) => a.id === mesh.assetId && a.kind === 'model');
+    if (asset) {
+      return { mesh, asset };
+    }
+  }
+  return null;
+}

@@ -5,14 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Model3DExportSheet } from '@/components/studio/model3d/Model3DExportSheet';
 import { palette } from '@/constants/editor';
 import { haptics } from '@/design';
 import { useBackLayer } from '@/hooks/useBackLayer';
 import { availableCaptureModes } from '@/lib/deviceCaps';
 import { makeId } from '@/lib/id';
 import { boundsSize, formatLength } from '@/lib/model3d';
-import { addMesh, createModel3DDoc, setEnvironment } from '@/lib/model3dDoc';
-import { model3dAsset } from '@/lib/model3dMedia';
+import { createModel3DDoc, replaceModel, setEnvironment } from '@/lib/model3dDoc';
+import { currentModel, model3dAsset } from '@/lib/model3dMedia';
 import { goBackOrHome } from '@/lib/nav';
 import {
   Remix3D,
@@ -55,8 +56,11 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const doc = project?.model3d;
-  const mesh = doc?.meshes[0];
-  const asset = mesh ? project?.assets.find((a) => a.id === mesh.assetId) : undefined;
+  // az AKTUÁLIS modell = a legutóbbi szken (korábban a meshes[0] → „Új szken” után a régi látszott)
+  const current = currentModel(doc?.meshes, project?.assets ?? []);
+  const mesh = current?.mesh;
+  const asset = current?.asset;
+  const [exportOpen, setExportOpen] = useState(false);
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
@@ -157,10 +161,12 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         textured: false,
       };
       const base: Model3DDoc = doc ?? createModel3DDoc();
-      const { doc: next } = addMesh({ ...base, capture: undefined }, m, project.name);
+      // „Új szken”: az új háló LECSERÉLI a régit (a régi asset is kikerül — egy undo-lépés)
+      const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
       useEditorStore.getState().applyBatch(
         [
           { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
           { type: 'SET_MODEL3D_DOC', doc: { ...next, ...(poster ? { poster } : {}) }, label: t('model3d.reconstruct.done') },
         ],
         'user'
@@ -216,10 +222,12 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         textured: true,
       };
       const base: Model3DDoc = doc ?? createModel3DDoc();
-      const { doc: next } = addMesh({ ...base, capture: undefined }, m, project.name);
+      // „Új szken”: az új háló LECSERÉLI a régit (a régi asset is kikerül — egy undo-lépés)
+      const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
       useEditorStore.getState().applyBatch(
         [
           { type: 'ADD_ASSET', asset: { ...target, uri } },
+          ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
           { type: 'SET_MODEL3D_DOC', doc: { ...next, ...(poster ? { poster } : {}) }, label: t('model3d.reconstruct.done') },
         ],
         'user'
@@ -479,6 +487,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           active={wireframe !== 'off'}
           onPress={() => setWireframe(WIREFRAME_CYCLE[(WIREFRAME_CYCLE.indexOf(wireframe) + 1) % WIREFRAME_CYCLE.length])}
         />
+        <Tool icon="share-outline" label={t('model3d.export.title')} onPress={() => setExportOpen(true)} />
         <Tool
           icon="scan-outline"
           label={t('model3d.viewer.newScan')}
@@ -488,6 +497,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           }}
         />
       </View>
+      <Model3DExportSheet
+        visible={exportOpen}
+        onClose={() => setExportOpen(false)}
+        modelUri={asset.uri}
+        mesh={mesh}
+        projectName={project?.name ?? 'model'}
+        background={bg}
+      />
     </SafeAreaView>
   );
 }

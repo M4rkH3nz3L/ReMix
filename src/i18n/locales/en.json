@@ -2205,6 +2205,14 @@
       "freezeNote": "Inserts a still at the playhead: the image holds, later clips ripple over, while the spanning audio keeps playing."
     },
     "sticker": {
+      "my3dTitle": "My 3D models",
+      "my3dEmpty": "This 3D project has no finished model yet.",
+      "my3dRendering": "Rendering 3D image…",
+      "my3dRenderingVideo": "Rendering turntable video…",
+      "my3dHow": "How should it go into the video?",
+      "my3dStill": "Still image (transparent)",
+      "my3dTurntable": "Turntable video ({{seconds}} s)",
+      "my3dHint": "Your LiDAR scans from the 3D Studio. The image/video is rendered into this video’s folder.",
       "object3dTitle": "3D object",
       "object3dDownloadFailed": "Download failed — is the worker running?",
       "faceStickerTitle": "Face sticker",
@@ -3597,6 +3605,7 @@
       "wireframe_only": "Mesh only"
     },
     "error": {
+      "needsNewBuild": "This needs a newer version of the app (new build).",
       "cancelled": "Cancelled.",
       "unsupported": "This feature isn't available on this device.",
       "badInput": "The file can't be read.",
@@ -3609,6 +3618,14 @@
       "errFps": "Frame rate must be 12–60 fps."
     },
     "export": {
+      "title": "Export",
+      "still": "Image from model",
+      "stillSub": "PNG with transparent background — share or save",
+      "turntable": "Turntable video (6 s)",
+      "turntableSub": "360° spin, MP4 — share or save",
+      "fileTitle": "Model file",
+      "continue": "Continue",
+      "videoHint": "To use it in a video: Sticker panel in the video editor, “My 3D models”.",
       "useAr": "AR view, Apple devices",
       "useEditing": "3D editing apps",
       "usePrint": "3D printing",

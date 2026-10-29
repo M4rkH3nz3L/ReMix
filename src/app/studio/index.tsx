@@ -177,8 +177,9 @@ export default function ProjectsScreen() {
                 </Text>
                 <Text style={styles.cardMeta}>
                   {t(`studio.kind.${itemKind}`)}
-                  {itemKind !== 'audio' ? ` · ${item.aspectRatio}` : ''}
-                  {itemKind !== 'image' ? ` · ${formatTime(item.duration)}` : ''}
+                  {/* a 3D-modellnek nincs képaránya/hossza — csak a fajta (+ tárhely) */}
+                  {itemKind !== 'audio' && itemKind !== 'model3d' ? ` · ${item.aspectRatio}` : ''}
+                  {itemKind !== 'image' && itemKind !== 'model3d' ? ` · ${formatTime(item.duration)}` : ''}
                   {itemKind === 'video'
                     ? ` · ${t('home.clipCount', { count: item.clipCount })}`
                     : ''}

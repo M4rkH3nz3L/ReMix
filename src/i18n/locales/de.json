@@ -2205,6 +2205,14 @@
       "freezeNote": "Fügt am Abspielkopf ein Standbild ein: das Bild hält, spätere Clips rücken nach, der übergreifende Ton läuft weiter."
     },
     "sticker": {
+      "my3dTitle": "Meine 3D-Modelle",
+      "my3dEmpty": "Dieses 3D-Projekt hat noch kein fertiges Modell.",
+      "my3dRendering": "3D-Bild wird erstellt…",
+      "my3dRenderingVideo": "Drehvideo wird erstellt…",
+      "my3dHow": "Wie soll es ins Video?",
+      "my3dStill": "Standbild (transparent)",
+      "my3dTurntable": "Drehvideo ({{seconds}} s)",
+      "my3dHint": "Deine LiDAR-Scans aus dem 3D-Studio. Bild/Video wird im Ordner dieses Videos erstellt.",
       "object3dTitle": "3D-Objekt",
       "object3dDownloadFailed": "Download fehlgeschlagen — läuft der Worker?",
       "faceStickerTitle": "Gesichts-Sticker",
@@ -3567,6 +3575,7 @@
       "wireframe_only": "Nur Netz"
     },
     "error": {
+      "needsNewBuild": "Dafür ist eine neuere App-Version nötig (neuer Build).",
       "cancelled": "Abgebrochen.",
       "unsupported": "Diese Funktion ist auf diesem Gerät nicht verfügbar.",
       "badInput": "Die Datei kann nicht gelesen werden.",
@@ -3579,6 +3588,14 @@
       "errFps": "Die Bildrate muss 12–60 fps sein."
     },
     "export": {
+      "title": "Export",
+      "still": "Bild aus dem Modell",
+      "stillSub": "PNG mit transparentem Hintergrund — teilen oder speichern",
+      "turntable": "Drehvideo (6 s)",
+      "turntableSub": "360°-Drehung, MP4 — teilen oder speichern",
+      "fileTitle": "Modelldatei",
+      "continue": "Weiter",
+      "videoHint": "Ins Video einfügen: im Videoeditor, Sticker-Panel, „Meine 3D-Modelle“.",
       "useAr": "AR-Ansicht, Apple-Geräte",
       "useEditing": "3D-Bearbeitungsprogramme",
       "usePrint": "3D-Druck",

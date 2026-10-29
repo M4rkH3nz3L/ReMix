@@ -1,5 +1,6 @@
 import { extractMediaKeys, planMediaDeletion } from '@/lib/mediaGc';
-import { isStorableFormat, model3dAsset, model3dMediaFileName } from '@/lib/model3dMedia';
+import type { Asset } from '@/types/project';
+import { currentModel, isStorableFormat, model3dAsset, model3dMediaFileName } from '@/lib/model3dMedia';
 
 const DOC = 'file:///var/mobile/Containers/Data/Application/ABC/Documents/';
 
@@ -42,4 +43,16 @@ test('model3dAsset: a projekt-mappába (mediaDirUri) épít, ha meg van adva', (
   expect(a.uri).toBe('file:///D/Documents/Files/Projektek/nyar/m3d_ast_1.usdz');
   const legacy = model3dAsset({ assetId: 'ast_1', format: 'usdz', documentDir: 'file:///D/Documents', name: 'x' });
   expect(legacy.uri).toBe('file:///D/Documents/media/m3d_ast_1.usdz');
+});
+
+test('currentModel: a legutóbbi (élő assetű) szken', () => {
+  const assets: Asset[] = [
+    { id: 'a1', kind: 'model', uri: 'file:///1.usdz', provider: 'local' },
+    { id: 'a2', kind: 'model', uri: 'file:///2.usdz', provider: 'local' },
+    { id: 'v', kind: 'video', uri: 'file:///v.mp4', provider: 'local' },
+  ];
+  expect(currentModel([{ assetId: 'a1' }, { assetId: 'a2' }], assets)?.asset.id).toBe('a2');
+  expect(currentModel([{ assetId: 'a1' }, { assetId: 'nincs' }], assets)?.asset.id).toBe('a1');
+  expect(currentModel([{ assetId: 'v' }], assets)).toBeNull();
+  expect(currentModel(undefined, assets)).toBeNull();
 });

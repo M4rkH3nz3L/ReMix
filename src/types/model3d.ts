@@ -154,6 +154,11 @@ export interface Model3DDoc {
   capture?: Model3DCapture;
   /** a modell poszter-képe (PNG a `media/`-ban) — projektkártya, feed, megosztás */
   poster?: string;
+  /**
+   * 🗄️ a választott TÁROLÁSI formátum (a létrehozáskor / a szerkesztésben) — a szkenek
+   * ebben kerülnek a projekt mappájába (`storedFormatFor` a fajta szerint dönt). Hiány → USDZ.
+   */
+  storageFormat?: MeshFormat;
 }
 
 /**

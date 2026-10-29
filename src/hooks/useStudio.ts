@@ -26,10 +26,12 @@ import {
 } from '@/lib/projectUtils';
 import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
 import { visibleProjects } from '@/lib/projectKinds';
+import { DEFAULT_STORAGE_FORMAT } from '@/lib/model3dExport';
 import { projectStorageMap } from '@/lib/storageQuota';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
+import type { MeshFormat } from '@/types/model3d';
 import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
 
 /**
@@ -59,6 +61,8 @@ export function useStudio() {
   const [bg, setBg] = useState<string>(BG_SWATCHES[0]);
   // 🎚️ hang-projekt: a master-cél (az alap hangosság/plafon preset)
   const [audioTarget, setAudioTarget] = useState<AudioMasterTarget>('music');
+  // 🧊 3D-projekt: a modell tárolási formátuma
+  const [model3dFormat, setModel3dFormat] = useState<MeshFormat>(DEFAULT_STORAGE_FORMAT);
   // 🗂️ a projekt FORRÁS-mappája — a létrehozáskor hozzáadott támogatott fájlok
   const [sources, setSources] = useState<Asset[]>([]);
   const [renaming, setRenaming] = useState<ProjectMeta | null>(null);
@@ -125,6 +129,7 @@ export function useStudio() {
     setImgFormat('raster');
     setBg(BG_SWATCHES[0]);
     setAudioTarget('music');
+    setModel3dFormat(DEFAULT_STORAGE_FORMAT);
     setSources([]);
   };
 
@@ -217,6 +222,8 @@ export function useStudio() {
       };
     } else if (kind === 'audio') {
       config.audioMasterTarget = audioTarget;
+    } else if (kind === 'model3d') {
+      config.model3dStorageFormat = model3dFormat;
     }
     // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
     const base = createEmptyProject(
@@ -450,6 +457,8 @@ export function useStudio() {
     setBg,
     audioTarget,
     setAudioTarget,
+    model3dFormat,
+    setModel3dFormat,
     sources,
     addSource,
     removeSource,

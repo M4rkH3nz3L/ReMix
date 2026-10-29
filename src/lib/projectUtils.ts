@@ -8,6 +8,7 @@ import { masterPreset } from '@/lib/audioMaster';
 import { createImageDoc, type ImageDocBackground } from '@/lib/imageDoc';
 import { createLiveDoc } from '@/lib/liveDoc';
 import { createModel3DDoc } from '@/lib/model3dDoc';
+import type { MeshFormat } from '@/types/model3d';
 import { projectKindMeta } from '@/lib/projectKinds';
 import type {
   AdjustClip,
@@ -36,6 +37,8 @@ export interface CreateProjectConfig {
     format?: 'raster' | 'vector';
   };
   audioMasterTarget?: AudioMasterTarget;
+  /** 🧊 3D: a modell tárolási formátuma (USDZ / GLB / OBJ / PLY) */
+  model3dStorageFormat?: MeshFormat;
 }
 
 /** A projekt fajtája, alapértelmezéssel (a régi, kind nélküli projektek videók). */
@@ -109,7 +112,8 @@ export function createEmptyProject(
     // (Main jelenet + kamera + ReMix-cél); a Live-hub a „Go live"-nál ezt hozza.
     ...(kind === 'live' ? { live: createLiveDoc(name, () => makeId('live')) } : {}),
     // 🧊 a 3D-stúdió üres dokumentummal indul; a szken (3D-1) tölti fel hálóval
-    ...(kind === 'model3d' ? { model3d: createModel3DDoc() } : {}),
+    // (a létrehozó-űrlapon választott tárolási formátummal)
+    ...(kind === 'model3d' ? { model3d: createModel3DDoc(undefined, config?.model3dStorageFormat) } : {}),
     createdAt: now,
     updatedAt: now,
     schemaVersion: 6,

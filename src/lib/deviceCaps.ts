@@ -12,6 +12,8 @@ export interface Device3DCaps {
   supportsObjectCapture: boolean;
   supportsRoomPlan: boolean;
   supportsSceneReconstruction: boolean;
+  /** 📦 a USD(C) kivitel (ModelIO) — a 3D-export formátumlistájához */
+  usdExport: boolean;
 }
 
 export const NO_3D_CAPS: Device3DCaps = Object.freeze({
@@ -19,6 +21,7 @@ export const NO_3D_CAPS: Device3DCaps = Object.freeze({
   supportsObjectCapture: false,
   supportsRoomPlan: false,
   supportsSceneReconstruction: false,
+  usdExport: false,
 });
 
 let current: Device3DCaps = NO_3D_CAPS;
@@ -30,6 +33,7 @@ export function setDevice3DCaps(caps: Partial<Device3DCaps> | null | undefined):
     supportsObjectCapture: !!caps?.supportsObjectCapture,
     supportsRoomPlan: !!caps?.supportsRoomPlan,
     supportsSceneReconstruction: !!caps?.supportsSceneReconstruction,
+    usdExport: !!caps?.usdExport,
   };
 }
 

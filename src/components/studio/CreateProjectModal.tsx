@@ -20,10 +20,12 @@ import { aspectRatios, palette } from '@/constants/editor';
 import { AUDIO_MASTER_TARGETS } from '@/lib/audioMaster';
 import { BG_SWATCHES, CANVAS_PRESETS, clampDim } from '@/lib/canvasPresets';
 import type { CreateFieldId } from '@/lib/createProjectForm';
+import { STORAGE_FORMATS } from '@/lib/model3dExport';
 import { creatableKinds } from '@/lib/projectKinds';
 import { supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import type { Layout } from '@/hooks/useLayout';
 import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind } from '@/types/project';
+import type { MeshFormat } from '@/types/model3d';
 
 /** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
 const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
@@ -75,6 +77,9 @@ export function CreateProjectModal(props: {
   // hang
   audioTarget: AudioMasterTarget;
   setAudioTarget: (tg: AudioMasterTarget) => void;
+  // 3D
+  model3dFormat: MeshFormat;
+  setModel3dFormat: (f: MeshFormat) => void;
   // forrás-mappa
   sources: Asset[];
   addSource: (sk: SourceKind) => void;
@@ -112,6 +117,8 @@ export function CreateProjectModal(props: {
     setBg,
     audioTarget,
     setAudioTarget,
+    model3dFormat,
+    setModel3dFormat,
     sources,
     addSource,
     removeSource,
@@ -368,6 +375,19 @@ export function CreateProjectModal(props: {
                       active={audioTarget === tg}
                       onPress={() => setAudioTarget(tg)}
                     />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {/* 🧊 3D-projekt: a modell tárolási formátuma (a projekt mappájában ebben él) */}
+            {kind === 'model3d' ? (
+              <>
+                <Text style={styles.fieldLabel}>{t('home.model3dFormatLabel')}</Text>
+                <Text style={styles.seoHint}>{t(`home.model3dFormatHint_${model3dFormat}`)}</Text>
+                <View style={styles.aspectRow}>
+                  {STORAGE_FORMATS.map((f) => (
+                    <Chip key={f} label={f.toUpperCase()} active={model3dFormat === f} onPress={() => setModel3dFormat(f)} />
                   ))}
                 </View>
               </>

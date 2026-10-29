@@ -19,8 +19,17 @@ import {
 } from '@/lib/model3dDoc';
 import { defaultOrbit } from '@/lib/model3dOrbit';
 import {
+  availableExportFormats,
   decimationRatio,
+  defaultExportSettings,
   EXPORT_FORMATS,
+  EXPORT_ORDER,
+  exportOptionsJson,
+  qualityParams,
+  STORAGE_FORMATS,
+  storedFormatFor,
+  UNIT_SCALE,
+  withFormat,
   exportFileName,
   exportWarnings,
   targetTriangles,
@@ -100,10 +109,43 @@ describe('model3dDoc', () => {
 });
 
 describe('model3dExport', () => {
-  it('helyi formátumok ingyenesek, a GLB felhős', () => {
-    expect(EXPORT_FORMATS.usdz.local).toBe(true);
-    expect(EXPORT_FORMATS.stl.local).toBe(true);
-    expect(EXPORT_FORMATS.glb.local).toBe(false);
+  it('minden formátum a készüléken készül; a GLB az első (alap)', () => {
+    expect(EXPORT_ORDER.every((f) => EXPORT_FORMATS[f].local)).toBe(true);
+    expect(EXPORT_ORDER[0]).toBe('glb');
+    expect(defaultExportSettings()).toEqual({ format: 'glb', quality: 'original', unit: 'm', textures: true });
+  });
+  it('kínálható formátumok: pontfelhőnél csak GLB/PLY; a USD a képességen múlik', () => {
+    expect(availableExportFormats({ points: 100 })).toEqual(['glb', 'ply']);
+    expect(availableExportFormats({})).not.toContain('usd');
+    expect(availableExportFormats({}, { usdExport: true })).toContain('usd');
+  });
+  it('egység: STL alapja mm; a GLB/USDZ mindig méter (nincs dupla skálázás)', () => {
+    const doc = createModel3DDoc();
+    const mesh = { bounds: { min: vec3(), max: vec3(1, 1, 1) } };
+    expect(withFormat(defaultExportSettings(), 'stl').unit).toBe('mm');
+    expect(JSON.parse(exportOptionsJson(doc, mesh, withFormat(defaultExportSettings(), 'stl'))).scale).toBe(1000);
+    expect(JSON.parse(exportOptionsJson(doc, mesh, { ...defaultExportSettings('glb'), unit: 'mm' })).scale).toBe(1);
+    expect(JSON.parse(exportOptionsJson(doc, mesh, { ...defaultExportSettings('fbx'), unit: 'cm' })).scale).toBe(100);
+    expect(UNIT_SCALE.cm).toBe(100);
+  });
+  it('minőség: eredeti = érintetlen; optimalizált durvább rács + kisebb textúra, mint a magas', () => {
+    const b = { min: vec3(), max: vec3(0.3, 0.3, 0.3) };
+    expect(qualityParams(b, 'original')).toEqual({ cell: 0, maxTexture: 0 });
+    const hi = qualityParams(b, 'high');
+    const opt = qualityParams(b, 'optimized');
+    expect(opt.cell).toBeGreaterThan(hi.cell);
+    expect(opt.maxTexture).toBeLessThan(hi.maxTexture);
+    const o = JSON.parse(exportOptionsJson(createModel3DDoc(), { bounds: b }, { ...defaultExportSettings(), textures: false }));
+    expect(o).toMatchObject({ format: 'glb', rotation: [0, 0, 0, 1], cell: 0, textures: false });
+  });
+  it('tárolási formátum: adatvesztés nélkül (textúrás → USDZ/GLB, pontfelhő → PLY/GLB)', () => {
+    expect(storedFormatFor(undefined, { textured: true, points: false })).toBe('usdz');
+    expect(storedFormatFor('glb', { textured: true, points: false })).toBe('glb');
+    expect(storedFormatFor('obj', { textured: true, points: false })).toBe('usdz');
+    expect(storedFormatFor('obj', { textured: false, points: false })).toBe('obj');
+    expect(storedFormatFor('usdz', { textured: false, points: true })).toBe('ply');
+    expect(storedFormatFor('glb', { textured: false, points: true })).toBe('glb');
+    expect(STORAGE_FORMATS).toContain('glb');
   });
   it('háromszög-keret felhasználás szerint, sosem több az eredetinél', () => {
     expect(targetTriangles(500_000, 'feed')).toBe(100_000);
@@ -117,10 +159,15 @@ describe('model3dExport', () => {
     expect(exportWarnings({ textured: false, triangles: 10, points: 5000 }, 'usdz')).toContain('model3d.export.warnPointCloudToMesh');
     expect(exportWarnings({ textured: false, triangles: 2_000_000 }, 'stl')).toContain('model3d.export.warnHeavyPrint');
     expect(exportWarnings({ textured: true, triangles: 10 }, 'usdz')).toEqual([]);
+    expect(exportWarnings({ textured: true, triangles: 10 }, 'ply')).toContain('model3d.export.warnTextureToColors');
+    // textúra kikapcsolva → nincs mit figyelmeztetni
+    expect(exportWarnings({ textured: true, triangles: 10 }, 'stl', false)).toEqual([]);
   });
   it('biztonságos fájlnév, ékezettel', () => {
     expect(exportFileName('Cipő / bal: "teszt"', 'usdz')).toBe('Cipő bal teszt.usdz');
     expect(exportFileName('   ', 'stl')).toBe('model.stl');
+    // az optimalizált változat külön néven — nem írja felül az eredetit
+    expect(exportFileName('Bögre', 'glb', 'optimized')).toBe('Bögre (optimized).glb');
   });
 });
 

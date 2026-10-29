@@ -8,6 +8,7 @@ import { boundsUnion, identityTransform, transformBounds } from '@/lib/model3d';
 import { defaultOrbit } from '@/lib/model3dOrbit';
 import type {
   Bounds3,
+  MeshFormat,
   Model3DAnnotation,
   Model3DCapture,
   Model3DDoc,
@@ -27,7 +28,7 @@ export const DEFAULT_ENVIRONMENT: Model3DEnvironment = {
   exposure: 1,
 };
 
-export function createModel3DDoc(capture?: Model3DCapture): Model3DDoc {
+export function createModel3DDoc(capture?: Model3DCapture, storageFormat?: MeshFormat): Model3DDoc {
   return {
     id: makeId('m3d'),
     nodes: [],
@@ -39,6 +40,7 @@ export function createModel3DDoc(capture?: Model3DCapture): Model3DDoc {
     measurements: [],
     annotations: [],
     ...(capture ? { capture } : {}),
+    ...(storageFormat ? { storageFormat } : {}),
   };
 }
 

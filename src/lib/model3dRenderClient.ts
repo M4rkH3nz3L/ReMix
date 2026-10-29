@@ -1,11 +1,10 @@
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 
 import { makeId } from '@/lib/id';
-import { exportFileName } from '@/lib/model3dExport';
+import { exportFileName, type ExportSettings } from '@/lib/model3dExport';
 import { planRenderJob } from '@/lib/model3dRenderJob';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { Remix3D } from '@/lib/remix3dNative';
-import type { MeshFormat } from '@/types/model3d';
 
 /**
  * 🧊→🖼️/🎬 A 3D-modell felhasználása máshol: állókép (átlátszó PNG), 360°-os forgó
@@ -120,16 +119,30 @@ export function cancelModelRender(): void {
   void Remix3D?.cancelRender?.();
 }
 
-/** 📦 A modell-fájl exportja a kért formátumba (a cache-be, megosztáshoz) → uri. */
+/** a projekt mappájának `Export/` almappája (a kész 3D-fájloknak — a szinkron ezt is viszi) */
+export function projectExportDir(): Directory {
+  const dir = new Directory(projectMediaDir(), 'Export');
+  if (!dir.exists) {
+    dir.create({ intermediates: true, idempotent: true });
+  }
+  return dir;
+}
+
+/**
+ * 📦 A modell kivitele a választott formátumban / minőségben / egységben (a natív író
+ * HÁTTÉRSZÁLON dolgozik; az eredeti modell érintetlen). `toCache`: csak megosztáshoz;
+ * különben a projekt `Export/` mappájába. → a kész fájl uri-ja (OBJ+textúra → .zip).
+ */
 export async function exportModelFile(
   modelUri: string,
   projectName: string,
-  format: MeshFormat,
-  optionsJson?: string
+  settings: ExportSettings,
+  optionsJson: string,
+  toCache: boolean
 ): Promise<string> {
   if (!Remix3D) {
     throw new Error('model3d.error.unsupported');
   }
-  const out = new File(Paths.cache, exportFileName(projectName, format));
-  return Remix3D.exportModel(modelUri, out.uri, optionsJson ?? null);
+  const out = new File(toCache ? Paths.cache : projectExportDir(), exportFileName(projectName, settings.format, settings.quality));
+  return Remix3D.exportModel(modelUri, out.uri, optionsJson);
 }

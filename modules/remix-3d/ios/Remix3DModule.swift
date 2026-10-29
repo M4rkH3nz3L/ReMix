@@ -69,6 +69,8 @@ public class Remix3DModule: Module {
         "supportsSceneReconstruction": mesh,
         "supportsObjectCapture": objectCapture,
         "supportsRoomPlan": roomPlan,
+        // 📦 a USD(C) kivitel a ModelIO-n múlik (P2)
+        "usdExport": MDLAsset.canExportFileExtension("usd"),
       ]
     }.runOnQueue(.main)
 
@@ -121,52 +123,21 @@ public class Remix3DModule: Module {
       return true
     }
 
-    // ── export: USDZ → OBJ / STL / PLY (ModelIO, a készüléken) ──────────────
-    // `optionsJson`: a stúdió „megjelenése" (forgatás) — a kivitt fájl azt adja, amit a néző mutat
-    AsyncFunction("exportModel") { (inputPath: String, outputPath: String, optionsJson: String?) -> String in
-      let input = try fileURL(inputPath)
-      let output = try fileURL(outputPath)
-      let ext = output.pathExtension.lowercased()
-      let look = Remix3DRender.Look.parse(optionsJson)
-      try? FileManager.default.removeItem(at: output)
-      if look.hasRotation {
-        switch ext {
-        case "usdz":
-          // a forgatás a csomópont-transzformba kerül; a textúrák/anyagok megmaradnak
-          let scene = try Remix3DRender.loadScene(input)
-          Remix3DRender.wrapContent(scene, look: look)
-          guard scene.write(to: output, options: nil, delegate: nil, progressHandler: nil) else {
-            throw Remix3DError.failed("usdzWrite")
-          }
-          return output.absoluteString
-        case "obj":
-          try Remix3DRender.writeOBJ(Remix3DRender.rotated(Remix3DRender.collectMesh(MDLAsset(url: input)), by: look.rotation), to: output)
-          return output.absoluteString
-        case "ply":
-          try Remix3DRender.writePLY(Remix3DRender.rotated(Remix3DRender.collectMesh(MDLAsset(url: input)), by: look.rotation), to: output)
-          return output.absoluteString
-        default:
-          break
+    // ── 📦 export / tárolási formátum: GLB · FBX · OBJ(+MTL+textúra zip) · USDZ · USD · PLY · STL ──
+    // `optionsJson`: forgatás (a néző megjelenése) + formátum, egység, minőség, textúra —
+    // `ExportOptions`. HÁTTÉRSZÁLON fut (nagy háló ne fogja a UI-t); az eredeti fájl
+    // érintetlen, a kimenet atomikusan kerül a helyére → a TÉNYLEGES uri (OBJ+textúra → .zip).
+    AsyncFunction("exportModel") { (inputPath: String, outputPath: String, optionsJson: String?, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let out = try Remix3DRender.export(input: try fileURL(inputPath), output: try fileURL(outputPath), optionsJson: optionsJson)
+          promise.resolve(out.absoluteString)
+        } catch let e as Remix3DError {
+          promise.reject(e)
+        } catch {
+          promise.reject(Remix3DError.failed(error.localizedDescription))
         }
       }
-      if ext == input.pathExtension.lowercased() {
-        try FileManager.default.copyItem(at: input, to: output)
-        return output.absoluteString
-      }
-      // 🖨️ STL: saját bináris író MILLIMÉTERBEN (a szeletelők mm-t várnak; a ModelIO
-      // méterben írna → a nyomat 1000× kisebb lenne), a csomópont-transzformokkal együtt
-      if ext == "stl" {
-        var mesh = Remix3DRender.collectMesh(MDLAsset(url: input))
-        if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
-        try Remix3DRender.writeSTL(mesh, to: output, scale: 1000)
-        return output.absoluteString
-      }
-      guard MDLAsset.canExportFileExtension(ext) else {
-        throw Remix3DError.unsupported("export:\(ext)")
-      }
-      let asset = MDLAsset(url: input)
-      try asset.export(to: output)
-      return output.absoluteString
     }
 
     // ── pillanatkép egy fájlból (bélyegkép / „Kép a modellből" fix kamerával) ─
@@ -211,23 +182,33 @@ public class Remix3DModule: Module {
     }
 
     // ── ✂️ háló-feldolgozás (textúra nélküli szkenhez): forgatás beégetése + padló
-    // levágása + egyszerűsítés → új OBJ. `{"rotation":[…],"cutY":0.02,"cell":0.004}`
-    AsyncFunction("processMesh") { (inputPath: String, outputPath: String, optionsJson: String?) -> [String: Any] in
-      let look = Remix3DRender.Look.parse(optionsJson)
-      var opts: [String: Any] = [:]
-      if let j = optionsJson, let d = j.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
-        opts = o
+    // levágása + egyszerűsítés → új fájl a kimenet kiterjesztése szerinti (tárolási)
+    // formátumban. `{"rotation":[…],"cutY":0.02,"cell":0.004}`
+    AsyncFunction("processMesh") { (inputPath: String, outputPath: String, optionsJson: String?, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let look = Remix3DRender.Look.parse(optionsJson)
+          var opts: [String: Any] = [:]
+          if let j = optionsJson, let d = j.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+            opts = o
+          }
+          var mesh = Remix3DRender.collectMesh(MDLAsset(url: try fileURL(inputPath)))
+          if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
+          if let cut = opts["cutY"] as? Double { mesh = Remix3DRender.cutBelow(mesh, minY: Float(cut)) }
+          if let cell = opts["cell"] as? Double, cell > 0 { mesh = Remix3DRender.simplified(mesh, cell: Float(cell)) }
+          guard mesh.triangleCount > 0 else { throw Remix3DError.failed("emptyMesh") }
+          let out = try fileURL(outputPath)
+          let model = ModelData(parts: [ModelPart(name: "scan", positions: mesh.positions, indices: mesh.indices)])
+          let written = try Remix3DRender.write(model, format: out.pathExtension.lowercased(), to: out)
+          var info = model.info
+          info["uri"] = written.absoluteString
+          promise.resolve(info)
+        } catch let e as Remix3DError {
+          promise.reject(e)
+        } catch {
+          promise.reject(Remix3DError.failed(error.localizedDescription))
+        }
       }
-      var mesh = Remix3DRender.collectMesh(MDLAsset(url: try fileURL(inputPath)))
-      if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
-      if let cut = opts["cutY"] as? Double { mesh = Remix3DRender.cutBelow(mesh, minY: Float(cut)) }
-      if let cell = opts["cell"] as? Double, cell > 0 { mesh = Remix3DRender.simplified(mesh, cell: Float(cell)) }
-      guard mesh.triangleCount > 0 else { throw Remix3DError.failed("emptyMesh") }
-      let out = try fileURL(outputPath)
-      try Remix3DRender.writeOBJ(mesh, to: out)
-      var info = Remix3DRender.info(mesh)
-      info["uri"] = out.absoluteString
-      return info
     }
 
     AsyncFunction("cancelRender") { () -> Bool in
@@ -237,7 +218,11 @@ public class Remix3DModule: Module {
 
     // ── háló-statisztika (háromszögszám + befoglaló doboz, méterben) ─────────
     AsyncFunction("inspectModel") { (modelPath: String) -> [String: Any] in
-      let asset = MDLAsset(url: try fileURL(modelPath))
+      let url = try fileURL(modelPath)
+      if url.pathExtension.lowercased() == "glb" {
+        return try Remix3DFormats.load(url).info
+      }
+      let asset = MDLAsset(url: url)
       // a fotogrammetria USDZ-je a hálókat egy Xform ALÁ teszi → a felső szint üres lenne
       // (ezért mentett a doc 0 háromszöget); a teljes hierarchiát bejárjuk
       var triangles = 0
@@ -522,85 +507,65 @@ enum Remix3DRender {
   // ── ☁️ pontfelhő: színes PLY írása / beolvasása (SceneKit pont-geometria) ──────────
 
   static func writePointPLY(points: [SIMD3<Float>], colors: [SIMD3<UInt8>], to url: URL) throws {
-    var data = Data()
-    let header = "ply\nformat binary_little_endian 1.0\ncomment ReMix 3D pointcloud\nelement vertex \(points.count)\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n"
-    data.append(header.data(using: .ascii)!)
-    data.reserveCapacity(header.count + points.count * 15)
-    for (i, p) in points.enumerated() {
-      for c in [p.x, p.y, p.z] {
-        var le = c.bitPattern.littleEndian
-        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
-      }
-      let col = i < colors.count ? colors[i] : SIMD3<UInt8>(200, 200, 200)
-      data.append(contentsOf: [col.x, col.y, col.z])
-    }
-    try? FileManager.default.removeItem(at: url)
-    try data.write(to: url)
+    try Remix3DFormats.writePointPLY(points: points, colors: colors, to: url)
   }
 
-  /// a SAJÁT (lap nélküli, binary_little_endian, x y z [+ r g b]) PLY-pontfelhő beolvasása;
-  /// más PLY (pl. háló lapokkal) → nil (a hívó a ModelIO-s betöltést használja)
-  static func readPointPLY(_ url: URL) -> (points: [SIMD3<Float>], colors: [SIMD3<UInt8>])? {
-    guard let data = try? Data(contentsOf: url),
-          let end = data.range(of: "end_header\n".data(using: .ascii)!) else { return nil }
-    guard let header = String(data: data.subdata(in: 0..<end.lowerBound), encoding: .ascii),
-          header.contains("binary_little_endian"), !header.contains("element face") else { return nil }
-    var count = 0
-    for line in header.split(separator: "\n") where line.hasPrefix("element vertex") {
-      count = Int(line.split(separator: " ").last ?? "0") ?? 0
-    }
-    let hasColor = header.contains("property uchar red")
-    let stride = 12 + (hasColor ? 3 : 0)
-    let body = end.upperBound
-    guard count > 0, data.count >= body + count * stride else { return nil }
-    var pts = [SIMD3<Float>](); pts.reserveCapacity(count)
-    var cols = [SIMD3<UInt8>](); cols.reserveCapacity(count)
-    data.withUnsafeBytes { raw in
-      for i in 0..<count {
-        let o = body + i * stride
-        let x = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o, as: UInt32.self).littleEndian)
-        let y = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o + 4, as: UInt32.self).littleEndian)
-        let z = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o + 8, as: UInt32.self).littleEndian)
-        pts.append(SIMD3<Float>(x, y, z))
-        if hasColor {
-          cols.append(SIMD3<UInt8>(raw[o + 12], raw[o + 13], raw[o + 14]))
-        }
-      }
-    }
-    return (pts, cols)
-  }
-
-  /// modell-fájl → jelenet: a saját pontfelhő-PLY pont-geometriaként, minden más SceneKit/ModelIO-val
+  /// modell-fájl → jelenet: a saját formák (GLB, pontfelhő-/színes PLY) a `ModelData`-n át,
+  /// minden más (USDZ, OBJ, STL) SceneKit/ModelIO-val
   static func loadScene(_ url: URL) throws -> SCNScene {
-    if url.pathExtension.lowercased() == "ply", let (pts, cols) = readPointPLY(url) {
-      let scene = SCNScene()
-      let vertices = SCNGeometrySource(vertices: pts.map { SCNVector3($0.x, $0.y, $0.z) })
-      var sources = [vertices]
-      if !cols.isEmpty {
-        let rgba = cols.map { SIMD4<Float>(Float($0.x) / 255, Float($0.y) / 255, Float($0.z) / 255, 1) }
-        let colorData = rgba.withUnsafeBufferPointer { Data(buffer: $0) }
-        sources.append(SCNGeometrySource(
-          data: colorData,
-          semantic: .color,
-          vectorCount: rgba.count,
-          usesFloatComponents: true,
-          componentsPerVector: 4,
-          bytesPerComponent: MemoryLayout<Float>.size,
-          dataOffset: 0,
-          dataStride: MemoryLayout<SIMD4<Float>>.stride
-        ))
-      }
-      let indices = (0..<UInt32(pts.count)).map { $0 }
-      let element = SCNGeometryElement(indices: indices, primitiveType: .point)
-      element.pointSize = 0.006
-      element.minimumPointScreenSpaceRadius = 1.5
-      element.maximumPointScreenSpaceRadius = 6
-      let geometry = SCNGeometry(sources: sources, elements: [element])
-      geometry.firstMaterial?.lightingModel = .constant
-      scene.rootNode.addChildNode(SCNNode(geometry: geometry))
-      return scene
+    let ext = url.pathExtension.lowercased()
+    if ext == "glb" || ext == "ply" {
+      return Remix3DFormats.scene(try Remix3DFormats.load(url))
     }
     return try SCNScene(url: url, options: nil)
+  }
+
+  /// 📦 kivitel / átalakítás (lásd `exportModel`)
+  static func export(input: URL, output: URL, optionsJson: String?) throws -> URL {
+    var o = ExportOptions.parse(optionsJson)
+    let inExt = input.pathExtension.lowercased()
+    var fmt = o.format
+    if optionsJson?.contains("\"format\"") != true { fmt = output.pathExtension.lowercased(); o.format = fmt }
+    // a glTF és a USD egysége szabvány szerint a méter → itt nincs skálázás
+    if ["glb", "usdz", "usd", "usdc", "usda"].contains(fmt) { o.scale = 1 }
+    try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+    // 1) változatlan tartalom ugyanabban a formátumban → másolat (veszteségmentes)
+    if fmt == inExt && o.keepsContent && !o.hasRotation && o.scale == 1 {
+      try? FileManager.default.removeItem(at: output)
+      try FileManager.default.copyItem(at: input, to: output)
+      return output
+    }
+    // 2) USDZ → USDZ csak forgatással: a csomópont-transzformba kerül (anyagok érintetlenek)
+    if fmt == "usdz" && inExt == "usdz" && o.keepsContent {
+      let scene = try loadScene(input)
+      var look = Look()
+      look.rotation = o.rotation
+      wrapContent(scene, look: look)
+      try? FileManager.default.removeItem(at: output)
+      guard scene.write(to: output, options: nil, delegate: nil, progressHandler: nil) else {
+        throw Remix3DError.failed("usdzWrite")
+      }
+      return output
+    }
+    // 3) minden más: semleges forma → opciók → saját író
+    let model = Remix3DFormats.apply(try Remix3DFormats.load(input), o)
+    return try write(model, format: fmt, to: output, options: o)
+  }
+
+  /// formátum szerinti írás (USD-családnál SceneKit/ModelIO, máshol a saját írók)
+  @discardableResult
+  static func write(_ model: ModelData, format: String, to url: URL, options: ExportOptions = ExportOptions()) throws -> URL {
+    var o = options
+    o.format = format
+    if ["usdz", "usd", "usdc", "usda"].contains(format) {
+      let tmp = url.deletingLastPathComponent().appendingPathComponent(".tmp_\(UUID().uuidString).\(format)")
+      defer { try? FileManager.default.removeItem(at: tmp) }
+      try Remix3DFormats.writeUSD(model, ext: format, to: tmp)
+      try? FileManager.default.removeItem(at: url)
+      try FileManager.default.moveItem(at: tmp, to: url)
+      return url
+    }
+    return try Remix3DFormats.write(model, options: o, to: url)
   }
 
   // ── 🔺 háló-adat: minden háromszög világ-koordinátában (a csomópont-transzformokkal) ──
@@ -719,74 +684,6 @@ enum Remix3DRender {
       t += 3
     }
     return out
-  }
-
-  // ── ✍️ írók (textúra nélküli hálók — a nyers / feldolgozott szkenhez és az exporthoz) ──
-
-  static func writeOBJ(_ m: MeshData, to url: URL) throws {
-    var text = "# ReMix 3D\n"
-    text.reserveCapacity(m.positions.count * 32 + m.indices.count * 8)
-    for p in m.positions {
-      text += "v \(p.x) \(p.y) \(p.z)\n"
-    }
-    var t = 0
-    while t + 2 < m.indices.count {
-      text += "f \(m.indices[t] + 1) \(m.indices[t + 1] + 1) \(m.indices[t + 2] + 1)\n"
-      t += 3
-    }
-    try? FileManager.default.removeItem(at: url)
-    try text.write(to: url, atomically: true, encoding: .utf8)
-  }
-
-  static func writePLY(_ m: MeshData, to url: URL) throws {
-    var data = Data()
-    let header = "ply\nformat binary_little_endian 1.0\ncomment ReMix 3D\nelement vertex \(m.positions.count)\nproperty float x\nproperty float y\nproperty float z\nelement face \(m.triangleCount)\nproperty list uchar int vertex_indices\nend_header\n"
-    data.append(header.data(using: .ascii)!)
-    for p in m.positions {
-      for c in [p.x, p.y, p.z] {
-        var le = c.bitPattern.littleEndian
-        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
-      }
-    }
-    var t = 0
-    while t + 2 < m.indices.count {
-      data.append(3)
-      for k in 0..<3 {
-        var le = Int32(m.indices[t + k]).littleEndian
-        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
-      }
-      t += 3
-    }
-    try? FileManager.default.removeItem(at: url)
-    try data.write(to: url)
-  }
-
-  /// 🖨️ bináris STL, `scale`-lel (1000 → mm — a szeletelők mm-t várnak)
-  static func writeSTL(_ m: MeshData, to url: URL, scale: Float) throws {
-    guard m.triangleCount > 0 else { throw Remix3DError.failed("emptyMesh") }
-    var data = Data(count: 80)
-    var count = UInt32(m.triangleCount).littleEndian
-    withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
-    func put(_ v: SIMD3<Float>) {
-      for c in [v.x, v.y, v.z] {
-        var le = c.bitPattern.littleEndian
-        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
-      }
-    }
-    var t = 0
-    while t + 2 < m.indices.count {
-      let a = m.positions[Int(m.indices[t])] * scale
-      let b = m.positions[Int(m.indices[t + 1])] * scale
-      let c = m.positions[Int(m.indices[t + 2])] * scale
-      let n = simd_cross(b - a, c - a)
-      let len = simd_length(n)
-      put(len > 0 ? n / len : .zero)
-      put(a); put(b); put(c)
-      data.append(contentsOf: [0, 0])
-      t += 3
-    }
-    try? FileManager.default.removeItem(at: url)
-    try data.write(to: url)
   }
 
   /// `{triangles, min, max}` — a JS ugyanazt a formát kapja, mint az `inspectModel`-nél

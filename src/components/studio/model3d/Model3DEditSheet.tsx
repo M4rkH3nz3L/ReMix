@@ -8,7 +8,8 @@ import { palette } from '@/constants/editor';
 import { formatLength } from '@/lib/model3d';
 import { setEnvironment } from '@/lib/model3dDoc';
 import { cutRange, modelRotation, resetRotation, rotate90, type RotationAxis, type SimplifyLevel } from '@/lib/model3dLook';
-import type { Model3DDoc, Model3DEnvironmentPreset, Model3DMesh } from '@/types/model3d';
+import { DEFAULT_STORAGE_FORMAT, STORAGE_FORMATS, storedFormatFor } from '@/lib/model3dExport';
+import type { MeshFormat, Model3DDoc, Model3DEnvironmentPreset, Model3DMesh } from '@/types/model3d';
 
 const PRESETS: Model3DEnvironmentPreset[] = ['studio', 'outdoor', 'night'];
 const AXES: RotationAxis[] = ['x', 'y', 'z'];
@@ -30,7 +31,10 @@ export function Model3DEditSheet({
   onCutPreview,
   onProcess,
   onBackground,
+  onStorageFormat,
 }: {
+  /** 🗄️ a tárolási formátum váltása (a jelenlegi modell átalakításával) */
+  onStorageFormat: (format: MeshFormat) => Promise<void>;
   /** a háttér körbeléptetése (sötét / világos / átlátszó …) */
   onBackground: () => void;
   visible: boolean;
@@ -120,6 +124,25 @@ export function Model3DEditSheet({
           ) : (
             <Text style={styles.hint}>{t('model3d.viewer.editOnlyMesh')}</Text>
           )}
+
+          <Text style={styles.section}>{t('model3d.storage.title')}</Text>
+          <Text style={styles.hint}>
+            {t('model3d.storage.current', { format: mesh.format.toUpperCase() })}
+          </Text>
+          <View style={styles.row}>
+            {STORAGE_FORMATS.filter((f) => storedFormatFor(f, { textured: mesh.textured, points: !!mesh.points }) === f).map((f) => (
+              <Chip
+                key={f}
+                label={f.toUpperCase()}
+                active={(doc.storageFormat ?? DEFAULT_STORAGE_FORMAT) === f}
+                onPress={() => {
+                  if (busy) return;
+                  setBusy(true);
+                  void onStorageFormat(f).finally(() => setBusy(false));
+                }}
+              />
+            ))}
+          </View>
 
           {busy ? (
             <View style={styles.busy}>

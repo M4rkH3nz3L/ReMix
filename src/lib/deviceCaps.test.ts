@@ -12,6 +12,7 @@ const LIDAR = {
   supportsObjectCapture: true,
   supportsRoomPlan: true,
   supportsSceneReconstruction: true,
+  usdExport: false,
 };
 
 afterEach(() => setDevice3DCaps(null));

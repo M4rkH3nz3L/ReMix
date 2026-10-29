@@ -22,6 +22,7 @@ import { createEmptyProject } from '@/lib/projectUtils';
 import { floorPlanImageDoc } from '@/lib/roomFloorPlan';
 import { roomStats, summarizeRoom } from '@/lib/roomPlanSummary';
 import { saveProject } from '@/lib/storage';
+import { storedFormatFor } from '@/lib/model3dExport';
 import { currentModel, model3dAsset } from '@/lib/model3dMedia';
 import { goBackOrHome } from '@/lib/nav';
 import {
@@ -40,7 +41,8 @@ import {
   type WireframeMode,
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
-import type { CaptureMode, Model3DCapture, Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
+import type { CaptureMode, MeshFormat, Model3DCapture, Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
+import type { Asset } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /** létezik-e a helyi fájl (pl. a poszter — újratelepítés / törlés után hiányozhat) */
@@ -122,6 +124,38 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     device: Device.modelName ?? '',
     startedAt: scanStartedAt.current,
   });
+  /**
+   * 🗄️ A friss szken a projekt választott TÁROLÁSI formátumába (USDZ / GLB / OBJ / PLY —
+   * `storedFormatFor` a fajta szerint, adatvesztés nélkül). Ha az átalakítás nem sikerül,
+   * a szkenner natív fájlja marad (a szken SOSEM vész el) — és ezt őszintén jelezzük.
+   */
+  const toStorageFormat = async (
+    uri: string,
+    native: MeshFormat,
+    assetId: string,
+    kind: { textured: boolean; points: boolean }
+  ): Promise<{ uri: string; format: MeshFormat; asset: Asset }> => {
+    const name = project?.name ?? '';
+    const asAsset = (format: MeshFormat) =>
+      model3dAsset({ assetId, format, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name, textured: kind.textured });
+    const want = storedFormatFor(useEditorStore.getState().project?.model3d?.storageFormat ?? doc?.storageFormat, kind);
+    if (want === native || !Remix3D) {
+      return { uri, format: native, asset: asAsset(native) };
+    }
+    const target = asAsset(want);
+    try {
+      const out = await Remix3D.exportModel(uri, target.uri, JSON.stringify({ format: want }));
+      try {
+        new File(uri).delete();
+      } catch {
+        // a régi (natív) fájlt a mappa-takarítás is viszi
+      }
+      return { uri: out, format: want, asset: target };
+    } catch {
+      Alert.alert(t('model3d.title'), t('model3d.storage.convertFailed', { format: want.toUpperCase(), fallback: native.toUpperCase() }));
+      return { uri, format: native, asset: asAsset(native) };
+    }
+  };
   const captureRef = useRef<CaptureViewHandle>(null);
   // ⏱️ ha a kamera nem tud tájékozódni (sötét, takart, mozdulatlan), az „inicializálás"
   // nem ér véget — néhány mp után érthető útmutatás a pörgő jelző helyett (élő teszt)
@@ -212,13 +246,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       if (useEditorStore.getState().project?.id !== projectId) {
         return;
       }
-      const info = await Remix3D.inspectModel(res.uri).catch(() => null);
+      const stored = await toStorageFormat(res.uri, 'usdz', assetId, { textured: false, points: false });
+      const info = await Remix3D.inspectModel(stored.uri).catch(() => null);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 4, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 4, false, lookOptionsJson(undefined)).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
-        format: 'usdz',
+        format: stored.format,
         triangles: info?.triangles ?? 0,
         bounds: info ? { min: info.min, max: info.max } : { min: res.min, max: res.max },
         textured: false,
@@ -227,7 +262,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
       useEditorStore.getState().applyBatch(
         [
-          { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          { type: 'ADD_ASSET', asset: { ...stored.asset, uri: stored.uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
           {
             type: 'SET_MODEL3D_DOC',
@@ -277,14 +312,15 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         if (useEditorStore.getState().project?.id !== projectId) {
           return;
         }
+        const stored = await toStorageFormat(res.uri, 'ply', assetId, { textured: false, points: true });
         const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-        const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
-        const m: Model3DMesh = { id: makeId('mesh'), assetId, format: 'ply', triangles: 0, points: res.points, bounds: { min: res.min, max: res.max }, textured: false };
+        const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+        const m: Model3DMesh = { id: makeId('mesh'), assetId, format: stored.format, triangles: 0, points: res.points, bounds: { min: res.min, max: res.max }, textured: false };
         const base: Model3DDoc = doc ?? createModel3DDoc();
         const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
         useEditorStore.getState().applyBatch(
           [
-            { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+            { type: 'ADD_ASSET', asset: { ...stored.asset, uri: stored.uri } },
             ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
             { type: 'SET_MODEL3D_DOC', doc: { ...next, capture: captureMeta('pointcloud'), poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
           ],
@@ -317,12 +353,13 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       if (useEditorStore.getState().project?.id !== projectId) {
         return;
       }
+      const stored = await toStorageFormat(res.uri, format, assetId, { textured: false, points: false });
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
-        format,
+        format: stored.format,
         triangles: res.triangles,
         bounds: { min: res.min, max: res.max },
         textured: false,
@@ -332,7 +369,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
       useEditorStore.getState().applyBatch(
         [
-          { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          { type: 'ADD_ASSET', asset: { ...stored.asset, uri: stored.uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
           { type: 'SET_MODEL3D_DOC', doc: { ...next, capture: captureMeta('freeform'), poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
         ],
@@ -389,13 +426,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       if (useEditorStore.getState().project?.id !== projectId) {
         return;
       }
-      const info = await Remix3D.inspectModel(uri);
+      const stored = await toStorageFormat(uri, 'usdz', assetId, { textured: true, points: false });
+      const info = await Remix3D.inspectModel(stored.uri);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
-        format: 'usdz',
+        format: stored.format,
         triangles: info.triangles,
         bounds: { min: info.min, max: info.max },
         textured: true,
@@ -405,7 +443,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
       useEditorStore.getState().applyBatch(
         [
-          { type: 'ADD_ASSET', asset: { ...target, uri } },
+          { type: 'ADD_ASSET', asset: { ...stored.asset, uri: stored.uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
           { type: 'SET_MODEL3D_DOC', doc: { ...next, poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
         ],
@@ -454,7 +492,9 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     }
     const q = modelRotation(doc);
     const assetId = makeId('ast');
-    const target = model3dAsset({ assetId, format: 'obj', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
+    // az új háló is a projekt tárolási formátumában készül (textúra nélküli háló → bármelyik)
+    const format = storedFormatFor(doc.storageFormat, { textured: false, points: false });
+    const target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
     try {
       const res = await Remix3D.processMesh(
         asset.uri,
@@ -470,7 +510,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       }
       const latest = useEditorStore.getState().project?.model3d ?? doc;
       const baked = bakeProcessedMesh(latest, mesh, q);
-      const m: Model3DMesh = { id: makeId('mesh'), assetId, format: 'obj', triangles: res.triangles, bounds: { min: res.min, max: res.max }, textured: false };
+      const m: Model3DMesh = { id: makeId('mesh'), assetId, format, triangles: res.triangles, bounds: { min: res.min, max: res.max }, textured: false };
       const { doc: next, removedAssetIds } = replaceModel(latest, m, project.name);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
       const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(next)).catch(() => null);
@@ -490,6 +530,50 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       Alert.alert(t('model3d.viewer.edit'), t('model3d.viewer.editDone', { tris: res.triangles.toLocaleString() }));
     } catch (e) {
       Alert.alert(t('model3d.viewer.edit'), t(remix3dErrorKey(e)));
+    }
+  };
+
+  /**
+   * 🗄️ Tárolási formátum váltása: a beállítás (a következő szkenekre) + a JELENLEGI modell
+   * átalakítása új fájlba (a régi asset kikerül — egy undo-lépés). Az átalakítás hibája
+   * semmit nem módosít (a meglévő fájl marad).
+   */
+  const changeStorageFormat = async (pref: MeshFormat) => {
+    if (!project || !doc || !mesh || !asset) {
+      return;
+    }
+    const want = storedFormatFor(pref, { textured: mesh.textured, points: !!mesh.points });
+    if (want === mesh.format || !Remix3D) {
+      useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...doc, storageFormat: pref }, label: t('model3d.storage.title') }, 'user');
+      return;
+    }
+    const assetId = makeId('ast');
+    const target = model3dAsset({ assetId, format: want, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: mesh.textured });
+    try {
+      const uri = await Remix3D.exportModel(asset.uri, target.uri, JSON.stringify({ format: want }));
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
+      const latest = useEditorStore.getState().project?.model3d ?? doc;
+      useEditorStore.getState().applyBatch(
+        [
+          { type: 'ADD_ASSET', asset: { ...target, uri } },
+          { type: 'REMOVE_ASSET', assetId: asset.id },
+          {
+            type: 'SET_MODEL3D_DOC',
+            doc: {
+              ...latest,
+              storageFormat: pref,
+              meshes: latest.meshes.map((m) => (m.id === mesh.id ? { ...m, assetId, format: want } : m)),
+            },
+            label: t('model3d.storage.title'),
+          },
+        ],
+        'user'
+      );
+      haptics.success();
+    } catch (e) {
+      Alert.alert(t('model3d.storage.title'), t(remix3dErrorKey(e)));
     }
   };
 
@@ -689,6 +773,15 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       </View>
       {phase === 'viewer' ? (
         <View style={styles.headerActions}>
+          {/* ⚙️ projekt-beállítások: mappa, ReMix Storage-szinkron, borító */}
+          <Pressable
+            onPress={() => router.push(`/collab/${projectId}`)}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('model3d.viewer.projectSettings')}
+          >
+            <Ionicons name="settings-outline" size={22} color={palette.text} />
+          </Pressable>
           <Pressable
             onPress={() => useEditorStore.getState().undo()}
             disabled={!canUndo}
@@ -973,21 +1066,25 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           onCutPreview={setCutPreviewY}
           onProcess={applyProcess}
           onBackground={cycleBackground}
+          onStorageFormat={changeStorageFormat}
         />
       ) : null}
-      <Model3DExportSheet
-        visible={exportOpen}
-        onClose={() => setExportOpen(false)}
-        modelUri={asset.uri}
-        mesh={mesh}
-        projectName={project?.name ?? 'model'}
-        background={bg}
-        optionsJson={lookOptionsJson(doc)}
-        onCurrentView={async () => {
-          if (!viewRef.current) throw new Error('model3d.error.unsupported');
-          return viewRef.current.snapshot(new File(Paths.cache, `m3d_view_${makeId('img')}.png`).uri, 1440, 1440, true);
-        }}
-      />
+      {project && doc ? (
+        <Model3DExportSheet
+          visible={exportOpen}
+          onClose={() => setExportOpen(false)}
+          modelUri={asset.uri}
+          mesh={mesh}
+          project={project}
+          doc={doc}
+          background={bg}
+          lookJson={lookOptionsJson(doc)}
+          onCurrentView={async () => {
+            if (!viewRef.current) throw new Error('model3d.error.unsupported');
+            return viewRef.current.snapshot(new File(Paths.cache, `m3d_view_${makeId('img')}.png`).uri, 1440, 1440, true);
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

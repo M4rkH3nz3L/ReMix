@@ -8,12 +8,16 @@ export interface Remix3DNative {
     supportsSceneReconstruction: boolean;
     supportsObjectCapture: boolean;
     supportsRoomPlan: boolean;
+    usdExport?: boolean;
   }>;
   reconstruct(imagesDir: string, outputPath: string, quality: 'preview' | 'medium' | 'full'): Promise<string>;
   cancelReconstruct(): Promise<boolean>;
-  /** `optionsJson`: a stúdió megjelenése (`{"rotation":[x,y,z,w]}`) — a fájl azt adja, amit a néző */
+  /**
+   * 📦 kivitel / tárolási átalakítás (háttérszálon). `optionsJson`: forgatás + formátum, egység,
+   * minőség, textúra (`exportOptionsJson`). → a TÉNYLEGES uri (OBJ textúrával → .zip)
+   */
   exportModel(inputPath: string, outputPath: string, optionsJson?: string | null): Promise<string>;
-  /** ✂️ forgatás beégetése + padló levágása + egyszerűsítés → új OBJ (textúra nélküli hálóhoz) */
+  /** ✂️ forgatás beégetése + padló levágása + egyszerűsítés → új fájl a kimenet kiterjesztése szerint (textúra nélküli hálóhoz) */
   processMesh(
     inputPath: string,
     outputPath: string,

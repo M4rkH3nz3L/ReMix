@@ -23,6 +23,9 @@ export function supportedSourceKinds(kind: ProjectKind | undefined): SourceKind[
       return ['image'];
     case 'audio':
       return ['audio'];
+    case 'model3d':
+      // 🧊 a 3D-modell CSAK az eszközön, LiDAR-ral készül — kívülről semmi nem importálható
+      return [];
     case 'video':
     default:
       // a videó-idővonal mindhárom médiát használja (kép/hang/videó)

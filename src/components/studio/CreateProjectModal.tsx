@@ -373,40 +373,44 @@ export function CreateProjectModal(props: {
               </>
             ) : null}
 
-            {/* 🗂️ FORRÁS-MAPPA — minden fajtánál: a támogatott fájlok importja már itt */}
-            <Text style={styles.fieldLabel}>{t('home.sourceLabel')}</Text>
-            <Text style={styles.seoHint}>{t('home.sourceHint')}</Text>
-            <View style={styles.aspectRow}>
-              {supportedSourceKinds(kind).map((sk) => (
-                <Pressable key={sk} style={styles.sourceBtn} onPress={() => addSource(sk)}>
-                  <Ionicons name="add" size={14} color={palette.accent} />
-                  <Text style={styles.sourceBtnText}>{t(`studio.kind.${sk}`)}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {sources.length > 0 ? (
-              <View style={styles.sourceList}>
-                {sources.map((a) => (
-                  <View key={a.id} style={styles.sourceItem}>
-                    <Ionicons
-                      name={a.kind === 'video' ? 'videocam' : a.kind === 'audio' ? 'musical-notes' : 'image'}
-                      size={14}
-                      color={palette.textDim}
-                    />
-                    <Text style={styles.sourceItemName} numberOfLines={1}>
-                      {a.name}
-                    </Text>
-                    <Pressable
-                      onPress={() => removeSource(a.id)}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('common.delete')}
-                    >
-                      <Ionicons name="close" size={16} color={palette.textDim} />
+            {/* 🗂️ FORRÁS-MAPPA — a támogatott fájlok importja már itt (a 3D-nél nincs: csak LiDAR-szken) */}
+            {supportedSourceKinds(kind).length > 0 ? (
+              <>
+                <Text style={styles.fieldLabel}>{t('home.sourceLabel')}</Text>
+                <Text style={styles.seoHint}>{t('home.sourceHint')}</Text>
+                <View style={styles.aspectRow}>
+                  {supportedSourceKinds(kind).map((sk) => (
+                    <Pressable key={sk} style={styles.sourceBtn} onPress={() => addSource(sk)}>
+                      <Ionicons name="add" size={14} color={palette.accent} />
+                      <Text style={styles.sourceBtnText}>{t(`studio.kind.${sk}`)}</Text>
                     </Pressable>
+                  ))}
+                </View>
+                {sources.length > 0 ? (
+                  <View style={styles.sourceList}>
+                    {sources.map((a) => (
+                      <View key={a.id} style={styles.sourceItem}>
+                        <Ionicons
+                          name={a.kind === 'video' ? 'videocam' : a.kind === 'audio' ? 'musical-notes' : 'image'}
+                          size={14}
+                          color={palette.textDim}
+                        />
+                        <Text style={styles.sourceItemName} numberOfLines={1}>
+                          {a.name}
+                        </Text>
+                        <Pressable
+                          onPress={() => removeSource(a.id)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('common.delete')}
+                        >
+                          <Ionicons name="close" size={16} color={palette.textDim} />
+                        </Pressable>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                ) : null}
+              </>
             ) : null}
           </ScrollView>
           <PrimaryButton

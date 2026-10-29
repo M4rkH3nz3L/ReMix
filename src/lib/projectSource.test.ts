@@ -8,6 +8,10 @@ describe('supportedSourceKinds', () => {
     expect(supportedSourceKinds('video')).toEqual(['video', 'image', 'audio']);
     expect(supportedSourceKinds(undefined)).toEqual(['video', 'image', 'audio']);
   });
+
+  it('a 3D-projektbe semmi nem importálható (csak LiDAR-szkennel készül)', () => {
+    expect(supportedSourceKinds('model3d')).toEqual([]);
+  });
 });
 
 describe('assetFromPicked', () => {

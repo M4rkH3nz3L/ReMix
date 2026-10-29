@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,8 +10,12 @@ import { logProjectActivity } from '@/lib/chat';
 import { backupProjectToCloud } from '@/lib/cloudSync';
 import { applyCommand } from '@/lib/commands';
 import { FPS_OPTIONS } from '@/lib/frames';
+import { makeId } from '@/lib/id';
+import { pickImage } from '@/lib/media';
+import { activeProjectFolder, setActiveProjectFolder } from '@/lib/projectFolderClient';
 import { saveProject } from '@/lib/storage';
-import type { AspectRatio, Project } from '@/types/project';
+import { useEditorStore } from '@/store/editorStore';
+import type { AspectRatio, Asset, Project } from '@/types/project';
 
 /**
  * ⚙️ Projekt-beállítások (tulaj): MINDEN, amit a létrehozásnál megadott,
@@ -38,6 +43,60 @@ export function ProjectMetaSection({
   const [seoHashtags, setSeoHashtags] = useState((project.seo?.hashtags ?? []).join(' '));
   const [seoKeywords, setSeoKeywords] = useState((project.seo?.keywords ?? []).join(', '));
   const [busy, setBusy] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const coverAsset = project.coverAssetId ? project.assets.find((a) => a.id === project.coverAssetId) : undefined;
+  const isAudio = (project.kind ?? 'video') === 'audio';
+
+  /**
+   * 🖼️ Borítókép (hangnál album-borító) — AZONNAL mentődik. Ha a projekt épp nyitva van
+   * a szerkesztőben, a parancs a store-on megy (visszavonható, és a szerkesztő nem írja
+   * felül visszatéréskor); különben a pure reducerrel, mint a többi beállítás.
+   */
+  const applyCover = async (asset: Asset | null) => {
+    const store = useEditorStore.getState();
+    let next: Project | null;
+    if (store.project?.id === project.id) {
+      next = store.dispatch({ type: 'SET_PROJECT_COVER', asset }, 'user') ? useEditorStore.getState().project : null;
+    } else {
+      next = applyCommand(project, { type: 'SET_PROJECT_COVER', asset });
+    }
+    if (!next) {
+      return;
+    }
+    await saveProject(next);
+    await backupProjectToCloud(next).catch(() => {});
+    void logProjectActivity(ownerId, next.id, `🖼️ ${t(asset ? 'lib.commands.setCover' : 'lib.commands.clearCover')}`);
+    onSaved(next);
+  };
+
+  const pickCover = async () => {
+    setCoverBusy(true);
+    const prevFolder = activeProjectFolder();
+    try {
+      // a pickImage az AKTÍV projekt-mappába másol → a borító a projekt SAJÁT mappájába kerül
+      setActiveProjectFolder(project.folder);
+      const picked = await pickImage();
+      if (picked) {
+        await applyCover({ id: makeId('ast'), kind: 'image', uri: picked.uri, provider: 'local', name: 'cover' });
+      }
+    } catch (e) {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setActiveProjectFolder(prevFolder);
+      setCoverBusy(false);
+    }
+  };
+
+  const removeCover = async () => {
+    setCoverBusy(true);
+    try {
+      await applyCover(null);
+    } catch (e) {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setCoverBusy(false);
+    }
+  };
 
   const dirty =
     name !== project.name ||
@@ -90,6 +149,36 @@ export function ProjectMetaSection({
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t('collab.settings.title')}</Text>
+      {/* 🖼️ borítókép / album-borító — a projekt előnézeti képe a listában */}
+      <Text style={styles.label}>{t(isAudio ? 'collab.settings.coverAudio' : 'collab.settings.cover')}</Text>
+      <View style={styles.coverRow}>
+        {coverAsset ? (
+          <Image source={{ uri: coverAsset.uri }} style={styles.cover} contentFit="cover" />
+        ) : (
+          <View style={[styles.cover, styles.coverEmpty]} />
+        )}
+        <View style={styles.coverActions}>
+          <Text style={styles.hint}>{t('collab.settings.coverHint')}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t(coverAsset ? 'collab.settings.coverChange' : 'collab.settings.coverPick')}
+              active={false}
+              onPress={() => {
+                if (!coverBusy) void pickCover();
+              }}
+            />
+            {coverAsset ? (
+              <Chip
+                label={t('collab.settings.coverRemove')}
+                active={false}
+                onPress={() => {
+                  if (!coverBusy) void removeCover();
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+      </View>
       <Text style={styles.label}>{t('collab.settings.name')}</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} />
       <Text style={styles.label}>{t('collab.settings.aspect')}</Text>
@@ -169,4 +258,9 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 64, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  coverRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  cover: { width: 72, height: 72, borderRadius: 12, backgroundColor: palette.surfaceHigh },
+  coverEmpty: { borderWidth: 1, borderColor: palette.border, borderStyle: 'dashed' },
+  coverActions: { flex: 1, gap: 8 },
+  hint: { color: palette.textDim, fontSize: 12, lineHeight: 17 },
 });

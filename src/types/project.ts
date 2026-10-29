@@ -1674,6 +1674,11 @@ export interface Project {
   folder?: string;
   /** ☁️ a projekt-mappa egyirányú szinkronja a ReMix Storage-ba (projekt-beállítás) */
   syncToRemix?: boolean;
+  /**
+   * 🖼️ a felhasználó által választott BORÍTÓKÉP (hangnál: album-borító) — egy `kind:'image'`
+   * asset id-ja a `assets`-ben. A projekt előnézeti képe ez (ha van), minden fajtánál.
+   */
+  coverAssetId?: string;
   createdAt: string;
   updatedAt: string;
   /** 1: assets nélkül · 2: asset-registry · 3: sáv-bővítés · 4: kulcskockák ·

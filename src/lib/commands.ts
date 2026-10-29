@@ -39,6 +39,8 @@ export type EditorCommand =
   | { type: 'RENAME_PROJECT'; name: string }
   /** ☁️ a projekt-mappa ReMix Storage-szinkronjának be/ki kapcsolása (projekt-beállítás) */
   | { type: 'SET_PROJECT_SYNC'; enabled: boolean }
+  /** 🖼️ a projekt borítóképe / album-borítója (null → eltávolítás; a kép-asset regisztrálódik) */
+  | { type: 'SET_PROJECT_COVER'; asset: Asset | null }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
   | { type: 'REMOVE_ASSET'; assetId: string }
@@ -246,6 +248,24 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, syncToRemix: cmd.enabled };
+    }
+
+    case 'SET_PROJECT_COVER': {
+      if (!cmd.asset) {
+        if (!project.coverAssetId) {
+          return null;
+        }
+        // a régi borító-asset kikerül (más nem hivatkozik rá), a fájlt a média-GC takarítja
+        const oldId = project.coverAssetId;
+        const { coverAssetId: _removed, ...rest } = project;
+        return { ...rest, assets: project.assets.filter((a) => a.id !== oldId) };
+      }
+      if (cmd.asset.kind !== 'image' || project.coverAssetId === cmd.asset.id) {
+        return null;
+      }
+      const prevId = project.coverAssetId;
+      const assets = project.assets.filter((a) => a.id !== prevId && a.id !== cmd.asset!.id);
+      return { ...project, coverAssetId: cmd.asset.id, assets: [...assets, cmd.asset] };
     }
 
     case 'SET_PARTICLES': {
@@ -515,6 +535,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.renameProject', { name: cmd.name });
     case 'SET_PROJECT_SYNC':
       return tr(cmd.enabled ? 'lib.commands.projectSyncOn' : 'lib.commands.projectSyncOff');
+    case 'SET_PROJECT_COVER':
+      return tr(cmd.asset ? 'lib.commands.setCover' : 'lib.commands.clearCover');
     case 'SET_PARTICLES':
       return cmd.particles
         ? tr('lib.commands.setParticles', {

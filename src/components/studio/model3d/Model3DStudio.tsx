@@ -64,6 +64,8 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   // 🩹 a néző nem tudta betölteni a modellfájlt (hiányzik / sérült) → ne üres vászon legyen
   const [loadFailedUri, setLoadFailedUri] = useState<string | null>(null);
   const loadFailed = !!asset && loadFailedUri === asset.uri;
+  // 🖼️ poszter-pótlás: a régebbi / sikertelen-poszteres modellnek is legyen előnézeti képe
+  const posterTried = useRef<string | null>(null);
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
@@ -472,7 +474,22 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           background={bg}
           autoRotate={autoRotate}
           wireframe={wireframe}
-          onLoad={() => setLoadFailedUri(null)}
+          onLoad={() => {
+            setLoadFailedUri(null);
+            // nincs poszter → egyszer (modellenként) elkészítjük a lista előnézeti képét
+            if (doc && !doc.poster && Remix3D && posterTried.current !== asset.uri) {
+              posterTried.current = asset.uri;
+              const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster.png`;
+              Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false)
+                .then((poster) => {
+                  const latest = useEditorStore.getState().project?.model3d;
+                  if (poster && latest && !latest.poster) {
+                    useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, poster } }, 'system');
+                  }
+                })
+                .catch(() => {});
+            }
+          }}
           onError={() => setLoadFailedUri(asset.uri)}
         />
         {loadFailed ? (

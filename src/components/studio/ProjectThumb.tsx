@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { ALL_PROJECT_KINDS, PROJECT_KINDS } from '@/lib/projectKinds';
+import { projectPreviewSource } from '@/lib/projectPreview';
 import { loadProject } from '@/lib/storage';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import type { ProjectKind } from '@/types/project';
@@ -15,8 +16,9 @@ const KIND_ICON = Object.fromEntries(
   ALL_PROJECT_KINDS.map((k) => [k, PROJECT_KINDS[k].icon as keyof typeof Ionicons.glyphMap])
 ) as Record<ProjectKind, keyof typeof Ionicons.glyphMap>;
 
-/** projekt-bélyegkép a lista-sorokhoz (videónál az első klip kockája, cache-elve;
- *  kép/hang projektnél a fajta-ikon — nincs videó-bélyegkép, amit kirakni) */
+/** projekt-bélyegkép a lista-sorokhoz (cache-elve) — MINDEN fajtánál a közös
+ *  `projectPreviewSource`: a választott borító (hangnál album-borító), különben a fajta
+ *  saját képe (3D-poszter, kép-lap, videó-kocka). Kép híján a fajta-ikon. */
 const thumbCache = new Map<string, string | null>();
 
 export function ProjectThumb({
@@ -32,29 +34,20 @@ export function ProjectThumb({
   const cacheKey = `${id}@${version}`;
   const [uri, setUri] = useState<string | null>(thumbCache.get(cacheKey) ?? null);
   useEffect(() => {
-    // videónál a filmstrip első kockája, képnél az első fotó-réteg; hangnál ikon
-    if (kind === 'audio' || thumbCache.has(cacheKey)) {
+    if (thumbCache.has(cacheKey)) {
       return;
     }
     let alive = true;
     loadProject(id)
       .then(async (p) => {
-        if (kind === 'model3d') {
-          // 🧊 a szken után készült poszter-kép (a modell egy nézetből renderelve)
-          return p?.model3d?.poster ?? null;
-        }
-        if (kind === 'image') {
-          // 🖼️ kép-projekt: az első lap első fotó-rétege (élő teszt H1 — eddig csak ikon)
-          const photo = p?.imageDocs?.[0]?.layers.find((l) => l.kind === 'photo');
-          return photo && photo.kind === 'photo' ? photo.uri : null;
-        }
-        const clip = p?.tracks
-          .find((t) => t.type === 'video')
-          ?.clips.find((c) => c.kind === 'video');
-        if (!clip || clip.kind !== 'video') {
+        const source = p ? projectPreviewSource(p) : null;
+        if (!source) {
           return null;
         }
-        const [thumb] = await getFilmstrip(clip.uri, [snapThumbTime(clip.trimIn + 0.5)]);
+        if (source.type === 'image') {
+          return source.uri;
+        }
+        const [thumb] = await getFilmstrip(source.uri, [snapThumbTime(source.time)]);
         return thumb;
       })
       .then((thumb) => {
@@ -68,7 +61,7 @@ export function ProjectThumb({
       alive = false;
     };
   }, [id, kind, cacheKey]);
-  if (kind !== 'audio' && uri) {
+  if (uri) {
     return <Image source={{ uri }} style={styles.cardThumb} contentFit="cover" />;
   }
   return (

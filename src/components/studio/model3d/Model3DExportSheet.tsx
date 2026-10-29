@@ -150,7 +150,7 @@ export function Model3DExportSheet({
             </View>
           ) : null}
           <Text style={styles.section}>{t('model3d.export.fileTitle')}</Text>
-          {LOCAL_FORMATS.map((f) => (
+          {(mesh.points ? (['ply'] as MeshFormat[]) : LOCAL_FORMATS).map((f) => (
             <Row key={f} busy={busy} progress={progress} cancelLabel={t('common.cancel')} k={f} icon="cube-outline" title={f.toUpperCase()} sub={t(EXPORT_FORMATS[f].useKey)} onPress={() => file(f)} />
           ))}
           <Text style={styles.hint}>{t('model3d.export.videoHint')}</Text>

@@ -3560,7 +3560,21 @@
       "roomDesc": "Room with walls, openings and floor plan",
       "soon": "Coming soon",
       "freeform": "Free scan — live mesh",
-      "freeformDesc": "Room, furniture, larger objects — the mesh builds live on screen"
+      "freeformDesc": "Room, furniture, larger objects — the mesh builds live on screen",
+      "pointcloud": "Point cloud",
+      "pointcloudDesc": "Detailed LiDAR capture of colored points — for professional use (PLY)"
+    },
+    "room": {
+      "title": "Room scan",
+      "hint": "Walk slowly around the room — walls, doors, windows and furniture appear live.",
+      "done": "Done",
+      "saving": "Processing the room…",
+      "area": "Floor area",
+      "walls": "Walls",
+      "ceiling": "Ceiling height",
+      "counts": "{{doors}} doors · {{windows}} windows · {{objects}} furniture",
+      "floorPlan": "Floor plan to Image Studio",
+      "floorPlanFail": "No floor plan can be made for this room."
     },
     "empty": {
       "title": "Scan an object",
@@ -3691,7 +3705,8 @@
       "dark": "Not enough light — turn on a lamp",
       "triangles": "{{count}} triangles",
       "done": "Done",
-      "saving": "Saving mesh…"
+      "saving": "Saving mesh…",
+      "points": "{{count}} points"
     }
   },
   "time": {

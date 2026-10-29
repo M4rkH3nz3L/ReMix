@@ -133,7 +133,7 @@ public class Remix3DModule: Module {
         switch ext {
         case "usdz":
           // a forgatás a csomópont-transzformba kerül; a textúrák/anyagok megmaradnak
-          let scene = try SCNScene(url: input, options: nil)
+          let scene = try Remix3DRender.loadScene(input)
           Remix3DRender.wrapContent(scene, look: look)
           guard scene.write(to: output, options: nil, delegate: nil, progressHandler: nil) else {
             throw Remix3DError.failed("usdzWrite")
@@ -171,7 +171,7 @@ public class Remix3DModule: Module {
 
     // ── pillanatkép egy fájlból (bélyegkép / „Kép a modellből" fix kamerával) ─
     AsyncFunction("snapshotFile") { (modelPath: String, outputPath: String, width: Int, height: Int, yaw: Double, pitch: Double, transparent: Bool, optionsJson: String?) -> String in
-      let scene = try SCNScene(url: try fileURL(modelPath), options: nil)
+      let scene = try Remix3DRender.loadScene(try fileURL(modelPath))
       let look = Remix3DRender.Look.parse(optionsJson)
       Remix3DRender.wrapContent(scene, look: look)
       Remix3DRender.addLights(to: scene, look: look)
@@ -350,7 +350,7 @@ enum Remix3DRender {
     let rate = max(1, min(fps, 60))
     let frames = max(1, Int((seconds * Double(rate)).rounded()))
     guard let device = MTLCreateSystemDefaultDevice() else { throw Remix3DError.unsupported("metal") }
-    let scene = try SCNScene(url: modelURL, options: nil)
+    let scene = try loadScene(modelURL)
     scene.background.contents = color(hex: background) ?? UIColor(red: 0.067, green: 0.078, blue: 0.125, alpha: 1)
     let renderer = SCNRenderer(device: device, options: nil)
     renderer.scene = scene
@@ -516,6 +516,91 @@ enum Remix3DRender {
     }
     scene.rootNode.addChildNode(rig)
     return rig
+  }
+
+
+  // ── ☁️ pontfelhő: színes PLY írása / beolvasása (SceneKit pont-geometria) ──────────
+
+  static func writePointPLY(points: [SIMD3<Float>], colors: [SIMD3<UInt8>], to url: URL) throws {
+    var data = Data()
+    let header = "ply\nformat binary_little_endian 1.0\ncomment ReMix 3D pointcloud\nelement vertex \(points.count)\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n"
+    data.append(header.data(using: .ascii)!)
+    data.reserveCapacity(header.count + points.count * 15)
+    for (i, p) in points.enumerated() {
+      for c in [p.x, p.y, p.z] {
+        var le = c.bitPattern.littleEndian
+        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+      }
+      let col = i < colors.count ? colors[i] : SIMD3<UInt8>(200, 200, 200)
+      data.append(contentsOf: [col.x, col.y, col.z])
+    }
+    try? FileManager.default.removeItem(at: url)
+    try data.write(to: url)
+  }
+
+  /// a SAJÁT (lap nélküli, binary_little_endian, x y z [+ r g b]) PLY-pontfelhő beolvasása;
+  /// más PLY (pl. háló lapokkal) → nil (a hívó a ModelIO-s betöltést használja)
+  static func readPointPLY(_ url: URL) -> (points: [SIMD3<Float>], colors: [SIMD3<UInt8>])? {
+    guard let data = try? Data(contentsOf: url),
+          let end = data.range(of: "end_header\n".data(using: .ascii)!) else { return nil }
+    guard let header = String(data: data.subdata(in: 0..<end.lowerBound), encoding: .ascii),
+          header.contains("binary_little_endian"), !header.contains("element face") else { return nil }
+    var count = 0
+    for line in header.split(separator: "\n") where line.hasPrefix("element vertex") {
+      count = Int(line.split(separator: " ").last ?? "0") ?? 0
+    }
+    let hasColor = header.contains("property uchar red")
+    let stride = 12 + (hasColor ? 3 : 0)
+    let body = end.upperBound
+    guard count > 0, data.count >= body + count * stride else { return nil }
+    var pts = [SIMD3<Float>](); pts.reserveCapacity(count)
+    var cols = [SIMD3<UInt8>](); cols.reserveCapacity(count)
+    data.withUnsafeBytes { raw in
+      for i in 0..<count {
+        let o = body + i * stride
+        let x = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o, as: UInt32.self).littleEndian)
+        let y = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o + 4, as: UInt32.self).littleEndian)
+        let z = Float(bitPattern: raw.loadUnaligned(fromByteOffset: o + 8, as: UInt32.self).littleEndian)
+        pts.append(SIMD3<Float>(x, y, z))
+        if hasColor {
+          cols.append(SIMD3<UInt8>(raw[o + 12], raw[o + 13], raw[o + 14]))
+        }
+      }
+    }
+    return (pts, cols)
+  }
+
+  /// modell-fájl → jelenet: a saját pontfelhő-PLY pont-geometriaként, minden más SceneKit/ModelIO-val
+  static func loadScene(_ url: URL) throws -> SCNScene {
+    if url.pathExtension.lowercased() == "ply", let (pts, cols) = readPointPLY(url) {
+      let scene = SCNScene()
+      let vertices = SCNGeometrySource(vertices: pts.map { SCNVector3($0.x, $0.y, $0.z) })
+      var sources = [vertices]
+      if !cols.isEmpty {
+        let rgba = cols.map { SIMD4<Float>(Float($0.x) / 255, Float($0.y) / 255, Float($0.z) / 255, 1) }
+        let colorData = rgba.withUnsafeBufferPointer { Data(buffer: $0) }
+        sources.append(SCNGeometrySource(
+          data: colorData,
+          semantic: .color,
+          vectorCount: rgba.count,
+          usesFloatComponents: true,
+          componentsPerVector: 4,
+          bytesPerComponent: MemoryLayout<Float>.size,
+          dataOffset: 0,
+          dataStride: MemoryLayout<SIMD4<Float>>.stride
+        ))
+      }
+      let indices = (0..<UInt32(pts.count)).map { $0 }
+      let element = SCNGeometryElement(indices: indices, primitiveType: .point)
+      element.pointSize = 0.006
+      element.minimumPointScreenSpaceRadius = 1.5
+      element.maximumPointScreenSpaceRadius = 6
+      let geometry = SCNGeometry(sources: sources, elements: [element])
+      geometry.firstMaterial?.lightingModel = .constant
+      scene.rootNode.addChildNode(SCNNode(geometry: geometry))
+      return scene
+    }
+    return try SCNScene(url: url, options: nil)
   }
 
   // ── 🔺 háló-adat: minden háromszög világ-koordinátában (a csomópont-transzformokkal) ──

@@ -24,6 +24,8 @@ export interface CaptureViewHandle {
 }
 
 export interface MeshScanStateEvent {
+  /** ☁️ pontfelhő-módban a gyűjtött pontok száma */
+  points?: number;
   tracking: 'normal' | 'notAvailable' | 'excessiveMotion' | 'insufficientFeatures' | 'initializing' | 'relocalizing' | 'limited';
   triangles: number;
   /** ARKit környezeti fény (lumen-szerű, ~1000 = normál beltér) */
@@ -31,7 +33,15 @@ export interface MeshScanStateEvent {
 }
 
 export interface MeshScanHandle {
-  start(): Promise<void>;
+  /** `mode`: 'mesh' (alap) | 'points' (színes pontfelhő is gyűlik) */
+  start(mode?: 'mesh' | 'points'): Promise<void>;
+  /** ☁️ a gyűjtött színes pontfelhő → PLY */
+  exportPoints(outputPath: string): Promise<{
+    uri: string;
+    points: number;
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }>;
   pause(): Promise<void>;
   exportMesh(outputPath: string): Promise<{
     uri: string;
@@ -39,6 +49,23 @@ export interface MeshScanHandle {
     min: { x: number; y: number; z: number };
     max: { x: number; y: number; z: number };
   }>;
+}
+
+/** 🏠 szoba-szken (RoomPlan) állapota */
+export interface RoomStateEvent {
+  state: 'scanning' | 'processing' | 'done';
+}
+
+export interface RoomScanHandle {
+  start(): Promise<void>;
+  /** leállítás → feldolgozás → parametrikus USDZ + a `RawRoom` összegzés */
+  finish(outputPath: string): Promise<{
+    uri: string;
+    room: import('@/lib/roomPlanSummary').RawRoom;
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }>;
+  cancel(): Promise<void>;
 }
 
 /** a kész háló megjelenítése: nincs / a felületen / csak a háló */
@@ -111,6 +138,14 @@ export const Remix3DCaptureView = optionalView<CaptureViewProps>('Remix3DCapture
 export const Remix3DMeshScanView = optionalView<MeshScanViewProps>('Remix3DMeshScanView');
 
 export const Remix3DModelView = optionalView<ModelViewProps>('Remix3DModelView');
+
+type RoomScanViewProps = ViewProps & {
+  ref?: Ref<RoomScanHandle>;
+  onRoomState?: (e: { nativeEvent: RoomStateEvent }) => void;
+};
+
+/** 🏠 RoomPlan szoba-szken nézet (régebbi natív buildben nincs → null) */
+export const Remix3DRoomScanView = optionalView<RoomScanViewProps>('Remix3DRoomScanView');
 
 /**
  * A natív hiba-üzenet (`unsupported:x` / `badInput:x` / `failed:x` / `cancelled`)

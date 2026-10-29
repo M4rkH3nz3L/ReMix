@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Device from 'expo-device';
 import { Directory, File, Paths } from 'expo-file-system';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,7 +17,11 @@ import { makeId } from '@/lib/id';
 import { boundsSize, formatLength } from '@/lib/model3d';
 import { addMeasurement, createModel3DDoc, removeMeasurement, replaceModel, setEnvironment } from '@/lib/model3dDoc';
 import { bakeProcessedMesh, lookOptionsJson, modelRotation, simplifyCell, type SimplifyLevel } from '@/lib/model3dLook';
-import { measurementValue } from '@/lib/model3dMeasure';
+import { formatArea, measurementValue } from '@/lib/model3dMeasure';
+import { createEmptyProject } from '@/lib/projectUtils';
+import { floorPlanImageDoc } from '@/lib/roomFloorPlan';
+import { roomStats, summarizeRoom } from '@/lib/roomPlanSummary';
+import { saveProject } from '@/lib/storage';
 import { currentModel, model3dAsset } from '@/lib/model3dMedia';
 import { goBackOrHome } from '@/lib/nav';
 import {
@@ -23,16 +29,18 @@ import {
   Remix3DCaptureView,
   Remix3DModelView,
   Remix3DMeshScanView,
+  Remix3DRoomScanView,
   remix3dErrorKey,
   type CaptureStateEvent,
   type CaptureViewHandle,
   type MeshScanHandle,
   type MeshScanStateEvent,
   type ModelViewHandle,
+  type RoomScanHandle,
   type WireframeMode,
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
-import type { Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
+import type { CaptureMode, Model3DCapture, Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /** létezik-e a helyi fájl (pl. a poszter — újratelepítés / törlés után hiányozhat) */
@@ -44,7 +52,7 @@ function fileExists(uri: string): boolean {
   }
 }
 
-type Phase = 'empty' | 'capturing' | 'meshScanning' | 'reconstructing' | 'viewer';
+type Phase = 'empty' | 'capturing' | 'meshScanning' | 'roomScanning' | 'reconstructing' | 'viewer';
 
 /** a háló-megjelenítés ciklusa a nézőben */
 const WIREFRAME_CYCLE: WireframeMode[] = ['off', 'overlay', 'only'];
@@ -101,6 +109,19 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const [scanState, setScanState] = useState<MeshScanStateEvent>({ tracking: 'initializing', triangles: 0, light: 1000 });
   const [savingMesh, setSavingMesh] = useState(false);
   const meshRef = useRef<MeshScanHandle>(null);
+  const roomRef = useRef<RoomScanHandle>(null);
+  // ☁️ a hálós szkenner módja: élő háló ('mesh') vagy színes pontfelhő ('points')
+  const [scanMode, setScanMode] = useState<'mesh' | 'points'>('mesh');
+  const [roomBusy, setRoomBusy] = useState(false);
+  const scanStartedAt = useRef<string>(new Date().toISOString());
+  /** a rögzítés metaadata (mód, eszköz, kezdés) — a projekt-dokumentumba kerül */
+  const captureMeta = (mode: CaptureMode): Model3DCapture => ({
+    mode,
+    quality: 'medium',
+    status: 'ready',
+    device: Device.modelName ?? '',
+    startedAt: scanStartedAt.current,
+  });
   const captureRef = useRef<CaptureViewHandle>(null);
   // ⏱️ ha a kamera nem tud tájékozódni (sötét, takart, mozdulatlan), az „inicializálás"
   // nem ér véget — néhány mp után érthető útmutatás a pörgő jelző helyett (élő teszt)
@@ -146,15 +167,100 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   useBackLayer(
     phase === 'capturing' ? confirmCancel : phase === 'reconstructing' ? () => void Remix3D?.cancelReconstruct() : null
   );
+  // 🏠 szoba-szken közben a vissza megszakít (feldolgozás közben nem)
+  useBackLayer(phase === 'roomScanning' && !roomBusy ? () => cancelRoomScan() : null);
 
   // ── 🕸️ szabad szken: élő LiDAR-háló a kameraképen ─────────────────────────
-  const startMeshScan = () => {
+  const startMeshScan = (mode: 'mesh' | 'points') => {
     setPicking(false);
-    setScanState({ tracking: 'initializing', triangles: 0, light: 1000 });
+    setScanMode(mode);
+    scanStartedAt.current = new Date().toISOString();
+    setScanState({ tracking: 'initializing', triangles: 0, light: 1000, points: 0 });
     setPhase('meshScanning');
     requestAnimationFrame(() => {
-      void meshRef.current?.start().catch((e) => Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))));
+      void meshRef.current?.start(mode).catch((e) => Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))));
     });
+  };
+
+  // ── 🏠 szoba-szken (RoomPlan): falak, nyílások, bútorok élőben ─────────────
+  const startRoomScan = () => {
+    setPicking(false);
+    scanStartedAt.current = new Date().toISOString();
+    setPhase('roomScanning');
+    requestAnimationFrame(() => {
+      void roomRef.current?.start().catch((e) => {
+        Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
+        setPhase(asset ? 'viewer' : 'empty');
+      });
+    });
+  };
+
+  const cancelRoomScan = () => {
+    void roomRef.current?.cancel();
+    setPhase(asset ? 'viewer' : 'empty');
+  };
+
+  const finishRoomScan = async () => {
+    if (!project || !roomRef.current || roomBusy || !Remix3D) {
+      return;
+    }
+    setRoomBusy(true);
+    const assetId = makeId('ast');
+    const target = model3dAsset({ assetId, format: 'usdz', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
+    try {
+      const res = await roomRef.current.finish(target.uri);
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
+      const info = await Remix3D.inspectModel(res.uri).catch(() => null);
+      const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
+      const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 4, false, lookOptionsJson(undefined)).catch(() => null);
+      const m: Model3DMesh = {
+        id: makeId('mesh'),
+        assetId,
+        format: 'usdz',
+        triangles: info?.triangles ?? 0,
+        bounds: info ? { min: info.min, max: info.max } : { min: res.min, max: res.max },
+        textured: false,
+      };
+      const base: Model3DDoc = doc ?? createModel3DDoc();
+      const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
+      useEditorStore.getState().applyBatch(
+        [
+          { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
+          {
+            type: 'SET_MODEL3D_DOC',
+            doc: { ...next, capture: { ...captureMeta('room'), room: summarizeRoom(res.room) }, poster: poster ?? undefined },
+            label: t('model3d.reconstruct.done'),
+          },
+        ],
+        'user'
+      );
+      haptics.success();
+      setPhase('viewer');
+    } catch (e) {
+      Alert.alert(t('model3d.room.title'), t(remix3dErrorKey(e)));
+    } finally {
+      setRoomBusy(false);
+    }
+  };
+
+  /** 🏠→🖼️ az alaprajz SZERKESZTHETŐ kép-projektként (falhosszakkal, alapterülettel) */
+  const exportFloorPlan = async () => {
+    const room = doc?.capture?.room;
+    if (!room || !project) {
+      return;
+    }
+    const planDoc = floorPlanImageDoc(room, project.name, `${t('model3d.room.area')}: ${formatArea(room.floorArea)}`, () => makeId('lyr'));
+    if (!planDoc) {
+      Alert.alert(t('model3d.room.title'), t('model3d.room.floorPlanFail'));
+      return;
+    }
+    const base = createEmptyProject(`${project.name} — ${t('model3d.room.area')}`, '1:1', undefined, 'image');
+    const imageProject = { ...base, imageDocs: [planDoc] };
+    await saveProject(imageProject);
+    router.push(`/studio/image/${imageProject.id}`);
   };
 
   const finishMeshScan = async () => {
@@ -163,6 +269,36 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     }
     setSavingMesh(true);
     const assetId = makeId('ast');
+    if (scanMode === 'points') {
+      try {
+        const target = model3dAsset({ assetId, format: 'ply', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
+        const res = await meshRef.current.exportPoints(target.uri);
+        void meshRef.current.pause();
+        if (useEditorStore.getState().project?.id !== projectId) {
+          return;
+        }
+        const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
+        const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+        const m: Model3DMesh = { id: makeId('mesh'), assetId, format: 'ply', triangles: 0, points: res.points, bounds: { min: res.min, max: res.max }, textured: false };
+        const base: Model3DDoc = doc ?? createModel3DDoc();
+        const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
+        useEditorStore.getState().applyBatch(
+          [
+            { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+            ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
+            { type: 'SET_MODEL3D_DOC', doc: { ...next, capture: captureMeta('pointcloud'), poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
+          ],
+          'user'
+        );
+        haptics.success();
+        setPhase('viewer');
+      } catch (e) {
+        Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
+      } finally {
+        setSavingMesh(false);
+      }
+      return;
+    }
     try {
       // USDZ, ha a ModelIO ezen az eszközön tud ilyet írni; különben OBJ (textúra nélkül egy fájl)
       let format: 'usdz' | 'obj' = 'usdz';
@@ -198,7 +334,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         [
           { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
           ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
-          { type: 'SET_MODEL3D_DOC', doc: { ...next, poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
+          { type: 'SET_MODEL3D_DOC', doc: { ...next, capture: captureMeta('freeform'), poster: poster ?? undefined }, label: t('model3d.reconstruct.done') },
         ],
         'user'
       );
@@ -398,6 +534,35 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   }
 
   // ── 🕸️ SZABAD SZKEN (Focus: élő háló a kameraképen) ─────────────────────────
+  if (phase === 'roomScanning' && Remix3DRoomScanView) {
+    const RoomView = Remix3DRoomScanView;
+    return (
+      <View style={styles.fill}>
+        <RoomView ref={roomRef} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={styles.fill} pointerEvents="box-none" edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.capTop} pointerEvents="box-none">
+            <Pressable onPress={cancelRoomScan} hitSlop={10} style={styles.capBtn} accessibilityRole="button" accessibilityLabel={t('model3d.capture.cancel')}>
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+          </View>
+          <View style={styles.fill} pointerEvents="none" />
+          <View style={styles.capBottom}>
+            <Text style={styles.capHint} accessibilityLiveRegion="polite">
+              {roomBusy ? t('model3d.room.saving') : t('model3d.room.hint')}
+            </Text>
+            {roomBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Pressable onPress={() => void finishRoomScan()} style={styles.capPrimary} accessibilityRole="button">
+                <Text style={styles.capPrimaryText}>{t('model3d.room.done')}</Text>
+              </Pressable>
+            )}
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   if (phase === 'meshScanning' && Remix3DMeshScanView) {
     const MeshView = Remix3DMeshScanView;
     const dark = scanState.light < DARK_LIGHT;
@@ -421,7 +586,11 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
             </Pressable>
             <View style={styles.fill} />
             <View style={styles.meshCount}>
-              <Text style={styles.meshCountText}>{t('model3d.mesh.triangles', { count: scanState.triangles })}</Text>
+              <Text style={styles.meshCountText}>
+                {scanMode === 'points'
+                  ? t('model3d.mesh.points', { count: scanState.points ?? 0 })
+                  : t('model3d.mesh.triangles', { count: scanState.triangles })}
+              </Text>
             </View>
           </View>
           <View style={styles.fill} pointerEvents="none" />
@@ -434,8 +603,8 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
             ) : (
               <Pressable
                 onPress={() => void finishMeshScan()}
-                disabled={scanState.triangles === 0}
-                style={[styles.capPrimary, scanState.triangles === 0 ? styles.disabled : null]}
+                disabled={scanMode === 'points' ? !scanState.points : scanState.triangles === 0}
+                style={[styles.capPrimary, (scanMode === 'points' ? !scanState.points : scanState.triangles === 0) ? styles.disabled : null]}
                 accessibilityRole="button"
               >
                 <Text style={styles.capPrimaryText}>{t('model3d.mesh.done')}</Text>
@@ -577,11 +746,31 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           <Text style={styles.bigText}>{t('model3d.empty.title')}</Text>
           <Text style={[styles.dim, styles.centerText]}>{t('model3d.empty.body')}</Text>
           {modes.includes('freeform') && Remix3DMeshScanView ? (
-            <Pressable onPress={startMeshScan} style={styles.modeCard} accessibilityRole="button">
+            <Pressable onPress={() => startMeshScan('mesh')} style={styles.modeCard} accessibilityRole="button">
               <Ionicons name="grid-outline" size={26} color={palette.accent} />
               <View style={styles.fill}>
                 <Text style={styles.modeTitle}>{t('model3d.mode.freeform')}</Text>
                 <Text style={styles.dim}>{t('model3d.mode.freeformDesc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
+            </Pressable>
+          ) : null}
+          {modes.includes('room') && Remix3DRoomScanView ? (
+            <Pressable onPress={startRoomScan} style={styles.modeCard} accessibilityRole="button">
+              <Ionicons name="home-outline" size={26} color={palette.accent} />
+              <View style={styles.fill}>
+                <Text style={styles.modeTitle}>{t('model3d.mode.room')}</Text>
+                <Text style={styles.dim}>{t('model3d.mode.roomDesc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
+            </Pressable>
+          ) : null}
+          {modes.includes('pointcloud') && Remix3DMeshScanView ? (
+            <Pressable onPress={() => startMeshScan('points')} style={styles.modeCard} accessibilityRole="button">
+              <Ionicons name="sparkles-outline" size={26} color={palette.accent} />
+              <View style={styles.fill}>
+                <Text style={styles.modeTitle}>{t('model3d.mode.pointcloud')}</Text>
+                <Text style={styles.dim}>{t('model3d.mode.pointcloudDesc')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
             </Pressable>
@@ -690,7 +879,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       </View>
       <Text style={[styles.dim, styles.centerText, styles.stats]}>
         {t('model3d.viewer.stats', {
-          tris: mesh.triangles.toLocaleString(),
+          tris: mesh.points ? t('model3d.mesh.points', { count: mesh.points }) : mesh.triangles.toLocaleString(),
           size: `${formatLength(size.x)} × ${formatLength(size.y)} × ${formatLength(size.z)}`,
         })}
       </Text>
@@ -725,6 +914,23 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
               );
             })}
           </View>
+        </View>
+      ) : doc?.capture?.room ? (
+        <View style={styles.measurePanel}>
+          <Text style={[styles.roomLine, styles.centerText]}>
+            {`${t('model3d.room.area')}: ${formatArea(doc.capture.room.floorArea)} · ${t('model3d.room.walls')}: ${formatLength(roomStats(doc.capture.room).wallLength, 'm')} · ${t('model3d.room.ceiling')}: ${formatLength(roomStats(doc.capture.room).ceilingHeight, 'm')}`}
+          </Text>
+          <Text style={[styles.dim, styles.centerText]}>
+            {t('model3d.room.counts', {
+              doors: doc.capture.room.openings.filter((o) => o.kind === 'door').length,
+              windows: doc.capture.room.openings.filter((o) => o.kind === 'window').length,
+              objects: doc.capture.room.objects.length,
+            })}
+          </Text>
+          <Pressable onPress={() => void exportFloorPlan()} style={styles.measureChip} accessibilityRole="button">
+            <Ionicons name="map-outline" size={16} color={palette.accent} />
+            <Text style={styles.measureText}>{t('model3d.room.floorPlan')}</Text>
+          </Pressable>
         </View>
       ) : (
         <Text style={[styles.dim, styles.centerText]}>{t('model3d.viewer.hint')}</Text>
@@ -846,6 +1052,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surfaceHigh,
   },
   measureText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  roomLine: { color: palette.text, fontSize: 13, fontWeight: '600', lineHeight: 19 },
   toolLabel: { color: palette.text, fontSize: 11, fontWeight: '600' },
   capTop: { flexDirection: 'row', alignItems: 'center', padding: 12 },
   meshCount: { paddingHorizontal: 12, height: 32, justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)' },

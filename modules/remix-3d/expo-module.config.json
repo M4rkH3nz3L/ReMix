@@ -1,6 +1,14 @@
 {
-  "platforms": ["apple"],
+  "platforms": [
+    "apple"
+  ],
   "apple": {
-    "modules": ["Remix3DModule", "Remix3DModelViewModule", "Remix3DCaptureViewModule", "Remix3DMeshScanViewModule"]
+    "modules": [
+      "Remix3DModule",
+      "Remix3DModelViewModule",
+      "Remix3DCaptureViewModule",
+      "Remix3DMeshScanViewModule",
+      "Remix3DRoomScanViewModule"
+    ]
   }
 }

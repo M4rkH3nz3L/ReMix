@@ -48,7 +48,8 @@ export function Model3DEditSheet({
   const [busy, setBusy] = useState(false);
   const range = cutRange(mesh.bounds, modelRotation(doc));
   const [cutY, setCutY] = useState(range.min + (range.max - range.min) * 0.1);
-  const meshEditable = !mesh.textured;
+  // ✂️/🔻 csak a nyers hálós szkennél (textúrás tárgynál, pontfelhőnél, parametrikus szobánál nem)
+  const meshEditable = !mesh.textured && !mesh.points && doc.capture?.mode !== 'room';
 
   // a lap megnyitásakor a vágósík látszik (csak hálós szkennél), bezáráskor eltűnik
   useEffect(() => {

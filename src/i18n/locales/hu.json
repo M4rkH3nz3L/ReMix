@@ -3560,7 +3560,21 @@
       "roomDesc": "Szoba falakkal, nyílásokkal, alaprajzzal",
       "soon": "Hamarosan",
       "freeform": "Szabad szken — élő hálóval",
-      "freeformDesc": "Tér, bútor, nagyobb tárgy — a háló élőben épül a képen"
+      "freeformDesc": "Tér, bútor, nagyobb tárgy — a háló élőben épül a képen",
+      "pointcloud": "Pontfelhő",
+      "pointcloudDesc": "Színes pontokból álló, részletes LiDAR-felvétel — szakmai felhasználásra (PLY)"
+    },
+    "room": {
+      "title": "Szoba-szken",
+      "hint": "Járd körbe lassan a szobát — a falak, ajtók, ablakok és bútorok élőben jelennek meg.",
+      "done": "Kész",
+      "saving": "A szoba feldolgozása…",
+      "area": "Alapterület",
+      "walls": "Falak",
+      "ceiling": "Belmagasság",
+      "counts": "{{doors}} ajtó · {{windows}} ablak · {{objects}} bútor",
+      "floorPlan": "Alaprajz a Kép Stúdióba",
+      "floorPlanFail": "Ehhez a szobához nem készíthető alaprajz."
     },
     "empty": {
       "title": "Szkennelj egy tárgyat",
@@ -3691,7 +3705,8 @@
       "dark": "Kevés a fény — kapcsolj fel lámpát",
       "triangles": "{{count}} háromszög",
       "done": "Kész",
-      "saving": "Háló mentése…"
+      "saving": "Háló mentése…",
+      "points": "{{count}} pont"
     }
   },
   "time": {

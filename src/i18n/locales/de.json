@@ -3530,7 +3530,21 @@
       "roomDesc": "Raum mit Wänden, Öffnungen und Grundriss",
       "soon": "Demnächst",
       "freeform": "Freier Scan — Live-Netz",
-      "freeformDesc": "Raum, Möbel, größere Objekte — das Netz entsteht live im Bild"
+      "freeformDesc": "Raum, Möbel, größere Objekte — das Netz entsteht live im Bild",
+      "pointcloud": "Punktwolke",
+      "pointcloudDesc": "Detaillierte LiDAR-Aufnahme aus farbigen Punkten — für den Profi-Einsatz (PLY)"
+    },
+    "room": {
+      "title": "Raum-Scan",
+      "hint": "Geh langsam durch den Raum — Wände, Türen, Fenster und Möbel erscheinen live.",
+      "done": "Fertig",
+      "saving": "Raum wird verarbeitet…",
+      "area": "Grundfläche",
+      "walls": "Wände",
+      "ceiling": "Raumhöhe",
+      "counts": "{{doors}} Türen · {{windows}} Fenster · {{objects}} Möbel",
+      "floorPlan": "Grundriss ins Bild-Studio",
+      "floorPlanFail": "Für diesen Raum kann kein Grundriss erstellt werden."
     },
     "empty": {
       "title": "Scanne ein Objekt",
@@ -3661,7 +3675,8 @@
       "dark": "Zu wenig Licht — schalte eine Lampe ein",
       "triangles": "{{count}} Dreiecke",
       "done": "Fertig",
-      "saving": "Netz wird gespeichert…"
+      "saving": "Netz wird gespeichert…",
+      "points": "{{count}} Punkte"
     }
   },
   "time": {

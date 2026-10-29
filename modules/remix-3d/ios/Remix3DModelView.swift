@@ -162,7 +162,7 @@ final class Remix3DModelView: ExpoView {
       return
     }
     do {
-      let scene = try SCNScene(url: url, options: nil)
+      let scene = try Remix3DRender.loadScene(url)
       // a modell a közös tartalom-csomópontba (forgatás a doboz közepe körül — ugyanúgy,
       // mint az állóképnél / videónál / exportnál), az fölé egy forgatható „asztal"
       let (contentNode, center, radius) = Remix3DRender.wrapContent(scene, look: look)

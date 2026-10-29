@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Model3DEditSheet } from '@/components/studio/model3d/Model3DEditSheet';
 import { Model3DExportSheet } from '@/components/studio/model3d/Model3DExportSheet';
 import { palette } from '@/constants/editor';
 import { haptics } from '@/design';
@@ -12,7 +13,9 @@ import { useBackLayer } from '@/hooks/useBackLayer';
 import { availableCaptureModes } from '@/lib/deviceCaps';
 import { makeId } from '@/lib/id';
 import { boundsSize, formatLength } from '@/lib/model3d';
-import { createModel3DDoc, replaceModel, setEnvironment } from '@/lib/model3dDoc';
+import { addMeasurement, createModel3DDoc, removeMeasurement, replaceModel, setEnvironment } from '@/lib/model3dDoc';
+import { bakeProcessedMesh, lookOptionsJson, modelRotation, simplifyCell, type SimplifyLevel } from '@/lib/model3dLook';
+import { measurementValue } from '@/lib/model3dMeasure';
 import { currentModel, model3dAsset } from '@/lib/model3dMedia';
 import { goBackOrHome } from '@/lib/nav';
 import {
@@ -29,7 +32,7 @@ import {
   type WireframeMode,
 } from '@/lib/remix3dNative';
 import { useEditorStore } from '@/store/editorStore';
-import type { Model3DDoc, Model3DMesh } from '@/types/model3d';
+import type { Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 
 /** létezik-e a helyi fájl (pl. a poszter — újratelepítés / törlés után hiányozhat) */
@@ -77,6 +80,14 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   // 🖼️ poszter-pótlás: a régebbi / sikertelen-poszteres modellnek is legyen előnézeti képe
   const posterTried = useRef<string | null>(null);
   const viewRef = useRef<ModelViewHandle>(null);
+  // 📏 mérés: a mód ki/be + az első (még pár nélküli) pont
+  const [measuring, setMeasuring] = useState(false);
+  const [pendingPoint, setPendingPoint] = useState<Vec3 | null>(null);
+  // ✏️ szerkesztés: a lap + a padló-vágósík élő előnézete
+  const [editOpen, setEditOpen] = useState(false);
+  const [cutPreviewY, setCutPreviewY] = useState<number | null>(null);
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
 
   const [phaseState, setPhase] = useState<Phase>(asset ? 'viewer' : 'empty');
   // a hálóval rendelkező projekt a nézőben nyílik (pl. visszatérés után) — levezetett, nem effekt
@@ -171,7 +182,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         return;
       }
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
+      const poster = await Remix3D?.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -244,7 +255,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
       }
       const info = await Remix3D.inspectModel(uri);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false).catch(() => null);
+      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -295,6 +306,56 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     },
     []
   );
+
+  /**
+   * ✂️/🔻 Háló-feldolgozás (natív `processMesh`): a forgatás beég, a padló levágódik /
+   * a háló egyszerűsödik → ÚJ OBJ-asset, a régi kikerül (egy undo-lépés), a mérések
+   * átszámolódnak. Csak textúra nélküli (hálós) szkennél.
+   */
+  const applyProcess = async (op: { cutY?: number; simplify?: SimplifyLevel }) => {
+    if (!Remix3D || !project || !doc || !mesh || !asset) {
+      return;
+    }
+    const q = modelRotation(doc);
+    const assetId = makeId('ast');
+    const target = model3dAsset({ assetId, format: 'obj', documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
+    try {
+      const res = await Remix3D.processMesh(
+        asset.uri,
+        target.uri,
+        JSON.stringify({
+          rotation: [q.x, q.y, q.z, q.w],
+          ...(op.cutY !== undefined ? { cutY: op.cutY } : {}),
+          ...(op.simplify ? { cell: simplifyCell(mesh.bounds, op.simplify) } : {}),
+        })
+      );
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
+      const latest = useEditorStore.getState().project?.model3d ?? doc;
+      const baked = bakeProcessedMesh(latest, mesh, q);
+      const m: Model3DMesh = { id: makeId('mesh'), assetId, format: 'obj', triangles: res.triangles, bounds: { min: res.min, max: res.max }, textured: false };
+      const { doc: next, removedAssetIds } = replaceModel(latest, m, project.name);
+      const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
+      const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(next)).catch(() => null);
+      useEditorStore.getState().applyBatch(
+        [
+          { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
+          ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
+          {
+            type: 'SET_MODEL3D_DOC',
+            doc: { ...next, measurements: baked.measurements, annotations: baked.annotations, poster: poster ?? undefined },
+            label: t('model3d.viewer.edit'),
+          },
+        ],
+        'user'
+      );
+      haptics.success();
+      Alert.alert(t('model3d.viewer.edit'), t('model3d.viewer.editDone', { tris: res.triangles.toLocaleString() }));
+    } catch (e) {
+      Alert.alert(t('model3d.viewer.edit'), t(remix3dErrorKey(e)));
+    }
+  };
 
   // ↩️ a fejléc vissza-gombja rekonstrukció közben megerősítést kér
   const goBack = () => {
@@ -457,6 +518,30 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           {project?.name ?? ''}
         </Text>
       </View>
+      {phase === 'viewer' ? (
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => useEditorStore.getState().undo()}
+            disabled={!canUndo}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('model3d.viewer.undo')}
+            accessibilityState={{ disabled: !canUndo }}
+          >
+            <Ionicons name="arrow-undo" size={22} color={canUndo ? palette.text : palette.border} />
+          </Pressable>
+          <Pressable
+            onPress={() => useEditorStore.getState().redo()}
+            disabled={!canRedo}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('model3d.viewer.redo')}
+            accessibilityState={{ disabled: !canRedo }}
+          >
+            <Ionicons name="arrow-redo" size={22} color={canRedo ? palette.text : palette.border} />
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -535,7 +620,36 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           style={StyleSheet.absoluteFill}
           modelUri={asset.uri}
           background={bg}
-          autoRotate={autoRotate}
+          autoRotate={autoRotate && !measuring && !editOpen}
+          modelRotation={(() => {
+            const q = modelRotation(doc);
+            return [q.x, q.y, q.z, q.w];
+          })()}
+          lightingPreset={doc?.environment.preset ?? 'studio'}
+          exposure={doc?.environment.exposure ?? 1}
+          cutPlaneY={cutPreviewY}
+          measureMode={measuring}
+          measureLines={(doc?.measurements ?? [])
+            .filter((m) => m.kind === 'distance' && m.points.length >= 2)
+            .flatMap((m) => [m.points[0].x, m.points[0].y, m.points[0].z, m.points[1].x, m.points[1].y, m.points[1].z])}
+          measureDots={pendingPoint ? [pendingPoint.x, pendingPoint.y, pendingPoint.z] : []}
+          onTapPoint={(e) => {
+            const p = e.nativeEvent;
+            if (!pendingPoint) {
+              haptics.selection();
+              setPendingPoint({ x: p.x, y: p.y, z: p.z });
+              return;
+            }
+            const latest = useEditorStore.getState().project?.model3d;
+            if (latest) {
+              haptics.success();
+              useEditorStore.getState().dispatch(
+                { type: 'SET_MODEL3D_DOC', doc: addMeasurement(latest, { kind: 'distance', points: [pendingPoint, { x: p.x, y: p.y, z: p.z }] }), label: t('model3d.viewer.measure') },
+                'user'
+              );
+            }
+            setPendingPoint(null);
+          }}
           wireframe={wireframe}
           onLoad={() => {
             setLoadFailedUri(null);
@@ -556,7 +670,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
             if (doc && (!doc.poster || !fileExists(doc.poster)) && Remix3D && posterTried.current !== asset.uri) {
               posterTried.current = asset.uri;
               const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster.png`;
-              Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false)
+              Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(doc))
                 .then((poster) => {
                   const latest = useEditorStore.getState().project?.model3d;
                   if (poster && latest) {
@@ -580,15 +694,58 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           size: `${formatLength(size.x)} × ${formatLength(size.y)} × ${formatLength(size.z)}`,
         })}
       </Text>
-      <Text style={[styles.dim, styles.centerText]}>{t('model3d.viewer.hint')}</Text>
+      {measuring ? (
+        <View style={styles.measurePanel}>
+          <Text style={[styles.dim, styles.centerText]}>
+            {t(pendingPoint ? 'model3d.viewer.measureSecond' : 'model3d.viewer.measureFirst')}
+            {(doc?.measurements.length ?? 0) > 0 ? ` ${t('model3d.viewer.measureTapToDelete')}` : ''}
+          </Text>
+          <View style={styles.measureList}>
+            {(doc?.measurements ?? []).map((m) => {
+              const v = measurementValue(m);
+              return (
+                <Pressable
+                  key={m.id}
+                  style={styles.measureChip}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${v != null ? formatLength(v) : '—'} — ${t('model3d.viewer.measureTapToDelete')}`}
+                  onPress={() => {
+                    const latest = useEditorStore.getState().project?.model3d;
+                    if (latest) {
+                      useEditorStore
+                        .getState()
+                        .dispatch({ type: 'SET_MODEL3D_DOC', doc: removeMeasurement(latest, m.id), label: t('model3d.viewer.measureDelete') }, 'user');
+                    }
+                  }}
+                >
+                  <Ionicons name="resize-outline" size={14} color={palette.accent} />
+                  <Text style={styles.measureText}>{v != null ? formatLength(v) : '—'}</Text>
+                  <Ionicons name="close" size={14} color={palette.textDim} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : (
+        <Text style={[styles.dim, styles.centerText]}>{t('model3d.viewer.hint')}</Text>
+      )}
       <View style={styles.toolbar}>
         <Tool icon={autoRotate ? 'pause-circle-outline' : 'sync-outline'} label={t('model3d.viewer.autoRotate')} active={autoRotate} onPress={() => setAutoRotate((v) => !v)} />
-        <Tool icon="contrast-outline" label={t('model3d.viewer.background')} onPress={cycleBackground} />
+        <Tool icon="options-outline" label={t('model3d.viewer.edit')} active={editOpen} onPress={() => setEditOpen(true)} />
         <Tool
           icon="grid-outline"
           label={t(`model3d.viewer.wireframe_${wireframe}`)}
           active={wireframe !== 'off'}
           onPress={() => setWireframe(WIREFRAME_CYCLE[(WIREFRAME_CYCLE.indexOf(wireframe) + 1) % WIREFRAME_CYCLE.length])}
+        />
+        <Tool
+          icon="resize-outline"
+          label={t('model3d.viewer.measure')}
+          active={measuring}
+          onPress={() => {
+            setMeasuring((v) => !v);
+            setPendingPoint(null);
+          }}
         />
         <Tool icon="share-outline" label={t('model3d.export.title')} onPress={() => setExportOpen(true)} />
         <Tool
@@ -600,6 +757,18 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           }}
         />
       </View>
+      {doc ? (
+        <Model3DEditSheet
+          visible={editOpen}
+          onClose={() => setEditOpen(false)}
+          doc={doc}
+          mesh={mesh}
+          onDoc={(next, label) => useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: next, label }, 'user')}
+          onCutPreview={setCutPreviewY}
+          onProcess={applyProcess}
+          onBackground={cycleBackground}
+        />
+      ) : null}
       <Model3DExportSheet
         visible={exportOpen}
         onClose={() => setExportOpen(false)}
@@ -607,6 +776,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
         mesh={mesh}
         projectName={project?.name ?? 'model'}
         background={bg}
+        optionsJson={lookOptionsJson(doc)}
         onCurrentView={async () => {
           if (!viewRef.current) throw new Error('model3d.error.unsupported');
           return viewRef.current.snapshot(new File(Paths.cache, `m3d_view_${makeId('img')}.png`).uri, 1440, 1440, true);
@@ -662,6 +832,20 @@ const styles = StyleSheet.create({
   stats: { marginTop: 10 },
   toolbar: { flexDirection: 'row', paddingHorizontal: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: palette.border, marginTop: 10 },
   tool: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  headerActions: { flexDirection: 'row', gap: 4, marginLeft: 'auto' },
+  headerBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  measurePanel: { gap: 8, paddingHorizontal: 12 },
+  measureList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  measureChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    backgroundColor: palette.surfaceHigh,
+  },
+  measureText: { color: palette.text, fontSize: 14, fontWeight: '700' },
   toolLabel: { color: palette.text, fontSize: 11, fontWeight: '600' },
   capTop: { flexDirection: 'row', alignItems: 'center', padding: 12 },
   meshCount: { paddingHorizontal: 12, height: 32, justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)' },

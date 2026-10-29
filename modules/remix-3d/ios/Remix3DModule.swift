@@ -122,11 +122,33 @@ public class Remix3DModule: Module {
     }
 
     // ── export: USDZ → OBJ / STL / PLY (ModelIO, a készüléken) ──────────────
-    AsyncFunction("exportModel") { (inputPath: String, outputPath: String) -> String in
+    // `optionsJson`: a stúdió „megjelenése" (forgatás) — a kivitt fájl azt adja, amit a néző mutat
+    AsyncFunction("exportModel") { (inputPath: String, outputPath: String, optionsJson: String?) -> String in
       let input = try fileURL(inputPath)
       let output = try fileURL(outputPath)
       let ext = output.pathExtension.lowercased()
+      let look = Remix3DRender.Look.parse(optionsJson)
       try? FileManager.default.removeItem(at: output)
+      if look.hasRotation {
+        switch ext {
+        case "usdz":
+          // a forgatás a csomópont-transzformba kerül; a textúrák/anyagok megmaradnak
+          let scene = try SCNScene(url: input, options: nil)
+          Remix3DRender.wrapContent(scene, look: look)
+          guard scene.write(to: output, options: nil, delegate: nil, progressHandler: nil) else {
+            throw Remix3DError.failed("usdzWrite")
+          }
+          return output.absoluteString
+        case "obj":
+          try Remix3DRender.writeOBJ(Remix3DRender.rotated(Remix3DRender.collectMesh(MDLAsset(url: input)), by: look.rotation), to: output)
+          return output.absoluteString
+        case "ply":
+          try Remix3DRender.writePLY(Remix3DRender.rotated(Remix3DRender.collectMesh(MDLAsset(url: input)), by: look.rotation), to: output)
+          return output.absoluteString
+        default:
+          break
+        }
+      }
       if ext == input.pathExtension.lowercased() {
         try FileManager.default.copyItem(at: input, to: output)
         return output.absoluteString
@@ -134,7 +156,9 @@ public class Remix3DModule: Module {
       // 🖨️ STL: saját bináris író MILLIMÉTERBEN (a szeletelők mm-t várnak; a ModelIO
       // méterben írna → a nyomat 1000× kisebb lenne), a csomópont-transzformokkal együtt
       if ext == "stl" {
-        try Remix3DRender.writeBinarySTL(asset: MDLAsset(url: input), to: output, scale: 1000)
+        var mesh = Remix3DRender.collectMesh(MDLAsset(url: input))
+        if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
+        try Remix3DRender.writeSTL(mesh, to: output, scale: 1000)
         return output.absoluteString
       }
       guard MDLAsset.canExportFileExtension(ext) else {
@@ -146,8 +170,11 @@ public class Remix3DModule: Module {
     }
 
     // ── pillanatkép egy fájlból (bélyegkép / „Kép a modellből" fix kamerával) ─
-    AsyncFunction("snapshotFile") { (modelPath: String, outputPath: String, width: Int, height: Int, yaw: Double, pitch: Double, transparent: Bool) -> String in
+    AsyncFunction("snapshotFile") { (modelPath: String, outputPath: String, width: Int, height: Int, yaw: Double, pitch: Double, transparent: Bool, optionsJson: String?) -> String in
       let scene = try SCNScene(url: try fileURL(modelPath), options: nil)
+      let look = Remix3DRender.Look.parse(optionsJson)
+      Remix3DRender.wrapContent(scene, look: look)
+      Remix3DRender.addLights(to: scene, look: look)
       let png = try Remix3DRender.snapshot(scene: scene, pointOfView: nil, yaw: yaw, pitch: pitch, width: width, height: height, transparent: transparent)
       let out = try fileURL(outputPath)
       try png.write(to: out)
@@ -157,7 +184,7 @@ public class Remix3DModule: Module {
     // ── 🎬 „Videó a modellből": 360°-os forgó felvétel → H.264 MP4 (a készüléken) ──
     // A kamera a `snapshotFile` orbitján kering (WYSIWYG az állóképpel); haladás az
     // `onRenderProgress` eseményen, megszakítás a `cancelRender`-rel.
-    AsyncFunction("renderTurntable") { (modelPath: String, outputPath: String, width: Int, height: Int, seconds: Double, fps: Int, pitch: Double, background: String?, promise: Promise) in
+    AsyncFunction("renderTurntable") { (modelPath: String, outputPath: String, width: Int, height: Int, seconds: Double, fps: Int, pitch: Double, background: String?, optionsJson: String?, promise: Promise) in
       self.renderCancelled = false
       DispatchQueue.global(qos: .userInitiated).async {
         do {
@@ -170,6 +197,7 @@ public class Remix3DModule: Module {
             fps: fps,
             pitch: pitch,
             background: background,
+            look: Remix3DRender.Look.parse(optionsJson),
             isCancelled: { self.renderCancelled },
             progress: { p in self.sendEvent("onRenderProgress", ["progress": p]) }
           )
@@ -180,6 +208,26 @@ public class Remix3DModule: Module {
           promise.reject(Remix3DError.failed(error.localizedDescription))
         }
       }
+    }
+
+    // ── ✂️ háló-feldolgozás (textúra nélküli szkenhez): forgatás beégetése + padló
+    // levágása + egyszerűsítés → új OBJ. `{"rotation":[…],"cutY":0.02,"cell":0.004}`
+    AsyncFunction("processMesh") { (inputPath: String, outputPath: String, optionsJson: String?) -> [String: Any] in
+      let look = Remix3DRender.Look.parse(optionsJson)
+      var opts: [String: Any] = [:]
+      if let j = optionsJson, let d = j.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+        opts = o
+      }
+      var mesh = Remix3DRender.collectMesh(MDLAsset(url: try fileURL(inputPath)))
+      if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
+      if let cut = opts["cutY"] as? Double { mesh = Remix3DRender.cutBelow(mesh, minY: Float(cut)) }
+      if let cell = opts["cell"] as? Double, cell > 0 { mesh = Remix3DRender.simplified(mesh, cell: Float(cell)) }
+      guard mesh.triangleCount > 0 else { throw Remix3DError.failed("emptyMesh") }
+      let out = try fileURL(outputPath)
+      try Remix3DRender.writeOBJ(mesh, to: out)
+      var info = Remix3DRender.info(mesh)
+      info["uri"] = out.absoluteString
+      return info
     }
 
     AsyncFunction("cancelRender") { () -> Bool in
@@ -293,6 +341,7 @@ enum Remix3DRender {
     fps: Int,
     pitch: Double,
     background: String?,
+    look: Look = Look(),
     isCancelled: () -> Bool,
     progress: (Double) -> Void
   ) throws -> URL {
@@ -305,8 +354,9 @@ enum Remix3DRender {
     scene.background.contents = color(hex: background) ?? UIColor(red: 0.067, green: 0.078, blue: 0.125, alpha: 1)
     let renderer = SCNRenderer(device: device, options: nil)
     renderer.scene = scene
-    renderer.autoenablesDefaultLighting = true
-    let (center, radius) = scene.rootNode.boundingSphere
+    let (_, center, radius) = wrapContent(scene, look: look)
+    addLights(to: scene, look: look)
+    renderer.autoenablesDefaultLighting = false
     let cam = SCNNode()
     cam.camera = makeCamera()
     scene.rootNode.addChildNode(cam)
@@ -368,7 +418,7 @@ enum Remix3DRender {
     guard let device = MTLCreateSystemDefaultDevice() else { throw Remix3DError.unsupported("metal") }
     let renderer = SCNRenderer(device: device, options: nil)
     renderer.scene = scene
-    renderer.autoenablesDefaultLighting = true
+    renderer.autoenablesDefaultLighting = scene.rootNode.childNode(withName: "remixLights", recursively: false) == nil
     let previousBackground = scene.background.contents
     if transparent { scene.background.contents = UIColor.clear }
     defer { scene.background.contents = previousBackground }
@@ -393,39 +443,244 @@ enum Remix3DRender {
     return data
   }
 
-  /// 🖨️ bináris STL — minden háló minden háromszöge, a csomópont-transzformokkal világ-
-  /// koordinátába, `scale`-lel szorozva (1000 → mm). A normál a háromszögből számolódik.
-  static func writeBinarySTL(asset: MDLAsset, to url: URL, scale: Float) throws {
-    var tris: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)] = []
+  // ── 🎛️ közös „megjelenés": forgatás + fény (néző = állókép = videó = export) ──────
+
+  struct Look {
+    var rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+    var preset = "studio"
+    var exposure: Float = 1
+    var hasRotation: Bool { abs(rotation.real) < 0.99999 }
+
+    /// `{"rotation":[x,y,z,w],"preset":"studio","exposure":1}` → Look (hiányzó → alap)
+    static func parse(_ json: String?) -> Look {
+      var l = Look()
+      guard let json = json, let d = json.data(using: .utf8),
+            let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return l }
+      if let r = o["rotation"] as? [Double], r.count == 4 {
+        let q = simd_quatf(ix: Float(r[0]), iy: Float(r[1]), iz: Float(r[2]), r: Float(r[3]))
+        if simd_length(q.vector) > 0 { l.rotation = simd_normalize(q) }
+      }
+      if let p = o["preset"] as? String { l.preset = p }
+      if let e = o["exposure"] as? Double { l.exposure = Float(max(0.25, min(2, e))) }
+      return l
+    }
+  }
+
+  /// a jelenet tartalma egy közös csomópont alá, a befoglaló DOBOZ közepe körül forgatva
+  /// (a középpont és a sugár a forgatástól független → a keretezés stabil)
+  @discardableResult
+  static func wrapContent(_ scene: SCNScene, look: Look) -> (content: SCNNode, center: SCNVector3, radius: Float) {
+    let content = SCNNode()
+    content.name = "remixContent"
+    for c in scene.rootNode.childNodes {
+      c.removeFromParentNode()
+      content.addChildNode(c)
+    }
+    let (mn, mx) = content.boundingBox
+    let center = SCNVector3((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2)
+    let d = SIMD3<Float>(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z)
+    content.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
+    content.position = center
+    content.simdOrientation = look.rotation
+    scene.rootNode.addChildNode(content)
+    return (content, center, simd_length(d) / 2)
+  }
+
+  /// fény-preset (studio / outdoor / night) × expozíció — saját fények, nem a SceneKit alapja
+  @discardableResult
+  static func addLights(to scene: SCNScene, look: Look) -> SCNNode {
+    scene.rootNode.childNode(withName: "remixLights", recursively: false)?.removeFromParentNode()
+    let rig = SCNNode()
+    rig.name = "remixLights"
+    func add(_ type: SCNLight.LightType, _ intensity: Float, _ color: UIColor, pitch: Float = 0, yaw: Float = 0) {
+      let l = SCNLight()
+      l.type = type
+      l.intensity = CGFloat(intensity * look.exposure)
+      l.color = color
+      let n = SCNNode()
+      n.light = l
+      n.eulerAngles = SCNVector3(pitch, yaw, 0)
+      rig.addChildNode(n)
+    }
+    switch look.preset {
+    case "outdoor":
+      add(.ambient, 550, UIColor(red: 0.85, green: 0.9, blue: 1, alpha: 1))
+      add(.directional, 1500, UIColor(red: 1, green: 0.96, blue: 0.88, alpha: 1), pitch: -.pi / 3, yaw: .pi / 5)
+    case "night":
+      add(.ambient, 140, UIColor(red: 0.55, green: 0.62, blue: 0.9, alpha: 1))
+      add(.directional, 650, UIColor(red: 0.75, green: 0.8, blue: 1, alpha: 1), pitch: -.pi / 6, yaw: -.pi / 3)
+    default: // studio: kulcs + derítő + környezet
+      add(.ambient, 350, .white)
+      add(.directional, 900, .white, pitch: -.pi / 4, yaw: .pi / 6)
+      add(.directional, 380, .white, pitch: -.pi / 10, yaw: -.pi * 2 / 3)
+    }
+    scene.rootNode.addChildNode(rig)
+    return rig
+  }
+
+  // ── 🔺 háló-adat: minden háromszög világ-koordinátában (a csomópont-transzformokkal) ──
+
+  struct MeshData {
+    var positions: [SIMD3<Float>] = []
+    var indices: [UInt32] = []
+    var triangleCount: Int { indices.count / 3 }
+
+    var bounds: (SIMD3<Float>, SIMD3<Float>) {
+      guard var mn = positions.first else { return (.zero, .zero) }
+      var mx = mn
+      for p in positions {
+        mn = simd_min(mn, p)
+        mx = simd_max(mx, p)
+      }
+      return (mn, mx)
+    }
+  }
+
+  /// az asset összes hálója → indexelt, csúcs-deduplikált háló (világ-koordináta, méter)
+  static func collectMesh(_ asset: MDLAsset) -> MeshData {
+    var out = MeshData()
+    var lookup: [SIMD3<Float>: UInt32] = [:]
     for case let mesh as MDLMesh in asset.childObjects(of: MDLMesh.self) {
       guard let pos = mesh.vertexAttributeData(forAttributeNamed: MDLVertexAttributePosition, as: .float3) else { continue }
       let world = MDLTransform.globalTransform(with: mesh, atTime: 0)
-      func vertex(_ i: Int) -> SIMD3<Float> {
+      func vertex(_ i: Int) -> UInt32 {
         let p = pos.dataStart.advanced(by: i * pos.stride).assumingMemoryBound(to: Float.self)
         let v = world * SIMD4<Float>(p[0], p[1], p[2], 1)
-        return SIMD3<Float>(v.x, v.y, v.z) * scale
+        let w = SIMD3<Float>(v.x, v.y, v.z)
+        if let k = lookup[w] { return k }
+        let k = UInt32(out.positions.count)
+        out.positions.append(w)
+        lookup[w] = k
+        return k
       }
       for sub in mesh.submeshes as? [MDLSubmesh] ?? [] where sub.geometryType == .triangles {
         let buf = sub.indexBuffer.map()
-        var idx: [Int] = []
-        idx.reserveCapacity(sub.indexCount)
         for k in 0..<sub.indexCount {
+          let i: Int
           switch sub.indexType {
-          case .uInt32: idx.append(Int(buf.bytes.load(fromByteOffset: k * 4, as: UInt32.self)))
-          case .uInt16: idx.append(Int(buf.bytes.load(fromByteOffset: k * 2, as: UInt16.self)))
-          default: idx.append(Int(buf.bytes.load(fromByteOffset: k, as: UInt8.self)))
+          case .uInt32: i = Int(buf.bytes.load(fromByteOffset: k * 4, as: UInt32.self))
+          case .uInt16: i = Int(buf.bytes.load(fromByteOffset: k * 2, as: UInt16.self))
+          default: i = Int(buf.bytes.load(fromByteOffset: k, as: UInt8.self))
           }
+          out.indices.append(vertex(i))
         }
-        var t = 0
-        while t + 2 < idx.count {
-          tris.append((vertex(idx[t]), vertex(idx[t + 1]), vertex(idx[t + 2])))
-          t += 3
-        }
+        out.indices.removeLast(out.indices.count % 3)
       }
     }
-    guard !tris.isEmpty else { throw Remix3DError.failed("emptyMesh") }
+    return out
+  }
+
+  /// forgatás a befoglaló doboz közepe körül (a néző `wrapContent`-jével egyezően)
+  static func rotated(_ m: MeshData, by q: simd_quatf) -> MeshData {
+    let (mn, mx) = m.bounds
+    let c = (mn + mx) / 2
+    var r = m
+    r.positions = m.positions.map { c + q.act($0 - c) }
+    return r
+  }
+
+  /// a `minY` (méter) ALATT teljesen elhelyezkedő háromszögek elhagyása (padló levágása)
+  static func cutBelow(_ m: MeshData, minY: Float) -> MeshData {
+    var out = MeshData()
+    var remap: [UInt32: UInt32] = [:]
+    func keep(_ i: UInt32) -> UInt32 {
+      if let k = remap[i] { return k }
+      let k = UInt32(out.positions.count)
+      out.positions.append(m.positions[Int(i)])
+      remap[i] = k
+      return k
+    }
+    var t = 0
+    while t + 2 < m.indices.count {
+      let a = m.indices[t], b = m.indices[t + 1], c = m.indices[t + 2]
+      let top = max(m.positions[Int(a)].y, m.positions[Int(b)].y, m.positions[Int(c)].y)
+      if top >= minY {
+        out.indices.append(contentsOf: [keep(a), keep(b), keep(c)])
+      }
+      t += 3
+    }
+    return out
+  }
+
+  /// egyszerűsítés csúcs-klaszterezéssel: a `cell` méretű rácsba eső csúcsok egybeolvadnak
+  static func simplified(_ m: MeshData, cell: Float) -> MeshData {
+    guard cell > 0 else { return m }
+    var out = MeshData()
+    var cellIndex: [SIMD3<Int32>: UInt32] = [:]
+    var sums: [SIMD3<Float>] = []
+    var counts: [Float] = []
+    var remap = [UInt32](repeating: 0, count: m.positions.count)
+    for (i, p) in m.positions.enumerated() {
+      let key = SIMD3<Int32>(Int32((p.x / cell).rounded(.down)), Int32((p.y / cell).rounded(.down)), Int32((p.z / cell).rounded(.down)))
+      if let k = cellIndex[key] {
+        remap[i] = k
+        sums[Int(k)] += p
+        counts[Int(k)] += 1
+      } else {
+        let k = UInt32(sums.count)
+        cellIndex[key] = k
+        sums.append(p)
+        counts.append(1)
+        remap[i] = k
+      }
+    }
+    out.positions = zip(sums, counts).map { $0 / $1 }
+    var t = 0
+    while t + 2 < m.indices.count {
+      let a = remap[Int(m.indices[t])], b = remap[Int(m.indices[t + 1])], c = remap[Int(m.indices[t + 2])]
+      if a != b && b != c && a != c {
+        out.indices.append(contentsOf: [a, b, c])
+      }
+      t += 3
+    }
+    return out
+  }
+
+  // ── ✍️ írók (textúra nélküli hálók — a nyers / feldolgozott szkenhez és az exporthoz) ──
+
+  static func writeOBJ(_ m: MeshData, to url: URL) throws {
+    var text = "# ReMix 3D\n"
+    text.reserveCapacity(m.positions.count * 32 + m.indices.count * 8)
+    for p in m.positions {
+      text += "v \(p.x) \(p.y) \(p.z)\n"
+    }
+    var t = 0
+    while t + 2 < m.indices.count {
+      text += "f \(m.indices[t] + 1) \(m.indices[t + 1] + 1) \(m.indices[t + 2] + 1)\n"
+      t += 3
+    }
+    try? FileManager.default.removeItem(at: url)
+    try text.write(to: url, atomically: true, encoding: .utf8)
+  }
+
+  static func writePLY(_ m: MeshData, to url: URL) throws {
+    var data = Data()
+    let header = "ply\nformat binary_little_endian 1.0\ncomment ReMix 3D\nelement vertex \(m.positions.count)\nproperty float x\nproperty float y\nproperty float z\nelement face \(m.triangleCount)\nproperty list uchar int vertex_indices\nend_header\n"
+    data.append(header.data(using: .ascii)!)
+    for p in m.positions {
+      for c in [p.x, p.y, p.z] {
+        var le = c.bitPattern.littleEndian
+        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+      }
+    }
+    var t = 0
+    while t + 2 < m.indices.count {
+      data.append(3)
+      for k in 0..<3 {
+        var le = Int32(m.indices[t + k]).littleEndian
+        withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+      }
+      t += 3
+    }
+    try? FileManager.default.removeItem(at: url)
+    try data.write(to: url)
+  }
+
+  /// 🖨️ bináris STL, `scale`-lel (1000 → mm — a szeletelők mm-t várnak)
+  static func writeSTL(_ m: MeshData, to url: URL, scale: Float) throws {
+    guard m.triangleCount > 0 else { throw Remix3DError.failed("emptyMesh") }
     var data = Data(count: 80)
-    var count = UInt32(tris.count).littleEndian
+    var count = UInt32(m.triangleCount).littleEndian
     withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
     func put(_ v: SIMD3<Float>) {
       for c in [v.x, v.y, v.z] {
@@ -433,14 +688,29 @@ enum Remix3DRender {
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
       }
     }
-    for (a, b, c) in tris {
+    var t = 0
+    while t + 2 < m.indices.count {
+      let a = m.positions[Int(m.indices[t])] * scale
+      let b = m.positions[Int(m.indices[t + 1])] * scale
+      let c = m.positions[Int(m.indices[t + 2])] * scale
       let n = simd_cross(b - a, c - a)
       let len = simd_length(n)
-      put(len > 0 ? n / len : SIMD3<Float>(0, 0, 0))
+      put(len > 0 ? n / len : .zero)
       put(a); put(b); put(c)
       data.append(contentsOf: [0, 0])
+      t += 3
     }
     try? FileManager.default.removeItem(at: url)
     try data.write(to: url)
+  }
+
+  /// `{triangles, min, max}` — a JS ugyanazt a formát kapja, mint az `inspectModel`-nél
+  static func info(_ m: MeshData) -> [String: Any] {
+    let (mn, mx) = m.bounds
+    return [
+      "triangles": m.triangleCount,
+      "min": ["x": mn.x, "y": mn.y, "z": mn.z],
+      "max": ["x": mx.x, "y": mx.y, "z": mx.z],
+    ]
   }
 }

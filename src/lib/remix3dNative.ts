@@ -66,6 +66,21 @@ type ModelViewProps = ViewProps & {
   autoRotate?: boolean;
   onLoad?: (e: { nativeEvent: { radius: number } }) => void;
   onError?: (e: { nativeEvent: { code: string; message?: string } }) => void;
+  /** 🎛️ a modell forgatása `[x, y, z, w]` kvaternióként (a befoglaló doboz közepe körül) */
+  modelRotation?: number[];
+  /** fény-preset: 'studio' | 'outdoor' | 'night' */
+  lightingPreset?: string;
+  /** expozíció 0.25–2 */
+  exposure?: number;
+  /** ✂️ a padló-levágás síkjának magassága (megjelenítési tér, méter); null → rejtett */
+  cutPlaneY?: number | null;
+  /** 📏 mérés-mód: a koppintás a modell felületi pontját adja (`onTapPoint`) */
+  measureMode?: boolean;
+  /** mérési szakaszok: 6 szám / szakasz (a.xyz, b.xyz) — modell-koordináta, méter */
+  measureLines?: number[];
+  /** függő pontok: 3 szám / pont */
+  measureDots?: number[];
+  onTapPoint?: (e: { nativeEvent: { x: number; y: number; z: number } }) => void;
 };
 
 /**

@@ -11,7 +11,19 @@ export interface Remix3DNative {
   }>;
   reconstruct(imagesDir: string, outputPath: string, quality: 'preview' | 'medium' | 'full'): Promise<string>;
   cancelReconstruct(): Promise<boolean>;
-  exportModel(inputPath: string, outputPath: string): Promise<string>;
+  /** `optionsJson`: a stúdió megjelenése (`{"rotation":[x,y,z,w]}`) — a fájl azt adja, amit a néző */
+  exportModel(inputPath: string, outputPath: string, optionsJson?: string | null): Promise<string>;
+  /** ✂️ forgatás beégetése + padló levágása + egyszerűsítés → új OBJ (textúra nélküli hálóhoz) */
+  processMesh(
+    inputPath: string,
+    outputPath: string,
+    optionsJson: string
+  ): Promise<{
+    uri: string;
+    triangles: number;
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }>;
   snapshotFile(
     modelPath: string,
     outputPath: string,
@@ -19,7 +31,9 @@ export interface Remix3DNative {
     height: number,
     yaw: number,
     pitch: number,
-    transparent: boolean
+    transparent: boolean,
+    /** `{"rotation":[x,y,z,w],"preset":"studio","exposure":1}` */
+    optionsJson?: string | null
   ): Promise<string>;
   inspectModel(modelPath: string): Promise<{
     triangles: number;
@@ -35,7 +49,8 @@ export interface Remix3DNative {
     seconds: number,
     fps: number,
     pitch: number,
-    background: string | null
+    background: string | null,
+    optionsJson?: string | null
   ): Promise<string>;
   cancelRender(): Promise<boolean>;
   addListener(

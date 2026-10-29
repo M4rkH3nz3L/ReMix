@@ -33,6 +33,8 @@ export interface StillOptions {
   transparent?: boolean;
   /** a gyorsítótárba írja (csak megosztáshoz — ne gyűljön a projekt mappájában) */
   toCache?: boolean;
+  /** a 3D-stúdió megjelenése (forgatás + fény) — `lookOptionsJson(doc)` */
+  optionsJson?: string;
 }
 
 /** 🖼️ Állókép a modellből → PNG uri (alap: átlátszó háttér, enyhén felülről). */
@@ -49,7 +51,8 @@ export async function renderModelStill(modelUri: string, opts: StillOptions = {}
     size,
     opts.yaw ?? Math.PI / 6,
     opts.pitch ?? Math.PI / 9,
-    opts.transparent ?? true
+    opts.transparent ?? true,
+    opts.optionsJson ?? null
   );
 }
 
@@ -63,6 +66,8 @@ export interface TurntableOptions {
   background?: string | null;
   /** a gyorsítótárba írja (csak megosztáshoz — ne gyűljön a projekt mappájában) */
   toCache?: boolean;
+  /** a 3D-stúdió megjelenése (forgatás + fény) — `lookOptionsJson(doc)` */
+  optionsJson?: string;
 }
 
 /**
@@ -102,7 +107,8 @@ export async function renderModelTurntable(
       seconds,
       fps,
       opts.pitch ?? Math.PI / 12,
-      opts.background ?? null
+      opts.background ?? null,
+      opts.optionsJson ?? null
     );
     return { uri, seconds };
   } finally {
@@ -115,10 +121,15 @@ export function cancelModelRender(): void {
 }
 
 /** 📦 A modell-fájl exportja a kért formátumba (a cache-be, megosztáshoz) → uri. */
-export async function exportModelFile(modelUri: string, projectName: string, format: MeshFormat): Promise<string> {
+export async function exportModelFile(
+  modelUri: string,
+  projectName: string,
+  format: MeshFormat,
+  optionsJson?: string
+): Promise<string> {
   if (!Remix3D) {
     throw new Error('model3d.error.unsupported');
   }
   const out = new File(Paths.cache, exportFileName(projectName, format));
-  return Remix3D.exportModel(modelUri, out.uri);
+  return Remix3D.exportModel(modelUri, out.uri, optionsJson ?? null);
 }

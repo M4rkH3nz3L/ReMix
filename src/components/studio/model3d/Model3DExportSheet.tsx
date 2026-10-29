@@ -39,7 +39,10 @@ export function Model3DExportSheet({
   projectName,
   background,
   onCurrentView,
+  optionsJson,
 }: {
+  /** a stúdió megjelenése (forgatás + fény) → a kivitel azt adja, amit a néző mutat */
+  optionsJson: string;
   visible: boolean;
   onClose: () => void;
   /** 📸 állókép a néző AKTUÁLIS nézetéből (PNG uri) — ha a néző elérhető */
@@ -81,7 +84,7 @@ export function Model3DExportSheet({
 
   const still = () =>
     run('still', async () => {
-      const uri = await renderModelStill(modelUri, { transparent: true, toCache: true });
+      const uri = await renderModelStill(modelUri, { transparent: true, toCache: true, optionsJson });
       await share(uri, 'image/png');
     });
 
@@ -95,7 +98,7 @@ export function Model3DExportSheet({
     run('video', async () => {
       const { uri } = await renderModelTurntable(
         modelUri,
-        { aspectRatio: aspect, seconds: 6, fps: 30, background, toCache: true },
+        { aspectRatio: aspect, seconds: 6, fps: 30, background, toCache: true, optionsJson },
         setProgress
       );
       await share(uri, 'video/mp4');
@@ -105,7 +108,7 @@ export function Model3DExportSheet({
     const warnings = exportWarnings(mesh, format);
     const go = () =>
       run(format, async () => {
-        const uri = await exportModelFile(modelUri, projectName, format);
+        const uri = await exportModelFile(modelUri, projectName, format, optionsJson);
         await share(uri);
       });
     if (warnings.length) {

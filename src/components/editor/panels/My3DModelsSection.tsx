@@ -6,6 +6,7 @@ import { ProjectThumb } from '@/components/studio/ProjectThumb';
 import { PanelSection } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { makeId } from '@/lib/id';
+import { lookOptionsJson } from '@/lib/model3dLook';
 import { currentModel } from '@/lib/model3dMedia';
 import {
   cancelModelRender,
@@ -48,18 +49,20 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
     return null;
   }
 
-  const modelUriOf = async (meta: ProjectMeta): Promise<string | null> => {
+  /** a modell-fájl + a 3D-stúdióban beállított megjelenés (forgatás, fény) */
+  const modelOf = async (meta: ProjectMeta): Promise<{ uri: string; optionsJson: string } | null> => {
     const p = await loadProject(meta.id);
-    return p ? (currentModel(p.model3d?.meshes, p.assets)?.asset.uri ?? null) : null;
+    const uri = p ? (currentModel(p.model3d?.meshes, p.assets)?.asset.uri ?? null) : null;
+    return p && uri ? { uri, optionsJson: lookOptionsJson(p.model3d) } : null;
   };
 
   const insertStill = async (meta: ProjectMeta) => {
-    const modelUri = await modelUriOf(meta);
-    if (!modelUri) {
+    const model = await modelOf(meta);
+    if (!model) {
       Alert.alert(t('panels.sticker.my3dTitle'), t('panels.sticker.my3dEmpty'));
       return;
     }
-    const uri = await withProgress(t('panels.sticker.my3dRendering'), () => renderModelStill(modelUri, { transparent: true }));
+    const uri = await withProgress(t('panels.sticker.my3dRendering'), () => renderModelStill(model.uri, { transparent: true, optionsJson: model.optionsJson }));
     const { playhead, addClip, selectClip, project } = useEditorStore.getState();
     const id = makeId('clip');
     // a négyzetes PNG a vásznon is négyzet maradjon: h = w × (vászon-szélesség / -magasság)
@@ -90,8 +93,8 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
   };
 
   const insertTurntable = async (meta: ProjectMeta) => {
-    const modelUri = await modelUriOf(meta);
-    if (!modelUri) {
+    const model = await modelOf(meta);
+    if (!model) {
       Alert.alert(t('panels.sticker.my3dTitle'), t('panels.sticker.my3dEmpty'));
       return;
     }
@@ -99,7 +102,7 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
     const { uri, seconds } = await withProgress(
       t('panels.sticker.my3dRenderingVideo'),
       (report) =>
-        renderModelTurntable(modelUri, { aspectRatio, seconds: TURNTABLE_SECONDS }, (ratio) =>
+        renderModelTurntable(model.uri, { aspectRatio, seconds: TURNTABLE_SECONDS, optionsJson: model.optionsJson }, (ratio) =>
           report({ phase: t('panels.sticker.my3dRenderingVideo'), ratio })
         ),
       cancelModelRender

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -20,6 +21,16 @@ const KIND_ICON = Object.fromEntries(
  *  `projectPreviewSource`: a választott borító (hangnál album-borító), különben a fajta
  *  saját képe (3D-poszter, kép-lap, videó-kocka). Kép híján a fajta-ikon. */
 const thumbCache = new Map<string, string | null>();
+
+/** helyi (`file://`) kép, ami már nincs a lemezen */
+function localFileMissing(uri: string): boolean {
+  if (!uri.startsWith('file://')) return false;
+  try {
+    return !new File(uri).exists;
+  } catch {
+    return true;
+  }
+}
 
 export function ProjectThumb({
   id,
@@ -45,7 +56,9 @@ export function ProjectThumb({
           return null;
         }
         if (source.type === 'image') {
-          return source.uri;
+          // a helyi kép (pl. 3D-poszter) eltűnhetett (régi szken, takarítás, konténer-váltás)
+          // → ikon, ne üres kártya
+          return localFileMissing(source.uri) ? null : source.uri;
         }
         const [thumb] = await getFilmstrip(source.uri, [snapThumbTime(source.time)]);
         return thumb;
@@ -62,7 +75,18 @@ export function ProjectThumb({
     };
   }, [id, kind, cacheKey]);
   if (uri) {
-    return <Image source={{ uri }} style={styles.cardThumb} contentFit="cover" />;
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.cardThumb}
+        contentFit="cover"
+        onError={() => {
+          // betölthetetlen kép → a fajta-ikon (eddig üres szürke kártya maradt)
+          thumbCache.set(cacheKey, null);
+          setUri(null);
+        }}
+      />
+    );
   }
   return (
     <View style={styles.cardIcon}>

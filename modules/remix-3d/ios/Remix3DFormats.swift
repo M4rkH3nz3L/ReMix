@@ -113,6 +113,15 @@ enum Remix3DFormats {
     if ext == "glb" {
       return try readGLB(url)
     }
+    if ext == "gltf" {
+      return try readGLTF(url)
+    }
+    if ext == "fbx" {
+      return try readFBX(url)
+    }
+    if ext == "zip" {
+      return try readZip(url)
+    }
     if ext == "ply", let (pts, cols) = readPointPLY(url) {
       var part = ModelPart(name: "points", positions: pts)
       part.colors = cols.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) / 255 }
@@ -556,6 +565,39 @@ enum Remix3DFormats {
       }
       offset = start + len
     }
+    return try parseGLTF(json: json, glbBin: bin, base: url.deletingLastPathComponent())
+  }
+
+  /// 📄 glTF 2.0 (.gltf JSON) — a pufferek/képek `data:` URI-ból vagy a fájl melletti
+  /// relatív fájlokból (Blender „glTF Separate" / „Embedded" export is)
+  static func readGLTF(_ url: URL) throws -> ModelData {
+    let data = try Data(contentsOf: url)
+    guard let json = (try JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+      throw Remix3DError.badInput("gltf")
+    }
+    return try parseGLTF(json: json, glbBin: nil, base: url.deletingLastPathComponent())
+  }
+
+  /// `data:` vagy relatív URI → bájtok
+  private static func gltfResource(_ uri: String, base: URL) -> Data? {
+    if uri.hasPrefix("data:") {
+      guard let comma = uri.firstIndex(of: ",") else { return nil }
+      return Data(base64Encoded: String(uri[uri.index(after: comma)...]))
+    }
+    let decoded = uri.removingPercentEncoding ?? uri
+    // biztonság: csak a modell mappáján BELÜLI fájl (nincs ../ kiszökés)
+    let file = base.appendingPathComponent(decoded).standardizedFileURL
+    guard file.path.hasPrefix(base.standardizedFileURL.path) else { return nil }
+    return try? Data(contentsOf: file)
+  }
+
+  /// a glTF közös feldolgozója (GLB: a BIN-chunk a 0. puffer, ha annak nincs uri-ja)
+  private static func parseGLTF(json: [String: Any], glbBin: Data?, base: URL) throws -> ModelData {
+    let bufferDefs = json["buffers"] as? [[String: Any]] ?? []
+    let buffers: [Data] = bufferDefs.enumerated().map { i, b in
+      if let uri = b["uri"] as? String { return gltfResource(uri, base: base) ?? Data() }
+      return i == 0 ? (glbBin ?? Data()) : Data()
+    }
     let views = json["bufferViews"] as? [[String: Any]] ?? []
     let accs = json["accessors"] as? [[String: Any]] ?? []
     let meshes = json["meshes"] as? [[String: Any]] ?? []
@@ -567,6 +609,9 @@ enum Remix3DFormats {
     func viewData(_ vi: Int) -> (Data, Int?)? {
       guard vi >= 0, vi < views.count else { return nil }
       let v = views[vi]
+      let bi = v["buffer"] as? Int ?? 0
+      guard bi >= 0, bi < buffers.count else { return nil }
+      let bin = buffers[bi]
       let off = v["byteOffset"] as? Int ?? 0
       let len = v["byteLength"] as? Int ?? 0
       guard off + len <= bin.count else { return nil }
@@ -629,7 +674,10 @@ enum Remix3DFormats {
     func image(texture ti: Int) -> CGImage? {
       guard ti >= 0, ti < texs.count, let si = texs[ti]["source"] as? Int, si < imgs.count else { return nil }
       if let c = imageCache[si] { return c }
-      guard let bv = imgs[si]["bufferView"] as? Int, let (d, _) = viewData(bv), let img = decodeImage(d) else { return nil }
+      var bytes: Data?
+      if let bv = imgs[si]["bufferView"] as? Int { bytes = viewData(bv)?.0 }
+      else if let uri = imgs[si]["uri"] as? String { bytes = gltfResource(uri, base: base) }
+      guard let d = bytes, let img = decodeImage(d) else { return nil }
       imageCache[si] = img
       return img
     }

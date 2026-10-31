@@ -2,6 +2,7 @@ import ExpoModulesCore
 import ARKit
 import AVFoundation
 import ModelIO
+import QuickLook
 import RealityKit
 import SceneKit
 import UIKit
@@ -44,6 +45,8 @@ public class Remix3DModule: Module {
   private var cancelReconstruct: (() -> Void)?
   /// a futó turntable-render megszakítás-jelzője
   private var renderCancelled = false
+  /// az AR Gyorsnézet adatforrása (a QLPreviewController gyengén tartja)
+  private var arSource: ARPreviewSource?
 
   public func definition() -> ModuleDefinition {
     Name("Remix3D")
@@ -213,6 +216,34 @@ public class Remix3DModule: Module {
       }
     }
 
+    // ── 🥽 AR Gyorsnézet: a modell a valós térben (Apple AR Quick Look, USDZ) ────────
+    AsyncFunction("presentAR") { (usdzPath: String, promise: Promise) in
+      DispatchQueue.main.async {
+        do {
+          let url = try fileURL(usdzPath)
+          guard let presenter = self.appContext?.utilities?.currentViewController() else {
+            promise.reject(Remix3DError.failed("noViewController"))
+            return
+          }
+          let source = ARPreviewSource(url: url)
+          let ql = QLPreviewController()
+          ql.dataSource = source
+          self.arSource = source // a dataSource gyenge referencia → itt tartjuk életben
+          presenter.present(ql, animated: true)
+          promise.resolve(true)
+        } catch {
+          promise.reject(Remix3DError.badInput("path"))
+        }
+      }
+    }
+
+    // ── 🖼️ üres-e egy (poszter-)kép — a régi / háttérben készült üres posztereket a
+    // stúdió megnyitáskor újragenerálja
+    AsyncFunction("imageIsBlank") { (path: String) -> Bool in
+      guard let img = UIImage(contentsOfFile: try fileURL(path).path) else { return true }
+      return Remix3DRender.isBlank(img)
+    }
+
     AsyncFunction("cancelRender") { () -> Bool in
       self.renderCancelled = true
       return true
@@ -221,7 +252,8 @@ public class Remix3DModule: Module {
     // ── háló-statisztika (háromszögszám + befoglaló doboz, méterben) ─────────
     AsyncFunction("inspectModel") { (modelPath: String) -> [String: Any] in
       let url = try fileURL(modelPath)
-      if url.pathExtension.lowercased() == "glb" {
+      // a saját olvasós formátumok (és az import-forrás) teljes adatot adnak: textúra / pontfelhő is
+      if ["glb", "gltf", "fbx", "zip", "ply"].contains(url.pathExtension.lowercased()) {
         return try Remix3DFormats.load(url).info
       }
       let asset = MDLAsset(url: url)
@@ -234,12 +266,37 @@ public class Remix3DModule: Module {
         }
       }
       let b = asset.boundingBox
+      // textúrás-e (az import tárolási döntéséhez: textúrás → USDZ/GLB, sosem OBJ/PLY)
+      var textured = false
+      for case let mesh as MDLMesh in asset.childObjects(of: MDLMesh.self) {
+        for sub in mesh.submeshes as? [MDLSubmesh] ?? [] {
+          if let prop = sub.material?.property(with: .baseColor), [.texture, .string, .URL].contains(prop.type) {
+            textured = true
+          }
+        }
+      }
       return [
         "triangles": triangles,
+        "points": 0,
+        "textured": textured,
         "min": ["x": b.minBounds.x, "y": b.minBounds.y, "z": b.minBounds.z],
         "max": ["x": b.maxBounds.x, "y": b.maxBounds.y, "z": b.maxBounds.z],
       ]
     }
+  }
+}
+
+/// 🥽 AR Quick Look adatforrás: egyetlen USDZ, valós méretben (átméretezés engedve)
+final class ARPreviewSource: NSObject, QLPreviewControllerDataSource {
+  let url: URL
+  init(url: URL) { self.url = url }
+
+  func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+
+  func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+    let item = ARQuickLookPreviewItem(fileAt: url)
+    item.allowsContentScaling = true
+    return item
   }
 }
 
@@ -422,12 +479,35 @@ enum Remix3DRender {
       defer { cam.removeFromParentNode() }
       renderer.pointOfView = cam
       let image = renderer.snapshot(atTime: 0, with: CGSize(width: width, height: height), antialiasingMode: .multisampling4X)
+      // üres kép (pl. háttérben futó app: nincs GPU) → hiba, NEM üres poszter/állókép
+      guard !isBlank(image) else { throw Remix3DError.failed("emptyRender") }
       guard let data = image.pngData() else { throw Remix3DError.failed("png") }
       return data
     }
     let image = renderer.snapshot(atTime: 0, with: CGSize(width: width, height: height), antialiasingMode: .multisampling4X)
+    guard !isBlank(image) else { throw Remix3DError.failed("emptyRender") }
     guard let data = image.pngData() else { throw Remix3DError.failed("png") }
     return data
+  }
+
+  /// teljesen átlátszó / üres-e a kép (kicsinyítve, gyors mintavétel)
+  static func isBlank(_ image: UIImage) -> Bool {
+    guard let cg = image.cgImage else { return true }
+    let n = 24
+    var px = [UInt8](repeating: 0, count: n * n * 4)
+    let drawn = px.withUnsafeMutableBytes { raw -> Bool in
+      guard let ctx = CGContext(data: raw.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+      ctx.draw(cg, in: CGRect(x: 0, y: 0, width: n, height: n))
+      return true
+    }
+    guard drawn else { return true }
+    var i = 0
+    while i < px.count {
+      if px[i + 3] > 8 && (px[i] > 4 || px[i + 1] > 4 || px[i + 2] > 4) { return false }
+      i += 4
+    }
+    return true
   }
 
   // ── 🎛️ közös „megjelenés": forgatás + fény (néző = állókép = videó = export) ──────
@@ -516,7 +596,7 @@ enum Remix3DRender {
   /// minden más (USDZ, OBJ, STL) SceneKit/ModelIO-val
   static func loadScene(_ url: URL) throws -> SCNScene {
     let ext = url.pathExtension.lowercased()
-    if ext == "glb" || ext == "ply" {
+    if ["glb", "gltf", "fbx", "zip", "ply"].contains(ext) {
       return Remix3DFormats.scene(try Remix3DFormats.load(url))
     }
     return try SCNScene(url: url, options: nil)

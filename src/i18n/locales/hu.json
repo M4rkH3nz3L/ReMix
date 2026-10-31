@@ -3615,8 +3615,28 @@
     }
   },
   "model3d": {
+    "import": {
+      "opening": "3D-fájl megnyitása…",
+      "noLidar": "A 3D Stúdió LiDAR-os iPhone-on / iPaden érhető el — ezen az eszközön nem nyitható meg a 3D-fájl.",
+      "title": "3D-fájl importálása",
+      "done": "3D-fájl importálva",
+      "nativeApp": "Ez {{app}}-fájl — a ReMix szabványos formátumot olvas. Exportáld GLB-be (ajánlott), FBX-be vagy OBJ-be, és azt importáld.",
+      "unsupported": "A .{{ext}} fájlt nem tudjuk megnyitni. Támogatott: GLB, glTF, FBX, OBJ, USDZ/USD, PLY, STL vagy ezek zip-ben.",
+      "gltfExternal": "Ez a glTF külön fájlokra (.bin, képek) hivatkozik, amik nem jöttek vele. Csomagold a mappát zip-be, vagy exportáld GLB-be.",
+      "fbxAscii": "Ez szöveges (ASCII) FBX — csak a bináris FBX olvasható. Exportáld újra binárisként, vagy GLB-be.",
+      "zipNoModel": "A zip-ben nincs megnyitható 3D-modell (GLB, glTF, FBX, OBJ, USDZ, PLY, STL).",
+      "unreadable": "A fájlt nem sikerült beolvasni — lehet, hogy sérült, vagy üres a háló."
+    },
+    "ar": {
+      "title": "AR-nézet",
+      "short": "AR"
+    },
     "title": "3D Stúdió",
     "mode": {
+      "import": "3D-fájl importálása",
+      "importDesc": "Meglévő modell Blenderből, Sketchfabról, más szkenner-appból vagy CAD-ből — megtekintés, mérés, AR, export.",
+      "importHow": "GLB, glTF, FBX, OBJ (+MTL), USDZ/USD, PLY, STL — vagy ezek zip-ben (pl. OBJ + textúrák). A Fájlokból, iCloudból, AirDropról.",
+      "importResult": "Eredmény: a modell a projekt mappájában ({{format}}), szinkronizálható a felhővel.",
       "howLabel": "Hogyan:",
       "objectHow": "Tedd jól megvilágított, sima felületre, és lassan járd körbe 2–3 magasságból — az app végig irányít.",
       "objectResult": "Eredmény: textúrás 3D-modell ({{format}}) — a feldolgozás pár perc a telefonon.",

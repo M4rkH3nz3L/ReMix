@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
+import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -16,13 +17,14 @@ import { availableCaptureModes } from '@/lib/deviceCaps';
 import { makeId } from '@/lib/id';
 import { boundsSize, formatLength } from '@/lib/model3d';
 import { addMeasurement, createModel3DDoc, removeMeasurement, replaceModel, setEnvironment } from '@/lib/model3dDoc';
-import { bakeProcessedMesh, lookOptionsJson, modelRotation, simplifyCell, type SimplifyLevel } from '@/lib/model3dLook';
+import { bakeProcessedMesh, hasRotation, lookOptionsJson, modelRotation, simplifyCell, type SimplifyLevel } from '@/lib/model3dLook';
 import { formatArea, measurementValue } from '@/lib/model3dMeasure';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { floorPlanImageDoc } from '@/lib/roomFloorPlan';
 import { roomStats, summarizeRoom } from '@/lib/roomPlanSummary';
 import { saveProject } from '@/lib/storage';
 import { storedFormatFor } from '@/lib/model3dExport';
+import { importExtOf, importProblem, nameFromFile, storableSourceFormat } from '@/lib/model3dImport';
 import { currentModel, model3dAsset } from '@/lib/model3dMedia';
 import { goBackOrHome } from '@/lib/nav';
 import {
@@ -75,7 +77,7 @@ const captureDirFor = (projectId: string) => new Directory(Paths.cache, `m3dcap_
  *    megerősítéssel vet el (a vissza-verem tetején).
  *  • A képkészlet IDEIGLENES (cache), a kész USDZ a lapos `media/`-ba kerül (§15.8).
  */
-export function Model3DStudio({ projectId }: { projectId: string }) {
+export function Model3DStudio({ projectId, importUri }: { projectId: string; importUri?: string }) {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const doc = project?.model3d;
@@ -110,6 +112,7 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   const [wireframe, setWireframe] = useState<WireframeMode>('off');
   const [scanState, setScanState] = useState<MeshScanStateEvent>({ tracking: 'initializing', triangles: 0, light: 1000 });
   const [savingMesh, setSavingMesh] = useState(false);
+  const [importing, setImporting] = useState(false);
   const meshRef = useRef<MeshScanHandle>(null);
   const roomRef = useRef<RoomScanHandle>(null);
   // ☁️ a hálós szkenner módja: élő háló ('mesh') vagy színes pontfelhő ('points')
@@ -577,6 +580,142 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
     }
   };
 
+  /**
+   * 📥 3D-fájl importja (GLB/glTF, FBX, OBJ, USDZ/USD, PLY, STL, zip) — a modell a projekt
+   * TÁROLÁSI formátumába kerül a projekt mappájában (a tárolható forrás változatlanul
+   * másolódik, a többi a natív írókkal alakul át). Az új modell lecseréli a régit (undo).
+   */
+  const importFromFile = async (incoming?: { uri: string; name: string }) => {
+    if (!project || !Remix3D || importing) {
+      return;
+    }
+    let file = incoming;
+    if (!file) {
+      const picked = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
+      if (picked.canceled || picked.assets.length === 0) {
+        return;
+      }
+      file = picked.assets[0];
+    }
+    const problem = importProblem(file.name);
+    if (problem) {
+      Alert.alert(
+        t('model3d.import.title'),
+        problem.code === 'nativeApp'
+          ? t('model3d.import.nativeApp', { app: problem.app })
+          : t('model3d.import.unsupported', { ext: problem.code === 'unsupported' ? problem.ext : '' })
+      );
+      return;
+    }
+    const ext = importExtOf(file.name)!;
+    setImporting(true);
+    setPicking(false);
+    try {
+      // a natív olvasók a kiterjesztésből döntenek → a cache-fájl a saját kiterjesztésével
+      const src = new File(Paths.cache, `m3d_import_${makeId('imp')}.${ext}`);
+      new File(file.uri).copy(src);
+      let info;
+      try {
+        info = await Remix3D.inspectModel(src.uri);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          msg.includes('fbxAscii')
+            ? 'model3d.import.fbxAscii'
+            : msg.includes('zipNoModel')
+              ? 'model3d.import.zipNoModel'
+              : ext === 'gltf'
+                ? 'model3d.import.gltfExternal'
+                : 'model3d.import.unreadable'
+        );
+      }
+      if (useEditorStore.getState().project?.id !== projectId) {
+        return;
+      }
+      const kind = { textured: !!info.textured, points: (info.points ?? 0) > 0 };
+      const want = storedFormatFor(useEditorStore.getState().project?.model3d?.storageFormat ?? doc?.storageFormat, kind);
+      const assetId = makeId('ast');
+      const target = model3dAsset({ assetId, format: want, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: nameFromFile(file.name), textured: kind.textured });
+      let uri: string;
+      if (storableSourceFormat(ext) === want) {
+        src.copy(new File(target.uri));
+        uri = target.uri;
+      } else {
+        uri = await Remix3D.exportModel(src.uri, target.uri, JSON.stringify({ format: want }));
+      }
+      try {
+        src.delete();
+      } catch {
+        // a cache-t a rendszer is takarítja
+      }
+      const stored = await Remix3D.inspectModel(uri);
+      const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
+      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const m: Model3DMesh = {
+        id: makeId('mesh'),
+        assetId,
+        format: want,
+        triangles: stored.triangles,
+        bounds: { min: stored.min, max: stored.max },
+        textured: kind.textured,
+        ...(kind.points ? { points: info.points } : {}),
+      };
+      const base: Model3DDoc = useEditorStore.getState().project?.model3d ?? doc ?? createModel3DDoc();
+      const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, nameFromFile(file.name));
+      useEditorStore.getState().applyBatch(
+        [
+          { type: 'ADD_ASSET', asset: { ...target, uri } },
+          ...removedAssetIds.map((id) => ({ type: 'REMOVE_ASSET' as const, assetId: id })),
+          { type: 'SET_MODEL3D_DOC', doc: { ...next, poster: poster ?? undefined }, label: t('model3d.import.done') },
+        ],
+        'user'
+      );
+      haptics.success();
+      setPhase('viewer');
+    } catch (e) {
+      Alert.alert(t('model3d.import.title'), t(remix3dErrorKey(e)));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // 📲 „Megnyitás a ReMix-szel": a bejövő fájlt a projekt betöltése után EGYSZER importáljuk
+  const incomingDone = useRef(false);
+  useEffect(() => {
+    if (!importUri || incomingDone.current || !project || project.id !== projectId) {
+      return;
+    }
+    incomingDone.current = true;
+    // a router a paramétert már dekódolta → az eredeti file:// URI (a %-kódolás a helyén marad)
+    const uri = importUri;
+    let name = uri.split('/').pop() ?? 'model';
+    try {
+      name = decodeURIComponent(name);
+    } catch {
+      // hibás %-kódolás → a nyers név
+    }
+    void importFromFile({ uri, name });
+    // az import egyszeri — a függőségek közül csak a projekt megérkezése számít
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importUri, project?.id, projectId]);
+
+  /** 🥽 AR Gyorsnézet: a modell USDZ-ként (forgatással) a valós térbe — valós méretben */
+  const openAR = async () => {
+    if (!Remix3D?.presentAR || !asset) {
+      Alert.alert(t('model3d.ar.title'), t('model3d.error.needsNewBuild'));
+      return;
+    }
+    try {
+      const usdz =
+        mesh?.format === 'usdz' && !hasRotation(doc)
+          ? asset.uri
+          : await Remix3D.exportModel(asset.uri, new File(Paths.cache, `m3d_ar_${asset.id}.usdz`).uri, JSON.stringify({ ...JSON.parse(lookOptionsJson(doc)), format: 'usdz' }));
+      await Remix3D.presentAR(usdz);
+    } catch (e) {
+      Alert.alert(t('model3d.ar.title'), t(remix3dErrorKey(e)));
+    }
+  };
+
   // ↩️ a fejléc vissza-gombja rekonstrukció közben megerősítést kér
   const goBack = () => {
     if (!reconstructing.current) {
@@ -852,6 +991,9 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           {modes.includes('object') ? (
             <ModeCard icon="cube-outline" mode="object" format={fmt({ textured: true, points: false })} onPress={startCapture} />
           ) : null}
+          {/* 📥 meglévő 3D-fájl (Blender, Sketchfab, más szkenner-app, CAD …) */}
+          <ModeCard icon="download-outline" mode="import" format={fmt({ textured: true, points: false })} onPress={() => void importFromFile()} />
+          {importing ? <ActivityIndicator color={palette.accent} /> : null}
         </ScrollView>
       </SafeAreaView>
     );
@@ -922,18 +1064,28 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
                 })
                 .catch(() => {});
             }
-            // nincs poszter → egyszer (modellenként) elkészítjük a lista előnézeti képét
-            if (doc && (!doc.poster || !fileExists(doc.poster)) && Remix3D && posterTried.current !== asset.uri) {
+            // nincs (vagy üres) poszter → egyszer (modellenként) elkészítjük a lista előnézeti képét
+            if (doc && Remix3D && posterTried.current !== asset.uri) {
               posterTried.current = asset.uri;
-              const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster.png`;
-              Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(doc))
-                .then((poster) => {
-                  const latest = useEditorStore.getState().project?.model3d;
-                  if (poster && latest) {
-                    useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, poster } }, 'system');
-                  }
-                })
-                .catch(() => {});
+              void (async () => {
+                // hiányzó VAGY üres (régi / háttérben renderelt) poszter → újra
+                const current = doc.poster && fileExists(doc.poster) ? doc.poster : null;
+                if (current && !(await Remix3D.imageIsBlank?.(current).catch(() => false))) {
+                  return;
+                }
+                // új fájlnév: a doc változik (mentés + a lista-bélyegkép frissül), a régi üres
+                // poszter a mappa-takarításnál kiesik
+                const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster_${Date.now().toString(36)}.png`;
+                const poster =
+                  (await Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(doc)).catch(() => null)) ??
+                  // tartalék: a LÁTHATÓ néző képe (a képernyőn lévő GPU-kontextus biztosan rajzol)
+                  (await viewRef.current?.snapshot(posterUri, 512, 512, false).catch(() => null)) ??
+                  null;
+                const latest = useEditorStore.getState().project?.model3d;
+                if (poster && latest) {
+                  useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, poster } }, 'system');
+                }
+              })();
             }
           }}
           onError={() => setLoadFailedUri(asset.uri)}
@@ -1021,6 +1173,8 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
           }}
         />
         <Tool icon="share-outline" label={t('model3d.export.title')} onPress={() => setExportOpen(true)} />
+        {/* 🥽 AR Gyorsnézet — pontfelhőt az AR nem jelenít meg (USDZ háló kell) */}
+        {mesh.points ? null : <Tool icon="cube-outline" label={t('model3d.ar.short')} onPress={() => void openAR()} />}
         <Tool
           icon="scan-outline"
           label={t('model3d.viewer.newScan')}
@@ -1071,7 +1225,7 @@ function ModeCard({
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
-  mode: 'object' | 'freeform' | 'room' | 'pointcloud';
+  mode: 'object' | 'freeform' | 'room' | 'pointcloud' | 'import';
   format: string;
   onPress: () => void;
 }) {

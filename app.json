@@ -18,7 +18,72 @@
         "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "3D Model",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": [
+              "com.pixar.universal-scene-description-mobile",
+              "com.pixar.universal-scene-description",
+              "public.geometry-definition-format",
+              "public.standard-tesselated-geometry-format",
+              "public.polygon-file-format",
+              "org.khronos.gltf.binary",
+              "org.khronos.gltf",
+              "com.autodesk.fbx"
+            ]
+          }
+        ],
+        "UTImportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "org.khronos.gltf.binary",
+            "UTTypeDescription": "glTF Binary 3D Model",
+            "UTTypeConformsTo": [
+              "public.data",
+              "public.content"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "glb"
+              ],
+              "public.mime-type": [
+                "model/gltf-binary"
+              ]
+            }
+          },
+          {
+            "UTTypeIdentifier": "org.khronos.gltf",
+            "UTTypeDescription": "glTF 3D Model",
+            "UTTypeConformsTo": [
+              "public.data",
+              "public.content"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "gltf"
+              ],
+              "public.mime-type": [
+                "model/gltf+json"
+              ]
+            }
+          },
+          {
+            "UTTypeIdentifier": "com.autodesk.fbx",
+            "UTTypeDescription": "Autodesk FBX 3D Model",
+            "UTTypeConformsTo": [
+              "public.data",
+              "public.content"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "fbx"
+              ]
+            }
+          }
+        ],
+        "LSSupportsOpeningDocumentsInPlace": false
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,

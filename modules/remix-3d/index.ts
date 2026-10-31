@@ -41,9 +41,17 @@ export interface Remix3DNative {
   ): Promise<string>;
   inspectModel(modelPath: string): Promise<{
     triangles: number;
+    /** pontfelhőnél a pontszám (saját olvasós formátumoknál) */
+    points?: number;
+    /** van-e textúrája (az import tárolási döntéséhez) */
+    textured?: boolean;
     min: { x: number; y: number; z: number };
     max: { x: number; y: number; z: number };
   }>;
+  /** 🖼️ teljesen üres-e a kép (pl. régi, háttérben renderelt poszter) */
+  imageIsBlank?(path: string): Promise<boolean>;
+  /** 🥽 AR Gyorsnézet (Apple AR Quick Look) — USDZ a valós térben, valós méretben */
+  presentAR?(usdzPath: string): Promise<boolean>;
   /** 🎬 360°-os forgó felvétel → H.264 MP4 (a készüléken); haladás: `onRenderProgress` */
   renderTurntable(
     modelPath: string,

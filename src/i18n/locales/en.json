@@ -3615,8 +3615,28 @@
     }
   },
   "model3d": {
+    "import": {
+      "opening": "Opening 3D file…",
+      "noLidar": "The 3D Studio is available on iPhone / iPad with LiDAR — this device can't open the 3D file.",
+      "title": "Import a 3D file",
+      "done": "3D file imported",
+      "nativeApp": "This is a {{app}} file — ReMix reads standard formats. Export it to GLB (recommended), FBX or OBJ and import that.",
+      "unsupported": "We can't open .{{ext}} files. Supported: GLB, glTF, FBX, OBJ, USDZ/USD, PLY, STL or any of these in a zip.",
+      "gltfExternal": "This glTF references separate files (.bin, images) that didn't come with it. Zip the folder or export to GLB.",
+      "fbxAscii": "This is a text (ASCII) FBX — only binary FBX can be read. Re-export as binary or to GLB.",
+      "zipNoModel": "The zip contains no 3D model we can open (GLB, glTF, FBX, OBJ, USDZ, PLY, STL).",
+      "unreadable": "Couldn't read the file — it may be damaged or the mesh is empty."
+    },
+    "ar": {
+      "title": "AR view",
+      "short": "AR"
+    },
     "title": "3D Studio",
     "mode": {
+      "import": "Import a 3D file",
+      "importDesc": "An existing model from Blender, Sketchfab, another scanner app or CAD — view, measure, AR, export.",
+      "importHow": "GLB, glTF, FBX, OBJ (+MTL), USDZ/USD, PLY, STL — or any of these in a zip (e.g. OBJ + textures). From Files, iCloud, AirDrop.",
+      "importResult": "Result: the model in the project folder ({{format}}), syncable to the cloud.",
       "howLabel": "How:",
       "objectHow": "Place it on a plain, well-lit surface and walk around it slowly at 2–3 heights — the app guides you.",
       "objectResult": "Result: textured 3D model ({{format}}) — processing takes a few minutes on the phone.",

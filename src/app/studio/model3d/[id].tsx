@@ -64,7 +64,7 @@ const AUTOSAVE_MS = 800;
  * minden új modell (új szken) után fut.
  */
 export default function Model3DStudioRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, importUri } = useLocalSearchParams<{ id: string; importUri?: string }>();
   const allowed = isKindAvailable('model3d') && isEditableKind('model3d');
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(allowed);
@@ -125,7 +125,7 @@ export default function Model3DStudioRoute() {
       </View>
     );
   }
-  return <Model3DStudio projectId={id} />;
+  return <Model3DStudio projectId={id} importUri={importUri} />;
 }
 
 const styles = StyleSheet.create({

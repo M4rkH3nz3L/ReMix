@@ -3585,8 +3585,28 @@
     }
   },
   "model3d": {
+    "import": {
+      "opening": "3D-Datei wird geöffnet…",
+      "noLidar": "Das 3D-Studio gibt es auf iPhone / iPad mit LiDAR — dieses Gerät kann die 3D-Datei nicht öffnen.",
+      "title": "3D-Datei importieren",
+      "done": "3D-Datei importiert",
+      "nativeApp": "Das ist eine {{app}}-Datei — ReMix liest Standardformate. Exportiere sie als GLB (empfohlen), FBX oder OBJ und importiere diese.",
+      "unsupported": ".{{ext}}-Dateien können wir nicht öffnen. Unterstützt: GLB, glTF, FBX, OBJ, USDZ/USD, PLY, STL oder diese als zip.",
+      "gltfExternal": "Dieses glTF verweist auf separate Dateien (.bin, Bilder), die nicht mitkamen. Packe den Ordner als zip oder exportiere als GLB.",
+      "fbxAscii": "Das ist ein Text-FBX (ASCII) — nur binäres FBX ist lesbar. Exportiere es erneut binär oder als GLB.",
+      "zipNoModel": "Die zip enthält kein öffenbares 3D-Modell (GLB, glTF, FBX, OBJ, USDZ, PLY, STL).",
+      "unreadable": "Die Datei konnte nicht gelesen werden — sie ist evtl. beschädigt oder das Netz ist leer."
+    },
+    "ar": {
+      "title": "AR-Ansicht",
+      "short": "AR"
+    },
     "title": "3D-Studio",
     "mode": {
+      "import": "3D-Datei importieren",
+      "importDesc": "Ein vorhandenes Modell aus Blender, Sketchfab, einer anderen Scanner-App oder CAD — ansehen, messen, AR, Export.",
+      "importHow": "GLB, glTF, FBX, OBJ (+MTL), USDZ/USD, PLY, STL — oder diese als zip (z. B. OBJ + Texturen). Aus Dateien, iCloud, AirDrop.",
+      "importResult": "Ergebnis: das Modell im Projektordner ({{format}}), mit der Cloud synchronisierbar.",
       "howLabel": "So geht's:",
       "objectHow": "Auf eine glatte, gut beleuchtete Fläche stellen und langsam in 2–3 Höhen umrunden — die App führt dich.",
       "objectResult": "Ergebnis: texturiertes 3D-Modell ({{format}}) — die Verarbeitung dauert ein paar Minuten auf dem Handy.",

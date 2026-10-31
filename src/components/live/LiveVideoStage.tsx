@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom, useDataChannel, useLocalParticipant } from '@livekit/react-native';
+import { LiveKitRoom, useConnectionState, useDataChannel, useLocalParticipant } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -10,6 +10,7 @@ import { LiveComposite } from '@/components/live/LiveComposite';
 import { palette } from '@/constants/editor';
 import { parseScenePayload, sceneHasVisible, type ScenePayload } from '@/lib/liveComposite';
 import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
+import { tokenErrorCode, type LiveErrorCode } from '@/lib/liveState';
 
 /**
  * 🔴 A LiveKit-videó (WebRTC) rétege — MINDEN WebRTC-függő import ide van szigetelve
@@ -34,6 +35,10 @@ export interface LiveVideoStageProps {
   hostId?: string;
   /** néző: a host (LiveKit-hitelesített) jelenet-állapota */
   onScene?: (payload: ScenePayload) => void;
+  /** 🚦 a média-kapcsolat állapota (az állapotgép hiteles forrása — L13) */
+  onConnection?: (state: 'connected' | 'reconnecting' | 'disconnected') => void;
+  /** végleges hiba (befejezett / nem létező adás, megtagadott engedély) — nincs újrapróba */
+  onFatal?: (code: LiveErrorCode) => void;
 }
 
 /** A host mikrofon-némítás alkalmazása a LiveKitre (a <LiveKitRoom>-on BELÜL). */
@@ -136,6 +141,21 @@ function SceneDataReceiver({ hostId, onScene }: { hostId: string; onScene: (p: S
   return null;
 }
 
+/** a LiveKit kapcsolat-állapotát továbbítja (a „reconnecting" csak így látszik) */
+function ConnectionReporter({ onConnection }: { onConnection: (s: 'connected' | 'reconnecting' | 'disconnected') => void }) {
+  const state = useConnectionState();
+  const cb = useRef(onConnection);
+  useEffect(() => {
+    cb.current = onConnection;
+  }, [onConnection]);
+  useEffect(() => {
+    if (state === 'connected') cb.current('connected');
+    else if (state === 'reconnecting' || state === 'signalReconnecting') cb.current('reconnecting');
+    else if (state === 'disconnected') cb.current('disconnected');
+  }, [state]);
+  return null;
+}
+
 export default function LiveVideoStage({
   liveId,
   publish,
@@ -146,6 +166,8 @@ export default function LiveVideoStage({
   micMuted,
   hostId,
   onScene,
+  onConnection,
+  onFatal,
 }: LiveVideoStageProps) {
   const { t } = useTranslation();
   const [, requestCam] = useCameraPermissions();
@@ -156,6 +178,10 @@ export default function LiveVideoStage({
   // pislákol), a „Kapcsolódás…" NEM ragad be némán — amint a `/live/token` válaszol,
   // belépünk a szobába. Pár sikertelen próba után „Újracsatlakozás…"-ra váltunk.
   const [retrying, setRetrying] = useState(false);
+  const onFatalRef = useRef(onFatal);
+  useEffect(() => {
+    onFatalRef.current = onFatal;
+  }, [onFatal]);
 
   useEffect(() => {
     let active = true;
@@ -165,8 +191,17 @@ export default function LiveVideoStage({
       if (!active) {
         return;
       }
-      const tok = await fetchLiveToken(liveId, publish, name, userId).catch(() => null);
+      let fatal: LiveErrorCode | null = null;
+      const tok = await fetchLiveToken(liveId, publish, name, userId).catch((e: Error) => {
+        // a befejezett / nem létező adásra NINCS újrapróba (a szerver 404/410-et ad)
+        fatal = tokenErrorCode(String(e?.message ?? ''));
+        return null;
+      });
       if (!active) {
+        return;
+      }
+      if (fatal) {
+        onFatalRef.current?.(fatal);
         return;
       }
       if (tok) {
@@ -183,8 +218,12 @@ export default function LiveVideoStage({
     (async () => {
       ensureLiveKit();
       if (publish) {
-        await requestCam();
-        await requestMic();
+        // 🔐 L28: a megtagadott engedély NEM csendes — a host érthető hibát kap
+        const cam = await requestCam().catch(() => null);
+        const mic = await requestMic().catch(() => null);
+        if (!cam?.granted || !mic?.granted) {
+          onFatalRef.current?.('permission');
+        }
       }
       await attemptFetch();
     })();
@@ -215,7 +254,15 @@ export default function LiveVideoStage({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <LiveKitRoom serverUrl={lk.url} token={lk.token} connect audio={publish} video={publish}>
+      <LiveKitRoom
+        serverUrl={lk.url}
+        token={lk.token}
+        connect
+        audio={publish}
+        video={publish}
+        onDisconnected={() => onConnection?.('disconnected')}
+      >
+        {onConnection ? <ConnectionReporter onConnection={onConnection} /> : null}
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />
         {publish && <MicControl muted={micMuted ?? false} />}
         {publish && <ScreenShareControl wantScreen={scene ? sceneHasVisible(scene, 'screen') : false} />}

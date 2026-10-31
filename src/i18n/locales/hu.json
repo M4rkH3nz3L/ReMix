@@ -3947,6 +3947,30 @@
     "empty": "Még nincs poszt."
   },
   "live": {
+    "state": {
+      "connecting": "Kapcsolódás…",
+      "reconnecting": "Újracsatlakozás…",
+      "retry": "Újrapróbálás",
+      "error_reconnectTimeout": "Megszakadt a kapcsolat, és 30 mp alatt nem jött vissza. A nézők most nem látják az adást.",
+      "error_ended": "Ez az adás már véget ért.",
+      "error_notFound": "Ez az adás nem található.",
+      "error_permission": "A kamera vagy a mikrofon nincs engedélyezve — a Beállításokban engedélyezd a ReMix számára.",
+      "error_token": "Nem sikerült csatlakozni az élő szerverhez.",
+      "error_unknown": "Hiba történt az adásban."
+    },
+    "egress": {
+      "title": "Multistream / felvétel",
+      "starting": "Indul…",
+      "failed": "Nem fut",
+      "recording": "Felvétel",
+      "on": "{{count}} platform",
+      "skipped": "Ezek a célok kimaradtak (érvénytelen vagy belső cím): {{names}}",
+      "reason_needsPro": "A multistream és a felhős felvétel Pro-funkció — a ReMix-en belül az adás megy tovább.",
+      "reason_busy": "Már fut egy multistream — állítsd le az előzőt, aztán indítsd újra az adást.",
+      "reason_unavailable": "A multistream-szolgáltatás most nem érhető el — a ReMix-en belül az adás megy tovább.",
+      "reason_noTargets": "Nincs engedélyezett platform-cél, és a felvétel sincs bekapcsolva.",
+      "reason_unknown": "A multistream nem indult el — a ReMix-en belül az adás megy tovább."
+    },
     "dest": {
       "errUrl": "Érvénytelen RTMP-cím.",
       "errScheme": "Csak rtmp:// vagy rtmps:// cím adható meg (a platform „Stream URL\"-je).",

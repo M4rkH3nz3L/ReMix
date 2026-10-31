@@ -3917,6 +3917,30 @@
     "empty": "Noch keine Beiträge."
   },
   "live": {
+    "state": {
+      "connecting": "Verbinde…",
+      "reconnecting": "Verbindung wird wiederhergestellt…",
+      "retry": "Erneut versuchen",
+      "error_reconnectTimeout": "Die Verbindung brach ab und kam in 30 s nicht zurück. Zuschauer sehen den Stream gerade nicht.",
+      "error_ended": "Dieser Stream ist beendet.",
+      "error_notFound": "Dieser Stream wurde nicht gefunden.",
+      "error_permission": "Kamera oder Mikrofon sind nicht erlaubt — erlaube sie für ReMix in den Einstellungen.",
+      "error_token": "Verbindung zum Live-Server fehlgeschlagen.",
+      "error_unknown": "Beim Stream ist ein Fehler aufgetreten."
+    },
+    "egress": {
+      "title": "Multistream / Aufnahme",
+      "starting": "Startet…",
+      "failed": "Läuft nicht",
+      "recording": "Aufnahme",
+      "on": "{{count}} Plattformen",
+      "skipped": "Diese Ziele wurden übersprungen (ungültige oder interne Adresse): {{names}}",
+      "reason_needsPro": "Multistreaming und Cloud-Aufnahme sind Pro-Funktionen — in ReMix läuft der Stream weiter.",
+      "reason_busy": "Es läuft bereits ein Multistream — beende ihn und starte den Stream neu.",
+      "reason_unavailable": "Der Multistream-Dienst ist gerade nicht verfügbar — in ReMix läuft der Stream weiter.",
+      "reason_noTargets": "Kein Plattformziel aktiviert und Aufnahme aus.",
+      "reason_unknown": "Der Multistream ist nicht gestartet — in ReMix läuft der Stream weiter."
+    },
     "dest": {
       "errUrl": "Ungültige RTMP-Adresse.",
       "errScheme": "Nur rtmp:// oder rtmps:// sind erlaubt (die „Stream-URL\" der Plattform).",

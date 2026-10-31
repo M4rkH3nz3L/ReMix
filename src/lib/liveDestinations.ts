@@ -183,6 +183,8 @@ export interface EgressStart {
   destinations: { id: string; platform: LivePlatform; label: string }[];
   /** 📼 D158: a VOD publikus URL-je (ha az egress S3-ba is rögzít), vagy null. */
   vodUrl?: string | null;
+  /** a szerver által kihagyott (érvénytelen / belső) célok (L7) */
+  skipped?: { id: string; label: string; error: string }[];
 }
 
 /**

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -24,6 +24,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { palette } from '@/constants/editor';
 import { encodeScenePayload, type ScenePayload } from '@/lib/liveComposite';
+import {
+  egressFailure,
+  initialLiveState,
+  isOnAir,
+  liveReducer,
+  type EgressStatus,
+  type LiveErrorCode,
+} from '@/lib/liveState';
 import {
   bumpViewerPeak,
   buildLiveSelf,
@@ -180,6 +188,27 @@ export default function LiveRoomScreen() {
   const [micMuted, setMicMuted] = useState(false);
   // 🔴 host: az adás kezdetének ms-időbélyege a live-timerhez (0 = még nem él)
   const [liveStartMs, setLiveStartMs] = useState(0);
+  // 🚦 az adás ÁLLAPOTGÉPE (L13) — a média-kapcsolat eseményei hajtják, nem a UI
+  const [ls, dispatchLs] = useReducer(liveReducer, undefined, () => initialLiveState(0));
+  // 📡 az egress (multistream / felhős felvétel) LÁTHATÓ állapota (L17 — eddig elnyelve)
+  const [egress, setEgress] = useState<EgressStatus>({ state: 'off' });
+  // újrapróbánál a videó-réteg újracsatlakozik (új kulcs → remount)
+  const [stageKey, setStageKey] = useState(0);
+  // a hosszú életű (session-) effekt a friss fordítót használja — nem indul újra nyelvváltáskor
+  const tRef = useRef(t);
+  tRef.current = t;
+  const onConnection = useCallback((st: 'connected' | 'reconnecting' | 'disconnected') => {
+    dispatchLs({ type: st === 'connected' ? 'CONNECTED' : 'DISCONNECTED', at: Date.now() });
+  }, []);
+  const onFatal = useCallback((code: LiveErrorCode) => {
+    dispatchLs({ type: 'FAIL', at: Date.now(), error: code });
+  }, []);
+  // ⏱️ újracsatlakozás közben másodpercenként: az időkorlát után hiba (nem ragad „ÉLŐ"-ben)
+  useEffect(() => {
+    if (ls.phase !== 'reconnecting') return;
+    const timer = setInterval(() => dispatchLs({ type: 'TICK', at: Date.now() }), 1000);
+    return () => clearInterval(timer);
+  }, [ls.phase]);
 
   const roomRef = useRef<LiveRoom | null>(null);
   const liveDocRef = useRef<LiveDoc | null>(null); // host: a live-produkció doc (Studio)
@@ -248,6 +277,7 @@ export default function LiveRoomScreen() {
         return;
       }
       setSelf(self); // → a LiveVideoStage ebből szerzi a videó-tokent (lazy)
+      dispatchLs({ type: 'CONNECT', at: Date.now() });
       roomRef.current = openLiveRoom(liveId, self, {
         onChat: (m) => setChat((prev) => [...prev.slice(-80), m]),
         onReaction: (emoji) => addFloat(emoji),
@@ -281,16 +311,31 @@ export default function LiveRoomScreen() {
           //    nem-Pro / nincs egress-infra esetén az egress csendben kimarad.
           const wantRecord = proj.live.record ?? false;
           hasEnabledTargets()
-            .then((has) =>
-              (has || wantRecord) && active ? startLiveEgress(liveId, wantRecord, proj.aspectRatio) : null,
-            )
+            .then((has) => {
+              if (!(has || wantRecord) || !active) return null;
+              setEgress({ state: 'starting' });
+              return startLiveEgress(liveId, wantRecord, proj.aspectRatio);
+            })
             .then((r) => {
-              if (r && active) {
-                egressIdRef.current = r.egressId;
-                vodUrlRef.current = r.vodUrl ?? null; // 📼 D158: felvett VOD (ha van)
+              if (!r) return;
+              if (!active || endedRef.current) {
+                // 🔐 L15: az adás közben véget ért → az árva egresst AZONNAL leállítjuk
+                void stopLiveEgress(r.egressId);
+                return;
+              }
+              egressIdRef.current = r.egressId;
+              vodUrlRef.current = r.vodUrl ?? null; // 📼 D158: felvett VOD (ha van)
+              setEgress({ state: 'on', destinations: r.destinations.length, recording: !!r.vodUrl, skipped: r.skipped?.length ?? 0 });
+              if (r.skipped?.length) {
+                Alert.alert(tRef.current('live.egress.title'), tRef.current('live.egress.skipped', { names: r.skipped.map((d) => d.label).join(', ') }));
               }
             })
-            .catch(() => {});
+            .catch((e: Error) => {
+              // L17: a hiba LÁTHATÓ (eddig elnyelve → a host azt hitte, multistreamel)
+              const reason = egressFailure(String(e?.message ?? ''));
+              setEgress({ state: 'failed', reason });
+              if (active) Alert.alert(tRef.current('live.egress.title'), tRef.current(`live.egress.reason_${reason}`));
+            });
         }
       }
     })();
@@ -322,11 +367,13 @@ export default function LiveRoomScreen() {
   const onEndOrLeave = async () => {
     if (isHost && session && !endedRef.current) {
       endedRef.current = true;
+      dispatchLs({ type: 'STOP', at: Date.now() });
       if (egressIdRef.current) {
         void stopLiveEgress(egressIdRef.current); // 🎥 multistream leállítása
         egressIdRef.current = null;
       }
       await endLive(session.id).catch(() => {});
+      dispatchLs({ type: 'STOPPED', at: Date.now() });
       const vod = vodUrlRef.current;
       const proj = liveProjRef.current;
       const record = liveDocRef.current?.record ?? false;
@@ -402,7 +449,8 @@ export default function LiveRoomScreen() {
     };
   }, [isHost, session, projectParam]);
 
-  if (notFound) {
+  // a néző: a befejezett / nem létező adás → „véget ért" nézet (nem végtelen „Kapcsolódás…")
+  if (notFound || (!isHost && ls.phase === 'error' && (ls.error === 'ended' || ls.error === 'notFound'))) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
@@ -449,6 +497,7 @@ export default function LiveRoomScreen() {
           <ErrorBoundary>
             <Suspense fallback={<ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />}>
               <LiveVideoStage
+                key={stageKey}
                 liveId={String(id)}
                 publish={isHost}
                 name={self.name}
@@ -458,6 +507,8 @@ export default function LiveRoomScreen() {
                 micMuted={micMuted}
                 hostId={session.hostId}
                 onScene={setScene}
+                onConnection={onConnection}
+                onFatal={onFatal}
               />
             </Suspense>
           </ErrorBoundary>
@@ -489,8 +540,37 @@ export default function LiveRoomScreen() {
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.viewerCount}>{viewers}</Text>
           </View>
-          {/* 🔴 host: mióta tart az adás (live-timer) */}
-          {isHost && liveStartMs > 0 && (
+          {/* 🚦 a kapcsolat valós állapota (nem ragad „ÉLŐ"-ben) */}
+          {ls.phase === 'connecting' || ls.phase === 'reconnecting' ? (
+            <View style={[styles.stateChip, ls.phase === 'reconnecting' && styles.stateChipWarn]} accessibilityLiveRegion="polite">
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.stateChipText}>{t(`live.state.${ls.phase}`)}</Text>
+            </View>
+          ) : null}
+          {/* 📡 host: multistream / felvétel állapota */}
+          {isHost && egress.state !== 'off' ? (
+            <Pressable
+              onPress={() =>
+                egress.state === 'failed' ? Alert.alert(t('live.egress.title'), t(`live.egress.reason_${egress.reason}`)) : undefined
+              }
+              style={[styles.stateChip, egress.state === 'failed' && styles.stateChipWarn]}
+              accessibilityRole="button"
+              accessibilityLabel={t('live.egress.title')}
+            >
+              <Ionicons name={egress.state === 'failed' ? 'alert-circle' : 'radio'} size={14} color="#fff" />
+              <Text style={styles.stateChipText}>
+                {egress.state === 'starting'
+                  ? t('live.egress.starting')
+                  : egress.state === 'failed'
+                    ? t('live.egress.failed')
+                    : egress.recording && egress.destinations === 0
+                      ? t('live.egress.recording')
+                      : t('live.egress.on', { count: egress.destinations })}
+              </Text>
+            </Pressable>
+          ) : null}
+          {/* 🔴 host: mióta tart az adás (live-timer) — csak ha TÉNYLEG élőben vagyunk */}
+          {isHost && liveStartMs > 0 && isOnAir(ls) && (
             <View style={styles.timerChip}>
               <View style={styles.liveDot} />
               <LiveTimer startMs={liveStartMs} />
@@ -510,6 +590,30 @@ export default function LiveRoomScreen() {
             <Text style={styles.closeText}>{isHost ? t('live.endLive') : t('live.leave')}</Text>
           </Pressable>
         </View>
+
+        {/* 🚦 hiba-sáv: mi történt + mit tehet (újrapróba / befejezés) — nem ragad „ÉLŐ"-ben */}
+        {ls.phase === 'error' ? (
+          <View style={styles.errorBanner} accessibilityRole="alert">
+            <Text style={styles.errorText}>{t(`live.state.error_${ls.error ?? 'unknown'}`)}</Text>
+            <View style={styles.errorActions}>
+              {ls.error === 'reconnectTimeout' ? (
+                <Pressable
+                  style={styles.errorBtn}
+                  onPress={() => {
+                    dispatchLs({ type: 'RETRY', at: Date.now() });
+                    setStageKey((k) => k + 1);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.errorBtnText}>{t('live.state.retry')}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={[styles.errorBtn, styles.errorBtnDanger]} onPress={() => void onEndOrLeave()} accessibilityRole="button">
+                <Text style={styles.errorBtnText}>{isHost ? t('live.endLive') : t('live.leave')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         <Text style={styles.liveTitle} numberOfLines={2}>
           {session.title}
@@ -603,7 +707,39 @@ const styles = StyleSheet.create({
   floatEmoji: { position: 'absolute', bottom: 0, right: 0, fontSize: 30 },
 
   overlay: { flex: 1, paddingHorizontal: 14 },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
+  stateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 30,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    backgroundColor: '#00000088',
+  },
+  stateChipWarn: { backgroundColor: '#b26a00cc' },
+  stateChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  errorBanner: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#3a0d14ee',
+    borderWidth: 1,
+    borderColor: palette.danger,
+    gap: 10,
+  },
+  errorText: { color: '#fff', fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  errorActions: { flexDirection: 'row', gap: 10 },
+  errorBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff22',
+  },
+  errorBtnDanger: { backgroundColor: palette.danger },
+  errorBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   hostChip: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -2763,6 +2763,7 @@
     },
     "capabilities": {
       "label": {
+        "liveCloud": "Live multistream + felhős felvétel",
         "localRender": "Export az eszközön",
         "lidarScan": "LiDAR 3D-szken",
         "model3dExport": "3D-export",

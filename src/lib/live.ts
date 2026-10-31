@@ -93,18 +93,26 @@ export async function startLive(title: string): Promise<LiveSession> {
     .select('username')
     .eq('id', self.id)
     .maybeSingle();
-  const { data, error } = await sb
-    .from('live_sessions')
-    .insert({
-      host_id: self.id,
-      title: title.trim() || 'Élő',
-      status: 'live',
-      host_username: (prof?.username as string | undefined) ?? null,
-      host_name: self.name,
-      host_avatar: self.avatar,
-    })
-    .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
-    .single();
+  const insert = () =>
+    sb
+      .from('live_sessions')
+      .insert({
+        host_id: self.id,
+        title: title.trim() || 'Élő',
+        status: 'live',
+        host_username: (prof?.username as string | undefined) ?? null,
+        host_name: self.name,
+        host_avatar: self.avatar,
+      })
+      .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
+      .single();
+  let { data, error } = await insert();
+  // 🩹 L14: egy korábbi (crash / app-kill után) beragadt „live" session az egyedi index miatt
+  // blokkolta az új adást → a host SAJÁT beragadt sessionjeit lezárjuk, és újrapróbáljuk
+  if (error && (error.code === '23505' || /duplicate key|one_live_per_host/i.test(error.message))) {
+    await sb.from('live_sessions').update({ status: 'ended' }).eq('host_id', self.id).eq('status', 'live');
+    ({ data, error } = await insert());
+  }
   if (error) {
     throw new Error(error.message);
   }
@@ -123,6 +131,19 @@ export async function endLive(id: string): Promise<void> {
   }
 }
 
+/**
+ * 💓 L14: a host 30 mp-enként „él még" jelet küld — a szerveres sweep a jel nélküli
+ * (crash / app-kill) sessiont lezárja, a „Most élő" lista pedig csak a friss adásokat mutatja.
+ * Best-effort (a migráció előtti szerveren a mező hiányzik → csendben kimarad).
+ */
+export async function heartbeatLive(id: string): Promise<void> {
+  const sb = requireSupabase();
+  await sb.from('live_sessions').update({ last_heartbeat: new Date().toISOString() }).eq('id', id).eq('status', 'live');
+}
+
+/** a „Most élő" lista frissességi küszöbe (ennél régebbi heartbeat = szellem-session) */
+export const LIVE_STALE_MS = 3 * 60 * 1000;
+
 /** A frissen induló élő `viewer_peak`-jének emelése, ha a jelenlegi nézőszám nagyobb. */
 export async function bumpViewerPeak(id: string, current: number): Promise<void> {
   const sb = requireSupabase();
@@ -133,16 +154,23 @@ export async function bumpViewerPeak(id: string, current: number): Promise<void>
 /** A „most élőben" lista. */
 export async function listLiveNow(limit = 50): Promise<LiveSession[]> {
   const sb = requireSupabase();
-  const { data, error } = await sb
+  const cols = 'id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak';
+  const fresh = new Date(Date.now() - LIVE_STALE_MS).toISOString();
+  // 🩹 L14: a heartbeat nélküli (beragadt) session nem jelenik meg „élőként"
+  let res = await sb
     .from('live_sessions')
-    .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
+    .select(cols)
     .eq('status', 'live')
+    .gt('last_heartbeat', fresh)
     .order('started_at', { ascending: false })
     .limit(limit);
-  if (error) {
-    throw new Error(error.message);
+  if (res.error && /last_heartbeat/.test(res.error.message)) {
+    res = await sb.from('live_sessions').select(cols).eq('status', 'live').order('started_at', { ascending: false }).limit(limit);
   }
-  return ((data ?? []) as RawLive[]).map(mapLive);
+  if (res.error) {
+    throw new Error(res.error.message);
+  }
+  return ((res.data ?? []) as RawLive[]).map(mapLive);
 }
 
 /** A KÖVETETT hostok élő adásai (a feed „LIVE now" sávjához). */

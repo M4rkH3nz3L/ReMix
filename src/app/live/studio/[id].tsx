@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
+import { capabilityAllowed } from '@/lib/capabilities';
 import { makeId } from '@/lib/id';
 import { startLive } from '@/lib/live';
 import {
@@ -30,6 +31,7 @@ import {
   removeSource,
   reorderSource,
   setActiveScene,
+  repairLiveDoc,
   setRecord,
   setTitle as setDocTitle,
   sortedSources,
@@ -55,6 +57,8 @@ import {
 } from '@/lib/liveDestinations';
 import { deleteProject, loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { usePaywall } from '@/store/paywallStore';
 import type {
   LiveChannelId,
   LiveDoc,
@@ -279,8 +283,14 @@ export default function LiveStudioScreen() {
           setLoadError(true);
           return;
         }
-        useEditorStore.getState().loadProject(loaded, events);
-        setTitleDraft(loaded.live?.title ?? loaded.name);
+        // 🩹 L21: hibás / hiányos live-doc → helyreállítva (eddig végtelen spinner)
+        const { doc: liveDoc, repaired } = repairLiveDoc(loaded.live, loaded.name, () => makeId('live'));
+        const project = repaired ? { ...loaded, live: liveDoc } : loaded;
+        if (repaired) {
+          void saveProject(project).catch(() => {});
+        }
+        useEditorStore.getState().loadProject(project, events);
+        setTitleDraft(liveDoc.title ?? loaded.name);
       })
       .catch(() => active && setLoadError(true));
     loadDests();
@@ -583,7 +593,15 @@ export default function LiveStudioScreen() {
             KI → NINCS projekt (a live csak élő adás, nem keletkezik üres-projekt). */}
         <Text style={styles.sectionLabel}>{t('live.studio.recordSection', { defaultValue: 'Rögzítés' })}</Text>
         <Pressable
-          onPress={() => commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on')}
+          onPress={() => {
+            // 💳 L18: a felhős felvétel Pro (szerveres egress) — Free usernél a Pro-ajánlat,
+            // nem egy csendben elbukó (402) „rögzítés" ígéret
+            if (!live.record && !capabilityAllowed('liveCloud', useEntitlement.getState().effectiveTier())) {
+              usePaywall.getState().open('liveCloud');
+              return;
+            }
+            commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on');
+          }}
           style={[styles.recordRow, live.record && styles.recordRowOn]}
         >
           <Ionicons

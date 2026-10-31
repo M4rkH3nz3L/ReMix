@@ -259,10 +259,14 @@ if (require.main === module) {
 
   // 💰 F3: a túl hosszú élő-adásokat (egress) periodikusan auto-stop (költségkontroll).
   // Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
-  const { sweepStaleEgress } = require('./liveEgress');
+  const { sweepStaleEgress, reconcileLive } = require('./liveEgress');
   setInterval(() => {
     sweepStaleEgress().catch(() => {});
   }, 5 * 60 * 1000).unref();
+  // 🩹 PRO-LIVE L14/L16: beragadt sessionök + az egress valós (LiveKit) állapotának egyeztetése
+  setInterval(() => {
+    reconcileLive().catch(() => {});
+  }, 60 * 1000).unref();
 
   // 🗑️ GDPR hard-erase sweep (03-production §03.4): a lejárt-cooldownú soft-delete-elt
   // fiókok NAPONTA automatikusan véglegesen törlődnek (storage-purge + auth-user-delete +

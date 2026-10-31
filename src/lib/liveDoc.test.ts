@@ -1,5 +1,6 @@
 import {
   activeScene,
+  repairLiveDoc,
   addDestination,
   addScene,
   addSource,
@@ -265,5 +266,24 @@ describe('📼 record (felvétel) + adás-vége disposition', () => {
     expect(liveEndDisposition(false, true)).toBe('delete-config'); // nem rögzít → törlés (clutter-fix)
     expect(liveEndDisposition(false, false)).toBe('delete-config');
     expect(liveEndDisposition(undefined, true)).toBe('delete-config'); // hiányzó flag = nem rögzít
+  });
+});
+
+describe('repairLiveDoc (PRO-LIVE L21)', () => {
+  let n = 0;
+  const gid = () => `id${n++}`;
+  it('hiányzó / jelenet nélküli doc → új alap-doc', () => {
+    expect(repairLiveDoc(undefined, 'Show', gid)).toMatchObject({ repaired: true });
+    expect(repairLiveDoc({ scenes: [] }, 'Show', gid).doc.scenes.length).toBeGreaterThan(0);
+  });
+  it('sérült részek pótolva, az ép doc változatlan', () => {
+    const ok = createLiveDoc('Show', gid);
+    expect(repairLiveDoc(ok, 'Show', gid)).toEqual({ doc: ok, repaired: false });
+    const broken = { ...ok, activeSceneId: 'nincs', destinations: undefined, scenes: [{ ...ok.scenes[0], sources: null }] };
+    const r = repairLiveDoc(broken, 'Show', gid);
+    expect(r.repaired).toBe(true);
+    expect(r.doc.activeSceneId).toBe(ok.scenes[0].id);
+    expect(r.doc.scenes[0].sources).toEqual([]);
+    expect(r.doc.destinations).toEqual([]);
   });
 });

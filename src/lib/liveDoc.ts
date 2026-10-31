@@ -349,3 +349,43 @@ function mapScene(doc: LiveDoc, sceneId: string, fn: (s: LiveScene) => LiveScene
   }
   return { ...doc, scenes: doc.scenes.map((s) => (s.id === sceneId ? fn(s) : s)) };
 }
+
+/**
+ * 🩹 PRO-LIVE L21 — hibás / hiányos `project.live` helyreállítása (eddig végtelen spinner).
+ * Hiányzó vagy jelenet nélküli doc → új alap-doc; sérült részek (nem tömb jelenetek/források,
+ * érvénytelen aktív jelenet, hiányzó célok) pótolva. → { doc, repaired }
+ */
+export function repairLiveDoc(raw: unknown, title: string, genId: GenId): { doc: LiveDoc; repaired: boolean } {
+  const d = raw as Partial<LiveDoc> | null | undefined;
+  if (!d || typeof d !== 'object' || !Array.isArray(d.scenes) || d.scenes.length === 0) {
+    return { doc: createLiveDoc(title, genId), repaired: true };
+  }
+  let repaired = false;
+  const scenes = d.scenes
+    .filter((sc): sc is LiveScene => !!sc && typeof sc === 'object' && typeof (sc as LiveScene).id === 'string')
+    .map((sc) => {
+      if (Array.isArray(sc.sources)) return sc;
+      repaired = true;
+      return { ...sc, sources: [] };
+    });
+  if (scenes.length !== d.scenes.length) repaired = true;
+  if (scenes.length === 0) return { doc: createLiveDoc(title, genId), repaired: true };
+  const activeSceneId = scenes.some((sc) => sc.id === d.activeSceneId) ? (d.activeSceneId as string) : scenes[0].id;
+  if (activeSceneId !== d.activeSceneId) repaired = true;
+  const destinations = Array.isArray(d.destinations) ? d.destinations : [];
+  if (!Array.isArray(d.destinations)) repaired = true;
+  const titleOk = typeof d.title === 'string' && d.title.length > 0;
+  if (!titleOk) repaired = true;
+  return {
+    doc: {
+      ...(d as LiveDoc),
+      title: titleOk ? (d.title as string) : title,
+      visibility: d.visibility ?? 'public',
+      scenes,
+      activeSceneId,
+      destinations,
+    },
+    repaired,
+  };
+}
+

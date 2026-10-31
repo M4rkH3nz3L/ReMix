@@ -37,6 +37,7 @@ import {
   buildLiveSelf,
   endLive,
   getLive,
+  heartbeatLive,
   LIVE_REACTIONS,
   myUserId,
   openLiveRoom,
@@ -364,6 +365,32 @@ export default function LiveRoomScreen() {
     // a sajátot azonnal is megmutatjuk (a broadcast self:true visszahozza, de ne lógjon)
   };
 
+  /**
+   * 📼 a felvett VOD → szerkeszthető video-projekt (mentve). Az adás-vége ÉS a hirtelen
+   * kilépés (vissza-gesztus / unmount) is ezt hívja — eddig unmountkor a VOD elveszett (L19).
+   */
+  const importVod = (): Project | null => {
+    const vod = vodUrlRef.current;
+    const proj = liveProjRef.current;
+    const record = liveDocRef.current?.record ?? false;
+    if (liveEndDisposition(record, !!vod) !== 'import-vod' || !vod || !proj) {
+      return null;
+    }
+    vodUrlRef.current = null;
+    // ⏱️ a VOD becsült hossza = az adás eltelt ideje (az editor betöltéskor pontosítja)
+    const elapsedSec = startStampRef.current > 0 ? (Date.now() - startStampRef.current) / 1000 : 0;
+    const vodProject = buildVodProject({
+      vodUrl: vod,
+      durationSec: elapsedSec,
+      fps: projectFps(proj),
+      makeId: () => makeId('clip'),
+      name: proj.live?.title || proj.name || t('live.vodDefaultName', { defaultValue: 'Live' }),
+      aspectRatio: proj.aspectRatio,
+    });
+    void saveProject(vodProject).catch(() => {});
+    return vodProject;
+  };
+
   const onEndOrLeave = async () => {
     if (isHost && session && !endedRef.current) {
       endedRef.current = true;
@@ -375,26 +402,11 @@ export default function LiveRoomScreen() {
       await endLive(session.id).catch(() => {});
       dispatchLs({ type: 'STOPPED', at: Date.now() });
       const vod = vodUrlRef.current;
-      const proj = liveProjRef.current;
-      const record = liveDocRef.current?.record ?? false;
       // 📼 record=be + van felvétel (VOD) → a felvételből SZERKESZTHETŐ video-projekt
       //    (LIVE/05.1): a VOD a fő videosávon lévő klip (command-bus). KÜLÖNBEN a
       //    transient live-config projekt TÖRLŐDIK → nincs üres-projekt clutter.
-      if (liveEndDisposition(record, !!vod) === 'import-vod' && vod && proj) {
-        vodUrlRef.current = null;
-        // ⏱️ a VOD becsült hossza = az adás eltelt ideje (a tényleges hosszt az editor
-        //    a videó betöltésekor pontosítja); a klip a projekt frame-rácsára ül.
-        //    (startStamp=0 → nem indult el a mérés; 0 hosszt adunk, a builder 1 kockára emeli.)
-        const elapsedSec = startStampRef.current > 0 ? (Date.now() - startStampRef.current) / 1000 : 0;
-        const vodProject = buildVodProject({
-          vodUrl: vod,
-          durationSec: elapsedSec,
-          fps: projectFps(proj),
-          makeId: () => makeId('clip'),
-          name: proj.live?.title || proj.name || 'Live felvétel',
-          aspectRatio: proj.aspectRatio,
-        });
-        void saveProject(vodProject).catch(() => {});
+      const vodProject = importVod();
+      if (vodProject && vod) {
         // 🧹 a transient live-config projekt törlése (a VOD-projekt az új otthon)
         if (projectParam) {
           void deleteProject(String(projectParam)).catch(() => {});
@@ -441,13 +453,29 @@ export default function LiveRoomScreen() {
           egressIdRef.current = null;
         }
         void endLive(session.id).catch(() => {});
-        // 🧹 hirtelen kilépés + nem rögzít → a transient live-config projekt törlése (nincs clutter)
-        if (!liveDocRef.current?.record && projectParam) {
+        // 📼 hirtelen kilépés RÖGZÍTÉSSEL → a VOD-projekt így is elkészül (L19)
+        const vodProject = importVod();
+        // 🧹 hirtelen kilépés + nem rögzít (vagy a VOD már projekt) → a transient config törlése
+        if ((vodProject || !liveDocRef.current?.record) && projectParam) {
           void deleteProject(String(projectParam)).catch(() => {});
         }
       }
     };
+    // az importVod a refekből dolgozik — a cleanup csak a session/host-váltásra fusson újra
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost, session, projectParam]);
+
+  // 💓 L14: a host 30 mp-enként „él még" jelet küld (a szerveres sweep a jel nélküli,
+  // beragadt sessiont lezárja; a „Most élő" lista csak a friss adásokat mutatja)
+  useEffect(() => {
+    if (!isHost || !session) return;
+    const beat = () => {
+      if (!endedRef.current) void heartbeatLive(session.id).catch(() => {});
+    };
+    beat();
+    const timer = setInterval(beat, 30_000);
+    return () => clearInterval(timer);
+  }, [isHost, session]);
 
   // a néző: a befejezett / nem létező adás → „véget ért" nézet (nem végtelen „Kapcsolódás…")
   if (notFound || (!isHost && ls.phase === 'error' && (ls.error === 'ended' || ls.error === 'notFound'))) {

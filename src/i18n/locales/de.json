@@ -2763,6 +2763,7 @@
     },
     "capabilities": {
       "label": {
+        "liveCloud": "Live-Multistream + Cloud-Aufnahme",
         "localRender": "Export auf dem Gerät",
         "lidarScan": "LiDAR-3D-Scan",
         "model3dExport": "3D-Export",

@@ -47,6 +47,7 @@ export type CapabilityId =
   | 'writeAssist' // ✍️ Writer Studio AI: rewrite/tone/summarize/expand/translate/outline
   | 'pitchCorrect' // 🎤 Vocal Studio: pitch-correction / harmónia-render (Rubber Band / world a workeren)
   | 'model3dCloud' // 🧊 GLB-konverzió, feed-optimalizálás, felhős háló-feldolgozás (worker)
+  | 'liveCloud' // 🔴 Live: multistream több platformra + felhős felvétel (szerveres egress)
   // ── 🤖 S-GENAI generatív média (mind cloud + Pro, provider-adapterrel) ──────
   | 'genImage' // text→kép / kép→kép / inpaint / outpaint
   | 'genVideo' // text/kép→videó
@@ -98,6 +99,7 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   bgRemove: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.bgRemove' },
   depth3d: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.depth3d' },
   model3dCloud: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.model3dCloud' },
+  liveCloud: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.liveCloud' },
   faceTools: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.faceTools' },
   reframe: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.reframe' },
   objectTrack: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.objectTrack' },

@@ -21,7 +21,7 @@ import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
 import { adjustTintLayers } from '@/lib/adjustPreview';
-import { canvasTransform, clampPan, pinchZoom, zoomStep } from '@/lib/canvasZoom';
+import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
@@ -37,6 +37,15 @@ import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/
 const BrushOverlay = lazy(() =>
   import('@/components/studio/image/BrushOverlay').then((m) => ({ default: m.BrushOverlay }))
 );
+
+/** a vászon ennyit tölt ki a munkaterületből — körülötte látszik, ami kilóg */
+const CANVAS_FILL = 0.84;
+/** a munkaterület színe */
+const PASTEBOARD = '#14161d';
+/** a vászon körüli fátyol kiterjedése (px) — legkisebb nagyításnál is takarnia kell */
+const VEIL = 6000;
+/** a vásznon túl ennyi vászonnyira húzható egy réteg közepe */
+const MOVE_RANGE: [number, number] = [-1.5, 2.5];
 
 function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
   return { ...layer, ...patch } as ImageLayer;
@@ -74,6 +83,7 @@ export function ImageCanvas({
   brushSize = 8,
   brushRef,
   guidesActive,
+  initialZoom = 1,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -115,12 +125,14 @@ export function ImageCanvas({
   brushRef?: Ref<BrushHandle>;
   /** 📐 vonalzók + segédvonalak megjelenítése/szerkesztése */
   guidesActive?: boolean;
+  /** induló nagyítás (a munkaterület a csippentéssel/gombokkal változik tovább) */
+  initialZoom?: number;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
   const [liveGuide, setLiveGuide] = useState<{ id: string; pos: number } | null>(null);
   // 🔍 nézegetős zoom/pan — a szerkesztés 1:1-nél, zoom>1-nél a pan-overlay veszi át a gesztust
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(initialZoom);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   // 🧲 smart-guides: a pattintott tengelyek jelző-vonalai (rövid felvillanás a mozgatás után)
   const [smartLines, setSmartLines] = useState<SnapLine[]>([]);
@@ -136,32 +148,40 @@ export function ImageCanvas({
   const fit =
     container.w > 0 && container.h > 0
       ? container.w / container.h > av
-        ? { w: container.h * av, h: container.h }
-        : { w: container.w, h: container.w / av }
+        ? { w: container.h * CANVAS_FILL * av, h: container.h * CANVAS_FILL }
+        : { w: container.w * CANVAS_FILL, h: (container.w * CANVAS_FILL) / av }
       : { w: 0, h: 0 };
 
-  // 🔍 zoom/pan gesztusok (Touch/03, RNGH): a vászon CSIPPENTÉSSEL nagyítható (2 ujj),
-  // zoom>1-nél 1 ujjal tolható (pan-overlay). A gesztusok EGYSZER jönnek létre (stabil),
-  // a friss zoom/pan/fit-et refből olvassák. A csippentés a KÜLSŐ vásznon ül → együtt él
-  // az 1-ujjas réteg-szerkesztéssel (azt a leszármazott réteg-gesztusok viszik); a pan
-  // `maxPointers(1)` → a 2-ujjas gesztus a csippentésé marad.
+  // 🔍 munkaterület-nézet (RNGH): a csippentés és a kétujjas húzás a TELJES nézetet mozgatja,
+  // egy ujj mindig a szerkesztésé. A gesztusok EGYSZER jönnek létre, a friss értékeket
+  // refből olvassák; a csippentés a fókuszpontja körül nagyít.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const panRef = useRef(pan);
   panRef.current = pan;
   const fitRef = useRef(fit);
   fitRef.current = fit;
+  const containerRef = useRef(container);
+  containerRef.current = container;
   const panStart = useRef({ x: 0, y: 0 });
-  const zoomStart = useRef(1);
+  const pinching = useRef(false);
+  const pinchStart = useRef({ zoom: 1, pan: { x: 0, y: 0 }, focal: { x: 0, y: 0 } });
+  /** a fókuszpont a munkaterület közepéhez mérve */
+  const fromCenter = (e: { focalX: number; focalY: number }) => ({
+    x: e.focalX - containerRef.current.w / 2,
+    y: e.focalY - containerRef.current.h / 2,
+  });
   const panGesture = useRef(
     Gesture.Pan()
       .runOnJS(true)
-      // I36: nagyítva a mozgatás KÉT ujjal megy — egy ujj a szerkesztésé (ecset, toll, keret)
       .minPointers(2)
       .onStart(() => {
         panStart.current = panRef.current;
       })
       .onUpdate((e) => {
+        if (pinching.current) {
+          return; // a csippentés a fókuszponttal maga tolja a nézetet
+        }
         setPan(
           clampPan(
             { x: panStart.current.x + e.translationX, y: panStart.current.y + e.translationY },
@@ -174,20 +194,32 @@ export function ImageCanvas({
   const pinchGesture = useRef(
     Gesture.Pinch()
       .runOnJS(true)
-      .onStart(() => {
-        zoomStart.current = zoomRef.current;
+      .onStart((e) => {
+        pinching.current = true;
+        pinchStart.current = { zoom: zoomRef.current, pan: panRef.current, focal: fromCenter(e) };
       })
       .onUpdate((e) => {
-        const z = pinchZoom(zoomStart.current, e.scale);
-        setZoom(z);
-        setPan((p) => clampPan(p, z, fitRef.current));
+        const next = pinchAt(pinchStart.current, e.scale, fromCenter(e), fitRef.current);
+        setZoom(next.zoom);
+        setPan(next.pan);
       })
+      .onFinalize(() => {
+        pinching.current = false;
+      })
+  ).current;
+  // koppintás a vásznon kívüli üres területre: kijelölés megszüntetése
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const backdropTap = useRef(
+    Gesture.Tap()
+      .runOnJS(true)
+      .onEnd(() => onSelectRef.current(null))
   ).current;
   const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture)).current;
   const tf = canvasTransform(zoom, pan, fit);
-  const zoomStyle = !capturing && zoom !== 1
-    ? { transform: [{ translateX: tf.translateX }, { translateY: tf.translateY }, { scale: tf.scale }] }
-    : undefined;
+  const viewportStyle = capturing
+    ? undefined
+    : { transform: [{ translateX: tf.translateX }, { translateY: tf.translateY }, { scale: tf.scale }] };
   const resetZoom = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -313,18 +345,23 @@ export function ImageCanvas({
   };
 
   return (
+    <GestureDetector gesture={canvasGesture}>
     <View
       style={styles.stage}
+      collapsable={false}
       onLayout={(e: LayoutChangeEvent) =>
         setContainer({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
       }
     >
+      <GestureDetector gesture={backdropTap}>
+        <View style={StyleSheet.absoluteFill} />
+      </GestureDetector>
       {fit.w > 0 ? (
-        <GestureDetector gesture={canvasGesture}>
-        <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }, capturing && styles.canvasCapture]}>
-          {/* 🔍 zoom/pan-wrapper: a tartalom (rétegek + overlay-k) együtt skálázódik/tolódik;
-              capture-kor és zoom===1-nél identitás (a raszterizálás + a szerkesztés érintetlen) */}
-          <View style={[StyleSheet.absoluteFill, zoomStyle]} pointerEvents="box-none">
+        <View style={[{ width: fit.w, height: fit.h }, viewportStyle]} pointerEvents="box-none">
+        {/* a vászon NEM vág: a túllógó réteg a munkaterületen is látszik és megfogható;
+            csak a raszterizálás idejére vág, keret és háttér nélkül */}
+        <View ref={canvasRef} style={[{ width: fit.w, height: fit.h }, capturing && styles.canvasCapture]} collapsable={false}>
+          {!capturing ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paper]} /> : null}
           {layers.map((raw0) => {
             // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
             const raw =
@@ -344,6 +381,7 @@ export function ImageCanvas({
                   box={fit}
                   selected={selected}
                   zoom={zoom}
+                  moveRange={MOVE_RANGE}
                   onSelect={onSelect}
                   onMove={move}
                 />
@@ -356,6 +394,7 @@ export function ImageCanvas({
                   clip={layerToShapeClip(l)}
                   box={fit}
                   zoom={zoom}
+                  moveRange={MOVE_RANGE}
                   editable
                   selected={selected}
                   onSelect={onSelect}
@@ -385,6 +424,7 @@ export function ImageCanvas({
                 t={0}
                 box={fit}
                 zoom={zoom}
+                moveRange={MOVE_RANGE}
                 editable
                 selected={selected}
                 onSelect={onSelect}
@@ -393,6 +433,17 @@ export function ImageCanvas({
               />
             );
           })}
+
+          {/* a vásznon kívüli rész halványan látszik; a fátyol nem fogja el az érintést */}
+          {!capturing ? (
+            <>
+              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, right: -VEIL, top: -VEIL, height: VEIL }]} />
+              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, right: -VEIL, bottom: -VEIL, height: VEIL }]} />
+              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, width: VEIL, top: 0, bottom: 0 }]} />
+              <View pointerEvents="none" style={[styles.veil, { right: -VEIL, width: VEIL, top: 0, bottom: 0 }]} />
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.canvasEdge, { borderWidth: 1 / zoom }]} />
+            </>
+          ) : null}
 
           {/* 🧲 smart-guide jelző-vonalak (a pattintott tengelyeken, rövid felvillanás) */}
           {!capturing && smartLines.map((ln, i) => (
@@ -489,43 +540,39 @@ export function ImageCanvas({
               onCommitGuide={onCommitGuide}
             />
           ) : null}
-          </View>
+        </View>
+        </View>
+      ) : null}
 
-          {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re.
-              Kivágás közben rejtve: a vágókeret jobb-felső sarokfogóját takarnák (élő teszt K1) */}
-          {!capturing && !cropRect ? (
-            <View style={styles.zoomBar} pointerEvents="box-none">
-              <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} hitSlop={6} accessibilityLabel="zoom in">
-                <Ionicons name="add" size={18} color={palette.text} />
-              </Pressable>
-              <Pressable style={styles.zoomBtn} onPress={() => applyZoom(-1)} hitSlop={6} accessibilityLabel="zoom out">
-                <Ionicons name="remove" size={18} color={palette.text} />
-              </Pressable>
-              {zoom !== 1 ? (
-                <Pressable style={styles.zoomBtn} onPress={resetZoom} hitSlop={6} accessibilityLabel="reset zoom">
-                  <Ionicons name="scan-outline" size={15} color={palette.accent} />
-                </Pressable>
-              ) : null}
-            </View>
+      {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re.
+          Kivágás közben rejtve: a vágókeret jobb-felső sarokfogóját takarnák (élő teszt K1) */}
+      {!capturing && !cropRect ? (
+        <View style={styles.zoomBar} pointerEvents="box-none">
+          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} hitSlop={6} accessibilityLabel="zoom in">
+            <Ionicons name="add" size={18} color={palette.text} />
+          </Pressable>
+          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(-1)} hitSlop={6} accessibilityLabel="zoom out">
+            <Ionicons name="remove" size={18} color={palette.text} />
+          </Pressable>
+          {zoom !== 1 || pan.x !== 0 || pan.y !== 0 ? (
+            <Pressable style={styles.zoomBtn} onPress={resetZoom} hitSlop={6} accessibilityLabel="reset zoom">
+              <Ionicons name="scan-outline" size={15} color={palette.accent} />
+            </Pressable>
           ) : null}
         </View>
-        </GestureDetector>
       ) : null}
     </View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  canvas: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: '#0b0c12',
-  },
-  // I12: az on-device kép a dokumentum, keret, lekerekítés és szerkesztő-háttér nélkül
-  canvasCapture: { borderWidth: 0, borderRadius: 0, backgroundColor: 'transparent' },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: PASTEBOARD },
+  paper: { backgroundColor: '#0b0c12' },
+  veil: { position: 'absolute', backgroundColor: `${PASTEBOARD}a6` },
+  canvasEdge: { borderColor: palette.border },
+  // I12: az on-device kép a dokumentum, keret és szerkesztő-háttér nélkül; csak itt vág
+  canvasCapture: { overflow: 'hidden', backgroundColor: 'transparent' },
   zoomBar: { position: 'absolute', top: 8, right: 8, gap: 6 },
   zoomBtn: {
     width: 34,

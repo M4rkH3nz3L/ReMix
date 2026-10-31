@@ -14,8 +14,11 @@ import type { ImageDoc, ImageLayer } from '@/types/project';
 /** A teljes (normalizált) vászon mint igazítási konténer. */
 const CANVAS: Rect = { x: 0, y: 0, width: 1, height: 1 };
 
+/** egy betű átlagos szélessége a betűmérethez képest */
+const TEXT_ADVANCE = 0.55;
+
 /** A szöveg becsült mérete (a rétegnek nincs w/h-ja): a betűméret a vászon-magasság %-a. */
-function textSize(layer: Extract<ImageLayer, { kind: 'text' }>, aspect: number): { w: number; h: number } {
+export function textSize(layer: Extract<ImageLayer, { kind: 'text' }>, aspect: number): { w: number; h: number } {
   const lines = String(layer.text ?? '').split('\n');
   const fontH = (layer.fontSize ?? 8) / 100;
   const longest = Math.max(...lines.map((l) => l.length), 1);
@@ -24,9 +27,6 @@ function textSize(layer: Extract<ImageLayer, { kind: 'text' }>, aspect: number):
     h: lines.length * fontH * (layer.lineHeight ?? 1.2),
   };
 }
-
-/** egy betű átlagos szélessége a betűmérethez képest */
-const TEXT_ADVANCE = 0.55;
 
 /**
  * A réteg befoglaló `Rect`-je (bal-felső + méret) a vászon arányában (`aspect` = W/H), a

@@ -2,11 +2,14 @@
  * 🧪 Gesztus-tesztek a VALÓDI komponenseken: a `react-native-gesture-handler` teszt-segédje a
  * tényleges callback-láncot futtatja (a natív felismerést nem — az eszközös próba része).
  */
+import { useState } from 'react';
 import { act, create } from 'react-test-renderer';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
+import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
+import type { LivePatch } from '@/lib/imageLayerClip';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
 import { normalizeRotation } from '@/lib/imageLayerGeometry';
 import type { PhotoLayer } from '@/types/project';
@@ -68,6 +71,54 @@ describe('I35/I36 — réteg-húzás', () => {
     render(<PhotoLayerView layer={layer} box={box} selected onMove={onMove} />);
     drag(30, false);
     expect(onMove).not.toHaveBeenCalled();
+  });
+});
+
+describe('méretezés a kijelölő keretben', () => {
+  /** a valódi szülő viselkedése: az élő patch visszakerül a keretbe (ez okozta a halmozódást) */
+  function Harness({ onCommit }: { onCommit: (p: LivePatch) => void }) {
+    const [live, setLive] = useState<LivePatch>({});
+    return <SelectionFrame layer={{ ...layer, ...live } as PhotoLayer} box={box} onLive={setLive} onCommit={onCommit} />;
+  }
+  /**
+   * Lépésenként külön `act`: minden frissítés után újrarajzol a keret, és a legfrissebb
+   * callback fut — mint az eszközön. (A `fireGestureHandler` egy menetben futtatná le.)
+   */
+  const dragCorner = async (corner: string, steps: number[]) => {
+    type Handlers = { onStart: (e: object) => void; onUpdate: (e: object) => void; onEnd: (e: object, ok: boolean) => void; onFinalize: (e: object, ok: boolean) => void };
+    const handlers = () => (getByGestureTestId(`scale-${corner}`) as unknown as { handlers: Handlers }).handlers;
+    // az RNGH az új callbackeket mikrotaszkban cseréli le — ezért aszinkron az `act`
+    const step = (fn: () => void) => act(async () => { fn(); await Promise.resolve(); });
+    await step(() => handlers().onStart({}));
+    for (const d of steps) {
+      await step(() => handlers().onUpdate({ translationX: d, translationY: d }));
+    }
+    const last = steps[steps.length - 1];
+    await step(() => handlers().onEnd({ translationX: last, translationY: last }, true));
+    await step(() => handlers().onFinalize({}, true));
+  };
+
+  it('sok kis lépés sem halmozódik: 75 px húzás = 1,5× (nem elszálló)', async () => {
+    const onCommit = jest.fn();
+    render(<Harness onCommit={onCommit} />);
+    await dragCorner('br', [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75]);
+    const p = onCommit.mock.calls[0][0] as LivePatch;
+    expect(p.w).toBeCloseTo(0.75, 2);
+    expect(p.h).toBeCloseTo(0.75, 2);
+  });
+  it('a szemközti sarok a helyén marad', async () => {
+    const onCommit = jest.fn();
+    render(<Harness onCommit={onCommit} />);
+    await dragCorner('br', [75]);
+    const p = onCommit.mock.calls[0][0] as LivePatch;
+    expect(p.position!.x - p.w! / 2).toBeCloseTo(0.25, 2); // bal széle eredetileg 0,25
+    expect(p.position!.y - p.h! / 2).toBeCloseTo(0.25, 2);
+  });
+  it('mind a négy sarok fogható', () => {
+    render(<Harness onCommit={() => {}} />);
+    for (const c of ['tl', 'tr', 'bl', 'br']) {
+      expect(getByGestureTestId(`scale-${c}`)).toBeTruthy();
+    }
   });
 });
 

@@ -4,21 +4,38 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import type { LivePatch } from '@/lib/imageLayerClip';
+import { textSize } from '@/lib/imageLayerLayout';
+import { resizeFromCorner, type ResizeCorner, type ResizeStart } from '@/lib/layerResize';
 import type { ImageLayer } from '@/types/project';
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+/** a réteg rövidebb oldala ennél kisebb nem lehet a képernyőn — különben nem fogható meg */
+const MIN_SIDE_PX = 24;
+/** a réteg legfeljebb a vászon ennyiszerese */
+const MAX_CANVAS_MULTIPLE = 6;
+const MIN_FONT = 2;
+const MAX_FONT = 200;
+/** a forgató fogó nyele (px) */
+const STEM = 26;
+
+const CORNERS: ResizeCorner[] = ['tl', 'tr', 'bl', 'br'];
+const CORNER_STYLE: Record<ResizeCorner, object> = {
+  tl: { left: -18, top: -18 },
+  tr: { right: -18, top: -18 },
+  bl: { left: -18, bottom: -18 },
+  br: { right: -18, bottom: -18 },
+};
 
 /**
- * 🎯 Kijelölő-keret a vászon aktív rétegén — közvetlen KÉZI méretezés (sarok-fogó,
- * minden réteg-fajta) és FORGATÁS (fej-fogó) a fotó/forma/szöveg rétegeken (a
+ * 🎯 Kijelölő-keret a vászon aktív rétegén — közvetlen KÉZI méretezés (négy sarokfogó,
+ * a szemközti sarok áll) és FORGATÁS (fej-fogó) a fotó/forma/szöveg rétegeken (a
  * háttér-fill nem forog). A `rotation`-t az előnézet (wrap-transform) és a kép-doc
  * render (PNG-forgatás) egyformán érvényesíti. A gesztus alatt `onLive` élőben
  * rajzol; a végén `onCommit` egyetlen undo-lépésként rögzít.
  *
- * Gesztus: modern react-native-gesture-handler (Touch/03) — a fogók inline
- * `Gesture.Pan`-je MINDEN renderben friss closure-t kap (a committed réteg a drag
- * alatt állandó, mert az `onLive` csak előnézetet rajzol), így nem kell a korábbi
- * `dataRef`-minta. A callbackek `.runOnJS(true)`-val a JS-szálon futnak (setState).
+ * Gesztus: react-native-gesture-handler; a fogók inline `Gesture.Pan`-je minden renderben
+ * friss, ezért a húzás KEZDŐ állapota ref-ben él. `.runOnJS(true)`: a callbackek a JS-szálon.
  */
 export function SelectionFrame({
   layer,
@@ -35,73 +52,76 @@ export function SelectionFrame({
 }) {
   // — MINDEN hook a korai visszatérés ELŐTT (rules-of-hooks) —
   const pending = useRef<LivePatch>({});
+  // a húzás KEZDETI állapota: a `layer` prop húzás közben az élő előnézet, abból számolni
+  // önmagára halmozná a skálát (ettől szállt el vagy esett össze a méret)
+  const resizeStart = useRef<{ layer: ImageLayer; geom: ResizeStart } | null>(null);
   const frameRef = useRef<View>(null);
   const rotState = useRef<{ center?: { x: number; y: number }; startAngle?: number; startRot: number }>({
     startRot: 0,
   });
 
   // — geometria a réteg-fajtából —
-  let cx: number;
-  let cy: number;
-  let halfW: number;
-  let halfH: number;
-  let rot = 0;
-  // 🔄 forgatható minden réteg a háttér (fill) KIVÉTELÉVEL — a shape/text már
-  // ugyanúgy honorálja a `rotation`-t az előnézetben és a render-ben, mint a fotó
-  const canRotate = layer.kind !== 'fill';
-  if (layer.kind === 'photo' || layer.kind === 'shape') {
-    cx = layer.position.x * box.w;
-    cy = layer.position.y * box.h;
-    halfW = (layer.w * box.w) / 2;
-    halfH = (layer.h * box.h) / 2;
-    rot = layer.rotation ?? 0;
-  } else if (layer.kind === 'text') {
-    cx = layer.position.x * box.w;
-    cy = layer.position.y * box.h;
-    const fontPx = (layer.fontSize / 100) * box.h;
-    halfH = Math.max(16, fontPx * 0.8);
-    halfW = Math.max(48, box.w * 0.34);
-    rot = layer.rotation ?? 0;
-  } else {
-    return null; // fill: háttér, nincs kerete
+  if (layer.kind === 'fill' || layer.kind === 'adjust') {
+    return null; // háttér / korrekció: nincs kerete
   }
+  const cx = layer.position.x * box.w;
+  const cy = layer.position.y * box.h;
+  const rot = layer.rotation ?? 0;
+  const size = layer.kind === 'text' ? textSize(layer, box.w / box.h) : { w: layer.w, h: layer.h };
+  const halfW = Math.max(12, (size.w * box.w) / 2);
+  const halfH = Math.max(12, (size.h * box.h) / 2);
+  // a fogók mérete a képernyőn állandó, bármekkora a nagyítás
+  const s = 1 / zoom;
 
-  // ── Méretezés (sarok-fogó): a teljes elmozdulásból abszolút skála-faktor ──
-  const scaleGesture = Gesture.Pan()
-    .runOnJS(true)
-    .hitSlop(12)
-    .onStart(() => {
-      pending.current = {};
-    })
-    .onUpdate((e) => {
-      const rad = (rot * Math.PI) / 180;
-      const sx = halfW * Math.cos(rad) - halfH * Math.sin(rad);
-      const sy = halfW * Math.sin(rad) + halfH * Math.cos(rad);
-      const diag = Math.max(1, Math.hypot(halfW, halfH));
-      const factor = clamp(Math.hypot(sx + e.translationX / zoom, sy + e.translationY / zoom) / diag, 0.12, 8);
-      if (layer.kind === 'text') {
-        const fontSize = clamp(Math.round(layer.fontSize * factor * 10) / 10, 2, 40);
-        pending.current = { fontSize };
-        onLive({ fontSize });
-      } else if (layer.kind === 'photo' || layer.kind === 'shape') {
-        const w = clamp(Math.round(layer.w * factor * 1000) / 1000, 0.02, 2);
-        const h = clamp(Math.round(layer.h * factor * 1000) / 1000, 0.02, 2);
-        pending.current = { w, h };
-        onLive({ w, h });
-      }
-    })
-    .onEnd(() => {
-      if (Object.keys(pending.current).length > 0) {
-        onCommit(pending.current);
-      }
-      pending.current = {};
-    })
-    .onFinalize((_e, success) => {
-      if (!success) {
+  // ── Méretezés (bármelyik sarok): a szemközti sarok áll, a húzás KEZDETI állapotából számol ──
+  const startResize = () => {
+    resizeStart.current = { layer, geom: { cx, cy, halfW, halfH, rotation: rot } };
+    pending.current = {};
+  };
+  const updateResize = (corner: ResizeCorner, tx: number, ty: number) => {
+    const start = resizeStart.current;
+    if (!start || start.layer.kind === 'fill' || start.layer.kind === 'adjust') {
+      return;
+    }
+    const { geom, layer: from } = start;
+    const shortSide = 2 * Math.min(geom.halfW, geom.halfH);
+    const longSide = 2 * Math.max(geom.halfW, geom.halfH);
+    const limits =
+      from.kind === 'text'
+        ? { minSide: shortSide * (MIN_FONT / from.fontSize), maxSide: longSide * (MAX_FONT / from.fontSize) }
+        : { minSide: MIN_SIDE_PX * s, maxSide: MAX_CANVAS_MULTIPLE * Math.max(box.w, box.h) };
+    const r = resizeFromCorner(geom, corner, tx * s, ty * s, limits);
+    const position = { x: r.cx / box.w, y: r.cy / box.h };
+    const patch: LivePatch =
+      from.kind === 'text'
+        ? { fontSize: Math.round(from.fontSize * r.factor * 10) / 10, position }
+        : { w: round4(from.w * r.factor), h: round4(from.h * r.factor), position };
+    pending.current = patch;
+    onLive(patch);
+  };
+  const scaleGesture = (corner: ResizeCorner) =>
+    Gesture.Pan()
+      .withTestId(`scale-${corner}`)
+      .runOnJS(true)
+      .maxPointers(1)
+      .minDistance(0)
+      .hitSlop(10)
+      .onStart(startResize)
+      .onUpdate((e) => updateResize(corner, e.translationX, e.translationY))
+      .onEnd(() => {
+        if (Object.keys(pending.current).length > 0) {
+          onCommit(pending.current);
+        }
         pending.current = {};
-        onLive({});
-      }
-    });
+        resizeStart.current = null;
+      })
+      .onFinalize((_e, success) => {
+        if (!success) {
+          pending.current = {};
+          resizeStart.current = null;
+          onLive({});
+        }
+      });
 
   // ── Forgatás (fej-fogó): a keret középpontja köré, abszolút képernyő-koordinátából ──
   const rotateGesture = Gesture.Pan()
@@ -157,46 +177,39 @@ export function SelectionFrame({
         },
       ]}
     >
-      {canRotate ? (
-        <>
-          <View pointerEvents="none" style={styles.rotStem} />
-          <GestureDetector gesture={rotateGesture}>
-            <View style={styles.rotHandle}>
-              <View style={styles.rotDot} />
-            </View>
-          </GestureDetector>
-        </>
-      ) : null}
-      <GestureDetector gesture={scaleGesture}>
-        <View style={styles.scaleHandle}>
-          <View style={styles.scaleDot} />
+      {/* a keret-vonal a nagyítástól függetlenül vékony */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.outline, { borderWidth: s }]} />
+      <View pointerEvents="none" style={[styles.rotStem, { top: -STEM * s, height: STEM * s, width: 2 * s, marginLeft: -s }]} />
+      <GestureDetector gesture={rotateGesture}>
+        <View style={[styles.rotHandle, { top: -STEM * s - 14, transform: [{ scale: s }] }]}>
+          <View style={styles.rotDot} />
         </View>
       </GestureDetector>
+      {CORNERS.map((corner) => (
+        <GestureDetector key={corner} gesture={scaleGesture(corner)}>
+          <View style={[styles.scaleHandle, CORNER_STYLE[corner], { transform: [{ scale: s }] }]}>
+            <View style={styles.scaleDot} />
+          </View>
+        </GestureDetector>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderColor: palette.accent,
-    borderStyle: 'dashed',
-  },
+  frame: { position: 'absolute' },
+  outline: { borderColor: palette.accent },
   scaleHandle: {
     position: 'absolute',
-    right: -14,
-    bottom: -14,
-    width: 28,
-    height: 28,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scaleDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: palette.accent, borderWidth: 2, borderColor: '#fff' },
-  rotStem: { position: 'absolute', top: -26, left: '50%', marginLeft: -1, width: 2, height: 26, backgroundColor: palette.accent },
+  scaleDot: { width: 14, height: 14, borderRadius: 3, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.accent },
+  rotStem: { position: 'absolute', left: '50%', backgroundColor: palette.accent },
   rotHandle: {
     position: 'absolute',
-    top: -40,
     left: '50%',
     marginLeft: -14,
     width: 28,

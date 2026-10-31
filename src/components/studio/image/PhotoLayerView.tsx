@@ -18,6 +18,7 @@ export function PhotoLayerView({
   box,
   selected,
   zoom = 1,
+  moveRange = [0.02, 0.98],
   onSelect,
   onMove,
 }: {
@@ -26,6 +27,8 @@ export function PhotoLayerView({
   selected: boolean;
   /** a vászon nagyítása — a képernyő-húzás ennyivel kisebb réteg-elmozdulás */
   zoom?: number;
+  /** a réteg közepének mozgástere (a szerkesztőben a vásznon túlra is mehet) */
+  moveRange?: [number, number];
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {
@@ -34,8 +37,8 @@ export function PhotoLayerView({
 
   const commitMove = (dx: number, dy: number) => {
     onMove?.(layer.id, {
-      x: clamp(layer.position.x + dx / zoom / box.w, 0.02, 0.98),
-      y: clamp(layer.position.y + dy / zoom / box.h, 0.02, 0.98),
+      x: clamp(layer.position.x + dx / zoom / box.w, moveRange[0], moveRange[1]),
+      y: clamp(layer.position.y + dy / zoom / box.h, moveRange[0], moveRange[1]),
     });
     dragX.value = 0;
     dragY.value = 0;

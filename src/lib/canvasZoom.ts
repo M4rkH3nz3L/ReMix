@@ -1,12 +1,11 @@
 /**
- * 🔍 Vászon-zoom/pan mag (IMGEDD §8) — pure, tesztelhető. A Kép Stúdió vászna
- * NÉZEGETŐS zoomot kap: a tartalmat `scale`+`translate` transzformmal nagyítjuk,
- * a `pan`-t a keretben tartjuk. A szerkesztés 1:1-nél (zoom===1) történik; zoom>1-nél
- * a UI egy pan-overlayt tesz a vászonra, így a réteg-húzás koordináta-rendszere nem
- * sérül. Itt csak a SKALÁRIS matek él (clamp/lépés/pan-határ) — a gesztus a komponensé.
+ * 🔍 Munkaterület-nézet (pure): a zoom/pan a TELJES nézetet mozgatja — a vásznat a körülötte
+ * lévő területtel együtt, ahogy a profi szerkesztőkben. A dokumentum nem változik. Kicsinyítve
+ * látszik, ami kilóg a vászonról, és elérhetők a vásznon túli fogók. Itt csak a skaláris matek
+ * él (clamp/lépés/pan-határ) — a gesztus a komponensé.
  */
-export const ZOOM_MIN = 1;
-export const ZOOM_MAX = 6;
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 8;
 const STEP = 1.5;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -32,8 +31,8 @@ export function pinchZoom(startZoom: number, scale: number): number {
 }
 
 /**
- * a pan-eltolás határokba szorítva: a nagyított tartalom szélei nem húzhatók beljebb
- * a kereten (max ±(box·(zoom-1)/2) px). Zoom===1-nél a pan mindig {0,0}.
+ * A pan határa: a vászon nem veszhet el a nézetből — a közepe legfeljebb a saját (nagyított)
+ * fél méretével + a méret negyedével tolható el.
  */
 export function clampPan(
   pan: { x: number; y: number },
@@ -41,12 +40,27 @@ export function clampPan(
   box: { w: number; h: number }
 ): { x: number; y: number } {
   const z = clampZoom(zoom);
-  if (z <= 1) {
-    return { x: 0, y: 0 };
-  }
-  const maxX = (box.w * (z - 1)) / 2;
-  const maxY = (box.h * (z - 1)) / 2;
+  const maxX = box.w * z * 0.5 + box.w * 0.25;
+  const maxY = box.h * z * 0.5 + box.h * 0.25;
   return { x: clamp(pan.x || 0, -maxX, maxX), y: clamp(pan.y || 0, -maxY, maxY) };
+}
+
+/**
+ * 🤏 Csippentés a fókuszpont körül: a nézet ujjak alatti pontja helyben marad, és a két ujj
+ * együttes mozgása tolja a nézetet. A `focal` a munkaterület közepéhez mért pont.
+ */
+export function pinchAt(
+  start: { zoom: number; pan: { x: number; y: number }; focal: { x: number; y: number } },
+  scale: number,
+  focal: { x: number; y: number },
+  box: { w: number; h: number }
+): { zoom: number; pan: { x: number; y: number } } {
+  const zoom = pinchZoom(start.zoom, scale);
+  const k = zoom / start.zoom;
+  return {
+    zoom,
+    pan: clampPan({ x: focal.x - (start.focal.x - start.pan.x) * k, y: focal.y - (start.focal.y - start.pan.y) * k }, zoom, box),
+  };
 }
 
 /** a vászon-transzform tömbje (a kerethez igazítva); zoom===1 → identitás (üres hatás). */

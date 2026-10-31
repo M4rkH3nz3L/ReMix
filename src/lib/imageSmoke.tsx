@@ -18,7 +18,7 @@ import { normalizePickedImage } from '@/lib/media';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { cloudBaseUrl } from '@/lib/backend';
-import { deleteProject, listProjects, loadProject, readRecovery, recoveryIsFresher, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
+import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
@@ -189,6 +189,20 @@ async function smokeZoomCanvas(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** A valódi vászon kilógó réteggel, kijelölve — képernyőképhez (a fázis nyitva marad). */
+async function smokePasteboard(log: Log, setHarness: (n: ReactNode) => void) {
+  const base = createImageDoc('Smoke', '1:1', () => makeId('lyr'), { width: 1080, height: 1080 });
+  const shape = { kind: 'shape', id: 'over', shape: 'ellipse', position: { x: 0.9, y: 0.5 }, w: 0.6, h: 0.6, fill: '#ff2d95' } as ShapeLayer;
+  const doc = addLayer({ ...base, layers: [] }, shape as ImageLayer);
+  setHarness(
+    <View style={{ width: 340, height: 320 }}>
+      <ImageCanvas doc={doc} selectedId="over" initialZoom={0.5} onSelect={() => {}} commit={() => {}} />
+    </View>
+  );
+  await sleep(800);
+  log(null, 'PASTEBOARD-READY');
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -286,6 +300,26 @@ async function killPhase2(log: Log, id: string) {
   await cleanupProject(id);
 }
 
+/** Csak olvas: a kép-projektek rétegei + a verzió-előzmény, hibakereséshez. */
+async function inspectProjects(log: Log) {
+  const all = (await listProjects()).filter((p) => p.kind === 'image');
+  for (const meta of all) {
+    const p = await loadProject(meta.id);
+    log(null, `PROJ ${meta.name} ${meta.id}`, `upd=${p?.updatedAt} docs=${p?.imageDocs?.length} assets=${p?.assets.length}`);
+    for (const d of p?.imageDocs ?? []) {
+      for (const l of d.layers) {
+        const uri = (l as PhotoLayer).uri;
+        const exists = uri ? (() => { try { return new File(uri).exists; } catch { return false; } })() : null;
+        const pos = (l as PhotoLayer).position;
+        log(null, `  ${l.kind} ${l.id}`, `w=${(l as PhotoLayer).w} h=${(l as PhotoLayer).h} pos=${pos?.x},${pos?.y} hidden=${!!l.hidden} file=${uri?.split('/').pop()} exists=${exists}`);
+      }
+    }
+    const versions = await loadVersions(meta.id).catch(() => []);
+    const summary = versions.slice(0, 6).map((v) => `${v.at.slice(11, 19)}:${v.project.imageDocs?.[0]?.layers.map((l) => (l as PhotoLayer).uri?.split('/').pop() ?? l.kind).join('+')}`);
+    log(null, `  verziók: ${versions.length}`, summary.join(' | '));
+  }
+}
+
 export async function firstImageProjectId(): Promise<string | null> {
   const all = await listProjects();
   return all.find((p) => p.kind === 'image')?.id ?? null;
@@ -314,6 +348,14 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'ui') {
+    return;
+  }
+  if (phase === 'inspect') {
+    await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'pasteboard') {
+    await step('pasteboard', () => smokePasteboard(log, setHarness));
     return;
   }
   const online = await smokeNetwork(log);

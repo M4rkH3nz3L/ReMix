@@ -161,6 +161,8 @@ interface Props {
   editable: boolean;
   /** a szerkesztő-vászon nagyítása: a húzás ennyivel kisebb elmozdulás (alap 1) */
   zoom?: number;
+  /** a közép mozgástere (a kép-szerkesztőben a vásznon túlra is mehet) */
+  moveRange?: [number, number];
   selected: boolean;
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
@@ -177,6 +179,7 @@ export function ShapeOverlay({
   box,
   editable,
   zoom = 1,
+  moveRange = [0.02, 0.98],
   selected,
   onSelect,
   onMove,
@@ -195,8 +198,8 @@ export function ShapeOverlay({
   const commitMove = (dx: number, dy: number) => {
     onDragLive?.(null);
     onMove?.(clip.id, {
-      x: clamp(clip.position.x + dx / zoom / box.w, 0.02, 0.98),
-      y: clamp(clip.position.y + dy / zoom / box.h, 0.02, 0.98),
+      x: clamp(clip.position.x + dx / zoom / box.w, moveRange[0], moveRange[1]),
+      y: clamp(clip.position.y + dy / zoom / box.h, moveRange[0], moveRange[1]),
     });
     dragX.value = 0;
     dragY.value = 0;

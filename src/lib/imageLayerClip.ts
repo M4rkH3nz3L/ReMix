@@ -10,6 +10,8 @@ export interface LivePatch {
   h?: number;
   rotation?: number;
   fontSize?: number;
+  /** sarokfogós méretezésnél a szemközti sarok áll, így a közép is mozog */
+  position?: { x: number; y: number };
   /** ✏️ path node-húzás élő előnézete (a toll v2 node-szerkesztője) */
   points?: PathPoint[];
 }

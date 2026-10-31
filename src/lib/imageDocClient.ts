@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { docMediaUris } from '@/lib/imageDoc';
+import { ImageRenderRejected, imageCacheKey } from '@/lib/imageExport';
+import { isProNow } from '@/store/entitlementStore';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import type { ImageDoc } from '@/types/project';
@@ -21,25 +23,8 @@ export interface RenderImageOpts {
   format?: 'png' | 'jpg' | 'webp';
   /** 0–1 (csak jpg/webp) */
   quality?: number;
-}
-
-function contentKey(doc: ImageDoc, height: number, fmt: string, quality?: number): string {
-  const src = JSON.stringify({
-    a: doc.aspectRatio,
-    w: doc.width,
-    h: doc.height,
-    f: doc.format,
-    l: doc.layers,
-    // a kimeneti variáns IS a kulcs része → 1×/2× és png/jpg/webp nem ütközik
-    oh: height,
-    of: fmt,
-    oq: quality ?? null,
-  });
-  let h = 5381;
-  for (let i = 0; i < src.length; i++) {
-    h = ((h << 5) + h + src.charCodeAt(i)) >>> 0;
-  }
-  return h.toString(36);
+  /** ennyi réteg maradt ki a kimenetből (hiányzó / elérhetetlen média) */
+  onMissingLayers?: (count: number) => void;
 }
 
 /**
@@ -271,7 +256,7 @@ export async function renderImageDoc(
       dir.create();
     }
     const fmt = opts.format === 'jpg' ? 'jpg' : opts.format === 'webp' ? 'webp' : 'png';
-    const target = new File(dir, `doc_${doc.id}_${contentKey(doc, height, fmt, opts.quality)}.${fmt}`);
+    const target = new File(dir, `doc_${doc.id}_${imageCacheKey(doc, height, fmt, opts.quality, isProNow())}.${fmt}`);
     if (target.exists) {
       return target.uri;
     }
@@ -281,6 +266,10 @@ export async function renderImageDoc(
     docMediaUris(doc).forEach((uri, i) => {
       const field = `f${i}`;
       uriMap[uri] = field;
+      // a http(s) médiát a worker maga tölti le (I14) — ide csak helyi fájl kerül
+      if (/^https?:\/\//i.test(uri)) {
+        return;
+      }
       const file = new File(uri);
       if (file.exists) {
         form.append(field, file as unknown as Blob, file.name);
@@ -300,12 +289,24 @@ export async function renderImageDoc(
       method: 'POST',
       body: form,
     });
+    if (res.status >= 400 && res.status < 500) {
+      // 🚫 I13: szándékos elutasítás (túl nagy doc, kvóta) — a user megkapja az okot
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new ImageRenderRejected(body.error || `Render-hiba (${res.status})`);
+    }
     if (!res.ok) {
       return null;
     }
+    const missing = Number(res.headers.get('x-missing-layers') ?? 0);
+    if (missing > 0) {
+      opts.onMissingLayers?.(missing);
+    }
     target.write(new Uint8Array(await res.arrayBuffer()));
     return target.uri;
-  } catch {
+  } catch (e) {
+    if (e instanceof ImageRenderRejected) {
+      throw e;
+    }
     return null;
   }
 }

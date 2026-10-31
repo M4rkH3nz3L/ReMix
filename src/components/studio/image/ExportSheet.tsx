@@ -7,7 +7,7 @@ import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { effectiveCanvas } from '@/lib/canvasPresets';
+import { exportSize } from '@/lib/imageExport';
 import type { ImageDoc } from '@/types/project';
 
 type Fmt = 'png' | 'jpg' | 'webp';
@@ -49,12 +49,13 @@ export function ExportSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const base = effectiveCanvas(doc).height;
+  const size1 = exportSize(doc, 1);
+  const size2 = exportSize(doc, 2);
   const [format, setFormat] = useState<Fmt>('png');
   const [scale, setScale] = useState<1 | 2>(1);
   const [quality, setQuality] = useState(0.9);
 
-  const height = Math.min(2160, Math.round(base * scale));
+  const height = (scale === 2 ? size2 : size1).height;
   const lossy = format === 'jpg' || format === 'webp';
   const hint = format === 'png' ? t('studio.image.export.hintPng') : format === 'jpg' ? t('studio.image.export.hintJpg') : t('studio.image.export.hintWebp');
 
@@ -70,8 +71,8 @@ export function ExportSheet({
 
       <Text style={styles.section}>{t('studio.image.export.resolutionLabel')}</Text>
       <View style={styles.row}>
-        <Chip label={`1× · ${Math.min(2160, base)}px`} active={scale === 1} onPress={() => setScale(1)} />
-        <Chip label={`2× · ${Math.min(2160, base * 2)}px`} active={scale === 2} onPress={() => setScale(2)} />
+        <Chip label={`1× · ${size1.width}×${size1.height}`} active={scale === 1} onPress={() => setScale(1)} />
+        <Chip label={`2× · ${size2.width}×${size2.height}`} active={scale === 2} onPress={() => setScale(2)} />
       </View>
 
       {lossy ? (

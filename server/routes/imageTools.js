@@ -18,12 +18,12 @@ const { upload, uploadImage, uploadSvg } = require('../lib/upload');
 const { shouldWatermark } = require('../entitlements');
 const { asTier } = require('../tiers');
 const { activeTier } = require('../billing');
-const { renderImageDoc, imageDocGuard } = require('../imagedoc');
+const { renderImageDoc, resolveRemoteMedia, imageDocGuard } = require('../imagedoc');
 const { parsePsdToImageDoc } = require('../psdImport');
 const { buildPsdFromImageDoc } = require('../psdExport');
 const { parsePdfToImageDocs } = require('../pdfImport');
 const { safeFetch } = require('../ssrf');
-const { mediaStoreEnabled, uploadMedia } = require('../mediastore');
+const { mediaStoreEnabled, uploadMedia, LOCAL_DIR } = require('../mediastore');
 const { enforceQuota, trackUsage, userTier } = require('../usage');
 const { renderSvgToPdf } = require('../svgPdf');
 const { computeFocusAssets, computeParallaxAssets, depthLayerDir } = require('../depth');
@@ -66,7 +66,7 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
       }
     }
   }
-  const height = Math.max(240, Math.min(2160, Number(req.body.height) || 1280));
+  const height = Math.max(240, Math.min(4096, Number(req.body.height) || 1280));
   const format = req.body.format; // png (alap) | jpg | webp
   const quality = req.body.quality != null ? Number(req.body.quality) : undefined;
   // ha a doc-hoz nem jött feltöltött média (tisztán vektor/forma/szöveg kép —
@@ -80,9 +80,33 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
   // 🏷️ free-vízjel a SZERVER-HITELES tier szerint (a kliens NEM kapcsolhatja ki):
   // prod-ban a user előfizetéséből (activeTier), dev-ben a kért tier-ből.
   const tierPromise = INSECURE_DEV ? Promise.resolve(asTier(req.body.tier)) : activeTier(req.user?.id);
+  const missing = [];
+  // a saját (lokális) média-tár URL-je a lemezről jön — a fetch ezt belső címként tiltaná
+  const localPath = (url) => {
+    const m = /^\/m\/(.+)$/.exec(new URL(url).pathname);
+    if (!LOCAL_DIR || !m || new URL(url).host !== req.get('host')) {
+      return null;
+    }
+    const file = path.resolve(LOCAL_DIR, decodeURIComponent(m[1]));
+    return file.startsWith(path.resolve(LOCAL_DIR) + path.sep) && fs.existsSync(file) ? file : null;
+  };
   tierPromise
-    .then((tier) => renderImageDoc(doc, height, req.workDir, { format, quality, watermark: shouldWatermark(tier) }))
-    .then((file) => res.sendFile(file))
+    .then(async (tier) => {
+      await resolveRemoteMedia(doc, req.workDir, { fetchUrl: (u) => safeFetch(u, { redirect: 'follow' }), localPath });
+      return renderImageDoc(doc, height, req.workDir, {
+        format,
+        quality,
+        watermark: shouldWatermark(tier),
+        onMissing: (id) => missing.push(id),
+      });
+    })
+    .then((file) => {
+      // ⚠️ I3: a kimaradt rétegek száma a válaszban — a kliens megmondja a usernek
+      if (missing.length > 0) {
+        res.set('X-Missing-Layers', String(missing.length));
+      }
+      res.sendFile(file);
+    })
     .catch((err) => {
       console.warn('imagedoc hiba:', err.message.slice(0, 300));
       res.status(500).json({ error: err.message.slice(0, 300) });

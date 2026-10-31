@@ -1,3 +1,4 @@
+import { keepsAlpha } from '@/lib/imageIntake';
 import { Directory, File } from 'expo-file-system';
 import { FlipType, ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
@@ -41,7 +42,7 @@ function mediaDir(): Directory {
 
 /** PNG-t őrzünk (alfa-csatorna, pl. háttér-eltávolítás után), különben JPEG. */
 function formatFor(uri: string): { format: SaveFormat; ext: string } {
-  return /\.png(\?|$)/i.test(uri)
+  return keepsAlpha(uri)
     ? { format: SaveFormat.PNG, ext: 'png' }
     : { format: SaveFormat.JPEG, ext: 'jpg' };
 }
@@ -83,7 +84,8 @@ export async function bakeImage(
   }
   const ref = await ctx.renderAsync();
   const { format, ext } = formatFor(uri);
-  const saved = await ref.saveAsync({ format, compress: 0.92 });
+  // művelet nélkül (csak EXIF-beégetés / HEIC-konverzió) nincs generációs minőségvesztés
+  const saved = await ref.saveAsync({ format, compress: ops.length === 0 ? 1 : 0.92 });
   if (!opts.persist) {
     return { uri: saved.uri, width: saved.width, height: saved.height };
   }

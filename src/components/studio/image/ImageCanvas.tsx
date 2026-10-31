@@ -318,7 +318,7 @@ export function ImageCanvas({
     >
       {fit.w > 0 ? (
         <GestureDetector gesture={pinchGesture}>
-        <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }]}>
+        <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }, capturing && styles.canvasCapture]}>
           {/* 🔍 zoom/pan-wrapper: a tartalom (rétegek + overlay-k) együtt skálázódik/tolódik;
               capture-kor és zoom===1-nél identitás (a raszterizálás + a szerkesztés érintetlen) */}
           <View style={[StyleSheet.absoluteFill, zoomStyle]} pointerEvents="box-none">
@@ -523,6 +523,8 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     backgroundColor: '#0b0c12',
   },
+  // I12: az on-device kép a dokumentum, keret, lekerekítés és szerkesztő-háttér nélkül
+  canvasCapture: { borderWidth: 0, borderRadius: 0, backgroundColor: 'transparent' },
   zoomBar: { position: 'absolute', top: 8, right: 8, gap: 6 },
   zoomBtn: {
     width: 34,

@@ -9,7 +9,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const { adjustChain } = require('./render');
+const { adjustChain, FILTERS } = require('./render');
 const { gradeFilterChain } = require('./grades');
 const {
   filterChain,
@@ -182,17 +182,33 @@ function canvasSize(aspectRatio, height) {
 }
 
 /** páros px-re kerekített, [16, 4096] közé zárt méret (a kép-editor szabad W×H-ja) */
+const MAX_CANVAS = 4096;
+
 function evenClamp(n) {
-  return Math.round(Math.max(16, Math.min(4096, Number(n) || 0)) / 2) * 2;
+  return Math.round(Math.max(16, Math.min(MAX_CANVAS, Number(n) || 0)) / 2) * 2;
 }
 
 /** a vászon mérete: ha a doc EXPLICIT width×height-ot hordoz, AZ a mérvadó
  *  (szabad méret, kép-editor); különben a régi arány+magasság út. */
 function docCanvas(doc, height) {
   if (doc.width && doc.height) {
-    return { w: evenClamp(doc.width), h: evenClamp(doc.height) };
+    // 📐 I9: a kért kimeneti magasság skáláz (2× export); I10: a plafon aránytartó
+    const requested = Number(height) > 0 ? Number(height) / doc.height : 1;
+    const scale = Math.min(requested, MAX_CANVAS / Math.max(doc.width, doc.height));
+    return { w: evenClamp(doc.width * scale), h: evenClamp(doc.height * scale) };
   }
   return canvasSize(doc.aspectRatio, height);
+}
+
+/** 🎞️ szín-preset (filterId) mint tónus-tint: az alfát nem érinti, átlátszó részt nem színez. */
+function filterTintChain(filterId, intensity) {
+  const f = FILTERS[filterId];
+  if (!f) {
+    return '';
+  }
+  const op = Math.max(0, Math.min(1, f.opacity * (intensity ?? 1)));
+  const channel = (hex) => `val*${(1 - op).toFixed(4)}+${(parseInt(hex, 16) * op).toFixed(3)}`;
+  return `,lutrgb=r='${channel(f.color.slice(0, 2))}':g='${channel(f.color.slice(2, 4))}':b='${channel(f.color.slice(4, 6))}'`;
 }
 
 /** a réteg rajzolódik-e (a klienssel AZONOS szabály — lásd imageDoc.ts) */
@@ -294,6 +310,48 @@ function watermarkLayer() {
   };
 }
 
+const MAX_REMOTE_BYTES = 40 * 1024 * 1024;
+
+/**
+ * 🌐 I14: a PSD/PDF-importált rétegek https URL-t hordoznak, a render viszont helyi fájlt
+ * olvas. A távoli médiát a munkakönyvtárba töltjük (a `fetchUrl` SSRF-védett), a saját
+ * média-tár URL-jét közvetlenül a lemezről oldjuk fel (`localPath`). Ami nem érhető el,
+ * az marad — a render `onMissing`-gel jelzi.
+ */
+async function resolveRemoteMedia(doc, workDir, { fetchUrl, localPath }) {
+  let seq = 0;
+  for (const layer of doc.layers ?? []) {
+    for (const key of ['uri', 'imageUri', 'lut']) {
+      const url = layer[key];
+      if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+        continue;
+      }
+      const local = localPath?.(url);
+      if (local) {
+        layer[key] = local;
+        continue;
+      }
+      try {
+        const res = await fetchUrl(url);
+        if (!res || !res.ok) {
+          continue;
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > MAX_REMOTE_BYTES) {
+          continue;
+        }
+        const ext = path.extname(new URL(url).pathname).slice(0, 8) || '.bin';
+        const file = path.join(workDir, `remote${seq}${ext}`);
+        seq += 1;
+        fs.writeFileSync(file, buf);
+        layer[key] = file;
+      } catch {
+        /* elérhetetlen → a réteg hiányzóként jelentődik */
+      }
+    }
+  }
+}
+
 async function renderImageDoc(doc, height, workDir, opts = {}) {
   const canvas = docCanvas(doc, height);
   // 🗂️ csoportok: a rejtett csoport tagjai kimaradnak, az opacity a tagokra RÁszorzódik
@@ -330,7 +388,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   }
 
   // 2) ffmpeg-kompozit rajzolási sorrendben
-  const inputs = ['-f', 'lavfi', '-i', `color=black@0:s=${canvas.w}x${canvas.h}`];
+  const inputs = ['-f', 'lavfi', '-i', `color=black@0:s=${canvas.w}x${canvas.h},format=rgba`];
   const filters = [];
   let last = '[0:v]';
   let idx = 1;
@@ -357,7 +415,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         filters.push(`[aca${ai}]alphaextract[acae${ai}]`);
         filters.push(`[acae${ai}][amg${ai}]blend=all_mode=multiply:shortest=1[acam${ai}]`);
         filters.push(`[acc${ai}][acam${ai}]alphamerge[acadjA${ai}]`);
-        filters.push(`[ao${ai}][acadjA${ai}]overlay=0:0[adj${ai}]`);
+        filters.push(`[ao${ai}][acadjA${ai}]overlay=0:0:format=auto[adj${ai}]`);
       } else {
         filters.push(`${last}${corr}[adj${ai}]`);
       }
@@ -370,7 +428,9 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
     if (layer.kind === 'photo') {
       if (!layer.uri || !fs.existsSync(layer.uri)) {
-        continue; // hiányzó média — a réteg kimarad, a többi mehet
+        // hiányzó média — a réteg kimarad, a többi mehet; a hívó jelzi a usernek (I3)
+        opts.onMissing?.(layer.id);
+        continue;
       }
       inputs.push('-i', layer.uri);
       const boxW = Math.max(2, Math.round((layer.w ?? 1) * canvas.w));
@@ -379,7 +439,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       // 'stretch' NEM-arányosan a keretre nyújt (szabad transzform — torzíthat)
       const fit =
         layer.fit === 'contain'
-          ? `scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
+          ? `format=rgba,scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
             `pad=${boxW}:${boxH}:(ow-iw)/2:(oh-ih)/2:color=black@0`
           : layer.fit === 'stretch'
             ? `scale=${boxW}:${boxH}`
@@ -417,11 +477,15 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       // 📸 RAW-develop (S-PHOTO): a non-destruktív előhívás a korrekció/grade/szűrő-lánc
       // UTÁN, a geometria (persp/flip/rotate) ELŐTT. Contract-locked `developFilterPlan` tükör.
       const dev = developChain(layer.develop);
+      // 🎞️ I15: a gyors szín-preset (filterId) a kész tónusra kerül
+      const tint = filterTintChain(layer.filterId, layer.filterIntensity);
       prepared = `p${idx}`;
+      // I18: a tartalom-lánc a réteg SAJÁT (doboz) terében fut; a geometria csak a lokális
+      // korrekció UTÁN jön, így a maszk mérete mindig a doboz, nem az elforgatott befoglaló
       filters.push(
-        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}${persp}${flip}${rotate}` +
-          `${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${tint}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}[${prepared}]`
       );
+      const geomIdx = idx;
       idx += 1;
 
       // 🎯 kijelölés-alapú (lokális) korrekció: a grade/adjust CSAK a maszk-régión BELÜL hat.
@@ -432,7 +496,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         if (corr) {
           const li = maskSeq;
           maskSeq += 1;
-          const lmask = maskToBox(la.mask, layer);
+          const lmask = maskToBox(la.mask, layer, canvas.w, canvas.h);
           // a korrigált példány alfája = (saját alfa × maszk) → az EREDETI fölé overlay-eljük:
           // a maszkon belül a korrigált, kívül (alfa 0) az eredeti látszik. (A maskedmerge a szürke
           // maszkot az rgba-auto-konverzió miatt félreértette — ez a bevált alphamerge+overlay út.)
@@ -443,10 +507,14 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           filters.push(`[caa${li}]alphaextract[cae${li}]`);
           filters.push(`[cae${li}][lmg${li}]blend=all_mode=multiply:shortest=1[cam${li}]`);
           filters.push(`[cc${li}][cam${li}]alphamerge[cadjA${li}]`);
-          filters.push(`[lo${li}][cadjA${li}]overlay=0:0[lc${li}]`);
+          filters.push(`[lo${li}][cadjA${li}]overlay=0:0:format=auto[lc${li}]`);
           prepared = `lc${li}`;
         }
       }
+      filters.push(
+        `[${prepared}]format=rgba${persp}${flip}${rotate}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[pg${geomIdx}]`
+      );
+      prepared = `pg${geomIdx}`;
     } else {
       const png = rendered.get(layer.id);
       if (!png || !fs.existsSync(png)) {
@@ -482,7 +550,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const gout = `gl${idx}`;
       filters.push(`[${prepared}]split[plg${idx}][psg${idx}]`);
       filters.push(`[psg${idx}]${glowSilhouette(gm, gsig, gc.opacity != null ? gc.opacity : 0.85, gc.color)}[gll${idx}]`);
-      filters.push(`${last}[gll${idx}]overlay=${posX}:${posY}[${gout}]`);
+      filters.push(`${last}[gll${idx}]overlay=${posX}:${posY}:format=auto[${gout}]`);
       last = `[${gout}]`;
       prepared = `plg${idx}`;
     }
@@ -497,7 +565,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const sout = `sh${idx}`;
       filters.push(`[${prepared}]split[pl${idx}][ps${idx}]`);
       filters.push(`[ps${idx}]${shadowSilhouette(sig, dc.opacity != null ? dc.opacity : 0.5, dc.color)}[shl${idx}]`);
-      filters.push(`${last}[shl${idx}]overlay=${posX}+(${dx}):${posY}+(${dy})[${sout}]`);
+      filters.push(`${last}[shl${idx}]overlay=${posX}+(${dx}):${posY}+(${dy}):format=auto[${sout}]`);
       last = `[${sout}]`;
       prepared = `pl${idx}`; // a réteg a split másik fele (az árnyék-sziluett nem fogyasztja el)
     }
@@ -510,7 +578,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         const kout = `st${idx}`;
         filters.push(`[${prepared}]split[plk${idx}][psk${idx}]`);
         filters.push(`[psk${idx}]${strokeSilhouette(layer.stroke.color, sw)}[stl${idx}]`);
-        filters.push(`${last}[stl${idx}]overlay=${posX}:${posY}[${kout}]`);
+        filters.push(`${last}[stl${idx}]overlay=${posX}:${posY}:format=auto[${kout}]`);
         last = `[${kout}]`;
         prepared = `plk${idx}`;
       }
@@ -518,43 +586,52 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
     // 🎭 réteg-maszk (szelekció/alak): a réteget átlátszó TELJES vászonra helyezzük, az alfáját a
     // maszk-szürkével szorozzuk (a maszkon kívül átlátszó) → a base fölé. A maszk a blend ELŐTT nyer (v1).
+    let placeX = posX;
+    let placeY = posY;
     const mask = layer.mask;
     if (mask && mask.shape && layer.kind !== 'fill') {
       const mi = maskSeq;
       maskSeq += 1;
-      filters.push(`color=black@0:s=${canvas.w}x${canvas.h}[mbg${mi}]`);
-      filters.push(`[mbg${mi}][${prepared}]overlay=${posX}:${posY}[Lf${mi}]`);
+      filters.push(`color=black@0:s=${canvas.w}x${canvas.h},format=rgba[mbg${mi}]`);
+      filters.push(`[mbg${mi}][${prepared}]overlay=${posX}:${posY}:format=auto[Lf${mi}]`);
       filters.push(maskGrayChain(mask, canvas.w, canvas.h, `[mimg${mi}]`));
       filters.push(`[Lf${mi}]split[mf${mi}][mfa${mi}]`);
       filters.push(`[mfa${mi}]alphaextract[mae${mi}]`);
       filters.push(`[mae${mi}][mimg${mi}]blend=all_mode=multiply:shortest=1[mab${mi}]`);
       filters.push(`[mf${mi}][mab${mi}]alphamerge[mk${mi}]`);
-      filters.push(`${last}[mk${mi}]overlay=0:0[${out}]`);
-      last = `[${out}]`;
-      continue;
+      // I16: a maszkolt réteg ezután teljes vásznas — a blend mód ugyanúgy érvényesül rá
+      prepared = `mk${mi}`;
+      placeX = '0';
+      placeY = '0';
     }
 
     const mode = BLEND_FF[layer.blendMode];
     if (!mode) {
       // normál (source-over)
-      filters.push(`${last}[${prepared}]overlay=${posX}:${posY}[${out}]`);
+      filters.push(`${last}[${prepared}]overlay=${placeX}:${placeY}:format=auto[${out}]`);
     } else {
       // 🎨 keverési mód: a réteget teljes átlátszó vászonra helyezzük (Lfull), a base-szel
       // `blend`-eljük a módnak megfelelően, majd a réteg ALFÁJÁVAL maszkolva a base fölé mergeljük
       // (így a blend csak ott hat, ahol a réteg átlátszatlan; az opacity az alfában benne van).
-      inputs.push('-f', 'lavfi', '-i', `color=black@0:s=${canvas.w}x${canvas.h}`);
+      inputs.push('-f', 'lavfi', '-i', `color=black@0:s=${canvas.w}x${canvas.h},format=rgba`);
       const tIdx = idx;
       idx += 1;
       filters.push(`[${tIdx}:v]format=rgba[t${tIdx}]`);
-      filters.push(`[t${tIdx}][${prepared}]overlay=${posX}:${posY}[Lf${tIdx}]`);
-      filters.push(`[Lf${tIdx}]split[Lb${tIdx}][La${tIdx}]`);
-      filters.push(`${last}split[bb${tIdx}][bc${tIdx}]`);
+      filters.push(`[t${tIdx}][${prepared}]overlay=${placeX}:${placeY}:format=auto[Lf${tIdx}]`);
+      filters.push(`[Lf${tIdx}]split=3[Lb${tIdx}][Lc${tIdx}][La${tIdx}]`);
+      filters.push(`${last}split=3[bb${tIdx}][bc${tIdx}][ba${tIdx}]`);
       // ⚠️ a `blend` RGB-SÍKOKON számoljon (gbrp), különben YUV-ban keverne → színhiba
       filters.push(`[bb${tIdx}]format=gbrp[bbf${tIdx}]`);
       filters.push(`[Lb${tIdx}]format=gbrp[Lbf${tIdx}]`);
       filters.push(`[bbf${tIdx}][Lbf${tIdx}]blend=all_mode=${mode}:shortest=1[bl${tIdx}]`);
+      // W3C-kompozit: Cs' = (1−αb)·Cs + αb·B(Cb,Cs) — átlátszó alapon a réteg saját színe
+      // látszik; a végső overlay őrzi az alap alfáját (a gbrp-ág egyébként eldobná)
+      filters.push(`[ba${tIdx}]alphaextract[baa${tIdx}]`);
+      filters.push(`[Lc${tIdx}]format=gbrp[Lcf${tIdx}]`);
+      filters.push(`[Lcf${tIdx}][bl${tIdx}][baa${tIdx}]maskedmerge[mix${tIdx}]`);
       filters.push(`[La${tIdx}]alphaextract[am${tIdx}]`);
-      filters.push(`[bc${tIdx}][bl${tIdx}][am${tIdx}]maskedmerge[${out}]`);
+      filters.push(`[mix${tIdx}][am${tIdx}]alphamerge,format=rgba[mixA${tIdx}]`);
+      filters.push(`[bc${tIdx}][mixA${tIdx}]overlay=0:0:format=auto[${out}]`);
     }
     last = `[${out}]`;
   }
@@ -582,6 +659,12 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   }
 
   const { ext, args: fmtArgs } = imageOutputArgs(opts.format, opts.quality);
+  // 🤍 I20: a JPG-nek nincs alfája — az átlátszó rész fehérre lapul (nem feketére)
+  if (ext === 'jpg') {
+    filters.push(`color=white:s=${canvas.w}x${canvas.h}[jbg]`);
+    filters.push(`[jbg]${last}overlay=0:0:format=auto:shortest=1[flat]`);
+    last = '[flat]';
+  }
   const outFile = path.join(workDir, `imagedoc.${ext}`);
   await run([
     '-hide_banner',
@@ -603,6 +686,8 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
 module.exports = {
   renderImageDoc,
+  resolveRemoteMedia,
+  docCanvas,
   canvasSize,
   imageOutputArgs,
   imageDocGuard,

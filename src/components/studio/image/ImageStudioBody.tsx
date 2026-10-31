@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { Chip } from '@/components/ui/controls';
@@ -46,6 +46,8 @@ import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } fro
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
+import { ImageRenderRejected } from '@/lib/imageExport';
+import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
 import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
@@ -163,25 +165,59 @@ export function ImageStudioBody({
    * ESZKÖZÖN a vászon `captureRef`-je a fallback — így a MENTÉS worker nélkül is
    * működik (offline/Expo Go). A kijelölés-króm elrejtve, hogy ne kerüljön a képbe.
    */
+  const rejectedRef = useRef(false);
   const rasterize = async (
-    doc: ImageDoc,
+    target: ImageDoc,
     opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number }
   ): Promise<string | null> => {
-    const viaWorker = await renderImageDoc(doc, opts?.height ?? doc.height ?? 1280, {
-      format: opts?.format,
-      quality: opts?.quality,
-    });
-    if (viaWorker) {
-      return viaWorker;
+    rejectedRef.current = false;
+    const height = opts?.height ?? target.height ?? 1280;
+    try {
+      const viaWorker = await renderImageDoc(target, height, {
+        format: opts?.format,
+        quality: opts?.quality,
+        onMissingLayers: (count) =>
+          Alert.alert(t('studio.image.missingInExport.title'), t('studio.image.missingInExport.body', { count })),
+      });
+      if (viaWorker) {
+        return viaWorker;
+      }
+    } catch (e) {
+      // 🚫 I13: szándékos elutasítás — a fallback a user elől rejtené el az okot
+      if (e instanceof ImageRenderRejected) {
+        rejectedRef.current = true;
+        Alert.alert(t('studio.image.renderFailTitle'), e.message);
+        return null;
+      }
+      throw e;
+    }
+    // ⚠️ I12: a vászon csak az AKTÍV dokumentumot mutatja — másik lapot nem szabad lefotózni
+    if (target.id !== doc?.id) {
+      return null;
     }
     setCapturing(true);
     await new Promise((r) => setTimeout(r, 90)); // egy render-kör, kijelölés-króm nélkül
     try {
-      return await captureRef(canvasRef, { format: 'png', quality: 1 });
+      const canvas = effectiveCanvas(target);
+      const ratio = PixelRatio.get();
+      // a view-shot a méretet képpontban várja — a dokumentum felbontására kérjük a képet
+      return await captureRef(canvasRef, {
+        format: opts?.format === 'jpg' ? 'jpg' : 'png',
+        quality: opts?.quality ?? 1,
+        width: Math.round((height * (canvas.width / canvas.height)) / ratio),
+        height: Math.round(height / ratio),
+      });
     } catch {
       return null;
     } finally {
       setCapturing(false);
+    }
+  };
+
+  /** az általános hibaablak — ha a szerver már megmondta az okot, nem duplázzuk */
+  const alertRenderFail = () => {
+    if (!rejectedRef.current) {
+      Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
     }
   };
 
@@ -448,6 +484,11 @@ export function ImageStudioBody({
       }
       // EGY command: a réteges doc a projektbe (sosem közvetlen doc-írás)
       useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: psdDoc, label: t('studio.image.undoImportPsd') });
+      // I22: az importált lapra ugrunk, különben úgy tűnik, nem történt semmi
+      if (mode === 'project') {
+        setActivePageId(psdDoc.id);
+        setSelectedId(null);
+      }
       setSheet('layers');
     } catch (e) {
       Alert.alert(t('studio.image.psdFailTitle'), (e as Error)?.message || t('studio.image.psdFailBody'));
@@ -808,7 +849,8 @@ export function ImageStudioBody({
   // 🖌️ ecset: a Skia-festés pillanatképe PNG-fájlként → FOTÓ-réteg a vásznon
   const commitBrush = () => {
     if (doc && brushRef.current?.hasStrokes()) {
-      const uri = brushRef.current.exportPng();
+      const canvas = effectiveCanvas(doc);
+      const uri = brushRef.current.exportPng(canvas.width, canvas.height);
       if (uri) {
         const l: PhotoLayer = {
           kind: 'photo',
@@ -861,16 +903,8 @@ export function ImageStudioBody({
         // 🩹 folt-javítás: a lasszó bbox-át a FOTÓ dobozába transzformáljuk (0–1 box-lokális) → heal-régió
         const cur = doc.layers.find((l) => l.id === maskTarget.id);
         if (cur && cur.kind === 'photo') {
-          const bw = Math.max(cur.w ?? 1, 0.0001);
-          const bh = Math.max(cur.h ?? 1, 0.0001);
-          const bx = cur.position.x - bw / 2;
-          const by = cur.position.y - bh / 2;
-          const region = {
-            x: Math.max(0, (minX - bx) / bw),
-            y: Math.max(0, (minY - by) / bh),
-            w: Math.min(1, (maxX - minX) / bw),
-            h: Math.min(1, (maxY - minY) / bh),
-          };
+          // I18: a réteg forgatása/tükrözése is számít — a heal a réteg saját terében fut
+          const region = healRegionFromPoints(points, cur, effectiveCanvas(doc));
           commit(
             updateLayer<PhotoLayer>(doc, maskTarget.id, { heal: [...(cur.heal ?? []), region] }),
             t('studio.image.undoHeal', { defaultValue: 'Folt-javítás' })
@@ -947,7 +981,7 @@ export function ImageStudioBody({
     try {
       const uri = await rasterize(doc, opts);
       if (!uri) {
-        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
+        alertRenderFail();
         return;
       }
       commitRendered(doc.id, uri);
@@ -1096,7 +1130,7 @@ export function ImageStudioBody({
     try {
       const uri = await rasterize(doc);
       if (!uri) {
-        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
+        alertRenderFail();
         return;
       }
       const vid = createEmptyProject(
@@ -1141,9 +1175,12 @@ export function ImageStudioBody({
       for (const p of pages) {
         if (!p.renderedUri) {
           const uri = await rasterize(p);
-          if (uri) {
-            commitRendered(p.id, uri);
+          if (!uri) {
+            // I12: inkább nem osztunk meg semmit, mint rossz lapot
+            alertRenderFail();
+            return;
           }
+          commitRendered(p.id, uri);
         }
       }
       const fresh = useEditorStore.getState().project;

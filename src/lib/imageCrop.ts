@@ -1,5 +1,5 @@
 import { effectiveCanvas } from '@/lib/canvasPresets';
-import type { ImageDoc, ImageLayer, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
+import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
 
 /**
  * ✂️ Kivágás-téglalap a JELENLEGI vászon terében, 0–1 normalizálva.
@@ -100,10 +100,56 @@ function remapPos(p: { x: number; y: number }, r: CropRect): { x: number; y: num
  * szélességével, a magasság-% (méret/vonalvastagság/betűméret/glow) a kivágás
  * magasságával skálázódik. A háttér-fill a teljes (új) vásznon marad.
  */
+function remapMask(mask: ClipMask, r: CropRect): ClipMask {
+  const next: ClipMask = { ...mask, ...remapPos(mask, r), w: mask.w / r.w, h: mask.h / r.h };
+  if (mask.points) {
+    next.points = mask.points.map((p) => remapPos(p, r));
+  }
+  // a téglalap lágy széle a magassághoz, a poligoné a szélességhez arányos (imageMask.js);
+  // az ellipszisé a saját méretéhez, az nem változik
+  if (mask.feather != null && mask.shape !== 'ellipse') {
+    next.feather = mask.feather / (mask.shape === 'polygon' ? r.w : r.h);
+  }
+  return next;
+}
+
+/** A vászon-relatív effekt-értékek: a `true` az alapértéket jelenti, ezért itt kifejtjük. */
+function remapEffects<T extends ImageLayer>(layer: T, r: CropRect): T {
+  const next = { ...layer } as T & Pick<PhotoLayer, 'mask' | 'localAdjust' | 'dropShadow' | 'outerGlow' | 'stroke'>;
+  const src = layer as T & Pick<PhotoLayer, 'mask' | 'localAdjust' | 'dropShadow' | 'outerGlow' | 'stroke'>;
+  if (src.mask) {
+    next.mask = remapMask(src.mask, r);
+  }
+  if (src.localAdjust?.mask) {
+    next.localAdjust = { ...src.localAdjust, mask: remapMask(src.localAdjust.mask, r) };
+  }
+  if (src.dropShadow) {
+    const d = typeof src.dropShadow === 'object' ? src.dropShadow : {};
+    next.dropShadow = {
+      ...d,
+      dx: (d.dx ?? 0.02) / r.w,
+      dy: (d.dy ?? 0.02) / r.h,
+      blur: (d.blur ?? 0.012) / r.w,
+    };
+  }
+  if (src.outerGlow) {
+    const g = typeof src.outerGlow === 'object' ? src.outerGlow : {};
+    next.outerGlow = { ...g, size: (g.size ?? 0.02) / r.w };
+  }
+  if (src.stroke) {
+    next.stroke = { ...src.stroke, width: src.stroke.width / r.w };
+  }
+  return next;
+}
+
 function remapLayer(layer: ImageLayer, r: CropRect): ImageLayer {
   if (layer.kind === 'fill') {
     return layer;
   }
+  return remapEffects(remapGeometry(layer, r), r);
+}
+
+function remapGeometry(layer: Exclude<ImageLayer, { kind: 'fill' }>, r: CropRect): ImageLayer {
   if (layer.kind === 'photo') {
     const next: PhotoLayer = {
       ...layer,

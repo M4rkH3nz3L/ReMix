@@ -30,6 +30,11 @@ export function isSupportedImage(uri: string): boolean {
   return ext === '' || SUPPORTED_EXT.includes(ext);
 }
 
+/** alfát hordozhat → PNG-ként mentjük; a JPEG feketére lapítaná az átlátszó részt */
+export function keepsAlpha(uri: string): boolean {
+  return ['png', 'webp', 'gif'].includes(imageExtOf(uri));
+}
+
 export interface ResizePlan {
   width: number;
   height: number;

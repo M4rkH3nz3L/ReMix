@@ -3107,6 +3107,11 @@
       "layer": "Réteg"
     },
     "image": {
+      "missingInExport": {
+        "title": "Hiányos export",
+        "body_one": "{{count}} réteg képe nem érhető el, ezért kimaradt az exportból.",
+        "body_other": "{{count}} réteg képe nem érhető el, ezért kimaradtak az exportból."
+      },
       "brushDiscard": {
         "title": "Elveted a rajzot?",
         "message": "A még nem véglegesített ecsetvonások elvesznek.",

@@ -3107,6 +3107,11 @@
       "layer": "Layer"
     },
     "image": {
+      "missingInExport": {
+        "title": "Incomplete export",
+        "body_one": "{{count}} layer's image isn't available, so it was left out of the export.",
+        "body_other": "{{count}} layers' images aren't available, so they were left out of the export."
+      },
       "brushDiscard": {
         "title": "Discard drawing?",
         "message": "Your unfinished brush strokes will be lost.",

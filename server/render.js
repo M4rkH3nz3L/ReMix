@@ -2959,6 +2959,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
 // az adjustChain a kép-dokumentum rasterizálójának is kell — ugyanaz a
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
 module.exports = {
+  FILTERS,
   renderProject,
   outputColorFilter,
   projectDuration,

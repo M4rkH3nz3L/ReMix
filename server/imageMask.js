@@ -80,22 +80,60 @@ function maskGrayChain(mask, W, H, label) {
 }
 
 // 🎯 vászon-normalizált maszk → a réteg DOBOZÁBA (box-lokális 0–1) transzformálva — a lokális
-// korrekcióhoz, ami a box-méretű prepared rétegen fut. A réteg középe (position) + w/h adja a dobozt.
-function maskToBox(mask, layer) {
+// korrekcióhoz, ami a réteg SAJÁT terében (forgatás/tükrözés ELŐTT) fut. A vászon-pontot a réteg
+// geometriájának INVERZÉVEL visszük vissza: a forgatás pixel-térben értendő, ezért kell a W×H.
+function maskToBox(mask, layer, W = 1, H = 1) {
   const bw = Math.max(Number(layer.w) || 1, 0.0001);
   const bh = Math.max(Number(layer.h) || 1, 0.0001);
-  const bx = (layer.position?.x ?? 0.5) - bw / 2;
-  const by = (layer.position?.y ?? 0.5) - bh / 2;
-  const tx = (v) => (v - bx) / bw;
-  const ty = (v) => (v - by) / bh;
+  const cx = layer.position?.x ?? 0.5;
+  const cy = layer.position?.y ?? 0.5;
+  const rad = ((Number(layer.rotation) || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const toBox = (x, y) => {
+    const dx = (x - cx) * W;
+    const dy = (y - cy) * H;
+    let lx = dx * cos + dy * sin;
+    let ly = -dx * sin + dy * cos;
+    if (layer.flipH) lx = -lx;
+    if (layer.flipV) ly = -ly;
+    return { x: 0.5 + lx / (bw * W), y: 0.5 + ly / (bh * H) };
+  };
+  // forgatott téglalap/ellipszis nem ábrázolható tengelyes paraméterekkel → poligon lesz belőle
+  let points = Array.isArray(mask.points) ? mask.points : undefined;
+  let shape = mask.shape;
+  if (rad !== 0 && shape !== 'polygon') {
+    points = outlinePoints(mask);
+    shape = 'polygon';
+  }
+  const center = toBox(mask.x, mask.y);
   return {
     ...mask,
-    x: tx(mask.x),
-    y: ty(mask.y),
+    shape,
+    x: center.x,
+    y: center.y,
     w: mask.w / bw,
     h: mask.h / bh,
-    points: Array.isArray(mask.points) ? mask.points.map((p) => ({ x: tx(p.x), y: ty(p.y) })) : undefined,
+    points: points ? points.map((p) => toBox(p.x, p.y)) : undefined,
   };
+}
+
+/** téglalap / ellipszis körvonala poligonként (vászon-normalizált) */
+function outlinePoints(mask) {
+  const rx = mask.w / 2;
+  const ry = mask.h / 2;
+  if (mask.shape === 'ellipse') {
+    return Array.from({ length: 48 }, (_, i) => {
+      const a = (i / 48) * Math.PI * 2;
+      return { x: mask.x + rx * Math.cos(a), y: mask.y + ry * Math.sin(a) };
+    });
+  }
+  return [
+    { x: mask.x - rx, y: mask.y - ry },
+    { x: mask.x + rx, y: mask.y - ry },
+    { x: mask.x + rx, y: mask.y + ry },
+    { x: mask.x - rx, y: mask.y + ry },
+  ];
 }
 
 module.exports = { maskWExpr, maskGrayChain, polyWExpr, staticPoly, maskToBox };

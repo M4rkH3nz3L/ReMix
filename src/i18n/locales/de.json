@@ -3105,6 +3105,11 @@
       "layer": "Ebene"
     },
     "image": {
+      "missingInExport": {
+        "title": "Unvollständiger Export",
+        "body_one": "Das Bild von {{count}} Ebene ist nicht verfügbar und fehlt im Export.",
+        "body_other": "Die Bilder von {{count}} Ebenen sind nicht verfügbar und fehlen im Export."
+      },
       "brushDiscard": {
         "title": "Zeichnung verwerfen?",
         "message": "Deine noch nicht übernommenen Pinselstriche gehen verloren.",

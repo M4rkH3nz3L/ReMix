@@ -1,4 +1,4 @@
-import { Canvas, ImageFormat, Path, useCanvasRef } from '@shopify/react-native-skia';
+import { Canvas, ImageFormat, PaintStyle, Path, Skia, StrokeCap, StrokeJoin, useCanvasRef } from '@shopify/react-native-skia';
 import { File } from 'expo-file-system';
 import { forwardRef, useImperativeHandle, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,8 +6,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 
 export interface BrushHandle {
-  /** a vászon pillanatképe PNG-fájlként (uri) vagy null */
-  exportPng: () => string | null;
+  /** a vonások PNG-fájlként (uri) DOKUMENTUM-felbontáson, vagy null */
+  exportPng: (docWidth: number, docHeight: number) => string | null;
   hasStrokes: () => boolean;
 }
 
@@ -15,6 +15,32 @@ interface Stroke {
   d: string;
   color: string;
   width: number;
+}
+
+/** A vonások offscreen raszterizálása a dokumentum felbontásán (null = nincs GPU-felület). */
+function renderStrokes(strokes: Stroke[], box: { w: number; h: number }, width: number, height: number) {
+  const surface = Skia.Surface.MakeOffscreen(Math.round(width), Math.round(height));
+  if (!surface) {
+    return null;
+  }
+  const canvas = surface.getCanvas();
+  canvas.scale(width / box.w, height / box.h);
+  for (const s of strokes) {
+    const path = Skia.Path.MakeFromSVGString(s.d);
+    if (!path) {
+      continue;
+    }
+    const paint = Skia.Paint();
+    paint.setColor(Skia.Color(s.color));
+    paint.setStyle(PaintStyle.Stroke);
+    paint.setStrokeWidth(s.width);
+    paint.setStrokeCap(StrokeCap.Round);
+    paint.setStrokeJoin(StrokeJoin.Round);
+    paint.setAntiAlias(true);
+    canvas.drawPath(path, paint);
+  }
+  surface.flush();
+  return surface.makeImageSnapshot();
 }
 
 /**
@@ -52,9 +78,11 @@ export const BrushOverlay = forwardRef<BrushHandle, { box: { w: number; h: numbe
       ref,
       () => ({
         hasStrokes: () => strokes.length > 0,
-        exportPng: () => {
+        exportPng: (docWidth, docHeight) => {
           try {
-            const img = canvasRef.current?.makeImageSnapshot();
+            // 🖼️ I19: a vonásokat a dokumentum méretén rajzoljuk újra (vektorból) — a
+            // képernyő-pillanatkép a nagy exportban elmosódna
+            const img = renderStrokes(strokes, box, docWidth, docHeight) ?? canvasRef.current?.makeImageSnapshot();
             if (!img) {
               return null;
             }
@@ -71,7 +99,7 @@ export const BrushOverlay = forwardRef<BrushHandle, { box: { w: number; h: numbe
           }
         },
       }),
-      [strokes, canvasRef]
+      [strokes, canvasRef, box]
     );
 
     const all = current ? [...strokes, current] : strokes;

@@ -16,7 +16,7 @@ export interface WorkspaceLayout {
 
 export function workspaceLayout(sizeClass: SizeClass, width: number): WorkspaceLayout {
   if (sizeClass === 'compact') {
-    return { mode: 'overlay', railWidth: 68, panelWidth: Math.min(300, Math.round(width * 0.8)) };
+    return { mode: 'overlay', railWidth: 68, panelWidth: Math.min(264, Math.round(width * 0.66)) };
   }
   return sizeClass === 'expanded'
     ? { mode: 'inline', railWidth: 76, panelWidth: 340 }

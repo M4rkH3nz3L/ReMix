@@ -39,6 +39,7 @@ import {
   createImageDoc,
   duplicateLayer,
   layerLabel,
+  moveLayerTo,
   removeLayer,
   reorderLayer,
   toggleLayerLocked,
@@ -144,6 +145,9 @@ export function ImageStudioBody({
   const workspace = workspaceLayout(L.sizeClass, L.width);
   const imagePanels = useEditorPrefs((s) => s.imagePanels);
   const panels = panelState(workspace.mode, imagePanels);
+  // telefonon a nyitott rétegpanel mellett a sín behúzódik, hogy a vászon látsszon rendezés közben
+  const railYieldsToPanel = workspace.mode === 'overlay' && panels.layers;
+  const [orderPreview, setOrderPreview] = useState<{ id: string; to: number } | null>(null);
   const setRailOpen = (rail: boolean) => useEditorPrefs.getState().setImagePanel(workspace.mode, { rail });
   const setLayersOpen = (layers: boolean) => useEditorPrefs.getState().setImagePanel(workspace.mode, { layers });
   const setSheet = (next: SheetKind) => {
@@ -1348,6 +1352,7 @@ export function ImageStudioBody({
         }}
         onRasterize={(id) => void mergeLayers([id], t('studio.image.rasterize'))}
         onFlatten={() => void mergeLayers(flattenTargets(doc), t('studio.image.flatten'))}
+        onOrderPreview={setOrderPreview}
         commit={commit}
         onClose={() => setLayersOpen(false)}
       />
@@ -1489,13 +1494,13 @@ export function ImageStudioBody({
         style={[styles.work, styles.workRow]}
         onLayout={(e) => setWorkH(e.nativeEvent.layout.height)}
       >
-        {panels.rail && !precisionMode ? rail : null}
+        {panels.rail && !precisionMode && !railYieldsToPanel ? rail : null}
         <View style={styles.work}>
           <View style={styles.work}>
           {/* vászon */}
           {doc ? (
             <ImageCanvas
-              doc={doc}
+              doc={orderPreview ? moveLayerTo(doc, orderPreview.id, orderPreview.to) : doc}
               selectedId={effectiveSelectedId}
               onSelect={setSelectedId}
               onRequestEdit={(id) => {
@@ -1539,9 +1544,9 @@ export function ImageStudioBody({
           {!precisionMode ? (
             <>
               {workspace.mode === 'overlay' && panels.layers ? (
-                <View style={[styles.overlayRight, { width: workspace.panelWidth }]}>{layerPanel}</View>
+                <View style={[styles.overlayRight, { width: workspace.panelWidth }, orderPreview ? styles.overlayDragging : null]}>{layerPanel}</View>
               ) : null}
-              {!panels.rail ? <EdgeTab side="left" icon="construct-outline" label={t('studio.image.toolsShow')} onPress={() => setRailOpen(true)} /> : null}
+              {!panels.rail && !railYieldsToPanel ? <EdgeTab side="left" icon="construct-outline" label={t('studio.image.toolsShow')} onPress={() => setRailOpen(true)} /> : null}
               {!panels.layers ? <EdgeTab side="right" icon="layers-outline" label={t('studio.image.layersShow')} onPress={() => setLayersOpen(true)} /> : null}
             </>
           ) : null}
@@ -1821,6 +1826,7 @@ const styles = StyleSheet.create({
   work: { flex: 1 },
   workRow: { flexDirection: 'row' },
   overlayRight: { position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 6, backgroundColor: palette.surface },
+  overlayDragging: { opacity: 0.55 },
   inlineRight: { alignSelf: 'stretch', backgroundColor: palette.surface, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: palette.border },
   hidden: { display: 'none' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },

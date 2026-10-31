@@ -11,6 +11,7 @@ import { StyleSheet } from 'react-native';
 
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
+import { LayerThumb } from '@/components/studio/image/LayerThumb';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import type { LivePatch } from '@/lib/imageLayerClip';
@@ -19,7 +20,7 @@ import en from '@/i18n/locales/en.json';
 import hu from '@/i18n/locales/hu.json';
 import { RAIL_GROUPS, selectionMenu, TOOL_ICONS } from '@/lib/imageMenu';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
-import { moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
+import { layerRowLabels, moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
 import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
 import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
@@ -147,6 +148,48 @@ describe('réteg-sorrend húzással', () => {
     const h = (getByGestureTestId('layer-drag-c') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
     await act(async () => h.onEnd({ translationY: 110 }, true));
     expect(ids(commit.mock.calls[0][0])).toBe('cab'); // a lista fölül a legfelső, 2 sorral lejjebb
+  });
+  it('húzás közben a vászon a várható sorrendet kapja, a végén visszaáll', async () => {
+    const preview = jest.fn();
+    const commit = jest.fn();
+    const doc = docOf([l('a'), l('b'), l('c')]);
+    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} onOrderPreview={preview} commit={commit} onClose={() => {}} />);
+    const h = (getByGestureTestId('layer-drag-c') as unknown as { handlers: { onUpdate: (e: object) => void; onEnd: (e: object, ok: boolean) => void } }).handlers;
+    await act(async () => h.onUpdate({ translationY: 60 }));
+    expect(preview).toHaveBeenLastCalledWith({ id: 'c', to: 1 });
+    await act(async () => h.onEnd({ translationY: 60 }, true));
+    expect(preview).toHaveBeenLastCalledWith(null);
+    expect(ids(commit.mock.calls[0][0])).toBe('acb');
+  });
+  it('az azonos nevű rétegek sorszámot kapnak, a saját név érintetlen', () => {
+    const photo2 = (id: string, name?: string) => ({ ...layer, id, name });
+    const labels = layerRowLabels(docOf([photo2('a'), photo2('b'), photo2('c', 'Portré'), photo2('d')]));
+    expect(labels.get('a')).not.toEqual(labels.get('b'));
+    expect(labels.get('b')).toMatch(/ 2$/);
+    expect(labels.get('c')).toBe('Portré');
+    expect(labels.get('d')).toMatch(/ 3$/);
+  });
+  it('minden fajtának van előnézete: a fotó a saját képét mutatja', () => {
+    let tree: ReturnType<typeof create> | undefined;
+    const kinds = [
+      layer,
+      { kind: 'text', id: 't', text: 'Hello', color: '#ff0000', fontSize: 8, position: { x: 0.5, y: 0.5 } },
+      { kind: 'shape', id: 's', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#00ff00' },
+      { kind: 'shape', id: 's2', shape: 'star', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#00ff00' },
+      { kind: 'fill', id: 'f', fill: '#0000ff' },
+      { kind: 'fill', id: 'g', fill: '#000', fillGradient: { from: '#111111', to: '#222222' } },
+      { kind: 'adjust', id: 'j' },
+    ] as ImageLayer[];
+    for (const k of kinds) {
+      act(() => {
+        tree = create(<LayerThumb layer={k} />);
+      });
+      expect(tree!.toJSON()).toBeTruthy();
+    }
+    act(() => {
+      tree = create(<LayerThumb layer={layer} />);
+    });
+    expect(JSON.stringify(tree!.toJSON())).toContain('file:///a.png');
   });
   it('a csoport egyben marad: kívülálló nem kerül a tagok közé', () => {
     const d = docOf([l('a'), l('x', 'g'), l('y', 'g'), l('b')]);

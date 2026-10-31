@@ -274,6 +274,22 @@ export function effectiveLayerOpacity(doc: ImageDoc, layer: ImageLayer): number 
   return own * (g?.opacity ?? 1);
 }
 
+/**
+ * A sorok feliratai: az azonos nevűek sorszámot kapnak alulról felfelé („Fotó", „Fotó 2"),
+ * hogy a listában megkülönböztethetők legyenek. A felhasználó adta név érintetlen.
+ */
+export function layerRowLabels(doc: ImageDoc): Map<string, string> {
+  const seen = new Map<string, number>();
+  const out = new Map<string, string>();
+  for (const l of doc.layers) {
+    const base = layerLabel(l);
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    out.set(l.id, n > 1 && !l.name ? `${base} ${n}` : base);
+  }
+  return out;
+}
+
 /** a réteglista címkéje — a felhasználó adta név, vagy a tartalomból képzett */
 export function layerLabel(layer: ImageLayer): string {
   if (layer.name) {

@@ -5,11 +5,12 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { Slider } from '@/components/studio/audio/primitives';
+import { LayerThumb } from '@/components/studio/image/LayerThumb';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
 import {
-  layerIcon,
   layerLabel,
+  layerRowLabels,
   moveLayerTo,
   toggleLayerHidden,
   toggleLayerLocked,
@@ -34,6 +35,7 @@ export function LayerPanel({
   onMergeDown,
   onRasterize,
   onFlatten,
+  onOrderPreview,
   commit,
   onClose,
 }: {
@@ -43,11 +45,14 @@ export function LayerPanel({
   onMergeDown: (id: string) => void;
   onRasterize: (id: string) => void;
   onFlatten: () => void;
+  /** húzás közben a várható sorrend (a vászon élőben mutatja), a végén null */
+  onOrderPreview?: (preview: { id: string; to: number } | null) => void;
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const layer = doc.layers.find((l) => l.id === selectedId) ?? null;
+  const labels = layerRowLabels(doc);
 
   return (
     <StudioSheet
@@ -84,6 +89,8 @@ export function LayerPanel({
                 key={l.id}
                 doc={doc}
                 layer={l}
+                label={labels.get(l.id) ?? layerLabel(l)}
+                onOrderPreview={onOrderPreview}
                 indented={!!g}
                 selected={l.id === selectedId}
                 onSelect={onSelect}
@@ -164,6 +171,8 @@ type TFn = ReturnType<typeof useTranslation>['t'];
 function LayerRow({
   doc,
   layer: l,
+  label,
+  onOrderPreview,
   indented,
   selected: sel,
   onSelect,
@@ -172,6 +181,8 @@ function LayerRow({
 }: {
   doc: ImageDoc;
   layer: ImageLayer;
+  label: string;
+  onOrderPreview?: (preview: { id: string; to: number } | null) => void;
   indented: boolean;
   selected: boolean;
   onSelect: (id: string | null) => void;
@@ -180,23 +191,29 @@ function LayerRow({
 }) {
   // 🖐️ húzásos sorrend: a lista fölül a legfelső réteg, ezért lefelé húzva csökken az index
   const [dragY, setDragY] = useState(0);
+  const targetIndex = (dy: number) => doc.layers.findIndex((x) => x.id === l.id) - Math.round(dy / LAYER_ROW_STEP);
+  const updateDrag = (dy: number) => {
+    setDragY(dy);
+    onOrderPreview?.({ id: l.id, to: targetIndex(dy) }); // a vászon húzás közben mutatja a sorrendet
+  };
   const finishDrag = (dy: number) => {
     setDragY(0);
-    const steps = Math.round(dy / LAYER_ROW_STEP);
-    if (steps !== 0) {
-      const from = doc.layers.findIndex((x) => x.id === l.id);
-      commit(moveLayerTo(doc, l.id, from - steps), t('studio.image.undoReorder'));
+    onOrderPreview?.(null);
+    const to = targetIndex(dy);
+    if (to !== doc.layers.findIndex((x) => x.id === l.id)) {
+      commit(moveLayerTo(doc, l.id, to), t('studio.image.undoReorder'));
     }
   };
   const drag = Gesture.Pan()
     .withTestId(`layer-drag-${l.id}`)
     .runOnJS(true)
     .minDistance(2)
-    .onUpdate((e) => setDragY(e.translationY))
+    .onUpdate((e) => updateDrag(e.translationY))
     .onEnd((e) => finishDrag(e.translationY))
     .onFinalize((_e, success) => {
       if (!success) {
         setDragY(0);
+        onOrderPreview?.(null);
       }
     });
 
@@ -215,9 +232,9 @@ function LayerRow({
           <Ionicons name="reorder-three" size={20} color={palette.textDim} />
         </View>
       </GestureDetector>
-      <Text style={styles.layerIcon}>{layerIcon(l)}</Text>
-      <Text style={[styles.layerName, l.hidden ? styles.hidden : null]} numberOfLines={1}>
-        {layerLabel(l)}
+      <LayerThumb layer={l} />
+      <Text style={[styles.layerName, l.hidden ? styles.hidden : null]} numberOfLines={2}>
+        {label}
       </Text>
       <IconBtn
         icon={l.hidden ? 'eye-off-outline' : 'eye-outline'}
@@ -329,7 +346,6 @@ const styles = StyleSheet.create({
   },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
   groupName: { flex: 1, color: palette.text, fontSize: 12, fontWeight: '800' },
-  layerIcon: { fontSize: 14 },
   layerName: { flex: 1, color: palette.text, fontSize: 12, fontWeight: '600' },
   hidden: { color: palette.textDim, textDecorationLine: 'line-through' },
   inspector: {

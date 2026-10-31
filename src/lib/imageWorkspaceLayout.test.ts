@@ -7,8 +7,8 @@ describe('Kép Stúdió elrendezés', () => {
   it('telefonon a panelek a vászon fölé nyílnak, és a szélesség nagyja megmarad', () => {
     const phone = at(440, 956);
     expect(phone.mode).toBe('overlay');
-    expect(phone.panelWidth).toBeLessThanOrEqual(440 * 0.8);
-    expect(at(320, 568).panelWidth).toBe(256); // kis iPhone-on sem takar mindent
+    expect(phone.panelWidth).toBe(264); // a vászon mellette látszik rendezés közben
+    expect(at(320, 568).panelWidth).toBe(211); // kis iPhone-on sem takar mindent
   });
   it('fekvő telefon is telefonos, ha nincs elég szélesség', () => {
     expect(at(430, 932).mode).toBe('overlay');

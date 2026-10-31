@@ -12,8 +12,8 @@
       "bundleIdentifier": "com.h3nz3l.remix",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Remix uses the camera so you can record video straight into your project and scan objects into 3D models.",
-        "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos.",
+        "NSCameraUsageDescription": "Remix uses the camera to record video into your projects, go live, and scan objects into 3D models.",
+        "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos and live streams.",
         "NSPhotoLibraryUsageDescription": "Remix imports videos and photos from your library so you can edit them.",
         "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library.",
         "NSAppTransportSecurity": {
@@ -83,7 +83,10 @@
             }
           }
         ],
-        "LSSupportsOpeningDocumentsInPlace": false
+        "LSSupportsOpeningDocumentsInPlace": false,
+        "UIBackgroundModes": [
+          "audio"
+        ]
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -146,7 +149,10 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE_CAMERA",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -192,7 +198,7 @@
         "@livekit/react-native-expo-plugin",
         {
           "android": {
-            "audioType": "communication",
+            "audioType": "media",
             "enableScreenShareService": true
           }
         }
@@ -200,8 +206,8 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "cameraPermission": "A ReMix a kamerádat használja az élő közvetítéshez.",
-          "microphonePermission": "A ReMix a mikrofonodat használja az élő közvetítéshez."
+          "cameraPermission": "Remix uses the camera for live streaming.",
+          "microphonePermission": "Remix uses the microphone for live streaming."
         }
       ],
       "./plugins/withWeakLet",

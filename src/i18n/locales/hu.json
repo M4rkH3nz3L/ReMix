@@ -3948,6 +3948,8 @@
     "empty": "Még nincs poszt."
   },
   "live": {
+    "flipCamera": "Kamera váltása",
+    "vodDefaultName": "Live felvétel",
     "state": {
       "connecting": "Kapcsolódás…",
       "reconnecting": "Újracsatlakozás…",

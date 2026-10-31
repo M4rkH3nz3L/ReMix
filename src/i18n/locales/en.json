@@ -3948,6 +3948,8 @@
     "empty": "No posts yet."
   },
   "live": {
+    "flipCamera": "Switch camera",
+    "vodDefaultName": "Live recording",
     "state": {
       "connecting": "Connecting…",
       "reconnecting": "Reconnecting…",

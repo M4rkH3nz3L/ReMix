@@ -130,6 +130,8 @@ export interface LiveDoc {
   destinations: LiveDestination[];
   /** 🎚️ élő audio-mixer (mikrofon/zene/média/rendszer-hang + master + auto-duck). */
   mixer?: LiveMixer;
+  /** 📷 a kamera iránya (a Studióban választott → az adás ezzel indul; adás közben váltható) */
+  cameraFacing?: 'front' | 'back';
   /**
    * 📼 Felveszi-e az adást (VOD)? Ha IGEN → az adás végén a felvételből `kind:'video'`
    * projekt jön létre (szerkeszthető). Ha NEM → NINCS projekt (a live-config projekt

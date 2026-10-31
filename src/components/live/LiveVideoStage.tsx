@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom, useConnectionState, useDataChannel, useLocalParticipant } from '@livekit/react-native';
+import { AudioSession, LiveKitRoom, useConnectionState, useDataChannel, useLocalParticipant } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -39,6 +39,8 @@ export interface LiveVideoStageProps {
   onConnection?: (state: 'connected' | 'reconnecting' | 'disconnected') => void;
   /** végleges hiba (befejezett / nem létező adás, megtagadott engedély) — nincs újrapróba */
   onFatal?: (code: LiveErrorCode) => void;
+  /** 📷 host: a kamera iránya (L27 — eddig mindig az alapértelmezett első kamera) */
+  facing?: 'front' | 'back';
 }
 
 /** A host mikrofon-némítás alkalmazása a LiveKitre (a <LiveKitRoom>-on BELÜL). */
@@ -141,6 +143,26 @@ function SceneDataReceiver({ hostId, onScene }: { hostId: string; onScene: (p: S
   return null;
 }
 
+/**
+ * 📷 L27 — adás közbeni kamera-váltás: a publikált kamerasávot az új iránnyal indítja újra
+ * (a publikáció és a kapcsolat megmarad — a nézőknél nincs megszakadás).
+ */
+function CameraFacingControl({ facing }: { facing: 'front' | 'back' }) {
+  const { localParticipant } = useLocalParticipant();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false; // a kezdő irányt a LiveKitRoom video-opciója adja
+      return;
+    }
+    const pub = localParticipant?.getTrackPublications().find((p) => p.kind === 'video' && p.source === 'camera');
+    const track = pub?.track as { restartTrack?: (o: { facingMode: string }) => Promise<void> } | undefined;
+    const p = track?.restartTrack?.({ facingMode: facing === 'back' ? 'environment' : 'user' });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  }, [facing, localParticipant]);
+  return null;
+}
+
 /** a LiveKit kapcsolat-állapotát továbbítja (a „reconnecting" csak így látszik) */
 function ConnectionReporter({ onConnection }: { onConnection: (s: 'connected' | 'reconnecting' | 'disconnected') => void }) {
   const state = useConnectionState();
@@ -168,6 +190,7 @@ export default function LiveVideoStage({
   onScene,
   onConnection,
   onFatal,
+  facing = 'front',
 }: LiveVideoStageProps) {
   const { t } = useTranslation();
   const [, requestCam] = useCameraPermissions();
@@ -178,6 +201,16 @@ export default function LiveVideoStage({
   // pislákol), a „Kapcsolódás…" NEM ragad be némán — amint a `/live/token` válaszol,
   // belépünk a szobába. Pár sikertelen próba után „Újracsatlakozás…"-ra váltunk.
   const [retrying, setRetrying] = useState(false);
+  // 🎧 L39: a host iOS audio-sessionje (nagy minőségű felvétel/lejátszás) az adás idejére
+  useEffect(() => {
+    if (!publish) return;
+    const started = AudioSession.startAudioSession?.();
+    if (started && typeof (started as Promise<void>).catch === 'function') (started as Promise<void>).catch(() => {});
+    return () => {
+      const stopped = AudioSession.stopAudioSession?.();
+      if (stopped && typeof (stopped as Promise<void>).catch === 'function') (stopped as Promise<void>).catch(() => {});
+    };
+  }, [publish]);
   const onFatalRef = useRef(onFatal);
   useEffect(() => {
     onFatalRef.current = onFatal;
@@ -259,12 +292,13 @@ export default function LiveVideoStage({
         token={lk.token}
         connect
         audio={publish}
-        video={publish}
+        video={publish ? { facingMode: facing === 'back' ? 'environment' : 'user' } : false}
         onDisconnected={() => onConnection?.('disconnected')}
       >
         {onConnection ? <ConnectionReporter onConnection={onConnection} /> : null}
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />
         {publish && <MicControl muted={micMuted ?? false} />}
+        {publish && <CameraFacingControl facing={facing} />}
         {publish && <ScreenShareControl wantScreen={scene ? sceneHasVisible(scene, 'screen') : false} />}
         {publish && <SceneDataPublisher scene={scene} />}
         {!publish && hostId && onScene ? <SceneDataReceiver hostId={hostId} onScene={onScene} /> : null}

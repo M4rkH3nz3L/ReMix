@@ -129,7 +129,10 @@ function LiveCanvas({
   primaryCameraId,
   onRequestCamera,
   onFlip,
+  releasing,
 }: {
+  /** a Go-live alatt az előnézet elengedi a kamerát (L40) */
+  releasing?: boolean;
   doc: LiveDoc;
   width: number;
   aspect: number;
@@ -171,7 +174,7 @@ function LiveCanvas({
             backgroundColor: '#000',
           }}
         >
-          <CameraView style={StyleSheet.absoluteFill} facing={facing} mode="video" />
+          {releasing ? null : <CameraView style={StyleSheet.absoluteFill} facing={facing} mode="video" />}
         </View>
       )}
       {scene &&
@@ -266,6 +269,8 @@ export default function LiveStudioScreen() {
   // 🎥 élő kamera-előnézet (expo-camera) — a Studio élő ELŐTTI, így a kamera szabad
   const [camPerm, requestCam] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('front');
+  // a Go-live előtt az előnézet kamerája elengedve (L40)
+  const [releasingCamera, setReleasingCamera] = useState(false);
 
   const loadDests = useCallback(() => {
     listDestinations()
@@ -291,6 +296,7 @@ export default function LiveStudioScreen() {
         }
         useEditorStore.getState().loadProject(project, events);
         setTitleDraft(liveDoc.title ?? loaded.name);
+        if (liveDoc.cameraFacing) setFacing(liveDoc.cameraFacing);
       })
       .catch(() => active && setLoadError(true));
     loadDests();
@@ -389,14 +395,20 @@ export default function LiveStudioScreen() {
       // mentjük, hogy a room a FRISS live-docot töltse (jelenetek/források/célok).
       const current = useEditorStore.getState().project;
       if (current) {
-        await saveProject(current);
+        // 📷 L27: a választott kamera-irány a műsorral együtt mentődik → az adás ezzel indul
+        await saveProject(current.live ? { ...current, live: { ...current.live, cameraFacing: facing } } : current);
       }
+      // 🎥 L40: az expo-camera előnézet ELENGEDI a kamerát, mielőtt a WebRTC megnyitja
+      // (különben „kamera foglalt" verseny, főleg Androidon)
+      setReleasingCamera(true);
+      await new Promise((r) => setTimeout(r, 350));
       const session = await startLive(title);
       // 🎥 a room megkapja a live-projekt id-jét → a host betölti a live-docot és
       // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).
       router.replace(`/live/${session.id}?project=${id}`);
     } catch (e) {
       setStarting(false);
+      setReleasingCamera(false);
       Alert.alert(t('live.error', { defaultValue: 'Live' }), String((e as Error)?.message ?? e));
     }
   };
@@ -439,6 +451,7 @@ export default function LiveStudioScreen() {
               primaryCameraId={primaryCameraId}
               onRequestCamera={() => requestCam()}
               onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+              releasing={releasingCamera}
             />
           )}
         </View>

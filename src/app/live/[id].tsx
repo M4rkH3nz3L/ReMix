@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
@@ -187,6 +188,8 @@ export default function LiveRoomScreen() {
   const [hostScenes, setHostScenes] = useState<{ id: string; name: string }[]>([]);
   // 🎚️ host: mikrofon némítva (az élő mic-kontroll; a mixer kezdőértékéből)
   const [micMuted, setMicMuted] = useState(false);
+  // 📷 host: a kamera iránya (a Studióból; adás közben váltható — L27)
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
   // 🔴 host: az adás kezdetének ms-időbélyege a live-timerhez (0 = még nem él)
   const [liveStartMs, setLiveStartMs] = useState(0);
   // 🚦 az adás ÁLLAPOTGÉPE (L13) — a média-kapcsolat eseményei hajtják, nem a UI
@@ -305,6 +308,7 @@ export default function LiveRoomScreen() {
           setLiveStartMs(startedAt);
           setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
           setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
+          setFacing(proj.live.cameraFacing ?? 'front');
           broadcastScene();
           // 🎥 egress indítása, ha VAN engedélyezett RTMP-cél (multistream, Pro)
           //    VAGY a RÖGZÍTÉS be van kapcsolva (ekkor az egress adja a VOD-ot — a
@@ -465,6 +469,16 @@ export default function LiveRoomScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost, session, projectParam]);
 
+  // 🔆 L36: adás közben a képernyő NEM zárolódik (különben az iOS leállítja a kamerát, a
+  // session pedig fagyott képpel „élő" maradna)
+  useEffect(() => {
+    if (!isHost || !session) return;
+    void activateKeepAwakeAsync('remix-live').catch(() => {});
+    return () => {
+      void deactivateKeepAwake('remix-live').catch(() => {});
+    };
+  }, [isHost, session]);
+
   // 💓 L14: a host 30 mp-enként „él még" jelet küld (a szerveres sweep a jel nélküli,
   // beragadt sessiont lezárja; a „Most élő" lista csak a friss adásokat mutatja)
   useEffect(() => {
@@ -537,6 +551,7 @@ export default function LiveRoomScreen() {
                 onScene={setScene}
                 onConnection={onConnection}
                 onFatal={onFatal}
+                facing={facing}
               />
             </Suspense>
           </ErrorBoundary>
@@ -603,6 +618,18 @@ export default function LiveRoomScreen() {
               <View style={styles.liveDot} />
               <LiveTimer startMs={liveStartMs} />
             </View>
+          )}
+          {/* 📷 host: kamera-váltás adás közben (L27) */}
+          {isHost && (
+            <Pressable
+              onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+              hitSlop={8}
+              style={styles.micBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('live.flipCamera')}
+            >
+              <Ionicons name="camera-reverse" size={18} color="#fff" />
+            </Pressable>
           )}
           {/* 🎚️ host: élő mikrofon-némítás (LiveKit) */}
           {isHost && (

@@ -3918,6 +3918,8 @@
     "empty": "Noch keine Beiträge."
   },
   "live": {
+    "flipCamera": "Kamera wechseln",
+    "vodDefaultName": "Live-Aufnahme",
     "state": {
       "connecting": "Verbinde…",
       "reconnecting": "Verbindung wird wiederhergestellt…",

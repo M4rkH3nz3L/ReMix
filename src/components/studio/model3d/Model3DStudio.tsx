@@ -4,7 +4,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Model3DEditSheet } from '@/components/studio/model3d/Model3DEditSheet';
@@ -831,54 +831,28 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   // ── 🧭 ÜRES: módválasztó (csak a támogatott módok — §1.1) ──────────────────
   if (phase === 'empty' || !asset || !mesh) {
     const modes = availableCaptureModes();
+    // az eredmény TÉNYLEGES formátuma a projekt tárolási beállítása szerint (adatvesztés nélkül)
+    const fmt = (kind: { textured: boolean; points: boolean }) => storedFormatFor(doc?.storageFormat, kind).toUpperCase();
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
         {header}
-        <View style={styles.center}>
+        <ScrollView contentContainerStyle={styles.pickerScroll}>
           <Text style={styles.emoji}>🧊</Text>
           <Text style={styles.bigText}>{t('model3d.empty.title')}</Text>
           <Text style={[styles.dim, styles.centerText]}>{t('model3d.empty.body')}</Text>
           {modes.includes('freeform') && Remix3DMeshScanView ? (
-            <Pressable onPress={() => startMeshScan('mesh')} style={styles.modeCard} accessibilityRole="button">
-              <Ionicons name="grid-outline" size={26} color={palette.accent} />
-              <View style={styles.fill}>
-                <Text style={styles.modeTitle}>{t('model3d.mode.freeform')}</Text>
-                <Text style={styles.dim}>{t('model3d.mode.freeformDesc')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
-            </Pressable>
+            <ModeCard icon="grid-outline" mode="freeform" format={fmt({ textured: false, points: false })} onPress={() => startMeshScan('mesh')} />
           ) : null}
           {modes.includes('room') && Remix3DRoomScanView ? (
-            <Pressable onPress={startRoomScan} style={styles.modeCard} accessibilityRole="button">
-              <Ionicons name="home-outline" size={26} color={palette.accent} />
-              <View style={styles.fill}>
-                <Text style={styles.modeTitle}>{t('model3d.mode.room')}</Text>
-                <Text style={styles.dim}>{t('model3d.mode.roomDesc')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
-            </Pressable>
+            <ModeCard icon="home-outline" mode="room" format={fmt({ textured: false, points: false })} onPress={startRoomScan} />
           ) : null}
           {modes.includes('pointcloud') && Remix3DMeshScanView ? (
-            <Pressable onPress={() => startMeshScan('points')} style={styles.modeCard} accessibilityRole="button">
-              <Ionicons name="sparkles-outline" size={26} color={palette.accent} />
-              <View style={styles.fill}>
-                <Text style={styles.modeTitle}>{t('model3d.mode.pointcloud')}</Text>
-                <Text style={styles.dim}>{t('model3d.mode.pointcloudDesc')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
-            </Pressable>
+            <ModeCard icon="sparkles-outline" mode="pointcloud" format={fmt({ textured: false, points: true })} onPress={() => startMeshScan('points')} />
           ) : null}
           {modes.includes('object') ? (
-            <Pressable onPress={startCapture} style={styles.modeCard} accessibilityRole="button">
-              <Ionicons name="cube-outline" size={26} color={palette.accent} />
-              <View style={styles.fill}>
-                <Text style={styles.modeTitle}>{t('model3d.mode.object')}</Text>
-                <Text style={styles.dim}>{t('model3d.mode.objectDesc')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
-            </Pressable>
+            <ModeCard icon="cube-outline" mode="object" format={fmt({ textured: true, points: false })} onPress={startCapture} />
           ) : null}
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1089,6 +1063,42 @@ export function Model3DStudio({ projectId }: { projectId: string }) {
   );
 }
 
+/** 🧭 egy rögzítési mód kártyája: mire jó · hogyan · mi lesz az eredmény (a valós formátummal) */
+function ModeCard({
+  icon,
+  mode,
+  format,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  mode: 'object' | 'freeform' | 'room' | 'pointcloud';
+  format: string;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.modeCard, pressed && styles.modeCardPressed]}
+      accessibilityRole="button"
+      accessibilityLabel={t(`model3d.mode.${mode}`)}
+      accessibilityHint={t(`model3d.mode.${mode}Desc`)}
+    >
+      <Ionicons name={icon} size={26} color={palette.accent} style={styles.modeIcon} />
+      <View style={styles.fill}>
+        <Text style={styles.modeTitle}>{t(`model3d.mode.${mode}`)}</Text>
+        <Text style={styles.modeDesc}>{t(`model3d.mode.${mode}Desc`)}</Text>
+        <Text style={styles.modeHow}>
+          <Text style={styles.modeHowLabel}>{t('model3d.mode.howLabel')} </Text>
+          {t(`model3d.mode.${mode}How`)}
+        </Text>
+        <Text style={styles.modeResult}>{t(`model3d.mode.${mode}Result`, { format })}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={palette.textDim} />
+    </Pressable>
+  );
+}
+
 function Tool({ icon, label, onPress, active }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; active?: boolean }) {
   return (
     <Pressable onPress={onPress} style={styles.tool} accessibilityRole="button" accessibilityLabel={label}>
@@ -1127,6 +1137,13 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   modeTitle: { color: palette.text, fontSize: 15, fontWeight: '800' },
+  modeDesc: { color: palette.text, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  modeHow: { color: palette.textDim, fontSize: 12, lineHeight: 17, marginTop: 6 },
+  modeHowLabel: { color: palette.textDim, fontWeight: '700' },
+  modeResult: { color: palette.accent, fontSize: 12, lineHeight: 17, marginTop: 4, fontWeight: '600' },
+  modeIcon: { alignSelf: 'flex-start', marginTop: 2 },
+  modeCardPressed: { opacity: 0.75 },
+  pickerScroll: { alignItems: 'center', padding: 20, paddingBottom: 40, gap: 6 },
   progressTrack: { alignSelf: 'stretch', height: 6, borderRadius: 3, backgroundColor: palette.surfaceHigh, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: palette.accent },
   secondaryBtn: { minHeight: 44, paddingHorizontal: 20, justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: palette.border },

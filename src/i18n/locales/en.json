@@ -3617,15 +3617,24 @@
   "model3d": {
     "title": "3D Studio",
     "mode": {
+      "howLabel": "How:",
+      "objectHow": "Place it on a plain, well-lit surface and walk around it slowly at 2–3 heights — the app guides you.",
+      "objectResult": "Result: textured 3D model ({{format}}) — processing takes a few minutes on the phone.",
+      "freeformHow": "Slowly sweep around with your phone; finished areas are covered by the mesh.",
+      "freeformResult": "Result: true-scale mesh without texture ({{format}}) — instantly, no waiting.",
+      "roomHow": "Stand in the middle of the room and turn slowly; show the walls, corners and floor too.",
+      "roomResult": "Result: a clean room model ({{format}}) + floor plan with dimensions and area.",
+      "pointcloudHow": "Sweep slowly and steadily; the more often LiDAR hits a surface, the denser the capture.",
+      "pointcloudResult": "Result: colored point cloud ({{format}}) — opens in Blender, CloudCompare, MeshLab.",
       "object": "Object scan",
-      "objectDesc": "Hand-sized object — walk around it, true scale",
+      "objectDesc": "A smaller, hand-held object (shoe, mug, statue) with photorealistic color texture.",
       "room": "Room scan",
-      "roomDesc": "Room with walls, openings and floor plan",
+      "roomDesc": "Measure a home or room: walls, doors, windows and furniture are recognized automatically.",
       "soon": "Coming soon",
       "freeform": "Free scan — live mesh",
-      "freeformDesc": "Room, furniture, larger objects — the mesh builds live on screen",
+      "freeformDesc": "A larger object, furniture or part of a room — fast, the mesh builds live on screen.",
       "pointcloud": "Point cloud",
-      "pointcloudDesc": "Detailed LiDAR capture of colored points — for professional use (PLY)"
+      "pointcloudDesc": "A detailed LiDAR capture of colored points — for surveying, CAD/BIM and professional work."
     },
     "room": {
       "title": "Room scan",
@@ -3640,8 +3649,8 @@
       "floorPlanFail": "No floor plan can be made for this room."
     },
     "empty": {
-      "title": "Scan an object",
-      "body": "Put the object on a plain, well-lit surface and walk around it slowly. LiDAR turns it into a true-scale 3D model — on your phone, for free."
+      "title": "What do you want to scan?",
+      "body": "There are four ways to scan — all with LiDAR, at true scale, on your phone, for free. Choose what you want to capture:"
     },
     "capture": {
       "hint_slowStart": "Move the phone slowly and point it at a well-lit, textured surface so the camera can find its bearings.",

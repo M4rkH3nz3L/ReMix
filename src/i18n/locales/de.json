@@ -3587,15 +3587,24 @@
   "model3d": {
     "title": "3D-Studio",
     "mode": {
+      "howLabel": "So geht's:",
+      "objectHow": "Auf eine glatte, gut beleuchtete Fläche stellen und langsam in 2–3 Höhen umrunden — die App führt dich.",
+      "objectResult": "Ergebnis: texturiertes 3D-Modell ({{format}}) — die Verarbeitung dauert ein paar Minuten auf dem Handy.",
+      "freeformHow": "Langsam mit dem Handy herumschwenken; fertige Bereiche sind vom Netz bedeckt.",
+      "freeformResult": "Ergebnis: Netz in echter Größe ohne Textur ({{format}}) — sofort, ohne Wartezeit.",
+      "roomHow": "Stell dich in die Raummitte und dreh dich langsam; zeig auch Wände, Ecken und Boden.",
+      "roomResult": "Ergebnis: sauberes Raummodell ({{format}}) + Grundriss mit Maßen und Fläche.",
+      "pointcloudHow": "Langsam und gleichmäßig schwenken; je öfter LiDAR eine Fläche trifft, desto dichter die Aufnahme.",
+      "pointcloudResult": "Ergebnis: farbige Punktwolke ({{format}}) — öffnet in Blender, CloudCompare, MeshLab.",
       "object": "Objekt-Scan",
-      "objectDesc": "Handliches Objekt — rundherum, in echter Größe",
+      "objectDesc": "Ein kleineres, handliches Objekt (Schuh, Tasse, Statue) mit fotorealistischer Farbtextur.",
       "room": "Raum-Scan",
-      "roomDesc": "Raum mit Wänden, Öffnungen und Grundriss",
+      "roomDesc": "Wohnung oder Raum vermessen: Wände, Türen, Fenster und Möbel werden automatisch erkannt.",
       "soon": "Demnächst",
       "freeform": "Freier Scan — Live-Netz",
-      "freeformDesc": "Raum, Möbel, größere Objekte — das Netz entsteht live im Bild",
+      "freeformDesc": "Ein größeres Objekt, Möbel oder ein Teil eines Raums — schnell, das Netz entsteht live im Bild.",
       "pointcloud": "Punktwolke",
-      "pointcloudDesc": "Detaillierte LiDAR-Aufnahme aus farbigen Punkten — für den Profi-Einsatz (PLY)"
+      "pointcloudDesc": "Eine detaillierte LiDAR-Aufnahme aus farbigen Punkten — für Vermessung, CAD/BIM und Profi-Arbeit."
     },
     "room": {
       "title": "Raum-Scan",
@@ -3610,8 +3619,8 @@
       "floorPlanFail": "Für diesen Raum kann kein Grundriss erstellt werden."
     },
     "empty": {
-      "title": "Scanne ein Objekt",
-      "body": "Stell das Objekt auf eine glatte, gut beleuchtete Fläche und geh langsam darum herum. LiDAR erstellt daraus ein 3D-Modell in echter Größe — auf dem Handy, kostenlos."
+      "title": "Was möchtest du scannen?",
+      "body": "Es gibt vier Scan-Arten — alle mit LiDAR, in echter Größe, auf dem Handy, kostenlos. Wähle, was du erfassen willst:"
     },
     "capture": {
       "hint_slowStart": "Beweg das Handy langsam und richte es auf eine gut beleuchtete, strukturierte Fläche, damit sich die Kamera orientieren kann.",

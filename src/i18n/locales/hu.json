@@ -3617,15 +3617,24 @@
   "model3d": {
     "title": "3D Stúdió",
     "mode": {
+      "howLabel": "Hogyan:",
+      "objectHow": "Tedd jól megvilágított, sima felületre, és lassan járd körbe 2–3 magasságból — az app végig irányít.",
+      "objectResult": "Eredmény: textúrás 3D-modell ({{format}}) — a feldolgozás pár perc a telefonon.",
+      "freeformHow": "Lassan pásztázd körbe a telefonnal; ahol már kész, ott háló fedi a képet.",
+      "freeformResult": "Eredmény: valós méretű, textúra nélküli háló ({{format}}) — azonnal, várakozás nélkül.",
+      "roomHow": "Állj a szoba közepére, és lassan fordulj körbe; a falakat, sarkokat és a padlót is mutasd meg.",
+      "roomResult": "Eredmény: tiszta szoba-modell ({{format}}) + méretes alaprajz és alapterület.",
+      "pointcloudHow": "Lassan, egyenletesen pásztázz; minél többször éri a LiDAR a felületet, annál sűrűbb a felvétel.",
+      "pointcloudResult": "Eredmény: színes pontfelhő ({{format}}) — Blender, CloudCompare, MeshLab is megnyitja.",
       "object": "Tárgy-szken",
-      "objectDesc": "Kézbe vehető tárgy — körbejárva, valós méretben",
+      "objectDesc": "Kisebb, kézbe vehető tárgy (cipő, bögre, szobor) fotórealisztikus, színes textúrával.",
       "room": "Tér-szken",
-      "roomDesc": "Szoba falakkal, nyílásokkal, alaprajzzal",
+      "roomDesc": "Lakás, szoba felmérése: a falakat, ajtókat, ablakokat és bútorokat magától felismeri.",
       "soon": "Hamarosan",
       "freeform": "Szabad szken — élő hálóval",
-      "freeformDesc": "Tér, bútor, nagyobb tárgy — a háló élőben épül a képen",
+      "freeformDesc": "Nagyobb tárgy, bútor vagy egy helyiség részlete — gyors, a háló élőben épül a képen.",
       "pointcloud": "Pontfelhő",
-      "pointcloudDesc": "Színes pontokból álló, részletes LiDAR-felvétel — szakmai felhasználásra (PLY)"
+      "pointcloudDesc": "Részletes, színes pontokból álló LiDAR-felvétel — felméréshez, CAD/BIM és szakmai munkához."
     },
     "room": {
       "title": "Szoba-szken",
@@ -3640,8 +3649,8 @@
       "floorPlanFail": "Ehhez a szobához nem készíthető alaprajz."
     },
     "empty": {
-      "title": "Szkennelj egy tárgyat",
-      "body": "Tedd a tárgyat jól megvilágított, sima felületre, és járd körbe lassan. A LiDAR valós méretű 3D-modellt készít belőle — a telefonon, ingyen."
+      "title": "Mit szeretnél szkennelni?",
+      "body": "Négyféle módon szkennelhetsz — mind a LiDAR-ral, valós méretben, a telefonon, ingyen. Válaszd ki, mit rögzítenél:"
     },
     "capture": {
       "hint_slowStart": "Mozgasd lassan a telefont, és irányítsd egy jól megvilágított, mintás felületre — a kamera így tud tájékozódni.",

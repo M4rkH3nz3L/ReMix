@@ -30,6 +30,7 @@ import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 // (régi dev-kliens) ne crash-eltesse az EGÉSZ kép-stúdiót; a vászon/forma/szöveg/
 // gradient/export Skia nélkül is megy, csak a varázspálca igényli.
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
+import { flattenTargets, mergeDownTargets, rasterSubDoc, replaceWithRaster } from '@/lib/imageCanvasOps';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
 import {
@@ -56,7 +57,7 @@ import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
-import { guardPro } from '@/store/paywallStore';
+import { guardPro, usePaywall } from '@/store/paywallStore';
 import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 
@@ -906,6 +907,37 @@ export function ImageStudioBody({
     })();
   };
 
+  /**
+   * 🧱 Rétegek egyesítése / raszterizálása a valódi renderrel (a preview-nál pontosabb).
+   * Pro: a Free render vízjeles, az a réteg pixeleibe égne; a vízjelet pedig kliens nem
+   * kapcsolhatja ki. Szerver nélkül nem megy, ezt megmondjuk.
+   */
+  const mergeLayers = async (ids: string[], label: string) => {
+    if (!doc || busy || ids.length === 0) {
+      return;
+    }
+    if (!isPro) {
+      usePaywall.getState().open();
+      return;
+    }
+    setBusy(true);
+    try {
+      const uri = await renderImageDoc(rasterSubDoc(doc, ids), effectiveCanvas(doc).height);
+      if (!uri) {
+        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.mergeNeedsServer'));
+        return;
+      }
+      const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
+      const id = makeId('lyr');
+      commit(replaceWithRaster(fresh, ids, uri, id, label), label);
+      setSelectedId(id);
+    } catch (e) {
+      Alert.alert(t('studio.image.renderFailTitle'), (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 🖌️ ecset: a Skia-festés pillanatképe PNG-fájlként → FOTÓ-réteg a vásznon
   const commitBrush = () => {
     if (doc && brushRef.current?.hasStrokes()) {
@@ -1480,6 +1512,7 @@ export function ImageStudioBody({
               commit={commit}
               canvasRef={canvasRef}
               capturing={capturing}
+              cropAspect={cropPreset}
               cropRect={cropRect}
               onCropRectChange={setCropRect}
               penPoints={penPoints}
@@ -1753,6 +1786,14 @@ export function ImageStudioBody({
             setSheet={setSheet}
             setSelectedId={setSelectedId}
             onAdd={(kind) => (kind === 'shape' ? setSheet('shapePicker') : add(kind))}
+            onMergeDown={(id) => {
+              const pair = doc ? mergeDownTargets(doc, id) : null;
+              if (pair) {
+                void mergeLayers(pair, t('studio.image.mergeDown'));
+              }
+            }}
+            onRasterize={(id) => void mergeLayers([id], t('studio.image.rasterize'))}
+            onFlatten={() => doc && void mergeLayers(flattenTargets(doc), t('studio.image.flatten'))}
             onAddShapeType={addShapeType}
             onInsertSource={insertSource}
             onDrawMask={startMaskDraw}

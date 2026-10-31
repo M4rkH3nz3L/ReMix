@@ -1,3 +1,4 @@
+import { GeometryFields } from '@/components/studio/image/GeometryFields';
 import { normalizeRotation } from '@/lib/imageLayerGeometry';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -106,6 +107,22 @@ export function LayerInspector({
 
   return (
     <>
+      <TextInput
+        style={styles.nameInput}
+        defaultValue={layer.name ?? ''}
+        key={`name-${layer.id}`}
+        placeholder={t('studio.image.layerName')}
+        placeholderTextColor={palette.textDim}
+        accessibilityLabel={t('studio.image.layerName')}
+        returnKeyType="done"
+        onEndEditing={(e) => {
+          const name = e.nativeEvent.text.trim() || undefined;
+          if (name !== layer.name) {
+            commit(updateLayer(doc, layer.id, { name }), t('studio.image.undoRename'));
+          }
+        }}
+      />
+      {layer.kind === 'photo' || layer.kind === 'shape' ? <GeometryFields doc={doc} layer={layer} commit={commit} /> : null}
       {layer.kind === 'text' ? (
         <>
           <TextInput
@@ -798,6 +815,15 @@ export function LayerInspector({
 }
 
 const styles = StyleSheet.create({
+  nameInput: {
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    color: palette.text,
+    fontSize: 14,
+    paddingHorizontal: 10,
+  },
   textInput: {
     color: palette.text,
     backgroundColor: palette.surfaceHigh,

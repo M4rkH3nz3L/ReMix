@@ -7,8 +7,10 @@ import { captureRef } from 'react-native-view-shot';
 
 import { renderStrokes } from '@/components/studio/image/BrushOverlay';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
+import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { flushProjectSave, useProjectAutosave } from '@/hooks/useProjectAutosave';
 import { deleteCloudProject } from '@/lib/cloudSync';
+import { rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { exportSize } from '@/lib/imageExport';
@@ -203,6 +205,36 @@ async function smokePasteboard(log: Log, setHarness: (n: ReactNode) => void) {
   log(null, 'PASTEBOARD-READY');
 }
 
+/** A valódi réteg- és vászon-lapok (képernyőképhez). */
+async function smokeSheets(log: Log, setHarness: (n: ReactNode) => void) {
+  const doc = testDoc();
+  const id = doc.layers[0].id;
+  setHarness(
+    <View style={{ width: 380, height: 320 }}>
+      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenAdjust={() => {}} />
+    </View>
+  );
+  await sleep(1200);
+  log(null, 'SHEETS-READY');
+}
+
+/** Vászon-művelet a telefonról, a valódi workeren át. */
+async function smokeCanvasOps(log: Log) {
+  const base = createImageDoc('Smoke', '1:1', () => makeId('lyr'), { width: 400, height: 200 });
+  const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.25, y: 0.5 }, w: 0.5, h: 1, fill: '#ff0000' } as ShapeLayer;
+  const doc = addLayer({ ...base, layers: [] }, shape as ImageLayer);
+  const rotated = rotateCanvasDoc(doc, 90);
+  const uri = await renderImageDoc(rotated, rotated.height);
+  if (!uri) {
+    log(false, 'vászon-forgatás a telefonról', 'nincs render');
+    return;
+  }
+  const img = await decode(uri);
+  // 400×200 balfele piros → 90° jobbra: 200×400, a FELSŐ fele piros
+  log(img.width() === 200 && img.height() === 400 && pixel(img, 100, 100)[0] > 240 && pixel(img, 100, 300)[3] === 0, 'vászon-forgatás 90° a telefonról', `${img.width()}×${img.height()} felül ${pixel(img, 100, 100)} alul ${pixel(img, 100, 300)}`);
+  removeFile(uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -354,6 +386,10 @@ export async function runImageSmoke(
     await step('inspect', () => inspectProjects(log));
     return;
   }
+  if (phase === 'sheets') {
+    await step('sheets', () => smokeSheets(log, setHarness));
+    return;
+  }
   if (phase === 'pasteboard') {
     await step('pasteboard', () => smokePasteboard(log, setHarness));
     return;
@@ -367,5 +403,6 @@ export async function runImageSmoke(
   await step('autosave', () => smokeAutosave(log, setHarness));
   if (online) {
     await step('worker', () => smokeWorker(log));
+    await step('canvas-ops', () => smokeCanvasOps(log));
   }
 }

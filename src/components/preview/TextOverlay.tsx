@@ -31,6 +31,8 @@ interface Props {
   zoom?: number;
   /** a közép mozgástere (a kép-szerkesztőben a vásznon túlra is mehet) */
   moveRange?: [number, number];
+  /** zárolt réteg: kijelölhető, de nem húzható */
+  locked?: boolean;
   selected: boolean;
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
@@ -181,6 +183,7 @@ export function TextOverlay({
   editable,
   zoom = 1,
   moveRange = [0.02, 0.98],
+  locked = false,
   selected,
   onSelect,
   onMove,
@@ -218,7 +221,7 @@ export function TextOverlay({
 
   // I35: egy ujj — a kétujjas gesztus a vászon csippentéséé
   const pan = Gesture.Pan()
-    .enabled(editable)
+    .enabled(editable && !locked)
     .maxPointers(1)
     .onEnd((e, success) => {
       if (success) {

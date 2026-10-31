@@ -200,6 +200,15 @@ function docCanvas(doc, height) {
   return canvasSize(doc.aspectRatio, height);
 }
 
+/** Forgatás a teljes elforgatott befoglalóval (a `rotw`/`roth` argumentuma a SZÖG). */
+function rotateChain(deg) {
+  if (!deg) {
+    return '';
+  }
+  const rad = ((deg * Math.PI) / 180).toFixed(5);
+  return `,rotate=${rad}:c=black@0:ow=rotw(${rad}):oh=roth(${rad})`;
+}
+
 /** 🎞️ szín-preset (filterId) mint tónus-tint: az alfát nem érinti, átlátszó részt nem színez. */
 function filterTintChain(filterId, intensity) {
   const f = FILTERS[filterId];
@@ -448,9 +457,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
               `crop=${boxW}:${boxH}`;
       // 🔁 tükrözés a forgatás ELŐTT (helyi tér) — a preview scaleX/Y-nal egyezik
       const flip = `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}`;
-      const rotate = layer.rotation
-        ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
-        : '';
+      const rotate = rotateChain(layer.rotation);
       // 🎞️ saját 3D LUT (.cube): a feltöltött fájlnak nincs .cube kiterjesztése (multer
       // generált név) → workDir-be másoljuk .cube-ként, hogy az ffmpeg felismerje. A grade UTÁN.
       let lutFrag = '';
@@ -523,14 +530,11 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       }
       inputs.push('-i', png);
       prepared = `p${idx}`;
-      // 🔄 forgatás + 🔁 tükrözés (kép-stúdió) a forma/szöveg PNG-n — a fotó-ág
-      // mintája; a fill (teljes vászon) nem forog/tükröződik, csak az elhelyezett rétegek
-      const flip =
-        layer.kind !== 'fill' ? `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}` : '';
-      const rot =
-        layer.kind !== 'fill' && layer.rotation
-          ? `,rotate=${((layer.rotation * Math.PI) / 180).toFixed(5)}:c=black@0:ow=rotw(iw):oh=roth(ih)`
-          : '';
+      // 🔄 forgatás + 🔁 tükrözés a forma PNG-n. A SZÖVEG PNG-jébe a generátor már beégeti
+      // (`textTransformCss`), itt még egyszer alkalmazva kétszer forogna; a fill nem forog.
+      const placed = layer.kind === 'shape';
+      const flip = placed ? `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}` : '';
+      const rot = placed ? rotateChain(layer.rotation) : '';
       filters.push(
         `[${idx}:v]format=rgba${flip}${rot}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );

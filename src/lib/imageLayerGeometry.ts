@@ -116,3 +116,55 @@ export function normalizeRotation(deg: number): number {
   const r = ((deg + 180) % 360 + 360) % 360 - 180;
   return r === -180 ? 180 : r;
 }
+
+/** Egy réteg pontos méretei képpontban: bal felső sarok (forgatás nélkül), méret, szög. */
+export interface LayerBoxPx {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+}
+
+export function layerBoxPx(layer: Placed, canvas: { width: number; height: number }): LayerBoxPx {
+  const w = layer.w * canvas.width;
+  const h = layer.h * canvas.height;
+  return {
+    x: Math.round(layer.position.x * canvas.width - w / 2),
+    y: Math.round(layer.position.y * canvas.height - h / 2),
+    w: Math.round(w),
+    h: Math.round(h),
+    rotation: normalizeRotation(layer.rotation ?? 0),
+  };
+}
+
+/**
+ * Számmezők módosítása → réteg-patch. A bal felső sarok tartott, `lockAspect` mellett a
+ * másik oldal arányosan követi. Érvénytelen vagy nulla méretet nem fogad el.
+ */
+export function applyLayerBoxPx(
+  layer: Placed,
+  patch: Partial<LayerBoxPx>,
+  canvas: { width: number; height: number },
+  lockAspect: boolean
+): Pick<PhotoLayer, 'position' | 'w' | 'h' | 'rotation'> {
+  const cur = layerBoxPx(layer, canvas);
+  const next = { ...cur, ...patch };
+  if (!(next.w >= 1) || !(next.h >= 1)) {
+    next.w = cur.w;
+    next.h = cur.h;
+  }
+  if (lockAspect && cur.w > 0 && cur.h > 0) {
+    if (patch.w != null) {
+      next.h = Math.max(1, Math.round((next.w * cur.h) / cur.w));
+    } else if (patch.h != null) {
+      next.w = Math.max(1, Math.round((next.h * cur.w) / cur.h));
+    }
+  }
+  return {
+    position: { x: (next.x + next.w / 2) / canvas.width, y: (next.y + next.h / 2) / canvas.height },
+    w: next.w / canvas.width,
+    h: next.h / canvas.height,
+    rotation: next.rotation,
+  };
+}

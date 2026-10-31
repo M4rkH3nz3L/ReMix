@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { LayerInspector } from '@/components/studio/image/LayerInspector';
 import { Slider } from '@/components/studio/audio/primitives';
@@ -12,13 +13,18 @@ import {
   layerIcon,
   layerLabel,
   removeLayer,
-  reorderLayer,
+  moveLayerTo,
   toggleLayerHidden,
+  toggleLayerLocked,
   ungroup,
   updateGroup,
 } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
+import { mergeDownTargets } from '@/lib/imageCanvasOps';
 import type { ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
+
+/** egy réteg-sor magassága + a köztük lévő rés (a húzás ennyi pixelenként lép egyet) */
+const LAYER_ROW_STEP = 54;
 
 /**
  * 🎨 Réteg-panel (alsó lap) — a réteg-fa listája (sorrend/láthatóság/duplázás/
@@ -31,6 +37,9 @@ export function LayerPanel({
   selectedId,
   onSelect,
   onAdd,
+  onMergeDown,
+  onRasterize,
+  onFlatten,
   commit,
   onClose,
   onOpenAdjust,
@@ -40,6 +49,9 @@ export function LayerPanel({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onAdd: (kind: ImageLayer['kind']) => void;
+  onMergeDown: (id: string) => void;
+  onRasterize: (id: string) => void;
+  onFlatten: () => void;
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
   onOpenAdjust: () => void;
@@ -110,12 +122,44 @@ export function LayerPanel({
       {layer ? (
         <View style={styles.inspector}>
           <Text style={styles.inspectorTitle}>{layerLabel(layer)}</Text>
+          <View style={styles.opsRow}>
+            <OpChip icon="git-merge-outline" label={t('studio.image.mergeDown')} disabled={!mergeDownTargets(doc, layer.id)} onPress={() => onMergeDown(layer.id)} />
+            {layer.kind === 'text' || layer.kind === 'shape' ? (
+              <OpChip icon="image-outline" label={t('studio.image.rasterize')} disabled={!!layer.locked} onPress={() => onRasterize(layer.id)} />
+            ) : null}
+            <OpChip icon="albums-outline" label={t('studio.image.flatten')} disabled={doc.layers.length < 2} onPress={onFlatten} />
+          </View>
           <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} onDrawMask={onDrawMask} />
         </View>
       ) : (
         <Text style={styles.hint}>{t('studio.image.selectHint')}</Text>
       )}
     </StudioSheet>
+  );
+}
+
+function OpChip({
+  icon,
+  label,
+  disabled,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[styles.addChip, disabled ? styles.chipDisabled : null]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+    >
+      <Ionicons name={icon} size={15} color={palette.accent} />
+      <Text style={styles.addChipText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -172,11 +216,43 @@ function LayerRow({
   commit: (next: ImageDoc, label?: string) => void;
   t: TFn;
 }) {
+  // 🖐️ húzásos sorrend: a lista fölül a legfelső réteg, ezért lefelé húzva csökken az index
+  const [dragY, setDragY] = useState(0);
+  const finishDrag = (dy: number) => {
+    setDragY(0);
+    const steps = Math.round(dy / LAYER_ROW_STEP);
+    if (steps !== 0) {
+      const from = doc.layers.findIndex((x) => x.id === l.id);
+      commit(moveLayerTo(doc, l.id, from - steps), t('studio.image.undoReorder'));
+    }
+  };
+  const drag = Gesture.Pan()
+    .withTestId(`layer-drag-${l.id}`)
+    .runOnJS(true)
+    .minDistance(2)
+    .onUpdate((e) => setDragY(e.translationY))
+    .onEnd((e) => finishDrag(e.translationY))
+    .onFinalize((_e, success) => {
+      if (!success) {
+        setDragY(0);
+      }
+    });
+
   return (
     <Pressable
       onPress={() => onSelect(sel ? null : l.id)}
-      style={[styles.layerRow, indented ? styles.layerIndent : null, sel ? styles.layerActive : null]}
+      style={[
+        styles.layerRow,
+        indented ? styles.layerIndent : null,
+        sel ? styles.layerActive : null,
+        dragY !== 0 ? [styles.layerDragging, { transform: [{ translateY: dragY }] }] : null,
+      ]}
     >
+      <GestureDetector gesture={drag}>
+        <View style={styles.dragHandle} accessibilityLabel={t('studio.image.reorderHandle')}>
+          <Ionicons name="reorder-three" size={20} color={palette.textDim} />
+        </View>
+      </GestureDetector>
       <Text style={styles.layerIcon}>{layerIcon(l)}</Text>
       <Text style={[styles.layerName, l.hidden ? styles.hidden : null]} numberOfLines={1}>
         {layerLabel(l)}
@@ -186,16 +262,22 @@ function LayerRow({
         color={l.hidden ? palette.textDim : palette.text}
         onPress={() => commit(toggleLayerHidden(doc, l.id), t('studio.image.undoVisibility'))}
       />
-      <IconBtn icon="chevron-up" onPress={() => commit(reorderLayer(doc, l.id, 1), t('studio.image.undoReorder'))} />
-      <IconBtn icon="chevron-down" onPress={() => commit(reorderLayer(doc, l.id, -1), t('studio.image.undoReorder'))} />
+      <IconBtn
+        icon={l.locked ? 'lock-closed' : 'lock-open-outline'}
+        color={l.locked ? palette.accent : palette.textDim}
+        onPress={() => commit(toggleLayerLocked(doc, l.id), t('studio.image.undoLock'))}
+      />
       <IconBtn
         icon="copy-outline"
         onPress={() => commit(duplicateLayer(doc, l.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}
       />
       <IconBtn
         icon="trash-outline"
-        color={palette.accent2}
+        color={l.locked ? palette.border : palette.accent2}
         onPress={() => {
+          if (l.locked) {
+            return;
+          }
           commit(removeLayer(doc, l.id), t('studio.image.undoDelete'));
           if (sel) {
             onSelect(null);
@@ -229,9 +311,19 @@ function GroupHeader({
           onPress={() => commit(updateGroup(doc, g.id, { collapsed: !g.collapsed }), 'group-collapse')}
         />
         <Ionicons name="folder-outline" size={14} color={palette.accent} />
-        <Text style={[styles.groupName, g.hidden ? styles.hidden : null]} numberOfLines={1}>
-          {g.name}
-        </Text>
+        <TextInput
+          style={[styles.groupName, styles.groupNameInput, g.hidden ? styles.hidden : null]}
+          defaultValue={g.name}
+          key={`gname-${g.id}`}
+          returnKeyType="done"
+          accessibilityLabel={t('studio.image.groupName')}
+          onEndEditing={(e) => {
+            const name = e.nativeEvent.text.trim();
+            if (name && name !== g.name) {
+              commit(updateGroup(doc, g.id, { name }), 'group-rename');
+            }
+          }}
+        />
         <IconBtn
           icon={g.hidden ? 'eye-off-outline' : 'eye-outline'}
           color={g.hidden ? palette.textDim : palette.text}
@@ -272,6 +364,11 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     backgroundColor: palette.surfaceHigh,
   },
+  groupNameInput: { padding: 0, minHeight: 32 },
+  dragHandle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', marginLeft: -6 },
+  layerDragging: { zIndex: 10, opacity: 0.92 },
+  chipDisabled: { opacity: 0.4 },
+  opsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   layerActive: { borderColor: palette.accent, backgroundColor: `${palette.accent}1a` },
   layerIndent: { marginLeft: 16, borderColor: `${palette.accent}55` },
   groupWrap: {

@@ -3107,6 +3107,29 @@
       "layer": "Réteg"
     },
     "image": {
+      "layerName": "Réteg neve",
+      "groupName": "Csoport neve",
+      "undoRename": "Átnevezés",
+      "undoLock": "Zárolás",
+      "mergeDown": "Egyesítés lefelé",
+      "rasterize": "Raszterizálás",
+      "flatten": "Lapítás",
+      "mergeNeedsServer": "Az egyesítéshez a renderelő szerver kell, ami most nem érhető el.",
+      "reorderHandle": "Húzd a sorrend módosításához",
+      "canvasTransform": "Teljes vászon",
+      "rotateLeft": "Forgatás balra",
+      "rotateRight": "Forgatás jobbra",
+      "flipCanvasH": "Vízszintes tükrözés",
+      "flipCanvasV": "Függőleges tükrözés",
+      "resizeCanvas": "Vászon (tartalom marad)",
+      "resizeImage": "Képméret (skáláz)",
+      "anchorCell": "Horgony {{x}}%, {{y}}%",
+      "geometry": {
+        "width": "Szél.",
+        "height": "Mag.",
+        "angle": "Szög",
+        "lockAspect": "Arány megtartása"
+      },
       "shareFeed": {
         "confirmTitle": "Megosztás a feedben",
         "confirmBody": "Kik láthassák a posztot?",

@@ -3105,6 +3105,29 @@
       "layer": "Ebene"
     },
     "image": {
+      "layerName": "Ebenenname",
+      "groupName": "Gruppenname",
+      "undoRename": "Umbenennen",
+      "undoLock": "Sperren",
+      "mergeDown": "Nach unten vereinen",
+      "rasterize": "Rastern",
+      "flatten": "Reduzieren",
+      "mergeNeedsServer": "Zum Vereinen wird der Render-Server benötigt, der gerade nicht erreichbar ist.",
+      "reorderHandle": "Zum Sortieren ziehen",
+      "canvasTransform": "Gesamte Leinwand",
+      "rotateLeft": "Nach links drehen",
+      "rotateRight": "Nach rechts drehen",
+      "flipCanvasH": "Horizontal spiegeln",
+      "flipCanvasV": "Vertikal spiegeln",
+      "resizeCanvas": "Leinwand (Inhalt bleibt)",
+      "resizeImage": "Bildgröße (skaliert)",
+      "anchorCell": "Anker {{x}} %, {{y}} %",
+      "geometry": {
+        "width": "B",
+        "height": "H",
+        "angle": "Winkel",
+        "lockAspect": "Seitenverhältnis beibehalten"
+      },
       "shareFeed": {
         "confirmTitle": "Im Feed teilen",
         "confirmBody": "Wer darf diesen Beitrag sehen?",

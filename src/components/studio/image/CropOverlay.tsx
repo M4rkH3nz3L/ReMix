@@ -23,15 +23,18 @@ export function CropOverlay({
   box,
   rect,
   zoom = 1,
+  aspect,
   onChange,
 }: {
   box: { w: number; h: number };
   zoom?: number;
+  /** aránytartás: a kívánt pixel-arány (w/h), üres = szabad */
+  aspect?: number | null;
   rect: CropRect;
   onChange: (rect: CropRect) => void;
 }) {
-  const dataRef = useRef({ rect, box, zoom, onChange });
-  dataRef.current = { rect, box, zoom, onChange };
+  const dataRef = useRef({ rect, box, zoom, aspect, onChange });
+  dataRef.current = { rect, box, zoom, aspect, onChange };
   const startRef = useRef<CropRect>(rect);
 
   const g = useRef<{
@@ -47,7 +50,9 @@ export function CropOverlay({
         })
         .onUpdate((e) => {
           const d = dataRef.current;
-          d.onChange(resizeCropCorner(startRef.current, corner, e.translationX / d.zoom / d.box.w, e.translationY / d.zoom / d.box.h));
+          // a sarok-húzás normalizált térben számol, ezért a pixel-arányt oda váltjuk át
+          const aspect = d.aspect ? (d.aspect * d.box.h) / d.box.w : null;
+          d.onChange(resizeCropCorner(startRef.current, corner, e.translationX / d.zoom / d.box.w, e.translationY / d.zoom / d.box.h, aspect));
         });
     g.current = {
       body: Gesture.Pan()

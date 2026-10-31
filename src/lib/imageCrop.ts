@@ -41,7 +41,7 @@ export type CropCorner = 'tl' | 'tr' | 'bl' | 'br';
  * Egy sarok húzása — a SZEMBEN lévő sarok marad fix. A `dx`/`dy` normalizált
  * (a vászon-doboz arányában). Negatívba forduló méretet a clamp fog meg.
  */
-export function resizeCropCorner(rect: CropRect, corner: CropCorner, dx: number, dy: number): CropRect {
+export function resizeCropCorner(rect: CropRect, corner: CropCorner, dx: number, dy: number, aspect?: number | null): CropRect {
   let { x, y, w, h } = rect;
   if (corner === 'br') {
     w = rect.w + dx;
@@ -61,7 +61,25 @@ export function resizeCropCorner(rect: CropRect, corner: CropCorner, dx: number,
     y = rect.y + dy;
     h = rect.h - dy;
   }
-  return clampCropRect({ x, y, w, h });
+  return aspect ? lockCropAspect(rect, corner, w, h, aspect) : clampCropRect({ x, y, w, h });
+}
+
+/**
+ * Aránytartás sarok-húzásnál: a szemközti sarok áll; a nagyobb elmozdulás dönt, és a
+ * téglalap a vásznon belül marad. Az `aspect` normalizált (w/h a 0–1 térben).
+ */
+function lockCropAspect(rect: CropRect, corner: CropCorner, rawW: number, rawH: number, aspect: number): CropRect {
+  const left = corner === 'tl' || corner === 'bl';
+  const top = corner === 'tl' || corner === 'tr';
+  const anchorX = left ? rect.x + rect.w : rect.x;
+  const anchorY = top ? rect.y + rect.h : rect.y;
+  const maxW = left ? anchorX : 1 - anchorX;
+  const maxH = top ? anchorY : 1 - anchorY;
+  let w = Math.max(rawW, rawH * aspect);
+  w = Math.min(w, maxW, maxH * aspect);
+  w = Math.max(w, 0.05, 0.05 * aspect);
+  const h = w / aspect;
+  return { x: left ? anchorX - w : anchorX, y: top ? anchorY - h : anchorY, w, h };
 }
 
 /**
@@ -200,13 +218,20 @@ function remapGeometry(layer: Exclude<ImageLayer, { kind: 'fill' }>, r: CropRect
 export function cropImageDoc(doc: ImageDoc, rect: CropRect): ImageDoc {
   const r = clampCropRect(rect);
   const { width: W, height: H } = effectiveCanvas(doc);
-  const width = Math.max(16, Math.round(W * r.w));
-  const height = Math.max(16, Math.round(H * r.h));
+  return cropImageDocRaw(doc, r, Math.max(16, Math.round(W * r.w)), Math.max(16, Math.round(H * r.h)));
+}
+
+/** A rétegek leképezése egy tetszőleges (a vászonnál nagyobb is lehet) téglalapra. */
+export function cropImageDocRaw(doc: ImageDoc, r: CropRect, width: number, height: number): ImageDoc {
   return {
     ...doc,
     width,
     height,
     layers: doc.layers.map((l) => remapLayer(l, r)),
+    guides: doc.guides?.map((g) => {
+      const pos = g.axis === 'x' ? (g.pos - r.x) / r.w : (g.pos - r.y) / r.h;
+      return { ...g, pos };
+    }).filter((g) => g.pos >= 0 && g.pos <= 1),
     renderedUri: undefined,
   };
 }

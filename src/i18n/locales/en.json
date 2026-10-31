@@ -3107,6 +3107,29 @@
       "layer": "Layer"
     },
     "image": {
+      "layerName": "Layer name",
+      "groupName": "Group name",
+      "undoRename": "Rename",
+      "undoLock": "Lock",
+      "mergeDown": "Merge down",
+      "rasterize": "Rasterize",
+      "flatten": "Flatten",
+      "mergeNeedsServer": "Merging needs the render server, which isn't reachable right now.",
+      "reorderHandle": "Drag to reorder",
+      "canvasTransform": "Whole canvas",
+      "rotateLeft": "Rotate left",
+      "rotateRight": "Rotate right",
+      "flipCanvasH": "Flip horizontal",
+      "flipCanvasV": "Flip vertical",
+      "resizeCanvas": "Canvas (keeps content)",
+      "resizeImage": "Image size (scales)",
+      "anchorCell": "Anchor {{x}}%, {{y}}%",
+      "geometry": {
+        "width": "W",
+        "height": "H",
+        "angle": "Angle",
+        "lockAspect": "Keep aspect ratio"
+      },
       "shareFeed": {
         "confirmTitle": "Share to feed",
         "confirmBody": "Who can see this post?",

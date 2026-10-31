@@ -45,6 +45,9 @@ export function ImageStudioSheets({
   setSheet,
   setSelectedId,
   onAdd,
+  onMergeDown,
+  onRasterize,
+  onFlatten,
   onAddShapeType,
   onInsertSource,
   onDrawMask,
@@ -72,6 +75,9 @@ export function ImageStudioSheets({
   setSheet: (sheet: SheetKind) => void;
   setSelectedId: (id: string | null) => void;
   onAdd: (kind: ImageLayer['kind']) => void;
+  onMergeDown: (id: string) => void;
+  onRasterize: (id: string) => void;
+  onFlatten: () => void;
   onAddShapeType: (shape: Exclude<ShapeLayer['shape'], 'path'>) => void;
   onInsertSource: (asset: Asset) => void;
   onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
@@ -107,6 +113,9 @@ export function ImageStudioSheets({
             onDetentChange('peek');
           }}
           onAdd={onAdd}
+          onMergeDown={onMergeDown}
+          onRasterize={onRasterize}
+          onFlatten={onFlatten}
           commit={commit}
           onClose={() => setSheet(null)}
           onOpenAdjust={() => {

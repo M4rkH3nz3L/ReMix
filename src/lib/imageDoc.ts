@@ -99,7 +99,8 @@ export function setBackground(
 }
 
 export function removeLayer(doc: ImageDoc, id: string): ImageDoc {
-  const layers = doc.layers.filter((l) => l.id !== id);
+  // a zárolt réteg nem törölhető (előbb fel kell oldani)
+  const layers = doc.layers.filter((l) => l.id !== id || l.locked);
   if (layers.length === doc.layers.length) {
     return doc;
   }
@@ -138,17 +139,44 @@ export function updateLayer<L extends ImageLayer = ImageLayer>(
  */
 export function reorderLayer(doc: ImageDoc, id: string, delta: number): ImageDoc {
   const from = doc.layers.findIndex((l) => l.id === id);
+  return from < 0 ? doc : moveLayerTo(doc, id, from + delta);
+}
+
+/**
+ * A réteg áthelyezése a `to` indexre úgy, hogy a csoportok egyben maradjanak: a tag a saját
+ * csoportján belül mozog, a kívülálló pedig átugorja a csoportot, nem kerül a tagok közé.
+ */
+export function moveLayerTo(doc: ImageDoc, id: string, to: number): ImageDoc {
+  const from = doc.layers.findIndex((l) => l.id === id);
   if (from < 0) {
     return doc;
   }
-  const to = Math.min(doc.layers.length - 1, Math.max(0, from + delta));
-  if (to === from) {
+  const moved = doc.layers[from];
+  const rest = doc.layers.filter((l) => l.id !== id);
+  let at = Math.max(0, Math.min(rest.length, to));
+  if (moved.groupId) {
+    const idx = rest.flatMap((l, i) => (l.groupId === moved.groupId ? [i] : []));
+    if (idx.length > 0) {
+      at = Math.max(idx[0], Math.min(idx[idx.length - 1] + 1, at));
+    }
+  } else {
+    const below = rest[at - 1]?.groupId;
+    if (below && below === rest[at]?.groupId) {
+      const idx = rest.flatMap((l, i) => (l.groupId === below ? [i] : []));
+      at = to > from ? idx[idx.length - 1] + 1 : idx[0];
+    }
+  }
+  if (at === from) {
     return doc;
   }
-  const layers = [...doc.layers];
-  const [moved] = layers.splice(from, 1);
-  layers.splice(to, 0, moved);
+  const layers = [...rest];
+  layers.splice(at, 0, moved);
   return { ...doc, layers, renderedUri: undefined };
+}
+
+export function toggleLayerLocked(doc: ImageDoc, id: string): ImageDoc {
+  const layer = doc.layers.find((l) => l.id === id);
+  return layer ? updateLayer(doc, id, { locked: !layer.locked }) : doc;
 }
 
 export function toggleLayerHidden(doc: ImageDoc, id: string): ImageDoc {

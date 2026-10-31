@@ -7,12 +7,14 @@ import { act, create } from 'react-test-renderer';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
+import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import type { LivePatch } from '@/lib/imageLayerClip';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
-import { normalizeRotation } from '@/lib/imageLayerGeometry';
-import type { PhotoLayer } from '@/types/project';
+import { moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
+import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
+import type { ImageDoc, PhotoLayer } from '@/types/project';
 
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
@@ -21,6 +23,10 @@ jest.mock('react-native-reanimated', () => {
     __esModule: true,
     default: { View: RN.View, createAnimatedComponent: (c: unknown) => c },
     runOnJS: (fn: unknown) => fn,
+    // a design-rendszer modul-szinten olvassa a görbéket és az animáció-építőket
+    Easing: new Proxy({}, { get: () => () => () => 0 }),
+    withTiming: (v: unknown) => v,
+    withSpring: (v: unknown) => v,
     useSharedValue: (value: unknown) => ({ value }),
     useAnimatedStyle: (fn: () => object) => fn(),
     useDerivedValue: (fn: () => unknown) => ({ value: fn() }),
@@ -119,6 +125,72 @@ describe('méretezés a kijelölő keretben', () => {
     for (const c of ['tl', 'tr', 'bl', 'br']) {
       expect(getByGestureTestId(`scale-${c}`)).toBeTruthy();
     }
+  });
+});
+
+describe('réteg-sorrend húzással', () => {
+  const docOf = (layers: object[], extra = {}) => ({ id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers, ...extra }) as unknown as ImageDoc;
+  const l = (id: string, groupId?: string) => ({ kind: 'shape', id, shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.1, h: 0.1, fill: '#000', groupId });
+  const ids = (d: ImageDoc) => d.layers.map((x) => x.id).join('');
+
+  it('a sor lefelé húzva a rétegek közt lejjebb kerül', async () => {
+    const commit = jest.fn();
+    const doc = docOf([l('a'), l('b'), l('c')]);
+    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={commit} onClose={() => {}} onOpenAdjust={() => {}} />);
+    const h = (getByGestureTestId('layer-drag-c') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
+    await act(async () => h.onEnd({ translationY: 110 }, true));
+    expect(ids(commit.mock.calls[0][0])).toBe('cab'); // a lista fölül a legfelső, 2 sorral lejjebb
+  });
+  it('a csoport egyben marad: kívülálló nem kerül a tagok közé', () => {
+    const d = docOf([l('a'), l('x', 'g'), l('y', 'g'), l('b')]);
+    expect(ids(moveLayerTo(d, 'b', 2))).toBe('abxy');
+    expect(ids(moveLayerTo(d, 'a', 1))).toBe('xyab');
+  });
+  it('a tag a csoportján belül marad', () => {
+    const d = docOf([l('a'), l('x', 'g'), l('y', 'g'), l('b')]);
+    expect(ids(moveLayerTo(d, 'x', 3))).toBe('ayxb');
+    expect(ids(moveLayerTo(d, 'y', 0))).toBe('ayxb');
+  });
+  it('a fel/le lépés a csoportot egyben ugorja át', () => {
+    expect(ids(reorderLayer(docOf([l('a'), l('x', 'g'), l('y', 'g')]), 'a', 1))).toBe('xya');
+  });
+});
+
+describe('zárolás', () => {
+  it('a zárolt réteg nem törölhető', () => {
+    const doc = { layers: [{ ...layer, locked: true }] } as unknown as ImageDoc;
+    expect(removeLayer(doc, 'p')).toBe(doc);
+  });
+  it('a zárolás oda-vissza kapcsol', () => {
+    const doc = { layers: [layer] } as unknown as ImageDoc;
+    const locked = toggleLayerLocked(doc, 'p');
+    expect(locked.layers[0].locked).toBe(true);
+    expect(toggleLayerLocked(locked, 'p').layers[0].locked).toBe(false);
+  });
+});
+
+describe('pontos számértékek', () => {
+  const canvas = { width: 1000, height: 500 };
+  const l2 = { position: { x: 0.5, y: 0.5 }, w: 0.2, h: 0.4, rotation: 190 };
+  it('képpontban mutat', () => {
+    expect(layerBoxPx(l2, canvas)).toEqual({ x: 400, y: 150, w: 200, h: 200, rotation: -170 });
+  });
+  it('az X a bal szélt állítja', () => {
+    const p = applyLayerBoxPx(l2, { x: 0 }, canvas, false);
+    expect(p.position.x).toBeCloseTo(0.1);
+    expect(p.w).toBeCloseTo(0.2);
+  });
+  it('aránytartással a másik oldal követi', () => {
+    const p = applyLayerBoxPx(l2, { w: 400 }, canvas, true);
+    expect([p.w * 1000, p.h * 500]).toEqual([400, 400]);
+  });
+  it('arány nélkül csak az az oldal változik; a bal felső sarok áll', () => {
+    const p = applyLayerBoxPx(l2, { w: 400 }, canvas, false);
+    expect(p.h * 500).toBeCloseTo(200);
+    expect(p.position.x * 1000 - (p.w * 1000) / 2).toBeCloseTo(400);
+  });
+  it('nulla / érvénytelen méretet nem fogad el', () => {
+    expect(applyLayerBoxPx(l2, { w: 0 }, canvas, false).w).toBeCloseTo(0.2);
   });
 });
 

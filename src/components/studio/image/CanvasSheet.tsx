@@ -15,9 +15,28 @@ import {
   effectiveCanvas,
   isHexColor,
 } from '@/lib/canvasPresets';
+import { type Anchor, flipCanvasDoc, resampleDoc, resizeCanvasDoc, rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { docBackground, setBackground } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
 import type { ClipAdjust, GradeId, ImageDoc } from '@/types/project';
+
+function TransformBtn({
+  icon,
+  label,
+  flip,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  flip?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.transformBtn} accessibilityRole="button" accessibilityLabel={label}>
+      <Ionicons name={icon} size={20} color={palette.text} style={flip ? { transform: [{ scaleX: -1 }] } : undefined} />
+    </Pressable>
+  );
+}
 
 /**
  * 🖼️ Vászon-beállítás lap — a kép-editor „Új dokumentum” mezőivel AZONOS
@@ -48,14 +67,26 @@ export function CanvasSheet({
   const adjNeutral =
     !Math.abs(adjust.exposure ?? 0) && !Math.abs(adjust.contrast ?? 0) && !Math.abs(adjust.saturation ?? 0);
 
+  // 📐 „Vászon": a keret változik, a tartalom pixelre marad; „Képméret": minden skálázódik
+  const [resizeMode, setResizeMode] = useState<'canvas' | 'resample'>('canvas');
+  const [anchor, setAnchor] = useState<Anchor>({ x: 0.5, y: 0.5 });
+  const transform = (next: ImageDoc, label: string) => {
+    commit(next, label);
+    onClose();
+  };
+
   const apply = () => {
     const width = clampDim(w);
     const height = clampDim(h);
+    const sized =
+      width === init.width && height === init.height
+        ? doc
+        : resizeMode === 'canvas'
+          ? resizeCanvasDoc(doc, width, height, anchor)
+          : resampleDoc(doc, width, height);
     const next = setBackground(
       {
-        ...doc,
-        width,
-        height,
+        ...sized,
         format,
         grain: grain > 0 ? grain : undefined,
         vignette: vignette > 0 ? vignette : undefined,
@@ -82,6 +113,14 @@ export function CanvasSheet({
         </Pressable>
       }
     >
+      <Text style={styles.section}>{t('studio.image.canvasTransform')}</Text>
+      <View style={styles.row}>
+        <TransformBtn icon="refresh-outline" flip label={t('studio.image.rotateLeft')} onPress={() => transform(rotateCanvasDoc(doc, -90), t('studio.image.rotateLeft'))} />
+        <TransformBtn icon="refresh-outline" label={t('studio.image.rotateRight')} onPress={() => transform(rotateCanvasDoc(doc, 90), t('studio.image.rotateRight'))} />
+        <TransformBtn icon="swap-horizontal" label={t('studio.image.flipCanvasH')} onPress={() => transform(flipCanvasDoc(doc, 'horizontal'), t('studio.image.flipCanvasH'))} />
+        <TransformBtn icon="swap-vertical" label={t('studio.image.flipCanvasV')} onPress={() => transform(flipCanvasDoc(doc, 'vertical'), t('studio.image.flipCanvasV'))} />
+      </View>
+
       <Text style={styles.section}>{t('home.formatLabel')}</Text>
       <View style={styles.row}>
         <Chip label={t('home.formatRaster')} active={format === 'raster'} onPress={() => setFormat('raster')} />
@@ -136,6 +175,26 @@ export function CanvasSheet({
         </View>
       </View>
       <Text style={styles.hint}>{t('home.canvasSize', { width: clampDim(w), height: clampDim(h) })}</Text>
+      <View style={styles.row}>
+        <Chip label={t('studio.image.resizeCanvas')} active={resizeMode === 'canvas'} onPress={() => setResizeMode('canvas')} />
+        <Chip label={t('studio.image.resizeImage')} active={resizeMode === 'resample'} onPress={() => setResizeMode('resample')} />
+      </View>
+      {resizeMode === 'canvas' ? (
+        <View style={styles.anchorGrid}>
+          {[0, 0.5, 1].flatMap((y) =>
+            [0, 0.5, 1].map((x) => (
+              <Pressable
+                key={`${x}-${y}`}
+                onPress={() => setAnchor({ x, y })}
+                style={[styles.anchorCell, anchor.x === x && anchor.y === y ? styles.anchorActive : null]}
+                accessibilityRole="button"
+                accessibilityLabel={t('studio.image.anchorCell', { x: x * 100, y: y * 100 })}
+                accessibilityState={{ selected: anchor.x === x && anchor.y === y }}
+              />
+            ))
+          )}
+        </View>
+      ) : null}
 
       <Text style={styles.section}>{t('home.backgroundLabel')}</Text>
       <View style={styles.bgRow}>
@@ -193,6 +252,18 @@ export function CanvasSheet({
 }
 
 const styles = StyleSheet.create({
+  transformBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  anchorGrid: { width: 132, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  anchorCell: { width: 40, height: 40, borderRadius: 6, borderWidth: 1, borderColor: palette.border },
+  anchorActive: { backgroundColor: palette.accent, borderColor: palette.accent },
   section: { color: palette.textDim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   dimRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },

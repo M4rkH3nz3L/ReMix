@@ -1288,6 +1288,8 @@ export interface ImageLayerBase {
   name?: string;
   /** kikapcsolt réteg: megmarad, de nem rajzolódik */
   hidden?: boolean;
+  /** zárolt réteg: nem mozdítható, nem méretezhető, nem törölhető */
+  locked?: boolean;
   /** 0–1 (hiányzó = 1) */
   opacity?: number;
   /** 🎨 keverési mód az ALATTA lévő rétegekkel (multiply/screen/overlay/…). Hiányzó = normál

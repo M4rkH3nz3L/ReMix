@@ -84,6 +84,7 @@ export function ImageCanvas({
   brushRef,
   guidesActive,
   initialZoom = 1,
+  cropAspect,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -127,6 +128,8 @@ export function ImageCanvas({
   guidesActive?: boolean;
   /** induló nagyítás (a munkaterület a csippentéssel/gombokkal változik tovább) */
   initialZoom?: number;
+  /** kivágás aránytartása: pixel-arány (w/h), üres = szabad */
+  cropAspect?: number | null;
 }) {
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
@@ -379,7 +382,7 @@ export function ImageCanvas({
                   key={l.id}
                   layer={l}
                   box={fit}
-                  selected={selected}
+                  selected={selected && !l.locked}
                   zoom={zoom}
                   moveRange={MOVE_RANGE}
                   onSelect={onSelect}
@@ -395,6 +398,7 @@ export function ImageCanvas({
                   box={fit}
                   zoom={zoom}
                   moveRange={MOVE_RANGE}
+                  locked={l.locked}
                   editable
                   selected={selected}
                   onSelect={onSelect}
@@ -425,6 +429,7 @@ export function ImageCanvas({
                 box={fit}
                 zoom={zoom}
                 moveRange={MOVE_RANGE}
+                locked={l.locked}
                 editable
                 selected={selected}
                 onSelect={onSelect}
@@ -458,7 +463,7 @@ export function ImageCanvas({
             />
           ))}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -475,7 +480,7 @@ export function ImageCanvas({
 
           {/* ✂️ kivágás-overlay (a kijelölés helyett) */}
           {!capturing && cropRect && onCropRectChange ? (
-            <CropOverlay box={fit} zoom={zoom} rect={cropRect} onChange={onCropRectChange} />
+            <CropOverlay box={fit} zoom={zoom} aspect={cropAspect} rect={cropRect} onChange={onCropRectChange} />
           ) : null}
 
           {/* ✏️ toll-overlay (a kijelölés helyett) */}

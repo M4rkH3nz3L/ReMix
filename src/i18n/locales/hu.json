@@ -3947,6 +3947,11 @@
     "empty": "Még nincs poszt."
   },
   "live": {
+    "dest": {
+      "errUrl": "Érvénytelen RTMP-cím.",
+      "errScheme": "Csak rtmp:// vagy rtmps:// cím adható meg (a platform „Stream URL\"-je).",
+      "errPrivate": "Belső hálózati cím nem adható meg — a platform nyilvános ingest-címét használd."
+    },
     "title": "Élő",
     "heroTitle": "Menj élőben a követőidnek",
     "heroBody": "Közvetíts valós időben, és hagyd, hogy a közösséged nézze, reagáljon és csevegjen közben.",

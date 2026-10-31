@@ -47,7 +47,11 @@ function encryptStreamKey(plain) {
   }
   const key = deriveKey();
   if (!key) {
-    return text; // nincs secret → nyers (dev); prod-ban LIVE_STREAM_KEY_SECRET kell
+    // 🔐 L5: production-ben NYERS kulcsot SOHA nem tárolunk (csendben sem) — hiba
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('LIVE_STREAM_KEY_SECRET hiányzik — a stream-kulcs nem tárolható titkosítás nélkül.');
+    }
+    return text; // dev: nyers (a hívó jelzi: encrypted:false)
   }
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);

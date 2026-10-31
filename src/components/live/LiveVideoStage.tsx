@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LiveKitRoom, useLocalParticipant } from '@livekit/react-native';
+import { LiveKitRoom, useDataChannel, useLocalParticipant } from '@livekit/react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -8,7 +8,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { LiveComposite } from '@/components/live/LiveComposite';
 import { palette } from '@/constants/editor';
-import { sceneHasVisible, type ScenePayload } from '@/lib/liveComposite';
+import { parseScenePayload, sceneHasVisible, type ScenePayload } from '@/lib/liveComposite';
 import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
 
 /**
@@ -30,6 +30,10 @@ export interface LiveVideoStageProps {
   scene: ScenePayload | null;
   /** 🎚️ a host mikrofonja némítva (az élő audio-mixerből; csak publish esetén él). */
   micMuted?: boolean;
+  /** a host azonosítója — a néző CSAK tőle fogad jelenetet (PRO-LIVE L2) */
+  hostId?: string;
+  /** néző: a host (LiveKit-hitelesített) jelenet-állapota */
+  onScene?: (payload: ScenePayload) => void;
 }
 
 /** A host mikrofon-némítás alkalmazása a LiveKitre (a <LiveKitRoom>-on BELÜL). */
@@ -106,6 +110,32 @@ function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
   return null;
 }
 
+/**
+ * 🛡️ PRO-LIVE L2 — a NÉZŐ a jelenetet a LiveKit adatcsatornáról veszi: a küldő identitását a
+ * LiveKit-szerver hitelesíti, és adatot csak a host küldhet (néző-token: canPublishData:false).
+ * A nyilvános Supabase-broadcast hamisítható volt. A payloadot validáljuk (néző-DoS ellen).
+ */
+function SceneDataReceiver({ hostId, onScene }: { hostId: string; onScene: (p: ScenePayload) => void }) {
+  const onSceneRef = useRef(onScene);
+  useEffect(() => {
+    onSceneRef.current = onScene;
+  }, [onScene]);
+  useDataChannel('scene', (msg) => {
+    if (msg.from?.identity !== hostId || typeof TextDecoder === 'undefined') {
+      return;
+    }
+    try {
+      const parsed = parseScenePayload(JSON.parse(new TextDecoder().decode(msg.payload)));
+      if (parsed) {
+        onSceneRef.current(parsed);
+      }
+    } catch {
+      // hibás payload → eldobjuk
+    }
+  });
+  return null;
+}
+
 export default function LiveVideoStage({
   liveId,
   publish,
@@ -114,6 +144,8 @@ export default function LiveVideoStage({
   hostAvatar,
   scene,
   micMuted,
+  hostId,
+  onScene,
 }: LiveVideoStageProps) {
   const { t } = useTranslation();
   const [, requestCam] = useCameraPermissions();
@@ -188,6 +220,7 @@ export default function LiveVideoStage({
         {publish && <MicControl muted={micMuted ?? false} />}
         {publish && <ScreenShareControl wantScreen={scene ? sceneHasVisible(scene, 'screen') : false} />}
         {publish && <SceneDataPublisher scene={scene} />}
+        {!publish && hostId && onScene ? <SceneDataReceiver hostId={hostId} onScene={onScene} /> : null}
       </LiveKitRoom>
     </View>
   );

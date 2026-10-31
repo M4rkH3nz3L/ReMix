@@ -3947,6 +3947,11 @@
     "empty": "No posts yet."
   },
   "live": {
+    "dest": {
+      "errUrl": "Invalid RTMP address.",
+      "errScheme": "Only rtmp:// or rtmps:// addresses are allowed (the platform's \"Stream URL\").",
+      "errPrivate": "Internal network addresses aren't allowed — use the platform's public ingest address."
+    },
     "title": "Live",
     "heroTitle": "Go live to your followers",
     "heroBody": "Stream in real time and let your community watch, react and chat as it happens.",

@@ -186,9 +186,17 @@ router.post('/live/destinations/set-key', express.json({ limit: '2kb' }), requir
     res.status(403).json({ error: 'Nem a te célod.' });
     return;
   }
+  let stored;
+  try {
+    stored = encryptStreamKey(streamKey);
+  } catch (e) {
+    // prod-ban secret nélkül NEM tárolunk nyers kulcsot (L5)
+    res.status(503).json({ error: e.message });
+    return;
+  }
   const { error: updErr } = await sb
     .from('live_destinations')
-    .update({ stream_key: encryptStreamKey(streamKey) })
+    .update({ stream_key: stored })
     .eq('id', destinationId);
   if (updErr) {
     res.status(500).json({ error: updErr.message });

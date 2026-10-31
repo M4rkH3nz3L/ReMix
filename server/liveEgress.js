@@ -14,6 +14,7 @@ const {
   EncodingOptions,
   S3Upload,
 } = require('livekit-server-sdk');
+const crypto = require('crypto');
 const { resolveSafe } = require('./security/rtmpUrl');
 const { redactSecrets } = require('./security/redact');
 const { createClient } = require('@supabase/supabase-js');
@@ -84,21 +85,29 @@ function vodEnabled() {
 }
 
 /** Az adott szoba VOD-jának S3-kulcsa (determinisztikus, a kliens is kiszámolja). */
-function vodKey(room) {
-  return `live-vod/${room}.mp4`;
+/**
+ * 🔐 L8: a VOD-objektum neve NEM kitalálható — a (nyilvánosan listázható) session-id mellé
+ * egy egress-indításonként új, 96 bites véletlen tag kerül.
+ */
+function vodName(room) {
+  return `${room}-${crypto.randomBytes(12).toString('hex')}`;
+}
+
+function vodKey(name) {
+  return `live-vod/${name}.mp4`;
 }
 
 /** A VOD publikus URL-je (S3_PUBLIC_BASE), ha VOD aktív — különben null. */
-function vodUrl(room) {
+function vodUrl(name) {
   if (!vodEnabled()) {
     return null;
   }
   const base = (process.env.S3_PUBLIC_BASE || '').replace(/\/+$/, '');
-  return base ? `${base}/${vodKey(room)}` : null;
+  return base ? `${base}/${vodKey(name)}` : null;
 }
 
 /** EncodedFileOutput az S3-ba (MP4), vagy null, ha a VOD nincs bekapcsolva. */
-function buildVodOutput(room) {
+function buildVodOutput(name) {
   if (!vodEnabled()) {
     return null;
   }
@@ -112,7 +121,7 @@ function buildVodOutput(room) {
   });
   return new EncodedFileOutput({
     fileType: EncodedFileType.MP4,
-    filepath: vodKey(room),
+    filepath: vodKey(name),
     output: { case: 's3', value: s3 },
   });
 }
@@ -318,7 +327,8 @@ async function startEgress({ room, userId, record, aspect }) {
   // 📼 record-only: a VOD-fájl RTMP-cél NÉLKÜL is készülhet (ha a user rögzít +
   //    EGRESS_VOD+S3 áll). Így az egress csak-felvételre is elindul (nem csak
   //    multistreamre). A `record` a kliensből jön (a Live „Rögzítés" kapcsoló).
-  const fileOutput = record ? buildVodOutput(room) : null;
+  const vodObject = vodName(room);
+  const fileOutput = record ? buildVodOutput(vodObject) : null;
   if (dests.length === 0 && !fileOutput) {
     return {
       ok: false,
@@ -394,7 +404,7 @@ async function startEgress({ room, userId, record, aspect }) {
       egressId: info.egressId,
       destinations: dests.map((d) => ({ id: d.id, platform: d.platform, label: d.label })),
       skipped,
-      vodUrl: fileOutput ? vodUrl(room) : null, // 📼 D158: a VOD publikus URL-je (csak ha készül felvétel)
+      vodUrl: fileOutput ? vodUrl(vodObject) : null, // 📼 D158: a VOD publikus URL-je (csak ha készül felvétel)
     };
   } catch (e) {
     return { ok: false, status: 502, error: `Egress-indítás hiba: ${redactSecrets(e.message)}` };

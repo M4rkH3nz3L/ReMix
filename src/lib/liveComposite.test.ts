@@ -1,6 +1,7 @@
 import { addSource, createLiveDoc, toggleSourceVisible, type GenId } from '@/lib/liveDoc';
 import {
   compositeLayers,
+  parseScenePayload,
   encodeScenePayload,
   layerPercentBox,
   sceneHasVisible,
@@ -67,5 +68,31 @@ describe('liveComposite — layerPercentBox', () => {
       t: { x: 0.72, y: 0.04, w: 0.24, h: 0.12, z: 1 },
     });
     expect(box).toEqual({ left: '72%', top: '4%', width: '24%', height: '12%' });
+  });
+});
+
+describe('parseScenePayload (PRO-LIVE L2)', () => {
+  it('rossz bemenet → null; hibás rétegek kiszűrve, értékek határok közé szorítva', () => {
+    expect(parseScenePayload(null)).toBeNull();
+    expect(parseScenePayload({ layers: 'x' })).toBeNull();
+    const p = parseScenePayload({
+      sceneId: 's',
+      layers: [
+        { id: 'a', kind: 'camera', v: true, t: { x: 0, y: 0, w: 1, h: 1, z: 0 } },
+        { id: 'b', kind: 'evil', v: true, t: {} },
+        { id: 'c', kind: 'image', v: true, t: { x: 'NaN', y: 1e9, w: -5, h: 0.5, z: 0 }, uri: 'http://169.254.169.254/x' },
+        { id: 'd', kind: 'logo', v: true, t: { x: 0, y: 0, w: 0.2, h: 0.2, z: 1 }, uri: 'https://cdn.example.com/l.png' },
+        null,
+      ],
+    })!;
+    expect(p.layers.map((l) => l.id)).toEqual(['a', 'c', 'd']);
+    expect(p.layers[1].t).toEqual({ x: 0, y: 2, w: 0, h: 0.5, z: 0 });
+    expect(p.layers[1].uri).toBeUndefined(); // belső / nem https cím eldobva
+    expect(p.layers[2].uri).toBe('https://cdn.example.com/l.png');
+  });
+
+  it('legfeljebb 32 réteg (néző-DoS ellen)', () => {
+    const layers = Array.from({ length: 100 }, (_, i) => ({ id: `l${i}`, kind: 'text', v: true, t: {} }));
+    expect(parseScenePayload({ layers })!.layers).toHaveLength(32);
   });
 });

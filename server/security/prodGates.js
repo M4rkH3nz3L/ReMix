@@ -18,7 +18,12 @@ function prodGateViolations(env = process.env) {
   if (env.NODE_ENV !== 'production') {
     return [];
   }
-  return DEV_GATES.filter((g) => env[g] === '1');
+  const bad = DEV_GATES.filter((g) => env[g] === '1');
+  // 🔐 PRO-LIVE L5: ha a Live (LiveKit) be van kötve, a stream-kulcs titkosító secret KÖTELEZŐ
+  if ((env.LIVEKIT_API_KEY || '').trim() && !(env.LIVE_STREAM_KEY_SECRET || '').trim()) {
+    bad.push('LIVE_STREAM_KEY_SECRET (hiányzik)');
+  }
+  return bad;
 }
 
 /**

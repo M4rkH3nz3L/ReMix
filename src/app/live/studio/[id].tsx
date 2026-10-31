@@ -770,7 +770,11 @@ export default function LiveStudioScreen() {
                       setRtmpOpen(false);
                       loadDests();
                     })
-                    .catch((e) => Alert.alert(t('common.error'), String(e?.message ?? e)));
+                    .catch((e) => {
+                      // a validációs hiba i18n-kulcs (live.dest.*), a többi szerver-üzenet (kitakarva)
+                      const msg = String(e?.message ?? e);
+                      Alert.alert(t('common.error'), msg.startsWith('live.dest.') ? t(msg) : msg);
+                    });
                 }}
               >
                 <Text style={[styles.modalBtnText, styles.modalBtnTextPrimary]}>{t('common.add', { defaultValue: 'Add' })}</Text>

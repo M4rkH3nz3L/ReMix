@@ -1,5 +1,4 @@
-import type { ScenePayload } from '@/lib/liveComposite';
-import { createRateLimiter, createTrailingThrottle } from '@/lib/liveRate';
+import { createRateLimiter } from '@/lib/liveRate';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 
@@ -232,14 +231,44 @@ export interface LiveChat {
   at: number;
 }
 
+/** a megengedett reakciók (a bejövő broadcast csak ezeket fogadja — L2) */
+export const LIVE_REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'] as const;
+
+interface ChatRow {
+  id: string;
+  author_id: string;
+  author_name: string | null;
+  author_avatar: string | null;
+  body: string;
+  created_at: string;
+}
+
+const rowToChat = (r: ChatRow): LiveChat => ({
+  id: r.author_id,
+  name: r.author_name || r.author_id.slice(0, 8),
+  avatar: r.author_avatar,
+  text: r.body,
+  at: Date.parse(r.created_at) || Date.now(),
+});
+
+/** a táblás (ellenőrzött) chat még nem érhető el (a migráció előtti szerver) */
+const isMissingRelation = (e: { code?: string; message?: string } | null | undefined) =>
+  !!e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message ?? ''));
+
 export interface LiveRoom {
   sendChat: (text: string) => void;
   sendReaction: (emoji: string) => void;
-  /** 🎥 a host a jelenet-állapotot broadcastolja (Fázis B kompozíció). */
-  sendScene: (payload: ScenePayload) => void;
   stop: () => void;
 }
 
+/**
+ * 🔴 A live-szoba realtime rétege. PRO-LIVE L2/L12:
+ *  • a CHAT a `live_chat_messages` táblán megy (a szerzőt az RLS, a nevet a DB adja → nincs
+ *    megszemélyesítés; szerveres rate limit; a késői csatlakozó az utolsó 50 üzenetet is
+ *    látja). Ha a szerveren még nincs meg a tábla, a régi broadcast-út a tartalék;
+ *  • a JELENET már nem itt megy (a néző a LiveKit adatcsatornáról, host-hitelesítve kapja);
+ *  • a reakció broadcast, de csak a fehérlistás emojik.
+ */
 export function openLiveRoom(
   sessionId: string,
   self: LiveSelf,
@@ -247,53 +276,50 @@ export function openLiveRoom(
     onChat: (m: LiveChat) => void;
     onReaction: (emoji: string) => void;
     onViewers: (count: number) => void;
-    /** 🎥 a host jelenet-állapota (a néző ebből rendereli a kompozíciót). */
-    onScene?: (payload: ScenePayload) => void;
-    /** új néző csatlakozott — a host ilyenkor újra-broadcastolja a jelenetet. */
-    onViewerJoin?: () => void;
   },
 ): LiveRoom {
   if (!supabase) {
-    return { sendChat: () => {}, sendReaction: () => {}, sendScene: () => {}, stop: () => {} };
+    return { sendChat: () => {}, sendReaction: () => {}, stop: () => {} };
   }
-  const channel = supabase.channel(`live:${sessionId}`, {
+  const sb = supabase;
+  const channel = sb.channel(`live:${sessionId}`, {
     config: { presence: { key: self.id }, broadcast: { self: true } },
   });
+  let chatMode: 'table' | 'broadcast' | 'unknown' = 'unknown';
 
   const readViewers = () => {
     const state = channel.presenceState() as Record<string, unknown[]>;
     handlers.onViewers(Object.keys(state).length);
   };
 
-  // 🛡️ F4 — BEJÖVŐ flood-védelem: globális token-bucket esemény-típusonként, hogy
-  // egy rosszindulatú/hibás peer ne áraszthassa el a renderert/UI-t. A többletet
-  // eldobjuk; a jelenet teljes-állapot (a legfrissebb úgyis felülír), a chat/reakció
-  // bőséges limittel megy (burst + fenntartott ráta).
-  const inScene = createRateLimiter(12, 10); // ~10 jelenet/mp, 12 burst
-  const inChat = createRateLimiter(15, 8); // chat: 8/mp, 15 burst
-  const inReaction = createRateLimiter(25, 15); // reakció (csak animáció): 15/mp, 25 burst
+  // 🛡️ F4 — BEJÖVŐ flood-védelem (a táblás chatnél a szerver is limitál)
+  const inChat = createRateLimiter(15, 8);
+  const inReaction = createRateLimiter(25, 15);
 
   channel
     .on('broadcast', { event: 'chat' }, ({ payload }) => {
-      if (inChat.allow()) {
-        handlers.onChat(payload as LiveChat);
+      // a hamisítható broadcast-chat CSAK tartalék módban él
+      if (chatMode !== 'broadcast' || !inChat.allow()) return;
+      const m = payload as Partial<LiveChat>;
+      if (typeof m?.text === 'string' && typeof m.id === 'string') {
+        handlers.onChat({ id: m.id, name: String(m.name ?? '').slice(0, 80), avatar: null, text: m.text.slice(0, 300), at: Date.now() });
       }
     })
     .on('broadcast', { event: 'reaction' }, ({ payload }) => {
-      if (inReaction.allow()) {
-        handlers.onReaction((payload as { emoji: string }).emoji);
+      const emoji = (payload as { emoji?: unknown })?.emoji;
+      if (typeof emoji === 'string' && (LIVE_REACTIONS as readonly string[]).includes(emoji) && inReaction.allow()) {
+        handlers.onReaction(emoji);
       }
     })
-    .on('broadcast', { event: 'scene' }, ({ payload }) => {
-      if (inScene.allow()) {
-        handlers.onScene?.(payload as ScenePayload);
-      }
-    })
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'live_chat_messages', filter: `session_id=eq.${sessionId}` },
+      (change) => {
+        if (inChat.allow()) handlers.onChat(rowToChat(change.new as ChatRow));
+      },
+    )
     .on('presence', { event: 'sync' }, readViewers)
-    .on('presence', { event: 'join' }, () => {
-      readViewers();
-      handlers.onViewerJoin?.();
-    })
+    .on('presence', { event: 'join' }, readViewers)
     .on('presence', { event: 'leave' }, readViewers)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -301,41 +327,55 @@ export function openLiveRoom(
       }
     });
 
-  // 🛡️ F4 — KIMENŐ védelem. A jelenet-állapotot throttle-öljük (gyors drag ne
-  // árasszon; trailing → a legfrissebb snapshot megy ~10×/mp-ig). A chat/reakció
-  // token-bucket (burst + ráta), a többletet csendben eldobjuk.
-  const sceneThrottle = createTrailingThrottle<ScenePayload>(100, (payload) => {
-    void channel.send({ type: 'broadcast', event: 'scene', payload });
-  });
-  const outChat = createRateLimiter(3, 1); // 1 chat/mp, 3 burst
-  const outReaction = createRateLimiter(6, 3); // 3 reakció/mp, 6 burst
+  // a chat-előzmény (késői csatlakozó) + a mód eldöntése
+  void sb
+    .from('live_chat_messages')
+    .select('id, author_id, author_name, author_avatar, body, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+    .then(({ data, error }) => {
+      if (error) {
+        chatMode = isMissingRelation(error) ? 'broadcast' : 'table';
+        return;
+      }
+      chatMode = 'table';
+      for (const r of [...((data ?? []) as ChatRow[])].reverse()) handlers.onChat(rowToChat(r));
+    });
+
+  const outChat = createRateLimiter(3, 1); // 1 chat/mp, 3 burst (a szerver is limitál)
+  const outReaction = createRateLimiter(6, 3);
 
   return {
     sendChat: (text) => {
-      if (!outChat.allow()) {
+      const body = text.trim().slice(0, 300);
+      if (!body || !outChat.allow()) {
         return;
       }
-      const msg: LiveChat = {
-        id: self.id,
-        name: self.name,
-        avatar: self.avatar,
-        text: text.slice(0, 500),
-        at: Date.now(),
-      };
-      void channel.send({ type: 'broadcast', event: 'chat', payload: msg });
+      if (chatMode === 'broadcast') {
+        const msg: LiveChat = { id: self.id, name: self.name, avatar: self.avatar, text: body, at: Date.now() };
+        void channel.send({ type: 'broadcast', event: 'chat', payload: msg });
+        return;
+      }
+      void sb
+        .from('live_chat_messages')
+        .insert({ session_id: sessionId, body })
+        .then(({ error }) => {
+          if (isMissingRelation(error)) {
+            chatMode = 'broadcast';
+            const msg: LiveChat = { id: self.id, name: self.name, avatar: self.avatar, text: body, at: Date.now() };
+            void channel.send({ type: 'broadcast', event: 'chat', payload: msg });
+          }
+        });
     },
     sendReaction: (emoji) => {
-      if (!outReaction.allow()) {
+      if (!(LIVE_REACTIONS as readonly string[]).includes(emoji) || !outReaction.allow()) {
         return;
       }
       void channel.send({ type: 'broadcast', event: 'reaction', payload: { emoji } });
     },
-    sendScene: (payload) => {
-      sceneThrottle.push(payload);
-    },
     stop: () => {
-      sceneThrottle.stop();
-      void supabase!.removeChannel(channel);
+      void sb.removeChannel(channel);
     },
   };
 }

@@ -3917,6 +3917,11 @@
     "empty": "Noch keine Beiträge."
   },
   "live": {
+    "dest": {
+      "errUrl": "Ungültige RTMP-Adresse.",
+      "errScheme": "Nur rtmp:// oder rtmps:// sind erlaubt (die „Stream-URL\" der Plattform).",
+      "errPrivate": "Interne Netzwerkadressen sind nicht erlaubt — nutze die öffentliche Ingest-Adresse der Plattform."
+    },
     "title": "Live",
     "heroTitle": "Geh live für deine Follower",
     "heroBody": "Streame in Echtzeit und lass deine Community zusehen, reagieren und mitchatten.",

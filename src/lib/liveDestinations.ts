@@ -28,8 +28,45 @@ interface RawDest {
   platform: LivePlatform;
   label: string;
   rtmp_url: string;
-  stream_key: string | null;
+  /** a szerver-oldali jelző (a kulcs maga a kliensnek NEM olvasható — L4) */
+  has_key?: boolean;
+  /** csak a migráció előtti szerveren (tartalék) */
+  stream_key?: string | null;
   enabled: boolean;
+}
+
+const COLS: string = 'id, platform, label, rtmp_url, has_key, enabled';
+/** a migráció ELŐTTI séma (has_key oszlop nélkül) — csak tartalékként */
+const LEGACY_COLS: string = 'id, platform, label, rtmp_url, stream_key, enabled';
+const isMissingColumn = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === '42703' || e.code === 'PGRST204' || /has_key/.test(e.message ?? ''));
+
+/**
+ * 🔐 PRO-LIVE L7 (kliens-tükör): csak rtmp(s)://, hitelesítő adat és belső hálózati cím
+ * nélkül — a teljes, DNS-sel is ellenőrzött validáció a workerben fut. → hiba-kulcs vagy null
+ */
+export function rtmpUrlProblem(raw: string): string | null {
+  const s = raw.trim();
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return 'live.dest.errUrl';
+  }
+  if (u.protocol !== 'rtmp:' && u.protocol !== 'rtmps:') return 'live.dest.errScheme';
+  if (u.username || u.password) return 'live.dest.errUrl';
+  const h = u.hostname.toLowerCase();
+  if (
+    !h ||
+    h === 'localhost' ||
+    h.endsWith('.local') ||
+    h.endsWith('.internal') ||
+    /^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h) ||
+    h.startsWith('[')
+  ) {
+    return 'live.dest.errPrivate';
+  }
+  return null;
 }
 
 function mapDest(r: RawDest): LiveDestinationRow {
@@ -38,7 +75,7 @@ function mapDest(r: RawDest): LiveDestinationRow {
     platform: r.platform,
     label: r.label,
     rtmpUrl: r.rtmp_url,
-    hasKey: !!r.stream_key,
+    hasKey: r.has_key ?? !!r.stream_key,
     enabled: r.enabled,
   };
 }
@@ -46,15 +83,15 @@ function mapDest(r: RawDest): LiveDestinationRow {
 /** A felhasználó céljai (kulcs nélkül). */
 export async function listDestinations(): Promise<LiveDestinationRow[]> {
   const sb = requireSupabase();
-  // a stream_key-t lekérjük, de CSAK a `hasKey` jelzőhöz — a kliensnek sosem adjuk vissza
-  const { data, error } = await sb
-    .from('live_destinations')
-    .select('id, platform, label, rtmp_url, stream_key, enabled')
-    .order('created_at', { ascending: true });
-  if (error) {
-    throw new Error(error.message);
+  // a kulcs helyett a `has_key` jelző (L4) — a migráció előtti szerveren a régi lekérés
+  let res = await sb.from('live_destinations').select(COLS).order('created_at', { ascending: true });
+  if (isMissingColumn(res.error)) {
+    res = await sb.from('live_destinations').select(LEGACY_COLS).order('created_at', { ascending: true });
   }
-  return ((data ?? []) as RawDest[]).map(mapDest);
+  if (res.error) {
+    throw new Error(res.error.message);
+  }
+  return ((res.data ?? []) as unknown as RawDest[]).map(mapDest);
 }
 
 export async function addDestination(input: {
@@ -69,28 +106,37 @@ export async function addDestination(input: {
   if (!uid) {
     throw new Error('Nincs bejelentkezve.');
   }
-  // 🔐 F2: a sort kulcs NÉLKÜL szúrjuk be (a nyers kulcs sosem a kliens-írható
-  // úton tárolódik). A kulcsot utána a worker titkosítja + írja (`setDestinationKey`).
-  const { data, error } = await sb
-    .from('live_destinations')
-    .insert({
-      user_id: uid, // kötelező az RLS-hez (auth.uid() = user_id)
-      platform: input.platform,
-      label: input.label.trim() || input.platform,
-      rtmp_url: input.rtmpUrl.trim(),
-      stream_key: '',
-      enabled: input.enabled ?? true,
-    })
-    .select('id, platform, label, rtmp_url, stream_key, enabled')
-    .single();
-  if (error) {
-    throw new Error(error.message);
+  const problem = rtmpUrlProblem(input.rtmpUrl);
+  if (problem) {
+    throw new Error(problem);
   }
-  const row = mapDest(data as RawDest);
+  // 🔐 F2 + L6: a sort kulcs NÉLKÜL és KIKAPCSOLVA szúrjuk be (a nyers kulcs sosem a
+  // kliens-írható úton tárolódik); a kulcsot a worker titkosítja + írja, és CSAK a sikeres
+  // kulcs-mentés után kapcsoljuk be — a félbemaradt mentés nem hagy élő, üres célt.
+  const base = {
+    user_id: uid, // kötelező az RLS-hez (auth.uid() = user_id)
+    platform: input.platform,
+    label: input.label.trim() || input.platform,
+    rtmp_url: input.rtmpUrl.trim(),
+    enabled: false,
+  };
+  let ins = await sb.from('live_destinations').insert(base).select(COLS).single();
+  if (ins.error && (isMissingColumn(ins.error) || /stream_key/.test(ins.error.message))) {
+    // migráció előtti séma: a stream_key NOT NULL alapérték nélkül + nincs has_key
+    ins = await sb.from('live_destinations').insert({ ...base, stream_key: '' }).select(LEGACY_COLS).single();
+  }
+  if (ins.error) {
+    throw new Error(ins.error.message);
+  }
+  const row = mapDest(ins.data as unknown as RawDest);
   const key = input.streamKey.trim();
   if (key) {
     await setDestinationKey(row.id, key);
     row.hasKey = true;
+    if (input.enabled ?? true) {
+      await setDestinationEnabled(row.id, true);
+      row.enabled = true;
+    }
   }
   return row;
 }

@@ -29,6 +29,7 @@ import {
   buildLiveSelf,
   endLive,
   getLive,
+  LIVE_REACTIONS,
   myUserId,
   openLiveRoom,
   type LiveChat,
@@ -75,7 +76,8 @@ const LiveVideoStage = lazy(async () => {
   return { default: LiveVideoUnavailable };
 });
 
-const REACTIONS = ['❤️', '🔥', '👏', '😂', '🎉'];
+// a reakciók a közös fehérlistából (a bejövő broadcast is csak ezeket fogadja — L2)
+const REACTIONS = LIVE_REACTIONS;
 
 /** Egy felúszó reakció-emoji (2 mp alatt felfelé + elhalványul). Az `x` drift az
  * esemény-handlerben készül (nem renderben), hogy ne hívjunk impure fn-t render közben. */
@@ -209,8 +211,9 @@ export default function LiveRoomScreen() {
       return;
     }
     const payload = encodeScenePayload(doc);
+    // a nézők a LiveKit adatcsatornán kapják (SceneDataPublisher, 3 mp-es heartbeattel a
+    // késői csatlakozónak is) — a hamisítható nyilvános broadcastot már nem használjuk
     setScene(payload);
-    roomRef.current?.sendScene(payload);
   }, []);
 
   // 🎥 a host élőben jelenetet vált → újra-broadcast
@@ -255,18 +258,8 @@ export default function LiveRoomScreen() {
             void bumpViewerPeak(liveId, count);
           }
         },
-        // 🎥 néző: a host jelenet-állapotát rendereli; host a sajátját (lentebb)
-        onScene: (payload) => {
-          if (s.hostId !== self.id) {
-            setScene(payload);
-          }
-        },
-        // új néző → a host újra-broadcastolja a jelenetet (késői csatlakozó is kapja)
-        onViewerJoin: () => {
-          if (s.hostId === self.id) {
-            broadcastScene();
-          }
-        },
+        // 🛡️ L2: a néző a jelenetet a LiveKit adatcsatornáról veszi (host-hitelesítve, lásd
+        // LiveVideoStage → SceneDataReceiver) — a nyilvános broadcast `scene`-jét NEM alkalmazzuk
       });
 
       // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast.
@@ -463,6 +456,8 @@ export default function LiveRoomScreen() {
                 hostAvatar={session.hostAvatar}
                 scene={scene}
                 micMuted={micMuted}
+                hostId={session.hostId}
+                onScene={setScene}
               />
             </Suspense>
           </ErrorBoundary>

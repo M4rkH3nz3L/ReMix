@@ -7,7 +7,6 @@ import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
 import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { HistorySheet } from '@/components/studio/image/HistorySheet';
-import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
 import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
@@ -44,10 +43,6 @@ export function ImageStudioSheets({
   commit,
   setSheet,
   setSelectedId,
-  onAdd,
-  onMergeDown,
-  onRasterize,
-  onFlatten,
   onAddShapeType,
   onInsertSource,
   onDrawMask,
@@ -62,7 +57,6 @@ export function ImageStudioSheets({
   detents,
   detent,
   onDetentChange,
-  docked = false,
 }: {
   sheet: SheetKind;
   doc: ImageDoc | null;
@@ -74,10 +68,6 @@ export function ImageStudioSheets({
   commit: (next: ImageDoc, label?: string) => void;
   setSheet: (sheet: SheetKind) => void;
   setSelectedId: (id: string | null) => void;
-  onAdd: (kind: ImageLayer['kind']) => void;
-  onMergeDown: (id: string) => void;
-  onRasterize: (id: string) => void;
-  onFlatten: () => void;
   onAddShapeType: (shape: Exclude<ShapeLayer['shape'], 'path'>) => void;
   onInsertSource: (asset: Asset) => void;
   onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
@@ -94,38 +84,13 @@ export function ImageStudioSheets({
   detents?: Record<Detent, number>;
   detent: Detent;
   onDetentChange: (detent: Detent) => void;
-  /** iPad fekvő: az élő lapok jobb oldali dokkolt oszlopban (MOBILE-UI §7) */
-  docked?: boolean;
 }) {
   const frame =
     detents && sheet
-      ? { inline: isInlineSheet(sheet), docked, detents, detent, onDetentChange }
+      ? { inline: isInlineSheet(sheet), detents, detent, onDetentChange }
       : null;
   return (
     <StudioSheetFrameContext.Provider value={frame}>
-      {sheet === 'layers' && doc ? (
-        <LayerPanel
-          doc={doc}
-          selectedId={effectiveSelectedId}
-          onSelect={(id) => {
-            setSelectedId(id);
-            // réteg-választás után a lap lehúzódik (peek) → azonnal a vásznon dolgozhatsz
-            onDetentChange('peek');
-          }}
-          onAdd={onAdd}
-          onMergeDown={onMergeDown}
-          onRasterize={onRasterize}
-          onFlatten={onFlatten}
-          commit={commit}
-          onClose={() => setSheet(null)}
-          onOpenAdjust={() => {
-            if (selectedLayer?.kind === 'photo') {
-              setSheet('adjust');
-            }
-          }}
-          onDrawMask={onDrawMask}
-        />
-      ) : null}
       {sheet === 'style' && doc && selectedLayer ? (
         <LayerStyleSheet
           doc={doc}
@@ -136,6 +101,7 @@ export function ImageStudioSheets({
               setSheet('adjust');
             }
           }}
+          onDrawMask={onDrawMask}
           onClose={() => setSheet(null)}
         />
       ) : null}

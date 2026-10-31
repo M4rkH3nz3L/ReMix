@@ -16,18 +16,20 @@ export function LayerStyleSheet({
   layer,
   commit,
   onOpenAdjust,
+  onDrawMask,
   onClose,
 }: {
   doc: ImageDoc;
   layer: ImageLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onOpenAdjust: () => void;
+  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
   onClose: () => void;
 }) {
   useTranslation();
   return (
     <StudioSheet title={layerLabel(layer)} icon="options-outline" onClose={onClose}>
-      <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} />
+      <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} onDrawMask={onDrawMask} />
     </StudioSheet>
   );
 }

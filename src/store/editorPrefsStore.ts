@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import type { WorkspaceMode } from '@/lib/imageWorkspaceLayout';
 import type { EditMode } from '@/lib/toolbarSpec';
+
+/** a Kép Stúdió oldalsó paneljeinek nyitottsága eszköz-típusonként */
+export type ImagePanels = Partial<Record<WorkspaceMode, { rail?: boolean; layers?: boolean }>>;
 
 /**
  * 🎛️ A videószerkesztő ESZKÖZ-szintű kezelési beállításai (nem a projekt része, nem
@@ -14,12 +18,16 @@ interface EditorPrefs {
   editMode: EditMode;
   /** a sztori/tempó-sáv + térkép látszik-e (összecsukva több hely jut a sávoknak) */
   timelineExtras: boolean;
+  imagePanels: ImagePanels;
 }
 
 interface EditorPrefsState extends EditorPrefs {
   setEditMode: (mode: EditMode) => void;
   setTimelineExtras: (open: boolean) => void;
+  setImagePanel: (mode: WorkspaceMode, patch: { rail?: boolean; layers?: boolean }) => void;
 }
+
+const pick = ({ editMode, timelineExtras, imagePanels }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels });
 
 function persist(p: EditorPrefs): void {
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(p)).catch(() => {
@@ -30,13 +38,19 @@ function persist(p: EditorPrefs): void {
 export const useEditorPrefs = create<EditorPrefsState>((set, get) => ({
   editMode: 'advanced',
   timelineExtras: true,
+  imagePanels: {},
   setEditMode: (editMode) => {
     set({ editMode });
-    persist({ editMode, timelineExtras: get().timelineExtras });
+    persist({ ...pick(get()), editMode });
   },
   setTimelineExtras: (timelineExtras) => {
     set({ timelineExtras });
-    persist({ editMode: get().editMode, timelineExtras });
+    persist({ ...pick(get()), timelineExtras });
+  },
+  setImagePanel: (mode, patch) => {
+    const imagePanels = { ...get().imagePanels, [mode]: { ...get().imagePanels[mode], ...patch } };
+    set({ imagePanels });
+    persist({ ...pick(get()), imagePanels });
   },
 }));
 
@@ -48,6 +62,7 @@ AsyncStorage.getItem(STORAGE_KEY)
     useEditorPrefs.setState({
       ...(p.editMode === 'quick' || p.editMode === 'advanced' || p.editMode === 'ai' ? { editMode: p.editMode } : {}),
       ...(typeof p.timelineExtras === 'boolean' ? { timelineExtras: p.timelineExtras } : {}),
+      ...(p.imagePanels && typeof p.imagePanels === 'object' ? { imagePanels: p.imagePanels } : {}),
     });
   })
   .catch(() => {});

@@ -140,7 +140,7 @@ describe('réteg-sorrend húzással', () => {
   it('a sor lefelé húzva a rétegek közt lejjebb kerül', async () => {
     const commit = jest.fn();
     const doc = docOf([l('a'), l('b'), l('c')]);
-    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={commit} onClose={() => {}} onOpenAdjust={() => {}} />);
+    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={commit} onClose={() => {}} onOpenStyle={() => {}} />);
     const h = (getByGestureTestId('layer-drag-c') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
     await act(async () => h.onEnd({ translationY: 110 }, true));
     expect(ids(commit.mock.calls[0][0])).toBe('cab'); // a lista fölül a legfelső, 2 sorral lejjebb
@@ -264,11 +264,11 @@ describe('≥44 pt célterület', () => {
     let tree: ReturnType<typeof create> | undefined;
     const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [layer] } as unknown as ImageDoc;
     act(() => {
-      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenAdjust={() => {}} />);
+      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenStyle={() => {}} />);
     });
     const icons = tree!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'button');
     const sized = icons.map((n) => StyleSheet.flatten(n.props.style)).filter((s) => s?.width != null);
-    expect(sized.length).toBeGreaterThanOrEqual(4);
+    expect(sized.length).toBeGreaterThanOrEqual(2); // szem + zár a sorban
     for (const s of sized) {
       expect(Number(s.width)).toBeGreaterThanOrEqual(44);
       expect(Number(s.height)).toBeGreaterThanOrEqual(44);

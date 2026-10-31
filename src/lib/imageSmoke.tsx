@@ -211,7 +211,7 @@ async function smokeSheets(log: Log, setHarness: (n: ReactNode) => void) {
   const id = doc.layers[0].id;
   setHarness(
     <View style={{ width: 380, height: 320 }}>
-      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenAdjust={() => {}} />
+      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenStyle={() => {}} />
     </View>
   );
   await sleep(1200);
@@ -369,6 +369,12 @@ function startFreezeWatch(log: Log) {
       console.log('[IMG-SMOKE] WATCH-DONE');
     }
   }, 250);
+}
+
+/** Ideiglenes projekt a tablet-elrendezés megnézéséhez (`kill2` törli). */
+export async function tabletProject(id: string): Promise<string> {
+  await saveProject(tempProject(id));
+  return id;
 }
 
 export async function firstImageProjectId(): Promise<string | null> {

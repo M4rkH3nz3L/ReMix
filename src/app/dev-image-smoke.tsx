@@ -53,7 +53,9 @@ function Smoke({ phase }: { phase: string }) {
       await m.runImageSmoke(phase, log, setHarness, PixelRatio.get(), SMOKE_KILL_ID);
       console.log(`${TAG} DONE phase=${phase}`);
       // a teszt nem maradhat a telefonon: az ál-lapok gombjai üresek, a user beragadna
-      if (phase !== 'ui') {
+      if (phase === 'tablet') {
+        router.replace(`/studio/image/${await m.tabletProject(SMOKE_KILL_ID)}`);
+      } else if (phase !== 'ui') {
         exitTimer.current = setTimeout(() => goBackOrHome(), AUTO_EXIT_MS);
       }
       if (phase === 'ui') {

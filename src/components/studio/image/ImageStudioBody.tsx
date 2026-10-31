@@ -49,6 +49,11 @@ import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
 import { toolVisible } from '@/lib/imageToolVisibility';
+import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
+import { useEditorPrefs } from '@/store/editorPrefsStore';
+import { EdgeTab } from '@/components/studio/image/body/PanelChrome';
+import { LayerPanel } from '@/components/studio/image/LayerPanel';
+import { StudioSheetFrameContext } from '@/components/studio/image/StudioSheet';
 import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
 import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
@@ -72,6 +77,9 @@ function deleteLocalFile(uri: string) {
     /* takarítás — best-effort */
   }
 }
+
+/** a rétegpanel a munkaterület oszlopa: nincs detent, a lap kitölti a helyét */
+const DOCKED_FRAME = { inline: true, docked: true, detents: { peek: 0, half: 0, full: 0 }, detent: 'peek' as const, onDetentChange: () => {} };
 
 /** ecset-színek + -méretek (px) a sávban */
 const BRUSH_COLORS = ['#ffffff', '#0b0b18', '#ff2d95', '#ffd166', '#39d98a', '#4d9dff'];
@@ -128,10 +136,20 @@ export function ImageStudioBody({
   const [sheetDetent, setSheetDetent] = useState<Detent>('peek');
   const detentMemory = useRef<Partial<Record<ImageSheetId, Detent>>>({});
   const [workH, setWorkH] = useState(0);
-  // 🖥️ iPad fekvő (expanded): az élő lapok jobb oldali dokkolt inspectorban
+  // 🧭 bal: szerszámsín, közép: vászon + eszköz-beállítások, jobb: rétegek. A sín mindig a
+  // sorban van; a rétegpanel telefonon a vászon fölé nyílik, tableten a sorba épül
   const L = useLayout();
-  const docked = L.isExpanded;
+  const workspace = workspaceLayout(L.sizeClass, L.width);
+  const imagePanels = useEditorPrefs((s) => s.imagePanels);
+  const panels = panelState(workspace.mode, imagePanels);
+  const setRailOpen = (rail: boolean) => useEditorPrefs.getState().setImagePanel(workspace.mode, { rail });
+  const setLayersOpen = (layers: boolean) => useEditorPrefs.getState().setImagePanel(workspace.mode, { layers });
   const setSheet = (next: SheetKind) => {
+    if (next === 'layers') {
+      setLayersOpen(true);
+      setSheetRaw(null);
+      return;
+    }
     if (next) {
       setSheetDetent(detentMemory.current[next] ?? IMAGE_SHEET_SPECS[next].initialDetent ?? 'peek');
     }
@@ -608,7 +626,7 @@ export function ImageStudioBody({
     }
     switch (key) {
       case 'layers':
-        setSheet('layers');
+        setLayersOpen(!panels.layers);
         break;
       case 'photo':
         add('photo');
@@ -1337,6 +1355,38 @@ export function ImageStudioBody({
     hasTransport: false,
   }).detents;
 
+  const rail = (
+    <ImageStudioToolbar
+      onTool={onTool}
+      toolDisabled={toolDisabled}
+      toolVisible={isToolVisible}
+      hasSelection={!!selectedLayer}
+      width={workspace.railWidth}
+      onCollapse={() => setRailOpen(false)}
+    />
+  );
+  const layerPanel = doc ? (
+    <StudioSheetFrameContext.Provider value={DOCKED_FRAME}>
+      <LayerPanel
+        doc={doc}
+        selectedId={effectiveSelectedId}
+        onSelect={setSelectedId}
+        onAdd={(kind) => (kind === 'shape' ? setSheet('shapePicker') : add(kind))}
+        onMergeDown={(id) => {
+          const pair = mergeDownTargets(doc, id);
+          if (pair) {
+            void mergeLayers(pair, t('studio.image.mergeDown'));
+          }
+        }}
+        onRasterize={(id) => void mergeLayers([id], t('studio.image.rasterize'))}
+        onFlatten={() => void mergeLayers(flattenTargets(doc), t('studio.image.flatten'))}
+        commit={commit}
+        onClose={() => setLayersOpen(false)}
+        onOpenStyle={() => setSheet('style')}
+      />
+    </StudioSheetFrameContext.Provider>
+  ) : null;
+
   return (
     <View style={styles.root}>
       {/* felső sáv */}
@@ -1480,10 +1530,12 @@ export function ImageStudioBody({
 
       {/* 📐 munkaterület: vászon + mód-sávok + inline lap — a mért magasság a detentek alapja */}
       <View
-        style={[styles.work, docked ? styles.workRow : null]}
+        style={[styles.work, styles.workRow]}
         onLayout={(e) => setWorkH(e.nativeEvent.layout.height)}
       >
+        {panels.rail && !precisionMode ? rail : null}
         <View style={styles.work}>
+          <View style={styles.work}>
           {/* vászon */}
           {doc ? (
             <ImageCanvas
@@ -1492,7 +1544,7 @@ export function ImageStudioBody({
               onSelect={setSelectedId}
               onRequestEdit={(id) => {
                 setSelectedId(id);
-                setSheet('layers');
+                setSheet('style');
               }}
               commit={commit}
               canvasRef={canvasRef}
@@ -1526,6 +1578,18 @@ export function ImageStudioBody({
               <ActivityIndicator color={palette.accent} />
             </View>
           )}
+
+          {/* telefonon a rétegpanel a vászon fölé nyílik; az összecsukott oldalt fül hozza vissza */}
+          {!precisionMode ? (
+            <>
+              {workspace.mode === 'overlay' && panels.layers ? (
+                <View style={[styles.overlayRight, { width: workspace.panelWidth }]}>{layerPanel}</View>
+              ) : null}
+              {!panels.rail ? <EdgeTab side="left" icon="construct-outline" label={t('studio.image.toolsShow')} onPress={() => setRailOpen(true)} /> : null}
+              {!panels.layers ? <EdgeTab side="right" icon="layers-outline" label={t('studio.image.layersShow')} onPress={() => setLayersOpen(true)} /> : null}
+            </>
+          ) : null}
+          </View>
 
           {/* kijelölés-jelző */}
           <View style={styles.statusRow}>
@@ -1742,7 +1806,7 @@ export function ImageStudioBody({
                 {t('studio.image.guides.hint')}
               </Text>
             </View>
-          ) : isInlineSheet(sheet) && !docked ? null : quickAdjust && doc && selectedLayer?.kind === 'photo' ? (
+          ) : quickAdjust && doc && selectedLayer?.kind === 'photo' && !isInlineSheet(sheet) ? (
             <ImageAdjustStrip
               doc={doc}
               layer={selectedLayer}
@@ -1753,19 +1817,7 @@ export function ImageStudioBody({
               }}
               onClose={() => setQuickAdjust(false)}
             />
-          ) : (
-            // nyitott inline lap alatt az eszköztár rejtve (a lap fejléce a kilépés)
-            <ImageStudioToolbar
-              onTool={onTool}
-              toolDisabled={toolDisabled}
-              toolVisible={isToolVisible}
-              hasSelection={!!selectedLayer}
-            />
-          )}
-        </View>
-        <View
-          style={docked && isInlineSheet(sheet) ? [styles.dock, { width: L.editor.inspectorWidth }] : null}
-        >
+          ) : null}
           <ImageStudioSheets
             sheet={sheet}
             doc={doc}
@@ -1777,15 +1829,6 @@ export function ImageStudioBody({
             commit={commit}
             setSheet={setSheet}
             setSelectedId={setSelectedId}
-            onAdd={(kind) => (kind === 'shape' ? setSheet('shapePicker') : add(kind))}
-            onMergeDown={(id) => {
-              const pair = doc ? mergeDownTargets(doc, id) : null;
-              if (pair) {
-                void mergeLayers(pair, t('studio.image.mergeDown'));
-              }
-            }}
-            onRasterize={(id) => void mergeLayers([id], t('studio.image.rasterize'))}
-            onFlatten={() => doc && void mergeLayers(flattenTargets(doc), t('studio.image.flatten'))}
             onAddShapeType={addShapeType}
             onInsertSource={insertSource}
             onDrawMask={startMaskDraw}
@@ -1800,9 +1843,11 @@ export function ImageStudioBody({
             detents={workH > 0 ? sheetDetents : undefined}
             detent={sheetDetent}
             onDetentChange={onSheetDetent}
-            docked={docked}
           />
         </View>
+        {workspace.mode === 'inline' && panels.layers && !precisionMode ? (
+          <View style={[styles.inlineRight, { width: workspace.panelWidth }]}>{layerPanel}</View>
+        ) : null}
       </View>
     </View>
   );
@@ -1812,7 +1857,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#05060a' },
   work: { flex: 1 },
   workRow: { flexDirection: 'row' },
-  dock: { alignSelf: 'stretch' },
+  overlayRight: { position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 6, backgroundColor: palette.surface },
+  inlineRight: { alignSelf: 'stretch', backgroundColor: palette.surface, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: palette.border },
   hidden: { display: 'none' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   // 🖼️📄 galéria lap-strip

@@ -40,9 +40,7 @@ interface Tool {
 }
 
 /**
- * 📱 Telefon-optimalizált, CSOPORTOSÍTOTT eszköztár (vízszintesen görgethető) —
- * a lapos 9-elemű sor helyett kategóriák (Hozzáadás / Rendezés / Stílus / Réteg),
- * így a teljes eszközkészlet kézre esik a kis kijelzőn is.
+ * Az eszközök kategóriái (Hozzáadás / Rendezés / Stílus / Réteg).
  */
 const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
   {
@@ -98,16 +96,16 @@ const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
 const SELECTED_ORDER = [2, 1, 3, 0] as const;
 
 /**
- * 📱 Eszköztár — a csoportosított, vízszintesen görgethető eszköz-sor. VISELKEDÉS-
- * MEGŐRZŐ kiemelés az `ImageStudioBody`-ból: azonos `TOOL_GROUPS`, render-sorrend
- * és UI; az eszköz-koppintás (`onTool`) és a letiltás-logika (`toolDisabled`) a
- * bodyból érkezik PROPBÓL.
+ * 🧰 Szerszámsín — a csoportosított eszközök függőleges, görgethető sora a munkaterület
+ * bal szélén, összecsukható. Az eszköz-koppintás és a láthatóság a bodyból jön propból.
  */
 export function ImageStudioToolbar({
   onTool,
   toolDisabled,
   toolVisible,
   hasSelection = false,
+  width,
+  onCollapse,
 }: {
   onTool: (key: ToolKey) => void;
   toolDisabled: (key: ToolKey) => boolean;
@@ -115,6 +113,8 @@ export function ImageStudioToolbar({
   toolVisible: (key: ToolKey) => boolean;
   /** van kijelölt réteg → a réteg-műveletek (Stílus, Rendezés, Réteg) kerülnek ELŐRE */
   hasSelection?: boolean;
+  width: number;
+  onCollapse: () => void;
 }) {
   const { t } = useTranslation();
   // 🧭 kontextusfüggő sorrend (MOBILE-UI §6.4, T1/12): kijelöléskor nem a Hozzáadás áll elöl,
@@ -124,89 +124,67 @@ export function ImageStudioToolbar({
     .map((group) => ({ ...group, tools: group.tools.filter((tool) => toolVisible(tool.key)) }))
     .filter((group) => group.tools.length > 0);
   return (
-    <ScrollView
-      key={hasSelection ? 'selected' : 'idle'}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.toolBar}
-      contentContainerStyle={styles.toolBarContent}
-    >
-      {groups.map((group, gi) => (
-        <View key={group.labelKey} style={styles.toolGroupRow}>
-          <View style={styles.toolGroup}>
-            <Text style={styles.groupLabel}>{t(group.labelKey)}</Text>
-            <View style={styles.groupTools}>
-              {group.tools.map((tool) => {
-                const disabled = toolDisabled(tool.key);
-                const danger = tool.key === 'delete';
-                const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
-                return (
-                  <Pressable
-                    key={tool.key}
-                    style={styles.tool}
-                    onPress={() => onTool(tool.key)}
-                    disabled={disabled}
-                    accessibilityRole="button"
-                    accessibilityLabel={t(tool.labelKey)}
-                  >
-                    <Ionicons name={tool.icon} size={22} color={color} />
-                    <Text
-                      style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}
-                      numberOfLines={1}
-                    >
-                      {t(tool.labelKey)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+    <View style={[styles.rail, { width }]}>
+      <Pressable style={styles.collapse} onPress={onCollapse} accessibilityRole="button" accessibilityLabel={t('studio.image.toolsHide')}>
+        <Ionicons name="chevron-back" size={18} color={palette.textDim} />
+      </Pressable>
+      <ScrollView key={hasSelection ? 'selected' : 'idle'} showsVerticalScrollIndicator={false} contentContainerStyle={styles.railContent}>
+        {groups.map((group, gi) => (
+          <View key={group.labelKey} style={styles.group}>
+            <Text style={styles.groupLabel} numberOfLines={1}>
+              {t(group.labelKey)}
+            </Text>
+            {group.tools.map((tool) => {
+              const disabled = toolDisabled(tool.key);
+              const danger = tool.key === 'delete';
+              const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
+              return (
+                <Pressable
+                  key={tool.key}
+                  style={styles.tool}
+                  onPress={() => onTool(tool.key)}
+                  disabled={disabled}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(tool.labelKey)}
+                >
+                  <Ionicons name={tool.icon} size={22} color={color} />
+                  <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]} numberOfLines={1}>
+                    {t(tool.labelKey)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {gi < groups.length - 1 ? <View style={styles.groupDivider} /> : null}
           </View>
-          {gi < groups.length - 1 ? <View style={styles.groupDivider} /> : null}
-        </View>
-      ))}
-    </ScrollView>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  toolBar: {
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
+  rail: {
+    alignSelf: 'stretch',
     backgroundColor: palette.surface,
-    flexGrow: 0,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: palette.border,
   },
-  toolBarContent: {
-    alignItems: 'flex-start',
-    paddingTop: 6,
-    paddingBottom: 6,
-    paddingHorizontal: 8,
-  },
-  toolGroupRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  toolGroup: {
-    paddingHorizontal: 6,
-  },
+  collapse: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  railContent: { paddingBottom: 12 },
+  group: { alignItems: 'stretch' },
   groupLabel: {
     color: palette.textDim,
     fontSize: 9,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginLeft: 6,
-    marginBottom: 2,
+    letterSpacing: 0.3,
+    textAlign: 'center',
     opacity: 0.7,
+    paddingHorizontal: 2,
+    marginTop: 4,
+    marginBottom: 2,
   },
-  groupTools: {
-    flexDirection: 'row',
-  },
-  groupDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: palette.border,
-    marginVertical: 4,
-    marginHorizontal: 2,
-  },
-  tool: { width: 60, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 2 },
-  toolLabel: { fontSize: 10, fontWeight: '600' },
+  groupDivider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginHorizontal: 10, marginTop: 6 },
+  tool: { minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 2 },
+  toolLabel: { fontSize: 9, fontWeight: '600' },
 });

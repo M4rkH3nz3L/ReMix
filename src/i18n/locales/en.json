@@ -3107,6 +3107,9 @@
       "layer": "Layer"
     },
     "image": {
+      "toolsShow": "Show tools",
+      "toolsHide": "Hide tools",
+      "layersShow": "Show layers",
       "filterType": {
         "blur": "Blur",
         "sharpen": "Sharpen",

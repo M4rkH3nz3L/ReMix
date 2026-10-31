@@ -3105,6 +3105,9 @@
       "layer": "Ebene"
     },
     "image": {
+      "toolsShow": "Werkzeuge einblenden",
+      "toolsHide": "Werkzeuge ausblenden",
+      "layersShow": "Ebenen einblenden",
       "pattern": {
         "kind": {
           "dots": "Punkte",

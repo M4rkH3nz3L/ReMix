@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { LayerInspector } from '@/components/studio/image/LayerInspector';
 import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
@@ -27,10 +26,9 @@ import type { ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
 const LAYER_ROW_STEP = 56;
 
 /**
- * 🎨 Réteg-panel (alsó lap) — a réteg-fa listája (sorrend/láthatóság/duplázás/
- * törlés) + a kijelölt réteg tulajdonság-szerkesztője (a megosztott
- * [LayerInspector](./LayerInspector.tsx): szín, betűméret, kitöltés, blend,
- * átlátszóság, kontúr/árnyék/glow). Minden módosítás a command-buson (undo).
+ * 🎨 Réteg-panel (a munkaterület jobb oldala) — a réteg-fa listája (sorrend, láthatóság,
+ * zárolás) és a kijelölt réteg műveletei. A réteg beállításai az alsó Stílus-lapon vannak.
+ * Minden módosítás a command-buson (undo).
  */
 export function LayerPanel({
   doc,
@@ -42,8 +40,7 @@ export function LayerPanel({
   onFlatten,
   commit,
   onClose,
-  onOpenAdjust,
-  onDrawMask,
+  onOpenStyle,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -54,10 +51,8 @@ export function LayerPanel({
   onFlatten: () => void;
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
-  onOpenAdjust: () => void;
-  /** 🎭 lasszó rajzolása a rétegre (a szülő aktiválja a lasszó-módot + bezárja a panelt);
-   *  target: 'clip' = vágó-maszk, 'local' = korrekció-maszk, 'heal' = folt-javítás régió */
-  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
+  /** a kijelölt réteg beállításai (alsó lap) */
+  onOpenStyle: () => void;
 }) {
   const { t } = useTranslation();
   const layer = doc.layers.find((l) => l.id === selectedId) ?? null;
@@ -118,18 +113,32 @@ export function LayerPanel({
         })()}
       </View>
 
-      {/* kijelölt réteg tulajdonságai — a megosztott inspector */}
+      {/* a kijelölt réteg műveletei; a beállításai alul nyílnak (Stílus) */}
       {layer ? (
         <View style={styles.inspector}>
-          <Text style={styles.inspectorTitle}>{layerLabel(layer)}</Text>
+          <Text style={styles.inspectorTitle} numberOfLines={1}>{layerLabel(layer)}</Text>
           <View style={styles.opsRow}>
+            <OpChip icon="options-outline" label={t('studio.imageTools.style')} onPress={onOpenStyle} />
+            <OpChip
+              icon="copy-outline"
+              label={t('studio.imageTools.duplicate')}
+              onPress={() => commit(duplicateLayer(doc, layer.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}
+            />
+            <OpChip
+              icon="trash-outline"
+              label={t('studio.imageTools.delete')}
+              disabled={!!layer.locked}
+              onPress={() => {
+                commit(removeLayer(doc, layer.id), t('studio.image.undoDelete'));
+                onSelect(null);
+              }}
+            />
             <OpChip icon="git-merge-outline" label={t('studio.image.mergeDown')} disabled={!mergeDownTargets(doc, layer.id)} onPress={() => onMergeDown(layer.id)} />
             {layer.kind === 'text' || layer.kind === 'shape' ? (
               <OpChip icon="image-outline" label={t('studio.image.rasterize')} disabled={!!layer.locked} onPress={() => onRasterize(layer.id)} />
             ) : null}
             <OpChip icon="albums-outline" label={t('studio.image.flatten')} disabled={doc.layers.length < 2} onPress={onFlatten} />
           </View>
-          <LayerInspector doc={doc} layer={layer} commit={commit} onOpenAdjust={onOpenAdjust} onDrawMask={onDrawMask} />
         </View>
       ) : (
         <Text style={styles.hint}>{t('studio.image.selectHint')}</Text>
@@ -270,25 +279,6 @@ function LayerRow({
         color={l.locked ? palette.accent : palette.textDim}
         label={t('studio.image.undoLock')}
         onPress={() => commit(toggleLayerLocked(doc, l.id), t('studio.image.undoLock'))}
-      />
-      <IconBtn
-        icon="copy-outline"
-        label={t('studio.image.undoDuplicate')}
-        onPress={() => commit(duplicateLayer(doc, l.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}
-      />
-      <IconBtn
-        icon="trash-outline"
-        color={l.locked ? palette.border : palette.accent2}
-        label={t('studio.image.undoDelete')}
-        onPress={() => {
-          if (l.locked) {
-            return;
-          }
-          commit(removeLayer(doc, l.id), t('studio.image.undoDelete'));
-          if (sel) {
-            onSelect(null);
-          }
-        }}
       />
     </Pressable>
   );

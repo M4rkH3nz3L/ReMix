@@ -3107,6 +3107,9 @@
       "layer": "Réteg"
     },
     "image": {
+      "toolsShow": "Szerszámok megnyitása",
+      "toolsHide": "Szerszámok elrejtése",
+      "layersShow": "Rétegek megnyitása",
       "filterType": {
         "blur": "Elmosás",
         "sharpen": "Élesítés",

@@ -11,14 +11,14 @@ export interface BrushHandle {
   hasStrokes: () => boolean;
 }
 
-interface Stroke {
+export interface Stroke {
   d: string;
   color: string;
   width: number;
 }
 
 /** A vonások offscreen raszterizálása a dokumentum felbontásán (null = nincs GPU-felület). */
-function renderStrokes(strokes: Stroke[], box: { w: number; h: number }, width: number, height: number) {
+export function renderStrokes(strokes: Stroke[], box: { w: number; h: number }, width: number, height: number) {
   const surface = Skia.Surface.MakeOffscreen(Math.round(width), Math.round(height));
   if (!surface) {
     return null;

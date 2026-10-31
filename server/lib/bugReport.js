@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { redactSecrets } = require('../security/redact');
 
 /**
  * 🐞 Hibajelentés-mag (tiszta, függőség nélkül → tesztelhető).
@@ -33,18 +34,19 @@ function sanitizeReport(body) {
   if (!body || typeof body !== 'object') {
     return null;
   }
-  const message = str(body.message, 2000).trim();
-  const stack = str(body.stack, 8000).trim();
+  // 🔐 L11: a stream-kulcsok / RTMP-útvonalak SOHA nem kerülnek a hibajelentésbe
+  const message = redactSecrets(str(body.message, 2000)).trim();
+  const stack = redactSecrets(str(body.stack, 8000)).trim();
   if (!message && !stack) {
     return null;
   }
   const breadcrumbs = Array.isArray(body.breadcrumbs)
-    ? body.breadcrumbs.slice(-30).map((b) => str(b, 200))
+    ? body.breadcrumbs.slice(-30).map((b) => redactSecrets(str(b, 200)))
     : [];
   const extra = {};
   if (body.extra && typeof body.extra === 'object' && !Array.isArray(body.extra)) {
     for (const [k, v] of Object.entries(body.extra).slice(0, 20)) {
-      extra[str(k, 60)] = typeof v === 'string' ? str(v, 500) : str(JSON.stringify(v), 500);
+      extra[str(k, 60)] = redactSecrets(typeof v === 'string' ? str(v, 500) : str(JSON.stringify(v), 500));
     }
   }
   const qid = typeof body.qid === 'string' && /^[0-9a-z]{4,40}$/.test(body.qid) ? body.qid : '';
@@ -57,7 +59,7 @@ function sanitizeReport(body) {
     name: str(body.name, 120).trim() || 'Error',
     message,
     stack,
-    componentStack: str(body.componentStack, 4000).trim(),
+    componentStack: redactSecrets(str(body.componentStack, 4000)).trim(),
     platform: PLATFORMS.has(body.platform) ? body.platform : 'unknown',
     osVersion: str(body.osVersion, 40),
     appVersion: str(body.appVersion, 40),

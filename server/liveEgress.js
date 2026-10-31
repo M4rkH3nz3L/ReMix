@@ -14,6 +14,8 @@ const {
   EncodingOptions,
   S3Upload,
 } = require('livekit-server-sdk');
+const { resolveSafe } = require('./security/rtmpUrl');
+const { redactSecrets } = require('./security/redact');
 const { createClient } = require('@supabase/supabase-js');
 const { decryptStreamKey } = require('./liveCrypto');
 const { trackUsage } = require('./usage');
@@ -154,7 +156,7 @@ async function recordEgress(sb, row) {
     status: 'active',
   });
   if (error) {
-    console.warn(`[liveEgress] tracking-insert nem sikerült (best-effort): ${error.message}`);
+    console.warn(`[liveEgress] tracking-insert nem sikerült (best-effort): ${redactSecrets(error.message)}`);
   }
 }
 
@@ -303,7 +305,16 @@ async function startEgress({ room, userId, record, aspect }) {
   if (error) {
     return { ok: false, status: 500, error: error.message };
   }
-  const dests = (data ?? []).filter((d) => d.rtmp_url && d.stream_key);
+  // 🔐 L7: csak érvényes, NEM belső hálózatra mutató rtmp(s) cél (DNS-sel is ellenőrizve);
+  // a hibás célt kihagyjuk (a többi megy), és a válaszban jelezzük
+  const candidates = (data ?? []).filter((d) => d.rtmp_url && d.stream_key);
+  const dests = [];
+  const skipped = [];
+  for (const d of candidates) {
+    const check = await resolveSafe(d.rtmp_url);
+    if (check.ok) dests.push(d);
+    else skipped.push({ id: d.id, label: d.label, error: check.error });
+  }
   // 📼 record-only: a VOD-fájl RTMP-cél NÉLKÜL is készülhet (ha a user rögzít +
   //    EGRESS_VOD+S3 áll). Így az egress csak-felvételre is elindul (nem csak
   //    multistreamre). A `record` a kliensből jön (a Live „Rögzítés" kapcsoló).
@@ -337,7 +348,7 @@ async function startEgress({ room, userId, record, aspect }) {
     try {
       urls = dests.map((d) => rtmpTarget(d.rtmp_url, decryptStreamKey(d.stream_key)));
     } catch (e) {
-      return { ok: false, status: 500, error: `Stream-kulcs dekódolási hiba: ${e.message}` };
+      return { ok: false, status: 500, error: `Stream-kulcs dekódolási hiba: ${redactSecrets(e.message)}` };
     }
     streamOutput = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
   }
@@ -365,8 +376,10 @@ async function startEgress({ room, userId, record, aspect }) {
     // 📐 a kimenet mérete a live aspect-arányához (különben fix landscape → „nem stimmel")
     const dims = egressDimensions(aspect);
     const encodingOptions = new EncodingOptions({ width: dims.width, height: dims.height, framerate: 30 });
+    // 🔐 L1: a sablon CSAK a host jelenetét/kameráját fogadja el → a host-id a sablon URL-jében
+    const hostLayoutUrl = layoutUrl ? `${layoutUrl}${layoutUrl.includes('?') ? '&' : '?'}host=${encodeURIComponent(userId)}` : '';
     const composite = layoutUrl
-      ? { layout: 'remix', customBaseUrl: layoutUrl, encodingOptions }
+      ? { layout: 'remix', customBaseUrl: hostLayoutUrl, encodingOptions }
       : { layout: 'grid', encodingOptions };
     const info = await client.startRoomCompositeEgress(room, output, composite);
     // 💰 F3: felvesszük a tracking-táblába (best-effort) a limit + max-hossz méréséhez
@@ -380,10 +393,11 @@ async function startEgress({ room, userId, record, aspect }) {
       ok: true,
       egressId: info.egressId,
       destinations: dests.map((d) => ({ id: d.id, platform: d.platform, label: d.label })),
+      skipped,
       vodUrl: fileOutput ? vodUrl(room) : null, // 📼 D158: a VOD publikus URL-je (csak ha készül felvétel)
     };
   } catch (e) {
-    return { ok: false, status: 502, error: `Egress-indítás hiba: ${e.message}` };
+    return { ok: false, status: 502, error: `Egress-indítás hiba: ${redactSecrets(e.message)}` };
   }
 }
 
@@ -402,7 +416,7 @@ async function stopEgress(egressId) {
     stopErr = e;
   }
   await markEgressStopped(getAdmin(), egressId, new Date().toISOString()).catch(() => {}); // best-effort tracking
-  return stopErr ? { ok: false, status: 502, error: `Egress-leállítás hiba: ${stopErr.message}` } : { ok: true };
+  return stopErr ? { ok: false, status: 502, error: `Egress-leállítás hiba: ${redactSecrets(stopErr.message)}` } : { ok: true };
 }
 
 /** Be van-e kötve az egress (a Studio ez alapján mutathatja a Pro-multistreamet). */

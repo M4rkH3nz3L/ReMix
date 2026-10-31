@@ -59,7 +59,12 @@
   </head>
   <body>
     <div id="stage"></div>
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
+    <!-- 🔐 L12: rögzített verzió + SRI (a CDN-en módosított fájl nem fut le) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"
+      integrity="sha384-MveBYLjjZe2VXnKzvBbPfyh5MEbiqNDeta9nzIGbtqnXmC+CwX/mLE5+M9PDIcPy"
+      crossorigin="anonymous"
+    ></script>
     <script>
       (function () {
         const LK = window.LivekitClient || window.LiveKitClient;
@@ -67,6 +72,10 @@
         const q = new URLSearchParams(window.location.search);
         const url = q.get('url');
         const token = q.get('token');
+        // 🔐 L1: a jelenetet és a kamerát CSAK a host küldheti — a többi résztvevő (néző,
+        // esetleg rosszindulatú kliens) adata és sávja figyelmen kívül marad
+        const hostId = q.get('host');
+        const fromHost = (p) => !hostId || (p && p.identity === hostId);
 
         // a legfrissebb jelenet (a host data-channel broadcastjából); default: üres
         let scene = { sceneId: '', layers: [] };
@@ -119,7 +128,8 @@
               box.textContent = l.text || '';
               box.style.fontSize = Math.max(14, l.t.h * 40) + 'vh';
             } else if (l.kind === 'image' || l.kind === 'logo') {
-              if (l.uri) {
+              // csak nyilvános https kép (belső címre a renderelő Chrome nem kérhet — SSRF)
+              if (l.uri && /^https:\/\//i.test(String(l.uri))) {
                 const img = document.createElement('img');
                 img.src = l.uri;
                 box.appendChild(img);
@@ -170,14 +180,17 @@
           }
           const room = new LK.Room({ adaptiveStream: false, dynacast: false });
 
-          room.on(LK.RoomEvent.TrackSubscribed, (track, pub) => {
+          room.on(LK.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+            if (!fromHost(participant)) {
+              return;
+            }
             if (track.kind === 'video') {
               attachTrack(track, pub.source);
             }
           });
           room.on(LK.RoomEvent.TrackUnsubscribed, () => render());
-          room.on(LK.RoomEvent.DataReceived, (payload, _p, _kind, topic) => {
-            if (topic && topic !== 'scene') {
+          room.on(LK.RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
+            if ((topic && topic !== 'scene') || !fromHost(participant)) {
               return;
             }
             try {

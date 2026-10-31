@@ -108,6 +108,21 @@
           el.style.transform = l.t.r ? 'rotate(' + l.t.r + 'deg)' : '';
         }
 
+        // 🎞️ L26: a változatlan jelenet NEM rajzolódik újra (a 3 mp-es heartbeat eddig minden
+        // kép/logó réteget törölt és újraépített → villogás a kimenetben)
+        let lastSceneKey = '';
+        let lastTrackKey = '';
+        function maybeRender() {
+          const sceneKey = JSON.stringify(scene);
+          const trackKey = Object.keys(videoEls).sort().join(',');
+          if (sceneKey === lastSceneKey && trackKey === lastTrackKey) {
+            return;
+          }
+          lastSceneKey = sceneKey;
+          lastTrackKey = trackKey;
+          render();
+        }
+
         /** A teljes jelenet újrarajzolása (video-trackeket újrahasznosítja). */
         function render() {
           // töröljük a nem-video rétegeket; a video-elemeket megtartjuk (reattach drága)
@@ -170,12 +185,27 @@
           const kind = source === LK.Track.Source.ScreenShare ? 'screen' : 'camera';
           const v = ensureVideoHolder(kind);
           track.attach(v);
-          render();
+          maybeRender();
+          // a felvétel CSAK akkor induljon, amikor a host képe tényleg megvan (nem fekete adás)
+          signalStart();
+        }
+
+        // 🔊 L22: a host hangsávjai is a lapra kerülnek — a RoomComposite a LAP hangját
+        // rögzíti; eddig csak videó csatolódott → az egyedi sablonnal az RTMP/VOD néma volt
+        const audioEls = [];
+        function attachAudio(track) {
+          const a = track.attach();
+          a.autoplay = true;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          audioEls.push(a);
         }
 
         async function main() {
           if (!LK || !url || !token) {
-            console.log('START_RECORDING'); // ne akadjon be a felvevő, ha hibás a konfig
+            // 🚫 L23: hibás konfig / a CDN-szkript nem töltődött (SRI-hiba is) → NEM jelzünk
+            // indulást: az egress időtúllépéssel HIBÁT ad (a host látja), nem fekete képet küld ki
+            console.log('REMIX_LAYOUT_ERROR: livekit-client vagy url/token hiányzik');
             return;
           }
           const room = new LK.Room({ adaptiveStream: false, dynacast: false });
@@ -186,9 +216,16 @@
             }
             if (track.kind === 'video') {
               attachTrack(track, pub.source);
+            } else if (track.kind === 'audio') {
+              attachAudio(track);
             }
           });
-          room.on(LK.RoomEvent.TrackUnsubscribed, () => render());
+          room.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
+            if (track && track.kind === 'audio') {
+              track.detach().forEach((el) => el.remove());
+            }
+            render();
+          });
           room.on(LK.RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
             if ((topic && topic !== 'scene') || !fromHost(participant)) {
               return;
@@ -198,7 +235,7 @@
               const next = JSON.parse(text);
               if (next && Array.isArray(next.layers)) {
                 scene = next;
-                render();
+                maybeRender();
               }
             } catch (_e) {
               /* rossz payload → ignoráljuk */
@@ -210,14 +247,15 @@
           });
 
           await room.connect(url, token, { autoSubscribe: true });
-          // induló render + jelzés a felvevőnek
           render();
-          signalStart();
+          // ha a host még nem publikál videót (pl. csak hang / képernyő később), 10 mp után
+          // akkor is indul a felvétel — de nem azonnal, fekete kockákkal
+          setTimeout(signalStart, 10000);
         }
 
-        main().catch(() => {
-          // hiba esetén is jelezzünk, hogy a felvevő ne függjön be örökre
-          console.log('START_RECORDING');
+        main().catch((e) => {
+          // kapcsolódási hiba → NEM jelzünk indulást (az egress hibát ad, nem fekete adást)
+          console.log('REMIX_LAYOUT_ERROR: ' + (e && e.message ? e.message : 'connect'));
         });
       })();
     </script>

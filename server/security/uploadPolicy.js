@@ -63,6 +63,10 @@ function mediaGuard(kind) {
     const r = validateUploads(files, kind);
     if (!r.ok) {
       cleanup(req.files);
+      // a kérés munkakönyvtára se maradjon a lemezen (I45)
+      if (req.workDir) {
+        fs.rm(req.workDir, { recursive: true, force: true }, () => {});
+      }
       res.status(r.status || 400).json({ error: r.error });
       return;
     }

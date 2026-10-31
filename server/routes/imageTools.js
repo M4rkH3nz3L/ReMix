@@ -11,9 +11,10 @@ const express = require('express');
 
 const { requireAuth, INSECURE_DEV, callerId } = require('../auth');
 const { proOnly } = require('../lib/guards');
+const { ownedMediaKey } = require('../security/ownedKey');
 const { rateLimit } = require('../security/rateLimit');
 const { mediaGuard } = require('../security/uploadPolicy');
-const { upload, uploadImage } = require('../lib/upload');
+const { upload, uploadImage, uploadSvg } = require('../lib/upload');
 const { shouldWatermark } = require('../entitlements');
 const { asTier } = require('../tiers');
 const { activeTier } = require('../billing');
@@ -37,7 +38,7 @@ const router = express.Router();
  * → PNG. A formákat/feliratokat ugyanaz a generátor rajzolja, mint az
  * idővonalon, így a kép és a videó megjelenése garantáltan egyezik.
  */
-router.post('/imagedoc', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
+router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), mediaGuard('imagedoc'), (req, res) => {
   let doc;
   let uriMap;
   try {
@@ -126,12 +127,10 @@ router.post('/psd/import', ...proOnly, uploadImage.any(), mediaGuard('psd'), asy
     const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
     const docId = crypto.randomUUID();
 
-    // a réteg-PNG-k feltöltője: projekt-rendezett kulcs (<projectId>/psd/<docId>/<layer>.png)
+    // a réteg-PNG-k feltöltője: projekt-rendezett kulcs (u/<uid>/<projectId>/psd/<docId>/<layer>.png)
     const uploadLayerPng = async (png, layerId) => {
       const safe = String(layerId).replace(/[^\w-]/g, '').slice(0, 40) || crypto.randomUUID();
-      const key = projectId
-        ? `${projectId}/psd/${docId}/${safe}.png`
-        : `psd/${docId}/${safe}.png`;
+      const key = ownedMediaKey(uid, projectId, `psd/${docId}/${safe}.png`);
       const tmp = path.join(req.workDir, `${safe}.png`);
       fs.writeFileSync(tmp, png);
       const url = await uploadMedia(key, tmp, 'image/png', publicBase);
@@ -225,9 +224,7 @@ router.post('/pdf/import', ...proOnly, uploadImage.any(), mediaGuard('pdf'), asy
         pdfSession = await openPdfForRaster(pdfBuf);
       }
       const png = await rasterPdfPage(pdfSession, pageIndex, size);
-      const key = projectId
-        ? `${projectId}/pdf/${importId}/page-${pageIndex + 1}.png`
-        : `pdf/${importId}/page-${pageIndex + 1}.png`;
+      const key = ownedMediaKey(uid, projectId, `pdf/${importId}/page-${pageIndex + 1}.png`);
       const tmp = path.join(req.workDir, `page-${pageIndex + 1}.png`);
       fs.writeFileSync(tmp, png);
       const url = await uploadMedia(key, tmp, 'image/png', publicBase);
@@ -391,9 +388,7 @@ router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (r
     const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
     const exportId = crypto.randomUUID();
     const safeName = (String(doc.name || 'image').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'image');
-    const key = projectId
-      ? `${projectId}/psd-export/${exportId}/${safeName}.psd`
-      : `psd-export/${exportId}/${safeName}.psd`;
+    const key = ownedMediaKey(uid, projectId, `psd-export/${exportId}/${safeName}.psd`);
     const tmp = path.join(workDir, `${safeName}.psd`);
     fs.writeFileSync(tmp, psdBuf);
     const url = await uploadMedia(key, tmp, 'image/vnd.adobe.photoshop', publicBase);
@@ -413,7 +408,7 @@ router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (r
 // 📄 SVG → nyomdakész vektor-PDF (a kliens imageDocToSvg kimenete → Chromium page.pdf).
 // Az SVG-t FÁJLKÉNT töltjük fel (a beágyazott fotóktól nagy lehet — a mező-méret-limit
 // nem gond), a vászon-méret (width/height px) mezőben jön.
-router.post('/svg/pdf', requireAuth, rateLimit('analysis'), upload.any(), (req, res) => {
+router.post('/svg/pdf', requireAuth, rateLimit('analysis'), uploadSvg.any(), (req, res) => {
   const svgFile = (req.files ?? []).find((f) => f.fieldname === 'svg');
   let svg = '';
   try {
@@ -435,7 +430,7 @@ router.post('/svg/pdf', requireAuth, rateLimit('analysis'), upload.any(), (req, 
     .then((file) => res.sendFile(file))
     .catch((err) => {
       console.warn('svg/pdf hiba:', err.message.slice(0, 300));
-      res.status(500).json({ error: err.message.slice(0, 300) });
+      res.status(err.status || 500).json({ error: err.message.slice(0, 300) });
     });
 });
 
@@ -577,7 +572,8 @@ router.post('/bgremove', ...proOnly, upload.any(), mediaGuard('image'), (req, re
     });
 });
 
-router.get('/bgremove/:id/:name', (req, res) => {
+// 🔐 I47: a kivágás/mélység-rétegek csak bejelentkezve tölthetők le (nem nyilvános „capability URL")
+router.get('/bgremove/:id/:name', requireAuth, (req, res) => {
   const { id, name } = req.params;
   if (!/^[a-f0-9]{32}$/.test(id) || !/^(cutout|alpha)\.png$/.test(name)) {
     res.status(400).json({ error: 'Hibás kérés.' });
@@ -685,7 +681,7 @@ router.post('/depth/focus', requireAuth, rateLimit('analysis'), upload.any(), me
     });
 });
 
-router.get('/depth/:id/:name', (req, res) => {
+router.get('/depth/:id/:name', requireAuth, (req, res) => {
   const { id, name } = req.params;
   if (!/^[a-f0-9]{32}$/.test(id) || !/^(bg|mid|fg|depth|focus-near|focus-far)\.png$/.test(name)) {
     res.status(400).json({ error: 'Hibás kérés.' });

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
  * 🏔️ 2.5D Photo-to-3D kliens (🧊 3D V1): a worker /depth/parallax végpontja a
@@ -95,7 +96,7 @@ export async function requestDepthFocus(uri: string): Promise<DepthFocusResult |
     }
     const target = new File(dir, `dfocus_${body.id}.png`);
     if (!target.exists) {
-      await File.downloadFileAsync(remote, target);
+      await File.downloadFileAsync(remote, target, { headers: await workerAuthHeaders() });
     }
     return { ...body, previewUri: target.uri };
   } catch {

@@ -73,6 +73,16 @@ const MEDIA_PROFILES = {
   psd: { exts: ['psd', 'psb'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 1 },
   // 📄 PDF-import (IMAGE 01.3): egyetlen PDF, oldalanként-egy-ImageDoc beolvasásra
   pdf: { exts: ['pdf'], kinds: ['document'], maxBytes: 40 * MB, maxCount: 1 },
+  // 🖼️ kép-dokumentum render: rétegenként egy kép + a .cube LUT-ok (szöveg → nincs magic-byte);
+  // réteg-kép nélküli doc is érvényes (csak szöveg/alakzat)
+  imagedoc: {
+    exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp', 'cube'],
+    textExts: ['cube'],
+    kinds: ['image'],
+    maxBytes: 40 * MB,
+    maxCount: 400,
+    allowEmpty: true,
+  },
   video: { exts: ['mp4', 'mov', 'm4v', 'webm', 'mkv'], kinds: ['video'], maxBytes: 500 * MB, maxCount: 1 },
   audio: { exts: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'], kinds: ['audio'], maxBytes: 100 * MB, maxCount: 8 },
   // vegyes média (pl. thumbnails/compose: kép + opcionális overlay)
@@ -120,6 +130,13 @@ function validateFile(file, header, profile) {
       error: `Túl nagy fájl (${Math.round(file.size / MB)}MB > ${Math.round(profile.maxBytes / MB)}MB).`,
     };
   }
+  // 3b) engedett SZÖVEGES formátum (.cube): nincs magic-byte, de bináris tartalom nem lehet
+  if (profile.textExts?.includes(ext)) {
+    if (header && header.includes(0)) {
+      return { ok: false, status: 415, error: `Bináris tartalom szövegfájlként: ${name}` };
+    }
+    return { ok: true, kind: 'text' };
+  }
   // 4) magic-byte: a TARTALOM média-kindje egyezzen a profillal (a kiterjesztésre
   //    és a kliens-MIME-re SOHA nem bízunk semmit)
   const kind = detectKind(header);
@@ -140,7 +157,7 @@ function validateUploads(files, kind) {
   const profile = profileFor(kind);
   const list = Array.isArray(files) ? files : [];
   if (list.length === 0) {
-    return { ok: false, status: 400, error: 'Nincs feltöltött fájl.' };
+    return profile.allowEmpty ? { ok: true } : { ok: false, status: 400, error: 'Nincs feltöltött fájl.' };
   }
   if (list.length > profile.maxCount) {
     return { ok: false, status: 413, error: `Túl sok fájl (${list.length} > ${profile.maxCount}).` };

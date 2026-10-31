@@ -36,6 +36,8 @@ function makeUpload(limitBytes) {
 const upload = makeUpload(2 * GB); // fallback (még-nem-profilozott route-ok)
 const uploadImage = makeUpload(40 * MB);
 const uploadVideo = makeUpload(500 * MB);
+// a beágyazott fotóktól nagy lehet egy SVG, de 2 GB-ot nem indokol
+const uploadSvg = makeUpload(200 * MB);
 const uploadAudio = makeUpload(100 * MB);
 
 // 🧹 B25: tmp-söprés — a kérésenkénti `vided-render-*` munkakönyvtárak, amiket egy
@@ -72,4 +74,4 @@ if (!process.env.JEST_WORKER_ID) {
   setInterval(() => sweepStaleWorkDirs(), 30 * 60 * 1000).unref();
 }
 
-module.exports = { upload, uploadImage, uploadVideo, uploadAudio, makeUpload, storage, sweepStaleWorkDirs };
+module.exports = { upload, uploadImage, uploadVideo, uploadAudio, uploadSvg, makeUpload, storage, sweepStaleWorkDirs };

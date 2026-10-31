@@ -46,7 +46,7 @@ export async function requestCutout(uri: string): Promise<CutoutResult | null> {
     }
     const target = new File(dir, `cutout_${body.id}.png`);
     if (!target.exists) {
-      await File.downloadFileAsync(remote, target);
+      await File.downloadFileAsync(remote, target, { headers: await workerAuthHeaders() });
     }
     return { id: body.id, cached: body.cached, uri: target.uri };
   } catch {

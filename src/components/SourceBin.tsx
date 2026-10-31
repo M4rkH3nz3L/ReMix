@@ -55,7 +55,8 @@ export function SourceBin({
   if (!project) {
     return null;
   }
-  const assets = project.assets;
+  // a LUT-fájl a projekt médiája (backup), de nem beszúrható forrás
+  const assets = project.assets.filter((a) => a.role !== 'lut');
   const kinds = supportedSourceKinds(projectKind(project));
   // 🗂️ típus-szűrő: „mind" + fajtánkénti darabszám; a kijelzett lista eszerint szűrve
   const counts = countSourceKinds(assets);

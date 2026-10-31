@@ -3107,6 +3107,17 @@
       "layer": "Réteg"
     },
     "image": {
+      "brushDiscard": {
+        "title": "Elveted a rajzot?",
+        "message": "A még nem véglegesített ecsetvonások elvesznek.",
+        "confirm": "Elvetés"
+      },
+      "unsaved": {
+        "title": "Nem sikerült menteni",
+        "message": "A legutóbbi módosítások még nincsenek elmentve. Ha most kilépsz, a következő megnyitáskor a helyreállítás felajánlja őket.",
+        "leave": "Kilépés",
+        "banner": "A mentés nem sikerült — újrapróbálom. A munkád helyreállítható."
+      },
       "layersTitle": "Rétegek",
       "correctionsTitle": "Korrekció",
       "adjustTitle": "Képjavítás",

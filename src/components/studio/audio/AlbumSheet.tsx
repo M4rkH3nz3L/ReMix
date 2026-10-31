@@ -179,7 +179,10 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
   /** A borító szerkesztése a Kép Stúdióban (ugyanaz a projekt — a cover ImageDoc lapja). */
   const editCover = () => {
     onClose();
-    router.push(`/studio/image/${project.id}`);
+    // I7: a BORÍTÓ lapját nyitjuk (nem a pages[0]-t); a kép-képernyő a store-ban lévő
+    // projektet veszi át — nem tölti újra, nem zárja be az alatta lévő Audio Stúdiót
+    const cover = album?.coverDocId;
+    router.push(cover ? `/studio/image/${project.id}?doc=${encodeURIComponent(cover)}` : `/studio/image/${project.id}`);
   };
 
   const coverDoc = album?.coverDocId ? project.imageDocs?.find((d) => d.id === album.coverDocId) : undefined;

@@ -237,6 +237,8 @@ export interface Asset {
   /** relinkhez (F2) */
   hash?: string;
   size?: number;
+  /** `lut`: kép-réteg .cube fájlja — menteni kell, de beszúrható képként nem listázzuk */
+  role?: 'lut';
   /**
    * 🗄️ a médiafájl szerveren tárolt másolatának publikus URL-je. A média-backup
    * (lib/mediaSync) tölti fel egyszer, és a felhő-projekt-másolat (cloud_projects)

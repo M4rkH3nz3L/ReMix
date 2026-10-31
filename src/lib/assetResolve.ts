@@ -1,3 +1,4 @@
+import { relinkImageDocs } from '@/lib/imageDocMedia';
 import type { Asset, Clip, Project } from '@/types/project';
 
 /**
@@ -82,6 +83,7 @@ export function relinkAsset(project: Project, assetId: string, newUri: string): 
   return {
     ...project,
     assets: project.assets.map((a) => (a.id === assetId ? { ...a, uri: newUri } : a)),
+    imageDocs: relinkImageDocs(project.imageDocs, oldUri, newUri),
     tracks: project.tracks.map((track) => ({
       ...track,
       clips: track.clips.map((clip) => {

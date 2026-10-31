@@ -1,6 +1,7 @@
 import { t as tr } from 'i18next';
 
 import { relinkAsset } from '@/lib/assetResolve';
+import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
@@ -331,7 +332,8 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       const next = index >= 0
         ? docs.map((d) => (d.id === cmd.doc.id ? cmd.doc : d))
         : [...docs, cmd.doc];
-      return { ...project, imageDocs: next };
+      // 🗄️ I2: a rétegek fájljai assetként regisztrálódnak (backup / relink / hiányzó-jelzés)
+      return withImageDocAssets({ ...project, imageDocs: next }, cmd.doc);
     }
 
     case 'REMOVE_IMAGE_DOC': {
@@ -490,6 +492,7 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       }
       const touches =
         project.assets.some((a) => a.uri === cmd.oldUri) ||
+        imageDocsReference(project, cmd.oldUri) ||
         project.tracks.some((t) =>
           t.clips.some(
             (c) =>

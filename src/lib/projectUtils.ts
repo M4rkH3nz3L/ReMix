@@ -1,3 +1,4 @@
+import { relinkImageDocs } from '@/lib/imageDocMedia';
 import { t as tr } from 'i18next';
 
 import { MIN_CLIP_DURATION } from '@/constants/editor';
@@ -631,6 +632,7 @@ export function relinkUri(project: Project, oldUri: string, newUri: string): Pro
     assets: project.assets.map((asset) =>
       asset.uri === oldUri ? { ...asset, uri: newUri } : asset
     ),
+    imageDocs: relinkImageDocs(project.imageDocs, oldUri, newUri),
   };
 }
 

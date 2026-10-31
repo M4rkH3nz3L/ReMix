@@ -3107,6 +3107,17 @@
       "layer": "Layer"
     },
     "image": {
+      "brushDiscard": {
+        "title": "Discard drawing?",
+        "message": "Your unfinished brush strokes will be lost.",
+        "confirm": "Discard"
+      },
+      "unsaved": {
+        "title": "Couldn't save",
+        "message": "Your latest changes aren't saved yet. If you leave now, recovery will offer them next time you open the project.",
+        "leave": "Leave",
+        "banner": "Saving failed — retrying. Your work can be recovered."
+      },
       "layersTitle": "Layers",
       "correctionsTitle": "Corrections",
       "adjustTitle": "Adjust",

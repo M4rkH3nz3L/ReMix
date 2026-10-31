@@ -8,7 +8,8 @@ import { resolveClipUri } from '@/lib/assetResolve';
 import type { EditorCommand } from '@/lib/commands';
 import { fingerprintFile, withFingerprints } from '@/lib/fingerprint';
 import { makeId } from '@/lib/id';
-import { pickAudio, pickImage, pickVideo } from '@/lib/media';
+import { projectImageMediaRefs } from '@/lib/imageDocMedia';
+import { pickAudio, pickCubeLut, pickImage, pickVideo } from '@/lib/media';
 import { migrateProject, relinkUri } from '@/lib/projectUtils';
 import type { Clip, Project } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
@@ -131,6 +132,10 @@ export function findMissingMedia(project: Project): MissingMedia[] {
     if (asset.kind === 'model' || asset.id === project.coverAssetId) {
       check(asset.uri, asset.kind === 'model' ? 'model' : 'image', asset.name ?? asset.uri.split('/').pop() ?? asset.uri);
     }
+  }
+  // 🖼️ a kép-dokumentumok rétegfájljai (fotó, ecset-PNG, LUT) is a projekt médiái
+  for (const ref of projectImageMediaRefs(project)) {
+    check(ref.uri, 'image', ref.name);
   }
   return [...seen.values()];
 }
@@ -321,8 +326,14 @@ export async function pickRelinkPairs(missing: MissingMedia[]): Promise<RelinkPa
       continue;
     }
     try {
-      const picked =
-        item.kind === 'video'
+      // 🎞️ a kép-réteg LUT-ja .cube fájl — képválasztóval nem csatolható újra
+      const isLut = /\.cube$/i.test(item.uri);
+      const lut = isLut ? await pickCubeLut() : null;
+      const picked = isLut
+        ? lut && lut !== 'invalid'
+          ? lut
+          : null
+        : item.kind === 'video'
           ? await pickVideo()
           : item.kind === 'image'
             ? await pickImage()

@@ -177,7 +177,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
     };
     // 🔗 összevonás: ugyanannak a folytonos szerkesztésnek a következő lépése (csúszka-húzás,
     // gyors léptetés) NEM új history-lépés — a húzás előtti állapot marad a visszaállítási pont
-    const key = actor === 'user' ? coalesceKey(command) : null;
+    const key = actor === 'user' ? coalesceKey(command, project) : null;
     const now = Date.now();
     if (past.length > 0 && shouldCoalesce(lastCommit, key, now)) {
       lastCommit = { key, at: now };

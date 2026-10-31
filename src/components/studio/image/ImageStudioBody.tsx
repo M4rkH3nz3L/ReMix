@@ -84,12 +84,15 @@ export function ImageStudioBody({
   mode,
   title,
   docId,
+  initialPageId,
   onExit,
   onSave,
 }: {
   mode: 'project' | 'scoped';
   title: string;
   docId?: string;
+  /** project mód: az induló lap (pl. album-borító) — érvénytelen id → első lap */
+  initialPageId?: string;
   onExit: () => void;
   onSave?: (doc: ImageDoc, renderedUri: string | null) => Promise<void>;
 }) {
@@ -98,7 +101,7 @@ export function ImageStudioBody({
   // 🔒 reaktív Pro-állapot a PSD-import gombhoz (free → letiltva + upsell)
   const isPro = useEntitlement((s) => s.isPro());
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [activePageId, setActivePageId] = useState<string | null>(initialPageId ?? null);
   const [sheet, setSheetRaw] = useState<SheetKind>(null);
   // 📐 MOBILE-UI §6.6: az inline lap detentje + a felhasználó utolsó választása laponként
   const [sheetDetent, setSheetDetent] = useState<Detent>('peek');
@@ -214,6 +217,16 @@ export function ImageStudioBody({
 
   const commit = (next: ImageDoc, label?: string) =>
     useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: next, label });
+
+  // 💾 I4: a kész renderelt kép a store FRISS doc-jára kerül — a render alatt tett
+  // szerkesztések nem állnak vissza az `await` előtt elkapott állapotra
+  const commitRendered = (docIdToUpdate: string, renderedUri: string) => {
+    const s = useEditorStore.getState();
+    const fresh = s.project?.imageDocs?.find((d) => d.id === docIdToUpdate);
+    if (fresh) {
+      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...fresh, renderedUri }, label: 'render' });
+    }
+  };
 
   // a kijelölés levezetve — ha a réteg eltűnik (törlés/undo), null-ra esik
   const selectedLayer = doc?.layers.find((l) => l.id === selectedId) ?? null;
@@ -364,6 +377,7 @@ export function ImageStudioBody({
       kind: 'photo',
       id: makeId('lyr'),
       uri: asset.uri,
+      assetId: asset.id,
       position: { x: 0.5, y: 0.5 },
       w: 0.7,
       h: 0.5,
@@ -812,6 +826,18 @@ export function ImageStudioBody({
     setBrushActive(false);
   };
 
+  // 🚪 I8: a kész vonások nem vesznek el kérdés nélkül a ✕-re
+  const cancelBrush = () => {
+    if (!brushRef.current?.hasStrokes()) {
+      setBrushActive(false);
+      return;
+    }
+    Alert.alert(t('studio.image.brushDiscard.title'), t('studio.image.brushDiscard.message'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('studio.image.brushDiscard.confirm'), style: 'destructive', onPress: () => setBrushActive(false) },
+    ]);
+  };
+
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
   // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)
   const startMaskDraw = (layerId: string, target: 'clip' | 'local' | 'heal' = 'clip') => {
@@ -924,7 +950,7 @@ export function ImageStudioBody({
         Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
         return;
       }
-      commit({ ...doc, renderedUri: uri }, 'render');
+      commitRendered(doc.id, uri);
       const canShare = await Sharing.isAvailableAsync().catch(() => false);
       if (canShare) {
         await Sharing.shareAsync(uri).catch(() => {});
@@ -1116,7 +1142,7 @@ export function ImageStudioBody({
         if (!p.renderedUri) {
           const uri = await rasterize(p);
           if (uri) {
-            s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...p, renderedUri: uri } });
+            commitRendered(p.id, uri);
           }
         }
       }
@@ -1508,7 +1534,7 @@ export function ImageStudioBody({
           ) : brushActive ? (
             /* 🖌️ ecset-sáv (szín + méret + Kész) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setBrushActive(false)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable onPress={cancelBrush} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <View style={styles.brushRow}>

@@ -3105,6 +3105,17 @@
       "layer": "Ebene"
     },
     "image": {
+      "brushDiscard": {
+        "title": "Zeichnung verwerfen?",
+        "message": "Deine noch nicht übernommenen Pinselstriche gehen verloren.",
+        "confirm": "Verwerfen"
+      },
+      "unsaved": {
+        "title": "Speichern fehlgeschlagen",
+        "message": "Deine letzten Änderungen sind noch nicht gespeichert. Wenn du jetzt gehst, bietet die Wiederherstellung sie beim nächsten Öffnen an.",
+        "leave": "Verlassen",
+        "banner": "Speichern fehlgeschlagen — neuer Versuch läuft. Deine Arbeit ist wiederherstellbar."
+      },
       "layersTitle": "Ebenen",
       "correctionsTitle": "Korrekturen",
       "adjustTitle": "Anpassen",

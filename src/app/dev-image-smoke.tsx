@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { PixelRatio, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { goBackOrHome } from '@/lib/nav';
 
 /**
  * 🧪 KÉP-STÚDIÓ ESZKÖZ-FÜSTTESZT — csak dev-buildben, deep linkkel:
@@ -10,6 +12,8 @@ import { PixelRatio, ScrollView, StyleSheet, Text, View } from 'react-native';
  */
 const TAG = '[IMG-SMOKE]';
 const SMOKE_KILL_ID = 'smoke_image_kill';
+/** ennyi idő után a tesztképernyő magától bezárul (képernyőképhez elég) */
+const AUTO_EXIT_MS = 10000;
 
 export default function ImageSmokeScreen() {
   const { phase = 'all' } = useLocalSearchParams<{ phase?: string }>();
@@ -23,6 +27,12 @@ function Smoke({ phase }: { phase: string }) {
   const [lines, setLines] = useState<string[]>([]);
   const [harness, setHarness] = useState<React.ReactNode>(null);
   const started = useRef<string | null>(null);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (exitTimer.current) {
+      clearTimeout(exitTimer.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (started.current === phase) {
@@ -42,6 +52,10 @@ function Smoke({ phase }: { phase: string }) {
       const m = await import('@/lib/imageSmoke');
       await m.runImageSmoke(phase, log, setHarness, PixelRatio.get(), SMOKE_KILL_ID);
       console.log(`${TAG} DONE phase=${phase}`);
+      // a teszt nem maradhat a telefonon: az ál-lapok gombjai üresek, a user beragadna
+      if (phase !== 'ui') {
+        exitTimer.current = setTimeout(() => goBackOrHome(), AUTO_EXIT_MS);
+      }
       if (phase === 'ui') {
         const id = await m.firstImageProjectId();
         if (id) {
@@ -53,6 +67,9 @@ function Smoke({ phase }: { phase: string }) {
 
   return (
     <View style={styles.root}>
+      <Pressable style={styles.exit} onPress={() => goBackOrHome()} accessibilityRole="button">
+        <Text style={styles.exitText}>✕ Teszt bezárása</Text>
+      </Pressable>
       <View style={styles.harness}>{harness}</View>
       <ScrollView style={styles.log}>
         {lines.map((l, i) => (
@@ -67,6 +84,8 @@ function Smoke({ phase }: { phase: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#20242e', paddingTop: 60 },
+  exit: { alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, backgroundColor: '#ff4d6d', zIndex: 10 },
+  exitText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   harness: { height: 320, alignItems: 'center', justifyContent: 'center' },
   log: { flex: 1, padding: 12 },
   line: { color: '#b7f7c4', fontSize: 12, marginBottom: 4 },

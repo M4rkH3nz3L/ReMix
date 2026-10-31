@@ -352,6 +352,25 @@ async function inspectProjects(log: Log) {
   }
 }
 
+/** A JS-szál mérése 20 mp-ig: 250 ms-os ketyegés, a késés a fagyást mutatja. Túléli a navigációt. */
+function startFreezeWatch(log: Log) {
+  let last = Date.now();
+  let worst = 0;
+  let ticks = 0;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    worst = Math.max(worst, now - last - 250);
+    last = now;
+    ticks += 1;
+    if (ticks === 80) {
+      clearInterval(timer);
+      const s = useEditorStore.getState();
+      log(worst < 500, 'JS-szál a valódi stúdióban (20 mp)', `legnagyobb akadás ${worst} ms, dirty=${s.dirty}, past=${s.past.length}`);
+      console.log('[IMG-SMOKE] WATCH-DONE');
+    }
+  }, 250);
+}
+
 export async function firstImageProjectId(): Promise<string | null> {
   const all = await listProjects();
   return all.find((p) => p.kind === 'image')?.id ?? null;
@@ -380,6 +399,7 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'ui') {
+    startFreezeWatch(log);
     return;
   }
   if (phase === 'inspect') {

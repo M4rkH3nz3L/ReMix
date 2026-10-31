@@ -154,6 +154,17 @@ export function snapPointToGuides(
  * Középre-igazító segédvonalak egy dobozhoz (a doksi közepe + harmadok) — gyors
  * „add guides" a kompozícióhoz. A meglévőkhöz fűzi (duplikátum-tűrő nem).
  */
+/** Új vonalak hozzáadása a meglévőkhöz: a kézi guide-ok maradnak, azonos pozíció nem duplázódik. */
+export function mergeGuides(existing: Guide[] | undefined, added: Guide[]): Guide[] {
+  const out = [...(existing ?? [])];
+  for (const g of added) {
+    if (!out.some((e) => e.axis === g.axis && Math.abs(e.pos - g.pos) < 1e-3)) {
+      out.push(g);
+    }
+  }
+  return out;
+}
+
 export function compositionGuides(thirds = true): Guide[] {
   const xs = thirds ? [1 / 3, 0.5, 2 / 3] : [0.5];
   const ys = thirds ? [1 / 3, 0.5, 2 / 3] : [0.5];

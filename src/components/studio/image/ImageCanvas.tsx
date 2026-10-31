@@ -28,8 +28,10 @@ import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDo
 import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
-import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath } from '@/lib/vectorPath';
-import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
+import { effectiveCanvas } from '@/lib/canvasPresets';
+import { renormalizePathLayer } from '@/lib/imageLayerGeometry';
+import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
+import type { ImageDoc, ImageLayer, PathPoint, ShapeLayer } from '@/types/project';
 
 // lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
 const BrushOverlay = lazy(() =>
@@ -259,26 +261,28 @@ export function ImageCanvas({
     if (!pathEditShape?.points) return;
     setLive({ id: pathEditShape.id, patch: { points: moveAnchor(pathEditShape.points, index, x, y) } });
   };
+  // I28: a dobozon kívülre húzott pont után a réteg doboza a formához igazodik
+  const commitPath = (points: PathPoint[], label: string) => {
+    if (!pathEditShape) return;
+    const next = renormalizePathLayer({ ...pathEditShape, points }, effectiveCanvas(doc));
+    const { points: pts, position, w, h } = next;
+    commit(updateLayer(doc, pathEditShape.id, { points: pts, position, w, h }), label);
+  };
   const onNodeCommit = (index: number, x: number, y: number) => {
     if (!pathEditShape?.points) return;
     setLive(null);
-    commit(
-      updateLayer(doc, pathEditShape.id, { points: moveAnchor(pathEditShape.points, index, x, y) }),
-      'node'
-    );
+    commitPath(moveAnchor(pathEditShape.points, index, x, y), 'node');
   };
-  // ✏️ v3: bezier-fogó húzása (tükrözött/szimmetrikus a szemközti fogóval)
+  // ✏️ v3: bezier-fogó húzása — I27: a node SAJÁT típusa szerint (a smooth/broken megmarad)
   const onHandleLive = (index: number, handle: HandleId, x: number, y: number) => {
     if (!pathEditShape?.points) return;
-    setLive({ id: pathEditShape.id, patch: { points: dragHandle(pathEditShape.points, index, handle, x, y, 'mirrored') } });
+    const mode = nodeType(pathEditShape.points[index]);
+    setLive({ id: pathEditShape.id, patch: { points: dragHandle(pathEditShape.points, index, handle, x, y, mode) } });
   };
   const onHandleCommit = (index: number, handle: HandleId, x: number, y: number) => {
     if (!pathEditShape?.points) return;
     setLive(null);
-    commit(
-      updateLayer(doc, pathEditShape.id, { points: dragHandle(pathEditShape.points, index, handle, x, y, 'mirrored') }),
-      'handle'
-    );
+    commitPath(dragHandle(pathEditShape.points, index, handle, x, y, nodeType(pathEditShape.points[index])), 'handle');
   };
   // ✏️ v4: koppintás a path-ÉLRE → új node (csak ha elég közel a vonalhoz)
   const onInsertNode = (x: number, y: number) => {

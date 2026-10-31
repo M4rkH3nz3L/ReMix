@@ -906,7 +906,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           `/></svg>`;
       }
       const border =
-        borderWidth > 0 && !clipPath && !useSvgPoly
+        borderWidth > 0 && !clipPath && !useSvgPoly && !pathSvg
           ? `border:${borderWidth}px ${clip.strokeDash && clip.strokeDash > 0 ? 'dashed' : 'solid'} ${clip.borderColor ?? '#ffffff'};`
           : '';
       // az árnyék a sziluettet követi (drop-shadow), és túlnyúlik a formán —
@@ -978,10 +978,14 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       // a wrapper paddingjének MINDEN effektet el kell bírnia, különben a
       // screenshot levágná a szélüket (szimmetrikus, hogy a középre igazítás
       // ne csússzon el)
+      // a path/sokszög kontúrja a vonal KÖZEPÉN ül: a fele a dobozon kívül esik
+      const svgStroke = pathSvg || clip.shape === 'arrow' || clip.shape === 'star'
+        ? Math.ceil(Math.max(clip.borderWidth ? borderWidth : 0, clip.shape === 'path' ? ((clip.strokeWidth ?? 0.9) / 100) * canvas.h : 0) / 2) + 1
+        : 0;
       const shadowPad =
         filters.length > 0 || clip.shadow || glowPx > 0
-          ? Math.max(8, shadowSpread, glowPx * 2, outlinePx * 2)
-          : 0;
+          ? Math.max(8, shadowSpread, glowPx * 2, outlinePx * 2, svgStroke)
+          : svgStroke;
       const shadowCss = filters.length > 0 ? `filter:${filters.join(' ')};` : '';
       const usesWrap = shadowPad > 0;
       // 🧩 minta-kitöltés — FELÜLÍRJA a sima fill-t. A formát inline SVG-vel

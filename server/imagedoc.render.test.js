@@ -184,3 +184,54 @@ describe('I14 — távoli (PSD/PDF) rétegképek', () => {
     expect(gone).toEqual(['r']);
   });
 });
+
+describe('alakzat-kompozit (SVG-összevetésből kiderült hibák)', () => {
+  const rect = (extra = {}) => ({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fill: '#ff0000', ...extra });
+  it('az 50%-os alakzat 50%, nem 25%', async () => {
+    const out = decode(await renderImageDoc(doc([rect({ opacity: 0.5 })]), 200, dir));
+    expect(Math.abs(out.at(100, 100)[3] - 128)).toBeLessThan(4);
+  });
+  it('a csoport-opacitás egyszer szorzódik', async () => {
+    const out = decode(await renderImageDoc(doc([rect({ opacity: 0.5, groupId: 'g' })], { groups: [{ id: 'g', opacity: 0.5 }] }), 200, dir));
+    expect(Math.abs(out.at(100, 100)[3] - 64)).toBeLessThan(4);
+  });
+  it('a zárt path kontúrjának külső fele is megvan', async () => {
+    const path_ = rect({ shape: 'path', closed: true, points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], borderColor: '#0000ff', borderWidth: 5 });
+    const out = decode(await renderImageDoc(doc([path_]), 200, dir));
+    expect(near(out.at(37, 100), [0, 0, 255])).toBe(true);
+    expect(out.at(37, 100)[3]).toBeGreaterThan(200);
+  });
+});
+
+describe('I29 — PSD: a rétegek valódi tartalommal', () => {
+  const { buildPsdFromImageDoc } = require('./psdExport');
+  const agPsd = require('ag-psd');
+  const rasterize = (d) => async (layer) => {
+    const sub = fs.mkdtempSync(path.join(dir, 'l-'));
+    const one = { ...layer, opacity: 1, blendMode: undefined, hidden: false, groupId: undefined };
+    return fs.readFileSync(await renderImageDoc({ ...d, layers: [one], groups: [] }, d.height, sub));
+  };
+  it('a szöveg, a JPEG-fotó és a forgatott alakzat is bekerül, a helyén', async () => {
+    const jpg = path.join(dir, 'p.jpg');
+    execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=blue:s=64x64', '-frames:v', '1', '-y', jpg]);
+    const d = doc([
+      photo(jpg, { id: 'ph', name: 'Fotó', w: 0.5, h: 0.5, position: { x: 0.25, y: 0.25 }, opacity: 0.8 }),
+      { kind: 'text', id: 't', name: 'Felirat', text: 'Hello', color: '#ff0000', fontSize: 20, position: { x: 0.5, y: 0.75 } },
+      { kind: 'shape', id: 's', name: 'Doboz', shape: 'rectangle', position: { x: 0.75, y: 0.25 }, w: 0.3, h: 0.3, fill: '#00ff00', rotation: 45 },
+    ]);
+    const buf = await buildPsdFromImageDoc(d, { fetchLayerPng: async () => null, rasterizeLayerPng: rasterize(d) });
+    const psd = agPsd.readPsd(buf, { useImageData: true });
+    const byName = Object.fromEntries(psd.children.map((l) => [l.name, l]));
+    expect(Object.keys(byName).sort()).toEqual(['Doboz', 'Felirat', 'Fotó']);
+    const px = (l, x, y) => [...l.imageData.data.subarray((y * l.imageData.width + x) * 4, (y * l.imageData.width + x) * 4 + 4)];
+    expect(px(byName['Fotó'], 50, 50)[2]).toBeGreaterThan(200); // a JPEG pixelei, a helyén
+    expect(px(byName['Fotó'], 150, 150)[3]).toBe(0);
+    expect(byName['Fotó'].opacity).toBeCloseTo(0.8, 1); // az opacity réteg-szintű, nincs beégetve
+    expect(px(byName['Doboz'], 150, 50)[1]).toBeGreaterThan(200);
+    expect(px(byName['Doboz'], 150 - 28, 50 - 28)[3]).toBe(0); // 45°: a sarok üres, tehát a forgatás beégett
+    const text = byName['Felirat'].imageData;
+    let inked = 0;
+    for (let i = 3; i < text.data.length; i += 4) if (text.data[i] > 128) inked += 1;
+    expect(inked).toBeGreaterThan(200);
+  });
+});

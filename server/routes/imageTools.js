@@ -33,6 +33,36 @@ const { listStickers3d, renderSticker3d } = require('../sticker3d');
 
 const router = express.Router();
 
+/** a rétegek uri-jait a feltöltött fájlokra írja (ugyanaz a minta, mint a /render-nél); a
+ *  nem feltöltött hivatkozás marad, a rasterizáló jelzi hiányzóként */
+function bindUploadedMedia(doc, files, uriMap) {
+  const fieldToFile = new Map((files ?? []).map((f) => [f.fieldname, f.path]));
+  for (const layer of doc.layers ?? []) {
+    for (const key of ['uri', 'imageUri', 'lut']) {
+      const field = layer[key] ? uriMap[layer[key]] : null;
+      const file = field ? fieldToFile.get(field) : null;
+      if (file) {
+        layer[key] = file;
+      }
+    }
+  }
+}
+
+/** távoli média feloldása: a saját (lokális) média-tár a lemezről jön, a fetch belső címnek tiltaná */
+function remoteMediaOpts(req) {
+  return {
+    fetchUrl: (u) => safeFetch(u, { redirect: 'follow' }),
+    localPath: (url) => {
+      const m = /^\/m\/(.+)$/.exec(new URL(url).pathname);
+      if (!LOCAL_DIR || !m || new URL(url).host !== req.get('host')) {
+        return null;
+      }
+      const file = path.resolve(LOCAL_DIR, decodeURIComponent(m[1]));
+      return file.startsWith(path.resolve(LOCAL_DIR) + path.sep) && fs.existsSync(file) ? file : null;
+    },
+  };
+}
+
 /**
  * 🎨 Kép-dokumentum rasterizálása: réteg-fa (JSON) + a hivatkozott médiafájlok
  * → PNG. A formákat/feliratokat ugyanaz a generátor rajzolja, mint az
@@ -54,18 +84,7 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
     res.status(413).json({ error: guardError });
     return;
   }
-  // a rétegek uri-jait a feltöltött fájlokra írjuk át (ugyanaz a minta, mint a
-  // /render-nél); a nem feltöltött hivatkozás marad, a rasterizáló kihagyja
-  const fieldToFile = new Map((req.files ?? []).map((f) => [f.fieldname, f.path]));
-  for (const layer of doc.layers ?? []) {
-    for (const key of ['uri', 'imageUri', 'lut']) {
-      const field = layer[key] ? uriMap[layer[key]] : null;
-      const file = field ? fieldToFile.get(field) : null;
-      if (file) {
-        layer[key] = file;
-      }
-    }
-  }
+  bindUploadedMedia(doc, req.files, uriMap);
   const height = Math.max(240, Math.min(4096, Number(req.body.height) || 1280));
   const format = req.body.format; // png (alap) | jpg | webp
   const quality = req.body.quality != null ? Number(req.body.quality) : undefined;
@@ -81,18 +100,9 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
   // prod-ban a user előfizetéséből (activeTier), dev-ben a kért tier-ből.
   const tierPromise = INSECURE_DEV ? Promise.resolve(asTier(req.body.tier)) : activeTier(req.user?.id);
   const missing = [];
-  // a saját (lokális) média-tár URL-je a lemezről jön — a fetch ezt belső címként tiltaná
-  const localPath = (url) => {
-    const m = /^\/m\/(.+)$/.exec(new URL(url).pathname);
-    if (!LOCAL_DIR || !m || new URL(url).host !== req.get('host')) {
-      return null;
-    }
-    const file = path.resolve(LOCAL_DIR, decodeURIComponent(m[1]));
-    return file.startsWith(path.resolve(LOCAL_DIR) + path.sep) && fs.existsSync(file) ? file : null;
-  };
   tierPromise
     .then(async (tier) => {
-      await resolveRemoteMedia(doc, req.workDir, { fetchUrl: (u) => safeFetch(u, { redirect: 'follow' }), localPath });
+      await resolveRemoteMedia(doc, req.workDir, remoteMediaOpts(req));
       return renderImageDoc(doc, height, req.workDir, {
         format,
         quality,
@@ -357,27 +367,37 @@ async function rasterPdfPage(session, pageIndex, size) {
  * kvóta (`enforceQuota`) + siker → `trackUsage` — pontosan mint a `/psd/import`.
  * A dev `ALLOW_INSECURE_DEV` bypass a gate-ekben automatikus (konzisztens).
  */
-router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (req, res) => {
+router.post('/psd/export', ...proOnly, uploadImage.any(), mediaGuard('imagedoc'), async (req, res) => {
   const uid = callerId(req, req.body?.userId);
-  let workDir;
+  let workDir = req.workDir;
   const cleanup = () => {
     if (workDir) {
       fs.rm(workDir, { recursive: true, force: true }, () => {});
     }
   };
   try {
-    const doc = req.body && typeof req.body.doc === 'object' ? req.body.doc : null;
+    let doc = null;
+    let uriMap = {};
+    try {
+      doc = JSON.parse(req.body?.doc ?? 'null');
+      uriMap = JSON.parse(req.body?.uriMap ?? '{}');
+    } catch {
+      doc = null;
+    }
     if (!doc || !Array.isArray(doc.layers)) {
+      cleanup();
       res.status(400).json({ error: 'Hiányzó vagy hibás ImageDoc.' });
       return;
     }
     if (!mediaStoreEnabled()) {
+      cleanup();
       res.status(503).json({ error: 'A média-tár nincs konfigurálva (SUPABASE service_role vagy S3_* / R2).' });
       return;
     }
     // 🛡️ a doc átmegy a RENDER-guardon (nagy-doc védőkorlát) a PSD-építés ELŐTT
     const guardError = imageDocGuard(doc);
     if (guardError) {
+      cleanup();
       res.status(413).json({ error: guardError });
       return;
     }
@@ -385,29 +405,32 @@ router.post('/psd/export', express.json({ limit: '16mb' }), ...proOnly, async (r
     // 📊 §2.2: a felhő-PSD-export havi `cloudJobs`-kvóta-gate (a `/psd/import` mintája)
     const gate = await enforceQuota(uid, await userTier(uid), 'cloudJobs', 1);
     if (!gate.ok) {
+      cleanup();
       res.status(429).json({ error: `Elérted a havi felhő-művelet kvótád (hátralévő: ${gate.remaining}).` });
       return;
     }
 
-    // a fotó-réteg PNG-jét a média-URL-ről töltjük (SSRF-védett; nem-OK → a réteg
-    // pixel nélkül marad, a mag best-effort kihagyja). ArrayBuffer → Node Buffer.
-    const fetchLayerPng = async (srcOrUri) => {
-      const url = String(srcOrUri || '');
-      if (!/^https?:\/\//i.test(url)) {
-        // nem-HTTP (pl. helyi file-uri) a workeren nem elérhető → a réteg kimarad
-        return null;
-      }
-      const r = await safeFetch(url, { redirect: 'follow' });
-      if (!r || !r.ok) {
-        return null;
-      }
-      return Buffer.from(await r.arrayBuffer());
+    if (!workDir) {
+      workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-render-'));
+    }
+    bindUploadedMedia(doc, req.files, uriMap);
+    await resolveRemoteMedia(doc, workDir, remoteMediaOpts(req));
+    // 🖨️ I29: minden réteg a /imagedoc renderén megy át, átlátszó, teljes vásznas PNG-ként —
+    // az opacity/blend/rejtettség a PSD-rétegen marad, így Photoshopban is állítható
+    let seq = 0;
+    const rasterizeLayerPng = async (layer) => {
+      const dir = path.join(workDir, `layer${seq}`);
+      seq += 1;
+      fs.mkdirSync(dir);
+      const one = { ...layer, opacity: 1, blendMode: undefined, hidden: false, groupId: undefined };
+      const single = { ...doc, layers: [one], groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0 };
+      return fs.readFileSync(await renderImageDoc(single, doc.height, dir));
     };
+    const fetchLayerPng = async () => null; // a rasterizáló fedi a fotókat is
 
-    const psdBuf = await buildPsdFromImageDoc(doc, { fetchLayerPng });
+    const psdBuf = await buildPsdFromImageDoc(doc, { fetchLayerPng, rasterizeLayerPng });
 
     // a PSD-t a média-tárba töltjük → letölthető URL (projekt-rendezett kulcs)
-    workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-psd-'));
     const publicBase = `${req.protocol}://${req.get('host')}`;
     const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
     const exportId = crypto.randomUUID();

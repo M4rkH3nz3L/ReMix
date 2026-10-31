@@ -370,7 +370,8 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   // 1) a forma- és szöveg-rétegek a MEGLÉVŐ generátorokkal PNG-be
   const shapeLike = layers
     .filter((l) => l.kind === 'shape' || l.kind === 'fill')
-    .map((l) => (l.kind === 'fill' ? fillAsShape(l) : { ...l, kind: 'shape' }));
+    // az opacity a kompoziton hat (csoporttal együtt) — a PNG-be nem szabad még egyszer beégetni
+    .map((l) => (l.kind === 'fill' ? { ...fillAsShape(l), opacity: 1 } : { ...l, kind: 'shape', opacity: 1 }));
   const textLike = layers
     .filter((l) => l.kind === 'text')
     .map((l) => ({ ...l, kind: 'text', animation: 'none', start: 0, duration: 1 }));

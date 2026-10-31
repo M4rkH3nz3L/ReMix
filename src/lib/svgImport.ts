@@ -27,6 +27,20 @@ export interface SvgImportResult {
   width: number;
   height: number;
   layers: ImageLayer[];
+  /** a fájl azon elemei, amiket nem tudtunk beolvasni (tag → darab) — a user megkapja */
+  unsupported: Record<string, number>;
+}
+
+/** Ismert, de NEM támogatott elemek: csendes eldobás helyett jelentjük őket. */
+const UNSUPPORTED_TAGS = new Set(['use', 'symbol', 'clipPath', 'mask', 'image', 'style', 'filter', 'pattern', 'marker', 'foreignObject', 'tspan', 'textPath']);
+
+function countUnsupported(node: XmlNode, out: Record<string, number>): void {
+  for (const child of node.children) {
+    if (UNSUPPORTED_TAGS.has(child.tag)) {
+      out[child.tag] = (out[child.tag] ?? 0) + 1;
+    }
+    countUnsupported(child, out);
+  }
 }
 
 // ── XML → könnyű fa ──────────────────────────────────────────────────────────
@@ -151,10 +165,12 @@ interface Style {
   fontFamily?: string;
   fontWeight?: string;
   textAnchor?: string;
+  fillRule?: 'nonzero' | 'evenodd';
 }
 
 const INHERIT: (keyof Style)[] = [
   'fill',
+  'fillRule',
   'stroke',
   'strokeWidth',
   'fontSize',
@@ -167,6 +183,9 @@ const INHERIT: (keyof Style)[] = [
 function resolveStyle(node: XmlNode, parent: Style): Style {
   const s: Style = {};
   for (const k of INHERIT) if (parent[k] !== undefined) (s as Record<string, unknown>)[k] = parent[k];
+  // az `opacity` nem öröklődik, hanem SZORZÓDIK a csoportokon át
+  const inherited = parent.opacity ?? 1;
+  if (inherited !== 1) s.opacity = inherited;
   const set = (key: string, val: string) => {
     const v = val.trim();
     switch (key) {
@@ -176,6 +195,9 @@ function resolveStyle(node: XmlNode, parent: Style): Style {
       case 'fill-opacity':
         s.fillOpacity = parseFloat(v);
         break;
+      case 'fill-rule':
+        s.fillRule = v === 'evenodd' ? 'evenodd' : 'nonzero';
+        break;
       case 'stroke':
         s.stroke = v;
         break;
@@ -183,7 +205,7 @@ function resolveStyle(node: XmlNode, parent: Style): Style {
         s.strokeWidth = parseLen(v);
         break;
       case 'opacity':
-        s.opacity = parseFloat(v);
+        s.opacity = inherited * parseFloat(v);
         break;
       case 'font-size':
         s.fontSize = parseLen(v);
@@ -288,13 +310,15 @@ interface Ctx {
 /** SVG-dokumentum → réteg-lista + doksi-méret. */
 export function parseSvg(svg: string): SvgImportResult {
   const root = parseXml(svg);
-  if (!root || root.tag !== 'svg') return { width: 0, height: 0, layers: [] };
+  if (!root || root.tag !== 'svg') return { width: 0, height: 0, layers: [], unsupported: {} };
   const vb = readViewBox(root);
   const grads = collectGradients(root);
   const layers: ImageLayer[] = [];
   const baseStyle: Style = { fill: '#000000' };
   walkLayers(root, { m: IDENTITY, style: baseStyle, grads, vb }, layers);
-  return { width: vb.w, height: vb.h, layers };
+  const unsupported: Record<string, number> = {};
+  countUnsupported(root, unsupported);
+  return { width: vb.w, height: vb.h, layers, unsupported };
 }
 
 function readViewBox(root: XmlNode): { x: number; y: number; w: number; h: number } {
@@ -404,7 +428,7 @@ function elementToLayer(node: XmlNode, ctx: Ctx): ImageLayer | null {
     closed: single ? norm.subpaths[0].closed : norm.subpaths.every((s) => s.closed),
     points: single ? norm.subpaths[0].points : undefined,
     subpaths: single ? undefined : norm.subpaths.map((s) => s.points),
-    fillRule: single ? undefined : 'nonzero',
+    fillRule: single ? undefined : ctx.style.fillRule ?? 'nonzero',
   });
 }
 
@@ -427,8 +451,10 @@ function resolvePaint(ctx: Ctx): Paint {
   };
   if (s.stroke && s.stroke !== 'none') {
     paint.borderColor = s.stroke;
-    // stroke-width user-egységből a vászon MAGASSÁG %-ára (a shape-konvenció)
-    paint.borderWidth = round(((s.strokeWidth ?? 1) / ctx.vb.h) * 100);
+    // stroke-width user-egységből a vászon MAGASSÁG %-ára (a shape-konvenció); a transzform
+    // a vonalat is skálázza (a mátrix területi skálájának gyöke)
+    const scale = Math.sqrt(Math.abs(ctx.m[0] * ctx.m[3] - ctx.m[1] * ctx.m[2])) || 1;
+    paint.borderWidth = round((((s.strokeWidth ?? 1) * scale) / ctx.vb.h) * 100);
   }
   const op = (s.opacity ?? 1) * (s.fillOpacity ?? 1);
   if (op < 1) paint.opacity = round(clamp01(op));
@@ -446,11 +472,13 @@ function finalizeShape(node: XmlNode, paint: Paint, geom: Record<string, unknown
   if (paint.borderColor) {
     layer.borderColor = paint.borderColor;
     layer.borderWidth = paint.borderWidth;
-    if (geom.shape === 'path') {
+    // a zárt path a kitöltést ÉS a kontúrt is megtartja; a nyitott path egy vonal,
+    // aminek a `fill` a színe és a `strokeWidth` a vastagsága (a modell konvenciója)
+    if (geom.shape === 'path' && !geom.closed) {
       layer.strokeWidth = paint.borderWidth;
       delete layer.borderColor;
       delete layer.borderWidth;
-      if (paint.fill === 'transparent') layer.fill = paint.borderColor;
+      layer.fill = paint.borderColor;
     }
   }
   if (paint.opacity !== undefined) layer.opacity = paint.opacity;

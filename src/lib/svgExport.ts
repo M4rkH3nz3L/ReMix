@@ -12,6 +12,7 @@
 // kimarad (a `<image>` a nyers kép), a konikus gradient az első stop színére esik
 // vissza — ezeket a hívó tudja (a doc.format==='vector' alapvetően vektor-elemű).
 
+import { effectiveLayerOpacity } from '@/lib/imageDoc';
 import type {
   GradientStop,
   ImageDoc,
@@ -177,29 +178,14 @@ function patternDef(p: PatternSpec, id: string, boxH: number): string {
 
 // ── forma-geometriák (star/arrow) ────────────────────────────────────────────
 
-function starPoints(b: Box): string {
-  const R = Math.min(b.bw, b.bh) / 2;
-  const r = R * 0.5;
-  const pts: string[] = [];
-  for (let k = 0; k < 10; k++) {
-    const rad = k % 2 === 0 ? R : r;
-    const ang = (-90 + k * 36) * (Math.PI / 180);
-    pts.push(`${n(b.cx + rad * Math.cos(ang))},${n(b.cy + rad * Math.sin(ang))}`);
-  }
-  return pts.join(' ');
-}
+// 0–100-as koordináták — az előnézet (ShapeOverlay) és a render (text-render.js) UGYANEZEK
+const POLY_POINTS: Record<'arrow' | 'star', [number, number][]> = {
+  arrow: [[0, 35], [60, 35], [60, 12], [100, 50], [60, 88], [60, 65], [0, 65]],
+  star: [[50, 0], [61, 35], [98, 35], [68, 57], [79, 91], [50, 70], [21, 91], [32, 57], [2, 35], [39, 35]],
+};
 
-function arrowPoints(b: Box): string {
-  const pts: [number, number][] = [
-    [0, 0.3],
-    [0.6, 0.3],
-    [0.6, 0.1],
-    [1, 0.5],
-    [0.6, 0.9],
-    [0.6, 0.7],
-    [0, 0.7],
-  ];
-  return pts.map(([x, y]) => `${n(b.left + x * b.bw)},${n(b.top + y * b.bh)}`).join(' ');
+function polyPoints(shape: 'arrow' | 'star', b: Box): string {
+  return POLY_POINTS[shape].map(([x, y]) => `${n(b.left + (x / 100) * b.bw)},${n(b.top + (y / 100) * b.bh)}`).join(' ');
 }
 
 // ── réteg-emitterek ──────────────────────────────────────────────────────────
@@ -249,16 +235,19 @@ function shapeSvg(layer: ShapeLayer, i: number, W: number, H: number, defs: stri
   let el = '';
   if (layer.shape === 'rectangle') {
     const rx = layer.cornerRadius ? n(layer.cornerRadius * Math.min(b.bw, b.bh)) : null;
-    el = `<rect x="${n(b.left)}" y="${n(b.top)}" width="${n(b.bw)}" height="${n(b.bh)}"${rx ? ` rx="${rx}"` : ''} fill="${paint}"${stroke}/>`;
+    // a render CSS-keretként BELÜLRE rajzolja a kontúrt; az SVG-stroke középre ülne
+    const inset = stroke ? strokeW / 2 : 0;
+    el = `<rect x="${n(b.left + inset)}" y="${n(b.top + inset)}" width="${n(b.bw - 2 * inset)}" height="${n(b.bh - 2 * inset)}"${rx ? ` rx="${rx}"` : ''} fill="${paint}"${stroke}/>`;
   } else if (layer.shape === 'ellipse') {
-    el = `<ellipse cx="${n(b.cx)}" cy="${n(b.cy)}" rx="${n(b.bw / 2)}" ry="${n(b.bh / 2)}" fill="${paint}"${stroke}/>`;
+    const inset = stroke ? strokeW / 2 : 0;
+    el = `<ellipse cx="${n(b.cx)}" cy="${n(b.cy)}" rx="${n(b.bw / 2 - inset)}" ry="${n(b.bh / 2 - inset)}" fill="${paint}"${stroke}/>`;
   } else if (layer.shape === 'line') {
     // vonal = vékony kitöltött doboz (a rasterizáló is így rajzolja)
     el = `<rect x="${n(b.left)}" y="${n(b.top)}" width="${n(b.bw)}" height="${n(Math.max(1, b.bh))}" fill="${paint}"/>`;
   } else if (layer.shape === 'star') {
-    el = `<polygon points="${starPoints(b)}" fill="${paint}"${stroke}/>`;
+    el = `<polygon points="${polyPoints('star', b)}" fill="${paint}"${stroke}/>`;
   } else if (layer.shape === 'arrow') {
-    el = `<polygon points="${arrowPoints(b)}" fill="${paint}"${stroke}/>`;
+    el = `<polygon points="${polyPoints('arrow', b)}" fill="${paint}"${stroke}/>`;
   } else if (layer.shape === 'path' && (hasSub || hasPts)) {
     const subs: Subpath[] = hasSub
       ? (layer.subpaths as PathPoint[][]).map((pts) => ({ points: pts.map((p) => mapPt(p, b)), closed: true }))
@@ -270,7 +259,8 @@ function shapeSvg(layer: ShapeLayer, i: number, W: number, H: number, defs: stri
       el = `<path d="${d}" fill="${paint}"${fr}${stroke}/>`;
     } else {
       // nyitott path = vonal a `fill` színével
-      el = `<path d="${d}" fill="none" stroke="${esc(layer.fill ?? '#000000')}" stroke-width="${n(Math.max(1, strokeW || H * 0.009))}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      const lineW = Math.max(1, ((layer.strokeWidth ?? 0.9) / 100) * H);
+      el = `<path d="${d}" fill="none" stroke="${esc(layer.fill ?? '#000000')}" stroke-width="${n(lineW)}" stroke-linecap="${layer.strokeCap ?? 'round'}" stroke-linejoin="${layer.strokeJoin ?? 'round'}"/>`;
     }
   } else {
     return '';
@@ -301,7 +291,7 @@ function shapeSvg(layer: ShapeLayer, i: number, W: number, H: number, defs: stri
 
 function photoSvg(layer: Extract<ImageLayer, { kind: 'photo' }>, W: number, H: number): string {
   const b = boxOf(layer, W, H);
-  const par = layer.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice';
+  const par = layer.fit === 'contain' ? 'xMidYMid meet' : layer.fit === 'stretch' ? 'none' : 'xMidYMid slice';
   const el = `<image href="${esc(layer.uri)}" x="${n(b.left)}" y="${n(b.top)}" width="${n(b.bw)}" height="${n(b.bh)}" preserveAspectRatio="${par}"/>`;
   return wrap(el, layer, b, '');
 }
@@ -317,12 +307,29 @@ function textSvg(layer: Extract<ImageLayer, { kind: 'text' }>, W: number, H: num
   const fontPx = ((layer.fontSize ?? 8) / 100) * H;
   const family = layer.fontFamily ? esc(layer.fontFamily) : 'sans-serif';
   const weight = layer.fontWeight === 'bold' ? 'bold' : 'normal';
-  const ls = layer.letterSpacing ? ` letter-spacing="${n(layer.letterSpacing)}"` : '';
+  // a betűköz em-ben tárolt (text-render.js), az SVG user-egységet vár
+  const ls = layer.letterSpacing ? ` letter-spacing="${n(layer.letterSpacing * fontPx)}"` : '';
+  // többsoros szöveg: soronként tspan, a blokk a középpontra ül (a render line-height-ja)
+  const lines = String(layer.text ?? '').split('\n');
+  const leading = fontPx * (layer.lineHeight ?? 1.2);
+  const firstY = b.cy - ((lines.length - 1) * leading) / 2;
+  const spans =
+    lines.length === 1
+      ? esc(lines[0])
+      : lines.map((line, i) => `<tspan x="${n(b.cx)}" y="${n(firstY + i * leading)}">${esc(line)}</tspan>`).join('');
   const el =
-    `<text x="${n(b.cx)}" y="${n(b.cy)}" font-family="${family}" font-size="${n(fontPx)}" font-weight="${weight}"` +
-    ` fill="${esc(layer.color ?? '#ffffff')}" text-anchor="middle" dominant-baseline="central"${ls}>${esc(layer.text ?? '')}</text>`;
+    `<text x="${n(b.cx)}" y="${n(firstY)}" font-family="${family}" font-size="${n(fontPx)}" font-weight="${weight}"` +
+    ` fill="${esc(layer.color ?? '#ffffff')}" text-anchor="middle" dominant-baseline="central"${ls}>${spans}</text>`;
   return wrap(el, layer, b, '');
 }
+
+/** a modell blend-nevei → érvényes CSS `mix-blend-mode` értékek */
+const CSS_BLEND: Record<string, string> = {
+  colordodge: 'color-dodge',
+  colorburn: 'color-burn',
+  hardlight: 'hard-light',
+  softlight: 'soft-light',
+};
 
 /** forgatás/tükrözés + opacity + blend-mód csomagolás (ha kell) */
 function wrap(
@@ -333,7 +340,7 @@ function wrap(
 ): string {
   const tf = transformOf(layer, b);
   const op = layer.opacity != null && layer.opacity < 1 ? ` opacity="${n(layer.opacity)}"` : '';
-  const blend = layer.blendMode && layer.blendMode !== 'normal' ? ` style="mix-blend-mode:${esc(layer.blendMode)}"` : '';
+  const blend = layer.blendMode && layer.blendMode !== 'normal' ? ` style="mix-blend-mode:${esc(CSS_BLEND[layer.blendMode] ?? layer.blendMode)}"` : '';
   const filt = filterId ? ` filter="url(#${filterId})"` : '';
   if (!tf && !op && !blend && !filt) {
     return el;
@@ -341,8 +348,12 @@ function wrap(
   return `<g${tf ? ` transform="${tf}"` : ''}${op}${blend}${filt}>${el}</g>`;
 }
 
-function isVisible(layer: ImageLayer & { visible?: boolean }): boolean {
-  return layer.visible !== false;
+/** a réteg rajzolódik-e (a render `isVisible` + rejtett-csoport szabálya) */
+function isVisible(layer: ImageLayer & { visible?: boolean }, doc: ImageDoc): boolean {
+  if (layer.hidden || layer.visible === false || (layer.opacity ?? 1) <= 0.001) {
+    return false;
+  }
+  return !doc.groups?.some((g) => g.id === layer.groupId && g.hidden);
 }
 
 /**
@@ -354,7 +365,7 @@ export function imageDocToSvg(doc: ImageDoc, opts?: SvgExportOptions): string {
   const { W, H } = canvas(doc, opts);
   const defs: string[] = [];
   const body: string[] = [];
-  const layers = (doc.layers ?? []).filter(isVisible);
+  const layers = (doc.layers ?? []).filter((l) => isVisible(l, doc)).map((l) => ({ ...l, opacity: effectiveLayerOpacity(doc, l) }) as ImageLayer);
   layers.forEach((layer, i) => {
     if (layer.kind === 'fill') {
       body.push(fillSvg(layer, i, W, H, defs));

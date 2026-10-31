@@ -1,3 +1,4 @@
+import { effectiveCanvas } from '@/lib/canvasPresets';
 import { alignRects, type AlignEdge, type Axis, distributeSpacing, type Rect } from '@/lib/layout';
 import type { ImageDoc, ImageLayer } from '@/types/project';
 
@@ -13,8 +14,25 @@ import type { ImageDoc, ImageLayer } from '@/types/project';
 /** A teljes (normalizált) vászon mint igazítási konténer. */
 const CANVAS: Rect = { x: 0, y: 0, width: 1, height: 1 };
 
-/** A réteg befoglaló `Rect`-je (bal-felső + méret). `null`, ha nincs pozíciója (fill). */
-export function layerRect(layer: ImageLayer): Rect | null {
+/** A szöveg becsült mérete (a rétegnek nincs w/h-ja): a betűméret a vászon-magasság %-a. */
+function textSize(layer: Extract<ImageLayer, { kind: 'text' }>, aspect: number): { w: number; h: number } {
+  const lines = String(layer.text ?? '').split('\n');
+  const fontH = (layer.fontSize ?? 8) / 100;
+  const longest = Math.max(...lines.map((l) => l.length), 1);
+  return {
+    w: Math.min(0.92, (longest * fontH * TEXT_ADVANCE) / aspect),
+    h: lines.length * fontH * (layer.lineHeight ?? 1.2),
+  };
+}
+
+/** egy betű átlagos szélessége a betűmérethez képest */
+const TEXT_ADVANCE = 0.55;
+
+/**
+ * A réteg befoglaló `Rect`-je (bal-felső + méret) a vászon arányában (`aspect` = W/H), a
+ * forgatást is figyelembe véve. `null`, ha nincs pozíciója (fill).
+ */
+export function layerRect(layer: ImageLayer, aspect = 1): Rect | null {
   if (layer.kind === 'fill') {
     return null;
   }
@@ -22,17 +40,40 @@ export function layerRect(layer: ImageLayer): Rect | null {
   if (!p) {
     return null;
   }
-  const w = (layer as { w?: number }).w ?? 0;
-  const h = (layer as { h?: number }).h ?? 0;
+  let w = (layer as { w?: number }).w ?? 0;
+  let h = (layer as { h?: number }).h ?? 0;
+  if (layer.kind === 'text') {
+    ({ w, h } = textSize(layer, aspect));
+  }
+  const rotation = (layer as { rotation?: number }).rotation ?? 0;
+  if (rotation) {
+    // a forgatás pixel-térben értendő: a dobozt oda visszük, és ott vesszük a befoglalót
+    const rad = (rotation * Math.PI) / 180;
+    const c = Math.abs(Math.cos(rad));
+    const s = Math.abs(Math.sin(rad));
+    const pw = w * aspect;
+    [w, h] = [(pw * c + h * s) / aspect, pw * s + h * c];
+  }
   return { x: p.x - w / 2, y: p.y - h / 2, width: w, height: h };
+}
+
+/** a doc vászonaránya */
+function aspectOf(doc: ImageDoc): number {
+  const c = effectiveCanvas(doc);
+  return c.width / c.height;
+}
+
+/** az elosztásban csak a látható, pozícionált rétegek vesznek részt */
+function visiblePositioned(doc: ImageDoc): ImageLayer[] {
+  return doc.layers.filter((l) => !l.hidden && layerRect(l) !== null);
 }
 
 /**
  * A réteg igazítása a VÁSZONHOZ (bal/közép/jobb · fent/közép/lent). Csak a releváns
  * tengelyt mozgatja; érdemi elmozdulás nélkül az EREDETI réteget adja vissza (no-op).
  */
-export function alignLayerToCanvas(layer: ImageLayer, edge: AlignEdge): ImageLayer {
-  const rect = layerRect(layer);
+export function alignLayerToCanvas(layer: ImageLayer, edge: AlignEdge, aspect = 1): ImageLayer {
+  const rect = layerRect(layer, aspect);
   if (!rect) {
     return layer;
   }
@@ -53,7 +94,7 @@ export function alignLayerInDoc(doc: ImageDoc, layerId: string, edge: AlignEdge)
     if (l.id !== layerId) {
       return l;
     }
-    const next = alignLayerToCanvas(l, edge);
+    const next = alignLayerToCanvas(l, edge, aspectOf(doc));
     if (next !== l) {
       changed = true;
     }
@@ -69,7 +110,7 @@ export function canAlignLayer(layer: ImageLayer | null): boolean {
 
 /** Hány pozícionálható (igazítható/elosztható) réteg van a dokumentumban. */
 export function positionedLayerCount(doc: ImageDoc): number {
-  return doc.layers.reduce((n, l) => (layerRect(l) ? n + 1 : n), 0);
+  return visiblePositioned(doc).length;
 }
 
 /** A rétegek (id→Rect) visszahelyezése a dokumentumba (középpont-alapú). No-op, ha nincs érdemi mozgás. */
@@ -103,7 +144,8 @@ export function alignLayersInDoc(doc: ImageDoc, layerIds: string[], edge: AlignE
   if (selected.length < 2) {
     return doc;
   }
-  const aligned = alignRects(selected.map((l) => layerRect(l)!), edge);
+  const aspect = aspectOf(doc);
+  const aligned = alignRects(selected.map((l) => layerRect(l, aspect)!), edge);
   const byId = new Map<string, Rect>();
   selected.forEach((l, i) => byId.set(l.id, aligned[i]));
   return applyRects(doc, byId);
@@ -119,7 +161,8 @@ export function distributeSelectedInDoc(doc: ImageDoc, layerIds: string[], axis:
   if (selected.length < 3) {
     return doc;
   }
-  const distributed = distributeSpacing(selected.map((l) => layerRect(l)!), axis);
+  const aspect = aspectOf(doc);
+  const distributed = distributeSpacing(selected.map((l) => layerRect(l, aspect)!), axis);
   const byId = new Map<string, Rect>();
   selected.forEach((l, i) => byId.set(l.id, distributed[i]));
   return applyRects(doc, byId);
@@ -131,11 +174,12 @@ export function distributeSelectedInDoc(doc: ImageDoc, layerIds: string[], axis:
  * működik; <3 pozícionált réteg esetén no-op (az eredeti doc-referencia).
  */
 export function distributeLayersInDoc(doc: ImageDoc, axis: Axis): ImageDoc {
-  const positioned = doc.layers.filter((l) => layerRect(l) !== null);
+  const positioned = visiblePositioned(doc);
   if (positioned.length < 3) {
     return doc;
   }
-  const distributed = distributeSpacing(positioned.map((l) => layerRect(l)!), axis);
+  const aspect = aspectOf(doc);
+  const distributed = distributeSpacing(positioned.map((l) => layerRect(l, aspect)!), axis);
   const byId = new Map<string, Rect>();
   positioned.forEach((l, i) => byId.set(l.id, distributed[i]));
   let changed = false;

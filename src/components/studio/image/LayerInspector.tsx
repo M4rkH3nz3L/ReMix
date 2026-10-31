@@ -541,14 +541,26 @@ export function LayerInspector({
               format={(v) => v.toFixed(2)}
             />
           ) : null}
-          <Slider
-            label={t('studio.image.strokeWidth')}
-            value={layer.borderWidth ?? 0}
-            min={0}
-            max={2}
-            onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { borderWidth: v }))}
-            format={(v) => v.toFixed(2)}
-          />
+          {/* I26: a nyitott path egy vonal (`strokeWidth`, a kitöltés színével), minden más kontúros */}
+          {layer.shape === 'path' && !layer.closed && !layer.subpaths?.length ? (
+            <Slider
+              label={t('studio.image.strokeWidth')}
+              value={layer.strokeWidth ?? 0.9}
+              min={0.1}
+              max={5}
+              onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeWidth: v }), 'stroke-width')}
+              format={(v) => v.toFixed(2)}
+            />
+          ) : (
+            <Slider
+              label={t('studio.image.strokeWidth')}
+              value={layer.borderWidth ?? 0}
+              min={0}
+              max={2}
+              onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { borderWidth: v }), 'border-width')}
+              format={(v) => v.toFixed(2)}
+            />
+          )}
           {(layer.borderWidth ?? 0) > 0 ? (
             <ColorField
               label={t('studio.image.borderColor')}

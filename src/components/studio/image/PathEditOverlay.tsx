@@ -1,3 +1,4 @@
+import { canvasToLayerBox, dragInLayer, layerBoxToCanvas } from '@/lib/imageLayerGeometry';
 import { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -46,10 +47,8 @@ export function PathEditOverlay({
   onInsertNode: (x: number, y: number) => void;
 }) {
   const pts = layer.points ?? [];
-  const toPx = (lx: number, ly: number) => ({
-    x: (layer.position.x - layer.w / 2 + lx * layer.w) * box.w,
-    y: (layer.position.y - layer.h / 2 + ly * layer.h) * box.h,
-  });
+  // I28: a réteg forgatása/tükrözése is számít — a pontok a formán üljenek
+  const toPx = (lx: number, ly: number) => localToPx(lx, ly, layer, box);
 
   // 🖐️ háttér-koppintás az él-beszúráshoz (a node/fogó-pöttyök FÖLÖTTE vannak)
   const bgRef = useRef({ box, layer, onInsertNode });
@@ -59,9 +58,8 @@ export function PathEditOverlay({
       .runOnJS(true)
       .onEnd((e) => {
         const d = bgRef.current;
-        const lx = (e.x / d.box.w - (d.layer.position.x - d.layer.w / 2)) / Math.max(1e-6, d.layer.w);
-        const ly = (e.y / d.box.h - (d.layer.position.y - d.layer.h / 2)) / Math.max(1e-6, d.layer.h);
-        d.onInsertNode(lx, ly);
+        const local = canvasToLayerBox({ x: e.x / d.box.w, y: e.y / d.box.h }, d.layer, { width: d.box.w, height: d.box.h });
+        d.onInsertNode(local.x, local.y);
       })
   ).current;
 
@@ -114,6 +112,11 @@ export function PathEditOverlay({
   );
 }
 
+function localToPx(lx: number, ly: number, layer: ShapeLayer, box: { w: number; h: number }) {
+  const p = layerBoxToCanvas({ x: lx, y: ly }, layer, { width: box.w, height: box.h });
+  return { x: p.x * box.w, y: p.y * box.h };
+}
+
 function NodeDot({
   box,
   layer,
@@ -148,25 +151,18 @@ function NodeDot({
       })
       .onUpdate((e) => {
         const d = dataRef.current;
-        d.onLive(
-          d.index,
-          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
-          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
-        );
+        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        d.onLive(d.index, p.x, p.y);
       })
       .onEnd((e) => {
         const d = dataRef.current;
-        d.onCommit(
-          d.index,
-          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
-          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
-        );
+        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        d.onCommit(d.index, p.x, p.y);
       })
   ).current;
 
   const local = layer.points?.[index] ?? { x: 0, y: 0 };
-  const cx = (layer.position.x - layer.w / 2 + local.x * layer.w) * box.w;
-  const cy = (layer.position.y - layer.h / 2 + local.y * layer.h) * box.h;
+  const { x: cx, y: cy } = localToPx(local.x, local.y, layer, box);
 
   return (
     <GestureDetector gesture={pan}>
@@ -208,21 +204,13 @@ function HandleDot({
       })
       .onUpdate((e) => {
         const d = dataRef.current;
-        d.onLive(
-          d.index,
-          d.handle,
-          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
-          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
-        );
+        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        d.onLive(d.index, d.handle, p.x, p.y);
       })
       .onEnd((e) => {
         const d = dataRef.current;
-        d.onCommit(
-          d.index,
-          d.handle,
-          startRef.current.x + e.translationX / d.box.w / Math.max(1e-6, d.layer.w),
-          startRef.current.y + e.translationY / d.box.h / Math.max(1e-6, d.layer.h)
-        );
+        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        d.onCommit(d.index, d.handle, p.x, p.y);
       })
   ).current;
 
@@ -230,8 +218,7 @@ function HandleDot({
   if (!h) {
     return null;
   }
-  const cx = (layer.position.x - layer.w / 2 + h.x * layer.w) * box.w;
-  const cy = (layer.position.y - layer.h / 2 + h.y * layer.h) * box.h;
+  const { x: cx, y: cy } = localToPx(h.x, h.y, layer, box);
 
   return (
     <GestureDetector gesture={pan}>

@@ -3107,6 +3107,8 @@
       "layer": "Réteg"
     },
     "image": {
+      "svgPartialTitle": "Részleges SVG-import",
+      "svgPartialBody": "Ezeket az elemeket nem tudtuk beolvasni, ezért kimaradtak: {{items}}",
       "missingInExport": {
         "title": "Hiányos export",
         "body_one": "{{count}} réteg képe nem érhető el, ezért kimaradt az exportból.",

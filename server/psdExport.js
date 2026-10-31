@@ -171,6 +171,13 @@ async function buildLayer(layer, ctx) {
     blendMode: psdBlendMode(layer.blendMode),
   };
 
+  // 🖨️ I29: ha van rasterizáló, a fotó is azon megy át — így a vágás/illesztés, forgatás,
+  // tükrözés és a korrekciók beleégnek, és a JPEG/helyi fájl is működik. A nyers PNG-letöltés
+  // csak a rasterizáló nélküli hívóknak marad.
+  if (layer.kind === 'photo' && ctx.rasterizeLayerPng) {
+    return rasterLayer(layer, box, base, ctx);
+  }
+
   // 🖼️ fotó-réteg: a PNG-t az injektált fetch adja → RGBA imageData
   if (layer.kind === 'photo') {
     const srcRef = layer.src || layer.uri;
@@ -202,7 +209,19 @@ async function buildLayer(layer, ctx) {
   // `psdVector.shapeToVector`-ban (a svgExport matekjának pure-JS párja). A roundtrip
   // BIZONYÍTOTT (psdVector.test.js + a lenti export-teszt): a knots/fill/stroke pontosan
   // visszaolvasható. Ha a forma nem vektorizálható (null) → raszter-fallback alább.
-  if (layer.kind === 'shape') {
+  // A vektor-mag forgatást, tükrözést, lekerekítést és gradienst nem ismer: az ilyen forma
+  // rasterizálva marad HŰ a vászonhoz (ha van rasterizáló).
+  const plainShape =
+    layer.kind === 'shape' &&
+    !layer.rotation &&
+    !layer.flipH &&
+    !layer.flipV &&
+    !layer.cornerRadius &&
+    !layer.gradient &&
+    !layer.fillGradient &&
+    !layer.pattern &&
+    !layer.imageUri;
+  if (layer.kind === 'shape' && (plainShape || !ctx.rasterizeLayerPng)) {
     const vec = shapeToVector(layer, ctx.canvasW, ctx.canvasH);
     if (vec) {
       // a box-a a forma-doboz (docBox), a vektor-mask doc-pixel koordinátái mellé;
@@ -222,24 +241,22 @@ async function buildLayer(layer, ctx) {
   // állít elő egy átlátszó PNG-t; ha nincs rasterizáló, a réteg kimarad (dokumentált
   // v1-korlát: az exportban a fotó-rétegek réteg-pixelként, a shape-ek ÉL-VEKTORként
   // garantáltak; a text/fill/adjust raszterként, ha van rasterizáló).
-  if (typeof ctx.rasterizeLayerPng === 'function') {
-    let png = null;
-    try {
-      png = await ctx.rasterizeLayerPng(layer, box);
-    } catch {
-      png = null;
-    }
-    const imageData = pngToImageData(png);
-    if (imageData) {
-      return {
-        ...base,
-        right: base.left + imageData.width,
-        bottom: base.top + imageData.height,
-        imageData,
-      };
-    }
+  return ctx.rasterizeLayerPng ? rasterLayer(layer, box, base, ctx) : null;
+}
+
+/** A rasterizáló teljes-vásznas, átlátszó PNG-t ad: a réteg a (0,0)-ból indul. */
+async function rasterLayer(layer, box, base, ctx) {
+  let png = null;
+  try {
+    png = await ctx.rasterizeLayerPng(layer, box);
+  } catch {
+    png = null;
   }
-  return null;
+  const imageData = pngToImageData(png);
+  if (!imageData) {
+    return null;
+  }
+  return { ...base, left: 0, top: 0, right: imageData.width, bottom: imageData.height, imageData };
 }
 
 /** emberi fallback-név a PSD-rétegnek a `kind`-ból (ha a modellen nincs `name`). */

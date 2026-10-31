@@ -19,6 +19,23 @@ import { projectMediaDir } from '@/lib/projectFolderClient';
  * új fájl születik, és a régi képklip nem íródik felül a hátad mögött.
  */
 /** 🎨 Export-kimenet: formátum + minőség (a `/imagedoc`-nak továbbadva). */
+/** A doc helyi fájljai a form-ba; a http(s) médiát a worker maga tölti le (I14). */
+function appendDocMedia(form: FormData, doc: ImageDoc): Record<string, string> {
+  const uriMap: Record<string, string> = {};
+  docMediaUris(doc).forEach((uri, i) => {
+    const field = `f${i}`;
+    uriMap[uri] = field;
+    if (/^https?:\/\//i.test(uri)) {
+      return;
+    }
+    const file = new File(uri);
+    if (file.exists) {
+      form.append(field, file as unknown as Blob, file.name);
+    }
+  });
+  return uriMap;
+}
+
 export interface RenderImageOpts {
   format?: 'png' | 'jpg' | 'webp';
   /** 0–1 (csak jpg/webp) */
@@ -198,11 +215,14 @@ export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<stri
   // 🔒 tier-gate: nincs Pro → ProRequiredError (a UI guardPro-val paywallra fordítja)
   const base = ensureCloud('psdExport');
 
-  const res = await uploadFetch(`${base}/psd/export`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ doc, ...(projectId ? { projectId } : {}) }),
-  });
+  // a rétegek helyi fájljai is felmennek (I29) — eddig csak a http-s kép jutott a PSD-be
+  const form = new FormData();
+  form.append('uriMap', JSON.stringify(appendDocMedia(form, doc)));
+  form.append('doc', JSON.stringify(doc));
+  if (projectId) {
+    form.append('projectId', projectId);
+  }
+  const res = await uploadFetch(`${base}/psd/export`, { method: 'POST', body: form });
   if (!res.ok) {
     // a worker barátságos (magyar) hibaüzenetet ad — azt dobjuk tovább
     let msg = 'A PSD-export nem sikerült.';
@@ -262,19 +282,7 @@ export async function renderImageDoc(
     }
 
     const form = new FormData();
-    const uriMap: Record<string, string> = {};
-    docMediaUris(doc).forEach((uri, i) => {
-      const field = `f${i}`;
-      uriMap[uri] = field;
-      // a http(s) médiát a worker maga tölti le (I14) — ide csak helyi fájl kerül
-      if (/^https?:\/\//i.test(uri)) {
-        return;
-      }
-      const file = new File(uri);
-      if (file.exists) {
-        form.append(field, file as unknown as Blob, file.name);
-      }
-    });
+    const uriMap = appendDocMedia(form, doc);
     form.append('doc', JSON.stringify(doc));
     form.append('uriMap', JSON.stringify(uriMap));
     form.append('height', String(height));

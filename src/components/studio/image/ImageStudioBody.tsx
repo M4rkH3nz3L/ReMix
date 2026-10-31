@@ -30,7 +30,7 @@ import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 // (régi dev-kliens) ne crash-eltesse az EGÉSZ kép-stúdiót; a vászon/forma/szöveg/
 // gradient/export Skia nélkül is megy, csak a varázspálca igényli.
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
-import { compositionGuides } from '@/lib/rulers';
+import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
@@ -439,10 +439,15 @@ export function ImageStudioBody({
       if (svg == null) {
         return;
       }
-      const { layers } = parseSvg(svg);
+      const { layers, unsupported } = parseSvg(svg);
       if (layers.length === 0) {
         Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
         return;
+      }
+      // ⚠️ I25: amit nem tudtunk beolvasni, azt megmondjuk (nem tűnik el csendben)
+      const skipped = Object.entries(unsupported).map(([tag, count]) => `<${tag}> ×${count}`);
+      if (skipped.length > 0) {
+        Alert.alert(t('studio.image.svgPartialTitle'), t('studio.image.svgPartialBody', { items: skipped.join(', ') }));
       }
       let next = doc;
       for (const l of layers) {
@@ -1606,7 +1611,7 @@ export function ImageStudioBody({
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <Pressable
-                onPress={() => doc && commit({ ...doc, guides: compositionGuides() }, t('studio.image.undoGuides'))}
+                onPress={() => doc && commit({ ...doc, guides: mergeGuides(doc.guides, compositionGuides()) }, t('studio.image.undoGuides'))}
                 style={styles.penClose}
                 hitSlop={6}
               >

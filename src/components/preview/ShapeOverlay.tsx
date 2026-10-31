@@ -351,7 +351,7 @@ export function ShapeOverlay({
                           : undefined
                         : clip.fill
                     }
-                    strokeWidth={pathClosed ? (clip.borderWidth ? strokePx : undefined) : strokePx}
+                    strokeWidth={pathClosed ? (clip.borderWidth ? borderWidth : undefined) : strokePx}
                     strokeLinecap={clip.strokeCap ?? 'round'}
                     strokeLinejoin={clip.strokeJoin ?? 'round'}
                     strokeDasharray={dashArray}

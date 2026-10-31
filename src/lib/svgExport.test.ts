@@ -129,8 +129,8 @@ describe('svgExport.imageDocToSvg', () => {
     expect(svg).toContain('transform="translate(360 360) rotate(30) scale(-1 1) translate(-360 -360)"');
   });
 
-  test('a láthatatlan réteg kimarad', () => {
-    const svg = imageDocToSvg(doc([L({ kind: 'fill', id: 'f', fill: '#000', visible: false }), L({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#f00' })]));
+  test('a rejtett réteg kimarad (I23)', () => {
+    const svg = imageDocToSvg(doc([L({ kind: 'fill', id: 'f', fill: '#000', hidden: true }), L({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#f00' })]));
     expect(svg).not.toContain('#000');
     expect(svg).toContain('#f00');
   });

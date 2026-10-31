@@ -14,11 +14,14 @@ import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import type { LivePatch } from '@/lib/imageLayerClip';
-import { toolVisible } from '@/lib/imageToolVisibility';
+import de from '@/i18n/locales/de.json';
+import en from '@/i18n/locales/en.json';
+import hu from '@/i18n/locales/hu.json';
+import { RAIL_GROUPS, selectionMenu, TOOL_ICONS } from '@/lib/imageMenu';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
 import { moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
 import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
-import type { ImageDoc, PhotoLayer } from '@/types/project';
+import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
@@ -140,7 +143,7 @@ describe('réteg-sorrend húzással', () => {
   it('a sor lefelé húzva a rétegek közt lejjebb kerül', async () => {
     const commit = jest.fn();
     const doc = docOf([l('a'), l('b'), l('c')]);
-    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={commit} onClose={() => {}} onOpenStyle={() => {}} />);
+    render(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={commit} onClose={() => {}} />);
     const h = (getByGestureTestId('layer-drag-c') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
     await act(async () => h.onEnd({ translationY: 110 }, true));
     expect(ids(commit.mock.calls[0][0])).toBe('cab'); // a lista fölül a legfelső, 2 sorral lejjebb
@@ -230,19 +233,52 @@ describe('I38 — forgatás', () => {
   });
 });
 
-describe('eszköztár: csak ami használható', () => {
-  const ctx = (selected: PhotoLayer | null, extra = {}) => ({ selected, canAlign: false, canBoolean: false, ...extra });
-  it('kijelölés nélkül a réteg-eszközök nem látszanak', () => {
-    for (const k of ['style', 'delete', 'duplicate', 'rotate', 'adjust', 'develop', 'fx', 'pattern', 'align', 'boolean']) {
-      expect(toolVisible(k, ctx(null))).toBe(false);
+describe('menüszerkezet', () => {
+  const ctx = { canAlign: true, canBoolean: false };
+  const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#000' } as unknown as ImageLayer;
+  const text = { kind: 'text', id: 't', text: 'A', fontSize: 8, position: { x: 0.5, y: 0.5 } } as unknown as ImageLayer;
+  const fill = { kind: 'fill', id: 'f', fill: '#000' } as unknown as ImageLayer;
+  const rail = RAIL_GROUPS.flatMap((g) => g.tools) as string[];
+
+  it('a bal sínen csak szerszám van: semmi, ami kijelölt elemre hat', () => {
+    for (const l of [layer, shape, text, fill]) {
+      const { actions } = selectionMenu(l, ctx);
+      expect(actions.filter((a) => rail.includes(a))).toEqual([]);
     }
-    for (const k of ['photo', 'text', 'crop', 'layers', 'guides']) {
-      expect(toolVisible(k, ctx(null))).toBe(true);
+    for (const notTool of ['delete', 'duplicate', 'rotate', 'flipH', 'style', 'layers']) {
+      expect(rail).not.toContain(notTool);
     }
   });
-  it('fotónál a fotó-eszközök, a forma-eszközök nem', () => {
-    expect(toolVisible('develop', ctx(layer))).toBe(true);
-    expect(toolVisible('fx', ctx(layer))).toBe(false);
+  it('minden elemnél elérhető a törlés, a zároltnál nem', () => {
+    for (const l of [layer, shape, text, fill]) {
+      expect(selectionMenu(l, ctx).canDelete).toBe(true);
+    }
+    const locked = selectionMenu({ ...layer, locked: true }, ctx);
+    expect(locked.canDelete).toBe(false);
+    expect(locked.actions).toEqual(['unlock', 'duplicate']);
+  });
+  it('a sorrend: beállítás → elrendezés → másolás', () => {
+    const { actions } = selectionMenu(layer, ctx);
+    expect(actions.indexOf('adjust')).toBeLessThan(actions.indexOf('align'));
+    expect(actions.indexOf('rotate')).toBeLessThan(actions.indexOf('duplicate'));
+    expect(actions[actions.length - 1]).toBe('duplicate');
+  });
+  it('csak a fajtájához illő műveletek', () => {
+    expect(selectionMenu(layer, ctx).actions).toContain('develop');
+    expect(selectionMenu(layer, ctx).actions).not.toContain('fx');
+    expect(selectionMenu(shape, ctx).actions).toContain('fx');
+    expect(selectionMenu(shape, ctx).actions).not.toContain('editPath');
+    expect(selectionMenu({ ...shape, shape: 'path', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] } as unknown as ImageLayer, ctx).actions).toContain('editPath');
+    expect(selectionMenu(fill, ctx).actions).not.toContain('rotate');
+  });
+  it('minden sín-szerszámnak és műveletnek van felirata és ikonja', () => {
+    const all = [...rail, ...selectionMenu({ ...shape, shape: 'path', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] } as unknown as ImageLayer, { canAlign: true, canBoolean: true }).actions, 'adjust', 'develop', 'unlock', 'delete'];
+    for (const key of all) {
+      expect(TOOL_ICONS[key as keyof typeof TOOL_ICONS]).toBeTruthy();
+      for (const dict of [hu, en, de]) {
+        expect((dict.studio.imageTools as Record<string, string>)[key]).toBeTruthy();
+      }
+    }
   });
 });
 
@@ -264,7 +300,7 @@ describe('≥44 pt célterület', () => {
     let tree: ReturnType<typeof create> | undefined;
     const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [layer] } as unknown as ImageDoc;
     act(() => {
-      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenStyle={() => {}} />);
+      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} />);
     });
     const icons = tree!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'button');
     const sized = icons.map((n) => StyleSheet.flatten(n.props.style)).filter((s) => s?.width != null);

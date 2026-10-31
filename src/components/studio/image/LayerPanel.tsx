@@ -8,17 +8,14 @@ import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
 import {
-  duplicateLayer,
   layerIcon,
   layerLabel,
-  removeLayer,
   moveLayerTo,
   toggleLayerHidden,
   toggleLayerLocked,
   ungroup,
   updateGroup,
 } from '@/lib/imageDoc';
-import { makeId } from '@/lib/id';
 import { mergeDownTargets } from '@/lib/imageCanvasOps';
 import type { ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
 
@@ -26,33 +23,28 @@ import type { ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
 const LAYER_ROW_STEP = 56;
 
 /**
- * 🎨 Réteg-panel (a munkaterület jobb oldala) — a réteg-fa listája (sorrend, láthatóság,
- * zárolás) és a kijelölt réteg műveletei. A réteg beállításai az alsó Stílus-lapon vannak.
+ * 🎨 Réteg-panel (a munkaterület jobb oldala) — a dokumentum szerkezete: sorrend, láthatóság,
+ * zárolás, csoportok, egyesítés. Az elem saját műveletei az alsó sávban vannak (`imageMenu`).
  * Minden módosítás a command-buson (undo).
  */
 export function LayerPanel({
   doc,
   selectedId,
   onSelect,
-  onAdd,
   onMergeDown,
   onRasterize,
   onFlatten,
   commit,
   onClose,
-  onOpenStyle,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onAdd: (kind: ImageLayer['kind']) => void;
   onMergeDown: (id: string) => void;
   onRasterize: (id: string) => void;
   onFlatten: () => void;
   commit: (next: ImageDoc, label?: string) => void;
   onClose: () => void;
-  /** a kijelölt réteg beállításai (alsó lap) */
-  onOpenStyle: () => void;
 }) {
   const { t } = useTranslation();
   const layer = doc.layers.find((l) => l.id === selectedId) ?? null;
@@ -62,15 +54,6 @@ export function LayerPanel({
       title={t('studio.image.layersTitle')}
       icon="layers"
       onClose={onClose}
-      footer={
-        <View style={styles.addRow}>
-          <AddChip icon="text" label={t('studio.imageTools.text')} onPress={() => onAdd('text')} />
-          <AddChip icon="shapes" label={t('studio.imageTools.shape')} onPress={() => onAdd('shape')} />
-          <AddChip icon="image" label={t('studio.imageTools.photo')} onPress={() => onAdd('photo')} />
-          <AddChip icon="color-fill" label={t('studio.imageTools.fill')} onPress={() => onAdd('fill')} />
-          <AddChip icon="options-outline" label={t('studio.imageTools.adjust', { defaultValue: 'Korrekció' })} onPress={() => onAdd('adjust')} />
-        </View>
-      }
     >
       {/* réteg-lista (fölül a legfelső réteg) — 🗂️ csoportokba bucketelve */}
       <View style={{ gap: 6 }}>
@@ -113,26 +96,11 @@ export function LayerPanel({
         })()}
       </View>
 
-      {/* a kijelölt réteg műveletei; a beállításai alul nyílnak (Stílus) */}
+      {/* a rétegszerkezet műveletei; az elem saját műveletei az alsó sávban vannak */}
       {layer ? (
         <View style={styles.inspector}>
           <Text style={styles.inspectorTitle} numberOfLines={1}>{layerLabel(layer)}</Text>
           <View style={styles.opsRow}>
-            <OpChip icon="options-outline" label={t('studio.imageTools.style')} onPress={onOpenStyle} />
-            <OpChip
-              icon="copy-outline"
-              label={t('studio.imageTools.duplicate')}
-              onPress={() => commit(duplicateLayer(doc, layer.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}
-            />
-            <OpChip
-              icon="trash-outline"
-              label={t('studio.imageTools.delete')}
-              disabled={!!layer.locked}
-              onPress={() => {
-                commit(removeLayer(doc, layer.id), t('studio.image.undoDelete'));
-                onSelect(null);
-              }}
-            />
             <OpChip icon="git-merge-outline" label={t('studio.image.mergeDown')} disabled={!mergeDownTargets(doc, layer.id)} onPress={() => onMergeDown(layer.id)} />
             {layer.kind === 'text' || layer.kind === 'shape' ? (
               <OpChip icon="image-outline" label={t('studio.image.rasterize')} disabled={!!layer.locked} onPress={() => onRasterize(layer.id)} />
@@ -167,23 +135,6 @@ function OpChip({
       accessibilityState={{ disabled: !!disabled }}
     >
       <Ionicons name={icon} size={15} color={palette.accent} />
-      <Text style={styles.addChipText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function AddChip({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.addChip} onPress={onPress}>
-      <Ionicons name={icon} size={16} color={palette.accent} />
       <Text style={styles.addChipText}>{label}</Text>
     </Pressable>
   );

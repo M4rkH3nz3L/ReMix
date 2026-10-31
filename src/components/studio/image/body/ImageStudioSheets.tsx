@@ -15,6 +15,7 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canBoolean } from '@/lib/imageBoolean';
 import type { Detent } from '@/lib/panelLayout';
 import { IMAGE_SHEET_SPECS, type ImageSheetId } from '@/lib/panelSpecs';
+import { ImportSheet } from '@/components/studio/image/ImportSheet';
 import type { Asset, ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 
 /** 🗂️ melyik szerkesztő-lap van nyitva — a body `sheet` állapotának típusa */
@@ -44,6 +45,7 @@ export function ImageStudioSheets({
   setSheet,
   setSelectedId,
   onAddShapeType,
+  onImport,
   onInsertSource,
   onDrawMask,
   onRaster,
@@ -69,6 +71,7 @@ export function ImageStudioSheets({
   setSheet: (sheet: SheetKind) => void;
   setSelectedId: (id: string | null) => void;
   onAddShapeType: (shape: Exclude<ShapeLayer['shape'], 'path'>) => void;
+  onImport: (key: 'svg' | 'psd' | 'pdf') => void;
   onInsertSource: (asset: Asset) => void;
   onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
@@ -131,6 +134,18 @@ export function ImageStudioSheets({
       ) : null}
       {sheet === 'shapePicker' && doc ? (
         <ShapePickerSheet onPick={onAddShapeType} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'import' && doc ? (
+        <ImportSheet
+          disabled={(key) => (key === 'psd' || key === 'pdf') && !canPsd}
+          onPick={(key) => {
+            setSheet(key === 'source' ? 'source' : null);
+            if (key !== 'source') {
+              onImport(key);
+            }
+          }}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
       {sheet === 'canvas' && doc ? (
         <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />

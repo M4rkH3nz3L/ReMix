@@ -211,7 +211,7 @@ async function smokeSheets(log: Log, setHarness: (n: ReactNode) => void) {
   const id = doc.layers[0].id;
   setHarness(
     <View style={{ width: 380, height: 320 }}>
-      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenStyle={() => {}} />
+      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} />
     </View>
   );
   await sleep(1200);

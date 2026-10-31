@@ -3069,6 +3069,13 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "fx": "Effekte",
+      "pattern": "Muster",
+      "addFill": "Hintergrund",
+      "addAdjust": "Korrekturebene",
+      "import": "Importieren",
+      "editPath": "Punkte",
+      "unlock": "Entsperren",
       "layers": "Ebenen",
       "crop": "Zuschneiden",
       "guides": "Hilfslinien",
@@ -3090,7 +3097,7 @@
       "psd": "PSD",
       "pdf": "PDF",
       "align": "Ausrichten",
-      "boolean": "Boolean",
+      "boolean": "Kombinieren",
       "rotate": "Drehen",
       "flipH": "Spiegeln ↔",
       "flipV": "Spiegeln ↕",
@@ -3099,12 +3106,21 @@
       "duplicate": "Duplizieren"
     },
     "imageGroups": {
+      "draw": "Zeichnen",
+      "select": "Auswahl",
+      "canvas": "Leinwand",
       "add": "Hinzufügen",
       "arrange": "Anordnen",
       "style": "Stil",
       "layer": "Ebene"
     },
     "image": {
+      "importFrom": {
+        "source": "Projektmedien",
+        "svg": "SVG-Datei",
+        "psd": "Photoshop (PSD)",
+        "pdf": "PDF"
+      },
       "toolsShow": "Werkzeuge einblenden",
       "toolsHide": "Werkzeuge ausblenden",
       "layersShow": "Ebenen einblenden",

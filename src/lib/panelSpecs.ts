@@ -89,6 +89,7 @@ export type ImageSheetId =
   | 'align'
   | 'boolean'
   | 'shapePicker'
+  | 'import'
   | 'canvas'
   | 'source'
   | 'export'
@@ -106,6 +107,7 @@ export const IMAGE_SHEET_SPECS: Record<ImageSheetId, PanelSpec> = {
   align: { tier: 'sheet', initialDetent: 'peek' },
   boolean: { tier: 'sheet', initialDetent: 'peek' },
   shapePicker: { tier: 'sheet', initialDetent: 'peek' },
+  import: { tier: 'sheet', initialDetent: 'peek' },
   canvas: { tier: 'sheet', initialDetent: 'full', modal: true },
   source: { tier: 'sheet', initialDetent: 'full', modal: true },
   export: { tier: 'sheet', initialDetent: 'full', modal: true },

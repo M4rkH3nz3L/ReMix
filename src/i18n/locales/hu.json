@@ -3069,6 +3069,11 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "addFill": "Háttér",
+      "addAdjust": "Korrekciós réteg",
+      "import": "Importálás",
+      "editPath": "Pontok",
+      "unlock": "Feloldás",
       "layers": "Rétegek",
       "crop": "Vágás",
       "guides": "Segédvonalak",
@@ -3092,7 +3097,7 @@
       "psd": "PSD",
       "pdf": "PDF",
       "align": "Igazítás",
-      "boolean": "Boolean",
+      "boolean": "Kombinálás",
       "rotate": "Forgatás",
       "flipH": "Tükör ↔",
       "flipV": "Tükör ↕",
@@ -3101,12 +3106,21 @@
       "duplicate": "Duplikálás"
     },
     "imageGroups": {
+      "draw": "Rajz",
+      "select": "Kijelölés",
+      "canvas": "Vászon",
       "add": "Hozzáadás",
       "arrange": "Rendezés",
       "style": "Stílus",
       "layer": "Réteg"
     },
     "image": {
+      "importFrom": {
+        "source": "A projekt médiái",
+        "svg": "SVG-fájl",
+        "psd": "Photoshop (PSD)",
+        "pdf": "PDF"
+      },
       "toolsShow": "Szerszámok megnyitása",
       "toolsHide": "Szerszámok elrejtése",
       "layersShow": "Rétegek megnyitása",

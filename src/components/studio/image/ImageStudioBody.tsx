@@ -16,7 +16,8 @@ import {
   isInlineSheet,
   type SheetKind,
 } from '@/components/studio/image/body/ImageStudioSheets';
-import { ImageStudioToolbar, type ToolKey } from '@/components/studio/image/body/ImageStudioToolbar';
+import { ImageStudioToolbar } from '@/components/studio/image/body/ImageStudioToolbar';
+import { SelectionActionBar } from '@/components/studio/image/body/SelectionActionBar';
 import { palette } from '@/constants/editor';
 import { useBackLayer } from '@/hooks/useBackLayer';
 import { useLayout } from '@/hooks/useLayout';
@@ -40,6 +41,7 @@ import {
   layerLabel,
   removeLayer,
   reorderLayer,
+  toggleLayerLocked,
   updateLayer,
 } from '@/lib/imageDoc';
 import { canAlignLayer } from '@/lib/imageLayerLayout';
@@ -48,7 +50,7 @@ import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
-import { toolVisible } from '@/lib/imageToolVisibility';
+import { type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { EdgeTab } from '@/components/studio/image/body/PanelChrome';
@@ -625,8 +627,30 @@ export function ImageStudioBody({
       return;
     }
     switch (key) {
-      case 'layers':
-        setLayersOpen(!panels.layers);
+      case 'import':
+        setSheet('import');
+        break;
+      case 'source':
+        setSheet('source');
+        break;
+      case 'addFill':
+        add('fill');
+        break;
+      case 'addAdjust':
+        add('adjust');
+        break;
+      case 'unlock':
+        if (selectedLayer) {
+          commit(toggleLayerLocked(doc, selectedLayer.id), t('studio.image.undoLock'));
+        }
+        break;
+      case 'editPath':
+        // ✏️ a kijelölt path pontjainak szerkesztése
+        setSheet(null);
+        setCropRect(null);
+        setPenPoints(null);
+        setPathEditNode(null);
+        setPathEditId(selectedLayer?.id ?? null);
         break;
       case 'photo':
         add('photo');
@@ -681,24 +705,12 @@ export function ImageStudioBody({
         })();
         break;
       case 'pen':
-        // ✏️ kijelölt path-forma → NODE-szerkesztő; különben ÚJ toll-rajz (üres path)
-        if (
-          selectedLayer?.kind === 'shape' &&
-          selectedLayer.shape === 'path' &&
-          (selectedLayer.points?.length ?? 0) >= 2
-        ) {
-          setSheet(null);
-          setCropRect(null);
-          setPenPoints(null);
-          setPathEditNode(null);
-          setPathEditId(selectedLayer.id);
-        } else {
-          setSheet(null);
-          setSelectedId(null);
-          setCropRect(null);
-          setPathEditId(null);
-          setPenPoints([]);
-        }
+        // ✏️ új toll-rajz (a meglévő path pontjait az alsó sáv „Pontok" gombja nyitja)
+        setSheet(null);
+        setSelectedId(null);
+        setCropRect(null);
+        setPathEditId(null);
+        setPenPoints([]);
         break;
       case 'svg':
         void importSvg();
@@ -797,46 +809,6 @@ export function ImageStudioBody({
           setSelectedId(null);
         }
         break;
-    }
-  };
-
-  // a kijelöléssel nem használható eszköz el van rejtve, nem kell ablakban magyarázni
-  const isToolVisible = (key: ToolKey) =>
-    toolVisible(key, {
-      selected: selectedLayer,
-      canAlign: canAlignLayer(selectedLayer),
-      canBoolean: !!doc && canBoolean(doc, effectiveSelectedId),
-    });
-
-  // melyik eszköz legyen letiltva (kijelölés/réteg-fajta szerint)
-  const toolDisabled = (key: ToolKey): boolean => {
-    switch (key) {
-      case 'delete':
-      case 'duplicate':
-      case 'forward':
-      case 'back':
-        return !selectedLayer;
-      case 'rotate':
-      case 'flipH':
-      case 'flipV':
-        return !selectedLayer || selectedLayer.kind === 'fill';
-      case 'style':
-        return !selectedLayer;
-      case 'adjust':
-      case 'develop':
-        return selectedLayer?.kind !== 'photo';
-      case 'align':
-        return !canAlignLayer(selectedLayer);
-      case 'boolean':
-        return !canBoolean(doc, effectiveSelectedId);
-      case 'psd':
-        // 🔒 PSD-import Pro-only: free usernél letiltva (upsell a letiltott gombon)
-        return !isPro;
-      case 'pdf':
-        // 🔒 PDF-import Pro-only: free usernél letiltva (upsell a letiltott gombon)
-        return !isPro;
-      default:
-        return false;
     }
   };
 
@@ -1358,9 +1330,6 @@ export function ImageStudioBody({
   const rail = (
     <ImageStudioToolbar
       onTool={onTool}
-      toolDisabled={toolDisabled}
-      toolVisible={isToolVisible}
-      hasSelection={!!selectedLayer}
       width={workspace.railWidth}
       onCollapse={() => setRailOpen(false)}
     />
@@ -1371,7 +1340,6 @@ export function ImageStudioBody({
         doc={doc}
         selectedId={effectiveSelectedId}
         onSelect={setSelectedId}
-        onAdd={(kind) => (kind === 'shape' ? setSheet('shapePicker') : add(kind))}
         onMergeDown={(id) => {
           const pair = mergeDownTargets(doc, id);
           if (pair) {
@@ -1382,7 +1350,6 @@ export function ImageStudioBody({
         onFlatten={() => void mergeLayers(flattenTargets(doc), t('studio.image.flatten'))}
         commit={commit}
         onClose={() => setLayersOpen(false)}
-        onOpenStyle={() => setSheet('style')}
       />
     </StudioSheetFrameContext.Provider>
   ) : null;
@@ -1412,17 +1379,6 @@ export function ImageStudioBody({
             accessibilityLabel={t('studio.image.historyTitle', { defaultValue: 'Előzmények' })}
           >
             <Ionicons name="time-outline" size={15} color={palette.textDim} />
-          </Pressable>
-        ) : null}
-        {doc ? (
-          <Pressable
-            onPress={() => setSheet('source')}
-            hitSlop={8}
-            style={styles.canvasBtn}
-            accessibilityRole="button"
-            accessibilityLabel={t('source.title')}
-          >
-            <Ionicons name="folder-open-outline" size={15} color={palette.textDim} />
           </Pressable>
         ) : null}
         {doc ? (
@@ -1806,7 +1762,7 @@ export function ImageStudioBody({
                 {t('studio.image.guides.hint')}
               </Text>
             </View>
-          ) : quickAdjust && doc && selectedLayer?.kind === 'photo' && !isInlineSheet(sheet) ? (
+          ) : isInlineSheet(sheet) ? null : quickAdjust && doc && selectedLayer?.kind === 'photo' ? (
             <ImageAdjustStrip
               doc={doc}
               layer={selectedLayer}
@@ -1816,6 +1772,12 @@ export function ImageStudioBody({
                 setSheet('adjust');
               }}
               onClose={() => setQuickAdjust(false)}
+            />
+          ) : selectedLayer && doc ? (
+            <SelectionActionBar
+              menu={selectionMenu(selectedLayer, { canAlign: canAlignLayer(selectedLayer), canBoolean: canBoolean(doc, effectiveSelectedId) })}
+              onAction={onTool}
+              onDelete={() => onTool('delete')}
             />
           ) : null}
           <ImageStudioSheets
@@ -1830,6 +1792,7 @@ export function ImageStudioBody({
             setSheet={setSheet}
             setSelectedId={setSelectedId}
             onAddShapeType={addShapeType}
+            onImport={onTool}
             onInsertSource={insertSource}
             onDrawMask={startMaskDraw}
             onRaster={(o) => void exportImage(o)}

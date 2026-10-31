@@ -3069,6 +3069,11 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "addFill": "Background",
+      "addAdjust": "Adjustment layer",
+      "import": "Import",
+      "editPath": "Points",
+      "unlock": "Unlock",
       "layers": "Layers",
       "crop": "Crop",
       "guides": "Guides",
@@ -3092,7 +3097,7 @@
       "psd": "PSD",
       "pdf": "PDF",
       "align": "Align",
-      "boolean": "Boolean",
+      "boolean": "Combine",
       "rotate": "Rotate",
       "flipH": "Flip ↔",
       "flipV": "Flip ↕",
@@ -3101,12 +3106,21 @@
       "duplicate": "Duplicate"
     },
     "imageGroups": {
+      "draw": "Draw",
+      "select": "Select",
+      "canvas": "Canvas",
       "add": "Add",
       "arrange": "Arrange",
       "style": "Style",
       "layer": "Layer"
     },
     "image": {
+      "importFrom": {
+        "source": "Project media",
+        "svg": "SVG file",
+        "psd": "Photoshop (PSD)",
+        "pdf": "PDF"
+      },
       "toolsShow": "Show tools",
       "toolsHide": "Hide tools",
       "layersShow": "Show layers",

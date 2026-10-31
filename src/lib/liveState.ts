@@ -101,7 +101,7 @@ export type EgressFailure = 'needsPro' | 'busy' | 'unavailable' | 'noTargets' | 
 export function egressFailure(message: string): EgressFailure {
   if (/\(402\)|pro/i.test(message)) return 'needsPro';
   if (/\(429\)|már fut/i.test(message)) return 'busy';
-  if (/\(503\)|nincs konfigurálva/i.test(message)) return 'unavailable';
+  if (/\(503\)|nincs konfigurálva|nem válaszolt|network request failed/i.test(message)) return 'unavailable';
   if (/\(400\)|nincs sem engedélyezett/i.test(message)) return 'noTargets';
   return 'unknown';
 }

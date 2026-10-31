@@ -2,6 +2,7 @@ import { registerGlobals } from '@livekit/react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
 import { workerJsonHeaders } from '@/lib/workerAuth';
+import { fetchRead } from '@/lib/netRetry';
 
 /**
  * 🔴 LiveKit (élő videó) kliens-híd. A WebRTC-globálisokat egyszer regisztráljuk
@@ -36,6 +37,9 @@ export interface LiveToken {
  * A `userId` csak a lokális `ALLOW_INSECURE_DEV` fallbackhez kell (ott a worker
  * nem tudja a prod-tokent verifikálni); prod-ban a verifikált tokenből jön a hívó.
  */
+/** A token-kérés felső időkorlátja — utána az újrapróba (backoff) veszi át. */
+export const LIVE_TOKEN_TIMEOUT_MS = 8000;
+
 export async function fetchLiveToken(
   room: string,
   publish: boolean,
@@ -43,11 +47,14 @@ export async function fetchLiveToken(
   userId?: string | null
 ): Promise<LiveToken> {
   const base = cloudBaseUrl();
-  const res = await fetch(`${base}/live/token`, {
+  // ⏱️ időkorlát: elérhetetlen worker (rossz hálózat) esetén a fetch különben sosem tér
+  // vissza → a „Kapcsolódás…" örökre beragadna; a hívó backoffja veszi át az újrapróbát
+  const res = await fetchRead(`${base}/live/token`, {
     method: 'POST',
+    timeoutMs: LIVE_TOKEN_TIMEOUT_MS,
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ room, publish, name, userId: userId ?? undefined }),
-  });
+  }, { attempts: 1 });
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(e.error || `LiveKit token-hiba (${res.status})`);

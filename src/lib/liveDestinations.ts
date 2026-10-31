@@ -3,6 +3,7 @@ import { myUserId } from '@/lib/live';
 import { requireSupabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { LivePlatform } from '@/types/live';
+import { fetchRead } from '@/lib/netRetry';
 
 /**
  * 🎥 Külső multistream-célok (LIVE.md Fázis E) — a felhasználó RTMP-céljai
@@ -193,14 +194,17 @@ export interface EgressStart {
  * Hibánál dob (pl. 503 = nincs egress-infra / LiveKit Cloud; 402/403 = nem Pro).
  */
 export async function startLiveEgress(room: string, record = false, aspect?: string): Promise<EgressStart> {
-  const res = await fetch(`${cloudBaseUrl()}/live/egress/start`, {
+  // ⏱️ időkorlát, újrapróba NÉLKÜL (az indítás nem idempotens): elérhetetlen worker esetén
+  // a host „Indul…"-ban ragadna — így hibát lát
+  const res = await fetchRead(`${cloudBaseUrl()}/live/egress/start`, {
     method: 'POST',
+    timeoutMs: 15_000,
     headers: await workerJsonHeaders(),
     // 📼 a `record` jelzi: készüljön VOD-fájl (akár RTMP-cél nélkül is) — a szerver
     //    csak-felvétel esetén is elindítja az egresst (fájl-only kimenet).
     // 📐 az `aspect` (a live-projekt aránya) az egress-kimenet méretét állítja (portré/landscape).
     body: JSON.stringify({ room, record, aspect }),
-  });
+  }, { attempts: 1 });
   if (!res.ok) {
     const e = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(e.error || `Egress-hiba (${res.status})`);
@@ -209,9 +213,10 @@ export async function startLiveEgress(room: string, record = false, aspect?: str
 }
 
 export async function stopLiveEgress(egressId: string): Promise<void> {
-  await fetch(`${cloudBaseUrl()}/live/egress/stop`, {
+  await fetchRead(`${cloudBaseUrl()}/live/egress/stop`, {
     method: 'POST',
+    timeoutMs: 8_000,
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ egressId }),
-  }).catch(() => {});
+  }, { attempts: 1 }).catch(() => {});
 }

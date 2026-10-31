@@ -171,7 +171,7 @@ function NodeDot({
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={[styles.hit, { left: cx - 18, top: cy - 18, transform: [{ scale: 1 / zoom }] }]}>
+      <View style={[styles.hit, { left: cx - 22, top: cy - 22, transform: [{ scale: 1 / zoom }] }]}>
         <View style={[styles.dot, selected ? styles.dotSel : null]} />
       </View>
     </GestureDetector>
@@ -229,7 +229,7 @@ function HandleDot({
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={[styles.hit, { left: cx - 18, top: cy - 18, transform: [{ scale: 1 / zoom }] }]}>
+      <View style={[styles.hit, { left: cx - 22, top: cy - 22, transform: [{ scale: 1 / zoom }] }]}>
         <View style={styles.handle} />
       </View>
     </GestureDetector>
@@ -237,7 +237,7 @@ function HandleDot({
 }
 
 const styles = StyleSheet.create({
-  hit: { position: 'absolute', width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  hit: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 3, borderColor: palette.accent },
   dotSel: { backgroundColor: palette.accent, borderColor: '#ffffff' },
   handle: { width: 13, height: 13, borderRadius: 3, backgroundColor: palette.accent, borderWidth: 2, borderColor: '#ffffff' },

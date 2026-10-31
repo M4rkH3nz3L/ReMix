@@ -48,6 +48,7 @@ import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
+import { toolVisible } from '@/lib/imageToolVisibility';
 import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
 import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
@@ -185,6 +186,10 @@ export function ImageStudioBody({
    * ESZKÖZÖN a vászon `captureRef`-je a fallback — így a MENTÉS worker nélkül is
    * működik (offline/Expo Go). A kijelölés-króm elrejtve, hogy ne kerüljön a képbe.
    */
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
+  const undo = () => useEditorStore.getState().undo();
+  const redo = () => useEditorStore.getState().redo();
   const rejectedRef = useRef(false);
   const rasterize = async (
     target: ImageDoc,
@@ -327,7 +332,7 @@ export function ImageStudioBody({
       return;
     }
     const size = effectiveCanvas({ aspectRatio: s.project.aspectRatio });
-    const nd = createImageDoc(`Lap ${pages.length + 1}`, s.project.aspectRatio, () => makeId('lyr'), {
+    const nd = createImageDoc(t('studio.image.pageName', { n: pages.length + 1 }), s.project.aspectRatio, () => makeId('lyr'), {
       width: size.width,
       height: size.height,
     });
@@ -341,7 +346,7 @@ export function ImageStudioBody({
       return;
     }
     const dup = duplicatePage(doc, makeId('img'));
-    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: dup, label: `Lap duplikálva: ${dup.name}` });
+    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: dup, label: t('studio.image.pageDuplicated', { name: dup.name }) });
     setActivePageId(dup.id);
     setSelectedId(null);
   };
@@ -353,7 +358,7 @@ export function ImageStudioBody({
     const idx = pages.findIndex((d) => d.id === doc.id);
     const remaining = pages.filter((d) => d.id !== doc.id);
     const nextIdx = pageIndexAfterRemoval(idx, pages.length);
-    Alert.alert(t('common.delete'), `„${doc.name}" lap törlése?`, [
+    Alert.alert(t('common.delete'), t('studio.image.pageDeleteConfirm', { name: doc.name }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -692,44 +697,24 @@ export function ImageStudioBody({
         break;
       case 'style':
         // 🎛️ a kijelölt réteg gazdag tulajdonság-lapja KÖZVETLENÜL (felfedezhetőség)
-        if (selectedLayer) {
-          setSheet('style');
-        } else {
-          Alert.alert(t('studio.image.style.needTitle'), t('studio.image.style.needBody'));
-        }
+        setSheet('style');
         break;
       case 'adjust':
-        if (selectedLayer?.kind === 'photo') {
-          // ⚡ előbb a gyors sáv (a kép teljes méretben látszik); a teljes verem a „Részletek"-ből
-          setSheet(null);
-          setQuickAdjust(true);
-        } else {
-          Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
-        }
+        // ⚡ előbb a gyors sáv (a kép teljes méretben látszik); a teljes verem a „Részletek"-ből
+        setSheet(null);
+        setQuickAdjust(true);
         break;
       case 'develop':
         // 📸 RAW-develop (non-destruktív előhívás) — csak fotó-rétegre
-        if (selectedLayer?.kind === 'photo') {
-          setSheet('develop');
-        } else {
-          Alert.alert(t('studio.image.needPhotoTitle'), t('studio.image.needPhotoBody'));
-        }
+        setSheet('develop');
         break;
       case 'fx':
         // ✨ réteg-effektek (ragyogás/árnyék/körvonal) — csak forma-rétegre
-        if (selectedLayer?.kind === 'shape') {
-          setSheet('fx');
-        } else {
-          Alert.alert(t('studio.image.fx.needTitle'), t('studio.image.fx.needBody'));
-        }
+        setSheet('fx');
         break;
       case 'pattern':
         // 🧩 geometrikus csempe-minta — csak forma-rétegre
-        if (selectedLayer?.kind === 'shape') {
-          setSheet('pattern');
-        } else {
-          Alert.alert(t('studio.image.pattern.needTitle'), t('studio.image.pattern.needBody'));
-        }
+        setSheet('pattern');
         break;
       case 'crop':
         // ✂️ kivágás-mód indítása (a kijelölés + lapok bezárva)
@@ -750,18 +735,10 @@ export function ImageStudioBody({
         setGuidesActive((v) => !v);
         break;
       case 'align':
-        if (canAlignLayer(selectedLayer)) {
-          setSheet('align');
-        } else {
-          Alert.alert(t('studio.image.align.needLayerTitle'), t('studio.image.align.needLayerBody'));
-        }
+        setSheet('align');
         break;
       case 'boolean':
-        if (canBoolean(doc, effectiveSelectedId)) {
-          setSheet('boolean');
-        } else {
-          Alert.alert(t('studio.image.boolean.needTitle'), t('studio.image.boolean.needBody'));
-        }
+        setSheet('boolean');
         break;
       case 'duplicate':
         if (selectedLayer) {
@@ -804,6 +781,14 @@ export function ImageStudioBody({
         break;
     }
   };
+
+  // a kijelöléssel nem használható eszköz el van rejtve, nem kell ablakban magyarázni
+  const isToolVisible = (key: ToolKey) =>
+    toolVisible(key, {
+      selected: selectedLayer,
+      canAlign: canAlignLayer(selectedLayer),
+      canBoolean: !!doc && canBoolean(doc, effectiveSelectedId),
+    });
 
   // melyik eszköz legyen letiltva (kijelölés/réteg-fajta szerint)
   const toolDisabled = (key: ToolKey): boolean => {
@@ -1301,7 +1286,7 @@ export function ImageStudioBody({
         t('studio.image.shareFeed.doneBody', { defaultValue: 'A poszt felkerült a feedbe.' })
       );
     } catch (e) {
-      Alert.alert(t('common.error', { defaultValue: 'Hiba' }), (e as Error).message);
+      Alert.alert(t('common.error'), (e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -1513,6 +1498,7 @@ export function ImageStudioBody({
               canvasRef={canvasRef}
               capturing={capturing}
               cropAspect={cropPreset}
+              onUndo={undo}
               cropRect={cropRect}
               onCropRectChange={setCropRect}
               penPoints={penPoints}
@@ -1548,7 +1534,7 @@ export function ImageStudioBody({
               size={9}
               color={selectedLayer ? palette.accent : palette.textDim}
             />
-            <Text style={styles.statusText} numberOfLines={1}>
+            <Text style={styles.statusText} numberOfLines={2}>
               {guidesActive
                 ? t('studio.image.guides.hint')
                 : brushActive
@@ -1567,6 +1553,13 @@ export function ImageStudioBody({
                         ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
                         : t('studio.image.tapToSelect')}
             </Text>
+            {/* ↩️ mindig kézre esik, a precíziós módokban is */}
+            <Pressable style={styles.historyBtn} onPress={undo} disabled={!canUndo} accessibilityRole="button" accessibilityLabel={t('studio.image.undo')} accessibilityState={{ disabled: !canUndo }}>
+              <Ionicons name="arrow-undo" size={20} color={canUndo ? palette.text : palette.border} />
+            </Pressable>
+            <Pressable style={styles.historyBtn} onPress={redo} disabled={!canRedo} accessibilityRole="button" accessibilityLabel={t('studio.image.redo')} accessibilityState={{ disabled: !canRedo }}>
+              <Ionicons name="arrow-redo" size={20} color={canRedo ? palette.text : palette.border} />
+            </Pressable>
           </View>
 
           {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
@@ -1703,11 +1696,9 @@ export function ImageStudioBody({
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.brushScroll}>
                 <View style={styles.brushRow}>
                   {BRUSH_COLORS.map((c) => (
-                    <Pressable
-                      key={c}
-                      onPress={() => setBrushColor(c)}
-                      style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
-                    />
+                    <Pressable key={c} onPress={() => setBrushColor(c)} style={styles.brushDotHit} accessibilityRole="button" accessibilityLabel={c} accessibilityState={{ selected: brushColor === c }}>
+                      <View style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]} />
+                    </Pressable>
                   ))}
                 </View>
                 <View style={styles.brushRow}>
@@ -1767,6 +1758,7 @@ export function ImageStudioBody({
             <ImageStudioToolbar
               onTool={onTool}
               toolDisabled={toolDisabled}
+              toolVisible={isToolVisible}
               hasSelection={!!selectedLayer}
             />
           )}
@@ -1869,8 +1861,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pageActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  pageActionBtn: { padding: 6 },
-  topBtn: { padding: 2 },
+  pageActionBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  topBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   titleWrap: { flex: 1, gap: 2 },
   kindTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   kindTagText: { color: palette.accent, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
@@ -1904,9 +1896,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 0,
   },
+  historyBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   statusText: { flex: 1, color: palette.textDim, fontSize: 11, fontWeight: '600' },
   cropBar: {
     flexDirection: 'row',
@@ -1919,8 +1913,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   cropBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.border,
@@ -1955,11 +1949,12 @@ const styles = StyleSheet.create({
   lassoLabel: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600', paddingLeft: 4 },
   brushRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   brushScroll: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6 },
+  brushDotHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
   brushDotActive: { borderColor: palette.text, borderWidth: 3 },
   brushSizeBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
     borderWidth: 1,
     borderColor: palette.border,

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
@@ -85,6 +86,7 @@ export function ImageCanvas({
   guidesActive,
   initialZoom = 1,
   cropAspect,
+  onUndo,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -130,7 +132,10 @@ export function ImageCanvas({
   initialZoom?: number;
   /** kivágás aránytartása: pixel-arány (w/h), üres = szabad */
   cropAspect?: number | null;
+  /** kétujjas koppintás a munkaterületen */
+  onUndo?: () => void;
 }) {
+  const { t } = useTranslation();
   const [container, setContainer] = useState({ w: 0, h: 0 });
   const [live, setLive] = useState<{ id: string; patch: LivePatch } | null>(null);
   const [liveGuide, setLiveGuide] = useState<{ id: string; pos: number } | null>(null);
@@ -214,11 +219,40 @@ export function ImageCanvas({
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const backdropTap = useRef(
-    Gesture.Tap()
-      .runOnJS(true)
-      .onEnd(() => onSelectRef.current(null))
+    Gesture.Exclusive(
+      // dupla koppintás a szabad területre: a teljes vászon vissza a nézetbe
+      Gesture.Tap()
+        .withTestId('canvas-fit-tap')
+        .runOnJS(true)
+        .numberOfTaps(2)
+        .onEnd((_e, success) => {
+          if (success) {
+            setZoom(1);
+            setPan({ x: 0, y: 0 });
+          }
+        }),
+      Gesture.Tap()
+        .runOnJS(true)
+        .onEnd(() => onSelectRef.current(null))
+    )
   ).current;
-  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture)).current;
+  // kétujjas koppintás = visszavonás (a profi rajz-appok szokása)
+  const onUndoRef = useRef(onUndo);
+  onUndoRef.current = onUndo;
+  const undoTap = useRef(
+    Gesture.Tap()
+      .withTestId('canvas-undo-tap')
+      .runOnJS(true)
+      .minPointers(2)
+      .maxDuration(250)
+      .maxDistance(12)
+      .onEnd((_e, success) => {
+        if (success) {
+          onUndoRef.current?.();
+        }
+      })
+  ).current;
+  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoTap)).current;
   const tf = canvasTransform(zoom, pan, fit);
   const viewportStyle = capturing
     ? undefined
@@ -553,14 +587,14 @@ export function ImageCanvas({
           Kivágás közben rejtve: a vágókeret jobb-felső sarokfogóját takarnák (élő teszt K1) */}
       {!capturing && !cropRect ? (
         <View style={styles.zoomBar} pointerEvents="box-none">
-          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} hitSlop={6} accessibilityLabel="zoom in">
+          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(1)} accessibilityRole="button" accessibilityLabel={t('studio.image.zoomIn')}>
             <Ionicons name="add" size={18} color={palette.text} />
           </Pressable>
-          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(-1)} hitSlop={6} accessibilityLabel="zoom out">
+          <Pressable style={styles.zoomBtn} onPress={() => applyZoom(-1)} accessibilityRole="button" accessibilityLabel={t('studio.image.zoomOut')}>
             <Ionicons name="remove" size={18} color={palette.text} />
           </Pressable>
           {zoom !== 1 || pan.x !== 0 || pan.y !== 0 ? (
-            <Pressable style={styles.zoomBtn} onPress={resetZoom} hitSlop={6} accessibilityLabel="reset zoom">
+            <Pressable style={styles.zoomBtn} onPress={resetZoom} accessibilityRole="button" accessibilityLabel={t('studio.image.zoomFit')}>
               <Ionicons name="scan-outline" size={15} color={palette.accent} />
             </Pressable>
           ) : null}
@@ -580,8 +614,8 @@ const styles = StyleSheet.create({
   canvasCapture: { overflow: 'hidden', backgroundColor: 'transparent' },
   zoomBar: { position: 'absolute', top: 8, right: 8, gap: 6 },
   zoomBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
     borderWidth: 1,
     borderColor: palette.border,

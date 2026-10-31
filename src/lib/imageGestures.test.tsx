@@ -7,10 +7,14 @@ import { act, create } from 'react-test-renderer';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
+import { StyleSheet } from 'react-native';
+
+import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import type { LivePatch } from '@/lib/imageLayerClip';
+import { toolVisible } from '@/lib/imageToolVisibility';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
 import { moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
 import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
@@ -223,5 +227,51 @@ describe('I33 — varázspálca-leképezés', () => {
 describe('I38 — forgatás', () => {
   it.each([[0, 0], [190, -170], [359, -1], [-190, 170], [720, 0], [180, 180], [-180, 180]])('%d° → %d°', (from, to) => {
     expect(normalizeRotation(from)).toBe(to);
+  });
+});
+
+describe('eszköztár: csak ami használható', () => {
+  const ctx = (selected: PhotoLayer | null, extra = {}) => ({ selected, canAlign: false, canBoolean: false, ...extra });
+  it('kijelölés nélkül a réteg-eszközök nem látszanak', () => {
+    for (const k of ['style', 'delete', 'duplicate', 'rotate', 'adjust', 'develop', 'fx', 'pattern', 'align', 'boolean']) {
+      expect(toolVisible(k, ctx(null))).toBe(false);
+    }
+    for (const k of ['photo', 'text', 'crop', 'layers', 'guides']) {
+      expect(toolVisible(k, ctx(null))).toBe(true);
+    }
+  });
+  it('fotónál a fotó-eszközök, a forma-eszközök nem', () => {
+    expect(toolVisible('develop', ctx(layer))).toBe(true);
+    expect(toolVisible('fx', ctx(layer))).toBe(false);
+  });
+});
+
+describe('kétujjas koppintás és dupla koppintás', () => {
+  const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [] } as unknown as ImageDoc;
+  it('a kétujjas koppintás visszavon, a megszakított nem', async () => {
+    const onUndo = jest.fn();
+    render(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onUndo={onUndo} />);
+    const tap = (getByGestureTestId('canvas-undo-tap') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
+    await act(async () => tap.onEnd({}, false));
+    expect(onUndo).not.toHaveBeenCalled();
+    await act(async () => tap.onEnd({}, true));
+    expect(onUndo).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('≥44 pt célterület', () => {
+  it('a réteg-panel minden gombja legalább 44 pt', () => {
+    let tree: ReturnType<typeof create> | undefined;
+    const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [layer] } as unknown as ImageDoc;
+    act(() => {
+      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onAdd={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} onOpenAdjust={() => {}} />);
+    });
+    const icons = tree!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'button');
+    const sized = icons.map((n) => StyleSheet.flatten(n.props.style)).filter((s) => s?.width != null);
+    expect(sized.length).toBeGreaterThanOrEqual(4);
+    for (const s of sized) {
+      expect(Number(s.width)).toBeGreaterThanOrEqual(44);
+      expect(Number(s.height)).toBeGreaterThanOrEqual(44);
+    }
   });
 });

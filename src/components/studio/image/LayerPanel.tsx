@@ -24,7 +24,7 @@ import { mergeDownTargets } from '@/lib/imageCanvasOps';
 import type { ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
 
 /** egy réteg-sor magassága + a köztük lévő rés (a húzás ennyi pixelenként lép egyet) */
-const LAYER_ROW_STEP = 54;
+const LAYER_ROW_STEP = 56;
 
 /**
  * 🎨 Réteg-panel (alsó lap) — a réteg-fa listája (sorrend/láthatóság/duplázás/
@@ -183,14 +183,16 @@ function AddChip({
 function IconBtn({
   icon,
   color = palette.textDim,
+  label,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   color?: string;
+  label?: string;
   onPress: () => void;
 }) {
   return (
-    <Pressable hitSlop={8} onPress={onPress}>
+    <Pressable style={styles.iconBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       <Ionicons name={icon} size={16} color={color} />
     </Pressable>
   );
@@ -260,20 +262,24 @@ function LayerRow({
       <IconBtn
         icon={l.hidden ? 'eye-off-outline' : 'eye-outline'}
         color={l.hidden ? palette.textDim : palette.text}
+        label={t('studio.image.undoVisibility')}
         onPress={() => commit(toggleLayerHidden(doc, l.id), t('studio.image.undoVisibility'))}
       />
       <IconBtn
         icon={l.locked ? 'lock-closed' : 'lock-open-outline'}
         color={l.locked ? palette.accent : palette.textDim}
+        label={t('studio.image.undoLock')}
         onPress={() => commit(toggleLayerLocked(doc, l.id), t('studio.image.undoLock'))}
       />
       <IconBtn
         icon="copy-outline"
+        label={t('studio.image.undoDuplicate')}
         onPress={() => commit(duplicateLayer(doc, l.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}
       />
       <IconBtn
         icon="trash-outline"
         color={l.locked ? palette.border : palette.accent2}
+        label={t('studio.image.undoDelete')}
         onPress={() => {
           if (l.locked) {
             return;
@@ -356,16 +362,17 @@ const styles = StyleSheet.create({
   layerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    gap: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.surfaceHigh,
   },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   groupNameInput: { padding: 0, minHeight: 32 },
-  dragHandle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', marginLeft: -6 },
+  dragHandle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -6 },
   layerDragging: { zIndex: 10, opacity: 0.92 },
   chipDisabled: { opacity: 0.4 },
   opsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },

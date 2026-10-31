@@ -21,10 +21,10 @@ const STEM = 26;
 
 const CORNERS: ResizeCorner[] = ['tl', 'tr', 'bl', 'br'];
 const CORNER_STYLE: Record<ResizeCorner, object> = {
-  tl: { left: -18, top: -18 },
-  tr: { right: -18, top: -18 },
-  bl: { left: -18, bottom: -18 },
-  br: { right: -18, bottom: -18 },
+  tl: { left: -22, top: -22 },
+  tr: { right: -22, top: -22 },
+  bl: { left: -22, bottom: -22 },
+  br: { right: -22, bottom: -22 },
 };
 
 /**
@@ -181,7 +181,7 @@ export function SelectionFrame({
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.outline, { borderWidth: s }]} />
       <View pointerEvents="none" style={[styles.rotStem, { top: -STEM * s, height: STEM * s, width: 2 * s, marginLeft: -s }]} />
       <GestureDetector gesture={rotateGesture}>
-        <View style={[styles.rotHandle, { top: -STEM * s - 14, transform: [{ scale: s }] }]}>
+        <View style={[styles.rotHandle, { top: -STEM * s - 22, transform: [{ scale: s }] }]}>
           <View style={styles.rotDot} />
         </View>
       </GestureDetector>
@@ -201,8 +201,8 @@ const styles = StyleSheet.create({
   outline: { borderColor: palette.accent },
   scaleHandle: {
     position: 'absolute',
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
   rotHandle: {
     position: 'absolute',
     left: '50%',
-    marginLeft: -14,
-    width: 28,
-    height: 28,
+    marginLeft: -22,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

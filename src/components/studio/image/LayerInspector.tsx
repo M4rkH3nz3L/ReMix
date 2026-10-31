@@ -321,7 +321,7 @@ export function LayerInspector({
             {IMAGE_FILTER_TYPES.map((f) => (
               <Chip
                 key={f.type}
-                label={t(`studio.image.filter.${f.type}`, { defaultValue: f.label })}
+                label={t(`studio.image.filterType.${f.type}`)}
                 active={hasFilter(layer.filters, f.type)}
                 onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { filters: toggleFilter(layer.filters, f.type) }))}
               />
@@ -330,7 +330,7 @@ export function LayerInspector({
           {IMAGE_FILTER_TYPES.filter((f) => hasFilter(layer.filters, f.type)).map((f) => (
             <Slider
               key={f.type}
-              label={t(`studio.image.filter.${f.type}`, { defaultValue: f.label })}
+              label={t(`studio.image.filterType.${f.type}`)}
               value={getFilterAmount(layer.filters, f.type)}
               min={0}
               max={1}

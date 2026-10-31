@@ -106,17 +106,23 @@ const SELECTED_ORDER = [2, 1, 3, 0] as const;
 export function ImageStudioToolbar({
   onTool,
   toolDisabled,
+  toolVisible,
   hasSelection = false,
 }: {
   onTool: (key: ToolKey) => void;
   toolDisabled: (key: ToolKey) => boolean;
+  /** a jelenlegi kijelöléssel nem használható eszköz nem jelenik meg */
+  toolVisible: (key: ToolKey) => boolean;
   /** van kijelölt réteg → a réteg-műveletek (Stílus, Rendezés, Réteg) kerülnek ELŐRE */
   hasSelection?: boolean;
 }) {
   const { t } = useTranslation();
   // 🧭 kontextusfüggő sorrend (MOBILE-UI §6.4, T1/12): kijelöléskor nem a Hozzáadás áll elöl,
   // hanem amit a kijelölt réteggel tenni lehet; a `key` váltás a görgetést is az elejére állítja
-  const groups = hasSelection ? SELECTED_ORDER.map((i) => TOOL_GROUPS[i]) : TOOL_GROUPS;
+  const ordered = hasSelection ? SELECTED_ORDER.map((i) => TOOL_GROUPS[i]) : TOOL_GROUPS;
+  const groups = ordered
+    .map((group) => ({ ...group, tools: group.tools.filter((tool) => toolVisible(tool.key)) }))
+    .filter((group) => group.tools.length > 0);
   return (
     <ScrollView
       key={hasSelection ? 'selected' : 'idle'}
@@ -201,6 +207,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     marginHorizontal: 2,
   },
-  tool: { width: 60, alignItems: 'center', gap: 4, paddingVertical: 2 },
+  tool: { width: 60, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 2 },
   toolLabel: { fontSize: 10, fontWeight: '600' },
 });

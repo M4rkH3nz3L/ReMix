@@ -192,7 +192,9 @@ public class Remix3DModule: Module {
           if let j = optionsJson, let d = j.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
             opts = o
           }
-          var mesh = Remix3DRender.collectMesh(MDLAsset(url: try fileURL(inputPath)))
+          // a GLB-t (és a színes PLY-t) a ModelIO nem olvassa → a saját olvasón át (a tárolási
+          // formátum GLB is lehet — eddig a vágás/egyszerűsítés ott „üres háló" hibát adott)
+          var mesh = try Remix3DRender.meshData(from: try fileURL(inputPath))
           if look.hasRotation { mesh = Remix3DRender.rotated(mesh, by: look.rotation) }
           if let cut = opts["cutY"] as? Double { mesh = Remix3DRender.cutBelow(mesh, minY: Float(cut)) }
           if let cell = opts["cell"] as? Double, cell > 0 { mesh = Remix3DRender.simplified(mesh, cell: Float(cell)) }
@@ -682,6 +684,19 @@ enum Remix3DRender {
         out.indices.append(contentsOf: [a, b, c])
       }
       t += 3
+    }
+    return out
+  }
+
+  /// bármely támogatott modell-fájl → egyesített háromszög-háló (GLB/PLY a saját olvasón át)
+  static func meshData(from url: URL) throws -> MeshData {
+    let ext = url.pathExtension.lowercased()
+    guard ext == "glb" || ext == "ply" else { return collectMesh(MDLAsset(url: url)) }
+    var out = MeshData()
+    for p in try Remix3DFormats.load(url).parts where !p.points {
+      let base = UInt32(out.positions.count)
+      out.positions.append(contentsOf: p.positions)
+      out.indices.append(contentsOf: p.indices.map { $0 + base })
     }
     return out
   }

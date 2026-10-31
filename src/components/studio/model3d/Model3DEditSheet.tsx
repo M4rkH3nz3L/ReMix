@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
@@ -76,9 +76,17 @@ export function Model3DEditSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => !busy && onClose()}>
-      <Pressable style={styles.backdrop} onPress={() => !busy && onClose()} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+      {/* háttér-koppintó + lap testvérként (a beágyazott Pressable ellopná a görgetést) */}
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => !busy && onClose()}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+        />
+        <View style={styles.sheet}>
           <View style={styles.grabber} />
+          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.head}>{t('model3d.viewer.edit')}</Text>
 
           <Text style={styles.section}>{t('model3d.viewer.editRotate')}</Text>
@@ -150,8 +158,9 @@ export function Model3DEditSheet({
               <Text style={styles.hint}>{t('model3d.viewer.editProcessing')}</Text>
             </View>
           ) : null}
-        </Pressable>
-      </Pressable>
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -171,12 +180,14 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 16,
-    paddingBottom: 32,
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    // a néző (és a vágósík) a lap fölött látható marad
+    maxHeight: '62%',
     borderTopWidth: 1,
     borderColor: palette.border,
   },
+  scroll: { gap: 8, paddingBottom: 32 },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: palette.border, marginBottom: 4 },
   head: { color: palette.text, fontSize: 17, fontWeight: '800' },
   section: { color: palette.textDim, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 6 },

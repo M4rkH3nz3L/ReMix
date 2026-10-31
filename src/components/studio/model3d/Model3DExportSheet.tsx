@@ -198,8 +198,16 @@ export function Model3DExportSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => !busy && onClose()}>
-      <Pressable style={styles.backdrop} onPress={() => !busy && onClose()}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+      {/* a háttér-koppintó és a lap TESTVÉREK (nem egymásba ágyazott Pressable-ök) — a
+          beágyazott Pressable ellopta a görgetést, a lap alja (Export gomb) elérhetetlen volt */}
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => !busy && onClose()}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+        />
+        <View style={styles.sheet}>
           <View style={styles.grabber} />
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
             <Text style={styles.head}>{t('model3d.export.title')}</Text>
@@ -296,8 +304,8 @@ export function Model3DExportSheet({
             </Pressable>
             <Text style={styles.hint}>{t('model3d.export.videoHint')}</Text>
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

@@ -645,7 +645,12 @@ export function Timeline({ compact = false }: { compact?: boolean } = {}) {
             showsHorizontalScrollIndicator={false}
             style={styles.insightTabsBar}
             contentContainerStyle={styles.insightTabs}
-            onLayout={(e) => setControls((c) => ({ ...c, w: e.nativeEvent.layout.width }))}
+            onLayout={(e) => {
+              // az eseményt AZONNAL olvassuk — a state-frissítő később fut, addigra a RN az
+              // eseményt nullázza („Cannot read property 'layout' of null")
+              const w = e.nativeEvent.layout.width;
+              setControls((c) => (c.w === w ? c : { ...c, w }));
+            }}
             onContentSizeChange={(w) => setControls((c) => ({ ...c, content: w }))}
             onScroll={(e) => {
               const x = e.nativeEvent.contentOffset.x;

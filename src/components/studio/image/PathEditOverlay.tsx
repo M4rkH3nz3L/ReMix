@@ -26,6 +26,7 @@ import type { ShapeLayer } from '@/types/project';
  */
 export function PathEditOverlay({
   box,
+  zoom = 1,
   layer,
   selectedNode,
   onSelectNode,
@@ -36,6 +37,7 @@ export function PathEditOverlay({
   onInsertNode,
 }: {
   box: { w: number; h: number };
+  zoom?: number;
   layer: ShapeLayer;
   selectedNode: number | null;
   onSelectNode: (index: number) => void;
@@ -92,6 +94,7 @@ export function PathEditOverlay({
         <NodeDot
           key={i}
           box={box}
+          zoom={zoom}
           layer={layer}
           index={i}
           selected={i === selectedNode}
@@ -103,10 +106,10 @@ export function PathEditOverlay({
 
       {/* bezier-fogó pöttyök a kijelölt node-nál */}
       {selectedNode != null && h1Px ? (
-        <HandleDot box={box} layer={layer} index={selectedNode} handle="h1" onLive={onHandleLive} onCommit={onHandleCommit} />
+        <HandleDot box={box} zoom={zoom} layer={layer} index={selectedNode} handle="h1" onLive={onHandleLive} onCommit={onHandleCommit} />
       ) : null}
       {selectedNode != null && h2Px ? (
-        <HandleDot box={box} layer={layer} index={selectedNode} handle="h2" onLive={onHandleLive} onCommit={onHandleCommit} />
+        <HandleDot box={box} zoom={zoom} layer={layer} index={selectedNode} handle="h2" onLive={onHandleLive} onCommit={onHandleCommit} />
       ) : null}
     </>
   );
@@ -119,6 +122,7 @@ function localToPx(lx: number, ly: number, layer: ShapeLayer, box: { w: number; 
 
 function NodeDot({
   box,
+  zoom,
   layer,
   index,
   selected,
@@ -127,6 +131,7 @@ function NodeDot({
   onCommit,
 }: {
   box: { w: number; h: number };
+  zoom: number;
   layer: ShapeLayer;
   index: number;
   selected: boolean;
@@ -134,8 +139,8 @@ function NodeDot({
   onLive: (index: number, x: number, y: number) => void;
   onCommit: (index: number, x: number, y: number) => void;
 }) {
-  const dataRef = useRef({ box, layer, index, onSelectNode, onLive, onCommit });
-  dataRef.current = { box, layer, index, onSelectNode, onLive, onCommit };
+  const dataRef = useRef({ box, zoom, layer, index, onSelectNode, onLive, onCommit });
+  dataRef.current = { box, zoom, layer, index, onSelectNode, onLive, onCommit };
   const startRef = useRef({ x: 0, y: 0 });
 
   const pan = useRef(
@@ -151,12 +156,12 @@ function NodeDot({
       })
       .onUpdate((e) => {
         const d = dataRef.current;
-        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        const p = dragInLayer(startRef.current, e.translationX / d.zoom, e.translationY / d.zoom, d.layer, d.box);
         d.onLive(d.index, p.x, p.y);
       })
       .onEnd((e) => {
         const d = dataRef.current;
-        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        const p = dragInLayer(startRef.current, e.translationX / d.zoom, e.translationY / d.zoom, d.layer, d.box);
         d.onCommit(d.index, p.x, p.y);
       })
   ).current;
@@ -175,6 +180,7 @@ function NodeDot({
 
 function HandleDot({
   box,
+  zoom,
   layer,
   index,
   handle,
@@ -182,14 +188,15 @@ function HandleDot({
   onCommit,
 }: {
   box: { w: number; h: number };
+  zoom: number;
   layer: ShapeLayer;
   index: number;
   handle: HandleId;
   onLive: (index: number, handle: HandleId, x: number, y: number) => void;
   onCommit: (index: number, handle: HandleId, x: number, y: number) => void;
 }) {
-  const dataRef = useRef({ box, layer, index, handle, onLive, onCommit });
-  dataRef.current = { box, layer, index, handle, onLive, onCommit };
+  const dataRef = useRef({ box, zoom, layer, index, handle, onLive, onCommit });
+  dataRef.current = { box, zoom, layer, index, handle, onLive, onCommit };
   const startRef = useRef({ x: 0, y: 0 });
 
   const pan = useRef(
@@ -204,12 +211,12 @@ function HandleDot({
       })
       .onUpdate((e) => {
         const d = dataRef.current;
-        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        const p = dragInLayer(startRef.current, e.translationX / d.zoom, e.translationY / d.zoom, d.layer, d.box);
         d.onLive(d.index, d.handle, p.x, p.y);
       })
       .onEnd((e) => {
         const d = dataRef.current;
-        const p = dragInLayer(startRef.current, e.translationX, e.translationY, d.layer, d.box);
+        const p = dragInLayer(startRef.current, e.translationX / d.zoom, e.translationY / d.zoom, d.layer, d.box);
         d.onCommit(d.index, d.handle, p.x, p.y);
       })
   ).current;

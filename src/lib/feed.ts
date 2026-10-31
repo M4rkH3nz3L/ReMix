@@ -686,7 +686,7 @@ export async function publishImageProject(
   if (mode === 'slideshow') {
     const slideshow = buildSlideshowProject(project, opts ?? {});
     if (!slideshow) {
-      throw new Error('Nincs renderelt lap a diavetítéshez — előbb rasterizáld a lapokat.');
+      throw new Error(tr('studio.image.shareFeed.noSlides'));
     }
     // a diavetítés-projekt a megszokott videó-úton megy (render + feltöltés + poszt)
     const { post } = await publishRenderedProject(slideshow, opts?.onProgress, {
@@ -698,7 +698,7 @@ export async function publishImageProject(
   // carousel: a renderelt lapok PNG-jeinek feltöltése → lapozható kép-poszt
   const uris = carouselImageUris(project);
   if (uris.length === 0) {
-    throw new Error('Nincs renderelt lap a lapozható poszthoz — előbb rasterizáld a lapokat.');
+    throw new Error(tr('studio.image.shareFeed.noCarousel'));
   }
   const urls: string[] = [];
   for (let i = 0; i < uris.length; i++) {

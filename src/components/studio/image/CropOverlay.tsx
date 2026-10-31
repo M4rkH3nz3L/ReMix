@@ -22,14 +22,16 @@ import { type CropCorner, type CropRect, moveCropRect, resizeCropCorner } from '
 export function CropOverlay({
   box,
   rect,
+  zoom = 1,
   onChange,
 }: {
   box: { w: number; h: number };
+  zoom?: number;
   rect: CropRect;
   onChange: (rect: CropRect) => void;
 }) {
-  const dataRef = useRef({ rect, box, onChange });
-  dataRef.current = { rect, box, onChange };
+  const dataRef = useRef({ rect, box, zoom, onChange });
+  dataRef.current = { rect, box, zoom, onChange };
   const startRef = useRef<CropRect>(rect);
 
   const g = useRef<{
@@ -45,7 +47,7 @@ export function CropOverlay({
         })
         .onUpdate((e) => {
           const d = dataRef.current;
-          d.onChange(resizeCropCorner(startRef.current, corner, e.translationX / d.box.w, e.translationY / d.box.h));
+          d.onChange(resizeCropCorner(startRef.current, corner, e.translationX / d.zoom / d.box.w, e.translationY / d.zoom / d.box.h));
         });
     g.current = {
       body: Gesture.Pan()
@@ -55,7 +57,7 @@ export function CropOverlay({
         })
         .onUpdate((e) => {
           const d = dataRef.current;
-          d.onChange(moveCropRect(startRef.current, e.translationX / d.box.w, e.translationY / d.box.h));
+          d.onChange(moveCropRect(startRef.current, e.translationX / d.zoom / d.box.w, e.translationY / d.zoom / d.box.h));
         }),
       corners: { tl: makeCorner('tl'), tr: makeCorner('tr'), bl: makeCorner('bl'), br: makeCorner('br') },
     };

@@ -52,6 +52,7 @@ type HistorySlice = Pick<
   | 'jumpHistory'
   | 'markSaved'
   | 'setRendered'
+  | 'setDocThumb'
 >;
 
 /**
@@ -326,4 +327,16 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
 
   setRendered: (rendered) =>
     set((s) => (s.project ? { project: { ...s.project, rendered } } : s)),
+  setDocThumb: (docId, thumbUri, thumbKey) =>
+    set((s) =>
+      s.project
+        ? {
+            dirty: true,
+            project: {
+              ...s.project,
+              imageDocs: s.project.imageDocs?.map((d) => (d.id === docId ? { ...d, thumbUri, thumbKey } : d)),
+            },
+          }
+        : s
+    ),
 });

@@ -3107,6 +3107,15 @@
       "layer": "Layer"
     },
     "image": {
+      "shareFeed": {
+        "confirmTitle": "Share to feed",
+        "confirmBody": "Who can see this post?",
+        "followers": "Followers only",
+        "public": "Public",
+        "noSlides": "There are no rendered pages for the slideshow.",
+        "noCarousel": "There are no rendered pages for the carousel."
+      },
+      "undoReorder": "Layer order",
       "svgPartialTitle": "Partial SVG import",
       "svgPartialBody": "These elements couldn't be imported and were left out: {{items}}",
       "missingInExport": {
@@ -3296,6 +3305,9 @@
       },
       "lasso": { "hint": "Draw a freehand closed shape" },
       "wand": {
+        "tight": "Tight",
+        "normal": "Medium",
+        "wide": "Wide",
         "hint": "Tap a photo to select a similar-color region",
         "failTitle": "No selection",
         "failBody": "Couldn't select a color region. Tap inside a photo layer."

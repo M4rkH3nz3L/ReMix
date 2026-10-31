@@ -110,3 +110,9 @@ export function renormalizePathLayer(layer: ShapeLayer, canvas: { width: number;
     h: layer.h * sy,
   };
 }
+
+/** Fok −180…180 közé (a csúszka tartománya; a forgató fogó korlátlan értéket ír). */
+export function normalizeRotation(deg: number): number {
+  const r = ((deg + 180) % 360 + 360) % 360 - 180;
+  return r === -180 ? 180 : r;
+}

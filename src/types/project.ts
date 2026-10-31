@@ -1511,6 +1511,11 @@ export interface ImageDoc {
   adjust?: ClipAdjust;
   /** a legutóbb kirasterizált PNG (cache; a réteg-fa az igazság) */
   renderedUri?: string;
+  /** a `renderedUri` melyik tartalomból készült (`imageDocContentKey`) — elavulás-észlelés */
+  renderedKey?: string;
+  /** kis élő bélyegkép a lap-sávhoz / album-borítóhoz + a tartalom, amiből készült */
+  thumbUri?: string;
+  thumbKey?: string;
 }
 
 /**

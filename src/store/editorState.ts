@@ -423,6 +423,8 @@ export interface EditorState {
    * jött, a projekt piszkos marad (B6). Paraméter nélkül feltétel nélkül tiszta.
    */
   markSaved: (saved?: Project) => void;
+  /** a lap élő bélyegképe (artefaktum — nem undo-lépés, de menteni kell) */
+  setDocThumb: (docId: string, thumbUri: string, thumbKey: string) => void;
   /** a renderelt változat rögzítése a projekten (artefaktum — nem undo/dirty) */
   setRendered: (rendered: Project['rendered']) => void;
 }

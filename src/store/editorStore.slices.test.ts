@@ -48,7 +48,7 @@ afterEach(() => store().closeProject());
 const METHOD_KEYS = [
   // history
   'loadProject', 'restoreProject', 'closeProject', 'dispatch', 'applyBatch',
-  'undo', 'redo', 'jumpHistory', 'markSaved', 'setRendered',
+  'undo', 'redo', 'jumpHistory', 'markSaved', 'setRendered', 'setDocThumb',
   // selection
   'selectClip', 'toggleMultiSelect', 'selectClips', 'setMultiSelectMode', 'allSelectedIds',
   'copyStyle', 'pasteStyle', 'copyClips', 'cutClips', 'pasteClipsAt', 'canPasteTo',

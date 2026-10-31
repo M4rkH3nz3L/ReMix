@@ -59,15 +59,17 @@ export const BrushOverlay = forwardRef<BrushHandle, { box: { w: number; h: numbe
     const pan = Gesture.Pan()
       .runOnJS(true)
       .minDistance(0)
+      .maxPointers(1)
       .onBegin((e) => {
         setCurrent({ d: `M${e.x.toFixed(1)},${e.y.toFixed(1)}`, color, width: size });
       })
       .onUpdate((e) => {
         setCurrent((c) => (c ? { ...c, d: `${c.d} L${e.x.toFixed(1)},${e.y.toFixed(1)}` } : c));
       })
-      .onEnd(() => {
+      .onFinalize((_e, success) => {
+        // a megszakított vonás (második ujj = zoom) nem marad a rajzon
         setCurrent((c) => {
-          if (c) {
+          if (c && success) {
             setStrokes((s) => [...s, c]);
           }
           return null;

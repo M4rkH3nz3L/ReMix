@@ -44,6 +44,16 @@ export function imageCacheKey(doc: ImageDoc, height: number, fmt: string, qualit
   return h.toString(36);
 }
 
+/** A dokumentum tartalmának azonosítója (a cache-mezők nélkül) — elavult render felismerésére. */
+export function imageDocContentKey(doc: ImageDoc): string {
+  return imageCacheKey(doc, 0, '', undefined, false);
+}
+
+/** A renderelt kép még a jelenlegi tartalmat mutatja-e? (régi doc-nál nincs kulcs → elavult) */
+export function isRenderFresh(doc: ImageDoc): boolean {
+  return !!doc.renderedUri && doc.renderedKey === imageDocContentKey(doc);
+}
+
 /** A szerver szándékosan elutasította a dokumentumot (413 stb.) — a fallback nem segít. */
 export class ImageRenderRejected extends Error {
   constructor(message: string) {

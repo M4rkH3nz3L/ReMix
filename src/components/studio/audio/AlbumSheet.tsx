@@ -186,7 +186,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
   };
 
   const coverDoc = album?.coverDocId ? project.imageDocs?.find((d) => d.id === album.coverDocId) : undefined;
-  const coverUri = coverDoc?.renderedUri;
+  const coverUri = coverDoc?.thumbUri ?? coverDoc?.renderedUri;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>

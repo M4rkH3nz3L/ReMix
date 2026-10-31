@@ -46,7 +46,7 @@ import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } fro
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
-import { ImageRenderRejected } from '@/lib/imageExport';
+import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
 import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
 import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
@@ -58,13 +58,30 @@ import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro } from '@/store/paywallStore';
 import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { PostVisibility } from '@/types/social';
 
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
 const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
 
+function deleteLocalFile(uri: string) {
+  try {
+    new File(uri).delete();
+  } catch {
+    /* takarítás — best-effort */
+  }
+}
+
 /** ecset-színek + -méretek (px) a sávban */
 const BRUSH_COLORS = ['#ffffff', '#0b0b18', '#ff2d95', '#ffd166', '#39d98a', '#4d9dff'];
 const BRUSH_SIZES = [4, 10, 20];
+/** ennyi tétlenség után frissül a lap bélyegképe */
+const THUMB_IDLE_MS = 2000;
+/** varázspálca-tűrés: mennyire eltérő színek tartoznak még a kijelölésbe */
+const WAND_TOLERANCES = [
+  { value: 16, labelKey: 'studio.image.wand.tight' },
+  { value: 32, labelKey: 'studio.image.wand.normal' },
+  { value: 64, labelKey: 'studio.image.wand.wide' },
+];
 
 /** kivágás-arány presetek (pixel-arány w:h; null = szabad/teljes) */
 const CROP_PRESETS: { label: string; labelKey?: string; ratio: number | null }[] = [
@@ -127,6 +144,7 @@ export function ImageStudioBody({
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [cropPreset, setCropPreset] = useState<number | null>(null);
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
@@ -135,9 +153,10 @@ export function ImageStudioBody({
   // ('local'), vagy 🩹 folt-javítás régió ('heal' — a bbox-ot delogo-zza a render)
   const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
+  const [wandTolerance, setWandTolerance] = useState(32);
   const [brushActive, setBrushActive] = useState(false);
   const [brushColor, setBrushColor] = useState('#ff2d95');
-  const [brushSize, setBrushSize] = useState(8);
+  const [brushSize, setBrushSize] = useState(10);
   const [guidesActive, setGuidesActive] = useState(false);
   // ⚡ gyors korrekció-sáv (az eszköztár helyén) — a „Részletek" a teljes verem-lapot nyitja
   const [quickAdjust, setQuickAdjust] = useState(false);
@@ -251,6 +270,11 @@ export function ImageStudioBody({
       ? project?.imageDocs?.find((d) => d.id === docId) ?? null
       : pages.find((d) => d.id === effectiveActivePageId) ?? pages[0] ?? null;
 
+  const scopedOpenKey = useRef<string | null>(null);
+  if (mode === 'scoped' && doc && scopedOpenKey.current === null) {
+    scopedOpenKey.current = imageDocContentKey(doc);
+  }
+
   const commit = (next: ImageDoc, label?: string) =>
     useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: next, label });
 
@@ -260,9 +284,34 @@ export function ImageStudioBody({
     const s = useEditorStore.getState();
     const fresh = s.project?.imageDocs?.find((d) => d.id === docIdToUpdate);
     if (fresh) {
-      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...fresh, renderedUri }, label: 'render' });
+      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...fresh, renderedUri, renderedKey: imageDocContentKey(fresh) }, label: 'render' });
     }
   };
+
+  // 🖼️ I41: élő bélyegkép az aktív lapról, szerkesztési szünetben (a régi fájl törlődik)
+  const activeThumbKey = doc && mode === 'project' ? imageDocContentKey(doc) : null;
+  useEffect(() => {
+    if (!doc || !activeThumbKey || doc.thumbKey === activeThumbKey || doc.layers.length === 0) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void renderImageDoc(doc, 256)
+        .then((uri) => {
+          if (!uri) {
+            return;
+          }
+          const previous = doc.thumbUri;
+          useEditorStore.getState().setDocThumb(doc.id, uri, activeThumbKey);
+          if (previous && previous !== uri) {
+            deleteLocalFile(previous);
+          }
+        })
+        .catch(() => {});
+    }, THUMB_IDLE_MS);
+    return () => clearTimeout(timer);
+    // a doc a kulcson át számít: csak valódi tartalom-változásra indul újra
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThumbKey]);
 
   // a kijelölés levezetve — ha a réteg eltűnik (törlés/undo), null-ra esik
   const selectedLayer = doc?.layers.find((l) => l.id === selectedId) ?? null;
@@ -602,6 +651,7 @@ export function ImageStudioBody({
           setPenPoints(null);
           setPathEditId(null);
           setLassoActive(false);
+          setMaskTarget(null);
           setWandActive(false);
           setBrushActive(true);
         })();
@@ -812,7 +862,7 @@ export function ImageStudioBody({
     uri: string,
     u: number,
     v: number,
-    box: { position: { x: number; y: number }; w: number; h: number }
+    source: PhotoLayer
   ) => {
     if (!doc || busy) {
       return;
@@ -822,7 +872,9 @@ export function ImageStudioBody({
       try {
         // Skia-függő mag → lustán töltjük; ha a natív modul hiányzik, a catch kezeli
         const { magicWandSelect } = await import('@/lib/magicWandClient');
-        const outline = await magicWandSelect(uri, u, v);
+        const canvas = effectiveCanvas(doc);
+        const boxAspect = (source.w * canvas.width) / (source.h * canvas.height);
+        const outline = await magicWandSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
         if (outline && outline.length >= 3 && doc) {
           const shape: ShapeLayer = {
             kind: 'shape',
@@ -830,9 +882,12 @@ export function ImageStudioBody({
             shape: 'path',
             points: outline,
             closed: true,
-            position: box.position,
-            w: box.w,
-            h: box.h,
+            position: source.position,
+            w: source.w,
+            h: source.h,
+            rotation: source.rotation,
+            flipH: source.flipH,
+            flipV: source.flipV,
             fill: '#7c5cff',
             opacity: 0.5,
           };
@@ -871,6 +926,12 @@ export function ImageStudioBody({
       }
     }
     setBrushActive(false);
+  };
+
+  // I34: a mégse a maszk-célt is törli, különben a következő sima lasszó a régi rétegre írna
+  const cancelLasso = () => {
+    setLassoActive(false);
+    setMaskTarget(null);
   };
 
   // 🚪 I8: a kész vonások nem vesznek el kérdés nélkül a ✕-re
@@ -1170,7 +1231,16 @@ export function ImageStudioBody({
    * poszttá alakítja. (Felhő-funkció: a render/feltöltés a workert/tárat igényli — a free a
    * telefonon marad; a hiba barátságosan jelenik meg.)
    */
-  const shareToFeed = async (shareMode: ImageShareMode) => {
+  // I43: a megosztás nem azonnal nyilvános — a user választ láthatóságot
+  const confirmShare = (shareMode: ImageShareMode) => {
+    Alert.alert(t('studio.image.shareFeed.confirmTitle'), t('studio.image.shareFeed.confirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('studio.image.shareFeed.followers'), onPress: () => void shareToFeed(shareMode, 'followers') },
+      { text: t('studio.image.shareFeed.public'), onPress: () => void shareToFeed(shareMode, 'public') },
+    ]);
+  };
+
+  const shareToFeed = async (shareMode: ImageShareMode, visibility: PostVisibility) => {
     const s = useEditorStore.getState();
     if (!s.project || busy) {
       return;
@@ -1178,7 +1248,8 @@ export function ImageStudioBody({
     setBusy(true);
     try {
       for (const p of pages) {
-        if (!p.renderedUri) {
+        // I41: a szerkesztés után elavult képet nem osztjuk meg
+        if (!isRenderFresh(p)) {
           const uri = await rasterize(p);
           if (!uri) {
             // I12: inkább nem osztunk meg semmit, mint rossz lapot
@@ -1192,7 +1263,7 @@ export function ImageStudioBody({
       if (!fresh) {
         return;
       }
-      await publishImageProject(fresh, shareMode, { visibility: 'public' });
+      await publishImageProject(fresh, shareMode, { visibility });
       Alert.alert(
         t('studio.image.shareFeed.doneTitle', { defaultValue: 'Megosztva' }),
         t('studio.image.shareFeed.doneBody', { defaultValue: 'A poszt felkerült a feedbe.' })
@@ -1224,6 +1295,15 @@ export function ImageStudioBody({
     }
   };
 
+  // I42: a videóból nyitott szerkesztő X-e sem hagyhatja a klipet a régi képen
+  const exitStudio = () => {
+    if (mode === 'scoped' && doc && scopedOpenKey.current !== imageDocContentKey(doc)) {
+      void saveScoped();
+      return;
+    }
+    onExit();
+  };
+
   if (!project) {
     return null;
   }
@@ -1244,7 +1324,7 @@ export function ImageStudioBody({
     <View style={styles.root}>
       {/* felső sáv */}
       <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>
-        <Pressable onPress={onExit} hitSlop={10} style={styles.topBtn}>
+        <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
         <View style={styles.titleWrap}>
@@ -1331,8 +1411,8 @@ export function ImageStudioBody({
                   accessibilityRole="button"
                   accessibilityLabel={`${p.name} (${i + 1})`}
                 >
-                  {p.renderedUri ? (
-                    <Image source={{ uri: p.renderedUri }} style={styles.pageThumb} resizeMode="cover" />
+                  {p.thumbUri ?? p.renderedUri ? (
+                    <Image source={{ uri: p.thumbUri ?? p.renderedUri }} style={styles.pageThumb} resizeMode="cover" />
                   ) : (
                     <View style={styles.pageThumbEmpty}>
                       <Ionicons name="image-outline" size={16} color={palette.textDim} />
@@ -1467,8 +1547,13 @@ export function ImageStudioBody({
                   <Chip
                     key={p.labelKey ?? p.label}
                     label={p.labelKey ? t(p.labelKey) : p.label}
-                    active={false}
-                    onPress={() => doc && setCropRect(aspectCropRect(doc, p.ratio))}
+                    active={cropPreset === p.ratio}
+                    onPress={() => {
+                      setCropPreset(p.ratio);
+                      if (doc) {
+                        setCropRect(aspectCropRect(doc, p.ratio));
+                      }
+                    }}
                   />
                 ))}
               </ScrollView>
@@ -1555,7 +1640,7 @@ export function ImageStudioBody({
           ) : lassoActive ? (
             /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setLassoActive(false)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable onPress={cancelLasso} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <Text style={styles.lassoLabel} numberOfLines={1}>
@@ -1569,9 +1654,11 @@ export function ImageStudioBody({
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
-              <Text style={styles.lassoLabel} numberOfLines={1}>
-                {t('studio.image.wand.hint')}
-              </Text>
+              <View style={styles.brushRow}>
+                {WAND_TOLERANCES.map((w) => (
+                  <Chip key={w.value} label={t(w.labelKey)} active={wandTolerance === w.value} onPress={() => setWandTolerance(w.value)} />
+                ))}
+              </View>
             </View>
           ) : brushActive ? (
             /* 🖌️ ecset-sáv (szín + méret + Kész) */
@@ -1579,26 +1666,29 @@ export function ImageStudioBody({
               <Pressable onPress={cancelBrush} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
-              <View style={styles.brushRow}>
-                {BRUSH_COLORS.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setBrushColor(c)}
-                    style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
-                  />
-                ))}
-              </View>
-              <View style={styles.brushRow}>
-                {BRUSH_SIZES.map((s) => (
-                  <Pressable
-                    key={s}
-                    onPress={() => setBrushSize(s)}
-                    style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
-                  >
-                    <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
-                  </Pressable>
-                ))}
-              </View>
+              {/* I39: keskeny telefonon görgethető, a Kész gomb mindig látszik */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.brushScroll}>
+                <View style={styles.brushRow}>
+                  {BRUSH_COLORS.map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => setBrushColor(c)}
+                      style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]}
+                    />
+                  ))}
+                </View>
+                <View style={styles.brushRow}>
+                  {BRUSH_SIZES.map((s) => (
+                    <Pressable
+                      key={s}
+                      onPress={() => setBrushSize(s)}
+                      style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
+                    >
+                      <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
               <Pressable onPress={commitBrush} style={styles.cropApply} hitSlop={6}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
                 <Text style={styles.cropApplyText}>{t('common.done')}</Text>
@@ -1662,7 +1752,7 @@ export function ImageStudioBody({
             commit={commit}
             setSheet={setSheet}
             setSelectedId={setSelectedId}
-            onAdd={add}
+            onAdd={(kind) => (kind === 'shape' ? setSheet('shapePicker') : add(kind))}
             onAddShapeType={addShapeType}
             onInsertSource={insertSource}
             onDrawMask={startMaskDraw}
@@ -1672,8 +1762,8 @@ export function ImageStudioBody({
             onPsd={() => void exportPsdFile()}
             canPsd={isPro}
             onVideo={() => void insertIntoVideo()}
-            onShareSlideshow={mode === 'project' ? () => void shareToFeed('slideshow') : undefined}
-            onShareCarousel={mode === 'project' ? () => void shareToFeed('carousel') : undefined}
+            onShareSlideshow={mode === 'project' ? () => confirmShare('slideshow') : undefined}
+            onShareCarousel={mode === 'project' ? () => confirmShare('carousel') : undefined}
             detents={workH > 0 ? sheetDetents : undefined}
             detent={sheetDetent}
             onDetentChange={onSheetDetent}
@@ -1823,6 +1913,7 @@ const styles = StyleSheet.create({
   penDisabled: { opacity: 0.4 },
   lassoLabel: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600', paddingLeft: 4 },
   brushRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  brushScroll: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6 },
   brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
   brushDotActive: { borderColor: palette.text, borderWidth: 3 },
   brushSizeBtn: {

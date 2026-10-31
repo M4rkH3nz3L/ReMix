@@ -1,3 +1,4 @@
+import { normalizeRotation } from '@/lib/imageLayerGeometry';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -268,7 +269,7 @@ export function LayerInspector({
           </View>
           <Slider
             label={t('studio.image.rotation')}
-            value={layer.rotation ?? 0}
+            value={normalizeRotation(layer.rotation ?? 0)}
             min={-180}
             max={180}
             onChange={(v) =>

@@ -27,6 +27,8 @@ interface Props {
   t: number;
   box: { w: number; h: number };
   editable: boolean;
+  /** a szerkesztő-vászon nagyítása: a húzás ennyivel kisebb elmozdulás (alap 1) */
+  zoom?: number;
   selected: boolean;
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
@@ -175,6 +177,7 @@ export function TextOverlay({
   t,
   box,
   editable,
+  zoom = 1,
   selected,
   onSelect,
   onMove,
@@ -205,19 +208,23 @@ export function TextOverlay({
   const commitMove = (dx: number, dy: number) => {
     onDragLive?.(null);
     onMove?.(clip.id, {
-      x: clamp(clip.position.x + dx / box.w, 0.02, 0.98),
-      y: clamp(clip.position.y + dy / box.h, 0.02, 0.98),
+      x: clamp(clip.position.x + dx / zoom / box.w, 0.02, 0.98),
+      y: clamp(clip.position.y + dy / zoom / box.h, 0.02, 0.98),
     });
   };
 
+  // I35: egy ujj — a kétujjas gesztus a vászon csippentéséé
   const pan = Gesture.Pan()
     .enabled(editable)
-    .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX, e.translationY);
+    .maxPointers(1)
+    .onEnd((e, success) => {
+      if (success) {
+        runOnJS(commitMove)(e.translationX, e.translationY);
+      }
     })
     .onUpdate((e) => {
-      dragX.value = e.translationX;
-      dragY.value = e.translationY;
+      dragX.value = e.translationX / zoom;
+      dragY.value = e.translationY / zoom;
       runOnJS(reportLive)(e.translationX, e.translationY);
     });
 

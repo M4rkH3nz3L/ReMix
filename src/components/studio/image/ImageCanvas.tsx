@@ -29,9 +29,9 @@ import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLa
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
-import { renormalizePathLayer } from '@/lib/imageLayerGeometry';
+import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
-import type { ImageDoc, ImageLayer, PathPoint, ShapeLayer } from '@/types/project';
+import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 // lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
 const BrushOverlay = lazy(() =>
@@ -106,7 +106,7 @@ export function ImageCanvas({
     uri: string,
     u: number,
     v: number,
-    box: { position: { x: number; y: number }; w: number; h: number }
+    layer: PhotoLayer
   ) => void;
   /** 🖌️ ecset-mód: Skia raszter-festés (a snapshotot a szülő fotó-rétegként menti) */
   brushActive?: boolean;
@@ -156,7 +156,8 @@ export function ImageCanvas({
   const panGesture = useRef(
     Gesture.Pan()
       .runOnJS(true)
-      .maxPointers(1)
+      // I36: nagyítva a mozgatás KÉT ujjal megy — egy ujj a szerkesztésé (ecset, toll, keret)
+      .minPointers(2)
       .onStart(() => {
         panStart.current = panRef.current;
       })
@@ -182,6 +183,7 @@ export function ImageCanvas({
         setPan((p) => clampPan(p, z, fitRef.current));
       })
   ).current;
+  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture)).current;
   const tf = canvasTransform(zoom, pan, fit);
   const zoomStyle = !capturing && zoom !== 1
     ? { transform: [{ translateX: tf.translateX }, { translateY: tf.translateY }, { scale: tf.scale }] }
@@ -297,17 +299,14 @@ export function ImageCanvas({
 
   // 🪄 varázspálca: a koppintás alatti LEGFELSŐ fotó-réteg + a dobozon belüli lokális (0–1) pont
   const onWandTap = (nx: number, ny: number) => {
+    const canvas = effectiveCanvas(doc);
     for (let i = doc.layers.length - 1; i >= 0; i--) {
       const l = doc.layers[i];
       if (l.kind !== 'photo' || l.hidden) continue;
-      const left = l.position.x - l.w / 2;
-      const top = l.position.y - l.h / 2;
-      if (nx >= left && nx <= left + l.w && ny >= top && ny <= top + l.h) {
-        onWandSeed?.(l.uri, (nx - left) / l.w, (ny - top) / l.h, {
-          position: l.position,
-          w: l.w,
-          h: l.h,
-        });
+      // I33: a réteg forgatása/tükrözése is számít
+      const local = canvasToLayerBox({ x: nx, y: ny }, l, canvas);
+      if (local.x >= 0 && local.x <= 1 && local.y >= 0 && local.y <= 1) {
+        onWandSeed?.(l.uri, local.x, local.y, l);
         return;
       }
     }
@@ -321,7 +320,7 @@ export function ImageCanvas({
       }
     >
       {fit.w > 0 ? (
-        <GestureDetector gesture={pinchGesture}>
+        <GestureDetector gesture={canvasGesture}>
         <View ref={canvasRef} style={[styles.canvas, { width: fit.w, height: fit.h }, capturing && styles.canvasCapture]}>
           {/* 🔍 zoom/pan-wrapper: a tartalom (rétegek + overlay-k) együtt skálázódik/tolódik;
               capture-kor és zoom===1-nél identitás (a raszterizálás + a szerkesztés érintetlen) */}
@@ -344,6 +343,7 @@ export function ImageCanvas({
                   layer={l}
                   box={fit}
                   selected={selected}
+                  zoom={zoom}
                   onSelect={onSelect}
                   onMove={move}
                 />
@@ -355,6 +355,7 @@ export function ImageCanvas({
                   key={l.id}
                   clip={layerToShapeClip(l)}
                   box={fit}
+                  zoom={zoom}
                   editable
                   selected={selected}
                   onSelect={onSelect}
@@ -383,6 +384,7 @@ export function ImageCanvas({
                 clip={layerToTextClip(l)}
                 t={0}
                 box={fit}
+                zoom={zoom}
                 editable
                 selected={selected}
                 onSelect={onSelect}
@@ -405,10 +407,11 @@ export function ImageCanvas({
             />
           ))}
 
-          {!capturing && zoom === 1 && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
+              zoom={zoom}
               onLive={(patch) =>
                 setLive(Object.keys(patch).length ? { id: selectedLayer.id, patch } : null)
               }
@@ -421,7 +424,7 @@ export function ImageCanvas({
 
           {/* ✂️ kivágás-overlay (a kijelölés helyett) */}
           {!capturing && cropRect && onCropRectChange ? (
-            <CropOverlay box={fit} rect={cropRect} onChange={onCropRectChange} />
+            <CropOverlay box={fit} zoom={zoom} rect={cropRect} onChange={onCropRectChange} />
           ) : null}
 
           {/* ✏️ toll-overlay (a kijelölés helyett) */}
@@ -433,6 +436,7 @@ export function ImageCanvas({
           {!capturing && pathEditLive ? (
             <PathEditOverlay
               box={fit}
+              zoom={zoom}
               layer={pathEditLive}
               selectedNode={selectedNode ?? null}
               onSelectNode={onSelectNode ?? (() => {})}
@@ -478,6 +482,7 @@ export function ImageCanvas({
           {!capturing && guidesActive ? (
             <RulersOverlay
               box={fit}
+              zoom={zoom}
               guides={displayGuides}
               onAddGuide={onAddGuide}
               onMoveGuide={(id, pos) => setLiveGuide({ id, pos })}
@@ -485,14 +490,6 @@ export function ImageCanvas({
             />
           ) : null}
           </View>
-
-          {/* 🔍 pan-overlay: zoom>1-nél a teljes vásznon ül → a gesztus a NÉZETET tolja (a szerkesztés
-              szünetel, így a réteg-húzás koordináta-rendszere sértetlen marad) */}
-          {!capturing && zoom !== 1 ? (
-            <GestureDetector gesture={panGesture}>
-              <View style={StyleSheet.absoluteFill} />
-            </GestureDetector>
-          ) : null}
 
           {/* 🔍 zoom-vezérlők (jobb-fönt): nagyítás / kicsinyítés / vissza 1:1-re.
               Kivágás közben rejtve: a vágókeret jobb-felső sarokfogóját takarnák (élő teszt K1) */}

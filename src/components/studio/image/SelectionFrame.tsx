@@ -23,11 +23,13 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 export function SelectionFrame({
   layer,
   box,
+  zoom = 1,
   onLive,
   onCommit,
 }: {
   layer: ImageLayer;
   box: { w: number; h: number };
+  zoom?: number;
   onLive: (patch: LivePatch) => void;
   onCommit: (patch: LivePatch) => void;
 }) {
@@ -76,7 +78,7 @@ export function SelectionFrame({
       const sx = halfW * Math.cos(rad) - halfH * Math.sin(rad);
       const sy = halfW * Math.sin(rad) + halfH * Math.cos(rad);
       const diag = Math.max(1, Math.hypot(halfW, halfH));
-      const factor = clamp(Math.hypot(sx + e.translationX, sy + e.translationY) / diag, 0.12, 8);
+      const factor = clamp(Math.hypot(sx + e.translationX / zoom, sy + e.translationY / zoom) / diag, 0.12, 8);
       if (layer.kind === 'text') {
         const fontSize = clamp(Math.round(layer.fontSize * factor * 10) / 10, 2, 40);
         pending.current = { fontSize };

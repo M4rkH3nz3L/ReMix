@@ -13,6 +13,7 @@ import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { exportSize } from '@/lib/imageExport';
 import { makeId } from '@/lib/id';
+import { magicWandSelect } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject } from '@/lib/projectUtils';
@@ -148,6 +149,46 @@ async function smokeCapture(log: Log, setHarness: (n: ReactNode) => void, ratio:
   setHarness(null);
 }
 
+/** 200×100-as kép: bal 70% piros, jobb 30% kék — aszimmetrikus, hogy a rossz leképezés kilógjon */
+function wandImage(): string {
+  const surface = Skia.Surface.MakeOffscreen(200, 100)!;
+  const canvas = surface.getCanvas();
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#ff0000'));
+  canvas.drawRect(Skia.XYWHRect(0, 0, 140, 100), paint);
+  paint.setColor(Skia.Color('#0000ff'));
+  canvas.drawRect(Skia.XYWHRect(140, 0, 60, 100), paint);
+  surface.flush();
+  const file = new File(projectMediaDir(), `smoke_wand_${Date.now().toString(36)}.png`);
+  file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  return file.uri;
+}
+
+async function smokeWand(log: Log) {
+  const uri = wandImage();
+  // cover négyzetes dobozban: a kép középső fele látszik (0,25–0,75), a kék 0,7-től → dobozban 0,9-től
+  const outline = await magicWandSelect(uri, 0.95, 0.5, 32, { boxAspect: 1, fit: 'cover' });
+  const xs = (outline ?? []).map((p) => p.x);
+  const min = Math.min(...xs);
+  log(!!outline && Math.abs(min - 0.9) < 0.03 && Math.max(...xs) <= 1, 'I33 pálca cover-illesztésnél a kék sávot jelöli', `dobozban x=${min.toFixed(3)}…${Math.max(...xs).toFixed(3)}`);
+  const margin = await magicWandSelect(uri, 0.5, 0.05, 32, { boxAspect: 1, fit: 'contain' });
+  log(margin === null, 'I33 contain-margóra koppintás nem jelöl ki semmit');
+  removeFile(uri);
+}
+
+async function smokeZoomCanvas(log: Log, setHarness: (n: ReactNode) => void) {
+  const doc = testDoc();
+  const layerId = doc.layers[0].id;
+  setHarness(
+    <View style={{ width: 280, height: 280 }}>
+      <ImageCanvas doc={doc} selectedId={layerId} onSelect={() => {}} commit={() => {}} />
+    </View>
+  );
+  await sleep(900);
+  log(true, 'I36 a vászon kijelöléssel, kétujjas-pan gesztussal felépül a natív rétegen');
+  setHarness(null);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -279,6 +320,8 @@ export async function runImageSmoke(
   await step('brush', () => smokeBrush(log));
   await step('intake', () => smokeIntake(log));
   await step('capture', () => smokeCapture(log, setHarness, ratio));
+  await step('wand', () => smokeWand(log));
+  await step('zoom', () => smokeZoomCanvas(log, setHarness));
   await step('autosave', () => smokeAutosave(log, setHarness));
   if (online) {
     await step('worker', () => smokeWorker(log));

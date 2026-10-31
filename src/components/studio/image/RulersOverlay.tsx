@@ -22,12 +22,14 @@ const EDGE = 0.012; // a szélre húzva a segédvonal törlődik (normalizált)
  */
 export function RulersOverlay({
   box,
+  zoom = 1,
   guides,
   onAddGuide,
   onMoveGuide,
   onCommitGuide,
 }: {
   box: { w: number; h: number };
+  zoom?: number;
   guides: ImageGuide[];
   onAddGuide: (axis: 'x' | 'y', pos: number) => void;
   onMoveGuide: (id: string, pos: number) => void;
@@ -55,7 +57,7 @@ export function RulersOverlay({
     <>
       {/* segédvonalak (a vonalzók ALATT, hogy a vonalzó-tap ne ütközzön) */}
       {guides.map((g) => (
-        <GuideLine key={g.id} guide={g} box={box} onMove={onMoveGuide} onCommit={onCommitGuide} />
+        <GuideLine key={g.id} guide={g} box={box} zoom={zoom} onMove={onMoveGuide} onCommit={onCommitGuide} />
       ))}
 
       {/* felső vonalzó */}
@@ -81,16 +83,18 @@ export function RulersOverlay({
 function GuideLine({
   guide,
   box,
+  zoom,
   onMove,
   onCommit,
 }: {
   guide: ImageGuide;
   box: { w: number; h: number };
+  zoom: number;
   onMove: (id: string, pos: number) => void;
   onCommit: (id: string, pos: number | null) => void;
 }) {
-  const dataRef = useRef({ guide, box, onMove, onCommit });
-  dataRef.current = { guide, box, onMove, onCommit };
+  const dataRef = useRef({ guide, box, zoom, onMove, onCommit });
+  dataRef.current = { guide, box, zoom, onMove, onCommit };
   const startRef = useRef(0);
 
   const pan = useRef(
@@ -101,12 +105,12 @@ function GuideLine({
       })
       .onUpdate((e) => {
         const d = dataRef.current;
-        const delta = d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h;
+        const delta = (d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h) / d.zoom;
         d.onMove(d.guide.id, startRef.current + delta);
       })
       .onEnd((e) => {
         const d = dataRef.current;
-        const delta = d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h;
+        const delta = (d.guide.axis === 'x' ? e.translationX / d.box.w : e.translationY / d.box.h) / d.zoom;
         const pos = startRef.current + delta;
         // a szélre húzva törlés
         d.onCommit(d.guide.id, pos < EDGE || pos > 1 - EDGE ? null : pos);

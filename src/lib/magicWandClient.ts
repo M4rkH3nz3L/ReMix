@@ -2,6 +2,7 @@ import { AlphaType, ColorType, Skia } from '@shopify/react-native-skia';
 
 import { magicWandOutline } from '@/lib/magicWand';
 import type { CanvasPoint } from '@/lib/penPath';
+import { boxToImage, imageToBox, type LayerFit } from '@/lib/wandMapping';
 
 /** a flood-fill költsége O(px) → nagy képet erre a hosszabb-oldal-méretre skálázunk */
 const MAX_DIM = 900;
@@ -16,7 +17,8 @@ export async function magicWandSelect(
   uri: string,
   u: number,
   v: number,
-  tolerance = 32
+  tolerance = 32,
+  placement: { boxAspect: number; fit: LayerFit } = { boxAspect: 1, fit: 'stretch' }
 ): Promise<CanvasPoint[] | null> {
   try {
     const data = await Skia.Data.fromURI(uri);
@@ -53,9 +55,16 @@ export async function magicWandSelect(
     if (!px || !(px instanceof Uint8Array)) {
       return null;
     }
-    const sx = Math.max(0, Math.min(w - 1, Math.round(u * (w - 1))));
-    const sy = Math.max(0, Math.min(h - 1, Math.round(v * (h - 1))));
-    return magicWandOutline(px, w, h, sx, sy, tolerance);
+    // I33: a koppintás doboz-lokális, a pixelek a kép sajátjai — a `fit` köti össze őket
+    const imageAspect = ow / oh;
+    const seed = boxToImage({ x: u, y: v }, imageAspect, placement.boxAspect, placement.fit);
+    if (!seed) {
+      return null; // a `contain` margójára koppintott
+    }
+    const sx = Math.max(0, Math.min(w - 1, Math.round(seed.x * (w - 1))));
+    const sy = Math.max(0, Math.min(h - 1, Math.round(seed.y * (h - 1))));
+    const outline = magicWandOutline(px, w, h, sx, sy, tolerance);
+    return outline ? outline.map((p) => imageToBox(p, imageAspect, placement.boxAspect, placement.fit)) : null;
   } catch {
     return null;
   }

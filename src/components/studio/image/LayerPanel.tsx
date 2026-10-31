@@ -186,8 +186,8 @@ function LayerRow({
         color={l.hidden ? palette.textDim : palette.text}
         onPress={() => commit(toggleLayerHidden(doc, l.id), t('studio.image.undoVisibility'))}
       />
-      <IconBtn icon="chevron-up" onPress={() => commit(reorderLayer(doc, l.id, 1))} />
-      <IconBtn icon="chevron-down" onPress={() => commit(reorderLayer(doc, l.id, -1))} />
+      <IconBtn icon="chevron-up" onPress={() => commit(reorderLayer(doc, l.id, 1), t('studio.image.undoReorder'))} />
+      <IconBtn icon="chevron-down" onPress={() => commit(reorderLayer(doc, l.id, -1), t('studio.image.undoReorder'))} />
       <IconBtn
         icon="copy-outline"
         onPress={() => commit(duplicateLayer(doc, l.id, () => makeId('lyr')), t('studio.image.undoDuplicate'))}

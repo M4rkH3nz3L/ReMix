@@ -17,12 +17,15 @@ export function PhotoLayerView({
   layer,
   box,
   selected,
+  zoom = 1,
   onSelect,
   onMove,
 }: {
   layer: PhotoLayer;
   box: { w: number; h: number };
   selected: boolean;
+  /** a vászon nagyítása — a képernyő-húzás ennyivel kisebb réteg-elmozdulás */
+  zoom?: number;
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {
@@ -31,20 +34,30 @@ export function PhotoLayerView({
 
   const commitMove = (dx: number, dy: number) => {
     onMove?.(layer.id, {
-      x: clamp(layer.position.x + dx / box.w, 0.02, 0.98),
-      y: clamp(layer.position.y + dy / box.h, 0.02, 0.98),
+      x: clamp(layer.position.x + dx / zoom / box.w, 0.02, 0.98),
+      y: clamp(layer.position.y + dy / zoom / box.h, 0.02, 0.98),
     });
     dragX.value = 0;
     dragY.value = 0;
   };
 
+  // I35: csak KIJELÖLT fotó húzható (a teljes vásznas háttér ne mozduljon el véletlenül), és
+  // csak egy ujjal — a kétujjas gesztus a vászon csippentéséé
   const pan = Gesture.Pan()
+    .withTestId(`photo-pan-${layer.id}`)
+    .enabled(selected)
+    .maxPointers(1)
     .onUpdate((e) => {
-      dragX.value = e.translationX;
-      dragY.value = e.translationY;
+      dragX.value = e.translationX / zoom;
+      dragY.value = e.translationY / zoom;
     })
-    .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX, e.translationY);
+    .onEnd((e, success) => {
+      if (success) {
+        runOnJS(commitMove)(e.translationX, e.translationY);
+      } else {
+        dragX.value = 0;
+        dragY.value = 0;
+      }
     });
 
   const tap = Gesture.Tap().onEnd(() => {

@@ -3105,6 +3105,15 @@
       "layer": "Ebene"
     },
     "image": {
+      "shareFeed": {
+        "confirmTitle": "Im Feed teilen",
+        "confirmBody": "Wer darf diesen Beitrag sehen?",
+        "followers": "Nur Follower",
+        "public": "Öffentlich",
+        "noSlides": "Keine gerenderten Seiten für die Diashow.",
+        "noCarousel": "Keine gerenderten Seiten für das Karussell."
+      },
+      "undoReorder": "Ebenenreihenfolge",
       "svgPartialTitle": "SVG teilweise importiert",
       "svgPartialBody": "Diese Elemente konnten nicht importiert werden und fehlen: {{items}}",
       "missingInExport": {
@@ -3266,6 +3275,9 @@
       },
       "lasso": { "hint": "Freihand eine geschlossene Form zeichnen" },
       "wand": {
+        "tight": "Eng",
+        "normal": "Mittel",
+        "wide": "Weit",
         "hint": "Tippe ein Foto an, um einen ähnlichen Farbbereich auszuwählen",
         "failTitle": "Keine Auswahl",
         "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene."

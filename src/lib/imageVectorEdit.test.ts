@@ -2,6 +2,7 @@
 import { canvasToLayerBox, dragInLayer, layerBoxToCanvas, renormalizePathLayer } from '@/lib/imageLayerGeometry';
 import { alignLayerToCanvas, distributeLayersInDoc, layerRect, positionedLayerCount } from '@/lib/imageLayerLayout';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
+import { booleanCombineInDoc } from '@/lib/imageBoolean';
 import { dragHandle, nodeType } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
 
@@ -113,5 +114,25 @@ describe('I31 — kompozíciós segédvonalak', () => {
     expect(once).toHaveLength(7);
     expect(once[0]).toBe(manual[0]);
     expect(mergeGuides(once, compositionGuides())).toHaveLength(7);
+  });
+});
+
+describe('logikai művelet motorral', () => {
+  const doc = { id: 'd', name: 'n', layers: [
+    { kind: 'shape', id: 'a', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#111111', stroke: { color: '#ff0000', width: 0.01 } },
+    { kind: 'shape', id: 'b', shape: 'ellipse', position: { x: 0.6, y: 0.5 }, w: 0.5, h: 0.5, fill: '#222222' },
+  ] } as unknown as ImageDoc;
+  it('a motor eredménye kerül a rétegre, az alsó forma stílusával', () => {
+    const subpaths = [[{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]];
+    const out = booleanCombineInDoc(doc, 'b', 'union', () => ({ subpaths, fillRule: 'evenodd' }))!;
+    const layer = out.doc.layers[0] as ShapeLayer;
+    expect(out.doc.layers).toHaveLength(1);
+    expect(layer.subpaths).toEqual(subpaths);
+    expect(layer.fillRule).toBe('evenodd');
+    expect(layer.fill).toBe('#111111');
+    expect(layer.stroke).toEqual({ color: '#ff0000', width: 0.01 });
+  });
+  it('a motor üres eredménye nem nyúl a dokumentumhoz', () => {
+    expect(booleanCombineInDoc(doc, 'b', 'intersect', () => null)).toBeNull();
   });
 });

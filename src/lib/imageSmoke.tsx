@@ -9,6 +9,8 @@ import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/stud
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
 import { Asset } from 'expo-asset';
+import { layerSkPath, skiaBooleanEngine } from '@/components/studio/image/skiaVector';
+import { booleanCombineInDoc } from '@/lib/imageBoolean';
 import { anchorFromDrag, type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import { setNodeType } from '@/lib/vectorPath';
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
@@ -1235,6 +1237,73 @@ async function smokeVector(log: Log, setHarness: (n: ReactNode) => void, ratio: 
   }
 }
 
+/** A logikai műveletek eredménye a két forrásformához mérve, függetlenül; és a vászon a szerver ellen. */
+async function smokeBoolean(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const canvas = { width: 320, height: 240 };
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const star = { kind: 'shape', id: 'a', shape: 'star', starPoints: 5, innerRatio: 0.4, position: { x: 0.45, y: 0.5 }, w: 0.6, h: 0.8, rotation: 20, fill: '#ff2d95' } as unknown as ShapeLayer;
+  const ball = { kind: 'shape', id: 'b', shape: 'ellipse', position: { x: 0.6, y: 0.5 }, w: 0.4, h: 0.5, fill: '#2060e0' } as unknown as ShapeLayer;
+  const ringDoc = { id: 'full', name: 'p', aspectRatio: '4:3', width: 320, height: 240, layers: [bg, star, ball] } as unknown as ImageDoc;
+  const engine = skiaBooleanEngine(canvas);
+  const [pa, pb] = [layerSkPath(star, canvas), layerSkPath(ball, canvas)];
+  const rule: Record<string, (x: boolean, y: boolean) => boolean> = { union: (x, y) => x || y, subtract: (x, y) => x && !y, intersect: (x, y) => x && y, exclude: (x, y) => x !== y };
+  for (const op of ['union', 'subtract', 'intersect', 'exclude'] as const) {
+    const out = booleanCombineInDoc(ringDoc, 'b', op, engine);
+    if (!out) {
+      log(false, `logika: ${op}`, 'nincs eredmény');
+      continue;
+    }
+    const layer = out.doc.layers.find((l) => l.id === out.resultId) as ShapeLayer;
+    const res = layerSkPath(layer, canvas);
+    let wrong = 0;
+    let total = 0;
+    for (let y = 4; y < 240; y += 8) {
+      for (let x = 4; x < 320; x += 8) {
+        total += 1;
+        if (res.contains(x, y) !== rule[op](pa.contains(x, y), pb.contains(x, y))) wrong += 1;
+      }
+    }
+    // ellenpróba: a régi, sokszöges mag ugyanezen a bemeneten
+    const old = booleanCombineInDoc(ringDoc, 'b', op);
+    let oldWrong = -1;
+    if (old) {
+      const oldPath = layerSkPath(old.doc.layers.find((l) => l.id === old.resultId) as ShapeLayer, canvas);
+      oldWrong = 0;
+      for (let y = 4; y < 240; y += 8) {
+        for (let x = 4; x < 320; x += 8) {
+          if (oldPath.contains(x, y) !== rule[op](pa.contains(x, y), pb.contains(x, y))) oldWrong += 1;
+        }
+      }
+    }
+    log(null, `régi mag: ${op}`, `${oldWrong}/${total} pont hibás`);
+    const curves = layer.subpaths!.flat().filter((p) => p.h1 || p.h2).length;
+    const nodes = layer.subpaths!.flat().length;
+    log(wrong <= 3 && (op === 'exclude' || curves > 0), `logika: ${op}`, `${wrong}/${total} pont hibás, ${nodes} csomópont, ebből ${curves} görbe`);
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 260 }}>
+        <ImageCanvas doc={out.doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1200);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 240 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [exp, ctl] = [await renderImageDoc(out.doc, 240), await renderImageDoc(ringDoc, 240)];
+    if (exp && ctl) {
+      const d = meanDiff(a, await decode(exp), 320, 240);
+      const c = meanDiff(a, await decode(ctl), 320, 240);
+      log(d <= 5 && c >= d * 1.5, `logika = export: ${op}`, `átlag ${d.toFixed(1)}/255; a művelet nélkül ${c.toFixed(1)}`);
+      removeFile(exp);
+      removeFile(ctl);
+    } else {
+      log(false, `logika = export: ${op}`, 'nincs render');
+    }
+    removeFile(shot);
+  }
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1427,6 +1496,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'boolean') {
+    await step('boolean', () => smokeBoolean(log, setHarness, ratio));
     return;
   }
   if (phase === 'vector') {

@@ -1,7 +1,7 @@
 import { booleanShapes, divideShapes, type BooleanOp } from '@/lib/boolean';
 import { makeId } from '@/lib/id';
 import { layerToShapeClip } from '@/lib/imageLayerClip';
-import type { ImageDoc, ShapeLayer } from '@/types/project';
+import type { ImageDoc, PathPoint, ShapeLayer } from '@/types/project';
 
 /**
  * 🔗 Image Studio boolean-kombináció (07 §2.6) — a `boolean` magot köti a réteg-
@@ -12,6 +12,14 @@ import type { ImageDoc, ShapeLayer } from '@/types/project';
  *
  * SZÁNDÉKOSAN pure (boolean/clip-adapter/id + típus) → tesztelhető.
  */
+
+export interface BooleanResult {
+  subpaths: PathPoint[][];
+  fillRule: 'nonzero' | 'evenodd';
+}
+
+/** A vászon a görbe-megtartó Skia-motort adja át; nélküle a tiszta, sokszöges mag fut. */
+export type BooleanEngine = (base: ShapeLayer, sel: ShapeLayer, op: BooleanOp) => BooleanResult | null;
 
 /** a kijelölt forma + a hozzá legközelebbi MÁSIK forma indexei (alatta előnyben). */
 function findShapePair(doc: ImageDoc, selectedId: string): { baseIdx: number; selIdx: number } | null {
@@ -46,7 +54,8 @@ export function canBoolean(doc: ImageDoc | null, selectedId: string | null): boo
 export function booleanCombineInDoc(
   doc: ImageDoc,
   selectedId: string,
-  op: BooleanOp
+  op: BooleanOp,
+  engine?: BooleanEngine
 ): { doc: ImageDoc; resultId: string } | null {
   const pair = findShapePair(doc, selectedId);
   if (!pair) {
@@ -54,7 +63,7 @@ export function booleanCombineInDoc(
   }
   const base = doc.layers[pair.baseIdx] as ShapeLayer;
   const sel = doc.layers[pair.selIdx] as ShapeLayer;
-  const result = booleanShapes(layerToShapeClip(base), layerToShapeClip(sel), op);
+  const result = engine ? engine(base, sel, op) : booleanShapes(layerToShapeClip(base), layerToShapeClip(sel), op);
   if (!result) {
     return null;
   }
@@ -71,6 +80,12 @@ export function booleanCombineInDoc(
     fillRule: result.fillRule,
     closed: true,
     ...(base.opacity != null ? { opacity: base.opacity } : {}),
+    // a stílus megmarad: az eredmény az alsó forma kinézetét viszi tovább
+    ...(base.fillGradient ? { fillGradient: base.fillGradient } : {}),
+    ...(base.gradient ? { gradient: base.gradient } : {}),
+    ...(base.stroke ? { stroke: base.stroke } : {}),
+    ...(base.dropShadow ? { dropShadow: base.dropShadow } : {}),
+    ...(base.outerGlow ? { outerGlow: base.outerGlow } : {}),
   } as ShapeLayer;
   const layers = doc.layers
     .map((l, i) => (i === pair.baseIdx ? combined : l))

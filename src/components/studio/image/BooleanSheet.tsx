@@ -5,7 +5,9 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
 import type { BooleanOp } from '@/lib/boolean';
+import { effectiveCanvas } from '@/lib/canvasPresets';
 import { booleanCombineInDoc } from '@/lib/imageBoolean';
+import { logCaught } from '@/lib/logCaught';
 import type { ImageDoc } from '@/types/project';
 
 const OPS: { op: BooleanOp; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
@@ -34,8 +36,15 @@ export function BooleanSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const apply = (op: BooleanOp) => {
-    const out = booleanCombineInDoc(doc, selectedId, op);
+  const apply = async (op: BooleanOp) => {
+    // a Skia-motor megtartja a görbéket; ha a natív modul hiányzik, a tiszta mag dolgozik
+    const engine = await import('@/components/studio/image/skiaVector')
+      .then((m) => m.skiaBooleanEngine(effectiveCanvas(doc)))
+      .catch((caught: unknown) => {
+        logCaught('components/studio/image/BooleanSheet.tsx:apply', caught);
+        return undefined;
+      });
+    const out = booleanCombineInDoc(doc, selectedId, op, engine);
     if (!out) {
       Alert.alert(t('studio.image.boolean.title'), t('studio.image.boolean.empty'));
       return;
@@ -52,7 +61,7 @@ export function BooleanSheet({
           <Pressable
             key={o.op}
             style={styles.btn}
-            onPress={() => apply(o.op)}
+            onPress={() => void apply(o.op)}
             accessibilityRole="button"
             accessibilityLabel={t(o.labelKey)}
           >

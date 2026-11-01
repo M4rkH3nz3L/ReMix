@@ -4372,14 +4372,15 @@
     "egress": {
       "title": "Multistream / Aufnahme",
       "starting": "Startet…",
-      "failed": "Läuft nicht",
+      "failed": "Multistream aus",
       "recording": "Aufnahme",
       "on": "{{count}} Plattformen",
       "skipped": "Diese Ziele wurden übersprungen (ungültige oder interne Adresse): {{names}}",
       "reason_needsPro": "Multistreaming und Cloud-Aufnahme sind Pro-Funktionen — in ReMix läuft der Stream weiter.",
       "reason_busy": "Es läuft bereits ein Multistream — beende ihn und starte den Stream neu.",
       "reason_unavailable": "Der Multistream-Dienst ist gerade nicht verfügbar — in ReMix läuft der Stream weiter.",
-      "reason_noTargets": "Kein Plattformziel aktiviert und Aufnahme aus.",
+      "reason_noTargets": "Keines deiner Plattformziele ist nutzbar. Prüfe die Adressen im Studio. Die Sendung läuft auf ReMix weiter.",
+      "reason_recordUnavailable": "Die Aufnahme kann gerade nicht starten. Die Sendung läuft auf ReMix weiter.",
       "reason_unknown": "Der Multistream ist nicht gestartet — in ReMix läuft der Stream weiter."
     },
     "dest": {

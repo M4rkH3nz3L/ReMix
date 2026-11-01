@@ -4367,14 +4367,15 @@
     "egress": {
       "title": "Multistream / felvétel",
       "starting": "Indul…",
-      "failed": "Nem fut",
+      "failed": "Multistream nem fut",
       "recording": "Felvétel",
       "on": "{{count}} platform",
       "skipped": "Ezek a célok kimaradtak (érvénytelen vagy belső cím): {{names}}",
       "reason_needsPro": "A multistream és a felhős felvétel Pro-funkció — a ReMix-en belül az adás megy tovább.",
       "reason_busy": "Már fut egy multistream — állítsd le az előzőt, aztán indítsd újra az adást.",
       "reason_unavailable": "A multistream-szolgáltatás most nem érhető el — a ReMix-en belül az adás megy tovább.",
-      "reason_noTargets": "Nincs engedélyezett platform-cél, és a felvétel sincs bekapcsolva.",
+      "reason_noTargets": "Egyik platform-cél sem használható, ellenőrizd a címüket a Stúdióban. A ReMix-en belül az adás megy tovább.",
+      "reason_recordUnavailable": "A felvétel most nem indítható, a ReMix-en belül az adás megy tovább.",
       "reason_unknown": "A multistream nem indult el — a ReMix-en belül az adás megy tovább."
     },
     "dest": {

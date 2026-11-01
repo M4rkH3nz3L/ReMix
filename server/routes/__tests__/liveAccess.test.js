@@ -16,7 +16,7 @@ jest.mock('../../notify', () => ({
   }),
 }));
 
-const { resolveLiveAccess } = require('../live');
+const { liveIdentity, resolveLiveAccess } = require('../live');
 
 beforeEach(() => {
   mockFail = false;
@@ -36,4 +36,11 @@ test('nem létező szoba → 404, befejezett adás → 410', async () => {
 test('DB-hiba prod-módban → 503 (nem enged tovább)', async () => {
   mockFail = true;
   expect((await resolveLiveAccess('room1', 'host', true)).status).toBe(503);
+});
+
+test('a néző eszközönként egyedi, a host identitása a fiók marad', () => {
+  expect(liveIdentity('u1', true)).toBe('u1');
+  const [a, b] = [liveIdentity('u1', false), liveIdentity('u1', false)];
+  expect(a).not.toBe('u1');
+  expect(a).not.toBe(b);
 });

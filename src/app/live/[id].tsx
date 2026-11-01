@@ -28,6 +28,7 @@ import { encodeScenePayload, type ScenePayload } from '@/lib/liveComposite';
 import {
   egressFailure,
   initialLiveState,
+  isHostDevice,
   isOnAir,
   liveReducer,
   type EgressStatus,
@@ -230,7 +231,7 @@ export default function LiveRoomScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
   const me = myUserId();
   // 🌐 weben nincs közvetítés (csak nézés) — a saját élőjét is nézőként látja
-  const isHost = !IS_WEB_VIEWER && session != null && session.hostId === me;
+  const isHost = !IS_WEB_VIEWER && isHostDevice(session?.hostId, me ?? undefined, projectParam ? String(projectParam) : undefined);
 
   const addFloat = useCallback((emoji: string) => {
     // esemény-handler (nem render) → itt szabad a Math.random
@@ -290,7 +291,7 @@ export default function LiveRoomScreen() {
         onViewers: (count) => {
           setViewers(count);
           // a host frissíti a csúcs-nézőszámot (RLS: csak ő)
-          if (s.hostId === self.id) {
+          if (s.hostId === self.id && projectParam) {
             void bumpViewerPeak(liveId, count);
           }
         },
@@ -340,7 +341,7 @@ export default function LiveRoomScreen() {
             .catch((e: Error) => {
             logCaught('app/live/[id].tsx:LiveRoomScreen', e);
               // L17: a hiba LÁTHATÓ (eddig elnyelve → a host azt hitte, multistreamel)
-              const reason = egressFailure(String(e?.message ?? ''));
+              const reason = egressFailure(String(e?.message ?? ''), wantRecord);
               setEgress({ state: 'failed', reason });
               if (active) Alert.alert(tRef.current('live.egress.title'), tRef.current(`live.egress.reason_${reason}`));
             });

@@ -86,6 +86,8 @@ function ScreenShareControl({ wantScreen }: { wantScreen: boolean }) {
  */
 function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
   const { localParticipant } = useLocalParticipant();
+  const connectedRef = useRef(false);
+  connectedRef.current = useConnectionState() === 'connected';
   const sceneRef = useRef<ScenePayload | null>(scene);
   useEffect(() => {
     sceneRef.current = scene;
@@ -94,7 +96,8 @@ function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
     const send = () => {
       const p = localParticipant;
       const s = sceneRef.current;
-      if (!p || !s || typeof TextEncoder === 'undefined') {
+      // kapcsolat nélkül a küldés biztosan elbukna: a következő ütem újrapróbálja
+      if (!p || !s || !connectedRef.current || typeof TextEncoder === 'undefined') {
         return;
       }
       try {
@@ -298,6 +301,11 @@ export default function LiveVideoStage({
         audio={publish}
         video={publish ? { facingMode: facing === 'back' ? 'environment' : 'user' } : false}
         onDisconnected={() => onConnection?.('disconnected')}
+        onError={(caught) => {
+          // elérhetetlen médiaszervernél is hiba látsszon, ne örök „Csatlakozás…”
+          logCaught('components/live/LiveVideoStage.tsx:room', caught);
+          onConnection?.('disconnected');
+        }}
       >
         {onConnection ? <ConnectionReporter onConnection={onConnection} /> : null}
         <LiveComposite payload={scene} hostAvatar={hostAvatar} />

@@ -60,6 +60,8 @@ export function liveReducer(s: LiveState, e: LiveEvent): LiveState {
       return s;
     case 'DISCONNECTED':
       if (s.phase === 'live') return go(s, 'reconnecting', e.at, { drops: s.drops + 1 });
+      // a kapcsolat létre sem jött: az időkorlát után hiba látszik, nem örök „Csatlakozás…”
+      if (s.phase === 'connecting') return go(s, 'reconnecting', e.at);
       if (s.phase === 'stopping') return go(s, 'ended', e.at);
       return s;
     case 'TICK':
@@ -95,13 +97,22 @@ export type EgressStatus =
   | { state: 'on'; destinations: number; recording: boolean; skipped: number }
   | { state: 'failed'; reason: EgressFailure };
 
-export type EgressFailure = 'needsPro' | 'busy' | 'unavailable' | 'noTargets' | 'unknown';
+/**
+ * Házigazda az az eszköz, amelyik a Stúdióból elindította az adást (ott van `project` paraméter).
+ * A fiók önmagában nem elég: ugyanazzal a fiókkal a másik eszköz nézőként lép be, különben ő is
+ * kamerát publikálna, és a kilépése lezárná az adást.
+ */
+export const isHostDevice = (hostId: string | undefined, me: string | undefined, project: string | undefined): boolean =>
+  !!hostId && hostId === me && !!project;
+
+export type EgressFailure = 'needsPro' | 'busy' | 'unavailable' | 'noTargets' | 'recordUnavailable' | 'unknown';
 
 /** a szerver egress-hibája (HTTP-státusz az üzenetben) → érthető ok */
-export function egressFailure(message: string): EgressFailure {
+export function egressFailure(message: string, record = false): EgressFailure {
   if (/\(402\)|pro/i.test(message)) return 'needsPro';
   if (/\(429\)|már fut/i.test(message)) return 'busy';
   if (/\(503\)|nincs konfigurálva|nem válaszolt|network request failed/i.test(message)) return 'unavailable';
-  if (/\(400\)|nincs sem engedélyezett/i.test(message)) return 'noTargets';
+  // a szerver üzenete akkor is ez, ha a felvétel be volt kapcsolva, csak nem indítható
+  if (/\(400\)|nincs sem engedélyezett/i.test(message)) return record ? 'recordUnavailable' : 'noTargets';
   return 'unknown';
 }

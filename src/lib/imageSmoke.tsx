@@ -20,6 +20,7 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { endLive, startLive } from '@/lib/live';
 import { DEFAULT_PALETTE, encodeFrame, floodFill, paintLine, pixelLayerBox, pixelLayerScale, type PixelArt, type PixelFrame } from '@/lib/pixelArt';
 import { writeLayerPng, writePixelGif, writeSpriteSheet } from '@/lib/pixelArtClient';
 import { PixelStudio } from '@/components/studio/image/PixelStudio';
@@ -2098,6 +2099,32 @@ async function smokeGestureScreens(log: Log) {
   }
 }
 
+/** Élő adás két eszközön: az egyik ad, a másik néz; a szerver oldali ellenőrzés a Macről fut. */
+async function smokeLiveHost(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const project = createEmptyProject('smoke live', '9:16', undefined, 'live');
+  await saveProject(project);
+  const session = await startLive('smoke live');
+  log(null, 'LIVEID', session.id);
+  router.push(`/live/${session.id}?project=${project.id}` as Href);
+  await sleep(60000);
+  await endLive(session.id);
+  log(null, 'LIVEEND', session.id);
+  await sleep(1500);
+  router.back();
+  await sleep(1500);
+  await deleteProject(project.id);
+}
+
+async function smokeLiveView(log: Log, id: string) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  router.push(`/live/${id}` as Href);
+  await sleep(30000);
+  log(true, 'FOTÓZHATÓ', 'néző');
+  await sleep(6000);
+  router.back();
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2290,6 +2317,14 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'livehost') {
+    await step('livehost', () => smokeLiveHost(log));
+    return;
+  }
+  if (phase.startsWith('liveview-')) {
+    await step('liveview', () => smokeLiveView(log, phase.slice('liveview-'.length)));
     return;
   }
   if (phase === 'screens') {

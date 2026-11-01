@@ -7,6 +7,7 @@ const { logCaught } = require('../lib/caught');
 // séma-validáció itt NEM kerül be: a handlerek a 503 (LiveKit-config) / 401 ellenőrzést
 // a mező-ellenőrzés ELŐTT végzik.
 
+const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const { AccessToken } = require('livekit-server-sdk');
@@ -52,6 +53,14 @@ async function resolveLiveAccess(room, uid, requested) {
   return { status: 200, canPublish: requested && data.host_id === uid, hostId: data.host_id };
 }
 
+/**
+ * A LiveKit az azonos identitást kidobja: a néző eszközönként egyedi, így ugyanazzal a fiókkal is
+ * nézhető az adás. A host identitása marad a fiók, mert az egress és a néző ezzel hitelesíti.
+ */
+function liveIdentity(uid, canPublish) {
+  return canPublish ? uid : `${uid}-v-${crypto.randomBytes(4).toString('hex')}`;
+}
+
 /** a megjelenítendő név a profilból (nem a kliens küldi → nincs megszemélyesítés) */
 async function displayNameFor(uid) {
   const sb = adminClient();
@@ -89,7 +98,7 @@ router.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimi
     }
     const canPublish = access.canPublish === true;
     const name = INSECURE_DEV && !adminClient() ? String(req.body?.name || uid).slice(0, 80) : await displayNameFor(uid);
-    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: uid, name, ttl: '2h' });
+    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: liveIdentity(uid, canPublish), name, ttl: '2h' });
     // a néző CSAK feliratkozik: nincs publish, nincs adatküldés (L1)
     at.addGrant({ roomJoin: true, room, canPublish, canSubscribe: true, canPublishData: canPublish });
     const token = await at.toJwt();
@@ -225,3 +234,4 @@ router.get('/live/egress-layout', (_req, res) => {
 
 module.exports = router;
 module.exports.resolveLiveAccess = resolveLiveAccess;
+module.exports.liveIdentity = liveIdentity;

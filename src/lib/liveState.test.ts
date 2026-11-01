@@ -1,5 +1,6 @@
 import {
   egressFailure,
+  isHostDevice,
   initialLiveState,
   isOnAir,
   liveReducer,
@@ -53,5 +54,37 @@ describe('liveReducer (PRO-LIVE L13)', () => {
     expect(egressFailure('Egress-hiba (402)')).toBe('needsPro');
     expect(egressFailure('Már fut 1 élő multistream (max 1).')).toBe('busy');
     expect(egressFailure('LiveKit Egress nincs konfigurálva.')).toBe('unavailable');
+  });
+});
+
+describe('isHostDevice', () => {
+  it('az indító eszköz a házigazda', () => {
+    expect(isHostDevice('u1', 'u1', 'prj1')).toBe(true);
+  });
+
+  it('ugyanazzal a fiókkal a másik eszköz néző', () => {
+    expect(isHostDevice('u1', 'u1', undefined)).toBe(false);
+  });
+
+  it('más fiók néző, a betöltés alatt senki nem házigazda', () => {
+    expect(isHostDevice('u1', 'u2', 'prj1')).toBe(false);
+    expect(isHostDevice(undefined, undefined, 'prj1')).toBe(false);
+  });
+});
+
+describe('egressFailure felvétellel', () => {
+  it('bekapcsolt felvételnél nem azt mondja, hogy ki van kapcsolva', () => {
+    expect(egressFailure('Nincs sem engedélyezett RTMP-cél', true)).toBe('recordUnavailable');
+    expect(egressFailure('Nincs sem engedélyezett RTMP-cél', false)).toBe('noTargets');
+  });
+});
+
+describe('sikertelen csatlakozás', () => {
+  it('a csatlakozás közbeni bontás az időkorlát után hibára fut', () => {
+    const connecting = liveReducer(initialLiveState(), { type: 'CONNECT', at: 0 });
+    const down = liveReducer(connecting, { type: 'DISCONNECTED', at: 10 });
+    expect(down.phase).toBe('reconnecting');
+    expect(down.drops).toBe(0);
+    expect(liveReducer(down, { type: 'TICK', at: 40_000 })).toMatchObject({ phase: 'error', error: 'reconnectTimeout' });
   });
 });

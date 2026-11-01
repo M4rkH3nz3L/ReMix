@@ -4367,14 +4367,15 @@
     "egress": {
       "title": "Multistream / recording",
       "starting": "Starting…",
-      "failed": "Not running",
+      "failed": "Multistream off",
       "recording": "Recording",
       "on": "{{count}} platforms",
       "skipped": "These targets were skipped (invalid or internal address): {{names}}",
       "reason_needsPro": "Multistreaming and cloud recording are Pro features — the stream continues inside ReMix.",
       "reason_busy": "A multistream is already running — stop it, then restart the stream.",
       "reason_unavailable": "The multistream service isn't available right now — the stream continues inside ReMix.",
-      "reason_noTargets": "No platform target is enabled and recording is off.",
+      "reason_noTargets": "None of your platform targets can be used. Check their addresses in the Studio. The broadcast continues on ReMix.",
+      "reason_recordUnavailable": "Recording can't start right now. The broadcast continues on ReMix.",
       "reason_unknown": "The multistream didn't start — the stream continues inside ReMix."
     },
     "dest": {

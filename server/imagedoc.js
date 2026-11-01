@@ -319,6 +319,20 @@ function watermarkLayer() {
   };
 }
 
+/**
+ * 🖊️ A szöveg körvonala valódi betű-kontúr (`-webkit-text-stroke`): a felnagyított sziluett a
+ * betűk közepén nem adna keretet. A CSS-vonal fele esik kifelé, ezért a kétszerese kell.
+ */
+function textWithStroke(layer, canvas) {
+  const width = Number(layer.stroke?.width) || 0;
+  if (width <= 0) {
+    return layer;
+  }
+  const fontPx = ((layer.fontSize ?? 8) / 100) * canvas.h;
+  const stroke = { color: layer.stroke.color, width: (2 * width * canvas.w) / fontPx };
+  return { ...layer, textStyle: { ...layer.textStyle, stroke } };
+}
+
 const MAX_REMOTE_BYTES = 40 * 1024 * 1024;
 
 /**
@@ -383,7 +397,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     .map((l) => (l.kind === 'fill' ? { ...fillAsShape(l), opacity: 1 } : { ...l, kind: 'shape', opacity: 1 }));
   const textLike = layers
     .filter((l) => l.kind === 'text')
-    .map((l) => ({ ...l, kind: 'text', animation: 'none', start: 0, duration: 1 }));
+    .map((l) => ({ ...textWithStroke(l, canvas), kind: 'text', animation: 'none', start: 0, duration: 1 }));
 
   const rendered = new Map(); // layer.id → png útvonal
   if (shapeLike.length > 0) {
@@ -577,7 +591,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
 
     // 🖊️ kontúr/stroke (pozícionált rétegre): a réteg színezett, N px-rel megnövelt sziluettje
     // MÖGÉ (középre) — a réteghez legközelebb (a glow/árnyék UTÁN). N a vászonszélesség törtje.
-    if (layer.stroke && layer.kind !== 'fill') {
+    if (layer.stroke && layer.kind !== 'fill' && layer.kind !== 'text') {
       const sw = Math.max(1, Math.round(canvas.w * (Number(layer.stroke.width) || 0)));
       if (sw >= 1 && Number(layer.stroke.width) > 0) {
         const kout = `st${idx}`;

@@ -20,22 +20,20 @@ import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
-import { gradeTint } from '@/constants/grades';
-import { adjustTintLayers } from '@/lib/adjustPreview';
 import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { layerToShapeClip, layerToTextClip, textEffectStyle, type LivePatch } from '@/lib/imageLayerClip';
-import { DocVignette } from '@/components/studio/image/DocVignette';
+import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
 import { ShapeEffects } from '@/components/studio/image/ShapeEffects';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
-import { correctHex, correctionsAbove, docVignetteAngles } from '@/lib/imagePixelPipeline';
+import { correctHex, correctPaint, correctionsAbove, docVignetteAngles, maskedCorrectionsAbove } from '@/lib/imagePixelPipeline';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
-import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 // lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
 const BrushOverlay = lazy(() =>
@@ -411,7 +409,7 @@ export function ImageCanvas({
             const l = live?.id === raw.id ? withLive(raw, live.patch) : raw;
             const selected = !capturing && l.id === selectedId;
             if (l.kind === 'fill') {
-              return <FillLayerView key={l.id} layer={{ ...l, fill: correctHex(l.fill, correctionsAbove(doc, l.id)) }} box={fit} onSelect={() => onSelect(l.id)} />;
+              return <FillLayerView key={l.id} layer={correctPaint(l, correctionsAbove(doc, l.id))} box={fit} onSelect={() => onSelect(l.id)} />;
             }
             if (l.kind === 'photo') {
               return (
@@ -424,6 +422,7 @@ export function ImageCanvas({
                   moveRange={MOVE_RANGE}
                   canvas={effectiveCanvas(doc)}
                   corrections={correctionsAbove(doc, l.id)}
+                  maskedCorrections={maskedCorrectionsAbove<ClipMask>(doc, l.id)}
                   onSelect={onSelect}
                   onMove={move}
                 />
@@ -439,7 +438,7 @@ export function ImageCanvas({
                   clip={{
                     ...clip,
                     // a Skia a nézetek mögé nem lát: a fölötte ható korrekció a forma színébe kerül
-                    fill: correctHex(clip.fill, above),
+                    ...correctPaint(clip, above),
                     borderColor: clip.borderColor ? correctHex(clip.borderColor, above) : clip.borderColor,
                   }}
                   box={fit}
@@ -454,20 +453,9 @@ export function ImageCanvas({
                 </Fragment>
               );
             }
-            // 🎚️ korrekciós réteg: a hatása a fotók színében van (`correctionsAbove`); ha maszkolt,
-            // azt a Skia nem tudja a fotókba számolni, oda marad a közelítő tint
+            // 🎚️ korrekciós réteg: nincs saját rajza, a hatása a fotók LUT-jában és a színekben van
             if (l.kind === 'adjust') {
-              const tints = l.mask ? [...gradeTint(l.grade), ...(l.adjust ? adjustTintLayers(l.adjust) : [])] : [];
-              if (!tints.length) {
-                return null;
-              }
-              return (
-                <View key={l.id} pointerEvents="none" style={StyleSheet.absoluteFill}>
-                  {tints.map((tint, i) => (
-                    <View key={i} style={[StyleSheet.absoluteFill, { backgroundColor: tint.color, opacity: tint.opacity }]} />
-                  ))}
-                </View>
-              );
+              return null;
             }
             return (
               <TextOverlay
@@ -488,6 +476,7 @@ export function ImageCanvas({
           })}
 
           <DocVignette angles={docVignetteAngles(doc as Parameters<typeof docVignetteAngles>[0])} box={fit} />
+          <DocGrain grain={doc.grain ?? 0} cell={fit.w / (doc.width || fit.w)} />
 
           {/* a vásznon kívüli rész halványan látszik; a fátyol nem fogja el az érintést */}
           {!capturing ? (

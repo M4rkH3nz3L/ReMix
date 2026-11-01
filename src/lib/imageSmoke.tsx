@@ -505,6 +505,165 @@ async function smokeDeep2(log: Log, setHarness: (n: ReactNode) => void, ratio: n
   removeFile(cube.uri);
 }
 
+function meanDiff(a: SkImage, b: SkImage, size: number, stop: number): number {
+  let sum = 0;
+  let n = 0;
+  for (let y = 5; y < stop; y += 7) {
+    for (let x = 5; x < size - 5; x += 7) {
+      const p = pixel(a, x, y);
+      const q = pixel(b, x, y);
+      sum += (Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2])) / 3;
+      n += 1;
+    }
+  }
+  return sum / n;
+}
+
+/** a cellahatárok körül mér: az élesítés csak ott hat */
+function edgeDiff(a: SkImage, b: SkImage): number {
+  let sum = 0;
+  let n = 0;
+  for (let k = 1; k < 15; k++) {
+    for (let j = 1; j < 15; j++) {
+      for (const off of [-2, -1, 0, 1]) {
+        const p = pixel(a, k * 20 + off, j * 20 + 10);
+        const q = pixel(b, k * 20 + off, j * 20 + 10);
+        sum += (Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2])) / 3;
+        n += 1;
+      }
+    }
+  }
+  return sum / n;
+}
+
+function redCount(a: SkImage, size: number): number {
+  let n = 0;
+  for (let y = 0; y < size; y += 2) {
+    for (let x = 0; x < size; x += 2) {
+      const p = pixel(a, x, y);
+      if (p[0] > 170 && p[1] < 90 && p[2] < 90) n += 1;
+    }
+  }
+  return n;
+}
+
+/** a lágy fényudvar mérése: az összes vörös többlet (R−G) */
+function redExcess(a: SkImage, size: number): number {
+  let sum = 0;
+  for (let y = 0; y < size; y += 2) {
+    for (let x = 0; x < size; x += 2) {
+      const p = pixel(a, x, y);
+      sum += Math.max(0, p[0] - p[1]);
+    }
+  }
+  return sum;
+}
+
+function spread(a: SkImage, x0: number, y0: number, n: number): number {
+  const v: number[] = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) v.push(pixel(a, x0 + x, y0 + y)[1]);
+  const m = v.reduce((p, c) => p + c, 0) / v.length;
+  return Math.sqrt(v.reduce((p, c) => p + (c - m) ** 2, 0) / v.length);
+}
+
+/** A részlet-műveletek pixelszintű mérése a szerver ellen, ellenpróbával: az effekt nélküli export. */
+async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  const c = surface.getCanvas();
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const v = (x * 37 + y * 91 + x * y * 13) % 200;
+      paint.setColor(Skia.Color(`rgb(${40 + v},${230 - v},${60 + (v * 2) % 170})`));
+      c.drawRect(Skia.XYWHRect(x * 20, y * 20, 20, 20), paint);
+    }
+  }
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_d3_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const gray = { kind: 'fill', id: 'f', fill: '#808080' } as ImageLayer;
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const photo = (extra: Partial<PhotoLayer>) => ({ kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }) as ImageLayer;
+  const rect = (extra: Partial<ShapeLayer>) => ({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.8, ...extra }) as ImageLayer;
+  const mask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 0.5, h: 0.5, feather: 0.005 };
+  const cases: [string, ImageLayer[], Partial<ImageDoc>][] = [
+    ['élesítés', [photo({ filters: [{ type: 'sharpen', amount: 0.8 }] })], {}],
+    ['clarity szűrő', [photo({ filters: [{ type: 'clarity', amount: 0.8 }] })], {}],
+    ['develop clarity', [photo({ develop: { base: {}, detail: { clarity: 0.8 } } as unknown as PhotoLayer['develop'] })], {}],
+    ['develop texture', [photo({ develop: { base: {}, detail: { texture: 1 } } as unknown as PhotoLayer['develop'] })], {}],
+    ['pixelezés', [photo({ filters: [{ type: 'pixelate', amount: 0.6 }] })], {}],
+    ['folt-javítás', [photo({ heal: [{ x: 0.3, y: 0.3, w: 0.2, h: 0.2 }] })], {}],
+    ['réteg-vignetta', [photo({ adjust: { vignette: 0.9 } })], {}],
+    ['grade-vignetta', [photo({ grade: 'moody' })], {}],
+    ['maszkolt korrekciós réteg', [photo({}), { kind: 'adjust', id: 'adj', adjust: { saturation: -1, contrast: 0.4 }, mask } as unknown as ImageLayer], {}],
+    ['gradiens + korrekció', [bg, rect({ fillGradient: { from: '#ff0000', to: '#0000ff' } }), { kind: 'adjust', id: 'adj', adjust: { saturation: -1 } } as ImageLayer], {}],
+    ['szöveg körvonala', [gray, { kind: 'text', id: 't', text: 'ÁRVÍZ', position: { x: 0.5, y: 0.5 }, fontSize: 22, color: '#ffffff', fontWeight: '900', stroke: { color: '#ff0000', width: 0.015 } } as unknown as ImageLayer], {}],
+    ['szöveg árnyéka', [gray, { kind: 'text', id: 't', text: 'ÁRVÍZ', position: { x: 0.5, y: 0.5 }, fontSize: 22, color: '#ffffff', fontWeight: '900', dropShadow: { color: '#ff0000', dx: 0.02, dy: 0.02, blur: 0.002, opacity: 1 } } as unknown as ImageLayer], {}],
+    ['szöveg ragyogása', [gray, { kind: 'text', id: 't', text: 'ÁRVÍZ', position: { x: 0.5, y: 0.5 }, fontSize: 22, color: '#ffffff', fontWeight: '900', outerGlow: { color: '#ff0000', size: 0.02, opacity: 1 } } as unknown as ImageLayer], {}],
+  ];
+  const plainOf = (doc: ImageDoc) =>
+    ({
+      ...doc,
+      layers: doc.layers
+        .filter((l) => l.kind !== 'adjust')
+        .map((l) => ({ ...l, filters: undefined, develop: undefined, heal: undefined, adjust: undefined, grade: undefined, stroke: undefined, dropShadow: undefined, outerGlow: undefined })),
+    }) as unknown as ImageDoc;
+  const shoot = async (doc: ImageDoc) => {
+    const ref = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+      </View>
+    );
+    await sleep(1600);
+    const shot = await captureRef(ref, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const img = await decode(shot);
+    removeFile(shot);
+    setHarness(null);
+    await sleep(80);
+    return img;
+  };
+  for (const [name, layers, extra] of cases) {
+    const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers, ...extra } as unknown as ImageDoc;
+    const a = await shoot(doc);
+    const uri = await renderImageDoc(doc, 320);
+    const plainUri = await renderImageDoc(plainOf(doc), 320);
+    if (!uri || !plainUri) {
+      log(false, `részlet = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const b = await decode(uri);
+    const p = await decode(plainUri);
+    if (name === 'szöveg ragyogása') {
+      const [ra, rb, rp] = [redExcess(a, 320), redExcess(b, 320), redExcess(p, 320)];
+      log(Math.abs(ra - rb) <= rb * 0.4 && rp < rb * 0.05, `részlet = export: ${name}`, `vörös többlet: vászon ${ra}, export ${rb}, ragyogás nélkül ${rp}`);
+    } else if (name.startsWith('szöveg')) {
+      const [ra, rb, rp] = [redCount(a, 320), redCount(b, 320), redCount(p, 320)];
+      log(Math.abs(ra - rb) <= rb * 0.4 && rp === 0 && rb > 50, `részlet = export: ${name}`, `vörös pontok: vászon ${ra}, export ${rb}, körvonal nélkül ${rp}`);
+    } else {
+      const edge = name === 'élesítés' || name.includes('clarity') || name.includes('texture');
+      const d = edge ? edgeDiff(a, b) : meanDiff(a, b, 320, 320);
+      const ctl = edge ? edgeDiff(a, p) : meanDiff(a, p, 320, 320);
+      log(d <= 8 && ctl >= d * 1.5, `részlet = export: ${name}`, `átlag ${d.toFixed(1)}/255; effekt nélkül ${ctl.toFixed(1)}`);
+    }
+    removeFile(uri);
+    removeFile(plainUri);
+  }
+  // a szemcse véletlen: pixel helyett a szórását mérjük a középszürkén
+  const grainDoc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [gray], grain: 0.7 } as unknown as ImageDoc;
+  const g = await shoot(grainDoc);
+  const flat = await shoot({ ...grainDoc, grain: 0 } as ImageDoc);
+  const uri = await renderImageDoc(grainDoc, 320);
+  if (uri) {
+    const sv = spread(await decode(uri), 100, 100, 60);
+    const sa = spread(g, 100, 100, 60);
+    const s0 = spread(flat, 100, 100, 60);
+    log(Math.abs(sa - sv) <= sv * 0.35 && s0 < sv * 0.2, 'szemcse szórása = export', `vászon ${sa.toFixed(1)}, export ${sv.toFixed(1)}, szemcse nélkül ${s0.toFixed(1)}`);
+    removeFile(uri);
+  }
+  removeFile(png.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -680,6 +839,10 @@ export async function runImageSmoke(
   }
   if (phase === 'inspect') {
     await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'deep3') {
+    await step('deep3', () => smokeDeep3(log, setHarness, ratio));
     return;
   }
   if (phase === 'deep2') {

@@ -38,11 +38,13 @@ export function textEffectStyle(layer: TextLayer, canvas: { width: number; heigh
   const fontPx = ((layer.fontSize ?? 8) / 100) * canvas.height;
   const shadow = layer.dropShadow ? (typeof layer.dropShadow === 'object' ? layer.dropShadow : {}) : null;
   const glow = layer.outerGlow ? (typeof layer.outerGlow === 'object' ? layer.outerGlow : {}) : null;
-  if (!shadow && !glow) {
+  const stroke = layer.stroke ? { color: layer.stroke.color, width: (2 * layer.stroke.width * canvas.width) / fontPx } : null;
+  if (!shadow && !glow && !stroke) {
     return layer.textStyle;
   }
   return {
     ...layer.textStyle,
+    ...(stroke ? { stroke } : {}),
     ...(shadow
       ? {
           shadow: {

@@ -348,8 +348,30 @@ export function cubeOp(lut: CubeLut): Op | null {
   };
 }
 
+/** A fölötte ható MASZKOLT korrekciók: a vászon a maszkon belül külön LUT-tal rajzolja a fotót. */
+export function maskedCorrectionsAbove<M>(doc: { layers: { kind: string; id: string; hidden?: boolean; mask?: M; grade?: GradeId; adjust?: ClipAdjust }[] }, layerId: string): { mask: M; adjust?: ClipAdjust; grade?: GradeId }[] {
+  const i = doc.layers.findIndex((l) => l.id === layerId);
+  return doc.layers
+    .slice(i + 1)
+    .filter((l) => l.kind === 'adjust' && !l.hidden && l.mask)
+    .map((l) => ({ mask: l.mask as M, adjust: l.adjust, grade: l.grade }));
+}
+
+/** a kitöltés színei a korrekciókon át (gradiens-megállók is) */
+export function correctPaint<T extends { fill?: string; gradient?: { stops: { color: string }[] }; fillGradient?: { from: string; to: string } }>(layer: T, above: ColorFields[]): T {
+  if (above.length === 0) {
+    return layer;
+  }
+  return {
+    ...layer,
+    fill: layer.fill ? correctHex(layer.fill, above) : layer.fill,
+    gradient: layer.gradient ? { ...layer.gradient, stops: layer.gradient.stops.map((st) => ({ ...st, color: correctHex(st.color, above) })) } : layer.gradient,
+    fillGradient: layer.fillGradient ? { from: correctHex(layer.fillGradient.from, above), to: correctHex(layer.fillGradient.to, above) } : layer.fillGradient,
+  };
+}
+
 /** a grade-presetek vignettája (`server/grades.js`): térbeli, ezért nincs a LUT-ban */
-const GRADE_VIGNETTE: Partial<Record<GradeId, number>> = { moody: 0.9, noir: 0.8 };
+export const GRADE_VIGNETTE: Partial<Record<GradeId, number>> = { moody: 0.9, noir: 0.8 };
 
 /** A teljes képre ható vignetták szöge: a doc-vignetta + a doc-szintű grade-eké. */
 export function docVignetteAngles(doc: { vignette?: number; grade?: GradeId; layers: { kind: string; hidden?: boolean; mask?: unknown; grade?: GradeId }[] }): number[] {

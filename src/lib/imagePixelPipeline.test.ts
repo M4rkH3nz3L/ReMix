@@ -2,9 +2,9 @@
  * 🧪 Az előnézet színe a VALÓDI export ellen mérve: minden beállítást lefuttatunk az ffmpeg-
  * láncon, és színenként összevetjük a tiszta függvénnyel. A hiba 0–255 skálán értendő.
  */
-import { applyOps, correctHex, correctionsAbove, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
+import { applyOps, correctHex, correctPaint, correctionsAbove, layerOps, maskedCorrectionsAbove, type Rgb } from '@/lib/imagePixelPipeline';
 import { parseCubeLut } from '@/lib/lutImport';
-import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, sampleLut } from '@/lib/imagePreviewLut';
+import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail, sampleLut } from '@/lib/imagePreviewLut';
 import type { PhotoLayer } from '@/types/project';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -204,5 +204,38 @@ describe('a 25³-es LUT hűsége', () => {
     expect(sampleLut(lut, [0.3, 0.6, 0.9]).map((v) => Math.round(v * 100))).toEqual([30, 60, 90]);
     expect(hasColorOps({})).toBe(false);
     expect(hasColorOps({ adjust: { contrast: 0.2 } })).toBe(true);
+  });
+});
+
+describe('részlet-műveletek a shadernek', () => {
+  it('a szűrők és a develop a render erősségeit adják', () => {
+    const d = layerDetail({ filters: [{ type: 'sharpen', amount: 0.5 }, { type: 'pixelate', amount: 0.5 }, { type: 'clarity', amount: 0.4 }], develop: { base: {}, detail: { texture: 0.5 } } } as unknown as PhotoLayer, 2);
+    expect(d.sharp).toBeCloseTo(1 + 0.6);
+    expect(d.clarity).toBeCloseTo(0.6);
+    expect(d.block).toBe((2 + 11) * 2);
+  });
+  it('a vignetta szögei a render képleteit követik', () => {
+    const d = layerDetail({ adjust: { vignette: 1 }, grade: 'noir', filters: [{ type: 'vignette', amount: 0.5 }] } as unknown as PhotoLayer, 1);
+    expect(d.vignette[0]).toBeCloseTo(Math.PI / 4);
+    expect(d.vignette[1]).toBeCloseTo(0.8);
+    expect(d.vignette[2]).toBeCloseTo(0.65);
+  });
+  it('üres réteghez nem kell részlet-shader', () => {
+    expect(hasDetail(layerDetail({} as PhotoLayer, 1))).toBe(false);
+    expect(hasDetail(layerDetail({ heal: [{ x: 0, y: 0, w: 0.1, h: 0.1 }] } as PhotoLayer, 1))).toBe(true);
+  });
+});
+
+describe('korrekciók a kitöltésen', () => {
+  const gray = [{ adjust: { saturation: -1 } }] as Parameters<typeof correctHex>[1];
+  it('a gradiens megállói is korrigálódnak', () => {
+    const out = correctPaint({ fillGradient: { from: '#ff0000', to: '#0000ff' } }, gray);
+    expect(out.fillGradient?.from).toBe(correctHex('#ff0000', gray));
+    expect(out.fillGradient?.from).not.toBe('#ff0000');
+  });
+  it('a maszkolt réteg külön listán van, a rejtett és az alatta lévő kimarad', () => {
+    const mask = { shape: 'rectangle' };
+    const doc = { layers: [{ kind: 'adjust', id: 'a', mask }, { kind: 'photo', id: 'p' }, { kind: 'adjust', id: 'b', mask }, { kind: 'adjust', id: 'c', mask, hidden: true }, { kind: 'adjust', id: 'd' }] };
+    expect(maskedCorrectionsAbove(doc, 'p')).toHaveLength(1);
   });
 });

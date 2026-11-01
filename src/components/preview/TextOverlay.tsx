@@ -10,6 +10,8 @@ import { activeWordIndex } from '@/lib/wordTiming';
 import type { Text3D, TextClip } from '@/types/project';
 
 /** a 3D anyag közelítő felület-színe az előnézetben */
+const STROKE_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]] as const;
+
 function text3dFaceColor(t3: Text3D, base: string): string {
   switch (t3.material) {
     case 'chrome':
@@ -349,6 +351,27 @@ export function TextOverlay({
               : null,
           ]}
         >
+          {!clip.text3d && clip.textStyle?.stroke
+            ? // körvonal: az RN-szövegnek nincs kontúrja, ezért eltolt másolatok a betűk mögött (a CSS-stroke fele kifelé esik)
+              STROKE_DIRS.map(([dx, dy]) => (
+                <Text
+                  key={`${dx}${dy}`}
+                  style={{
+                    position: 'absolute',
+                    left: dx * (clip.textStyle!.stroke!.width * fontSize) / 2,
+                    top: dy * (clip.textStyle!.stroke!.width * fontSize) / 2,
+                    right: -dx * (clip.textStyle!.stroke!.width * fontSize) / 2,
+                    color: clip.textStyle!.stroke!.color,
+                    fontSize,
+                    fontWeight: clip.fontWeight,
+                    fontFamily: clip.fontFamily,
+                    textAlign: clip.textAlign ?? 'center',
+                  }}
+                >
+                  {shown}
+                </Text>
+              ))
+            : null}
           {clip.text3d ? (
             // extrúzió-közelítés: sötét mélység-másolat a szöveg mögött
             <Text

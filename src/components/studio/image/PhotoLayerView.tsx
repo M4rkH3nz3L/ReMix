@@ -7,7 +7,7 @@ import { cssBlendMode, palette } from '@/constants/editor';
 import { SkiaPhotoLayer, needsSkiaPreview } from '@/components/studio/image/SkiaPhotoLayer';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
 import { clamp } from '@/lib/time';
-import type { PhotoLayer } from '@/types/project';
+import type { ClipMask, PhotoLayer } from '@/types/project';
 
 /**
  * 🖼️ Fotó-réteg a Kép Stúdió vásznán — húzással mozgatható, koppintásra
@@ -22,6 +22,7 @@ export function PhotoLayerView({
   moveRange = [0.02, 0.98],
   canvas,
   corrections,
+  maskedCorrections,
   onSelect,
   onMove,
 }: {
@@ -36,6 +37,8 @@ export function PhotoLayerView({
   canvas: { width: number; height: number };
   /** a fölötte ható korrekciós rétegek + a dokumentum-szintű grade */
   corrections?: ColorFields[];
+  /** a fölötte ható maszkolt korrekciós rétegek */
+  maskedCorrections?: { mask: ClipMask; adjust?: PhotoLayer['adjust']; grade?: PhotoLayer['grade'] }[];
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {
@@ -100,7 +103,7 @@ export function PhotoLayerView({
   const w = layer.w * box.w;
   const scale = box.w / canvas.width;
   const h = layer.h * box.h;
-  const skia = needsSkiaPreview(layer, corrections);
+  const skia = needsSkiaPreview(layer, corrections, maskedCorrections?.length ?? 0);
   const plain = (
     <Image
       source={{ uri: layer.uri }}
@@ -126,7 +129,7 @@ export function PhotoLayerView({
           selected ? styles.selected : null,
         ]}
       >
-        {skia ? <SkiaPhotoLayer layer={layer} after={corrections} w={w} h={h} scale={scale} canvas={canvas} fallback={plain} /> : plain}
+        {skia ? <SkiaPhotoLayer layer={layer} after={corrections} maskedAfter={maskedCorrections} w={w} h={h} scale={scale} canvas={canvas} fallback={plain} /> : plain}
       </Animated.View>
     </GestureDetector>
   );

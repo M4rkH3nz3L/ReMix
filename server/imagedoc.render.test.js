@@ -245,3 +245,20 @@ describe('ellipszis nem négyzetes dobozban', () => {
     expect(out.at(100, 70)[3]).toBe(255);
   });
 });
+
+describe('szöveg körvonala', () => {
+  it('valódi betű-kontúr: a sziluett felnagyítása nélkül a betű közepénél is van keret', async () => {
+    const text = { kind: 'text', id: 't', text: 'I', position: { x: 0.5, y: 0.5 }, fontSize: 60, color: '#ffffff', fontWeight: '900' };
+    const img = decode(await renderImageDoc(doc([{ kind: 'fill', id: 'f', fill: '#000000' }, { ...text, stroke: { color: '#ff0000', width: 0.02 } }]), 200, dir));
+    // a betű függőleges közepének sora: fehér mag, két oldalán vörös keret
+    let red = 0;
+    let white = 0;
+    for (let x = 0; x < img.w; x++) {
+      const [r, g, b] = img.at(x, Math.round(img.h / 2));
+      if (r > 170 && g < 90 && b < 90) red += 1;
+      if (r > 200 && g > 200 && b > 200) white += 1;
+    }
+    expect(white).toBeGreaterThan(5);
+    expect(red).toBeGreaterThanOrEqual(4);
+  }, 60000);
+});

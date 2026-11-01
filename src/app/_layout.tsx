@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Alert, BackHandler, LogBox, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, Dimensions, LogBox, Platform, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import {
@@ -51,6 +51,7 @@ import { TutorialMenu } from '@/components/tutorial/TutorialMenu';
 import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
 import { WebAlertHost } from '@/components/WebAlertHost';
 import { palette } from '@/constants/editor';
+import { windowControlsInset } from '@/lib/windowControls';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
 import { configureBilling } from '@/lib/billing';
@@ -75,6 +76,7 @@ function openNotificationRoute(route: string) {
 }
 
 export default function RootLayout() {
+  const controlsInset = windowControlsInset(Platform.OS === 'ios' && Platform.isPad, useWindowDimensions(), Dimensions.get('screen'));
   // ↩️ hardveres vissza (Android): ELŐBB a legfelső nyitott szerkesztő-felület
   // (inline lap, Focus, workspace, precíziós mód) zárul — csak üres veremnél
   // navigál vissza. A gyerek NavigationContainer a saját listenerét KORÁBBAN
@@ -235,7 +237,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.bg }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: controlsInset }}>
       <StatusBar style="light" />
       <ErrorBoundary>
         {authHydrated ? (

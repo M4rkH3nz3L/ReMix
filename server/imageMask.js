@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 // 🎭 Kép-réteg maszk (IMGEDD §2): egy `ClipMask` (rectangle/ellipse/polygon) → teljes-vászon
 // SZÜRKE maszk-kocka ffmpeg `geq`-kifejezése (0..1 alfa-súly). A render a réteget egy átlátszó
 // teljes vászonra helyezi, az alfáját EZZEL szorozza (alphaextract→blend multiply→alphamerge),
@@ -68,9 +71,67 @@ function maskWExpr(mask, W, H) {
   return wExpr;
 }
 
+/** Egy gyűrű kitöltése soronként (páros-páratlan szabály): homorú formán is pontos. */
+function fillRing(points, W, H) {
+  const out = new Uint8Array(W * H);
+  const n = points.length;
+  for (let y = 0; y < H; y += 1) {
+    const cy = y + 0.5;
+    const hits = [];
+    for (let i = 0, j = n - 1; i < n; j = i, i += 1) {
+      const [ax, ay, bx, by] = [points[i].x * W, points[i].y * H, points[j].x * W, points[j].y * H];
+      if (ay > cy !== by > cy) {
+        hits.push(ax + ((cy - ay) * (bx - ax)) / (by - ay));
+      }
+    }
+    hits.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < hits.length; k += 2) {
+      const from = Math.max(0, Math.round(hits[k]));
+      const to = Math.min(W, Math.round(hits[k + 1]));
+      if (to > from) {
+        out.fill(255, y * W + from, y * W + to);
+      }
+    }
+  }
+  return out;
+}
+
+/** A maszk műveletei sorban egy W×H-s szürke képpé (0 / 255). */
+function rasterMask(mask, W, H) {
+  const ops = mask.ops?.length ? mask.ops : [{ op: 'add', points: mask.points }];
+  const expand = 1 + Math.max(-0.5, Math.min(0.5, mask.expand ?? 0));
+  let buf = new Uint8Array(W * H);
+  for (const { op, points } of ops) {
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+    const ring = fillRing(points.map((p) => ({ x: cx + (p.x - cx) * expand, y: cy + (p.y - cy) * expand })), W, H);
+    for (let i = 0; i < buf.length; i += 1) {
+      buf[i] = op === 'add' ? buf[i] | ring[i] : op === 'subtract' ? buf[i] & ~ring[i] : buf[i] & ring[i];
+    }
+  }
+  return buf;
+}
+
+const isRaster = (mask) => mask.shape === 'polygon' && (mask.ops?.length > 0 || mask.points?.length >= 3);
+
+/** A poligon-maszk a munkakönyvtárba írt szürke képből: a `geq` legyezője homorú formát nem ad vissza. */
+function rasterMaskChain(mask, W, H, label, workDir) {
+  const file = path.join(workDir, `mask_${label.replace(/\W/g, '')}.pgm`);
+  fs.writeFileSync(file, Buffer.concat([Buffer.from(`P5\n${W} ${H}\n255\n`), Buffer.from(rasterMask(mask, W, H))]));
+  const feather = mask.feather ?? 0;
+  const blur = feather > 0.005 ? `,gblur=sigma=${Math.max(1, feather * W).toFixed(1)}` : '';
+  const invert = mask.invert ? ',negate' : '';
+  const mo = Math.max(0, Math.min(1, mask.opacity ?? 0));
+  const floor = mo > 0 ? `,geq=lum='${(mo * 255).toFixed(1)}+${(1 - mo).toFixed(3)}*lum(X,Y)'` : '';
+  return `movie='${file.replace(/'/g, "'\\''")}',format=gray,scale=${W}:${H}${blur}${invert}${floor}${label}`;
+}
+
 /** A teljes-vászon szürke maszk-forrás filter-fragmentje (`color=white…geq…[label]`).
  *  Poligonnál az él lágyítását (feather) utólagos gblur adja (az ellipszis/téglalap a geq-ben featheröl). */
-function maskGrayChain(mask, W, H, label) {
+function maskGrayChain(mask, W, H, label, workDir) {
+  if (workDir && isRaster(mask)) {
+    return rasterMaskChain(mask, W, H, label, workDir);
+  }
   const wExpr = maskWExpr(mask, W, H);
   let blur = '';
   if (mask.shape === 'polygon' && (mask.feather ?? 0) > 0.005) {
@@ -115,6 +176,7 @@ function maskToBox(mask, layer, W = 1, H = 1) {
     w: mask.w / bw,
     h: mask.h / bh,
     points: points ? points.map((p) => toBox(p.x, p.y)) : undefined,
+    ops: mask.ops?.map((o) => ({ ...o, points: o.points.map((p) => toBox(p.x, p.y)) })),
   };
 }
 
@@ -136,4 +198,4 @@ function outlinePoints(mask) {
   ];
 }
 
-module.exports = { maskWExpr, maskGrayChain, polyWExpr, staticPoly, maskToBox };
+module.exports = { maskWExpr, maskGrayChain, polyWExpr, staticPoly, maskToBox, rasterMask };

@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "marquee": "Kijelölés",
       "toPath": "Görbévé",
       "addFill": "Háttér",
       "addAdjust": "Korrekciós réteg",
@@ -3116,6 +3117,36 @@
       "layer": "Réteg"
     },
     "image": {
+      "select": {
+        "action": {
+          "copy": "Új rétegre",
+          "delete": "Törlés",
+          "adjust": "Korrekció",
+          "mask": "Maszk",
+          "shape": "Alakzat"
+        },
+        "mode": {
+          "new": "Új",
+          "add": "Hozzáadás",
+          "subtract": "Kivonás",
+          "intersect": "Metszet"
+        },
+        "tool": {
+          "rect": "Téglalap",
+          "ellipse": "Ellipszis",
+          "lasso": "Lasszó",
+          "wand": "Varázspálca"
+        },
+        "hint": "Húzz a vásznon a kijelöléshez",
+        "active": "Aktív kijelölés",
+        "edit": "Szerkesztés",
+        "clear": "Kijelölés megszüntetése",
+        "invert": "Invertálás",
+        "feather": "Lágy szél",
+        "failTitle": "Ez nem hajtható végre",
+        "failBody": "Ezen a rétegen ez a kijelölés így nem alkalmazható. Próbáld egyszerűbb kijelöléssel, vagy szüntesd meg a réteg maszkját.",
+        "undo": "Kijelölés alkalmazása"
+      },
       "brushBar": {
         "paint": "Ecset",
         "eraser": "Radír",

@@ -276,6 +276,8 @@ export interface ClipMask {
    *  szabadkézi rajz és a bezier-simítás is ide sűrűsödik (a render poligonként
    *  értelmezi, egyetlen szürke kockán). */
   points?: { x: number; y: number }[];
+  /** ✂️ kijelölésből készült maszk: sorban alkalmazott műveletek, lyuk és homorú forma is pontos */
+  ops?: { op: 'add' | 'subtract' | 'intersect'; points: { x: number; y: number }[] }[];
   /** középpont, 0–1 */
   x: number;
   y: number;

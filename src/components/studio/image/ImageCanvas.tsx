@@ -14,6 +14,8 @@ import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
+import { MarqueeOverlay } from '@/components/studio/image/MarqueeOverlay';
+import type { Point, Selection } from '@/lib/selection';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
@@ -37,6 +39,9 @@ import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nod
 import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 // lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
+const SelectionAnts = lazy(() =>
+  import('@/components/studio/image/SelectionAnts').then((m) => ({ default: m.SelectionAnts }))
+);
 const BrushOverlay = lazy(() =>
   import('@/components/studio/image/BrushOverlay').then((m) => ({ default: m.BrushOverlay }))
 );
@@ -76,6 +81,9 @@ export function ImageCanvas({
   pathEditId,
   selectedNode,
   onSelectNode,
+  selection,
+  marquee,
+  onSelectionRing,
   lassoActive,
   onLassoComplete,
   onLassoCancel,
@@ -113,6 +121,10 @@ export function ImageCanvas({
   selectedNode?: number | null;
   onSelectNode?: (index: number) => void;
   /** 🪢 lasszó-mód: szabadkézi húzás → zárt path-forma */
+  /** ✂️ az aktív kijelölés; korlátozza az ecsetet */
+  selection?: Selection | null;
+  marquee?: 'rect' | 'ellipse' | null;
+  onSelectionRing?: (ring: Point[]) => void;
   lassoActive?: boolean;
   onLassoComplete?: (points: CanvasPoint[]) => void;
   onLassoCancel?: () => void;
@@ -509,7 +521,7 @@ export function ImageCanvas({
             />
           ))}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !marquee && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -558,10 +570,20 @@ export function ImageCanvas({
           {/* 🪄 varázspálca-overlay (fotóra koppintás → szín-szelekció) */}
           {!capturing && wandActive ? <WandOverlay box={fit} onTap={onWandTap} /> : null}
 
+          {/* ✂️ téglalap / ellipszis kijelölő */}
+          {!capturing && marquee && onSelectionRing ? <MarqueeOverlay box={fit} shape={marquee} onRing={onSelectionRing} /> : null}
+
           {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
           {!capturing && brushActive ? (
             <Suspense fallback={null}>
-              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={(layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined)?.uri} onHistory={onBrushHistory} />
+              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={(layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined)?.uri} onHistory={onBrushHistory} clip={selection} />
+            </Suspense>
+          ) : null}
+
+          {/* ✂️ a kijelölés körvonala minden eszköz fölött látszik; lustán, mint az ecset */}
+          {!capturing && selection ? (
+            <Suspense fallback={null}>
+              <SelectionAnts selection={selection} box={fit} />
             </Suspense>
           ) : null}
 

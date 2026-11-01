@@ -25,7 +25,8 @@ import { StyleSheet } from 'react-native';
 
 import { File } from 'expo-file-system';
 
-import { maskOutlineInBox } from '@/lib/imageLayerGeometry';
+import { selectionSkPath } from '@/components/studio/image/selectionPath';
+import { canvasToLayerBox, maskOutlineInBox } from '@/lib/imageLayerGeometry';
 import { type CubeLut, parseCubeLut } from '@/lib/lutImport';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
 import { LUT_DRAFT_SIZE, LUT_SHADER, LUT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail } from '@/lib/imagePreviewLut';
@@ -174,10 +175,11 @@ export function PhotoSkiaContent({
     );
   }
   const maskElement = (mask: ClipMask) => {
-    const pts = maskOutlineInBox(mask, layer, canvas);
-    const path = Skia.Path.Make();
-    pts.forEach((p, i) => (i === 0 ? path.moveTo(p.x * w, p.y * h) : path.lineTo(p.x * w, p.y * h)));
-    path.close();
+    // a kijelölésből jött maszk műveletekből áll: homorú forma és lyuk is pontos
+    const ops = mask.ops?.length
+      ? mask.ops.map((o) => ({ op: o.op, points: o.points.map((p) => canvasToLayerBox(p, layer, canvas)) }))
+      : [{ op: 'add' as const, points: maskOutlineInBox(mask, layer, canvas) }];
+    const path = selectionSkPath(ops, w, h, false);
     const feather = Math.max(0, (mask.feather ?? 0.05) * canvas.height * scale);
     const shape = (
       <Group layer={<Paint><Blur blur={feather} /></Paint>}>

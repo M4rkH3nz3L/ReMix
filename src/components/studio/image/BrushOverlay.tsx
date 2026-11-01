@@ -1,6 +1,7 @@
 import {
   BlendMode,
   Canvas,
+  ClipOp,
   createPicture,
   ImageFormat,
   PaintStyle,
@@ -31,7 +32,9 @@ import {
   strokeSegments,
   undoStroke,
 } from '@/lib/brushEngine';
+import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import type { Selection } from '@/lib/selection';
 
 export type { Stroke } from '@/lib/brushEngine';
 
@@ -50,7 +53,11 @@ export interface BrushHandle {
  * hat (önmagát keresztezve sem sötétedik), a radír pedig a réteget lyukasztja az alatta lévőbe.
  * Az előnézet és az export is ezt hívja, ezért nem térhetnek el.
  */
-export function drawStrokes(canvas: SkCanvas, strokes: Stroke[], w: number, h: number) {
+export function drawStrokes(canvas: SkCanvas, strokes: Stroke[], w: number, h: number, clip?: Selection | null) {
+  canvas.save();
+  if (clip) {
+    canvas.clipPath(selectionSkPath(clip.ops, w, h, clip.invert), ClipOp.Intersect, true);
+  }
   for (const s of strokes) {
     const layer = Skia.Paint();
     layer.setAlphaf(s.opacity);
@@ -74,10 +81,11 @@ export function drawStrokes(canvas: SkCanvas, strokes: Stroke[], w: number, h: n
     }
     canvas.restore();
   }
+  canvas.restore();
 }
 
 /** A vonások offscreen raszterizálása adott felbontáson, opcionálisan egy meglévő festésre (null = nincs GPU-felület). */
-export function renderStrokes(strokes: Stroke[], width: number, height: number, base?: SkImage | null) {
+export function renderStrokes(strokes: Stroke[], width: number, height: number, base?: SkImage | null, clip?: Selection | null) {
   const surface = Skia.Surface.MakeOffscreen(Math.round(width), Math.round(height));
   if (!surface) {
     return null;
@@ -86,7 +94,7 @@ export function renderStrokes(strokes: Stroke[], width: number, height: number, 
   if (base) {
     canvas.drawImageRect(base, Skia.XYWHRect(0, 0, base.width(), base.height()), Skia.XYWHRect(0, 0, width, height), Skia.Paint());
   }
-  drawStrokes(canvas, strokes, width, height);
+  drawStrokes(canvas, strokes, width, height, clip);
   surface.flush();
   return surface.makeImageSnapshot();
 }
@@ -100,8 +108,8 @@ export function renderStrokes(strokes: Stroke[], width: number, height: number, 
  */
 export const BrushOverlay = forwardRef<
   BrushHandle,
-  { box: { w: number; h: number }; settings: BrushSettings; baseUri?: string | null; onHistory?: (canUndo: boolean, canRedo: boolean) => void; gestureTestId?: string }
->(function BrushOverlay({ box, settings, baseUri, onHistory, gestureTestId = 'brush-pan' }, ref) {
+  { box: { w: number; h: number }; settings: BrushSettings; baseUri?: string | null; onHistory?: (canUndo: boolean, canRedo: boolean) => void; gestureTestId?: string; clip?: Selection | null }
+>(function BrushOverlay({ box, settings, baseUri, onHistory, gestureTestId = 'brush-pan', clip }, ref) {
   const base = useImage(baseUri ?? null);
   const [history, setHistory] = useState(EMPTY_HISTORY);
   const [current, setCurrent] = useState<Stroke | null>(null);
@@ -161,7 +169,7 @@ export const BrushOverlay = forwardRef<
         try {
           // 🖼️ I19: a vonásokat a dokumentum méretén rajzoljuk újra (adatból) — a
           // képernyő-pillanatkép a nagy exportban elmosódna
-          const img = renderStrokes(history.done, docWidth, docHeight, base);
+          const img = renderStrokes(history.done, docWidth, docHeight, base, clip);
           if (!img || (baseUri && !base)) {
             return null;
           }
@@ -177,14 +185,14 @@ export const BrushOverlay = forwardRef<
         }
       },
     }),
-    [history, base, baseUri]
+    [history, base, baseUri, clip]
   );
 
   const baked = useMemo(() => {
     const ratio = PixelRatio.get();
     // a GPU-textúrás kép a JS-szálhoz kötött, a vászon másik szálon rajzol: e nélkül üres lenne
-    return renderStrokes(history.done, box.w * ratio, box.h * ratio, base)?.makeNonTextureImage() ?? null;
-  }, [history, box.w, box.h, base]);
+    return renderStrokes(history.done, box.w * ratio, box.h * ratio, base, clip)?.makeNonTextureImage() ?? null;
+  }, [history, box.w, box.h, base, clip]);
 
   const picture = useMemo(
     () =>
@@ -193,10 +201,10 @@ export const BrushOverlay = forwardRef<
           canvas.drawImageRect(baked, Skia.XYWHRect(0, 0, baked.width(), baked.height()), Skia.XYWHRect(0, 0, box.w, box.h), Skia.Paint());
         }
         if (current) {
-          drawStrokes(canvas, [current], box.w, box.h);
+          drawStrokes(canvas, [current], box.w, box.h, clip);
         }
       }, Skia.XYWHRect(0, 0, box.w, box.h)),
-    [baked, current, box.w, box.h]
+    [baked, current, box.w, box.h, clip]
   );
 
   return (

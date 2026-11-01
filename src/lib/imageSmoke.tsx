@@ -8,6 +8,11 @@ import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
+import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
+import { updateLayer } from '@/lib/imageDoc';
+import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
+import { applyRing, ellipseRing, invertSelection, rectRing } from '@/lib/selection';
 import { DEFAULT_BRUSH, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
@@ -796,6 +801,99 @@ async function smokeBrushEngine(log: Log, setHarness: (n: ReactNode) => void, ra
   setHarness(null);
 }
 
+/** A kijelölés a valódi vásznon a szerver ellen, ellenpróbával; a műveletek a valódi függvényeken át mennek. */
+async function smokeSelection(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  const c = surface.getCanvas();
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      paint.setColor(Skia.Color(`rgb(${40 + x * 60},${220 - y * 50},${60 + (x + y) * 25})`));
+      c.drawRect(Skia.XYWHRect(x * 80, y * 80, 80, 80), paint);
+    }
+  }
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_sel_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const pt = (x: number, y: number) => ({ x, y });
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const photo = (extra: Partial<PhotoLayer> = {}) => ({ kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }) as ImageLayer;
+  const base = (layers: ImageLayer[]) => ({ id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers }) as unknown as ImageDoc;
+  const u = applyRing(null, [pt(0.1, 0.1), pt(0.9, 0.1), pt(0.9, 0.9), pt(0.6, 0.9), pt(0.6, 0.3), pt(0.4, 0.3), pt(0.4, 0.9), pt(0.1, 0.9)], 'new')!;
+  const ring = applyRing(applyRing(null, ellipseRing(pt(0.1, 0.1), pt(0.9, 0.9)), 'new'), rectRing(pt(0.35, 0.35), pt(0.65, 0.65)), 'subtract')!;
+  const cut = applyRing(null, rectRing(pt(0.2, 0.2), pt(0.5, 0.5)), 'new')!;
+  const start = base([bg, photo()]);
+  const moved = updateLayer<PhotoLayer>(deleteSelection(start, 'p', cut)!, 'p', { position: { x: 0.65, y: 0.6 } });
+  const cases: [string, ImageDoc][] = [
+    ['homorú lasszó maszkként', maskFromSelection(start, 'p', u)!],
+    ['lyukas ellipszis maszkként', maskFromSelection(start, 'p', ring)!],
+    ['invertált kijelölés', maskFromSelection(start, 'p', invertSelection(u))!],
+    ['lágy szél', maskFromSelection(start, 'p', { ...u, feather: 0.03 })!],
+    ['törlés', deleteSelection(start, 'p', cut)!],
+    ['mozgatott réteg maszkja', moved],
+    ['másolat új rétegre', { ...copySelectionToLayer(base([bg, photo({ opacity: 0.25 })]), 'p', u, 'c')!, id: 'full' }],
+    ['korrekció a kijelölésen', ((d) => ({ ...d, layers: d.layers.map((l) => (l.kind === 'adjust' ? { ...l, adjust: { saturation: -1, contrast: 0.4 } } : l)) }) as ImageDoc)(adjustSelection(start, u, 'adj'))],
+  ];
+  const ctlDoc = (d: ImageDoc) => base([bg, photo({ position: (d.layers[1] as PhotoLayer).position })]);
+  for (const [name, doc] of cases) {
+    const ref = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+      </View>
+    );
+    await sleep(1500);
+    const shot = await captureRef(ref, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [uri, plainUri] = [await renderImageDoc(doc, 320), await renderImageDoc(ctlDoc(doc), 320)];
+    if (!uri || !plainUri) {
+      log(false, `kijelölés = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const server = await decode(uri);
+    const d = meanDiff(a, server, 320, 320);
+    const ctl = meanDiff(a, await decode(plainUri), 320, 320);
+    if (d > 8) {
+      const rows: string[] = [];
+      for (let y = 0; y < 320; y += 40) {
+        const row: number[] = [];
+        for (let x = 0; x < 320; x += 40) {
+          let sum = 0;
+          for (let i = 4; i < 40; i += 8) for (let j = 4; j < 40; j += 8) sum += Math.abs(pixel(a, x + i, y + j)[1] - pixel(server, x + i, y + j)[1]);
+          row.push(Math.round(sum / 25));
+        }
+        rows.push(row.join(','));
+      }
+      log(true, 'TÉRKÉP', rows.join(' / '));
+    }
+    log(d <= 8 && ctl >= d * 1.5, `kijelölés = export: ${name}`, `átlag ${d.toFixed(1)}/255; a kijelölés nélkül ${ctl.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(uri);
+    removeFile(plainUri);
+  }
+
+  // az ecset nem fest ki a kijelölésből
+  const brush: Stroke = { points: [pt(0.1, 0.25), pt(0.9, 0.25)].map((p) => ({ ...p, p: 1 })), color: '#ff0000', width: 0.1, hardness: 1, opacity: 1, eraser: false };
+  const clipped = renderStrokes([brush], 400, 400, null, cut)!;
+  const free = renderStrokes([brush], 400, 400)!;
+  log(pixel(clipped, 140, 100)[3] === 255 && pixel(clipped, 300, 100)[3] === 0 && pixel(free, 300, 100)[3] === 255, 'az ecset a kijelölésen belül marad', `benne α=${pixel(clipped, 140, 100)[3]}, kívül α=${pixel(clipped, 300, 100)[3]}, kijelölés nélkül α=${pixel(free, 300, 100)[3]}`);
+  const inv = renderStrokes([brush], 400, 400, null, invertSelection(cut))!;
+  log(pixel(inv, 140, 100)[3] === 0 && pixel(inv, 300, 100)[3] === 255, 'invertált kijelölésnél fordítva', `benne α=${pixel(inv, 140, 100)[3]}, kívül α=${pixel(inv, 300, 100)[3]}`);
+
+  // a körvonal a kijelzőn: rendszer-képernyőképhez
+  setHarness(
+    <View style={{ width: 300, height: 300, backgroundColor: '#3060a0' }}>
+      <SelectionAnts selection={ring} box={{ w: 300, h: 300 }} />
+    </View>
+  );
+  log(true, 'FOTÓZHATÓ', 'a kijelölés körvonala a kijelzőn');
+  await sleep(6000);
+  setHarness(null);
+  removeFile(png.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -971,6 +1069,23 @@ export async function runImageSmoke(
   }
   if (phase === 'inspect') {
     await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'selectbar') {
+    await step('selectbar', async () => {
+      setHarness(
+        <View style={{ width: Math.min(390, Dimensions.get('window').width), alignSelf: 'center' }}>
+          <SelectionBar tool="rect" mode="subtract" selection={applyRing(null, rectRing({ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.8 }), 'new')} canUseLayer canShape={false} onTool={() => {}} onMode={() => {}} onInvert={() => {}} onFeather={() => {}} onAction={() => {}} onClear={() => {}} onDone={() => {}} />
+        </View>
+      );
+      log(true, 'FOTÓZHATÓ', 'a kijelölés sávja a kijelzőn');
+      await sleep(6000);
+      setHarness(null);
+    });
+    return;
+  }
+  if (phase === 'selection') {
+    await step('selection', () => smokeSelection(log, setHarness, ratio));
     return;
   }
   if (phase === 'brushbar') {

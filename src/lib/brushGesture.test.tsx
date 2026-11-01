@@ -13,6 +13,8 @@ jest.mock('@shopify/react-native-skia', () => {
   const canvas = new Proxy({}, { get: () => () => undefined });
   return {
     BlendMode: {},
+    ClipOp: {},
+    PathOp: {},
     Canvas: () => null,
     Picture: () => null,
     ImageFormat: {},

@@ -17,6 +17,10 @@ import {
   type SheetKind,
 } from '@/components/studio/image/body/ImageStudioSheets';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
+import { layerBoxToCanvas } from '@/lib/imageLayerGeometry';
+import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget } from '@/lib/imageSelectionOps';
+import { applyRing, invertSelection, type Point, type Selection, type SelectionMode } from '@/lib/selection';
 import { DEFAULT_BRUSH, isPaintLayer } from '@/lib/brushEngine';
 import { ImageStudioToolbar } from '@/components/studio/image/body/ImageStudioToolbar';
 import { SelectionActionBar } from '@/components/studio/image/body/SelectionActionBar';
@@ -176,6 +180,11 @@ export function ImageStudioBody({
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
+  // ✂️ a kijelölés a szerkesztés állapota, nem a dokumentumé: nem kerül az undo-ba és a mentésbe
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selectTool, setSelectTool] = useState<SelectTool | null>(null);
+  const [selectMode, setSelectMode] = useState<SelectionMode>('new');
+  const [selectTargetId, setSelectTargetId] = useState<string | null>(null);
   // 🎭 ha be van állítva, a következő lasszó-rajz: vágó-maszk ('clip'), lokális korrekció-maszk
   // ('local'), vagy 🩹 folt-javítás régió ('heal' — a bbox-ot delogo-zza a render)
   const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' } | null>(null);
@@ -191,11 +200,12 @@ export function ImageStudioBody({
   const [quickAdjust, setQuickAdjust] = useState(false);
   // ↩️ precíziós módban a vissza a MÓDBÓL lép ki (nem a stúdióból) — mint a sáv ✕-e
   useBackLayer(
-    cropRect || penPoints || pathEditId || lassoActive || wandActive || brushActive || guidesActive
+    cropRect || penPoints || pathEditId || !!selectTool || lassoActive || wandActive || brushActive || guidesActive
       ? () => {
           setCropRect(null);
           setPenPoints(null);
           setPathEditId(null);
+          setSelectTool(null);
           setLassoActive(false);
           setMaskTarget(null);
           setWandActive(false);
@@ -679,26 +689,14 @@ export function ImageStudioBody({
       case 'shape':
         setSheet('shapePicker'); // 🔷 forma-TÍPUS választó (nem csak téglalap)
         break;
+      case 'marquee':
+        startSelect('rect');
+        break;
       case 'lasso':
-        // 🪢 lasszó-mód: szabadkézi húzás → zárt path-forma (más módok bezárva)
-        setSheet(null);
-        setSelectedId(null);
-        setCropRect(null);
-        setPenPoints(null);
-        setPathEditId(null);
-        setWandActive(false);
-        setLassoActive(true);
+        startSelect('lasso');
         break;
       case 'wand':
-        // 🪄 varázspálca-mód: fotóra koppintva szín-szelekció (Skia)
-        setSheet(null);
-        setSelectedId(null);
-        setCropRect(null);
-        setPenPoints(null);
-        setPathEditId(null);
-        setLassoActive(false);
-        setBrushActive(false);
-        setWandActive(true);
+        startSelect('wand');
         break;
       case 'brush':
         // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként. A Skia-függő
@@ -719,6 +717,7 @@ export function ImageStudioBody({
           setCropRect(null);
           setPenPoints(null);
           setPathEditId(null);
+          setSelectTool(null);
           setLassoActive(false);
           setMaskTarget(null);
           setWandActive(false);
@@ -872,7 +871,9 @@ export function ImageStudioBody({
         const canvas = effectiveCanvas(doc);
         const boxAspect = (source.w * canvas.width) / (source.h * canvas.height);
         const outline = await magicWandSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
-        if (outline && outline.length >= 3 && doc) {
+        if (outline && outline.length >= 3 && selectTool === 'wand') {
+          addSelectionRing(outline.map((p) => layerBoxToCanvas(p, source, canvas)));
+        } else if (outline && outline.length >= 3 && doc) {
           const shape: ShapeLayer = {
             kind: 'shape',
             id: makeId('lyr'),
@@ -978,6 +979,66 @@ export function ImageStudioBody({
     ]);
   };
 
+  // ✂️ kijelölés: eszköz választása; a többi mód bezárul, a meglévő kijelölés megmarad
+  const addSelectionRing = (ring: Point[]) => setSelection((sel) => applyRing(sel, ring, selectMode));
+  const openSelectTool = (tool: SelectTool) => {
+    setSelectTool(tool);
+    setLassoActive(tool === 'lasso');
+    setWandActive(tool === 'wand');
+  };
+  const startSelect = (tool: SelectTool) => {
+    if (!doc) {
+      return;
+    }
+    setSelectTargetId(selectionTarget(doc, selectedId));
+    setSheet(null);
+    setSelectedId(null);
+    setCropRect(null);
+    setPenPoints(null);
+    setPathEditId(null);
+    setMaskTarget(null);
+    setBrushActive(false);
+    openSelectTool(tool);
+  };
+  const closeSelectTool = () => {
+    setSelectTool(null);
+    setLassoActive(false);
+    setWandActive(false);
+  };
+  const clearSelection = () => {
+    setSelection(null);
+    closeSelectTool();
+  };
+  const selectionAction = (action: SelectionAction) => {
+    if (!doc || !selection) {
+      return;
+    }
+    const id = makeId('lyr');
+    let next: ImageDoc | null = null;
+    if (action === 'copy') {
+      next = copySelectionToLayer(doc, selectTargetId, selection, id);
+    } else if (action === 'delete') {
+      next = deleteSelection(doc, selectTargetId, selection);
+    } else if (action === 'mask') {
+      next = maskFromSelection(doc, selectTargetId, selection);
+    } else if (action === 'adjust') {
+      next = adjustSelection(doc, selection, id);
+    } else if (selection.ops.length === 1 && !selection.invert) {
+      const shape = pathShapeFromCanvasPoints(selection.ops[0].points, true, id);
+      next = shape ? addLayer(doc, shape) : null;
+    }
+    if (!next) {
+      Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.failBody'));
+      return;
+    }
+    commit(next, t('studio.image.select.undo'));
+    // a törlés után a kijelölés marad (mehet a következő lépés), a többi egy új réteget szerkeszt tovább
+    if (action !== 'delete') {
+      clearSelection();
+      setSelectedId(action === 'mask' ? selectTargetId : id);
+    }
+  };
+
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
   // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)
   const startMaskDraw = (layerId: string, target: 'clip' | 'local' | 'heal' = 'clip') => {
@@ -989,6 +1050,10 @@ export function ImageStudioBody({
 
   // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma — VAGY (maszk-módban) a kijelölt réteg maszkja
   const commitLasso = (points: CanvasPoint[]) => {
+    if (selectTool === 'lasso') {
+      addSelectionRing(points);
+      return;
+    }
     if (doc && points.length >= 3 && maskTarget) {
       // 🎭 szelekció → maszk (poligon): a vászon-normalizált pontok + bbox
       const xs = points.map((p) => p.x);
@@ -1343,7 +1408,7 @@ export function ImageStudioBody({
   // 🎯 precíziós mód (kivágás, toll, node, lasszó, pálca, ecset, vonalzó): a felső
   // sáv és a lap-strip elrejtve → a vászon kapja a helyet; a mód-sáv a kilépés (§3.3)
   const precisionMode =
-    !!cropRect || !!penPoints || !!pathEditId || lassoActive || wandActive || brushActive || guidesActive;
+    !!cropRect || !!penPoints || !!pathEditId || !!selectTool || lassoActive || wandActive || brushActive || guidesActive;
   const sheetDetents = layoutBudget({
     bodyHeight: workH,
     tier: 'sheet',
@@ -1541,6 +1606,9 @@ export function ImageStudioBody({
               pathEditId={pathEditId}
               selectedNode={pathEditNode}
               onSelectNode={setPathEditNode}
+              selection={selection}
+              marquee={selectTool === 'rect' || selectTool === 'ellipse' ? selectTool : null}
+              onSelectionRing={addSelectionRing}
               lassoActive={lassoActive}
               onLassoComplete={commitLasso}
               onLassoCancel={() => {
@@ -1574,6 +1642,22 @@ export function ImageStudioBody({
           ) : null}
           </View>
 
+          {selection && !selectTool ? (
+            /* ✂️ a kijelölés a többi eszköz alatt is él: innen szerkeszthető vagy szüntethető meg */
+            <View style={styles.statusRow}>
+              <Ionicons name="scan-outline" size={12} color={palette.accent} />
+              <Text style={styles.statusText} numberOfLines={1}>
+                {t('studio.image.select.active')}
+              </Text>
+              <Pressable onPress={() => startSelect('rect')} hitSlop={6} accessibilityRole="button">
+                <Text style={styles.selectLink}>{t('studio.image.select.edit')}</Text>
+              </Pressable>
+              <Pressable onPress={clearSelection} hitSlop={6} accessibilityRole="button">
+                <Text style={styles.selectLink}>{t('studio.image.select.clear')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {/* kijelölés-jelző */}
           <View style={styles.statusRow}>
             <Ionicons
@@ -1586,6 +1670,8 @@ export function ImageStudioBody({
                 ? t('studio.image.guides.hint')
                 : brushActive
                 ? t('studio.image.brush.hint')
+                : selectTool === 'rect' || selectTool === 'ellipse'
+                ? t('studio.image.select.hint')
                 : wandActive
                 ? t('studio.image.wand.hint')
                 : lassoActive
@@ -1710,6 +1796,21 @@ export function ImageStudioBody({
                 <Text style={styles.cropApplyText}>{t('common.done')}</Text>
               </Pressable>
             </View>
+          ) : selectTool ? (
+            <SelectionBar
+              tool={selectTool}
+              mode={selectMode}
+              selection={selection}
+              canUseLayer={!!selectTargetId}
+              canShape={!!selection && selection.ops.length === 1 && !selection.invert}
+              onTool={openSelectTool}
+              onMode={setSelectMode}
+              onInvert={() => setSelection((sel) => (sel ? invertSelection(sel) : sel))}
+              onFeather={(feather) => setSelection((sel) => (sel ? { ...sel, feather } : sel))}
+              onAction={selectionAction}
+              onClear={clearSelection}
+              onDone={closeSelectTool}
+            />
           ) : lassoActive ? (
             /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
             <View style={styles.cropBar}>
@@ -1968,6 +2069,7 @@ const styles = StyleSheet.create({
   brushDotHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
   brushDotActive: { borderColor: palette.text, borderWidth: 3 },
+  selectLink: { color: palette.accent, fontSize: 12, fontWeight: '700' },
   brushSizeBtn: {
     width: 44,
     height: 44,

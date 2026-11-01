@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "marquee": "Auswahl",
       "toPath": "In Pfad",
       "fx": "Effekte",
       "pattern": "Muster",
@@ -3116,6 +3117,36 @@
       "layer": "Ebene"
     },
     "image": {
+      "select": {
+        "action": {
+          "copy": "Auf neue Ebene",
+          "delete": "Löschen",
+          "adjust": "Korrektur",
+          "mask": "Maske",
+          "shape": "Form"
+        },
+        "mode": {
+          "new": "Neu",
+          "add": "Hinzufügen",
+          "subtract": "Abziehen",
+          "intersect": "Schnittmenge"
+        },
+        "tool": {
+          "rect": "Rechteck",
+          "ellipse": "Ellipse",
+          "lasso": "Lasso",
+          "wand": "Zauberstab"
+        },
+        "hint": "Zum Auswählen auf der Leinwand ziehen",
+        "active": "Aktive Auswahl",
+        "edit": "Bearbeiten",
+        "clear": "Auswahl aufheben",
+        "invert": "Umkehren",
+        "feather": "Weiche Kante",
+        "failTitle": "Das ist nicht möglich",
+        "failBody": "Diese Auswahl lässt sich auf diese Ebene nicht anwenden. Versuche eine einfachere Auswahl oder entferne die Ebenenmaske.",
+        "undo": "Auswahl anwenden"
+      },
       "brushBar": {
         "paint": "Pinsel",
         "eraser": "Radierer",

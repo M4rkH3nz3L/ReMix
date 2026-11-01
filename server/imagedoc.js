@@ -269,6 +269,12 @@ function imageDocGuard(doc) {
   }
   let points = 0;
   for (const l of layers) {
+    // a kijelölésből jött maszk gyűrűi is vektor-tartalom: a raszterizálás ideje ezekkel nő
+    for (const mask of [l?.mask, l?.localAdjust?.mask]) {
+      for (const op of Array.isArray(mask?.ops) ? mask.ops : []) {
+        points += Array.isArray(op?.points) ? op.points.length : 0;
+      }
+    }
     if (Array.isArray(l && l.points)) {
       points += l.points.length;
     }
@@ -434,7 +440,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       if (layer.mask && layer.mask.shape) {
         filters.push(`${last}format=rgba,split[ao${ai}][ax${ai}]`);
         filters.push(`[ax${ai}]${corr},format=rgba[acx${ai}]`);
-        filters.push(maskGrayChain(layer.mask, canvas.w, canvas.h, `[amg${ai}]`));
+        filters.push(maskGrayChain(layer.mask, canvas.w, canvas.h, `[amg${ai}]`, workDir));
         filters.push(`[acx${ai}]split[acc${ai}][aca${ai}]`);
         filters.push(`[aca${ai}]alphaextract[acae${ai}]`);
         filters.push(`[acae${ai}][amg${ai}]blend=all_mode=multiply:shortest=1[acam${ai}]`);
@@ -524,7 +530,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           // maszkot az rgba-auto-konverzió miatt félreértette — ez a bevált alphamerge+overlay út.)
           filters.push(`[${prepared}]format=rgba,split[lo${li}][lx${li}]`);
           filters.push(`[lx${li}]${corr},format=rgba[cadj${li}]`);
-          filters.push(maskGrayChain(lmask, boxW, boxH, `[lmg${li}]`));
+          filters.push(maskGrayChain(lmask, boxW, boxH, `[lmg${li}]`, workDir));
           filters.push(`[cadj${li}]split[cc${li}][caa${li}]`);
           filters.push(`[caa${li}]alphaextract[cae${li}]`);
           filters.push(`[cae${li}][lmg${li}]blend=all_mode=multiply:shortest=1[cam${li}]`);
@@ -613,7 +619,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       maskSeq += 1;
       filters.push(`color=black@0:s=${canvas.w}x${canvas.h},format=rgba[mbg${mi}]`);
       filters.push(`[mbg${mi}][${prepared}]overlay=${posX}:${posY}:format=auto[Lf${mi}]`);
-      filters.push(maskGrayChain(mask, canvas.w, canvas.h, `[mimg${mi}]`));
+      filters.push(maskGrayChain(mask, canvas.w, canvas.h, `[mimg${mi}]`, workDir));
       filters.push(`[Lf${mi}]split[mf${mi}][mfa${mi}]`);
       filters.push(`[mfa${mi}]alphaextract[mae${mi}]`);
       filters.push(`[mae${mi}][mimg${mi}]blend=all_mode=multiply:shortest=1[mab${mi}]`);

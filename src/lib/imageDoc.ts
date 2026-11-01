@@ -1,6 +1,7 @@
 import { t as tr } from 'i18next';
 
-import type { AspectRatio, ImageDoc, ImageGroup, ImageLayer } from '@/types/project';
+import { shiftMask } from '@/lib/imageSelectionOps';
+import type { AspectRatio, ImageDoc, ImageGroup, ImageLayer, PhotoLayer } from '@/types/project';
 
 /**
  * 🎨 Kép-dokumentum (Creative Canvas V1) — pure réteg-műveletek.
@@ -117,6 +118,21 @@ export function removeLayer(doc: ImageDoc, id: string): ImageDoc {
  * hívás helyén MÁR SZŰKÍTETT rétegtípusból következtethető, így a patch valódi
  * típusellenőrzést kap az assertion helyett.
  */
+/** Mozgatásnál a réteg maszkjai vele mennek, ha a módosítás nem ír saját maszkot. */
+function followMasks(layer: ImageLayer, patch: Partial<ImageLayer>): Partial<PhotoLayer> {
+  const from = (layer as { position?: { x: number; y: number } }).position;
+  const to = (patch as { position?: { x: number; y: number } }).position;
+  const { mask, localAdjust } = layer as PhotoLayer;
+  if (!from || !to || (from.x === to.x && from.y === to.y) || 'mask' in patch) {
+    return {};
+  }
+  const [dx, dy] = [to.x - from.x, to.y - from.y];
+  return {
+    ...(mask ? { mask: shiftMask(mask, dx, dy) } : {}),
+    ...(localAdjust?.mask ? { localAdjust: { ...localAdjust, mask: shiftMask(localAdjust.mask, dx, dy) } } : {}),
+  };
+}
+
 export function updateLayer<L extends ImageLayer = ImageLayer>(
   doc: ImageDoc,
   id: string,
@@ -128,7 +144,7 @@ export function updateLayer<L extends ImageLayer = ImageLayer>(
       return l;
     }
     changed = true;
-    return { ...l, ...patch } as ImageLayer;
+    return { ...l, ...followMasks(l, patch), ...patch } as ImageLayer;
   });
   return changed ? { ...doc, layers, renderedUri: undefined } : doc;
 }

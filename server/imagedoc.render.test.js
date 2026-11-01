@@ -262,3 +262,61 @@ describe('szöveg körvonala', () => {
     expect(red).toBeGreaterThanOrEqual(4);
   }, 60000);
 });
+
+describe('kijelölésből készült maszk', () => {
+  const white = () => photo(solid('white', 'w.png', '200x200'));
+  const u = [{ x: 0.1, y: 0.1 }, { x: 0.9, y: 0.1 }, { x: 0.9, y: 0.9 }, { x: 0.6, y: 0.9 }, { x: 0.6, y: 0.3 }, { x: 0.4, y: 0.3 }, { x: 0.4, y: 0.9 }, { x: 0.1, y: 0.9 }];
+  const base = { shape: 'polygon', x: 0.5, y: 0.5, w: 0.8, h: 0.8, feather: 0 };
+  const alpha = (img, x, y) => img.at(x, y)[3];
+
+  it('homorú lasszó: a bemélyedés átlátszó marad', async () => {
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask: { ...base, points: u } }]), 200, dir));
+    // a bemélyedés középvonalán kívül is üres: a súlypontos legyező ezt a pontot tévesen lefedné
+    expect(alpha(out, 90, 120)).toBe(0);
+    expect(alpha(out, 110, 120)).toBe(0);
+    expect(alpha(out, 40, 130)).toBe(255);
+  });
+
+  it('kivonás: lyuk a kijelölés közepén, széle érintetlen', async () => {
+    const box = [{ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.2 }, { x: 0.8, y: 0.8 }, { x: 0.2, y: 0.8 }];
+    const hole = [{ x: 0.4, y: 0.4 }, { x: 0.6, y: 0.4 }, { x: 0.6, y: 0.6 }, { x: 0.4, y: 0.6 }];
+    const mask = { ...base, points: box, ops: [{ op: 'add', points: box }, { op: 'subtract', points: hole }] };
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask }]), 200, dir));
+    expect(alpha(out, 100, 100)).toBe(0);
+    expect(alpha(out, 60, 60)).toBe(255);
+    expect(alpha(out, 10, 10)).toBe(0);
+  });
+
+  it('invertált maszk a lyukat tartja meg', async () => {
+    const box = [{ x: 0.4, y: 0.4 }, { x: 0.6, y: 0.4 }, { x: 0.6, y: 0.6 }, { x: 0.4, y: 0.6 }];
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask: { ...base, points: box, ops: [{ op: 'add', points: box }], invert: true } }]), 200, dir));
+    expect(alpha(out, 100, 100)).toBe(0);
+    expect(alpha(out, 20, 20)).toBe(255);
+  });
+
+  it('lokális korrekció homorú maszkkal, elforgatott rétegen is a helyén marad', async () => {
+    const box = [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 0.5, y: 0.5 }, { x: 0, y: 0.5 }];
+    const local = { adjust: { brightness: -1 }, mask: { ...base, points: box, ops: [{ op: 'add', points: box }] } };
+    const out = decode(await renderImageDoc(doc([{ ...photo(solid('gray', 'g.png', '200x200')), localAdjust: local }]), 200, dir));
+    expect(out.at(50, 50)[0]).toBeLessThan(out.at(150, 150)[0] - 40);
+  });
+
+  it('a lágy szél fokozatos átmenetet ad', async () => {
+    const box = [{ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.2 }, { x: 0.8, y: 0.8 }, { x: 0.2, y: 0.8 }];
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask: { ...base, points: box, feather: 0.03 } }]), 200, dir));
+    const edge = alpha(out, 40, 100);
+    expect(edge).toBeGreaterThan(60);
+    expect(edge).toBeLessThan(200);
+  });
+});
+
+describe('a maszk műveletei a korláton belül', () => {
+  it('a túl sok gyűrűpont elutasítás, nem végtelen raszterizálás', () => {
+    const { imageDocGuard } = require('./imagedoc');
+    const points = Array.from({ length: 300000 }, (_, i) => ({ x: i, y: i }));
+    const layers = [{ kind: 'photo', id: 'p', mask: { shape: 'polygon', ops: [{ op: 'add', points }] } }];
+    expect(imageDocGuard({ layers })).toEqual(expect.stringContaining('Túl összetett'));
+    expect(imageDocGuard({ layers: [{ kind: 'photo', id: 'p', localAdjust: { mask: { ops: [{ op: 'add', points }] } } }] })).toEqual(expect.stringContaining('Túl összetett'));
+    expect(imageDocGuard({ layers: [{ kind: 'photo', id: 'p', mask: { shape: 'polygon', ops: [{ op: 'add', points: points.slice(0, 10) }] } }] })).toBeFalsy();
+  });
+});

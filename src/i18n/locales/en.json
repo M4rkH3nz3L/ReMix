@@ -3069,6 +3069,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "marquee": "Select",
       "toPath": "To path",
       "addFill": "Background",
       "addAdjust": "Adjustment layer",
@@ -3116,6 +3117,36 @@
       "layer": "Layer"
     },
     "image": {
+      "select": {
+        "action": {
+          "copy": "To new layer",
+          "delete": "Delete",
+          "adjust": "Adjust",
+          "mask": "Mask",
+          "shape": "Shape"
+        },
+        "mode": {
+          "new": "New",
+          "add": "Add",
+          "subtract": "Subtract",
+          "intersect": "Intersect"
+        },
+        "tool": {
+          "rect": "Rectangle",
+          "ellipse": "Ellipse",
+          "lasso": "Lasso",
+          "wand": "Magic wand"
+        },
+        "hint": "Drag on the canvas to select",
+        "active": "Active selection",
+        "edit": "Edit",
+        "clear": "Clear selection",
+        "invert": "Invert",
+        "feather": "Feather",
+        "failTitle": "This can't be done",
+        "failBody": "This selection can't be applied to this layer. Try a simpler selection or remove the layer's mask.",
+        "undo": "Apply selection"
+      },
       "brushBar": {
         "paint": "Brush",
         "eraser": "Eraser",

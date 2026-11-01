@@ -3,7 +3,6 @@ import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
-import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -583,8 +582,6 @@ function spread(a: SkImage, x0: number, y0: number, n: number): number {
 /** A részlet-műveletek pixelszintű mérése a szerver ellen, ellenpróbával: az effekt nélküli export. */
 async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
   log(true, 'mért eszköz', `${Platform.OS === 'ios' && Platform.isPad ? 'iPad' : 'telefon'}, pixelarány ${ratio}`);
-  const [win, scr] = [Dimensions.get('window'), Dimensions.get('screen')];
-  log(true, 'ablak', `ablak ${win.width}×${win.height}, képernyő ${scr.width}×${scr.height}, iOS ${Platform.Version}, safe ${JSON.stringify(initialWindowMetrics?.insets)}`);
   const surface = Skia.Surface.MakeOffscreen(320, 320)!;
   const paint = Skia.Paint();
   const c = surface.getCanvas();
@@ -1081,6 +1078,28 @@ export async function runImageSmoke(
       log(true, 'FOTÓZHATÓ', 'a kijelölés sávja a kijelzőn');
       await sleep(6000);
       setHarness(null);
+    });
+    return;
+  }
+  if (phase === 'net') {
+    await step('net', async () => {
+      const probe = async (url: string) => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 5000);
+        const t0 = Date.now();
+        try {
+          const r = await fetch(url, { signal: ctrl.signal });
+          log(r.ok, 'elérés', `${url} HTTP ${r.status}, ${Date.now() - t0} ms`);
+        } catch (e) {
+          log(false, 'elérés', `${url} ${String(e).slice(0, 70)}, ${Date.now() - t0} ms`);
+        }
+        clearTimeout(timer);
+      };
+      log(true, 'eszköz', Platform.OS === 'ios' && Platform.isPad ? 'iPad' : 'telefon');
+      await probe('http://192.168.0.34:8081/status');
+      await probe('http://192.168.0.34:8787/health');
+      await probe('http://192.168.0.34:8081/status');
+      await probe('http://192.168.0.34:8787/health');
     });
     return;
   }

@@ -32,16 +32,24 @@ const RENDER_PORT = 8787;
  *   4. localhost               — utolsó mentsvár
  * EXPO_PUBLIC_* értékek a bundle-be égnek → módosítás után Metro-újraindítás kell.
  */
+/**
+ * A worker gépe. Fejlesztéskor a Metro címe az igazság: ezen érte el az eszköz a gépet, akkor is,
+ * ha kábelen át jön, és az env-ben rögzített Wi-Fi-cím épp nem elérhető.
+ */
+export function serverHost(envHost: string | undefined, hostUri: string | undefined, dev: boolean): string {
+  const metro = hostUri?.split(':')[0];
+  if (dev && metro && metro !== 'localhost' && metro !== '127.0.0.1') {
+    return metro;
+  }
+  return envHost?.trim() || metro || 'localhost';
+}
+
 export function renderServerUrl(): string {
   const fullUrl = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
   if (fullUrl) {
     return fullUrl.replace(/\/+$/, '');
   }
-  const host =
-    process.env.EXPO_PUBLIC_SERVER_HOST?.trim() ||
-    Constants.expoConfig?.hostUri?.split(':')[0] ||
-    'localhost';
-  return `http://${host}:${RENDER_PORT}`;
+  return `http://${serverHost(process.env.EXPO_PUBLIC_SERVER_HOST, Constants.expoConfig?.hostUri, __DEV__)}:${RENDER_PORT}`;
 }
 
 /**

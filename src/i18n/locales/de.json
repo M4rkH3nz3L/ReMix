@@ -3124,6 +3124,17 @@
       "layer": "Ebene"
     },
     "image": {
+      "variant": {
+        "title": "Variante auf neuer Seite",
+        "done": "Neue Seite: {{name}}"
+      },
+      "templates": {
+        "title": "Vorlagen",
+        "youtubeThumb": "YouTube-Thumbnail",
+        "instaPost": "Instagram-Post",
+        "story": "Story",
+        "banner": "Header-Banner"
+      },
       "assistant": {
         "cmd": {
           "ADD_TEXT": "Neuer Text",
@@ -3274,6 +3285,7 @@
       "starPoints": "Zacken",
       "innerRadius": "Innenradius",
       "importFrom": {
+        "template": "Aus Vorlage",
         "file": "Bild aus Dateien",
         "source": "Projektmedien",
         "svg": "SVG-Datei",

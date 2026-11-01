@@ -47,10 +47,13 @@ function TransformBtn({
 export function CanvasSheet({
   doc,
   commit,
+  onVariant,
   onClose,
 }: {
   doc: ImageDoc;
   commit: (next: ImageDoc, label?: string) => void;
+  /** ugyanaz a terv más méretben, új lapon */
+  onVariant?: (width: number, height: number, label: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -126,6 +129,25 @@ export function CanvasSheet({
         <Chip label={t('home.formatRaster')} active={format === 'raster'} onPress={() => setFormat('raster')} />
         <Chip label={t('home.formatVector')} active={format === 'vector'} onPress={() => setFormat('vector')} />
       </View>
+
+      {onVariant ? (
+        <>
+          <Text style={styles.section}>{t('studio.image.variant.title')}</Text>
+          <View style={styles.row}>
+            {CANVAS_PRESETS.map((p) => (
+              <Chip
+                key={p.label}
+                label={p.label}
+                active={false}
+                onPress={() => {
+                  onVariant(p.w, p.h, p.label);
+                  onClose();
+                }}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <Text style={styles.section}>{t('home.canvasLabel')}</Text>
       <View style={styles.row}>

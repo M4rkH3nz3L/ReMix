@@ -178,6 +178,7 @@ function presetStyles(clip: TextClip, fontSize: number) {
   }
 }
 
+// a vászon a kész képet mutatja: a rendszer szövegméret-beállítása az exportot sem érinti
 export function TextOverlay({
   clip,
   t,
@@ -355,6 +356,7 @@ export function TextOverlay({
             ? // körvonal: az RN-szövegnek nincs kontúrja, ezért eltolt másolatok a betűk mögött (a CSS-stroke fele kifelé esik)
               STROKE_DIRS.map(([dx, dy]) => (
                 <Text
+                  allowFontScaling={false}
                   key={`${dx}${dy}`}
                   style={{
                     position: 'absolute',
@@ -375,6 +377,7 @@ export function TextOverlay({
           {clip.text3d ? (
             // extrúzió-közelítés: sötét mélység-másolat a szöveg mögött
             <Text
+              allowFontScaling={false}
               style={{
                 position: 'absolute',
                 left: fontSize * clip.text3d.depth * 0.12,
@@ -390,6 +393,7 @@ export function TextOverlay({
             </Text>
           ) : null}
           <Text
+            allowFontScaling={false}
             style={[
               {
                 color: clip.text3d ? text3dFaceColor(clip.text3d, clip.color) : clip.color,
@@ -434,6 +438,7 @@ export function TextOverlay({
             {karaokeWords
               ? karaokeWords.map((w, i) => (
                   <Text
+                    allowFontScaling={false}
                     key={i}
                     style={[
                       w.state === 'active'

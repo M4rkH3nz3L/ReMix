@@ -23,6 +23,9 @@ import { applyImageCommands, type ImageCommand } from '@/lib/imageIntent';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
 import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
+import { addImageDocToVideo } from '@/lib/imageToVideo';
+import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
+import { variantDoc } from '@/lib/imageVariants';
 import { customExportSize, exportSize } from '@/lib/imageExport';
 import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
@@ -78,12 +81,12 @@ import { makeId } from '@/lib/id';
 import { pickImage, pickImageFile, pickPdf, pickPsd, pickSvg, saveImageToPhotos } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
-import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
+import { createEmptyProject } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
-import type { Asset, ClipMask, ImageClip, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { Asset, ClipMask, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
 
@@ -389,6 +392,18 @@ export function ImageStudioBody({
   useBackLayer(quickAdjust && selectedLayer?.kind === 'photo' ? () => setQuickAdjust(false) : null);
 
   // ── 🖼️📄 Galéria-lapok (project mód): új/duplikál/töröl/mozgat az aktív lapon ──
+  const addDocPage = (nd: ImageDoc) => {
+    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: nd });
+    setActivePageId(nd.id);
+    setSelectedId(null);
+  };
+  const addTemplatePage = (tpl: ImageTemplate) => addDocPage(docFromTemplate(tpl, t(`studio.image.templates.${tpl.key}`), () => makeId('lyr')));
+  const addVariantPage = (width: number, height: number, label: string) => {
+    if (doc) {
+      addDocPage(variantDoc(doc, width, height, label, () => makeId('lyr')));
+    }
+  };
+
   const addPage = () => {
     const s = useEditorStore.getState();
     if (!s.project) {
@@ -1652,25 +1667,9 @@ export function ImageStudioBody({
         alertRenderFail();
         return;
       }
-      const vid = createEmptyProject(
-        t('studio.image.videoName', { name: project.name }),
-        project.aspectRatio,
-        undefined,
-        'video'
-      );
-      const clip: ImageClip = {
-        kind: 'image',
-        id: makeId('clip'),
-        start: trackEnd(trackOf(vid, 'video')),
-        duration: 4,
-        uri,
-        filterId: 'none',
-      };
-      const withClip: typeof vid = {
-        ...vid,
-        tracks: vid.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [clip] } : tr)),
-        assets: [{ id: makeId('ast'), kind: 'image', uri, provider: 'local', name: doc.name }],
-      };
+      const vid = createEmptyProject(t('studio.image.videoName', { name: project.name }), project.aspectRatio, undefined, 'video');
+      // a rétegek megmaradnak: a videó-szerkesztőből a kép tovább szerkeszthető
+      const withClip = addImageDocToVideo(vid, doc, uri);
       await saveProject(withClip);
       router.replace(`/editor/${withClip.id}`);
     } finally {
@@ -2313,6 +2312,8 @@ export function ImageStudioBody({
             onDrawMask={startMaskDraw}
             onRaster={(o) => void exportImage(o)}
             onPack={(o) => void exportPack(o)}
+            onTemplate={addTemplatePage}
+            onVariant={addVariantPage}
             onSvg={() => void exportSvg()}
             onPdf={() => void exportPdf()}
             onPsd={() => void exportPsdFile()}

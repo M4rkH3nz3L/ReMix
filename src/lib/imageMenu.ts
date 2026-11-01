@@ -48,7 +48,7 @@ export type LayerAction =
   | 'exportLayer'
   | 'unlock';
 
-export type ImportAction = 'file' | 'svg' | 'psd' | 'pdf' | 'source';
+export type ImportAction = 'template' | 'file' | 'svg' | 'psd' | 'pdf' | 'source';
 
 export type ToolKey = RailTool | LayerAction | ImportAction | 'delete';
 

@@ -273,7 +273,7 @@ export function applyImageCommands(doc: ImageDoc, commands: ImageCommand[], make
       continue;
     }
     if (cmd.type === 'ADD_TEXT') {
-      next = addLayer(next, { kind: 'text', id: makeId(), text: cmd.text, color: cmd.color ?? '#ffffff', backgroundColor: null, fontSize: 9, fontWeight: 'bold', position: { x: 0.5, y: 0.5 } } as unknown as TextLayer);
+      next = addLayer(next, { kind: 'text', id: makeId(), text: cmd.text, color: cmd.color ?? '#ffffff', backgroundColor: null, fontSize: 9, fontFamily: 'Poppins', fontWeight: 'bold', position: { x: 0.5, y: 0.5 } } as unknown as TextLayer);
     } else if (cmd.type === 'ADD_SHAPE') {
       next = addLayer(next, { kind: 'shape', id: makeId(), shape: cmd.shape, position: { x: 0.5, y: 0.5 }, w: 0.3, h: 0.3, fill: cmd.color ?? '#ff2d95' } as ShapeLayer);
     } else if (cmd.type === 'SET_BACKGROUND') {

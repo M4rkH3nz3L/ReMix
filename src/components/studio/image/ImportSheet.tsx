@@ -7,6 +7,7 @@ import { palette } from '@/constants/editor';
 import type { ImportAction } from '@/lib/imageMenu';
 
 const ROWS: { key: ImportAction; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'template', icon: 'albums-outline' },
   { key: 'file', icon: 'image-outline' },
   { key: 'source', icon: 'folder-open-outline' },
   { key: 'svg', icon: 'shapes-outline' },

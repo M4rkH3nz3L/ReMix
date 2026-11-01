@@ -3124,6 +3124,17 @@
       "layer": "Layer"
     },
     "image": {
+      "variant": {
+        "title": "Variant on a new page",
+        "done": "New page: {{name}}"
+      },
+      "templates": {
+        "title": "Templates",
+        "youtubeThumb": "YouTube thumbnail",
+        "instaPost": "Instagram post",
+        "story": "Story",
+        "banner": "Header banner"
+      },
       "assistant": {
         "cmd": {
           "ADD_TEXT": "New text",
@@ -3274,6 +3285,7 @@
       "starPoints": "Points",
       "innerRadius": "Inner radius",
       "importFrom": {
+        "template": "From template",
         "file": "Image from Files",
         "source": "Project media",
         "svg": "SVG file",

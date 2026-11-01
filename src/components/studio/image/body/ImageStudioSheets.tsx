@@ -8,6 +8,8 @@ import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
 import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { HistorySheet } from '@/components/studio/image/HistorySheet';
 import { HslSheet } from '@/components/studio/image/HslSheet';
+import { TemplatesSheet } from '@/components/studio/image/TemplatesSheet';
+import type { ImageTemplate } from '@/lib/imageTemplates';
 import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
 import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
@@ -51,6 +53,8 @@ export function ImageStudioSheets({
   onDrawMask,
   onRaster,
   onPack,
+  onTemplate,
+  onVariant,
   onSvg,
   onPdf,
   onPsd,
@@ -78,6 +82,8 @@ export function ImageStudioSheets({
   onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
   onPack: (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => void;
+  onTemplate: (tpl: ImageTemplate) => void;
+  onVariant: (width: number, height: number, label: string) => void;
   onSvg: () => void;
   onPdf: () => void;
   onPsd: () => void;
@@ -117,6 +123,15 @@ export function ImageStudioSheets({
       {sheet === 'develop' && doc && selectedLayer?.kind === 'photo' ? (
         <DevelopSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
+      {sheet === 'templates' ? (
+        <TemplatesSheet
+          onPick={(tpl) => {
+            onTemplate(tpl);
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
       {sheet === 'hsl' && doc && selectedLayer?.kind === 'photo' ? (
         <HslSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
@@ -145,8 +160,8 @@ export function ImageStudioSheets({
         <ImportSheet
           disabled={(key) => (key === 'psd' || key === 'pdf') && !canPsd}
           onPick={(key) => {
-            setSheet(key === 'source' ? 'source' : null);
-            if (key !== 'source') {
+            setSheet(key === 'source' ? 'source' : key === 'template' ? 'templates' : null);
+            if (key !== 'source' && key !== 'template') {
               onImport(key);
             }
           }}
@@ -154,7 +169,7 @@ export function ImageStudioSheets({
         />
       ) : null}
       {sheet === 'canvas' && doc ? (
-        <CanvasSheet doc={doc} commit={commit} onClose={() => setSheet(null)} />
+        <CanvasSheet doc={doc} commit={commit} onVariant={onVariant} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'history' && doc ? <HistorySheet onClose={() => setSheet(null)} /> : null}
       {sheet === 'source' ? (

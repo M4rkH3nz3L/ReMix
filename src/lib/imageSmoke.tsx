@@ -2,7 +2,7 @@ import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkIma
 import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef } from 'react';
-import { Dimensions, Modal, Platform, View } from 'react-native';
+import { Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -16,6 +16,10 @@ import { moveAnchor, pathEditPatch, pathEditView, setNodeType } from '@/lib/vect
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
+import { effectiveCanvas } from '@/lib/canvasPresets';
+import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
+import { addImageDocToVideo } from '@/lib/imageToVideo';
+import { variantDoc } from '@/lib/imageVariants';
 import { applyImageCommands, parseImageIntent } from '@/lib/imageIntent';
 import { logCaught } from '@/lib/logCaught';
 import { ExportCancelled } from '@/lib/imageDocClient';
@@ -52,7 +56,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
-import type { ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
+import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
 
@@ -1610,6 +1614,91 @@ async function smokeAssistant(log: Log, setHarness: (n: ReactNode) => void, rati
   removeFile(png.uri);
 }
 
+/** Sablonok, méretváltozat és a kép→videó a valódi vásznon, szerveren és tárolón át. */
+async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  let n = 0;
+  const id = () => `eco${++n}`;
+  const check = async (name: string, doc: ImageDoc, other: ImageDoc) => {
+    const { width, height } = effectiveCanvas(doc);
+    const scale = Math.min(320 / width, 320 / height);
+    const [W, H] = [Math.round(width * scale), Math.round(height * scale)];
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: W + 20, height: H + 20 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1300);
+    // a kijelző teljes felbontásán: a kis szöveg így nem mintavételi zaj
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: W, height: H });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const target = Math.max(240, H * ratio);
+    const [e, c] = [await renderImageDoc(doc, target), await renderImageDoc(other, target)];
+    if (!e || !c) {
+      log(false, name, 'nincs render');
+      return;
+    }
+    // a két kép mérete eltérhet (a szerver minimum 240 magas): arányos pontokon hasonlítunk
+    const diff = (p: SkImage, q: SkImage) => {
+      let sum = 0;
+      let count = 0;
+      for (let i = 1; i < 40; i++) {
+        for (let j = 1; j < 40; j++) {
+          const [x, y] = [(j + 0.5) / 40, (i + 0.5) / 40];
+          const [u, w] = [pixel(p, Math.floor(x * p.width()), Math.floor(y * p.height())), pixel(q, Math.floor(x * q.width()), Math.floor(y * q.height()))];
+          sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+          count += 1;
+        }
+      }
+      return sum / count;
+    };
+    const d = diff(a, await decode(e));
+    const ctl = diff(a, await decode(c));
+    // hol van a fehér szöveg a két képen, a kép arányában
+    const whiteBox = (img: SkImage) => {
+      let [x0, y0, x1, y1] = [1, 1, 0, 0];
+      for (let i = 0; i < 120; i++) {
+        for (let j = 0; j < 120; j++) {
+          const [x, y] = [j / 120, i / 120];
+          const p = pixel(img, Math.floor(x * img.width()), Math.floor(y * img.height()));
+          if (p[0] > 230 && p[1] > 230 && p[2] > 230) {
+            x0 = Math.min(x0, x);
+            y0 = Math.min(y0, y);
+            x1 = Math.max(x1, x);
+            y1 = Math.max(y1, y);
+          }
+        }
+      }
+      return `${x0.toFixed(2)},${y0.toFixed(2)}–${x1.toFixed(2)},${y1.toFixed(2)}`;
+    };
+    log(null, `doboz ${name}`, `vászon ${whiteBox(a)}, export ${whiteBox(await decode(e))}`);
+    log(d <= 7 && ctl >= d * 1.5, name, `átlag ${d.toFixed(1)}/255; ellenpróba ${ctl.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(e);
+    removeFile(c);
+  };
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height} betűméret ${PixelRatio.getFontScale()}`);
+  const docs = IMAGE_TEMPLATES.map((tpl) => docFromTemplate(tpl, tpl.key, id));
+  for (const [i, doc] of docs.entries()) {
+    await check(`sablon = export: ${IMAGE_TEMPLATES[i].key}`, doc, { ...doc, layers: doc.layers.slice(0, 1) } as ImageDoc);
+  }
+  const post = docs[1];
+  const story = variantDoc(post, 1080, 1920, 'Story', id);
+  await check('változat 9:16 = export', story, post);
+  const wide = variantDoc(post, 1500, 500, 'Fejléc', id);
+  await check('változat széles = export', wide, post);
+
+  const video = addImageDocToVideo(createEmptyProject('smoke kép→videó', '16:9', undefined, 'video'), post, 'file:///smoke.png');
+  await saveProject(video);
+  const loaded = await loadProject(video.id);
+  const clip = loaded?.tracks.find((t) => t.type === 'video')?.clips[0] as ImageClip | undefined;
+  const restored = loaded?.imageDocs?.find((d) => d.id === clip?.docId);
+  log(restored?.layers.length === post.layers.length, 'kép→videó: mentés után is ott a réteges dokumentum', `${restored?.layers.length ?? 0} réteg, docId ${clip?.docId ? 'megvan' : 'nincs'}`);
+  await deleteProject(video.id);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1802,6 +1891,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'eco') {
+    await step('eco', () => smokeEcosystem(log, setHarness, ratio));
     return;
   }
   if (phase === 'assistant') {

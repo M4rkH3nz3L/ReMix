@@ -3124,6 +3124,17 @@
       "layer": "Réteg"
     },
     "image": {
+      "variant": {
+        "title": "Változat új lapra",
+        "done": "Új lap: {{name}}"
+      },
+      "templates": {
+        "title": "Sablonok",
+        "youtubeThumb": "YouTube indexkép",
+        "instaPost": "Instagram poszt",
+        "story": "Story",
+        "banner": "Fejléc-banner"
+      },
       "assistant": {
         "cmd": {
           "ADD_TEXT": "Új szöveg",
@@ -3274,6 +3285,7 @@
       "starPoints": "Ágak",
       "innerRadius": "Belső sugár",
       "importFrom": {
+        "template": "Sablonból",
         "file": "Képfájl a Fájlokból",
         "source": "A projekt médiái",
         "svg": "SVG-fájl",

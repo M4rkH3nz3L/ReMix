@@ -85,6 +85,7 @@ export type ImageSheetId =
   | 'adjust'
   | 'develop'
   | 'hsl'
+  | 'templates'
   | 'fx'
   | 'pattern'
   | 'align'
@@ -101,6 +102,7 @@ export const IMAGE_SHEET_SPECS: Record<ImageSheetId, PanelSpec> = {
   adjust: { tier: 'sheet', initialDetent: 'half' },
   develop: { tier: 'sheet', initialDetent: 'half' },
   hsl: { tier: 'sheet', initialDetent: 'half' },
+  templates: { tier: 'sheet', initialDetent: 'half' },
   layers: { tier: 'sheet', initialDetent: 'peek' },
   style: { tier: 'sheet', initialDetent: 'half' },
   fx: { tier: 'sheet', initialDetent: 'half' },

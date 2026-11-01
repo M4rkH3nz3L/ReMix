@@ -9,12 +9,16 @@ import type { AspectRatio } from '@/types/project';
 
 /** gyakori vászon-méret presetek (px). */
 export const CANVAS_PRESETS: { w: number; h: number; label: string }[] = [
-  { w: 1080, h: 1080, label: '1080²' },
-  { w: 1080, h: 1920, label: '1080×1920' },
-  { w: 1080, h: 1350, label: '1080×1350' },
-  { w: 1920, h: 1080, label: '1920×1080' },
+  { w: 1080, h: 1080, label: 'Instagram poszt' },
+  { w: 1080, h: 1350, label: 'Instagram portré' },
+  { w: 1080, h: 1920, label: 'Story / TikTok' },
+  { w: 1280, h: 720, label: 'YouTube indexkép' },
+  { w: 2560, h: 1440, label: 'YouTube borító' },
+  { w: 1920, h: 1080, label: 'Full HD' },
+  { w: 1500, h: 500, label: 'X fejléc' },
+  { w: 1640, h: 624, label: 'Facebook borító' },
+  { w: 1000, h: 1500, label: 'Pinterest' },
   { w: 2048, h: 2048, label: '2048²' },
-  { w: 1024, h: 1024, label: '1024²' },
 ];
 
 export const CANVAS_MIN = 16;

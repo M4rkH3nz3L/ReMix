@@ -12,6 +12,8 @@ import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
 import { useUndoRedoGestures } from '@/hooks/useUndoRedoGestures';
+import { gestures } from '@/design';
+import { layerAtPoint, layerBounds, stageToCanvas } from '@/lib/imageMulti';
 import { GridOverlay } from '@/components/studio/image/GridOverlay';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
@@ -45,6 +47,8 @@ const SelectionAnts = lazy(() =>
 const BrushOverlay = lazy(() =>
   import('@/components/studio/image/BrushOverlay').then((m) => ({ default: m.BrushOverlay }))
 );
+
+const pointOf = (p: { x: number; y: number }): [number, number] => [p.x, p.y];
 
 /** a vászon ennyit tölt ki a munkaterületből — körülötte látszik, ami kilóg */
 const CANVAS_FILL = 0.84;
@@ -103,6 +107,8 @@ export function ImageCanvas({
   cropAspect,
   onUndo,
   onRedo,
+  onLayerLongPress,
+  multiIds,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -165,6 +171,10 @@ export function ImageCanvas({
   onUndo?: () => void;
   /** háromujjas koppintás a munkaterületen */
   onRedo?: () => void;
+  /** hosszú nyomás egy rétegen */
+  onLayerLongPress?: (id: string) => void;
+  /** több réteg kijelölése: ezek körvonala látszik */
+  multiIds?: string[];
 }) {
   const { t } = useTranslation();
   const [container, setContainer] = useState({ w: 0, h: 0 });
@@ -267,10 +277,26 @@ export function ImageCanvas({
         .onEnd(() => onSelectRef.current(null))
     )
   ).current;
+  // hosszú nyomás a rétegen: a menü; a pontot a nézet aktuális állása szerint váltjuk vászon-arányra
+  const longPress = useRef({ run: (_x: number, _y: number) => {} });
+  const layerLongPress = useRef(
+    Gesture.LongPress()
+      .withTestId('canvas-long-press')
+      .runOnJS(true)
+      .minDuration(gestures.longPress.context)
+      .maxDistance(gestures.slop.tap)
+      .onStart((e) => longPress.current.run(e.x, e.y))
+  ).current;
   // kétujjas koppintás = visszavonás, háromujjas = újra (a profi rajz-appok szokása)
   const undoRedo = useUndoRedoGestures(() => onUndo?.(), () => onRedo?.());
-  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoRedo)).current;
+  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoRedo, layerLongPress)).current;
   const tf = canvasTransform(zoom, pan, fit);
+  longPress.current.run = (x, y) => {
+    const hit = onLayerLongPress && fit.w > 0 ? layerAtPoint(doc, ...pointOf(stageToCanvas(x, y, container, fit, tf))) : null;
+    if (hit) {
+      onLayerLongPress?.(hit.id);
+    }
+  };
   const viewportStyle = capturing
     ? undefined
     : { transform: [{ translateX: tf.translateX }, { translateY: tf.translateY }, { scale: tf.scale }] };
@@ -468,6 +494,23 @@ export function ImageCanvas({
             );
           })}
 
+          {!capturing
+            ? multiIds?.map((id) => {
+                const layer = doc.layers.find((l) => l.id === id);
+                const b = layer ? layerBounds(layer, docCanvas) : null;
+                return b ? (
+                  <View
+                    key={id}
+                    pointerEvents="none"
+                    style={[
+                      styles.multiOutline,
+                      { left: (b.x - b.w / 2) * fit.w, top: (b.y - b.h / 2) * fit.h, width: b.w * fit.w, height: b.h * fit.h, transform: [{ rotate: `${b.rotation}deg` }], borderWidth: 2 / zoom },
+                    ]}
+                  />
+                ) : null;
+              })
+            : null}
+
           <DocVignette angles={docVignetteAngles(doc as Parameters<typeof docVignetteAngles>[0])} box={fit} />
           <DocGrain grain={doc.grain ?? 0} cell={fit.w / (doc.width || fit.w)} />
 
@@ -627,6 +670,7 @@ export function ImageCanvas({
 const styles = StyleSheet.create({
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: PASTEBOARD },
   paper: { backgroundColor: '#0b0c12' },
+  multiOutline: { position: 'absolute', borderColor: palette.accent },
   veil: { position: 'absolute', backgroundColor: `${PASTEBOARD}a6` },
   canvasEdge: { borderColor: palette.border },
   // I12: az on-device kép a dokumentum, keret és szerkesztő-háttér nélkül; csak itt vág

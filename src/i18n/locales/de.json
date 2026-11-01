@@ -3160,6 +3160,8 @@
         "title": "Variante auf neuer Seite",
         "done": "Neue Seite: {{name}}"
       },
+      "layerMenu": {"title": "Ebene", "multi": "Mehrere auswählen", "duplicate": "Duplizieren", "forward": "Nach vorne", "back": "Nach hinten", "unlock": "Entsperren", "delete": "Löschen"},
+      "multi": {"count_one": "{{count}} Ebene", "count_other": "{{count}} Ebenen", "group": "Gruppe", "left": "Links", "hcenter": "Mitte", "right": "Rechts", "top": "Oben", "vcenter": "Mittig", "bottom": "Unten", "duplicate": "Duplizieren"},
       "templates": {
         "title": "Vorlagen",
         "youtubeThumb": "YouTube-Thumbnail",

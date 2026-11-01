@@ -26,6 +26,11 @@ import { foregroundMask } from '@/lib/foregroundMask';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
 import { useBrandStyle } from '@/store/brandStyleStore';
+import { haptics } from '@/design';
+import { type LayerMenuAction } from '@/components/studio/image/LayerMenuSheet';
+import { MultiSelectBar, type MultiAction } from '@/components/studio/image/body/MultiSelectBar';
+import { duplicateLayers, removeLayers, toggleId } from '@/lib/imageMulti';
+import { alignLayersInDoc } from '@/lib/imageLayerLayout';
 import { pixelLayerBox, type PixelArt } from '@/lib/pixelArt';
 import { variantDoc } from '@/lib/imageVariants';
 import { customExportSize, exportSize } from '@/lib/imageExport';
@@ -56,6 +61,7 @@ import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { deleteAnchor, type NodeType, pathEditPatch, pathEditView, reversePath, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
+  createGroup,
   createImageDoc,
   duplicateLayer,
   layerLabel,
@@ -215,6 +221,7 @@ export function ImageStudioBody({
   const [wandTolerance, setWandTolerance] = useState(32);
   const [brushActive, setBrushActive] = useState(false);
   const [pixelOpen, setPixelOpen] = useState(false);
+  const [multiIds, setMultiIds] = useState<string[] | null>(null);
   const [pixelLayerId, setPixelLayerId] = useState<string | null>(null);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [brushLayerId, setBrushLayerId] = useState<string | null>(null);
@@ -947,6 +954,48 @@ export function ImageStudioBody({
           setSelectedId(null);
         }
         break;
+    }
+  };
+
+  // 🖐️ hosszú nyomás: a réteg kijelölve, a menüje nyitva; a „Több” után a koppintás gyűjt
+  const onLayerLongPress = (id: string) => {
+    if (multiIds || precisionMode) {
+      return;
+    }
+    haptics.impact();
+    setSelectedId(id);
+    setSheet('layerMenu');
+  };
+  const onCanvasSelect = (id: string | null) => {
+    if (!multiIds) {
+      setSelectedId(id);
+    } else if (id) {
+      setMultiIds(toggleId(multiIds, id));
+    }
+  };
+  const onLayerMenu = (action: LayerMenuAction) => {
+    setSheet(null);
+    if (action === 'multi') {
+      setMultiIds(selectedId ? [selectedId] : []);
+      setSelectedId(null);
+    } else {
+      onTool(action);
+    }
+  };
+  const onMultiAction = (action: MultiAction) => {
+    if (!doc || !multiIds) {
+      return;
+    }
+    if (action === 'delete') {
+      commit(removeLayers(doc, multiIds), t('studio.image.undoDelete'));
+      setMultiIds(null);
+    } else if (action === 'duplicate') {
+      commit(duplicateLayers(doc, multiIds, () => makeId('lyr')), t('studio.image.undoDuplicate'));
+    } else if (action === 'group') {
+      commit(createGroup(doc, multiIds, makeId('grp'), t('studio.image.multi.group')), t('studio.image.multi.group'));
+      setMultiIds(null);
+    } else {
+      commit(alignLayersInDoc(doc, multiIds, action), t(`studio.image.multi.${action}`));
     }
   };
 
@@ -1976,7 +2025,7 @@ export function ImageStudioBody({
             <ImageCanvas
               doc={orderPreview ? moveLayerTo(doc, orderPreview.id, orderPreview.to) : doc}
               selectedId={effectiveSelectedId}
-              onSelect={setSelectedId}
+              onSelect={onCanvasSelect}
               onRequestEdit={(id) => {
                 setSelectedId(id);
                 setSheet('style');
@@ -1985,6 +2034,8 @@ export function ImageStudioBody({
               canvasRef={canvasRef}
               capturing={capturing}
               cropAspect={cropPreset}
+              onLayerLongPress={onLayerLongPress}
+              multiIds={multiIds ?? undefined}
               onUndo={() => void (brushActive ? brushRef.current?.undo() : undo())}
               onRedo={() => void (brushActive ? brushRef.current?.redo() : redo())}
               cropRect={cropRect}
@@ -2321,6 +2372,8 @@ export function ImageStudioBody({
               }}
               onClose={() => setQuickAdjust(false)}
             />
+          ) : multiIds && doc ? (
+            <MultiSelectBar count={multiIds.length} onAction={onMultiAction} onClose={() => setMultiIds(null)} />
           ) : selectedLayer && doc ? (
             <SelectionActionBar
               menu={selectionMenu(selectedLayer, { canAlign: canAlignLayer(selectedLayer), canBoolean: canBoolean(doc, effectiveSelectedId) })}
@@ -2347,6 +2400,7 @@ export function ImageStudioBody({
             onPack={(o) => void exportPack(o)}
             onTemplate={addTemplatePage}
             onVariant={addVariantPage}
+            onLayerMenu={onLayerMenu}
             onSvg={() => void exportSvg()}
             onPdf={() => void exportPdf()}
             onPsd={() => void exportPsdFile()}

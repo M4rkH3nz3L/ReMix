@@ -95,7 +95,8 @@ export type ImageSheetId =
   | 'canvas'
   | 'source'
   | 'export'
-  | 'history';
+  | 'history'
+  | 'layerMenu';
 
 export const IMAGE_SHEET_SPECS: Record<ImageSheetId, PanelSpec> = {
   // élő korrekció: a kép scrim NÉLKÜL, nagyban látszik húzás közben
@@ -108,6 +109,7 @@ export const IMAGE_SHEET_SPECS: Record<ImageSheetId, PanelSpec> = {
   fx: { tier: 'sheet', initialDetent: 'half' },
   pattern: { tier: 'sheet', initialDetent: 'half' },
   history: { tier: 'sheet', initialDetent: 'half' },
+  layerMenu: { tier: 'sheet', initialDetent: 'half' },
   align: { tier: 'sheet', initialDetent: 'peek' },
   boolean: { tier: 'sheet', initialDetent: 'peek' },
   shapePicker: { tier: 'sheet', initialDetent: 'peek' },

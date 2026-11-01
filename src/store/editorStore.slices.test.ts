@@ -50,7 +50,7 @@ const METHOD_KEYS = [
   'loadProject', 'restoreProject', 'closeProject', 'dispatch', 'applyBatch',
   'undo', 'redo', 'jumpHistory', 'markSaved', 'setRendered', 'setDocThumb',
   // selection
-  'selectClip', 'toggleMultiSelect', 'selectClips', 'setMultiSelectMode', 'allSelectedIds',
+  'selectClip', 'toggleMultiSelect', 'selectClips', 'setMultiSelectMode', 'beginMultiSelect', 'removeSelectedClips', 'allSelectedIds',
   'copyStyle', 'pasteStyle', 'copyClips', 'cutClips', 'pasteClipsAt', 'canPasteTo',
   // clipEdit
   'addClip', 'insertSourceAsset', 'updateClip', 'removeClip', 'splitClipAt',

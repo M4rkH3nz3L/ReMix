@@ -384,6 +384,10 @@ function TimelineClipInner({
     const splitAt = onClip ? st.playhead : clip.start + clip.duration / 2;
     Alert.alert(t('editor.track.' + trackType), undefined, [
       {
+        text: t('editor.toolbar.multiSelectTitle'),
+        onPress: () => st.beginMultiSelect(clip.id),
+      },
+      {
         text: t('editor.toolbar.splitHere'),
         onPress: () => st.splitClipAt(clip.id, splitAt),
       },

@@ -20,6 +20,8 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { LayerMenuSheet } from '@/components/studio/image/LayerMenuSheet';
+import { MultiSelectBar } from '@/components/studio/image/body/MultiSelectBar';
 import { BASE_PX_PER_SEC, MAX_ZOOM } from '@/constants/editor';
 import { endLive, startLive } from '@/lib/live';
 import { setRecord } from '@/lib/liveDoc';
@@ -2194,6 +2196,22 @@ async function smokeTimelineZoom(log: Log) {
   await deleteProject(project.id);
 }
 
+/** A hosszú nyomás menüje és a többes sáv a kijelzőn. */
+async function smokeMenus(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const layer = { kind: 'shape', id: 'm', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.4, h: 0.4, fill: '#fff' } as ImageLayer;
+  setHarness(
+    <View style={{ width: Math.min(420, Dimensions.get('window').width) }}>
+      <MultiSelectBar count={3} onAction={() => {}} onClose={() => {}} />
+      <LayerMenuSheet layer={layer} onPick={() => {}} onClose={() => {}} />
+    </View>
+  );
+  await sleep(1500);
+  log(true, 'FOTÓZHATÓ', 'menü és többes sáv');
+  await sleep(6000);
+  setHarness(null);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2386,6 +2404,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'menus') {
+    await step('menus', () => smokeMenus(log, setHarness));
     return;
   }
   if (phase === 'timeline') {

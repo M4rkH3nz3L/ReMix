@@ -26,6 +26,8 @@ type SelectionSlice = Pick<
   | 'toggleMultiSelect'
   | 'selectClips'
   | 'setMultiSelectMode'
+  | 'beginMultiSelect'
+  | 'removeSelectedClips'
   | 'allSelectedIds'
   | 'copyStyle'
   | 'pasteStyle'
@@ -226,6 +228,23 @@ export const createSelectionSlice: EditorSlice<SelectionSlice> = (set, get) => (
   canPasteTo: (trackType) => {
     const cb = get().clipClipboard;
     return !!cb && cb.clips.some((c) => canHostClip(trackType, c.kind));
+  },
+
+  // hosszú nyomás menüjéből: a klip az első elem, a további koppintások hozzáadnak
+  beginMultiSelect: (clipId) => {
+    get().selectClip(clipId);
+    set({ multiSelectMode: true });
+  },
+
+  // a kijelölés egy visszavonási lépésben törlődik
+  removeSelectedClips: () => {
+    const { selectedClipId, multiSelectIds } = get();
+    const ids = [...(selectedClipId ? [selectedClipId] : []), ...multiSelectIds];
+    if (ids.length === 0) {
+      return;
+    }
+    get().applyBatch(ids.map((clipId) => ({ type: 'REMOVE_CLIP', clipId })), 'user');
+    set({ selectedClipId: null, activePanel: null, multiSelectIds: [], multiSelectMode: false });
   },
 
   setMultiSelectMode: (on) =>

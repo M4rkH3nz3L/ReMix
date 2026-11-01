@@ -385,6 +385,8 @@ export interface EditorState {
   /** hallható-e a sáv az ELŐNÉZETBEN (solo felülírja a némítást) */
   isTrackAudible: (type: TrackType) => boolean;
   setMultiSelectMode: (on: boolean) => void;
+  beginMultiSelect: (clipId: string) => void;
+  removeSelectedClips: () => void;
   /** minden kijelölt klip azonosítója (elsődleges + a többi) */
   allSelectedIds: () => string[];
   /** a lejátszófej beállítása; `snap:true` → a projekt frame-rácsára ül (scrub/koppintás) */

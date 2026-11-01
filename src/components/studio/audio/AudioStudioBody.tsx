@@ -91,6 +91,8 @@ export function AudioStudioBody({
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
+  const multiSelectIds = useEditorStore((s) => s.multiSelectIds);
+  const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
   const loop = useEditorStore((s) => s.loop);
@@ -651,6 +653,7 @@ export function AudioStudioBody({
                         laneType={lane.type}
                         laneTypes={LANE_TYPES}
                         selected={clip.id === selectedClipId}
+                        multiSelected={multiSelectIds.includes(clip.id)}
                         snap={snapSecIn}
                       />
                     ))}
@@ -756,6 +759,20 @@ export function AudioStudioBody({
         />
       </ScrollView>
 
+      {/* többes kijelölés: a koppintás hozzáad, innen lehet kilépni */}
+      {multiSelectMode ? (
+        <Pressable
+          testID="audio-multi-exit"
+          style={styles.multiBar}
+          onPress={() => useEditorStore.getState().setMultiSelectMode(false)}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.cancel')}
+        >
+          <Text style={styles.multiText}>{t('editor.toolbar.multiSelectActive', { count: multiSelectIds.length + (selectedClipId ? 1 : 0) })}</Text>
+          <Ionicons name="close" size={20} color={palette.text} />
+        </Pressable>
+      ) : null}
+
       {/* eszköz-sor — nyitott inline lapnál rejtve (a lap fejléce a kilépés; a transport marad) */}
       {inlineSheet && !docked ? null : (
         <AudioStudioToolbar
@@ -765,7 +782,7 @@ export function AudioStudioBody({
           onRecord={toggleRecord}
           onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
           onEdit={() => selClip && setEditing(true)}
-          onDelete={() => selClip && useEditorStore.getState().removeClip(selClip.id)}
+          onDelete={() => selClip && useEditorStore.getState().removeSelectedClips()}
           onMixer={() => setMixerOpen(true)}
         />
       )}
@@ -805,6 +822,8 @@ function TBtn({
 }
 
 const styles = StyleSheet.create({
+  multiBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingHorizontal: 14, backgroundColor: palette.surfaceHigh },
+  multiText: { color: palette.text, fontSize: 13, fontWeight: '700' },
   root: { flex: 1, backgroundColor: '#05060a' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   topBtn: { padding: 2 },

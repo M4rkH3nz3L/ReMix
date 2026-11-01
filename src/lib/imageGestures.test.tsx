@@ -346,6 +346,33 @@ describe('kétujjas koppintás és dupla koppintás', () => {
   });
 });
 
+describe('hosszú nyomás a vásznon', () => {
+  const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.4, h: 0.4, fill: '#fff' };
+  const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [shape] } as unknown as ImageDoc;
+  const press = async (onLayerLongPress: (id: string) => void, x: number, y: number) => {
+    let tree!: ReactTestRenderer;
+    act(() => {
+      tree = create(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onLayerLongPress={onLayerLongPress} />);
+    });
+    const stage = tree.root.findAll((n) => typeof n.props.onLayout === 'function')[0];
+    await act(async () => stage.props.onLayout({ nativeEvent: { layout: { width: 200, height: 200 } } }));
+    const handler = getByGestureTestId('canvas-long-press') as unknown as { handlers: { onStart: (e: object) => void } };
+    await act(async () => handler.handlers.onStart({ x, y }));
+  };
+
+  it('a rétegen a réteg menüjét kéri', async () => {
+    const menu = jest.fn();
+    await press(menu, 100, 100);
+    expect(menu).toHaveBeenCalledWith('s');
+  });
+
+  it('üres helyen nem nyit menüt', async () => {
+    const menu = jest.fn();
+    await press(menu, 5, 5);
+    expect(menu).not.toHaveBeenCalled();
+  });
+});
+
 describe('≥44 pt célterület', () => {
   it('a réteg-panel minden gombja legalább 44 pt', () => {
     let tree: ReturnType<typeof create> | undefined;

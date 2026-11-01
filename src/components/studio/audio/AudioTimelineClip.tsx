@@ -1,5 +1,6 @@
 import { memo, useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
@@ -7,6 +8,7 @@ import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { palette } from '@/constants/editor';
 import { gestures, haptics, motion } from '@/design';
 import { audioLaneTarget } from '@/lib/audioTimelineGestures';
+import { makeId } from '@/lib/id';
 import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType } from '@/types/project';
@@ -34,6 +36,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   laneType,
   laneTypes,
   selected,
+  multiSelected = false,
   snap,
 }: {
   clip: AudioClip;
@@ -45,9 +48,11 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   /** a sávok típusai fentről le (zene/voiceover/sfx) — a sáv-váltás cél-sávjához */
   laneTypes: TrackType[];
   selected: boolean;
+  multiSelected?: boolean;
   /** frame/beat-illesztés a transport snap-módja szerint (AudioStudioBody adja) */
   snap: (sec: number) => number;
 }) {
+  const { t } = useTranslation();
   // élő eltolások (px): test-mozgatás + bal/jobb trim; a „lift" visszajelzi a fogást
   const moveDX = useSharedValue(0);
   const moveDY = useSharedValue(0);
@@ -65,8 +70,40 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
 
   const selectAndSeek = () => {
     const st = useEditorStore.getState();
+    if (st.multiSelectMode) {
+      st.toggleMultiSelect(clip.id);
+      haptics.snap();
+      return;
+    }
     st.selectClip(clip.id);
     st.setPlayhead(clip.start);
+  };
+
+  // hosszú nyomás mozgás nélkül: a videóval azonos menü
+  const showMenu = () => {
+    const st = useEditorStore.getState();
+    haptics.impact();
+    const onClip = st.playhead > clip.start && st.playhead < clip.start + clip.duration;
+    Alert.alert(clip.label, undefined, [
+      { text: t('editor.toolbar.multiSelectTitle'), onPress: () => st.beginMultiSelect(clip.id) },
+      { text: t('editor.toolbar.splitHere'), onPress: () => st.splitClipAt(clip.id, onClip ? st.playhead : clip.start + clip.duration / 2) },
+      { text: t('common.duplicate'), onPress: () => st.addClip(laneType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }) },
+      { text: t('common.delete'), style: 'destructive', onPress: () => st.removeClip(clip.id) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  // a húzás és a menü a klipre vonatkozik, többes kijelölésben sem ad hozzá
+  const selectForMove = () => {
+    const st = useEditorStore.getState();
+    if (!st.multiSelectMode) {
+      st.selectClip(clip.id);
+    }
+  };
+
+  const cancelMove = () => {
+    moveDX.value = 0;
+    moveDY.value = 0;
   };
 
   const commitMove = (dx: number, dy: number) => {
@@ -110,23 +147,30 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   };
 
   const tap = Gesture.Tap()
+    .withTestId(`audio-clip-tap-${clip.id}`)
     .maxDistance(gestures.slop.tap)
     .onEnd(() => {
       runOnJS(selectAndSeek)();
     });
 
   const movePan = Gesture.Pan()
+    .withTestId(`audio-clip-move-${clip.id}`)
     .activateAfterLongPress(gestures.longPress.drag)
     .onStart(() => {
       lift.value = withSpring(1, motion.spring.snappy);
-      runOnJS(selectAndSeek)();
+      runOnJS(selectForMove)();
     })
     .onUpdate((e) => {
       moveDX.value = e.translationX;
       moveDY.value = e.translationY;
     })
     .onEnd((e) => {
-      runOnJS(commitMove)(e.translationX, e.translationY);
+      if (Math.abs(e.translationX) < gestures.slop.pan && Math.abs(e.translationY) < gestures.slop.pan) {
+        runOnJS(cancelMove)();
+        runOnJS(showMenu)();
+      } else {
+        runOnJS(commitMove)(e.translationX, e.translationY);
+      }
     })
     .onFinalize(() => {
       lift.value = withSpring(0, motion.spring.snappy);
@@ -170,7 +214,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   return (
     <GestureDetector gesture={bodyGesture}>
       <Animated.View
-        style={[styles.clip, { left, borderColor: selected ? '#fff' : `${laneColor}99` }, animStyle]}
+        style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99` }, animStyle]}
       >
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>
           <ClipWaveform clip={clip} widthPx={w} heightPx={laneH - 22} color={laneColor} />

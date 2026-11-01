@@ -3160,6 +3160,8 @@
         "title": "Változat új lapra",
         "done": "Új lap: {{name}}"
       },
+      "layerMenu": {"title": "Réteg", "multi": "Több kijelölése", "duplicate": "Másolás", "forward": "Előrébb", "back": "Hátrébb", "unlock": "Feloldás", "delete": "Törlés"},
+      "multi": {"count_one": "{{count}} réteg", "count_other": "{{count}} réteg", "group": "Csoport", "left": "Bal", "hcenter": "Közép", "right": "Jobb", "top": "Fent", "vcenter": "Középre", "bottom": "Lent", "duplicate": "Másolás"},
       "templates": {
         "title": "Sablonok",
         "youtubeThumb": "YouTube indexkép",

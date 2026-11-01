@@ -3160,6 +3160,8 @@
         "title": "Variant on a new page",
         "done": "New page: {{name}}"
       },
+      "layerMenu": {"title": "Layer", "multi": "Select multiple", "duplicate": "Duplicate", "forward": "Bring forward", "back": "Send backward", "unlock": "Unlock", "delete": "Delete"},
+      "multi": {"count_one": "{{count}} layer", "count_other": "{{count}} layers", "group": "Group", "left": "Left", "hcenter": "Center", "right": "Right", "top": "Top", "vcenter": "Middle", "bottom": "Bottom", "duplicate": "Duplicate"},
       "templates": {
         "title": "Templates",
         "youtubeThumb": "YouTube thumbnail",

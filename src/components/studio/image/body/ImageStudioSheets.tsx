@@ -1,6 +1,7 @@
 import { SourceSheet } from '@/components/SourceSheet';
 import { AdjustStackSheet } from '@/components/studio/image/AdjustStackSheet';
 import { DevelopSheet } from '@/components/studio/image/DevelopSheet';
+import { LayerMenuSheet, type LayerMenuAction } from '@/components/studio/image/LayerMenuSheet';
 import { AlignSheet } from '@/components/studio/image/AlignSheet';
 import { BooleanSheet } from '@/components/studio/image/BooleanSheet';
 import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
@@ -55,6 +56,7 @@ export function ImageStudioSheets({
   onPack,
   onTemplate,
   onVariant,
+  onLayerMenu,
   onSvg,
   onPdf,
   onPsd,
@@ -84,6 +86,7 @@ export function ImageStudioSheets({
   onPack: (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => void;
   onTemplate: (tpl: ImageTemplate) => void;
   onVariant: (width: number, height: number, label: string) => void;
+  onLayerMenu: (action: LayerMenuAction) => void;
   onSvg: () => void;
   onPdf: () => void;
   onPsd: () => void;
@@ -172,6 +175,9 @@ export function ImageStudioSheets({
         <CanvasSheet doc={doc} commit={commit} onVariant={onVariant} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'history' && doc ? <HistorySheet onClose={() => setSheet(null)} /> : null}
+      {sheet === 'layerMenu' && selectedLayer ? (
+        <LayerMenuSheet layer={selectedLayer} onPick={onLayerMenu} onClose={() => setSheet(null)} />
+      ) : null}
       {sheet === 'source' ? (
         <SourceSheet onInsert={onInsertSource} onClose={() => setSheet(null)} />
       ) : null}

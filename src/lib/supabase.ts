@@ -15,6 +15,8 @@
 import 'react-native-url-polyfill/auto';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+import { loggedSupabaseFetch } from '@/lib/supabaseFetch';
 import Constants from 'expo-constants';
 import { AppState } from 'react-native';
 
@@ -64,6 +66,8 @@ export const supabase: SupabaseClient | null = hasSupabaseConfig()
         // mobilon nincs URL-alapú OAuth-callback (a deep link külön kezelendő)
         detectSessionInUrl: false,
       },
+      // 📋 a Supabase nem dob, `{ error }`-t ad vissza: a sikertelen kérés itt hagy nyomot
+      global: { fetch: loggedSupabaseFetch(fetch) },
     })
   : null;
 

@@ -803,7 +803,7 @@ export async function recordView(postId: string): Promise<void> {
   }
   await supabase.rpc('record_post_view', { p_post: postId }).then(
     () => {},
-    () => {}
+    (caught: unknown) => { logCaught('lib/feed.ts:recordView', caught); }
   );
 }
 
@@ -831,7 +831,7 @@ export async function recordViewEvent(postId: string, watchedMs: number, duratio
     })
     .then(
       () => {},
-      () => {}
+      (caught: unknown) => { logCaught('lib/feed.ts:recordViewEvent', caught); }
     );
 }
 

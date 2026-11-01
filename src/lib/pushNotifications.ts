@@ -146,14 +146,21 @@ export async function registerForPush(userId: string | null): Promise<PushRegist
     if (!Device.isDevice || !projectId) {
       return { granted: true, token: null };
     }
-    const { data: token } = await N.getExpoPushTokenAsync({ projectId });
-    if (token && userId) {
-      await saveCurrentDevicePushToken(userId, token);
+    // a token hibája nem vonja vissza az engedélyt: a helyi értesítés enélkül is működik.
+    // Tipikus ok: a build jogosultsága nem tartalmazza az `aps-environment`-et (ingyenes Apple-fiók).
+    try {
+      const { data: token } = await N.getExpoPushTokenAsync({ projectId });
+      if (token && userId) {
+        await saveCurrentDevicePushToken(userId, token);
+      }
+      return { granted: true, token: token ?? null };
+    } catch (caught) {
+      logCaught('lib/pushNotifications.ts:registerForPush:token', caught);
+      return { granted: true, token: null };
     }
-    return { granted: true, token: token ?? null };
   } catch (caught) {
     logCaught('lib/pushNotifications.ts:registerForPush', caught);
-    // az engedély/token hibája ne dőljön az appra — a realtime csengő megy nélküle is
+    // az engedély hibája ne dőljön az appra — a realtime csengő megy nélküle is
     return { granted: false, token: null };
   }
 }

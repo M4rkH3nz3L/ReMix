@@ -17,3 +17,13 @@ describe('a naplózott hibaüzenet nem szivárogtat', () => {
     expect(redactSecrets(msg)).toBe(msg);
   });
 });
+
+describe('Supabase-kérések naplója a workerben', () => {
+  it('a sikertelen választ átengedi, a sikeres csendes', async () => {
+    const { loggedFetch } = require('../lib/caught');
+    const bad = { status: 500, clone: () => ({ text: async () => 'x' }) };
+    await expect(loggedFetch(async () => bad)('https://x.supabase.co/rest/v1/a?b=1')).resolves.toBe(bad);
+    const ok = { status: 200 };
+    await expect(loggedFetch(async () => ok)('https://x.supabase.co/rest/v1/a')).resolves.toBe(ok);
+  });
+});

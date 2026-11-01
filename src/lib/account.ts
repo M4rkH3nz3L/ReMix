@@ -58,7 +58,7 @@ export async function exportMyData(): Promise<string> {
   const pick = (p: PromiseLike<{ data: unknown }>): Promise<unknown> =>
     Promise.resolve(p).then(
       (r) => r.data ?? null,
-      () => null
+      (caught: unknown) => { logCaught('lib/account.ts:pick', caught); return null; }
     );
 
   const [

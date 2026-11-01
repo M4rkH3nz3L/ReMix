@@ -1,3 +1,4 @@
+const { loggedFetch } = require('./lib/caught');
 const { logCaught } = require('./lib/caught');
 // 🎥 LiveKit Egress a workerben (LIVE.md Fázis E) — a felhasználó ENGEDÉLYEZETT
 // RTMP-céljaira streameli az élő szobát (RoomComposite → fan-out). A stream-
@@ -61,7 +62,7 @@ function getAdmin() {
     return null;
   }
   if (!admin) {
-    admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false }, global: { fetch: loggedFetch() } });
   }
   return admin;
 }

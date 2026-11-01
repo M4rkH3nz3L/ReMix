@@ -51,4 +51,18 @@ function logCaught(where, error) {
   }
 }
 
-module.exports = { logCaught };
+/** A Supabase nem dob, `{ error }`-t ad vissza: a sikertelen kérés itt hagy nyomot. */
+function loggedFetch(impl = fetch) {
+  return async (input, init) => {
+    const res = await impl(input, init);
+    if (res.status >= 400) {
+      const url = String(input && input.url ? input.url : input);
+      const where = `supabase:${new URL(url).pathname}`;
+      const body = await res.clone().text().catch((e) => String(e));
+      logCaught(where, new Error(`Supabase ${res.status} ${(init && init.method) || 'GET'}: ${body.slice(0, 300)}`));
+    }
+    return res;
+  };
+}
+
+module.exports = { logCaught, loggedFetch };

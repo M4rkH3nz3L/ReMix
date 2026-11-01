@@ -1,3 +1,4 @@
+const { loggedFetch } = require('./lib/caught');
 const { logCaught } = require('./lib/caught');
 // 🔔 Értesítés-küldés a workerből — service_role-lal (megkerüli az RLS-t), így
 // SELF és CROSS-USER (team-working: komment/meghívó/mention) is mehet.
@@ -25,6 +26,7 @@ function adminClient() {
     return null;
   }
   admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
+    global: { fetch: loggedFetch() },
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return admin;

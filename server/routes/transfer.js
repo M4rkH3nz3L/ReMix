@@ -1,3 +1,4 @@
+const { loggedFetch } = require('../lib/caught');
 const { logCaught } = require('../lib/caught');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -40,7 +41,7 @@ function admin() {
     return null;
   }
   const { createClient } = require('@supabase/supabase-js');
-  adminClient = createClient(url, key, { auth: { persistSession: false } });
+  adminClient = createClient(url, key, { auth: { persistSession: false }, global: { fetch: loggedFetch() } });
   return adminClient;
 }
 

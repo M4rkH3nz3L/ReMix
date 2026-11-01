@@ -1,5 +1,6 @@
 /**
- * 📋 Őrteszt: az appban és a workerben nincs néma hibakezelés. Minden `catch` és `.catch()` vagy
+ * 📋 Őrteszt: az appban és a workerben nincs néma hibakezelés. Minden `catch`, `.catch()` és
+ * `.then(_, hiba)` vagy
  * naplóz, vagy továbbdob. Ha ez a teszt bukik, a jelzett helyre `logCaught('hely', e)` kell.
  */
 import ts from 'typescript';
@@ -63,6 +64,11 @@ function silentSites(file: string): string[] {
     if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === 'catch') {
       const a = n.arguments[0];
       if (a && (ts.isArrowFunction(a) || ts.isFunctionExpression(a)) && !LOGGED.test(a.body.getText()) && !rethrows(a.body)) flag(n);
+    }
+    // a `.then(jó, rossz)` második ága ugyanúgy elnyelheti a hibát
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === 'then' && n.arguments.length === 2) {
+      const a = n.arguments[1];
+      if ((ts.isArrowFunction(a) || ts.isFunctionExpression(a)) && !LOGGED.test(a.body.getText()) && !rethrows(a.body)) flag(n);
     }
     ts.forEachChild(n, visit);
   };

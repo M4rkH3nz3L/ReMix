@@ -1,3 +1,4 @@
+const { loggedFetch } = require('./lib/caught');
 // 📊 Usage-metering a workerben (audit §2.2) — a drága felhő-erőforrások havi
 // mérése + tier-kvóta ENFORCE-olása. A kvóta-logika AZONOS a kliens
 // src/lib/usageMeter.ts-sel (preview/kliens == worker konzisztencia); a tárolás a
@@ -92,7 +93,7 @@ function getAdmin() {
     return null;
   }
   if (!admin) {
-    admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false }, global: { fetch: loggedFetch() } });
   }
   return admin;
 }

@@ -195,7 +195,7 @@ export async function registerCurrentDevice(userId: string): Promise<void> {
           route: '/devices',
           data: { fingerprint: info.fingerprint, platform: info.platform },
         })
-        .then(undefined, () => {});
+        .then(undefined, (caught: unknown) => { logCaught('lib/deviceInfo.ts:registerCurrentDevice', caught); });
     }
   } catch (caught) {
     logCaught('lib/deviceInfo.ts:registerCurrentDevice', caught);

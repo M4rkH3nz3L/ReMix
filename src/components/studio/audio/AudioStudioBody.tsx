@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
@@ -489,6 +490,7 @@ export function AudioStudioBody({
   );
 
   return (
+    <UndoGestureArea>
     <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
       <View style={styles.topBar} onLayout={(e) => setTopBarH(e.nativeEvent.layout.height)}>
         <Pressable onPress={onExit} hitSlop={10} style={styles.topBtn}>
@@ -770,6 +772,7 @@ export function AudioStudioBody({
 
       {sheetsInDock ? null : sheets}
     </View>
+    </UndoGestureArea>
   );
 }
 

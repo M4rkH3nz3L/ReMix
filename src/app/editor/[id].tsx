@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CollabPresence } from '@/components/editor/CollabPresence';
+import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { SourceBin } from '@/components/SourceBin';
 import { SourceSheet } from '@/components/SourceSheet';
 import { ImageStudioModal } from '@/components/studio/image/ImageStudioModal';
@@ -1038,6 +1039,7 @@ export default function EditorScreen() {
     // Fekvőben a notch / home-indicator az OLDALAKON van → ott az előnézet a
     // bevágás alá csúszna; ezért fekvő módban a bal/jobb szélt is insetteljük.
     // Állóban a bal/jobb inset 0, így ez nem változtat semmit.
+    <UndoGestureArea>
     <SafeAreaView
       style={styles.container}
       edges={L.isLandscape ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
@@ -1203,6 +1205,7 @@ export default function EditorScreen() {
       {/* ⏳ live-VOD feldolgozás-loader: a legfelső réteg, amíg a felvétel elérhető nem lesz */}
       <VodProcessingOverlay />
     </SafeAreaView>
+    </UndoGestureArea>
   );
 }
 

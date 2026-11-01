@@ -11,6 +11,7 @@ import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
+import { useUndoRedoGestures } from '@/hooks/useUndoRedoGestures';
 import { GridOverlay } from '@/components/studio/image/GridOverlay';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
@@ -101,6 +102,7 @@ export function ImageCanvas({
   initialZoom = 1,
   cropAspect,
   onUndo,
+  onRedo,
 }: {
   doc: ImageDoc;
   selectedId: string | null;
@@ -161,6 +163,8 @@ export function ImageCanvas({
   cropAspect?: number | null;
   /** kétujjas koppintás a munkaterületen */
   onUndo?: () => void;
+  /** háromujjas koppintás a munkaterületen */
+  onRedo?: () => void;
 }) {
   const { t } = useTranslation();
   const [container, setContainer] = useState({ w: 0, h: 0 });
@@ -263,23 +267,9 @@ export function ImageCanvas({
         .onEnd(() => onSelectRef.current(null))
     )
   ).current;
-  // kétujjas koppintás = visszavonás (a profi rajz-appok szokása)
-  const onUndoRef = useRef(onUndo);
-  onUndoRef.current = onUndo;
-  const undoTap = useRef(
-    Gesture.Tap()
-      .withTestId('canvas-undo-tap')
-      .runOnJS(true)
-      .minPointers(2)
-      .maxDuration(250)
-      .maxDistance(12)
-      .onEnd((_e, success) => {
-        if (success) {
-          onUndoRef.current?.();
-        }
-      })
-  ).current;
-  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoTap)).current;
+  // kétujjas koppintás = visszavonás, háromujjas = újra (a profi rajz-appok szokása)
+  const undoRedo = useUndoRedoGestures(() => onUndo?.(), () => onRedo?.());
+  const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoRedo)).current;
   const tf = canvasTransform(zoom, pan, fit);
   const viewportStyle = capturing
     ? undefined

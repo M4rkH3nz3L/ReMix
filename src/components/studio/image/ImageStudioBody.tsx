@@ -1985,7 +1985,8 @@ export function ImageStudioBody({
               canvasRef={canvasRef}
               capturing={capturing}
               cropAspect={cropPreset}
-              onUndo={undo}
+              onUndo={() => void (brushActive ? brushRef.current?.undo() : undo())}
+              onRedo={() => void (brushActive ? brushRef.current?.redo() : redo())}
               cropRect={cropRect}
               onCropRectChange={setCropRect}
               penPoints={penPoints}

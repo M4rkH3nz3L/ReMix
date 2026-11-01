@@ -2082,6 +2082,22 @@ async function smokePixel(log: Log, setHarness: (n: ReactNode) => void, ratio: n
   setHarness(null);
 }
 
+/** A gesztus-terület a valódi képernyőkön: megnyílnak, és a tárolóban él az undo-lánc. */
+async function smokeGestureScreens(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  for (const [kind, path] of [['video', '/editor'], ['audio', '/studio/audio'], ['live', '/live/studio']] as const) {
+    const project = createEmptyProject(`smoke gesztus ${kind}`, '9:16', undefined, kind);
+    await saveProject(project);
+    router.push(`${path}/${project.id}` as Href);
+    await sleep(3500);
+    const open = useEditorStore.getState().project;
+    log(open?.id === project.id, `${kind}: a képernyő megnyílt a gesztus-területtel`, `${open?.kind}`);
+    router.back();
+    await sleep(1500);
+    await deleteProject(project.id);
+  }
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2274,6 +2290,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'screens') {
+    await step('screens', () => smokeGestureScreens(log));
     return;
   }
   if (phase === 'pixel') {

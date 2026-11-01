@@ -333,8 +333,12 @@ describe('kétujjas koppintás és dupla koppintás', () => {
   const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [] } as unknown as ImageDoc;
   it('a kétujjas koppintás visszavon, a megszakított nem', async () => {
     const onUndo = jest.fn();
-    render(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onUndo={onUndo} />);
-    const tap = (getByGestureTestId('canvas-undo-tap') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
+    const onRedo = jest.fn();
+    render(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onUndo={onUndo} onRedo={onRedo} />);
+    const three = (getByGestureTestId('redo-tap') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
+    await act(async () => three.onEnd({}, true));
+    expect(onRedo).toHaveBeenCalledTimes(1);
+    const tap = (getByGestureTestId('undo-tap') as unknown as { handlers: { onEnd: (e: object, ok: boolean) => void } }).handlers;
     await act(async () => tap.onEnd({}, false));
     expect(onUndo).not.toHaveBeenCalled();
     await act(async () => tap.onEnd({}, true));

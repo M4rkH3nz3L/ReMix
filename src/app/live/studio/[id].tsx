@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
+import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -416,6 +417,7 @@ export default function LiveStudioScreen() {
   };
 
   return (
+    <UndoGestureArea>
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* fejléc */}
       <View style={styles.topBar}>
@@ -818,6 +820,7 @@ export default function LiveStudioScreen() {
         </Pressable>
       </Modal>
     </SafeAreaView>
+    </UndoGestureArea>
   );
 }
 

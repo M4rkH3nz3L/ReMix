@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "retouch": "Retusche",
       "marquee": "Auswahl",
       "toPath": "In Pfad",
       "fx": "Effekte",
@@ -3117,6 +3118,18 @@
       "layer": "Ebene"
     },
     "image": {
+      "retouch": {
+        "clone": "Klonen",
+        "heal": "Reparieren",
+        "dodge": "Abwedeln",
+        "burn": "Nachbelichten",
+        "blur": "Weichzeichnen",
+        "sharpen": "Schärfen",
+        "pick": "Neue Quelle",
+        "pickHint": "Tippe auf den Quellpunkt, von dem der Pinsel kopiert",
+        "hint": "Male über die zu korrigierende Stelle",
+        "failBody": "Die Leinwandaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
+      },
       "maskPaint": "Malen",
       "undoMaskPaint": "Maske malen",
       "maskPaintFail": "Die Maske konnte nicht gespeichert werden. Bitte versuche es erneut.",
@@ -3172,6 +3185,7 @@
         "undo": "Auswahl anwenden"
       },
       "brushBar": {
+        "strength": "Stärke",
         "maskShow": "Einblenden",
         "maskHide": "Ausblenden",
         "paint": "Pinsel",

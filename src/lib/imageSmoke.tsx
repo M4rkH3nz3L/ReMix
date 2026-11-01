@@ -17,7 +17,7 @@ import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
 import { applyRing, ellipseRing, invertSelection, rectRing, selectionToMask } from '@/lib/selection';
-import { DEFAULT_BRUSH, type Stroke } from '@/lib/brushEngine';
+import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
@@ -1045,6 +1045,84 @@ async function smokePaintMask(log: Log, setHarness: (n: ReactNode) => void, rati
   removeFile(png.uri);
 }
 
+/** A retus-eszközök a valódi Skia-rajzon: a vonás alatt változik, mellette a réteg átlátszó marad. */
+async function smokeRetouch(log: Log) {
+  const size = 400;
+  const surface = Skia.Surface.MakeOffscreen(size, size)!;
+  const c = surface.getCanvas();
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#606060'));
+  c.drawRect(Skia.XYWHRect(0, 0, size, size), paint);
+  paint.setColor(Skia.Color('#d04020'));
+  c.drawRect(Skia.XYWHRect(0, 0, 200, 200), paint);
+  paint.setColor(Skia.Color('#ffffff'));
+  for (let i = 0; i < 20; i++) {
+    c.drawRect(Skia.XYWHRect(0, i * 20, 200, 4), paint); // mintázat a klónhoz
+  }
+  surface.flush();
+  const source = surface.makeImageSnapshot().makeNonTextureImage()!;
+  const line = (tool: RetouchTool, y: number, offset?: { x: number; y: number }, extra: Partial<Stroke> = {}): Stroke => ({ points: [{ x: 0.1, y, p: 1 }, { x: 0.9, y, p: 1 }], color: '#000000', width: 0.1, hardness: 1, opacity: 1, eraser: false, tool, offset, ...extra });
+  const render = (s: Stroke) => renderStrokes([s], size, size, null, null, null, source)!;
+
+  // klón: a jobb alsó szürke helyre a bal felső mintás piros kerül
+  const clone = render(line('clone', 0.75, { x: -0.5, y: -0.5 }));
+  const [dst, src] = [pixel(clone, 300, 303), pixel(source, 100, 103)];
+  log(Math.abs(dst[0] - src[0]) <= 2 && Math.abs(dst[1] - src[1]) <= 2 && dst[3] === 255, 'klón: a forrás pixele kerül a célra', `cél ${dst}, forrás ${src}`);
+  log(pixel(clone, 300, 100)[3] === 0, 'klón: a vonáson kívül átlátszó', `α=${pixel(clone, 300, 100)[3]}`);
+
+  // folt: a minta jön át, de a cél szürke tónusa marad (a klón pirosat adna)
+  const heal = render(line('heal', 0.75, { x: -0.5, y: -0.5 }, { width: 0.1 }));
+  // egy pixel a minta miatt eltérhet: a terület átlagos színe a döntő
+  const mean = (img: SkImage) => {
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let y = 285; y < 315; y++) {
+      for (let x = 240; x < 340; x += 3) {
+        const p = pixel(img, x, y);
+        [0, 1, 2].forEach((k) => (sum[k] += p[k]));
+        n += 1;
+      }
+    }
+    return sum.map((v) => Math.round(v / n));
+  };
+  const [hm, cm] = [mean(heal), mean(clone)];
+  const healSpread = Math.max(...hm) - Math.min(...hm);
+  const cloneSpread = Math.max(...cm) - Math.min(...cm);
+  let [hi0, lo0] = [0, 255];
+  for (let y = 285; y < 315; y++) {
+    const v = pixel(heal, 300, y)[1];
+    hi0 = Math.max(hi0, v);
+    lo0 = Math.min(lo0, v);
+  }
+  log(healSpread <= 40 && Math.abs(hm[1] - 96) <= 45 && cloneSpread > 60 && hi0 - lo0 > 40, 'folt: a cél tónusa marad, a minta átjön', `folt átlag ${hm}, klón átlag ${cm}, minta terjedelme ${hi0 - lo0}`);
+
+  const base = pixel(source, 300, 300);
+  const dodge = pixel(render(line('dodge', 0.75)), 300, 300);
+  const burn = pixel(render(line('burn', 0.75)), 300, 300);
+  log(Math.abs(dodge[0] - base[0] * 1.35) <= 3 && Math.abs(burn[0] - base[0] * 0.65) <= 3, 'világosít és sötétít', `alap ${base[0]}, világos ${dodge[0]}, sötét ${burn[0]}`);
+  const half = pixel(render(line('dodge', 0.75, undefined, { opacity: 0.5 })), 300, 300);
+  log(Math.abs(half[3] - 128) <= 3, 'az erősség az átlátszóságon át hat', `α=${half[3]}`);
+
+  // elmosás: a piros-szürke él elmosódik; élesítés: túllövés az élen
+  const edge = (y: number, tool: RetouchTool) => pixel(render({ ...line(tool, 0.5), points: [{ x: 0.5, y: 0.1, p: 1 }, { x: 0.5, y: 0.9, p: 1 }], width: 0.2 }), 200 + y, 310);
+  const blurred = edge(-3, 'blur');
+  log(blurred[0] > 100 && blurred[0] < 130 + 60, 'elmosás: az él átmenetet kap', `él mellett ${blurred}`);
+  const sharpSurface = render({ ...line('sharpen', 0.25), points: [{ x: 0.1, y: 0.25, p: 1 }, { x: 0.45, y: 0.25, p: 1 }], width: 0.2 });
+  let [hi, orig] = [0, 0];
+  for (let y = 60; y < 140; y++) {
+    hi = Math.max(hi, pixel(sharpSurface, 100, y)[1]);
+    orig = Math.max(orig, pixel(source, 100, y)[1]);
+  }
+  let lo = 255;
+  for (let y = 60; y < 140; y++) lo = Math.min(lo, pixel(sharpSurface, 100, y)[1]);
+  const origLo = pixel(source, 100, 110)[1];
+  log(lo < origLo - 10, 'élesítés: a sötét oldal mélyül az élen', `legsötétebb ${lo}, eredeti ${origLo}`);
+
+  // forrás nélkül nincs rajz
+  const empty = renderStrokes([line('clone', 0.75, { x: 0, y: 0 })], size, size)!;
+  log(pixel(empty, 300, 300)[3] === 0, 'forrás nélkül nem fest feketét', `${pixel(empty, 300, 300)}`);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1239,6 +1317,10 @@ export async function runImageSmoke(
     await step('color', () => smokeColor(log, setHarness, ratio));
     return;
   }
+  if (phase === 'retouch') {
+    await step('retouch', () => smokeRetouch(log));
+    return;
+  }
   if (phase === 'paintmask') {
     await step('paintmask', () => smokePaintMask(log, setHarness, ratio));
     return;
@@ -1284,7 +1366,7 @@ export async function runImageSmoke(
     await step('brushbar', async () => {
       setHarness(
         <View style={{ width: Math.min(390, Dimensions.get('window').width), alignSelf: 'center' }}>
-          <BrushBar brush={DEFAULT_BRUSH} onChange={() => {}} canUndo canRedo={false} onUndo={() => {}} onRedo={() => {}} onCancel={() => {}} onDone={() => {}} />
+          <BrushBar brush={{ ...DEFAULT_BRUSH, tool: 'clone' }} retouch onChange={() => {}} canUndo canRedo={false} onUndo={() => {}} onRedo={() => {}} onCancel={() => {}} onDone={() => {}} />
         </View>
       );
       log(true, 'FOTÓZHATÓ', 'az ecset-sáv a kijelzőn');

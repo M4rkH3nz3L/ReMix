@@ -3,7 +3,13 @@
  * és a szélesség a vászon arányában vannak (0–1, szélesség = a vászonszélesség törtje), így a
  * vonás a képernyő méretétől függetlenül ugyanaz, az előnézet és az export egy adatból rajzol.
  */
+/** a retus-eszközök a vászon pillanatképéből dolgoznak, az eredmény festett rétegbe kerül */
+export type RetouchTool = 'clone' | 'heal' | 'dodge' | 'burn' | 'blur' | 'sharpen';
+export const RETOUCH_TOOLS: RetouchTool[] = ['clone', 'heal', 'dodge', 'burn', 'blur', 'sharpen'];
+
 export interface BrushSettings {
+  /** nincs megadva: sima festés */
+  tool?: RetouchTool;
   color: string;
   /** vastagság a vászon pontjaiban */
   size: number;
@@ -32,6 +38,9 @@ export interface Stroke {
   hardness: number;
   opacity: number;
   eraser: boolean;
+  tool?: RetouchTool;
+  /** klón és folt: a cél → forrás eltolás a vászon arányában */
+  offset?: { x: number; y: number };
 }
 
 export interface StrokeSegment {
@@ -102,6 +111,22 @@ export function undoStroke(h: StrokeHistory): StrokeHistory {
 export function redoStroke(h: StrokeHistory): StrokeHistory {
   const last = h.undone[h.undone.length - 1];
   return last ? { done: [...h.done, last], undone: h.undone.slice(0, -1) } : h;
+}
+
+/** Ehhez az eszközhöz kell-e forráspont? */
+export function needsSource(tool: RetouchTool | undefined): boolean {
+  return tool === 'clone' || tool === 'heal';
+}
+
+/** A forráspont és a vonás kezdete közti eltolás: ezután együtt mozognak, mint a fotós klónozásnál. */
+export function sourceOffset(origin: { x: number; y: number }, start: { x: number; y: number }): { x: number; y: number } {
+  return { x: origin.x - start.x, y: origin.y - start.y };
+}
+
+/** Világosítás és sötétítés színmátrixa: egyenletes fény-szorzó. */
+export function toneMatrix(tool: 'dodge' | 'burn'): number[] {
+  const k = tool === 'dodge' ? 1.35 : 0.65;
+  return [k, 0, 0, 0, 0, 0, k, 0, 0, 0, 0, 0, k, 0, 0, 0, 0, 0, 1, 0];
 }
 
 /** Festett réteg: a korábbi ecset-rétegek fájlnévről is felismerhetők. */

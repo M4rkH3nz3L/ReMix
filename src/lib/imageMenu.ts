@@ -17,6 +17,7 @@ export type RailTool =
   | 'import'
   | 'pen'
   | 'brush'
+  | 'retouch'
   | 'marquee'
   | 'lasso'
   | 'wand'
@@ -47,7 +48,7 @@ export type ToolKey = RailTool | LayerAction | ImportAction | 'delete';
 
 export const RAIL_GROUPS: { labelKey: string; tools: RailTool[] }[] = [
   { labelKey: 'studio.imageGroups.add', tools: ['photo', 'text', 'shape', 'addFill', 'addAdjust', 'import'] },
-  { labelKey: 'studio.imageGroups.draw', tools: ['pen', 'brush'] },
+  { labelKey: 'studio.imageGroups.draw', tools: ['pen', 'brush', 'retouch'] },
   { labelKey: 'studio.imageGroups.select', tools: ['marquee', 'lasso', 'wand'] },
   { labelKey: 'studio.imageGroups.canvas', tools: ['crop', 'guides'] },
 ];
@@ -61,6 +62,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   import: 'folder-open-outline',
   pen: 'pencil-outline',
   brush: 'brush-outline',
+  retouch: 'bandage-outline',
   marquee: 'scan-outline',
   lasso: 'analytics-outline',
   wand: 'color-wand-outline',

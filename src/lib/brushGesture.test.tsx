@@ -14,6 +14,8 @@ jest.mock('@shopify/react-native-skia', () => {
   return {
     BlendMode: {},
     ClipOp: {},
+    FilterMode: {},
+    MipmapMode: {},
     PathOp: {},
     Canvas: () => null,
     Picture: () => null,
@@ -83,5 +85,43 @@ describe('ecset-gesztus', () => {
     drag(State.END);
     act(() => ref.current!.undo());
     expect(ref.current!.hasStrokes()).toBe(true);
+  });
+});
+
+describe('klón forráspontja', () => {
+  const setupClone = () => {
+    const ref = createRef<BrushHandle>();
+    const need: boolean[] = [];
+    act(() => {
+      create(<BrushOverlay ref={ref} box={box} settings={{ ...DEFAULT_BRUSH, smoothing: 0, tool: 'clone' }} onNeedSource={(n) => need.push(n)} gestureTestId="clone" />);
+    });
+    return { ref, need };
+  };
+  const tap = (x: number, y: number) =>
+    act(() => {
+      fireGestureHandler(getByGestureTestId('clone'), [{ state: State.BEGAN, x, y }, { state: State.END, x, y }]);
+    });
+
+  it('az első koppintás a forrás, nem vonás; utána fest', () => {
+    const { ref, need } = setupClone();
+    expect(need).toEqual([true]);
+    tap(40, 20);
+    expect(ref.current!.hasStrokes()).toBe(false);
+    expect(need[need.length - 1]).toBe(false);
+    act(() => {
+      fireGestureHandler(getByGestureTestId('clone'), [
+        { state: State.BEGAN, x: 100, y: 50 },
+        { state: State.ACTIVE, x: 110, y: 50 },
+        { state: State.ACTIVE, x: 120, y: 50 },
+        { state: State.END, x: 120, y: 50 },
+      ]);
+    });
+    expect(ref.current!.hasStrokes()).toBe(true);
+  });
+  it('új forrás kérhető', () => {
+    const { ref, need } = setupClone();
+    tap(40, 20);
+    act(() => ref.current!.pickSource());
+    expect(need[need.length - 1]).toBe(true);
   });
 });

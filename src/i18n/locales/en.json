@@ -3069,6 +3069,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "retouch": "Retouch",
       "marquee": "Select",
       "toPath": "To path",
       "addFill": "Background",
@@ -3117,6 +3118,18 @@
       "layer": "Layer"
     },
     "image": {
+      "retouch": {
+        "clone": "Clone",
+        "heal": "Heal",
+        "dodge": "Dodge",
+        "burn": "Burn",
+        "blur": "Blur",
+        "sharpen": "Sharpen",
+        "pick": "New source",
+        "pickHint": "Tap the source point the brush copies from",
+        "hint": "Brush over the area to fix",
+        "failBody": "The canvas snapshot failed. Please try again."
+      },
       "maskPaint": "Paint",
       "undoMaskPaint": "Paint mask",
       "maskPaintFail": "The mask couldn't be saved. Please try again.",
@@ -3172,6 +3185,7 @@
         "undo": "Apply selection"
       },
       "brushBar": {
+        "strength": "Strength",
         "maskShow": "Reveal",
         "maskHide": "Hide",
         "paint": "Brush",

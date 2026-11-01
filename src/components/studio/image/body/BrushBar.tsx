@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Slider } from '@/components/studio/audio/primitives';
 import { ColorField } from '@/components/studio/image/ColorField';
 import { palette } from '@/constants/editor';
-import type { BrushSettings } from '@/lib/brushEngine';
+import { type BrushSettings, needsSource, RETOUCH_TOOLS } from '@/lib/brushEngine';
 
 const COLORS = ['#ffffff', '#0b0b18', '#ff2d95', '#ffd166', '#39d98a', '#4d9dff'];
 const percent = (v: number) => `${Math.round(v * 100)}%`;
@@ -22,6 +22,8 @@ export function BrushBar({
   onCancel,
   onDone,
   maskMode,
+  retouch,
+  onPickSource,
 }: {
   brush: BrushSettings;
   onChange: (patch: Partial<BrushSettings>) => void;
@@ -33,6 +35,9 @@ export function BrushBar({
   onDone: () => void;
   /** festett maszk: nincs szín, az ecset mutat, a radír rejt */
   maskMode?: boolean;
+  /** retus-munkamenet: eszközválasztó a szín és a radír helyett */
+  retouch?: boolean;
+  onPickSource?: () => void;
 }) {
   const { t } = useTranslation();
   const [more, setMore] = useState(false);
@@ -54,8 +59,8 @@ export function BrushBar({
     <View style={styles.bar}>
       <View style={styles.row}>
         {icon('close', t('common.cancel'), onCancel)}
-        {icon('brush-outline', t(maskMode ? 'studio.image.brushBar.maskShow' : 'studio.image.brushBar.paint'), () => onChange({ eraser: false }), !brush.eraser)}
-        {icon('remove-circle-outline', t(maskMode ? 'studio.image.brushBar.maskHide' : 'studio.image.brushBar.eraser'), () => onChange({ eraser: true }), brush.eraser)}
+        {retouch ? null : icon('brush-outline', t(maskMode ? 'studio.image.brushBar.maskShow' : 'studio.image.brushBar.paint'), () => onChange({ eraser: false }), !brush.eraser)}
+        {retouch ? null : icon('remove-circle-outline', t(maskMode ? 'studio.image.brushBar.maskHide' : 'studio.image.brushBar.eraser'), () => onChange({ eraser: true }), brush.eraser)}
         {icon('arrow-undo', t('studio.image.brushBar.undo'), onUndo, false, !canUndo)}
         {icon('arrow-redo', t('studio.image.brushBar.redo'), onRedo, false, !canRedo)}
         {icon('options-outline', t('studio.image.brushBar.more'), () => setMore((m) => !m), more)}
@@ -65,7 +70,21 @@ export function BrushBar({
           <Text style={styles.doneText}>{t('common.done')}</Text>
         </Pressable>
       </View>
-      {brush.eraser || maskMode ? null : (
+      {retouch ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
+          {RETOUCH_TOOLS.map((tool) => (
+            <Pressable key={tool} onPress={() => onChange({ tool })} style={[styles.tool, brush.tool === tool && styles.iconActive]} accessibilityRole="button" accessibilityState={{ selected: brush.tool === tool }}>
+              <Text style={[styles.toolText, brush.tool === tool && styles.toolTextActive]}>{t(`studio.image.retouch.${tool}`)}</Text>
+            </Pressable>
+          ))}
+          {needsSource(brush.tool) ? (
+            <Pressable onPress={onPickSource} style={styles.tool} accessibilityRole="button">
+              <Text style={styles.toolTextActive}>{t('studio.image.retouch.pick')}</Text>
+            </Pressable>
+          ) : null}
+        </ScrollView>
+      ) : null}
+      {brush.eraser || maskMode || retouch ? null : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colors}>
           {COLORS.map((c) => (
             <Pressable key={c} onPress={() => onChange({ color: c })} style={styles.dotHit} accessibilityRole="button" accessibilityLabel={c} accessibilityState={{ selected: brush.color === c }}>
@@ -85,7 +104,7 @@ export function BrushBar({
           <Slider label={t('studio.image.brushBar.size')} value={brush.size} min={1} max={120} onChange={(size) => onChange({ size: Math.round(size) })} format={(v) => `${Math.round(v)}`} />
         </View>
         <View style={styles.flex}>
-          <Slider label={t('studio.image.brushBar.opacity')} value={brush.opacity} min={0.05} max={1} onChange={(opacity) => onChange({ opacity })} format={percent} />
+          <Slider label={t(retouch ? 'studio.image.brushBar.strength' : 'studio.image.brushBar.opacity')} value={brush.opacity} min={0.05} max={1} onChange={(opacity) => onChange({ opacity })} format={percent} />
         </View>
       </View>
       {more ? (
@@ -117,4 +136,8 @@ const styles = StyleSheet.create({
   dotActive: { borderWidth: 2, borderColor: palette.accent },
   customDot: { alignItems: 'center', justifyContent: 'center' },
   sliders: { flexDirection: 'row', gap: 12 },
+  tools: { alignItems: 'center', gap: 6 },
+  tool: { paddingHorizontal: 12, height: 30, borderRadius: 15, justifyContent: 'center', borderWidth: 1, borderColor: palette.border },
+  toolText: { color: palette.text, fontSize: 12, fontWeight: '700' },
+  toolTextActive: { color: palette.accent, fontSize: 12, fontWeight: '700' },
 });

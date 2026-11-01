@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
+import type { SkImage } from '@shopify/react-native-skia';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -196,6 +197,9 @@ export function ImageStudioBody({
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [brushLayerId, setBrushLayerId] = useState<string | null>(null);
   const [brushMaskMode, setBrushMaskMode] = useState(false);
+  // 🩹 retus: a vászon pillanatképe a forrás; az eredmény új festett rétegbe kerül
+  const [brushSource, setBrushSource] = useState<SkImage | null>(null);
+  const [needSource, setNeedSource] = useState(false);
   const [brushHistory, setBrushHistory] = useState({ canUndo: false, canRedo: false });
   const onBrushHistory = useCallback((canUndo: boolean, canRedo: boolean) => setBrushHistory({ canUndo, canRedo }), []);
   const [guidesActive, setGuidesActive] = useState(false);
@@ -260,6 +264,11 @@ export function ImageStudioBody({
     if (target.id !== doc?.id) {
       return null;
     }
+    return captureCanvas(target, height, opts);
+  };
+
+  /** A vászon képe az eszközön, a dokumentum felbontásán, vízjel és kijelölés-króm nélkül. */
+  const captureCanvas = async (target: ImageDoc, height: number, opts?: { format?: 'png' | 'jpg' | 'webp'; quality?: number }) => {
     setCapturing(true);
     await new Promise((r) => setTimeout(r, 90)); // egy render-kör, kijelölés-króm nélkül
     try {
@@ -705,6 +714,9 @@ export function ImageStudioBody({
       case 'wand':
         startSelect('wand');
         break;
+      case 'retouch':
+        void startRetouch();
+        break;
       case 'brush':
         // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként. A Skia-függő
         // overlay-t előbb LEPROBÁLJUK betölteni; ha a natív modul hiányzik (régi
@@ -721,6 +733,8 @@ export function ImageStudioBody({
           const target = doc?.layers.find((l) => l.id === selectedId);
           setBrushLayerId(target && isPaintLayer(target) ? target.id : null);
           setBrushMaskMode(false);
+          setBrushSource(null);
+          setBrush((b) => ({ ...b, tool: undefined }));
           setSheet(null);
           setSelectedId(null);
           setCropRect(null);
@@ -978,6 +992,42 @@ export function ImageStudioBody({
       }
     }
     setBrushActive(false);
+  };
+
+  // 🩹 retus: előbb a vászon képe, utána indul a munkamenet (a pillanatkép az overlay-t levenné)
+  const startRetouch = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const { Skia } = await import('@shopify/react-native-skia');
+      const uri = await captureCanvas(doc, effectiveCanvas(doc).height);
+      const image = uri ? Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(uri)) : null;
+      if (!image) {
+        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.retouch.failBody'));
+        return;
+      }
+      setBrushSource(image);
+      setBrush((b) => ({ ...b, tool: 'clone', opacity: 1 }));
+      setBrushLayerId(null);
+      setBrushMaskMode(false);
+      setSheet(null);
+      setSelectedId(null);
+      setCropRect(null);
+      setPenPoints(null);
+      setPathEditId(null);
+      setSelectTool(null);
+      setLassoActive(false);
+      setMaskTarget(null);
+      setWandActive(false);
+      setBrushActive(true);
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:startRetouch', caught);
+      Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.retouch.failBody'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   // I34: a mégse a maszk-célt is törli, különben a következő sima lasszó a régi rétegre írna
@@ -1656,6 +1706,8 @@ export function ImageStudioBody({
               brushSettings={brush}
               brushLayerId={brushLayerId}
               brushMaskMode={brushMaskMode}
+              brushSource={brushSource}
+              onBrushNeedSource={setNeedSource}
               onBrushHistory={onBrushHistory}
               brushRef={brushRef}
               guidesActive={guidesActive}
@@ -1705,7 +1757,9 @@ export function ImageStudioBody({
               {guidesActive
                 ? t('studio.image.guides.hint')
                 : brushActive
-                ? t('studio.image.brush.hint')
+                ? brush.tool
+                  ? t(needSource ? 'studio.image.retouch.pickHint' : 'studio.image.retouch.hint')
+                  : t('studio.image.brush.hint')
                 : selectTool === 'rect' || selectTool === 'ellipse'
                 ? t('studio.image.select.hint')
                 : wandActive
@@ -1881,6 +1935,8 @@ export function ImageStudioBody({
               onCancel={cancelBrush}
               onDone={commitBrush}
               maskMode={brushMaskMode}
+              retouch={!!brush.tool}
+              onPickSource={() => brushRef.current?.pickSource()}
             />
           ) : guidesActive ? (
             /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */

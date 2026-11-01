@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "retouch": "Retus",
       "marquee": "Kijelölés",
       "toPath": "Görbévé",
       "addFill": "Háttér",
@@ -3117,6 +3118,18 @@
       "layer": "Réteg"
     },
     "image": {
+      "retouch": {
+        "clone": "Klón",
+        "heal": "Folt",
+        "dodge": "Világosít",
+        "burn": "Sötétít",
+        "blur": "Elmos",
+        "sharpen": "Élesít",
+        "pick": "Új forrás",
+        "pickHint": "Koppints a forráspontra, onnan másol az ecset",
+        "hint": "Húzd az ecsetet a javítandó részre",
+        "failBody": "A vászon képe nem készült el. Próbáld újra."
+      },
       "maskPaint": "Festés",
       "undoMaskPaint": "Maszk festése",
       "maskPaintFail": "A maszk nem menthető. Próbáld újra.",
@@ -3172,6 +3185,7 @@
         "undo": "Kijelölés alkalmazása"
       },
       "brushBar": {
+        "strength": "Erősség",
         "maskShow": "Mutat",
         "maskHide": "Elrejt",
         "paint": "Ecset",

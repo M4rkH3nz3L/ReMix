@@ -15,6 +15,7 @@ import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { MarqueeOverlay } from '@/components/studio/image/MarqueeOverlay';
+import type { SkImage } from '@shopify/react-native-skia';
 import type { Point, Selection } from '@/lib/selection';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
@@ -93,6 +94,8 @@ export function ImageCanvas({
   brushSettings = DEFAULT_BRUSH,
   brushLayerId,
   brushMaskMode,
+  brushSource,
+  onBrushNeedSource,
   onBrushHistory,
   brushRef,
   guidesActive,
@@ -144,6 +147,9 @@ export function ImageCanvas({
   brushLayerId?: string | null;
   /** festett maszk: a réteg látszik, az overlay a maszkját szerkeszti */
   brushMaskMode?: boolean;
+  /** retus: a vászon pillanatképe */
+  brushSource?: SkImage | null;
+  onBrushNeedSource?: (needed: boolean) => void;
   onBrushHistory?: (canUndo: boolean, canRedo: boolean) => void;
   brushRef?: Ref<BrushHandle>;
   /** 📐 vonalzók + segédvonalak megjelenítése/szerkesztése */
@@ -580,7 +586,7 @@ export function ImageCanvas({
           {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
           {!capturing && brushActive ? (
             <Suspense fallback={null}>
-              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={brushMaskMode ? brushTarget?.mask?.image : brushTarget?.uri} maskMode={brushMaskMode} maskSeed={brushMaskMode ? brushTarget?.mask : null} onHistory={onBrushHistory} clip={selection} />
+              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={brushMaskMode ? brushTarget?.mask?.image : brushTarget?.uri} maskMode={brushMaskMode} maskSeed={brushMaskMode ? brushTarget?.mask : null} source={brushSource} onNeedSource={onBrushNeedSource} onHistory={onBrushHistory} clip={selection} />
             </Suspense>
           ) : null}
 

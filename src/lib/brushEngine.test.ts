@@ -1,4 +1,4 @@
-import { DEFAULT_BRUSH, EMPTY_HISTORY, hardnessSigma, isPaintLayer, pressureOf, pressureWidth, pushStroke, redoStroke, stabilize, strokeSegments, undoStroke, type Stroke } from '@/lib/brushEngine';
+import { DEFAULT_BRUSH, EMPTY_HISTORY, hardnessSigma, isPaintLayer, needsSource, pressureOf, pressureWidth, pushStroke, redoStroke, sourceOffset, stabilize, strokeSegments, toneMatrix, undoStroke, type Stroke } from '@/lib/brushEngine';
 
 const stroke = (id: number): Stroke => ({ points: [{ x: id, y: 0, p: 1 }], color: '#000000', width: 0.1, hardness: 1, opacity: 1, eraser: false });
 
@@ -78,4 +78,21 @@ describe('festett réteg', () => {
 
 it('az alapbeállítás éles, teljesen fedő ecset', () => {
   expect(DEFAULT_BRUSH).toMatchObject({ hardness: 1, opacity: 1, eraser: false });
+});
+
+describe('retus', () => {
+  it('csak a klón és a folt kér forráspontot', () => {
+    expect(needsSource('clone')).toBe(true);
+    expect(needsSource('heal')).toBe(true);
+    expect(needsSource('dodge')).toBe(false);
+    expect(needsSource(undefined)).toBe(false);
+  });
+  it('az eltolás a forráspontból a vonás kezdetébe mutat', () => {
+    expect(sourceOffset({ x: 0.2, y: 0.3 }, { x: 0.5, y: 0.5 })).toEqual({ x: -0.3, y: -0.2 });
+  });
+  it('a világosító szoroz, a sötétítő oszt, az alfa érintetlen', () => {
+    expect(toneMatrix('dodge')[0]).toBeGreaterThan(1);
+    expect(toneMatrix('burn')[0]).toBeLessThan(1);
+    expect(toneMatrix('dodge')[18]).toBe(1);
+  });
 });

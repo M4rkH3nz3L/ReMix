@@ -3572,7 +3572,12 @@
         "failBody": "Couldn't select a color region. Tap inside a photo layer."
       },
       "pen": {
-        "hint": "Tap to add points · tap the first point to close",
+        "mirrored": "Mirrored",
+        "broken": "Broken",
+        "open": "Open",
+        "closePath": "Close",
+        "reverse": "Reverse",
+        "hint": "Tap for a corner · drag for a curve · tap the first point to close",
         "close": "Close",
         "editHint": "Tap a node (Smooth/Corner/delete) · tap the edge to add a point",
         "smooth": "Smooth",

@@ -1,4 +1,4 @@
-import { pathShapeFromCanvasPoints } from '@/lib/penPath';
+import { anchorFromDrag, pathShapeFromCanvasPoints } from '@/lib/penPath';
 
 describe('pathShapeFromCanvasPoints', () => {
   it('< 2 pont → null', () => {
@@ -47,5 +47,25 @@ describe('pathShapeFromCanvasPoints', () => {
     // vízszintes vonal: h degenerált → min 0.02-re emelve (ne tűnjön el)
     expect(s.h).toBeCloseTo(0.02);
     expect(s.w).toBeCloseTo(0.8);
+  });
+});
+
+describe('húzásos toll', () => {
+  const box = { w: 200, h: 100 };
+  it('kis mozdulat sarokpont marad', () => {
+    expect(anchorFromDrag({ x: 0.5, y: 0.5 }, { x: 0.51, y: 0.5 }, box)).toEqual({ x: 0.5, y: 0.5 });
+  });
+  it('a húzás kimenő fogantyú, a bejövő a tükörképe', () => {
+    const p = anchorFromDrag({ x: 0.5, y: 0.5 }, { x: 0.6, y: 0.7 }, box);
+    expect(p.h2).toEqual({ x: 0.6, y: 0.7 });
+    expect(p.h1!.x).toBeCloseTo(0.4);
+    expect(p.h1!.y).toBeCloseTo(0.3);
+  });
+  it('a fogantyúk átjönnek a formába, a dobozra normalizálva', () => {
+    const s = pathShapeFromCanvasPoints([{ x: 0.2, y: 0.5, h2: { x: 0.4, y: 0.2 } }, { x: 0.8, y: 0.5, h1: { x: 0.6, y: 0.8 } }], false, 'p')!;
+    expect(s.points![0].h2).toBeDefined();
+    expect(s.points![0].h2!.y).toBeCloseTo(0);
+    expect(s.points![1].h1!.y).toBeCloseTo(1);
+    expect(s.h).toBeCloseTo(0.6);
   });
 });

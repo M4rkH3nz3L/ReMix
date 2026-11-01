@@ -9,6 +9,8 @@ import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/stud
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
 import { Asset } from 'expo-asset';
+import { anchorFromDrag, type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
+import { setNodeType } from '@/lib/vectorPath';
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { logCaught } from '@/lib/logCaught';
@@ -1182,6 +1184,57 @@ async function smokeBgRemove(log: Log, setHarness: (n: ReactNode) => void, ratio
   removeFile(res.uri);
 }
 
+/** Húzásos tollal rajzolt görbék a vásznon a szerver ellen; az egyenes változat az ellenpróba. */
+async function smokeVector(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const docOf = (...layers: ImageLayer[]) => ({ id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [bg, ...layers] }) as unknown as ImageDoc;
+  const box = { w: 320, h: 320 };
+  const blob = [
+    anchorFromDrag({ x: 0.5, y: 0.15 }, { x: 0.75, y: 0.15 }, box),
+    anchorFromDrag({ x: 0.85, y: 0.5 }, { x: 0.85, y: 0.75 }, box),
+    anchorFromDrag({ x: 0.5, y: 0.85 }, { x: 0.25, y: 0.85 }, box),
+    anchorFromDrag({ x: 0.15, y: 0.5 }, { x: 0.15, y: 0.25 }, box),
+  ];
+  const wave = [
+    anchorFromDrag({ x: 0.1, y: 0.5 }, { x: 0.25, y: 0.1 }, box),
+    anchorFromDrag({ x: 0.5, y: 0.5 }, { x: 0.65, y: 0.9 }, box),
+    { x: 0.9, y: 0.5 },
+  ];
+  const straight = (pts: CanvasPoint[]) => pts.map(({ x, y }) => ({ x, y }));
+  const shape = (pts: CanvasPoint[], closed: boolean, extra: Partial<ShapeLayer> = {}) => ({ ...pathShapeFromCanvasPoints(pts, closed, 's', '#ff2d95')!, ...extra }) as ImageLayer;
+  const edited = shape(blob, true) as ShapeLayer;
+  const cases: [string, ImageDoc, ImageDoc][] = [
+    ['zárt görbe forma', docOf(shape(blob, true)), docOf(shape(straight(blob), true))],
+    ['nyitott görbe vonal', docOf(shape(wave, false, { strokeWidth: 2 })), docOf(shape(straight(wave), false, { strokeWidth: 2 }))],
+    ['sarokká tett csomópont', docOf({ ...edited, points: setNodeType(edited.points!, 1, 'corner', true) } as ImageLayer), docOf(edited)],
+    ['megnyitott útvonal', docOf({ ...edited, closed: false, strokeWidth: 1.5 } as ImageLayer), docOf(edited)],
+  ];
+  for (const [name, doc, other] of cases) {
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1300);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [out, ctl] = [await renderImageDoc(doc, 320), await renderImageDoc(other, 320)];
+    if (!out || !ctl) {
+      log(false, `görbe = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const d = meanDiff(a, await decode(out), 320, 320);
+    const c = meanDiff(a, await decode(ctl), 320, 320);
+    log(d <= 5 && c >= d * 1.5, `görbe = export: ${name}`, `átlag ${d.toFixed(1)}/255; ellenpróba ${c.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(out);
+    removeFile(ctl);
+  }
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1374,6 +1427,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'vector') {
+    await step('vector', () => smokeVector(log, setHarness, ratio));
     return;
   }
   if (phase === 'bgremove') {

@@ -3572,7 +3572,12 @@
         "failBody": "Nem sikerült szín-régiót kijelölni. Koppints egy fotó-réteg belsejébe."
       },
       "pen": {
-        "hint": "Koppints pontokért · az első pontra a záráshoz",
+        "mirrored": "Szimmetrikus",
+        "broken": "Törött",
+        "open": "Megnyit",
+        "closePath": "Lezár",
+        "reverse": "Irány csere",
+        "hint": "Koppints sarokpontért · húzz görbéért · az első pontra a záráshoz",
         "close": "Bezár",
         "editHint": "Node-ra koppints (Görbe/Sarok/törlés) · az élre koppintva új pont",
         "smooth": "Görbe",

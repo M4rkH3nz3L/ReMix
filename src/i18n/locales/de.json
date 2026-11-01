@@ -3577,7 +3577,12 @@
         "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene."
       },
       "pen": {
-        "hint": "Tippen zum Punkte setzen · auf den ersten Punkt zum Schließen",
+        "mirrored": "Symmetrisch",
+        "broken": "Getrennt",
+        "open": "Öffnen",
+        "closePath": "Schließen",
+        "reverse": "Umkehren",
+        "hint": "Tippen für Ecke · ziehen für Kurve · auf den ersten Punkt tippen zum Schließen",
         "close": "Schließen",
         "editHint": "Knoten antippen (Kurve/Ecke/löschen) · Kante antippen = neuer Punkt",
         "smooth": "Kurve",

@@ -43,7 +43,7 @@ import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import { flattenTargets, mergeDownTargets, rasterSubDoc, replaceWithRaster } from '@/lib/imageCanvasOps';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
-import { deleteAnchor, setNodeType } from '@/lib/vectorPath';
+import { deleteAnchor, type NodeType, reversePath, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
   createImageDoc,
@@ -1246,13 +1246,26 @@ export function ImageStudioBody({
   // ✏️ v3: a KIJELÖLT node típusa (görbe/sarok) — bezier-fogók létrehozása/törlése
   const pe = pathEditId && doc ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
   const pathEditShape = pe && pe.kind === 'shape' && pe.shape === 'path' ? pe : null;
-  const setNodeKind = (type: 'smooth' | 'corner') => {
+  // nyitott útvonalnak vonal kell, különben láthatatlan volna
+  const togglePathClosed = () => {
+    if (doc && pathEditShape) {
+      const closed = !pathEditShape.closed;
+      commit(updateLayer<ShapeLayer>(doc, pathEditShape.id, { closed, strokeWidth: closed ? pathEditShape.strokeWidth : pathEditShape.strokeWidth ?? 0.9 }), 'path-closed');
+    }
+  };
+  const reverseEditedPath = () => {
+    if (doc && pathEditShape?.points) {
+      commit(updateLayer<ShapeLayer>(doc, pathEditShape.id, { points: reversePath(pathEditShape.points) }), 'path-reverse');
+      setPathEditNode(null);
+    }
+  };
+  const setNodeKind = (type: NodeType) => {
     if (doc && pathEditShape?.points && pathEditNode != null) {
       commit(
         updateLayer(doc, pathEditShape.id, {
           points: setNodeType(pathEditShape.points, pathEditNode, type, !!pathEditShape.closed),
         }),
-        type === 'corner' ? 'node-corner' : 'node-smooth'
+        `node-${type}`
       );
     }
   };
@@ -1914,23 +1927,26 @@ export function ImageStudioBody({
               >
                 <Ionicons name="trash-outline" size={18} color={palette.danger} />
               </Pressable>
-              {/* ✏️ v3: a kijelölt node görbévé / sarokká (bezier-fogók) */}
-              <Pressable
-                onPress={() => setNodeKind('smooth')}
-                style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
-                hitSlop={6}
-                disabled={pathEditNode == null}
-              >
-                <Text style={styles.penCloseText}>{t('studio.image.pen.smooth')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setNodeKind('corner')}
-                style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
-                hitSlop={6}
-                disabled={pathEditNode == null}
-              >
-                <Text style={styles.penCloseText}>{t('studio.image.pen.corner')}</Text>
-              </Pressable>
+              {/* ✏️ a kijelölt node típusa, az útvonal iránya és nyitása */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.brushScroll}>
+                {(['smooth', 'mirrored', 'broken', 'corner'] as const).map((type) => (
+                  <Pressable
+                    key={type}
+                    onPress={() => setNodeKind(type)}
+                    style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
+                    hitSlop={6}
+                    disabled={pathEditNode == null}
+                  >
+                    <Text style={styles.penCloseText}>{t(`studio.image.pen.${type}`)}</Text>
+                  </Pressable>
+                ))}
+                <Pressable onPress={togglePathClosed} style={styles.penClose} hitSlop={6}>
+                  <Text style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
+                </Pressable>
+                <Pressable onPress={reverseEditedPath} style={styles.penClose} hitSlop={6}>
+                  <Text style={styles.penCloseText}>{t('studio.image.pen.reverse')}</Text>
+                </Pressable>
+              </ScrollView>
               <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
                 <Text style={styles.cropApplyText}>{t('common.done')}</Text>

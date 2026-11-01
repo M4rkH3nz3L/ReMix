@@ -2,7 +2,7 @@ import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkIma
 import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -519,21 +519,27 @@ function meanDiff(a: SkImage, b: SkImage, size: number, stop: number): number {
   return sum / n;
 }
 
-/** a cellahatárok körül mér: az élesítés csak ott hat */
-function edgeDiff(a: SkImage, b: SkImage): number {
-  let sum = 0;
+/** Az effekt tiszta hatása a cellahatárokon: a vászon és az export VÁLTOZÁSÁNAK különbsége, az újramintázás zaja nélkül. */
+function edgeEffect(a: SkImage, a0: SkImage, b: SkImage, b0: SkImage): { residual: number; effect: number } {
+  let residual = 0;
+  let effect = 0;
   let n = 0;
   for (let k = 1; k < 15; k++) {
     for (let j = 1; j < 15; j++) {
       for (const off of [-2, -1, 0, 1]) {
-        const p = pixel(a, k * 20 + off, j * 20 + 10);
-        const q = pixel(b, k * 20 + off, j * 20 + 10);
-        sum += (Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2])) / 3;
-        n += 1;
+        const [x, y] = [k * 20 + off, j * 20 + 10];
+        const [p, p0, q, q0] = [pixel(a, x, y), pixel(a0, x, y), pixel(b, x, y), pixel(b0, x, y)];
+        for (const c of [0, 1, 2]) {
+          const canvasDelta = p[c] - p0[c];
+          const exportDelta = q[c] - q0[c];
+          residual += Math.abs(canvasDelta - exportDelta);
+          effect += Math.abs(exportDelta);
+          n += 1;
+        }
       }
     }
   }
-  return sum / n;
+  return { residual: residual / n, effect: effect / n };
 }
 
 function redCount(a: SkImage, size: number): number {
@@ -568,6 +574,7 @@ function spread(a: SkImage, x0: number, y0: number, n: number): number {
 
 /** A részlet-műveletek pixelszintű mérése a szerver ellen, ellenpróbával: az effekt nélküli export. */
 async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  log(true, 'mért eszköz', `${Platform.OS === 'ios' && Platform.isPad ? 'iPad' : 'telefon'}, pixelarány ${ratio}`);
   const surface = Skia.Surface.MakeOffscreen(320, 320)!;
   const paint = Skia.Paint();
   const c = surface.getCanvas();
@@ -641,9 +648,17 @@ async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: n
       const [ra, rb, rp] = [redCount(a, 320), redCount(b, 320), redCount(p, 320)];
       log(Math.abs(ra - rb) <= rb * 0.4 && rp === 0 && rb > 50, `részlet = export: ${name}`, `vörös pontok: vászon ${ra}, export ${rb}, körvonal nélkül ${rp}`);
     } else {
-      const edge = name === 'élesítés' || name.includes('clarity') || name.includes('texture');
-      const d = edge ? edgeDiff(a, b) : meanDiff(a, b, 320, 320);
-      const ctl = edge ? edgeDiff(a, p) : meanDiff(a, p, 320, 320);
+      if (name === 'élesítés' || name.includes('clarity') || name.includes('texture')) {
+        // az alap is a Skia-úton rajzolódjon: elhanyagolható élesítés, különben a sima Image-et mérnénk
+        const skiaPlain = { ...plainOf(doc), layers: [photo({ filters: [{ type: 'sharpen', amount: 0.001 }] })] } as ImageDoc;
+        const fx = edgeEffect(a, await shoot(skiaPlain), b, p);
+        log(fx.residual <= fx.effect * 0.5 && fx.effect > 1, `részlet = export: ${name}`, `az effekt a cellahatáron ${fx.effect.toFixed(1)}/255, ebből eltér ${fx.residual.toFixed(1)}`);
+        removeFile(uri);
+        removeFile(plainUri);
+        continue;
+      }
+      const d = meanDiff(a, b, 320, 320);
+      const ctl = meanDiff(a, p, 320, 320);
       log(d <= 8 && ctl >= d * 1.5, `részlet = export: ${name}`, `átlag ${d.toFixed(1)}/255; effekt nélkül ${ctl.toFixed(1)}`);
     }
     removeFile(uri);

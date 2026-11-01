@@ -23,7 +23,7 @@ export function LayerStyleSheet({
   layer: ImageLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onOpenAdjust: () => void;
-  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
+  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
   onClose: () => void;
 }) {
   useTranslation();

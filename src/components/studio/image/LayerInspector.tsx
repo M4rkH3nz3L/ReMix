@@ -74,7 +74,7 @@ export function LayerInspector({
   onOpenAdjust: () => void;
   /** 🎭 szabadkézi (lasszó) rajzolása a megadott rétegre — a szülő aktiválja a lasszó-módot;
    *  target: 'clip' = vágó-maszk, 'local' = korrekció-maszk, 'heal' = folt-javítás régió */
-  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
+  onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
 }) {
   const { t } = useTranslation();
 
@@ -802,6 +802,13 @@ export function LayerInspector({
                 label={t('studio.image.maskLasso', { defaultValue: '✏️ Lasszó' })}
                 active={curMask?.shape === 'polygon'}
                 onPress={() => onDrawMask(layer.id, 'clip')}
+              />
+            ) : null}
+            {onDrawMask && layer.kind === 'photo' ? (
+              <Chip
+                label={t('studio.image.maskPaint')}
+                active={!!curMask?.image}
+                onPress={() => onDrawMask(layer.id, 'paint')}
               />
             ) : null}
           </View>

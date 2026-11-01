@@ -189,12 +189,13 @@ export function ImageStudioBody({
   const [selectTargetId, setSelectTargetId] = useState<string | null>(null);
   // 🎭 ha be van állítva, a következő lasszó-rajz: vágó-maszk ('clip'), lokális korrekció-maszk
   // ('local'), vagy 🩹 folt-javítás régió ('heal' — a bbox-ot delogo-zza a render)
-  const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' } | null>(null);
+  const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' | 'paint' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(32);
   const [brushActive, setBrushActive] = useState(false);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [brushLayerId, setBrushLayerId] = useState<string | null>(null);
+  const [brushMaskMode, setBrushMaskMode] = useState(false);
   const [brushHistory, setBrushHistory] = useState({ canUndo: false, canRedo: false });
   const onBrushHistory = useCallback((canUndo: boolean, canRedo: boolean) => setBrushHistory({ canUndo, canRedo }), []);
   const [guidesActive, setGuidesActive] = useState(false);
@@ -719,6 +720,7 @@ export function ImageStudioBody({
           // a kijelölt festett réteget folytatjuk (a radír is azon dolgozik), különben új réteg lesz
           const target = doc?.layers.find((l) => l.id === selectedId);
           setBrushLayerId(target && isPaintLayer(target) ? target.id : null);
+          setBrushMaskMode(false);
           setSheet(null);
           setSelectedId(null);
           setCropRect(null);
@@ -949,7 +951,15 @@ export function ImageStudioBody({
     if (doc && brushRef.current?.hasStrokes()) {
       const canvas = effectiveCanvas(doc);
       const uri = brushRef.current.exportPng(canvas.width, canvas.height);
-      if (uri && brushLayerId) {
+      if (brushMaskMode && brushLayerId) {
+        if (uri) {
+          const mask: ClipMask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image: uri };
+          commit(updateLayer<PhotoLayer>(doc, brushLayerId, { mask }), t('studio.image.undoMaskPaint'));
+        } else {
+          Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.maskPaintFail'));
+        }
+        setSelectedId(brushLayerId);
+      } else if (uri && brushLayerId) {
         commit({ ...doc, layers: doc.layers.map((l) => (l.id === brushLayerId ? { ...l, uri, paint: true } : l)) } as ImageDoc, t('studio.image.undoBrush'));
         setSelectedId(brushLayerId);
       } else if (uri) {
@@ -1050,7 +1060,19 @@ export function ImageStudioBody({
 
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
   // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)
-  const startMaskDraw = (layerId: string, target: 'clip' | 'local' | 'heal' = 'clip') => {
+  const startMaskDraw = (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint' = 'clip') => {
+    if (target === 'paint') {
+      // 🖌️ festett maszk: az ecset-motor a réteg maszkján dolgozik
+      setSheet(null);
+      setSelectedId(null);
+      setSelectTool(null);
+      setLassoActive(false);
+      setWandActive(false);
+      setBrushLayerId(layerId);
+      setBrushMaskMode(true);
+      setBrushActive(true);
+      return;
+    }
     setSelectedId(layerId);
     setMaskTarget({ id: layerId, target });
     setLassoActive(true);
@@ -1633,6 +1655,7 @@ export function ImageStudioBody({
               brushActive={brushActive}
               brushSettings={brush}
               brushLayerId={brushLayerId}
+              brushMaskMode={brushMaskMode}
               onBrushHistory={onBrushHistory}
               brushRef={brushRef}
               guidesActive={guidesActive}
@@ -1857,6 +1880,7 @@ export function ImageStudioBody({
               onRedo={() => brushRef.current?.redo()}
               onCancel={cancelBrush}
               onDone={commitBrush}
+              maskMode={brushMaskMode}
             />
           ) : guidesActive ? (
             /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */

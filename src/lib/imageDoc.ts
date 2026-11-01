@@ -359,6 +359,9 @@ export function docMediaUris(doc: ImageDoc): string[] {
       if (l.lut) {
         out.push(l.lut); // 🎞️ saját .cube LUT — a renderhez fel kell tölteni
       }
+      if (l.mask?.image) {
+        out.push(l.mask.image); // 🖌️ festett maszk
+      }
     } else if (l.kind === 'shape' && l.imageUri) {
       out.push(l.imageUri);
     }

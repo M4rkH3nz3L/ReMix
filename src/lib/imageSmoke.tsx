@@ -16,7 +16,7 @@ import { computeHistogram, histogramShift } from '@/lib/histogram';
 import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
-import { applyRing, ellipseRing, invertSelection, rectRing } from '@/lib/selection';
+import { applyRing, ellipseRing, invertSelection, rectRing, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
@@ -966,6 +966,85 @@ async function smokeColor(log: Log, setHarness: (n: ReactNode) => void, ratio: n
   removeFile(png.uri);
 }
 
+/** A festett maszk: a valódi overlay festi, a valódi vászon mutatja, a szerver ellen mérve. */
+async function smokePaintMask(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  const c = surface.getCanvas();
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      paint.setColor(Skia.Color(`rgb(${40 + x * 60},${220 - y * 50},${60 + (x + y) * 25})`));
+      c.drawRect(Skia.XYWHRect(x * 80, y * 80, 80, 80), paint);
+    }
+  }
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_pm_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const photo = (extra: Partial<PhotoLayer> = {}) => ({ kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }) as PhotoLayer;
+  const docOf = (l: PhotoLayer) => ({ id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [bg, l] }) as unknown as ImageDoc;
+  const line = (color: string, y: number, extra: Partial<Stroke> = {}): Stroke => ({ points: [{ x: 0.1, y, p: 1 }, { x: 0.9, y, p: 1 }], color, width: 0.14, hardness: 1, opacity: 1, eraser: false, ...extra });
+
+  const ref = createRef<BrushHandle>();
+  setHarness(
+    <View style={{ width: 300, height: 300, backgroundColor: '#406080' }}>
+      <BrushOverlay ref={ref} box={{ w: 300, h: 300 }} settings={DEFAULT_BRUSH} maskMode />
+    </View>
+  );
+  await sleep(500);
+  ref.current!.addStroke(line('#000000', 0.3));
+  ref.current!.addStroke(line('#000000', 0.7, { hardness: 0.2, opacity: 0.6 }));
+  await sleep(400);
+  log(true, 'FOTÓZHATÓ', 'a maszk-festés nézete a kijelzőn');
+  await sleep(5000);
+  const uri = ref.current!.exportPng(320, 320)!;
+  const m = await decode(uri);
+  log(pixel(m, 160, 96)[0] < 10 && pixel(m, 160, 10)[0] > 245, 'a maszk: rejtett fekete, a többi fehér', `rejtett ${pixel(m, 160, 96)}, látható ${pixel(m, 160, 10)}`);
+  setHarness(null);
+  await sleep(80);
+
+  // a meglévő kijelölésből induló festés a formát hozza
+  const seedRing = applyRing(null, rectRing({ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.75 }), 'new')!;
+  const seeded = renderStrokes([], 320, 320, null, null, selectionToMask(seedRing))!;
+  log(pixel(seeded, 160, 160)[0] > 245 && pixel(seeded, 20, 20)[0] < 10, 'a meglévő maszk formája átjön a festésbe', `belül ${pixel(seeded, 160, 160)}, kívül ${pixel(seeded, 20, 20)}`);
+
+  const mask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image: uri } as PhotoLayer['mask'];
+  const moved = updateLayer<PhotoLayer>(docOf(photo({ mask })), 'p', { position: { x: 0.62, y: 0.55 } });
+  const cases: [string, ImageDoc][] = [
+    ['festett maszk', docOf(photo({ mask }))],
+    ['lágy szélű maszk', docOf(photo({ mask: { ...mask!, feather: 0.015 } }))],
+    ['mozgatott réteg maszkja', moved],
+    ['elforgatott réteg', docOf(photo({ mask, rotation: 25, w: 0.7, h: 0.7 }))],
+  ];
+  for (const [name, doc] of cases) {
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1500);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const plainDoc = { ...doc, layers: doc.layers.map((l) => (l.kind === 'photo' ? { ...l, mask: undefined } : l)) } as ImageDoc;
+    const [out, plain] = [await renderImageDoc(doc, 320), await renderImageDoc(plainDoc, 320)];
+    if (!out || !plain) {
+      log(false, `festett maszk = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const d = meanDiff(a, await decode(out), 320, 320);
+    const ctl = meanDiff(a, await decode(plain), 320, 320);
+    log(d <= 6 && ctl >= d * 1.5, `festett maszk = export: ${name}`, `átlag ${d.toFixed(1)}/255; maszk nélkül ${ctl.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(out);
+    removeFile(plain);
+  }
+  removeFile(uri);
+  removeFile(png.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1158,6 +1237,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'paintmask') {
+    await step('paintmask', () => smokePaintMask(log, setHarness, ratio));
     return;
   }
   if (phase === 'logs') {

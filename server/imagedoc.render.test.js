@@ -336,3 +336,31 @@ describe('színenkénti HSL', () => {
     expect(out.at(150, 100)[0]).toBeLessThan(40);
   });
 });
+
+describe('festett maszk', () => {
+  // fehér bal fél, fekete jobb fél
+  const maskPng = () => {
+    const file = path.join(dir, 'mask.png');
+    // RGB-ben készül: a YUV-os overlay 253-ra kerekítené a fehéret
+    execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=white:s=100x100,format=gbrp', '-f', 'lavfi', '-i', 'color=black:s=50x100,format=gbrp', '-filter_complex', '[0][1]overlay=50:0:format=gbrp', '-frames:v', '1', '-y', file]);
+    return file;
+  };
+  const white = () => photo(solid('white', 'w.png', '200x200'));
+  const base = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0 };
+
+  it('fehér látszik, fekete rejtett', async () => {
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask: { ...base, image: maskPng() } }]), 200, dir));
+    expect(out.at(50, 100)[3]).toBe(255);
+    expect(out.at(150, 100)[3]).toBe(0);
+  });
+  it('a dobozával mozog, azon kívül rejtett', async () => {
+    const out = decode(await renderImageDoc(doc([{ ...white(), mask: { ...base, x: 0.6, image: maskPng() } }]), 200, dir));
+    expect(out.at(10, 100)[3]).toBe(0);
+    expect(out.at(40, 100)[3]).toBe(255);
+    expect(out.at(170, 100)[3]).toBe(0);
+  });
+  it('nem helyi képnél nem nyúl az URL-hez', () => {
+    const { maskGrayChain } = require('./imageMask');
+    expect(maskGrayChain({ ...base, image: 'https://belso.example/titok.png' }, 100, 100, '[m]', dir)).not.toContain('belso.example');
+  });
+});

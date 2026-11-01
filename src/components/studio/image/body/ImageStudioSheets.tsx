@@ -74,7 +74,7 @@ export function ImageStudioSheets({
   onAddShapeType: (shape: Exclude<ShapeLayer['shape'], 'path'>) => void;
   onImport: (key: 'svg' | 'psd' | 'pdf') => void;
   onInsertSource: (asset: Asset) => void;
-  onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal') => void;
+  onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;

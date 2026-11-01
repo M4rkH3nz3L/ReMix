@@ -127,12 +127,15 @@ export function PhotoSkiaContent({
   h,
   scale,
   canvas,
+  maskImage,
 }: {
   image: SkImage;
   lut: SkImage | null;
   lutSize?: number;
   /** a maszkon belül más LUT-tal rajzolt rész (lokális / maszkolt korrekció), ugyanakkora rács */
   overlays?: { mask: ClipMask; lut: SkImage | null }[];
+  /** a festett maszk betöltött képe */
+  maskImage?: SkImage | null;
   layer: PhotoLayer;
   w: number;
   h: number;
@@ -177,6 +180,25 @@ export function PhotoSkiaContent({
     );
   }
   const maskElement = (mask: ClipMask) => {
+    // 🖌️ festett maszk: a szürke kép a vászon-dobozából a réteg terébe vetítve
+    if (mask.image) {
+      if (!maskImage) {
+        return <Rect x={0} y={0} width={w} height={h} color="white" />;
+      }
+      const [a, b, c] = [
+        { x: mask.x - mask.w / 2, y: mask.y - mask.h / 2 },
+        { x: mask.x + mask.w / 2, y: mask.y - mask.h / 2 },
+        { x: mask.x - mask.w / 2, y: mask.y + mask.h / 2 },
+      ].map((p) => canvasToLayerBox(p, layer, canvas));
+      const matrix = Skia.Matrix([(b.x - a.x) * w, (c.x - a.x) * w, a.x * w, (b.y - a.y) * h, (c.y - a.y) * h, a.y * h, 0, 0, 1]);
+      return (
+        <Group layer={<Paint><Blur blur={Math.max(0, (mask.feather ?? 0) * canvas.height * scale)} /></Paint>}>
+          <Group matrix={matrix}>
+            <SkiaImage image={maskImage} x={0} y={0} width={1} height={1} fit="fill" />
+          </Group>
+        </Group>
+      );
+    }
     // a kijelölésből jött maszk műveletekből áll: homorú forma és lyuk is pontos
     const ops = mask.ops?.length
       ? mask.ops.map((o) => ({ op: o.op, points: o.points.map((p) => canvasToLayerBox(p, layer, canvas)) }))
@@ -284,6 +306,7 @@ export function SkiaPhotoLayer({
   fallback: React.ReactNode;
 }) {
   const image = useImage(layer.uri);
+  const maskImage = useImage(layer.mask?.image ?? null);
   const cube = useCubeFile(layer.lut);
   // a maszkon belül más színlánc fut: a saját lokális korrekció + a fölötte lévő maszkolt rétegek
   const masked = useMemo(() => {
@@ -317,7 +340,7 @@ export function SkiaPhotoLayer({
     // sRGB: az export is ez; a Skia alapból P3-as felülete másképp számolná a telített színeket
     <Canvas colorSpace="srgb" style={[styles.canvas, { left: -pad, top: -pad, width: w + 2 * pad, height: h + 2 * pad }]}>
       <Group transform={[{ translateX: pad }, { translateY: pad }]}>
-        <PhotoSkiaContent image={image} lut={(exact ?? draft).lut} overlays={(exact ?? draft).overlays} lutSize={exact ? LUT_SIZE : LUT_DRAFT_SIZE} layer={layer} w={w} h={h} scale={scale} canvas={canvas} />
+        <PhotoSkiaContent image={image} maskImage={maskImage} lut={(exact ?? draft).lut} overlays={(exact ?? draft).overlays} lutSize={exact ? LUT_SIZE : LUT_DRAFT_SIZE} layer={layer} w={w} h={h} scale={scale} canvas={canvas} />
       </Group>
     </Canvas>
   );

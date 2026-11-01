@@ -92,6 +92,7 @@ export function ImageCanvas({
   brushActive,
   brushSettings = DEFAULT_BRUSH,
   brushLayerId,
+  brushMaskMode,
   onBrushHistory,
   brushRef,
   guidesActive,
@@ -141,6 +142,8 @@ export function ImageCanvas({
   brushSettings?: BrushSettings;
   /** az ecsettel éppen szerkesztett festett réteg: rejtve, mert az overlay rajzolja */
   brushLayerId?: string | null;
+  /** festett maszk: a réteg látszik, az overlay a maszkját szerkeszti */
+  brushMaskMode?: boolean;
   onBrushHistory?: (canUndo: boolean, canRedo: boolean) => void;
   brushRef?: Ref<BrushHandle>;
   /** 📐 vonalzók + segédvonalak megjelenítése/szerkesztése */
@@ -334,6 +337,7 @@ export function ImageCanvas({
   };
 
   const layers = visibleLayers(doc);
+  const brushTarget = layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined;
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
 
   // ✏️ node-szerkesztő: a kijelölt path-forma (committed = a moveAnchor stabil alapja)
@@ -417,7 +421,7 @@ export function ImageCanvas({
         <View ref={canvasRef} style={[{ width: fit.w, height: fit.h }, capturing && styles.canvasCapture]} collapsable={false}>
           {!capturing ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paper]} /> : null}
           {layers.map((raw0) => {
-            if (brushActive && raw0.id === brushLayerId) {
+            if (brushActive && !brushMaskMode && raw0.id === brushLayerId) {
               return null;
             }
             // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
@@ -576,7 +580,7 @@ export function ImageCanvas({
           {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
           {!capturing && brushActive ? (
             <Suspense fallback={null}>
-              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={(layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined)?.uri} onHistory={onBrushHistory} clip={selection} />
+              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={brushMaskMode ? brushTarget?.mask?.image : brushTarget?.uri} maskMode={brushMaskMode} maskSeed={brushMaskMode ? brushTarget?.mask : null} onHistory={onBrushHistory} clip={selection} />
             </Suspense>
           ) : null}
 

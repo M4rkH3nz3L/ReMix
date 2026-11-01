@@ -1,4 +1,5 @@
-import { updateLayer } from '@/lib/imageDoc';
+import { docMediaUris, updateLayer } from '@/lib/imageDoc';
+import { imageDocMediaRefs, relinkImageDocs } from '@/lib/imageDocMedia';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, rectRing, type Selection, selectionContains } from '@/lib/selection';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
@@ -88,5 +89,24 @@ describe('a maszk követi a réteget', () => {
   it('más módosítás nem mozdítja a maszkot', () => {
     const d = updateLayer<PhotoLayer>(doc(photo('a', { mask: m })), 'a', { opacity: 0.5 });
     expect((d.layers[0] as PhotoLayer).mask).toBe(m);
+  });
+});
+
+describe('a festett maszk képe a média része', () => {
+  const m: ClipMask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, image: 'file:///p/brush_m.png' };
+  const d = doc(photo('a', { mask: m }));
+  it('felkerül a szervernek', () => {
+    expect(docMediaUris(d)).toContain('file:///p/brush_m.png');
+  });
+  it('a mentés és a hiányzó-fájl felismerés látja', () => {
+    expect(imageDocMediaRefs(d).map((r) => r.uri)).toContain('file:///p/brush_m.png');
+  });
+  it('újralinkelhető', () => {
+    const next = relinkImageDocs([d], 'file:///p/brush_m.png', 'file:///q/uj.png')!;
+    expect((next[0].layers[0] as PhotoLayer).mask?.image).toBe('file:///q/uj.png');
+  });
+  it('a mozgatás a dobozát viszi', () => {
+    const moved = updateLayer<PhotoLayer>(d, 'a', { position: { x: 0.6, y: 0.5 } });
+    expect((moved.layers[0] as PhotoLayer).mask?.x).toBeCloseTo(0.6);
   });
 });

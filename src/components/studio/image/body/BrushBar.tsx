@@ -21,6 +21,7 @@ export function BrushBar({
   onRedo,
   onCancel,
   onDone,
+  maskMode,
 }: {
   brush: BrushSettings;
   onChange: (patch: Partial<BrushSettings>) => void;
@@ -30,6 +31,8 @@ export function BrushBar({
   onRedo: () => void;
   onCancel: () => void;
   onDone: () => void;
+  /** festett maszk: nincs szín, az ecset mutat, a radír rejt */
+  maskMode?: boolean;
 }) {
   const { t } = useTranslation();
   const [more, setMore] = useState(false);
@@ -51,8 +54,8 @@ export function BrushBar({
     <View style={styles.bar}>
       <View style={styles.row}>
         {icon('close', t('common.cancel'), onCancel)}
-        {icon('brush-outline', t('studio.image.brushBar.paint'), () => onChange({ eraser: false }), !brush.eraser)}
-        {icon('remove-circle-outline', t('studio.image.brushBar.eraser'), () => onChange({ eraser: true }), brush.eraser)}
+        {icon('brush-outline', t(maskMode ? 'studio.image.brushBar.maskShow' : 'studio.image.brushBar.paint'), () => onChange({ eraser: false }), !brush.eraser)}
+        {icon('remove-circle-outline', t(maskMode ? 'studio.image.brushBar.maskHide' : 'studio.image.brushBar.eraser'), () => onChange({ eraser: true }), brush.eraser)}
         {icon('arrow-undo', t('studio.image.brushBar.undo'), onUndo, false, !canUndo)}
         {icon('arrow-redo', t('studio.image.brushBar.redo'), onRedo, false, !canRedo)}
         {icon('options-outline', t('studio.image.brushBar.more'), () => setMore((m) => !m), more)}
@@ -62,7 +65,7 @@ export function BrushBar({
           <Text style={styles.doneText}>{t('common.done')}</Text>
         </Pressable>
       </View>
-      {brush.eraser ? null : (
+      {brush.eraser || maskMode ? null : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colors}>
           {COLORS.map((c) => (
             <Pressable key={c} onPress={() => onChange({ color: c })} style={styles.dotHit} accessibilityRole="button" accessibilityLabel={c} accessibilityState={{ selected: brush.color === c }}>
@@ -76,7 +79,7 @@ export function BrushBar({
           </Pressable>
         </ScrollView>
       )}
-      {custom && !brush.eraser ? <ColorField label={t('studio.image.brushBar.customColor')} value={brush.color} onChange={(color) => onChange({ color })} /> : null}
+      {custom && !brush.eraser && !maskMode ? <ColorField label={t('studio.image.brushBar.customColor')} value={brush.color} onChange={(color) => onChange({ color })} /> : null}
       <View style={styles.sliders}>
         <View style={styles.flex}>
           <Slider label={t('studio.image.brushBar.size')} value={brush.size} min={1} max={120} onChange={(size) => onChange({ size: Math.round(size) })} format={(v) => `${Math.round(v)}`} />

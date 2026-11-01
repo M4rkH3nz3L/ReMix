@@ -32,6 +32,10 @@ export function imageDocMediaRefs(doc: ImageDoc): ImageMediaRef[] {
     if (isLocal(layer.lut) && !seen.has(layer.lut)) {
       seen.set(layer.lut, { uri: layer.lut, role: 'lut', name: layer.lutName ?? fileName(layer.lut) });
     }
+    const maskImage = layer.mask?.image;
+    if (isLocal(maskImage) && !seen.has(maskImage)) {
+      seen.set(maskImage, { uri: maskImage, role: 'photo', name: fileName(maskImage) });
+    }
   }
   return [...seen.values()];
 }
@@ -93,7 +97,7 @@ export function relinkImageDocs(docs: ImageDoc[] | undefined, oldUri: string, ne
   const next = docs.map((doc) => {
     let docChanged = false;
     const layers = doc.layers.map((layer) => {
-      if (layer.kind !== 'photo' || (layer.uri !== oldUri && layer.lut !== oldUri)) {
+      if (layer.kind !== 'photo' || (layer.uri !== oldUri && layer.lut !== oldUri && layer.mask?.image !== oldUri)) {
         return layer;
       }
       docChanged = true;
@@ -103,6 +107,9 @@ export function relinkImageDocs(docs: ImageDoc[] | undefined, oldUri: string, ne
       }
       if (layer.lut === oldUri) {
         patched.lut = newUri;
+      }
+      if (layer.mask?.image === oldUri) {
+        patched.mask = { ...layer.mask, image: newUri };
       }
       return patched;
     });

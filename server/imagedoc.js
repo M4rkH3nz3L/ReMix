@@ -352,14 +352,18 @@ const MAX_REMOTE_BYTES = 40 * 1024 * 1024;
 async function resolveRemoteMedia(doc, workDir, { fetchUrl, localPath }) {
   let seq = 0;
   for (const layer of doc.layers ?? []) {
-    for (const key of ['uri', 'imageUri', 'lut']) {
-      const url = layer[key];
+    const refs = ['uri', 'imageUri', 'lut'].map((key) => [layer, key]);
+    if (layer.mask?.image) {
+      refs.push([layer.mask, 'image']);
+    }
+    for (const [holder, key] of refs) {
+      const url = holder[key];
       if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
         continue;
       }
       const local = localPath?.(url);
       if (local) {
-        layer[key] = local;
+        holder[key] = local;
         continue;
       }
       try {
@@ -375,7 +379,7 @@ async function resolveRemoteMedia(doc, workDir, { fetchUrl, localPath }) {
         const file = path.join(workDir, `remote${seq}${ext}`);
         seq += 1;
         fs.writeFileSync(file, buf);
-        layer[key] = file;
+        holder[key] = file;
       } catch (caught) {
         logCaught('imagedoc.js:resolveRemoteMedia', caught);
         /* elérhetetlen → a réteg hiányzóként jelentődik */

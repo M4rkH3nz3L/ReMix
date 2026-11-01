@@ -34,10 +34,14 @@ import {
 } from '@/lib/brushEngine';
 import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import type { Selection } from '@/lib/selection';
+import { ellipseRing, rectRing, type Selection } from '@/lib/selection';
+import type { ClipMask } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 export type { Stroke } from '@/lib/brushEngine';
+
+/** rejtett (fekete) → 60%-os piros, látható (fehér) → átlátszó */
+const RUBY_MATRIX = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0.12, 0, 0, 0, 0, 0.12, -0.18, -0.35, -0.07, 0, 0.6];
 
 export interface BrushHandle {
   /** a festés PNG-fájlként (uri) DOKUMENTUM-felbontáson, vagy null */
@@ -85,14 +89,46 @@ export function drawStrokes(canvas: SkCanvas, strokes: Stroke[], w: number, h: n
   canvas.restore();
 }
 
+/** A festett maszk kiinduló képe: maszk nélkül minden látszik, a meglévő maszk formája átjön. */
+function drawMaskBase(canvas: SkCanvas, seed: ClipMask | null, base: SkImage | null | undefined, w: number, h: number) {
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color(seed ? '#000000' : '#ffffff'));
+  canvas.drawRect(Skia.XYWHRect(0, 0, w, h), paint);
+  if (!seed) {
+    return;
+  }
+  paint.setColor(Skia.Color('#ffffff'));
+  if (seed.image) {
+    if (base) {
+      const rect = Skia.XYWHRect((seed.x - seed.w / 2) * w, (seed.y - seed.h / 2) * h, seed.w * w, seed.h * h);
+      canvas.drawImageRect(base, Skia.XYWHRect(0, 0, base.width(), base.height()), rect, Skia.Paint());
+    }
+    return;
+  }
+  const [a, b] = [{ x: seed.x - seed.w / 2, y: seed.y - seed.h / 2 }, { x: seed.x + seed.w / 2, y: seed.y + seed.h / 2 }];
+  const ops = seed.ops?.length
+    ? seed.ops
+    : [{ op: 'add' as const, points: seed.shape === 'polygon' && seed.points?.length ? seed.points : seed.shape === 'ellipse' ? ellipseRing(a, b) : rectRing(a, b) }];
+  canvas.drawPath(selectionSkPath(ops, w, h, !!seed.invert), paint);
+}
+
 /** A vonások offscreen raszterizálása adott felbontáson, opcionálisan egy meglévő festésre (null = nincs GPU-felület). */
-export function renderStrokes(strokes: Stroke[], width: number, height: number, base?: SkImage | null, clip?: Selection | null) {
+export function renderStrokes(
+  strokes: Stroke[],
+  width: number,
+  height: number,
+  base?: SkImage | null,
+  clip?: Selection | null,
+  maskSeed?: ClipMask | true | null
+) {
   const surface = Skia.Surface.MakeOffscreen(Math.round(width), Math.round(height));
   if (!surface) {
     return null;
   }
   const canvas = surface.getCanvas();
-  if (base) {
+  if (maskSeed) {
+    drawMaskBase(canvas, maskSeed === true ? null : maskSeed, base, width, height);
+  } else if (base) {
     canvas.drawImageRect(base, Skia.XYWHRect(0, 0, base.width(), base.height()), Skia.XYWHRect(0, 0, width, height), Skia.Paint());
   }
   drawStrokes(canvas, strokes, width, height, clip);
@@ -109,9 +145,13 @@ export function renderStrokes(strokes: Stroke[], width: number, height: number, 
  */
 export const BrushOverlay = forwardRef<
   BrushHandle,
-  { box: { w: number; h: number }; settings: BrushSettings; baseUri?: string | null; onHistory?: (canUndo: boolean, canRedo: boolean) => void; gestureTestId?: string; clip?: Selection | null }
->(function BrushOverlay({ box, settings, baseUri, onHistory, gestureTestId = 'brush-pan', clip }, ref) {
+  { box: { w: number; h: number }; settings: BrushSettings; baseUri?: string | null; onHistory?: (canUndo: boolean, canRedo: boolean) => void; gestureTestId?: string; clip?: Selection | null;
+    /** festett maszk: a vonás fehér vagy fekete, a nézet a rejtett részt pirossal jelöli */
+    maskMode?: boolean;
+    maskSeed?: ClipMask | null }
+>(function BrushOverlay({ box, settings, baseUri, onHistory, gestureTestId = 'brush-pan', clip, maskMode, maskSeed }, ref) {
   const base = useImage(baseUri ?? null);
+  const seed = maskMode ? (maskSeed ?? true) : null;
   const [history, setHistory] = useState(EMPTY_HISTORY);
   const [current, setCurrent] = useState<Stroke | null>(null);
   const last = useRef<BrushPoint | null>(null);
@@ -136,11 +176,11 @@ export const BrushOverlay = forwardRef<
       last.current = p;
       setCurrent({
         points: [p],
-        color: settings.color,
+        color: maskMode ? (settings.eraser ? '#000000' : '#ffffff') : settings.color,
         width: settings.size / box.w,
         hardness: settings.hardness,
         opacity: settings.opacity,
-        eraser: settings.eraser,
+        eraser: !maskMode && settings.eraser,
       });
     })
     .onUpdate((e) => {
@@ -170,7 +210,7 @@ export const BrushOverlay = forwardRef<
         try {
           // 🖼️ I19: a vonásokat a dokumentum méretén rajzoljuk újra (adatból) — a
           // képernyő-pillanatkép a nagy exportban elmosódna
-          const img = renderStrokes(history.done, docWidth, docHeight, base, clip);
+          const img = renderStrokes(history.done, docWidth, docHeight, base, clip, seed);
           if (!img || (baseUri && !base)) {
             return null;
           }
@@ -187,26 +227,35 @@ export const BrushOverlay = forwardRef<
         }
       },
     }),
-    [history, base, baseUri, clip]
+    [history, base, baseUri, clip, seed]
   );
 
   const baked = useMemo(() => {
     const ratio = PixelRatio.get();
     // a GPU-textúrás kép a JS-szálhoz kötött, a vászon másik szálon rajzol: e nélkül üres lenne
-    return renderStrokes(history.done, box.w * ratio, box.h * ratio, base, clip)?.makeNonTextureImage() ?? null;
-  }, [history, box.w, box.h, base, clip]);
+    return renderStrokes(history.done, box.w * ratio, box.h * ratio, base, clip, seed)?.makeNonTextureImage() ?? null;
+  }, [history, box.w, box.h, base, clip, seed]);
 
   const picture = useMemo(
     () =>
       createPicture((canvas) => {
+        if (maskMode) {
+          // a rejtett rész pirosan látszik: a szín a fényességből lesz átlátszóság
+          const ruby = Skia.Paint();
+          ruby.setColorFilter(Skia.ColorFilter.MakeMatrix(RUBY_MATRIX));
+          canvas.saveLayer(ruby);
+        }
         if (baked) {
           canvas.drawImageRect(baked, Skia.XYWHRect(0, 0, baked.width(), baked.height()), Skia.XYWHRect(0, 0, box.w, box.h), Skia.Paint());
         }
         if (current) {
           drawStrokes(canvas, [current], box.w, box.h, clip);
         }
+        if (maskMode) {
+          canvas.restore();
+        }
       }, Skia.XYWHRect(0, 0, box.w, box.h)),
-    [baked, current, box.w, box.h, clip]
+    [baked, current, box.w, box.h, clip, maskMode]
   );
 
   return (

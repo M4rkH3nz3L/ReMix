@@ -3117,6 +3117,9 @@
       "layer": "Ebene"
     },
     "image": {
+      "maskPaint": "Malen",
+      "undoMaskPaint": "Maske malen",
+      "maskPaintFail": "Die Maske konnte nicht gespeichert werden. Bitte versuche es erneut.",
       "histogram": {
         "title": "Histogramm",
         "clip": "Tiefen {{shadows}}% · Lichter {{highlights}}%"
@@ -3169,6 +3172,8 @@
         "undo": "Auswahl anwenden"
       },
       "brushBar": {
+        "maskShow": "Einblenden",
+        "maskHide": "Ausblenden",
         "paint": "Pinsel",
         "eraser": "Radierer",
         "undo": "Strich rückgängig",

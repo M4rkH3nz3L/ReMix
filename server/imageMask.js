@@ -128,7 +128,24 @@ function rasterMaskChain(mask, W, H, label, workDir) {
 
 /** A teljes-vászon szürke maszk-forrás filter-fragmentje (`color=white…geq…[label]`).
  *  Poligonnál az él lágyítását (feather) utólagos gblur adja (az ellipszis/téglalap a geq-ben featheröl). */
+/**
+ * A festett maszk: szürke PNG a saját dobozában, a dobozon kívül rejtett. Csak helyi fájl lehet
+ * (a feltöltés-kötés után); a még URL-t hordozó, le nem tölthető képet nem adjuk az ffmpegnek.
+ */
+function imageMaskChain(mask, W, H, label) {
+  const [bw, bh] = [Math.max(1, Math.round(mask.w * W)), Math.max(1, Math.round(mask.h * H))];
+  const [x, y] = [Math.round((mask.x - mask.w / 2) * W), Math.round((mask.y - mask.h / 2) * H)];
+  const feather = mask.feather ?? 0;
+  const blur = feather > 0.005 ? `,gblur=sigma=${Math.max(1, feather * W).toFixed(1)}` : '';
+  const file = mask.image.replace(/'/g, "'\\''");
+  const src = label.replace(/\W/g, '');
+  return `movie='${file}',format=gbrp,scale=${bw}:${bh}[${src}s];color=black:s=${W}x${H},format=gbrp[${src}b];[${src}b][${src}s]overlay=${x}:${y}:format=gbrp,extractplanes=g${blur}${mask.invert ? ',negate' : ''}${label}`;
+}
+
 function maskGrayChain(mask, W, H, label, workDir) {
+  if (mask.image && fs.existsSync(mask.image)) {
+    return imageMaskChain(mask, W, H, label);
+  }
   if (workDir && isRaster(mask)) {
     return rasterMaskChain(mask, W, H, label, workDir);
   }

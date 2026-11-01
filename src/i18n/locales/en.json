@@ -3117,6 +3117,9 @@
       "layer": "Layer"
     },
     "image": {
+      "maskPaint": "Paint",
+      "undoMaskPaint": "Paint mask",
+      "maskPaintFail": "The mask couldn't be saved. Please try again.",
       "histogram": {
         "title": "Histogram",
         "clip": "Crushed {{shadows}}% · clipped {{highlights}}%"
@@ -3169,6 +3172,8 @@
         "undo": "Apply selection"
       },
       "brushBar": {
+        "maskShow": "Reveal",
+        "maskHide": "Hide",
         "paint": "Brush",
         "eraser": "Eraser",
         "undo": "Undo stroke",

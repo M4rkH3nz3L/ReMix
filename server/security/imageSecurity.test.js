@@ -74,3 +74,29 @@ describe('I46 — ownedMediaKey', () => {
     expect(ownedMediaKey('user-1', '../user-2', 'x.png')).toBe('u/user-1/user-2/x.png');
   });
 });
+
+describe('a kliens dokumentuma nem olvastathat szerver-oldali fájlt', () => {
+  const { bindUploadedMedia } = require('../routes/imageTools');
+  const files = [{ fieldname: 'f0', path: '/tmp/feltoltes/a.png' }];
+  const bind = (layer) => {
+    const doc = { layers: [layer] };
+    bindUploadedMedia(doc, files, { 'file:///a.png': 'f0' });
+    return doc.layers[0];
+  };
+
+  it('a feltöltött fájl a szerver útvonalára kötődik', () => {
+    expect(bind({ uri: 'file:///a.png' }).uri).toBe('/tmp/feltoltes/a.png');
+  });
+  it('a nem feltöltött helyi útvonal kiesik', () => {
+    expect(bind({ uri: '/etc/passwd' }).uri).toBeUndefined();
+    expect(bind({ lut: '/etc/hosts' }).lut).toBeUndefined();
+    expect(bind({ imageUri: '../../server/.env' }).imageUri).toBeUndefined();
+    expect(bind({ uri: 'x', mask: { image: '/etc/passwd' } }).mask.image).toBeUndefined();
+  });
+  it('a távoli cím marad, azt a védett letöltő kezeli', () => {
+    expect(bind({ uri: 'https://x.example/a.png' }).uri).toBe('https://x.example/a.png');
+  });
+  it('a maszk képe is a feltöltéshez kötődik', () => {
+    expect(bind({ uri: 'file:///a.png', mask: { image: 'file:///a.png' } }).mask.image).toBe('/tmp/feltoltes/a.png');
+  });
+});

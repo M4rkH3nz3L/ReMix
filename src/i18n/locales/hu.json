@@ -4266,7 +4266,7 @@
     "empty": "Még nincs videó — oszd meg te az elsőt!",
     "emptyFollowing": "Még senkit sem követsz.",
     "createCta": "Videó készítése",
-    "notRemixable": "Ez a videó nem remixelhető.",
+    "notRemixable": "Ez a poszt nem remixelhető.",
     "followed": "Mostantól követed: {{name}}",
     "remixOf": "Remix tőle: @{{name}}",
     "remixPrompt": "Megnyitod új projektként remixeléshez?",

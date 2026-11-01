@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { type Href, router, useLocalSearchParams } from 'expo-router';
+import { canRemix, remixRoute } from '@/lib/imageRemix';
 import { goBackOrHome } from '@/lib/nav';
 import { requireApp } from '@/lib/webGate';
 import { useCallback, useEffect, useState } from 'react';
@@ -207,7 +208,7 @@ export default function ChannelScreen() {
       Alert.alert(post.title, undefined, buttons);
       return;
     }
-    if (post.remixable && post.videoUri) {
+    if (canRemix(post)) {
       Alert.alert(post.title, t('feed.remixPrompt'), [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -216,7 +217,7 @@ export default function ChannelScreen() {
             requireApp() &&
             remixFromPost(post).then((pid) => {
               if (pid) {
-                router.push(`/editor/${pid}`);
+                router.push(remixRoute(post, pid) as Href);
               }
             }),
         },

@@ -4266,7 +4266,7 @@
     "empty": "No videos yet — share the first one!",
     "emptyFollowing": "You're not following anyone yet.",
     "createCta": "Create a video",
-    "notRemixable": "This video isn't remixable.",
+    "notRemixable": "This post isn't remixable.",
     "followed": "You now follow {{name}}",
     "remixOf": "Remix of @{{name}}",
     "remixPrompt": "Open this as a new project to remix?",

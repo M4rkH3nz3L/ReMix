@@ -1,4 +1,5 @@
-import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { type Href, router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { canRemix, remixRoute } from '@/lib/imageRemix';
 import { useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -387,7 +388,7 @@ export function useFeed() {
     if (busy || !requireApp() || !requireSignIn()) {
       return;
     }
-    if (!post.remixable || !post.videoUri) {
+    if (!canRemix(post)) {
       Alert.alert(t('feed.title'), t('feed.notRemixable'));
       return;
     }
@@ -395,7 +396,7 @@ export function useFeed() {
     remixFromPost(post)
       .then((pid) => {
         if (pid) {
-          router.push(`/editor/${pid}`);
+          router.push(remixRoute(post, pid) as Href);
         }
       })
       .catch((e: unknown) => { logCaught('hooks/useFeed.ts:onRemix', e); return showError(e, 'remix'); })

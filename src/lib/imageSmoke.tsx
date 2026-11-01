@@ -18,6 +18,10 @@ import { foregroundMask } from '@/lib/foregroundMask';
 import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
+import { remixFromPost } from '@/lib/feed';
+import { remixRoute } from '@/lib/imageRemix';
+import type { FeedPost } from '@/types/social';
+import { type Href, router } from 'expo-router';
 import { useBrandStyle } from '@/store/brandStyleStore';
 import { TemplatesSheet } from '@/components/studio/image/TemplatesSheet';
 import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
@@ -1730,6 +1734,72 @@ async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, rati
   await deleteProject(video.id);
 }
 
+/** Kép-poszt remixe valódi hálózati képekből: projekt, megnyitás a stúdióban, vászon = export. */
+async function smokeRemix(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  // nyilvános https-kép kell: a szerver privát címről védelemből nem tölt le (SSRF)
+  const base = 'https://raw.githubusercontent.com/M4rkH3nz3L/ReMix/main/assets/images';
+  const post = {
+    id: 'smoke-post',
+    title: 'Teszt',
+    remixable: true,
+    videoUri: null,
+    images: [`${base}/icon.png`, `${base}/android-icon-background.png`],
+    aspectRatio: '1:1',
+    creator: { displayName: 'Teszt Elek' },
+  } as unknown as FeedPost;
+  const id = await remixFromPost(post);
+  const saved = id ? await loadProject(id) : null;
+  const docs = saved?.imageDocs ?? [];
+  log(saved?.kind === 'image' && docs.length === 2 && saved.remixOf?.postId === 'smoke-post', 'remix: új kép-projekt két lappal, forrással', `${saved?.kind} ${docs.length} lap, ${saved?.remixOf?.postId}`);
+  if (!id || docs.length !== 2) {
+    return;
+  }
+  log(remixRoute(post, id) === `/studio/image/${id}`, 'remix: a képstúdióba visz', remixRoute(post, id));
+  const v = createRef<View>() as RefObject<View>;
+  setHarness(
+    <View style={{ width: 340, height: 340 }}>
+      <ImageCanvas doc={docs[0]} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+    </View>
+  );
+  // a hálózati kép lassabban ér ide, mint a helyi
+  await sleep(6000);
+  const shot = await captureRef(v, { format: 'png', quality: 1, width: 320, height: 320 });
+  const a = await decode(shot);
+  setHarness(null);
+  await sleep(80);
+  const [e, c] = [await renderImageDoc(docs[0], 320 * ratio), await renderImageDoc(docs[1], 320 * ratio)];
+  if (!e || !c) {
+    log(false, 'remix: hálózati kép az exportban', 'nincs render');
+  } else {
+    const diff = (p: SkImage, q: SkImage) => {
+      let sum = 0;
+      for (let i = 1; i < 30; i++) {
+        for (let j = 1; j < 30; j++) {
+          const [x, y] = [(j + 0.5) / 30, (i + 0.5) / 30];
+          const [u, w] = [pixel(p, Math.floor(x * p.width()), Math.floor(y * p.height())), pixel(q, Math.floor(x * q.width()), Math.floor(y * q.height()))];
+          sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+        }
+      }
+      return sum / (29 * 29);
+    };
+    const [d, ctl] = [diff(a, await decode(e)), diff(a, await decode(c))];
+    log(d <= 7 && ctl >= 20, 'remix: a hálózati kép a vásznon = export', `átlag ${d.toFixed(1)}/255; a másik lap ${ctl.toFixed(1)}`);
+    removeFile(e);
+    removeFile(c);
+  }
+  removeFile(shot);
+  router.push(remixRoute(post, id) as Href);
+  await sleep(4000);
+  const open = useEditorStore.getState().project;
+  log(open?.id === id && open.imageDocs?.length === 2, 'remix: a valódi képstúdió megnyitotta', `${open?.name}, ${open?.imageDocs?.length} lap`);
+  log(true, 'FOTÓZHATÓ', 'a remix a képstúdióban');
+  await sleep(7000);
+  router.back();
+  await sleep(2000);
+  await deleteProject(id);
+  log((await loadProject(id)) === null, 'remix: a tesztprojekt törölve', id);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1922,6 +1992,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'remix') {
+    await step('remix', () => smokeRemix(log, setHarness, ratio));
     return;
   }
   if (phase === 'brand') {

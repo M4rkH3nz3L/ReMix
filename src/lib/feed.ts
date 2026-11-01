@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
+import { imageRemixProject } from '@/lib/imageRemix';
 import { finiteNum, mapValid, str } from '@/lib/parseGuards';
 import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
@@ -869,6 +870,11 @@ export async function fetchViewEvents(postId: string): Promise<ViewEvent[]> {
  * hogy publikáláskor a poszthoz csatolódjon. Visszaadja az új projekt id-ját, vagy null.
  */
 export async function remixFromPost(post: FeedPost): Promise<string | null> {
+  if (post.remixable && post.images?.length) {
+    const remix = imageRemixProject(post);
+    await saveProject(remix);
+    return remix.id;
+  }
   // renderelt videó nélkül nincs mit importálni
   if (!post.remixable || !post.videoUri) {
     return null;

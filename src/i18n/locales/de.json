@@ -4271,7 +4271,7 @@
     "empty": "Noch keine Videos — teile das erste!",
     "emptyFollowing": "Du folgst noch niemandem.",
     "createCta": "Video erstellen",
-    "notRemixable": "Dieses Video ist nicht remixbar.",
+    "notRemixable": "Dieser Beitrag ist nicht remixbar.",
     "followed": "Du folgst jetzt {{name}}",
     "remixOf": "Remix von @{{name}}",
     "remixPrompt": "Als neues Projekt zum Remixen öffnen?",

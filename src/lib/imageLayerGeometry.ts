@@ -1,4 +1,4 @@
-import type { PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { ClipMask, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 /**
  * 📐 Vászon-koordináta → a réteg SAJÁT dobozának terébe (box-lokális 0–1). A réteg
@@ -167,4 +167,25 @@ export function applyLayerBoxPx(
     h: next.h / canvas.height,
     rotation: next.rotation,
   };
+}
+
+/**
+ * Egy vászon-relatív maszk körvonala a réteg saját terében (0–1) — az előnézet a réteg dobozán
+ * belül vág. A téglalap/ellipszis poligonná válik, mert forgatott rétegen nem marad tengelyes.
+ */
+export function maskOutlineInBox(mask: ClipMask, layer: Placed, canvas: { width: number; height: number }): { x: number; y: number }[] {
+  const rx = mask.w / 2;
+  const ry = mask.h / 2;
+  const outline =
+    mask.shape === 'polygon' && mask.points?.length
+      ? mask.points
+      : mask.shape === 'ellipse'
+        ? Array.from({ length: 48 }, (_, i) => ({ x: mask.x + rx * Math.cos((i / 48) * Math.PI * 2), y: mask.y + ry * Math.sin((i / 48) * Math.PI * 2) }))
+        : [
+            { x: mask.x - rx, y: mask.y - ry },
+            { x: mask.x + rx, y: mask.y - ry },
+            { x: mask.x + rx, y: mask.y + ry },
+            { x: mask.x - rx, y: mask.y + ry },
+          ];
+  return outline.map((p) => canvasToLayerBox(p, layer, canvas));
 }

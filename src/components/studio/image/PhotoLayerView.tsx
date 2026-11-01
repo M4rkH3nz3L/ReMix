@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
-import { palette } from '@/constants/editor';
-import { adjustTintLayers } from '@/lib/adjustPreview';
+import { cssBlendMode, palette } from '@/constants/editor';
+import { SkiaPhotoLayer, needsSkiaPreview } from '@/components/studio/image/SkiaPhotoLayer';
 import { clamp } from '@/lib/time';
 import type { PhotoLayer } from '@/types/project';
 
@@ -19,6 +19,7 @@ export function PhotoLayerView({
   selected,
   zoom = 1,
   moveRange = [0.02, 0.98],
+  canvas,
   onSelect,
   onMove,
 }: {
@@ -29,6 +30,8 @@ export function PhotoLayerView({
   zoom?: number;
   /** a réteg közepének mozgástere (a szerkesztőben a vásznon túlra is mehet) */
   moveRange?: [number, number];
+  /** a dokumentum pixelmérete: a maszk és az effektek vászon-arányosak */
+  canvas: { width: number; height: number };
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {
@@ -91,8 +94,16 @@ export function PhotoLayerView({
   }));
 
   const w = layer.w * box.w;
+  const scale = box.w / canvas.width;
   const h = layer.h * box.h;
-  const tints = layer.adjust ? adjustTintLayers(layer.adjust) : [];
+  const skia = needsSkiaPreview(layer);
+  const plain = (
+    <Image
+      source={{ uri: layer.uri }}
+      style={StyleSheet.absoluteFill}
+      contentFit={layer.fit === 'contain' ? 'contain' : layer.fit === 'stretch' ? 'fill' : 'cover'}
+    />
+  );
 
   return (
     <GestureDetector gesture={Gesture.Simultaneous(tap, pan)}>
@@ -105,29 +116,19 @@ export function PhotoLayerView({
             width: w,
             height: h,
             opacity: layer.opacity ?? 1,
+            mixBlendMode: layer.blendMode ? cssBlendMode(layer.blendMode) : undefined,
           },
           dragStyle,
           selected ? styles.selected : null,
         ]}
       >
-        <Image
-          source={{ uri: layer.uri }}
-          style={StyleSheet.absoluteFill}
-          contentFit={layer.fit === 'contain' ? 'contain' : layer.fit === 'stretch' ? 'fill' : 'cover'}
-        />
-        {tints.map((tint, i) => (
-          <View
-            key={i}
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { backgroundColor: tint.color, opacity: tint.opacity }]}
-          />
-        ))}
+        {skia ? <SkiaPhotoLayer layer={layer} w={w} h={h} scale={scale} canvas={canvas} fallback={plain} /> : plain}
       </Animated.View>
     </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', overflow: 'hidden' },
+  wrap: { position: 'absolute' },
   selected: { borderWidth: 1, borderColor: palette.accent },
 });

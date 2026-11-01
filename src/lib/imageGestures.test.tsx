@@ -24,6 +24,8 @@ import { layerRowLabels, moveLayerTo, removeLayer, reorderLayer, toggleLayerLock
 import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
 import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
+// a natív Skia nem fut Jest alatt; a kép a telefonos füstteszten mért
+jest.mock('@/components/studio/image/SkiaPhotoLayer', () => ({ needsSkiaPreview: () => false, SkiaPhotoLayer: () => null }));
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
   const RN = jest.requireActual('react-native');
@@ -64,25 +66,25 @@ function drag(dx: number, success = true) {
 describe('I35/I36 — réteg-húzás', () => {
   it('1:1-en a húzás a teljes elmozdulás', () => {
     const onMove = jest.fn();
-    render(<PhotoLayerView layer={layer} box={box} selected onMove={onMove} />);
+    render(<PhotoLayerView canvas={{ width: 300, height: 300 }} layer={layer} box={box} selected onMove={onMove} />);
     drag(30);
     expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.6);
   });
   it('3× nagyításnál ugyanaz a húzás harmadannyi', () => {
     const onMove = jest.fn();
-    render(<PhotoLayerView layer={layer} box={box} selected zoom={3} onMove={onMove} />);
+    render(<PhotoLayerView canvas={{ width: 300, height: 300 }} layer={layer} box={box} selected zoom={3} onMove={onMove} />);
     drag(30);
     expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.5 + 10 / 300);
   });
   it('a kijelöletlen fotó nem mozdul', () => {
     const onMove = jest.fn();
-    render(<PhotoLayerView layer={layer} box={box} selected={false} onMove={onMove} />);
+    render(<PhotoLayerView canvas={{ width: 300, height: 300 }} layer={layer} box={box} selected={false} onMove={onMove} />);
     drag(30);
     expect(onMove).not.toHaveBeenCalled();
   });
   it('a megszakított húzás (második ujj) nem ment', () => {
     const onMove = jest.fn();
-    render(<PhotoLayerView layer={layer} box={box} selected onMove={onMove} />);
+    render(<PhotoLayerView canvas={{ width: 300, height: 300 }} layer={layer} box={box} selected onMove={onMove} />);
     drag(30, false);
     expect(onMove).not.toHaveBeenCalled();
   });

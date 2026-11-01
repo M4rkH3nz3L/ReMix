@@ -419,6 +419,7 @@ export function ImageCanvas({
                   selected={selected && !l.locked}
                   zoom={zoom}
                   moveRange={MOVE_RANGE}
+                  canvas={effectiveCanvas(doc)}
                   onSelect={onSelect}
                   onMove={move}
                 />

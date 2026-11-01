@@ -29,11 +29,13 @@ export function ClipFilmstrip({ clip, widthPx, heightPx }: Props) {
     [clip, widthPx, heightPx]
   );
   const timesKey = times.join(',');
+  const pending = clip.kind === 'video' && clip.pending;
 
   const [thumbs, setThumbs] = useState<(string | null)[]>([]);
 
   useEffect(() => {
-    if (clip.kind !== 'video') {
+    // a még feltöltődő élő-felvételnek nincs képkockája
+    if (clip.kind !== 'video' || pending) {
       return;
     }
     let cancelled = false;
@@ -52,7 +54,7 @@ export function ClipFilmstrip({ clip, widthPx, heightPx }: Props) {
     };
     // a timesKey lefedi a times tartalmát — identitás-váltásra nem kell újragenerálni
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clip.kind, clip.uri, timesKey]);
+  }, [clip.kind, clip.uri, timesKey, pending]);
 
   if (clip.kind === 'image') {
     return (

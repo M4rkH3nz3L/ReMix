@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
+import { RecordToggle } from '@/components/live/RecordToggle';
 import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -609,8 +610,9 @@ export default function LiveStudioScreen() {
         {/* 📼 Rögzítés: BE → az adás végén a teljes felvételből szerkeszthető video-projekt;
             KI → NINCS projekt (a live csak élő adás, nem keletkezik üres-projekt). */}
         <Text style={styles.sectionLabel}>{t('live.studio.recordSection', { defaultValue: 'Rögzítés' })}</Text>
-        <Pressable
-          onPress={() => {
+        <RecordToggle
+          value={!!live.record}
+          onToggle={() => {
             // 💳 L18: a felhős felvétel Pro (szerveres egress) — Free usernél a Pro-ajánlat,
             // nem egy csendben elbukó (402) „rögzítés" ígéret
             if (!live.record && !capabilityAllowed('liveCloud', useEntitlement.getState().effectiveTier())) {
@@ -619,27 +621,7 @@ export default function LiveStudioScreen() {
             }
             commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on');
           }}
-          style={[styles.recordRow, live.record && styles.recordRowOn]}
-        >
-          <Ionicons
-            name={live.record ? 'videocam' : 'videocam-off'}
-            size={20}
-            color={live.record ? palette.danger : palette.textDim}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.recordLabel}>{t('live.studio.recordLabel', { defaultValue: 'Élő mentése videó-projektbe' })}</Text>
-            <Text style={styles.recordSub}>
-              {live.record
-                ? t('live.studio.recordOn', { defaultValue: 'Az adás végén a teljes felvételből szerkeszthető projekt lesz.' })
-                : t('live.studio.recordOff', { defaultValue: 'Nincs felvétel/projekt — csak élő adás.' })}
-            </Text>
-          </View>
-          <Ionicons
-            name={live.record ? 'toggle' : 'toggle-outline'}
-            size={38}
-            color={live.record ? palette.danger : palette.textDim}
-          />
-        </Pressable>
+        />
 
         {/* 🎚️ audio-mixer */}
         {live.mixer && (
@@ -967,20 +949,6 @@ const styles = StyleSheet.create({
   destChipTextOn: { color: palette.accent },
   destPro: { color: palette.textDim, fontSize: 10, fontWeight: '800' },
   hint: { color: palette.textDim, fontSize: 12, lineHeight: 17 },
-  recordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  recordRowOn: { borderColor: palette.danger, backgroundColor: palette.danger + '18' },
-  recordLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
-  recordSub: { color: palette.textDim, fontSize: 11, lineHeight: 15, marginTop: 2 },
 
   duckChip: {
     flexDirection: 'row',

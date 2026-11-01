@@ -84,3 +84,10 @@ describe('SET_PROJECT_COVER', () => {
     expect(applyCommand(p1, { type: 'SET_PROJECT_COVER', asset: cover })).toBeNull();
   });
 });
+
+describe('feltöltés alatt álló élő-felvétel', () => {
+  it('nem kér képkockát a még nem létező fájlból', () => {
+    const project = { kind: 'video', assets: [], tracks: [{ type: 'video', clips: [{ kind: 'video', uri: 'https://x/v.mp4', trimIn: 0, pending: true }] }] } as unknown as Parameters<typeof projectPreviewSource>[0];
+    expect(projectPreviewSource(project)).toBeNull();
+  });
+});

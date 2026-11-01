@@ -20,7 +20,10 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { BASE_PX_PER_SEC, MAX_ZOOM } from '@/constants/editor';
 import { endLive, startLive } from '@/lib/live';
+import { setRecord } from '@/lib/liveDoc';
+import { RecordToggle } from '@/components/live/RecordToggle';
 import { DEFAULT_PALETTE, encodeFrame, floodFill, paintLine, pixelLayerBox, pixelLayerScale, type PixelArt, type PixelFrame } from '@/lib/pixelArt';
 import { writeLayerPng, writePixelGif, writeSpriteSheet } from '@/lib/pixelArtClient';
 import { PixelStudio } from '@/components/studio/image/PixelStudio';
@@ -67,7 +70,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
-import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
+import type { ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
 
@@ -2116,6 +2119,42 @@ async function smokeLiveHost(log: Log) {
   await deleteProject(project.id);
 }
 
+/** „Élő mentése videó-projektbe”: adás felvétellel, kilépés, a felvételből szerkeszthető projekt. */
+async function smokeLiveRecord(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  setHarness(<View><RecordToggle value={false} onToggle={() => {}} /><RecordToggle value onToggle={() => {}} /></View>);
+  await sleep(800);
+  log(true, 'FOTÓZHATÓ', 'kapcsoló két állapotban');
+  await sleep(4000);
+  setHarness(null);
+  const blank = createEmptyProject('smoke felvétel', '9:16', undefined, 'live');
+  const project = { ...blank, live: setRecord(blank.live!, true) };
+  await saveProject(project);
+  const before = new Set((await listProjects()).map((p) => p.id));
+  const session = await startLive('smoke felvétel');
+  log(null, 'LIVEID', session.id);
+  router.push(`/live/${session.id}?project=${project.id}` as Href);
+  await sleep(35000);
+  router.back();
+  await sleep(4000);
+  const created = (await listProjects()).filter((p) => !before.has(p.id) && p.kind === 'video');
+  log(created.length === 1, 'a felvételből videóprojekt lett', `${created.length} új projekt`);
+  const full = created[0] ? await loadProject(created[0].id) : null;
+  const clip = full?.tracks.find((t) => t.type === 'video')?.clips[0] as VideoClip | undefined;
+  log(!!clip?.uri && /^https:/.test(clip.uri), 'a projekt videósávján ott a felvétel', `${clip?.duration.toFixed(0)} mp, ${clip?.uri.slice(0, 48)}`);
+  let size = 0;
+  for (let i = 0; i < 45 && clip?.uri && size === 0; i++) {
+    await sleep(2000);
+    const res = await fetch(clip.uri, { headers: { Range: 'bytes=0-1' } }).catch((caught) => { logCaught('lib/imageSmoke.tsx:vod', caught); return null; });
+    size = res && res.status < 300 ? Number(res.headers.get('content-range')?.split('/')[1] ?? 1) : 0;
+  }
+  log(size > 0, 'az MP4 letölthető a tárból', `${Math.round(size / 1024)} kB`);
+  if (created[0]) {
+    await deleteProject(created[0].id);
+  }
+  await endLive(session.id).catch((caught) => { logCaught('lib/imageSmoke.tsx:liveRecord', caught); });
+}
+
 async function smokeLiveView(log: Log, id: string) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   router.push(`/live/${id}` as Href);
@@ -2123,6 +2162,36 @@ async function smokeLiveView(log: Log, id: string) {
   log(true, 'FOTÓZHATÓ', 'néző');
   await sleep(6000);
   router.back();
+}
+
+/** Tíz perces klip legnagyobb nagyításon a valódi szerkesztőben. */
+async function smokeTimelineZoom(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  let n = 0;
+  const doc = createImageDoc('t', '9:16', () => `tz${++n}`);
+  const base = addImageDocToVideo(createEmptyProject('smoke idővonal', '9:16', undefined, 'video'), doc, 'file:///smoke.png');
+  const project = { ...base, tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: t.clips.map((c) => ({ ...c, duration: 600 })) } : t)) };
+  await saveProject(project);
+  router.push(`/editor/${project.id}` as Href);
+  await sleep(3500);
+  const store = useEditorStore.getState();
+  store.setZoom(100);
+  await sleep(1500);
+  const zoom = useEditorStore.getState().zoom;
+  log(zoom === MAX_ZOOM, 'a nagyítás felső határa', `${zoom}× = ${(zoom * BASE_PX_PER_SEC) / 30} pont/kocka 30 fps-en`);
+  log((zoom * BASE_PX_PER_SEC) / 30 >= 30, 'egy kocka ujjal fogható', '≥ 30 pont');
+  const start = performance.now();
+  for (let i = 1; i <= 10; i++) {
+    store.setPlayhead(i * 55);
+    await sleep(150);
+  }
+  log(useEditorStore.getState().project?.id === project.id, 'tíz perces klip végiggörgetve a legnagyobb nagyításon', `${(performance.now() - start).toFixed(0)} ms`);
+  log(true, 'FOTÓZHATÓ', 'idővonal');
+  await sleep(5000);
+  store.setZoom(1);
+  router.back();
+  await sleep(1500);
+  await deleteProject(project.id);
 }
 
 async function smokeWorker(log: Log) {
@@ -2317,6 +2386,14 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'timeline') {
+    await step('timeline', () => smokeTimelineZoom(log));
+    return;
+  }
+  if (phase === 'liverecord') {
+    await step('liverecord', () => smokeLiveRecord(log, setHarness));
     return;
   }
   if (phase === 'livehost') {

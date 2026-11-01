@@ -53,6 +53,10 @@ export function projectPreviewSource(project: Project): PreviewSource {
   // videó / élő / egyéb: az első videóklip kockája, különben az első képklip
   const videoTrack = project.tracks.find((t) => t.type === 'video');
   const clip = videoTrack?.clips.find((c) => c.kind === 'video');
+  // a még feltöltődő élő-felvételből nincs mit kivenni: amíg kész nem lesz, ikon látszik
+  if (clip && clip.kind === 'video' && clip.pending) {
+    return null;
+  }
   if (clip && clip.kind === 'video') {
     return { type: 'videoFrame', uri: clip.uri, time: clip.trimIn + 0.5 };
   }

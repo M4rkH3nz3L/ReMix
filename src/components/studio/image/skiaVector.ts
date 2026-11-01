@@ -1,4 +1,4 @@
-import { FillType, PathOp, Skia, type SkPath } from '@shopify/react-native-skia';
+import { FillType, PathOp, Skia, type SkPath, StrokeCap, StrokeJoin } from '@shopify/react-native-skia';
 
 import type { BooleanOp } from '@/lib/boolean';
 import type { BooleanEngine, BooleanResult } from '@/lib/imageBoolean';
@@ -78,5 +78,42 @@ export function skiaBooleanEngine(canvas: Size): BooleanEngine {
     const skOp = SK_OP[op];
     const result = skOp === undefined ? null : Skia.Path.MakeFromOp(layerSkPath(base, canvas), layerSkPath(sel, canvas), skOp);
     return result ? pathToResult(result, canvas) : null;
+  };
+}
+
+/** Egy útvonal körvonala kitöltött formaként; a vonalvég és az illesztés a rétegé. */
+export function strokeToResult(layer: ShapeLayer, canvas: Size): BooleanResult | null {
+  const width = Math.max(1, Math.round(((layer.strokeWidth ?? 0.9) / 100) * canvas.height));
+  const cap = { butt: StrokeCap.Butt, round: StrokeCap.Round, square: StrokeCap.Square }[layer.strokeCap ?? 'round'];
+  const join = { miter: StrokeJoin.Miter, round: StrokeJoin.Round, bevel: StrokeJoin.Bevel }[layer.strokeJoin ?? 'round'];
+  const out = layerSkPath(layer, canvas).stroke({ width, cap, join });
+  const merged = out ? Skia.Path.MakeFromOp(out, Skia.Path.Make(), PathOp.Union) : null;
+  return merged ? pathToResult(merged, canvas) : null;
+}
+
+/** Eltolt forma: a körvonal a formához adva bővít, belőle kivonva szűkít. */
+export function offsetToResult(layer: ShapeLayer, canvas: Size, distance: number): BooleanResult | null {
+  const base = layerSkPath(layer, canvas);
+  const ring = base.copy().stroke({ width: Math.abs(distance) * 2, cap: StrokeCap.Round, join: StrokeJoin.Round });
+  const merged = ring ? Skia.Path.MakeFromOp(base, ring, distance > 0 ? PathOp.Union : PathOp.Difference) : null;
+  return merged ? pathToResult(merged, canvas) : null;
+}
+
+/** Az eredmény a réteg helyére kerül: vászon-terű összetett forma, a réteg stílusával. */
+export function withResult(layer: ShapeLayer, result: BooleanResult): Partial<ShapeLayer> {
+  return {
+    shape: 'path',
+    position: { x: 0.5, y: 0.5 },
+    w: 1,
+    h: 1,
+    rotation: 0,
+    flipH: false,
+    flipV: false,
+    points: undefined,
+    subpaths: result.subpaths,
+    fillRule: result.fillRule,
+    closed: true,
+    strokeWidth: undefined,
+    fill: layer.fill,
   };
 }

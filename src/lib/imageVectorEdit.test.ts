@@ -3,7 +3,7 @@ import { canvasToLayerBox, dragInLayer, layerBoxToCanvas, renormalizePathLayer }
 import { alignLayerToCanvas, distributeLayersInDoc, layerRect, positionedLayerCount } from '@/lib/imageLayerLayout';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { booleanCombineInDoc } from '@/lib/imageBoolean';
-import { dragHandle, nodeType } from '@/lib/vectorPath';
+import { dragHandle, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -134,5 +134,24 @@ describe('logikai művelet motorral', () => {
   });
   it('a motor üres eredménye nem nyúl a dokumentumhoz', () => {
     expect(booleanCombineInDoc(doc, 'b', 'intersect', () => null)).toBeNull();
+  });
+});
+
+describe('összetett útvonal szerkesztése', () => {
+  const a = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }];
+  const b = [{ x: 0.2, y: 0.2 }, { x: 0.4, y: 0.2 }, { x: 0.4, y: 0.4 }];
+  const layer: { points?: PathPoint[]; subpaths?: PathPoint[][] } = { subpaths: [a, b] };
+  it('a kért gyűrű lesz a szerkesztett pontsor', () => {
+    expect(pathEditView(layer, 1).points).toBe(b);
+    expect(pathEditView(layer, 9).points).toBe(b);
+  });
+  it('a mentés csak azt a gyűrűt írja', () => {
+    const next = [{ x: 0.3, y: 0.3 }, ...b.slice(1)];
+    expect(pathEditPatch(layer, 1, next)).toEqual({ subpaths: [a, next] });
+  });
+  it('egyszerű formán a lencse átlátszó', () => {
+    const simple = { points: a };
+    expect(pathEditView(simple, 0)).toBe(simple);
+    expect(pathEditPatch(simple, 0, b)).toEqual({ points: b });
   });
 });

@@ -3069,6 +3069,9 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "outlineStroke": "Linie zu Form",
+      "offsetOut": "Vergrößern",
+      "offsetIn": "Verkleinern",
       "bgRemove": "Hintergrund weg",
       "retouch": "Retusche",
       "marquee": "Auswahl",
@@ -3577,6 +3580,8 @@
         "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene."
       },
       "pen": {
+        "ring": "Pfad {{n}}/{{total}}",
+        "outlineFail": "Aus dieser Form lässt sich kein Pfad erstellen.",
         "mirrored": "Symmetrisch",
         "broken": "Getrennt",
         "open": "Öffnen",

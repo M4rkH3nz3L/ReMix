@@ -36,7 +36,7 @@ import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/ruler
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
 import { correctHex, correctPaint, correctionsAbove, docVignetteAngles, maskedCorrectionsAbove } from '@/lib/imagePixelPipeline';
-import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
+import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
 import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 // lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
@@ -80,6 +80,7 @@ export function ImageCanvas({
   onPenAddPoint,
   onPenClose,
   pathEditId,
+  pathEditRing = 0,
   selectedNode,
   onSelectNode,
   selection,
@@ -121,6 +122,8 @@ export function ImageCanvas({
   onPenClose?: () => void;
   /** ✏️ toll v2 node-szerkesztő mód: a megadott id-jű path-forma horgonypontjait húzhatja */
   pathEditId?: string | null;
+  /** összetett útvonalnál a szerkesztett gyűrű */
+  pathEditRing?: number;
   /** ✏️ toll v3: a kijelölt node indexe (ennél jelennek meg a bezier-fogók) */
   selectedNode?: number | null;
   onSelectNode?: (index: number) => void;
@@ -348,20 +351,25 @@ export function ImageCanvas({
 
   // ✏️ node-szerkesztő: a kijelölt path-forma (committed = a moveAnchor stabil alapja)
   const rawPathEdit = pathEditId ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
-  const pathEditShape =
-    rawPathEdit && rawPathEdit.kind === 'shape' && rawPathEdit.shape === 'path' ? rawPathEdit : null;
+  const rawPathShape = rawPathEdit && rawPathEdit.kind === 'shape' && rawPathEdit.shape === 'path' ? rawPathEdit : null;
+  const pathEditShape = rawPathShape ? pathEditView(rawPathShape, pathEditRing) : null;
   // a dot-követéshez a vászon-rajzolással AZONOS élő-patchelt változat
   const pathEditLive =
-    pathEditShape && live?.id === pathEditShape.id
-      ? (withLive(pathEditShape, live.patch) as ShapeLayer)
+    rawPathShape && live?.id === rawPathShape.id
+      ? pathEditView(withLive(rawPathShape, live.patch) as ShapeLayer, pathEditRing)
       : pathEditShape;
+  const livePath = (points: PathPoint[]) => setLive({ id: rawPathShape!.id, patch: pathEditPatch(rawPathShape!, pathEditRing, points) });
   const onNodeLive = (index: number, x: number, y: number) => {
     if (!pathEditShape?.points) return;
-    setLive({ id: pathEditShape.id, patch: { points: moveAnchor(pathEditShape.points, index, x, y) } });
+    livePath(moveAnchor(pathEditShape.points, index, x, y));
   };
   // I28: a dobozon kívülre húzott pont után a réteg doboza a formához igazodik
   const commitPath = (points: PathPoint[], label: string) => {
-    if (!pathEditShape) return;
+    if (!pathEditShape || !rawPathShape) return;
+    if (rawPathShape.subpaths?.length) {
+      commit(updateLayer(doc, rawPathShape.id, pathEditPatch(rawPathShape, pathEditRing, points)), label);
+      return;
+    }
     const next = renormalizePathLayer({ ...pathEditShape, points }, effectiveCanvas(doc));
     const { points: pts, position, w, h } = next;
     commit(updateLayer(doc, pathEditShape.id, { points: pts, position, w, h }), label);
@@ -375,7 +383,7 @@ export function ImageCanvas({
   const onHandleLive = (index: number, handle: HandleId, x: number, y: number) => {
     if (!pathEditShape?.points) return;
     const mode = nodeType(pathEditShape.points[index]);
-    setLive({ id: pathEditShape.id, patch: { points: dragHandle(pathEditShape.points, index, handle, x, y, mode) } });
+    livePath(dragHandle(pathEditShape.points, index, handle, x, y, mode));
   };
   const onHandleCommit = (index: number, handle: HandleId, x: number, y: number) => {
     if (!pathEditShape?.points) return;
@@ -387,10 +395,7 @@ export function ImageCanvas({
     if (!pathEditShape?.points) return;
     const hit = nearestOnPath(pathEditShape.points, !!pathEditShape.closed, x, y);
     if (!hit || hit.dist > 0.05) return;
-    commit(
-      updateLayer(doc, pathEditShape.id, { points: insertAnchor(pathEditShape.points, x, y, !!pathEditShape.closed) }),
-      'node-insert'
-    );
+    commit(updateLayer(doc, pathEditShape.id, pathEditPatch(rawPathShape ?? {}, pathEditRing, insertAnchor(pathEditShape.points, x, y, !!pathEditShape.closed))), 'node-insert');
   };
 
   // 🪄 varázspálca: a koppintás alatti LEGFELSŐ fotó-réteg + a dobozon belüli lokális (0–1) pont

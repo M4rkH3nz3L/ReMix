@@ -14,6 +14,8 @@ export interface LivePatch {
   position?: { x: number; y: number };
   /** ✏️ path node-húzás élő előnézete (a toll v2 node-szerkesztője) */
   points?: PathPoint[];
+  /** ugyanez összetett formán */
+  subpaths?: PathPoint[][];
 }
 
 /**

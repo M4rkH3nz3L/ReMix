@@ -3069,6 +3069,9 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "outlineStroke": "Stroke to shape",
+      "offsetOut": "Grow",
+      "offsetIn": "Shrink",
       "bgRemove": "Remove BG",
       "retouch": "Retouch",
       "marquee": "Select",
@@ -3572,6 +3575,8 @@
         "failBody": "Couldn't select a color region. Tap inside a photo layer."
       },
       "pen": {
+        "ring": "Path {{n}}/{{total}}",
+        "outlineFail": "This shape can't be converted to a path.",
         "mirrored": "Mirrored",
         "broken": "Broken",
         "open": "Open",

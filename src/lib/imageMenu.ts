@@ -33,6 +33,9 @@ export type LayerAction =
   | 'pattern'
   | 'editPath'
   | 'toPath'
+  | 'outlineStroke'
+  | 'offsetOut'
+  | 'offsetIn'
   | 'boolean'
   | 'align'
   | 'rotate'
@@ -77,6 +80,9 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   pattern: 'apps-outline',
   editPath: 'git-network-outline',
   toPath: 'analytics-outline',
+  outlineStroke: 'resize-outline',
+  offsetOut: 'add-circle-outline',
+  offsetIn: 'remove-circle-outline',
   boolean: 'git-merge-outline',
   align: 'magnet-outline',
   rotate: 'refresh-outline',
@@ -112,7 +118,7 @@ export function selectionMenu(layer: ImageLayer, ctx: { canAlign: boolean; canBo
       return { actions: ['adjust', 'bgRemove', 'develop', 'style', ...placed, ...order, 'duplicate'], canDelete: true };
     case 'shape': {
       const path: LayerAction[] =
-        layer.shape === 'path' ? ((layer.points?.length ?? 0) >= 2 ? ['editPath'] : []) : layer.shape === 'line' ? [] : ['toPath'];
+        layer.shape === 'path' ? [...((layer.points?.length ?? 0) >= 2 || layer.subpaths?.length ? (['editPath'] as const) : []), ...(!layer.closed && layer.strokeWidth ? (['outlineStroke'] as const) : ['offsetOut' as const, 'offsetIn' as const])] : layer.shape === 'line' ? [] : ['toPath'];
       const bool: LayerAction[] = ctx.canBoolean ? ['boolean'] : [];
       return { actions: ['style', 'fx', 'pattern', ...path, ...bool, ...placed, ...order, 'duplicate'], canDelete: true };
     }

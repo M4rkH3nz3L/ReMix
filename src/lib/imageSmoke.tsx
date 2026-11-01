@@ -9,10 +9,10 @@ import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/stud
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
 import { Asset } from 'expo-asset';
-import { layerSkPath, skiaBooleanEngine } from '@/components/studio/image/skiaVector';
+import { layerSkPath, offsetToResult, skiaBooleanEngine, strokeToResult, withResult } from '@/components/studio/image/skiaVector';
 import { booleanCombineInDoc } from '@/lib/imageBoolean';
 import { anchorFromDrag, type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
-import { setNodeType } from '@/lib/vectorPath';
+import { moveAnchor, pathEditPatch, pathEditView, setNodeType } from '@/lib/vectorPath';
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { logCaught } from '@/lib/logCaught';
@@ -1304,6 +1304,82 @@ async function smokeBoolean(log: Log, setHarness: (n: ReactNode) => void, ratio:
   }
 }
 
+/** Összetett forma szerkesztése, vonalból forma és eltolt útvonal: a vásznon a szerver ellen, a geometria függetlenül. */
+async function smokePathOps(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const canvas = { width: 320, height: 320 };
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const docOf = (...layers: ImageLayer[]) => ({ id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [bg, ...layers] }) as unknown as ImageDoc;
+  const square = { kind: 'shape', id: 'a', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.7, h: 0.7, fill: '#ff2d95' } as unknown as ShapeLayer;
+  const hole = { kind: 'shape', id: 'b', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.3, h: 0.3, fill: '#2060e0' } as unknown as ShapeLayer;
+  const res = booleanCombineInDoc(docOf(square, hole), 'b', 'subtract', skiaBooleanEngine(canvas))!;
+  const compound = res.doc.layers.find((l) => l.id === res.resultId) as ShapeLayer;
+  log(compound.subpaths!.length === 2, 'a lyukas forma két gyűrű', `${compound.subpaths!.length} gyűrű`);
+
+  // a lyuk gyűrűjének egy pontját húzzuk el: a lyuk változik, a külső forma nem
+  const ring = compound.subpaths!.findIndex((r) => r.some((p) => p.h1 || p.h2));
+  const view = pathEditView(compound, ring);
+  const edited = { ...compound, ...pathEditPatch(compound, ring, moveAnchor(view.points!, 0, view.points![0].x + 0.1, view.points![0].y)) } as ShapeLayer;
+  const [p0, p1] = [layerSkPath(compound, canvas), layerSkPath(edited, canvas)];
+  log(p1.contains(70, 70) && !p0.contains(160, 160), 'a gyűrű szerkesztése a külső formához nem nyúl', `gyűrű ${ring}`);
+
+  const box = { w: 320, h: 320 };
+  const wave = { ...pathShapeFromCanvasPoints([anchorFromDrag({ x: 0.1, y: 0.5 }, { x: 0.25, y: 0.1 }, box), anchorFromDrag({ x: 0.5, y: 0.5 }, { x: 0.65, y: 0.9 }, box), { x: 0.9, y: 0.5 }], false, 's', '#ff2d95')!, strokeWidth: 3 } as ShapeLayer;
+  const outline = strokeToResult(wave, canvas);
+  const star = { kind: 'shape', id: 's', shape: 'star', starPoints: 5, innerRatio: 0.5, position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fill: '#2060e0' } as unknown as ShapeLayer;
+  const [grown, shrunk] = [offsetToResult(star, canvas, 8), offsetToResult(star, canvas, -8)];
+  if (!outline || !grown || !shrunk) {
+    log(false, 'útvonal-műveletek', 'nincs eredmény');
+    return;
+  }
+  const outlined = { ...wave, ...withResult(wave, outline) } as ShapeLayer;
+  const [g, sh] = [{ ...star, ...withResult(star, grown) } as ShapeLayer, { ...star, ...withResult(star, shrunk) } as ShapeLayer];
+  const [pStar, pG, pS] = [layerSkPath(star, canvas), layerSkPath(g, canvas), layerSkPath(sh, canvas)];
+  let [wrong, total, aS, aStar, aG] = [0, 0, 0, 0, 0];
+  for (let y = 4; y < 320; y += 6) {
+    for (let x = 4; x < 320; x += 6) {
+      const [i, j, k] = [pS.contains(x, y), pStar.contains(x, y), pG.contains(x, y)];
+      total += 1;
+      if ((j && !k) || (i && !j)) wrong += 1;
+      aS += i ? 1 : 0;
+      aStar += j ? 1 : 0;
+      aG += k ? 1 : 0;
+    }
+  }
+  log(wrong === 0 && aG > aStar && aS < aStar, 'eltolás: a bővített tartalmazza, a szűkített benne van', `területek ${aS} < ${aStar} < ${aG}, hibás ${wrong}/${total}`);
+
+  const cases: [string, ImageDoc, ImageDoc][] = [
+    ['szerkesztett lyuk', docOf(edited), docOf(compound)],
+    ['vonalból forma = az eredeti vonal', docOf(outlined), docOf(wave)],
+    ['bővített csillag', docOf(g), docOf(star)],
+    ['szűkített csillag', docOf(sh), docOf(star)],
+  ];
+  for (const [name, doc, other] of cases) {
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1200);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [e, c] = [await renderImageDoc(doc, 320), await renderImageDoc(other, 320)];
+    if (!e || !c) {
+      log(false, `útvonal = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const d = meanDiff(a, await decode(e), 320, 320);
+    const ctl = meanDiff(a, await decode(c), 320, 320);
+    const same = name.startsWith('vonalból');
+    log(same ? d <= 5 && ctl <= 5 : d <= 5 && ctl >= d * 1.5, `útvonal = export: ${name}`, `átlag ${d.toFixed(1)}/255; ${same ? 'az eredeti vonal exportjától' : 'ellenpróba'} ${ctl.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(e);
+    removeFile(c);
+  }
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1496,6 +1572,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'pathops') {
+    await step('pathops', () => smokePathOps(log, setHarness, ratio));
     return;
   }
   if (phase === 'boolean') {

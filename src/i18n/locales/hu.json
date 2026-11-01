@@ -3069,6 +3069,9 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "outlineStroke": "Vonalból forma",
+      "offsetOut": "Bővít",
+      "offsetIn": "Szűkít",
       "bgRemove": "Háttér ki",
       "retouch": "Retus",
       "marquee": "Kijelölés",
@@ -3572,6 +3575,8 @@
         "failBody": "Nem sikerült szín-régiót kijelölni. Koppints egy fotó-réteg belsejébe."
       },
       "pen": {
+        "ring": "Alakzat {{n}}/{{total}}",
+        "outlineFail": "Ebből a formából nem készíthető útvonal.",
         "mirrored": "Szimmetrikus",
         "broken": "Törött",
         "open": "Megnyit",

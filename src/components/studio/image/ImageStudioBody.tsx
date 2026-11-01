@@ -43,7 +43,7 @@ import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
 import { flattenTargets, mergeDownTargets, rasterSubDoc, replaceWithRaster } from '@/lib/imageCanvasOps';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
-import { deleteAnchor, type NodeType, reversePath, setNodeType } from '@/lib/vectorPath';
+import { deleteAnchor, type NodeType, pathEditPatch, pathEditView, reversePath, setNodeType } from '@/lib/vectorPath';
 import {
   addLayer,
   createImageDoc,
@@ -78,7 +78,7 @@ import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
-import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
 
@@ -184,6 +184,7 @@ export function ImageStudioBody({
   const [cropPreset, setCropPreset] = useState<number | null>(null);
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const [pathEditId, setPathEditId] = useState<string | null>(null);
+  const [pathEditRing, setPathEditRing] = useState(0);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
   // ✂️ a kijelölés a szerkesztés állapota, nem a dokumentumé: nem kerül az undo-ba és a mentésbe
@@ -682,6 +683,13 @@ export function ImageStudioBody({
           commit(toggleLayerLocked(doc, selectedLayer.id), t('studio.image.undoLock'));
         }
         break;
+      case 'outlineStroke':
+      case 'offsetOut':
+      case 'offsetIn':
+        if (selectedLayer?.kind === 'shape') {
+          void pathOperation(selectedLayer, key);
+        }
+        break;
       case 'toPath':
         // 🔷 forma → szerkeszthető pontok (a kinézet nem változik)
         if (selectedLayer?.kind === 'shape') {
@@ -697,6 +705,7 @@ export function ImageStudioBody({
         setCropRect(null);
         setPenPoints(null);
         setPathEditNode(null);
+        setPathEditRing(0);
         setPathEditId(selectedLayer?.id ?? null);
         break;
       case 'photo':
@@ -1044,6 +1053,27 @@ export function ImageStudioBody({
     }
   };
 
+  // 🔷 vonalból forma és eltolt útvonal: az eredmény szerkeszthető összetett forma
+  const pathOperation = async (layer: ShapeLayer, op: 'outlineStroke' | 'offsetOut' | 'offsetIn') => {
+    if (!doc) {
+      return;
+    }
+    try {
+      const { offsetToResult, strokeToResult, withResult } = await import('@/components/studio/image/skiaVector');
+      const canvas = effectiveCanvas(doc);
+      const step = Math.round(canvas.width * 0.01) * (op === 'offsetIn' ? -1 : 1);
+      const result = op === 'outlineStroke' ? strokeToResult(layer, canvas) : offsetToResult(layer, canvas, step);
+      if (!result) {
+        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.pen.outlineFail'));
+        return;
+      }
+      commit(updateLayer<ShapeLayer>(doc, layer.id, withResult(layer, result)), t(`studio.imageTools.${op}`));
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:pathOperation', caught);
+      Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.pen.outlineFail'));
+    }
+  };
+
   // 🩹 retus: előbb a vászon képe, utána indul a munkamenet (a pillanatkép az overlay-t levenné)
   const startRetouch = async () => {
     if (!doc || busy) {
@@ -1245,7 +1275,10 @@ export function ImageStudioBody({
 
   // ✏️ v3: a KIJELÖLT node típusa (görbe/sarok) — bezier-fogók létrehozása/törlése
   const pe = pathEditId && doc ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
-  const pathEditShape = pe && pe.kind === 'shape' && pe.shape === 'path' ? pe : null;
+  const rawPathShape = pe && pe.kind === 'shape' && pe.shape === 'path' ? pe : null;
+  const pathEditShape = rawPathShape ? pathEditView(rawPathShape, pathEditRing) : null;
+  const ringCount = rawPathShape?.subpaths?.length ?? 0;
+  const writePath = (points: PathPoint[]) => pathEditPatch(rawPathShape ?? {}, pathEditRing, points);
   // nyitott útvonalnak vonal kell, különben láthatatlan volna
   const togglePathClosed = () => {
     if (doc && pathEditShape) {
@@ -1255,16 +1288,14 @@ export function ImageStudioBody({
   };
   const reverseEditedPath = () => {
     if (doc && pathEditShape?.points) {
-      commit(updateLayer<ShapeLayer>(doc, pathEditShape.id, { points: reversePath(pathEditShape.points) }), 'path-reverse');
+      commit(updateLayer<ShapeLayer>(doc, pathEditShape.id, writePath(reversePath(pathEditShape.points))), 'path-reverse');
       setPathEditNode(null);
     }
   };
   const setNodeKind = (type: NodeType) => {
     if (doc && pathEditShape?.points && pathEditNode != null) {
       commit(
-        updateLayer(doc, pathEditShape.id, {
-          points: setNodeType(pathEditShape.points, pathEditNode, type, !!pathEditShape.closed),
-        }),
+        updateLayer(doc, pathEditShape.id, writePath(setNodeType(pathEditShape.points, pathEditNode, type, !!pathEditShape.closed))),
         `node-${type}`
       );
     }
@@ -1273,7 +1304,7 @@ export function ImageStudioBody({
   const deleteNode = () => {
     if (doc && pathEditShape?.points && pathEditNode != null && pathEditShape.points.length > 2) {
       commit(
-        updateLayer(doc, pathEditShape.id, { points: deleteAnchor(pathEditShape.points, pathEditNode) }),
+        updateLayer(doc, pathEditShape.id, writePath(deleteAnchor(pathEditShape.points, pathEditNode))),
         'node-delete'
       );
       setPathEditNode(null);
@@ -1752,6 +1783,7 @@ export function ImageStudioBody({
               onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
               onPenClose={() => commitPen(true)}
               pathEditId={pathEditId}
+              pathEditRing={pathEditRing}
               selectedNode={pathEditNode}
               onSelectNode={setPathEditNode}
               selection={selection}
@@ -1940,9 +1972,22 @@ export function ImageStudioBody({
                     <Text style={styles.penCloseText}>{t(`studio.image.pen.${type}`)}</Text>
                   </Pressable>
                 ))}
-                <Pressable onPress={togglePathClosed} style={styles.penClose} hitSlop={6}>
-                  <Text style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
-                </Pressable>
+                {ringCount > 1 ? (
+                  <Pressable
+                    onPress={() => {
+                      setPathEditRing((r) => (r + 1) % ringCount);
+                      setPathEditNode(null);
+                    }}
+                    style={styles.penClose}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.penCloseText}>{t('studio.image.pen.ring', { n: (pathEditRing % ringCount) + 1, total: ringCount })}</Text>
+                  </Pressable>
+                ) : ringCount === 0 ? (
+                  <Pressable onPress={togglePathClosed} style={styles.penClose} hitSlop={6}>
+                    <Text style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable onPress={reverseEditedPath} style={styles.penClose} hitSlop={6}>
                   <Text style={styles.penCloseText}>{t('studio.image.pen.reverse')}</Text>
                 </Pressable>

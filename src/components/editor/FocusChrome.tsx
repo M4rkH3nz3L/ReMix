@@ -57,7 +57,7 @@ export function FocusChrome({
           hitSlop={8}
           style={styles.iconBtn}
           accessibilityRole="button"
-          accessibilityLabel={t('editor.help.shortcut.undo')}
+          accessibilityLabel={t('editor.transportBar.undo')}
         >
           <Ionicons name="arrow-undo-outline" size={18} color={canUndo ? palette.text : palette.border} />
         </Pressable>
@@ -67,7 +67,7 @@ export function FocusChrome({
           hitSlop={8}
           style={styles.iconBtn}
           accessibilityRole="button"
-          accessibilityLabel={t('editor.help.shortcut.redo')}
+          accessibilityLabel={t('editor.transportBar.redo')}
         >
           <Ionicons name="arrow-redo-outline" size={18} color={canRedo ? palette.text : palette.border} />
         </Pressable>

@@ -1,8 +1,9 @@
 import { useFonts } from 'expo-font';
 import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Image } from 'expo-image';
 import { useEffect } from 'react';
-import { ActivityIndicator, Alert, BackHandler, Dimensions, LogBox, Platform, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, BackHandler, Dimensions, LogBox, Platform, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import {
@@ -11,6 +12,7 @@ import {
   setBugRoute,
   setBugSignedIn,
 } from '@/lib/bugReporter';
+import { onMemoryWarning } from '@/lib/memoryPressure';
 import { handleBack } from '@/lib/backStack';
 import { loadDevice3DCaps } from '@/lib/deviceCapsClient';
 import { useEditorStore } from '@/store/editorStore';
@@ -93,6 +95,7 @@ export default function RootLayout() {
     installGlobalBugHandlers();
     // 📡 3D-képességek (LiDAR) egyszeri lekérdezése — a 3D Stúdió láthatóságának forrása
     void loadDevice3DCaps();
+    const memory = AppState.addEventListener('memoryWarning', () => onMemoryWarning(() => void Image.clearMemoryCache()));
     // a jelentésekhez: a nyitott projekt + az utolsó parancs-TÍPUSOK (tartalom nélkül)
     setBugEditorContextProvider(() => {
       const st = useEditorStore.getState();
@@ -101,6 +104,7 @@ export default function RootLayout() {
         recent: (st.events ?? []).slice(-8).map((e) => `${e.actor}:${e.command.type}`),
       };
     });
+    return () => memory.remove();
   }, []);
   // 🧩 helyi AI alapból a telefonon: indulás után EGYSZER felajánlja a Whisper
   // (felirat/átirat) letöltését — utána minden helyi AI-funkció offline megy

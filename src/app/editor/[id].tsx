@@ -36,7 +36,6 @@ import { AudioLayer } from '@/components/preview/AudioLayer';
 import { PreviewSurface } from '@/components/preview/PreviewSurface';
 import { VodProcessingOverlay } from '@/components/editor/VodProcessingOverlay';
 import { accentGradient, aspectRatios, palette } from '@/constants/editor';
-import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
@@ -118,7 +117,6 @@ export default function EditorScreen() {
   const L = useLayout();
 
   usePlaybackClock();
-  useEditorKeyboard(); // ⌨️ web/tablet-billentyűzet → egységes parancskészlet (§2.7)
 
   // 👥 megosztott projekt-e + a szerepem (a fejléc-jelzéshez / Studio-linkhez)
   useEffect(() => {

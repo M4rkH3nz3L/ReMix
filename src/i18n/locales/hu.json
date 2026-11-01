@@ -119,7 +119,7 @@
         "s1_where": "Eszköztár → Videó",
         "s1_result": "A klip megjelenik a videó-sávon, filmstrip-előnézettel.",
         "s2_action": "Indítsd el a lejátszást, majd állítsd meg.",
-        "s2_where": "Lejátszás/szünet gomb (K)",
+        "s2_where": "Lejátszás/szünet gomb",
         "s2_result": "Az előnézet a lejátszófejtől játszik; a fej középen áll.",
         "s3_action": "Léptesd a lejátszófejet és nagyíts az idővonalon.",
         "s3_where": "Idővonal — húzd/görgesd; kétujjas csippentés a zoomhoz",
@@ -995,39 +995,21 @@
       "help": "Súgó"
     },
     "help": {
-      "title": "Súgó — gesztusok és billentyűk",
+      "title": "Súgó — gesztusok",
       "gestureSection": "Gesztusok",
-      "keyboardSection": "Billentyűk (web / külső billentyűzet)",
       "gesture": {
         "tapSelect": "Koppintás egy klipre: kijelölés",
         "dragMove": "Klip húzása: áthelyezés az idővonalon",
         "dragTrim": "A klip szélének húzása: trimmelés (be/ki-pont)",
         "pinchZoom": "Csípés az idővonalon: nagyítás / kicsinyítés",
         "longPressMulti": "Hosszú nyomás: többszörös kijelölés"
-      },
-      "shortcut": {
-        "playPause": "Lejátszás / szünet",
-        "jogBack": "Léptetés vissza",
-        "stop": "Megállás",
-        "jogForward": "Lejátszás előre",
-        "frameBack": "Egy frame vissza",
-        "frameForward": "Egy frame előre",
-        "setIn": "Be-pont",
-        "setOut": "Ki-pont",
-        "split": "Vágás a lejátszófejnél",
-        "delete": "Törlés",
-        "undo": "Visszavonás",
-        "redo": "Mégis",
-        "copy": "Klip másolása",
-        "cut": "Klip kivágása",
-        "paste": "Beillesztés"
       }
     },
     "transportBar": {
       "moreTitle": "További lejátszás-műveletek",
       "toStart": "Ugrás az elejére",
-      "shuttleBack": "Gyors visszajátszás (J)",
-      "shuttleFwd": "Gyors előrejátszás (L)",
+      "shuttleBack": "Gyors visszajátszás",
+      "shuttleFwd": "Gyors előrejátszás",
       "loopOn": "Ismétlés bekapcsolása",
       "loopOff": "Ismétlés kikapcsolása",
       "undo": "Visszavonás",
@@ -3124,6 +3106,10 @@
       "layer": "Réteg"
     },
     "image": {
+      "limits": {
+        "layers": "Túl sok réteg az exporthoz (legfeljebb 400). Egyesíts vagy lapíts rétegeket.",
+        "points": "Túl összetett vektor-tartalom az exporthoz. Egyszerűsítsd a formákat."
+      },
       "brand": {
         "title": "Márkám",
         "hint": "A sablonok ezekkel nyílnak, és minden színválasztóban ott vannak.",

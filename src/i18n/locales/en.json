@@ -119,7 +119,7 @@
         "s1_where": "Toolbar → Video",
         "s1_result": "The clip appears on the video track with a filmstrip preview.",
         "s2_action": "Start playback, then pause.",
-        "s2_where": "Play/pause button (K)",
+        "s2_where": "Play/pause button",
         "s2_result": "The preview plays from the playhead; the head stays centered.",
         "s3_action": "Move the playhead and zoom the timeline.",
         "s3_where": "Timeline — drag/scroll; pinch with two fingers to zoom",
@@ -995,39 +995,21 @@
       "help": "Help"
     },
     "help": {
-      "title": "Help — gestures & keyboard",
+      "title": "Help — gestures",
       "gestureSection": "Gestures",
-      "keyboardSection": "Keyboard (web / external keyboard)",
       "gesture": {
         "tapSelect": "Tap a clip: select it",
         "dragMove": "Drag a clip: move it along the timeline",
         "dragTrim": "Drag a clip edge: trim (in/out point)",
         "pinchZoom": "Pinch the timeline: zoom in / out",
         "longPressMulti": "Long-press: multi-select"
-      },
-      "shortcut": {
-        "playPause": "Play / pause",
-        "jogBack": "Jog back",
-        "stop": "Stop",
-        "jogForward": "Play forward",
-        "frameBack": "One frame back",
-        "frameForward": "One frame forward",
-        "setIn": "Set in-point",
-        "setOut": "Set out-point",
-        "split": "Split at playhead",
-        "delete": "Delete",
-        "undo": "Undo",
-        "redo": "Redo",
-        "copy": "Copy clip",
-        "cut": "Cut clip",
-        "paste": "Paste"
       }
     },
     "transportBar": {
       "moreTitle": "More playback actions",
       "toStart": "Go to start",
-      "shuttleBack": "Shuttle back (J)",
-      "shuttleFwd": "Shuttle forward (L)",
+      "shuttleBack": "Shuttle back",
+      "shuttleFwd": "Shuttle forward",
       "loopOn": "Turn loop on",
       "loopOff": "Turn loop off",
       "undo": "Undo",
@@ -3124,6 +3106,10 @@
       "layer": "Layer"
     },
     "image": {
+      "limits": {
+        "layers": "Too many layers to export (400 at most). Merge or flatten layers.",
+        "points": "Vector content is too complex to export. Simplify the shapes."
+      },
       "brand": {
         "title": "My brand",
         "hint": "Templates open with these, and they appear in every colour picker.",

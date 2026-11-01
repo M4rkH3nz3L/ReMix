@@ -1,8 +1,10 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { ensureCloud } from '@/lib/backend';
 import { docMediaUris } from '@/lib/imageDoc';
+import { docLimitProblem } from '@/lib/imageDocLimits';
 import { ImageRenderRejected, imageCacheKey } from '@/lib/imageExport';
 import { isProNow } from '@/store/entitlementStore';
 import { renderServerUrl } from '@/lib/render';
@@ -280,6 +282,10 @@ export async function renderImageDoc(
 ): Promise<string | null> {
   if (Platform.OS === 'web') {
     return null;
+  }
+  const limit = docLimitProblem(doc);
+  if (limit) {
+    throw new ImageRenderRejected(tr(`studio.image.limits.${limit}`));
   }
   try {
     const dir = projectMediaDir();

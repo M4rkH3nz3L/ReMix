@@ -201,7 +201,7 @@ export function TransportBar() {
           >
             <Ionicons name="play-back" size={18} color={palette.textDim} />
           </Pressable>
-          {/* K: lejátszás/szünet (a J/L shuttle a ⋯ menüben és billentyűn) */}
+          {/* K: lejátszás/szünet (a J/L shuttle a ⋯ menüben) */}
           <TutorialTarget id="transport.playPause">
             <Pressable
               onPress={togglePlay}

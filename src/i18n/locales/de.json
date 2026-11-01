@@ -119,7 +119,7 @@
         "s1_where": "Werkzeugleiste → Video",
         "s1_result": "Der Clip erscheint auf der Videospur mit Filmstreifen-Vorschau.",
         "s2_action": "Starte die Wiedergabe und pausiere dann.",
-        "s2_where": "Wiedergabe/Pause-Taste (K)",
+        "s2_where": "Wiedergabe/Pause-Taste",
         "s2_result": "Die Vorschau spielt ab dem Abspielkopf; der Kopf bleibt mittig.",
         "s3_action": "Bewege den Abspielkopf und zoome die Timeline.",
         "s3_where": "Timeline — ziehen/scrollen; mit zwei Fingern zoomen",
@@ -995,39 +995,21 @@
       "help": "Hilfe"
     },
     "help": {
-      "title": "Hilfe — Gesten & Tastatur",
+      "title": "Hilfe — Gesten",
       "gestureSection": "Gesten",
-      "keyboardSection": "Tastatur (Web / externe Tastatur)",
       "gesture": {
         "tapSelect": "Auf einen Clip tippen: auswählen",
         "dragMove": "Clip ziehen: auf der Timeline verschieben",
         "dragTrim": "Clip-Rand ziehen: trimmen (In-/Out-Punkt)",
         "pinchZoom": "Timeline zusammenziehen: zoomen",
         "longPressMulti": "Lang drücken: Mehrfachauswahl"
-      },
-      "shortcut": {
-        "playPause": "Wiedergabe / Pause",
-        "jogBack": "Zurück joggen",
-        "stop": "Stopp",
-        "jogForward": "Vorwärts abspielen",
-        "frameBack": "Ein Frame zurück",
-        "frameForward": "Ein Frame vor",
-        "setIn": "In-Punkt setzen",
-        "setOut": "Out-Punkt setzen",
-        "split": "Am Abspielkopf teilen",
-        "delete": "Löschen",
-        "undo": "Rückgängig",
-        "redo": "Wiederholen",
-        "copy": "Clip kopieren",
-        "cut": "Clip ausschneiden",
-        "paste": "Einfügen"
       }
     },
     "transportBar": {
       "moreTitle": "Weitere Wiedergabe-Aktionen",
       "toStart": "Zum Anfang",
-      "shuttleBack": "Schnell zurück (J)",
-      "shuttleFwd": "Schnell vorwärts (L)",
+      "shuttleBack": "Schnell zurück",
+      "shuttleFwd": "Schnell vorwärts",
       "loopOn": "Wiederholung einschalten",
       "loopOff": "Wiederholung ausschalten",
       "undo": "Rückgängig",
@@ -3124,6 +3106,10 @@
       "layer": "Ebene"
     },
     "image": {
+      "limits": {
+        "layers": "Zu viele Ebenen für den Export (höchstens 400). Ebenen zusammenfügen.",
+        "points": "Vektorinhalt ist zu komplex für den Export. Formen vereinfachen."
+      },
       "brand": {
         "title": "Meine Marke",
         "hint": "Vorlagen öffnen sich damit, und sie stehen in jeder Farbauswahl.",

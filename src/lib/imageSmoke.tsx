@@ -1,5 +1,5 @@
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler } from 'react';
 import { Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
@@ -1898,6 +1898,74 @@ async function smokePerf(log: Log, setHarness: (n: ReactNode) => void) {
   }
 }
 
+/** Nagy fotók a vásznon: megjelenés és egy fotó mozgatásának ára. */
+async function smokePerfPhotos(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  let seq = 0;
+  const id = () => `perfp${++seq}`;
+  const source = addLayer(createImageDoc('forrás', '1:1', id, { width: 3072, height: 3072 }), { kind: 'shape', id: id(), shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.8, fill: '#ff2d95', gradient: { type: 'linear', angle: 45, stops: [{ color: '#ff2d95', offset: 0 }, { color: '#00e5ff', offset: 1 }] } } as unknown as ImageLayer);
+  const png = await renderImageDoc(source, 3072);
+  if (!png) {
+    log(false, 'perf fotó: forrás', 'nincs render');
+    return;
+  }
+  const files: File[] = [];
+  for (let i = 0; i < 10; i++) {
+    const copy = new File(Paths.cache, `perf_${Date.now()}_${i}.png`);
+    new File(png).copy(copy);
+    files.push(copy);
+  }
+  log(null, 'forrás', `3072×3072 PNG, ${Math.round(new File(png).size / 1024)} kB`);
+  for (const count of [2, 5, 10]) {
+    let doc = createImageDoc('fotók', '1:1', id, { width: 1080, height: 1080 });
+    for (let i = 0; i < count; i++) {
+      doc = addLayer(doc, { kind: 'photo', id: id(), name: `${i}`, uri: files[i].uri, position: { x: 0.2 + 0.06 * i, y: 0.5 }, w: 0.7, h: 0.7, fit: 'cover' } as PhotoLayer);
+    }
+    const renders: number[] = [];
+    const v = createRef<View>() as RefObject<View>;
+    const view = (d: ImageDoc) => (
+      <Profiler id="canvas" onRender={(_id, _phase, actual) => { renders.push(actual); }}>
+        <View style={{ width: 320, height: 320 }}>
+          <ImageCanvas doc={d} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+        </View>
+      </Profiler>
+    );
+    const start = performance.now();
+    setHarness(view(doc));
+    let shown = -1;
+    for (let i = 0; i < 60 && shown < 0; i++) {
+      await sleep(100);
+      if (!v.current) {
+        continue;
+      }
+      const uri = await captureRef(v, { format: 'png', quality: 1, width: 64, height: 64 });
+      const img = await decode(uri);
+      removeFile(uri);
+      // a legfelső fotó a szélén látszik először: a sarokhoz közel még a háttér volt
+      const p = pixel(img, Math.round(img.width() * (0.2 + 0.06 * (count - 1))), Math.round(img.height() / 2));
+      if (Math.abs(p[0] - 18) + Math.abs(p[1] - 18) + Math.abs(p[2] - 26) > 40) {
+        shown = performance.now() - start;
+      }
+    }
+    await sleep(500);
+    const updates: number[] = [];
+    const last = doc.layers[doc.layers.length - 1];
+    for (let k = 0; k < 7; k++) {
+      renders.length = 0;
+      setHarness(view(updateLayer(doc, last.id, { position: { x: 0.3 + k / 50, y: 0.5 } } as Partial<ImageLayer>)));
+      await sleep(120);
+      updates.push(renders.reduce((a, b) => a + b, 0));
+    }
+    setHarness(null);
+    await sleep(300);
+    const median = [...updates].sort((a, b) => a - b)[3];
+    log(shown > 0, `perf ${count} fotó megjelent`, `${shown.toFixed(0)} ms`);
+    log(median <= 30, `perf ${count} fotó: egy fotó mozgatása`, `${median.toFixed(0)} ms`);
+  }
+  files.forEach((f) => f.delete());
+  removeFile(png);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2090,6 +2158,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'perfphoto') {
+    await step('perfphoto', () => smokePerfPhotos(log, setHarness));
     return;
   }
   if (phase === 'perf') {

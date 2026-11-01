@@ -3,16 +3,11 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
-import { SHORTCUT_HINTS } from '@/lib/editorKeymap';
 
 /** A súgóban felsorolt alap-gesztusok (a leírás i18n-kulcsa + egy ikon-emoji). */
 const GESTURES = ['tapSelect', 'dragMove', 'dragTrim', 'pinchZoom', 'longPressMulti'] as const;
 
-/**
- * ❓ Gesztus- és billentyű-térkép (EDITOR-UX §2.7). A profi vágó-módokat
- * felfedezhetővé teszi: a `SHORTCUT_HINTS` magból épül a billentyű-lista
- * (a `resolveShortcut`-tal garantáltan szinkronban), alatta a fő gesztusok.
- */
+/** ❓ Gesztus-térkép (EDITOR-UX §2.7): a profi vágó-módokat felfedezhetővé teszi. */
 export function HelpOverlay({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   return (
@@ -22,16 +17,6 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
         {GESTURES.map((g) => (
           <View key={g} style={styles.row}>
             <Text style={styles.rowLabel}>{t('editor.help.gesture.' + g)}</Text>
-          </View>
-        ))}
-
-        <Text style={[styles.section, styles.sectionGap]}>{t('editor.help.keyboardSection')}</Text>
-        {SHORTCUT_HINTS.map((h) => (
-          <View key={h.action} style={styles.row}>
-            <Text style={styles.rowLabel}>{t('editor.help.shortcut.' + h.action)}</Text>
-            <View style={styles.keyBadge}>
-              <Text style={styles.keyText}>{h.keys}</Text>
-            </View>
           </View>
         ))}
       </ScrollView>
@@ -53,9 +38,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 6,
   },
-  sectionGap: {
-    marginTop: 18,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -69,18 +51,5 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.text,
     fontSize: 13,
-  },
-  keyBadge: {
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  keyText: {
-    color: palette.textDim,
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

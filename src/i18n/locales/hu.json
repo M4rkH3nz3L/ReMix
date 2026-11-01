@@ -3051,6 +3051,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "pixel": "Pixel art",
       "assistant": "Asszisztens",
       "exportLayer": "Réteg exportja",
       "outlineStroke": "Vonalból forma",
@@ -3106,6 +3107,43 @@
       "layer": "Réteg"
     },
     "image": {
+      "pixel": {
+        "save": {
+          "saved": "Elmentve a Fotókba.",
+          "denied": "Nincs engedély a Fotókhoz.",
+          "failed": "A mentés nem sikerült."
+        },
+        "title": "Pixel art",
+        "size": "Rács mérete",
+        "undo": "Visszavonás",
+        "redo": "Újra",
+        "done": "Kész",
+        "pencil": "Ceruza",
+        "eraser": "Radír",
+        "fill": "Kitöltés",
+        "pick": "Szín felvétele",
+        "mirrorX": "Vízszintes tükör",
+        "mirrorY": "Függőleges tükör",
+        "grid": "Rács",
+        "fit": "Teljes rács",
+        "shiftLeft": "Eltolás balra",
+        "shiftRight": "Eltolás jobbra",
+        "shiftUp": "Eltolás fel",
+        "shiftDown": "Eltolás le",
+        "flipH": "Tükrözés vízszintesen",
+        "flipV": "Tükrözés függőlegesen",
+        "frame": "{{n}}/{{total}}. kocka",
+        "removeHint": "Hosszan nyomva törlöd a színt",
+        "editColor": "Szín szerkesztése",
+        "addColor": "Új szín",
+        "play": "Lejátszás",
+        "addFrame": "Új kocka",
+        "copyFrame": "Kocka másolása",
+        "removeFrame": "Kocka törlése",
+        "onion": "Előző kocka halványan",
+        "speed": "Sebesség",
+        "sheet": "Sprite-lap"
+      },
       "limits": {
         "layers": "Túl sok réteg az exporthoz (legfeljebb 400). Egyesíts vagy lapíts rétegeket.",
         "points": "Túl összetett vektor-tartalom az exporthoz. Egyszerűsítsd a formákat."

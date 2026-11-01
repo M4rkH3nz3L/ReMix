@@ -20,6 +20,9 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { DEFAULT_PALETTE, encodeFrame, floodFill, paintLine, pixelLayerBox, pixelLayerScale, type PixelArt, type PixelFrame } from '@/lib/pixelArt';
+import { writeLayerPng, writePixelGif, writeSpriteSheet } from '@/lib/pixelArtClient';
+import { PixelStudio } from '@/components/studio/image/PixelStudio';
 import type { FeedPost } from '@/types/social';
 import { type Href, router } from 'expo-router';
 import { useBrandStyle } from '@/store/brandStyleStore';
@@ -1966,6 +1969,119 @@ async function smokePerfPhotos(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(png);
 }
 
+/** Pixel art: a kép, a GIF és a sprite-lap a valódi Skia-dekóderen át, a réteg a vásznon és a szerveren. */
+async function smokePixel(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const [w, h] = [32, 32];
+  const frames: PixelFrame[] = [0, 1, 2].map((n) => {
+    const f = new Uint8Array(w * h);
+    paintLine(f, w, h, 4 + n * 3, 4, 20, 26, 9, { x: true, y: false });
+    paintLine(f, w, h, 0, 31, 31, 31, 12, { x: false, y: false });
+    floodFill(f, w, h, 15, 2, 0, { x: false, y: false });
+    f[(5 + n) * w + 15] = 11;
+    // a mintavétel a kitöltött területet látja, a vékony vonalat nem
+    f.fill(4 + n, 8 * w, 8 * w);
+    for (let y = 8; y < 24; y++) {
+      f.fill(4 + n, y * w + 8, y * w + 24);
+    }
+    return f;
+  });
+  const art: PixelArt = { width: w, height: h, palette: [...DEFAULT_PALETTE], frames: frames.map(encodeFrame), fps: 8 };
+  const expected = (frame: PixelFrame, x: number, y: number) => {
+    const v = frame[y * w + x];
+    if (v === 0) {
+      return null;
+    }
+    const n = parseInt(DEFAULT_PALETTE[v - 1].slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const mismatches = (img: SkImage, frame: PixelFrame, scale: number, ox = 0, oy = 0) => {
+    const px = img.readPixels(ox, oy, { width: w * scale, height: h * scale, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul });
+    let bad = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const at = ((y * scale + scale - 1) * w * scale + x * scale + scale - 1) * 4;
+        const want = expected(frame, x, y);
+        const got = px ? [px[at], px[at + 1], px[at + 2]] : [];
+        if (want ? got.join() !== want.join() || (px as Uint8Array)[at + 3] !== 255 : (px as Uint8Array)[at + 3] !== 0) {
+          bad++;
+        }
+      }
+    }
+    return bad;
+  };
+  const scale = pixelLayerScale(w, h);
+  const png = writeLayerPng(art);
+  const img = await decode(png);
+  log(img.width() === w * scale && mismatches(img, frames[0], scale) === 0, 'réteg-PNG pontos és éles', `${img.width()}×${img.height()}, eltérés ${mismatches(img, frames[0], scale)}/${w * h}`);
+
+  const gifUri = writePixelGif(art, 4);
+  const gifData = await Skia.Data.fromURI(gifUri);
+  const gif = Skia.AnimatedImage.MakeAnimatedImageFromEncoded(gifData);
+  log(gif?.getFrameCount() === 3, 'GIF: a Skia három kockát olvas', `${gif?.getFrameCount()}`);
+  log(Math.abs((gif?.currentFrameDuration() ?? 0) - 120) <= 10, 'GIF: 8 fps időzítés', `${gif?.currentFrameDuration()} ms`);
+  for (let n = 0; n < 3 && gif; n++) {
+    const shot = gif.getCurrentFrame();
+    const bad = shot ? mismatches(shot, frames[n], 4) : -1;
+    log(bad === 0, `GIF ${n + 1}. kocka pixelre pontos`, `eltérés ${bad}/${w * h}`);
+    gif.decodeNextFrame();
+  }
+  const sheetUri = writeSpriteSheet(art, 2);
+  const sheet = await decode(sheetUri);
+  log(sheet.width() === 128 && sheet.height() === 128 && mismatches(sheet, frames[2], 2, 0, 64) === 0, 'sprite-lap: a 3. kocka a helyén', `${sheet.width()}×${sheet.height()}, eltérés ${mismatches(sheet, frames[2], 2, 0, 64)}`);
+
+  let n = 0;
+  const id = () => `pix${++n}`;
+  const base = createImageDoc('pixel', '1:1', id, { width: 1080, height: 1080, background: '#20242e' });
+  const box = pixelLayerBox(w, h, 1080, 1080);
+  const doc = addLayer(base, { kind: 'photo', id: id(), name: 'p', uri: png, position: { x: 0.5, y: 0.5 }, ...box, fit: 'stretch', pixelArt: art } as PhotoLayer);
+  const project = { ...createEmptyProject('smoke pixel', '1:1', undefined, 'image'), imageDocs: [doc] };
+  await saveProject(project);
+  // a mentés a projekt mappájába költözteti a képet: a visszaolvasott dokumentum az érvényes
+  const savedDoc = (await loadProject(project.id))?.imageDocs?.[0] ?? doc;
+  const reopened = (savedDoc.layers[1] as PhotoLayer | undefined)?.pixelArt;
+  log(reopened?.frames.join('|') === art.frames.join('|'), 'mentés után a rács szerkeszthető marad', `${reopened?.frames.length} kocka`);
+
+  const v = createRef<View>() as RefObject<View>;
+  setHarness(
+    <View style={{ width: 340, height: 340 }}>
+      <ImageCanvas doc={savedDoc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+    </View>
+  );
+  await sleep(1200);
+  const shot = await captureRef(v, { format: 'png', quality: 1, width: 320, height: 320 });
+  const canvasImg = await decode(shot);
+  setHarness(null);
+  await sleep(80);
+  const [e, c] = [await renderImageDoc(savedDoc, 320 * ratio), await renderImageDoc(base, 320 * ratio)];
+  if (e && c) {
+    const diff = (p: SkImage, q: SkImage) => {
+      let sum = 0;
+      for (let i = 1; i < 40; i++) {
+        for (let j = 1; j < 40; j++) {
+          const [x, y] = [(j + 0.5) / 40, (i + 0.5) / 40];
+          const [u, t] = [pixel(p, Math.floor(x * p.width()), Math.floor(y * p.height())), pixel(q, Math.floor(x * q.width()), Math.floor(y * q.height()))];
+          sum += (Math.abs(u[0] - t[0]) + Math.abs(u[1] - t[1]) + Math.abs(u[2] - t[2])) / 3;
+        }
+      }
+      return sum / (39 * 39);
+    };
+    const [d, ctl] = [diff(canvasImg, await decode(e)), diff(canvasImg, await decode(c))];
+    log(d <= 7 && ctl >= d * 1.5, 'pixel-réteg: vászon = export', `átlag ${d.toFixed(1)}/255; ellenpróba ${ctl.toFixed(1)}`);
+    removeFile(e);
+    removeFile(c);
+  } else {
+    log(false, 'pixel-réteg: vászon = export', 'nincs render');
+  }
+  await deleteProject(project.id);
+  [shot, png, gifUri, sheetUri].forEach(removeFile);
+  setHarness(<PixelStudio initial={art} onDone={() => {}} onClose={() => {}} />);
+  await sleep(1500);
+  log(true, 'FOTÓZHATÓ', 'pixel-szerkesztő');
+  await sleep(8000);
+  setHarness(null);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2158,6 +2274,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'pixel') {
+    await step('pixel', () => smokePixel(log, setHarness, ratio));
     return;
   }
   if (phase === 'perfphoto') {

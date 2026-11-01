@@ -3051,6 +3051,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "pixel": "Pixel art",
       "assistant": "Assistant",
       "exportLayer": "Export layer",
       "outlineStroke": "Stroke to shape",
@@ -3106,6 +3107,43 @@
       "layer": "Layer"
     },
     "image": {
+      "pixel": {
+        "save": {
+          "saved": "Saved to Photos.",
+          "denied": "No access to Photos.",
+          "failed": "Saving failed."
+        },
+        "title": "Pixel art",
+        "size": "Grid size",
+        "undo": "Undo",
+        "redo": "Redo",
+        "done": "Done",
+        "pencil": "Pencil",
+        "eraser": "Eraser",
+        "fill": "Fill",
+        "pick": "Pick colour",
+        "mirrorX": "Horizontal mirror",
+        "mirrorY": "Vertical mirror",
+        "grid": "Grid",
+        "fit": "Fit grid",
+        "shiftLeft": "Shift left",
+        "shiftRight": "Shift right",
+        "shiftUp": "Shift up",
+        "shiftDown": "Shift down",
+        "flipH": "Flip horizontally",
+        "flipV": "Flip vertically",
+        "frame": "Frame {{n}}/{{total}}",
+        "removeHint": "Long press to remove the colour",
+        "editColor": "Edit colour",
+        "addColor": "New colour",
+        "play": "Play",
+        "addFrame": "New frame",
+        "copyFrame": "Copy frame",
+        "removeFrame": "Delete frame",
+        "onion": "Faint previous frame",
+        "speed": "Speed",
+        "sheet": "Sprite sheet"
+      },
       "limits": {
         "layers": "Too many layers to export (400 at most). Merge or flatten layers.",
         "points": "Vector content is too complex to export. Simplify the shapes."

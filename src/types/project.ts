@@ -4,6 +4,7 @@
  * (az előnézeti felület méretétől független).
  */
 
+import type { PixelArt } from '@/lib/pixelArt';
 import type { LiveDoc } from './live';
 import type { Model3DDoc } from './model3d';
 import type { PhotoDevelop } from '@/lib/photoDevelop';
@@ -1402,6 +1403,8 @@ export interface PhotoLayer extends ImageLayerBase {
   uri: string;
   /** 🖌️ ecsettel festett réteg: újra megnyitható, a radír is rajta dolgozik */
   paint?: boolean;
+  /** 👾 pixel art: a szerkeszthető rács; a `uri` ennek az első kockája */
+  pixelArt?: PixelArt;
   /** 🎨 színenkénti HSL */
   hsl?: HslBands;
   assetId?: string;

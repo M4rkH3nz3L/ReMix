@@ -3051,6 +3051,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "pixel": "Pixel-Art",
       "assistant": "Assistent",
       "exportLayer": "Ebene exportieren",
       "outlineStroke": "Linie zu Form",
@@ -3106,6 +3107,43 @@
       "layer": "Ebene"
     },
     "image": {
+      "pixel": {
+        "save": {
+          "saved": "In Fotos gespeichert.",
+          "denied": "Kein Zugriff auf Fotos.",
+          "failed": "Speichern fehlgeschlagen."
+        },
+        "title": "Pixel-Art",
+        "size": "Rastergröße",
+        "undo": "Rückgängig",
+        "redo": "Wiederholen",
+        "done": "Fertig",
+        "pencil": "Bleistift",
+        "eraser": "Radierer",
+        "fill": "Füllen",
+        "pick": "Farbe aufnehmen",
+        "mirrorX": "Horizontal spiegeln",
+        "mirrorY": "Vertikal spiegeln",
+        "grid": "Raster",
+        "fit": "Ganzes Raster",
+        "shiftLeft": "Nach links",
+        "shiftRight": "Nach rechts",
+        "shiftUp": "Nach oben",
+        "shiftDown": "Nach unten",
+        "flipH": "Horizontal kippen",
+        "flipV": "Vertikal kippen",
+        "frame": "Bild {{n}}/{{total}}",
+        "removeHint": "Lange drücken zum Entfernen",
+        "editColor": "Farbe bearbeiten",
+        "addColor": "Neue Farbe",
+        "play": "Abspielen",
+        "addFrame": "Neues Bild",
+        "copyFrame": "Bild kopieren",
+        "removeFrame": "Bild löschen",
+        "onion": "Vorheriges Bild blass",
+        "speed": "Tempo",
+        "sheet": "Sprite-Sheet"
+      },
       "limits": {
         "layers": "Zu viele Ebenen für den Export (höchstens 400). Ebenen zusammenfügen.",
         "points": "Vektorinhalt ist zu komplex für den Export. Formen vereinfachen."

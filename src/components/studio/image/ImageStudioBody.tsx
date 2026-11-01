@@ -3,7 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { SkImage } from '@shopify/react-native-skia';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
@@ -26,6 +26,7 @@ import { foregroundMask } from '@/lib/foregroundMask';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
 import { useBrandStyle } from '@/store/brandStyleStore';
+import { pixelLayerBox, type PixelArt } from '@/lib/pixelArt';
 import { variantDoc } from '@/lib/imageVariants';
 import { customExportSize, exportSize } from '@/lib/imageExport';
 import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
@@ -90,6 +91,11 @@ import { guardPro, usePaywall } from '@/store/paywallStore';
 import type { Asset, ClipMask, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
+
+// a Skia csak megnyitáskor töltődik be, mint az ecsetnél
+const PixelStudio = lazy(() =>
+  import('@/components/studio/image/PixelStudio').then((m) => ({ default: m.PixelStudio }))
+);
 
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
 const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
@@ -208,6 +214,8 @@ export function ImageStudioBody({
   const [wandActive, setWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(32);
   const [brushActive, setBrushActive] = useState(false);
+  const [pixelOpen, setPixelOpen] = useState(false);
+  const [pixelLayerId, setPixelLayerId] = useState<string | null>(null);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [brushLayerId, setBrushLayerId] = useState<string | null>(null);
   const [brushMaskMode, setBrushMaskMode] = useState(false);
@@ -785,6 +793,12 @@ export function ImageStudioBody({
         setSheet(null);
         setAssistantOpen(true);
         break;
+      case 'pixel': {
+        const target = doc.layers.find((l) => l.id === selectedId);
+        setPixelLayerId(target?.kind === 'photo' && target.pixelArt ? target.id : null);
+        setPixelOpen(true);
+        break;
+      }
       case 'brush':
         // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként. A Skia-függő
         // overlay-t előbb LEPROBÁLJUK betölteni; ha a natív modul hiányzik (régi
@@ -934,6 +948,23 @@ export function ImageStudioBody({
         }
         break;
     }
+  };
+
+  // 👾 a pixel-munka szerkeszthető rétegként kerül a dokumentumba, egy undo-lépésben
+  const onPixelDone = (art: PixelArt, uri: string) => {
+    setPixelOpen(false);
+    if (!doc) {
+      return;
+    }
+    if (pixelLayerId) {
+      commit(updateLayer(doc, pixelLayerId, { uri, pixelArt: art } as Partial<ImageLayer>), t('studio.image.pixel.title'));
+      return;
+    }
+    const { width, height } = effectiveCanvas(doc);
+    const id = makeId('lyr');
+    const layer: PhotoLayer = { kind: 'photo', id, name: t('studio.image.pixel.title'), uri, position: { x: 0.5, y: 0.5 }, ...pixelLayerBox(art.width, art.height, width, height), fit: 'stretch', pixelArt: art };
+    commit(addLayer(doc, layer), t('studio.image.pixel.title'));
+    setSelectedId(id);
   };
 
   // ✂️ a kivágás alkalmazása (egy undo-lépés) / elvetése
@@ -2331,6 +2362,15 @@ export function ImageStudioBody({
           <View style={[styles.inlineRight, { width: workspace.panelWidth }]}>{layerPanel}</View>
         ) : null}
       </View>
+      {pixelOpen ? (
+        <Suspense fallback={null}>
+          <PixelStudio
+            initial={(doc?.layers.find((l) => l.id === pixelLayerId) as PhotoLayer | undefined)?.pixelArt ?? null}
+            onDone={onPixelDone}
+            onClose={() => setPixelOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </View>
   );
 }

@@ -300,7 +300,8 @@ export async function renderImageDoc(
 
     const form = new FormData();
     const uriMap = appendDocMedia(form, doc);
-    form.append('doc', JSON.stringify(doc));
+    // a pixel-rácsot a szerver nem használja: a réteg képe a `uri`
+    form.append('doc', JSON.stringify(doc, (key, value) => (key === 'pixelArt' ? undefined : value)));
     form.append('uriMap', JSON.stringify(uriMap));
     form.append('height', String(height));
     if (opts.format) {

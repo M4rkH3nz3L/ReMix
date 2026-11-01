@@ -121,7 +121,12 @@ function writePlanFile(project: Project): void {
     return;
   }
   try {
-    const file = new File(projectFolderDir(project.folder), `${project.folder}.remix`);
+    const dir = projectFolderDir(project.folder);
+    // közben törölt projekt: a függő mentésnek nincs hova írnia
+    if (!dir.exists) {
+      return;
+    }
+    const file = new File(dir, `${project.folder}.remix`);
     if (!file.exists) {
       file.create();
     }

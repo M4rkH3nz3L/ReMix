@@ -26,6 +26,8 @@ import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 // a natív Skia nem fut Jest alatt; a kép a telefonos füstteszten mért
 jest.mock('@/components/studio/image/SkiaPhotoLayer', () => ({ needsSkiaPreview: () => false, SkiaPhotoLayer: () => null }));
+jest.mock('@/components/studio/image/ShapeEffects', () => ({ ShapeEffects: () => null }));
+jest.mock('@/components/studio/image/DocVignette', () => ({ DocVignette: () => null }));
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
   const RN = jest.requireActual('react-native');

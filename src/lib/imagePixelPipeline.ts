@@ -1,3 +1,4 @@
+import type { CubeLut } from '@/lib/lutImport';
 import type { ClipAdjust, FilterId, GradeId, PhotoLayer } from '@/types/project';
 
 /**
@@ -321,10 +322,67 @@ export function applyOps(ops: Op[], c: Rgb): Rgb {
 /** a réteg színmezői; a korrekciós rétegek és a dokumentum ugyanezekből áll */
 export type ColorFields = Pick<PhotoLayer, 'adjust' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters' | 'develop'>;
 
+/** `.cube` 3D LUT háromszorosan lineáris olvasással (az ffmpeg `lut3d` közelítése) */
+export function cubeOp(lut: CubeLut): Op | null {
+  if (lut.dim !== '3D') {
+    return null;
+  }
+  const n = lut.size;
+  const at = (r: number, g: number, b: number) => lut.data[b * n * n + g * n + r];
+  const axis = (v: number, i: number) => {
+    const p = Math.max(0, Math.min(1, (v - lut.domainMin[i]) / (lut.domainMax[i] - lut.domainMin[i]))) * (n - 1);
+    const lo = Math.min(n - 2, Math.floor(p));
+    return [lo, p - lo] as const;
+  };
+  return (c) => {
+    const [r0, rt] = axis(c[0], 0);
+    const [g0, gt] = axis(c[1], 1);
+    const [b0, bt] = axis(c[2], 2);
+    const out: Rgb = [0, 0, 0];
+    for (let k = 0; k < 3; k++) {
+      const row = (g: number, b: number) => lerp(at(r0, g, b)[k], at(r0 + 1, g, b)[k], rt);
+      const plane = (b: number) => lerp(row(g0, b), row(g0 + 1, b), gt);
+      out[k] = lerp(plane(b0), plane(b0 + 1), bt);
+    }
+    return out;
+  };
+}
+
+/** a grade-presetek vignettája (`server/grades.js`): térbeli, ezért nincs a LUT-ban */
+const GRADE_VIGNETTE: Partial<Record<GradeId, number>> = { moody: 0.9, noir: 0.8 };
+
+/** A teljes képre ható vignetták szöge: a doc-vignetta + a doc-szintű grade-eké. */
+export function docVignetteAngles(doc: { vignette?: number; grade?: GradeId; layers: { kind: string; hidden?: boolean; mask?: unknown; grade?: GradeId }[] }): number[] {
+  const out: number[] = [];
+  for (const l of doc.layers) {
+    const a = l.kind === 'adjust' && !l.hidden && !l.mask && l.grade ? GRADE_VIGNETTE[l.grade] : undefined;
+    if (a) out.push(a);
+  }
+  const g = doc.grade ? GRADE_VIGNETTE[doc.grade] : undefined;
+  if (g) out.push(g);
+  const v = Math.max(0, Math.min(1, Number(doc.vignette) || 0));
+  if (v > 0) out.push(v * (Math.PI / 3));
+  return out;
+}
+
+/** Egy #rrggbb szín a korrekciókon át: a vászon így a szöveg és forma színét is pontosan adja. */
+export function correctHex(hex: string, after: ColorFields[]): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m || after.length === 0) {
+    return hex;
+  }
+  const out = applyOps(layerOps({}, after), hexRgb(m[1]));
+  return `#${out.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** A fotó-réteg teljes színlánca, az `imagedoc.js` sorrendjében. Az `after` a fölötte ható korrekciók. */
-export function layerOps(layer: ColorFields, after: ColorFields[] = []): Op[] {
+export function layerOps(layer: ColorFields, after: ColorFields[] = [], cube?: CubeLut | null): Op[] {
   const ops = adjustOps(layer.adjust);
   ops.push(...(layer.grade ? GRADE_OPS[layer.grade]?.() ?? [] : []));
+  const lut3d = cube ? cubeOp(cube) : null;
+  if (lut3d) {
+    ops.push(lut3d);
+  }
   const tint = layer.filterId ? FILTER_TINTS[layer.filterId] : undefined;
   if (tint) {
     ops.push(tintOp(hexRgb(tint.color), Math.max(0, Math.min(1, tint.opacity * (layer.filterIntensity ?? 1)))));

@@ -1,4 +1,5 @@
 import { applyOps, type ColorFields, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
+import type { CubeLut } from '@/lib/lutImport';
 
 /**
  * 🧊 Az előnézet 3D LUT-ja: a réteg színlánca 25×25×25 rácspontra számolva, 2D-atlaszban
@@ -11,13 +12,13 @@ export const LUT_SIZE = 25;
 export const LUT_DRAFT_SIZE = 13;
 
 /** Van-e a rétegen pixelenkénti színművelet? */
-export function hasColorOps(layer: ColorFields, after: ColorFields[] = []): boolean {
-  return layerOps(layer, after).length > 0;
+export function hasColorOps(layer: ColorFields, after: ColorFields[] = [], cube?: CubeLut | null): boolean {
+  return layerOps(layer, after, cube).length > 0;
 }
 
 /** RGBA bájtok: szélesség `LUT_SIZE²`, magasság `LUT_SIZE`. */
-export function buildLutBytes(layer: ColorFields, after: ColorFields[] = [], n = LUT_SIZE): Uint8Array {
-  const ops = layerOps(layer, after);
+export function buildLutBytes(layer: ColorFields, after: ColorFields[] = [], n = LUT_SIZE, cube?: CubeLut | null): Uint8Array {
+  const ops = layerOps(layer, after, cube);
   const max = n - 1;
   const out = new Uint8Array(n * n * n * 4);
   let o = 0;

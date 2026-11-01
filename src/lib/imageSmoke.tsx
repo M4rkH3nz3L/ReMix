@@ -436,6 +436,75 @@ async function smokeDeep(log: Log, setHarness: (n: ReactNode) => void, ratio: nu
   removeFile(file.uri);
 }
 
+/** 🔬 Szöveg/forma effektek, doc-szintű hatások, .cube, lokális korrekció: valódi vászon a szerver ellen. */
+async function smokeDeep2(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#3070d0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 320, 320), paint);
+  paint.setColor(Skia.Color('#f0c040'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 160, 160), paint);
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_d2_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const rows = ['LUT_3D_SIZE 3'];
+  for (let b = 0; b < 3; b++) for (let g = 0; g < 3; g++) for (let r = 0; r < 3; r++) rows.push(`${(r / 2) * 0.8 + 0.1} ${(g / 2) ** 2} ${1 - (b / 2) * 0.7}`);
+  const cube = new File(projectMediaDir(), `smoke_d2_${Date.now().toString(36)}.cube`);
+  cube.write(rows.join('\n'));
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const photo = (extra: Partial<PhotoLayer>) => ({ kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.45 }, w: 1, h: 0.9, fit: 'stretch', ...extra }) as ImageLayer;
+  const rect = (extra: Partial<ShapeLayer>) => ({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.45 }, w: 0.4, h: 0.4, fill: '#ff2d95', ...extra }) as ImageLayer;
+  const cases: [string, ImageLayer[], Partial<ImageDoc>][] = [
+    ['forma árnyéka', [bg, rect({ dropShadow: { color: '#0000ff', dx: 0.08, dy: 0.08, blur: 0.004, opacity: 1 } })], {}],
+    ['forma ragyogása', [bg, rect({ outerGlow: { color: '#00aa00', size: 0.03, opacity: 1 } })], {}],
+    ['forma körvonala', [bg, rect({ stroke: { color: '#ff0000', width: 0.03 } })], {}],
+    ['forgatott forma árnyéka', [bg, rect({ rotation: 30, dropShadow: { color: '#0000ff', dx: 0.08, dy: 0.02, blur: 0.004, opacity: 1 } })], {}],
+    ['forma + doc-grade', [bg, rect({})], { grade: 'noir' } as Partial<ImageDoc>],
+    ['forma + korrekciós réteg', [bg, rect({}), { kind: 'adjust', id: 'adj', adjust: { saturation: -0.9 } } as ImageLayer], {}],
+    ['fotó + vignetta', [photo({})], { vignette: 0.8 } as Partial<ImageDoc>],
+    ['.cube LUT', [photo({ lut: cube.uri, lutName: 'x' })], {}],
+    ['lokális korrekció', [photo({ localAdjust: { adjust: { contrast: 0.3, saturation: 0.5 }, mask: { shape: 'rectangle', x: 0.5, y: 0.45, w: 0.4, h: 0.4, feather: 0.005 } } })], {}],
+    ['fotó körvonala', [bg, photo({ w: 0.6, h: 0.6, stroke: { color: '#ff0000', width: 0.03 } })], {}],
+  ];
+  for (const [name, layers, extra] of cases) {
+    const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers, ...extra } as unknown as ImageDoc;
+    const ref = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+      </View>
+    );
+    await sleep(1600);
+    const shot = await captureRef(ref, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const uri = await renderImageDoc(doc, 320);
+    if (!uri) {
+      log(false, `vászon = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const a = await decode(shot);
+    const d = gridDiff(a, await decode(uri), 320, 280);
+    // ellenpróba: az effekt NÉLKÜLI exporttól el kell térnie, különben a mérés vak
+    const plain = {
+      ...doc,
+      grade: undefined,
+      vignette: 0,
+      layers: doc.layers.filter((l) => l.kind !== 'adjust').map((l) => ({ ...l, dropShadow: undefined, outerGlow: undefined, stroke: undefined, lut: undefined, localAdjust: undefined })),
+    } as unknown as ImageDoc;
+    const plainUri = await renderImageDoc(plain, 320);
+    const c = plainUri ? gridDiff(a, await decode(plainUri), 320, 280) : { bad: 0, total: 0 };
+    log(d.bad / d.total <= 0.06 && c.bad > d.bad, `vászon = export: ${name}`, `${d.bad}/${d.total} tér el; effekt nélküli exporttól ${c.bad}`);
+    if (plainUri) {
+      removeFile(plainUri);
+    }
+    setHarness(null);
+    await sleep(80);
+    removeFile(uri);
+    removeFile(shot);
+  }
+  removeFile(png.uri);
+  removeFile(cube.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -611,6 +680,10 @@ export async function runImageSmoke(
   }
   if (phase === 'inspect') {
     await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'deep2') {
+    await step('deep2', () => smokeDeep2(log, setHarness, ratio));
     return;
   }
   if (phase === 'deep') {

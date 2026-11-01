@@ -33,6 +33,30 @@ export function layerToShapeClip(layer: ShapeLayer): ShapeClip {
   return { ...layer, kind: 'shape', start: 0, duration: 1 } as ShapeClip;
 }
 
+/** A szöveg réteg-effektjei a szöveg saját stílusává alakítva (em-arányban), az előnézethez. */
+export function textEffectStyle(layer: TextLayer, canvas: { width: number; height: number }): TextLayer['textStyle'] {
+  const fontPx = ((layer.fontSize ?? 8) / 100) * canvas.height;
+  const shadow = layer.dropShadow ? (typeof layer.dropShadow === 'object' ? layer.dropShadow : {}) : null;
+  const glow = layer.outerGlow ? (typeof layer.outerGlow === 'object' ? layer.outerGlow : {}) : null;
+  if (!shadow && !glow) {
+    return layer.textStyle;
+  }
+  return {
+    ...layer.textStyle,
+    ...(shadow
+      ? {
+          shadow: {
+            color: shadow.color ?? '#00000080',
+            dx: ((shadow.dx ?? 0.02) * canvas.width) / fontPx,
+            dy: ((shadow.dy ?? 0.02) * canvas.height) / fontPx,
+            blur: ((shadow.blur ?? 0.012) * canvas.width * 2) / fontPx,
+          },
+        }
+      : {}),
+    ...(glow ? { glow: { color: glow.color ?? '#7c5cff', size: ((glow.size ?? 0.02) * canvas.width * 2) / fontPx } } : {}),
+  };
+}
+
 export function layerToTextClip(layer: TextLayer): TextClip {
   return { ...layer, kind: 'text', start: 0, duration: 1, animation: 'none' } as TextClip;
 }

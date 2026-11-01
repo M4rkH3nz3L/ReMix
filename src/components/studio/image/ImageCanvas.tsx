@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Fragment, type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -26,12 +26,14 @@ import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
-import { layerToShapeClip, layerToTextClip, type LivePatch } from '@/lib/imageLayerClip';
+import { layerToShapeClip, layerToTextClip, textEffectStyle, type LivePatch } from '@/lib/imageLayerClip';
+import { DocVignette } from '@/components/studio/image/DocVignette';
+import { ShapeEffects } from '@/components/studio/image/ShapeEffects';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
-import { correctionsAbove } from '@/lib/imagePixelPipeline';
+import { correctHex, correctionsAbove, docVignetteAngles } from '@/lib/imagePixelPipeline';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
@@ -409,7 +411,7 @@ export function ImageCanvas({
             const l = live?.id === raw.id ? withLive(raw, live.patch) : raw;
             const selected = !capturing && l.id === selectedId;
             if (l.kind === 'fill') {
-              return <FillLayerView key={l.id} layer={l} box={fit} onSelect={() => onSelect(l.id)} />;
+              return <FillLayerView key={l.id} layer={{ ...l, fill: correctHex(l.fill, correctionsAbove(doc, l.id)) }} box={fit} onSelect={() => onSelect(l.id)} />;
             }
             if (l.kind === 'photo') {
               return (
@@ -428,10 +430,18 @@ export function ImageCanvas({
               );
             }
             if (l.kind === 'shape') {
+              const above = correctionsAbove(doc, l.id);
+              const clip = layerToShapeClip(l);
               return (
+                <Fragment key={l.id}>
+                <ShapeEffects layer={l} box={fit} canvas={effectiveCanvas(doc)} />
                 <ShapeOverlay
-                  key={l.id}
-                  clip={layerToShapeClip(l)}
+                  clip={{
+                    ...clip,
+                    // a Skia a nézetek mögé nem lát: a fölötte ható korrekció a forma színébe kerül
+                    fill: correctHex(clip.fill, above),
+                    borderColor: clip.borderColor ? correctHex(clip.borderColor, above) : clip.borderColor,
+                  }}
                   box={fit}
                   zoom={zoom}
                   moveRange={MOVE_RANGE}
@@ -441,6 +451,7 @@ export function ImageCanvas({
                   onSelect={onSelect}
                   onMove={move}
                 />
+                </Fragment>
               );
             }
             // 🎚️ korrekciós réteg: a hatása a fotók színében van (`correctionsAbove`); ha maszkolt,
@@ -461,7 +472,7 @@ export function ImageCanvas({
             return (
               <TextOverlay
                 key={l.id}
-                clip={layerToTextClip(l)}
+                clip={{ ...layerToTextClip(l), color: correctHex(l.color, correctionsAbove(doc, l.id)), textStyle: textEffectStyle(l, effectiveCanvas(doc)) }}
                 t={0}
                 box={fit}
                 zoom={zoom}
@@ -475,6 +486,8 @@ export function ImageCanvas({
               />
             );
           })}
+
+          <DocVignette angles={docVignetteAngles(doc as Parameters<typeof docVignetteAngles>[0])} box={fit} />
 
           {/* a vásznon kívüli rész halványan látszik; a fátyol nem fogja el az érintést */}
           {!capturing ? (

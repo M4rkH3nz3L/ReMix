@@ -2,7 +2,8 @@
  * 🧪 Az előnézet színe a VALÓDI export ellen mérve: minden beállítást lefuttatunk az ffmpeg-
  * láncon, és színenként összevetjük a tiszta függvénnyel. A hiba 0–255 skálán értendő.
  */
-import { applyOps, correctionsAbove, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
+import { applyOps, correctHex, correctionsAbove, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
+import { parseCubeLut } from '@/lib/lutImport';
 import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, sampleLut } from '@/lib/imagePreviewLut';
 import type { PhotoLayer } from '@/types/project';
 
@@ -129,6 +130,48 @@ describe('a fölötte ható korrekciók', () => {
   it('az alatta lévő korrekció nem hat a fölötte lévő fotóra', () => {
     const doc = { layers: [{ kind: 'adjust', id: 'a', adjust: { contrast: 0.2 } }, { kind: 'photo', id: 'p' }] };
     expect(correctionsAbove(doc, 'p')).toEqual([]);
+  });
+});
+
+describe('.cube LUT', () => {
+  it('a beolvasott LUT az exportot adja', async () => {
+    const n = 5;
+    const rows: string[] = [`LUT_3D_SIZE ${n}`];
+    for (let b = 0; b < n; b++) for (let g = 0; g < n; g++) for (let r = 0; r < n; r++) {
+      const [R, G, B] = [r / (n - 1), g / (n - 1), b / (n - 1)];
+      rows.push(`${(R * 0.8 + 0.1).toFixed(4)} ${Math.pow(G, 1.5).toFixed(4)} ${(1 - B * 0.7).toFixed(4)}`);
+    }
+    const file = path.join(dir, 'x.cube');
+    fs.writeFileSync(file, rows.join('\n'));
+    const parsed = parseCubeLut(rows.join('\n'));
+    expect(parsed.ok).toBe(true);
+    const real = await exportColors({ lut: file });
+    const ops = layerOps({}, [], parsed.lut);
+    const errs = COLORS.map((c, i) => {
+      const p = applyOps(ops, c.map((v) => v / 255) as Rgb).map((v) => v * 255);
+      return Math.max(...real[i].map((v, k) => Math.abs(v - p[k])));
+    });
+    expect(Math.max(...errs)).toBeLessThanOrEqual(LIMIT);
+  });
+});
+
+describe('szöveg és forma színe a korrekciók után', () => {
+  it('a forma színe a korrekciós réteggel az exportot adja', async () => {
+    const W = 200;
+    const w = fs.mkdtempSync(path.join(dir, 'r-'));
+    const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fill: '#3070d0' };
+    const adj = { kind: 'adjust', id: 'a', grade: 'teal-orange', adjust: { contrast: 0.2 } };
+    const doc = { id: 'd', aspectRatio: '1:1', width: W, height: W, layers: [shape, adj] };
+    const file = await renderImageDoc(JSON.parse(JSON.stringify(doc)), undefined, w);
+    const d = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { maxBuffer: 1 << 24 });
+    const o = (100 * W + 100) * 4;
+    const hex = correctHex('#3070d0', correctionsAbove(doc as never, 's'));
+    const p = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    expect(Math.max(...p.map((v, k) => Math.abs(v - d[o + k])))).toBeLessThanOrEqual(LIMIT);
+  });
+  it('korrekció nélkül a szín érintetlen', () => {
+    expect(correctHex('#3070d0', [])).toBe('#3070d0');
+    expect(correctHex('rgba(0,0,0,.5)', [{ grade: 'noir' }])).toBe('rgba(0,0,0,.5)');
   });
 });
 

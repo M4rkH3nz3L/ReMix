@@ -22,7 +22,8 @@ export type RailTool =
   | 'lasso'
   | 'wand'
   | 'crop'
-  | 'guides';
+  | 'guides'
+  | 'assistant';
 
 export type LayerAction =
   | 'style'
@@ -55,7 +56,7 @@ export const RAIL_GROUPS: { labelKey: string; tools: RailTool[] }[] = [
   { labelKey: 'studio.imageGroups.add', tools: ['photo', 'text', 'shape', 'addFill', 'addAdjust', 'import'] },
   { labelKey: 'studio.imageGroups.draw', tools: ['pen', 'brush', 'retouch'] },
   { labelKey: 'studio.imageGroups.select', tools: ['marquee', 'lasso', 'wand'] },
-  { labelKey: 'studio.imageGroups.canvas', tools: ['crop', 'guides'] },
+  { labelKey: 'studio.imageGroups.canvas', tools: ['crop', 'guides', 'assistant'] },
 ];
 
 export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
@@ -74,6 +75,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   wand: 'color-wand-outline',
   crop: 'crop-outline',
   guides: 'grid-outline',
+  assistant: 'sparkles-outline',
   style: 'options-outline',
   adjust: 'sunny-outline',
   develop: 'aperture-outline',

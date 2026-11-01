@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "assistant": "Asszisztens",
       "exportLayer": "Réteg exportja",
       "outlineStroke": "Vonalból forma",
       "offsetOut": "Bővít",
@@ -3123,6 +3124,33 @@
       "layer": "Réteg"
     },
     "image": {
+      "assistant": {
+        "cmd": {
+          "ADD_TEXT": "Új szöveg",
+          "SET_TEXT": "Szöveg cseréje",
+          "ADD_SHAPE": "Új forma",
+          "SET_COLOR": "Szín változtatása",
+          "SET_BACKGROUND": "Háttérszín",
+          "SET_OPACITY": "Átlátszóság",
+          "MOVE": "Mozgatás",
+          "SCALE": "Átméretezés",
+          "ROTATE": "Forgatás",
+          "DELETE": "Réteg törlése",
+          "HIDE": "Réteg elrejtése",
+          "ORDER": "Rétegsorrend",
+          "ADJUST": "Fotó korrekciója",
+          "REMOVE_BG": "Háttér eltávolítása",
+          "AUTO_LAYOUT": "Automatikus elrendezés",
+          "EXPORT": "Export megnyitása"
+        },
+        "placeholder": "Mit változtassak?",
+        "apply": "Végrehajt ({{count}})",
+        "unknown": "Ezt nem értettem: {{text}}",
+        "undo": "Asszisztens",
+        "example1": "a szöveg legyen piros",
+        "example2": "a fotó legyen világosabb",
+        "example3": "rendezd el poszterként"
+      },
       "importFile": {
         "invalidTitle": "A fájl nem nyitható meg",
         "invalidBody": "Ez a fájl nem olvasható képként, vagy sérült.",

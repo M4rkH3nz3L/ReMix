@@ -17,7 +17,9 @@ import {
   isInlineSheet,
   type SheetKind,
 } from '@/components/studio/image/body/ImageStudioSheets';
+import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { applyImageCommands, type ImageCommand } from '@/lib/imageIntent';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
 import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
@@ -188,6 +190,7 @@ export function ImageStudioBody({
   const [penPoints, setPenPoints] = useState<CanvasPoint[] | null>(null);
   const [pathEditId, setPathEditId] = useState<string | null>(null);
   const [pathEditRing, setPathEditRing] = useState(0);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [pathEditNode, setPathEditNode] = useState<number | null>(null);
   const [lassoActive, setLassoActive] = useState(false);
   // ✂️ a kijelölés a szerkesztés állapota, nem a dokumentumé: nem kerül az undo-ba és a mentésbe
@@ -762,6 +765,10 @@ export function ImageStudioBody({
       case 'retouch':
         void startRetouch();
         break;
+      case 'assistant':
+        setSheet(null);
+        setAssistantOpen(true);
+        break;
       case 'brush':
         // 🖌️ ecset-mód: Skia raszter-festés → snapshot fotó-rétegként. A Skia-függő
         // overlay-t előbb LEPROBÁLJUK betölteni; ha a natív modul hiányzik (régi
@@ -1119,6 +1126,26 @@ export function ImageStudioBody({
     if (doc) {
       commit({ ...doc, grid: { ...DEFAULT_GRID, show: false, snap: false, ...doc.grid, ...patch } }, t('studio.image.guides.grid'));
     }
+  };
+
+  // 🤖 asszisztens: egy visszavonható lépés; a natív és a lapot nyitó lépések utána futnak
+  const applyAssistant = (commands: ImageCommand[]) => {
+    if (!doc) {
+      return;
+    }
+    const { doc: next, followUps } = applyImageCommands(doc, commands, () => makeId('lyr'));
+    if (next !== doc) {
+      commit(next, t('studio.image.assistant.undo'));
+    }
+    for (const step of followUps) {
+      const layer = step.type === 'REMOVE_BG' ? next.layers.find((l) => l.id === step.layerId) : null;
+      if (layer?.kind === 'photo') {
+        void removeBackground(layer);
+      } else if (step.type === 'EXPORT') {
+        setSheet('export');
+      }
+    }
+    setAssistantOpen(false);
   };
 
   // 🩹 retus: előbb a vászon képe, utána indul a munkamenet (a pillanatkép az overlay-t levenné)
@@ -2160,6 +2187,8 @@ export function ImageStudioBody({
                 <Text style={styles.cropApplyText}>{t('common.done')}</Text>
               </Pressable>
             </View>
+          ) : assistantOpen && doc ? (
+            <AssistantBar doc={doc} selectedId={selectedId} onApply={applyAssistant} onClose={() => setAssistantOpen(false)} />
           ) : selectTool ? (
             <SelectionBar
               tool={selectTool}

@@ -3069,6 +3069,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "assistant": "Assistant",
       "exportLayer": "Export layer",
       "outlineStroke": "Stroke to shape",
       "offsetOut": "Grow",
@@ -3123,6 +3124,33 @@
       "layer": "Layer"
     },
     "image": {
+      "assistant": {
+        "cmd": {
+          "ADD_TEXT": "New text",
+          "SET_TEXT": "Replace text",
+          "ADD_SHAPE": "New shape",
+          "SET_COLOR": "Change color",
+          "SET_BACKGROUND": "Background color",
+          "SET_OPACITY": "Opacity",
+          "MOVE": "Move",
+          "SCALE": "Resize",
+          "ROTATE": "Rotate",
+          "DELETE": "Delete layer",
+          "HIDE": "Hide layer",
+          "ORDER": "Layer order",
+          "ADJUST": "Adjust photo",
+          "REMOVE_BG": "Remove background",
+          "AUTO_LAYOUT": "Auto layout",
+          "EXPORT": "Open export"
+        },
+        "placeholder": "What should I change?",
+        "apply": "Apply ({{count}})",
+        "unknown": "I didn't understand: {{text}}",
+        "undo": "Assistant",
+        "example1": "make the text red",
+        "example2": "make the photo brighter",
+        "example3": "arrange as a poster"
+      },
       "importFile": {
         "invalidTitle": "Can't open this file",
         "invalidBody": "This file can't be read as an image, or it's damaged.",

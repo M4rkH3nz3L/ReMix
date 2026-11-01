@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "assistant": "Assistent",
       "exportLayer": "Ebene exportieren",
       "outlineStroke": "Linie zu Form",
       "offsetOut": "Vergrößern",
@@ -3123,6 +3124,33 @@
       "layer": "Ebene"
     },
     "image": {
+      "assistant": {
+        "cmd": {
+          "ADD_TEXT": "Neuer Text",
+          "SET_TEXT": "Text ersetzen",
+          "ADD_SHAPE": "Neue Form",
+          "SET_COLOR": "Farbe ändern",
+          "SET_BACKGROUND": "Hintergrundfarbe",
+          "SET_OPACITY": "Deckkraft",
+          "MOVE": "Verschieben",
+          "SCALE": "Größe ändern",
+          "ROTATE": "Drehen",
+          "DELETE": "Ebene löschen",
+          "HIDE": "Ebene ausblenden",
+          "ORDER": "Ebenenreihenfolge",
+          "ADJUST": "Foto korrigieren",
+          "REMOVE_BG": "Hintergrund entfernen",
+          "AUTO_LAYOUT": "Automatisches Layout",
+          "EXPORT": "Export öffnen"
+        },
+        "placeholder": "Was soll ich ändern?",
+        "apply": "Ausführen ({{count}})",
+        "unknown": "Nicht verstanden: {{text}}",
+        "undo": "Assistent",
+        "example1": "make the text red",
+        "example2": "make the photo brighter",
+        "example3": "arrange as a poster"
+      },
       "importFile": {
         "invalidTitle": "Datei lässt sich nicht öffnen",
         "invalidBody": "Diese Datei ist kein lesbares Bild oder beschädigt.",

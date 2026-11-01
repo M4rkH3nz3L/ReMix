@@ -2,7 +2,7 @@ import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkIma
 import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef } from 'react';
-import { Dimensions, Platform, View } from 'react-native';
+import { Dimensions, Modal, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -15,6 +15,8 @@ import { anchorFromDrag, type CanvasPoint, pathShapeFromCanvasPoints } from '@/l
 import { moveAnchor, pathEditPatch, pathEditView, setNodeType } from '@/lib/vectorPath';
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
+import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
+import { applyImageCommands, parseImageIntent } from '@/lib/imageIntent';
 import { logCaught } from '@/lib/logCaught';
 import { ExportCancelled } from '@/lib/imageDocClient';
 import { photoBytesPerPixel } from '@/components/studio/image/exportEstimate';
@@ -1541,6 +1543,73 @@ async function smokeImportExport(log: Log) {
   removeFile(photoUri);
 }
 
+/** Az asszisztens végig: mondat → parancsok → dokumentum → vászon és export. */
+async function smokeAssistant(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#4080c0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 320, 320), paint);
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_as_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const start = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [
+    { kind: 'fill', id: 'bg', fill: '#ffffff' },
+    { kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fit: 'stretch' },
+    { kind: 'shape', id: 'c', shape: 'ellipse', position: { x: 0.3, y: 0.3 }, w: 0.2, h: 0.2, fill: '#ff0000' },
+  ] } as unknown as ImageDoc;
+  let n = 0;
+  const say = (doc: ImageDoc, text: string) => {
+    const { commands, unknown } = parseImageIntent(text, doc, null);
+    return { unknown, doc: applyImageCommands(doc, commands, () => `new${++n}`).doc };
+  };
+  const steps = [
+    'a kör legyen kék, tedd a kört felülre és a kör legyen nagyobb',
+    'adj hozzá egy zöld csillagot',
+    'a fotó legyen sötétebb, forgasd a fotót 20 fokkal',
+    'legyen fekete a háttér',
+  ];
+  let doc = start;
+  for (const text of steps) {
+    const before = doc;
+    const res = say(doc, text);
+    doc = res.doc;
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1300);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [e, c] = [await renderImageDoc(doc, 320), await renderImageDoc(before, 320)];
+    if (e && c) {
+      const d = meanDiff(a, await decode(e), 320, 320);
+      const ctl = meanDiff(a, await decode(c), 320, 320);
+      log(res.unknown.length === 0 && d <= 6 && ctl >= d * 1.5, `asszisztens: ${text}`, `átlag ${d.toFixed(1)}/255; a lépés előtti állapottól ${ctl.toFixed(1)}`);
+      removeFile(e);
+      removeFile(c);
+    } else {
+      log(false, `asszisztens: ${text}`, 'nincs render');
+    }
+    removeFile(shot);
+  }
+  setHarness(
+    <Modal transparent visible>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#20242e' }}>
+        <AssistantBar doc={doc} selectedId={null} onApply={() => {}} onClose={() => {}} />
+      </View>
+    </Modal>
+  );
+  await sleep(2500);
+  log(true, 'FOTÓZHATÓ', 'az asszisztens sávja a kijelzőn');
+  await sleep(5000);
+  setHarness(null);
+  removeFile(png.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1733,6 +1802,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'assistant') {
+    await step('assistant', () => smokeAssistant(log, setHarness, ratio));
     return;
   }
   if (phase === 'export13') {

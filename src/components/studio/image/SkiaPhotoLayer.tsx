@@ -288,7 +288,7 @@ export function SkiaPhotoLayer({
     const local = layer.localAdjust?.mask ? [{ mask: layer.localAdjust.mask, adjust: layer.localAdjust.adjust, grade: layer.localAdjust.grade }] : [];
     return [...local, ...maskedAfter].map((m) => ({ mask: m.mask, after: [{ adjust: m.adjust, grade: m.grade }, ...after] }));
   }, [layer.localAdjust, maskedAfter, after]);
-  const key = JSON.stringify([layer.adjust, layer.grade, layer.filterId, layer.filterIntensity, layer.gradientMap, layer.levels, layer.channelMix, layer.filters, layer.develop, after, masked, !!cube, layer.lut, layer.heal]);
+  const key = JSON.stringify([layer.adjust, layer.hsl, layer.grade, layer.filterId, layer.filterIntensity, layer.gradientMap, layer.levels, layer.channelMix, layer.filters, layer.develop, after, masked, !!cube, layer.lut, layer.heal]);
   const hasLut = hasColorOps(layer, after, cube) || masked.length > 0 || hasDetail(layerDetail(layer, scale));
   const build = (size: number) => ({
     lut: hasLut ? makeLutImage(layer, after, size, cube) : null,

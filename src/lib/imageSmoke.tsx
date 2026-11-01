@@ -8,6 +8,9 @@ import { captureRef } from 'react-native-view-shot';
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
+import { layerHistogram } from '@/components/studio/image/HistogramView';
+import { HslSheet } from '@/components/studio/image/HslSheet';
+import { computeHistogram, histogramShift } from '@/lib/histogram';
 import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
@@ -891,6 +894,76 @@ async function smokeSelection(log: Log, setHarness: (n: ReactNode) => void, rati
   removeFile(png.uri);
 }
 
+/** A színenkénti HSL és a fényerő a vásznon a szerver ellen; a hisztogram a kész export eloszlása ellen. */
+async function smokeColor(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  const c = surface.getCanvas();
+  const colors = ['#e02020', '#e08020', '#e0d020', '#30c040', '#20c0c0', '#2040e0', '#8040e0', '#e020a0', '#808080'];
+  colors.forEach((col, i) => {
+    paint.setColor(Skia.Color(col));
+    c.drawRect(Skia.XYWHRect((i % 3) * 107, Math.floor(i / 3) * 107, 107, 107), paint);
+  });
+  surface.flush();
+  const png = new File(projectMediaDir(), `smoke_col_${Date.now().toString(36)}.png`);
+  png.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const photo = (extra: Partial<PhotoLayer>) => ({ kind: 'photo', id: 'p', uri: png.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }) as PhotoLayer;
+  const docOf = (l: PhotoLayer) => ({ id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [l] }) as unknown as ImageDoc;
+  const source = await decode(png.uri);
+  const cases: [string, Partial<PhotoLayer>][] = [
+    ['piros kifakítva', { hsl: { red: { s: -1 } } }],
+    ['kék árnyalat', { hsl: { blue: { h: 1 } } }],
+    ['zöld világosítva', { hsl: { green: { l: 1 } } }],
+    ['több sáv', { hsl: { orange: { h: -0.7, s: 0.5 }, aqua: { l: -0.8 }, magenta: { s: -0.6, h: 0.4 } } }],
+    ['HSL + korrekció', { adjust: { contrast: 0.3 }, hsl: { yellow: { s: -1 } } }],
+    ['fényerő', { adjust: { brightness: 0.2 } }],
+  ];
+  for (const [name, extra] of cases) {
+    const layer = photo(extra);
+    const doc = docOf(layer);
+    const ref = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+      </View>
+    );
+    await sleep(1500);
+    const shot = await captureRef(ref, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [uri, plainUri] = [await renderImageDoc(doc, 320), await renderImageDoc(docOf(photo({})), 320)];
+    if (!uri || !plainUri) {
+      log(false, `szín = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const server = await decode(uri);
+    const d = meanDiff(a, server, 320, 320);
+    const ctl = meanDiff(a, await decode(plainUri), 320, 320);
+    log(d <= 6 && ctl >= d * 1.5, `szín = export: ${name}`, `átlag ${d.toFixed(1)}/255; a beállítás nélkül ${ctl.toFixed(1)}`);
+    // a hisztogram az eszközön számolt: a kész exporttal kell egyeznie, az eredetitől eltérnie
+    const hist = layerHistogram(source, layer)!;
+    const px = server.readPixels(0, 0, { width: 320, height: 320, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul }) as Uint8Array;
+    const real = computeHistogram(px);
+    const before = layerHistogram(source, photo({}))!;
+    const dist = Math.max(histogramShift(hist.r, real.r), histogramShift(hist.g, real.g), histogramShift(hist.b, real.b));
+    const change = Math.max(histogramShift(before.r, real.r), histogramShift(before.g, real.g), histogramShift(before.b, real.b));
+    log(dist <= 3 && change >= dist * 2, `hisztogram = export: ${name}`, `eltérés ${dist.toFixed(1)} szint; az eredetitől ${change.toFixed(1)} szint`);
+    removeFile(shot);
+    removeFile(uri);
+    removeFile(plainUri);
+  }
+  setHarness(
+    <View style={{ width: Math.min(390, Dimensions.get('window').width), alignSelf: 'center', height: 320 }}>
+      <HslSheet doc={docOf(photo({ hsl: { red: { s: -0.5 } } }))} layer={photo({ hsl: { red: { s: -0.5 } } })} commit={() => {}} onClose={() => {}} />
+    </View>
+  );
+  log(true, 'FOTÓZHATÓ', 'a HSL-lap a kijelzőn');
+  await sleep(6000);
+  setHarness(null);
+  removeFile(png.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1079,6 +1152,10 @@ export async function runImageSmoke(
       await sleep(6000);
       setHarness(null);
     });
+    return;
+  }
+  if (phase === 'color') {
+    await step('color', () => smokeColor(log, setHarness, ratio));
     return;
   }
   if (phase === 'net') {

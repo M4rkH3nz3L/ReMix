@@ -320,3 +320,19 @@ describe('a maszk műveletei a korláton belül', () => {
     expect(imageDocGuard({ layers: [{ kind: 'photo', id: 'p', mask: { shape: 'polygon', ops: [{ op: 'add', points: points.slice(0, 10) }] } }] })).toBeFalsy();
   });
 });
+
+describe('színenkénti HSL', () => {
+  it('csak a kért szín változik a kimeneten', async () => {
+    const left = solid('red', 'r.png', '100x100');
+    const right = solid('blue', 'b.png', '100x100');
+    const layers = [
+      photo(left, { id: 'a', position: { x: 0.25, y: 0.5 }, w: 0.5, h: 1, hsl: { red: { s: -1 } } }),
+      photo(right, { id: 'b', position: { x: 0.75, y: 0.5 }, w: 0.5, h: 1, hsl: { red: { s: -1 } } }),
+    ];
+    const out = decode(await renderImageDoc(doc(layers), 200, dir));
+    const [r, g] = out.at(50, 100);
+    expect(Math.abs(r - g)).toBeLessThan(12);
+    expect(out.at(150, 100)[2]).toBeGreaterThan(200);
+    expect(out.at(150, 100)[0]).toBeLessThan(40);
+  });
+});

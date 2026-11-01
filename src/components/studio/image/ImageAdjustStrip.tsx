@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -17,8 +17,11 @@ import {
 import { updateLayer } from '@/lib/imageDoc';
 import type { AdjustmentLayer, ClipAdjust, ImageDoc, PhotoLayer } from '@/types/project';
 
+const HistogramView = lazy(() => import('@/components/studio/image/HistogramView').then((m) => ({ default: m.HistogramView })));
+
 /** a gyors-sáv paraméterei (a leggyakoribb fotó-korrekciók, gyakorisági sorrendben) */
 const QUICK_FIELDS: (keyof ClipAdjust)[] = [
+  'brightness',
   'exposure',
   'contrast',
   'highlights',
@@ -46,12 +49,14 @@ export function ImageAdjustStrip({
   layer,
   commit,
   onDetails,
+  onHsl,
   onClose,
 }: {
   doc: ImageDoc;
   layer: PhotoLayer;
   commit: (next: ImageDoc, label?: string) => void;
   onDetails: () => void;
+  onHsl: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -85,6 +90,10 @@ export function ImageAdjustStrip({
       <View style={styles.head}>
         <Ionicons name="contrast-outline" size={15} color={palette.accent} />
         <Text style={styles.title}>{t('studio.imageTools.adjust')}</Text>
+        <Pressable onPress={onHsl} hitSlop={8} style={styles.details} accessibilityRole="button" accessibilityLabel={t('studio.image.hsl.title')}>
+          <Ionicons name="color-palette-outline" size={14} color={palette.accent} />
+          <Text style={styles.detailsText}>HSL</Text>
+        </Pressable>
         <Pressable
           onPress={onDetails}
           hitSlop={8}
@@ -105,6 +114,9 @@ export function ImageAdjustStrip({
           <Ionicons name="checkmark" size={20} color={palette.text} />
         </Pressable>
       </View>
+      <Suspense fallback={null}>
+        <HistogramView layer={layer} uri={layer.uri} height={40} />
+      </Suspense>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {QUICK_FIELDS.map((f) => {
           const m = FIELD_META[f];

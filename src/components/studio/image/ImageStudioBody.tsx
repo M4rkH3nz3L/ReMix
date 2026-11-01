@@ -1878,6 +1878,10 @@ export function ImageStudioBody({
                 setQuickAdjust(false);
                 setSheet('adjust');
               }}
+              onHsl={() => {
+                setQuickAdjust(false);
+                setSheet('hsl');
+              }}
               onClose={() => setQuickAdjust(false)}
             />
           ) : selectedLayer && doc ? (

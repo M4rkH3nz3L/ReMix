@@ -1,3 +1,4 @@
+import { isNeutralHsl, shiftColor } from '@/lib/hslBands';
 import type { CubeLut } from '@/lib/lutImport';
 import type { ClipAdjust, FilterId, GradeId, PhotoLayer } from '@/types/project';
 
@@ -320,7 +321,7 @@ export function applyOps(ops: Op[], c: Rgb): Rgb {
 }
 
 /** a réteg színmezői; a korrekciós rétegek és a dokumentum ugyanezekből áll */
-export type ColorFields = Pick<PhotoLayer, 'adjust' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters' | 'develop'>;
+export type ColorFields = Pick<PhotoLayer, 'adjust' | 'hsl' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters' | 'develop'>;
 
 /** `.cube` 3D LUT háromszorosan lineáris olvasással (az ffmpeg `lut3d` közelítése) */
 export function cubeOp(lut: CubeLut): Op | null {
@@ -400,6 +401,10 @@ export function correctHex(hex: string, after: ColorFields[]): string {
 /** A fotó-réteg teljes színlánca, az `imagedoc.js` sorrendjében. Az `after` a fölötte ható korrekciók. */
 export function layerOps(layer: ColorFields, after: ColorFields[] = [], cube?: CubeLut | null): Op[] {
   const ops = adjustOps(layer.adjust);
+  const { hsl } = layer;
+  if (hsl && !isNeutralHsl(hsl)) {
+    ops.push((c) => shiftColor(c[0], c[1], c[2], hsl));
+  }
   ops.push(...(layer.grade ? GRADE_OPS[layer.grade]?.() ?? [] : []));
   const lut3d = cube ? cubeOp(cube) : null;
   if (lut3d) {

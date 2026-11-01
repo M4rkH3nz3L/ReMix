@@ -27,6 +27,7 @@ const FILTERS: FilterId[] = ['none', 'warm', 'cool', 'mono', 'vivid', 'fade', 'n
 /** egy skalár ClipAdjust-mező szerkesztő-metaadata (tartomány + címke) */
 type Field = keyof ClipAdjust;
 export const FIELD_META: Partial<Record<Field, { min: number; max: number; labelKey: string }>> = {
+  brightness: { min: -0.3, max: 0.3, labelKey: 'panels.adjust.adjust_brightness' },
   exposure: { min: -1, max: 1, labelKey: 'panels.adjust.adjust_exposure' },
   contrast: { min: -0.4, max: 0.4, labelKey: 'panels.adjust.adjust_contrast' },
   temperature: { min: -0.3, max: 0.3, labelKey: 'panels.adjust.adjust_temperature' },

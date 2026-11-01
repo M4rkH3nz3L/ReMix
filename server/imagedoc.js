@@ -24,6 +24,7 @@ const {
   channelMixFilter,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
+const { hslCube, isNeutralHsl } = require('./hslBands');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
@@ -496,6 +497,13 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const gmap = layer.gradientMap
         ? gradientMapFilter(layer.gradientMap.shadow, layer.gradientMap.highlight)
         : '';
+      // 🎨 színenkénti HSL: a közös képletből írt .cube, a korrekció után
+      let hslFrag = '';
+      if (!isNeutralHsl(layer.hsl)) {
+        const cube = path.join(workDir, `hsl${idx}.cube`);
+        fs.writeFileSync(cube, hslCube(layer.hsl));
+        hslFrag = `,lut3d='${cube.replace(/'/g, "'\\''")}'`;
+      }
       // 🩹 folt-javítás: a nyers (fit-elt) fotón, a korrekció/szűrők ELŐTT (delogo a környezetből interpolál)
       const heal = healChain(layer.heal, boxW, boxH);
       // 📊 szintek (levels): a tonális remap a korrekció/grade UTÁN, a struktúra-szűrők előtt
@@ -511,7 +519,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       // I18: a tartalom-lánc a réteg SAJÁT (doboz) terében fut; a geometria csak a lokális
       // korrekció UTÁN jön, így a maszk mérete mindig a doboz, nem az elforgatott befoglaló
       filters.push(
-        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${gradeFilterChain(layer.grade)}${lutFrag}${tint}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}[${prepared}]`
+        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${hslFrag}${gradeFilterChain(layer.grade)}${lutFrag}${tint}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}[${prepared}]`
       );
       const geomIdx = idx;
       idx += 1;

@@ -1384,11 +1384,17 @@ export interface AdjustmentLayer {
 }
 
 /** fotó-réteg: a kép + a videóból ismert képjavítás/szűrő/maszk */
+/** 🎨 Színsávok a színenkénti HSL-hez; mindhárom érték −1…1. */
+export type HslBand = 'red' | 'orange' | 'yellow' | 'green' | 'aqua' | 'blue' | 'purple' | 'magenta';
+export type HslBands = Partial<Record<HslBand, { h?: number; s?: number; l?: number }>>;
+
 export interface PhotoLayer extends ImageLayerBase {
   kind: 'photo';
   uri: string;
   /** 🖌️ ecsettel festett réteg: újra megnyitható, a radír is rajta dolgozik */
   paint?: boolean;
+  /** 🎨 színenkénti HSL */
+  hsl?: HslBands;
   assetId?: string;
   /** középpont, 0–1 normalizálva */
   position: { x: number; y: number };

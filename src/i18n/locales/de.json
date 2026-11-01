@@ -3117,6 +3117,27 @@
       "layer": "Ebene"
     },
     "image": {
+      "histogram": {
+        "title": "Histogramm",
+        "clip": "Tiefen {{shadows}}% · Lichter {{highlights}}%"
+      },
+      "hsl": {
+        "band": {
+          "red": "Rot",
+          "orange": "Orange",
+          "yellow": "Gelb",
+          "green": "Grün",
+          "aqua": "Türkis",
+          "blue": "Blau",
+          "purple": "Lila",
+          "magenta": "Magenta"
+        },
+        "title": "HSL nach Farbe",
+        "reset": "Zurücksetzen",
+        "h": "Farbton",
+        "s": "Sättigung",
+        "l": "Helligkeit"
+      },
       "select": {
         "action": {
           "copy": "Auf neue Ebene",

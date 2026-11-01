@@ -3117,6 +3117,27 @@
       "layer": "Layer"
     },
     "image": {
+      "histogram": {
+        "title": "Histogram",
+        "clip": "Crushed {{shadows}}% · clipped {{highlights}}%"
+      },
+      "hsl": {
+        "band": {
+          "red": "Red",
+          "orange": "Orange",
+          "yellow": "Yellow",
+          "green": "Green",
+          "aqua": "Aqua",
+          "blue": "Blue",
+          "purple": "Purple",
+          "magenta": "Magenta"
+        },
+        "title": "HSL by color",
+        "reset": "Reset",
+        "h": "Hue",
+        "s": "Saturation",
+        "l": "Lightness"
+      },
       "select": {
         "action": {
           "copy": "To new layer",

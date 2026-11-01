@@ -3117,6 +3117,27 @@
       "layer": "Réteg"
     },
     "image": {
+      "histogram": {
+        "title": "Hisztogram",
+        "clip": "Beégett {{shadows}}% · kiégett {{highlights}}%"
+      },
+      "hsl": {
+        "band": {
+          "red": "Piros",
+          "orange": "Narancs",
+          "yellow": "Sárga",
+          "green": "Zöld",
+          "aqua": "Türkiz",
+          "blue": "Kék",
+          "purple": "Lila",
+          "magenta": "Bíbor"
+        },
+        "title": "Színenkénti HSL",
+        "reset": "Alaphelyzet",
+        "h": "Árnyalat",
+        "s": "Telítettség",
+        "l": "Világosság"
+      },
       "select": {
         "action": {
           "copy": "Új rétegre",

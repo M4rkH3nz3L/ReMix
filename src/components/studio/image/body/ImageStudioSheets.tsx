@@ -7,6 +7,7 @@ import { CanvasSheet } from '@/components/studio/image/CanvasSheet';
 import { EffectsSheet } from '@/components/studio/image/EffectsSheet';
 import { ExportSheet } from '@/components/studio/image/ExportSheet';
 import { HistorySheet } from '@/components/studio/image/HistorySheet';
+import { HslSheet } from '@/components/studio/image/HslSheet';
 import { LayerStyleSheet } from '@/components/studio/image/LayerStyleSheet';
 import { PatternSheet } from '@/components/studio/image/PatternSheet';
 import { ShapePickerSheet } from '@/components/studio/image/ShapePickerSheet';
@@ -113,6 +114,9 @@ export function ImageStudioSheets({
       ) : null}
       {sheet === 'develop' && doc && selectedLayer?.kind === 'photo' ? (
         <DevelopSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === 'hsl' && doc && selectedLayer?.kind === 'photo' ? (
+        <HslSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (
         <EffectsSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />

@@ -3116,6 +3116,7 @@
       "layer": "Ebene"
     },
     "image": {
+      "moreTools": "Weitere Werkzeuge",
       "stroke": {
         "style": "Linie",
         "solid": "Durchgehend",

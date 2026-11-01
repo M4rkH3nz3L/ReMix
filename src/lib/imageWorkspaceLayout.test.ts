@@ -1,5 +1,6 @@
 import { sizeClassFor } from '@/constants/layout';
 import { panelDefaults, panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
+import { railHasMore } from '@/lib/imageWorkspaceLayout';
 
 const at = (w: number, h: number) => workspaceLayout(sizeClassFor(w, h), w);
 
@@ -28,5 +29,16 @@ describe('Kép Stúdió elrendezés', () => {
     const saved = { overlay: { rail: false } };
     expect(panelState('overlay', saved)).toEqual({ rail: false, layers: false });
     expect(panelState('inline', saved)).toEqual({ rail: true, layers: true });
+  });
+});
+
+describe('a sín alsó jelzése', () => {
+  it('ha minden belefér, nincs jelzés', () => {
+    expect(railHasMore(600, 700, 0)).toBe(false);
+  });
+  it('túlcsorduláskor jelez, a végére görgetve eltűnik', () => {
+    expect(railHasMore(900, 700, 0)).toBe(true);
+    expect(railHasMore(900, 700, 200)).toBe(false);
+    expect(railHasMore(900, 700, 199.5)).toBe(false);
   });
 });

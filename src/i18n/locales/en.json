@@ -3116,6 +3116,7 @@
       "layer": "Layer"
     },
     "image": {
+      "moreTools": "More tools",
       "stroke": {
         "style": "Line",
         "solid": "Solid",

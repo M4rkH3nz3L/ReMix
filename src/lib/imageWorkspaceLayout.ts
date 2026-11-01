@@ -35,3 +35,8 @@ export function panelState(
 ): { rail: boolean; layers: boolean } {
   return { ...panelDefaults(mode), ...saved[mode] };
 }
+
+/** Van-e még görgethető tartalom a sín alján? (1 pontnyi tűréssel a tört eltolások miatt) */
+export function railHasMore(contentHeight: number, viewHeight: number, offset: number): boolean {
+  return contentHeight - viewHeight - offset > 1;
+}

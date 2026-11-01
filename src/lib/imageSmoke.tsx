@@ -2,7 +2,8 @@ import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkIma
 import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef } from 'react';
-import { Platform, View } from 'react-native';
+import { Dimensions, Platform, View } from 'react-native';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
 import { renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -575,6 +576,8 @@ function spread(a: SkImage, x0: number, y0: number, n: number): number {
 /** A részlet-műveletek pixelszintű mérése a szerver ellen, ellenpróbával: az effekt nélküli export. */
 async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
   log(true, 'mért eszköz', `${Platform.OS === 'ios' && Platform.isPad ? 'iPad' : 'telefon'}, pixelarány ${ratio}`);
+  const [win, scr] = [Dimensions.get('window'), Dimensions.get('screen')];
+  log(true, 'ablak', `ablak ${win.width}×${win.height}, képernyő ${scr.width}×${scr.height}, iOS ${Platform.Version}, safe ${JSON.stringify(initialWindowMetrics?.insets)}`);
   const surface = Skia.Surface.MakeOffscreen(320, 320)!;
   const paint = Skia.Paint();
   const c = surface.getCanvas();

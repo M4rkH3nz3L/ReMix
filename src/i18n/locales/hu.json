@@ -3116,6 +3116,7 @@
       "layer": "Réteg"
     },
     "image": {
+      "moreTools": "További eszközök",
       "stroke": {
         "style": "Vonal",
         "solid": "Folytonos",

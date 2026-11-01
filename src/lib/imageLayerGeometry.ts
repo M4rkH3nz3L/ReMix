@@ -203,3 +203,9 @@ export function imageCornersOnCanvas(
   const boxAspect = (layer.w * canvas.width) / (layer.h * canvas.height);
   return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }].map((p) => layerBoxToCanvas(imageToBoxRaw(p, imageAspect, boxAspect, layer.fit ?? 'cover'), layer, canvas));
 }
+
+/** Új fotó-réteg doboza: a kép saját arányában, levágás nélkül, a vászon 80%-án belül. */
+export function photoBoxFor(width: number, height: number, canvas: { width: number; height: number }): { w: number; h: number } {
+  const scale = Math.min((0.8 * canvas.width) / width, (0.8 * canvas.height) / height);
+  return { w: (width * scale) / canvas.width, h: (height * scale) / canvas.height };
+}

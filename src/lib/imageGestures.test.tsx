@@ -304,11 +304,11 @@ describe('menüszerkezet', () => {
     expect(locked.canDelete).toBe(false);
     expect(locked.actions).toEqual(['unlock', 'duplicate']);
   });
-  it('a sorrend: beállítás → elrendezés → másolás', () => {
+  it('a sorrend: beállítás → elrendezés → másolás → export', () => {
     const { actions } = selectionMenu(layer, ctx);
     expect(actions.indexOf('adjust')).toBeLessThan(actions.indexOf('align'));
     expect(actions.indexOf('rotate')).toBeLessThan(actions.indexOf('duplicate'));
-    expect(actions[actions.length - 1]).toBe('duplicate');
+    expect(actions.slice(-2)).toEqual(['duplicate', 'exportLayer']);
   });
   it('csak a fajtájához illő műveletek', () => {
     expect(selectionMenu(layer, ctx).actions).toContain('develop');

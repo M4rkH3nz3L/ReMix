@@ -61,3 +61,32 @@ export class ImageRenderRejected extends Error {
     this.name = 'ImageRenderRejected';
   }
 }
+
+/** Az exportálható magasságok: a szerver ennél többet nem ad. */
+export const EXPORT_HEIGHT_MIN = 240;
+export const EXPORT_HEIGHT_MAX = 4096;
+
+/** A kért magasság a dokumentum arányában, a korlátok közé szorítva. */
+export function customExportSize(doc: { width?: number; height?: number; aspectRatio?: string }, height: number): { width: number; height: number } {
+  const base = exportSize(doc as never, 1);
+  const h = Math.max(EXPORT_HEIGHT_MIN, Math.min(EXPORT_HEIGHT_MAX, Math.round(Number.isFinite(height) ? height : base.height)));
+  const w = Math.round((h * base.width) / base.height);
+  // a széles kép szélessége is a plafon alatt marad
+  return w > EXPORT_HEIGHT_MAX ? { width: EXPORT_HEIGHT_MAX, height: Math.round((EXPORT_HEIGHT_MAX * base.height) / base.width) } : { width: w, height: h };
+}
+
+/**
+ * Durva fájlméret-becslés bájtban: fotónál a tartalom sok bitet ad, lapos grafikánál keveset.
+ * Nagyságrendet mutat, a pontos méret a tartalomtól függ.
+ */
+export function estimateExportBytes(pixels: number, format: 'png' | 'jpg' | 'webp', quality: number, hasPhoto: boolean): number {
+  const q = Math.max(0.3, Math.min(1, quality));
+  const lossy = (hasPhoto ? 0.1 : 0.03) + q * q * (hasPhoto ? 0.5 : 0.1);
+  const bytesPerPixel = format === 'png' ? (hasPhoto ? 1.6 : 0.15) : format === 'jpg' ? lossy : lossy * 0.7;
+  return Math.round(pixels * bytesPerPixel);
+}
+
+/** Olvasható méret: 820 kB, 3,4 MB. */
+export function formatBytes(bytes: number): string {
+  return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} kB` : `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`;
+}

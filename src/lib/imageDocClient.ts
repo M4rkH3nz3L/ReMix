@@ -43,7 +43,12 @@ export interface RenderImageOpts {
   quality?: number;
   /** ennyi réteg maradt ki a kimenetből (hiányzó / elérhetetlen média) */
   onMissingLayers?: (count: number) => void;
+  /** a felhasználó megszakíthatja: megszakításkor `ExportCancelled` jön */
+  signal?: AbortSignal;
 }
+
+/** A felhasználó állította le az exportot: ez nem hiba, nincs tartalék-út és hibaablak. */
+export class ExportCancelled extends Error {}
 
 /**
  * 📄 A dokumentum (már legenerált, önálló) SVG-jéből nyomdakész VEKTOR-PDF a
@@ -302,6 +307,7 @@ export async function renderImageDoc(
     const res = await uploadFetch(`${renderServerUrl()}/imagedoc`, {
       method: 'POST',
       body: form,
+      signal: opts.signal,
     });
     if (res.status >= 400 && res.status < 500) {
       // 🚫 I13: szándékos elutasítás (túl nagy doc, kvóta) — a user megkapja az okot
@@ -320,6 +326,9 @@ export async function renderImageDoc(
   } catch (e) {
     if (e instanceof ImageRenderRejected) {
       throw e;
+    }
+    if (opts.signal?.aborted) {
+      throw new ExportCancelled();
     }
     return null;
   }

@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { exportSize } from '@/lib/imageExport';
+import { customExportSize, estimateExportBytes, exportSize, formatBytes } from '@/lib/imageExport';
+import { logCaught } from '@/lib/logCaught';
 import type { ImageDoc } from '@/types/project';
 
 type Fmt = 'png' | 'jpg' | 'webp';
@@ -24,6 +25,7 @@ export function ExportSheet({
   pageCount = 1,
   canPsd = true,
   onRaster,
+  onPack,
   onSvg,
   onPdf,
   onPsd,
@@ -38,7 +40,8 @@ export function ExportSheet({
   pageCount?: number;
   /** 🔒 PSD-export Pro-kapu: false → a gomb letiltva (upsell), true → engedélyezett */
   canPsd?: boolean;
-  onRaster: (opts: { format: Fmt; height: number; quality: number }) => void;
+  onRaster: (opts: { format: Fmt; height: number; quality: number; target?: 'share' | 'photos' }) => void;
+  onPack: (opts: { format: Fmt; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
   /** 🖼️ réteges .psd export (worker, réteg-megőrzés) — Pro-gated */
@@ -52,10 +55,29 @@ export function ExportSheet({
   const size1 = exportSize(doc, 1);
   const size2 = exportSize(doc, 2);
   const [format, setFormat] = useState<Fmt>('png');
-  const [scale, setScale] = useState<1 | 2>(1);
+  const [scale, setScale] = useState<1 | 2 | 'custom'>(1);
+  const [customHeight, setCustomHeight] = useState(String(size1.height));
   const [quality, setQuality] = useState(0.9);
 
-  const height = (scale === 2 ? size2 : size1).height;
+  const chosen = scale === 'custom' ? customExportSize(doc, Number(customHeight)) : scale === 2 ? size2 : size1;
+  const { height } = chosen;
+  const photos = useMemo(() => doc.layers.flatMap((l) => (l.kind === 'photo' ? [l.uri] : [])), [doc.layers]);
+  const [measured, setMeasured] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      void import('@/components/studio/image/exportEstimate')
+        .then((m) => m.photoBytesPerPixel(photos, format, quality))
+        .then((v) => alive && setMeasured(v))
+        .catch((caught: unknown) => logCaught('components/studio/image/ExportSheet.tsx:estimate', caught));
+    }, 200);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [photos, format, quality]);
+  const pixels = chosen.width * chosen.height;
+  const estimate = formatBytes(measured != null ? pixels * measured : estimateExportBytes(pixels, format, format === 'png' ? 1 : quality, photos.length > 0));
   const lossy = format === 'jpg' || format === 'webp';
   const hint = format === 'png' ? t('studio.image.export.hintPng') : format === 'jpg' ? t('studio.image.export.hintJpg') : t('studio.image.export.hintWebp');
 
@@ -73,7 +95,21 @@ export function ExportSheet({
       <View style={styles.row}>
         <Chip label={`1× · ${size1.width}×${size1.height}`} active={scale === 1} onPress={() => setScale(1)} />
         <Chip label={`2× · ${size2.width}×${size2.height}`} active={scale === 2} onPress={() => setScale(2)} />
+        <Chip label={t('studio.image.export.custom')} active={scale === 'custom'} onPress={() => setScale('custom')} />
       </View>
+      {scale === 'custom' ? (
+        <View style={styles.customRow}>
+          <Text style={styles.hint}>{t('studio.image.export.customHeight')}</Text>
+          <TextInput
+            value={customHeight}
+            onChangeText={setCustomHeight}
+            keyboardType="number-pad"
+            style={styles.input}
+            accessibilityLabel={t('studio.image.export.customHeight')}
+          />
+          <Text style={styles.hint}>{`${chosen.width}×${chosen.height}`}</Text>
+        </View>
+      ) : null}
 
       {lossy ? (
         <Slider
@@ -86,6 +122,8 @@ export function ExportSheet({
         />
       ) : null}
 
+      <Text style={styles.hint}>{t('studio.image.export.estimate', { size: estimate })}</Text>
+
       <Pressable
         style={[styles.primary, busy && styles.disabled]}
         disabled={busy}
@@ -96,6 +134,28 @@ export function ExportSheet({
       >
         <Ionicons name="download-outline" size={16} color="#fff" />
         <Text style={styles.primaryText}>{t('studio.image.export.run')}</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.secondary, busy && styles.disabled]}
+        disabled={busy}
+        onPress={() => {
+          onRaster({ format, height, quality, target: 'photos' });
+          onClose();
+        }}
+      >
+        <Ionicons name="images-outline" size={16} color={palette.text} />
+        <Text style={styles.secondaryText}>{t('studio.image.export.savePhotos')}</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.secondary, busy && styles.disabled]}
+        disabled={busy}
+        onPress={() => {
+          onPack({ format, quality });
+          onClose();
+        }}
+      >
+        <Ionicons name="albums-outline" size={16} color={palette.text} />
+        <Text style={styles.secondaryText}>{t('studio.image.export.pack')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -190,6 +250,8 @@ const styles = StyleSheet.create({
   section: { color: palette.textDim, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   hint: { color: palette.textDim, fontSize: 12, marginTop: -4 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  input: { color: palette.text, borderWidth: 1, borderColor: palette.border, borderRadius: 8, paddingHorizontal: 10, height: 36, minWidth: 80, fontWeight: '700' },
   primary: {
     flexDirection: 'row',
     alignItems: 'center',

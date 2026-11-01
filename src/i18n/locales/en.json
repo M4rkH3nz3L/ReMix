@@ -3069,6 +3069,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "exportLayer": "Export layer",
       "outlineStroke": "Stroke to shape",
       "offsetOut": "Grow",
       "offsetIn": "Shrink",
@@ -3122,6 +3123,12 @@
       "layer": "Layer"
     },
     "image": {
+      "importFile": {
+        "invalidTitle": "Can't open this file",
+        "invalidBody": "This file can't be read as an image, or it's damaged.",
+        "scaledTitle": "Scaled down",
+        "scaledBody": "The image was {{from}} px wide; it was reduced to {{to}} px for editing."
+      },
       "bgRemove": {
         "noSubject": "No clear subject was found in this image.",
         "failBody": "Removing the background failed. Please try again.",
@@ -3167,6 +3174,7 @@
       },
       "select": {
         "action": {
+          "export": "Export",
           "copy": "To new layer",
           "delete": "Delete",
           "adjust": "Adjust",
@@ -3238,6 +3246,7 @@
       "starPoints": "Points",
       "innerRadius": "Inner radius",
       "importFrom": {
+        "file": "Image from Files",
         "source": "Project media",
         "svg": "SVG file",
         "psd": "Photoshop (PSD)",
@@ -3526,6 +3535,25 @@
       "exportToVideo": "Insert into new video",
       "skiaMissing": "This tool needs a new app build (the Skia module is missing from this dev client). Rebuild the dev client, then try again.",
       "export": {
+        "problem": {
+          "unreadable": "The finished file can't be opened.",
+          "empty": "The finished file is empty.",
+          "size": "The image size differs from what was requested.",
+          "alpha": "Transparency was not preserved."
+        },
+        "pack": "Size pack to Photos (1×, 2×, 3×)",
+        "packDone": "{{count}} images in Photos",
+        "problemTitle": "The export may be faulty",
+        "custom": "Custom",
+        "customHeight": "Height (px)",
+        "estimate": "Estimated size: {{size}}",
+        "savePhotos": "Save to Photos",
+        "savedTitle": "Saved",
+        "savedBody": "The image is in Photos.",
+        "saveDenied": "No permission to save to Photos. You can grant it in Settings.",
+        "saveFailed": "Saving to Photos failed.",
+        "cancel": "Cancel",
+        "exporting": "Exporting…",
         "formatLabel": "Format",
         "resolutionLabel": "Resolution",
         "qualityLabel": "Quality",

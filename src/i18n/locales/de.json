@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "exportLayer": "Ebene exportieren",
       "outlineStroke": "Linie zu Form",
       "offsetOut": "Vergrößern",
       "offsetIn": "Verkleinern",
@@ -3122,6 +3123,12 @@
       "layer": "Ebene"
     },
     "image": {
+      "importFile": {
+        "invalidTitle": "Datei lässt sich nicht öffnen",
+        "invalidBody": "Diese Datei ist kein lesbares Bild oder beschädigt.",
+        "scaledTitle": "Verkleinert",
+        "scaledBody": "Das Bild war {{from}} px breit und wurde zum Bearbeiten auf {{to}} px verkleinert."
+      },
       "bgRemove": {
         "noSubject": "Auf diesem Bild wurde kein klares Motiv gefunden.",
         "failBody": "Das Entfernen des Hintergrunds ist fehlgeschlagen. Bitte versuche es erneut.",
@@ -3167,6 +3174,7 @@
       },
       "select": {
         "action": {
+          "export": "Export",
           "copy": "Auf neue Ebene",
           "delete": "Löschen",
           "adjust": "Korrektur",
@@ -3238,6 +3246,7 @@
       "starPoints": "Zacken",
       "innerRadius": "Innenradius",
       "importFrom": {
+        "file": "Bild aus Dateien",
         "source": "Projektmedien",
         "svg": "SVG-Datei",
         "psd": "Photoshop (PSD)",
@@ -3531,6 +3540,25 @@
       "exportToVideo": "In neues Video einfügen",
       "skiaMissing": "Dieses Werkzeug benötigt einen neuen App-Build (das Skia-Modul fehlt in diesem Dev-Client). Erstelle den Dev-Client neu und versuche es erneut.",
       "export": {
+        "problem": {
+          "unreadable": "Die fertige Datei lässt sich nicht öffnen.",
+          "empty": "Die fertige Datei ist leer.",
+          "size": "Die Bildgröße weicht von der angeforderten ab.",
+          "alpha": "Die Transparenz blieb nicht erhalten."
+        },
+        "pack": "Größenpaket in Fotos (1×, 2×, 3×)",
+        "packDone": "{{count}} Bilder in Fotos",
+        "problemTitle": "Der Export ist möglicherweise fehlerhaft",
+        "custom": "Eigene",
+        "customHeight": "Höhe (px)",
+        "estimate": "Geschätzte Größe: {{size}}",
+        "savePhotos": "In Fotos sichern",
+        "savedTitle": "Gesichert",
+        "savedBody": "Das Bild ist in Fotos.",
+        "saveDenied": "Keine Berechtigung für Fotos. Du kannst sie in den Einstellungen erteilen.",
+        "saveFailed": "Sichern in Fotos fehlgeschlagen.",
+        "cancel": "Abbrechen",
+        "exporting": "Exportieren…",
         "formatLabel": "Format",
         "resolutionLabel": "Auflösung",
         "qualityLabel": "Qualität",

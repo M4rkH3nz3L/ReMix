@@ -21,9 +21,11 @@ import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
 import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
+import { customExportSize, exportSize } from '@/lib/imageExport';
+import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import { layerBoxToCanvas } from '@/lib/imageLayerGeometry';
+import { layerBoxToCanvas, photoBoxFor } from '@/lib/imageLayerGeometry';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, type Point, type Selection, type SelectionMode } from '@/lib/selection';
 import { DEFAULT_BRUSH, isPaintLayer } from '@/lib/brushEngine';
@@ -60,7 +62,7 @@ import { canAlignLayer } from '@/lib/imageLayerLayout';
 import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
 import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
-import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
+import { ExportCancelled, exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
 import { type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { shapeToPathPoints } from '@/lib/shapeGeometry';
@@ -71,7 +73,7 @@ import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { StudioSheetFrameContext } from '@/components/studio/image/StudioSheet';
 import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
-import { pickImage, pickPdf, pickPsd, pickSvg } from '@/lib/media';
+import { pickImage, pickImageFile, pickPdf, pickPsd, pickSvg, saveImageToPhotos } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import { createEmptyProject, trackEnd, trackOf } from '@/lib/projectUtils';
@@ -240,9 +242,11 @@ export function ImageStudioBody({
   const undo = () => useEditorStore.getState().undo();
   const redo = () => useEditorStore.getState().redo();
   const rejectedRef = useRef(false);
+  const exportAbort = useRef<AbortController | null>(null);
+  const [exporting, setExporting] = useState(false);
   const rasterize = async (
     target: ImageDoc,
-    opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number }
+    opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number; signal?: AbortSignal }
   ): Promise<string | null> => {
     rejectedRef.current = false;
     const height = opts?.height ?? target.height ?? 1280;
@@ -250,6 +254,7 @@ export function ImageStudioBody({
       const viaWorker = await renderImageDoc(target, height, {
         format: opts?.format,
         quality: opts?.quality,
+        signal: opts?.signal,
         onMissingLayers: (count) =>
           Alert.alert(t('studio.image.missingInExport.title'), t('studio.image.missingInExport.body', { count })),
       });
@@ -541,6 +546,33 @@ export function ImageStudioBody({
    * ImageDoc-rétegekre bontjuk, és EGY köteg-műveletként (egy undo-lépés) a
    * command-buson betesszük — a vászonon azonnal megjelennek.
    */
+  // 🖼️ raszterkép a Fájlokból: a hibás fájl üzenetet ad, a réteg a kép saját arányában jön létre
+  const importImageFile = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const picked = await pickImageFile();
+      if (!picked) {
+        return;
+      }
+      if (picked.status === 'invalid') {
+        Alert.alert(t('studio.image.importFile.invalidTitle'), t('studio.image.importFile.invalidBody'));
+        return;
+      }
+      const l: PhotoLayer = { kind: 'photo', id: makeId('lyr'), uri: picked.uri, position: { x: 0.5, y: 0.5 }, ...photoBoxFor(picked.width, picked.height, effectiveCanvas(doc)), fit: 'stretch' };
+      commit(addLayer(doc, l), t('studio.image.undoAddPhoto'));
+      setSelectedId(l.id);
+      setSheet(null);
+      if (picked.width < picked.originalWidth) {
+        Alert.alert(t('studio.image.importFile.scaledTitle'), t('studio.image.importFile.scaledBody', { from: picked.originalWidth, to: picked.width }));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const importSvg = async () => {
     if (!doc || busy) {
       return;
@@ -768,6 +800,9 @@ export function ImageStudioBody({
         setPathEditId(null);
         setPenPoints([]);
         break;
+      case 'file':
+        void importImageFile();
+        break;
       case 'svg':
         void importSvg();
         break;
@@ -789,6 +824,11 @@ export function ImageStudioBody({
         // ⚡ előbb a gyors sáv (a kép teljes méretben látszik); a teljes verem a „Részletek"-ből
         setSheet(null);
         setQuickAdjust(true);
+        break;
+      case 'exportLayer':
+        if (selectedLayer) {
+          void exportPart(layerOnlyDoc(doc, selectedLayer.id));
+        }
         break;
       case 'bgRemove':
         if (selectedLayer?.kind === 'photo') {
@@ -1169,6 +1209,10 @@ export function ImageStudioBody({
     if (!doc || !selection) {
       return;
     }
+    if (action === 'export') {
+      void exportPart(selectTargetId ? selectionOnlyDoc(doc, selection, selectTargetId) : null);
+      return;
+    }
     const id = makeId('lyr');
     let next: ImageDoc | null = null;
     if (action === 'copy') {
@@ -1318,25 +1362,125 @@ export function ImageStudioBody({
     }
   };
 
-  const exportImage = async (opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number }) => {
+  /** ✅ minőségkapu: a kész fájlt visszaolvassuk, a hibát a felhasználó is látja */
+  const reportProblems = async (uri: string, target: ImageDoc, height: number, format: 'png' | 'jpg' | 'webp') => {
+    const { verifyExport } = await import('@/components/studio/image/exportVerify');
+    const problems = await verifyExport(uri, { ...customExportSize(target, height), format, wantsAlpha: expectsAlpha(target, format) });
+    if (problems.length > 0) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:quality', new Error(`export minőségkapu: ${problems.join(',')}`));
+      Alert.alert(t('studio.image.export.problemTitle'), problems.map((p) => t(`studio.image.export.problem.${p}`)).join('\n'));
+    }
+    return problems;
+  };
+
+  /** Egy réteg vagy kijelölés önálló képként, átlátszó háttéren. */
+  const exportPart = async (part: ImageDoc | null) => {
+    if (!doc || !part || busy) {
+      return;
+    }
+    setBusy(true);
+    exportAbort.current = new AbortController();
+    setExporting(true);
+    try {
+      const height = effectiveCanvas(doc).height;
+      const uri = await rasterize(part, { format: 'png', height, signal: exportAbort.current.signal });
+      if (!uri) {
+        alertRenderFail();
+        return;
+      }
+      await reportProblems(uri, part, height, 'png');
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      }
+    } catch (caught) {
+      if (!(caught instanceof ExportCancelled)) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:exportPart', caught);
+        alertRenderFail();
+      }
+    } finally {
+      exportAbort.current = null;
+      setExporting(false);
+      setBusy(false);
+    }
+  };
+
+  /** Méretcsomag: ugyanaz a kép több méretben a Fotókba. */
+  const exportPack = async (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => {
     if (!doc || busy) {
       return;
     }
     setBusy(true);
+    exportAbort.current = new AbortController();
+    setExporting(true);
     try {
-      const uri = await rasterize(doc, opts);
+      let saved = 0;
+      for (const scale of EXPORT_PACK_SCALES) {
+        const { height } = exportSize(doc, scale);
+        const uri = await rasterize(doc, { ...opts, height, signal: exportAbort.current.signal });
+        if (!uri) {
+          alertRenderFail();
+          return;
+        }
+        await reportProblems(uri, doc, height, opts.format);
+        const res = await saveImageToPhotos(uri);
+        if (res !== 'saved') {
+          Alert.alert(t('studio.image.wand.failTitle'), t(res === 'denied' ? 'studio.image.export.saveDenied' : 'studio.image.export.saveFailed'));
+          return;
+        }
+        saved += 1;
+      }
+      Alert.alert(t('studio.image.export.savedTitle'), t('studio.image.export.packDone', { count: saved }));
+    } catch (caught) {
+      if (!(caught instanceof ExportCancelled)) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:exportPack', caught);
+        alertRenderFail();
+      }
+    } finally {
+      exportAbort.current = null;
+      setExporting(false);
+      setBusy(false);
+    }
+  };
+
+  const exportImage = async (opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number; target?: 'share' | 'photos' }) => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    exportAbort.current = new AbortController();
+    setExporting(true);
+    try {
+      const uri = await rasterize(doc, { ...opts, signal: exportAbort.current.signal });
       if (!uri) {
         alertRenderFail();
         return;
       }
       commitRendered(doc.id, uri);
+      await reportProblems(uri, doc, opts?.height ?? effectiveCanvas(doc).height, opts?.format ?? 'png');
+      if (opts?.target === 'photos') {
+        const saved = await saveImageToPhotos(uri);
+        if (saved === 'saved') {
+          Alert.alert(t('studio.image.export.savedTitle'), t('studio.image.export.savedBody'));
+        } else {
+          Alert.alert(t('studio.image.wand.failTitle'), t(saved === 'denied' ? 'studio.image.export.saveDenied' : 'studio.image.export.saveFailed'));
+        }
+        return;
+      }
       const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); return false; });
       if (canShare) {
         await Sharing.shareAsync(uri).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); });
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
+    } catch (caught) {
+      // a felhasználó leállította: nincs hibaablak
+      if (!(caught instanceof ExportCancelled)) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught);
+        alertRenderFail();
+      }
     } finally {
+      exportAbort.current = null;
+      setExporting(false);
       setBusy(false);
     }
   };
@@ -1832,6 +1976,18 @@ export function ImageStudioBody({
           ) : null}
           </View>
 
+          {exporting ? (
+            <View style={styles.statusRow}>
+              <ActivityIndicator size="small" color={palette.accent} />
+              <Text style={styles.statusText} numberOfLines={1}>
+                {t('studio.image.export.exporting')}
+              </Text>
+              <Pressable onPress={() => exportAbort.current?.abort()} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.selectLink}>{t('studio.image.export.cancel')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {selection && !selectTool ? (
             /* ✂️ a kijelölés a többi eszköz alatt is él: innen szerkeszthető vagy szüntethető meg */
             <View style={styles.statusRow}>
@@ -2127,6 +2283,7 @@ export function ImageStudioBody({
             onInsertSource={insertSource}
             onDrawMask={startMaskDraw}
             onRaster={(o) => void exportImage(o)}
+            onPack={(o) => void exportPack(o)}
             onSvg={() => void exportSvg()}
             onPdf={() => void exportPdf()}
             onPsd={() => void exportPsdFile()}

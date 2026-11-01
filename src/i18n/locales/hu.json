@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "exportLayer": "Réteg exportja",
       "outlineStroke": "Vonalból forma",
       "offsetOut": "Bővít",
       "offsetIn": "Szűkít",
@@ -3122,6 +3123,12 @@
       "layer": "Réteg"
     },
     "image": {
+      "importFile": {
+        "invalidTitle": "A fájl nem nyitható meg",
+        "invalidBody": "Ez a fájl nem olvasható képként, vagy sérült.",
+        "scaledTitle": "Kicsinyítve",
+        "scaledBody": "A kép {{from}} px széles volt, a szerkesztéshez {{to}} px-re csökkentettük."
+      },
       "bgRemove": {
         "noSubject": "Nem találtam kiemelhető témát ezen a képen.",
         "failBody": "A háttér eltávolítása nem sikerült. Próbáld újra.",
@@ -3167,6 +3174,7 @@
       },
       "select": {
         "action": {
+          "export": "Export",
           "copy": "Új rétegre",
           "delete": "Törlés",
           "adjust": "Korrekció",
@@ -3238,6 +3246,7 @@
       "starPoints": "Ágak",
       "innerRadius": "Belső sugár",
       "importFrom": {
+        "file": "Képfájl a Fájlokból",
         "source": "A projekt médiái",
         "svg": "SVG-fájl",
         "psd": "Photoshop (PSD)",
@@ -3526,6 +3535,25 @@
       "exportToVideo": "Beszúrás új videóba",
       "skiaMissing": "Ehhez az eszközhöz új app-build kell (a Skia natív modul hiányzik ebből a dev-kliensből). Építsd újra a dev-klienst, majd próbáld újra.",
       "export": {
+        "problem": {
+          "unreadable": "A kész fájl nem nyitható meg.",
+          "empty": "A kész fájl üres.",
+          "size": "A kész kép mérete eltér a kérttől.",
+          "alpha": "Az átlátszóság nem maradt meg."
+        },
+        "pack": "Méretcsomag a Fotókba (1×, 2×, 3×)",
+        "packDone": "{{count}} kép a Fotókban",
+        "problemTitle": "Az export hibás lehet",
+        "custom": "Egyedi",
+        "customHeight": "Magasság (px)",
+        "estimate": "Becsült méret: {{size}}",
+        "savePhotos": "Mentés a Fotókba",
+        "savedTitle": "Elmentve",
+        "savedBody": "A kép a Fotókba került.",
+        "saveDenied": "Nincs engedély a Fotókba mentéshez. A Beállításokban adhatod meg.",
+        "saveFailed": "A mentés a Fotókba nem sikerült.",
+        "cancel": "Megszakítás",
+        "exporting": "Exportálás…",
         "formatLabel": "Formátum",
         "resolutionLabel": "Felbontás",
         "qualityLabel": "Minőség",

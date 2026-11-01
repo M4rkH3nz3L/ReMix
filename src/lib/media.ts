@@ -122,6 +122,52 @@ export async function normalizePickedImage(
   }
 }
 
+export type PickedFile =
+  | { status: 'ok'; uri: string; width: number; height: number; originalWidth: number }
+  | { status: 'invalid' };
+
+/**
+ * Raszterkép a Fájlokból. A galériától eltérően a hibás fájl nem megy tovább: a Fájlokból bármi
+ * jöhet, ezért a dekódolás a kapu, sikertelenül érthető üzenet lesz, nem üres réteg.
+ */
+export async function ingestImageFile(uri: string): Promise<PickedFile> {
+  try {
+    const first = await bakeImage(uri, [], { persist: false });
+    if (!first.width || !first.height) {
+      return { status: 'invalid' };
+    }
+    const baked = await bakeImage(uri, intakeOps(first.width, first.height), { persist: true });
+    return { status: 'ok', uri: baked.uri, width: baked.width, height: baked.height, originalWidth: first.width };
+  } catch (caught) {
+    logCaught('lib/media.ts:ingestImageFile', caught);
+    return { status: 'invalid' };
+  }
+}
+
+export async function pickImageFile(): Promise<PickedFile | null> {
+  const result = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true, multiple: false });
+  if (result.canceled || result.assets.length === 0) {
+    return null;
+  }
+  return ingestImageFile(result.assets[0].uri);
+}
+
+/** A kész kép a Fotókba: az engedélyt csak íráshoz kérjük. */
+export async function saveImageToPhotos(uri: string): Promise<'saved' | 'denied' | 'failed'> {
+  try {
+    const MediaLibrary = await import('expo-media-library');
+    const { status } = await MediaLibrary.requestPermissionsAsync(true);
+    if (status !== 'granted') {
+      return 'denied';
+    }
+    await MediaLibrary.saveToLibraryAsync(uri);
+    return 'saved';
+  } catch (caught) {
+    logCaught('lib/media.ts:saveImageToPhotos', caught);
+    return 'failed';
+  }
+}
+
 export async function pickImage(): Promise<{ uri: string; width?: number; height?: number } | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],

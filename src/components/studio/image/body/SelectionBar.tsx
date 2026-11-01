@@ -7,7 +7,7 @@ import { palette } from '@/constants/editor';
 import type { Selection, SelectionMode } from '@/lib/selection';
 
 export type SelectTool = 'rect' | 'ellipse' | 'lasso' | 'wand';
-export type SelectionAction = 'copy' | 'delete' | 'adjust' | 'mask' | 'shape';
+export type SelectionAction = 'copy' | 'delete' | 'adjust' | 'mask' | 'shape' | 'export';
 
 const TOOLS: { key: SelectTool; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'rect', icon: 'square-outline' },
@@ -22,6 +22,7 @@ const ACTIONS: { key: SelectionAction; icon: keyof typeof Ionicons.glyphMap }[] 
   { key: 'adjust', icon: 'contrast-outline' },
   { key: 'mask', icon: 'eye-off-outline' },
   { key: 'shape', icon: 'shapes-outline' },
+  { key: 'export', icon: 'share-outline' },
 ];
 
 /** ✂️ A kijelölés sávja: fent az eszköz, alatta a mód, és ha van kijelölés, a vele végezhető műveletek. */

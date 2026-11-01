@@ -50,6 +50,7 @@ export function ImageStudioSheets({
   onInsertSource,
   onDrawMask,
   onRaster,
+  onPack,
   onSvg,
   onPdf,
   onPsd,
@@ -72,10 +73,11 @@ export function ImageStudioSheets({
   setSheet: (sheet: SheetKind) => void;
   setSelectedId: (id: string | null) => void;
   onAddShapeType: (shape: Exclude<ShapeLayer['shape'], 'path'>) => void;
-  onImport: (key: 'svg' | 'psd' | 'pdf') => void;
+  onImport: (key: 'file' | 'svg' | 'psd' | 'pdf') => void;
   onInsertSource: (asset: Asset) => void;
   onDrawMask: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
+  onPack: (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
   onPsd: () => void;
@@ -165,6 +167,7 @@ export function ImageStudioSheets({
           pageCount={mode === 'project' ? pageCount : 1}
           canPsd={canPsd}
           onRaster={onRaster}
+          onPack={onPack}
           onSvg={onSvg}
           onPdf={onPdf}
           onPsd={onPsd}

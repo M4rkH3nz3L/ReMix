@@ -44,9 +44,10 @@ export type LayerAction =
   | 'forward'
   | 'back'
   | 'duplicate'
+  | 'exportLayer'
   | 'unlock';
 
-export type ImportAction = 'svg' | 'psd' | 'pdf' | 'source';
+export type ImportAction = 'file' | 'svg' | 'psd' | 'pdf' | 'source';
 
 export type ToolKey = RailTool | LayerAction | ImportAction | 'delete';
 
@@ -91,6 +92,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   forward: 'chevron-up-outline',
   back: 'chevron-down-outline',
   duplicate: 'copy-outline',
+  exportLayer: 'share-outline',
   unlock: 'lock-open-outline',
   delete: 'trash-outline',
 };
@@ -115,15 +117,15 @@ export function selectionMenu(layer: ImageLayer, ctx: { canAlign: boolean; canBo
   const order: LayerAction[] = ['forward', 'back'];
   switch (layer.kind) {
     case 'photo':
-      return { actions: ['adjust', 'bgRemove', 'develop', 'style', ...placed, ...order, 'duplicate'], canDelete: true };
+      return { actions: ['adjust', 'bgRemove', 'develop', 'style', ...placed, ...order, 'duplicate', 'exportLayer'], canDelete: true };
     case 'shape': {
       const path: LayerAction[] =
         layer.shape === 'path' ? [...((layer.points?.length ?? 0) >= 2 || layer.subpaths?.length ? (['editPath'] as const) : []), ...(!layer.closed && layer.strokeWidth ? (['outlineStroke'] as const) : ['offsetOut' as const, 'offsetIn' as const])] : layer.shape === 'line' ? [] : ['toPath'];
       const bool: LayerAction[] = ctx.canBoolean ? ['boolean'] : [];
-      return { actions: ['style', 'fx', 'pattern', ...path, ...bool, ...placed, ...order, 'duplicate'], canDelete: true };
+      return { actions: ['style', 'fx', 'pattern', ...path, ...bool, ...placed, ...order, 'duplicate', 'exportLayer'], canDelete: true };
     }
     case 'text':
-      return { actions: ['style', ...placed, ...order, 'duplicate'], canDelete: true };
+      return { actions: ['style', ...placed, ...order, 'duplicate', 'exportLayer'], canDelete: true };
     default:
       // háttér és korrekciós réteg: nem pozícionált, csak a beállításai + a sorrendje van
       return { actions: ['style', ...order, 'duplicate'], canDelete: true };

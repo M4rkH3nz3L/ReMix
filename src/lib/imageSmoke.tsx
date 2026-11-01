@@ -16,6 +16,12 @@ import { moveAnchor, pathEditPatch, pathEditView, setNodeType } from '@/lib/vect
 import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { logCaught } from '@/lib/logCaught';
+import { ExportCancelled } from '@/lib/imageDocClient';
+import { photoBytesPerPixel } from '@/components/studio/image/exportEstimate';
+import { readExportFacts } from '@/components/studio/image/exportVerify';
+import { expectsAlpha, exportProblems, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
+import { customExportSize, formatBytes } from '@/lib/imageExport';
+import { ingestImageFile } from '@/lib/media';
 import { supabase } from '@/lib/supabase';
 import { layerHistogram } from '@/components/studio/image/HistogramView';
 import { HslSheet } from '@/components/studio/image/HslSheet';
@@ -1426,6 +1432,115 @@ async function smokeGrid(log: Log, setHarness: (n: ReactNode) => void, ratio: nu
   setHarness(null);
 }
 
+/** Fájl-import, exportméret, becslés és megszakítás a valódi úton. */
+async function smokeImportExport(log: Log) {
+  const pngFile = (w: number, h: number, name: string) => {
+    const surface = Skia.Surface.MakeOffscreen(w, h)!;
+    const c = surface.getCanvas();
+    const paint = Skia.Paint();
+    for (let i = 0; i < 40; i++) {
+      paint.setColor(Skia.Color(`rgb(${(i * 37) % 255},${(i * 91) % 255},${(i * 53) % 255})`));
+      c.drawRect(Skia.XYWHRect(0, (i * h) / 40, w, h / 40 + 1), paint);
+    }
+    surface.flush();
+    const file = new File(projectMediaDir(), `${name}_${Date.now().toString(36)}.png`);
+    file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+    return file.uri;
+  };
+  const ok = await ingestImageFile(pngFile(400, 200, 'imp'));
+  log(ok.status === 'ok' && ok.width === 400, 'érvényes képfájl beolvasva', JSON.stringify({ s: ok.status }));
+  const bad = new File(projectMediaDir(), `rossz_${Date.now().toString(36)}.png`);
+  bad.write('ez nem kép');
+  const invalid = await ingestImageFile(bad.uri);
+  log(invalid.status === 'invalid', 'a sérült fájl nem megy tovább', invalid.status);
+  removeFile(bad.uri);
+  const big = await ingestImageFile(pngFile(4000, 1000, 'big'));
+  log(big.status === 'ok' && big.width === 3072 && big.originalWidth === 4000, 'a túl nagy kép kicsinyül, és tudjuk az eredetit', big.status === 'ok' ? `${big.originalWidth} → ${big.width}` : big.status);
+
+  const photoUri = pngFile(1024, 1024, 'exp');
+  const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 1024, height: 1024, layers: [{ kind: 'photo', id: 'p', uri: photoUri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch' }] } as unknown as ImageDoc;
+  const size = customExportSize(doc, 700);
+  const out = await renderImageDoc(doc, size.height);
+  if (out) {
+    const img = await decode(out);
+    log(img.height() === size.height && img.width() === size.width, 'az egyedi méret pontos', `${img.width()}×${img.height()}, kért ${size.width}×${size.height}`);
+    removeFile(out);
+  } else {
+    log(false, 'az egyedi méret pontos', 'nincs render');
+  }
+
+  // a becslés a valódi fájlmérethez: csíkos grafika és a csomagolt, részletgazdag logó
+  const art = (await Asset.fromModule(require('../../assets/images/icon.png')).downloadAsync()).localUri!;
+  for (const [label, uri] of [['csíkos', photoUri], ['logó', art]] as const) {
+    const estDoc = { ...doc, id: `est${label === 'logó' ? 1 : 0}`, layers: [{ ...(doc.layers[0] as PhotoLayer), uri }] } as ImageDoc;
+    for (const [format, quality] of [['png', 1], ['jpg', 0.9]] as const) {
+      const out2 = await renderImageDoc(estDoc, 1024, { format, quality });
+      const bpp = await photoBytesPerPixel([uri], format, quality);
+      if (out2 && bpp != null) {
+        const real = new File(out2).size ?? 0;
+        const guess = bpp * 1024 * 1024;
+        const ratio = real ? guess / real : 0;
+        log(ratio >= 0.25 && ratio <= 4, `becslés ${label} ${format}`, `becsült ${formatBytes(guess)}, valódi ${formatBytes(real)}, arány ${ratio.toFixed(2)}`);
+        removeFile(out2);
+      } else {
+        log(false, `becslés ${label} ${format}`, 'nincs mérés');
+      }
+    }
+  }
+
+  // a minőségkapu a valódi fájlokon: a jót átengedi, a rosszat megfogja
+  const bgDoc = { ...doc, id: 'gate', layers: [{ kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer, { ...(doc.layers[0] as PhotoLayer), w: 0.5, h: 0.5 }] } as ImageDoc;
+  const partOf = layerOnlyDoc(bgDoc, 'p')!;
+  const part = await renderImageDoc(partOf, 512);
+  if (part) {
+    const facts = await readExportFacts(part);
+    const expected = { ...customExportSize(partOf, 512), format: 'png' as const, wantsAlpha: expectsAlpha(partOf, 'png') };
+    log(exportProblems(facts, expected).length === 0 && facts.hasAlpha, 'réteg-export: átlátszó háttéren, kapu átengedi', `${facts.width}×${facts.height}, alfa ${facts.hasAlpha}`);
+    const img = await decode(part);
+    log(pixel(img, 10, 10)[3] === 0 && pixel(img, 256, 256)[3] === 255, 'a réteg a helyén, körülötte átlátszó', `sarok α=${pixel(img, 10, 10)[3]}, közép α=${pixel(img, 256, 256)[3]}`);
+    const wrong = exportProblems(facts, { ...expected, width: 1024, height: 1024 });
+    log(wrong.includes('size'), 'a kapu megfogja a rossz méretet', wrong.join(','));
+    removeFile(part);
+  } else {
+    log(false, 'réteg-export', 'nincs render');
+  }
+  const sel = applyRing(null, rectRing({ x: 0.3, y: 0.3 }, { x: 0.5, y: 0.5 }), 'new')!;
+  const selPart = await renderImageDoc(selectionOnlyDoc(bgDoc, sel, 'p')!, 512);
+  if (selPart) {
+    const img = await decode(selPart);
+    log(pixel(img, 200, 200)[3] === 255 && pixel(img, 300, 300)[3] === 0, 'kijelölés-export: csak a terület marad', `benne α=${pixel(img, 200, 200)[3]}, kívül α=${pixel(img, 300, 300)[3]}`);
+    removeFile(selPart);
+  } else {
+    log(false, 'kijelölés-export', 'nincs render');
+  }
+  const flat = await renderImageDoc(bgDoc, 256, { format: 'jpg' });
+  if (flat) {
+    const facts = await readExportFacts(flat);
+    const missing = exportProblems(facts, { width: 256, height: 256, format: 'png', wantsAlpha: true });
+    log(!facts.hasAlpha && missing.includes('alpha'), 'a kapu megfogja az elveszett átlátszóságot', missing.join(','));
+    removeFile(flat);
+  }
+  const broken = new File(projectMediaDir(), `tort_${Date.now().toString(36)}.png`);
+  broken.write('nem kép');
+  const bf = await readExportFacts(broken.uri);
+  log(exportProblems(bf, { width: 1, height: 1, format: 'png', wantsAlpha: false })[0] === 'unreadable', 'a kapu megfogja a nem nyitható fájlt', `opened=${bf.opened}`);
+  removeFile(broken.uri);
+
+  // megszakítás: a kérés indul, azonnal leállítjuk, a következő export zavartalan
+  const ctrl = new AbortController();
+  const cancelled = renderImageDoc({ ...doc, id: 'cancel' } as ImageDoc, 4000, { signal: ctrl.signal }).then(
+    () => 'lefutott',
+    (e: unknown) => (e instanceof ExportCancelled ? 'megszakítva' : String(e))
+  );
+  await sleep(40);
+  ctrl.abort();
+  const verdict = await cancelled;
+  log(verdict === 'megszakítva', 'a megszakítás leállít, nem hiba', verdict);
+  const after = await renderImageDoc({ ...doc, id: 'after' } as ImageDoc, 512);
+  log(!!after, 'megszakítás után újra exportál', after ? 'kész' : 'nincs render');
+  removeFile(photoUri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1618,6 +1733,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'export13') {
+    await step('export13', () => smokeImportExport(log));
     return;
   }
   if (phase === 'grid') {

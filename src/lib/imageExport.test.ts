@@ -5,6 +5,7 @@
  */
 import { cropImageDoc } from '@/lib/imageCrop';
 import { exportSize, imageCacheKey } from '@/lib/imageExport';
+import { customExportSize, estimateExportBytes, formatBytes } from '@/lib/imageExport';
 import { canvasToLayerBox, healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { keepsAlpha } from '@/lib/imageIntake';
 import type { ImageDoc, PhotoLayer, ShapeLayer } from '@/types/project';
@@ -141,5 +142,26 @@ describe('I18 — heal a réteg saját terében', () => {
 describe('I21 — import-formátum', () => {
   it.each([['a.png', true], ['a.WEBP', true], ['b.gif?x=1', true], ['c.jpg', false], ['d.heic', false]])('%s → alfa: %s', (uri, want) => {
     expect(keepsAlpha(uri)).toBe(want);
+  });
+});
+
+describe('egyedi méret és becslés', () => {
+  const doc = { aspectRatio: '1:1', width: 1000, height: 500 };
+  it('az arány marad, a korlátok tartanak', () => {
+    expect(customExportSize(doc, 1000)).toEqual({ width: 2000, height: 1000 });
+    expect(customExportSize(doc, 50).height).toBe(240);
+    expect(customExportSize(doc, 9000)).toEqual({ width: 4096, height: 2048 });
+    expect(customExportSize(doc, Number.NaN).height).toBe(500);
+  });
+  it('a fotó többet nyom, a minőség számít, a PNG a legnagyobb', () => {
+    const n = 1_000_000;
+    expect(estimateExportBytes(n, 'png', 1, true)).toBeGreaterThan(estimateExportBytes(n, 'jpg', 1, true));
+    expect(estimateExportBytes(n, 'jpg', 0.9, true)).toBeGreaterThan(estimateExportBytes(n, 'jpg', 0.5, true));
+    expect(estimateExportBytes(n, 'png', 1, true)).toBeGreaterThan(estimateExportBytes(n, 'png', 1, false));
+    expect(estimateExportBytes(n, 'webp', 0.9, true)).toBeLessThan(estimateExportBytes(n, 'jpg', 0.9, true));
+  });
+  it('olvasható méretet ír', () => {
+    expect(formatBytes(820_000)).toBe('820 kB');
+    expect(formatBytes(3_400_000)).toBe('3,4 MB');
   });
 });

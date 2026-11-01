@@ -3,7 +3,7 @@
  * tényleges callback-láncot futtatja (a natív felismerést nem — az eszközös próba része).
  */
 import { useState } from 'react';
-import { act, create } from 'react-test-renderer';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
@@ -27,7 +27,7 @@ import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 // a natív Skia nem fut Jest alatt; a kép a telefonos füstteszten mért
 jest.mock('@/components/studio/image/SkiaPhotoLayer', () => ({ needsSkiaPreview: () => false, SkiaPhotoLayer: () => null }));
 jest.mock('@/components/studio/image/ShapeEffects', () => ({ ShapeEffects: () => null }));
-jest.mock('@/components/studio/image/DocVignette', () => ({ DocVignette: () => null }));
+jest.mock('@/components/studio/image/DocVignette', () => ({ DocVignette: () => null, DocGrain: () => null }));
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
   const RN = jest.requireActual('react-native');
@@ -356,5 +356,33 @@ describe('≥44 pt célterület', () => {
       expect(Number(s.width)).toBeGreaterThanOrEqual(44);
       expect(Number(s.height)).toBeGreaterThanOrEqual(44);
     }
+  });
+});
+
+describe('rács-illesztés a vásznon', () => {
+  const docWith = (grid?: ImageDoc['grid']) => ({ id: 'd', name: 'n', aspectRatio: '1:1', width: 320, height: 320, layers: [{ ...layer, w: 0.25, h: 0.25, position: { x: 0.5, y: 0.5 } }], grid }) as unknown as ImageDoc;
+  const moved = (grid?: ImageDoc['grid']) => {
+    let last: ImageDoc | null = null;
+    let root: ReactTestRenderer | undefined;
+    act(() => {
+      root = create(<ImageCanvas doc={docWith(grid)} selectedId="p" onSelect={() => {}} commit={(d) => (last = d)} />);
+    });
+    const host = root!.root.findAll((n) => typeof n.props.onLayout === 'function')[0];
+    act(() => host.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 320 } } }));
+    drag(40);
+    const l = (last as ImageDoc | null)?.layers[0] as PhotoLayer | undefined;
+    return l?.position;
+  };
+  it('bekapcsolva a réteg bal felső sarka rácsponton áll meg', () => {
+    const pos = moved({ size: 32, show: false, snap: true });
+    expect(pos).toBeDefined();
+    const left = (pos!.x - 0.125) * 320;
+    expect(Math.abs(left / 32 - Math.round(left / 32))).toBeLessThan(1e-6);
+  });
+  it('kikapcsolva nem igazít a rácshoz', () => {
+    const pos = moved({ size: 32, show: true, snap: false });
+    expect(pos).toBeDefined();
+    const left = (pos!.x - 0.125) * 320;
+    expect(Math.abs(left / 32 - Math.round(left / 32))).toBeGreaterThan(1e-3);
   });
 });

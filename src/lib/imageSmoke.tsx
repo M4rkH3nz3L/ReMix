@@ -1380,6 +1380,52 @@ async function smokePathOps(log: Log, setHarness: (n: ReactNode) => void, ratio:
   }
 }
 
+/** A rács a szerkesztőben látszik, a képbe és az exportba nem kerül. */
+async function smokeGrid(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#ff2d95' } as ImageLayer;
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const plain = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [bg, shape] } as unknown as ImageDoc;
+  const doc = { ...plain, grid: { size: 32, show: true, snap: true } } as ImageDoc;
+  const shot = async (d: ImageDoc, capturing: boolean) => {
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={d} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing={capturing} />
+      </View>
+    );
+    await sleep(900);
+    const uri = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const img = await decode(uri);
+    removeFile(uri);
+    return img;
+  };
+  const [edit, none, capture] = [await shot(doc, false), await shot(plain, false), await shot(doc, true)];
+  setHarness(null);
+  const edge = meanDiff(edit, none, 320, 320);
+  let lines = 0;
+  // a hajszálvonal a kicsinyítésben részben eltűnik: a jelenlét számít, rács nélkül ez pontosan 0
+  for (let i = 0; i < 320; i++) if (Math.abs(pixel(edit, i, 20)[1] - pixel(none, i, 20)[1]) > 2) lines += 1;
+  log(lines > 0, 'a rács látszik a szerkesztőben', `${lines} eltérő pont a sorban, átlag ${edge.toFixed(1)}`);
+  log(meanDiff(capture, none, 320, 320) < 1, 'a mentett képbe nem kerül', `átlag ${meanDiff(capture, none, 320, 320).toFixed(1)}/255`);
+  const [a, b] = [await renderImageDoc(doc, 320), await renderImageDoc(plain, 320)];
+  if (a && b) {
+    const d = meanDiff(await decode(a), await decode(b), 320, 320);
+    log(d === 0, 'az exportba nem kerül', `átlag ${d.toFixed(1)}/255`);
+    removeFile(a);
+    removeFile(b);
+  } else {
+    log(false, 'az exportba nem kerül', 'nincs render');
+  }
+  setHarness(
+    <View style={{ width: 300, height: 300 }}>
+      <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} />
+    </View>
+  );
+  log(true, 'FOTÓZHATÓ', 'a rács a kijelzőn');
+  await sleep(6000);
+  setHarness(null);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1572,6 +1618,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'grid') {
+    await step('grid', () => smokeGrid(log, setHarness, ratio));
     return;
   }
   if (phase === 'pathops') {

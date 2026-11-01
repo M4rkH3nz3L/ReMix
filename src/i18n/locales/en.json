@@ -3561,6 +3561,9 @@
       "brush": { "hint": "Paint on the canvas · pick a color and size" },
       "undoGuides": "Guides",
       "guides": {
+        "grid": "Grid",
+        "snap": "Snap",
+        "gridSize": "{{size}} px",
         "hint": "Tap a ruler to add a guide · drag to the edge to remove",
         "thirds": "Thirds",
         "clear": "Clear"

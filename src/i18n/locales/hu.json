@@ -3561,6 +3561,9 @@
       "brush": { "hint": "Fess a vászonra · válassz színt és méretet" },
       "undoGuides": "Segédvonalak",
       "guides": {
+        "grid": "Rács",
+        "snap": "Illesztés",
+        "gridSize": "{{size}} px",
         "hint": "Koppints a vonalzóra új segédvonalhoz · húzd/szélre a törléshez",
         "thirds": "Harmadok",
         "clear": "Törlés"

@@ -21,6 +21,7 @@ import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
 import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
+import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { layerBoxToCanvas } from '@/lib/imageLayerGeometry';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget } from '@/lib/imageSelectionOps';
@@ -78,7 +79,7 @@ import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
-import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { Asset, ClipMask, ImageClip, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
 
@@ -1071,6 +1072,12 @@ export function ImageStudioBody({
     } catch (caught) {
       logCaught('components/studio/image/ImageStudioBody.tsx:pathOperation', caught);
       Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.pen.outlineFail'));
+    }
+  };
+
+  const updateGrid = (patch: Partial<ImageGrid>) => {
+    if (doc) {
+      commit({ ...doc, grid: { ...DEFAULT_GRID, show: false, snap: false, ...doc.grid, ...patch } }, t('studio.image.guides.grid'));
     }
   };
 
@@ -2069,6 +2076,15 @@ export function ImageStudioBody({
               >
                 <Text style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
               </Pressable>
+              <Pressable onPress={() => updateGrid({ show: !(doc?.grid?.show ?? false) })} style={[styles.penClose, doc?.grid?.show ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.show }}>
+                <Text style={styles.penCloseText}>{t('studio.image.guides.grid')}</Text>
+              </Pressable>
+              <Pressable onPress={() => updateGrid({ snap: !(doc?.grid?.snap ?? false) })} style={[styles.penClose, doc?.grid?.snap ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.snap }}>
+                <Text style={styles.penCloseText}>{t('studio.image.guides.snap')}</Text>
+              </Pressable>
+              <Pressable onPress={() => updateGrid({ size: GRID_SIZES[(GRID_SIZES.indexOf(doc?.grid?.size ?? 32) + 1) % GRID_SIZES.length] })} style={styles.penClose} hitSlop={6} accessibilityRole="button">
+                <Text style={styles.penCloseText}>{t('studio.image.guides.gridSize', { size: doc?.grid?.size ?? DEFAULT_GRID.size })}</Text>
+              </Pressable>
               <Text style={styles.lassoLabel} numberOfLines={1}>
                 {t('studio.image.guides.hint')}
               </Text>
@@ -2277,6 +2293,7 @@ const styles = StyleSheet.create({
   brushDotHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
   brushDotActive: { borderColor: palette.text, borderWidth: 3 },
+  toggleOn: { borderColor: palette.accent, backgroundColor: `${palette.accent}33` },
   selectLink: { color: palette.accent, fontSize: 12, fontWeight: '700' },
   brushSizeBtn: {
     width: 44,

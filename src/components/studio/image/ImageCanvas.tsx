@@ -13,7 +13,9 @@ import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
+import { GridOverlay } from '@/components/studio/image/GridOverlay';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
+import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
 import { MarqueeOverlay } from '@/components/studio/image/MarqueeOverlay';
 import type { SkImage } from '@shopify/react-native-skia';
 import type { Point, Selection } from '@/lib/selection';
@@ -34,7 +36,7 @@ import { ShapeEffects } from '@/components/studio/image/ShapeEffects';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
-import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
+import { canvasToLayerBox, layerBoxToCanvas, renormalizePathLayer } from '@/lib/imageLayerGeometry';
 import { correctHex, correctPaint, correctionsAbove, docVignetteAngles, maskedCorrectionsAbove } from '@/lib/imagePixelPipeline';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
 import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
@@ -312,7 +314,11 @@ export function ImageCanvas({
       pos = { x: g.x, y: g.y };
     }
     const dragged = doc.layers.find((l) => l.id === id);
-    if (dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
+    // a bekapcsolt rács erősebb az okos segédvonalaknál: pontos, ismétlődő elhelyezéshez van
+    if (doc.grid?.snap && dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
+      const { w, h } = layerBox(dragged, pos);
+      pos = snapBoxToGrid(pos, { w, h }, doc.grid, effectiveCanvas(doc));
+    } else if (dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
       const others = visibleLayers(doc)
         .filter((l) => l.id !== id && l.kind !== 'fill' && l.kind !== 'adjust')
         .map((l) => layerBox(l));
@@ -377,7 +383,9 @@ export function ImageCanvas({
   const onNodeCommit = (index: number, x: number, y: number) => {
     if (!pathEditShape?.points) return;
     setLive(null);
-    commitPath(moveAnchor(pathEditShape.points, index, x, y), 'node');
+    const size = effectiveCanvas(doc);
+    const snapped = canvasToLayerBox(snapPointToGrid(layerBoxToCanvas({ x, y }, pathEditShape, size), doc.grid, size), pathEditShape, size);
+    commitPath(moveAnchor(pathEditShape.points, index, snapped.x, snapped.y), 'node');
   };
   // ✏️ v3: bezier-fogó húzása — I27: a node SAJÁT típusa szerint (a smooth/broken megmarad)
   const onHandleLive = (index: number, handle: HandleId, x: number, y: number) => {
@@ -558,7 +566,16 @@ export function ImageCanvas({
 
           {/* ✏️ toll-overlay (a kijelölés helyett) */}
           {!capturing && penPoints && onPenAddPoint && onPenClose ? (
-            <PenOverlay box={fit} points={penPoints} onAddPoint={onPenAddPoint} onClosePath={onPenClose} />
+            <PenOverlay
+              box={fit}
+              points={penPoints}
+              onAddPoint={(p) => {
+                const at = snapPointToGrid(p, doc.grid, effectiveCanvas(doc));
+                const shift = (h: { x: number; y: number }) => ({ x: h.x + at.x - p.x, y: h.y + at.y - p.y });
+                onPenAddPoint({ ...at, ...(p.h1 ? { h1: shift(p.h1) } : {}), ...(p.h2 ? { h2: shift(p.h2) } : {}) });
+              }}
+              onClosePath={onPenClose}
+            />
           ) : null}
 
           {/* ✏️ node-szerkesztő overlay (toll v2 + v3 bezier) */}
@@ -601,6 +618,8 @@ export function ImageCanvas({
               <SelectionAnts selection={selection} box={fit} />
             </Suspense>
           ) : null}
+
+          {!capturing && doc.grid ? <GridOverlay grid={doc.grid} canvas={effectiveCanvas(doc)} box={fit} /> : null}
 
           {/* 📐 statikus segédvonalak — mindig látszanak, ha vannak (a snap miatt) */}
           {!capturing && !guidesActive

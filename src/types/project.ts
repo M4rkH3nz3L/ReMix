@@ -1386,6 +1386,13 @@ export interface AdjustmentLayer {
 }
 
 /** fotó-réteg: a kép + a videóból ismert képjavítás/szűrő/maszk */
+/** 🔲 Rács: a méret dokumentum-pixelben. */
+export interface ImageGrid {
+  size: number;
+  show: boolean;
+  snap: boolean;
+}
+
 /** 🎨 Színsávok a színenkénti HSL-hez; mindhárom érték −1…1. */
 export type HslBand = 'red' | 'orange' | 'yellow' | 'green' | 'aqua' | 'blue' | 'purple' | 'magenta';
 export type HslBands = Partial<Record<HslBand, { h?: number; s?: number; l?: number }>>;
@@ -1527,6 +1534,8 @@ export interface ImageDoc {
   groups?: ImageGroup[];
   /** 📐 kézzel húzott segédvonalak (szerkesztő-only; a render NEM égeti be) */
   guides?: ImageGuide[];
+  /** 🔲 rács (szerkesztő-only) */
+  grid?: ImageGrid;
   /** 🎞️ dokumentum-szintű filmszemcse 0–1 (a TELJES kész képre; cinematic/retró finish). A render égeti. */
   grain?: number;
   /** 🔦 dokumentum-szintű vignetta 0–1 (a sarkokat sötétíti a teljes képen; cinematic). A render égeti. */

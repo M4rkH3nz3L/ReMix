@@ -3566,6 +3566,9 @@
       "brush": { "hint": "Auf die Leinwand malen · Farbe und Größe wählen" },
       "undoGuides": "Hilfslinien",
       "guides": {
+        "grid": "Raster",
+        "snap": "Ausrichten",
+        "gridSize": "{{size}} px",
         "hint": "Lineal antippen für eine Hilfslinie · zum Rand ziehen zum Löschen",
         "thirds": "Drittel",
         "clear": "Löschen"

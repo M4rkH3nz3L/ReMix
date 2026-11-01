@@ -3124,6 +3124,14 @@
       "layer": "Layer"
     },
     "image": {
+      "brand": {
+        "title": "My brand",
+        "hint": "Templates open with these, and they appear in every colour picker.",
+        "colors": "Brand",
+        "font": "Brand font",
+        "addColor": "Save colour to brand",
+        "removeHint": "Long press to remove from brand"
+      },
       "variant": {
         "title": "Variant on a new page",
         "done": "New page: {{name}}"

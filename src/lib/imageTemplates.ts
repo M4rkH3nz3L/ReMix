@@ -1,3 +1,4 @@
+import { applyBrand, EMPTY_BRAND, type BrandStyle } from '@/lib/imageBrand';
 import { createImageDoc } from '@/lib/imageDoc';
 import { nearestAspect } from '@/lib/canvasPresets';
 import type { ImageDoc, ImageLayer, ShapeLayer, TextLayer } from '@/types/project';
@@ -51,7 +52,7 @@ export const IMAGE_TEMPLATES: ImageTemplate[] = [
 ];
 
 /** A sablonból új lap: friss azonosítók, a rétegek azonnal szerkeszthetők. */
-export function docFromTemplate(tpl: ImageTemplate, name: string, makeId: () => string): ImageDoc {
+export function docFromTemplate(tpl: ImageTemplate, name: string, makeId: () => string, brand: BrandStyle = EMPTY_BRAND): ImageDoc {
   const doc = createImageDoc(name, nearestAspect(tpl.width, tpl.height), makeId, { width: tpl.width, height: tpl.height, background: tpl.background });
-  return { ...doc, layers: [...doc.layers, ...tpl.layers.map((l) => ({ ...(l as object), id: makeId() }) as ImageLayer)] };
+  return applyBrand({ ...doc, layers: [...doc.layers, ...tpl.layers.map((l) => ({ ...(l as object), id: makeId() }) as ImageLayer)] }, brand);
 }

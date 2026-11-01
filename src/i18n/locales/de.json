@@ -3124,6 +3124,14 @@
       "layer": "Ebene"
     },
     "image": {
+      "brand": {
+        "title": "Meine Marke",
+        "hint": "Vorlagen öffnen sich damit, und sie stehen in jeder Farbauswahl.",
+        "colors": "Marke",
+        "font": "Marken-Schrift",
+        "addColor": "Farbe in Marke speichern",
+        "removeHint": "Lange drücken zum Entfernen"
+      },
       "variant": {
         "title": "Variante auf neuer Seite",
         "done": "Neue Seite: {{name}}"

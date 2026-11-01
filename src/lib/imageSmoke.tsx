@@ -17,6 +17,9 @@ import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
 import { effectiveCanvas } from '@/lib/canvasPresets';
+import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
+import { useBrandStyle } from '@/store/brandStyleStore';
+import { TemplatesSheet } from '@/components/studio/image/TemplatesSheet';
 import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { variantDoc } from '@/lib/imageVariants';
@@ -1615,7 +1618,7 @@ async function smokeAssistant(log: Log, setHarness: (n: ReactNode) => void, rati
 }
 
 /** Sablonok, méretváltozat és a kép→videó a valódi vásznon, szerveren és tárolón át. */
-async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, ratio: number, brandOnly = false) {
   let n = 0;
   const id = () => `eco${++n}`;
   const check = async (name: string, doc: ImageDoc, other: ImageDoc) => {
@@ -1680,6 +1683,34 @@ async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, rati
     removeFile(c);
   };
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height} betűméret ${PixelRatio.getFontScale()}`);
+  if (brandOnly) {
+    // a felhasználó márkáját a mérés után visszaírjuk
+    const mine = await loadBrandStyle();
+    const brand = { colors: ['#ffd166', '#0a7d3e'], fontFamily: 'Bungee' };
+    await saveBrandStyle(brand);
+    const stored = await loadBrandStyle();
+    log(stored.fontFamily === 'Bungee' && stored.colors.length === 2, 'márka: visszaolvasva a tárolóból', JSON.stringify(stored));
+    for (const tpl of IMAGE_TEMPLATES) {
+      const doc = docFromTemplate(tpl, tpl.key, id, stored);
+      // ellenpróba: ugyanaz a sablon márka nélkül; ha a szerver nem kapná a fontot, ez bukna
+      await check(`márkás sablon = export: ${tpl.key}`, doc, docFromTemplate(tpl, tpl.key, id));
+    }
+    const plain = docFromTemplate(IMAGE_TEMPLATES[0], 'a', id, { colors: [], fontFamily: 'Poppins' });
+    await check('a márka-font valóban más képet ad', docFromTemplate(IMAGE_TEMPLATES[0], 'b', id, { colors: [], fontFamily: 'Bungee' }), plain);
+    useBrandStyle.setState({ colors: stored.colors, fontFamily: stored.fontFamily });
+    setHarness(
+      <Modal transparent visible>
+        <TemplatesSheet onPick={() => {}} onClose={() => {}} />
+      </Modal>
+    );
+    await sleep(1500);
+    log(true, 'FOTÓZHATÓ', 'a Sablonok lap a márkával');
+    await sleep(9000);
+    setHarness(null);
+    useBrandStyle.setState({ colors: mine.colors, fontFamily: mine.fontFamily });
+    await saveBrandStyle(mine);
+    return;
+  }
   const docs = IMAGE_TEMPLATES.map((tpl) => docFromTemplate(tpl, tpl.key, id));
   for (const [i, doc] of docs.entries()) {
     await check(`sablon = export: ${IMAGE_TEMPLATES[i].key}`, doc, { ...doc, layers: doc.layers.slice(0, 1) } as ImageDoc);
@@ -1891,6 +1922,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'brand') {
+    await step('brand', () => smokeEcosystem(log, setHarness, ratio, true));
     return;
   }
   if (phase === 'eco') {

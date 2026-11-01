@@ -3124,6 +3124,14 @@
       "layer": "Réteg"
     },
     "image": {
+      "brand": {
+        "title": "Márkám",
+        "hint": "A sablonok ezekkel nyílnak, és minden színválasztóban ott vannak.",
+        "colors": "Márka",
+        "font": "Márka-font",
+        "addColor": "A szín mentése a márkába",
+        "removeHint": "Hosszan nyomva törlöd a márkából"
+      },
       "variant": {
         "title": "Változat új lapra",
         "done": "Új lap: {{name}}"

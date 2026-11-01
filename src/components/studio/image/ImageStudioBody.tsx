@@ -25,6 +25,7 @@ import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
+import { useBrandStyle } from '@/store/brandStyleStore';
 import { variantDoc } from '@/lib/imageVariants';
 import { customExportSize, exportSize } from '@/lib/imageExport';
 import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
@@ -397,7 +398,7 @@ export function ImageStudioBody({
     setActivePageId(nd.id);
     setSelectedId(null);
   };
-  const addTemplatePage = (tpl: ImageTemplate) => addDocPage(docFromTemplate(tpl, t(`studio.image.templates.${tpl.key}`), () => makeId('lyr')));
+  const addTemplatePage = (tpl: ImageTemplate) => addDocPage(docFromTemplate(tpl, t(`studio.image.templates.${tpl.key}`), () => makeId('lyr'), useBrandStyle.getState()));
   const addVariantPage = (width: number, height: number, label: string) => {
     if (doc) {
       addDocPage(variantDoc(doc, width, height, label, () => makeId('lyr')));

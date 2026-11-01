@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { useBrandStyle } from '@/store/brandStyleStore';
 
 const SWATCHES = [
   '#ffffff', '#0b0b18', '#ff2d95', '#ff6b6b', '#ffd166',
@@ -34,9 +37,41 @@ export function ColorField({
   value: string;
   onChange: (color: string) => void;
 }) {
+  const { t } = useTranslation();
+  const brand = useBrandStyle((s) => s.colors);
+  const saved = brand.includes(value.toLowerCase());
+  useEffect(() => {
+    void useBrandStyle.getState().hydrate();
+  }, []);
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
+      <View style={styles.row}>
+        <Text style={styles.brand}>{t('studio.image.brand.colors')}</Text>
+        {brand.map((c) => (
+          <Pressable
+            key={c}
+            testID={`brand-color-${c}`}
+            onPress={() => onChange(c)}
+            onLongPress={() => void useBrandStyle.getState().removeColor(c)}
+            accessibilityRole="button"
+            accessibilityLabel={c}
+            accessibilityHint={t('studio.image.brand.removeHint')}
+            style={[styles.swatch, { backgroundColor: c }, value.toLowerCase() === c ? styles.active : null]}
+          />
+        ))}
+        <Pressable
+          testID="brand-add-color"
+          disabled={saved}
+          onPress={() => void useBrandStyle.getState().addColor(value)}
+          accessibilityRole="button"
+          accessibilityLabel={t('studio.image.brand.addColor')}
+          accessibilityState={{ disabled: saved }}
+          style={[styles.add, saved ? styles.addDone : null]}
+        >
+          <Text style={styles.addText}>+</Text>
+        </Pressable>
+      </View>
       <View style={styles.row}>
         {SWATCHES.map((c) => (
           <Pressable
@@ -73,6 +108,10 @@ const styles = StyleSheet.create({
   wrap: { gap: 6 },
   label: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  brand: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
+  add: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center' },
+  addDone: { opacity: 0.35 },
+  addText: { color: palette.text, fontSize: 16, fontWeight: '700', lineHeight: 18 },
   swatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: palette.border },
   active: { borderColor: palette.text, borderWidth: 3 },
   hexWrap: {

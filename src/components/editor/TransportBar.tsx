@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { DetailPreview } from '@/components/editor/DetailPreview';
 import { HistoryModal } from '@/components/editor/HistoryModal';
 import { TutorialTarget } from '@/components/tutorial/TutorialTarget';
@@ -41,6 +42,8 @@ export function TransportBar() {
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
   const setPlaybackRate = useEditorStore((s) => s.setPlaybackRate);
   const shuttle = useEditorStore((s) => s.shuttle);
+  const holdBack = useShuttleHold(-1);
+  const holdForward = useShuttleHold(1);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const canUndo = useEditorStore((s) => s.past.length > 0);
@@ -195,6 +198,7 @@ export function TransportBar() {
           {/* ⏭️ képkocka-pontos léptetés */}
           <Pressable
             onPress={() => stepFrame(-1)}
+            {...holdBack}
             style={styles.side}
             accessibilityRole="button"
             accessibilityLabel={t('editor.transportBar.frameBack')}
@@ -221,6 +225,7 @@ export function TransportBar() {
           </TutorialTarget>
           <Pressable
             onPress={() => stepFrame(1)}
+            {...holdForward}
             style={styles.side}
             accessibilityRole="button"
             accessibilityLabel={t('editor.transportBar.frameFwd')}

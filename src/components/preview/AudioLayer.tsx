@@ -68,7 +68,8 @@ export function AudioLayer() {
 function VideoVoice() {
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
-  const isPlaying = useEditorStore((s) => s.isPlaying);
+  // gyors vissza és előre alatt a hang néma: a lejátszók csak 1×-en szólnak helyesen
+  const isPlaying = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
   const setVideoVoiceActive = useEditorStore((s) => s.setVideoVoiceActive);
   const masterVolume = useEditorStore((s) => s.masterVolume);
 
@@ -241,7 +242,8 @@ function ClipAudioPlayer({
 }) {
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
-  const isPlaying = useEditorStore((s) => s.isPlaying);
+  // gyors vissza és előre alatt a hang néma: a lejátszók csak 1×-en szólnak helyesen
+  const isPlaying = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
   const masterVolume = useEditorStore((s) => s.masterVolume);
 
   // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)

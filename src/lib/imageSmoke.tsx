@@ -2212,6 +2212,48 @@ async function smokeMenus(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** Gyors vissza és előre a valódi mesterórán: a lejátszófej a sebesség szerint halad. */
+async function smokeShuttle(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  let n = 0;
+  const base = addImageDocToVideo(createEmptyProject('smoke shuttle', '9:16', undefined, 'video'), createImageDoc('t', '9:16', () => `sh${++n}`), 'file:///smoke.png');
+  const project = { ...base, tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: t.clips.map((c) => ({ ...c, duration: 120 })) } : t)) };
+  await saveProject(project);
+  router.push(`/editor/${project.id}` as Href);
+  const s = () => useEditorStore.getState();
+  for (let i = 0; i < 40 && s().project?.id !== project.id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  s().setPlayhead(60);
+  await sleep(300);
+  const run = async (dir: 1 | -1, times: number, expected: number, name: string) => {
+    s().setPlaybackRate(dir);
+    for (let i = 0; i < times; i++) {
+      s().shuttle(dir);
+    }
+    const [from, t0] = [s().playhead, performance.now()];
+    await sleep(1500);
+    const moved = s().playhead - from;
+    const elapsed = (performance.now() - t0) / 1000;
+    s().setPlaying(false);
+    s().setPlaybackRate(1);
+    const rate = moved / elapsed;
+    log(Math.abs(rate - expected) < Math.abs(expected) * 0.25, name, `${rate.toFixed(2)}× (várt ${expected}×)`);
+    await sleep(300);
+  };
+  await run(1, 1, 2, 'előre 2×');
+  await run(1, 2, 4, 'előre 4×');
+  await run(-1, 1, -2, 'vissza 2×');
+  await run(-1, 2, -4, 'vissza 4×');
+  const stopped = s().playhead;
+  await sleep(600);
+  log(s().playhead === stopped && !s().isPlaying, 'elengedés után megáll a helyén', `${stopped.toFixed(2)} mp`);
+  router.back();
+  await sleep(1500);
+  await deleteProject(project.id);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2404,6 +2446,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'shuttle') {
+    await step('shuttle', () => smokeShuttle(log));
     return;
   }
   if (phase === 'menus') {

@@ -12,6 +12,7 @@ import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, Scroll
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { UndoGestureArea } from '@/components/UndoGestureArea';
+import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
@@ -91,6 +92,8 @@ export function AudioStudioBody({
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
+  const holdBack = useShuttleHold(-1);
+  const holdForward = useShuttleHold(1);
   const multiSelectIds = useEditorStore((s) => s.multiSelectIds);
   const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
@@ -711,11 +714,11 @@ export function AudioStudioBody({
         <View style={styles.tSep} />
         {/* ugrás elejére / lépés beatre vissza */}
         <TBtn icon="play-skip-back" onPress={() => useEditorStore.getState().setPlayhead(0)} />
-        <TBtn icon="chevron-back" onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} />
+        <TBtn icon="chevron-back" {...holdBack} onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} />
         <Pressable onPress={() => useEditorStore.getState().setPlaying(!isPlaying)} style={styles.playBtn}>
           <Ionicons name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
         </Pressable>
-        <TBtn icon="chevron-forward" onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} />
+        <TBtn icon="chevron-forward" {...holdForward} onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} />
         <TBtn icon="play-skip-forward" onPress={() => useEditorStore.getState().setPlayhead(duration)} />
         <View style={styles.tSep} />
         {/* loop + In/Out + range törlés */}
@@ -800,16 +803,21 @@ function TBtn({
   onPress,
   disabled,
   active,
+  ...press
 }: {
   icon?: keyof typeof Ionicons.glyphMap;
   label?: string;
   onPress: () => void;
   disabled?: boolean;
   active?: boolean;
+  onLongPress?: () => void;
+  onPressOut?: () => void;
+  delayLongPress?: number;
 }) {
   const color = disabled ? palette.border : active ? palette.accent : palette.text;
   return (
     <Pressable
+      {...press}
       style={[styles.tBtn, active && styles.tBtnActive]}
       onPress={onPress}
       disabled={disabled}

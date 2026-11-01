@@ -2261,9 +2261,13 @@ async function smokeLiveStudio(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const project = createEmptyProject('smoke stúdió', '9:16', undefined, 'live');
   await saveProject(project);
+  const start = performance.now();
   router.push(`/live/studio/${project.id}` as Href);
-  await sleep(4000);
-  log(useEditorStore.getState().project?.id === project.id, 'a Stúdió megnyílt', project.id);
+  for (let i = 0; i < 100 && useEditorStore.getState().project?.id !== project.id; i++) {
+    await sleep(200);
+  }
+  log(useEditorStore.getState().project?.id === project.id, 'a Stúdió megnyílt', `${Math.round(performance.now() - start)} ms`);
+  await sleep(1500);
   log(true, 'FOTÓZHATÓ', 'Live Stúdió');
   await sleep(7000);
   router.back();

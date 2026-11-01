@@ -205,7 +205,8 @@ export const speedPresets = [0.25, 0.5, 1, 1.5, 2, 4];
 /** idővonal-lépték: pixel/másodperc = BASE * zoom */
 export const BASE_PX_PER_SEC = 60;
 export const MIN_ZOOM = 0.2;
-export const MAX_ZOOM = 4;
+/** 16× = 960 px/mp: 30 fps-en 32 pont egy kocka, így kockapontosan fogható az ujjal */
+export const MAX_ZOOM = 16;
 
 /** ennél rövidebbre nem vágható klip (mp) */
 export const MIN_CLIP_DURATION = 0.2;

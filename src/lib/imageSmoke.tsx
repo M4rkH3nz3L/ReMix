@@ -8,6 +8,9 @@ import { captureRef } from 'react-native-view-shot';
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
+import { Asset } from 'expo-asset';
+import { projectMaskToCanvas } from '@/components/studio/image/projectMask';
+import { foregroundMask } from '@/lib/foregroundMask';
 import { logCaught } from '@/lib/logCaught';
 import { supabase } from '@/lib/supabase';
 import { layerHistogram } from '@/components/studio/image/HistogramView';
@@ -1123,6 +1126,62 @@ async function smokeRetouch(log: Log) {
   log(pixel(empty, 300, 300)[3] === 0, 'forrás nélkül nem fest feketét', `${pixel(empty, 300, 300)}`);
 }
 
+/** A háttér-eltávolítás a valódi Vision-úton; a kép a csomagolt logó, a téma közepe ismert. */
+async function smokeBgRemove(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const asset = await Asset.fromModule(require('../../assets/images/icon.png')).downloadAsync();
+  const uri = asset.localUri!;
+  const output = new File(projectMediaDir(), `fg_smoke_${Date.now().toString(36)}.png`).uri;
+  const res = await foregroundMask(uri, output);
+  log(res.status === 'ok', 'Vision maszk', res.status);
+  if (res.status !== 'ok') {
+    return;
+  }
+  const [photo, mask] = [await decode(uri), await decode(res.uri)];
+  log(mask.width() > 0 && Math.abs(mask.width() / mask.height() - photo.width() / photo.height()) < 0.02, 'a maszk a kép arányában', `${mask.width()}×${mask.height()}, kép ${photo.width()}×${photo.height()}`);
+  const [w, h] = [mask.width(), mask.height()];
+  const row = Array.from({ length: 11 }, (_, i) => Array.from({ length: 11 }, (__, j) => (pixel(mask, Math.min(w - 1, Math.floor((j / 10) * w)), Math.min(h - 1, Math.floor((i / 10) * h)))[0] > 128 ? '#' : '.')).join(''));
+  log(row.join('').includes('#') && row.join('').includes('.'), 'a maszkban van téma és háttér', row.join(' / '));
+
+  const canvas = { width: 320, height: 320 };
+  const bg = { kind: 'fill', id: 'f', fill: '#ffffff' } as ImageLayer;
+  const place = (extra: Partial<PhotoLayer>) => ({ kind: 'photo', id: 'p', uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'cover', ...extra }) as PhotoLayer;
+  const layouts: [string, Partial<PhotoLayer>][] = [
+    ['teljes vásznon', {}],
+    ['elforgatva', { rotation: 30, w: 0.7, h: 0.7 }],
+    ['tükrözve, eltolva', { flipH: true, position: { x: 0.6, y: 0.45 }, w: 0.7, h: 0.7 }],
+    ['contain, eltérő arány', { fit: 'contain', w: 0.9, h: 0.5 }],
+  ];
+  for (const [name, extra] of layouts) {
+    const layer = place(extra);
+    const projected = projectMaskToCanvas(mask, layer, { width: photo.width(), height: photo.height() }, canvas, false)!;
+    const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [bg, { ...layer, mask: { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image: projected } }] } as unknown as ImageDoc;
+    const v = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+      </View>
+    );
+    await sleep(1600);
+    const shot = await captureRef(v, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const a = await decode(shot);
+    setHarness(null);
+    await sleep(80);
+    const [out, plain] = [await renderImageDoc(doc, 320), await renderImageDoc({ ...doc, layers: [bg, layer] } as unknown as ImageDoc, 320)];
+    if (!out || !plain) {
+      log(false, `kivágás = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const d = meanDiff(a, await decode(out), 320, 320);
+    const ctl = meanDiff(a, await decode(plain), 320, 320);
+    log(d <= 6 && ctl >= d * 1.5, `kivágás = export: ${name}`, `átlag ${d.toFixed(1)}/255; kivágás nélkül ${ctl.toFixed(1)}`);
+    removeFile(shot);
+    removeFile(out);
+    removeFile(plain);
+    removeFile(projected);
+  }
+  removeFile(res.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1315,6 +1374,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'bgremove') {
+    await step('bgremove', () => smokeBgRemove(log, setHarness, ratio));
     return;
   }
   if (phase === 'retouch') {

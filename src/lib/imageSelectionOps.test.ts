@@ -1,5 +1,6 @@
 import { docMediaUris, updateLayer } from '@/lib/imageDoc';
 import { imageDocMediaRefs, relinkImageDocs } from '@/lib/imageDocMedia';
+import { imageCornersOnCanvas } from '@/lib/imageLayerGeometry';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, rectRing, type Selection, selectionContains } from '@/lib/selection';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
@@ -108,5 +109,26 @@ describe('a festett maszk képe a média része', () => {
   it('a mozgatás a dobozát viszi', () => {
     const moved = updateLayer<PhotoLayer>(d, 'a', { position: { x: 0.6, y: 0.5 } });
     expect((moved.layers[0] as PhotoLayer).mask?.x).toBeCloseTo(0.6);
+  });
+});
+
+describe('a fotó sarkai a vásznon', () => {
+  const canvas = { width: 100, height: 100 };
+  const place = (extra: Partial<PhotoLayer>) => ({ position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }) as PhotoLayer;
+  it('teljes vásznon a sarkok a vászon sarkai', () => {
+    const [a, b, c] = imageCornersOnCanvas(place({}), 1, canvas);
+    expect([a.x, a.y, b.x, b.y, c.x, c.y].map((v) => Math.round(v * 100) / 100)).toEqual([0, 0, 1, 0, 0, 1]);
+  });
+  it('tükrözve a bal sarok jobbra kerül', () => {
+    const [a] = imageCornersOnCanvas(place({ flipH: true }), 1, canvas);
+    expect(a.x).toBeCloseTo(1);
+  });
+  it('90 fokkal forgatva a jobb felső sarok lefelé mutat', () => {
+    const [a, b] = imageCornersOnCanvas(place({ rotation: 90 }), 1, canvas);
+    expect(b.y).toBeGreaterThan(a.y);
+  });
+  it('cover: a szélesebb kép túlnyúlik a dobozon', () => {
+    const [a] = imageCornersOnCanvas(place({ fit: 'cover' }), 2, canvas);
+    expect(a.x).toBeLessThan(0);
   });
 });

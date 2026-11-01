@@ -19,6 +19,9 @@ import {
 } from '@/components/studio/image/body/ImageStudioSheets';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
+import { requestCutout } from '@/lib/bgremove';
+import { foregroundMask } from '@/lib/foregroundMask';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 import { layerBoxToCanvas } from '@/lib/imageLayerGeometry';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, type Point, type Selection, type SelectionMode } from '@/lib/selection';
@@ -777,6 +780,11 @@ export function ImageStudioBody({
         setSheet(null);
         setQuickAdjust(true);
         break;
+      case 'bgRemove':
+        if (selectedLayer?.kind === 'photo') {
+          void removeBackground(selectedLayer);
+        }
+        break;
       case 'develop':
         // 📸 RAW-develop (non-destruktív előhívás) — csak fotó-rétegre
         setSheet('develop');
@@ -992,6 +1000,48 @@ export function ImageStudioBody({
       }
     }
     setBrushActive(false);
+  };
+
+  // ✂️ háttér ki: eszközön, ha lehet (ingyenes); különben a felhő-út. A maszk festett maszkként
+  // kerül a rétegre, így roncsolásmentes és ecsettel javítható.
+  const removeBackground = async (layer: PhotoLayer) => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const { Skia } = await import('@shopify/react-native-skia');
+      const { projectMaskToCanvas } = await import('@/components/studio/image/projectMask');
+      const output = new File(projectMediaDir(), `fg_${Date.now().toString(36)}.png`).uri;
+      const local = await foregroundMask(layer.uri, output);
+      if (local.status === 'no-subject') {
+        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.noSubject'));
+        return;
+      }
+      let maskUri: string | null = local.status === 'ok' ? local.uri : null;
+      if (local.status !== 'ok') {
+        if (!isPro) {
+          Alert.alert(t('studio.image.bgRemove.proTitle'), t('studio.image.bgRemove.proBody'));
+          return;
+        }
+        maskUri = (await requestCutout(layer.uri))?.uri ?? null;
+      }
+      const [photo, mask] = await Promise.all([Skia.Data.fromURI(layer.uri), maskUri ? Skia.Data.fromURI(maskUri) : null]);
+      const [photoImg, maskImg] = [Skia.Image.MakeImageFromEncoded(photo), mask ? Skia.Image.MakeImageFromEncoded(mask) : null];
+      const canvas = effectiveCanvas(doc);
+      const image = photoImg && maskImg ? projectMaskToCanvas(maskImg, layer, { width: photoImg.width(), height: photoImg.height() }, canvas, local.status !== 'ok') : null;
+      if (!image) {
+        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.failBody'));
+        return;
+      }
+      const next: ClipMask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image };
+      commit(updateLayer<PhotoLayer>(doc, layer.id, { mask: next }), t('studio.image.bgRemove.undo'));
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:removeBackground', caught);
+      Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.failBody'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   // 🩹 retus: előbb a vászon képe, utána indul a munkamenet (a pillanatkép az overlay-t levenné)

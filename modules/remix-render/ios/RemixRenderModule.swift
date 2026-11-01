@@ -2,6 +2,7 @@ import ExpoModulesCore
 import AVFoundation
 import CoreMedia
 import UIKit
+import Vision
 
 // Eszközön futó videó-render AVFoundation-nel — a Remix ingyenes export-útja.
 //
@@ -70,7 +71,56 @@ enum RenderError: Error, LocalizedError {
   }
 }
 
+enum ForegroundError: LocalizedError {
+  case unsupported
+  case noSubject
+  case badImage
+
+  var errorDescription: String? {
+    switch self {
+    case .unsupported: return "UNSUPPORTED"
+    case .noSubject: return "NO_SUBJECT"
+    case .badImage: return "BAD_IMAGE"
+    }
+  }
+}
+
 public class RemixRenderModule: Module {
+  /// A kép álló helyzetbe forgatva, legfeljebb 2048 pont hosszú oldallal: a maszk a látható képhez igazodjon.
+  private static func uprightImage(uri: String) throws -> CGImage {
+    let path = uri.hasPrefix("file://") ? (URL(string: uri)?.path ?? uri) : uri
+    guard let image = UIImage(contentsOfFile: path) else { throw ForegroundError.badImage }
+    let scale = min(1, 2048 / max(image.size.width, image.size.height))
+    let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let upright = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: size))
+    }
+    guard let cg = upright.cgImage else { throw ForegroundError.badImage }
+    return cg
+  }
+
+  static func foregroundMask(uri: String, outputPath: String) throws -> String {
+    guard #available(iOS 17.0, *) else { throw ForegroundError.unsupported }
+    let handler = VNImageRequestHandler(cgImage: try uprightImage(uri: uri), options: [:])
+    let request = VNGenerateForegroundInstanceMaskRequest()
+    do {
+      try handler.perform([request])
+    } catch {
+      // a szimulátoron és a régi Neural Engine-en a kérés nem fut
+      throw ForegroundError.unsupported
+    }
+    guard let result = request.results?.first, !result.allInstances.isEmpty else {
+      throw ForegroundError.noSubject
+    }
+    let mask = try result.generateScaledMaskForImage(forInstances: result.allInstances, from: handler)
+    let output = outputPath.hasPrefix("file://") ? URL(string: outputPath)! : URL(fileURLWithPath: outputPath)
+    let gray = CGColorSpace(name: CGColorSpace.genericGrayGamma2_2)!
+    try CIContext().writePNGRepresentation(of: CIImage(cvPixelBuffer: mask), to: output, format: .L8, colorSpace: gray)
+    return output.absoluteString
+  }
+
   private var progressTimer: Timer?
   // a futó export + a megszakítás-jelző — a JS `cancel()` másik szálról jön
   private let stateLock = NSLock()
@@ -100,6 +150,18 @@ public class RemixRenderModule: Module {
     }
 
     // a futó render tényleges leállítása (a JS AbortSignal → ide jut)
+    // A téma maszkja az eszközön (Vision, iOS 17+): a kép nem hagyja el a telefont.
+    AsyncFunction("foregroundMask") { (uri: String, outputPath: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let url = try RemixRenderModule.foregroundMask(uri: uri, outputPath: outputPath)
+          DispatchQueue.main.async { promise.resolve(url) }
+        } catch {
+          DispatchQueue.main.async { promise.reject(error) }
+        }
+      }
+    }
+
     AsyncFunction("cancel") { () in
       self.stateLock.lock()
       self.cancelRequested = true

@@ -32,12 +32,16 @@ export function boxToImage(
   return out.x < 0 || out.x > 1 || out.y < 0 || out.y > 1 ? null : out;
 }
 
+/** Kép-pont (0–1) → doboz-pont; a `cover` levágott része a dobozon kívülre esik (<0 vagy >1). */
+export function imageToBoxRaw(p: { x: number; y: number }, imageAspect: number, boxAspect: number, fit: LayerFit): { x: number; y: number } {
+  const f = fitFractions(imageAspect, boxAspect, fit);
+  return fit === 'contain'
+    ? { x: 0.5 + (p.x - 0.5) * f.x, y: 0.5 + (p.y - 0.5) * f.y }
+    : { x: 0.5 + (p.x - 0.5) / f.x, y: 0.5 + (p.y - 0.5) / f.y };
+}
+
 /** Kép-pont (0–1) → doboz-pont (0–1); a `cover` levágott része a doboz szélére szorul. */
 export function imageToBox(p: { x: number; y: number }, imageAspect: number, boxAspect: number, fit: LayerFit): { x: number; y: number } {
-  const f = fitFractions(imageAspect, boxAspect, fit);
-  const out =
-    fit === 'contain'
-      ? { x: 0.5 + (p.x - 0.5) * f.x, y: 0.5 + (p.y - 0.5) * f.y }
-      : { x: 0.5 + (p.x - 0.5) / f.x, y: 0.5 + (p.y - 0.5) / f.y };
+  const out = imageToBoxRaw(p, imageAspect, boxAspect, fit);
   return { x: Math.max(0, Math.min(1, out.x)), y: Math.max(0, Math.min(1, out.y)) };
 }

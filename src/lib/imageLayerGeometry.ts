@@ -1,3 +1,4 @@
+import { imageToBoxRaw } from '@/lib/wandMapping';
 import type { ClipMask, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
 /**
@@ -188,4 +189,17 @@ export function maskOutlineInBox(mask: ClipMask, layer: Placed, canvas: { width:
             { x: mask.x - rx, y: mask.y + ry },
           ];
   return outline.map((p) => canvasToLayerBox(p, layer, canvas));
+}
+
+/**
+ * A fotó bal felső, jobb felső és bal alsó sarka a vásznon (0–1): a réteg illesztése, helye,
+ * forgatása és tükrözése szerint. Ebből számolható a kép → vászon leképezés.
+ */
+export function imageCornersOnCanvas(
+  layer: Placed & { fit?: PhotoLayer['fit'] },
+  imageAspect: number,
+  canvas: { width: number; height: number }
+): { x: number; y: number }[] {
+  const boxAspect = (layer.w * canvas.width) / (layer.h * canvas.height);
+  return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }].map((p) => layerBoxToCanvas(imageToBoxRaw(p, imageAspect, boxAspect, layer.fit ?? 'cover'), layer, canvas));
 }

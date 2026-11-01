@@ -9,6 +9,8 @@ import { requireOptionalNativeModule } from 'expo';
 export interface RemixRenderNative {
   /** A render-tervet (JSON) MP4-re rendereli; a kimeneti fájl URI-ját adja vissza. */
   exportPlan(planJson: string, outputPath: string): Promise<string>;
+  /** A téma maszkja szürke PNG-ként (iOS 17+, Vision). */
+  foregroundMask(uri: string, outputPath: string): Promise<string>;
   addListener(
     event: 'onProgress',
     listener: (e: { progress: number }) => void

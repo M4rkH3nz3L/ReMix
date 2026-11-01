@@ -28,6 +28,7 @@ export type LayerAction =
   | 'style'
   | 'adjust'
   | 'develop'
+  | 'bgRemove'
   | 'fx'
   | 'pattern'
   | 'editPath'
@@ -63,6 +64,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   pen: 'pencil-outline',
   brush: 'brush-outline',
   retouch: 'bandage-outline',
+  bgRemove: 'cut-outline',
   marquee: 'scan-outline',
   lasso: 'analytics-outline',
   wand: 'color-wand-outline',
@@ -107,7 +109,7 @@ export function selectionMenu(layer: ImageLayer, ctx: { canAlign: boolean; canBo
   const order: LayerAction[] = ['forward', 'back'];
   switch (layer.kind) {
     case 'photo':
-      return { actions: ['adjust', 'develop', 'style', ...placed, ...order, 'duplicate'], canDelete: true };
+      return { actions: ['adjust', 'bgRemove', 'develop', 'style', ...placed, ...order, 'duplicate'], canDelete: true };
     case 'shape': {
       const path: LayerAction[] =
         layer.shape === 'path' ? ((layer.points?.length ?? 0) >= 2 ? ['editPath'] : []) : layer.shape === 'line' ? [] : ['toPath'];

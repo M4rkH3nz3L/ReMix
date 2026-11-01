@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "bgRemove": "Hintergrund weg",
       "retouch": "Retusche",
       "marquee": "Auswahl",
       "toPath": "In Pfad",
@@ -3118,6 +3119,13 @@
       "layer": "Ebene"
     },
     "image": {
+      "bgRemove": {
+        "noSubject": "Auf diesem Bild wurde kein klares Motiv gefunden.",
+        "failBody": "Das Entfernen des Hintergrunds ist fehlgeschlagen. Bitte versuche es erneut.",
+        "proTitle": "Pro-Funktion auf diesem Gerät",
+        "proBody": "Auf diesem Gerät läuft die Hintergrundentfernung in der Cloud und erfordert Pro.",
+        "undo": "Hintergrund entfernen"
+      },
       "retouch": {
         "clone": "Klonen",
         "heal": "Reparieren",

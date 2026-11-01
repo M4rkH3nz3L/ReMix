@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "bgRemove": "Háttér ki",
       "retouch": "Retus",
       "marquee": "Kijelölés",
       "toPath": "Görbévé",
@@ -3118,6 +3119,13 @@
       "layer": "Réteg"
     },
     "image": {
+      "bgRemove": {
+        "noSubject": "Nem találtam kiemelhető témát ezen a képen.",
+        "failBody": "A háttér eltávolítása nem sikerült. Próbáld újra.",
+        "proTitle": "Pro funkció ezen az eszközön",
+        "proBody": "Ezen az eszközön a háttér-eltávolítás a felhőben fut, ez Pro-előfizetéssel érhető el.",
+        "undo": "Háttér eltávolítása"
+      },
       "retouch": {
         "clone": "Klón",
         "heal": "Folt",

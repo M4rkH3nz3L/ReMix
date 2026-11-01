@@ -1,7 +1,7 @@
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
 import { File } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
-import { createRef } from 'react';
+import { createRef, Profiler } from 'react';
 import { Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
@@ -60,7 +60,7 @@ import { normalizePickedImage } from '@/lib/media';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { cloudBaseUrl } from '@/lib/backend';
-import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
+import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
@@ -1800,6 +1800,104 @@ async function smokeRemix(log: Log, setHarness: (n: ReactNode) => void, ratio: n
   log((await loadProject(id)) === null, 'remix: a tesztprojekt törölve', id);
 }
 
+/** Nagy dokumentum költsége: módosítás, visszavonás, mentés, vászon. Fejlesztői build, a növekedés a lényeg. */
+async function smokePerf(log: Log, setHarness: (n: ReactNode) => void) {
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const timed = async (fn: () => unknown) => {
+    const t = performance.now();
+    await fn();
+    return performance.now() - t;
+  };
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  for (const count of [20, 100, 400]) {
+    let n = 0;
+    const id = () => `perf${count}_${++n}`;
+    let doc = createImageDoc('perf', '1:1', id, { width: 1080, height: 1080 });
+    for (let i = 0; i < count; i++) {
+      const position = { x: ((i * 37) % 100) / 100, y: ((i * 61) % 100) / 100 };
+      doc = addLayer(doc, i % 3 === 0
+        ? ({ kind: 'text', id: id(), text: `Szöveg ${i}`, position, fontSize: 4, color: '#ffffff', fontFamily: 'Poppins' } as ImageLayer)
+        : ({ kind: 'shape', id: id(), shape: 'rectangle', position, w: 0.1, h: 0.1, fill: '#ff2d95' } as ImageLayer));
+    }
+    const project = { ...createEmptyProject(`perf ${count}`, '1:1', undefined, 'image'), imageDocs: [doc] };
+    useEditorStore.getState().loadProject(project, []);
+    const moved = (d: ImageDoc, k: number) => updateLayer(d, d.layers[d.layers.length - 1].id, { position: { x: 0.1 + k / 100, y: 0.5 } } as Partial<ImageLayer>);
+    const commits: number[] = [];
+    const undos: number[] = [];
+    for (let k = 0; k < 9; k++) {
+      commits.push(await timed(() => useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: moved(doc, k) }, 'user')));
+    }
+    for (let k = 0; k < 5; k++) {
+      undos.push(await timed(() => useEditorStore.getState().undo()));
+    }
+    const state = useEditorStore.getState();
+    const bytes = JSON.stringify(state.project).length;
+    const save = await timed(() => saveProjectAndEvents(state.project!, state.events));
+    const renders: number[] = [];
+    const view = (d: ImageDoc) => (
+      <Profiler id="canvas" onRender={(_id, _phase, actual) => { renders.push(actual); }}>
+        <View style={{ width: 320, height: 320 }}>
+          <ImageCanvas doc={d} selectedId={null} onSelect={() => {}} commit={() => {}} capturing />
+        </View>
+      </Profiler>
+    );
+    setHarness(view(doc));
+    await sleep(1500);
+    const mount = renders.reduce((a, b) => a + b, 0);
+    const updates: number[] = [];
+    for (let k = 0; k < 5; k++) {
+      renders.length = 0;
+      setHarness(view(moved(doc, k)));
+      await sleep(250);
+      updates.push(renders.reduce((a, b) => a + b, 0));
+    }
+    setHarness(null);
+    await sleep(200);
+    // a memo nem hagyhat elavult képet: a korrekció és az eltolt réteg azonnal látszik
+    if (count === 20) {
+      const v = createRef<View>() as RefObject<View>;
+      const frame = (d: ImageDoc) => (
+        <View style={{ width: 200, height: 200 }}>
+          <ImageCanvas doc={d} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={v} capturing />
+        </View>
+      );
+      const grab = async () => {
+        await sleep(350);
+        const uri = await captureRef(v, { format: 'png', quality: 1, width: 120, height: 120 });
+        const img = await decode(uri);
+        removeFile(uri);
+        return img;
+      };
+      const distance = (p: SkImage, q: SkImage) => {
+        let sum = 0;
+        for (let i = 0; i < 400; i++) {
+          const [x, y] = [(i * 53) % 120, (i * 97) % 120];
+          const [u, w] = [pixel(p, x, y), pixel(q, x, y)];
+          sum += Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2]);
+        }
+        return sum / 1200;
+      };
+      setHarness(frame(doc));
+      const base = await grab();
+      const graded = addLayer(doc, { kind: 'adjust', id: id(), name: 'k', adjust: { brightness: -0.6 } } as unknown as ImageLayer);
+      setHarness(frame(graded));
+      const dark = await grab();
+      const lighter = { ...graded, layers: graded.layers.map((l) => (l.kind === 'adjust' ? ({ ...l, adjust: { brightness: 0.6 } } as ImageLayer) : l)) };
+      setHarness(frame(lighter));
+      const light = await grab();
+      setHarness(frame(doc));
+      const back = await grab();
+      setHarness(null);
+      log(distance(base, dark) > 8 && distance(dark, light) > 8, 'memo: az új és a változó korrekció azonnal látszik', `alap→sötét ${distance(base, dark).toFixed(1)}, sötét→világos ${distance(dark, light).toFixed(1)}`);
+      log(distance(base, back) < 1, 'memo: a korrekció törlése visszaadja az eredeti képet', `${distance(base, back).toFixed(2)}`);
+    }
+    log(median(updates) <= (count === 400 ? 100 : 30), `perf ${count} réteg: egy réteg változása elfér`, `${median(updates).toFixed(0)} ms`);
+    log(null, `perf ${count} réteg`, `módosítás ${median(commits).toFixed(1)} ms, undo ${median(undos).toFixed(1)} ms, mentés ${save.toFixed(0)} ms (${Math.round(bytes / 1024)} kB), vászon-felépítés ${mount.toFixed(0)} ms, egy réteg változása ${median(updates).toFixed(0)} ms`);
+    useEditorStore.getState().closeProject();
+    await deleteProject(project.id);
+  }
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -1992,6 +2090,10 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'perf') {
+    await step('perf', () => smokePerf(log, setHarness));
     return;
   }
   if (phase === 'remix') {

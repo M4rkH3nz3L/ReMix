@@ -43,14 +43,14 @@ function walk(dir: string, re: RegExp, out: string[] = []): string[] {
   return out;
 }
 
+/** minden ágon továbbdob: a feltételes `throw` után a kód még elnyelheti a hibát */
 function rethrows(node: ts.Node): boolean {
-  let found = false;
-  const visit = (n: ts.Node) => {
-    if (ts.isThrowStatement(n)) found = true;
-    else if (!ts.isFunctionLike(n)) ts.forEachChild(n, visit);
-  };
-  visit(node);
-  return found;
+  const statements = ts.isBlock(node) ? node.statements : null;
+  if (!statements) {
+    return false;
+  }
+  const last = statements[statements.length - 1];
+  return !!last && (ts.isThrowStatement(last) || (ts.isIfStatement(last) && !!last.elseStatement && rethrows(last.thenStatement) && rethrows(last.elseStatement)));
 }
 
 function silentSites(file: string): string[] {

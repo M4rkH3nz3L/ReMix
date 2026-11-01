@@ -315,6 +315,7 @@ export async function renderImageDoc(
       throw new ImageRenderRejected(body.error || `Render-hiba (${res.status})`);
     }
     if (!res.ok) {
+      logCaught('lib/imageDocClient.ts:renderImageDoc:http', new Error(`Render-hiba (${res.status})`));
       return null;
     }
     const missing = Number(res.headers.get('x-missing-layers') ?? 0);
@@ -330,6 +331,7 @@ export async function renderImageDoc(
     if (opts.signal?.aborted) {
       throw new ExportCancelled();
     }
+    logCaught('lib/imageDocClient.ts:renderImageDoc', e);
     return null;
   }
 }

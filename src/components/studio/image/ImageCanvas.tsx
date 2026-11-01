@@ -1,18 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Fragment, type Ref, Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { type Ref, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
-import { TextOverlay } from '@/components/preview/TextOverlay';
 // 🖌️ a BrushOverlay (Skia-függő) LUSTÁN töltődik — csak a TÍPUS statikus (erased),
 // a komponens csak az ecset bekapcsolásakor rántja be a @shopify/react-native-skia
 // natív modult, így annak hiánya (régi dev-kliens) nem crash-eltet betöltéskor.
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
-import { FillLayerView } from '@/components/studio/image/FillLayerView';
+import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
 import { GridOverlay } from '@/components/studio/image/GridOverlay';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
 import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
@@ -21,7 +19,6 @@ import type { SkImage } from '@shopify/react-native-skia';
 import type { Point, Selection } from '@/lib/selection';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
-import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
 import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
 import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
 import { WandOverlay } from '@/components/studio/image/WandOverlay';
@@ -30,14 +27,13 @@ import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
-import { layerToShapeClip, layerToTextClip, textEffectStyle, type LivePatch } from '@/lib/imageLayerClip';
+import { type LivePatch } from '@/lib/imageLayerClip';
 import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
-import { ShapeEffects } from '@/components/studio/image/ShapeEffects';
 import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canvasToLayerBox, layerBoxToCanvas, renormalizePathLayer } from '@/lib/imageLayerGeometry';
-import { correctHex, correctPaint, correctionsAbove, docVignetteAngles, maskedCorrectionsAbove } from '@/lib/imagePixelPipeline';
+import { correctionContext, correctionsKey, type CorrectionMap, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
 import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
@@ -352,6 +348,23 @@ export function ImageCanvas({
   };
 
   const layers = visibleLayers(doc);
+  // ⚡ a rétegek memoizáltak: a kellékeik csak akkor változhatnak, ha tényleg más a rajzuk
+  const box = useMemo(() => ({ w: fit.w, h: fit.h }), [fit.w, fit.h]);
+  const { width: canvasW, height: canvasH } = effectiveCanvas(doc);
+  const docCanvas = useMemo(() => ({ width: canvasW, height: canvasH }), [canvasW, canvasH]);
+  const correctionMap = useRef<{ key: string; map: CorrectionMap<ClipMask> } | null>(null);
+  const correctionKey = correctionsKey(doc);
+  if (correctionMap.current?.key !== correctionKey) {
+    correctionMap.current = { key: correctionKey, map: correctionContext<ClipMask>(doc) };
+  }
+  const corrections = (id: string) => correctionMap.current?.map.get(id) ?? NO_CORRECTIONS;
+  const latest = useRef({ move, onSelect, onRequestEdit });
+  latest.current = { move, onSelect, onRequestEdit };
+  const stable = useRef({
+    move: (id: string, position: { x: number; y: number }) => latest.current.move(id, position),
+    select: (id: string | null) => latest.current.onSelect(id),
+    edit: (id: string) => latest.current.onRequestEdit?.(id),
+  }).current;
   const brushTarget = layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined;
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
 
@@ -448,71 +461,19 @@ export function ImageCanvas({
               raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
                 ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
                 : raw0;
-            const l = live?.id === raw.id ? withLive(raw, live.patch) : raw;
-            const selected = !capturing && l.id === selectedId;
-            if (l.kind === 'fill') {
-              return <FillLayerView key={l.id} layer={correctPaint(l, correctionsAbove(doc, l.id))} box={fit} onSelect={() => onSelect(l.id)} />;
-            }
-            if (l.kind === 'photo') {
-              return (
-                <PhotoLayerView
-                  key={l.id}
-                  layer={l}
-                  box={fit}
-                  selected={selected && !l.locked}
-                  zoom={zoom}
-                  moveRange={MOVE_RANGE}
-                  canvas={effectiveCanvas(doc)}
-                  corrections={correctionsAbove(doc, l.id)}
-                  maskedCorrections={maskedCorrectionsAbove<ClipMask>(doc, l.id)}
-                  onSelect={onSelect}
-                  onMove={move}
-                />
-              );
-            }
-            if (l.kind === 'shape') {
-              const above = correctionsAbove(doc, l.id);
-              const clip = layerToShapeClip(l);
-              return (
-                <Fragment key={l.id}>
-                <ShapeEffects layer={l} box={fit} canvas={effectiveCanvas(doc)} />
-                <ShapeOverlay
-                  clip={{
-                    ...clip,
-                    // a Skia a nézetek mögé nem lát: a fölötte ható korrekció a forma színébe kerül
-                    ...correctPaint(clip, above),
-                    borderColor: clip.borderColor ? correctHex(clip.borderColor, above) : clip.borderColor,
-                  }}
-                  box={fit}
-                  zoom={zoom}
-                  moveRange={MOVE_RANGE}
-                  locked={l.locked}
-                  editable
-                  selected={selected}
-                  onSelect={onSelect}
-                  onMove={move}
-                />
-                </Fragment>
-              );
-            }
-            // 🎚️ korrekciós réteg: nincs saját rajza, a hatása a fotók LUT-jában és a színekben van
-            if (l.kind === 'adjust') {
-              return null;
-            }
             return (
-              <TextOverlay
-                key={l.id}
-                clip={{ ...layerToTextClip(l), color: correctHex(l.color, correctionsAbove(doc, l.id)), textStyle: textEffectStyle(l, effectiveCanvas(doc)) }}
-                t={0}
-                box={fit}
+              <CanvasLayerView
+                key={raw.id}
+                layer={live?.id === raw.id ? withLive(raw, live.patch) : raw}
+                box={box}
+                canvas={docCanvas}
                 zoom={zoom}
                 moveRange={MOVE_RANGE}
-                locked={l.locked}
-                editable
-                selected={selected}
-                onSelect={onSelect}
-                onMove={move}
-                onEdit={onRequestEdit}
+                selected={!capturing && raw.id === selectedId}
+                corrections={corrections(raw.id)}
+                onSelect={stable.select}
+                onMove={stable.move}
+                onEdit={onRequestEdit ? stable.edit : undefined}
               />
             );
           })}

@@ -4,6 +4,8 @@
 // exponenciális backoffal. A nem-idempotens (token-csere, feltöltés) CSAK időkorlátot kap.
 // A fetch + sleep injektálható → tesztelhető valódi hálózat/idő nélkül.
 
+const { logCaught } = require('./lib/caught');
+
 /** Átmeneti (újrapróbálható) HTTP-státusz? */
 function isTransientStatus(status) {
   return status === 408 || status === 425 || status === 429 || (status >= 500 && status < 600);
@@ -50,6 +52,7 @@ async function fetchRetry(url, init = {}, opts = {}) {
       if (!idempotent || last) {
         throw err;
       }
+      logCaught('netFetch.js:fetchRetry', err);
       await sleep(baseDelayMs * 2 ** i);
     }
   }

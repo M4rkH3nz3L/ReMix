@@ -355,6 +355,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
         res = await meshRef.current.exportMesh(target.uri);
       } catch (e) {
         if (remix3dErrorKey(e) !== 'model3d.error.unsupported') throw e;
+        logCaught('components/studio/model3d/Model3DStudio.tsx:exportMesh', e);
         format = 'obj';
         target = model3dAsset({ assetId, format, documentDir: Paths.document.uri, mediaDirUri: projectMediaDir().uri, name: project.name, textured: false });
         res = await meshRef.current.exportMesh(target.uri);

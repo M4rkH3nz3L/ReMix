@@ -106,6 +106,7 @@ export async function retryRead(
       if (isAbortError(e) || opts.signal?.aborted) {
         throw e; // a megszakítás a felhasználó döntése — tiszteletben tartjuk
       }
+      logCaught('lib/netRetry.ts:attempt', e);
       lastError = e;
     }
 

@@ -444,4 +444,41 @@ export function correctionsAbove(doc: { layers: { kind: string; id: string; hidd
   return doc.grade || doc.adjust ? [...above, { grade: doc.grade, adjust: doc.adjust }] : above;
 }
 
+/** egy réteg fölött ható korrekciók */
+export interface LayerCorrections<M> {
+  above: ColorFields[];
+  masked: { mask: M; adjust?: ColorFields['adjust']; grade?: ColorFields['grade'] }[];
+}
+export type CorrectionMap<M> = Map<string, LayerCorrections<M>>;
+
+export const NO_CORRECTIONS: LayerCorrections<never> = { above: [], masked: [] };
+
+/** a korrekciók mindent meghatározó kulcsa: ha ez azonos, a rétegek színe sem változott */
+export function correctionsKey(doc: { layers: { kind: string; id: string }[]; grade?: unknown; adjust?: unknown }): string {
+  const adjusts = doc.layers.filter((l) => l.kind === 'adjust');
+  if (adjusts.length === 0 && !doc.grade && !doc.adjust) {
+    return '';
+  }
+  return JSON.stringify([adjusts, doc.grade, doc.adjust, doc.layers.map((l) => l.id)]);
+}
+
+/**
+ * A `correctionsAbove` és a `maskedCorrectionsAbove` minden rétegre, egy menetben (nem rétegenként
+ * az egész listán). Az azonos készletű rétegek ugyanazt az objektumot kapják, ezért a memo nem rajzolja újra őket.
+ */
+export function correctionContext<M>(doc: { layers: { kind: string; id: string; hidden?: boolean; mask?: unknown; adjust?: unknown; grade?: unknown }[]; grade?: unknown; adjust?: unknown }): CorrectionMap<M> {
+  const map: CorrectionMap<M> = new Map();
+  let current: LayerCorrections<M> = { above: doc.grade || doc.adjust ? ([{ grade: doc.grade, adjust: doc.adjust }] as ColorFields[]) : [], masked: [] };
+  for (let i = doc.layers.length - 1; i >= 0; i--) {
+    const l = doc.layers[i];
+    map.set(l.id, current);
+    if (l.kind === 'adjust' && !l.hidden) {
+      current = l.mask
+        ? { above: current.above, masked: [{ mask: l.mask as M, adjust: l.adjust as ColorFields['adjust'], grade: l.grade as ColorFields['grade'] }, ...current.masked] }
+        : { above: [l as ColorFields, ...current.above], masked: current.masked };
+    }
+  }
+  return map;
+}
+
 export { lerp };

@@ -5,6 +5,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 
 import { cssBlendMode, palette } from '@/constants/editor';
 import { SkiaPhotoLayer, needsSkiaPreview } from '@/components/studio/image/SkiaPhotoLayer';
+import type { ColorFields } from '@/lib/imagePixelPipeline';
 import { clamp } from '@/lib/time';
 import type { PhotoLayer } from '@/types/project';
 
@@ -20,6 +21,7 @@ export function PhotoLayerView({
   zoom = 1,
   moveRange = [0.02, 0.98],
   canvas,
+  corrections,
   onSelect,
   onMove,
 }: {
@@ -32,6 +34,8 @@ export function PhotoLayerView({
   moveRange?: [number, number];
   /** a dokumentum pixelmérete: a maszk és az effektek vászon-arányosak */
   canvas: { width: number; height: number };
+  /** a fölötte ható korrekciós rétegek + a dokumentum-szintű grade */
+  corrections?: ColorFields[];
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {
@@ -96,7 +100,7 @@ export function PhotoLayerView({
   const w = layer.w * box.w;
   const scale = box.w / canvas.width;
   const h = layer.h * box.h;
-  const skia = needsSkiaPreview(layer);
+  const skia = needsSkiaPreview(layer, corrections);
   const plain = (
     <Image
       source={{ uri: layer.uri }}
@@ -122,7 +126,7 @@ export function PhotoLayerView({
           selected ? styles.selected : null,
         ]}
       >
-        {skia ? <SkiaPhotoLayer layer={layer} w={w} h={h} scale={scale} canvas={canvas} fallback={plain} /> : plain}
+        {skia ? <SkiaPhotoLayer layer={layer} after={corrections} w={w} h={h} scale={scale} canvas={canvas} fallback={plain} /> : plain}
       </Animated.View>
     </GestureDetector>
   );

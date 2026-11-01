@@ -31,6 +31,7 @@ import type { CanvasPoint } from '@/lib/penPath';
 import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { canvasToLayerBox, renormalizePathLayer } from '@/lib/imageLayerGeometry';
+import { correctionsAbove } from '@/lib/imagePixelPipeline';
 import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 
@@ -420,6 +421,7 @@ export function ImageCanvas({
                   zoom={zoom}
                   moveRange={MOVE_RANGE}
                   canvas={effectiveCanvas(doc)}
+                  corrections={correctionsAbove(doc, l.id)}
                   onSelect={onSelect}
                   onMove={move}
                 />
@@ -441,10 +443,10 @@ export function ImageCanvas({
                 />
               );
             }
-            // 🎚️ korrekció-réteg: teljes-vászon tint-közelítés a RAJZOLÁSI sorrendben (az alatta
-            // lévőkre ül rá, a fölötte lévők föléje rajzolnak) — a render pontosan égeti (maszkkal is)
+            // 🎚️ korrekciós réteg: a hatása a fotók színében van (`correctionsAbove`); ha maszkolt,
+            // azt a Skia nem tudja a fotókba számolni, oda marad a közelítő tint
             if (l.kind === 'adjust') {
-              const tints = [...gradeTint(l.grade), ...(l.adjust ? adjustTintLayers(l.adjust) : [])];
+              const tints = l.mask ? [...gradeTint(l.grade), ...(l.adjust ? adjustTintLayers(l.adjust) : [])] : [];
               if (!tints.length) {
                 return null;
               }

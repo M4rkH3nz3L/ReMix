@@ -14,6 +14,7 @@ import { deleteCloudProject } from '@/lib/cloudSync';
 import { rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
+import { LUT_DRAFT_SIZE, LUT_SIZE } from '@/lib/imagePreviewLut';
 import { exportSize } from '@/lib/imageExport';
 import { makeId } from '@/lib/id';
 import { magicWandSelect } from '@/lib/magicWandClient';
@@ -323,6 +324,118 @@ async function smokeParity(log: Log) {
   removeFile(file.uri);
 }
 
+/** Mérési segéd: két kép eltérése rácspontonként (alfa + szín, ahol mindkettő fedő). */
+function gridDiff(a: SkImage, b: SkImage, size: number, stop: number): { bad: number; total: number } {
+  let bad = 0;
+  let total = 0;
+  for (let y = 8; y < stop; y += 12) {
+    for (let x = 8; x < size; x += 12) {
+      total += 1;
+      const p = pixel(a, x, y);
+      const q = pixel(b, x, y);
+      const color = p[3] > 128 && q[3] > 128 ? Math.max(...[0, 1, 2].map((k) => Math.abs(p[k] - q[k]))) : 0;
+      if (Math.abs(p[3] - q[3]) > 70 || color > 40) {
+        bad += 1;
+      }
+    }
+  }
+  return { bad, total };
+}
+
+/** 🔬 A második kör mérései: sebesség, effektek, és a TELJES valódi vászon. */
+async function smokeDeep(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const heavy = { kind: 'photo', id: 'h', uri: 'x', position: { x: 0.5, y: 0.5 }, w: 1, h: 1, adjust: { contrast: 0.2, saturation: 0.3, vibrance: 0.4, hue: 0.1, highlights: 0.3, temperature: 0.1 }, grade: 'teal-orange', levels: { black: 0.05, white: 0.95, gamma: 1.2 } } as unknown as PhotoLayer;
+  const time = (size: number) => {
+    const t0 = Date.now();
+    for (let i = 0; i < 10; i++) {
+      makeLutImage(heavy, [], size);
+    }
+    return (Date.now() - t0) / 10;
+  };
+  const draft = time(LUT_DRAFT_SIZE);
+  log(draft < 34, 'csúszka-költség húzás közben', `${draft.toFixed(1)} ms (cél: 33 ms alatt)`);
+  log(null, 'pontos LUT megálláskor', `${time(LUT_SIZE).toFixed(1)} ms`);
+
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#3070d0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 320, 320), paint);
+  paint.setColor(Skia.Color('#f0c040'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 160, 160), paint);
+  surface.flush();
+  const file = new File(projectMediaDir(), `smoke_deep_${Date.now().toString(36)}.png`);
+  file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const source = await decode(file.uri);
+  const canvas = { width: 320, height: 320 };
+  const small = { kind: 'photo', id: 'p', uri: file.uri, position: { x: 0.5, y: 0.45 }, w: 0.5, h: 0.5, fit: 'stretch' } as PhotoLayer;
+
+  const effects: [string, Partial<PhotoLayer>][] = [
+    ['vetett árnyék', { dropShadow: { color: '#ff0000', dx: 0.08, dy: 0.08, blur: 0.004, opacity: 1 } }],
+    ['ragyogás', { outerGlow: { color: '#00ff00', size: 0.02, opacity: 1 } }],
+    ['gradiens-maszk jobbra', { maskGradient: 'right' }],
+  ];
+  for (const [name, patch] of effects) {
+    const layer = { ...small, ...patch } as PhotoLayer;
+    const lw = 160;
+    const preview = await drawAsImage(
+      <Group transform={[{ translate: [80, 64] }]}>
+        <PhotoSkiaContent image={source} lut={null} layer={layer} w={lw} h={lw} scale={1} canvas={canvas} />
+      </Group>,
+      { width: 320, height: 320 }
+    );
+    const uri = await renderImageDoc({ id: 'fx', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [layer] } as unknown as ImageDoc, 320);
+    if (!preview || !uri) {
+      log(false, `effekt = export: ${name}`, 'nincs kép');
+      continue;
+    }
+    const d = gridDiff(preview, await decode(uri), 320, 280);
+    log(d.bad / d.total <= 0.06, `effekt = export: ${name}`, `${d.bad}/${d.total} rácspont tér el`);
+    removeFile(uri);
+  }
+
+  // a TELJES vászon: a valódi ImageCanvas nézet-fája, keverési móddal, a szerver ellen
+  const base = { ...small, id: 'bg', position: { x: 0.5, y: 0.5 }, w: 1, h: 1 } as PhotoLayer;
+  const top = { ...small, id: 'top', blendMode: 'multiply', adjust: { saturation: -1 } } as PhotoLayer;
+  const docs: [string, ImageLayer[]][] = [
+    ['fotó', [base as ImageLayer]],
+    ['fotó + korrekció + szorzás-keverés', [base as ImageLayer, top as ImageLayer]],
+    ['korrekciós réteg a fotó fölött', [base as ImageLayer, { kind: 'adjust', id: 'adj', adjust: { contrast: 0.3, saturation: 0.5 } } as ImageLayer]],
+  ];
+  for (const [name, layers] of docs) {
+    const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers } as unknown as ImageDoc;
+    const ref = createRef<View>() as RefObject<View>;
+    setHarness(
+      <View style={{ width: 340, height: 320 }}>
+        <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+      </View>
+    );
+    await sleep(1500);
+    const shot = await captureRef(ref, { format: 'png', quality: 1, width: 320 / ratio, height: 320 / ratio });
+    const uri = await renderImageDoc(doc, 320);
+    if (!uri) {
+      log(false, `vászon = export: ${name}`, 'nincs render');
+      continue;
+    }
+    const a = await decode(shot);
+    const d = gridDiff(a, await decode(uri), Math.min(a.width(), 320), Math.min(a.height(), 280));
+    const b2 = await decode(uri);
+    log(d.bad / d.total <= 0.06, `vászon = export: ${name}`, `${a.width()}×${a.height()}, ${d.bad}/${d.total} rácspont tér el; sárga ${pixel(a, 80, 80)} / ${pixel(b2, 80, 80)}; kék ${pixel(a, 240, 240)} / ${pixel(b2, 240, 240)}`);
+    if (name.includes('szorzás')) {
+      // ellenpróba: a keverés nélküli kép ugyanitt el KELL térjen, különben a mérés vak
+      const plainUri = await renderImageDoc({ ...doc, layers: [base, { ...top, blendMode: undefined }] } as unknown as ImageDoc, 320);
+      if (plainUri) {
+        const ctrl = gridDiff(a, await decode(plainUri), Math.min(a.width(), 320), 280);
+        log(ctrl.bad > 0, 'ellenpróba: a mérés érzékeli a keverést', `${ctrl.bad} rácspont tér el a keverés nélküli képtől`);
+        removeFile(plainUri);
+      }
+    }
+    setHarness(null);
+    removeFile(uri);
+    removeFile(shot);
+  }
+  removeFile(file.uri);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -498,6 +611,10 @@ export async function runImageSmoke(
   }
   if (phase === 'inspect') {
     await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'deep') {
+    await step('deep', () => smokeDeep(log, setHarness, ratio));
     return;
   }
   if (phase === 'parity') {

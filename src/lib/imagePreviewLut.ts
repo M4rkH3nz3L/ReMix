@@ -1,5 +1,4 @@
-import { applyOps, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
-import type { PhotoLayer } from '@/types/project';
+import { applyOps, type ColorFields, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
 
 /**
  * 🧊 Az előnézet 3D LUT-ja: a réteg színlánca 25×25×25 rácspontra számolva, 2D-atlaszban
@@ -8,17 +7,17 @@ import type { PhotoLayer } from '@/types/project';
  */
 export const LUT_SIZE = 25;
 
-type ColorFields = Pick<PhotoLayer, 'adjust' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters'>;
+/** húzás közbeni, gyors rács: megállás után a pontos `LUT_SIZE` váltja */
+export const LUT_DRAFT_SIZE = 13;
 
 /** Van-e a rétegen pixelenkénti színművelet? */
-export function hasColorOps(layer: ColorFields): boolean {
-  return layerOps(layer).length > 0;
+export function hasColorOps(layer: ColorFields, after: ColorFields[] = []): boolean {
+  return layerOps(layer, after).length > 0;
 }
 
 /** RGBA bájtok: szélesség `LUT_SIZE²`, magasság `LUT_SIZE`. */
-export function buildLutBytes(layer: ColorFields): Uint8Array {
-  const ops = layerOps(layer);
-  const n = LUT_SIZE;
+export function buildLutBytes(layer: ColorFields, after: ColorFields[] = [], n = LUT_SIZE): Uint8Array {
+  const ops = layerOps(layer, after);
   const max = n - 1;
   const out = new Uint8Array(n * n * n * 4);
   let o = 0;
@@ -37,8 +36,7 @@ export function buildLutBytes(layer: ColorFields): Uint8Array {
 }
 
 /** A shader számításának mása (teszthez): háromszorosan lineáris olvasás az atlaszból. */
-export function sampleLut(bytes: Uint8Array, c: Rgb): Rgb {
-  const n = LUT_SIZE;
+export function sampleLut(bytes: Uint8Array, c: Rgb, n = LUT_SIZE): Rgb {
   const max = n - 1;
   const at = (r: number, g: number, b: number, ch: number) => bytes[(g * n * n + b * n + r) * 4 + ch] / 255;
   const f = (v: number) => {

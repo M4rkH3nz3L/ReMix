@@ -20,14 +20,18 @@ import {
   useImage,
   vec,
 } from '@shopify/react-native-skia';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { maskOutlineInBox } from '@/lib/imageLayerGeometry';
-import { LUT_SHADER, LUT_SIZE, buildLutBytes, hasColorOps } from '@/lib/imagePreviewLut';
+import type { ColorFields } from '@/lib/imagePixelPipeline';
+import { LUT_DRAFT_SIZE, LUT_SHADER, LUT_SIZE, buildLutBytes, hasColorOps } from '@/lib/imagePreviewLut';
 import type { PhotoLayer } from '@/types/project';
 
 type Canvas2D = { width: number; height: number };
+
+/** ennyi tétlenség után vált a pontos LUT-ra */
+const LUT_IDLE_MS = 120;
 
 let lutEffect: ReturnType<typeof Skia.RuntimeEffect.Make> | null = null;
 function effect() {
@@ -36,19 +40,18 @@ function effect() {
 }
 
 /** a réteg 3D LUT-ja Skia-képként */
-export function makeLutImage(layer: PhotoLayer): SkImage | null {
-  const n = LUT_SIZE;
+export function makeLutImage(layer: PhotoLayer, after: ColorFields[] = [], n = LUT_SIZE): SkImage | null {
   return Skia.Image.MakeImage(
     { width: n * n, height: n, alphaType: AlphaType.Opaque, colorType: ColorType.RGBA_8888 },
-    Skia.Data.fromBytes(buildLutBytes(layer)),
+    Skia.Data.fromBytes(buildLutBytes(layer, after, n)),
     n * n * 4
   );
 }
 
 /** Kell-e Skia ehhez a réteghez, vagy elég a sima kép? */
-export function needsSkiaPreview(layer: PhotoLayer): boolean {
+export function needsSkiaPreview(layer: PhotoLayer, after: ColorFields[] = []): boolean {
   return (
-    hasColorOps(layer) ||
+    hasColorOps(layer, after) ||
     !!layer.mask ||
     !!layer.maskGradient ||
     !!layer.dropShadow ||
@@ -81,6 +84,7 @@ const GRADIENT_DIR = {
 export function PhotoSkiaContent({
   image,
   lut,
+  lutSize = LUT_SIZE,
   layer,
   w,
   h,
@@ -89,6 +93,7 @@ export function PhotoSkiaContent({
 }: {
   image: SkImage;
   lut: SkImage | null;
+  lutSize?: number;
   layer: PhotoLayer;
   w: number;
   h: number;
@@ -101,7 +106,7 @@ export function PhotoSkiaContent({
   let content =
     runtime && lut ? (
       <Rect x={0} y={0} width={w} height={h}>
-        <Shader source={runtime} uniforms={{ size: LUT_SIZE }}>
+        <Shader source={runtime} uniforms={{ size: lutSize }}>
           <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} />
           <ImageShader image={lut} tx="clamp" ty="clamp" sampling={{ filter: FilterMode.Linear, mipmap: MipmapMode.None }} />
         </Shader>
@@ -172,19 +177,47 @@ export function PhotoSkiaContent({
 }
 
 /** 🎨 A fotó-réteg előnézete: az export színével és vágásával. */
-export function SkiaPhotoLayer({ layer, w, h, scale, canvas, fallback }: { layer: PhotoLayer; w: number; h: number; scale: number; canvas: Canvas2D; fallback: React.ReactNode }) {
+export function SkiaPhotoLayer({
+  layer,
+  after = [],
+  w,
+  h,
+  scale,
+  canvas,
+  fallback,
+}: {
+  layer: PhotoLayer;
+  after?: ColorFields[];
+  w: number;
+  h: number;
+  scale: number;
+  canvas: Canvas2D;
+  fallback: React.ReactNode;
+}) {
   const image = useImage(layer.uri);
-  const key = JSON.stringify([layer.adjust, layer.grade, layer.filterId, layer.filterIntensity, layer.gradientMap, layer.levels, layer.channelMix, layer.filters]);
+  const key = JSON.stringify([layer.adjust, layer.grade, layer.filterId, layer.filterIntensity, layer.gradientMap, layer.levels, layer.channelMix, layer.filters, layer.develop?.base, after]);
+  // húzás közben a gyors rács fut, megálláskor a pontos: a csúszka nem akad
+  const [fine, setFine] = useState<{ key: string; lut: SkImage | null } | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const lut = useMemo(() => (hasColorOps(layer) ? makeLutImage(layer) : null), [key]);
+  const draft = useMemo(() => (hasColorOps(layer, after) ? makeLutImage(layer, after, LUT_DRAFT_SIZE) : null), [key]);
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+    const timer = setTimeout(() => setFine({ key, lut: makeLutImage(layer, after) }), LUT_IDLE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const exact = fine?.key === key ? fine.lut : null;
   if (!image) {
     return fallback;
   }
   const pad = effectPad(layer, w);
   return (
-    <Canvas style={[styles.canvas, { left: -pad, top: -pad, width: w + 2 * pad, height: h + 2 * pad }]}>
+    // sRGB: az export is ez; a Skia alapból P3-as felülete másképp számolná a telített színeket
+    <Canvas colorSpace="srgb" style={[styles.canvas, { left: -pad, top: -pad, width: w + 2 * pad, height: h + 2 * pad }]}>
       <Group transform={[{ translateX: pad }, { translateY: pad }]}>
-        <PhotoSkiaContent image={image} lut={lut} layer={layer} w={w} h={h} scale={scale} canvas={canvas} />
+        <PhotoSkiaContent image={image} lut={exact ?? draft} lutSize={exact ? LUT_SIZE : LUT_DRAFT_SIZE} layer={layer} w={w} h={h} scale={scale} canvas={canvas} />
       </Group>
     </Canvas>
   );

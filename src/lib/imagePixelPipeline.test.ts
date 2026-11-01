@@ -2,8 +2,8 @@
  * 🧪 Az előnézet színe a VALÓDI export ellen mérve: minden beállítást lefuttatunk az ffmpeg-
  * láncon, és színenként összevetjük a tiszta függvénnyel. A hiba 0–255 skálán értendő.
  */
-import { applyOps, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
-import { buildLutBytes, hasColorOps, sampleLut } from '@/lib/imagePreviewLut';
+import { applyOps, correctionsAbove, layerOps, type Rgb } from '@/lib/imagePixelPipeline';
+import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, sampleLut } from '@/lib/imagePreviewLut';
 import type { PhotoLayer } from '@/types/project';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -83,6 +83,9 @@ const CASES: [string, Partial<PhotoLayer>][] = [
   ['grade cold', { grade: 'cold' }],
   ['grade warm-film', { grade: 'warm-film' }],
   ['grade dreamy', { grade: 'dreamy' }],
+  ['kézi görbe', { adjust: { curves: { rgb: [{ x: 0, y: 0.1 }, { x: 0.5, y: 0.65 }, { x: 1, y: 0.9 }] } } }],
+  ['csatorna-görbe', { adjust: { curves: { red: [{ x: 0, y: 0 }, { x: 0.5, y: 0.7 }, { x: 1, y: 1 }], blue: [{ x: 0, y: 0.2 }, { x: 1, y: 0.8 }] } } }],
+  ['develop', { develop: { base: { contrast: 0.2, saturation: 0.3, temperature: 0.1 } } }],
 ] as [string, Partial<PhotoLayer>][];
 
 const LIMIT = Number(process.env.PIX_LIMIT ?? 8);
@@ -92,6 +95,40 @@ describe('előnézet = export színben', () => {
     const e = await maxError(layer);
     if (process.env.PIX_LOG) console.log('PIX', _n, e.toFixed(1));
     expect(e).toBeLessThanOrEqual(LIMIT);
+  });
+});
+
+describe('a fölötte ható korrekciók', () => {
+  const docCase = async (extra: object, layers: object[], id = 'p') => {
+    const W = COLORS.length * CELL;
+    const w = fs.mkdtempSync(path.join(dir, 'r-'));
+    const photo = { kind: 'photo', id, uri: png, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch' };
+    const doc = { id: 'd', aspectRatio: '1:1', width: W, height: CELL, ...extra, layers: [photo, ...layers] };
+    const file = await renderImageDoc(JSON.parse(JSON.stringify(doc)), undefined, w);
+    const d = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { maxBuffer: 1 << 24 });
+    const ops = layerOps({}, correctionsAbove(doc as never, id));
+    return Math.max(...COLORS.map((c, i) => {
+      const o = (20 * W + i * CELL + 20) * 4;
+      const p = applyOps(ops, c.map((v) => v / 255) as Rgb).map((v) => v * 255);
+      return Math.max(...[0, 1, 2].map((k) => Math.abs(d[o + k] - p[k])));
+    }));
+  };
+  it('korrekciós réteg a fotó fölött', async () => {
+    expect(await docCase({}, [{ kind: 'adjust', id: 'a', adjust: { contrast: 0.2, saturation: 0.3 } }])).toBeLessThanOrEqual(LIMIT);
+  });
+  it('korrekciós réteg grade-del', async () => {
+    expect(await docCase({}, [{ kind: 'adjust', id: 'a', grade: 'vintage' }])).toBeLessThanOrEqual(LIMIT);
+  });
+  it('dokumentum-szintű grade + korrekció', async () => {
+    expect(await docCase({ grade: 'teal-orange', adjust: { brightness: 0.1 } }, [])).toBeLessThanOrEqual(LIMIT);
+  });
+  it('a rejtett és a maszkolt korrekció nem számít bele', () => {
+    const doc = { layers: [{ kind: 'photo', id: 'p' }, { kind: 'adjust', id: 'h', hidden: true }, { kind: 'adjust', id: 'm', mask: {} }] };
+    expect(correctionsAbove(doc, 'p')).toEqual([]);
+  });
+  it('az alatta lévő korrekció nem hat a fölötte lévő fotóra', () => {
+    const doc = { layers: [{ kind: 'adjust', id: 'a', adjust: { contrast: 0.2 } }, { kind: 'photo', id: 'p' }] };
+    expect(correctionsAbove(doc, 'p')).toEqual([]);
   });
 });
 
@@ -105,6 +142,19 @@ describe('a 25³-es LUT hűsége', () => {
     });
     if (process.env.PIX_LOG) console.log('LUT', _n, Math.max(...errs).toFixed(1));
     expect(Math.max(...errs)).toBeLessThanOrEqual(Number(process.env.PIX_LUT_LIMIT ?? 12));
+  });
+  it('a gyors (húzás közbeni) rács is használhatóan közel van', async () => {
+    let worst = 0;
+    for (const [, layer] of CASES.filter(([n]) => n !== 'poszter')) {
+      const real = await exportColors(layer);
+      const lut = buildLutBytes(layer as PhotoLayer, [], LUT_DRAFT_SIZE);
+      COLORS.forEach((c, i) => {
+        const p = sampleLut(lut, c.map((v) => v / 255) as Rgb, LUT_DRAFT_SIZE).map((v) => v * 255);
+        worst = Math.max(worst, ...real[i].map((v, k) => Math.abs(v - p[k])));
+      });
+    }
+    console.log('DRAFT', worst);
+    expect(worst).toBeLessThanOrEqual(24);
   });
   it('a semleges réteg LUT-ja azonosság', () => {
     const lut = buildLutBytes({});

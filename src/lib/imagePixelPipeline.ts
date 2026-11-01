@@ -155,6 +155,20 @@ export function adjustOps(a: ClipAdjust | undefined): Op[] {
     const f = splineLut([[0, cl(blacks * 0.15)], [0.25, cl(0.25 + shadows * 0.15)], [0.5, 0.5], [0.75, cl(0.75 + highlights * 0.15)], [1, cl(1 + whites * 0.15)]]);
     ops.push((c) => [f(c[0]), f(c[1]), f(c[2])]);
   }
+  if (a.curves) {
+    // kézi tónusgörbék: csatornánként, utána a közös (az ffmpeg `curves` sorrendje)
+    const curve = (pts: { x: number; y: number }[] | undefined) => {
+      if (!pts || pts.length < 2 || pts.every((p) => Math.abs(cl(p.x) - cl(p.y)) < 1e-3)) {
+        return null;
+      }
+      return splineLut(pts.map((p): [number, number] => [cl(p.x), cl(p.y)]).sort((p, q) => p[0] - q[0]));
+    };
+    const [fr, fg, fb, fa] = [curve(a.curves.red), curve(a.curves.green), curve(a.curves.blue), curve(a.curves.rgb)];
+    if (fr || fg || fb || fa) {
+      const all = (v: number) => (fa ? fa(v) : v);
+      ops.push((c) => [all(fr ? fr(c[0]) : c[0]), all(fg ? fg(c[1]) : c[1]), all(fb ? fb(c[2]) : c[2])]);
+    }
+  }
   if (temperature !== 0) {
     const m = kelvinRgb(Math.round(Math.min(40000, Math.max(1000, 6500 - temperature * 10000))));
     ops.push((c) => [c[0] * m[0], c[1] * m[1], c[2] * m[2]]);
@@ -304,10 +318,11 @@ export function applyOps(ops: Op[], c: Rgb): Rgb {
   return [cl(out[0]), cl(out[1]), cl(out[2])];
 }
 
-/** A fotó-réteg teljes színlánca, az `imagedoc.js` sorrendjében. */
-export function layerOps(
-  layer: Pick<PhotoLayer, 'adjust' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters'>
-): Op[] {
+/** a réteg színmezői; a korrekciós rétegek és a dokumentum ugyanezekből áll */
+export type ColorFields = Pick<PhotoLayer, 'adjust' | 'filterId' | 'filterIntensity' | 'grade' | 'gradientMap' | 'levels' | 'channelMix' | 'filters' | 'develop'>;
+
+/** A fotó-réteg teljes színlánca, az `imagedoc.js` sorrendjében. Az `after` a fölötte ható korrekciók. */
+export function layerOps(layer: ColorFields, after: ColorFields[] = []): Op[] {
   const ops = adjustOps(layer.adjust);
   ops.push(...(layer.grade ? GRADE_OPS[layer.grade]?.() ?? [] : []));
   const tint = layer.filterId ? FILTER_TINTS[layer.filterId] : undefined;
@@ -325,5 +340,23 @@ export function layerOps(
     ops.push(channelMixOp(layer.channelMix));
   }
   ops.push(...filterOps(layer.filters));
+  ops.push(...adjustOps(layer.develop?.base));
+  for (const up of after) {
+    // a korrekciós réteg és a dokumentum sorrendje a renderben: grade, utána adjust
+    ops.push(...(up.grade ? GRADE_OPS[up.grade]?.() ?? [] : []), ...adjustOps(up.adjust));
+  }
   return ops;
 }
+
+/**
+ * Egy fotó fölött ható korrekciók a vásznon: a fölötte lévő, maszk nélküli korrekciós rétegek,
+ * majd a dokumentum-szintű grade. A Skia a nézetek mögé nem lát, ezért a hatást a fotó LUT-jába
+ * számoljuk; a nem-fotó rétegek ezeket nem kapják meg.
+ */
+export function correctionsAbove(doc: { layers: { kind: string; id: string; hidden?: boolean; mask?: unknown; grade?: GradeId; adjust?: ClipAdjust }[]; grade?: GradeId; adjust?: ClipAdjust }, layerId: string): ColorFields[] {
+  const i = doc.layers.findIndex((l) => l.id === layerId);
+  const above = doc.layers.slice(i + 1).filter((l) => l.kind === 'adjust' && !l.hidden && !l.mask) as ColorFields[];
+  return doc.grade || doc.adjust ? [...above, { grade: doc.grade, adjust: doc.adjust }] : above;
+}
+
+export { lerp };

@@ -3,7 +3,9 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
-import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState, type ComponentType } from 'react';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { LiveQuickGrid } from '@/components/live/LiveQuickGrid';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -50,7 +52,7 @@ import {
 } from '@/lib/live';
 import { publishLiveVod } from '@/lib/feed';
 import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
-import { liveEndDisposition, setActiveScene } from '@/lib/liveDoc';
+import { activeScene, liveEndDisposition, sceneAfterSwipe, setActiveScene, sortedSources, toggleSourceVisible } from '@/lib/liveDoc';
 import { buildVodProject } from '@/lib/liveVod';
 import { projectFps } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -263,6 +265,38 @@ export default function LiveRoomScreen() {
       broadcastScene();
     },
     [broadcastScene],
+  );
+
+  // 🎛️ gombrács: a jelenet forrásai ki-be, azonnal a kimeneten
+  const [gridOpen, setGridOpen] = useState(false);
+  const toggleSource = useCallback(
+    (sourceId: string) => {
+      const doc = liveDocRef.current;
+      const sceneId = doc?.activeSceneId;
+      if (doc && sceneId) {
+        liveDocRef.current = toggleSourceVisible(doc, sceneId, sourceId);
+        broadcastScene();
+      }
+    },
+    [broadcastScene]
+  );
+  // 👉 vízszintes húzás a képen: a szomszédos jelenet; a küszöb nagy, adás közben nem válthat véletlenül
+  const swipe = useRef({ run: (_translationX: number) => {} });
+  swipe.current.run = (translationX) => {
+    const next = isHost ? sceneAfterSwipe(hostScenes, scene?.sceneId, translationX) : null;
+    if (next) {
+      switchScene(next);
+    }
+  };
+  const sceneSwipe = useMemo(
+    () =>
+      Gesture.Pan()
+        .withTestId('live-scene-swipe')
+        .runOnJS(true)
+        .activeOffsetX([-30, 30])
+        .failOffsetY([-30, 30])
+        .onEnd((e) => swipe.current.run(e.translationX)),
+    []
   );
 
   // session betöltése + realtime room nyitása
@@ -525,7 +559,8 @@ export default function LiveRoomScreen() {
       {/* háttér: a WEBRTC-videó LAZY rétege (host → kamera-publish, néző → remote),
           Suspense (betöltés) + ErrorBoundary (hiányzó natív modul = barátságos panel,
           nem app-crash). A kompozíciót a `scene` jelenet-állapot hajtja. */}
-      <View style={StyleSheet.absoluteFill}>
+      <GestureDetector gesture={sceneSwipe}>
+      <View style={StyleSheet.absoluteFill} collapsable={false}>
         {!self ? (
           <ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />
         ) : !WEBRTC_AVAILABLE ? (
@@ -561,6 +596,7 @@ export default function LiveRoomScreen() {
           </ErrorBoundary>
         )}
       </View>
+      </GestureDetector>
 
       {/* felúszó reakciók */}
       <View pointerEvents="none" style={styles.floatLayer}>
@@ -622,6 +658,19 @@ export default function LiveRoomScreen() {
               <View style={styles.liveDot} />
               <LiveTimer startMs={liveStartMs} />
             </View>
+          )}
+          {/* 🎛️ host: érintős gombrács */}
+          {isHost && (
+            <Pressable
+              testID="live-grid-toggle"
+              onPress={() => setGridOpen((v) => !v)}
+              hitSlop={8}
+              style={[styles.micBtn, gridOpen && styles.micBtnOn]}
+              accessibilityRole="button"
+              accessibilityLabel={t('live.quick.title')}
+            >
+              <Ionicons name="apps" size={18} color="#fff" />
+            </Pressable>
           )}
           {/* 📷 host: kamera-váltás adás közben (L27) */}
           {isHost && (
@@ -702,6 +751,19 @@ export default function LiveRoomScreen() {
             })}
           </ScrollView>
         )}
+
+        {isHost && gridOpen && liveDocRef.current ? (
+          <LiveQuickGrid
+            sources={(() => {
+              const current = activeScene(liveDocRef.current);
+              return current ? sortedSources(current) : [];
+            })()}
+            micMuted={micMuted}
+            onToggle={toggleSource}
+            onMic={() => setMicMuted((v) => !v)}
+            onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+          />
+        ) : null}
 
         <View style={{ flex: 1 }} />
 
@@ -840,6 +902,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   micBtnOff: { backgroundColor: palette.danger },
+  micBtnOn: { backgroundColor: palette.accent },
   closeBtn: {
     marginLeft: 'auto',
     backgroundColor: palette.danger,

@@ -20,15 +20,18 @@ interface EditorPrefs {
   /** a sztori/tempó-sáv + térkép látszik-e (összecsukva több hely jut a sávoknak) */
   timelineExtras: boolean;
   imagePanels: ImagePanels;
+  /** a Live Stúdió paneljeinek sorrendje */
+  livePanels: string[];
 }
 
 interface EditorPrefsState extends EditorPrefs {
   setEditMode: (mode: EditMode) => void;
   setTimelineExtras: (open: boolean) => void;
   setImagePanel: (mode: WorkspaceMode, patch: { rail?: boolean; layers?: boolean }) => void;
+  setLivePanels: (order: string[]) => void;
 }
 
-const pick = ({ editMode, timelineExtras, imagePanels }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels });
+const pick = ({ editMode, timelineExtras, imagePanels, livePanels }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels, livePanels });
 
 function persist(p: EditorPrefs): void {
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(p)).catch((caught) => {
@@ -41,6 +44,7 @@ export const useEditorPrefs = create<EditorPrefsState>((set, get) => ({
   editMode: 'advanced',
   timelineExtras: true,
   imagePanels: {},
+  livePanels: [],
   setEditMode: (editMode) => {
     set({ editMode });
     persist({ ...pick(get()), editMode });
@@ -54,6 +58,10 @@ export const useEditorPrefs = create<EditorPrefsState>((set, get) => ({
     set({ imagePanels });
     persist({ ...pick(get()), imagePanels });
   },
+  setLivePanels: (livePanels) => {
+    set({ livePanels });
+    persist({ ...pick(get()), livePanels });
+  },
 }));
 
 // induláskor egyszer betöltjük (a hiányzó / sérült érték az alapra esik vissza)
@@ -65,6 +73,7 @@ AsyncStorage.getItem(STORAGE_KEY)
       ...(p.editMode === 'quick' || p.editMode === 'advanced' || p.editMode === 'ai' ? { editMode: p.editMode } : {}),
       ...(typeof p.timelineExtras === 'boolean' ? { timelineExtras: p.timelineExtras } : {}),
       ...(p.imagePanels && typeof p.imagePanels === 'object' ? { imagePanels: p.imagePanels } : {}),
+      ...(Array.isArray(p.livePanels) ? { livePanels: p.livePanels.filter((v) => typeof v === 'string') } : {}),
     });
   })
   .catch((caught) => { logCaught('store/editorPrefsStore.ts', caught); });

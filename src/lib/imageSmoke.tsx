@@ -21,6 +21,7 @@ import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
 import { LayerMenuSheet } from '@/components/studio/image/LayerMenuSheet';
+import { LiveQuickGrid } from '@/components/live/LiveQuickGrid';
 import { MultiSelectBar } from '@/components/studio/image/body/MultiSelectBar';
 import { BASE_PX_PER_SEC, MAX_ZOOM } from '@/constants/editor';
 import { endLive, startLive } from '@/lib/live';
@@ -2203,6 +2204,7 @@ async function smokeMenus(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(
     <View style={{ width: Math.min(420, Dimensions.get('window').width) }}>
       <MultiSelectBar count={3} onAction={() => {}} onClose={() => {}} />
+      <LiveQuickGrid sources={[{ id: 'k', kind: 'camera', label: 'Kamera', visible: true }, { id: 'l', kind: 'logo', label: 'Logó', visible: false }, { id: 't', kind: 'text', label: 'Felirat', visible: true }]} micMuted={false} onToggle={() => {}} onMic={() => {}} onFlip={() => {}} />
       <LayerMenuSheet layer={layer} onPick={() => {}} onClose={() => {}} />
     </View>
   );
@@ -2249,6 +2251,21 @@ async function smokeShuttle(log: Log) {
   const stopped = s().playhead;
   await sleep(600);
   log(s().playhead === stopped && !s().isPlaying, 'elengedés után megáll a helyén', `${stopped.toFixed(2)} mp`);
+  router.back();
+  await sleep(1500);
+  await deleteProject(project.id);
+}
+
+/** A Live Stúdió a valódi képernyőn: panelek, tablet-elrendezés, fogók. */
+async function smokeLiveStudio(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const project = createEmptyProject('smoke stúdió', '9:16', undefined, 'live');
+  await saveProject(project);
+  router.push(`/live/studio/${project.id}` as Href);
+  await sleep(4000);
+  log(useEditorStore.getState().project?.id === project.id, 'a Stúdió megnyílt', project.id);
+  log(true, 'FOTÓZHATÓ', 'Live Stúdió');
+  await sleep(7000);
   router.back();
   await sleep(1500);
   await deleteProject(project.id);
@@ -2450,6 +2467,10 @@ export async function runImageSmoke(
   }
   if (phase === 'shuttle') {
     await step('shuttle', () => smokeShuttle(log));
+    return;
+  }
+  if (phase === 'studio') {
+    await step('studio', () => smokeLiveStudio(log));
     return;
   }
   if (phase === 'menus') {

@@ -4353,6 +4353,8 @@
     "empty": "No posts yet."
   },
   "live": {
+    "studio": { "movePanel": "Move panel" },
+    "quick": {"title": "Quick buttons", "mic": "Microphone"},
     "flipCamera": "Switch camera",
     "vodDefaultName": "Live recording",
     "state": {

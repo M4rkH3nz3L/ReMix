@@ -159,6 +159,20 @@ export function removeScene(doc: LiveDoc, sceneId: string): LiveDoc {
   return { ...doc, scenes, activeSceneId };
 }
 
+/** a szomszédos jelenet; a sor végén nincs körbeugrás, élő adásban az meglepetés lenne */
+export function adjacentSceneId(scenes: { id: string }[], currentId: string | undefined, dir: 1 | -1): string | null {
+  const at = scenes.findIndex((s) => s.id === currentId);
+  return at < 0 ? null : (scenes[at + dir]?.id ?? null);
+}
+
+/** ennél rövidebb húzás nem vált jelenetet: adás közben nem történhet véletlenül */
+export const SCENE_SWIPE_MIN = 90;
+
+/** balra húzás a következő, jobbra az előző jelenet */
+export function sceneAfterSwipe(scenes: { id: string }[], currentId: string | undefined, translationX: number): string | null {
+  return Math.abs(translationX) < SCENE_SWIPE_MIN ? null : adjacentSceneId(scenes, currentId, translationX < 0 ? 1 : -1);
+}
+
 export function renameScene(doc: LiveDoc, sceneId: string, name: string): LiveDoc {
   const next = name.trim();
   if (!next) {

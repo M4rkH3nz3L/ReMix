@@ -4353,6 +4353,8 @@
     "empty": "Még nincs poszt."
   },
   "live": {
+    "studio": { "movePanel": "Panel áthelyezése" },
+    "quick": {"title": "Gyorsgombok", "mic": "Mikrofon"},
     "flipCamera": "Kamera váltása",
     "vodDefaultName": "Live felvétel",
     "state": {

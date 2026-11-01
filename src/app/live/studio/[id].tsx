@@ -3,8 +3,13 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { RecordToggle } from '@/components/live/RecordToggle';
+import { LiveSourceBox } from '@/components/live/LiveSourceBox';
+import { LivePanelList } from '@/components/live/LivePanelList';
+import { sizeClassFor } from '@/constants/layout';
+import { normalizePanelOrder, type LivePanelId } from '@/lib/livePanels';
+import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { goBackOrHome } from '@/lib/nav';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -127,6 +132,7 @@ function LiveCanvas({
   maxHeight,
   selectedId,
   onSelect,
+  onMoveSource,
   facing,
   cameraGranted,
   primaryCameraId,
@@ -142,6 +148,7 @@ function LiveCanvas({
   maxHeight: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onMoveSource: (id: string, transform: LiveTransform) => void;
   facing: 'front' | 'back';
   cameraGranted: boolean;
   primaryCameraId: string | null;
@@ -149,6 +156,9 @@ function LiveCanvas({
   onFlip: () => void;
 }) {
   const scene = getActiveScene(doc);
+  // húzás közben csak a keret mozog, a dokumentum a gesztus végén változik (egy undo)
+  const [draft, setDraft] = useState<{ id: string; t: LiveTransform } | null>(null);
+  const transformOf = (src: LiveSource) => (draft?.id === src.id ? draft.t : src.transform);
   // a 9:16 vászon túl magas lenne teljes szélességen → ha kell, a magasságra
   // korlátozzuk és a szélességet arányosan csökkentjük (középre igazítva).
   let w = width;
@@ -160,18 +170,19 @@ function LiveCanvas({
   // az élő kamera-forrás (az első látható) — a preview KÜLÖN, STABIL rétegben megy
   const primaryCam = scene?.sources.find((s) => s.id === primaryCameraId) ?? null;
   const showCamera = !!primaryCam && cameraGranted;
+  const camT = primaryCam ? transformOf(primaryCam) : null;
   return (
     <View style={[styles.canvas, { width: w, height }]}>
-      {showCamera && primaryCam && (
+      {showCamera && camT && (
         <View
           collapsable={false}
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: primaryCam.transform.x * w,
-            top: primaryCam.transform.y * height,
-            width: Math.max(28, primaryCam.transform.w * w),
-            height: Math.max(22, primaryCam.transform.h * height),
+            left: camT.x * w,
+            top: camT.y * height,
+            width: Math.max(28, camT.w * w),
+            height: Math.max(22, camT.h * height),
             borderRadius: 8,
             overflow: 'hidden',
             backgroundColor: '#000',
@@ -182,14 +193,24 @@ function LiveCanvas({
       )}
       {scene &&
         sortedSources(scene).map((src) => {
-          const t = src.transform;
+          const t = transformOf(src);
           const selected = src.id === selectedId;
           const isCamera = src.kind === 'camera';
           const liveCamera = isCamera && src.visible && src.id === primaryCameraId && cameraGranted;
           return (
-            <Pressable
+            <LiveSourceBox
               key={src.id}
+              id={src.id}
+              transform={src.transform}
+              canvas={{ w, h: height }}
+              selected={selected}
               onPress={() => (isCamera && !cameraGranted ? onRequestCamera() : onSelect(src.id))}
+              onSelect={() => onSelect(src.id)}
+              onDraft={(next) => setDraft({ id: src.id, t: next })}
+              onCommit={(next) => {
+                setDraft(null);
+                onMoveSource(src.id, next);
+              }}
               style={[
                 styles.srcBox,
                 liveCamera && styles.srcBoxLive,
@@ -224,7 +245,7 @@ function LiveCanvas({
                   </Text>
                 </>
               )}
-            </Pressable>
+            </LiveSourceBox>
           );
         })}
       {(!scene || scene.sources.length === 0) && (
@@ -254,7 +275,12 @@ const LAYOUT_PRESETS: { key: string; icon: keyof typeof Ionicons.glyphMap; t: Pa
 
 export default function LiveStudioScreen() {
   const { t } = useTranslation();
-  const { height: winH } = useWindowDimensions();
+  const { height: winH, width: winW } = useWindowDimensions();
+  // tableten a vászon és a panelek egymás mellett
+  const wide = sizeClassFor(winW, winH) !== 'compact';
+  const savedPanels = useEditorPrefs((s) => s.livePanels);
+  const setLivePanels = useEditorPrefs((s) => s.setLivePanels);
+  const panelOrder = useMemo(() => normalizePanelOrder(savedPanels), [savedPanels]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const project = useEditorStore((s) => s.project);
   const [loadError, setLoadError] = useState(false);
@@ -417,50 +443,10 @@ export default function LiveStudioScreen() {
     }
   };
 
-  return (
-    <UndoGestureArea>
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* fejléc */}
-      <View style={styles.topBar}>
-        <Pressable onPress={onCancel} hitSlop={10} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color={palette.text} />
-        </Pressable>
-        <TextInput
-          value={titleDraft}
-          onChangeText={setTitleDraft}
-          onEndEditing={() => commit(setDocTitle(live, titleDraft))}
-          placeholder={t('live.titlePlaceholder', { defaultValue: "What's your live about?" })}
-          placeholderTextColor={palette.textDim}
-          style={styles.titleInput}
-          maxLength={120}
-        />
-        <View style={styles.liveStudioBadge}>
-          <Ionicons name="radio" size={13} color="#fff" />
-          <Text style={styles.liveStudioBadgeText}>Studio</Text>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {/* program-vászon */}
-        <View style={styles.canvasWrap} onLayout={(e) => setCanvasW(e.nativeEvent.layout.width)}>
-          {canvasW > 0 && (
-            <LiveCanvas
-              doc={live}
-              width={canvasW}
-              aspect={aspect}
-              maxHeight={winH * 0.42}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              facing={facing}
-              cameraGranted={!!camPerm?.granted}
-              primaryCameraId={primaryCameraId}
-              onRequestCamera={() => requestCam()}
-              onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
-              releasing={releasingCamera}
-            />
-          )}
-        </View>
-
+  // 🧩 a szakaszok panelek: tableten a vászon mellett állnak, és ujjal átrendezhetők
+  const panels: Partial<Record<LivePanelId, ReactNode>> = {
+    scenes: (
+      <>
         {/* scene-strip */}
         <Text style={styles.sectionLabel}>{t('live.studio.scenes', { defaultValue: 'Scenes' })}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sceneStrip}>
@@ -494,7 +480,10 @@ export default function LiveStudioScreen() {
             <Ionicons name="add" size={18} color={palette.accent} />
           </Pressable>
         </ScrollView>
-
+      </>
+    ),
+    sources: (
+      <>
         {/* forrás-lista */}
         <View style={styles.rowBetween}>
           <Text style={styles.sectionLabel}>{t('live.studio.sources', { defaultValue: 'Sources' })}</Text>
@@ -574,7 +563,10 @@ export default function LiveStudioScreen() {
             </View>
           </View>
         )}
-
+      </>
+    ),
+    destinations: (
+      <>
         {/* célok */}
         <Text style={styles.sectionLabel}>{t('live.studio.destinations', { defaultValue: 'Destinations' })}</Text>
         <View style={styles.destRow}>
@@ -606,7 +598,10 @@ export default function LiveStudioScreen() {
           ))}
         </View>
         <Text style={styles.hint}>{t('live.studio.destHint', { defaultValue: 'ReMix feed is always on. External platforms are Pro (multistream).' })}</Text>
-
+      </>
+    ),
+    record: (
+      <>
         {/* 📼 Rögzítés: BE → az adás végén a teljes felvételből szerkeszthető video-projekt;
             KI → NINCS projekt (a live csak élő adás, nem keletkezik üres-projekt). */}
         <Text style={styles.sectionLabel}>{t('live.studio.recordSection', { defaultValue: 'Rögzítés' })}</Text>
@@ -622,7 +617,10 @@ export default function LiveStudioScreen() {
             commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on');
           }}
         />
-
+      </>
+    ),
+    mixer: live.mixer ? (
+      <>
         {/* 🎚️ audio-mixer */}
         {live.mixer && (
           <>
@@ -679,7 +677,10 @@ export default function LiveStudioScreen() {
             <Text style={styles.hint}>{t('live.studio.mixerHint', { defaultValue: 'Mic mute is live. Music/media/system mixing lands with native audio (soon).' })}</Text>
           </>
         )}
-
+      </>
+    ) : null,
+    multistream: (
+      <>
         {/* 🎥 Multistream RTMP-célok (Pro) — a tényleges ingest-URL + kulcs */}
         <View style={styles.rowBetween}>
           <Text style={styles.sectionLabel}>{t('live.studio.multistream', { defaultValue: 'Multistream (Pro)' })}</Text>
@@ -717,7 +718,79 @@ export default function LiveStudioScreen() {
             </View>
           ))
         )}
-      </ScrollView>
+      </>
+    ),
+  };
+  const canvasBlock = (
+    <>
+        {/* program-vászon */}
+        <View style={styles.canvasWrap} onLayout={(e) => setCanvasW(e.nativeEvent.layout.width)}>
+          {canvasW > 0 && (
+            <LiveCanvas
+              doc={live}
+              width={canvasW}
+              aspect={aspect}
+              maxHeight={wide ? winH * 0.7 : winH * 0.42}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onMoveSource={(sourceId, transform) => {
+                const sceneId = getActiveScene(live)?.id;
+                if (sceneId) {
+                  commit(updateSource(live, sceneId, sourceId, { transform }), 'move-source');
+                }
+              }}
+              facing={facing}
+              cameraGranted={!!camPerm?.granted}
+              primaryCameraId={primaryCameraId}
+              onRequestCamera={() => requestCam()}
+              onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+              releasing={releasingCamera}
+            />
+          )}
+        </View>
+
+    </>
+  );
+  const panelList = <LivePanelList order={panelOrder} panels={panels} onOrder={setLivePanels} />;
+
+  return (
+    <UndoGestureArea>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* fejléc */}
+      <View style={styles.topBar}>
+        <Pressable onPress={onCancel} hitSlop={10} style={styles.iconBtn}>
+          <Ionicons name="chevron-back" size={24} color={palette.text} />
+        </Pressable>
+        <TextInput
+          value={titleDraft}
+          onChangeText={setTitleDraft}
+          onEndEditing={() => commit(setDocTitle(live, titleDraft))}
+          placeholder={t('live.titlePlaceholder', { defaultValue: "What's your live about?" })}
+          placeholderTextColor={palette.textDim}
+          style={styles.titleInput}
+          maxLength={120}
+        />
+        <View style={styles.liveStudioBadge}>
+          <Ionicons name="radio" size={13} color="#fff" />
+          <Text style={styles.liveStudioBadgeText}>Studio</Text>
+        </View>
+      </View>
+
+      {wide ? (
+        <View style={styles.desk}>
+          <ScrollView style={styles.deskCanvas} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {canvasBlock}
+          </ScrollView>
+          <ScrollView style={styles.deskPanels} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {panelList}
+          </ScrollView>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          {canvasBlock}
+          {panelList}
+        </ScrollView>
+      )}
 
       {/* akció-sáv */}
       <View style={styles.actionBar}>
@@ -826,6 +899,9 @@ const styles = StyleSheet.create({
   liveStudioBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
 
   body: { padding: 12, gap: 12, paddingBottom: 24 },
+  desk: { flex: 1, flexDirection: 'row' },
+  deskCanvas: { flex: 3 },
+  deskPanels: { flex: 2, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: palette.border },
   canvasWrap: { width: '100%' },
   canvas: { backgroundColor: '#000', borderRadius: 14, overflow: 'hidden', alignSelf: 'center' },
   srcBox: {

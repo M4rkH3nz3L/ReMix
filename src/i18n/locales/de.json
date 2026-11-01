@@ -4358,6 +4358,8 @@
     "empty": "Noch keine Beiträge."
   },
   "live": {
+    "studio": { "movePanel": "Bereich verschieben" },
+    "quick": {"title": "Schnelltasten", "mic": "Mikrofon"},
     "flipCamera": "Kamera wechseln",
     "vodDefaultName": "Live-Aufnahme",
     "state": {

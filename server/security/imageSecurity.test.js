@@ -76,7 +76,7 @@ describe('I46 — ownedMediaKey', () => {
 });
 
 describe('a kliens dokumentuma nem olvastathat szerver-oldali fájlt', () => {
-  const { bindUploadedMedia } = require('../routes/imageTools');
+  const { bindUploadedMedia } = require('../lib/bindMedia');
   const files = [{ fieldname: 'f0', path: '/tmp/feltoltes/a.png' }];
   const bind = (layer) => {
     const doc = { layers: [layer] };

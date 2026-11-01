@@ -10,6 +10,7 @@ import { TextOverlay } from '@/components/preview/TextOverlay';
 // a komponens csak az ecset bekapcsolásakor rántja be a @shopify/react-native-skia
 // natív modult, így annak hiánya (régi dev-kliens) nem crash-eltet betöltéskor.
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
+import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
 import { CropOverlay } from '@/components/studio/image/CropOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
@@ -81,8 +82,9 @@ export function ImageCanvas({
   wandActive,
   onWandSeed,
   brushActive,
-  brushColor = '#ff2d95',
-  brushSize = 8,
+  brushSettings = DEFAULT_BRUSH,
+  brushLayerId,
+  onBrushHistory,
   brushRef,
   guidesActive,
   initialZoom = 1,
@@ -124,8 +126,10 @@ export function ImageCanvas({
   ) => void;
   /** 🖌️ ecset-mód: Skia raszter-festés (a snapshotot a szülő fotó-rétegként menti) */
   brushActive?: boolean;
-  brushColor?: string;
-  brushSize?: number;
+  brushSettings?: BrushSettings;
+  /** az ecsettel éppen szerkesztett festett réteg: rejtve, mert az overlay rajzolja */
+  brushLayerId?: string | null;
+  onBrushHistory?: (canUndo: boolean, canRedo: boolean) => void;
   brushRef?: Ref<BrushHandle>;
   /** 📐 vonalzók + segédvonalak megjelenítése/szerkesztése */
   guidesActive?: boolean;
@@ -401,6 +405,9 @@ export function ImageCanvas({
         <View ref={canvasRef} style={[{ width: fit.w, height: fit.h }, capturing && styles.canvasCapture]} collapsable={false}>
           {!capturing ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paper]} /> : null}
           {layers.map((raw0) => {
+            if (brushActive && raw0.id === brushLayerId) {
+              return null;
+            }
             // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
             const raw =
               raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
@@ -554,7 +561,7 @@ export function ImageCanvas({
           {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
           {!capturing && brushActive ? (
             <Suspense fallback={null}>
-              <BrushOverlay ref={brushRef} box={fit} color={brushColor} size={brushSize} />
+              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={(layers.find((l) => l.id === brushLayerId) as PhotoLayer | undefined)?.uri} onHistory={onBrushHistory} />
             </Suspense>
           ) : null}
 

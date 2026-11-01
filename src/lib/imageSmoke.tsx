@@ -6,7 +6,9 @@ import { Dimensions, Platform, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
-import { renderStrokes } from '@/components/studio/image/BrushOverlay';
+import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
+import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { DEFAULT_BRUSH, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
@@ -85,8 +87,8 @@ async function smokeNetwork(log: Log) {
 function smokeBrush(log: Log) {
   const box = { w: 300, h: 300 };
   // vízszintes vonal a vászon közepén, 10 képpont vastag a képernyőn
-  const stroke = { d: 'M30,150 L270,150', color: '#ff0000', width: 10 };
-  const img = renderStrokes([stroke], box, 2160, 2160);
+  const stroke = { points: [{ x: 0.1, y: 0.5, p: 1 }, { x: 0.9, y: 0.5, p: 1 }], color: '#ff0000', width: 10 / box.w, hardness: 1, opacity: 1, eraser: false };
+  const img = renderStrokes([stroke], 2160, 2160);
   if (!img) {
     log(false, 'I19 ecset offscreen', 'nincs GPU-felület');
     return;
@@ -682,6 +684,118 @@ async function smokeDeep3(log: Log, setHarness: (n: ReactNode) => void, ratio: n
   removeFile(png.uri);
 }
 
+/** Az ecset-motor a valódi Skia-rajzon, a valódi overlay-en át; a hibás logikát mind ellenpróba fogja meg. */
+async function smokeBrushEngine(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const line = (extra: Partial<Stroke>, y = 0.5): Stroke => ({ points: [{ x: 0.1, y, p: 1 }, { x: 0.9, y, p: 1 }], color: '#ff0000', width: 0.1, hardness: 1, opacity: 1, eraser: false, ...extra });
+  const size = 400;
+  const alpha = (img: SkImage, x: number, y: number) => pixel(img, x, y)[3];
+
+  // átlátszóság: önmagát keresztező vonás a metszésben sem sötétedik
+  const cross: Stroke = { ...line({ opacity: 0.5 }), points: [{ x: 0.1, y: 0.5, p: 1 }, { x: 0.9, y: 0.5, p: 1 }, { x: 0.5, y: 0.1, p: 1 }, { x: 0.5, y: 0.9, p: 1 }] };
+  const a = renderStrokes([cross], size, size)!;
+  const [one, both] = [alpha(a, 100, 200), alpha(a, 200, 200)];
+  log(Math.abs(one - 128) <= 3 && Math.abs(both - one) <= 3, 'átlátszóság: a vonás önmagán nem halmozódik', `vonalon α=${one}, keresztezésben α=${both}`);
+  const twice = renderStrokes([line({ opacity: 0.5 }), line({ opacity: 0.5 })], size, size)!;
+  log(alpha(twice, 200, 200) > 180, 'ellenpróba: két külön vonás már fed', `α=${alpha(twice, 200, 200)}`);
+
+  // keménység: az él mennyire fokozatos
+  const edgeBand = (s: Stroke) => {
+    const img = renderStrokes([s], size, size)!;
+    let band = 0;
+    for (let y = 120; y < 200; y++) {
+      const v = alpha(img, 200, y);
+      if (v > 12 && v < 243) band += 1;
+    }
+    return band;
+  };
+  const [hard, soft] = [edgeBand(line({ hardness: 1 })), edgeBand(line({ hardness: 0 }))];
+  log(hard <= 3 && soft >= 10, 'keménység: a lágy él fokozatos, a kemény éles', `átmenet: kemény ${hard} px, lágy ${soft} px`);
+
+  // nyomás
+  const widthAt = (p: number) => {
+    const img = renderStrokes([{ ...line({}), points: [{ x: 0.1, y: 0.5, p }, { x: 0.9, y: 0.5, p }] }], size, size)!;
+    let n = 0;
+    for (let y = 100; y < 300; y++) if (alpha(img, 200, y) > 128) n += 1;
+    return n;
+  };
+  const [light, heavy] = [widthAt(0), widthAt(1)];
+  log(Math.abs(heavy - 40) <= 1 && Math.abs(light - 10) <= 1, 'nyomás: a vastagság a nyomást követi', `könnyű ${light} px, erős ${heavy} px`);
+
+  // radír: csak a metszetben lyukaszt
+  const erased = renderStrokes([line({}), { ...line({ eraser: true }), points: [{ x: 0.5, y: 0.1, p: 1 }, { x: 0.5, y: 0.9, p: 1 }] }], size, size)!;
+  log(alpha(erased, 200, 200) === 0 && alpha(erased, 100, 200) === 255, 'radír: a keresztezésben lyuk, mellette érintetlen', `metszet α=${alpha(erased, 200, 200)}, mellette α=${alpha(erased, 100, 200)}`);
+
+  // a valódi overlay: vonásonkénti undo, és az előnézet = export
+  const box = { w: 300, h: 300 };
+  const ref = createRef<BrushHandle>();
+  const view = createRef<View>() as RefObject<View>;
+  const history: string[] = [];
+  const mount = (baseUri?: string) =>
+    setHarness(
+      <View ref={view} collapsable={false} style={{ width: box.w, height: box.h, backgroundColor: 'transparent' }}>
+        <BrushOverlay ref={ref} box={box} settings={DEFAULT_BRUSH} baseUri={baseUri} onHistory={(u, r) => history.push(`${u}/${r}`)} />
+      </View>
+    );
+  mount();
+  await sleep(500);
+  ref.current!.addStroke(line({ color: '#00ff00', opacity: 0.6, hardness: 0.3 }, 0.3));
+  ref.current!.addStroke(line({ color: '#0000ff' }, 0.7));
+  await sleep(300);
+  ref.current!.undo();
+  await sleep(300);
+  const undone = await decode(ref.current!.exportPng(300, 300)!);
+  log(alpha(undone, 150, 90) > 100 && alpha(undone, 150, 210) === 0, 'undo: csak az utolsó vonás tűnik el', `első α=${alpha(undone, 150, 90)}, második α=${alpha(undone, 150, 210)}`);
+  log(history[history.length - 1] === 'true/true', 'a gombok állapota követi az előzményt', history[history.length - 1]);
+  ref.current!.redo();
+  await sleep(300);
+  const shot = await captureRef(view, { format: 'png', quality: 1, width: 300 / ratio, height: 300 / ratio });
+  const uri = ref.current!.exportPng(300, 300)!;
+  const [screen, png] = [await decode(shot), await decode(uri)];
+  // egyetlen élpixel bármit mutathat, ezért a rácspontok arányát mérjük
+  let bad = 0;
+  let total = 0;
+  const sample: string[] = [];
+  for (let y = 10; y < 290; y += 6) {
+    for (let x = 40; x < 260; x += 6) {
+      const [p, q] = [pixel(screen, x, y), pixel(png, x, y)];
+      total += 1;
+      // az alig látszó szélen a szín nem számít, az alfa viszont kiszúrná a hiányzó rajzot
+      const seen = p[3] > 64 && q[3] > 64;
+      if (Math.abs(p[3] - q[3]) > 40 || (seen && [0, 1, 2].some((c) => Math.abs(p[c] - q[c]) > 40))) {
+        bad += 1;
+        if (sample.length < 3) sample.push(`${x},${y}: ${p} / ${q}`);
+      }
+    }
+  }
+  log(bad / total <= 0.03 && alpha(png, 150, 210) === 255, 'előnézet = PNG az overlay-en', `${bad}/${total} rácspont tér el ${sample.join(' | ')}`);
+  removeFile(shot);
+
+  // festett réteg folytatása: a radír a korábbi festést is törli
+  setHarness(null);
+  await sleep(100);
+  mount(uri);
+  await sleep(900);
+  ref.current!.addStroke({ ...line({ eraser: true }, 0.7) });
+  await sleep(300);
+  const reopened = await decode(ref.current!.exportPng(300, 300)!);
+  log(alpha(reopened, 150, 90) > 100 && alpha(reopened, 150, 210) === 0, 'újranyitott festésen a radír a régi vonást törli', `megmaradó α=${alpha(reopened, 150, 90)}, törölt α=${alpha(reopened, 150, 210)}`);
+
+  // az export a szerver útján is ugyanazt adja
+  const doc = { id: 'full', name: 'p', aspectRatio: '1:1', width: 300, height: 300, layers: [{ kind: 'photo', id: 'p', uri, paint: true, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'contain' }] } as unknown as ImageDoc;
+  const server = await renderImageDoc(doc, 300);
+  if (server) {
+    const s = await decode(server);
+    const [g, b] = [pixel(s, 150, 90), pixel(s, 150, 210)];
+    const [eg, eb] = [pixel(png, 150, 90), pixel(png, 150, 210)];
+    log(Math.abs(b[2] - eb[2]) <= 8 && Math.abs(b[3] - eb[3]) <= 8 && Math.abs(g[3] - eg[3]) <= 20, 'a szerver-export a festést adja', `kék ${b} (várt ${eb}), zöld ${g} (várt ${eg})`);
+    removeFile(server);
+  } else {
+    log(false, 'a szerver-export a festést adja', 'nincs render');
+  }
+  removeFile(uri);
+  setHarness(null);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -857,6 +971,23 @@ export async function runImageSmoke(
   }
   if (phase === 'inspect') {
     await step('inspect', () => inspectProjects(log));
+    return;
+  }
+  if (phase === 'brushbar') {
+    await step('brushbar', async () => {
+      setHarness(
+        <View style={{ width: Math.min(390, Dimensions.get('window').width), alignSelf: 'center' }}>
+          <BrushBar brush={DEFAULT_BRUSH} onChange={() => {}} canUndo canRedo={false} onUndo={() => {}} onRedo={() => {}} onCancel={() => {}} onDone={() => {}} />
+        </View>
+      );
+      log(true, 'FOTÓZHATÓ', 'az ecset-sáv a kijelzőn');
+      await sleep(7000);
+      setHarness(null);
+    });
+    return;
+  }
+  if (phase === 'brush') {
+    await step('brush', () => smokeBrushEngine(log, setHarness, ratio));
     return;
   }
   if (phase === 'deep3') {

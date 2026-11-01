@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
@@ -16,6 +16,8 @@ import {
   isInlineSheet,
   type SheetKind,
 } from '@/components/studio/image/body/ImageStudioSheets';
+import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { DEFAULT_BRUSH, isPaintLayer } from '@/lib/brushEngine';
 import { ImageStudioToolbar } from '@/components/studio/image/body/ImageStudioToolbar';
 import { SelectionActionBar } from '@/components/studio/image/body/SelectionActionBar';
 import { palette } from '@/constants/editor';
@@ -86,8 +88,6 @@ function deleteLocalFile(uri: string) {
 const DOCKED_FRAME = { inline: true, docked: true, detents: { peek: 0, half: 0, full: 0 }, detent: 'peek' as const, onDetentChange: () => {} };
 
 /** ecset-színek + -méretek (px) a sávban */
-const BRUSH_COLORS = ['#ffffff', '#0b0b18', '#ff2d95', '#ffd166', '#39d98a', '#4d9dff'];
-const BRUSH_SIZES = [4, 10, 20];
 /** ennyi tétlenség után frissül a lap bélyegképe */
 const THUMB_IDLE_MS = 2000;
 /** varázspálca-tűrés: mennyire eltérő színek tartoznak még a kijelölésbe */
@@ -182,8 +182,10 @@ export function ImageStudioBody({
   const [wandActive, setWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(32);
   const [brushActive, setBrushActive] = useState(false);
-  const [brushColor, setBrushColor] = useState('#ff2d95');
-  const [brushSize, setBrushSize] = useState(10);
+  const [brush, setBrush] = useState(DEFAULT_BRUSH);
+  const [brushLayerId, setBrushLayerId] = useState<string | null>(null);
+  const [brushHistory, setBrushHistory] = useState({ canUndo: false, canRedo: false });
+  const onBrushHistory = useCallback((canUndo: boolean, canRedo: boolean) => setBrushHistory({ canUndo, canRedo }), []);
   const [guidesActive, setGuidesActive] = useState(false);
   // ⚡ gyors korrekció-sáv (az eszköztár helyén) — a „Részletek" a teljes verem-lapot nyitja
   const [quickAdjust, setQuickAdjust] = useState(false);
@@ -709,6 +711,9 @@ export function ImageStudioBody({
             Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
             return;
           }
+          // a kijelölt festett réteget folytatjuk (a radír is azon dolgozik), különben új réteg lesz
+          const target = doc?.layers.find((l) => l.id === selectedId);
+          setBrushLayerId(target && isPaintLayer(target) ? target.id : null);
           setSheet(null);
           setSelectedId(null);
           setCropRect(null);
@@ -934,11 +939,15 @@ export function ImageStudioBody({
     if (doc && brushRef.current?.hasStrokes()) {
       const canvas = effectiveCanvas(doc);
       const uri = brushRef.current.exportPng(canvas.width, canvas.height);
-      if (uri) {
+      if (uri && brushLayerId) {
+        commit({ ...doc, layers: doc.layers.map((l) => (l.id === brushLayerId ? { ...l, uri, paint: true } : l)) } as ImageDoc, t('studio.image.undoBrush'));
+        setSelectedId(brushLayerId);
+      } else if (uri) {
         const l: PhotoLayer = {
           kind: 'photo',
           id: makeId('lyr'),
           uri,
+          paint: true,
           position: { x: 0.5, y: 0.5 },
           w: 1,
           h: 1,
@@ -1541,8 +1550,9 @@ export function ImageStudioBody({
               wandActive={wandActive}
               onWandSeed={onWandSeed}
               brushActive={brushActive}
-              brushColor={brushColor}
-              brushSize={brushSize}
+              brushSettings={brush}
+              brushLayerId={brushLayerId}
+              onBrushHistory={onBrushHistory}
               brushRef={brushRef}
               guidesActive={guidesActive}
             />
@@ -1724,37 +1734,16 @@ export function ImageStudioBody({
               </View>
             </View>
           ) : brushActive ? (
-            /* 🖌️ ecset-sáv (szín + méret + Kész) */
-            <View style={styles.cropBar}>
-              <Pressable onPress={cancelBrush} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              {/* I39: keskeny telefonon görgethető, a Kész gomb mindig látszik */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.brushScroll}>
-                <View style={styles.brushRow}>
-                  {BRUSH_COLORS.map((c) => (
-                    <Pressable key={c} onPress={() => setBrushColor(c)} style={styles.brushDotHit} accessibilityRole="button" accessibilityLabel={c} accessibilityState={{ selected: brushColor === c }}>
-                      <View style={[styles.brushDot, { backgroundColor: c }, brushColor === c ? styles.brushDotActive : null]} />
-                    </Pressable>
-                  ))}
-                </View>
-                <View style={styles.brushRow}>
-                  {BRUSH_SIZES.map((s) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => setBrushSize(s)}
-                      style={[styles.brushSizeBtn, brushSize === s ? styles.brushSizeActive : null]}
-                    >
-                      <View style={{ width: s * 0.7 + 3, height: s * 0.7 + 3, borderRadius: 99, backgroundColor: palette.text }} />
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-              <Pressable onPress={commitBrush} style={styles.cropApply} hitSlop={6}>
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
-              </Pressable>
-            </View>
+            <BrushBar
+              brush={brush}
+              onChange={(patch) => setBrush((b) => ({ ...b, ...patch }))}
+              canUndo={brushHistory.canUndo}
+              canRedo={brushHistory.canRedo}
+              onUndo={() => brushRef.current?.undo()}
+              onRedo={() => brushRef.current?.redo()}
+              onCancel={cancelBrush}
+              onDone={commitBrush}
+            />
           ) : guidesActive ? (
             /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
             <View style={styles.cropBar}>

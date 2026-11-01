@@ -1385,6 +1385,8 @@ export interface AdjustmentLayer {
 export interface PhotoLayer extends ImageLayerBase {
   kind: 'photo';
   uri: string;
+  /** 🖌️ ecsettel festett réteg: újra megnyitható, a radír is rajta dolgozik */
+  paint?: boolean;
   assetId?: string;
   /** középpont, 0–1 normalizálva */
   position: { x: number; y: number };

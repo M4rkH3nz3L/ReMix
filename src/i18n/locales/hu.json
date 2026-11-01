@@ -3116,6 +3116,18 @@
       "layer": "Réteg"
     },
     "image": {
+      "brushBar": {
+        "paint": "Ecset",
+        "eraser": "Radír",
+        "undo": "Vonás visszavonása",
+        "redo": "Vonás újra",
+        "more": "További beállítások",
+        "customColor": "Egyedi szín",
+        "size": "Méret",
+        "opacity": "Átlátszóság",
+        "hardness": "Keménység",
+        "smoothing": "Simítás"
+      },
       "moreTools": "További eszközök",
       "stroke": {
         "style": "Vonal",

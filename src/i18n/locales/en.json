@@ -3116,6 +3116,18 @@
       "layer": "Layer"
     },
     "image": {
+      "brushBar": {
+        "paint": "Brush",
+        "eraser": "Eraser",
+        "undo": "Undo stroke",
+        "redo": "Redo stroke",
+        "more": "More settings",
+        "customColor": "Custom color",
+        "size": "Size",
+        "opacity": "Opacity",
+        "hardness": "Hardness",
+        "smoothing": "Smoothing"
+      },
       "moreTools": "More tools",
       "stroke": {
         "style": "Line",

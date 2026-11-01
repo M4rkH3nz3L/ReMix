@@ -3116,6 +3116,18 @@
       "layer": "Ebene"
     },
     "image": {
+      "brushBar": {
+        "paint": "Pinsel",
+        "eraser": "Radierer",
+        "undo": "Strich rückgängig",
+        "redo": "Strich wiederholen",
+        "more": "Weitere Einstellungen",
+        "customColor": "Eigene Farbe",
+        "size": "Größe",
+        "opacity": "Deckkraft",
+        "hardness": "Härte",
+        "smoothing": "Glättung"
+      },
       "moreTools": "Weitere Werkzeuge",
       "stroke": {
         "style": "Linie",

@@ -35,6 +35,7 @@ import { saveProject, loadProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
 import { useCollab } from '@/store/collabStore';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const ROLE_COLOR: Record<string, string> = {
   owner: palette.accent,
@@ -73,7 +74,7 @@ export default function CollabScreen() {
   useEffect(() => {
     if (ownerId && projectId) {
       void open(ownerId, projectId);
-      loadProjectRoles(ownerId, projectId).then(setRoles).catch(() => {});
+      loadProjectRoles(ownerId, projectId).then(setRoles).catch((caught) => { logCaught('app/collab/[id].tsx:CollabScreen', caught); });
     }
     return () => close();
   }, [ownerId, projectId, open, close]);
@@ -81,7 +82,7 @@ export default function CollabScreen() {
   // a tulaj lokális projektje kell a megosztás bekapcsolásához (név + JSON)
   useEffect(() => {
     if (ownerId === me && projectId) {
-      loadProject(projectId).then(setLocalProject).catch(() => {});
+      loadProject(projectId).then(setLocalProject).catch((caught) => { logCaught('app/collab/[id].tsx:CollabScreen', caught); });
     }
   }, [ownerId, me, projectId]);
 

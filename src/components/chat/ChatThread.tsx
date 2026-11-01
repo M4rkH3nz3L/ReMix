@@ -15,6 +15,7 @@ import { palette } from '@/constants/editor';
 import { haptics } from '@/design';
 import { currentUserId, type ChatMessage } from '@/lib/chat';
 import { useChat } from '@/store/chatStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 💬 Üzenet-szál — buborékok (inverted lista, legújabb alul) + composer. A chatStore
@@ -46,7 +47,8 @@ export function ChatThread({ showSenders = false }: { showSenders?: boolean }) {
     haptics.selection();
     try {
       await send(body);
-    } catch {
+    } catch (caught) {
+      logCaught('components/chat/ChatThread.tsx:onSend', caught);
       setText(body); // hibánál visszatesszük, hogy ne vesszen el
     } finally {
       setSending(false);

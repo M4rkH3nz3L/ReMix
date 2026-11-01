@@ -2,6 +2,7 @@ import { getInfoAsync } from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 import type { Asset, Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * File identity (full-plan F2): a médiafájlok tartalom-alapú azonosítója
@@ -25,7 +26,8 @@ export async function fingerprintFile(uri: string): Promise<FileFingerprint | nu
       return null;
     }
     return { hash: info.md5, size: info.size };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/fingerprint.ts:fingerprintFile', caught);
     return null;
   }
 }

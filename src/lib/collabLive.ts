@@ -1,6 +1,7 @@
 import type { LockBroadcast } from '@/lib/clipLock';
 import type { EditorCommand } from '@/lib/commands';
 import { supabase } from '@/lib/supabase';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 👥 Élő kollaboráció REALTIME csatornája — presence (ki van bent) + broadcast
@@ -82,7 +83,7 @@ export function openLiveChannel(
     let stopped = false;
     void sb
       .removeChannel(stale)
-      .catch(() => 'error')
+      .catch((caught) => { logCaught('lib/collabLive.ts:openLiveChannel', caught); return 'error'; })
       .then(() => {
         // ha a lebontás nem sikerült, a topic még foglalt → nem próbálkozunk (nincs végtelen ciklus)
         if (!stopped && !sb.getChannels().some((c) => c.topic === `realtime:${topic}`)) {

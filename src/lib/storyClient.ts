@@ -5,6 +5,7 @@ import { localStoryChapters } from '@/lib/localTasks';
 import { projectDuration } from '@/lib/projectUtils';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import type { ChapterKind, Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎬 AI Story Engine hálózati rétege (Phase 1.1): a beszéd-átirat + a hossz
@@ -30,13 +31,14 @@ export async function runStoryFlow(project: Project): Promise<StoryChapter[] | n
   if (duration <= 0.05) {
     return null;
   }
-  const transcript = (await getTimelineTranscript(project).catch(() => null)) ?? [];
+  const transcript = (await getTimelineTranscript(project).catch((caught) => { logCaught('lib/storyClient.ts:runStoryFlow', caught); return null; })) ?? [];
 
   let base: string;
   try {
     // Pro-kapu + felhő-cím egy lépésben (nem-Pro → lokál ív, nem paywall)
     base = ensureCloud('storyAnalyze');
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storyClient.ts:runStoryFlow', caught);
     return localStoryChapters(duration, transcript);
   }
   const aiConfig = await aiConfigForTask('storyStructure');
@@ -44,7 +46,8 @@ export async function runStoryFlow(project: Project): Promise<StoryChapter[] | n
   let res: Awaited<ReturnType<typeof aiFetch>>;
   try {
     res = await storyRequest(base, duration, transcript, aiConfig);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storyClient.ts:runStoryFlow', caught);
     return localStoryChapters(duration, transcript);
   }
   if (!res.ok) {
@@ -84,7 +87,7 @@ async function parseChapters(
   res: Awaited<ReturnType<typeof aiFetch>>,
   duration: number,
 ): Promise<StoryChapter[] | null> {
-  const body = (await res.json().catch(() => ({}))) as {
+  const body = (await res.json().catch((caught) => { logCaught('lib/storyClient.ts:parseChapters', caught); return {}; })) as {
     chapters?: { start?: unknown; kind?: unknown }[];
   };
 

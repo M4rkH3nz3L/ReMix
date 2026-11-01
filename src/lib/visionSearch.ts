@@ -14,6 +14,7 @@ import {
 import type { SearchHit, VisionEntry } from '@/lib/visionIndex';
 import type { Project, VideoClip } from '@/types/project';
 import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Smart Search hálózati rétege (P0‑8): a projekt videóinak jelenet-keyframe-jei
@@ -53,7 +54,8 @@ async function indexUri(
     }
     indexCache.set(uri, body.entries);
     return body.entries;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/visionSearch.ts:indexUri', caught);
     return null;
   }
 }
@@ -112,7 +114,8 @@ export async function searchVision(
         scores = body.scores;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/visionSearch.ts:searchVision', caught);
     // embedding nem érhető el — kulcsszó-fallback
   }
   // hibrid pontozás: az embedding magyar szövegen szűk dinamikájú (nomic),

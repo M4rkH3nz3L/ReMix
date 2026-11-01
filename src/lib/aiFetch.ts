@@ -13,6 +13,7 @@
 import { t as tr } from 'i18next';
 
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /** alapértelmezett várakozás: a lokális modell bemelegedve 3–8 mp, de az első
  *  hívás modell-betöltéssel jár, ezért bőkezű a keret */
@@ -75,7 +76,7 @@ export async function aiPostJson<T>(
     },
     timeoutMs
   );
-  const parsed = await res.json().catch(() => ({}));
+  const parsed = await res.json().catch((caught) => { logCaught('lib/aiFetch.ts:aiPostJson', caught); return {}; });
   if (!res.ok) {
     throw new Error((parsed as { error?: string }).error ?? fallbackError);
   }
@@ -109,8 +110,9 @@ export async function aiPostJsonOrNull<T>(
     if (!res.ok) {
       return null;
     }
-    return ((await res.json().catch(() => null)) as T) ?? null;
-  } catch {
+    return ((await res.json().catch((caught) => { logCaught('lib/aiFetch.ts:aiPostJsonOrNull', caught); return null; })) as T) ?? null;
+  } catch (caught) {
+    logCaught('lib/aiFetch.ts:aiPostJsonOrNull', caught);
     return null;
   }
 }

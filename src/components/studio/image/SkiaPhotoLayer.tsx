@@ -31,6 +31,7 @@ import { type CubeLut, parseCubeLut } from '@/lib/lutImport';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
 import { LUT_DRAFT_SIZE, LUT_SHADER, LUT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail } from '@/lib/imagePreviewLut';
 import type { ClipMask, PhotoLayer } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 type Canvas2D = { width: number; height: number };
 
@@ -57,7 +58,8 @@ export function useCubeFile(uri: string | undefined): CubeLut | null {
         if (alive && parsed.ok && parsed.lut) {
           setCube({ uri, lut: parsed.lut });
         }
-      } catch {
+      } catch (caught) {
+        logCaught('components/studio/image/SkiaPhotoLayer.tsx:useCubeFile', caught);
         /* olvashatatlan fájl: a LUT nélküli kép látszik, a hiányzó fájlt a sáv jelzi */
       }
     })();

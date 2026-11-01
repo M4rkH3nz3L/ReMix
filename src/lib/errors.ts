@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🧯 Kétrétegű hibakezelés MAGja (expo-mentes → tesztelhető).
  *
@@ -38,7 +40,8 @@ export function errorDetail(e: unknown): string {
   }
   try {
     return JSON.stringify(e);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/errors.ts:errorDetail', caught);
     return String(e);
   }
 }

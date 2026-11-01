@@ -7,6 +7,7 @@ import {
   type RedeemReason,
 } from '@/lib/promoCodes';
 import { requireSupabase } from '@/lib/supabase';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎟️ Promo / kupon — kliens-kötés.
@@ -90,7 +91,7 @@ export async function redeemPromo(rawCode: string): Promise<PromoResult> {
   }
   const d = (data ?? {}) as Record<string, unknown>;
   if (d.kind === 'proDays') {
-    await refreshEntitlement().catch(() => {});
+    await refreshEntitlement().catch((caught) => { logCaught('lib/promoClient.ts:redeemPromo', caught); });
   }
   return {
     kind: d.kind as PromoCode['kind'],

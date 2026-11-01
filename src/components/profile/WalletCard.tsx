@@ -33,6 +33,7 @@ import {
   setPayoutAccount,
   subscribeProWithCredits,
 } from '@/lib/wallet';
+import { logCaught } from '@/lib/logCaught';
 
 const KIND_ICON: Record<string, string> = {
   topup: 'add-circle',
@@ -71,7 +72,7 @@ export function WalletCard() {
         setBalance(b);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); return setLoading(false); });
     fetchPayoutAccount()
       .then((a) => {
         setAccount(a);
@@ -79,11 +80,11 @@ export function WalletCard() {
           setPayoutEmail(a.email);
         }
       })
-      .catch(() => {});
-    creditHistory(12).then(setHistory).catch(() => {});
-    myPayoutRequests(5).then(setPayouts).catch(() => {});
-    listGifts().then(setGifts).catch(() => {});
-    receivedGifts(8).then(setReceived).catch(() => {});
+      .catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
+    creditHistory(12).then(setHistory).catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
+    myPayoutRequests(5).then(setPayouts).catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
+    listGifts().then(setGifts).catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
+    receivedGifts(8).then(setReceived).catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
   }, []);
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export function WalletCard() {
       try {
         setBalance(await buyCreditsDev(amount));
       } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onBuyDev', e);
         Alert.alert(t('common.error'), (e as Error).message);
       }
     });
@@ -125,6 +127,7 @@ export function WalletCard() {
         refresh();
         Alert.alert(t('wallet.proDoneTitle'), t('wallet.proDoneMsg', { months: proMonths }));
       } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onPayPro', e);
         if (e instanceof InsufficientCreditsError) {
           toShop();
         } else {
@@ -146,6 +149,7 @@ export function WalletCard() {
           t('wallet.gift.sentMsg', { icon: gift.icon, name: gift.name, user: to })
         );
       } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:sendTheGift', e);
         if (e instanceof InsufficientCreditsError) {
           toShop();
         } else if (e instanceof RecipientNotFoundError) {
@@ -186,6 +190,7 @@ export function WalletCard() {
         setAccount({ provider: 'paypal', email: payoutEmail.trim() });
         Alert.alert(t('wallet.accountSavedTitle'), t('wallet.accountSavedMsg'));
       } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onSaveAccount', e);
         Alert.alert(t('common.error'), (e as Error).message);
       }
     });
@@ -206,6 +211,7 @@ export function WalletCard() {
           t('wallet.payoutMsg', { amount: res.amountHuf, currency: CURRENCY })
         );
       } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onCashout', e);
         if (e instanceof NoPayoutAccountError) {
           Alert.alert(t('common.error'), t('wallet.noPayoutAccount'));
         } else if (e instanceof InsufficientCreditsError) {

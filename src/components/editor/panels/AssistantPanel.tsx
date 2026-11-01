@@ -46,6 +46,7 @@ import { LookPacksSection } from '@/components/editor/panels/assistant/LookPacks
 import { SmartSearchSection } from '@/components/editor/panels/assistant/SmartSearchSection';
 import { SoundDesignSection } from '@/components/editor/panels/assistant/SoundDesignSection';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const QUICK_ACTIONS = ['makeEngaging', 'shorten30', 'addTitleCta', 'captionsLowerThird', 'unifyCaptions'];
 
@@ -124,7 +125,8 @@ export function AssistantPanel() {
           fileInfo = new File(firstVideo.uri).exists
             ? t('panels.assistant.mediaOk')
             : t('panels.assistant.mediaMissing');
-        } catch {
+        } catch (caught) {
+          logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', caught);
           fileInfo = t('panels.assistant.mediaUncheckable');
         }
       }
@@ -145,7 +147,8 @@ export function AssistantPanel() {
           );
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', caught);
         if (alive) {
           setWorkerDiag(
             t('panels.assistant.workerStatus', {
@@ -185,6 +188,7 @@ export function AssistantPanel() {
             }
           })
           .catch((e) => {
+          logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', e);
             console.warn('feltöltés-próba hiba:', (e as Error).message);
             if (alive) {
               setWorkerDiag(
@@ -235,7 +239,7 @@ export function AssistantPanel() {
       // fájlonként cache-elve — worker/Whisper nélkül kimarad)
       const transcript = await withProgress(t('panels.assistant.progressTranscript'), (report) =>
         getTimelineTranscript(state.project!, report)
-      ).catch(() => null);
+      ).catch((caught) => { logCaught('components/editor/panels/AssistantPanel.tsx:send', caught); return null; });
       if (transcript && transcript.length > 0) {
         context.transcript = transcript;
       }
@@ -255,6 +259,7 @@ export function AssistantPanel() {
           : t('panels.assistant.replyNoCommands'),
       });
     } catch (err) {
+      logCaught('components/editor/panels/AssistantPanel.tsx:send', err);
       // 🧯 kétrétegű hiba: a fejlesztői részlet a logba, a felhasználó barátságos,
       // cselekvésre hívó üzenetet lát (nem nyers „TypeError: …")
       const appErr = toAppError(err);
@@ -521,6 +526,7 @@ export function AssistantPanel() {
       );
       setAutoResult(result);
     } catch (err) {
+      logCaught('components/editor/panels/AssistantPanel.tsx:startAutoEdit', err);
       Alert.alert(t('panels.assistant.autoEditTitle'), (err as Error).message);
     } finally {
       setAutoStatus(null);
@@ -895,7 +901,7 @@ export function AssistantPanel() {
       state.toggleSafeZones();
     }
     // az arány már frissült (a dispatch szinkron) → reframe az új vászonra
-    smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
+    smartReframe().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:applySocialPreset', err); return Alert.alert(t('panels.assistant.reframeTitle'), err.message); });
   };
 
   /**
@@ -1018,26 +1024,26 @@ export function AssistantPanel() {
     {
       label: t('panels.assistant.cmdSilenceOut'),
       run: () => {
-        cutDeadAir().catch((err: Error) => Alert.alert(t('panels.assistant.deadAirTitle'), err.message));
+        cutDeadAir().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.deadAirTitle'), err.message); });
       },
     },
     {
       label: t('panels.assistant.cmdBeatCut'),
       run: () => {
-        splitOnBeats().catch((err: Error) => Alert.alert(t('panels.assistant.beatCutTitle'), err.message));
+        splitOnBeats().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.beatCutTitle'), err.message); });
       },
     },
     {
       label: t('panels.assistant.cmdReframe'),
       run: () => {
-        smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
+        smartReframe().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.reframeTitle'), err.message); });
       },
     },
     {
       label: t('panels.assistant.cmdShort30'),
       run: () => {
         setTargetSeconds(30);
-        startAutoEdit().catch((err: Error) => Alert.alert(t('panels.assistant.autoEditTitle'), err.message));
+        startAutoEdit().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.autoEditTitle'), err.message); });
       },
     },
     { label: t('panels.assistant.cmdCaption'), run: () => send(t('panels.assistant.promptCaption')) },
@@ -1086,7 +1092,7 @@ export function AssistantPanel() {
           icon="flash-outline"
           label={autoStatus ?? t('panels.assistant.autoEditStart', { seconds: targetSeconds })}
           onPress={() => {
-            startAutoEdit().catch((err: Error) => Alert.alert('Auto Edit', err.message));
+            startAutoEdit().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert('Auto Edit', err.message); });
           }}
         />
         {autoResult ? (
@@ -1141,7 +1147,7 @@ export function AssistantPanel() {
           icon="albums-outline"
           label={highlightStatus ?? t('panels.assistant.findShortsBtn')}
           onPress={() => {
-            findShorts().catch((err: Error) => Alert.alert(t('panels.assistant.shortsTitle'), err.message));
+            findShorts().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.shortsTitle'), err.message); });
           }}
         />
         {highlights?.map((h, i) => (
@@ -1212,56 +1218,56 @@ export function AssistantPanel() {
           icon="cut-outline"
           label={cutStatus ?? t('panels.assistant.cutDeadAirBtn')}
           onPress={() => {
-            cutDeadAir().catch((err: Error) => Alert.alert(t('panels.assistant.deadAirTitle'), err.message));
+            cutDeadAir().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.deadAirTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="film-outline"
           label={sceneStatus ?? t('panels.assistant.splitScenesBtn')}
           onPress={() => {
-            splitAtScenes().catch((err: Error) => Alert.alert(t('panels.assistant.sceneCutTitle'), err.message));
+            splitAtScenes().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.sceneCutTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="musical-notes-outline"
           label={beatStatus ?? t('panels.assistant.splitBeatsBtn')}
           onPress={() => {
-            splitOnBeats().catch((err: Error) => Alert.alert(t('panels.assistant.beatCutTitle'), err.message));
+            splitOnBeats().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.beatCutTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="pulse-outline"
           label={fxStatus ?? t('panels.assistant.beatPulseBtn')}
           onPress={() => {
-            applyBeatFx('pulse').catch((err: Error) => Alert.alert(t('panels.assistant.beatFxTitle'), err.message));
+            applyBeatFx('pulse').catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.beatFxTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="flash-outline"
           label={fxStatus ?? t('panels.assistant.beatFlashBtn')}
           onPress={() => {
-            applyBeatFx('flash').catch((err: Error) => Alert.alert(t('panels.assistant.beatFxTitle'), err.message));
+            applyBeatFx('flash').catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.beatFxTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="crop-outline"
           label={reframeStatus ?? t('panels.assistant.smartReframeBtn')}
           onPress={() => {
-            smartReframe().catch((err: Error) => Alert.alert(t('panels.assistant.reframeTitle'), err.message));
+            smartReframe().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.reframeTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="search-outline"
           label={footageStatus ?? t('panels.assistant.footageCheckBtn')}
           onPress={() => {
-            footageCheck().catch((err: Error) => Alert.alert(t('panels.assistant.footageTitle'), err.message));
+            footageCheck().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.footageTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="images-outline"
           label={brollStatus ?? t('panels.assistant.brollBtn')}
           onPress={() => {
-            findBroll().catch((err: Error) => Alert.alert(t('panels.assistant.brollTitle'), err.message));
+            findBroll().catch((err: Error) => { logCaught('components/editor/panels/AssistantPanel.tsx:AssistantPanel', err); return Alert.alert(t('panels.assistant.brollTitle'), err.message); });
           }}
         />
         <Text style={styles.note}>{t('panels.assistant.cutToolsNote')}</Text>

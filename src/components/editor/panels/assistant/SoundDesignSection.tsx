@@ -10,6 +10,7 @@ import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import { planSoundDesign, usedSfxIds } from '@/lib/soundDesign';
 import type { SfxId, SfxPlacement } from '@/lib/soundDesign';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔊 Sound Design AI v1: a vágópontokra és a beat-rácsra oszt ki SFX-eket a
@@ -97,7 +98,8 @@ export function SoundDesignSection({
         }
         try {
           uriById.set(id, { uri: await downloadTrack(track), name: track.name });
-        } catch {
+        } catch (caught) {
+          logCaught('components/editor/panels/assistant/SoundDesignSection.tsx:runSoundDesign', caught);
           // ez az egy SFX kimarad, a többi mehet
         }
       }
@@ -187,7 +189,7 @@ export function SoundDesignSection({
         label={busy ?? t('panels.assistant.soundDesignBtn')}
         onPress={() => {
           runSoundDesign().catch((err: Error) =>
-            Alert.alert(t('panels.assistant.soundDesignTitle'), err.message)
+            { logCaught('components/editor/panels/assistant/SoundDesignSection.tsx:SoundDesignSection', err); return Alert.alert(t('panels.assistant.soundDesignTitle'), err.message); }
           );
         }}
       />

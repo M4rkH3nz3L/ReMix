@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { palette } from '@/constants/editor';
 import { createGenerationGuard } from '@/lib/asyncGuard';
 import { createCollection, deleteCollection, listCollections, type PostCollection } from '@/lib/postCollections';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📁 Kollekciók — a felhasználó mappái/playlistjei (az élő `post_collections` fölött).
@@ -44,7 +45,8 @@ export default function CollectionsScreen() {
             setCols(r);
           }
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('app/collections/index.tsx:timer', caught);
           if (guard.isCurrent(token)) {
             setCols([]);
           }
@@ -71,14 +73,14 @@ export default function CollectionsScreen() {
         setName('');
         load();
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('app/collections/index.tsx:onCreate', caught); })
       .finally(() => setBusy(false));
   };
 
   const onDelete = (c: PostCollection) => {
     deleteCollection(c.id)
       .then(() => setCols((prev) => prev.filter((x) => x.id !== c.id)))
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/collections/index.tsx:onDelete', caught); });
   };
 
   const open = (c: PostCollection) =>

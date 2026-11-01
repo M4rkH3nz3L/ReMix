@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { BrandKit } from '@/lib/brandKit';
+import { logCaught } from '@/lib/logCaught';
 
 /** 🎨 Brand Kit tárolás — app-szintű, projekteken átívelő (AsyncStorage). */
 
@@ -10,7 +11,8 @@ export async function loadBrandKit(): Promise<BrandKit | null> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     return raw ? (JSON.parse(raw) as BrandKit) : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/brandStore.ts:loadBrandKit', caught);
     return null;
   }
 }

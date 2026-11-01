@@ -9,6 +9,7 @@ import { projectDuration } from '@/lib/projectUtils';
 import { clamp, formatRuler } from '@/lib/time';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import type { Project, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📈 AI Pacing (Phase 1.2): a videó TEMPÓ-térképe VALÓS worker-jelekből —
@@ -67,7 +68,7 @@ export async function analyzePacing(project: Project): Promise<PacingInsight | n
   }
   const silences = mapSourceRangesToTimeline(videoClips, silencesByUri);
   const scenes = mapSourcePointsToTimeline(videoClips, scenesByUri);
-  const transcript = (await getTimelineTranscript(project).catch(() => null)) ?? [];
+  const transcript = (await getTimelineTranscript(project).catch((caught) => { logCaught('lib/pacingClient.ts:analyzePacing', caught); return null; })) ?? [];
 
   // ha SEMMI jel nem jött (nincs worker / minden null), nincs értelmes elemzés
   if (silences.length === 0 && scenes.length === 0 && transcript.length === 0) {

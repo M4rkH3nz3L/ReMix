@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🎬 Render route-ok + lokális job-állapot (render/proxy/collect/queue/:id*).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek + a `jobs` in-memory map
@@ -33,7 +34,8 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
   try {
     project = JSON.parse(req.body.project);
     uriMap = JSON.parse(req.body.uriMap ?? '{}');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/render.js', caught);
     res.status(400).json({ error: 'Hibás project/uriMap JSON.' });
     return;
   }
@@ -97,7 +99,8 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
   let settingsRaw = {};
   try {
     settingsRaw = JSON.parse(req.body.settings ?? '{}');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/render.js', caught);
     // alapértékek
   }
 
@@ -141,7 +144,7 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
       // különben a job „waiting"-ben ülne, a kliens pedig 25%-on ragadna a
       // ~10 perces timeoutig (ez volt a „megosztás beragadt" tünet). Látható
       // hibát adunk, hogy a UI újrapróbálhasson (a média-feltöltés ELŐTT).
-      const aliveWorkers = await listWorkers().catch(() => []);
+      const aliveWorkers = await listWorkers().catch((caught) => { logCaught('routes/render.js', caught); return []; });
       if (aliveWorkers.length === 0) {
         const wErr = new Error('Jelenleg nincs elérhető render-worker — indítsd el a render-workert, vagy próbáld újra pár perc múlva.');
         wErr.status = 503;
@@ -188,6 +191,7 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
     })()
       .then(() => res.json({ id, mode: 'cloud' }))
       .catch((err) => {
+      logCaught('routes/render.js', err);
         console.error('render enqueue hiba:', err.message);
         res.status(err.status || 500).json({ error: err.message });
       });
@@ -208,7 +212,8 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
   let settings = {};
   try {
     settings = JSON.parse(req.body.settings ?? '{}');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/render.js', caught);
     // beállítások nélkül alapértékekkel megy
   }
   renderProject(
@@ -227,6 +232,7 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
       jobs.set(id, { state: 'done', file, dir: workDir, userId: uid });
     })
     .catch((err) => {
+    logCaught('routes/render.js', err);
       if (controller.signal.aborted) {
         // megszakítva: nem hiba — a jobot lezárjuk és a temp-mappát takarítjuk
         jobs.set(id, { state: 'cancelled', dir: workDir, userId: uid });
@@ -308,7 +314,8 @@ router.post('/collect', requireAuth, rateLimit('render'), upload.any(), (req, re
   try {
     project = JSON.parse(req.body.project);
     uriMap = JSON.parse(req.body.uriMap ?? '{}');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/render.js', caught);
     res.status(400).json({ error: 'Hibás project/uriMap JSON.' });
     return;
   }
@@ -395,7 +402,7 @@ router.get('/render/queue', requireAuth, async (req, res) => {
   const FACTOR = Math.max(0.05, parseFloat(process.env.RENDER_ETA_FACTOR || '0.7'));
   const now = Date.now();
   try {
-    const [snap, workers] = await Promise.all([listRenderJobs(), listWorkers().catch(() => [])]);
+    const [snap, workers] = await Promise.all([listRenderJobs(), listWorkers().catch((caught) => { logCaught('routes/render.js', caught); return []; })]);
     const C = Math.max(1, snap.concurrency);
     // egy job becsült renderideje (mp) — 0 hossz esetén óvatos alapérték
     const estSec = (j) => Math.max(3, (j.durationSec > 0 ? j.durationSec : 20) * FACTOR);
@@ -480,6 +487,7 @@ router.get('/render/queue', requireAuth, async (req, res) => {
       mineEtaSec: mineNext ? mineNext.etaSec : null,
     });
   } catch (err) {
+    logCaught('routes/render.js', err);
     console.error('render-queue hiba:', err.message);
     res.status(500).json({ error: err.message });
   }
@@ -546,7 +554,7 @@ router.get('/render/:id', renderJobAuth, async (req, res) => {
     return;
   }
   if (queueEnabled()) {
-    const j = await getRenderJob(req.params.id).catch(() => null);
+    const j = await getRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; });
     if (j) {
       if (!canAccessRenderJob(j.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, j.userId);
@@ -579,7 +587,7 @@ router.get('/render/:id/file', renderJobAuth, async (req, res) => {
     return;
   }
   if (queueEnabled()) {
-    const j = await getRenderJob(req.params.id).catch(() => null);
+    const j = await getRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; });
     if (j) {
       if (!canAccessRenderJob(j.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, j.userId);
@@ -610,14 +618,15 @@ router.post('/render/:id/cancel', renderJobAuth, async (req, res) => {
     }
     try {
       job.abort?.(); // → az ffmpeg SIGKILL + a temp-mappa törlése a render catch-ágában
-    } catch {
+    } catch (caught) {
+      logCaught('routes/render.js', caught);
       /* már leállt */
     }
     res.json({ ok: true, mode: 'local' });
     return;
   }
   if (queueEnabled()) {
-    const r = await cancelRenderJob(req.params.id).catch(() => null);
+    const r = await cancelRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; });
     if (r && r.found) {
       if (!canAccessRenderJob(r.userId, req.user?.id, INSECURE_DEV)) {
         denyRenderJob(req, res, r.userId);

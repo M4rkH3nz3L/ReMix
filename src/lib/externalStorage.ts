@@ -5,6 +5,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { asRecord, boolOr, finiteTime, mapValid, str } from '@/lib/parseGuards';
 import type { StorageEntry } from '@/lib/storageProviders';
 import { workerAuthHeaders, workerJsonHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔌 Külső tárhely-szolgáltatók kliens-rétege — a user SAJÁT felhőjének (Google
@@ -46,7 +47,7 @@ export const EXTERNAL_PROVIDERS: {
 ];
 
 async function readError(res: Response, fallback: string): Promise<string> {
-  const body = asRecord(await res.json().catch(() => null));
+  const body = asRecord(await res.json().catch((caught) => { logCaught('lib/externalStorage.ts:body', caught); return null; }));
   return str(body?.error) || fallback;
 }
 
@@ -114,7 +115,7 @@ export async function fetchConnectedProviders(): Promise<ConnectedProvider[]> {
   if (!res.ok) {
     return [];
   }
-  return parseConnectedProviders(await res.json().catch(() => null));
+  return parseConnectedProviders(await res.json().catch((caught) => { logCaught('lib/externalStorage.ts:fetchConnectedProviders', caught); return null; }));
 }
 
 /** rövid cache: a mentés-kori backup-döntés ne kérdezze le a workert minden alkalommal */
@@ -135,7 +136,8 @@ export async function hasOwnStorageTarget(): Promise<boolean> {
     const value = (await fetchConnectedProviders()).some((p) => p.isDefault);
     ownTargetCache = { at: Date.now(), value };
     return value;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/externalStorage.ts:hasOwnStorageTarget', caught);
     return ownTargetCache?.value ?? false;
   }
 }
@@ -157,7 +159,7 @@ export async function connectOAuthProvider(provider: OAuthProviderType): Promise
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ returnUrl }),
   });
-  const body = asRecord(await res.json().catch(() => null));
+  const body = asRecord(await res.json().catch((caught) => { logCaught('lib/externalStorage.ts:body', caught); return null; }));
   const url = str(body?.url);
   if (!res.ok || !url) {
     throw new Error(str(body?.error) || 'oauth_start_failed');
@@ -213,7 +215,7 @@ export async function listProviderFiles(id: string): Promise<StorageEntry[]> {
   const res = await fetch(`${cloudBaseUrl()}/storage/${encodeURIComponent(id)}/list`, {
     headers: await workerAuthHeaders(),
   });
-  const raw = await res.json().catch(() => null);
+  const raw = await res.json().catch((caught) => { logCaught('lib/externalStorage.ts:listProviderFiles', caught); return null; });
   if (!res.ok) {
     throw new Error(str(asRecord(raw)?.error) || 'list_failed');
   }

@@ -14,6 +14,7 @@ import {
   listGifts,
   sendGift,
 } from '@/lib/wallet';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎁 Ajándék-lap (TikTok-modell): egy ISMERT címzettnek (creator / poszt szerzője)
@@ -45,8 +46,8 @@ export function GiftSheet({
     if (!visible) {
       return;
     }
-    listGifts().then(setGifts).catch(() => {});
-    creditBalance().then(setBalance).catch(() => {});
+    listGifts().then(setGifts).catch((caught) => { logCaught('components/GiftSheet.tsx:GiftSheet', caught); });
+    creditBalance().then(setBalance).catch((caught) => { logCaught('components/GiftSheet.tsx:GiftSheet', caught); });
   }, [visible]);
 
   const onPick = (gift: Gift) => {
@@ -77,6 +78,7 @@ export function GiftSheet({
                 t('wallet.gift.sentMsg', { icon: gift.icon, name: gift.name, user: toName || toUsername })
               );
             } catch (e) {
+              logCaught('components/GiftSheet.tsx:onPick', e);
               if (e instanceof InsufficientCreditsError) {
                 Alert.alert(t('wallet.notEnoughTitle'), t('wallet.notEnoughMsg'), [
                   { text: t('common.cancel'), style: 'cancel' },

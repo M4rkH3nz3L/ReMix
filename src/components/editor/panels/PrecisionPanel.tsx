@@ -20,6 +20,7 @@ import { clamp } from '@/lib/time';
 import { pointsToPanKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, ImageClip, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const STEP = 0.1;
 
@@ -96,6 +97,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
       updateClip(clip.id, { uri: file.uri });
       Alert.alert(t('panels.precision.compoundDoneTitle'), t('panels.precision.compoundDoneBody'));
     } catch (err) {
+      logCaught('components/editor/panels/PrecisionPanel.tsx:renderCompoundProxy', err);
       if (!isRenderCancelledError(err)) {
         Alert.alert(t('panels.precision.compoundTitle'), (err as Error).message);
       }
@@ -150,7 +152,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
         state.updateClip(clip.id, { keyframes: { ...clip.keyframes, ...kf } });
         Alert.alert(t('panels.precision.trackDone'), t('panels.precision.trackDoneBody', { count: kf.x.length }));
       })
-      .catch((err: Error) => Alert.alert(t('panels.precision.trackTitle'), err.message))
+      .catch((err: Error) => { logCaught('components/editor/panels/PrecisionPanel.tsx:runTrackImage', err); return Alert.alert(t('panels.precision.trackTitle'), err.message); })
       .finally(() => setTrackBusy(false));
   };
   const startTrackPick = () => {
@@ -556,7 +558,7 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
               label={proxyBusy ? t('panels.precision.compoundRendering') : t('panels.precision.compoundRender')}
               active={proxyBusy}
               onPress={() => {
-                renderCompoundProxy().catch(() => {});
+                renderCompoundProxy().catch((caught) => { logCaught('components/editor/panels/PrecisionPanel.tsx:PrecisionPanel', caught); });
               }}
             />
           </View>

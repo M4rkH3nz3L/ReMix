@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🎥 LiveKit Egress a workerben (LIVE.md Fázis E) — a felhasználó ENGEDÉLYEZETT
 // RTMP-céljaira streameli az élő szobát (RoomComposite → fan-out). A stream-
 // kulcsokat service_role-lal olvassa a live_destinations-ből (a kliens sosem
@@ -207,7 +208,8 @@ async function stopStale(sb, client, rows, nowIso) {
   for (const r of rows ?? []) {
     try {
       await client.stopEgress(r.egress_id);
-    } catch {
+    } catch (caught) {
+      logCaught('liveEgress.js:stopStale', caught);
       // lehet, hogy LiveKit-oldalon már nincs — a jelölés akkor is kell
     }
     await markEgressStopped(sb, r.egress_id, nowIso);
@@ -295,7 +297,8 @@ async function reconcileLive(nowMs = Date.now(), deps = {}) {
     if (client) {
       try {
         [info] = await client.listEgress({ egressId: r.egress_id });
-      } catch {
+      } catch (caught) {
+        logCaught('liveEgress.js:reconcileLive', caught);
         info = undefined; // a LiveKit most nem válaszol → ebben a körben nem döntünk
       }
     }
@@ -310,7 +313,8 @@ async function reconcileLive(nowMs = Date.now(), deps = {}) {
     if (sess && sess.status !== 'live') {
       try {
         await client.stopEgress(r.egress_id);
-      } catch {
+      } catch (caught) {
+        logCaught('liveEgress.js:reconcileLive', caught);
         // már leállt — a jelölés akkor is kell
       }
       await markEgressStopped(sb, r.egress_id, nowIso);
@@ -425,6 +429,7 @@ async function startEgress({ room, userId, record, aspect }) {
     try {
       urls = dests.map((d) => rtmpTarget(d.rtmp_url, decryptStreamKey(d.stream_key)));
     } catch (e) {
+      logCaught('liveEgress.js:startEgress', e);
       return { ok: false, status: 500, error: `Stream-kulcs dekódolási hiba: ${redactSecrets(e.message)}` };
     }
     streamOutput = new StreamOutput({ protocol: StreamProtocol.RTMP, urls });
@@ -443,7 +448,7 @@ async function startEgress({ room, userId, record, aspect }) {
     // ha már van, nem gond; az egress így bevárja a hostot az (üres) szobában.
     const rc = getRoomClient();
     if (rc) {
-      await rc.createRoom({ name: room, emptyTimeout: 300 }).catch(() => {});
+      await rc.createRoom({ name: room, emptyTimeout: 300 }).catch((caught) => { logCaught('liveEgress.js:startEgress', caught); });
     }
     // 🎥 168: scene-pontos kompozitor az egresshez. Ha az EGRESS_LAYOUT_URL be van
     // állítva (a worker `/live/egress-layout` route-ja, headless Chrome-ból elérhető
@@ -474,6 +479,7 @@ async function startEgress({ room, userId, record, aspect }) {
       vodUrl: fileOutput ? vodUrl(vodObject) : null, // 📼 D158: a VOD publikus URL-je (csak ha készül felvétel)
     };
   } catch (e) {
+    logCaught('liveEgress.js:startEgress', e);
     return { ok: false, status: 502, error: `Egress-indítás hiba: ${redactSecrets(e.message)}` };
   }
 }
@@ -490,9 +496,10 @@ async function stopEgress(egressId) {
   try {
     await client.stopEgress(egressId);
   } catch (e) {
+    logCaught('liveEgress.js:stopEgress', e);
     stopErr = e;
   }
-  await markEgressStopped(getAdmin(), egressId, new Date().toISOString()).catch(() => {}); // best-effort tracking
+  await markEgressStopped(getAdmin(), egressId, new Date().toISOString()).catch((caught) => { logCaught('liveEgress.js:stopEgress', caught); }); // best-effort tracking
   return stopErr ? { ok: false, status: 502, error: `Egress-leállítás hiba: ${redactSecrets(stopErr.message)}` } : { ok: true };
 }
 

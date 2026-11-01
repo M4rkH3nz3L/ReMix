@@ -13,6 +13,7 @@ import { pickAudio, pickCubeLut, pickImage, pickVideo } from '@/lib/media';
 import { migrateProject, relinkUri } from '@/lib/projectUtils';
 import type { Clip, Project } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * `.remix` projektfájl (full-plan F2): a projekt + asset-referenciák, nyers
@@ -97,7 +98,8 @@ export function findMissingMedia(project: Project): MissingMedia[] {
     let exists = false;
     try {
       exists = new File(uri).exists;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/videdFile.ts:check', caught);
       exists = false;
     }
     if (!exists) {
@@ -201,7 +203,8 @@ export async function findAutoRelinkPairs(
     if (!dir.exists) {
       return [];
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/videdFile.ts:findAutoRelinkPairs', caught);
     return [];
   }
   const candidates = dir.list().filter((entry): entry is File => entry instanceof File);
@@ -286,7 +289,8 @@ export async function pickAndParseVided(): Promise<ImportResult | null> {
       const { importRpFromUri } = await import('@/lib/rpFile');
       return importRpFromUri(picked.uri);
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/videdFile.ts:pickAndParseVided', caught);
     // nem olvasható bináris fejként → JSON-ként próbáljuk
   }
   const text = await picked.text();
@@ -341,7 +345,8 @@ export async function pickRelinkPairs(missing: MissingMedia[]): Promise<RelinkPa
       if (picked) {
         pairs.push({ oldUri: item.uri, newUri: picked.uri });
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/videdFile.ts:pickRelinkPairs', caught);
       // a választó hibája nem szakítja meg a többi tétel újracsatolását
     }
   }

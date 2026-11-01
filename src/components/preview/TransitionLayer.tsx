@@ -8,6 +8,7 @@ import { resolveClipUri } from '@/lib/assetResolve';
 import { activeTransition, type ActiveTransition } from '@/lib/projectUtils';
 import { transitionPreviewGeometry, type TransitionGeometry } from '@/lib/transitions';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Átmenet-előnézet a fő preview-ban: ha a lejátszófej egy klip `transitionOut`-
@@ -61,7 +62,7 @@ function IncomingClip({ trans, box }: { trans: ActiveTransition; box: { w: numbe
           player.currentTime = toVideo.trimIn;
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/preview/TransitionLayer.tsx:IncomingClip', caught); });
   }, [player, toVideo, toVideoUri]);
 
   // 🔗 KÖZÖS átmenet-spec: a preview-geometria a render-paritásos magból jön

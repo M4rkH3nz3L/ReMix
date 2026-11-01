@@ -9,6 +9,7 @@ import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import type { ImageDoc } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎨 Kép-dokumentum rasterizálása a workerrel.
@@ -81,7 +82,8 @@ export async function renderSvgPdf(svg: string, width: number, height: number): 
     const target = new File(dir, `doc_${Date.now().toString(36)}.pdf`);
     target.write(new Uint8Array(await res.arrayBuffer()));
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/imageDocClient.ts:renderSvgPdf', caught);
     return null;
   }
 }
@@ -131,7 +133,8 @@ export async function importPsd(
       if (body?.error) {
         msg = body.error;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/imageDocClient.ts:importPsd', caught);
       // nem-JSON válasz — marad az alap üzenet
     }
     throw new Error(msg);
@@ -186,7 +189,8 @@ export async function importPdf(
       if (body?.error) {
         msg = body.error;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/imageDocClient.ts:importPdf', caught);
       // nem-JSON válasz — marad az alap üzenet
     }
     throw new Error(msg);
@@ -231,7 +235,8 @@ export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<stri
       if (body?.error) {
         msg = body.error;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/imageDocClient.ts:exportPsd', caught);
       // nem-JSON válasz — marad az alap üzenet
     }
     throw new Error(msg);
@@ -255,7 +260,8 @@ export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<stri
     }
     target.write(new Uint8Array(await dl.arrayBuffer()));
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/imageDocClient.ts:exportPsd', caught);
     return null;
   }
 }
@@ -299,7 +305,7 @@ export async function renderImageDoc(
     });
     if (res.status >= 400 && res.status < 500) {
       // 🚫 I13: szándékos elutasítás (túl nagy doc, kvóta) — a user megkapja az okot
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch((caught) => { logCaught('lib/imageDocClient.ts:renderImageDoc', caught); return {}; })) as { error?: string };
       throw new ImageRenderRejected(body.error || `Render-hiba (${res.status})`);
     }
     if (!res.ok) {

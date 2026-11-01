@@ -10,6 +10,7 @@ import { clearTranscriptMemory } from '@/lib/transcripts';
 import { clearVisionMemory } from '@/lib/visionSearch';
 import { clearVoiceProxyMemory } from '@/lib/voiceProxy';
 import { clearWaveformMemory } from '@/lib/waveform';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧹 Cache-kezelés: az ELDOBHATÓ, újragenerálható gyorsítótárak mérete és
@@ -38,7 +39,8 @@ function fileList(makeDir: () => Directory): File[] {
       return [];
     }
     return dir.list().filter((e): e is File => e instanceof File);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cacheManager.ts:fileList', caught);
     return [];
   }
 }
@@ -51,7 +53,8 @@ function waveformFiles(): File[] {
     return new Directory(Paths.cache)
       .list()
       .filter((e): e is File => e instanceof File && e.name.startsWith('wf_'));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cacheManager.ts:waveformFiles', caught);
     return [];
   }
 }
@@ -93,21 +96,24 @@ export function clearCaches(): void {
   for (const f of fileList(() => new Directory(Paths.document, 'proxies'))) {
     try {
       f.delete();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/cacheManager.ts:clearCaches', caught);
       /* ignore */
     }
   }
   for (const f of waveformFiles()) {
     try {
       f.delete();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/cacheManager.ts:clearCaches', caught);
       /* ignore */
     }
   }
   for (const f of fileList(() => thumbnailDir())) {
     try {
       f.delete();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/cacheManager.ts:clearCaches', caught);
       /* ignore */
     }
   }
@@ -149,7 +155,8 @@ export function pruneProxyCache(maxBytes: number = PROXY_CACHE_MAX_BYTES): numbe
     if (evictSet.has(f.uri)) {
       try {
         f.delete();
-      } catch {
+      } catch (caught) {
+        logCaught('lib/cacheManager.ts:pruneProxyCache', caught);
         /* ignore */
       }
     }
@@ -186,7 +193,8 @@ export function pruneRenderCache(maxBytes: number = RENDER_CACHE_MAX_BYTES): num
     if (evictSet.has(f.uri)) {
       try {
         f.delete();
-      } catch {
+      } catch (caught) {
+        logCaught('lib/cacheManager.ts:pruneRenderCache', caught);
         /* ignore */
       }
     }

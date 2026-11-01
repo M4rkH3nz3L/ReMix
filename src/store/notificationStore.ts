@@ -8,6 +8,7 @@ import {
   type AppNotification,
 } from '@/lib/notifications';
 import { presentLocal } from '@/lib/pushNotifications';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔔 Értesítés-store — a lista + olvasatlan-szám EGYETLEN forrása, REALTIME
@@ -47,7 +48,8 @@ export const useNotifications = create<NotificationState>((set) => ({
     try {
       const items = await listNotifications();
       set({ items, unread: countUnread(items), hydrated: true });
-    } catch {
+    } catch (caught) {
+      logCaught('store/notificationStore.ts:useNotifications', caught);
       set({ hydrated: true });
     }
     // realtime: új értesítés → a lista elejére, olvasatlan-szám nő
@@ -73,11 +75,11 @@ export const useNotifications = create<NotificationState>((set) => ({
       const items = s.items.map((n) => (n.id === id ? { ...n, read: true } : n));
       return { items, unread: countUnread(items) };
     });
-    markRead(id).catch(() => {});
+    markRead(id).catch((caught) => { logCaught('store/notificationStore.ts:useNotifications', caught); });
   },
 
   markAll: () => {
     set((s) => ({ items: s.items.map((n) => ({ ...n, read: true })), unread: 0 }));
-    markAllRead().catch(() => {});
+    markAllRead().catch((caught) => { logCaught('store/notificationStore.ts:useNotifications', caught); });
   },
 }));

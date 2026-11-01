@@ -9,6 +9,13 @@ const PATTERNS = [
   [/\blive_[A-Za-z0-9_]{10,}/g, 'live_***'],
   [/\b[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}\b/gi, '****-****-****-****-****'],
   [/\bFB-[A-Za-z0-9-]{10,}/g, 'FB-***'],
+  // hitelesítés: minden naplózott hibaüzenetből ki kell maradnia
+  [/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer ***'],
+  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(\.[A-Za-z0-9_-]+)?/g, '***jwt***'],
+  [/\b(sk|rk|pk)[-_](ant[-_])?[A-Za-z0-9_-]{16,}/g, '***key***'],
+  [/\b(access_token|refresh_token|api[-_]?key|apikey|token|password|secret)(["']?\s*[=:]\s*["']?)[^\s"'&,}]+/gi, '$1$2***'],
+  // személyes adat
+  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '***@***'],
   // a titkosított tárolási forma
   [/enc:v1:[A-Za-z0-9+/=:._-]+/g, 'enc:v1:***'],
 ];

@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 💰 Wallet route-ok (tarhely-kvota kijelzes + PayPal kifizetes).
 // Domain-router (01-api-architecture §01.1). SZO SZERINT az index.js-bol.
 
@@ -25,6 +26,7 @@ router.get('/storage/usage', requireAuth, async (req, res) => {
   try {
     res.json({ usage: await usageFor(uid) });
   } catch (err) {
+    logCaught('routes/wallet.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -89,6 +91,7 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
       });
       res.json({ status: 'paid', provider_ref: ref, ...reqRow });
     } catch (perr) {
+      logCaught('routes/wallet.js', perr);
       // provider-hiba → koin-visszatérítés a resolve_payout-ban
       await sb.rpc('resolve_payout', {
         p_request: reqRow.request_id,
@@ -98,6 +101,7 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
       res.status(502).json({ error: `payout_failed: ${perr.message}` });
     }
   } catch (err) {
+    logCaught('routes/wallet.js', err);
     res.status(500).json({ error: err.message });
   }
 });

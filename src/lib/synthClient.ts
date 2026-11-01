@@ -4,6 +4,7 @@ import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import { synthDurationSec, type SynthNote, type SynthWave } from '@/lib/synth';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎹 A piano-roll hangjegyeinek renderelése hang-fájllá a worker `/synth`-jén (MIDI → generált
@@ -35,7 +36,8 @@ export async function renderSynthToClip(
     const headerDur = Number(res.headers.get('X-Duration-Sec'));
     const durationSec = Number.isFinite(headerDur) && headerDur > 0 ? headerDur : synthDurationSec(notes, opts.bpm);
     return { uri: target.uri, durationSec };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/synthClient.ts:renderSynthToClip', caught);
     return null;
   }
 }

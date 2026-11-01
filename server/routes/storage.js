@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🗄️ Külső tárhely-provider route-ok (Drive/Dropbox/WebDAV/S3 + aktív-cél + proxy).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből
@@ -25,6 +26,7 @@ router.get('/storage/sources', requireAuth, async (req, res) => {
     const user = uid ? await userStorage.describeUserSources(uid) : [];
     res.json({ sources: [...user, ...describeSources()] });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -43,6 +45,7 @@ router.get('/storage/connected', requireAuth, async (req, res) => {
     ]);
     res.json({ providers, default: defaultTarget });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -59,6 +62,7 @@ router.post('/storage/default', requireAuth, rateLimit('messaging'), express.jso
     await userStorage.setDefaultTarget(uid, sourceId);
     res.json({ ok: true, default: sourceId });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -81,6 +85,7 @@ router.post('/storage/oauth/:provider/start', requireAuth, rateLimit('messaging'
     );
     res.json({ url });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -107,6 +112,7 @@ router.get('/storage/oauth/:provider/callback', async (req, res) => {
         `</body>`
     );
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(400).send(`Bekötés sikertelen: ${err.message}`);
   }
 });
@@ -131,6 +137,7 @@ router.post('/storage/connect', requireAuth, rateLimit('messaging'), express.jso
     });
     res.json({ id });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -145,6 +152,7 @@ router.post('/storage/:sourceId/disconnect', requireAuth, rateLimit('messaging')
     await userStorage.disconnectSource(uid, req.params.sourceId);
     res.json({ ok: true });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -163,6 +171,7 @@ router.get('/storage/:sourceId/list', requireAuth, async (req, res) => {
     }
     res.json({ entries });
   } catch (err) {
+    logCaught('routes/storage.js', err);
     res.status(502).json({ error: err.message });
   }
 });
@@ -209,6 +218,7 @@ router.get('/storage/:sourceId/file', (req, res) => {
       await streamSourceFile(req.params.sourceId, rel, res);
     }
   })().catch((err) => {
+    logCaught('routes/storage.js', err);
     if (!res.headersSent) {
       res.status(502).json({ error: err.message });
     }

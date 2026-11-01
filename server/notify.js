@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🔔 Értesítés-küldés a workerből — service_role-lal (megkerüli az RLS-t), így
 // SELF és CROSS-USER (team-working: komment/meghívó/mention) is mehet.
 //   1) beszúr a `notifications` sorba → a Supabase Realtime kézbesíti a kliensnek
@@ -94,7 +95,7 @@ async function sendNotification(input) {
     throw new Error(error.message);
   }
 
-  const push = await sendPushToUser(sb, userId, row).catch((e) => ({ sent: 0, error: e.message }));
+  const push = await sendPushToUser(sb, userId, row).catch((e) => { logCaught('notify.js:sendNotification', e); return { sent: 0, error: e.message }; });
   return { id: inserted.id, push };
 }
 
@@ -153,7 +154,7 @@ async function inviteMember(input) {
       body: `${projectName || 'Projekt'} — ${role}`,
       route: `/collab/${projectId}?owner=${ownerId}`,
       data: { ownerId, projectId, role },
-    }).catch(() => {});
+    }).catch((caught) => { logCaught('notify.js:inviteMember', caught); });
     return { status: 'added', memberId: uid };
   }
 

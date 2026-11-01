@@ -13,6 +13,7 @@ import {
   type AiProvider,
   type AiTask,
 } from '@/lib/aiProviders';
+import { logCaught } from '@/lib/logCaught';
 
 type Health = 'checking' | 'ok' | 'down';
 
@@ -85,14 +86,15 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
                 setHealth((h) => ({ ...h, [m.id]: ok ? 'ok' : 'down' }));
               }
             })
-            .catch(() => {
+            .catch((caught) => {
+            logCaught('components/editor/AiCharacterPicker.tsx:AiCharacterPicker', caught);
               if (alive) {
                 setHealth((h) => ({ ...h, [m.id]: 'down' }));
               }
             });
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/editor/AiCharacterPicker.tsx:AiCharacterPicker', caught); });
     return () => {
       alive = false;
       stopTimer();
@@ -106,7 +108,7 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
       return;
     }
     setSelected(id);
-    setTaskAssignment(task, id).catch(() => {});
+    setTaskAssignment(task, id).catch((caught) => { logCaught('components/editor/AiCharacterPicker.tsx:choose', caught); });
     const p = id ? models.find((x) => x.id === id) : null;
     if (p && (p.avatar || p.personaName)) {
       playIntro(p);

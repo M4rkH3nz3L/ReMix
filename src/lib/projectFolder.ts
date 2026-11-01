@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 📁 Projekt-mappa — PURE mag (expo-mentes, tesztelhető).
  *
@@ -98,7 +100,8 @@ export function deviceRelativePath(uri: string): string | null {
   }
   try {
     return decodeURIComponent(uri.slice(i + marker.length).split(/[?#]/)[0]);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectFolder.ts:deviceRelativePath', caught);
     return uri.slice(i + marker.length).split(/[?#]/)[0];
   }
 }
@@ -185,7 +188,8 @@ export function planAdoption(
       let name = m[2];
       try {
         name = decodeURIComponent(name);
-      } catch {
+      } catch (caught) {
+        logCaught('lib/projectFolder.ts:planAdoption', caught);
         // marad a nyers név
       }
       out.push({ uri, name, shared: false });

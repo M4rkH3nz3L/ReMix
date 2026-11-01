@@ -4,6 +4,7 @@ import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
 import { catalogRuntime, downloadModel } from '@/lib/modelRegistryClient';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import { runWhisperSmokeTest } from '@/lib/whisperClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧩 Helyi AI alapból a telefonon: első induláskor a Whisper (felirat/átirat)
@@ -78,7 +79,8 @@ export async function ensureLocalAiReady(
       }
     }
     return (await runWhisperSmokeTest(BOOTSTRAP_MODEL_ID)) ? 'installed' : 'failed';
-  } catch {
+  } catch (caught) {
+    logCaught('lib/localAiBootstrap.ts:ensureLocalAiReady', caught);
     return 'failed';
   }
 }

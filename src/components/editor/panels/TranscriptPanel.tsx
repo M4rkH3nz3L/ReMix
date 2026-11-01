@@ -16,6 +16,7 @@ import { getProjectWordCues } from '@/lib/transcripts';
 import { buildMultiRangeDeletePlan } from '@/lib/rangeEdit';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** ennyi szó fölött a lista csonkolódik (render-teljesítmény) */
 const MAX_WORDS = 800;
@@ -134,7 +135,7 @@ export function TranscriptPanel() {
             icon="mic-outline"
             label={status ?? t('panels.transcript.createFromSpeech')}
             onPress={() => {
-              load().catch((err: Error) => Alert.alert(t('panels.transcript.title'), err.message));
+              load().catch((err: Error) => { logCaught('components/editor/panels/TranscriptPanel.tsx:TranscriptPanel', err); return Alert.alert(t('panels.transcript.title'), err.message); });
             }}
           />
           {applied ? <Text style={styles.note}>{applied}</Text> : null}

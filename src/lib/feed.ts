@@ -23,6 +23,7 @@ import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 import type { Asset, AspectRatio, Project, Track, VideoClip } from '@/types/project';
 import type { Creator, FeedMode, FeedPost, PostVisibility } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📱 Feed / csatorna kliens-réteg. A poszt a Project egy NÉZETE — a
@@ -651,7 +652,8 @@ export async function publishRenderedProject(
         updated = { ...updated, rendered };
         await saveProject(updated);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/feed.ts:publishRenderedProject', caught);
       // best-effort — poster nélkül is publikálható
     }
   }
@@ -732,7 +734,8 @@ export async function syncMyPostsAvatar(avatarUrl: string | null): Promise<void>
   }
   try {
     await supabase.from('posts').update({ creator_avatar: avatarUrl }).eq('creator_id', uid);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/feed.ts:syncMyPostsAvatar', caught);
     // best-effort: a régi posztok maradnak a korábbi avatarral
   }
 }

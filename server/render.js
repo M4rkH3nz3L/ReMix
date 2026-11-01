@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // A projekt-JSON → FFmpeg parancs fordítása és futtatása.
 //
 // Vizuális sáv: a klipek start szerint rendezve, átfedésnél a későbbi győz
@@ -94,7 +95,8 @@ async function hasAudioStream(file) {
       file,
     ]);
     return stdout.trim().length > 0;
-  } catch {
+  } catch (caught) {
+    logCaught('render.js:hasAudioStream', caught);
     return false;
   }
 }
@@ -371,7 +373,8 @@ function ffmpegHasFilter(name) {
         stdio: ['ignore', 'pipe', 'ignore'],
       });
       ok = new RegExp(`\\s${name}\\s`).test(out);
-    } catch {
+    } catch (caught) {
+      logCaught('render.js:ffmpegHasFilter', caught);
       ok = false;
     }
     _filterCache.set(name, ok);
@@ -482,7 +485,8 @@ function measureLoudnorm(inFile, graphStr, I, TP, LRA) {
         }
         try {
           resolve(JSON.parse(m[0]));
-        } catch {
+        } catch (caught) {
+          logCaught('render.js:measureLoudnorm', caught);
           reject(new Error('a mérés-JSON olvashatatlan'));
         }
       }
@@ -1035,7 +1039,8 @@ function runFfmpegWithProgress(args, totalSeconds, onProgress, signal) {
     const onAbort = () => {
       try {
         child.kill('SIGKILL');
-      } catch {
+      } catch (caught) {
+        logCaught('render.js:onAbort', caught);
         /* a process már leállt */
       }
     };
@@ -1119,6 +1124,7 @@ async function resolveCompounds(project, workDir, settings, signal) {
           clips.push({ ...c, uri: mp4, comp: undefined, trimIn: c.trimIn ?? 0, sourceDuration: dur, speed: c.speed ?? 1 });
           continue;
         } catch (err) {
+          logCaught('render.js:resolveCompounds', err);
           console.warn('pre-compose render kihagyva:', err.message); // → a nyers uri marad
         }
       }
@@ -1178,11 +1184,13 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   try {
     texts.push(...(await renderShapePngs(shapeClips, canvas, workDir)));
   } catch (err) {
+    logCaught('render.js:renderProject', err);
     console.warn('Forma-rasterizálás kihagyva:', err.message);
   }
   try {
     texts.push(...(await renderTextPngs(textClips, canvas, workDir)));
   } catch (err) {
+    logCaught('render.js:renderProject', err);
     console.warn('Felirat-rasterizálás kihagyva:', err.message);
   }
 
@@ -1830,6 +1838,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
           maskSeqIdx[i] = addInput(['-framerate', String(FPS), '-i', seqM.pattern]);
         }
       } catch (err) {
+        logCaught('render.js:renderProject', err);
         console.warn('mask-render kihagyva:', err.message); // → geq fallback
       }
     }
@@ -2222,6 +2231,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       graph.push(`[vtrack][ptl]overlay=x=0:y=0:eof_action=pass[vpt]`);
       overlayBase = 'vpt';
     } catch (err) {
+      logCaught('render.js:renderProject', err);
       console.warn('particles kihagyva:', err.message);
     }
   }
@@ -2302,6 +2312,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         fs.mkdirSync(psDir, { recursive: true });
         seq = await renderPathSequence(clip, canvas, psDir, FPS);
       } catch (err) {
+        logCaught('render.js:renderProject', err);
         console.warn('path-anim kihagyva:', err.message);
       }
       if (seq) {
@@ -2345,6 +2356,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         fs.mkdirSync(tmDir, { recursive: true });
         seq = await renderTextSequence(clip, canvas, tmDir, FPS);
       } catch (err) {
+        logCaught('render.js:renderProject', err);
         console.warn('kinetic text kihagyva:', err.message);
       }
       if (seq) {
@@ -2930,6 +2942,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   if (project.audioMaster) {
     masteredFile = await applyMaster(outFile, project.audioMaster, workDir, total, onProgress).catch(
       (e) => {
+      logCaught('render.js:renderProject', e);
         console.error('Master hiba — a mester nélküli kimenet marad:', e.message);
         return outFile;
       }

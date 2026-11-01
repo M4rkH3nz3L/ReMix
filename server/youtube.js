@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // YouTube (és bármely yt-dlp által támogatott URL) import a dev-workeren:
 // teljes VIDEÓ, csak HANG (m4a), vagy egy KÉP (képkocka a megadott mp-nél).
 // A yt-dlp külső függőség (mint a whisper/ollama) — `brew install yt-dlp`,
@@ -35,7 +36,8 @@ function ytAvailable() {
   try {
     execFileSync(ytBin(), ['--version'], { timeout: 5000, stdio: 'ignore' });
     _avail = true;
-  } catch {
+  } catch (caught) {
+    logCaught('youtube.js:ytAvailable', caught);
     _avail = false;
   }
   return _avail;
@@ -45,7 +47,8 @@ async function probeDuration(file) {
   try {
     const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], 15000);
     return Math.round(parseFloat(out.trim()) * 1000) / 1000 || 0;
-  } catch {
+  } catch (caught) {
+    logCaught('youtube.js:probeDuration', caught);
     return 0;
   }
 }
@@ -59,7 +62,8 @@ async function probeDims(file) {
     );
     const [w, h] = out.trim().split('x').map((n) => parseInt(n, 10));
     return { width: w || undefined, height: h || undefined };
-  } catch {
+  } catch (caught) {
+    logCaught('youtube.js:probeDims', caught);
     return {};
   }
 }
@@ -73,7 +77,8 @@ async function probeCodec(file, streamType) {
       15000
     );
     return out.trim();
-  } catch {
+  } catch (caught) {
+    logCaught('youtube.js:probeCodec', caught);
     return '';
   }
 }
@@ -161,7 +166,8 @@ async function importMedia(url, kind, atSec) {
         await run('ffmpeg', ['-y', '-ss', String(at), '-i', urls[0], '-frames:v', '1', '-q:v', '3', out], 60000);
         grabbed = fs.existsSync(out);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('youtube.js:importMedia', caught);
       grabbed = false;
     }
     if (!grabbed) {

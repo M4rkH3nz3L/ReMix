@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 import { type ConnectionKind, type SyncPrefs, DEFAULT_SYNC_PREFS, parseSyncPrefs } from '@/lib/syncPolicy';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📶 Hálózat-típus + a szinkron-beállítás tárolása. Az `expo-network` natív modult
@@ -21,7 +22,8 @@ async function network(): Promise<NetworkModule | null> {
   }
   try {
     netModule = Platform.OS === 'web' ? null : await import('expo-network');
-  } catch {
+  } catch (caught) {
+    logCaught('lib/networkPolicy.ts:network', caught);
     netModule = null; // a natív modul még nincs a buildben
   }
   return netModule;
@@ -44,7 +46,8 @@ export async function connectionKind(): Promise<ConnectionKind> {
       return 'cellular';
     }
     return 'unknown';
-  } catch {
+  } catch (caught) {
+    logCaught('lib/networkPolicy.ts:connectionKind', caught);
     return 'unknown';
   }
 }
@@ -62,7 +65,8 @@ export async function onWifiAvailable(cb: () => void): Promise<() => void> {
       }
     });
     return () => sub.remove();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/networkPolicy.ts:onWifiAvailable', caught);
     return () => {};
   }
 }
@@ -71,11 +75,11 @@ export async function loadSyncPrefs(): Promise<SyncPrefs> {
   if (prefsCache) {
     return prefsCache;
   }
-  prefsCache = parseSyncPrefs(await AsyncStorage.getItem(PREFS_KEY).catch(() => null));
+  prefsCache = parseSyncPrefs(await AsyncStorage.getItem(PREFS_KEY).catch((caught) => { logCaught('lib/networkPolicy.ts:loadSyncPrefs', caught); return null; }));
   return prefsCache;
 }
 
 export async function saveSyncPrefs(prefs: SyncPrefs): Promise<void> {
   prefsCache = { ...DEFAULT_SYNC_PREFS, ...prefs };
-  await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefsCache)).catch(() => {});
+  await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefsCache)).catch((caught) => { logCaught('lib/networkPolicy.ts:saveSyncPrefs', caught); });
 }

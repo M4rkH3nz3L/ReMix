@@ -2,6 +2,7 @@
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Beat-engine kliens (P0‑2): a worker /beats végpontja BPM-et, beat/downbeat-
@@ -50,7 +51,8 @@ export async function detectBeats(uri: string): Promise<BeatGrid | null> {
   const base = renderServerUrl();
   try {
     await fetchWithTimeout(`${base}/health`, 4000);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/beats.ts:detectBeats', caught);
     return null; // worker nem fut
   }
   try {
@@ -65,7 +67,8 @@ export async function detectBeats(uri: string): Promise<BeatGrid | null> {
     }
     memory.set(uri, body);
     return body;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/beats.ts:detectBeats', caught);
     return null;
   }
 }

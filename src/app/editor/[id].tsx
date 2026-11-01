@@ -78,6 +78,7 @@ import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { useToast } from '@/store/toastStore';
 import { useTutorial } from '@/store/tutorialStore';
+import { logCaught } from '@/lib/logCaught';
 
 const AUTOSAVE_MS = 800;
 
@@ -122,7 +123,7 @@ export default function EditorScreen() {
   // 👥 megosztott projekt-e + a szerepem (a fejléc-jelzéshez / Studio-linkhez)
   useEffect(() => {
     if (project?.id === id) {
-      myMembership(id).then(setCollab).catch(() => {});
+      myMembership(id).then(setCollab).catch((caught) => { logCaught('app/editor/[id].tsx:EditorScreen', caught); });
     }
   }, [project?.id, id]);
 
@@ -175,7 +176,7 @@ export default function EditorScreen() {
           setTransferSize(meta && !meta.expired ? meta.sizeBytes : null);
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/editor/[id].tsx:EditorScreen', caught); });
     return () => {
       alive = false;
     };
@@ -223,7 +224,7 @@ export default function EditorScreen() {
       void useChat.getState().loadInbox(); // a fejléc-cím/kind azonnal helyes legyen
       router.push(`/chat/${convId}`);
     };
-    void run().catch(() => {});
+    void run().catch((caught) => { logCaught('app/editor/[id].tsx:openCollabChat', caught); });
   };
 
   // 🤖 mély-link a szerkesztő egy paneljéhez (pl. a kezdőképernyő „AI eszközök"
@@ -283,7 +284,7 @@ export default function EditorScreen() {
           // remoteUrl-ök: a helyi assetből, vagy a felhő-projekt-másolatból
           let remoteByUri = mediaRemoteMap(proj);
           if (Object.keys(remoteByUri).length === 0) {
-            const cloud = await pullProject(proj.id).catch(() => null);
+            const cloud = await pullProject(proj.id).catch((caught) => { logCaught('app/editor/[id].tsx:recoverMissingMedia', caught); return null; });
             if (cloud) {
               remoteByUri = mediaRemoteMap(cloud);
             }
@@ -306,7 +307,7 @@ export default function EditorScreen() {
               pairs.map((p) => ({ type: 'RELINK_URI' as const, oldUri: p.oldUri, newUri: p.newUri })),
               'system'
             );
-            saveProject(useEditorStore.getState().project!).catch(() => {});
+            saveProject(useEditorStore.getState().project!).catch((caught) => { logCaught('app/editor/[id].tsx:recoverMissingMedia', caught); });
           }
           setMissingMedia(findMissingMedia(useEditorStore.getState().project!));
         };
@@ -355,7 +356,7 @@ export default function EditorScreen() {
                 return;
               }
               if (cloud) {
-                saveProject(cloud).catch(() => {}); // helyi visszaírás
+                saveProject(cloud).catch((caught) => { logCaught('app/editor/[id].tsx:EditorScreen', caught); }); // helyi visszaírás
                 useEditorStore.getState().loadProject(cloud, events);
                 if (Platform.OS !== 'web') {
                   void recoverMissingMedia(cloud);
@@ -364,14 +365,16 @@ export default function EditorScreen() {
                 setMissing(true);
               }
             })
-            .catch(() => {
+            .catch((caught) => {
+            logCaught('app/editor/[id].tsx:EditorScreen', caught);
               if (alive) {
                 setMissing(true);
               }
             });
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('app/editor/[id].tsx:EditorScreen', caught);
         if (alive) {
           setMissing(true);
         }
@@ -458,7 +461,7 @@ export default function EditorScreen() {
 
   // némító kapcsolón is szóljon az előnézet
   useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    setAudioModeAsync({ playsInSilentMode: true }).catch((caught) => { logCaught('app/editor/[id].tsx:EditorScreen', caught); });
   }, []);
 
   // vágási proxyk előmelegítése a projekt videóihoz (fire-and-forget)
@@ -484,7 +487,8 @@ export default function EditorScreen() {
       try {
         pruneProxyCache();
         pruneRenderCache(); // 🎬 a renderelt kimenetek (renders/) LRU-nyírása (VIDEOT §8)
-      } catch {
+      } catch (caught) {
+        logCaught('app/editor/[id].tsx:prune', caught);
         /* best-effort — a cache-nyírás sosem akaszthatja a szerkesztőt */
       }
     }, 3000);
@@ -521,11 +525,12 @@ export default function EditorScreen() {
           setSaveAttempt(0);
           clearRecovery(snap.id); // a munka biztonságban → a recovery-kulcs törölhető
           // 🕓 autosave-előzmény (throttle-olt auto-verzió a történethez)
-          recordAutoVersion(snap).catch(() => {});
+          recordAutoVersion(snap).catch((caught) => { logCaught('app/editor/[id].tsx:timer', caught); });
           // 🗄️ INGYENES felhő-backup (best-effort) — a projekt userhez mentve, ne vesszen el
           backupProjectToCloud(snap);
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('app/editor/[id].tsx:timer', caught);
           setSaveFailed(true);
           setSaveAttempt((n) => n + 1); // ← újrapróbálkozás; a recovery MARAD (nem mentett munka)
         });
@@ -540,7 +545,7 @@ export default function EditorScreen() {
       if (state.project && state.dirty) {
         const p = state.project;
         writeRecovery(p, state.events);
-        saveProjectAndEvents(p, state.events).then(() => clearRecovery(p.id)).catch(() => {});
+        saveProjectAndEvents(p, state.events).then(() => clearRecovery(p.id)).catch((caught) => { logCaught('app/editor/[id].tsx:EditorScreen', caught); });
         backupProjectToCloud(p);
       }
       state.setPlaying(false);
@@ -602,7 +607,7 @@ export default function EditorScreen() {
         setSaveAttempt(0);
         clearRecovery(p.id);
       })
-      .catch(() => setSaveFailed(true));
+      .catch((caught) => { logCaught('app/editor/[id].tsx:saveNow', caught); return setSaveFailed(true); });
   };
 
   // 🧬 „Mentés másként" — a jelenlegi mentése után egy MÁSOLAT, és ugrás rá
@@ -619,7 +624,7 @@ export default function EditorScreen() {
           router.replace(`/editor/${copy.id}`);
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/editor/[id].tsx:saveAsCopy', caught); });
   };
 
   // ⋯ projekt-menü lapként (nem Alert): telefonon ide költöznek a fejléc ritka
@@ -1129,6 +1134,7 @@ export default function EditorScreen() {
                   })
                 );
               } catch (e) {
+                logCaught('app/editor/[id].tsx:run', e);
                 Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
               } finally {
                 setRelinking(false);
@@ -1182,6 +1188,7 @@ export default function EditorScreen() {
                   })
                 );
               } catch (e) {
+                logCaught('app/editor/[id].tsx:run', e);
                 Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
               } finally {
                 setRelinking(false);

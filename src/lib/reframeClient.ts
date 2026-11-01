@@ -14,6 +14,7 @@ import { ensureCloud } from '@/lib/backend';
 import { finiteNum, finiteTime, mapValid, unitNum } from '@/lib/parseGuards';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { Clip, Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Auto Reframe hálózati rétege (P0‑7): klipenként lekéri a téma-útvonalat a
@@ -63,7 +64,8 @@ async function analyzeClipReframe(
       return t === null || x === null || y === null ? null : { t, x, y };
     });
     return points.length > 0 ? { width, height, points } : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/reframeClient.ts:analyzeClipReframe', caught);
     return null;
   }
 }

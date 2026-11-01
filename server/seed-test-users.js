@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🌱 Teszt-userek létrehozása a (prod) Supabase auth-ban — SIGNUP úton.
 //
 // A prod service_role kulcs nem elérhető lokálisan, ezért az admin-API helyett a
@@ -85,6 +86,7 @@ async function main() {
 }
 
 main().catch((e) => {
+  logCaught('seed-test-users.js', e);
   console.error('Seed hiba:', e.message);
   process.exit(1);
 });

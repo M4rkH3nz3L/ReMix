@@ -12,6 +12,7 @@ import { fetchTtsVoices, generateTts, type TtsVoice } from '@/lib/tts';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import type { AudioClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗣️ AI-hang (TTS) a stúdióban — szövegből beszéd a voiceover sávra, a playheadnél.
@@ -37,7 +38,7 @@ export function TtsSheet({ onClose }: { onClose: () => void }) {
           setVoice(r.voices[0]?.name);
         }
       })
-      .catch(() => alive && setAvailable(false));
+      .catch((caught) => { logCaught('components/studio/audio/TtsSheet.tsx:TtsSheet', caught); return alive && setAvailable(false); });
     return () => {
       alive = false;
     };

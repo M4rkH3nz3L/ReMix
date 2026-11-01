@@ -4,6 +4,7 @@ import { type DrumHit, patternDurationSec } from '@/lib/drums';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🥁 A dob-minta ütéseinek renderelése hang-fájllá a worker `/drums`-án (szintetizált dob-hangok),
@@ -34,7 +35,8 @@ export async function renderDrumsToClip(
     const headerDur = Number(res.headers.get('X-Duration-Sec'));
     const durationSec = Number.isFinite(headerDur) && headerDur > 0 ? headerDur : patternDurationSec(opts.bars, opts.bpm);
     return { uri: target.uri, durationSec };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/drumsClient.ts:renderDrumsToClip', caught);
     return null;
   }
 }

@@ -24,6 +24,7 @@ import { MatteSection } from '@/components/editor/panels/filter/MatteSection';
 import { SkySection } from '@/components/editor/panels/filter/SkySection';
 import { StabilizeSection } from '@/components/editor/panels/filter/StabilizeSection';
 import { ThreeDSection } from '@/components/editor/panels/filter/ThreeDSection';
+import { logCaught } from '@/lib/logCaught';
 
 /** freeform maszk-alakzatok: szabályos sokszögek + gyémánt (vászon-arányra igazítva) */
 const POLY_SHAPES: { id: string; sides: number; rotate: number }[] = [
@@ -85,6 +86,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         }
       }
     } catch (err) {
+      logCaught('components/editor/panels/FilterPanel.tsx:trackMaskToFace', err);
       Alert.alert(t('panels.filter.maskTrackFace'), (err as Error).message);
       return;
     }
@@ -126,6 +128,7 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
         Alert.alert(t('panels.filter.maskTrackSubject'), t('panels.filter.trackNoSubject'));
       }
     } catch (err) {
+      logCaught('components/editor/panels/FilterPanel.tsx:trackMaskToSubject', err);
       Alert.alert(t('panels.filter.maskTrackSubject'), (err as Error).message);
     }
   };
@@ -358,14 +361,14 @@ export function FilterPanel({ clip }: { clip: VideoClip | ImageClip }) {
                     label={t('panels.filter.maskTrackSubject')}
                     active={false}
                     onPress={() => {
-                      trackMaskToSubject().catch(() => {});
+                      trackMaskToSubject().catch((caught) => { logCaught('components/editor/panels/FilterPanel.tsx:FilterPanel', caught); });
                     }}
                   />
                   <Chip
                     label={t('panels.filter.maskTrackFace')}
                     active={false}
                     onPress={() => {
-                      trackMaskToFace().catch(() => {});
+                      trackMaskToFace().catch((caught) => { logCaught('components/editor/panels/FilterPanel.tsx:FilterPanel', caught); });
                     }}
                   />
                 </>

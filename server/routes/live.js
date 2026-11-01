@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🔴 Live (LiveKit) route-ok: access-token, multistream-egress, RTMP-kulcs, egress-layout.
 //
 // Domain-router (01-api-architecture §01.1). A handlerek + a resolveLivePublish helper
@@ -94,6 +95,7 @@ router.post('/live/token', express.json({ limit: '4kb' }), requireAuth, rateLimi
     const token = await at.toJwt();
     res.json({ token, url: LIVEKIT_URL, canPublish });
   } catch (err) {
+    logCaught('routes/live.js', err);
     res.status(500).json({ error: `Token-hiba: ${err.message}` });
   }
 });
@@ -190,6 +192,7 @@ router.post('/live/destinations/set-key', express.json({ limit: '2kb' }), requir
   try {
     stored = encryptStreamKey(streamKey);
   } catch (e) {
+    logCaught('routes/live.js', e);
     // prod-ban secret nélkül NEM tárolunk nyers kulcsot (L5)
     res.status(503).json({ error: e.message });
     return;

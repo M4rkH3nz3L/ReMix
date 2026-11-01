@@ -13,6 +13,7 @@ import { AUDIO_MASTER_TARGETS, masterPreset } from '@/lib/audioMaster';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, AudioMaster, AudioMasterDynamics, TrackType } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const MIX_LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
   { type: 'music', icon: 'musical-notes', labelKey: 'editor.track.music' },
@@ -67,7 +68,7 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
         setStats(r);
         setSpectrum(r.spectrum ?? null);
       })
-      .catch((e: Error) => Alert.alert(t('studio.master.analyze'), e.message))
+      .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); return Alert.alert(t('studio.master.analyze'), e.message); })
       .finally(() => setAnalyzing(false));
   };
 

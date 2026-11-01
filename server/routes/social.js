@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🔔 Social route-ok (értesítés-küldés + projekt-meghívó).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből
@@ -44,6 +45,7 @@ router.post('/notify', express.json({ limit: '64kb' }), requireAuth, rateLimit('
       return sendNotification(req.body ?? {}).then((result) => res.json(result));
     })
     .catch((err) => {
+    logCaught('routes/social.js', err);
       console.error('Notify hiba:', err.message);
       if (!res.headersSent) {
         res.status(400).json({ error: err.message });
@@ -77,6 +79,7 @@ router.post('/invite', express.json({ limit: '32kb' }), ...paidOnly, rateLimit('
   inviteMember({ ...(req.body ?? {}), ownerId: owner, invitedBy: owner })
     .then((result) => res.json(result))
     .catch((err) => {
+    logCaught('routes/social.js', err);
       console.error('Invite hiba:', err.message);
       res.status(400).json({ error: err.message });
     });

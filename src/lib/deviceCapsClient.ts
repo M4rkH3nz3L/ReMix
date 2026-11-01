@@ -1,6 +1,7 @@
 import { requireOptionalNativeModule } from 'expo';
 
 import { setDevice3DCaps, type Device3DCaps } from '@/lib/deviceCaps';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📡 A 3D-képességek natív lekérdezése (3D-Studio.md §1.1, §5) — indításkor EGYSZER.
@@ -21,7 +22,8 @@ export async function loadDevice3DCaps(): Promise<void> {
       return;
     }
     setDevice3DCaps(await native.capabilities());
-  } catch {
+  } catch (caught) {
+    logCaught('lib/deviceCapsClient.ts:loadDevice3DCaps', caught);
     setDevice3DCaps(null);
   }
 }

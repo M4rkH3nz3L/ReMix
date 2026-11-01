@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { createElement, type ReactNode, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎞️ Videó-előnézet kártya — a videó ELSŐ KOCKÁJÁT mutatja (nem sablonos név),
@@ -45,7 +46,7 @@ function WebThumb({ videoUri, posterUri, style, onPress, children, label }: Vide
         const v = videoElRef.current;
         if (v) {
           v.currentTime = 0;
-          void v.play().catch(() => {});
+          void v.play().catch((caught) => { logCaught('components/VideoThumb.tsx:WebThumb', caught); });
         }
       }}
       onHoverOut={() => {
@@ -54,7 +55,8 @@ function WebThumb({ videoUri, posterUri, style, onPress, children, label }: Vide
           v.pause();
           try {
             v.currentTime = 0.05;
-          } catch {
+          } catch (caught) {
+            logCaught('components/VideoThumb.tsx:WebThumb', caught);
             // seek before metadata — nem baj
           }
         }
@@ -76,7 +78,8 @@ function WebThumb({ videoUri, posterUri, style, onPress, children, label }: Vide
                 el.onloadedmetadata = () => {
                   try {
                     el.currentTime = 0.05;
-                  } catch {
+                  } catch (caught) {
+                    logCaught('components/VideoThumb.tsx:WebThumb', caught);
                     // ignore
                   }
                 };
@@ -115,7 +118,7 @@ function NativeThumb({ videoUri, posterUri, style, onPress, children, label }: V
     player
       .replaceAsync(videoUri)
       .then(() => player.play())
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/VideoThumb.tsx:start', caught); });
   };
   const stop = () => {
     setPreview(false);

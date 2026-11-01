@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🧰 Upload-guard middleware a mediaPolicy köré.
 //
 // SZÁNDÉKOSAN post-multer, ADDITÍV guard: a meglévő `upload.any()` mezőkezelését
@@ -22,13 +23,15 @@ function readHeader(filePath) {
     const buf = Buffer.alloc(HEADER_BYTES);
     const n = fs.readSync(fd, buf, 0, HEADER_BYTES, 0);
     return buf.subarray(0, n);
-  } catch {
+  } catch (caught) {
+    logCaught('security/uploadPolicy.js:readHeader', caught);
     return Buffer.alloc(0);
   } finally {
     if (fd !== undefined) {
       try {
         fs.closeSync(fd);
-      } catch {
+      } catch (caught) {
+        logCaught('security/uploadPolicy.js:readHeader', caught);
         /* ignore */
       }
     }
@@ -41,7 +44,8 @@ function cleanup(files) {
     if (f && f.path) {
       try {
         fs.unlinkSync(f.path);
-      } catch {
+      } catch (caught) {
+        logCaught('security/uploadPolicy.js:cleanup', caught);
         /* ignore */
       }
     }

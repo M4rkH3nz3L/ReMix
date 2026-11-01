@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -51,7 +52,8 @@ async function deleteObject(key) {
     } else {
       fs.rmSync(path.join(LOCAL_DIR, key), { force: true });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('routes/transfer.js:deleteObject', caught);
     // az árva objektum a TTL/lifecycle alatt amúgy is elévül
   }
 }
@@ -64,7 +66,8 @@ router.post('/transfer', requireAuth, rateLimit('upload'), upload.any(), async (
       if (f?.path) {
         fs.rmSync(f.path, { force: true });
       }
-    } catch {
+    } catch (caught) {
+      logCaught('routes/transfer.js:cleanup', caught);
       /* temp-takarítás best-effort */
     }
   };
@@ -138,6 +141,7 @@ router.post('/transfer', requireAuth, rateLimit('upload'), upload.any(), async (
       expiresAt: new Date(Date.parse(createdAt) + TRANSFER_TTL_MS).toISOString(),
     });
   } catch (e) {
+    logCaught('routes/transfer.js', e);
     cleanup();
     res.status(500).json({ error: e?.message || 'transfer hiba' });
   }
@@ -165,6 +169,7 @@ router.delete('/transfer/:projectId', requireAuth, async (req, res) => {
     await sb.from('project_transfers').delete().eq('user_id', uid).eq('project_id', projectId);
     res.json({ ok: true });
   } catch (e) {
+    logCaught('routes/transfer.js', e);
     res.status(500).json({ error: e?.message || 'transfer hiba' });
   }
 });

@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🤖 AI-worker route-ok (hooks / probe / translate / highlights / story /
 // thumbheadlines / captionstudio / assist / autoedit).
 //
@@ -39,6 +40,7 @@ router.post('/ai/hooks', express.json({ limit: '256kb' }), ...authenticated({ me
   runHookGenerator(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('Hook hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -53,7 +55,7 @@ router.post('/ai/probe', express.json({ limit: '64kb' }), ...authenticated({ met
   }
   probeProvider(cfg)
     .then((ok) => res.json({ ok }))
-    .catch(() => res.json({ ok: false }));
+    .catch((caught) => { logCaught('routes/ai.js', caught); return res.json({ ok: false }); });
 });
 
 // 🌍 Felirat-fordítás (Phase 4.2): szegmensek + célnyelv → fordított szegmensek
@@ -66,6 +68,7 @@ router.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateL
   runTranslateCaptions(segments.slice(0, 200), String(lang).slice(0, 40), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('Translate hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -81,6 +84,7 @@ router.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rate
   runHighlights(context, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('Highlights hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -96,6 +100,7 @@ router.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit
   runStoryEngine(context, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('Story hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -111,6 +116,7 @@ router.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authentic
   runThumbHeadlines(summary.slice(0, 2000), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('ThumbHeadline hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -126,6 +132,7 @@ router.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticate
   runCaptionStudio(segments.slice(0, 60), sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('CaptionStudio hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -141,6 +148,7 @@ router.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ met
   runAssistant(context ?? {}, instruction, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('AI hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -156,6 +164,7 @@ router.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, rateLimi
   runAutoEdit(context, sanitizeAiConfig(aiConfig))
     .then((reply) => res.json(reply))
     .catch((err) => {
+    logCaught('routes/ai.js', err);
       console.error('AutoEdit hiba:', err.message);
       res.status(500).json({ error: err.message });
     });

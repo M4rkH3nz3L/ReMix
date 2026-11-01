@@ -13,6 +13,7 @@ import {
   remixTrashRestore,
 } from '@/lib/remixFilesClient';
 import { formatBytes } from '@/lib/storageQuota';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗑️ A ReMix Storage Lomtára: a törölt fájlok/mappák 30 napig visszaállíthatók az
@@ -48,6 +49,7 @@ export function TrashView({ onChanged }: { onChanged?: () => void }) {
       setRetention(res.retentionDays);
       setLoadedAt(Date.now());
     } catch (err) {
+      logCaught('components/storage/TrashView.tsx:load', err);
       setError(errText(err));
     } finally {
       setLoading(false);
@@ -64,6 +66,7 @@ export function TrashView({ onChanged }: { onChanged?: () => void }) {
       await fn();
       onChanged?.();
     } catch (err) {
+      logCaught('components/storage/TrashView.tsx:run', err);
       Alert.alert(t('storage.trash.title'), errText(err));
     } finally {
       setBusy(false);

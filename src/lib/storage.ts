@@ -6,6 +6,7 @@ import { makeId } from '@/lib/id';
 import { migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
 import { addTombstones, removeTombstones } from '@/lib/projectTombstones';
 import type { Project, ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const INDEX_KEY = 'vided.projects.v1';
 const projectKey = (id: string) => `vided.project.v1.${id}`;
@@ -60,7 +61,8 @@ async function withProjectFolder(project: Project): Promise<{ project: Project; 
   try {
     const { prepareProjectFolder } = await import('@/lib/projectFolderClient');
     return await prepareProjectFolder(project, () => otherStoredDocs(project.id));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:withProjectFolder', caught);
     return { project, changed: false };
   }
 }
@@ -75,7 +77,8 @@ async function rebaseStoredUris(raw: string): Promise<{ raw: string; rebased: bo
     const { Paths } = await import('expo-file-system');
     const next = rebaseDocumentUris(raw, Paths.document.uri);
     return { raw: next, rebased: next !== raw };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:rebaseStoredUris', caught);
     return { raw, rebased: false };
   }
 }
@@ -84,7 +87,7 @@ async function rebaseStoredUris(raw: string): Promise<{ raw: string; rebased: bo
 function afterSave(project: Project): void {
   import('@/lib/projectSyncClient')
     .then(({ onProjectSaved }) => onProjectSaved(project))
-    .catch(() => {});
+    .catch((caught) => { logCaught('lib/storage.ts:afterSave', caught); });
 }
 
 /** a sérült index jelzése (a „nincs projekt" esettől megkülönböztetve) */
@@ -134,7 +137,8 @@ async function rebuildIndex(): Promise<ProjectMeta[]> {
     }
     try {
       metas.push(metaOf(migrateProject(JSON.parse(raw) as Project)));
-    } catch {
+    } catch (caught) {
+      logCaught('lib/storage.ts:rebuildIndex', caught);
       // ez az EGY projekt olvashatatlan — a többi mehet tovább
     }
   }
@@ -145,11 +149,12 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   let metas: ProjectMeta[];
   try {
     metas = await readIndex();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:listProjects', caught);
     // 🛟 sérült index → újraépítés a tárolt projektekből, és visszaírás, hogy a
     // következő olvasás már ép legyen. Ha a visszaírás nem megy, a lista akkor is jó.
     metas = await rebuildIndex();
-    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(metas)).catch(() => {});
+    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(metas)).catch((caught) => { logCaught('lib/storage.ts:listProjects', caught); });
   }
   return metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
@@ -166,7 +171,8 @@ async function readTombstones(): Promise<string[]> {
     const raw = await AsyncStorage.getItem(TOMBSTONE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     tombstoneCache = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:readTombstones', caught);
     tombstoneCache = [];
   }
   return tombstoneCache;
@@ -180,7 +186,7 @@ export async function deletedProjectIds(): Promise<Set<string>> {
 /** Projekt(ek) töröltként jelölése — a felhő-visszatöltés és a háttér-mentés kihagyja. */
 export async function markProjectsDeleted(ids: string[]): Promise<void> {
   tombstoneCache = addTombstones(await readTombstones(), ids);
-  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch(() => {});
+  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch((caught) => { logCaught('lib/storage.ts:markProjectsDeleted', caught); });
 }
 
 /** Ugyanazzal az id-vel KIFEJEZETTEN újra elmentett projekt (pl. .rp-import) ismét él. */
@@ -190,7 +196,7 @@ async function clearTombstone(id: string): Promise<void> {
     return;
   }
   tombstoneCache = removeTombstones(cur, [id]);
-  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch(() => {});
+  await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(tombstoneCache)).catch((caught) => { logCaught('lib/storage.ts:clearTombstone', caught); });
 }
 
 export async function loadProject(id: string): Promise<Project | null> {
@@ -204,7 +210,8 @@ export async function loadProject(id: string): Promise<Project | null> {
   try {
     // régi sémák automatikus felhozása (v1 → v2: asset-registry)
     project = migrateProject(JSON.parse(raw) as Project);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:loadProject', caught);
     return null;
   }
   // 📁 a projekt a TELEFONON él, saját mappában — a szerkesztő már a mappás
@@ -280,7 +287,8 @@ export async function deleteProject(id: string): Promise<void> {
       const { removeRemoteProjectFolder } = await import('@/lib/projectSyncClient');
       void removeRemoteProjectFolder(folder);
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:deleteProject', caught);
     // árva fájl maradhat — a következő törlés/GC elviszi
   }
 }
@@ -289,7 +297,8 @@ function folderOf(raw: string | null | undefined): string | null {
   try {
     const folder = raw ? (JSON.parse(raw) as Project).folder : undefined;
     return typeof folder === 'string' && folder ? folder : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:folderOf', caught);
     return null;
   }
 }
@@ -352,7 +361,8 @@ export async function loadVersions(projectId: string): Promise<ProjectVersion[]>
     const { raw } = await rebaseStoredUris(stored);
     const list = JSON.parse(raw) as ProjectVersion[];
     return Array.isArray(list) ? list : [];
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:loadVersions', caught);
     return [];
   }
 }
@@ -401,7 +411,8 @@ export async function recordAutoVersion(project: Project): Promise<void> {
     await saveVersions(project.id, next);
     // az olcsó throttle-kulcs frissítése (a következő hívás már ebből dönt)
     await AsyncStorage.setItem(lastAutoKey(project.id), String(Date.now()));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:recordAutoVersion', caught);
     // az autosave-előzmény best-effort — hiba esetén csendben kihagyjuk
   }
 }
@@ -418,7 +429,8 @@ export async function loadEvents(projectId: string): Promise<ProjectEvent[]> {
   }
   try {
     return JSON.parse(raw) as ProjectEvent[];
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:loadEvents', caught);
     return [];
   }
 }
@@ -441,7 +453,8 @@ export async function writeRecovery(project: Project, events: ProjectEvent[]): P
   const snap: RecoverySnapshot = { at: new Date().toISOString(), project, events };
   try {
     await AsyncStorage.setItem(recoveryKey(project.id), JSON.stringify(snap));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:writeRecovery', caught);
     // best-effort — a recovery hiánya nem buktathatja a szerkesztést
   }
 }
@@ -458,7 +471,8 @@ export async function readRecovery(id: string): Promise<RecoverySnapshot | null>
       return null;
     }
     return { at: snap.at, project: migrateProject(snap.project), events: snap.events ?? [] };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:readRecovery', caught);
     return null;
   }
 }
@@ -466,7 +480,8 @@ export async function readRecovery(id: string): Promise<RecoverySnapshot | null>
 export async function clearRecovery(id: string): Promise<void> {
   try {
     await AsyncStorage.removeItem(recoveryKey(id));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:clearRecovery', caught);
     // best-effort
   }
 }
@@ -494,7 +509,8 @@ export const PROJECT_SIZE_WARN_BYTES = 2 * 1024 * 1024;
 export function estimateProjectBytes(project: Project): number {
   try {
     return JSON.stringify(project).length;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storage.ts:estimateProjectBytes', caught);
     return 0;
   }
 }

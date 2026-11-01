@@ -9,6 +9,7 @@ import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { type FileKind, type StorageEntry, breadcrumbs, fileKindOf, parentPath, sortEntries } from '@/lib/remixFiles';
 import { RemixFilesError, deviceList, remixList } from '@/lib/remixFilesClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗂️ Fájl-választó a Tárhelyemből (Eszközöm / ReMix Storage) — a projekten belüli
@@ -41,6 +42,7 @@ export function StoragePickerSheet({
       const list = location === 'device' ? deviceList(path) : await remixList(path);
       setEntries(sortEntries(list.filter((e) => e.isFolder || kinds.includes(fileKindOf(e.name))), 'name'));
     } catch (err) {
+      logCaught('components/storage/StoragePickerSheet.tsx:load', err);
       setEntries([]);
       setError(
         err instanceof RemixFilesError

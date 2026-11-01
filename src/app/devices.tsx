@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { palette } from '@/constants/editor';
 import { listMyDevices, removeDeviceEntry, type UserDevice } from '@/lib/devices';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** 📱 Bejelentkezett eszközök (08 — session/device-management). */
 export default function DevicesScreen() {
@@ -29,6 +30,7 @@ export default function DevicesScreen() {
     try {
       setDevices(await listMyDevices());
     } catch (e) {
+      logCaught('app/devices.tsx:reload', e);
       setError(e instanceof Error ? e.message : String(e));
       setDevices([]);
     }
@@ -42,6 +44,7 @@ export default function DevicesScreen() {
           setDevices(list);
         }
       } catch (e) {
+        logCaught('app/devices.tsx:DevicesScreen', e);
         if (active) {
           setError(e instanceof Error ? e.message : String(e));
           setDevices([]);
@@ -66,6 +69,7 @@ export default function DevicesScreen() {
             await removeDeviceEntry(d.fingerprint);
             await reload();
           } catch (e) {
+            logCaught('app/devices.tsx:onRemove', e);
             setError(e instanceof Error ? e.message : String(e));
           } finally {
             setBusy(false);
@@ -98,7 +102,8 @@ export default function DevicesScreen() {
     }
     try {
       return new Date(iso).toLocaleString();
-    } catch {
+    } catch (caught) {
+      logCaught('app/devices.tsx:fmt', caught);
       return iso;
     }
   };

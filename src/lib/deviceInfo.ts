@@ -18,6 +18,7 @@ import { t } from 'i18next';
 import { Dimensions, PixelRatio, Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
+import { logCaught } from '@/lib/logCaught';
 
 const INSTALL_ID_KEY = 'remix.installId.v1';
 
@@ -37,13 +38,15 @@ export async function getInstallId(): Promise<string> {
     if (existing) {
       return existing;
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/deviceInfo.ts:getInstallId', caught);
     // olvasási hiba → új id (nem kritikus)
   }
   const id = uuidv4();
   try {
     await AsyncStorage.setItem(INSTALL_ID_KEY, id);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/deviceInfo.ts:getInstallId', caught);
     // best-effort perzisztálás
   }
   return id;
@@ -103,7 +106,7 @@ export interface DeviceRow {
 /** Összeszedi az aktuális eszköz adatait (DB-sor alakban). */
 export async function collectDeviceInfo(): Promise<DeviceRow> {
   const fingerprint = await getInstallId();
-  const deviceType = await Device.getDeviceTypeAsync().catch(() => Device.DeviceType.UNKNOWN);
+  const deviceType = await Device.getDeviceTypeAsync().catch((caught) => { logCaught('lib/deviceInfo.ts:collectDeviceInfo', caught); return Device.DeviceType.UNKNOWN; });
 
   const screen = Dimensions.get('screen');
   const win = Dimensions.get('window');
@@ -194,7 +197,8 @@ export async function registerCurrentDevice(userId: string): Promise<void> {
         })
         .then(undefined, () => {});
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/deviceInfo.ts:registerCurrentDevice', caught);
     // best-effort telemetria; a bejelentkezést nem blokkolja
   }
 }
@@ -216,7 +220,8 @@ export async function saveCurrentDevicePushToken(userId: string, token: string):
       .update({ push_token: token, last_seen: new Date().toISOString() })
       .eq('user_id', userId)
       .eq('fingerprint', fingerprint);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/deviceInfo.ts:saveCurrentDevicePushToken', caught);
     // best-effort; a push nélkül is megy a realtime + in-app csengő
   }
 }

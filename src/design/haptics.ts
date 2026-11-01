@@ -9,8 +9,9 @@
  * egy flow-t, és emulátoron/weben egyszerűen nincs).
  */
 import * as Haptics from 'expo-haptics';
+import { logCaught } from '@/lib/logCaught';
 
-const swallow = () => {};
+const swallow = (e: unknown) => logCaught('design/haptics.ts', e);
 
 export const haptics = {
   /** kijelölés-váltás (klip, tab, opció) — a leggyakoribb, legfinomabb */

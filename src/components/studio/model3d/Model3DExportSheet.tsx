@@ -32,6 +32,7 @@ import { formatBytes } from '@/lib/storageQuota';
 import { useEditorStore } from '@/store/editorStore';
 import type { Model3DDoc, Model3DMesh } from '@/types/model3d';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -112,6 +113,7 @@ export function Model3DExportSheet({
     try {
       await job();
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DExportSheet.tsx:run', e);
       const k = remix3dErrorKey(e);
       if (k !== 'model3d.error.cancelled') {
         Alert.alert(t('model3d.export.title'), t(k));

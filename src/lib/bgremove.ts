@@ -5,6 +5,7 @@ import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { ensureCloud } from '@/lib/backend';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🪄 AI háttér-eltávolítás kliens (P1 v1, fotón): a worker /bgremove végpontja
@@ -49,7 +50,8 @@ export async function requestCutout(uri: string): Promise<CutoutResult | null> {
       await File.downloadFileAsync(remote, target, { headers: await workerAuthHeaders() });
     }
     return { id: body.id, cached: body.cached, uri: target.uri };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/bgremove.ts:requestCutout', caught);
     return null;
   }
 }

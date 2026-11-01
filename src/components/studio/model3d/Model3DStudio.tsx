@@ -46,12 +46,14 @@ import { useEditorStore } from '@/store/editorStore';
 import type { CaptureMode, MeshFormat, Model3DCapture, Model3DDoc, Model3DMesh, Vec3 } from '@/types/model3d';
 import type { Asset } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /** létezik-e a helyi fájl (pl. a poszter — újratelepítés / törlés után hiányozhat) */
 function fileExists(uri: string): boolean {
   try {
     return new File(uri).exists;
-  } catch {
+  } catch (caught) {
+    logCaught('components/studio/model3d/Model3DStudio.tsx:fileExists', caught);
     return false;
   }
 }
@@ -150,11 +152,13 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       const out = await Remix3D.exportModel(uri, target.uri, JSON.stringify({ format: want }));
       try {
         new File(uri).delete();
-      } catch {
+      } catch (caught) {
+        logCaught('components/studio/model3d/Model3DStudio.tsx:toStorageFormat', caught);
         // a régi (natív) fájlt a mappa-takarítás is viszi
       }
       return { uri: out, format: want, asset: target };
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:toStorageFormat', caught);
       Alert.alert(t('model3d.title'), t('model3d.storage.convertFailed', { format: want.toUpperCase(), fallback: native.toUpperCase() }));
       return { uri, format: native, asset: asAsset(native) };
     }
@@ -177,10 +181,11 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
   const reconstructing = useRef(false);
 
   const discardCapture = () => {
-    void captureRef.current?.command('cancel').catch(() => {});
+    void captureRef.current?.command('cancel').catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:discardCapture', caught); });
     try {
       captureDirFor(projectId).delete();
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:discardCapture', caught);
       // nincs mit törölni
     }
     setPhase(asset ? 'viewer' : 'empty');
@@ -215,7 +220,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
     setScanState({ tracking: 'initializing', triangles: 0, light: 1000, points: 0 });
     setPhase('meshScanning');
     requestAnimationFrame(() => {
-      void meshRef.current?.start(mode).catch((e) => Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))));
+      void meshRef.current?.start(mode).catch((e) => { logCaught('components/studio/model3d/Model3DStudio.tsx:startMeshScan', e); return Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))); });
     });
   };
 
@@ -226,6 +231,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
     setPhase('roomScanning');
     requestAnimationFrame(() => {
       void roomRef.current?.start().catch((e) => {
+        logCaught('components/studio/model3d/Model3DStudio.tsx:startRoomScan', e);
         Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
         setPhase(asset ? 'viewer' : 'empty');
       });
@@ -250,9 +256,9 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
         return;
       }
       const stored = await toStorageFormat(res.uri, 'usdz', assetId, { textured: false, points: false });
-      const info = await Remix3D.inspectModel(stored.uri).catch(() => null);
+      const info = await Remix3D.inspectModel(stored.uri).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:finishRoomScan', caught); return null; });
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 4, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 4, false, lookOptionsJson(undefined)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:finishRoomScan', caught); return null; });
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -278,6 +284,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       haptics.success();
       setPhase('viewer');
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:finishRoomScan', e);
       Alert.alert(t('model3d.room.title'), t(remix3dErrorKey(e)));
     } finally {
       setRoomBusy(false);
@@ -317,7 +324,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
         }
         const stored = await toStorageFormat(res.uri, 'ply', assetId, { textured: false, points: true });
         const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-        const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+        const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:finishMeshScan', caught); return null; });
         const m: Model3DMesh = { id: makeId('mesh'), assetId, format: stored.format, triangles: 0, points: res.points, bounds: { min: res.min, max: res.max }, textured: false };
         const base: Model3DDoc = doc ?? createModel3DDoc();
         const { doc: next, removedAssetIds } = replaceModel({ ...base, capture: undefined }, m, project.name);
@@ -332,6 +339,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
         haptics.success();
         setPhase('viewer');
       } catch (e) {
+        logCaught('components/studio/model3d/Model3DStudio.tsx:finishMeshScan', e);
         Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
       } finally {
         setSavingMesh(false);
@@ -358,7 +366,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       }
       const stored = await toStorageFormat(res.uri, format, assetId, { textured: false, points: false });
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D?.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:finishMeshScan', caught); return null; });
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -383,6 +391,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       haptics.success();
       setPhase('viewer');
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:finishMeshScan', e);
       Alert.alert(t('model3d.title'), t(remix3dErrorKey(e)));
     } finally {
       setSavingMesh(false);
@@ -394,21 +403,23 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
     const dir = captureDirFor(projectId);
     try {
       dir.delete();
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:startCapture', caught);
       // friss könyvtár
     }
     setCapState({ state: 'initializing', feedback: [] });
     setPhase('capturing');
     // a natív nézet a következő frame-ben mountol → utána indítjuk a munkamenetet
     requestAnimationFrame(() => {
-      void captureRef.current?.start(dir.uri).catch((e) => Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))));
+      void captureRef.current?.start(dir.uri).catch((e) => { logCaught('components/studio/model3d/Model3DStudio.tsx:startCapture', e); return Alert.alert(t('model3d.title'), t(remix3dErrorKey(e))); });
     });
   };
 
   const discardImages = () => {
     try {
       captureDirFor(projectId).delete();
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:discardImages', caught);
       // a képkészlet ideiglenes — ha nem törölhető, a cache-ürítés viszi
     }
   };
@@ -432,7 +443,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       const stored = await toStorageFormat(uri, 'usdz', assetId, { textured: true, points: false });
       const info = await Remix3D.inspectModel(stored.uri);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(stored.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:reconstruct', caught); return null; });
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -456,6 +467,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       haptics.success();
       setPhase('viewer');
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:reconstruct', e);
       setPhase(asset ? 'viewer' : 'empty');
       const key = remix3dErrorKey(e);
       if (key === 'model3d.error.cancelled') {
@@ -516,7 +528,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       const m: Model3DMesh = { id: makeId('mesh'), assetId, format, triangles: res.triangles, bounds: { min: res.min, max: res.max }, textured: false };
       const { doc: next, removedAssetIds } = replaceModel(latest, m, project.name);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(next)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(res.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(next)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:applyProcess', caught); return null; });
       useEditorStore.getState().applyBatch(
         [
           { type: 'ADD_ASSET', asset: { ...target, uri: res.uri } },
@@ -532,6 +544,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       haptics.success();
       Alert.alert(t('model3d.viewer.edit'), t('model3d.viewer.editDone', { tris: res.triangles.toLocaleString() }));
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:applyProcess', e);
       Alert.alert(t('model3d.viewer.edit'), t(remix3dErrorKey(e)));
     }
   };
@@ -576,6 +589,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       );
       haptics.success();
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:changeStorageFormat', e);
       Alert.alert(t('model3d.storage.title'), t(remix3dErrorKey(e)));
     }
   };
@@ -645,12 +659,13 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       }
       try {
         src.delete();
-      } catch {
+      } catch (caught) {
+        logCaught('components/studio/model3d/Model3DStudio.tsx:importFromFile', caught);
         // a cache-t a rendszer is takarítja
       }
       const stored = await Remix3D.inspectModel(uri);
       const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${assetId}_poster.png`;
-      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch(() => null);
+      const poster = await Remix3D.snapshotFile(uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(undefined)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:importFromFile', caught); return null; });
       const m: Model3DMesh = {
         id: makeId('mesh'),
         assetId,
@@ -673,6 +688,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       haptics.success();
       setPhase('viewer');
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:importFromFile', e);
       Alert.alert(t('model3d.import.title'), t(remix3dErrorKey(e)));
     } finally {
       setImporting(false);
@@ -691,7 +707,8 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
     let name = uri.split('/').pop() ?? 'model';
     try {
       name = decodeURIComponent(name);
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:Model3DStudio', caught);
       // hibás %-kódolás → a nyers név
     }
     void importFromFile({ uri, name });
@@ -712,6 +729,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
           : await Remix3D.exportModel(asset.uri, new File(Paths.cache, `m3d_ar_${asset.id}.usdz`).uri, JSON.stringify({ ...JSON.parse(lookOptionsJson(doc)), format: 'usdz' }));
       await Remix3D.presentAR(usdz);
     } catch (e) {
+      logCaught('components/studio/model3d/Model3DStudio.tsx:openAR', e);
       Alert.alert(t('model3d.ar.title'), t(remix3dErrorKey(e)));
     }
   };
@@ -1062,7 +1080,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
                   const meshes = latest.meshes.map((x) => (x.id === meshId ? { ...x, triangles: info.triangles } : x));
                   useEditorStore.getState().dispatch({ type: 'SET_MODEL3D_DOC', doc: { ...latest, meshes } }, 'system');
                 })
-                .catch(() => {});
+                .catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:Model3DStudio', caught); });
             }
             // nincs (vagy üres) poszter → egyszer (modellenként) elkészítjük a lista előnézeti képét
             if (doc && Remix3D && posterTried.current !== asset.uri) {
@@ -1070,16 +1088,16 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
               void (async () => {
                 // hiányzó VAGY üres (régi / háttérben renderelt) poszter → újra
                 const current = doc.poster && fileExists(doc.poster) ? doc.poster : null;
-                if (current && !(await Remix3D.imageIsBlank?.(current).catch(() => false))) {
+                if (current && !(await Remix3D.imageIsBlank?.(current).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:Model3DStudio', caught); return false; }))) {
                   return;
                 }
                 // új fájlnév: a doc változik (mentés + a lista-bélyegkép frissül), a régi üres
                 // poszter a mappa-takarításnál kiesik
                 const posterUri = `${projectMediaDir().uri.replace(/\/?$/, '/')}m3d_${asset.id}_poster_${Date.now().toString(36)}.png`;
                 const poster =
-                  (await Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(doc)).catch(() => null)) ??
+                  (await Remix3D.snapshotFile(asset.uri, posterUri, 512, 512, Math.PI / 6, Math.PI / 9, false, lookOptionsJson(doc)).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:Model3DStudio', caught); return null; })) ??
                   // tartalék: a LÁTHATÓ néző képe (a képernyőn lévő GPU-kontextus biztosan rajzol)
-                  (await viewRef.current?.snapshot(posterUri, 512, 512, false).catch(() => null)) ??
+                  (await viewRef.current?.snapshot(posterUri, 512, 512, false).catch((caught) => { logCaught('components/studio/model3d/Model3DStudio.tsx:Model3DStudio', caught); return null; })) ??
                   null;
                 const latest = useEditorStore.getState().project?.model3d;
                 if (poster && latest) {

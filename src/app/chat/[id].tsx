@@ -19,6 +19,7 @@ import { GroupCreateSheet } from '@/components/chat/GroupCreateSheet';
 import { palette } from '@/constants/editor';
 import { groupTitle, leaveConversation } from '@/lib/chat';
 import { useChat } from '@/store/chatStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** 💬 Beszélgetés (DM / projekt / csoport) — fejléc + közös ChatThread. */
 export default function ChatScreen() {
@@ -62,7 +63,7 @@ export default function ChatScreen() {
               goBackOrHome();
             })
             .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+              { logCaught('app/chat/[id].tsx:manageGroup', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
             );
         },
       },

@@ -3,6 +3,7 @@ import { registerGlobals } from '@livekit/react-native';
 import { cloudBaseUrl } from '@/lib/backend';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { fetchRead } from '@/lib/netRetry';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔴 LiveKit (élő videó) kliens-híd. A WebRTC-globálisokat egyszer regisztráljuk
@@ -19,7 +20,8 @@ export function ensureLiveKit(): void {
   try {
     registerGlobals();
     registered = true;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/livekit.ts:ensureLiveKit', caught);
     // a natív @livekit/react-native-webrtc modul még nincs a buildben (rebuild előtt)
   }
 }
@@ -56,7 +58,7 @@ export async function fetchLiveToken(
     body: JSON.stringify({ room, publish, name, userId: userId ?? undefined }),
   }, { attempts: 1 });
   if (!res.ok) {
-    const e = (await res.json().catch(() => ({}))) as { error?: string };
+    const e = (await res.json().catch((caught) => { logCaught('lib/livekit.ts:fetchLiveToken', caught); return {}; })) as { error?: string };
     throw new Error(e.error || `LiveKit token-hiba (${res.status})`);
   }
   const data = (await res.json()) as Partial<LiveToken>;

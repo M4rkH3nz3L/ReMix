@@ -25,6 +25,7 @@ import { isValidActionUrl } from '@/lib/url';
 import { useEditorStore } from '@/store/editorStore';
 import { formatTime } from '@/lib/time';
 import type { InteractiveClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Interaktív lejátszó: a hotspotok élőben kattinthatók — URL-megnyitás,
@@ -63,7 +64,7 @@ export default function PlayerScreen() {
           useEditorStore.getState().loadProject(loaded);
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/player/[id].tsx:PlayerScreen', caught); });
     return () => {
       alive = false;
     };
@@ -96,8 +97,8 @@ export default function PlayerScreen() {
           Alert.alert(t('playerScreen.linkTitle'), t('playerScreen.linkInvalid'));
           break;
         }
-        Linking.openURL(url).catch(() =>
-          Alert.alert(t('playerScreen.linkTitle'), t('playerScreen.linkFailed'))
+        Linking.openURL(url).catch((caught) =>
+          { logCaught('app/player/[id].tsx:onHotspotPress', caught); return Alert.alert(t('playerScreen.linkTitle'), t('playerScreen.linkFailed')); }
         );
         break;
       }

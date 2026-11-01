@@ -4,6 +4,7 @@ import { requireSupabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { LivePlatform } from '@/types/live';
 import { fetchRead } from '@/lib/netRetry';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎥 Külső multistream-célok (LIVE.md Fázis E) — a felhasználó RTMP-céljai
@@ -51,7 +52,8 @@ export function rtmpUrlProblem(raw: string): string | null {
   let u: URL;
   try {
     u = new URL(s);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/liveDestinations.ts:rtmpUrlProblem', caught);
     return 'live.dest.errUrl';
   }
   if (u.protocol !== 'rtmp:' && u.protocol !== 'rtmps:') return 'live.dest.errScheme';
@@ -153,7 +155,7 @@ export async function setDestinationKey(destinationId: string, streamKey: string
     body: JSON.stringify({ destinationId, streamKey }),
   });
   if (!res.ok) {
-    const e = (await res.json().catch(() => ({}))) as { error?: string };
+    const e = (await res.json().catch((caught) => { logCaught('lib/liveDestinations.ts:setDestinationKey', caught); return {}; })) as { error?: string };
     throw new Error(e.error || `Kulcs-mentési hiba (${res.status})`);
   }
 }
@@ -206,7 +208,7 @@ export async function startLiveEgress(room: string, record = false, aspect?: str
     body: JSON.stringify({ room, record, aspect }),
   }, { attempts: 1 });
   if (!res.ok) {
-    const e = (await res.json().catch(() => ({}))) as { error?: string };
+    const e = (await res.json().catch((caught) => { logCaught('lib/liveDestinations.ts:startLiveEgress', caught); return {}; })) as { error?: string };
     throw new Error(e.error || `Egress-hiba (${res.status})`);
   }
   return (await res.json()) as EgressStart;
@@ -218,5 +220,5 @@ export async function stopLiveEgress(egressId: string): Promise<void> {
     timeoutMs: 8_000,
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ egressId }),
-  }, { attempts: 1 }).catch(() => {});
+  }, { attempts: 1 }).catch((caught) => { logCaught('lib/liveDestinations.ts:stopLiveEgress', caught); });
 }

@@ -2,6 +2,7 @@ import { aiFetch, aiPostJsonOrNull } from '@/lib/aiFetch';
 import { aiConfigForTask } from '@/lib/aiProviders';
 import type { CaptionSuggestion } from '@/lib/captionStudio';
 import { ensureCloud } from '@/lib/backend';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ✨ Caption Studio hálózati kliens: a worker AI-rétege (lokális modell vagy
@@ -18,7 +19,8 @@ export async function fetchCaptionSuggestions(
       { segments, aiConfig }
     );
     return body && Array.isArray(body.segments) ? body.segments : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/captionStudioClient.ts:fetchCaptionSuggestions', caught);
     return null;
   }
 }
@@ -44,7 +46,7 @@ export async function fetchCaptionTranslations(
   }
   // a `.catch()` nélkül egy nem-JSON válasz (502 / proxy-hibaoldal) „JSON Parse
   // error"-t dobna a felhasználó arcába; így csak „nincs fordítás" lesz belőle
-  const body = (await res.json().catch(() => ({}))) as {
+  const body = (await res.json().catch((caught) => { logCaught('lib/captionStudioClient.ts:fetchCaptionTranslations', caught); return {}; })) as {
     segments?: { id: string; text: string }[];
   };
   return Array.isArray(body.segments) ? body.segments : null;

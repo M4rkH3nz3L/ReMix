@@ -2,6 +2,7 @@ import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { detectSilenceRanges } from '@/lib/silenceDetect';
 import type { SilenceRange } from '@/lib/cutplan';
 import { downmixToMono, resampleLinear, WHISPER_SAMPLE_RATE } from '@/lib/wav';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎚️ Eszközön történő audio-dekódolás (local-ai Fázis A): média-fájl (mp4/m4a/
@@ -29,9 +30,10 @@ export async function decodeToMono16k(uri: string): Promise<Float32Array | null>
       // a dekóder elvben a kontextus rátájára hoz — ha mégsem, itt igazítjuk
       return resampleLinear(mono, buffer.sampleRate, WHISPER_SAMPLE_RATE);
     } finally {
-      await ctx.close().catch(() => undefined);
+      await ctx.close().catch((caught) => { logCaught('lib/audioDecode.ts:decodeToMono16k', caught); });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/audioDecode.ts:decodeToMono16k', caught);
     return null;
   }
 }

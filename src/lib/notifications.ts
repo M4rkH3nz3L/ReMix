@@ -2,6 +2,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔔 Értesítések kliens-rétege: lista + olvasottság + REALTIME feliratkozás
@@ -75,7 +76,8 @@ export async function markAllRead(): Promise<void> {
 }
 
 /** Monoton számláló egyedi realtime-topic-hoz (lásd `subscribeNotifications`). */
-let channelSeq = 0;
+// véletlen kezdőérték: Fast Refresh után a számláló nem ütközhet a még élő csatorna nevével
+let channelSeq = Math.floor(Math.random() * 1e9);
 
 /**
  * REALTIME feliratkozás a user új értesítéseire (INSERT). Az RLS szűri, hogy csak
@@ -163,7 +165,8 @@ export async function sendNotification(
       body: JSON.stringify({ userId, ...input }),
     });
     return res.ok;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/notifications.ts:sendNotification', caught);
     return false;
   }
 }

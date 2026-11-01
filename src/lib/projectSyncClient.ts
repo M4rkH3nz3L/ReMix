@@ -24,6 +24,7 @@ import { fetchStorageUsage } from '@/lib/storageQuota';
 import { syncDecision } from '@/lib/syncPolicy';
 import { VIDED_FORMAT } from '@/lib/videdFile';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ☁️ Projekt-mappa → ReMix Storage szinkron (EGYIRÁNYÚ: telefon → felhő).
@@ -86,7 +87,7 @@ function setState(id: string, patch: Partial<ProjectSyncState>): void {
   states.set(id, next);
   listeners.forEach((l) => l());
   if (patch.phase && patch.phase !== 'syncing') {
-    void AsyncStorage.setItem(STATE_KEY(id), JSON.stringify(next)).catch(() => {});
+    void AsyncStorage.setItem(STATE_KEY(id), JSON.stringify(next)).catch((caught) => { logCaught('lib/projectSyncClient.ts:setState', caught); });
   }
 }
 
@@ -105,7 +106,7 @@ export function useProjectSyncState(projectId: string | undefined): ProjectSyncS
               listeners.forEach((l) => l());
             }
           })
-          .catch(() => {});
+          .catch((caught) => { logCaught('lib/projectSyncClient.ts:useProjectSyncState', caught); });
       }
       return () => listeners.delete(cb);
     },
@@ -127,7 +128,8 @@ function writePlanFile(project: Project): void {
     file.write(
       JSON.stringify({ format: VIDED_FORMAT, version: 1, exportedAt: new Date().toISOString(), project })
     );
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectSyncClient.ts:writePlanFile', caught);
     // best-effort
   }
 }
@@ -192,12 +194,12 @@ export async function checkSyncCapacity(project: Project): Promise<{
 }> {
   const folder = project.folder;
   const local = folder ? listProjectFolderFiles(folder) : [];
-  const usage = await fetchStorageUsage().catch(() => null);
+  const usage = await fetchStorageUsage().catch((caught) => { logCaught('lib/projectSyncClient.ts:checkSyncCapacity', caught); return null; });
   if (!usage) {
     const bytes = local.reduce((a, f) => a + f.size, 0);
     return { ok: false, signedIn: false, uploadBytes: bytes, missingBytes: 0, usedBytes: 0, quotaBytes: 0 };
   }
-  const remote = folder ? await listRemoteTree(projectFolderPath(folder)).catch(() => []) : [];
+  const remote = folder ? await listRemoteTree(projectFolderPath(folder)).catch((caught) => { logCaught('lib/projectSyncClient.ts:checkSyncCapacity', caught); return []; }) : [];
   const plan = planProjectSync(local, remote);
   const cap = canEnableSync(plan.uploadBytes, usage.usedBytes, usage.quotaBytes);
   return {
@@ -240,7 +242,7 @@ export function requestProjectSync(project: Project, opts: { manual?: boolean } 
   }
   latest.set(project.id, project);
   setState(project.id, { phase: 'pending', error: undefined });
-  running = running.then(() => runSync(project.id, Boolean(opts.manual))).catch(() => {});
+  running = running.then(() => runSync(project.id, Boolean(opts.manual))).catch((caught) => { logCaught('lib/projectSyncClient.ts:requestProjectSync', caught); });
   return running;
 }
 
@@ -269,7 +271,7 @@ async function runSync(projectId: string, manual: boolean): Promise<void> {
     const remote = await listRemoteTree(remoteDir);
     const plan = planProjectSync(local, remote);
     if (plan.upload.length > 0) {
-      const usage = await fetchStorageUsage().catch(() => null);
+      const usage = await fetchStorageUsage().catch((caught) => { logCaught('lib/projectSyncClient.ts:runSync', caught); return null; });
       if (usage) {
         const cap = canEnableSync(plan.uploadBytes, usage.usedBytes, usage.quotaBytes);
         if (!cap.ok) {
@@ -301,6 +303,7 @@ async function runSync(projectId: string, manual: boolean): Promise<void> {
     // ✅ „szinkronizálva" CSAK ha minden feltöltés ellenőrzötten kész (a szerver MD5+HEAD után válaszol)
     setState(projectId, { phase: 'synced', lastSyncedAt: new Date().toISOString(), progress: 0 });
   } catch (err) {
+    logCaught('lib/projectSyncClient.ts:runSync', err);
     if (err instanceof RemixFilesError) {
       setState(projectId, {
         phase: err.code === 'quota_exceeded' ? 'quota' : err.status === 401 ? 'offline' : 'failed',
@@ -318,7 +321,8 @@ async function runSync(projectId: string, manual: boolean): Promise<void> {
 export async function removeRemoteProjectFolder(folder: string): Promise<void> {
   try {
     await remixDelete([projectFolderPath(folder)]);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectSyncClient.ts:removeRemoteProjectFolder', caught);
     // nincs felhős másolat / offline — nincs teendő
   }
 }

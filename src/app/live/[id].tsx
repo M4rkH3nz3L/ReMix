@@ -58,6 +58,7 @@ import type { LiveDoc } from '@/types/live';
 import type { Project } from '@/types/project';
 // type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
 import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
+import { logCaught } from '@/lib/logCaught';
 
 // 🔴 A WebRTC-videó réteg LAZY (külön modul: @/components/live/LiveVideoStage) →
 // az expo-router INDULÁSI route-validációja NEM tölti be a natív WebRTC-modult,
@@ -79,7 +80,8 @@ const LiveVideoStage = lazy(async () => {
     if (m && typeof m.default === 'function') {
       return { default: m.default };
     }
-  } catch {
+  } catch (caught) {
+    logCaught('app/live/[id].tsx:LiveVideoStage', caught);
     // a natív WebRTC-modul hiányzik (régi build) → fallback (lentebb)
   }
   // MINDIG valid komponenst adunk vissza (sosem `undefined` → nincs „invalid element type")
@@ -267,7 +269,7 @@ export default function LiveRoomScreen() {
     let active = true;
     const liveId = String(id);
     (async () => {
-      const s = await getLive(liveId).catch(() => null);
+      const s = await getLive(liveId).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); return null; });
       if (!active) {
         return;
       }
@@ -299,7 +301,7 @@ export default function LiveRoomScreen() {
       // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast.
       // (A videó-token + WebRTC-kapcsolat a lazy LiveVideoStage-ben fut.)
       if (s.hostId === self.id && projectParam) {
-        const proj = await loadProject(String(projectParam)).catch(() => null);
+        const proj = await loadProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); return null; });
         if (active && proj?.live) {
           liveDocRef.current = proj.live;
           liveProjRef.current = proj; // VOD-poszthoz (D158)
@@ -336,6 +338,7 @@ export default function LiveRoomScreen() {
               }
             })
             .catch((e: Error) => {
+            logCaught('app/live/[id].tsx:LiveRoomScreen', e);
               // L17: a hiba LÁTHATÓ (eddig elnyelve → a host azt hitte, multistreamel)
               const reason = egressFailure(String(e?.message ?? ''));
               setEgress({ state: 'failed', reason });
@@ -391,7 +394,7 @@ export default function LiveRoomScreen() {
       name: proj.live?.title || proj.name || t('live.vodDefaultName', { defaultValue: 'Live' }),
       aspectRatio: proj.aspectRatio,
     });
-    void saveProject(vodProject).catch(() => {});
+    void saveProject(vodProject).catch((caught) => { logCaught('app/live/[id].tsx:importVod', caught); });
     return vodProject;
   };
 
@@ -403,7 +406,7 @@ export default function LiveRoomScreen() {
         void stopLiveEgress(egressIdRef.current); // 🎥 multistream leállítása
         egressIdRef.current = null;
       }
-      await endLive(session.id).catch(() => {});
+      await endLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
       dispatchLs({ type: 'STOPPED', at: Date.now() });
       const vod = vodUrlRef.current;
       // 📼 record=be + van felvétel (VOD) → a felvételből SZERKESZTHETŐ video-projekt
@@ -413,7 +416,7 @@ export default function LiveRoomScreen() {
       if (vodProject && vod) {
         // 🧹 a transient live-config projekt törlése (a VOD-projekt az új otthon)
         if (projectParam) {
-          void deleteProject(String(projectParam)).catch(() => {});
+          void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
         }
         Alert.alert(
           t('live.vodTitle', { defaultValue: 'Felvétel kész' }),
@@ -426,7 +429,7 @@ export default function LiveRoomScreen() {
             {
               text: t('live.vodShare', { defaultValue: 'Megosztás feedre' }),
               onPress: () => {
-                void publishLiveVod(vodProject, vod).catch(() => {});
+                void publishLiveVod(vodProject, vod).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
                 goBackOrHome();
               },
             },
@@ -441,7 +444,7 @@ export default function LiveRoomScreen() {
       }
       // 🧹 nem rögzített (vagy nincs VOD) → a transient live-config projekt törlése
       if (projectParam) {
-        void deleteProject(String(projectParam)).catch(() => {});
+        void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
       }
     }
     goBackOrHome();
@@ -456,12 +459,12 @@ export default function LiveRoomScreen() {
           void stopLiveEgress(egressIdRef.current);
           egressIdRef.current = null;
         }
-        void endLive(session.id).catch(() => {});
+        void endLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
         // 📼 hirtelen kilépés RÖGZÍTÉSSEL → a VOD-projekt így is elkészül (L19)
         const vodProject = importVod();
         // 🧹 hirtelen kilépés + nem rögzít (vagy a VOD már projekt) → a transient config törlése
         if ((vodProject || !liveDocRef.current?.record) && projectParam) {
-          void deleteProject(String(projectParam)).catch(() => {});
+          void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
         }
       }
     };
@@ -473,9 +476,9 @@ export default function LiveRoomScreen() {
   // session pedig fagyott képpel „élő" maradna)
   useEffect(() => {
     if (!isHost || !session) return;
-    void activateKeepAwakeAsync('remix-live').catch(() => {});
+    void activateKeepAwakeAsync('remix-live').catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
     return () => {
-      void deactivateKeepAwake('remix-live').catch(() => {});
+      void deactivateKeepAwake('remix-live').catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
     };
   }, [isHost, session]);
 
@@ -484,7 +487,7 @@ export default function LiveRoomScreen() {
   useEffect(() => {
     if (!isHost || !session) return;
     const beat = () => {
-      if (!endedRef.current) void heartbeatLive(session.id).catch(() => {});
+      if (!endedRef.current) void heartbeatLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:beat', caught); });
     };
     beat();
     const timer = setInterval(beat, 30_000);

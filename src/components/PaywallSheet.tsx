@@ -14,6 +14,7 @@ import {
 } from '@/lib/billing';
 import { capabilityLabel, proCapabilities } from '@/lib/capabilities';
 import { usePaywall } from '@/store/paywallStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔒 Remix Pro paywall — a felhő-funkciók (AI + felhő-HD render) ajánlata.
@@ -63,6 +64,7 @@ export function PaywallSheet() {
       // 3) nincs natív build / store-termék → tájékoztatás
       Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
     } catch (e) {
+      logCaught('components/PaywallSheet.tsx:onUpgrade', e);
       if (e instanceof PurchaseCancelledError) {
         return; // felhasználó megszakította — nincs hibajelzés
       }
@@ -87,6 +89,7 @@ export function PaywallSheet() {
         close();
       }
     } catch (e) {
+      logCaught('components/PaywallSheet.tsx:onRestore', e);
       Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import { duration } from '@/design/motion';
 import { getLesson, nextStepIndex, prevStepIndex, type Rect } from '@/lib/tutorial';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * A lecke-választó (BottomSheet) ÉS az overlay is RN `Modal`. iOS-en két natív
@@ -47,7 +48,8 @@ interface TutorialState {
 }
 
 function persistCompleted(completed: string[]): void {
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(completed)).catch(() => {
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(completed)).catch((caught) => {
+    logCaught('store/tutorialStore.ts:persistCompleted', caught);
     // best-effort: a tutorial-állapot elvesztése nem kritikus
   });
 }
@@ -126,7 +128,8 @@ export const useTutorial = create<TutorialState>((set, get) => ({
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       const completed = raw ? (JSON.parse(raw) as string[]) : [];
       set({ completed: Array.isArray(completed) ? completed : [], hydrated: true });
-    } catch {
+    } catch (caught) {
+      logCaught('store/tutorialStore.ts:useTutorial', caught);
       set({ hydrated: true });
     }
   },

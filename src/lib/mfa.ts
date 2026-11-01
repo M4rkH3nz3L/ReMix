@@ -1,4 +1,5 @@
 import { requireSupabase, supabase } from '@/lib/supabase';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔐 MFA (TOTP) — kétlépcsős hitelesítés a Supabase GoTrue MFA-API-ján.
@@ -91,7 +92,8 @@ export async function loginNeedsMfa(): Promise<boolean> {
       return false;
     }
     return data.nextLevel === 'aal2' && data.nextLevel !== data.currentLevel;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/mfa.ts:loginNeedsMfa', caught);
     return false;
   }
 }

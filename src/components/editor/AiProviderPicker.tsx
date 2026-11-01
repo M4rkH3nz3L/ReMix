@@ -12,6 +12,7 @@ import {
   type AiProvider,
   type AiTask,
 } from '@/lib/aiProviders';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🤖 Provider-választó egy adott AI-feladathoz — a felhasználó MINDEN AI-
@@ -37,7 +38,8 @@ export function AiProviderPicker({ task }: { task: AiTask }) {
           setSelected(tasks[task] ?? null);
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('components/editor/AiProviderPicker.tsx:AiProviderPicker', caught);
         // nincs backend / bejelentkezés → nincs választó, marad az Auto
       });
     return () => {
@@ -48,7 +50,7 @@ export function AiProviderPicker({ task }: { task: AiTask }) {
   // választás — optimista + perzisztálva (a következő betöltés a szervert tükrözi)
   const pick = (id: string | null) => {
     setSelected(id);
-    setTaskAssignment(task, id).catch(() => {});
+    setTaskAssignment(task, id).catch((caught) => { logCaught('components/editor/AiProviderPicker.tsx:pick', caught); });
   };
 
   if (models.length === 0) {

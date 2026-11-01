@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // TTS (szöveg → beszéd) a dev-workeren: macOS `say` → AAC/m4a (ffmpeg).
 // A faceless/AI-creatoroknak: voiceover felvétel nélkül. Provider-független
 // minta (mint az ai.js/whisper): dev-ben `say`, élesben cloud-TTS-re cserélhető.
@@ -32,7 +33,8 @@ async function probeDuration(file) {
       '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file,
     ]);
     return Math.round(parseFloat(out.toString().trim()) * 1000) / 1000 || 0;
-  } catch {
+  } catch (caught) {
+    logCaught('tts.js:probeDuration', caught);
     return 0;
   }
 }
@@ -61,7 +63,8 @@ async function synthesize(text, voice) {
     await run('ffmpeg', ['-y', '-i', aiff, '-c:a', 'aac', '-b:a', '128k', m4a]);
     try {
       fs.unlinkSync(aiff);
-    } catch {
+    } catch (caught) {
+      logCaught('tts.js:synthesize', caught);
       /* nem fatális */
     }
   }

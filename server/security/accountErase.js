@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🗑️ GDPR hard-erasure (devs/tasks/remix/09). A soft-delete (profiles.deleted_at)
 // VISSZAÁLLÍTHATÓ; ez a VÉGLEGES törlés a visszavonási (cooldown) idő letelte után:
 // a user storage-médiája (a ~5% gap, amit az auth.users cascade NEM töröl) + az
@@ -50,7 +51,8 @@ async function listAllObjects(storage, prefix, depth = 0) {
   try {
     const { data } = await storage.list(prefix.replace(/\/$/, ''), { limit: 1000 });
     entries = data || [];
-  } catch {
+  } catch (caught) {
+    logCaught('security/accountErase.js:listAllObjects', caught);
     return [];
   }
   const out = [];

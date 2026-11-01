@@ -12,6 +12,7 @@ import { createGenerationGuard } from '@/lib/asyncGuard';
 import { listPostsByIds } from '@/lib/feed';
 import { listCollectionPostIds } from '@/lib/postCollections';
 import type { FeedPost } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -49,7 +50,8 @@ export default function CollectionScreen() {
             setPosts(r);
           }
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('app/collections/[id].tsx:timer', caught);
           if (guard.isCurrent(token)) {
             setPosts([]);
           }

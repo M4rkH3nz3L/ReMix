@@ -13,6 +13,7 @@ import { formatTime } from '@/lib/time';
 import { loadStorageProviders, type StorageEntry, type StorageProvider } from '@/lib/storageProviders';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ➕ Hang hozzáadása a stúdióhoz — ESZKÖZRŐL importálva VAGY a szerver-könyvtárból
@@ -56,7 +57,8 @@ export function AddMediaSheet({
                 out.push({ provider, entry });
               }
             }
-          } catch {
+          } catch (caught) {
+            logCaught('components/studio/audio/AddMediaSheet.tsx:AddMediaSheet', caught);
             // egy provider bukása nem állítja meg a többit
           }
         }
@@ -64,7 +66,7 @@ export function AddMediaSheet({
           setRows(out);
         }
       })
-      .catch(() => alive && setRows([]));
+      .catch((caught) => { logCaught('components/studio/audio/AddMediaSheet.tsx:AddMediaSheet', caught); return alive && setRows([]); });
     return () => {
       alive = false;
     };

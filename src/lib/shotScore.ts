@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { finiteNum, finiteTime, mapValid, unitNum } from '@/lib/parseGuards';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🏆 Best-shot kliens (P0‑1): a worker /shotscore végpontja forrás-időpontok
@@ -55,7 +56,8 @@ export async function fetchShotScores(
       };
     });
     return shots.length > 0 ? shots : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/shotScore.ts:fetchShotScores', caught);
     return null;
   }
 }

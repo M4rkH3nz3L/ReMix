@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { isProRequiredError } from '@/lib/backend';
 import type { CapabilityId } from '@/lib/capabilities';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔒 Paywall-store — bárhonnan megnyitható Pro-ajánlat.
@@ -40,6 +41,7 @@ export async function guardPro<T>(
   try {
     return await fn();
   } catch (err) {
+    logCaught('store/paywallStore.ts:guardPro', err);
     if (isProRequiredError(err)) {
       usePaywall.getState().open(err.capability);
       return undefined;

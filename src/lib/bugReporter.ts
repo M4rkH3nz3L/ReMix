@@ -20,6 +20,7 @@ import {
   throttleKey,
   type BugKind,
 } from '@/lib/bugReport';
+import { setCaughtSink } from '@/lib/logCaught';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 
 /**
@@ -302,7 +303,9 @@ export async function reportBug(error: unknown, ctx: BugContext = {}): Promise<B
   }
   try {
     const err = normalizeError(error);
-    const decision = throttleDecision(throttle, throttleKey(err), Date.now());
+    // ugyanaz a hiba két különböző helyről két külön teendő
+    const where = typeof ctx.extra?.where === 'string' ? ctx.extra.where : '';
+    const decision = throttleDecision(throttle, `${where}|${throttleKey(err)}`, Date.now());
     throttle = decision.next;
     if (!decision.send) {
       return 'throttled';
@@ -373,6 +376,13 @@ function timeout(ms: number): Promise<void> {
  *  - előtérbe lépés / indulás → a korábbi (pl. crash előtti) sor elküldése
  */
 export function installGlobalBugHandlers(): void {
+  // 📋 minden elkapott hiba ugyanezen a kímélő úton megy (ritkítás, sor, kötegelés)
+  setCaughtSink((error, where, errorClass) => {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.log(`[CAUGHT] ${where} (${errorClass}): ${normalizeError(error).message.slice(0, 160)}`);
+    }
+    void reportBug(error, { kind: 'handled', extra: { where, errorClass } });
+  });
   const g = globalThis as BugGlobals;
   if (g.__remixBugHandlersInstalled || !reportsEnabled() || Platform.OS === 'web') {
     return;

@@ -9,6 +9,7 @@ import { hasOverlayRasterHost, rasterTextOverlays } from '@/lib/overlayRasterBri
 import type { RenderSettings } from '@/lib/render';
 import { localRenderMatchesPreview } from '@/lib/renderParity';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📱 Eszközön futó render — a #1 termék-blokkoló feloldása.
@@ -287,7 +288,8 @@ export async function renderLocal(
     if (target.exists) {
       target.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/nativeRender.ts:renderLocal', caught);
     // ha nem törölhető, az export úgyis hibát ad
   }
 
@@ -300,7 +302,7 @@ export async function renderLocal(
       return new File(await exporting);
     }
     if (signal.aborted) {
-      Native.cancel().catch(() => {});
+      Native.cancel().catch((caught) => { logCaught('lib/nativeRender.ts:renderLocal', caught); });
       throw cancelledError();
     }
     // versenyeztetés: amelyik előbb — a kész render vagy a megszakítás.
@@ -311,7 +313,7 @@ export async function renderLocal(
     try {
       const outUri = await new Promise<string>((resolve, reject) => {
         onAbort = () => {
-          Native.cancel().catch(() => {});
+          Native.cancel().catch((caught) => { logCaught('lib/nativeRender.ts:renderLocal', caught); });
           reject(cancelledError());
         };
         signal.addEventListener('abort', onAbort, { once: true });

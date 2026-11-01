@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🖼️ Kép-eszköz route-ok (imagedoc/svg-pdf/color/text/bgremove/stickers3d/depth).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből —
@@ -74,7 +75,8 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
   try {
     doc = JSON.parse(req.body.doc);
     uriMap = JSON.parse(req.body.uriMap ?? '{}');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/imageTools.js', caught);
     res.status(400).json({ error: 'Hibás doc/uriMap JSON.' });
     return;
   }
@@ -118,6 +120,7 @@ router.post('/imagedoc', requireAuth, rateLimit('analysis'), uploadImage.any(), 
       res.sendFile(file);
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       console.warn('imagedoc hiba:', err.message.slice(0, 300));
       res.status(500).json({ error: err.message.slice(0, 300) });
     });
@@ -189,6 +192,7 @@ router.post('/psd/import', ...proOnly, uploadImage.any(), mediaGuard('psd'), asy
     cleanup();
     res.json({ doc });
   } catch (err) {
+    logCaught('routes/imageTools.js', err);
     cleanup();
     const msg = String(err && err.message ? err.message : err).slice(0, 300);
     console.warn('psd/import hiba:', msg);
@@ -284,6 +288,7 @@ router.post('/pdf/import', ...proOnly, uploadImage.any(), mediaGuard('pdf'), asy
     // a kliens oldalanként EGY `UPSERT_IMAGE_DOC`-ot tesz a command-busra (undo-barát)
     res.json({ docs });
   } catch (err) {
+    logCaught('routes/imageTools.js', err);
     cleanup();
     const msg = String(err && err.message ? err.message : err).slice(0, 300);
     console.warn('pdf/import hiba:', msg);
@@ -381,7 +386,8 @@ router.post('/psd/export', ...proOnly, uploadImage.any(), mediaGuard('imagedoc')
     try {
       doc = JSON.parse(req.body?.doc ?? 'null');
       uriMap = JSON.parse(req.body?.uriMap ?? '{}');
-    } catch {
+    } catch (caught) {
+      logCaught('routes/imageTools.js', caught);
       doc = null;
     }
     if (!doc || !Array.isArray(doc.layers)) {
@@ -445,6 +451,7 @@ router.post('/psd/export', ...proOnly, uploadImage.any(), mediaGuard('imagedoc')
     cleanup();
     res.json({ url, name: `${safeName}.psd`, bytes: psdBuf.length });
   } catch (err) {
+    logCaught('routes/imageTools.js', err);
     cleanup();
     const msg = String(err && err.message ? err.message : err).slice(0, 300);
     console.warn('psd/export hiba:', msg);
@@ -460,7 +467,8 @@ router.post('/svg/pdf', requireAuth, rateLimit('analysis'), uploadSvg.any(), (re
   let svg = '';
   try {
     svg = svgFile ? fs.readFileSync(svgFile.path, 'utf8') : String(req.body.svg || '');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/imageTools.js', caught);
     svg = String(req.body.svg || '');
   }
   if (!svg || !svg.includes('<svg')) {
@@ -476,6 +484,7 @@ router.post('/svg/pdf', requireAuth, rateLimit('analysis'), uploadSvg.any(), (re
   renderSvgToPdf(svg, { width, height, workDir: req.workDir })
     .then((file) => res.sendFile(file))
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       console.warn('svg/pdf hiba:', err.message.slice(0, 300));
       res.status(err.status || 500).json({ error: err.message.slice(0, 300) });
     });
@@ -497,6 +506,7 @@ router.post('/color/stats', requireAuth, rateLimit('analysis'), upload.any(), me
       res.json(stats);
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('color-stats hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -522,6 +532,7 @@ router.post('/color/pixel', requireAuth, rateLimit('analysis'), upload.any(), me
       res.json(r);
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('color-pixel hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -544,6 +555,7 @@ router.post('/color/lut-export', express.json({ limit: '256kb' }), requireAuth, 
       res.type('text/plain').send(cube);
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       console.error('lut-export hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -567,6 +579,7 @@ router.post('/color/scope', requireAuth, rateLimit('analysis'), upload.any(), me
       res.json(r);
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('color-scope hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -586,6 +599,7 @@ router.post('/text/bake', express.json({ limit: '256kb' }), requireAuth, rateLim
   bakeTextPng(clip, { w: Math.round(canvas.w), h: Math.round(canvas.h) })
     .then((r) => res.json(r))
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       console.error('text-bake hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -613,6 +627,7 @@ router.post('/bgremove', ...proOnly, upload.any(), mediaGuard('image'), (req, re
       });
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('bgremove hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -661,6 +676,7 @@ router.get('/stickers3d/:id.png', (req, res) => {
   })
     .then((file) => res.sendFile(file))
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       console.error('sticker3d hiba:', err.message);
       res.status(500).json({ error: err.message });
     });
@@ -693,6 +709,7 @@ router.post('/depth/parallax', requireAuth, rateLimit('analysis'), upload.any(),
       });
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('depth hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -722,6 +739,7 @@ router.post('/depth/focus', requireAuth, rateLimit('analysis'), upload.any(), me
       });
     })
     .catch((err) => {
+    logCaught('routes/imageTools.js', err);
       cleanup();
       console.error('depth-focus hiba:', err.message);
       res.status(500).json({ error: err.message });

@@ -20,6 +20,7 @@ import { listProjects, loadProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
 import type { ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** a forgó videó hossza a videóban (mp) */
 const TURNTABLE_SECONDS = 6;
@@ -42,7 +43,7 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
     }
     void listProjects()
       .then((metas) => setModels(metas.filter((m) => m.kind === 'model3d')))
-      .catch(() => setModels([]));
+      .catch((caught) => { logCaught('components/editor/panels/My3DModelsSection.tsx:My3DModelsSection', caught); return setModels([]); });
   }, []);
 
   if (!model3dRenderAvailable() || models.length === 0) {
@@ -132,6 +133,7 @@ export function My3DModelsSection({ onInserted }: { onInserted?: () => void }) {
   const choose = (meta: ProjectMeta) => {
     const guard = (fn: () => Promise<void>) => () => {
       fn().catch((e) => {
+        logCaught('components/editor/panels/My3DModelsSection.tsx:guard', e);
         const k = remix3dErrorKey(e);
         if (k !== 'model3d.error.cancelled') {
           Alert.alert(t('panels.sticker.my3dTitle'), t(k));

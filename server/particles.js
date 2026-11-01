@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // ✨ Részecske-generátor (🧊 3D V2): Chromium-canvas rendereli az átlátszó
 // hátterű PNG-képsort — determinisztikus (seedelt) szimuláció, beat-burstökkel.
 // A render a képsort a videóra komponálja a feliratok alá. A felbontás a
@@ -26,7 +27,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('particles.js:findChromium', caught);
     // nincs playwright-cache
   }
   return null;

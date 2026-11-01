@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { fetchMyPermissions, type PermissionKey } from '@/lib/roles';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🛡️ A bejelentkezett user GLOBÁLIS governance-jogai (RBAC). Belépéskor töltődik
@@ -24,7 +25,8 @@ export const useRoles = create<RoleState>((set, get) => ({
     try {
       const perms = await fetchMyPermissions();
       set({ permissions: perms, loaded: true });
-    } catch {
+    } catch (caught) {
+      logCaught('store/roleStore.ts:useRoles', caught);
       set({ permissions: [], loaded: true });
     }
   },

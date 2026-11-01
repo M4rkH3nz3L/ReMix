@@ -27,6 +27,7 @@ import { useToast } from '@/store/toastStore';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { useTutorial } from '@/store/tutorialStore';
 import type { Asset, Clip, TrackType } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Kontextusfüggő eszköztár: kijelölés nélkül a hozzáadás-műveletek, kijelölt
@@ -112,7 +113,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
       }
     );
     // a 720p vágási proxy már készülhet, mire lejátszásra kerül
-    ensureProxy(picked.uri).catch(() => {});
+    ensureProxy(picked.uri).catch((caught) => { logCaught('components/editor/Toolbar.tsx:addVideo', caught); });
   };
 
   // 🎬 PiP: a videó a PIP-sávra kerül a lejátszófejnél, alap kis mérettel (jobb-fent)
@@ -162,7 +163,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
         height: picked.height,
       }
     );
-    ensureProxy(picked.uri).catch(() => {});
+    ensureProxy(picked.uri).catch((caught) => { logCaught('components/editor/Toolbar.tsx:addPip', caught); });
   };
 
   const addImage = async () => {
@@ -485,7 +486,7 @@ export function Toolbar({ variant = 'bar' }: { variant?: 'bar' | 'rail' } = {}) 
         // frissen elkapott kockát rögtön a Kép Stúdióban nyitjuk
         s.openImageStudio(result.clip.id);
       })
-      .catch(() => Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureFailed')));
+      .catch((caught) => { logCaught('components/editor/Toolbar.tsx:frameCaptureAction', caught); return Alert.alert(t('editor.toolbar.frameCaptureTitle'), t('editor.toolbar.frameCaptureFailed')); });
   };
 
   const toggleMultiSelect = () => {

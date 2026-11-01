@@ -24,6 +24,7 @@ import {
 } from '@/lib/creatorProfile';
 import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { pickProfileImageLocal, uploadProfileImage } from '@/lib/profile';
+import { logCaught } from '@/lib/logCaught';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 const ico = (name: string) => name as IoniconName;
@@ -53,7 +54,7 @@ export function ShowcaseEditor({ userId }: { userId: string }) {
           setItems(rows);
         }
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('components/profile/ShowcaseEditor.tsx:ShowcaseEditor', caught); })
       .finally(() => {
         if (alive) {
           setLoading(false);
@@ -98,6 +99,7 @@ export function ShowcaseEditor({ userId }: { userId: string }) {
       const url = await uploadProfileImage(local);
       patch(i, { thumbUrl: url });
     } catch (e) {
+      logCaught('components/profile/ShowcaseEditor.tsx:pickThumb', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setThumbBusy(null);
@@ -114,6 +116,7 @@ export function ShowcaseEditor({ userId }: { userId: string }) {
       setItems(await listShowcase(userId));
       Alert.alert(t('profile.savedTitle'), t('showcase.saved'));
     } catch (e) {
+      logCaught('components/profile/ShowcaseEditor.tsx:save', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);

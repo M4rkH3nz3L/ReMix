@@ -12,6 +12,7 @@ import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🪝 Hook Generator: erősebb nyitómondatok a videó témájából. Önálló AI-mód —
@@ -37,7 +38,7 @@ export function HooksSection({
     }
     setBusy(t('panels.assistant.hookWriting'));
     try {
-      const transcript = await getTimelineTranscript(state.project).catch(() => null);
+      const transcript = await getTimelineTranscript(state.project).catch((caught) => { logCaught('components/editor/panels/assistant/HooksSection.tsx:generateHooks', caught); return null; });
       const lines = (transcript ?? []).slice(0, 12).map((l) => l.text);
       const summary = `${state.project.name}\n${lines.join('\n')}`.slice(0, 900);
       const list = await fetchHooks(summary);
@@ -84,7 +85,7 @@ export function HooksSection({
         label={busy ?? t('panels.assistant.hookGenerateBtn')}
         onPress={() => {
           generateHooks().catch((err: Error) =>
-            Alert.alert('Hook Generator', err.message)
+            { logCaught('components/editor/panels/assistant/HooksSection.tsx:HooksSection', err); return Alert.alert('Hook Generator', err.message); }
           );
         }}
       />

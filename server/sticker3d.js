@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🧊 3D stickers (3D V1): CC0 glTF modellek (assets/stickers3d/, licencek a
 // LICENSES.md-ben) → three.js render a Chromium headless shellben → átlátszó
 // hátterű PNG. A kliens a PNG-t kép-kitöltésű formaként (logó-útvonal) teszi a
@@ -52,7 +53,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('sticker3d.js:findChromium', caught);
     // nincs playwright-cache
   }
   return null;

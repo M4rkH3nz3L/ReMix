@@ -76,6 +76,7 @@ import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
 import type { Asset, ClipMask, ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 /** ✂️ induló kivágás-téglalap: enyhén behúzva, hogy a sarok-fogók látszódjanak */
 const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
@@ -83,7 +84,8 @@ const START_CROP: CropRect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
 function deleteLocalFile(uri: string) {
   try {
     new File(uri).delete();
-  } catch {
+  } catch (caught) {
+    logCaught('components/studio/image/ImageStudioBody.tsx:deleteLocalFile', caught);
     /* takarítás — best-effort */
   }
 }
@@ -269,7 +271,8 @@ export function ImageStudioBody({
         width: Math.round((height * (canvas.width / canvas.height)) / ratio),
         height: Math.round(height / ratio),
       });
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:rasterize', caught);
       return null;
     } finally {
       setCapturing(false);
@@ -349,7 +352,7 @@ export function ImageStudioBody({
             deleteLocalFile(previous);
           }
         })
-        .catch(() => {});
+        .catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:timer', caught); });
     }, THUMB_IDLE_MS);
     return () => clearTimeout(timer);
     // a doc a kulcson át számít: csak valódi tartalom-változásra indul újra
@@ -550,7 +553,8 @@ export function ImageStudioBody({
       commit(next, t('studio.image.undoImportSvg'));
       setSelectedId(layers[layers.length - 1].id);
       setSheet('layers');
-    } catch {
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:importSvg', caught);
       Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
     } finally {
       setBusy(false);
@@ -590,6 +594,7 @@ export function ImageStudioBody({
       }
       setSheet('layers');
     } catch (e) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:importPsdDoc', e);
       Alert.alert(t('studio.image.psdFailTitle'), (e as Error)?.message || t('studio.image.psdFailBody'));
     } finally {
       setBusy(false);
@@ -635,6 +640,7 @@ export function ImageStudioBody({
       }
       setSheet('layers');
     } catch (e) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:importPdfDocs', e);
       Alert.alert(t('studio.image.pdfFailTitle'), (e as Error)?.message || t('studio.image.pdfFailBody'));
     } finally {
       setBusy(false);
@@ -705,7 +711,8 @@ export function ImageStudioBody({
         void (async () => {
           try {
             await import('@/components/studio/image/BrushOverlay');
-          } catch {
+          } catch (caught) {
+            logCaught('components/studio/image/ImageStudioBody.tsx:onTool', caught);
             Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
             return;
           }
@@ -894,7 +901,8 @@ export function ImageStudioBody({
         } else {
           Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
         }
-      } catch {
+      } catch (caught) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:onWandSeed', caught);
         // a @shopify/react-native-skia natív modul hiányzik a dev-kliensből → új build kell
         Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
       } finally {
@@ -929,6 +937,7 @@ export function ImageStudioBody({
       commit(replaceWithRaster(fresh, ids, uri, id, label), label);
       setSelectedId(id);
     } catch (e) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:mergeLayers', e);
       Alert.alert(t('studio.image.renderFailTitle'), (e as Error).message);
     } finally {
       setBusy(false);
@@ -1148,9 +1157,9 @@ export function ImageStudioBody({
         return;
       }
       commitRendered(doc.id, uri);
-      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); return false; });
       if (canShare) {
-        await Sharing.shareAsync(uri).catch(() => {});
+        await Sharing.shareAsync(uri).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); });
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
@@ -1175,7 +1184,8 @@ export function ImageStudioBody({
               const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
               return { ...l, uri: `data:${mime};base64,${src.base64()}` };
             }
-          } catch {
+          } catch (caught) {
+            logCaught('components/studio/image/ImageStudioBody.tsx:buildExportSvg', caught);
             // nem olvasható fotó → marad a hivatkozás (nem self-contained)
           }
         }
@@ -1206,13 +1216,14 @@ export function ImageStudioBody({
         if (file.exists) {
           file.delete();
         }
-      } catch {
+      } catch (caught) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught);
         // a write úgyis felülírja
       }
       file.write(svg);
-      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); return false; });
       if (canShare) {
-        await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch(() => {});
+        await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); });
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
@@ -1238,9 +1249,9 @@ export function ImageStudioBody({
         Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
         return;
       }
-      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); return false; });
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch(() => {});
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); });
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
@@ -1268,16 +1279,17 @@ export function ImageStudioBody({
       if (!uri) {
         return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
       }
-      const canShare = await Sharing.isAvailableAsync().catch(() => false);
+      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', caught); return false; });
       if (canShare) {
         await Sharing.shareAsync(uri, {
           mimeType: 'image/vnd.adobe.photoshop',
           dialogTitle: t('studio.export'),
-        }).catch(() => {});
+        }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', caught); });
       } else {
         Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
       }
     } catch (e) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', e);
       Alert.alert(t('studio.image.psdExportFailTitle'), (e as Error)?.message || t('studio.image.psdExportFailBody'));
     } finally {
       setBusy(false);
@@ -1366,6 +1378,7 @@ export function ImageStudioBody({
         t('studio.image.shareFeed.doneBody', { defaultValue: 'A poszt felkerült a feedbe.' })
       );
     } catch (e) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:shareToFeed', e);
       Alert.alert(t('common.error'), (e as Error).message);
     } finally {
       setBusy(false);

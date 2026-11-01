@@ -37,6 +37,7 @@ import {
   formatBytes,
 } from '@/lib/storageQuota';
 import { useEntitlement } from '@/store/entitlementStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** A manuális (nem-OAuth) források mezői — a config a workeren tárolódik. */
 const MANUAL_FIELDS: Record<'webdav' | 's3', { key: string; label: string; secret?: boolean }[]> = {
@@ -83,12 +84,13 @@ export function StorageCard() {
         setUsage(u);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('components/profile/StorageCard.tsx:refresh', caught);
         setUsage(null);
         setLoading(false);
       });
-    fetchConnectedProviders().then(setProviders).catch(() => {});
-    creditBalance().then(setBalance).catch(() => {});
+    fetchConnectedProviders().then(setProviders).catch((caught) => { logCaught('components/profile/StorageCard.tsx:refresh', caught); });
+    creditBalance().then(setBalance).catch((caught) => { logCaught('components/profile/StorageCard.tsx:refresh', caught); });
   }, []);
 
   useEffect(() => {
@@ -112,6 +114,7 @@ export function StorageCard() {
       setUsage(res.usage);
       Alert.alert(t('profile.storage.boostDoneTitle'), t('profile.storage.boostDoneMsg', { gb: boostGb, months: boostMonths }));
     } catch (e) {
+      logCaught('components/profile/StorageCard.tsx:onBuy', e);
       if (e instanceof InsufficientCreditsError) {
         Alert.alert(t('profile.storage.notEnoughTitle'), t('profile.storage.notEnoughMsg'), [
           { text: t('common.cancel'), style: 'cancel' },
@@ -136,6 +139,7 @@ export function StorageCard() {
         await refresh();
       }
     } catch (e) {
+      logCaught('components/profile/StorageCard.tsx:onConnectOAuth', e);
       Alert.alert(t('profile.storage.connectFailedTitle'), (e as Error).message);
     } finally {
       setBusy(false);
@@ -154,6 +158,7 @@ export function StorageCard() {
       setManualCfg({});
       await refresh();
     } catch (e) {
+      logCaught('components/profile/StorageCard.tsx:onConnectManual', e);
       Alert.alert(t('profile.storage.connectFailedTitle'), (e as Error).message);
     } finally {
       setBusy(false);
@@ -171,6 +176,7 @@ export function StorageCard() {
             await disconnectProvider(p.id);
             await refresh();
           } catch (e) {
+            logCaught('components/profile/StorageCard.tsx:onDisconnect', e);
             Alert.alert(t('common.error'), (e as Error).message);
           }
         },
@@ -190,6 +196,7 @@ export function StorageCard() {
       invalidateOwnStorageTargetCache();
       await refresh();
     } catch (e) {
+      logCaught('components/profile/StorageCard.tsx:onSelectTarget', e);
       Alert.alert(t('common.error'), (e as Error).message);
     } finally {
       setBusy(false);
@@ -206,7 +213,8 @@ export function StorageCard() {
     setFiles(null);
     try {
       setFiles(await listProviderFiles(id));
-    } catch {
+    } catch (caught) {
+      logCaught('components/profile/StorageCard.tsx:onToggleFiles', caught);
       setFiles([]);
     }
   };

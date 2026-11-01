@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🏷️ Média-fájl emberi megjelenítési neve.
  *
@@ -22,7 +24,8 @@ export function mediaDisplayName(uri: string): string | null {
   let last = uri.split('?')[0].split('/').pop() ?? '';
   try {
     last = decodeURIComponent(last);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/mediaDisplayName.ts:mediaDisplayName', caught);
     // hibás %-kódolás → nyersen
   }
   if (!last || isMachineFileName(last)) {

@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🔗 Külső média route-ok (YouTube/URL-import + TTS voiceover).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből.
@@ -22,6 +23,7 @@ router.post('/youtube', express.json({ limit: '8kb' }), ...proOnly, async (req, 
     const { url, kind, atSec } = req.body || {};
     res.json(await importMedia(url, kind, atSec));
   } catch (e) {
+    logCaught('routes/externalMedia.js', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -57,6 +59,7 @@ router.post('/tts', express.json({ limit: '256kb' }), ...proOnly, async (req, re
     void trackUsage(uid, 'cloudJobs', 1);
     res.json(result);
   } catch (e) {
+    logCaught('routes/externalMedia.js', e);
     res.status(500).json({ error: e.message });
   }
 });

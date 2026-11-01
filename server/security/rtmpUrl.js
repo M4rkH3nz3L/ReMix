@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🔐 PRO-LIVE L7 — RTMP(S) cél-URL validáció (SSRF elleni védelem).
 //
 // Az egress a user által megadott URL-re pushol: belső hálózati / loopback / link-local /
@@ -48,7 +49,8 @@ function validateRtmpUrl(raw) {
   let u;
   try {
     u = new URL(s);
-  } catch {
+  } catch (caught) {
+    logCaught('security/rtmpUrl.js:validateRtmpUrl', caught);
     return { ok: false, error: 'Érvénytelen RTMP-cím.' };
   }
   if (u.protocol !== 'rtmp:' && u.protocol !== 'rtmps:') {
@@ -76,7 +78,8 @@ async function resolveSafe(raw, lookup = (h) => dns.lookup(h, { all: true })) {
       return { ok: false, error: 'Az RTMP-cél belső hálózatra mutat.' };
     }
     return v;
-  } catch {
+  } catch (caught) {
+    logCaught('security/rtmpUrl.js:resolveSafe', caught);
     return { ok: false, error: 'Az RTMP-cél hostja nem oldható fel.' };
   }
 }

@@ -16,6 +16,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { COVER_ASPECT, palette } from '@/constants/editor';
 import { bakeImage, getImageSize, type ImageOp } from '@/lib/imageEditor';
+import { logCaught } from '@/lib/logCaught';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -70,7 +71,7 @@ export function CoverPhotoEditor({
           setNatFor({ uri, width: s.width, height: s.height });
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/CoverPhotoEditor.tsx:CoverPhotoEditor', caught); });
     return () => {
       alive = false;
     };
@@ -189,6 +190,7 @@ export function CoverPhotoEditor({
       const baked = await bakeImage(uri!, ops, { persist: true });
       onConfirm(baked.uri);
     } catch (e) {
+      logCaught('components/CoverPhotoEditor.tsx:apply', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setBaking(false);

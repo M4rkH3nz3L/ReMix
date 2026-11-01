@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗑️ Fiók soft-delete (GDPR — deaktiválás, nem végleges törlés). A fiók/tartalom
@@ -140,7 +141,8 @@ export async function exportMyData(): Promise<string> {
     if (file.exists) {
       file.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/account.ts:exportMyData', caught);
     // a write úgyis felülírja
   }
   file.write(json);

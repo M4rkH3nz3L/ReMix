@@ -12,6 +12,7 @@ import { loadEvents, loadProject, loadVersions, readRecovery, saveProject } from
 import { findMissingMedia, relinkCommandsFor } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ☁️→📱 Hiányzó modell-/borító-fájl visszaállítása a felhő-mentésből (újratelepítés /
@@ -23,7 +24,7 @@ async function recoverMissingModel(proj: Project): Promise<void> {
   }
   let remoteByUri = mediaRemoteMap(proj);
   if (Object.keys(remoteByUri).length === 0) {
-    const cloud = await pullProject(proj.id).catch(() => null);
+    const cloud = await pullProject(proj.id).catch((caught) => { logCaught('app/studio/model3d/[id].tsx:recoverMissingModel', caught); return null; });
     if (cloud) {
       remoteByUri = mediaRemoteMap(cloud);
     }
@@ -80,16 +81,16 @@ export default function Model3DStudioRoute() {
       .then(([loaded, events]) => {
         if (alive && loaded) {
           useEditorStore.getState().loadProject(loaded, events);
-          void recoverMissingModel(loaded).catch(() => {});
+          void recoverMissingModel(loaded).catch((caught) => { logCaught('app/studio/model3d/[id].tsx:Model3DStudioRoute', caught); });
         }
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('app/studio/model3d/[id].tsx:Model3DStudioRoute', caught); })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
       const p = useEditorStore.getState().project;
       if (p && p.id === id) {
-        void persistAndPrune(p).catch(() => {});
+        void persistAndPrune(p).catch((caught) => { logCaught('app/studio/model3d/[id].tsx:Model3DStudioRoute', caught); });
       }
     };
   }, [id, allowed]);
@@ -110,7 +111,7 @@ export default function Model3DStudioRoute() {
           }
           return undefined;
         })
-        .catch(() => {});
+        .catch((caught) => { logCaught('app/studio/model3d/[id].tsx:timer', caught); });
     }, AUTOSAVE_MS);
     return () => clearTimeout(timer);
   }, [project, id]);

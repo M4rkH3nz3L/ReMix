@@ -2,6 +2,7 @@ import { examAllowsTask } from '@/lib/aiExam';
 import { normalizeAvatar, type AvatarConfig } from '@/lib/avatar';
 import { hasSupabaseConfig, requireSupabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🤖 Felhasználói AI-modell konfigurációk (BYOK) — a `public.user_ai_providers`
@@ -311,7 +312,8 @@ export async function aiConfigForRequest(): Promise<AiRequestConfig | undefined>
   try {
     const p = await getDefaultAiProvider();
     return p ? toConfig(p) : undefined;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/aiProviders.ts:aiConfigForRequest', caught);
     return undefined;
   }
 }
@@ -352,7 +354,8 @@ export async function aiConfigForTask(task: AiTask): Promise<AiRequestConfig | u
       return toConfig(def);
     }
     return undefined;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/aiProviders.ts:aiConfigForTask', caught);
     return undefined;
   }
 }

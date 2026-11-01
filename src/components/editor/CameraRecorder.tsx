@@ -12,6 +12,7 @@ import { ensureProxy } from '@/lib/proxy';
 import { useEditorStore } from '@/store/editorStore';
 import type { FilterId } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 const MAX_SEC = 60; // short-video felső korlát (auto-stop)
 const SPEEDS = [0.5, 1, 2, 3] as const;
@@ -102,20 +103,22 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
     const dir = projectMediaDir();
     try {
       dir.create();
-    } catch {
+    } catch (caught) {
+      logCaught('components/editor/CameraRecorder.tsx:saveAndAdd', caught);
       /* már létezik */
     }
     const target = new File(dir, `rec_${makeId('v')}.mp4`);
     try {
       new File(uri).copy(target);
-    } catch {
+    } catch (caught) {
+      logCaught('components/editor/CameraRecorder.tsx:saveAndAdd', caught);
       /* ha a másolás nem megy, a cache-uri marad */
     }
     const finalUri = target.exists ? target.uri : uri;
     const src = Math.max(0.5, Math.round(recorded * 10) / 10);
     // a sebesség a klip idővonal-hosszát rövidíti (2× → fele annyi idő), a
     // választott szűrő a klipre kerül és a renderben ég be
-    ensureProxy(finalUri).catch(() => {});
+    ensureProxy(finalUri).catch((caught) => { logCaught('components/editor/CameraRecorder.tsx:saveAndAdd', caught); });
     useEditorStore.getState().addClip(
       'video',
       {
@@ -158,7 +161,8 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
         await saveAndAdd(res.uri, elapsedRef.current);
         onClose();
       }
-    } catch {
+    } catch (caught) {
+      logCaught('components/editor/CameraRecorder.tsx:beginRecording', caught);
       clearTimer();
       setRecording(false);
     }

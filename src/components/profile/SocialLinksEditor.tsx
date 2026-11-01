@@ -24,6 +24,7 @@ import {
   socialPlatform,
   socialUrl,
 } from '@/lib/creatorProfile';
+import { logCaught } from '@/lib/logCaught';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 const ico = (name: string) => name as IoniconName;
@@ -51,7 +52,7 @@ export function SocialLinksEditor({ userId }: { userId: string }) {
           setLinks(rows);
         }
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('components/profile/SocialLinksEditor.tsx:SocialLinksEditor', caught); })
       .finally(() => {
         if (alive) {
           setLoading(false);
@@ -94,6 +95,7 @@ export function SocialLinksEditor({ userId }: { userId: string }) {
       setLinks(await listSocialLinks(userId));
       Alert.alert(t('profile.savedTitle'), t('socialLinks.saved'));
     } catch (e) {
+      logCaught('components/profile/SocialLinksEditor.tsx:save', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);

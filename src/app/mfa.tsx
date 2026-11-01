@@ -26,6 +26,7 @@ import {
 } from '@/lib/mfa';
 import { isValidOtp, sanitizeOtpInput } from '@/lib/phoneAuth';
 import { can } from '@/store/roleStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔐 Kétlépcsős hitelesítés (TOTP) beállítása/kezelése. Additív: a login-oldali
@@ -46,6 +47,7 @@ export default function MfaScreen() {
     try {
       setFactors(await listTotpFactors());
     } catch (e) {
+      logCaught('app/mfa.tsx:reload', e);
       setError(e instanceof Error ? e.message : String(e));
       setFactors([]);
     }
@@ -59,6 +61,7 @@ export default function MfaScreen() {
           setFactors(f);
         }
       } catch (e) {
+        logCaught('app/mfa.tsx:MfaScreen', e);
         if (active) {
           setError(e instanceof Error ? e.message : String(e));
           setFactors([]);
@@ -82,6 +85,7 @@ export default function MfaScreen() {
       setEnrollment(await enrollTotp());
       setCode('');
     } catch (e) {
+      logCaught('app/mfa.tsx:startEnroll', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -101,6 +105,7 @@ export default function MfaScreen() {
       setNotice(t('auth.mfaEnrolledOk'));
       await reload();
     } catch (e) {
+      logCaught('app/mfa.tsx:confirm', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -121,6 +126,7 @@ export default function MfaScreen() {
             setNotice(null);
             await reload();
           } catch (e) {
+            logCaught('app/mfa.tsx:remove', e);
             setError(e instanceof Error ? e.message : String(e));
           } finally {
             setBusy(false);

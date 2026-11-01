@@ -12,6 +12,7 @@ import {
   writeRecovery,
 } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** szünet az utolsó módosítás után, mielőtt mentünk */
 export const AUTOSAVE_MS = 800;
@@ -36,7 +37,7 @@ export function flushProjectSave(): Promise<boolean> {
       backupProjectToCloud(snap);
       return true;
     })
-    .catch(() => false);
+    .catch((caught) => { logCaught('hooks/useProjectAutosave.ts:flushProjectSave', caught); return false; });
 }
 
 /**
@@ -73,10 +74,11 @@ export function useProjectAutosave(projectId: string | undefined, enabled: boole
           setSaveFailed(false);
           setSaveAttempt(0);
           void clearRecovery(snap.id);
-          recordAutoVersion(snap).catch(() => {});
+          recordAutoVersion(snap).catch((caught) => { logCaught('hooks/useProjectAutosave.ts:timer', caught); });
           backupProjectToCloud(snap);
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('hooks/useProjectAutosave.ts:timer', caught);
           setSaveFailed(true);
           setSaveAttempt((n) => n + 1); // újrapróba; a recovery MARAD
         });

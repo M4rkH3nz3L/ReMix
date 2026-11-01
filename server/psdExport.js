@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🖼️ PSD-export mag (IMAGE 01.2): `ImageDoc` réteg-fa → Photoshop .psd (bináris),
 // RÉTEG-MEGŐRZÉSSEL (NEM flatten!). Ez a `psdImport.js` FORDÍTOTTJA.
 //
@@ -129,7 +130,8 @@ function pngToImageData(pngBuffer) {
   let png;
   try {
     png = PNG.sync.read(Buffer.isBuffer(pngBuffer) ? pngBuffer : Buffer.from(pngBuffer));
-  } catch {
+  } catch (caught) {
+    logCaught('psdExport.js:pngToImageData', caught);
     return null;
   }
   if (!png || !png.width || !png.height || !png.data) {
@@ -187,7 +189,8 @@ async function buildLayer(layer, ctx) {
     let png = null;
     try {
       png = await ctx.fetchLayerPng(srcRef);
-    } catch {
+    } catch (caught) {
+      logCaught('psdExport.js:buildLayer', caught);
       png = null; // a hívó dönthet szigorúbban; itt best-effort (a réteg kimarad)
     }
     const imageData = pngToImageData(png);
@@ -252,7 +255,8 @@ async function rasterLayer(layer, box, base, ctx) {
   let png = null;
   try {
     png = await ctx.rasterizeLayerPng(layer, box);
-  } catch {
+  } catch (caught) {
+    logCaught('psdExport.js:rasterLayer', caught);
     png = null;
   }
   const imageData = pngToImageData(png);

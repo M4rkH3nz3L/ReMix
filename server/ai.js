@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // AI-asszisztens (full-plan F3): a kliens rétegzett projekt-kontextust küld,
 // a modell egy szigorú parancs-whitelistből ad vissza műveleteket (structured
 // output), amit a kliens validál és a Command Bus-on hajt végre. Az AI sosem
@@ -161,7 +162,8 @@ async function localAvailable() {
     const body = await res.json();
     const models = (body.models ?? []).map((m) => m.name);
     localProbe = { at: Date.now(), ok: models.some((n) => n.startsWith(LOCAL_MODEL.split(':')[0])) };
-  } catch {
+  } catch (caught) {
+    logCaught('ai.js:localAvailable', caught);
     localProbe = { at: Date.now(), ok: false };
   }
   return localProbe.ok;
@@ -711,7 +713,8 @@ async function probeProvider(cfg) {
   try {
     const res = await fetch(`${base}/models`, { headers, redirect: 'error', signal: controller.signal });
     return res.ok;
-  } catch {
+  } catch (caught) {
+    logCaught('ai.js:probeProvider', caught);
     return false;
   } finally {
     clearTimeout(timer);

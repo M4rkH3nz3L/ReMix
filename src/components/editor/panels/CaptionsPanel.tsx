@@ -30,6 +30,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { TextClip, TextStylePreset, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** feliratonkénti hossz-korlátok (mp) */
 const MIN_CAPTION = 1;
@@ -644,6 +645,7 @@ export function CaptionsPanel() {
             setAiStatus(t('panels.captions.startingStatus'));
             autoCaptions()
               .catch((err: Error) => {
+              logCaught('components/editor/panels/CaptionsPanel.tsx:CaptionsPanel', err);
                 if (isProRequiredError(err)) {
                   usePaywall.getState().open(err.capability);
                 } else {
@@ -759,7 +761,7 @@ export function CaptionsPanel() {
           icon="document-text-outline"
           label={t('panels.captions.importSrtButton')}
           onPress={() => {
-            importSrt().catch(() => Alert.alert(t('common.error'), t('panels.captions.srtImportError')));
+            importSrt().catch((caught) => { logCaught('components/editor/panels/CaptionsPanel.tsx:CaptionsPanel', caught); return Alert.alert(t('common.error'), t('panels.captions.srtImportError')); });
           }}
         />
         <Text style={styles.note}>

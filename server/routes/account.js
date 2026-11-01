@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🗑️ Account route (GDPR vegleges torles / hard-erase).
 // Domain-router (01-api-architecture §01.1). SZO SZERINT az index.js-bol; env-kapuzott.
 
@@ -56,6 +57,7 @@ router.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async
         }
       }
     } catch (e) {
+      logCaught('routes/account.js', e);
       console.warn('[erase] storage-purge részleges:', e.message);
     }
     // 3) AUTH-felhasználó törlése → cascade a DB-ben (profiles/posts/…)
@@ -66,6 +68,7 @@ router.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async
     securityEvent('account.erased', { actor: uid, result: 'ok', meta: { purgedObjects: purged } });
     res.json({ erased: true, purgedObjects: purged });
   } catch (e) {
+    logCaught('routes/account.js', e);
     securityEvent('account.erase_failed', { actor: uid, result: 'error', meta: { error: e.message } });
     res.status(500).json({ error: e.message });
   }

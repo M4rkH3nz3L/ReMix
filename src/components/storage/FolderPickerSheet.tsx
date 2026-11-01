@@ -9,6 +9,7 @@ import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { type StorageEntry, breadcrumbs, parentPath, sortEntries } from '@/lib/remixFiles';
 import { deviceList, remixList } from '@/lib/remixFilesClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📂 Cél-mappa választó az áthelyezéshez (ugyanazon a helyen belül). A mozgatott
@@ -38,7 +39,8 @@ export function FolderPickerSheet({
     try {
       const list = location === 'device' ? deviceList(path) : await remixList(path);
       setFolders(sortEntries(list.filter((e) => e.isFolder), 'name'));
-    } catch {
+    } catch (caught) {
+      logCaught('components/storage/FolderPickerSheet.tsx:load', caught);
       setFolders([]);
     } finally {
       setLoading(false);

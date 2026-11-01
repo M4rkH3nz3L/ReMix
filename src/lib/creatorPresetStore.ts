@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { CreatorPreset } from '@/lib/creatorPreset';
+import { logCaught } from '@/lib/logCaught';
 
 /** 🎨 Creator Preset-ek tárolása — app-szintű, projekteken átívelő (AsyncStorage). */
 
@@ -11,7 +12,8 @@ export async function loadCreatorPresets(): Promise<CreatorPreset[]> {
     const raw = await AsyncStorage.getItem(KEY);
     const arr = raw ? (JSON.parse(raw) as CreatorPreset[]) : [];
     return Array.isArray(arr) ? arr : [];
-  } catch {
+  } catch (caught) {
+    logCaught('lib/creatorPresetStore.ts:loadCreatorPresets', caught);
     return [];
   }
 }

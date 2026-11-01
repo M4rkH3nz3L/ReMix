@@ -11,6 +11,7 @@ import { remixAnalytics } from '@/lib/creatorAnalytics';
 import { currentUserId, getChannel } from '@/lib/feed';
 import { creatorTotals, type CreatorTotals } from '@/lib/promotion';
 import type { FeedPost } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -51,7 +52,8 @@ export default function DashboardScreen() {
             setTotals(tot);
           }
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('app/dashboard.tsx:timer', caught);
           if (guard.isCurrent(token)) {
             setPosts([]);
             setTotals(null);

@@ -45,6 +45,7 @@ import {
   useTransfers,
 } from '@/lib/transferQueue';
 import type { ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** `external` = egy bekötött külső forrás (CSAK olvasható; a `external` állapot mondja meg, melyik) */
 export type BrowsableLocation = 'device' | 'remix' | 'external';
@@ -100,23 +101,24 @@ export function useStorageBrowser() {
   // a setState mindig promise-callbackben (halasztva) → effektből is hívható
   const refreshStats = useCallback(() => {
     void fetchStorageUsage()
-      .catch(() => null)
+      .catch((caught) => { logCaught('hooks/useStorageBrowser.ts:refreshStats', caught); return null; })
       .then(setUsage);
     void Promise.resolve()
       .then(() => ({ used: deviceUsedBytes(), ...deviceSpace() }))
       .then(setDevice)
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('hooks/useStorageBrowser.ts:refreshStats', caught);
         // eszköz-statisztika best-effort
       });
     void fetchConnectedProviders()
       .then(setProviders)
-      .catch(() => setProviders([]));
+      .catch((caught) => { logCaught('hooks/useStorageBrowser.ts:refreshStats', caught); return setProviders([]); });
     void remixTrashList()
       .then((r) => setTrash({ count: r.items.length, bytes: r.bytes }))
-      .catch(() => setTrash(null));
+      .catch((caught) => { logCaught('hooks/useStorageBrowser.ts:refreshStats', caught); return setTrash(null); });
     void listProjects()
       .then((metas) => setProjects(new Map(metas.filter((m) => m.folder).map((m) => [m.folder as string, m]))))
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useStorageBrowser.ts:refreshStats', caught); });
   }, []);
 
   useEffect(() => {
@@ -140,6 +142,7 @@ export function useStorageBrowser() {
             : await remixList(path)
       );
     } catch (err) {
+      logCaught('hooks/useStorageBrowser.ts:reload', err);
       setEntries([]);
       setError(errorText(err));
     } finally {
@@ -220,7 +223,7 @@ export function useStorageBrowser() {
         const owner = projectAt(p);
         let used: Set<string> = new Set();
         if (location === 'device' && owner && p !== projectFolderPath(owner.folder as string)) {
-          const full = await loadProject(owner.id).catch(() => null);
+          const full = await loadProject(owner.id).catch((caught) => { logCaught('hooks/useStorageBrowser.ts:blockedReason', caught); return null; });
           used = full ? referencedDevicePaths(JSON.stringify(full)) : new Set();
         }
         const prot = protectionOf(p, folders, used);
@@ -276,6 +279,7 @@ export function useStorageBrowser() {
       setDialog(null);
       await reload();
     } catch (err) {
+      logCaught('hooks/useStorageBrowser.ts:submitDialog', err);
       Alert.alert(t('storage.title'), errorText(err));
     }
   }, [dialog, location, path, reload, t, errorText, blockedReason]);
@@ -307,6 +311,7 @@ export function useStorageBrowser() {
                   await remixDelete(paths);
                 }
               } catch (err) {
+                logCaught('hooks/useStorageBrowser.ts:confirmDelete', err);
                 Alert.alert(t('storage.title'), errorText(err));
               }
               setSelected(new Set());
@@ -340,6 +345,7 @@ export function useStorageBrowser() {
           }
         }
       } catch (err) {
+        logCaught('hooks/useStorageBrowser.ts:moveTo', err);
         Alert.alert(t('storage.title'), errorText(err));
       }
       setSelected(new Set());
@@ -409,6 +415,7 @@ export function useStorageBrowser() {
       }
       enqueue(picked.result.map((f) => ({ direction: 'up' as const, name: f.name, source: f.uri, targetDir: path })));
     } catch (err) {
+      logCaught('hooks/useStorageBrowser.ts:addFiles', err);
       Alert.alert(t('storage.title'), errorText(err));
     }
   }, [location, path, enqueue, reload, refreshStats, t, errorText]);
@@ -418,6 +425,7 @@ export function useStorageBrowser() {
       try {
         await Sharing.shareAsync(e.uri ?? deviceUri(e.path));
       } catch (err) {
+        logCaught('hooks/useStorageBrowser.ts:share', err);
         Alert.alert(t('storage.title'), errorText(err));
       }
     },

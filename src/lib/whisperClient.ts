@@ -11,6 +11,7 @@ import {
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import type { TranscriptLine } from '@/lib/transcripts';
 import { bytesToBase64, floatPcmToBytes, makeTestTone, WHISPER_SAMPLE_RATE } from '@/lib/wav';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎙️ On-device Whisper kliens (local-ai Fázis A) — a whisper.rn natív motor
@@ -53,7 +54,8 @@ export async function releaseWhisper(): Promise<void> {
   if (current) {
     try {
       await current.ctx.release();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/whisperClient.ts:releaseWhisper', caught);
       // a natív oldal már elengedhette — nem hiba
     }
   }
@@ -83,7 +85,8 @@ async function getContext(modelId: string): Promise<WhisperContextLike | null> {
     active = { modelId, ctx };
     markModelUsed(modelId);
     return ctx;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/whisperClient.ts:getContext', caught);
     return null;
   }
 }
@@ -130,7 +133,8 @@ export async function transcribeWavOnDevice(
       speech: lines.map((l) => ({ start: l.start, end: l.end })),
       language: result.language,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/whisperClient.ts:transcribeWavOnDevice', caught);
     return null;
   }
 }
@@ -188,7 +192,8 @@ export async function transcribeMediaOnDevice(
       speech: lines.map((l) => ({ start: l.start, end: l.end })),
       language: result.language,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/whisperClient.ts:transcribeMediaOnDevice', caught);
     return null;
   }
 }
@@ -222,7 +227,8 @@ export async function runWhisperSmokeTest(modelId: string): Promise<boolean> {
       recordModelRtf(modelId, (Date.now() - started) / 1000 / SAMPLE_SEC);
     }
     return ok;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/whisperClient.ts:runWhisperSmokeTest', caught);
     setModelSmokeResult(modelId, 'fail');
     return false;
   }

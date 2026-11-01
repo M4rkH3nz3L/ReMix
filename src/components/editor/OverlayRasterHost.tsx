@@ -9,6 +9,7 @@ import {
   type OverlayRasterRequest,
 } from '@/lib/overlayRasterBridge';
 import type { TextClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📸 Overlay-raszter host: a szöveg/felirat-klipeket a TÉNYLEGES preview-
@@ -96,7 +97,7 @@ export function OverlayRasterHost() {
       job.resolve(out);
     };
     run()
-      .catch((e: unknown) => job.reject(e instanceof Error ? e : new Error(String(e))))
+      .catch((e: unknown) => { logCaught('components/editor/OverlayRasterHost.tsx:OverlayRasterHost', e); return job.reject(e instanceof Error ? e : new Error(String(e))); })
       .finally(() => {
         busy.current = false;
         setJob(null);

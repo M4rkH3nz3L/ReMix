@@ -39,6 +39,7 @@ import {
 import { listProjects, loadProject } from '@/lib/storage';
 import { visibleProjects } from '@/lib/projectKinds';
 import type { ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const KIND_EMOJI: Record<ShopKind, string> = {
   template: '🎬',
@@ -74,7 +75,7 @@ export default function ShopScreen() {
   const [pubPrice, setPubPrice] = useState('50');
 
   const refreshBalance = useCallback(() => {
-    creditBalance().then(setBalance).catch(() => {});
+    creditBalance().then(setBalance).catch((caught) => { logCaught('app/shop.tsx:refreshBalance', caught); });
   }, []);
 
   const load = useCallback(() => {
@@ -85,7 +86,7 @@ export default function ShopScreen() {
           setItems(rows);
           setLoadError(false);
         })
-        .catch(() => setLoadError(true))
+        .catch((caught) => { logCaught('app/shop.tsx:load', caught); return setLoadError(true); })
         .finally(() => setLoading(false));
     } else if (tab === 'purchases') {
       myPurchases()
@@ -93,7 +94,7 @@ export default function ShopScreen() {
           setPurchases(rows);
           setLoadError(false);
         })
-        .catch(() => setLoadError(true))
+        .catch((caught) => { logCaught('app/shop.tsx:load', caught); return setLoadError(true); })
         .finally(() => setLoading(false));
     } else {
       myListings()
@@ -101,7 +102,7 @@ export default function ShopScreen() {
           setListings(rows);
           setLoadError(false);
         })
-        .catch(() => setLoadError(true))
+        .catch((caught) => { logCaught('app/shop.tsx:load', caught); return setLoadError(true); })
         .finally(() => setLoading(false));
     }
   }, [tab, kind, refreshBalance]);
@@ -138,7 +139,7 @@ export default function ShopScreen() {
         }
       })
       .catch((e: unknown) =>
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+        { logCaught('app/shop.tsx:openInEditor', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
       );
   };
 
@@ -156,6 +157,7 @@ export default function ShopScreen() {
         ]);
       })
       .catch((e: unknown) => {
+      logCaught('app/shop.tsx:onBuy', e);
         if (e instanceof InsufficientCreditsError) {
           Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
             { text: t('common.cancel'), style: 'cancel' },
@@ -179,7 +181,7 @@ export default function ShopScreen() {
           openInEditor(payload);
         }
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('app/shop.tsx:onUseOwned', caught); })
       .finally(() => setBusy(false));
   };
 
@@ -192,7 +194,7 @@ export default function ShopScreen() {
         setPubTitle(ps[0]?.name ?? '');
         setPublishOpen(true);
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/shop.tsx:openPublish', caught); });
   };
 
   const doPublish = () => {
@@ -217,7 +219,7 @@ export default function ShopScreen() {
         load();
       })
       .catch((e: unknown) =>
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+        { logCaught('app/shop.tsx:doPublish', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
       )
       .finally(() => setBusy(false));
   };
@@ -228,7 +230,7 @@ export default function ShopScreen() {
       {
         text: t('shop.unpublish'),
         style: 'destructive',
-        onPress: () => unpublishItem(item.id).then(load).catch(() => {}),
+        onPress: () => unpublishItem(item.id).then(load).catch((caught) => { logCaught('app/shop.tsx:confirmUnpublish', caught); }),
       },
     ]);
   };

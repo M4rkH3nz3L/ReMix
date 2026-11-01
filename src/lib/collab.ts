@@ -7,6 +7,7 @@ import { migrateProject } from '@/lib/projectUtils';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 👥 Projekt-kollaboráció kliens-rétege — tagok + szerepkörök.
@@ -99,7 +100,8 @@ export async function ensureShared(project: Project): Promise<void> {
   try {
     const { data } = await sb.from('profiles').select('full_name').eq('id', uid).maybeSingle();
     displayName = (data?.full_name as string | undefined) ?? null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/collab.ts:ensureShared', caught);
     // a profil-név opcionális
   }
   const { error } = await sb.from('project_members').upsert(
@@ -199,7 +201,7 @@ export async function inviteMember(input: {
     body: JSON.stringify({ ...input, invitedBy: currentUserId() }),
   });
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
+    const msg = await res.text().catch((caught) => { logCaught('lib/collab.ts:inviteMember', caught); return ''; });
     throw new Error(msg || `Meghívás sikertelen (${res.status}).`);
   }
   const result = (await res.json()) as InviteResult;
@@ -277,7 +279,8 @@ export async function loadProjectRoles(ownerId: string, projectId: string): Prom
       .eq('project_id', projectId)
       .maybeSingle();
     return normalizeProjectRoles(data?.roles);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/collab.ts:loadProjectRoles', caught);
     return normalizeProjectRoles(null);
   }
 }

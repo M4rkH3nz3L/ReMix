@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🔧 DEV↔PROD config-guardok — TISZTA függvények (nincs `__DEV__` global és nincs
  * `process.env` beolvasás itt; a hívó adja át `isDev`-et és a nyers env-értéket).
@@ -21,7 +23,8 @@ export function isLoopbackHost(u: string | undefined | null): boolean {
     // IPv6 zárójelek le (`[::1]` → `::1`)
     const h = new URL(u).hostname.replace(/^\[|\]$/g, '');
     return h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0' || h === '::1';
-  } catch {
+  } catch (caught) {
+    logCaught('lib/envConfig.ts:isLoopbackHost', caught);
     return false;
   }
 }
@@ -55,7 +58,8 @@ export function resolvePublicUrl(opts: {
       return u.toString().replace(/\/$/, '');
     }
     return raw;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/envConfig.ts:resolvePublicUrl', caught);
     return raw;
   }
 }

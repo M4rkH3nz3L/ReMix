@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 📚 Media-tar + zene route-ok (/library, /music + fajl-serve).
 // Domain-router (01-api-architecture §01.1). SZO SZERINT az index.js-bol; a 30 mp-es
 // cache-frissites a modul sajat, unref-elt intervallumaban (teszt-importkor artalmatlan).
@@ -24,7 +25,7 @@ router.get('/library', (_req, res) => {
         })),
       });
     })
-    .catch(() => res.status(500).json({ error: 'A médiatár nem olvasható.' }));
+    .catch((caught) => { logCaught('routes/library.js', caught); return res.status(500).json({ error: 'A médiatár nem olvasható.' }); });
 });
 
 router.get('/library/:id/file', (req, res) => {
@@ -38,7 +39,7 @@ router.get('/library/:id/file', (req, res) => {
       }
       res.sendFile(item.file);
     })
-    .catch(() => res.status(500).json({ error: 'A médiatár nem olvasható.' }));
+    .catch((caught) => { logCaught('routes/library.js', caught); return res.status(500).json({ error: 'A médiatár nem olvasható.' }); });
 });
 
 // hang-könyvtár: generált SFX-ek + a server/music mappa fájljai
@@ -60,7 +61,7 @@ router.get('/music', (_req, res) => {
         })),
       });
     })
-    .catch(() => res.status(500).json({ error: 'A könyvtár nem olvasható.' }));
+    .catch((caught) => { logCaught('routes/library.js', caught); return res.status(500).json({ error: 'A könyvtár nem olvasható.' }); });
 });
 
 router.get('/music/:id/file', (req, res) => {
@@ -74,7 +75,7 @@ router.get('/music/:id/file', (req, res) => {
       }
       res.sendFile(item.file);
     })
-    .catch(() => res.status(500).json({ error: 'A könyvtár nem olvasható.' }));
+    .catch((caught) => { logCaught('routes/library.js', caught); return res.status(500).json({ error: 'A könyvtár nem olvasható.' }); });
 });
 
 // a music/library mappa valtozhat futas kozben — a cache 30 mp-enkent frissul

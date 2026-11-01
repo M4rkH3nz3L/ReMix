@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎙️ Voice Studio ELŐNÉZETI PROXY.
@@ -116,7 +117,8 @@ export function ensureVoiceProxy(
       target.write(new Uint8Array(bytes));
       memory.set(key, target.uri);
       return target.uri;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/voiceProxy.ts:task', caught);
       memory.set(key, null);
       return null;
     } finally {

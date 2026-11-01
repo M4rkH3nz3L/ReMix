@@ -5,6 +5,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { palette } from '@/constants/editor';
 import { getWaveform, type WaveformData } from '@/lib/waveform';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎧 Közös hang-stúdió primitívek — a `HangStudio` bevált vezérlőiből kiemelve,
@@ -31,7 +32,7 @@ export function useWaveform(uri: string | null): WaveformData | null {
           setWave({ uri, data: w });
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/studio/audio/primitives.tsx:useWaveform', caught); });
     return () => {
       alive = false;
     };

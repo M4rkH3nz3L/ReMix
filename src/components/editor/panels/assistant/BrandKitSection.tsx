@@ -21,6 +21,7 @@ import { loadBrandKit, saveBrandKit } from '@/lib/brandStore';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎨 Brand Kit + 🎬 Intro/outro: stílusprofil mentése/alkalmazása + a mentett
@@ -240,7 +241,7 @@ export function BrandKitSection() {
         label={t('panels.assistant.insertIntroOutroBtn')}
         onPress={() => {
           applyBrandSegments().catch((err: Error) =>
-            Alert.alert(t('panels.assistant.introOutroTitle'), err.message)
+            { logCaught('components/editor/panels/assistant/BrandKitSection.tsx:BrandKitSection', err); return Alert.alert(t('panels.assistant.introOutroTitle'), err.message); }
           );
         }}
       />

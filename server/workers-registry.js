@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🖥️ Render-WORKER-regiszter (Redis). Minden futó render-worker ide „jelentkezik
 // be", és pár másodpercenként heartbeat-el: mit csinál ÉPPEN (melyik projektet,
 // melyik fázisban), mennyire szabad. A „Sor" (schedules) nézet ebből mutatja
@@ -49,7 +50,8 @@ async function listWorkers() {
     if (vals[i]) {
       try {
         alive.push(JSON.parse(vals[i]));
-      } catch {
+      } catch (caught) {
+        logCaught('workers-registry.js:listWorkers', caught);
         dead.push(id);
       }
     } else {

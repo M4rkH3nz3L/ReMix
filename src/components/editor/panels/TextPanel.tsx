@@ -14,6 +14,7 @@ import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { TextClip, TextStyle } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 export function TextPanel({ clip }: { clip: TextClip }) {
   const { t: tr } = useTranslation();
@@ -802,7 +803,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
               label={trackStatus ?? tr('panels.text.trackFromPlayhead')}
               onPress={() => {
                 startTracking().catch((err: Error) =>
-                  Alert.alert(tr('panels.text.trackTitle'), err.message)
+                  { logCaught('components/editor/panels/TextPanel.tsx:TextPanel', err); return Alert.alert(tr('panels.text.trackTitle'), err.message); }
                 );
               }}
             />
@@ -816,7 +817,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
                   setPickHint(null);
                   useEditorStore.getState().setPanel('text');
                   startTracking(point).catch((err: Error) =>
-                    Alert.alert(tr('panels.text.trackTitle'), err.message)
+                    { logCaught('components/editor/panels/TextPanel.tsx:TextPanel', err); return Alert.alert(tr('panels.text.trackTitle'), err.message); }
                   );
                 });
               }}
@@ -826,7 +827,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
               label={trackStatus ?? tr('panels.text.trackFace')}
               onPress={() => {
                 trackFace().catch((err: Error) =>
-                  Alert.alert(tr('panels.text.faceTrackTitle'), err.message)
+                  { logCaught('components/editor/panels/TextPanel.tsx:TextPanel', err); return Alert.alert(tr('panels.text.faceTrackTitle'), err.message); }
                 );
               }}
             />

@@ -8,6 +8,7 @@ import { captureRef } from 'react-native-view-shot';
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
 import { SelectionBar } from '@/components/studio/image/body/SelectionBar';
+import { logCaught } from '@/lib/logCaught';
 import { layerHistogram } from '@/components/studio/image/HistogramView';
 import { HslSheet } from '@/components/studio/image/HslSheet';
 import { computeHistogram, histogramShift } from '@/lib/histogram';
@@ -1156,6 +1157,14 @@ export async function runImageSmoke(
   }
   if (phase === 'color') {
     await step('color', () => smokeColor(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'logs') {
+    await step('logs', async () => {
+      // egyedi üzenetű hiba, hogy a szerveren egyértelműen megtalálható legyen
+      logCaught('lib/imageSmoke.tsx:logs', new Error(`smoke-naplo-proba ${Platform.OS}`));
+      await sleep(4000);
+    });
     return;
   }
   if (phase === 'net') {

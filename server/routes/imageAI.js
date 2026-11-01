@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🖼️🤖 Kép-AI route-ok (arc-detektálás / shot-score / ég-csere / upscale).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből.
@@ -43,6 +44,7 @@ router.post('/faces', ...proOnly, upload.any(), mediaGuard('image'), (req, res) 
       res.json(result);
     })
     .catch((err) => {
+    logCaught('routes/imageAI.js', err);
       cleanup();
       console.error('faces hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -62,7 +64,8 @@ router.post('/shotscore', requireAuth, rateLimit('analysis'), upload.any(), medi
   let times;
   try {
     times = JSON.parse(req.body.times ?? '[]');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/imageAI.js', caught);
     times = [];
   }
   if (!Array.isArray(times) || times.length === 0) {
@@ -76,6 +79,7 @@ router.post('/shotscore', requireAuth, rateLimit('analysis'), upload.any(), medi
       res.json({ shots });
     })
     .catch((err) => {
+    logCaught('routes/imageAI.js', err);
       cleanup();
       console.error('shotscore hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -107,6 +111,7 @@ router.post('/sky', ...proOnly, upload.any(), mediaGuard('image'), (req, res) =>
       res.json({ cached, pngBase64 });
     })
     .catch((err) => {
+    logCaught('routes/imageAI.js', err);
       cleanup();
       console.error('sky hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -131,6 +136,7 @@ router.post('/upscale', ...proOnly, upload.any(), mediaGuard('image'), (req, res
       res.json({ width, height, cached, pngBase64 });
     })
     .catch((err) => {
+    logCaught('routes/imageAI.js', err);
       cleanup();
       console.error('upscale hiba:', err.message);
       res.status(500).json({ error: err.message });

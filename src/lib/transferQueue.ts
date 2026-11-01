@@ -12,6 +12,7 @@ import {
   remixUpload,
   remixUploadChunked,
 } from '@/lib/remixFilesClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔁 A Tárhelyem átviteli sora (Sync Center csírája) — KÉPERNYŐ-FÜGGETLEN modul:
@@ -62,7 +63,7 @@ function persist(): void {
     persistTimer = null;
     const done = items.filter((x) => x.status === 'done').slice(-KEEP_DONE);
     const keep = items.filter((x) => x.status !== 'done' || done.includes(x));
-    void AsyncStorage.setItem(KEY, JSON.stringify(keep.map((x) => ({ ...x, progress: 0 })))).catch(() => {});
+    void AsyncStorage.setItem(KEY, JSON.stringify(keep.map((x) => ({ ...x, progress: 0 })))).catch((caught) => { logCaught('lib/transferQueue.ts:persist', caught); });
   }, 300);
 }
 
@@ -93,7 +94,8 @@ export async function hydrateTransfers(): Promise<void> {
     // a félbemaradt elem újra várakozik (megszakítás utáni folytatás)
     const restored = saved.map((x) => (x.status === 'active' ? { ...x, status: 'pending' as const, progress: 0 } : x));
     set([...restored, ...items.filter((x) => !restored.some((r) => r.id === x.id))], false);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/transferQueue.ts:hydrateTransfers', caught);
     // sérült tár → üres sor
   }
   pump();
@@ -111,7 +113,8 @@ async function uploadOne(item: Transfer, onProgress: (f: number) => void): Promi
   let size = 0;
   try {
     size = new File(item.source).size ?? 0;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/transferQueue.ts:uploadOne', caught);
     size = 0;
   }
   if (size < CHUNKED_UPLOAD_MIN_BYTES && !item.uploadId) {
@@ -146,7 +149,7 @@ function pump(): void {
         : remixDownloadToDevice(next.source, next.targetDir, onProgress).then(() => false);
   job
     .then((deduplicated) => patch(next.id, { status: 'done', progress: 1, deduplicated }))
-    .catch((err) => patch(next.id, { status: 'failed', error: errorText(err) }))
+    .catch((err) => { logCaught('lib/transferQueue.ts:pump', err); return patch(next.id, { status: 'failed', error: errorText(err) }); })
     .finally(() => {
       running = false;
       doneListeners.forEach((l) => l());

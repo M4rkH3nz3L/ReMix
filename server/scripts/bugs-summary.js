@@ -45,6 +45,11 @@ for (const b of bugs) {
     .join(' ');
   const flag = b.status === 'regressed' ? '🔁' : b.status === 'fixed' ? '✅' : '🐞';
   console.log(`${flag} ${String(b.count).padStart(4)}×  ${b.title}`);
+  const last = (b.occurrences || []).slice(-1)[0];
+  const { where, errorClass } = last?.extra || {};
+  if (where) {
+    console.log(`        📍 ${where}${errorClass ? ` · ${errorClass}` : ''}`);
+  }
   console.log(`        ${b.file} · utoljára ${b.lastSeen} · ${platforms}`);
 }
 console.log(`\n${bugs.length} hiba · mappa: ${dir}`);

@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Storage-gateway távoli forrásokhoz (full-plan F2, CUSTOM-STORAGE §18-19):
 // a kliens sosem látja a hitelesítést — a worker listáz és proxyz. Új
 // forrás-típus = új connector ebben a fájlban; a források a
@@ -29,7 +30,8 @@ function loadSources() {
     const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((s) => s.id && s.type) : [];
-  } catch {
+  } catch (caught) {
+    logCaught('storage.js:loadSources', caught);
     return [];
   }
 }
@@ -207,7 +209,8 @@ function s3Client(source) {
   try {
     const { NodeHttpHandler } = require('@smithy/node-http-handler');
     requestHandler = new NodeHttpHandler({ connectionTimeout: 10000, socketTimeout: 60000 });
-  } catch {
+  } catch (caught) {
+    logCaught('storage.js:s3Client', caught);
     requestHandler = undefined;
   }
   const client = new S3Client({
@@ -288,7 +291,8 @@ async function davMkcol(source, rel) {
       headers: davAuthHeader(source),
       signal: AbortSignal.timeout(10000),
     });
-  } catch {
+  } catch (caught) {
+    logCaught('storage.js:davMkcol', caught);
     // ha már létezik / nem támogatott — a PUT úgyis eldönti
   }
 }

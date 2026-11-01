@@ -21,6 +21,7 @@ import {
   type SearchResult,
   type SearchScope,
 } from '@/lib/universalSearch';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ⌘K — Universal Search / Command Palette. A [universalSearch](@/lib/universalSearch)
@@ -68,7 +69,7 @@ export default function CommandPaletteScreen() {
     let alive = true;
     (async () => {
       // 🔒 LiDAR nélkül a 3D-projektek a ⌘K-ban sem jelennek meg (3D-Studio.md §1.1)
-      const metas = visibleProjects(await listProjects().catch(() => []));
+      const metas = visibleProjects(await listProjects().catch((caught) => { logCaught('app/command.tsx:metas', caught); return []; }));
       const projectDocs: SearchDoc[] = metas.map((m) => ({
         id: m.id,
         scope: 'project',
@@ -81,7 +82,8 @@ export default function CommandPaletteScreen() {
       let wsDocs: SearchDoc[] = [];
       try {
         wsDocs = workspaceSearchDocs(await loadWorkspace());
-      } catch {
+      } catch (caught) {
+        logCaught('app/command.tsx:CommandPaletteScreen', caught);
         wsDocs = [];
       }
       if (alive) {

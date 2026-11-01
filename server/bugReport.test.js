@@ -151,3 +151,14 @@ describe('legalább-egyszer kézbesítés + pontos számláló', () => {
     expect(b.occurrences[1].repeat).toBe(7);
   });
 });
+
+describe('elkapott hibák csoportosítása', () => {
+  const base = { kind: 'handled', name: 'Error', message: 'x', stack: '' };
+  const { fingerprint: fp } = require('./lib/bugReport');
+  it('ugyanaz a hiba két helyről két külön bejegyzés', () => {
+    expect(fp({ ...base, extra: { where: 'a.ts' } })).not.toBe(fp({ ...base, extra: { where: 'b.ts' } }));
+  });
+  it('hely nélkül a régi ujjlenyomat marad, a régi fájlok nem duplázódnak', () => {
+    expect(fp(base)).toBe(fp({ ...base, extra: {} }));
+  });
+});

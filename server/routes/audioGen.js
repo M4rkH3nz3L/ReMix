@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🎚️ Hang-generáló route-ok (szintetizátor / dob-gép / sampler / spektrogram).
 //
 // Az ELSŐ domain-router (01-api-architecture §01.1): az index.js-ből SZÓ SZERINT
@@ -39,6 +40,7 @@ router.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, validate(sy
     res.setHeader('X-Duration-Sec', String(r.durationSec));
     res.sendFile(out);
   } catch (e) {
+    logCaught('routes/audioGen.js', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -61,6 +63,7 @@ router.post('/audio/spectrum', requireAuth, uploadAudio.any(), async (req, res) 
     await renderSpectrum(file.path, opts, out);
     res.sendFile(out);
   } catch (e) {
+    logCaught('routes/audioGen.js', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -75,7 +78,8 @@ router.post('/sampler', ...paidOnly, validateJsonField('steps', samplerSteps), u
   let steps = [];
   try {
     steps = JSON.parse(req.body?.steps ?? '[]');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/audioGen.js', caught);
     steps = [];
   }
   if (!Array.isArray(steps) || steps.length === 0) {
@@ -98,6 +102,7 @@ router.post('/sampler', ...paidOnly, validateJsonField('steps', samplerSteps), u
     res.setHeader('X-Duration-Sec', String(r.durationSec));
     res.sendFile(out);
   } catch (e) {
+    logCaught('routes/audioGen.js', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -119,6 +124,7 @@ router.post('/drums', express.json({ limit: '512kb' }), ...paidOnly, validate(dr
     res.setHeader('X-Duration-Sec', String(r.durationSec));
     res.sendFile(out);
   } catch (e) {
+    logCaught('routes/audioGen.js', e);
     res.status(500).json({ error: e.message });
   }
 });

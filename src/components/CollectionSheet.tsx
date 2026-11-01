@@ -23,6 +23,7 @@ import {
   removeFromCollection,
   type PostCollection,
 } from '@/lib/postCollections';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📁 Kollekció-választó — egy posztot mentünk mappá(k)ba (az élő `post_collections`
@@ -57,7 +58,8 @@ export function CollectionSheet({ postId, onClose }: { postId: string | null; on
             setMember(new Set(ids));
           }
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('components/CollectionSheet.tsx:timer', caught);
           if (guard.isCurrent(token)) {
             setCols([]);
             setMember(new Set());
@@ -88,7 +90,8 @@ export function CollectionSheet({ postId, onClose }: { postId: string | null; on
       return next;
     });
     const op = inIt ? removeFromCollection(c.id, postId) : addToCollection(c.id, postId);
-    op.catch(() => {
+    op.catch((caught) => {
+      logCaught('components/CollectionSheet.tsx:toggle', caught);
       setMember((prev) => {
         const next = new Set(prev);
         if (inIt) {
@@ -117,7 +120,7 @@ export function CollectionSheet({ postId, onClose }: { postId: string | null; on
         }
         return undefined;
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('components/CollectionSheet.tsx:onCreate', caught); })
       .finally(() => setBusy(false));
   };
 

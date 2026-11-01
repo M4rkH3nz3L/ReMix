@@ -1,6 +1,7 @@
 import { cloudBaseUrl } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎚️ Hang-analízis (AUDIO-MASTER Analyze) — a workeren az ffmpeg `loudnorm` mérő-
@@ -26,7 +27,7 @@ export async function analyzeAudio(uri: string): Promise<LoudnessStats> {
     body: form,
     headers: await workerAuthHeaders(),
   });
-  const body = (await res.json().catch(() => ({}))) as Partial<LoudnessStats> & { error?: string };
+  const body = (await res.json().catch((caught) => { logCaught('lib/audioAnalyze.ts:analyzeAudio', caught); return {}; })) as Partial<LoudnessStats> & { error?: string };
   if (!res.ok) {
     throw new Error(body.error || 'analyze_failed');
   }

@@ -3,6 +3,7 @@ import type { ComponentType, Ref } from 'react';
 import type { ViewProps } from 'react-native';
 
 import type { Remix3DNative } from '../../modules/remix-3d';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧊 A `remix-3d` natív modul JS-oldala (3D-Studio.md §5) — OPCIONÁLIS feloldás:
@@ -127,7 +128,8 @@ function optionalView<P>(name: string): ComponentType<P> | null {
   }
   try {
     return requireNativeView(name) as ComponentType<P>;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/remix3dNative.ts:optionalView', caught);
     return null;
   }
 }

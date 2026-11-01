@@ -7,6 +7,7 @@ import { fetchPixelColor } from '@/lib/colorClient';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🟢 Green screen (chroma key): preset/pipetta kulcs-szín + tolerancia, spill,
@@ -35,7 +36,7 @@ export function GreenScreenSection({ clip }: { clip: VideoClip | ImageClip }) {
             Alert.alert(t('panels.filter.sectionGreenScreen'), t('panels.filter.chromaPickFailed'));
           }
         })
-        .catch(() => {});
+        .catch((caught) => { logCaught('components/editor/panels/filter/GreenScreenSection.tsx:pickChromaColor', caught); });
     });
   };
 

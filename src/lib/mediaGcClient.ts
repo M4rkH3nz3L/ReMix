@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import type { MediaFileKey } from '@/lib/mediaGc';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧹 Projekt-média GC — FS-oldal: a tiszta terv ([mediaGc](./mediaGc.ts))
@@ -29,12 +30,14 @@ export function sweepAppMediaDirs(): number {
           try {
             entry.delete();
             deleted += 1;
-          } catch {
+          } catch (caught) {
+            logCaught('lib/mediaGcClient.ts:sweepAppMediaDirs', caught);
             // zárolt fájl — megy tovább
           }
         }
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaGcClient.ts:sweepAppMediaDirs', caught);
       // a mappa-hiba nem állítja meg a másik mappát
     }
   }
@@ -53,7 +56,8 @@ export function deleteMediaFiles(keys: readonly MediaFileKey[]): number {
         f.delete();
         deleted += 1;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaGcClient.ts:deleteMediaFiles', caught);
       // zárolt/hiányzó fájl — a többi törlése megy tovább
     }
   }

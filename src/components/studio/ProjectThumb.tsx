@@ -10,6 +10,7 @@ import { projectPreviewSource } from '@/lib/projectPreview';
 import { loadProject } from '@/lib/storage';
 import { getFilmstrip, snapThumbTime } from '@/lib/thumbnails';
 import type { ProjectKind } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** a projekt-fajta ikonja a lista-kártyákhoz (a videó a bélyegkép alá esik vissza) —
  *  MINDEN fajtára (a CreativeDocument-bővítésre is), a katalógusból származtatva. */
@@ -27,7 +28,8 @@ function localFileMissing(uri: string): boolean {
   if (!uri.startsWith('file://')) return false;
   try {
     return !new File(uri).exists;
-  } catch {
+  } catch (caught) {
+    logCaught('components/studio/ProjectThumb.tsx:localFileMissing', caught);
     return true;
   }
 }
@@ -69,7 +71,7 @@ export function ProjectThumb({
           setUri(thumb ?? null);
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/studio/ProjectThumb.tsx:ProjectThumb', caught); });
     return () => {
       alive = false;
     };

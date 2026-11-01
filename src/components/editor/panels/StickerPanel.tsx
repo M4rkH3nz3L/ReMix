@@ -22,6 +22,7 @@ import {
 import type { Sticker3DEntry } from '@/lib/stickers3d';
 import { useEditorStore } from '@/store/editorStore';
 import type { ParticlesPreset } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const PARTICLE_PRESETS: { id: ParticlesPreset }[] = [
   { id: 'confetti' },
@@ -284,8 +285,8 @@ export function StickerPanel() {
           <Pressable
             style={styles.shapeCell}
             onPress={() => {
-              addLogo().catch(() =>
-                Alert.alert(t('panels.sticker.logoName'), t('panels.sticker.logoLoadFailed'))
+              addLogo().catch((caught) =>
+                { logCaught('components/editor/panels/StickerPanel.tsx:StickerPanel', caught); return Alert.alert(t('panels.sticker.logoName'), t('panels.sticker.logoLoadFailed')); }
               );
             }}
           >

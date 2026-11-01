@@ -6,6 +6,7 @@ import { asRecord, str } from '@/lib/parseGuards';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 💳 Billing kliens-réteg — a VALÓS Pro-aktiválás.
@@ -41,7 +42,8 @@ function rc(): any | null {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('react-native-purchases');
     purchasesRef = mod?.default ?? mod;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/billing.ts:rc', caught);
     purchasesRef = null;
   }
   return purchasesRef;
@@ -84,9 +86,10 @@ export async function configureBilling(userId: string | null): Promise<void> {
     if (userId) {
       await Purchases.logIn(userId);
     } else {
-      await Purchases.logOut().catch(() => {});
+      await Purchases.logOut().catch((caught: unknown) => { logCaught('lib/billing.ts:configureBilling', caught); });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/billing.ts:configureBilling', caught);
     // best-effort; a valós vásárlás enélkül úgysem indul
   }
 }
@@ -181,7 +184,8 @@ export async function activateProDev(days = 30): Promise<boolean> {
       const data = asRecord(await res.json());
       useEntitlement.getState().setTier('pro', str(data?.proUntil));
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/billing.ts:activateProDev', caught);
     // a worker nem elérhető — a dev-override marad az aktív Pro-forrás
   }
   return useEntitlement.getState().isPro();
@@ -200,5 +204,5 @@ export async function deactivateProDev(): Promise<void> {
     method: 'POST',
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ userId }),
-  }).catch(() => {});
+  }).catch((caught) => { logCaught('lib/billing.ts:deactivateProDev', caught); });
 }

@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🎛️ Editor-analízis route-ok (jelenet/beat/követés/vízió/thumbnail/reframe/csend).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből —
@@ -98,6 +99,7 @@ router.post('/beats', requireAuth, rateLimit('analysis'), upload.any(), (req, re
       res.json(grid);
     })
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       cleanup();
       // hang nélküli / dekódolhatatlan fájl — üres rács, a kliens jelzi
       console.warn('Beat-analízis hiba:', err.message);
@@ -131,6 +133,7 @@ router.post('/track', ...proOnly, upload.any(), (req, res) => {
       res.json(result);
     })
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       cleanup();
       console.warn('Követés hiba:', err.message);
       res.status(422).json({ error: err.message });
@@ -153,7 +156,8 @@ router.post('/vision/index', requireAuth, rateLimit('analysis'), upload.any(), (
   let times;
   try {
     times = JSON.parse(req.body.times ?? '[]');
-  } catch {
+  } catch (caught) {
+    logCaught('routes/analysis.js', caught);
     times = [];
   }
   if (!Array.isArray(times) || times.length === 0) {
@@ -167,6 +171,7 @@ router.post('/vision/index', requireAuth, rateLimit('analysis'), upload.any(), (
       res.json({ entries });
     })
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       cleanup();
       console.warn('Vision-index hiba:', err.message);
       res.status(422).json({ error: err.message });
@@ -184,6 +189,7 @@ router.post('/vision/query', express.json({ limit: '1mb' }), requireAuth, rateLi
   queryScores(String(query), docs.slice(0, 200).map((d) => String(d).slice(0, 500)))
     .then((scores) => res.json({ scores }))
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       console.warn('Vision-query hiba:', err.message);
       res.status(422).json({ error: err.message });
     });
@@ -213,6 +219,7 @@ router.post('/thumbnails', requireAuth, rateLimit('analysis'), upload.any(), med
       res.json({ thumbs: out });
     })
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       cleanup();
       console.warn('Thumbnail hiba:', err.message);
       res.status(422).json({ error: err.message });
@@ -241,6 +248,7 @@ router.post('/reframe', ...proOnly, upload.any(), mediaGuard('video'), (req, res
       res.json(result);
     })
     .catch((err) => {
+    logCaught('routes/analysis.js', err);
       cleanup();
       console.warn('Reframe hiba:', err.message);
       res.status(422).json({ error: err.message });

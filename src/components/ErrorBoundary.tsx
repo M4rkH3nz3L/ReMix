@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { reportBug } from '@/lib/bugReporter';
+import { logCaught } from '@/lib/logCaught';
 
 interface Props {
   children: ReactNode;
@@ -42,7 +43,8 @@ export class ErrorBoundary extends Component<Props, State> {
     // képernyő így nem renderelődik újra azonnal ugyanazzal a hibával)
     try {
       router.replace('/');
-    } catch {
+    } catch (caught) {
+      logCaught('components/ErrorBoundary.tsx', caught);
       // ha a router még nem áll készen, a puszta reset is segít
     }
     this.setState({ error: null });

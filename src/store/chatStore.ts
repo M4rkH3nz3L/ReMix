@@ -13,6 +13,7 @@ import {
   type Conversation,
   type TypingChannel,
 } from '@/lib/chat';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 💬 Chat-store — az inbox (beszélgetés-lista + olvasatlan-szám) ÉS az éppen
@@ -88,7 +89,8 @@ export const useChat = create<ChatState>((set, get) => ({
     try {
       const list = await listConversations();
       set({ conversations: list, unreadTotal: unreadCount(list), inboxLoading: false });
-    } catch {
+    } catch (caught) {
+      logCaught('store/chatStore.ts:useChat', caught);
       set({ inboxLoading: false });
     }
   },
@@ -145,6 +147,7 @@ export const useChat = create<ChatState>((set, get) => ({
         typingClearTimer = setTimeout(() => set({ typingName: null }), 3500);
       });
     } catch (e) {
+      logCaught('store/chatStore.ts:useChat', e);
       set({ activeLoading: false, error: e instanceof Error ? e.message : 'Hiba' });
     }
   },

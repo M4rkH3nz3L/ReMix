@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 📝 Audit- és security-event napló (devs/tasks/remix/14).
 //
 // Strukturált, append-only napló a biztonság-releváns eseményekhez: ki / mit /
@@ -35,13 +36,15 @@ function formatAuditEntry(event, nowIso) {
 function write(line) {
   try {
     console.log(`[audit] ${line}`);
-  } catch {
+  } catch (caught) {
+    logCaught('security/auditLog.js:write', caught);
     /* ignore */
   }
   if (AUDIT_FILE) {
     try {
       fs.appendFileSync(AUDIT_FILE, line + '\n');
-    } catch {
+    } catch (caught) {
+      logCaught('security/auditLog.js:write', caught);
       /* best-effort */
     }
   }
@@ -51,7 +54,8 @@ function write(line) {
 function audit(event) {
   try {
     write(formatAuditEntry(event, new Date().toISOString()));
-  } catch {
+  } catch (caught) {
+    logCaught('security/auditLog.js:audit', caught);
     /* ignore */
   }
 }

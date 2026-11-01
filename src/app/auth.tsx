@@ -34,6 +34,7 @@ import {
 import { isSendablePhone, isValidOtp, maskPhone, sanitizeOtpInput } from '@/lib/phoneAuth';
 import { isUsernameAvailable } from '@/lib/profile';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 type Mode = 'signIn' | 'signUp';
 /** 📲 Regisztrációs csatorna: a fiók e-mailre VAGY telefonszámra jön létre. */
@@ -133,6 +134,7 @@ export default function AuthScreen() {
         setError(result.error);
       }
     } catch (e) {
+      logCaught('app/auth.tsx:submitOtp', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -154,6 +156,7 @@ export default function AuthScreen() {
         setOtpCode('');
       }
     } catch (e) {
+      logCaught('app/auth.tsx:resendOtp', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -176,6 +179,7 @@ export default function AuthScreen() {
         setNotice(t('auth.resendEmailSent'));
       }
     } catch (e) {
+      logCaught('app/auth.tsx:resendEmail', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -196,6 +200,7 @@ export default function AuthScreen() {
       }
       // siker: a guard reaktívan a projektekhez vált (mfaPending=false)
     } catch (e) {
+      logCaught('app/auth.tsx:submitMfa', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -239,6 +244,7 @@ export default function AuthScreen() {
       }
       // siker (session): a guard reaktívan a projektekhez vált, itt nincs teendő
     } catch (e) {
+      logCaught('app/auth.tsx:submit', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);

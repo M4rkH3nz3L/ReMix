@@ -11,6 +11,7 @@ import { mapCuesToTimeline, parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 import type { Project, VideoClip } from '@/types/project';
 import { ANALYSIS_CACHE_LIMIT, LruCache } from '@/lib/lruCache';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Idővonal-átirat az AI-kontextushoz (full-plan F3, szemantikus index): a
@@ -42,7 +43,7 @@ async function transcribeUriRouted(uri: string, durationSec: number): Promise<Sr
     if (!modelId) {
       return null;
     }
-    const local = await transcribeMediaOnDevice(uri, { modelId }).catch(() => null);
+    const local = await transcribeMediaOnDevice(uri, { modelId }).catch((caught) => { logCaught('lib/transcripts.ts:viaDevice', caught); return null; });
     return local && local.lines.length > 0
       ? local.lines.map((l) => ({ start: l.start, end: l.end, text: l.text }))
       : null;
@@ -115,7 +116,8 @@ export async function getProjectWordCues(
       const cues = parseSrt(await transcribeToSrt(uri, 'word'));
       wordCueCache.set(uri, cues);
       cuesByUri.set(uri, cues);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/transcripts.ts:getProjectWordCues', caught);
       // nincs worker / Whisper / hang — a többi fájllal megyünk tovább
     }
   }
@@ -177,7 +179,8 @@ export async function getTimelineTranscript(
       const cues = await transcribeUriRouted(uri, durationSec);
       cueCache.set(uri, cues);
       cuesByUri.set(uri, cues);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/transcripts.ts:getTimelineTranscript', caught);
       // se on-device modell, se worker / Whisper / hang — a többi fájllal megyünk tovább
     }
   }

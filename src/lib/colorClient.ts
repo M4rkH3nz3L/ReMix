@@ -8,6 +8,7 @@ import { ensureCloud } from '@/lib/backend';
 import { renderServerUrl } from '@/lib/render';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { ClipAdjust, GradeId } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎨 Color AI hálózati kliens: a worker /color/stats végpontja egy képkocka
@@ -28,7 +29,8 @@ export async function fetchColorStats(
     // 🛡️ §12.1: a válasz objektum-e + a kulcs-mező véges szám-e (null-body sem omlik)
     const body = asRecord(await res.json());
     return body && finiteNum(body.lumaMean) !== null ? (body as unknown as ColorStats) : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/colorClient.ts:fetchColorStats', caught);
     return null;
   }
 }
@@ -60,7 +62,8 @@ export async function fetchPixelColor(
     }
     const body = asRecord(await res.json());
     return str(body?.color);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/colorClient.ts:fetchPixelColor', caught);
     return null;
   }
 }
@@ -94,7 +97,8 @@ export async function fetchScope(
     const body = asRecord(await res.json());
     const b64 = str(body?.pngBase64);
     return b64 ? `data:image/png;base64,${b64}` : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/colorClient.ts:fetchScope', caught);
     return null;
   }
 }
@@ -123,7 +127,8 @@ export async function exportLutCube(
     }
     const text = await res.text();
     return text.includes('LUT_3D_SIZE') ? text : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/colorClient.ts:exportLutCube', caught);
     return null;
   }
 }

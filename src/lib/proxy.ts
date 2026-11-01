@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Vágási proxy (full-plan F2): a nagy felbontású videókhoz a worker 720p-s
@@ -138,7 +139,8 @@ export function ensureProxy(uri: string): Promise<string | null> {
       const base = renderServerUrl();
       try {
         await fetchWithTimeout(`${base}/health`, 4000);
-      } catch {
+      } catch (caught) {
+        logCaught('lib/proxy.ts:task', caught);
         return null; // worker nem fut — az eredetivel megyünk tovább
       }
 
@@ -185,7 +187,8 @@ export function ensureProxy(uri: string): Promise<string | null> {
       } finally {
         releaseSlot();
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/proxy.ts:task', caught);
       return null;
     }
   })();
@@ -197,6 +200,6 @@ export function ensureProxy(uri: string): Promise<string | null> {
 /** A projekt összes videóklipjéhez elindítja a proxy-készítést (fire-and-forget). */
 export function prewarmProxies(uris: string[]): void {
   for (const uri of uris) {
-    ensureProxy(uri).catch(() => {});
+    ensureProxy(uri).catch((caught) => { logCaught('lib/proxy.ts:prewarmProxies', caught); });
   }
 }

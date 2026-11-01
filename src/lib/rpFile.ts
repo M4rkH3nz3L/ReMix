@@ -20,6 +20,7 @@ import {
 } from '@/lib/zipStore';
 import { autoRelink, findMissingMedia, type ImportResult } from '@/lib/videdFile';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📦 `.rp` (RemixProject) — a SZABVÁNYOS teljes-projekt csomag (export/import).
@@ -76,7 +77,8 @@ function collectMediaFiles(project: Project): { uri: string; key: string; file: 
         seenKeys.add(ks);
         out.push({ uri, key: ks, file });
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/rpFile.ts:collectMediaFiles', caught);
       // nem elérhető fájl — a manifest/fingerprint relink-tartaléka marad rá
     }
   }
@@ -105,7 +107,8 @@ export async function exportRpFile(
     if (out.exists) {
       out.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/rpFile.ts:exportRpFile', caught);
     // felülírjuk
   }
   out.create();

@@ -4,6 +4,7 @@ import { ensureCloud } from '@/lib/backend';
 import { projectDuration } from '@/lib/projectUtils';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎯 AI Rough Cut → shorts (Phase 3.3): hosszú anyagból több ÖNÁLLÓ short-jelölt
@@ -30,7 +31,7 @@ export async function findHighlights(project: Project): Promise<Highlight[] | nu
   if (duration <= MIN_LEN) {
     return null;
   }
-  const transcript = (await getTimelineTranscript(project).catch(() => null)) ?? [];
+  const transcript = (await getTimelineTranscript(project).catch((caught) => { logCaught('lib/highlightsClient.ts:findHighlights', caught); return null; })) ?? [];
   const { localHighlights } = await import('@/lib/localTasks');
   const localOrNull = (): Highlight[] | null => {
     const local = localHighlights(transcript, duration);
@@ -40,7 +41,8 @@ export async function findHighlights(project: Project): Promise<Highlight[] | nu
   let base: string;
   try {
     base = ensureCloud('autoEdit'); // Pro-kapu — a FELHŐ-útra; lokál út ingyenes
-  } catch {
+  } catch (caught) {
+    logCaught('lib/highlightsClient.ts:findHighlights', caught);
     return localOrNull();
   }
   const aiConfig = await aiConfigForTask('autoEdit');
@@ -64,7 +66,8 @@ export async function findHighlights(project: Project): Promise<Highlight[] | nu
       aiConfig,
     }),
     });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/highlightsClient.ts:findHighlights', caught);
     return localOrNull();
   }
   if (!res.ok) {

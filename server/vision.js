@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Smart Search vision-réteg (P0-8): jelenet-keyframe-ek címkézése a lokális
 // multimodális modellel (Ollama, alap: qwen2.5vl:7b — LOCAL_VISION_MODEL
 // env-vel cserélhető), és szemantikus keresés nomic-embed-text embeddingekkel.
@@ -33,7 +34,8 @@ async function visionAvailable() {
       at: Date.now(),
       ok: (body.models ?? []).some((m) => m.name.startsWith(VISION_MODEL.split(':')[0])),
     };
-  } catch {
+  } catch (caught) {
+    logCaught('vision.js:visionAvailable', caught);
     visionProbe = { at: Date.now(), ok: false };
   }
   return visionProbe.ok;
@@ -145,7 +147,8 @@ async function indexFrames(file, times, workDir) {
       try {
         out.push(JSON.parse(fs.readFileSync(cacheFile, 'utf8')));
         continue;
-      } catch {
+      } catch (caught) {
+        logCaught('vision.js:indexFrames', caught);
         // sérült cache — újracímkézzük
       }
     }

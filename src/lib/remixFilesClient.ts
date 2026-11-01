@@ -6,6 +6,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { listProviderFiles } from '@/lib/externalStorage';
 import { type StorageEntry, joinPath, parentPath } from '@/lib/remixFiles';
 import { workerAuthHeaders, workerJsonHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗂️ Tárhelyem — a két első hely kliense:
@@ -39,7 +40,8 @@ async function failFrom(res: { status: number; text: () => Promise<string> }): P
     const body = JSON.parse(await res.text()) as { error?: string; code?: string };
     code = body.code ?? (res.status === 507 ? 'quota_exceeded' : code);
     message = body.error ?? message;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/remixFilesClient.ts:failFrom', caught);
     // nem JSON → a státusz marad
   }
   throw new RemixFilesError(code, res.status, message);

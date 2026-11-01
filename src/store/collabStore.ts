@@ -7,6 +7,7 @@ import {
   type CollabRole,
   type ProjectMember,
 } from '@/lib/collab';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 👥 Kollaboráció-store — az ÉPPEN nézett projekt taglistája + a saját szerep,
@@ -57,6 +58,7 @@ export const useCollab = create<CollabState>((set, get) => ({
       const { members, role } = await load(ownerId, projectId);
       set({ members, role, loading: false });
     } catch (e) {
+      logCaught('store/collabStore.ts:useCollab', e);
       set({ loading: false, error: e instanceof Error ? e.message : String(e) });
     }
     // realtime: bármely tagsági változásnál újratöltés
@@ -74,6 +76,7 @@ export const useCollab = create<CollabState>((set, get) => ({
       const { members, role } = await load(ownerId, projectId);
       set({ members, role });
     } catch (e) {
+      logCaught('store/collabStore.ts:useCollab', e);
       set({ error: e instanceof Error ? e.message : String(e) });
     }
   },

@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🛡️ SSRF-védelem a BYOK (bring-your-own-key) AI-végpontokhoz.
 //
 // A felhasználó megadhatja a saját AI-szolgáltatója `baseUrl`-jét, és a worker
@@ -87,7 +88,8 @@ async function assertSafeAiBaseUrl(rawUrl) {
   let url;
   try {
     url = new URL(rawUrl);
-  } catch {
+  } catch (caught) {
+    logCaught('ssrf.js:assertSafeAiBaseUrl', caught);
     return { ok: false, error: 'Érvénytelen AI-cím (URL).' };
   }
 
@@ -127,6 +129,7 @@ async function assertSafeAiBaseUrl(rawUrl) {
       return { ok: false, error: `Az AI-cím belső hálózati címre mutat (${bad.address}).` };
     }
   } catch (err) {
+    logCaught('ssrf.js:assertSafeAiBaseUrl', err);
     return { ok: false, error: `Az AI-cím nem feloldható: ${err.message}` };
   }
 
@@ -148,7 +151,8 @@ async function assertSafeUrl(rawUrl, { allowHttp = false } = {}) {
   let url;
   try {
     url = new URL(rawUrl);
-  } catch {
+  } catch (caught) {
+    logCaught('ssrf.js:assertSafeUrl', caught);
     return { ok: false, error: 'Érvénytelen URL.' };
   }
 
@@ -181,6 +185,7 @@ async function assertSafeUrl(rawUrl, { allowHttp = false } = {}) {
       return { ok: false, error: `A cím belső hálózati címre mutat (${bad.address}).` };
     }
   } catch (err) {
+    logCaught('ssrf.js:assertSafeUrl', err);
     return { ok: false, error: `A cím nem feloldható: ${err.message}` };
   }
 

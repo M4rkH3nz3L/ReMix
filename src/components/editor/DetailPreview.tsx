@@ -11,6 +11,7 @@ import { renderMp4 } from '@/lib/render';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎬 Részlet-előnézet: a playhead körüli pár másodperc VALÓDI renderje.
@@ -73,6 +74,7 @@ export function DetailPreview({ trigger = 0, showButton = true }: { trigger?: nu
       );
       setUri(file.uri);
     } catch (err) {
+      logCaught('components/editor/DetailPreview.tsx:run', err);
       Alert.alert(t('editor.detailPreview.title'), (err as Error).message);
     } finally {
       setStatus(null);
@@ -93,7 +95,8 @@ export function DetailPreview({ trigger = 0, showButton = true }: { trigger?: nu
   const close = () => {
     try {
       player.pause();
-    } catch {
+    } catch (caught) {
+      logCaught('components/editor/DetailPreview.tsx:close', caught);
       // a lejátszó már eldobható állapotban lehet
     }
     setUri(null);

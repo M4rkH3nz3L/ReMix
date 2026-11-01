@@ -6,6 +6,7 @@ import { uploadMediaResult } from '@/lib/render';
 import { findMissingMedia, type MissingMedia, type RelinkPair } from '@/lib/videdFile';
 import type { Asset, Project } from '@/types/project';
 import { projectFolderDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🗄️ Média-szinkron — a projekt médiafájljainak SZERVER-tárolása és a hiányzó
@@ -47,7 +48,8 @@ export function needsBackup(asset: Asset, known: Record<string, string>): boolea
 function fileExists(uri: string): boolean {
   try {
     return new File(uri).exists;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/mediaSync.ts:fileExists', caught);
     return false;
   }
 }
@@ -147,7 +149,8 @@ export async function backupProjectMedia(
       assets.push({ ...a, remoteUrl, ...(size > 0 ? { size } : {}) });
       uploaded += 1;
       changed = true;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaSync.ts:backupProjectMedia', caught);
       assets.push(a); // a feltöltés bukása nem állítja meg a többit
     }
   }
@@ -197,7 +200,8 @@ export async function restoreSelectedMedia(
     if (!dir.exists) {
       dir.create({ intermediates: true });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/mediaSync.ts:restoreSelectedMedia', caught);
     return { pairs: [], failed: targets.map((t) => t.uri) };
   }
   const pairs: RelinkPair[] = [];
@@ -216,7 +220,8 @@ export async function restoreSelectedMedia(
         continue;
       }
       pairs.push({ oldUri: t.uri, newUri: file.uri });
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaSync.ts:restoreSelectedMedia', caught);
       failed.push(t.uri);
     }
   }
@@ -252,7 +257,8 @@ export async function restoreMissingMedia(
     if (!dir.exists) {
       dir.create({ intermediates: true });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/mediaSync.ts:restoreMissingMedia', caught);
     // a cache-mappa se jött létre → semmit sem tudtunk visszaállítani
     return { pairs: [], restored: [], failed: missing };
   }
@@ -276,13 +282,15 @@ export async function restoreMissingMedia(
       if ((target.size ?? 0) === 0) {
         try {
           target.delete();
-        } catch {
+        } catch (caught) {
+          logCaught('lib/mediaSync.ts:restoreMissingMedia', caught);
           // takarítás best-effort
         }
         continue;
       }
       pairs.push({ oldUri: m.uri, newUri: target.uri });
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaSync.ts:restoreMissingMedia', caught);
       // egy fájl bukása nem állítja meg a többi visszaállítását
     }
   }

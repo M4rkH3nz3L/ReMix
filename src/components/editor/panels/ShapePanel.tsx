@@ -13,6 +13,7 @@ import { clamp } from '@/lib/time';
 import { pointsToPositionKeyframes, trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip, ShapeGradient } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const GRADIENTS: { id: string; from: string; to: string }[] = [
   { id: 'purplePink', from: '#7c5cff', to: '#ff5ca8' },
@@ -134,7 +135,7 @@ export function ShapePanel({ clip }: { clip: ShapeClip }) {
         state.updateClip(clip.id, { keyframes: { ...clip.keyframes, ...kf } });
         Alert.alert(t('panels.shape.trackDone'), t('panels.shape.trackDoneBody', { count: kf.x.length }));
       })
-      .catch((err: Error) => Alert.alert(t('panels.shape.trackTitle'), err.message))
+      .catch((err: Error) => { logCaught('components/editor/panels/ShapePanel.tsx:runTrack', err); return Alert.alert(t('panels.shape.trackTitle'), err.message); })
       .finally(() => setTrackBusy(false));
   };
   const startTrackPick = () => {

@@ -4,6 +4,7 @@ import { renderServerUrl } from '@/lib/render';
 import { activeSteps, samplerDurationSec, type SamplerPattern } from '@/lib/sampler';
 import { uploadFetch } from '@/lib/upload';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎛️🔊 A sampler step-mintájának renderelése a worker `/sampler`-én: a feltöltött minta-fájlt
@@ -40,7 +41,8 @@ export async function renderSamplerToClip(
     const headerDur = Number(res.headers.get('X-Duration-Sec'));
     const durationSec = Number.isFinite(headerDur) && headerDur > 0 ? headerDur : samplerDurationSec(opts.bars, opts.bpm);
     return { uri: target.uri, durationSec };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/samplerClient.ts:renderSamplerToClip', caught);
     return null;
   }
 }

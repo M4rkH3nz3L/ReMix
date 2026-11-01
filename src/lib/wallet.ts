@@ -4,6 +4,7 @@ import { InsufficientCreditsError } from '@/lib/shop';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🪙 Koin-pénztárca — a pénzkeresés alaprendszere.
@@ -111,7 +112,7 @@ export async function subscribeProWithCredits(
     }
     throw new Error(error.message);
   }
-  await refreshEntitlement().catch(() => {});
+  await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:subscribeProWithCredits', caught); });
   const d = (data ?? {}) as Record<string, unknown>;
   return { balance: Number(d.balance ?? 0), proUntil: String(d.pro_until ?? '') };
 }
@@ -225,7 +226,7 @@ export async function requestPayout(
     headers: await workerJsonHeaders(),
     body: JSON.stringify({ coins }),
   });
-  const body = (await res.json().catch(() => ({}))) as {
+  const body = (await res.json().catch((caught) => { logCaught('lib/wallet.ts:requestPayout', caught); return {}; })) as {
     error?: string;
     status?: string;
     balance?: number;

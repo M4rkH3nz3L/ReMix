@@ -45,6 +45,7 @@ import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { useRoles } from '@/store/roleStore';
 import { exportMyData, softDeleteAccount } from '@/lib/account';
+import { logCaught } from '@/lib/logCaught';
 
 /** 🤖 Az AI-provider szerkesztő-űrlapja (új = `id: null`, egyébként meglévő). */
 export interface ProviderForm {
@@ -144,6 +145,7 @@ export function useProfile() {
         setTaskAssign(tasks);
       })
       .catch((e: unknown) => {
+      logCaught('hooks/useProfile.ts:refresh', e);
         Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
@@ -175,7 +177,7 @@ export function useProfile() {
         const updatedText = d?.updatedAt ? new Date(d.updatedAt).toLocaleDateString() : null;
         setProMeta({ untilText, updatedText });
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useProfile.ts:useProfile', caught); });
   }, [userId, isPro, proUntil, t]);
 
   // — személyes adatok —
@@ -206,6 +208,7 @@ export function useProfile() {
       await saveProfile(profile);
       Alert.alert(t('profile.savedTitle'), t('profile.profileSaved'));
     } catch (e) {
+      logCaught('hooks/useProfile.ts:saveProfileAsync', e);
       const msg = e instanceof Error ? e.message : String(e);
       // beszédes üzenet a username-hibákra (a lib sentinel-kódot dob)
       const friendly =
@@ -231,7 +234,8 @@ export function useProfile() {
       if (tz) {
         setField('timezone', tz);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('hooks/useProfile.ts:detectTimezone', caught);
       /* Intl/timeZone nem elérhető — marad a kézi bevitel */
     }
   };
@@ -252,6 +256,7 @@ export function useProfile() {
           setCoverDraftUri(local);
         }
       } catch (e) {
+        logCaught('hooks/useProfile.ts:onPickProfileImage', e);
         Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       }
       return;
@@ -268,6 +273,7 @@ export function useProfile() {
       // a profilkép változását a KORÁBBI posztokra is átvezetjük (denormalizált feed-avatar)
       void syncMyPostsAvatar(url);
     } catch (e) {
+      logCaught('hooks/useProfile.ts:onPickProfileImage', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setImgBusy(false);
@@ -287,6 +293,7 @@ export function useProfile() {
       await saveProfile(next);
       setCoverDraftUri(null); // csak sikeres mentés után zárjuk
     } catch (e) {
+      logCaught('hooks/useProfile.ts:commitCover', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setImgBusy(false);
@@ -309,6 +316,7 @@ export function useProfile() {
       await activateProDev();
       Alert.alert(t('profile.devProTitle'), t('profile.devProActivated'));
     } catch (e) {
+      logCaught('hooks/useProfile.ts:onDevActivate', e);
       Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
     } finally {
       setDevBusy(false);
@@ -323,6 +331,7 @@ export function useProfile() {
       await deactivateProDev();
       Alert.alert(t('profile.devProTitle'), t('profile.devProDeactivated'));
     } catch (e) {
+      logCaught('hooks/useProfile.ts:onDevDeactivate', e);
       // a deactivate/refreshEntitlement hibáját is jelezzük (szimmetria az activate-tel)
       Alert.alert(t('profile.devProTitle'), e instanceof Error ? e.message : String(e));
     } finally {
@@ -338,7 +347,7 @@ export function useProfile() {
         )
       )
       .catch((e: unknown) =>
-        Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e))
+        { logCaught('hooks/useProfile.ts:onRestore', e); return Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e)); }
       );
   };
 
@@ -405,6 +414,7 @@ export function useProfile() {
       // beérkeztekor a lista újratölt (a kártya 🧪 n/6 jelvénye frissül)
       void examineProvider(saved).then(() => refresh());
     } catch (e) {
+      logCaught('hooks/useProfile.ts:saveProviderAsync', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setSavingProvider(false);
@@ -424,7 +434,7 @@ export function useProfile() {
         onPress: () => {
           deleteAiProvider(p.id)
             .then(() => refresh())
-            .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+            .catch((e: Error) => { logCaught('hooks/useProfile.ts:onDeleteProvider', e); return Alert.alert(t('common.error'), e.message); });
         },
       },
     ]);
@@ -436,7 +446,7 @@ export function useProfile() {
     }
     setDefaultAiProvider(p.id)
       .then(() => refresh())
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+      .catch((e: Error) => { logCaught('hooks/useProfile.ts:onSetDefault', e); return Alert.alert(t('common.error'), e.message); });
   };
 
   // 🤖 feladat → provider választás (Auto = null); optimista + perzisztálva
@@ -451,7 +461,7 @@ export function useProfile() {
       return next;
     });
     setTaskAssignment(task, providerId).catch((e: Error) =>
-      Alert.alert(t('common.error'), e.message)
+      { logCaught('hooks/useProfile.ts:pickTask', e); return Alert.alert(t('common.error'), e.message); }
     );
   };
 
@@ -470,7 +480,7 @@ export function useProfile() {
   // 📤 GDPR adat-export: az összes saját adat JSON-ban, megosztva
   const onExportData = () => {
     exportMyData().catch((e: unknown) =>
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+      { logCaught('hooks/useProfile.ts:onExportData', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
     );
   };
 
@@ -487,7 +497,7 @@ export function useProfile() {
               void signOut();
             })
             .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+              { logCaught('hooks/useProfile.ts:onDeleteAccount', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
             ),
       },
     ]);

@@ -65,12 +65,14 @@ import { useChat } from '@/store/chatStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useNotifications } from '@/store/notificationStore';
 import { useTutorial } from '@/store/tutorialStore';
+import { logCaught } from '@/lib/logCaught';
 
 /** Deep-link cél megnyitása egy notification koppintásából (best-effort). */
 function openNotificationRoute(route: string) {
   try {
     router.push(route as Parameters<typeof router.push>[0]);
-  } catch {
+  } catch (caught) {
+    logCaught('app/_layout.tsx:openNotificationRoute', caught);
     // ismeretlen/rossz útvonal → csendben elnyeljük
   }
 }

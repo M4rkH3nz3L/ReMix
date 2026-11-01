@@ -16,6 +16,7 @@ import { activeProjectFolder, setActiveProjectFolder } from '@/lib/projectFolder
 import { saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { AspectRatio, Asset, Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ⚙️ Projekt-beállítások (tulaj): MINDEN, amit a létrehozásnál megadott,
@@ -64,7 +65,7 @@ export function ProjectMetaSection({
       return;
     }
     await saveProject(next);
-    await backupProjectToCloud(next).catch(() => {});
+    await backupProjectToCloud(next).catch((caught) => { logCaught('components/collab/ProjectMetaSection.tsx:applyCover', caught); });
     void logProjectActivity(ownerId, next.id, `🖼️ ${t(asset ? 'lib.commands.setCover' : 'lib.commands.clearCover')}`);
     onSaved(next);
   };
@@ -80,6 +81,7 @@ export function ProjectMetaSection({
         await applyCover({ id: makeId('ast'), kind: 'image', uri: picked.uri, provider: 'local', name: 'cover' });
       }
     } catch (e) {
+      logCaught('components/collab/ProjectMetaSection.tsx:pickCover', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setActiveProjectFolder(prevFolder);
@@ -92,6 +94,7 @@ export function ProjectMetaSection({
     try {
       await applyCover(null);
     } catch (e) {
+      logCaught('components/collab/ProjectMetaSection.tsx:removeCover', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setCoverBusy(false);
@@ -135,11 +138,12 @@ export function ProjectMetaSection({
       };
       next = { ...next, seo };
       await saveProject(next);
-      await backupProjectToCloud(next).catch(() => {});
+      await backupProjectToCloud(next).catch((caught) => { logCaught('components/collab/ProjectMetaSection.tsx:save', caught); });
       void logProjectActivity(ownerId, next.id, `⚙️ ${t('collab.settings.logUpdated')}`);
       onSaved(next);
       Alert.alert(t('collab.settings.title'), t('collab.settings.saved'));
     } catch (e) {
+      logCaught('components/collab/ProjectMetaSection.tsx:save', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);

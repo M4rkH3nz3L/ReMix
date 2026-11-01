@@ -35,6 +35,7 @@ import {
 import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import type { Selection } from '@/lib/selection';
+import { logCaught } from '@/lib/logCaught';
 
 export type { Stroke } from '@/lib/brushEngine';
 
@@ -180,7 +181,8 @@ export const BrushOverlay = forwardRef<
           const file = new File(dir, `brush_${Date.now().toString(36)}.png`);
           file.write(img.encodeToBytes(ImageFormat.PNG));
           return file.uri;
-        } catch {
+        } catch (caught) {
+          logCaught('components/studio/image/BrushOverlay.tsx:BrushOverlay', caught);
           return null;
         }
       },

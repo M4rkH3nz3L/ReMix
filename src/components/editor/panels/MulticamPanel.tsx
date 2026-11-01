@@ -17,6 +17,7 @@ import { trackEnd, trackOf } from '@/lib/projectUtils';
 import { getWaveform } from '@/lib/waveform';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 interface Angle {
   uri: string;
@@ -68,7 +69,7 @@ export function MulticamPanel() {
           player.play();
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/editor/panels/MulticamPanel.tsx:MulticamPanel', caught); });
     // szándékosan csak a szög-váltásra fut (a masterTime tekerést a scrub végzi)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, angles.length]);

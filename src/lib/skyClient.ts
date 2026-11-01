@@ -5,6 +5,7 @@ import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🌅 Sky Replacement kliens (CC V2): a worker mélység-alapú ég-maszkkal
@@ -50,12 +51,14 @@ export async function replaceSky(uri: string, preset: SkyPreset): Promise<string
       if (target.exists) {
         target.delete();
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/skyClient.ts:replaceSky', caught);
       // felülírja a write
     }
     target.write(Uint8Array.from(atob(body.pngBase64), (c) => c.charCodeAt(0)));
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/skyClient.ts:replaceSky', caught);
     return null;
   }
 }

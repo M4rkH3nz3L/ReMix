@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { capabilityAllowed, type CapabilityId } from '@/lib/capabilities';
 import { fetchMySubscription } from '@/lib/subscription';
 import { asTier, isPaidTier, tierMeetsMin, tierRank, type Tier } from '@/lib/tiers';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 💳 Entitlement-store — a Free / Pro szint EGYETLEN kliens-oldali forrása.
@@ -66,7 +67,8 @@ interface EntitlementState extends Persisted {
 }
 
 function persist(userId: string | null, p: Persisted): void {
-  AsyncStorage.setItem(cacheKey(userId), JSON.stringify(p)).catch(() => {
+  AsyncStorage.setItem(cacheKey(userId), JSON.stringify(p)).catch((caught) => {
+    logCaught('store/entitlementStore.ts:persist', caught);
     // a perzisztálás best-effort; a memóriabeli állapot marad a forrás
   });
 }
@@ -82,7 +84,8 @@ async function loadCache(userId: string | null): Promise<Persisted> {
         devPro: p.devPro === true,
       };
     }
-  } catch {
+  } catch (caught) {
+    logCaught('store/entitlementStore.ts:loadCache', caught);
     // sérült/hiányzó mentés — Free
   }
   return { tier: 'free', proUntil: null, devPro: false };
@@ -154,7 +157,8 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
         : { tier: 'free', proUntil: null, devPro };
       set(next);
       persist(userId, next);
-    } catch {
+    } catch (caught) {
+      logCaught('store/entitlementStore.ts:useEntitlement', caught);
       // best-effort; marad az offline cache
     }
   },

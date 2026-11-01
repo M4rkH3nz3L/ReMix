@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Remix márka-ikonok generálása (gradiens + shuffle-glyph) a meglévő
 // playwright-Chromiummal. Futtatás: `cd server && node gen-icons.js`.
 const fs = require('fs');
@@ -22,7 +23,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('gen-icons.js:findChromium', caught);
     /* nincs cache */
   }
   return null;
@@ -75,6 +77,7 @@ async function main() {
 }
 
 main().catch((e) => {
+  logCaught('gen-icons.js', e);
   console.error(e);
   process.exit(1);
 });

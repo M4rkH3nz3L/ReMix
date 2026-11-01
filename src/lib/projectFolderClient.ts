@@ -12,6 +12,7 @@ import {
   slugifyProjectName,
   uniqueFolderName,
 } from '@/lib/projectFolder';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📁 Projekt-mappa — FS-oldal (a pure mag a `projectFolder.ts`-ben).
@@ -66,7 +67,8 @@ function ownerOf(dir: Directory | File): string | null {
   try {
     const marker = new File(dir, OWNER_MARKER);
     return marker.exists ? marker.textSync().trim() || null : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectFolderClient.ts:ownerOf', caught);
     return null;
   }
 }
@@ -169,13 +171,15 @@ export async function prepareProjectFolder<T extends { id: string; name: string;
         }
         raw = raw.split(item.uri).join(target.uri);
         changed = true;
-      } catch {
+      } catch (caught) {
+        logCaught('lib/projectFolderClient.ts:prepareProjectFolder', caught);
         // egy fájl hibája nem állítja meg a többit
       }
     }
     next = JSON.parse(raw) as T;
     return { project: next, changed };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectFolderClient.ts:prepareProjectFolder', caught);
     return { project, changed: false };
   }
 }
@@ -201,7 +205,8 @@ export function projectMediaDir(): Directory {
         dir.create({ intermediates: true, idempotent: true });
       }
       return dir;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectFolderClient.ts:projectMediaDir', caught);
       // esés a közös mappára
     }
   }
@@ -236,7 +241,8 @@ export function listProjectFolderFiles(folder: string): FolderFile[] {
     if (dir.exists) {
       walk(dir, '');
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/projectFolderClient.ts:listProjectFolderFiles', caught);
     // nem olvasható mappa → üres
   }
   return out;
@@ -261,7 +267,8 @@ export function pruneUnreferencedModelFiles(folder: string, docs: readonly (stri
     try {
       new File(f.uri).delete();
       freed += f.size;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectFolderClient.ts:pruneUnreferencedModelFiles', caught);
       // a takarítás nem kritikus
     }
   }
@@ -298,14 +305,16 @@ export function removeProjectFolder(folder: string, remainingDocs: readonly (str
     }
     try {
       new File(f.uri).delete();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectFolderClient.ts:removeProjectFolder', caught);
       kept += 1;
     }
   }
   if (kept === 0) {
     try {
       projectFolderDir(folder).delete();
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectFolderClient.ts:removeProjectFolder', caught);
       // zárolt — a következő törlés elviszi
     }
   }

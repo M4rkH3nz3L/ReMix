@@ -15,6 +15,7 @@ import {
   type ProjectPermission,
   type ProjectRole,
 } from '@/lib/projectRoles';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔑 Szerepkörök kezelése (tulaj): a projekt role-jait és a hozzájuk tartozó
@@ -44,7 +45,7 @@ export function RoleManagerSection({
     setBusy(true);
     saveProjectRoles(ownerId, projectId, next)
       .then(() => onChanged(next))
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+      .catch((e: Error) => { logCaught('components/collab/RoleManagerSection.tsx:persist', e); return Alert.alert(t('common.error'), e.message); })
       .finally(() => setBusy(false));
   };
 

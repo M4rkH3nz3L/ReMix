@@ -13,6 +13,7 @@ import { uploadProjectTransfer } from '@/lib/transferClient';
 import { relinkCommandsFor, type RelinkPair } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎯 Fájlonkénti visszaállítás — a felhő-mentésből (asset.remoteUrl: R2 vagy a
@@ -124,6 +125,7 @@ export function CloudMediaSection({ project }: { project: Project }) {
         t('panels.export.rpRestoreDone', { count: restored.size }),
       );
     } catch (e) {
+      logCaught('components/editor/panels/CloudMediaSection.tsx:restoreFromRp', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setRpBusy(false);
@@ -180,7 +182,7 @@ export function CloudMediaSection({ project }: { project: Project }) {
           setTransferBusy(true);
           uploadProjectTransfer(project)
             .then(() => Alert.alert(t('panels.export.transferSend'), t('panels.export.transferSent')))
-            .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+            .catch((e: Error) => { logCaught('components/editor/panels/CloudMediaSection.tsx:CloudMediaSection', e); return Alert.alert(t('common.error'), e.message); })
             .finally(() => setTransferBusy(false));
         }}
       />

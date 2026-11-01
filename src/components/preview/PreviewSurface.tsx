@@ -63,6 +63,7 @@ import type {
   TextClip,
   VideoClip,
 } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const IDENTITY: CanvasTransform = { scale: 1, x: 0, y: 0 };
 
@@ -214,9 +215,9 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
     preloadedRef.current = uri;
     if (upcoming?.isVideo) {
-      ensureProxy(uri).catch(() => {});
+      ensureProxy(uri).catch((caught) => { logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught); });
     } else {
-      Image.prefetch(uri).catch(() => {});
+      Image.prefetch(uri).catch((caught) => { logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught); });
     }
   }, [upcoming?.uri, upcoming?.isVideo]);
 
@@ -237,7 +238,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   // háttérben elindítjuk a proxy-készítést a következő lejátszáshoz
   useEffect(() => {
     if (videoSrcUri) {
-      ensureProxy(videoSrcUri).catch(() => {});
+      ensureProxy(videoSrcUri).catch((caught) => { logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught); });
     }
   }, [videoSrcUri]);
 
@@ -246,7 +247,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     if (!videoClip || !playbackUri) {
       if (loadedUriRef.current !== null) {
         loadedUriRef.current = null;
-        player.replaceAsync(null).catch(() => {});
+        player.replaceAsync(null).catch((caught) => { logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught); });
       }
       return;
     }
@@ -263,7 +264,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
           player.play();
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught); });
   }, [player, videoClip, playbackUri]);
 
   // sebesség + hangerő követése (🎚️ volume-automációval a playheadből).
@@ -312,7 +313,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       if (nowPlaying && !useEditorStore.getState().isPlaying) {
         try {
           player.pause();
-        } catch {
+        } catch (caught) {
+          logCaught('components/preview/PreviewSurface.tsx:sub', caught);
           // a lejátszó épp cserélődik/tölt — a play/pause effekt úgyis rendezi
         }
       }
@@ -333,7 +335,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
         player.pause();
       }
       player.currentTime = sourceTimeAt(videoClip, playhead);
-    } catch {
+    } catch (caught) {
+      logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught);
       // a forrás még töltődik — a replaceAsync utáni seek rendezi
     }
   }, [player, playhead, isPlaying, videoClip]);
@@ -348,7 +351,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
       if (Math.abs(player.currentTime - want) > 0.35) {
         player.currentTime = want;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught);
       // forrás töltés alatt
     }
   }, [player, playhead, isPlaying, videoClip]);

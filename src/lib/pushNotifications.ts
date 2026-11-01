@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import type * as NotificationsModule from 'expo-notifications';
 
 import { saveCurrentDevicePushToken } from '@/lib/deviceInfo';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📲 Push / helyi értesítések rétege (expo-notifications).
@@ -63,7 +64,8 @@ function notif(): typeof NotificationsModule | null {
         shouldSetBadge: false,
       }),
     });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/pushNotifications.ts:notif', caught);
     moduleRef = null;
   }
   return moduleRef;
@@ -149,7 +151,8 @@ export async function registerForPush(userId: string | null): Promise<PushRegist
       await saveCurrentDevicePushToken(userId, token);
     }
     return { granted: true, token: token ?? null };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/pushNotifications.ts:registerForPush', caught);
     // az engedély/token hibája ne dőljön az appra — a realtime csengő megy nélküle is
     return { granted: false, token: null };
   }
@@ -193,7 +196,8 @@ export async function presentLocal(input: {
       // `null` → fallback csatorna, ami elnyomja a bannert. iOS: null = azonnal.
       trigger: android ? { channelId: ANDROID_CHANNEL_ID } : null,
     });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/pushNotifications.ts:presentLocal', caught);
     // ha a helyi megjelenítés elbukik, a realtime csengő akkor is frissül
   }
 }
@@ -236,7 +240,8 @@ export async function getInitialNotificationRoute(): Promise<string | null> {
   try {
     const response = await N.getLastNotificationResponseAsync();
     return routeFromResponse(response);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/pushNotifications.ts:getInitialNotificationRoute', caught);
     return null;
   }
 }

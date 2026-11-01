@@ -19,6 +19,7 @@ import type { ProgressUpdate } from '@/lib/progress';
 import { fetchShotScores } from '@/lib/shotScore';
 import { getTimelineTranscript } from '@/lib/transcripts';
 import type { Project, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * AI Edit Engine hálózati rétege (P0‑1): a meglévő jel-detektorok (csend,
@@ -65,7 +66,7 @@ async function gatherSignals(
   }
 
   const transcript =
-    (await getTimelineTranscript(project, onProgress).catch(() => null)) ?? [];
+    (await getTimelineTranscript(project, onProgress).catch((caught) => { logCaught('lib/autoeditClient.ts:gatherSignals', caught); return null; })) ?? [];
 
   let beats: number[] = [];
   let bpm = 0;
@@ -191,7 +192,8 @@ export async function runAutoEditFlow(
           }
         }
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/autoeditClient.ts:runAutoEditFlow', caught);
       // worker/AI hiba — heurisztikával megyünk tovább
     }
   }

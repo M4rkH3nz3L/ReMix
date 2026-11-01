@@ -46,6 +46,7 @@ import type { PostVisibility } from '@/types/social';
 import { useEditorStore } from '@/store/editorStore';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { pullProject, pushProject } from '@/lib/cloudSync';
+import { logCaught } from '@/lib/logCaught';
 
 const RESOLUTIONS = [
   { label: '480p', value: 480 },
@@ -118,7 +119,7 @@ export function ExportPanel() {
     }
     setHeadlineStatus(t('panels.export.writingHeadlines'));
     try {
-      const transcript = await getTimelineTranscript(project).catch(() => null);
+      const transcript = await getTimelineTranscript(project).catch((caught) => { logCaught('components/editor/panels/ExportPanel.tsx:loadHeadlines', caught); return null; });
       const lines = (transcript ?? []).slice(0, 12).map((l) => l.text);
       const summary = `${project.name}\n${lines.join('\n')}`.slice(0, 800);
       const list = await fetchThumbHeadlines(summary);
@@ -148,7 +149,8 @@ export function ExportPanel() {
         final = composed;
       }
       await saveAndShareThumbnail(final, project.name);
-    } catch {
+    } catch (caught) {
+      logCaught('components/editor/panels/ExportPanel.tsx:pickThumb', caught);
       setThumbStatus(null);
       Alert.alert('Thumbnail Studio', t('panels.export.saveFailed'));
     }
@@ -225,6 +227,7 @@ export function ExportPanel() {
       renderAndShareMp4(project, report, buildSettings(), { mode, signal })
     )
       .catch((err: Error) => {
+      logCaught('components/editor/panels/ExportPanel.tsx:exportLocal', err);
         if (!isRenderCancelledError(err)) {
           Alert.alert(t('panels.export.exportOnDevice'), err.message);
         }
@@ -257,6 +260,7 @@ export function ExportPanel() {
         );
       }
     } catch (err) {
+      logCaught('components/editor/panels/ExportPanel.tsx:exportBatch', err);
       if (!isRenderCancelledError(err as Error)) {
         Alert.alert(t('panels.export.batchTitle', { defaultValue: 'Batch export' }), (err as Error).message);
       }
@@ -337,7 +341,7 @@ export function ExportPanel() {
   };
 
   const guard = (fn: () => Promise<void>) => () => {
-    fn().catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
+    fn().catch((caught) => { logCaught('components/editor/panels/ExportPanel.tsx:guard', caught); return Alert.alert(t('common.error'), t('panels.export.shareFailed')); });
   };
 
   // 📲 Posztolás egy platformra: render → Fotókba mentés → a platform megnyitása.
@@ -373,7 +377,7 @@ export function ExportPanel() {
           Alert.alert(t('panels.export.noCaptionsTitle'), t('panels.export.noCaptionsMessage'));
         }
       })
-      .catch(() => Alert.alert(t('common.error'), t('panels.export.shareFailed')));
+      .catch((caught) => { logCaught('components/editor/panels/ExportPanel.tsx:exportCaptions', caught); return Alert.alert(t('common.error'), t('panels.export.shareFailed')); });
   };
 
   // ☁️ projekt-terv felhő-mentése (Pro; a médiafájlok külön, későbbi lépés)
@@ -812,9 +816,9 @@ export function ExportPanel() {
             // (ingyen, offline); a worker /collect útja fallbackként él tovább
             setCollectStatus(t('common.processing'));
             withProgress(t('panels.export.collectPackaging'), (report) =>
-              shareRpFile(project, report).catch(() => collectAndShareProject(project, report))
+              shareRpFile(project, report).catch((caught) => { logCaught('components/editor/panels/ExportPanel.tsx:ExportPanel', caught); return collectAndShareProject(project, report); })
             )
-              .catch((err: Error) => Alert.alert('.rp', err.message))
+              .catch((err: Error) => { logCaught('components/editor/panels/ExportPanel.tsx:ExportPanel', err); return Alert.alert('.rp', err.message); })
               .finally(() => setCollectStatus(null));
           }}
         />
@@ -822,14 +826,14 @@ export function ExportPanel() {
           icon="cloud-upload-outline"
           label={cloudStatus ?? t('panels.export.cloudBackupBtn')}
           onPress={() => {
-            cloudBackup().catch((err: Error) => Alert.alert(t('panels.export.cloudTitle'), err.message));
+            cloudBackup().catch((err: Error) => { logCaught('components/editor/panels/ExportPanel.tsx:ExportPanel', err); return Alert.alert(t('panels.export.cloudTitle'), err.message); });
           }}
         />
         <PrimaryButton
           icon="cloud-download-outline"
           label={t('panels.export.cloudRestoreBtn')}
           onPress={() => {
-            cloudRestore().catch((err: Error) => Alert.alert(t('panels.export.cloudTitle'), err.message));
+            cloudRestore().catch((err: Error) => { logCaught('components/editor/panels/ExportPanel.tsx:ExportPanel', err); return Alert.alert(t('panels.export.cloudTitle'), err.message); });
           }}
         />
         <Text style={styles.note}>

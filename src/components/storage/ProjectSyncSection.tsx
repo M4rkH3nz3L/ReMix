@@ -17,6 +17,7 @@ import {
 import { loadProject } from '@/lib/storage';
 import { formatBytes } from '@/lib/storageQuota';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ⚙️ Projekt-beállítás: „Tárhely és szinkron". Megmutatja a projekt telefonos
@@ -81,6 +82,7 @@ export function ProjectSyncSection({ projectId, onChanged }: { projectId: string
         onChanged?.(next);
       }
     } catch (err) {
+      logCaught('components/storage/ProjectSyncSection.tsx:toggle', err);
       Alert.alert(t('storage.sync.title'), err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);

@@ -34,6 +34,7 @@ import {
 import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
 import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🛡️ Admin-panel — a globális szerep/jogosultság (RBAC) TESTRESZABÁSA:
@@ -80,7 +81,7 @@ export default function AdminScreen() {
         setReports(rep as ReportRow[]);
         setAppeals(app as AppealRow[]);
       })
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => { logCaught('app/admin.tsx:load', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); })
       .finally(() => setLoading(false));
   }, [canUser, canReview, t]);
 
@@ -99,6 +100,7 @@ export default function AdminScreen() {
       return next;
     });
     setRolePermission(role, perm, on).catch((e: unknown) => {
+      logCaught('app/admin.tsx:toggle', e);
       // visszagörgetés
       setPairs((prev) => {
         const next = new Set(prev);
@@ -120,7 +122,7 @@ export default function AdminScreen() {
         setNewLabel('');
         load();
       })
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { logCaught('app/admin.tsx:addRole', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
   };
 
   const removeRole = (role: AppRole) => {
@@ -129,7 +131,7 @@ export default function AdminScreen() {
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: () => deleteRole(role.slug).then(load).catch((e: unknown) => Alert.alert(t('common.error'), String(e))),
+        onPress: () => deleteRole(role.slug).then(load).catch((e: unknown) => { logCaught('app/admin.tsx:removeRole', e); return Alert.alert(t('common.error'), String(e)); }),
       },
     ]);
   };
@@ -145,7 +147,7 @@ export default function AdminScreen() {
           onPress: () => {
             assignRole(u.id, r.slug)
               .then(() => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role: r.slug } : x))))
-              .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+              .catch((e: unknown) => { logCaught('app/admin.tsx:changeUserRole', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
           },
         })),
         // 🚫 fiók-tiltás/feloldás (csak `user.suspend` birtokosnak)
@@ -164,6 +166,7 @@ export default function AdminScreen() {
   const doResolve = (id: string, status: 'resolved' | 'dismissed') => {
     setReports((prev) => prev.filter((r) => r.id !== id));
     resolveReport(id, status).catch((e: unknown) => {
+      logCaught('app/admin.tsx:doResolve', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       load();
     });
@@ -175,7 +178,7 @@ export default function AdminScreen() {
     }
     moderatePostGlobal(rep.postId, 'removed')
       .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReported', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
   };
   // 🚩 komment-bejelentés kezelése: a komment törlése (comment.moderate) + lezárás
   const doRemoveReportedComment = (rep: ReportRow) => {
@@ -184,13 +187,13 @@ export default function AdminScreen() {
     }
     moderateCommentGlobal(rep.commentId)
       .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReportedComment', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
   };
   // 🚫 fiók-felfüggesztés (user.suspend): a tiltott user nem tud belépni
   const doSuspend = (u: UserWithRole, suspended: boolean) => {
     const run = () =>
       setUserSuspended(u.id, suspended).catch((e: unknown) =>
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+        { logCaught('app/admin.tsx:run', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
       );
     if (suspended) {
       Alert.alert(t('admin.suspendTitle'), t('admin.suspendConfirm', { name: u.name }), [
@@ -205,6 +208,7 @@ export default function AdminScreen() {
   const doResolveAppeal = (app: AppealRow, decision: 'granted' | 'denied') => {
     setAppeals((prev) => prev.filter((a) => a.id !== app.id));
     resolveAppeal(app.id, app.postId, decision).catch((e: unknown) => {
+      logCaught('app/admin.tsx:doResolveAppeal', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       load();
     });

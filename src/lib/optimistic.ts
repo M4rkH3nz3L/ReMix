@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * ⚡ Optimista UI-frissítés egységes mintája (audit §12.4).
  *
@@ -36,6 +38,7 @@ export async function runOptimistic<T>(opts: OptimisticOptions<T>): Promise<bool
     opts.onSuccess?.(result);
     return true;
   } catch (error) {
+    logCaught('lib/optimistic.ts:runOptimistic', error);
     opts.rollback();
     opts.onError?.(error);
     return false;

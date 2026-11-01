@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import type { WorkspaceMode } from '@/lib/imageWorkspaceLayout';
 import type { EditMode } from '@/lib/toolbarSpec';
+import { logCaught } from '@/lib/logCaught';
 
 /** a Kép Stúdió oldalsó paneljeinek nyitottsága eszköz-típusonként */
 export type ImagePanels = Partial<Record<WorkspaceMode, { rail?: boolean; layers?: boolean }>>;
@@ -30,7 +31,8 @@ interface EditorPrefsState extends EditorPrefs {
 const pick = ({ editMode, timelineExtras, imagePanels }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels });
 
 function persist(p: EditorPrefs): void {
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(p)).catch(() => {
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(p)).catch((caught) => {
+    logCaught('store/editorPrefsStore.ts:persist', caught);
     // best-effort: a kezelési beállítás elvesztése nem kritikus
   });
 }
@@ -65,4 +67,4 @@ AsyncStorage.getItem(STORAGE_KEY)
       ...(p.imagePanels && typeof p.imagePanels === 'object' ? { imagePanels: p.imagePanels } : {}),
     });
   })
-  .catch(() => {});
+  .catch((caught) => { logCaught('store/editorPrefsStore.ts', caught); });

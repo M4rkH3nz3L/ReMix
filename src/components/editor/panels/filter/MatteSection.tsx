@@ -6,6 +6,7 @@ import { palette } from '@/constants/editor';
 import { pickImage } from '@/lib/media';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎭 Track / luma / alpha matte: egy külső kép fényereje/alfája adja az
@@ -29,7 +30,7 @@ export function MatteSection({ clip }: { clip: VideoClip | ImageClip }) {
                   });
                 }
               })
-              .catch(() => {});
+              .catch((caught) => { logCaught('components/editor/panels/filter/MatteSection.tsx:MatteSection', caught); });
           }}
         />
         {clip.matte ? (

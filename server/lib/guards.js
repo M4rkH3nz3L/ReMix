@@ -1,3 +1,4 @@
+const { logCaught } = require('./caught');
 // 🔐 Megosztott HTTP-guardok — kiemelve az index.js-ből (01-api-architecture §01.1).
 //
 // Szerver-hiteles Pro/Paid-kapu, AI-token-metering, render-job „puha" auth és a
@@ -31,7 +32,7 @@ function requirePro(req, res, next) {
       }
       res.status(402).json({ error: 'Ehhez a funkcióhoz Pro-előfizetés szükséges.', pro: true });
     })
-    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
+    .catch((caught) => { logCaught('lib/guards.js:requirePro', caught); return res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }); });
 }
 
 /** rövidítés: hitelesítés + szerver-hiteles Pro-ellenőrzés egy lépésben */
@@ -59,7 +60,7 @@ function requirePaid(req, res, next) {
       }
       res.status(402).json({ error: 'A felhő-render előfizetést igényel (min. Amatőr); ingyenesben a renderelés az eszközön történik.', pro: true });
     })
-    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
+    .catch((caught) => { logCaught('lib/guards.js:requirePaid', caught); return res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }); });
 }
 
 /** hitelesítés + min. Amatőr (fizető) — a worker/felhő-render/felhő-tár gate-je */
@@ -87,7 +88,8 @@ async function aiMeter(req, res, next) {
       return;
     }
     aiUsageContext.run({ uid }, () => next());
-  } catch {
+  } catch (caught) {
+    logCaught('lib/guards.js:aiMeter', caught);
     next(); // best-effort: a metering sosem blokkolja a funkciót hiba esetén
   }
 }
@@ -111,7 +113,8 @@ function renderJobAuth(req, _res, next) {
       req.user = result.ok ? result.user : null;
       next();
     })
-    .catch(() => {
+    .catch((caught) => {
+    logCaught('lib/guards.js:renderJobAuth', caught);
       req.user = null;
       next();
     });

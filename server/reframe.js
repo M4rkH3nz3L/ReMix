@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Auto Reframe (P0-7): a téma útvonalának becslése mozgás-centroiddal —
 // függőség-mentesen. Kis szürke képkockákon a szomszédos kockák különbségének
 // súlypontja adja a "hol történik valami" pontot; alacsony mozgásnál a
@@ -155,7 +156,8 @@ async function sampleFaceAnchors(file, { startSec, durationSec, width, height })
   let face;
   try {
     face = require('./face');
-  } catch {
+  } catch (caught) {
+    logCaught('reframe.js:sampleFaceAnchors', caught);
     return [];
   }
   if (!face.faceAvailable()) {
@@ -177,7 +179,8 @@ async function sampleFaceAnchors(file, { startSec, durationSec, width, height })
         )[0];
         anchors.push({ t: rel, x: best.x, y: best.y });
       }
-    } catch {
+    } catch (caught) {
+      logCaught('reframe.js:sampleFaceAnchors', caught);
       // egy-egy kocka kimaradhat — a mozgás-út úgyis megvan
     }
   }

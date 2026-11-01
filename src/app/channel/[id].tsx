@@ -44,6 +44,7 @@ import {
   type CreatorTotals,
 } from '@/lib/promotion';
 import type { FeedPost } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -76,17 +77,17 @@ export default function ChannelScreen() {
     // 🔴 él-e épp a csatorna tulajdonosa? (LIVE-jelző + tap-to-watch)
     getLiveByHost(id)
       .then(setLiveSession)
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/channel/[id].tsx:load', caught); });
     getChannel(id)
       .then((d) => {
         setData(d);
         setFollowing(d.isFollowing);
         setFollowers(d.followers);
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/channel/[id].tsx:load', caught); });
     creatorTotals(id)
       .then(setTotals)
-      .catch(() => {})
+      .catch((caught) => { logCaught('app/channel/[id].tsx:load', caught); })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -121,7 +122,7 @@ export default function ChannelScreen() {
     }
     openDm(id)
       .then((convId) => router.push(`/chat/${convId}`))
-      .catch((e: unknown) => Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { logCaught('app/channel/[id].tsx:onMessage', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
   };
 
   const showStats = (post: FeedPost) => {
@@ -147,7 +148,7 @@ export default function ChannelScreen() {
         }
         Alert.alert(t('stats.title'), lines.join('\n'));
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/channel/[id].tsx:showStats', caught); });
   };
 
   const openRemixMod = (post: FeedPost) => {
@@ -156,7 +157,7 @@ export default function ChannelScreen() {
     setRemixes([]);
     listRemixesOf(post.id)
       .then(setRemixes)
-      .catch(() => setRemixes([]))
+      .catch((caught) => { logCaught('app/channel/[id].tsx:openRemixMod', caught); return setRemixes([]); })
       .finally(() => setRemixLoading(false));
   };
 
@@ -166,6 +167,7 @@ export default function ChannelScreen() {
       prev.map((r) => (r.id === remix.id ? { ...r, moderationStatus: status } : r))
     );
     moderateRemix(remix.id, status).catch((e: unknown) => {
+      logCaught('app/channel/[id].tsx:doModerate', e);
       // visszagörgetés hibánál
       setRemixes((prev) =>
         prev.map((r) =>
@@ -199,7 +201,7 @@ export default function ChannelScreen() {
       buttons.push({
         text: t('common.delete'),
         style: 'destructive',
-        onPress: () => deletePost(post.id).then(load).catch(() => {}),
+        onPress: () => deletePost(post.id).then(load).catch((caught) => { logCaught('app/channel/[id].tsx:openPost', caught); }),
       });
       buttons.push({ text: t('common.cancel'), style: 'cancel' });
       Alert.alert(post.title, undefined, buttons);
@@ -236,6 +238,7 @@ export default function ChannelScreen() {
         load();
       })
       .catch((e: unknown) => {
+      logCaught('app/channel/[id].tsx:doPromote', e);
         if (e instanceof InsufficientCreditsError) {
           Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
             { text: t('common.cancel'), style: 'cancel' },

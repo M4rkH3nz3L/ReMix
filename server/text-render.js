@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Szövegklipek rasterizálása átlátszó PNG-vé headless Chromiummal.
 // A CSS ugyanazokat a stílus-preseteket valósítja meg, mint az app TextOverlay-e,
 // így a beégetett felirat vizuálisan egyezik az előnézettel.
@@ -35,7 +36,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('text-render.js:findChromium', caught);
     // nincs playwright-cache
   }
   return null;
@@ -57,7 +59,8 @@ function fontFaceCss(family) {
     try {
       const b64 = fs.readFileSync(path.join(__dirname, 'assets', 'fonts', FONT_FILES[family])).toString('base64');
       fontFaceCache[family] = `@font-face{font-family:'${family}';src:url(data:font/ttf;base64,${b64}) format('truetype');font-display:block;}`;
-    } catch {
+    } catch (caught) {
+      logCaught('text-render.js:fontFaceCss', caught);
       fontFaceCache[family] = '';
     }
   }

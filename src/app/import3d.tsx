@@ -8,6 +8,7 @@ import { nameFromFile } from '@/lib/model3dImport';
 import { isKindAvailable } from '@/lib/projectKinds';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📲 Bejövő 3D-fájl („Megnyitás a ReMix-szel"): új 3D-projekt a fájl nevével, majd a 3D
@@ -36,7 +37,7 @@ export default function Import3DRoute() {
       await saveProject(project);
       router.replace(`/studio/model3d/${project.id}?importUri=${encodeURIComponent(uri)}`);
     };
-    run().catch(() => router.replace('/studio'));
+    run().catch((caught) => { logCaught('app/import3d.tsx:Import3DRoute', caught); return router.replace('/studio'); });
   }, [uri, t]);
 
   return (

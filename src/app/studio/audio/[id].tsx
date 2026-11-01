@@ -17,6 +17,7 @@ import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎧 HANG STÚDIÓ képernyő (`kind: 'audio'` projekt). Vékony burkoló: betölti a
@@ -35,7 +36,7 @@ export default function AudioStudioScreen() {
   // 🔊 néma-kapcsolónál is szóljon a lejátszás (mint a videó-editorban); a
   // felvétel ideiglenesen record-módra vált, de a ClipEditSheet/stúdió vissza is állítja
   useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+    setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch((caught) => { logCaught('app/studio/audio/[id].tsx:AudioStudioScreen', caught); });
   }, []);
 
   useEffect(() => {
@@ -49,13 +50,13 @@ export default function AudioStudioScreen() {
         useEditorStore.getState().loadProject(loaded, events);
         setLoading(false);
       })
-      .catch(() => alive && setLoading(false));
+      .catch((caught) => { logCaught('app/studio/audio/[id].tsx:AudioStudioScreen', caught); return alive && setLoading(false); });
     return () => {
       alive = false;
       const p = useEditorStore.getState().project;
       if (p && p.id === id) {
         useEditorStore.getState().setPlaying(false);
-        saveProject(p).catch(() => {});
+        saveProject(p).catch((caught) => { logCaught('app/studio/audio/[id].tsx:AudioStudioScreen', caught); });
       }
     };
   }, [id]);
@@ -82,14 +83,14 @@ export default function AudioStudioScreen() {
   const preview = () =>
     saveProject(project)
       .then(() => router.push(`/player/${project.id}`))
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/studio/audio/[id].tsx:preview', caught); });
 
   const useInVideo = () => {
     // 🎧→🎬 a hang átvitele egy ÚJ videó-projektbe (a userhez képet ad)
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
     saveProject(vid)
       .then(() => router.replace(`/editor/${vid.id}`))
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/studio/audio/[id].tsx:useInVideo', caught); });
   };
 
   const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus') =>
@@ -97,7 +98,7 @@ export default function AudioStudioScreen() {
       () =>
         withProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report) =>
           exportAudioFile(project, format, report).then((url) => {
-            Linking.openURL(url).catch(() => {});
+            Linking.openURL(url).catch((caught) => { logCaught('app/studio/audio/[id].tsx:downloadAudio', caught); });
           })
         ),
       (e) => Alert.alert(t('studio.export'), e.message)

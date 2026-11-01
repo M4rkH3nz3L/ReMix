@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { palette } from '@/constants/editor';
 import { useEditorStore } from '@/store/editorStore';
 import type { VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ⏳ Live-VOD feldolgozás-loader (LIVE/05.1). Amikor a user leállítja a rögzített
@@ -55,7 +56,8 @@ export function VodProcessingOverlay() {
               .getState()
               .dispatch({ type: 'UPDATE_CLIP', clipId: clip.id, patch: { pending: false } }, 'system');
           }
-        } catch {
+        } catch (caught) {
+          logCaught('components/editor/VodProcessingOverlay.tsx:check', caught);
           // hálózati hiba → a következő körben újrapróbáljuk
         }
       }

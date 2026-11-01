@@ -6,6 +6,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { palette } from '@/constants/editor';
 import { loadProject } from '@/lib/storage';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** egy származási-lánc elem: a projekt neve/id-ja + elérhető-e helyben */
 interface LineageNode {
@@ -49,7 +50,7 @@ export function RemixGraphModal({
           break; // ciklus
         }
         seen.add(ref.projectId);
-        const loaded = await loadProject(ref.projectId).catch(() => null);
+        const loaded = await loadProject(ref.projectId).catch((caught) => { logCaught('components/editor/RemixGraphModal.tsx:walk', caught); return null; });
         out.push({ id: ref.projectId, name: loaded?.name ?? ref.name, available: !!loaded });
         ref = loaded?.remixOf ?? null;
       }

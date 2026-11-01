@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { fetchMyUsage, nearQuota, type MetricStatus } from '@/lib/usageClient';
 import { useEntitlement } from '@/store/entitlementStore';
+import { logCaught } from '@/lib/logCaught';
 
 const AMBER = '#f5a623';
 
@@ -29,7 +30,7 @@ export function UsageBanner() {
           setWarn(nearQuota(c, tier));
         }
       })
-      .catch(() => {}); // kijelentkezve / nincs supabase → nincs banner
+      .catch((caught) => { logCaught('components/UsageBanner.tsx:UsageBanner', caught); }); // kijelentkezve / nincs supabase → nincs banner
     return () => {
       alive = false;
     };

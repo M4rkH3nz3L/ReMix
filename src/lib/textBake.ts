@@ -5,6 +5,7 @@ import { renderServerUrl } from '@/lib/render';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import type { TextClip } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 export interface BakedText {
   uri: string;
@@ -60,7 +61,8 @@ export async function bakeTextToImage(clip: TextClip, aspect: number): Promise<B
       canvasW: canvas.w,
       canvasH: canvas.h,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/textBake.ts:bakeTextToImage', caught);
     return null;
   }
 }

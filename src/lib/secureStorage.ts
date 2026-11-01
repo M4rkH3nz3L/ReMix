@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔒 Titkosított kulcs-érték tár a BIZALMAS adatoknak (Supabase session/refresh
@@ -121,7 +122,8 @@ export const secureStorage = {
         return legacy;
       }
       return null;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/secureStorage.ts', caught);
       return null;
     }
   },
@@ -136,7 +138,8 @@ export const secureStorage = {
     }
     try {
       await secureSet(key, value);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/secureStorage.ts', caught);
       // ha a titkosított tár nem elérhető, NE essünk vissza sima tárolásra:
       // a token inkább vesszen el (újra be kell lépni), mint hogy nyíltan álljon
     }
@@ -152,10 +155,11 @@ export const secureStorage = {
     }
     try {
       await secureDelete(key);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/secureStorage.ts', caught);
       // best-effort
     }
     // a régi helyen maradt példányt is takarítjuk
-    await AsyncStorage.removeItem(key).catch(() => {});
+    await AsyncStorage.removeItem(key).catch((caught) => { logCaught('lib/secureStorage.ts', caught); });
   },
 };

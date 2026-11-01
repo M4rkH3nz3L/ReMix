@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🎨 Kép-dokumentum rasterizáló (Creative Canvas V1): réteg-fa → PNG.
 //
 // ELV: a formákat és a feliratokat UGYANAZOK a generátorok rajzolják, mint az
@@ -375,7 +376,8 @@ async function resolveRemoteMedia(doc, workDir, { fetchUrl, localPath }) {
         seq += 1;
         fs.writeFileSync(file, buf);
         layer[key] = file;
-      } catch {
+      } catch (caught) {
+        logCaught('imagedoc.js:resolveRemoteMedia', caught);
         /* elérhetetlen → a réteg hiányzóként jelentődik */
       }
     }
@@ -487,7 +489,8 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           const lutFile = path.join(workDir, `lut${idx}.cube`);
           fs.copyFileSync(layer.lut, lutFile);
           lutFrag = `,lut3d='${lutFile.replace(/'/g, "'\\''")}'`;
-        } catch {
+        } catch (caught) {
+          logCaught('imagedoc.js:renderImageDoc', caught);
           lutFrag = '';
         }
       }

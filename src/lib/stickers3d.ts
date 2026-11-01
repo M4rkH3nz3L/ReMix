@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { fetchRead } from '@/lib/netRetry';
 import { renderServerUrl } from '@/lib/render';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧊 3D stickers kliens (3D V1): a worker CC0 glTF-modelleket renderel
@@ -31,7 +32,8 @@ export async function listStickers3d(): Promise<Sticker3DEntry[] | null> {
     return Array.isArray(body.entries) && body.entries.length > 0
       ? body.entries
       : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/stickers3d.ts:listStickers3d', caught);
     return null;
   }
 }
@@ -77,7 +79,8 @@ export async function downloadSticker3d(
     }
     const file = await File.downloadFileAsync(remote, target);
     return file.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/stickers3d.ts:downloadSticker3d', caught);
     return null;
   }
 }

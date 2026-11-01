@@ -12,6 +12,7 @@ import { fetchShotScores } from '@/lib/shotScore';
 import { fetchThumbHeadlines } from '@/lib/thumbStudio';
 import { useEditorStore } from '@/store/editorStore';
 import type { VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎬 Look-csomagok + 🛍️ Product showcase: kamera/átmenet/lighting look-pack egy
@@ -176,7 +177,7 @@ export function LookPacksSection({
         label={busy ?? t('panels.assistant.makeProductAdBtn')}
         onPress={() => {
           makeProductAd().catch((err: Error) =>
-            Alert.alert(t('panels.assistant.productAdTitle'), err.message)
+            { logCaught('components/editor/panels/assistant/LookPacksSection.tsx:LookPacksSection', err); return Alert.alert(t('panels.assistant.productAdTitle'), err.message); }
           );
         }}
       />

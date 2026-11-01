@@ -29,6 +29,7 @@ import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
 import { requireApp, requireSignIn } from '@/lib/webGate';
 import type { InteractiveClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** Egy poszt interaktív (hotspot) klipjei a poszton hordozott interaktív rétegből. */
 export function hotspotsOf(post: FeedPost): InteractiveClip[] {
@@ -171,14 +172,15 @@ export function useFeed() {
         try {
           prev.pause();
           prev.currentTime = 0;
-        } catch {
+        } catch (caught) {
+          logCaught('hooks/useFeed.ts:webVideoRef', caught);
           /* a leváló elem már eldobható */
         }
       }
       activeVideoElRef.current = el;
       el.muted = mutedRef.current;
       el.volume = volumeRef.current;
-      void el.play?.().catch(() => {});
+      void el.play?.().catch((caught) => { logCaught('hooks/useFeed.ts:webVideoRef', caught); });
     }
   }, []);
 
@@ -223,7 +225,8 @@ export function useFeed() {
             return prev && list.some((p) => p.id === prev) ? prev : (list[0]?.id ?? null);
           });
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('hooks/useFeed.ts:load', caught);
           setPosts([]);
           setActiveTopId(null);
         })
@@ -246,7 +249,8 @@ export function useFeed() {
           setPosts((prev) => filterBlocked(prev, (p) => p.creator.id, ids));
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('hooks/useFeed.ts:useFeed', caught);
         /* nem bejelentkezve / nincs backend → nincs blokk-szűrés */
       });
   }, []);
@@ -394,7 +398,7 @@ export function useFeed() {
           router.push(`/editor/${pid}`);
         }
       })
-      .catch((e: unknown) => showError(e, 'remix'))
+      .catch((e: unknown) => { logCaught('hooks/useFeed.ts:onRemix', e); return showError(e, 'remix'); })
       .finally(() => setBusy(false));
   };
 
@@ -420,7 +424,7 @@ export function useFeed() {
                 return next;
               });
             })
-            .catch((e: unknown) => showError(e)),
+            .catch((e: unknown) => { logCaught('hooks/useFeed.ts:onModerate', e); return showError(e); }),
       },
     ]);
   };
@@ -434,7 +438,7 @@ export function useFeed() {
         onPress: () =>
           reportPost(post.id, r)
             .then(() => Alert.alert(t('report.title'), t('report.done')))
-            .catch((e: unknown) => showError(e)),
+            .catch((e: unknown) => { logCaught('hooks/useFeed.ts:reportWithReason', e); return showError(e); }),
       })),
       { text: t('common.cancel'), style: 'cancel' as const },
     ]);
@@ -455,7 +459,7 @@ export function useFeed() {
               setPosts((prev) => prev.filter((p) => p.creator.id !== post.creator.id));
               Alert.alert(t('report.blockTitle'), t('report.blockDone', { name }));
             })
-            .catch((e: unknown) => showError(e)),
+            .catch((e: unknown) => { logCaught('hooks/useFeed.ts:onBlockUser', e); return showError(e); }),
       },
     ]);
   };
@@ -482,7 +486,7 @@ export function useFeed() {
       .then(() =>
         Alert.alert(t('feed.title'), t('feed.followed', { name: post.creator.displayName }))
       )
-      .catch(() => Alert.alert(t('common.error'), t('feed.followFailed')));
+      .catch((caught) => { logCaught('hooks/useFeed.ts:onFollow', caught); return Alert.alert(t('common.error'), t('feed.followFailed')); });
   };
 
   const viewedRef = useRef<Set<string>>(new Set());
@@ -530,7 +534,8 @@ export function useFeed() {
           Platform.OS === 'web'
             ? activeVideoElRef.current?.currentTime ?? 0
             : player.currentTime ?? 0;
-      } catch {
+      } catch (caught) {
+        logCaught('hooks/useFeed.ts:useFeed', caught);
         return;
       }
       if (durSec > 0 && watchedSec > 0) {
@@ -555,7 +560,7 @@ export function useFeed() {
           v.pause();
         } else {
           v.muted = mutedRef.current;
-          void v.play().catch(() => {});
+          void v.play().catch((caught) => { logCaught('hooks/useFeed.ts:useFeed', caught); });
         }
       }
       return;
@@ -579,7 +584,7 @@ export function useFeed() {
           player.play();
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useFeed.ts:useFeed', caught); });
     return () => {
       cancelled = true;
     };
@@ -647,7 +652,7 @@ export function useFeed() {
           setRemixMap((m) => ({ ...m, [activeTopId]: visibleRemixes(rx) }));
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useFeed.ts:useFeed', caught); });
     return () => {
       alive = false;
     };
@@ -656,7 +661,7 @@ export function useFeed() {
   const handleHotspot = (clip: InteractiveClip) => {
     const a = clip.action;
     if (a.type === 'url') {
-      Linking.openURL(a.url).catch(() => {});
+      Linking.openURL(a.url).catch((caught) => { logCaught('hooks/useFeed.ts:handleHotspot', caught); });
     } else if (a.type === 'seek') {
       if (Platform.OS === 'web') {
         const v = activeVideoElRef.current;
@@ -693,7 +698,7 @@ export function useFeed() {
         const v = activeVideoElRef.current;
         if (v) {
           if (v.paused) {
-            void v.play().catch(() => {});
+            void v.play().catch((caught) => { logCaught('hooks/useFeed.ts:onTapItem', caught); });
             flashPlayPause(true);
           } else {
             v.pause();
@@ -804,7 +809,7 @@ export function useFeed() {
         el.volume = vol;
         el.muted = m;
         if (!m) {
-          void el.play().catch(() => {});
+          void el.play().catch((caught) => { logCaught('hooks/useFeed.ts:useFeed', caught); });
         }
       }
     } else {
@@ -838,7 +843,7 @@ export function useFeed() {
         v.muted = nm;
         v.volume = volumeRef.current;
         if (!nm) {
-          void v.play().catch(() => {});
+          void v.play().catch((caught) => { logCaught('hooks/useFeed.ts:onToggleMute', caught); });
         }
       }
     } else {

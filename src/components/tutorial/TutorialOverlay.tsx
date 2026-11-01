@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getLesson, localize, type Rect } from '@/lib/tutorial';
 import { haptics, motion, palette, radius } from '@/design';
 import { useTutorial } from '@/store/tutorialStore';
+import { logCaught } from '@/lib/logCaught';
 
 const HOLE_PAD = 8;
 /** a kártya becsült magassága az elhelyezés-döntéshez (fölé/alá/középre) */
@@ -83,7 +84,7 @@ export function TutorialOverlay() {
             setRect(r);
           }
         })
-        .catch(() => {});
+        .catch((caught) => { logCaught('components/tutorial/TutorialOverlay.tsx:attempt', caught); });
     };
     const timers = MEASURE_ATTEMPTS_MS.map((d) => setTimeout(attempt, d));
     return () => {

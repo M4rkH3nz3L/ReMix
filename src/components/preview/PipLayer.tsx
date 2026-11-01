@@ -11,6 +11,7 @@ import { resolveClipUri } from '@/lib/assetResolve';
 import { activePipClips, sourceTimeAt } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * PiP-réteg (több videóréteg): a pip-sáv MINDEN, a lejátszófejnél aktív klipjét
@@ -212,7 +213,7 @@ function PipVideoClip({
           player.play();
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/preview/PipLayer.tsx:PipVideoClip', caught); });
   }, [player, clip, srcUri]);
 
   // sebesség + hangerő
@@ -239,7 +240,8 @@ function PipVideoClip({
       if (nowPlaying && !useEditorStore.getState().isPlaying) {
         try {
           player.pause();
-        } catch {
+        } catch (caught) {
+          logCaught('components/preview/PipLayer.tsx:sub', caught);
           // a lejátszó épp cserélődik/tölt
         }
       }

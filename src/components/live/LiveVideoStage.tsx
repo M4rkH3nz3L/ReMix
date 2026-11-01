@@ -11,6 +11,7 @@ import { palette } from '@/constants/editor';
 import { parseScenePayload, sceneHasVisible, type ScenePayload } from '@/lib/liveComposite';
 import { ensureLiveKit, fetchLiveToken } from '@/lib/livekit';
 import { tokenErrorCode, type LiveErrorCode } from '@/lib/liveState';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔴 A LiveKit-videó (WebRTC) rétege — MINDEN WebRTC-függő import ide van szigetelve
@@ -51,7 +52,7 @@ function MicControl({ muted }: { muted: boolean }) {
     // és a room (még nem / már nem) kész állapotában elutasíthat → kezeljük a rejectiont.
     const p = localParticipant?.setMicrophoneEnabled(!muted);
     if (p && typeof p.catch === 'function') {
-      p.catch(() => {});
+      p.catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:MicControl', caught); });
     }
   }, [localParticipant, muted]);
   return null;
@@ -69,7 +70,7 @@ function ScreenShareControl({ wantScreen }: { wantScreen: boolean }) {
   useEffect(() => {
     const p = localParticipant?.setScreenShareEnabled(wantScreen);
     if (p && typeof p.catch === 'function') {
-      p.catch(() => {});
+      p.catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:ScreenShareControl', caught); });
     }
   }, [localParticipant, wantScreen]);
   return null;
@@ -104,9 +105,10 @@ function SceneDataPublisher({ scene }: { scene: ScenePayload | null }) {
         // mint a ScreenShareControl-ban, különben „Uncaught (in promise)".
         const pub = p.publishData(bytes, { reliable: true, topic: 'scene' });
         if (pub && typeof pub.catch === 'function') {
-          pub.catch(() => {});
+          pub.catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:send', caught); });
         }
-      } catch {
+      } catch (caught) {
+        logCaught('components/live/LiveVideoStage.tsx:send', caught);
         // best-effort — az in-app nézők úgyis a Supabase-realtime-on kapják a jelenetet
       }
     };
@@ -136,7 +138,8 @@ function SceneDataReceiver({ hostId, onScene }: { hostId: string; onScene: (p: S
       if (parsed) {
         onSceneRef.current(parsed);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('components/live/LiveVideoStage.tsx:SceneDataReceiver', caught);
       // hibás payload → eldobjuk
     }
   });
@@ -158,7 +161,7 @@ function CameraFacingControl({ facing }: { facing: 'front' | 'back' }) {
     const pub = localParticipant?.getTrackPublications().find((p) => p.kind === 'video' && p.source === 'camera');
     const track = pub?.track as { restartTrack?: (o: { facingMode: string }) => Promise<void> } | undefined;
     const p = track?.restartTrack?.({ facingMode: facing === 'back' ? 'environment' : 'user' });
-    if (p && typeof p.catch === 'function') p.catch(() => {});
+    if (p && typeof p.catch === 'function') p.catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:CameraFacingControl', caught); });
   }, [facing, localParticipant]);
   return null;
 }
@@ -205,10 +208,10 @@ export default function LiveVideoStage({
   useEffect(() => {
     if (!publish) return;
     const started = AudioSession.startAudioSession?.();
-    if (started && typeof (started as Promise<void>).catch === 'function') (started as Promise<void>).catch(() => {});
+    if (started && typeof (started as Promise<void>).catch === 'function') (started as Promise<void>).catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:LiveVideoStage', caught); });
     return () => {
       const stopped = AudioSession.stopAudioSession?.();
-      if (stopped && typeof (stopped as Promise<void>).catch === 'function') (stopped as Promise<void>).catch(() => {});
+      if (stopped && typeof (stopped as Promise<void>).catch === 'function') (stopped as Promise<void>).catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:LiveVideoStage', caught); });
     };
   }, [publish]);
   const onFatalRef = useRef(onFatal);
@@ -226,6 +229,7 @@ export default function LiveVideoStage({
       }
       let fatal: LiveErrorCode | null = null;
       const tok = await fetchLiveToken(liveId, publish, name, userId).catch((e: Error) => {
+        logCaught('components/live/LiveVideoStage.tsx:attemptFetch', e);
         // a befejezett / nem létező adásra NINCS újrapróba (a szerver 404/410-et ad)
         fatal = tokenErrorCode(String(e?.message ?? ''));
         return null;
@@ -252,8 +256,8 @@ export default function LiveVideoStage({
       ensureLiveKit();
       if (publish) {
         // 🔐 L28: a megtagadott engedély NEM csendes — a host érthető hibát kap
-        const cam = await requestCam().catch(() => null);
-        const mic = await requestMic().catch(() => null);
+        const cam = await requestCam().catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:LiveVideoStage', caught); return null; });
+        const mic = await requestMic().catch((caught) => { logCaught('components/live/LiveVideoStage.tsx:LiveVideoStage', caught); return null; });
         if (!cam?.granted || !mic?.granted) {
           onFatalRef.current?.('permission');
         }

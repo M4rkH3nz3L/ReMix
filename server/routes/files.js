@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🗂️ ReMix Storage route-ok — a user saját, mappás fájl-tára (élesben R2).
 //
 // Domain-router (01-api-architecture §01.1). Minden route requireAuth; a hívó a
@@ -60,6 +61,7 @@ const handle = (fn) => async (req, res) => {
   try {
     await fn(req, res, uid);
   } catch (err) {
+    logCaught('routes/files.js:handle', err);
     if (res.headersSent) {
       res.end();
       return;

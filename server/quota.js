@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🗄️ Tárhely-kvóta — a MI tárhelyünkön (Supabase `renders` bucket / szerver-média)
 // fekvő bájtok elszámolása és a KEMÉNY limit-tiltás szerver-oldali fele.
 //
@@ -56,7 +57,7 @@ async function recordObject(userId, { projectId = null, bucket = 'renders', key,
   });
   if (error) {
     if (/quota_exceeded/i.test(error.message)) {
-      throw new QuotaExceededError(await usageFor(uid).catch(() => null));
+      throw new QuotaExceededError(await usageFor(uid).catch((caught) => { logCaught('quota.js:recordObject', caught); return null; }));
     }
     throw new Error(error.message);
   }
@@ -69,7 +70,7 @@ async function recordObject(userId, { projectId = null, bucket = 'renders', key,
  * (az a `recordObject`), csak gyors, felhasználóbarát elutasítás.
  */
 async function wouldExceed(userId, incomingBytes) {
-  const usage = await usageFor(userId).catch(() => null);
+  const usage = await usageFor(userId).catch((caught) => { logCaught('quota.js:wouldExceed', caught); return null; });
   if (!usage) {
     return { exceeded: false, usage: null };
   }

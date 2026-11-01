@@ -17,6 +17,7 @@ import { loadVersions, saveVersions, type ProjectVersion } from '@/lib/storage';
 import { compareProjects } from '@/lib/versionDiff';
 import { mergeVersionLists, type CloudVersionMeta, type VersionListItem } from '@/lib/versionsSync';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -59,8 +60,8 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
   // 🕓 a mentett verziók betöltése a modal megnyitásakor (async → nem sync setState)
   useEffect(() => {
     if (visible && projectId) {
-      loadVersions(projectId).then(setVersions).catch(() => setVersions([]));
-      listCloudVersionMetas(projectId).then(setCloudMetas).catch(() => setCloudMetas([]));
+      loadVersions(projectId).then(setVersions).catch((caught) => { logCaught('components/editor/HistoryModal.tsx:HistoryModal', caught); return setVersions([]); });
+      listCloudVersionMetas(projectId).then(setCloudMetas).catch((caught) => { logCaught('components/editor/HistoryModal.tsx:HistoryModal', caught); return setCloudMetas([]); });
     }
   }, [visible, projectId]);
 
@@ -82,7 +83,7 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
       // ☁️ a kézi snapshot azonnal megy a felhőbe is (best-effort)
       .then(() => pushProjectVersions(p.id))
       .then(() => listCloudVersionMetas(p.id).then(setCloudMetas))
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/editor/HistoryModal.tsx:saveCurrentVersion', caught); });
     // 🧾 aktivitás a projekt-szobába (ha tag vagyok — best-effort)
     void import('@/lib/collab').then(({ myMembership }) =>
       myMembership(p.id).then((m) =>
@@ -90,7 +91,7 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
           logProjectActivity(m.ownerId, p.id, `🕓 ${t('editor.versions.logSnapshot', { name: v.name })}`)
         ) : undefined
       )
-    ).catch(() => {});
+    ).catch((caught) => { logCaught('components/editor/HistoryModal.tsx:saveCurrentVersion', caught); });
   };
 
   /** a lista-elem TELJES pillanatképe: lokálisból azonnal, felhőből letöltve */
@@ -117,7 +118,7 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
     };
     const next = [...versions, copy];
     setVersions(next);
-    saveVersions(projectId, next).catch(() => {});
+    saveVersions(projectId, next).catch((caught) => { logCaught('components/editor/HistoryModal.tsx:duplicateVersion', caught); });
   };
 
   // 🔍 összehasonlítás a JELENLEGI állapottal (mi változott a pillanatkép óta)
@@ -172,7 +173,7 @@ export function HistoryModal({ visible, onClose }: { visible: boolean; onClose: 
     setVersions(next);
     setCloudMetas((metas) => metas.filter((m) => m.versionId !== item.id));
     if (projectId) {
-      saveVersions(projectId, next).catch(() => {});
+      saveVersions(projectId, next).catch((caught) => { logCaught('components/editor/HistoryModal.tsx:deleteVersion', caught); });
       if (item.inCloud) {
         void deleteCloudVersion(projectId, item.id);
       }

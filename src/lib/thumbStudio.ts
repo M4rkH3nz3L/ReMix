@@ -9,6 +9,7 @@ import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Project, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Thumbnail Studio (Creative Canvas): a worker kiválasztja a projekt első
@@ -61,7 +62,8 @@ export async function suggestThumbnails(
       jpegBase64: t.jpegBase64,
       uri: `data:image/jpeg;base64,${t.jpegBase64}`,
     }));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/thumbStudio.ts:suggestThumbnails', caught);
     return null;
   }
 }
@@ -87,7 +89,8 @@ export async function fetchThumbHeadlines(summary: string): Promise<string[] | n
       .filter((h) => h.length > 0)
       .slice(0, 3);
     return list.length > 0 ? list : localThumbHeadlines(summary);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/thumbStudio.ts:fetchThumbHeadlines', caught);
     return localThumbHeadlines(summary);
   }
 }
@@ -108,7 +111,8 @@ export async function composeThumbnail(
       if (src.exists) {
         src.delete();
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/thumbStudio.ts:composeThumbnail', caught);
       // felülírja a write
     }
     src.write(Uint8Array.from(atob(thumb.jpegBase64), (c) => c.charCodeAt(0)));
@@ -131,7 +135,8 @@ export async function composeThumbnail(
       jpegBase64: body.jpegBase64,
       uri: `data:image/jpeg;base64,${body.jpegBase64}`,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/thumbStudio.ts:composeThumbnail', caught);
     return null;
   }
 }
@@ -151,7 +156,8 @@ export async function saveAndShareThumbnail(
     if (target.exists) {
       target.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/thumbStudio.ts:saveAndShareThumbnail', caught);
     // ha nem törölhető, a write úgyis hibát ad
   }
   target.write(Uint8Array.from(atob(thumb.jpegBase64), (c) => c.charCodeAt(0)));
@@ -162,7 +168,8 @@ export async function saveAndShareThumbnail(
     if (permission.granted) {
       await MediaLibrary.saveToLibraryAsync(target.uri);
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/thumbStudio.ts:saveAndShareThumbnail', caught);
     // engedély nélkül a megosztó is felajánlja a mentést
   }
   if (await Sharing.isAvailableAsync()) {

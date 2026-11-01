@@ -1,6 +1,7 @@
 import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎚️ Stem-szeparáció (AI audio, Phase D) — a hangot komponensekre bontja a worker
@@ -23,7 +24,7 @@ export async function separateStems(uri: string): Promise<Stem[]> {
     body: form,
     headers: await workerAuthHeaders(),
   });
-  const body = (await res.json().catch(() => ({}))) as { stems?: Stem[]; error?: string };
+  const body = (await res.json().catch((caught) => { logCaught('lib/stems.ts:separateStems', caught); return {}; })) as { stems?: Stem[]; error?: string };
   if (!res.ok) {
     throw new Error(body.error || 'stems_failed');
   }

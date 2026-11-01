@@ -5,6 +5,7 @@ import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { workerAuthHeaders } from '@/lib/workerAuth';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🏔️ 2.5D Photo-to-3D kliens (🧊 3D V1): a worker /depth/parallax végpontja a
@@ -36,7 +37,8 @@ export async function depthAvailable(): Promise<boolean> {
     const res = await fetchWithTimeout(`${renderServerUrl()}/health`, 4000);
     const body = (await res.json()) as { depth?: boolean };
     return Boolean(body.depth);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/depthClient.ts:depthAvailable', caught);
     return false;
   }
 }
@@ -57,7 +59,8 @@ export async function requestDepthParallax(
       return null;
     }
     return body;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/depthClient.ts:requestDepthParallax', caught);
     return null;
   }
 }
@@ -99,7 +102,8 @@ export async function requestDepthFocus(uri: string): Promise<DepthFocusResult |
       await File.downloadFileAsync(remote, target, { headers: await workerAuthHeaders() });
     }
     return { ...body, previewUri: target.uri };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/depthClient.ts:requestDepthFocus', caught);
     return null;
   }
 }

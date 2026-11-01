@@ -16,6 +16,7 @@ import { importYouTubeMedia, type YtKind } from '@/lib/youtube';
 import { useEditorStore } from '@/store/editorStore';
 import { usePaywall } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
+import { logCaught } from '@/lib/logCaught';
 
 type ProviderState =
   | { state: 'loading' }
@@ -118,7 +119,7 @@ export function LibraryPanel() {
           );
         } else if (m.kind === 'video') {
           const duration = m.duration || 5;
-          ensureProxy(m.uri).catch(() => {});
+          ensureProxy(m.uri).catch((caught) => { logCaught('components/editor/panels/LibraryPanel.tsx:importFromUrl', caught); });
           addClip(
             'video',
             {
@@ -152,6 +153,7 @@ export function LibraryPanel() {
         setUrl('');
       })
       .catch((e: Error) => {
+      logCaught('components/editor/panels/LibraryPanel.tsx:importFromUrl', e);
         if (isProRequiredError(e)) {
           usePaywall.getState().open(e.capability);
         } else {
@@ -187,6 +189,7 @@ export function LibraryPanel() {
             });
           })
           .catch((err: Error) => {
+          logCaught('components/editor/panels/LibraryPanel.tsx:fetchAll', err);
             setStates((prev) => ({
               ...prev,
               [provider.id]: { state: 'error', message: err.message },
@@ -255,7 +258,7 @@ export function LibraryPanel() {
           );
         } else if (entry.kind === 'video') {
           const duration = probedDuration || 5;
-          ensureProxy(resolved.uri).catch(() => {});
+          ensureProxy(resolved.uri).catch((caught) => { logCaught('components/editor/panels/LibraryPanel.tsx:addEntry', caught); });
           addClip(
             'video',
             {
@@ -287,7 +290,8 @@ export function LibraryPanel() {
           );
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('components/editor/panels/LibraryPanel.tsx:addEntry', caught);
         setStates((prev) => ({
           ...prev,
           [provider.id]: { state: 'error', message: t('panels.library.downloadFailed') },

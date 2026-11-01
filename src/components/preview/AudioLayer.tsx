@@ -10,6 +10,7 @@ import { clamp } from '@/lib/time';
 import { ensureVoiceProxy, getVoiceProxySync, needsVoiceProxy } from '@/lib/voiceProxy';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** a hangot hordozó sávok — mindhez saját lejátszó, egyszerre szólnak */
 const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
@@ -140,7 +141,8 @@ function VideoVoice() {
         loadedRef.current = null;
         try {
           player.pause();
-        } catch {
+        } catch (caught) {
+          logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught);
           // a lejátszó már eldobható állapotban lehet
         }
       }
@@ -152,7 +154,8 @@ function VideoVoice() {
     loadedRef.current = uri;
     try {
       player.replace(uri);
-    } catch {
+    } catch (caught) {
+      logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught);
       // hibás fájl — a videó saját hangja veszi vissza
     }
   }, [player, uri]);
@@ -172,17 +175,18 @@ function VideoVoice() {
         ) * masterVolume;
       if (isPlaying) {
         if (!player.playing) {
-          player.seekTo(sourceTime).catch(() => {});
+          player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
           player.play();
         } else if (shouldResync(sourceTime, player.currentTime)) {
           // 🎚️ A/V-drift-korrekció: a natív hang elcsúszott a mestéróra playheadjétől → vissza
-          player.seekTo(sourceTime).catch(() => {});
+          player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
         }
       } else {
         player.pause();
-        player.seekTo(sourceTime).catch(() => {});
+        player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
       }
-    } catch {
+    } catch (caught) {
+      logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught);
       // a lejátszó még nem áll készen
     }
   }, [player, uri, clip, playhead, isPlaying, masterVolume]);
@@ -297,11 +301,11 @@ function ClipAudioPlayer({
     try {
       player.replace(playUri);
       const state = useEditorStore.getState();
-      player.seekTo(sourceTimeOf(clip, state.playhead)).catch(() => {});
+      player.seekTo(sourceTimeOf(clip, state.playhead)).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
       if (state.isPlaying) {
         player.play();
       }
-    } catch {}
+    } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
   }, [player, clip, playUri]);
 
   // play/pause követés; a klip inaktívvá válásakor (unmount) elhallgat
@@ -312,11 +316,11 @@ function ClipAudioPlayer({
       } else {
         player.pause();
       }
-    } catch {}
+    } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
     return () => {
       try {
         player.pause();
-      } catch {}
+      } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
     };
   }, [player, isPlaying]);
 
@@ -336,12 +340,12 @@ function ClipAudioPlayer({
       const sourceTime = sourceTimeOf(clip, playhead);
       if (!isPlaying) {
         // álló óránál a forrás-időre tekerünk (egységes seek-pont)
-        player.seekTo(sourceTime).catch(() => {});
+        player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
       } else if (player.playing && shouldResync(sourceTime, player.currentTime)) {
         // 🎚️ A/V-drift-korrekció lejátszás közben (a jank miatti elcsúszás behúzása)
-        player.seekTo(sourceTime).catch(() => {});
+        player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
       }
-    } catch {}
+    } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
   }, [player, playhead, isPlaying, clip, audible, masterVolume, trackGain]);
 
   return null;

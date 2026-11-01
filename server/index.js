@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // vided render worker — dev: `npm start` (port 8787).
 // POST /render  (multipart: `project` JSON-mező + fájlok, fieldname = a manifest kulcsa)
 //   a project JSON mellé `uriMap` mező jön: { "<clip uri>": "<file fieldname>" }
@@ -119,7 +120,7 @@ app.get('/health', async (_req, res) => {
     aiAvailable(),
     aiProvider(),
     visionAvailable(),
-    listWorkers().catch(() => []),
+    listWorkers().catch((caught) => { logCaught('index.js', caught); return []; }),
   ]);
   res.json({
     ok: true,
@@ -261,11 +262,11 @@ if (require.main === module) {
   // Csak akkor fut valóban, ha az egress + service_role konfigurált (egressConfigured).
   const { sweepStaleEgress, reconcileLive } = require('./liveEgress');
   setInterval(() => {
-    sweepStaleEgress().catch(() => {});
+    sweepStaleEgress().catch((caught) => { logCaught('index.js', caught); });
   }, 5 * 60 * 1000).unref();
   // 🩹 PRO-LIVE L14/L16: beragadt sessionök + az egress valós (LiveKit) állapotának egyeztetése
   setInterval(() => {
-    reconcileLive().catch(() => {});
+    reconcileLive().catch((caught) => { logCaught('index.js', caught); });
   }, 60 * 1000).unref();
 
   // 🗑️ GDPR hard-erase sweep (03-production §03.4): a lejárt-cooldownú soft-delete-elt
@@ -289,7 +290,7 @@ if (require.main === module) {
     console.log(`vided render worker: http://localhost:${PORT}`);
     ensureSfx()
       .then(() => console.log('SFX-könyvtár kész (server/assets/sfx)'))
-      .catch(() => {});
+      .catch((caught) => { logCaught('index.js', caught); });
   });
 }
 

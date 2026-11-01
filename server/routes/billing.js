@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 💳 Billing / shop-kredit route-ok (manuális/dev aktiválás + RevenueCat webhook).
 //
 // Domain-router (01-api-architecture §01.1). A handlerek SZÓ SZERINT az index.js-ből
@@ -35,6 +36,7 @@ router.post('/billing/activate', express.json({ limit: '16kb' }), devBillingGuar
   activatePro(userId, { days: Number.isFinite(days) ? days : 30, source: 'manual' })
     .then((result) => res.json(result))
     .catch((err) => {
+    logCaught('routes/billing.js', err);
       console.error('Billing activate hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
@@ -55,6 +57,7 @@ router.post('/shop/credits/grant', express.json({ limit: '16kb' }), devBillingGu
   grantCredits(userId, Number.isFinite(amount) ? amount : 100, 'topup', 'manual')
     .then((result) => res.json(result))
     .catch((err) => {
+    logCaught('routes/billing.js', err);
       console.error('Credit grant hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
@@ -74,6 +77,7 @@ router.post('/billing/deactivate', express.json({ limit: '16kb' }), devBillingGu
   deactivatePro(target, { source: 'manual', status: 'canceled' })
     .then((result) => res.json(result))
     .catch((err) => {
+    logCaught('routes/billing.js', err);
       console.error('Billing deactivate hiba:', err.message);
       res.status(400).json({ error: err.message });
     });
@@ -94,6 +98,7 @@ router.post('/billing/revenuecat', express.json({ limit: '256kb' }), (req, res) 
   handleRevenueCatEvent(req.body ?? {})
     .then((result) => res.json(result))
     .catch((err) => {
+    logCaught('routes/billing.js', err);
       console.error('RevenueCat webhook hiba:', err.message);
       res.status(400).json({ error: err.message });
     });

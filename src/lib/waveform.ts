@@ -1,6 +1,7 @@
 import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Hang-hullámforma az idővonalhoz ÉS a Hang Stúdióhoz. A csúcsokat AZ ESZKÖZÖN
@@ -69,7 +70,8 @@ async function computeNativeWaveform(uri: string): Promise<WaveformData | null> 
     const audio = await api.decodeAudioData(uri, 8000);
     markAudioApi(true);
     return peaksFromChannel(audio.getChannelData(0), audio.sampleRate, audio.duration, 20);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/waveform.ts:computeNativeWaveform', caught);
     return null; // az adott fájl nem dekódolható → worker-fallback
   }
 }
@@ -105,7 +107,8 @@ async function computeWebWaveform(uri: string): Promise<WaveformData | null> {
     return peaks.length > 0
       ? { duration: audio.duration, peaksPerSecond: pps, peaks }
       : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/waveform.ts:computeWebWaveform', caught);
     return null;
   }
 }
@@ -136,7 +139,8 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
       if (cacheFile.exists) {
         return JSON.parse(await cacheFile.text()) as WaveformData;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/waveform.ts:getWaveform', caught);
       cacheFile = null;
     }
     try {
@@ -144,12 +148,14 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
       if (data && cacheFile) {
         try {
           cacheFile.write(JSON.stringify(data));
-        } catch {
+        } catch (caught) {
+          logCaught('lib/waveform.ts:getWaveform', caught);
           // a lemez-cache opcionális
         }
       }
       return data;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/waveform.ts:getWaveform', caught);
       return null;
     }
   })();

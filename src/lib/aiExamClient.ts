@@ -13,6 +13,7 @@ import {
   type AiTask,
 } from '@/lib/aiProviders';
 import { renderServerUrl } from '@/lib/render';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧪 Feladat-vizsga futtató (local-ai 5.3) — a tiszta vizsga-mag
@@ -63,10 +64,11 @@ async function runSingleExam(
     if (!res.ok) {
       return { task, ok: false, reason: `HTTP ${res.status}` };
     }
-    const body: unknown = await res.json().catch(() => null);
+    const body: unknown = await res.json().catch((caught) => { logCaught('lib/aiExamClient.ts:runSingleExam', caught); return null; });
     const verdict = evaluateExamResponse(task, body, fixture);
     return verdict.ok ? { task, ok: true } : { task, ok: false, reason: verdict.reason };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/aiExamClient.ts:runSingleExam', caught);
     return { task, ok: false, reason: 'network' };
   }
 }
@@ -84,7 +86,8 @@ export async function examineProvider(provider: AiProvider): Promise<ProviderExa
   const passed = results.filter((r) => r.ok).map((r) => r.task);
   try {
     await saveProviderExam(provider.id, passed, providerFingerprint(provider));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/aiExamClient.ts:examineProvider', caught);
     // offline/migráció-hiány esetén a mentés kimarad — a következő mentés pótolja
   }
   return results;

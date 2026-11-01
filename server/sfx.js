@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Alap hangeffekt-csomag generálása FFmpeg-szintézissel (első indításkor).
 // A server/music mappába dobott saját fájlok (mp3/m4a/wav) szintén bekerülnek
 // a könyvtárba — így a zenei kínálat fájlmásolással bővíthető.
@@ -136,7 +137,8 @@ async function listLibrary() {
     let bpm = 0;
     try {
       bpm = (await analyzeBeats(file)).bpm || 0;
-    } catch {
+    } catch (caught) {
+      logCaught('sfx.js:listLibrary', caught);
       // elemzés-hiba → semleges energia, a track így is használható
     }
     items.push({

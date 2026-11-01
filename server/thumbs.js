@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Thumbnail Studio (Creative Canvas): a videó legjobb borítókép-kockáinak
 // kiválasztása — függőség-mentes pontozással: élesség (Laplace-variancia) +
 // kontraszt (szórás) + fényerő-büntetés a túl sötét/világos kockákra.
@@ -135,7 +136,8 @@ async function faceBonusFor(file, t, width, height) {
       bonus: Math.round((30 * best.score * size + 12 * central) * 10) / 10,
       faces: faces.length,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('thumbs.js:faceBonusFor', caught);
     return { bonus: 0, faces: 0 };
   }
 }
@@ -204,7 +206,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('thumbs.js:findChromium', caught);
     // nincs playwright-cache
   }
   return null;

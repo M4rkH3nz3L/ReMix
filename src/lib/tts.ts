@@ -7,6 +7,7 @@ import { cloudBaseUrl, ensureCloud } from '@/lib/backend';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { fetchRead } from '@/lib/netRetry';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * TTS-kliens (AI-hang): a dev-worker `say`-alapú szöveg→beszéd végpontja.
@@ -41,7 +42,8 @@ export async function fetchTtsVoices(): Promise<{ available: boolean; voices: Tt
     }
     const body = await res.json();
     return { available: Boolean(body.available), voices: curate(body.voices ?? []) };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/tts.ts:fetchTtsVoices', caught);
     return { available: false, voices: [] };
   }
 }
@@ -70,7 +72,8 @@ export async function generateTts(
   const dir = projectMediaDir();
   try {
     dir.create();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/tts.ts:generateTts', caught);
     /* már létezik */
   }
   const target = new File(dir, `tts_${makeId('v')}.m4a`);

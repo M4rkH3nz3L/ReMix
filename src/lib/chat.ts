@@ -2,6 +2,7 @@ import { reachableMediaUrl } from '@/lib/mediaUrl';
 import { listProjects } from '@/lib/storage';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 💬 Realtime chat kliens-réteg — DM ÉS projekt-scoped (collab) beszélgetés.
@@ -341,7 +342,8 @@ async function resolveProjectNames(ids: string[]): Promise<Map<string, string>> 
         out.set(r.project_id, r.name);
       }
     });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/chat.ts:resolveProjectNames', caught);
     // offline / nincs jog → a helyi lista pótolja
   }
   if (out.size < unique.length) {
@@ -351,7 +353,8 @@ async function resolveProjectNames(ids: string[]): Promise<Map<string, string>> 
           out.set(m.id, m.name);
         }
       });
-    } catch {
+    } catch (caught) {
+      logCaught('lib/chat.ts:resolveProjectNames', caught);
       // nincs helyi tár (teszt/web) → marad, ami van
     }
   }
@@ -463,7 +466,8 @@ export async function logProjectActivity(
   try {
     const convId = await openProjectConversation(ownerId, projectId);
     await sendSystemMessage(convId, text);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/chat.ts:logProjectActivity', caught);
     // a napló sosem akaszthatja meg magát a műveletet
   }
 }

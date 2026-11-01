@@ -2,6 +2,7 @@ import { currentUserId } from '@/lib/collab';
 import { sweepAppMediaDirs } from '@/lib/mediaGcClient';
 import { deleteProject, listProjects, markProjectsDeleted } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧨 Tiszta lap: az ÖSSZES projekt törlése — eszközön ÉS a saját felhő-soraimban.
@@ -31,7 +32,8 @@ export async function wipeAllProjects(): Promise<WipeResult> {
   for (const m of metas) {
     try {
       await deleteProject(m.id);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectWipe.ts:wipeAllProjects', caught);
       // egy projekt hibája nem állítja meg a többit
     }
   }
@@ -59,7 +61,8 @@ export async function wipeAllProjects(): Promise<WipeResult> {
       ]);
       const projects = await supabase.from('cloud_projects').delete().eq('user_id', uid);
       cloudOk = [...results, projects].every((r) => !r.error);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/projectWipe.ts:wipeAllProjects', caught);
       cloudOk = false;
     }
   }

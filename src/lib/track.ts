@@ -14,6 +14,7 @@ import { workerAuthHeaders } from '@/lib/workerAuth';
  */
 
 import type { TrackPoint } from '@/lib/trackPlan';
+import { logCaught } from '@/lib/logCaught';
 
 export { pointsToPanKeyframes, pointsToPositionKeyframes } from '@/lib/trackPlan';
 export type { TrackPoint };
@@ -35,7 +36,8 @@ export async function trackSubject(
   const base = ensureCloud('objectTrack'); // Pro-kapu + a (dev/felhő) worker báziscíme
   try {
     await fetch(`${base}/health`);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/track.ts:trackSubject', caught);
     return null;
   }
   try {
@@ -57,7 +59,8 @@ export async function trackSubject(
     }
     const body = (await res.json()) as { points: TrackPoint[] };
     return Array.isArray(body.points) && body.points.length >= 2 ? body.points : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/track.ts:trackSubject', caught);
     return null;
   }
 }

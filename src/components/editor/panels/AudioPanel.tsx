@@ -23,6 +23,7 @@ import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import type { AudioClip, AudioFx, TextClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Hang-panel: voiceover-felvétel közvetlenül az appból + a kijelölt hangklip
@@ -127,14 +128,14 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   useEffect(() => {
     fetchSoundLibrary()
       .then(setLibrary)
-      .catch(() => setLibraryError(true));
+      .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); return setLibraryError(true); });
     fetchTtsVoices()
       .then((r) => {
         setTtsAvailable(r.available);
         setTtsVoices(r.voices);
         setTtsVoice(r.voices[0]?.name);
       })
-      .catch(() => setTtsAvailable(false));
+      .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); return setTtsAvailable(false); });
   }, []);
 
   const generateVoice = () => {
@@ -148,7 +149,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
         addAudioClip(uri, t('panels.audio.aiVoiceLabel'), duration, 'local', 'voiceover');
         setTtsText('');
       })
-      .catch((err: Error) => Alert.alert(t('panels.audio.aiVoiceLabel'), err.message))
+      .catch((err: Error) => { logCaught('components/editor/panels/AudioPanel.tsx:generateVoice', err); return Alert.alert(t('panels.audio.aiVoiceLabel'), err.message); })
       .finally(() => setTtsBusy(false));
   };
 
@@ -236,7 +237,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
           track.kind === 'sfx' ? 'sfx' : 'music'
         )
       )
-      .catch(() => Alert.alert(t('common.error'), t('panels.audio.downloadFailed')))
+      .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:addFromLibrary', caught); return Alert.alert(t('common.error'), t('panels.audio.downloadFailed')); })
       .finally(() => setBusyTrack(null));
   };
 
@@ -353,7 +354,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
           icon="folder-open-outline"
           label={t('panels.audio.importMusic')}
           onPress={() => {
-            importOwn().catch(() => Alert.alert(t('common.error'), t('panels.audio.importFailed')));
+            importOwn().catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); return Alert.alert(t('common.error'), t('panels.audio.importFailed')); });
           }}
         />
       </PanelSection>
@@ -367,7 +368,8 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
               : t('panels.audio.startRecording')
           }
           onPress={() => {
-            toggleRecord().catch(() => {
+            toggleRecord().catch((caught) => {
+              logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught);
               Alert.alert(t('common.error'), t('panels.audio.recordFailed'));
             });
           }}
@@ -416,7 +418,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
                   icon="language-outline"
                   label={t('panels.audio.dubBtn')}
                   onPress={() => {
-                    runDub().catch((err: Error) => Alert.alert(t('panels.audio.dubTitle'), err.message));
+                    runDub().catch((err: Error) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', err); return Alert.alert(t('panels.audio.dubTitle'), err.message); });
                   }}
                 />
               </>
@@ -456,14 +458,14 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
                 label={t('panels.audio.beatToMarkers')}
                 active={false}
                 onPress={() => {
-                  runBeatMarkers().catch(() => {});
+                  runBeatMarkers().catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); });
                 }}
               />
               <Chip
                 label={t('panels.audio.beatToCuts')}
                 active={false}
                 onPress={() => {
-                  runBeatCuts().catch(() => {});
+                  runBeatCuts().catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); });
                 }}
               />
             </View>

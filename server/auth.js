@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🔐 Worker-hitelesítés: Supabase JWT verifikáció + CORS-allowlist.
 //
 // A worker `service_role` kulccsal ír a Supabase-be, tehát MEGKERÜLI az RLS-t.
@@ -78,6 +79,7 @@ async function verifyToken(token) {
     }
     return { ok: true, user: { id: data.user.id, email: data.user.email ?? null } };
   } catch (err) {
+    logCaught('auth.js:verifyToken', err);
     return { ok: false, status: 401, error: `Token-verifikáció sikertelen: ${err.message}` };
   }
 }
@@ -113,7 +115,7 @@ function requireAuth(req, res, next) {
       }
       res.status(result.status).json({ error: result.error });
     })
-    .catch((err) => res.status(500).json({ error: `Hitelesítési hiba: ${err.message}` }));
+    .catch((err) => { logCaught('auth.js:requireAuth', err); return res.status(500).json({ error: `Hitelesítési hiba: ${err.message}` }); });
 }
 
 /**

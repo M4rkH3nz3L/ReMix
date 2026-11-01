@@ -5,6 +5,7 @@ import { openLiveChannel, type LiveChannel, type LiveParticipant } from '@/lib/c
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 import { setLiveBroadcaster, setLockBroadcaster, useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 👥 Élő kollaboráció store — a szerkesztő nyitja egy projektre. Ha a projekt
@@ -45,7 +46,7 @@ export const useCollabLive = create<CollabLiveState>((set, get) => ({
     if (!me?.id) {
       return;
     }
-    const membership = await myMembership(projectId).catch(() => null);
+    const membership = await myMembership(projectId).catch((caught) => { logCaught('store/collabLiveStore.ts:useCollabLive', caught); return null; });
     if (!membership) {
       return; // nem megosztott projekt → nincs élő collab
     }
@@ -56,7 +57,7 @@ export const useCollabLive = create<CollabLiveState>((set, get) => ({
     if (membership.role !== 'owner') {
       const ed = useEditorStore.getState();
       if (ed.project?.id === projectId && !ed.dirty) {
-        const fresh = await pullSharedProject(membership.ownerId, projectId).catch(() => null);
+        const fresh = await pullSharedProject(membership.ownerId, projectId).catch((caught) => { logCaught('store/collabLiveStore.ts:useCollabLive', caught); return null; });
         const now = useEditorStore.getState();
         // a pull alatt nem kezdett-e szerkeszteni / másik projektre váltani?
         if (fresh && now.project?.id === projectId && !now.dirty) {

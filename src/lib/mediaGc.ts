@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🧹 Projekt-média szemétgyűjtés — tiszta mag (ADR-013 kiegészítés).
  *
@@ -44,7 +46,8 @@ export function mediaFileKeyOf(uri: string): MediaFileKey | null {
     let name = pm[1];
     try {
       name = decodeURIComponent(name);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/mediaGc.ts:mediaFileKeyOf', caught);
       // marad a nyers név
     }
     return name.includes('..') ? null : { dir: 'Files', name };

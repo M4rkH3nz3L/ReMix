@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🎨 Color AI (P1, v1): kép/videó-kocka szín-statisztikái — az Auto Color és a
 // Match Color alapja. Determinisztikus mérés (nem modell): a kliens pure
 // leképezője fordítja a meglévő ClipAdjust-ra (fényerő/kontraszt/szaturáció/
@@ -213,7 +214,7 @@ async function exportLut(clip, size = 33) {
       '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-',
     ]);
   } finally {
-    try { fs.unlinkSync(inFile); } catch { /* ignore */ }
+    try { fs.unlinkSync(inFile); } catch (caught) { logCaught('color.js:exportLut', caught);  /* ignore */ }
   }
   const lines = ['# ReMix color grade export', `LUT_3D_SIZE ${S}`, ''];
   for (let k = 0; k < N; k++) {

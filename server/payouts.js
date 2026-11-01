@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 💸 Kifizetés (koin → pénz) — provideres, automata utalás.
 //
 // A koin-levonás + a payout-sor a DB-ben SZERVER-HITELES (request_payout_for RPC,
@@ -25,7 +26,7 @@ async function paypalToken() {
     headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=client_credentials',
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('payouts.js:paypalToken', caught); return {}; });
   if (!res.ok || !data.access_token) {
     throw new Error(data.error_description || `PayPal token hiba (${res.status})`);
   }
@@ -63,7 +64,7 @@ async function sendPayout(account, amountHuf, note) {
       ],
     }),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('payouts.js:sendPayout', caught); return {}; });
   if (!res.ok) {
     throw new Error(data.message || `PayPal payout hiba (${res.status})`);
   }

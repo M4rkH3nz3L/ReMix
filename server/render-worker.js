@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Render-worker: a queue-ból húzza a render-jobokat, letölti az S3-inputokat,
 // renderel (renderProject), és a kész MP4-et S3-ba tölti + progresszt jelent.
 // Indítás: `REDIS_URL=... S3_...=... node render-worker.js` (több példány =
@@ -43,7 +44,7 @@ async function heartbeat() {
     status: activeJobs.size > 0 ? 'busy' : 'idle',
     activeJobs: [...activeJobs.values()],
     startedAt: STARTED_AT,
-  }).catch(() => {}); // best-effort: a heartbeat sose döntse el a rendert
+  }).catch((caught) => { logCaught('render-worker.js:heartbeat', caught); }); // best-effort: a heartbeat sose döntse el a rendert
 }
 
 /** A job aktuális fázisának beállítása + azonnali heartbeat (a „Sor" reszponzív). */
@@ -106,7 +107,7 @@ const worker = new Worker(
             controller.abort();
           }
         })
-        .catch(() => {}); // best-effort — a poll hibája sose döntse el a rendert
+        .catch((caught) => { logCaught('render-worker.js:cancelPoll', caught); }); // best-effort — a poll hibája sose döntse el a rendert
     }, 1500);
     try {
       // 1) médiafájlok betöltése az S3-ból
@@ -146,12 +147,13 @@ const worker = new Worker(
       return { outKey };
     } finally {
       clearInterval(cancelPoll);
-      void clearJobCancel(job.id).catch(() => {}); // a flag ne ragadjon a Redisben
+      void clearJobCancel(job.id).catch((caught) => { logCaught('render-worker.js', caught); }); // a flag ne ragadjon a Redisben
       activeJobs.delete(job.id);
       void heartbeat(); // a befejezett feladat azonnal lekerül a workerről
       try {
         fs.rmSync(workDir, { recursive: true, force: true });
-      } catch {
+      } catch (caught) {
+        logCaught('render-worker.js', caught);
         /* nem fatális */
       }
     }
@@ -178,7 +180,7 @@ function notifyOwner(job, ok, errMessage) {
       : `${name} renderelése nem sikerült${errMessage ? `: ${String(errMessage).slice(0, 160)}` : '.'}`,
     route: '/schedules',
     data: { jobId: job.id, projectId: d.projectId || null, ok },
-  }).catch((e) => console.warn('[render-worker] értesítés hiba:', e.message));
+  }).catch((e) => { logCaught('render-worker.js:notifyOwner', e); return console.warn('[render-worker] értesítés hiba:', e.message); });
 }
 
 worker.on('completed', (job) => {
@@ -216,7 +218,8 @@ async function shutdown(sig) {
   try {
     await removeWorker(WORKER_ID);
     await worker.close();
-  } catch {
+  } catch (caught) {
+    logCaught('render-worker.js:shutdown', caught);
     /* leállásnál nem érdekel */
   }
   process.exit(0);

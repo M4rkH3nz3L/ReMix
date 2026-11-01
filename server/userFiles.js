@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🗂️ ReMix Storage — a user SAJÁT fájl-tára a MI tárhelyünkön (élesben Cloudflare R2).
 //
 // Projekt-független, mappás fájlkezelő: minden user egy saját prefix alatt
@@ -452,7 +453,7 @@ function s3Backend() {
       );
     },
     async mpAbort(key, id) {
-      await send(new sdk.AbortMultipartUploadCommand({ Bucket, Key: key, UploadId: id })).catch(() => {});
+      await send(new sdk.AbortMultipartUploadCommand({ Bucket, Key: key, UploadId: id })).catch((caught) => { logCaught('userFiles.js:mpAbort', caught); });
     },
   };
 }
@@ -568,14 +569,14 @@ function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_
     // ✅ ellenőrzés a célon: méret (+ MD5, ha a backend adja) — csak ezután „kész"
     const head = await backend.head(key);
     if (!head || head.size !== bytes || (head.etag && /^[0-9a-f]{32}$/.test(head.etag) && head.etag !== sum)) {
-      await backend.remove(key).catch(() => {});
+      await backend.remove(key).catch((caught) => { logCaught('userFiles.js:upload', caught); });
       throw new UserFilesError(502, 'verify_failed', 'A feltöltött példány ellenőrzése nem sikerült.');
     }
     try {
       await ledger.recordObject(uid, { projectId: null, bucket, key, bytes, source: 'server' });
     } catch (err) {
       // a kvóta-főkönyv elutasította (verseny) → a tárolt objektumot is visszavonjuk
-      await backend.remove(key).catch(() => {});
+      await backend.remove(key).catch((caught) => { logCaught('userFiles.js:upload', caught); });
       throw err;
     }
     return { name: finalName, path: p, size: bytes, md5: sum, deduplicated: false };
@@ -724,11 +725,12 @@ function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_
     const { folders } = await backend.list(userTrash(uid));
     const items = [];
     for (const id of folders) {
-      const raw = await backend.readText(`${userTrash(uid)}${id}/${TRASH_META}`).catch(() => null);
+      const raw = await backend.readText(`${userTrash(uid)}${id}/${TRASH_META}`).catch((caught) => { logCaught('userFiles.js:listTrash', caught); return null; });
       let meta = null;
       try {
         meta = raw ? JSON.parse(raw) : null;
-      } catch {
+      } catch (caught) {
+        logCaught('userFiles.js:listTrash', caught);
         meta = null;
       }
       const deletedAt = meta?.deletedAt ? Date.parse(meta.deletedAt) : now;
@@ -821,15 +823,15 @@ function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_
 
   /** a régi (félbehagyott) munkamenetek takarítása — best-effort */
   async function sweepSessions(uid, now) {
-    const { files } = await backend.list(userUploads(uid)).catch(() => ({ files: [] }));
+    const { files } = await backend.list(userUploads(uid)).catch((caught) => { logCaught('userFiles.js:sweepSessions', caught); return { files: [] }; });
     for (const f of files.filter((x) => x.name.endsWith('.json'))) {
-      const raw = await backend.readText(`${userUploads(uid)}${f.name}`).catch(() => null);
+      const raw = await backend.readText(`${userUploads(uid)}${f.name}`).catch((caught) => { logCaught('userFiles.js:sweepSessions', caught); return null; });
       const sess = raw ? JSON.parse(raw) : null;
       if (!sess || now - Date.parse(sess.createdAt) > UPLOAD_SESSION_DAYS * 86400000) {
         if (sess) {
-          await backend.mpAbort(sess.staging, sess.backendId).catch(() => {});
+          await backend.mpAbort(sess.staging, sess.backendId).catch((caught) => { logCaught('userFiles.js:sweepSessions', caught); });
         }
-        await backend.remove(`${userUploads(uid)}${f.name}`).catch(() => {});
+        await backend.remove(`${userUploads(uid)}${f.name}`).catch((caught) => { logCaught('userFiles.js:sweepSessions', caught); });
       }
     }
   }
@@ -920,8 +922,8 @@ function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_
         })
       : null;
     if (!head || head.size !== sess.size || sum !== sess.md5) {
-      await backend.remove(sess.staging).catch(() => {});
-      await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+      await backend.remove(sess.staging).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
+      await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
       throw new UserFilesError(422, 'checksum_mismatch', 'A fájl sérülten érkezett meg — próbáld újra.');
     }
     // végleges név (ütközés → „név (1)”), másolás a helyére, ellenőrzés, staging törlése
@@ -933,27 +935,27 @@ function createUserFiles({ backend, ledger, bucket = 'renders', partSize = PART_
     await backend.copy(sess.staging, key);
     const done = await backend.head(key);
     if (!done || done.size !== sess.size) {
-      await backend.remove(key).catch(() => {});
+      await backend.remove(key).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
       throw new UserFilesError(502, 'verify_failed', 'A feltöltött példány ellenőrzése nem sikerült.');
     }
     try {
       await ledger.recordObject(uid, { projectId: null, bucket, key, bytes: sess.size, source: 'server' });
     } catch (err) {
-      await backend.remove(key).catch(() => {});
+      await backend.remove(key).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
       throw err;
     }
-    await backend.remove(sess.staging).catch(() => {});
-    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+    await backend.remove(sess.staging).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
+    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch((caught) => { logCaught('userFiles.js:uploadComplete', caught); });
     return { name: finalName, path: p, size: sess.size, md5: sess.md5, deduplicated: false };
   }
 
   async function uploadAbort(uid, sid) {
-    const sess = await readSession(uid, sid).catch(() => null);
+    const sess = await readSession(uid, sid).catch((caught) => { logCaught('userFiles.js:uploadAbort', caught); return null; });
     if (sess) {
-      await backend.mpAbort(sess.staging, sess.backendId).catch(() => {});
-      await backend.remove(sess.staging).catch(() => {});
+      await backend.mpAbort(sess.staging, sess.backendId).catch((caught) => { logCaught('userFiles.js:uploadAbort', caught); });
+      await backend.remove(sess.staging).catch((caught) => { logCaught('userFiles.js:uploadAbort', caught); });
     }
-    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch(() => {});
+    await backend.remove(`${userUploads(uid)}${cleanSession(sid)}.json`).catch((caught) => { logCaught('userFiles.js:uploadAbort', caught); });
     return { aborted: true };
   }
 

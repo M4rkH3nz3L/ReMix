@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📊 Egy hang-klip spektrogramja (frekvencia-kép) a worker `/audio/spectrum`-ából: a klip audióját
@@ -29,7 +30,8 @@ export async function renderClipSpectrum(
     const target = new File(dir, `spec_${Date.now().toString(36)}.png`);
     target.write(new Uint8Array(await res.arrayBuffer()));
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/audioSpectrum.ts:renderClipSpectrum', caught);
     return null;
   }
 }

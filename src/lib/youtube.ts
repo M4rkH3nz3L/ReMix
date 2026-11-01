@@ -8,6 +8,7 @@ import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
 import { importYouTubeLocal } from '@/lib/youtubeLocal';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * URL-import kliens (YouTube stb.): a felhő-worker yt-dlp-alapú végpontja.
@@ -35,7 +36,8 @@ export async function youtubeAvailable(): Promise<boolean> {
     }
     const body = await res.json();
     return Boolean(body.youtube);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/youtube.ts:youtubeAvailable', caught);
     return false;
   }
 }
@@ -60,7 +62,8 @@ export async function importYouTubeMedia(
       if (local) {
         return local;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/youtube.ts:importYouTubeMedia', caught);
       // best-effort — bármi hiba esetén megy tovább a worker-fallback
     }
   }
@@ -100,7 +103,8 @@ export async function importYouTubeMedia(
   const dir = projectMediaDir();
   try {
     dir.create();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/youtube.ts:importYouTubeMedia', caught);
     /* már létezik */
   }
   const target = new File(dir, `yt_${makeId('m')}.${ext}`);

@@ -30,6 +30,7 @@ import { useCollabLive } from '@/store/collabLiveStore';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project, TrackType } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /** ezeken a sávokon van hang — csak ezek kapnak némítás/solo gombot */
 const AUDIBLE_TRACKS: TrackType[] = ['video', 'music', 'voiceover', 'sfx'];
@@ -532,7 +533,8 @@ export function Timeline({ compact = false }: { compact?: boolean } = {}) {
       beginScrub();
       try {
         node.setPointerCapture(e.pointerId);
-      } catch {
+      } catch (caught) {
+        logCaught('components/editor/Timeline.tsx:onDown', caught);
         /* nem támogatott — a mozgás akkor is működik */
       }
     };

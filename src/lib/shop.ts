@@ -6,6 +6,7 @@ import { saveProject } from '@/lib/storage';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🛒 Shop / marketplace kliens-réteg — a userek eladásai (sablon/asset-csomagok)
@@ -290,7 +291,7 @@ export async function buyCreditsDev(amount: number): Promise<number> {
     body: JSON.stringify({ userId, amount }),
   });
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
+    const msg = await res.text().catch((caught) => { logCaught('lib/shop.ts:buyCreditsDev', caught); return ''; });
     throw new Error(msg || 'A kredit-feltöltés nem sikerült.');
   }
   const data = (await res.json()) as { balance?: number };

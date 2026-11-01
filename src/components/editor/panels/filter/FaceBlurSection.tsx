@@ -9,6 +9,7 @@ import { clamp } from '@/lib/time';
 import { trackSubject } from '@/lib/track';
 import { useEditorStore } from '@/store/editorStore';
 import type { ImageClip, VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🙈 Arc-elmosás + 🎯 objektum-követő elmosás. Önálló szekció — saját
@@ -115,7 +116,7 @@ export function FaceBlurSection({ clip }: { clip: VideoClip | ImageClip }) {
         });
         Alert.alert(t('panels.filter.blurTrackDone'), t('panels.filter.blurTrackDoneBody', { count: track.length }));
       })
-      .catch((err: Error) => Alert.alert(t('panels.filter.blurTrackTitle'), err.message))
+      .catch((err: Error) => { logCaught('components/editor/panels/filter/FaceBlurSection.tsx:trackBlur', err); return Alert.alert(t('panels.filter.blurTrackTitle'), err.message); })
       .finally(() => setBlurTrackBusy(false));
   };
   const startBlurTrackPick = () => {

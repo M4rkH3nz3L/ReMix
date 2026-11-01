@@ -1,6 +1,7 @@
 import { createRateLimiter } from '@/lib/liveRate';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔴 Élő közvetítés (Live) — session-életciklus + „most élőben" lista + a LIVE-room
@@ -75,7 +76,8 @@ export async function buildLiveSelf(): Promise<LiveSelf | null> {
       .maybeSingle();
     name = (data?.full_name as string | undefined) || (data?.username as string | undefined) || name;
     avatar = (data?.avatar_url as string | undefined) ?? null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/live.ts:buildLiveSelf', caught);
     // best-effort; marad az e-mail-előtag
   }
   return { id: me.id, name, avatar };

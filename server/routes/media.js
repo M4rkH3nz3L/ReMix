@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🎬🎧 Média route-ok (thumbnail-compose / voice-preview / captions / waveform /
 // media-upload / audio-analyze / audio-stems).
 //
@@ -46,6 +47,7 @@ router.post('/thumbnails/compose', requireAuth, rateLimit('analysis'), upload.an
       res.json({ jpegBase64 });
     })
     .catch((err) => {
+    logCaught('routes/media.js', err);
       cleanup();
       console.error('thumb-compose hiba:', err.message);
       res.status(500).json({ error: err.message });
@@ -148,7 +150,8 @@ router.post('/captions', ...proOnly, upload.any(), (req, res) => {
           try {
             const srt = fs.readFileSync(`${outBase}.srt`, 'utf8');
             res.json({ srt });
-          } catch {
+          } catch (caught) {
+            logCaught('routes/media.js', caught);
             res.status(500).json({ error: 'A felirat-fájl nem jött létre.' });
           }
         }
@@ -212,7 +215,8 @@ router.post('/waveform', requireAuth, rateLimit('analysis'), upload.any(), media
           // a leghangosabb ponthoz normalizálva, 2 tizedesre kerekítve
           peaks: peaks.map((p) => Math.round((p / top) * 100) / 100),
         });
-      } catch {
+      } catch (caught) {
+        logCaught('routes/media.js', caught);
         cleanup();
         res.status(500).json({ error: 'A hullámforma-számítás nem sikerült.' });
       }
@@ -244,7 +248,8 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
     if (uid) {
       try {
         target = await userStorage.getDefaultTarget(uid);
-      } catch {
+      } catch (caught) {
+        logCaught('routes/media.js', caught);
         target = null;
       }
     }
@@ -294,6 +299,7 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
     }
     res.json({ url, key, size: bytes });
   } catch (err) {
+    logCaught('routes/media.js', err);
     if (err instanceof QuotaExceededError) {
       res.status(507).json({ error: 'quota_exceeded', usage: err.usage });
       return;
@@ -303,7 +309,8 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
   } finally {
     try {
       fs.unlinkSync(f.path);
-    } catch {
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
       // takarítás best-effort
     }
   }
@@ -353,7 +360,8 @@ router.post('/audio/analyze', requireAuth, rateLimit('analysis'), upload.any(), 
       if (dr) {
         out.dynamicRange = Number(dr[1]);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
       // az astats opcionális
     }
     // 🎨 spektrum-kép (opcionális): showspectrumpic → média-tár
@@ -372,20 +380,24 @@ router.post('/audio/analyze', requireAuth, rateLimit('analysis'), upload.any(), 
         out.spectrum = await mediaStoreUpload(`analyze/${crypto.randomUUID()}.png`, specPath, 'image/png', publicBase);
         try {
           fs.unlinkSync(specPath);
-        } catch {
+        } catch (caught) {
+          logCaught('routes/media.js', caught);
           // takarítás best-effort
         }
-      } catch {
+      } catch (caught) {
+        logCaught('routes/media.js', caught);
         // a spektrum opcionális — a mérés attól még megy
       }
     }
     res.json(out);
   } catch (err) {
+    logCaught('routes/media.js', err);
     res.status(500).json({ error: err.message });
   } finally {
     try {
       fs.unlinkSync(f.path);
-    } catch {
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
       // takarítás best-effort
     }
   }
@@ -420,17 +432,20 @@ router.post('/audio/stems', ...proOnly, upload.any(), async (req, res) => {
     }
     res.json({ stems: out });
   } catch (err) {
+    logCaught('routes/media.js', err);
     console.error('Stem-szeparáció hiba:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
     try {
       fs.unlinkSync(f.path);
-    } catch {
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
       // takarítás best-effort
     }
     try {
       fs.rmSync(workDir, { recursive: true, force: true });
-    } catch {
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
       // takarítás best-effort
     }
   }

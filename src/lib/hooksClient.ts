@@ -3,6 +3,7 @@ import { aiConfigForTask } from '@/lib/aiProviders';
 import type { HookSuggestion } from '@/lib/hooks';
 import { localHooks } from '@/lib/localTasks';
 import { renderServerUrl } from '@/lib/render';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🪝 Hook Generator hálózati kliens: a worker AI-rétege (lokális modell vagy
@@ -28,7 +29,8 @@ export async function fetchHooks(summary: string): Promise<HookSuggestion[] | nu
       .map((h) => ({ text: h.text.trim(), style: String(h.style ?? '').trim() }))
       .slice(0, 6);
     return list.length > 0 ? list : localHooks(summary);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/hooksClient.ts:fetchHooks', caught);
     return localHooks(summary);
   }
 }

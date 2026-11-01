@@ -53,6 +53,7 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
 import { persistToLibrary } from '@/lib/media';
+import { logCaught } from '@/lib/logCaught';
 
 const LANE_H = 70;
 const RULER_H = 24;
@@ -176,7 +177,7 @@ export function AudioStudioBody({
       // amiben iOS-en a kimenet a fülhallgató-hangszóróra megy (halk/„néma"
       // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
       // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught); });
       // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
       const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
       if (uri) {
@@ -418,6 +419,7 @@ export function AudioStudioBody({
       await publishRenderedProject(albumProject, undefined, { visibility: 'public' });
       Alert.alert(t('studio.audio.album.doneTitle', { defaultValue: 'Megosztva' }), t('studio.audio.album.doneBody', { defaultValue: 'Az album felkerült a feedbe.' }));
     } catch (e) {
+      logCaught('components/studio/audio/AudioStudioBody.tsx:shareAlbum', e);
       Alert.alert(t('common.error', { defaultValue: 'Hiba' }), (e as Error).message);
     } finally {
       setAlbumSharing(false);

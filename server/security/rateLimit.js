@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🧱 Rate limiting (OWASP API4 — Unrestricted Resource Consumption).
 //
 // A worker publikus compute-API: FFmpeg/Chromium/ONNX/AI végpontok hívhatók.
@@ -125,7 +126,8 @@ function store() {
       sharedStore = new RedisStore(connection());
       return sharedStore;
     }
-  } catch {
+  } catch (caught) {
+    logCaught('security/rateLimit.js:store', caught);
     // a queue modul hiánya/hibája → in-memory fallback
   }
   sharedStore = new MemoryStore();
@@ -174,7 +176,7 @@ function rateLimit(className) {
           error: `Túl sok kérés. Próbáld újra ${r.retryAfterSec} mp múlva.`,
         });
       })
-      .catch(() => next()); // a limiter hibája SOHA ne dobja el a legitim kérést
+      .catch((caught) => { logCaught('security/rateLimit.js:rateLimit', caught); return next(); }); // a limiter hibája SOHA ne dobja el a legitim kérést
   };
 }
 

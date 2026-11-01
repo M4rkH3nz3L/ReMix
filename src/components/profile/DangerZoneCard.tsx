@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { wipeAllProjects } from '@/lib/projectWipe';
 import { profileStyles as styles } from './styles';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🧨 Veszélyzóna: az ÖSSZES projekt törlése (eszköz + saját felhő-sorok) —
@@ -29,7 +30,7 @@ export function DangerZoneCard() {
           }),
         ),
       )
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+      .catch((e: Error) => { logCaught('components/profile/DangerZoneCard.tsx:runWipe', e); return Alert.alert(t('common.error'), e.message); })
       .finally(() => setBusy(false));
   };
 

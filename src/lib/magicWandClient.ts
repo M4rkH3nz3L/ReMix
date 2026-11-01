@@ -3,6 +3,7 @@ import { AlphaType, ColorType, Skia } from '@shopify/react-native-skia';
 import { magicWandOutline } from '@/lib/magicWand';
 import type { CanvasPoint } from '@/lib/penPath';
 import { boxToImage, imageToBox, type LayerFit } from '@/lib/wandMapping';
+import { logCaught } from '@/lib/logCaught';
 
 /** a flood-fill költsége O(px) → nagy képet erre a hosszabb-oldal-méretre skálázunk */
 const MAX_DIM = 900;
@@ -65,7 +66,8 @@ export async function magicWandSelect(
     const sy = Math.max(0, Math.min(h - 1, Math.round(seed.y * (h - 1))));
     const outline = magicWandOutline(px, w, h, sx, sy, tolerance);
     return outline ? outline.map((p) => imageToBox(p, imageAspect, placement.boxAspect, placement.fit)) : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/magicWandClient.ts:magicWandSelect', caught);
     return null;
   }
 }

@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🔁 Újrapróbálkozás — SZÁNDÉKOSAN csak IDEMPOTENS OLVASÁSOKRA.
  *
@@ -146,7 +148,7 @@ export async function readJson<T = Record<string, unknown>>(
   res: Response,
   fallback: string
 ): Promise<T> {
-  const text = await res.text().catch(() => '');
+  const text = await res.text().catch((caught) => { logCaught('lib/netRetry.ts:readJson', caught); return ''; });
   if (!text.trim()) {
     if (res.ok) {
       return {} as T;

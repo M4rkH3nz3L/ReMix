@@ -6,6 +6,7 @@ import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Asset } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * StorageProvider-réteg (full-plan F2): a média bárhol lehet — a szerkesztő a
@@ -73,7 +74,8 @@ const serverLibraryProvider: StorageProvider = {
     try {
       const res = await fetchWithTimeout(`${renderServerUrl()}/health`, 4000);
       return res.ok;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/storageProviders.ts:isAvailable', caught);
       return false;
     }
   },
@@ -128,7 +130,8 @@ function remoteSourceProvider(source: {
       try {
         const res = await fetchWithTimeout(`${renderServerUrl()}/health`, 4000);
         return res.ok;
-      } catch {
+      } catch (caught) {
+        logCaught('lib/storageProviders.ts:isAvailable', caught);
         return false;
       }
     },
@@ -175,7 +178,8 @@ function remoteSourceProvider(source: {
         );
         const body = await res.json();
         return typeof body.duration === 'number' ? body.duration : null;
-      } catch {
+      } catch (caught) {
+        logCaught('lib/storageProviders.ts:probeDuration', caught);
         return null;
       }
     },
@@ -203,7 +207,8 @@ export async function loadStorageProviders(): Promise<StorageProvider[]> {
         providers.push(remoteSourceProvider(source));
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/storageProviders.ts:loadStorageProviders', caught);
     // worker nem fut — a beépített providerekkel megyünk tovább
   }
   return providers;

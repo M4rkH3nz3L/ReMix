@@ -6,6 +6,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { palette } from '@/constants/editor';
 import { listLiveFollowing, subscribeLiveList, type LiveSession } from '@/lib/live';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔴 „LIVE now" sáv (Fázis D) — a KÖVETETT hostok épp futó élő adásait mutatja
@@ -22,7 +23,7 @@ export function LiveNowStrip() {
     const load = () => {
       listLiveFollowing()
         .then((rows) => active && setLive(rows))
-        .catch(() => {});
+        .catch((caught) => { logCaught('components/live/LiveNowStrip.tsx:load', caught); });
     };
     load();
     const unsub = subscribeLiveList(load); // insert/update a live_sessions-ön → újratöltés

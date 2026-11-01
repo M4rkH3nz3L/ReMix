@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 📶 Szinkron-szabályok — PURE mag (expo-mentes, tesztelhető).
  *
@@ -21,7 +23,8 @@ export function parseSyncPrefs(raw: string | null | undefined): SyncPrefs {
   try {
     const o = raw ? (JSON.parse(raw) as Partial<SyncPrefs>) : {};
     return { wifiOnly: typeof o.wifiOnly === 'boolean' ? o.wifiOnly : DEFAULT_SYNC_PREFS.wifiOnly };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/syncPolicy.ts:parseSyncPrefs', caught);
     return { ...DEFAULT_SYNC_PREFS };
   }
 }

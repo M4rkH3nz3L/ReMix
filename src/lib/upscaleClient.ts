@@ -5,6 +5,7 @@ import { ensureCloud } from '@/lib/backend';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔍 Upscale / Enhance kliens (CC V2): a worker szuper-felbontással nagyítja
@@ -47,12 +48,14 @@ export async function upscalePhoto(
       if (target.exists) {
         target.delete();
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/upscaleClient.ts:upscalePhoto', caught);
       // felülírja a write
     }
     target.write(Uint8Array.from(atob(body.pngBase64), (c) => c.charCodeAt(0)));
     return { uri: target.uri, width: body.width, height: body.height };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/upscaleClient.ts:upscalePhoto', caught);
     return null;
   }
 }

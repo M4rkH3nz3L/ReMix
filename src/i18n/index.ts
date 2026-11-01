@@ -24,6 +24,7 @@ import {
   isSupportedLanguage,
   type LanguageCode,
 } from './languages';
+import { logCaught } from '@/lib/logCaught';
 
 const STORAGE_KEY = 'remix.lang.v1';
 
@@ -42,7 +43,8 @@ function detectDeviceLanguage(): LanguageCode {
         return code;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('i18n/index.ts:detectDeviceLanguage', caught);
     // a locale-lekérés best-effort; hiba esetén az alap-nyelv marad
   }
   return DEFAULT_LANGUAGE;
@@ -72,7 +74,8 @@ export async function hydrateLanguage(): Promise<void> {
     if (isSupportedLanguage(saved) && saved !== i18n.language) {
       await changeLanguage(saved);
     }
-  } catch {
+  } catch (caught) {
+    logCaught('i18n/index.ts:hydrateLanguage', caught);
     // sérült/hiányzó mentés — a felismert eszköz-nyelv marad
   }
 }
@@ -82,7 +85,8 @@ export async function setLanguage(code: LanguageCode): Promise<void> {
   await changeLanguage(code);
   try {
     await AsyncStorage.setItem(STORAGE_KEY, code);
-  } catch {
+  } catch (caught) {
+    logCaught('i18n/index.ts:setLanguage', caught);
     // best-effort; a memóriabeli váltás akkor is megtörtént
   }
 }

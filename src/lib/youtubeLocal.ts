@@ -5,6 +5,7 @@ import { makeId } from '@/lib/id';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { YtImport, YtKind } from '@/lib/youtube';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🆓 ON-DEVICE YouTube-import (worker és Pro NÉLKÜL).
@@ -124,7 +125,8 @@ async function fetchPlayer(videoId: string): Promise<PlayerResponse | null> {
       if (body.playabilityStatus?.status === 'OK' && body.streamingData) {
         return body;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/youtubeLocal.ts:fetchPlayer', caught);
       // hálózati/parse hiba → következő kliens
     }
   }
@@ -193,14 +195,16 @@ export async function importYouTubeLocal(
   const dir = projectMediaDir();
   try {
     dir.create();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/youtubeLocal.ts:importYouTubeLocal', caught);
     /* már létezik */
   }
   const target = new File(dir, `yt_${makeId('m')}.${ext}`);
   onProgress?.({ phase: tr('lib.youtube.phaseDownload') });
   try {
     await File.downloadFileAsync(format.url, target);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/youtubeLocal.ts:importYouTubeLocal', caught);
     return null;
   }
   if (!target.exists) {

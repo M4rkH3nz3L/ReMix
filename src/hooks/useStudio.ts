@@ -33,6 +33,7 @@ import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { MeshFormat } from '@/types/model3d';
 import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎬 A Stúdió / projekt-lista képernyő NEM-prezentációs magja: a lista
@@ -79,11 +80,11 @@ export function useStudio() {
   const refresh = useCallback(() => {
     // ⚡ fókuszkor csak a HELYI lista (olcsó); a felhő-visszatöltés egyszer, mountkor fut
     // 🔒 az ezen az eszközön nem elérhető fajták (LiDAR nélkül a 3D) rejtve — nem törölve
-    listProjects().then((all) => setProjects(visibleProjects(all))).catch(() => {});
+    listProjects().then((all) => setProjects(visibleProjects(all))).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
     // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
-    listSharedWithMe().then(setShared).catch(() => {});
+    listSharedWithMe().then(setShared).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
     // 🗄️ per-projekt MI-tárhely-használat (a MI tárolónkon foglalt pontos bájt)
-    projectStorageMap().then(setStorageMap).catch(() => {});
+    projectStorageMap().then(setStorageMap).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
   }, []);
 
   useFocusEffect(refresh);
@@ -97,7 +98,7 @@ export function useStudio() {
           refresh();
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); });
   }, [refresh]);
 
   // 🗑️ deaktivált fiók → helyreállítás-prompt belépés után (a tartalom addig rejtve)
@@ -111,11 +112,11 @@ export function useStudio() {
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('gdpr.reactivate'),
-            onPress: () => reactivateAccount().then(refresh).catch(() => {}),
+            onPress: () => reactivateAccount().then(refresh).catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); }),
           },
         ]);
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); });
   }, [refresh, t]);
 
   const resetCreateForm = () => {
@@ -164,7 +165,7 @@ export function useStudio() {
         setSources([asset]);
         setCreating(true);
       })
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message))
+      .catch((e: Error) => { logCaught('hooks/useStudio.ts:useStudio', e); return Alert.alert(t('common.error'), e.message); })
       .finally(() => router.setParams({ openLoc: undefined, openPath: undefined, openUri: undefined }));
     // a resetCreateForm stabil setterekből áll; a paraméter-kulcs a valódi trigger
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,7 +179,7 @@ export function useStudio() {
           setSources((prev) => [...prev, asset]);
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('hooks/useStudio.ts:addSource', caught); });
   };
 
   // egy forrás eltávolítása a leendő projekt forrás-mappájából
@@ -250,7 +251,7 @@ export function useStudio() {
         backupProjectToCloud(project); // 🗄️ felhő-backup (best-effort)
         router.push(`/editor/${project.id}`);
       })
-      .catch(() => Alert.alert(t('common.error'), t('home.createFailed')));
+      .catch((caught) => { logCaught('hooks/useStudio.ts:createFromTemplate', caught); return Alert.alert(t('common.error'), t('home.createFailed')); });
   };
 
   const confirmDelete = (meta: ProjectMeta) => {
@@ -266,7 +267,7 @@ export function useStudio() {
           deleteProject(meta.id)
             .then(() => Promise.all([deletePostsForProject(meta.id), deleteCloudProject(meta.id)]))
             .then(refresh)
-            .catch(() => {});
+            .catch((caught) => { logCaught('hooks/useStudio.ts:confirmDelete', caught); });
         },
       },
     ]);
@@ -292,7 +293,7 @@ export function useStudio() {
         });
       })
       .then(refresh)
-      .catch(() => Alert.alert(t('common.error'), t('home.duplicateFailed')));
+      .catch((caught) => { logCaught('hooks/useStudio.ts:duplicate', caught); return Alert.alert(t('common.error'), t('home.duplicateFailed')); });
   };
 
   const startRename = (meta: ProjectMeta) => {
@@ -310,7 +311,7 @@ export function useStudio() {
     loadProject(meta.id)
       .then((p) => (p ? saveProject({ ...p, name: nextName }) : undefined))
       .then(refresh)
-      .catch(() => Alert.alert(t('common.error'), t('home.renameFailed')));
+      .catch((caught) => { logCaught('hooks/useStudio.ts:saveRename', caught); return Alert.alert(t('common.error'), t('home.renameFailed')); });
   };
 
   const shareToFeed = (meta: ProjectMeta) => {
@@ -336,7 +337,7 @@ export function useStudio() {
           (e) => Alert.alert(t('common.error'), e.message)
         );
       })
-      .catch((e: Error) => Alert.alert(t('common.error'), e.message));
+      .catch((e: Error) => { logCaught('hooks/useStudio.ts:shareToFeed', e); return Alert.alert(t('common.error'), e.message); });
   };
 
   const projectMenu = (meta: ProjectMeta) => {
@@ -368,7 +369,7 @@ export function useStudio() {
               refresh();
               router.push(studioRoute(p.kind, p.id) as Href);
             })
-            .catch(() => Alert.alert(t('common.import'), t('home.saveFailed')));
+            .catch((caught) => { logCaught('hooks/useStudio.ts:finish', caught); return Alert.alert(t('common.import'), t('home.saveFailed')); });
         };
         if (result.missing.length === 0) {
           if (result.relinked > 0) {
@@ -400,7 +401,7 @@ export function useStudio() {
           ]
         );
       })
-      .catch((err: Error) => Alert.alert(t('common.import'), err.message));
+      .catch((err: Error) => { logCaught('hooks/useStudio.ts:importVided', err); return Alert.alert(t('common.import'), err.message); });
   };
 
   // 🤖 „AI eszközök": az AI a szerkesztőben él → a legutóbbi projektet nyitjuk

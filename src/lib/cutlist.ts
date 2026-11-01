@@ -8,6 +8,7 @@ import { renderServerUrl } from '@/lib/render';
 
 import { detectSilenceOnDevice } from '@/lib/audioDecode';
 import type { SilenceRange } from '@/lib/cutplan';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Editor AI cut-lista (full-plan F3): a worker FFmpeg-alapú csend-detektálása
@@ -51,7 +52,7 @@ export async function detectSilence(uri: string): Promise<SilenceRange[] | null>
   // 🔇 LOCAL-FIRST: az eszközön (ingyen, offline, worker nélkül) — ugyanaz a
   // forrás-idejű formátum, mint a worker FFmpeg silencedetect-jéé; a worker
   // csak akkor jön, ha a fájl helyben nem dekódolható
-  const local = await detectSilenceOnDevice(uri).catch(() => null);
+  const local = await detectSilenceOnDevice(uri).catch((caught) => { logCaught('lib/cutlist.ts:detectSilence', caught); return null; });
   if (local) {
     memory.set(uri, local);
     return local;
@@ -59,7 +60,8 @@ export async function detectSilence(uri: string): Promise<SilenceRange[] | null>
   const base = renderServerUrl();
   try {
     await fetchWithTimeout(`${base}/health`, 4000);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cutlist.ts:detectSilence', caught);
     return null; // worker nem fut
   }
   try {
@@ -79,6 +81,7 @@ export async function detectSilence(uri: string): Promise<SilenceRange[] | null>
     memory.set(uri, silences);
     return silences;
   } catch (err) {
+    logCaught('lib/cutlist.ts:detectSilence', err);
     // a leggyakoribb ok: a mentett file:// út elszakadt (konténer-költözés)
     console.warn('detectSilence hiba:', (err as Error).message, '| uri:', uri);
     return null;
@@ -97,7 +100,8 @@ export async function detectScenes(uri: string): Promise<number[] | null> {
   const base = renderServerUrl();
   try {
     await fetchWithTimeout(`${base}/health`, 4000);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cutlist.ts:detectScenes', caught);
     return null; // worker nem fut
   }
   try {
@@ -115,7 +119,8 @@ export async function detectScenes(uri: string): Promise<number[] | null> {
     const scenes = timeList(raw);
     sceneMemory.set(uri, scenes);
     return scenes;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cutlist.ts:detectScenes', caught);
     return null;
   }
 }

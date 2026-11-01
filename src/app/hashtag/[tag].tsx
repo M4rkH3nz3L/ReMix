@@ -12,6 +12,7 @@ import { createGenerationGuard } from '@/lib/asyncGuard';
 import { listPostsByHashtag } from '@/lib/feed';
 import { canonicalTag } from '@/lib/hashtags';
 import type { FeedPost } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 /** rövid szám (1.2k / 3.4M) — mint a feedben/keresőben */
 function compact(n: number): string {
@@ -51,7 +52,8 @@ export default function HashtagScreen() {
             setPosts(r);
           }
         })
-        .catch(() => {
+        .catch((caught) => {
+        logCaught('app/hashtag/[tag].tsx:timer', caught);
           if (guard.isCurrent(token)) {
             setPosts([]);
           }

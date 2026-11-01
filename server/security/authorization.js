@@ -1,3 +1,4 @@
+const { logCaught } = require('../lib/caught');
 // 🔑 Endpoint policy-réteg (OWASP API5 — Broken Function Level Authorization,
 // API9 — Improper Inventory Management).
 //
@@ -115,7 +116,8 @@ function proGate(req, res, next) {
   let isPro;
   try {
     ({ isPro } = require('../billing'));
-  } catch {
+  } catch (caught) {
+    logCaught('security/authorization.js:proGate', caught);
     res.status(503).json({ error: 'A billing-réteg nem elérhető.' });
     return;
   }
@@ -125,7 +127,7 @@ function proGate(req, res, next) {
         ? next()
         : res.status(402).json({ error: 'Ehhez a funkcióhoz Pro-előfizetés szükséges.', pro: true })
     )
-    .catch(() => res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }));
+    .catch((caught) => { logCaught('security/authorization.js:proGate', caught); return res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }); });
 }
 
 /** PUBLIC — tudatosan nyitott (regisztrálva az inventory-ba). */

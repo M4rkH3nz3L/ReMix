@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // Render-job-queue (BullMQ + Redis). REDIS_URL nélkül kikapcsolt → a render a
 // lokális in-process úton megy (dev). Beállítva: az API sorba tesz, a külön
 // render-worker(ek) dolgozzák fel — így vízszintesen skálázható és túléli az
@@ -106,14 +107,15 @@ async function cancelRenderJob(id) {
     try {
       await job.remove();
       return { found: true, userId, removed: true, active: false };
-    } catch {
+    } catch (caught) {
+      logCaught('queue.js:cancelRenderJob', caught);
       return { found: true, userId, removed: false, active: false };
     }
   }
   if (state === 'active') {
     // 🛑 ÉPP FUTÓ job: a worker külön folyamatban renderel → Redis abort-flaget
     // teszünk, amit a worker figyel, és SIGKILL-je a saját ffmpeg-jét (kooperatív).
-    await requestJobCancel(id).catch(() => {});
+    await requestJobCancel(id).catch((caught) => { logCaught('queue.js:cancelRenderJob', caught); });
     return { found: true, userId, removed: false, active: true };
   }
   return { found: true, userId, removed: false, active: false };

@@ -15,6 +15,7 @@ import { pickVersionsToPush, type CloudVersionMeta } from '@/lib/versionsSync';
 import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * ☁️ Cloud-sync (Phase 5.1 alap): a projekt TELJES állapotának (JSON) felhő-
@@ -104,7 +105,8 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
       if (data?.data) {
         known = mediaRemoteMap(migrateProject(data.data as Project));
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/cloudSync.ts:backupProjectToCloud', caught);
       // nincs korábbi másolat / offline → minden helyi asset feltölthető
     }
     // 🗄️ ADR-013: a MÉDIA auto-backup a MI R2-tárunkba FIZETŐS (Pro+). Free usernél
@@ -127,7 +129,8 @@ export async function backupProjectToCloud(project: Project): Promise<void> {
     );
     // 🕓 a KÉZI verzió-pillanatképek felhő-tükre (idempotens, best-effort)
     await pushProjectVersions(backed.id);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:backupProjectToCloud', caught);
     // az auto-backup sosem törheti meg a szerkesztést
   }
 }
@@ -167,7 +170,8 @@ export async function pushProjectVersions(projectId: string): Promise<number> {
       { onConflict: 'user_id,project_id,version_id' }
     );
     return error ? 0 : toPush.length;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:pushProjectVersions', caught);
     return 0;
   }
 }
@@ -194,7 +198,8 @@ export async function listCloudVersionMetas(projectId: string): Promise<CloudVer
       at: r.at,
       kind: r.kind === 'auto' ? 'auto' : 'manual',
     }));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:listCloudVersionMetas', caught);
     return [];
   }
 }
@@ -226,7 +231,8 @@ export async function fetchCloudVersion(
       kind: data.kind === 'auto' ? 'auto' : 'manual',
       project: migrateProject(data.data as Project),
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:fetchCloudVersion', caught);
     return null;
   }
 }
@@ -244,7 +250,8 @@ export async function deleteCloudVersion(projectId: string, versionId: string): 
       .eq('user_id', uid)
       .eq('project_id', projectId)
       .eq('version_id', versionId);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:deleteCloudVersion', caught);
     // best-effort
   }
 }
@@ -294,7 +301,8 @@ export async function deleteCloudProject(projectId: string): Promise<boolean> {
       .eq('user_id', uid)
       .eq('project_id', projectId);
     return !error;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:deleteCloudProject', caught);
     return false;
   }
 }
@@ -345,7 +353,8 @@ export async function syncProjectsFromCloud(): Promise<number> {
       }
     }
     return restored;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/cloudSync.ts:syncProjectsFromCloud', caught);
     return 0;
   }
 }

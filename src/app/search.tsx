@@ -20,6 +20,7 @@ import { palette } from '@/constants/editor';
 import { createGenerationGuard } from '@/lib/asyncGuard';
 import { searchFeed, type SearchResults } from '@/lib/feed';
 import type { Creator, FeedPost } from '@/types/social';
+import { logCaught } from '@/lib/logCaught';
 
 /** rövid szám (1.2k / 3.4M) — mint a feedben */
 function compact(n: number): string {
@@ -68,7 +69,8 @@ export default function SearchScreen() {
               setResults(r);
             }
           })
-          .catch(() => {
+          .catch((caught) => {
+          logCaught('app/search.tsx:timer', caught);
             if (guard.isCurrent(token)) {
               setResults(EMPTY);
             }

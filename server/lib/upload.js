@@ -1,3 +1,4 @@
+const { logCaught } = require('./caught');
 // 📤 Multer feltöltés-konfig — kiemelve az index.js-ből (01-api-architecture §01.1/§01.5).
 //
 // A korábbi GLOBÁLIS `fileSize: 2 GB` blanket-limit helyett endpoint-PROFIL
@@ -51,7 +52,8 @@ function sweepStaleWorkDirs(now = Date.now(), maxAgeMs = STALE_MS, root = os.tmp
   let entries = [];
   try {
     entries = fs.readdirSync(root);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/upload.js:sweepStaleWorkDirs', caught);
     return 0;
   }
   for (const name of entries) {
@@ -63,7 +65,8 @@ function sweepStaleWorkDirs(now = Date.now(), maxAgeMs = STALE_MS, root = os.tmp
         fs.rmSync(dir, { recursive: true, force: true });
         removed++;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/upload.js:sweepStaleWorkDirs', caught);
       // párhuzamosan törölt / nem olvasható → kihagyjuk
     }
   }

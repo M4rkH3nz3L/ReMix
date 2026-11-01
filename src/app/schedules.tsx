@@ -23,6 +23,7 @@ import {
   type RenderQueue,
   type RenderWorker,
 } from '@/lib/schedules';
+import { logCaught } from '@/lib/logCaught';
 
 const POLL_MS = 4000;
 const DONE_GREEN = '#3ddc84';
@@ -80,6 +81,7 @@ export default function SchedulesScreen() {
         setError(null);
       }
     } catch (e) {
+      logCaught('app/schedules.tsx:load', e);
       if (!ctrl.signal.aborted) {
         setError((e as Error).message || t('schedules.unreachable'));
       }

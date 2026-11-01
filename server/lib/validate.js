@@ -1,3 +1,4 @@
+const { logCaught } = require('./caught');
 // ✅ Séma-vezérelt input-validáció (01-api-architecture §01.2).
 //
 // `unknown → zod schema → typed` a vak `req.body.x`/`as SomeType` helyett
@@ -51,7 +52,8 @@ function validateJsonField(field, schema, opts = {}) {
     let obj;
     try {
       obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch {
+    } catch (caught) {
+      logCaught('lib/validate.js:validateJsonField', caught);
       return next(httpError(400, `Hibás ${field} JSON.`, { code: 'validation' }));
     }
     const result = schema.safeParse(obj);

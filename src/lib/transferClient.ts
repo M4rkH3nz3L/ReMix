@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import type { Project } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📲 Átviteli tár kliens — eszköz→eszköz projekt-továbbítás felhő-előfizetés
@@ -46,7 +47,7 @@ export async function uploadProjectTransfer(
     headers: await workerAuthHeaders(),
   });
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
+    const msg = await res.text().catch((caught) => { logCaught('lib/transferClient.ts:uploadProjectTransfer', caught); return ''; });
     throw new Error(msg || `Átvitel sikertelen (${res.status}).`);
   }
   const body = (await res.json()) as { sizeBytes?: number; expiresAt?: string };
@@ -77,7 +78,8 @@ export async function fetchProjectTransfer(projectId: string): Promise<TransferM
       createdAt,
       expired: !Number.isFinite(t) || Date.now() - t > TRANSFER_TTL_MS,
     };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/transferClient.ts:fetchProjectTransfer', caught);
     return null;
   }
 }
@@ -89,7 +91,8 @@ export async function deleteProjectTransfer(projectId: string): Promise<void> {
       method: 'DELETE',
       headers: await workerAuthHeaders(),
     });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/transferClient.ts:deleteProjectTransfer', caught);
     // best-effort — a lazy TTL amúgy is söpri
   }
 }
@@ -113,7 +116,8 @@ export async function restoreProjectFromTransfer(
   const outcome = restoreMissingFromRpUri(project, target.uri);
   try {
     target.delete();
-  } catch {
+  } catch (caught) {
+    logCaught('lib/transferClient.ts:restoreProjectFromTransfer', caught);
     // cache-takarítás best-effort
   }
   if (outcome.matched > 0) {

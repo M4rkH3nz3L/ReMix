@@ -1,3 +1,5 @@
+import { logCaught } from '@/lib/logCaught';
+
 /**
  * 🏷️ Más platformról letöltött forrás felismerése (PRO-VIDEO-EDITOR D11) — pure.
  *
@@ -23,7 +25,8 @@ export function sourcePlatformOf(nameOrUri: string | undefined | null): SourcePl
   let base = nameOrUri.split('/').pop() ?? nameOrUri;
   try {
     base = decodeURIComponent(base);
-  } catch {
+  } catch (caught) {
+    logCaught('lib/sourceWatermark.ts:sourcePlatformOf', caught);
     // hibás %-kódolás → a nyers név marad
   }
   for (const [platform, re] of PATTERNS) {

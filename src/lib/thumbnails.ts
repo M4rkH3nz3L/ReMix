@@ -2,6 +2,7 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
 
 import { LruCache } from '@/lib/lruCache';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Filmstrip-képkockák a videóklipekhez (full-plan F2 thumbnail-szelet, kliens-
@@ -28,7 +29,7 @@ function thumbAt(uri: string, second: number): Promise<string | null> {
       quality: 0.4,
     })
       .then((result) => result.uri)
-      .catch(() => null);
+      .catch((caught) => { logCaught('lib/thumbnails.ts:thumbAt', caught); return null; });
   cache.set(key, pending);
   return pending;
 }

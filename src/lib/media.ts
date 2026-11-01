@@ -10,6 +10,7 @@ import { parseCubeLut } from '@/lib/lutImport';
 import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 export interface PickedVideo {
   uri: string;
@@ -43,7 +44,8 @@ export function persistToLibrary(uri: string): string {
     const target = new File(dir, `${Date.now().toString(36)}_${source.name}`);
     source.copy(target);
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/media.ts:persistToLibrary', caught);
     return uri;
   }
 }
@@ -75,7 +77,8 @@ export async function downloadToCache(url: string, name?: string): Promise<strin
     }
     target.write(buf);
     return target.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/media.ts:downloadToCache', caught);
     return null;
   }
 }
@@ -113,7 +116,8 @@ export async function normalizePickedImage(
   try {
     const baked = await bakeImage(uri, intakeOps(width, height), { persist: true });
     return { uri: baked.uri, width: baked.width, height: baked.height };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/media.ts:normalizePickedImage', caught);
     return { uri: persistToLibrary(uri), width, height };
   }
 }
@@ -143,7 +147,8 @@ export async function probeAudioDuration(uri: string): Promise<number> {
   let createAudioPlayer: typeof import('expo-audio').createAudioPlayer;
   try {
     ({ createAudioPlayer } = await import('expo-audio'));
-  } catch {
+  } catch (caught) {
+    logCaught('lib/media.ts:probeAudioDuration', caught);
     return 0;
   }
   return new Promise<number>((resolve) => {
@@ -157,19 +162,22 @@ export async function probeAudioDuration(uri: string): Promise<number> {
       done = true;
       try {
         sub?.remove();
-      } catch {
+      } catch (caught) {
+        logCaught('lib/media.ts:finish', caught);
         // már eltávolítva
       }
       try {
         player?.remove();
-      } catch {
+      } catch (caught) {
+        logCaught('lib/media.ts:finish', caught);
         // már felszabadítva
       }
       resolve(Number.isFinite(d) && d > 0 ? d : 0);
     };
     try {
       player = createAudioPlayer(uri);
-    } catch {
+    } catch (caught) {
+      logCaught('lib/media.ts:probeAudioDuration', caught);
       finish(0);
       return;
     }
@@ -199,7 +207,7 @@ export async function pickAudio(): Promise<PickedAudio | null> {
   const asset = result.assets[0];
   const uri = persistToLibrary(asset.uri);
   // a VALÓS hossz kiolvasása → a teljes fájl importálható (nem fix 10 mp)
-  const duration = await probeAudioDuration(uri).catch(() => 0);
+  const duration = await probeAudioDuration(uri).catch((caught) => { logCaught('lib/media.ts:pickAudio', caught); return 0; });
   // 🎵 §5 bevételi osztályozás: barátságos hiba/figyelmeztetés a néma kudarc helyett
   const intake = classifyAudioIntake({ uri, name: asset.name, durationSec: duration });
   return { uri, name: asset.name, duration, intake };
@@ -273,7 +281,8 @@ export async function pickCubeLut(): Promise<{ uri: string; name: string } | 'in
       return 'invalid';
     }
     return { uri: asset.uri, name: asset.name ?? 'LUT.cube' };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/media.ts:pickCubeLut', caught);
     return 'invalid';
   }
 }

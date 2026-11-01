@@ -18,6 +18,7 @@ import { formatBytes } from '@/lib/storageQuota';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 const KIND_ICON: Record<Asset['kind'], keyof typeof Ionicons.glyphMap> = {
   video: 'videocam',
@@ -70,7 +71,7 @@ export function SourceBin({
           useEditorStore.getState().dispatch({ type: 'ADD_ASSET', asset }, 'user');
         }
       })
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/SourceBin.tsx:importOne', caught); });
   };
 
   // 🗂️ import a Tárhelyemből (Eszközöm / ReMix Storage) — a fájl a projekt mappájába kerül
@@ -87,7 +88,8 @@ export function SourceBin({
           if (asset) {
             useEditorStore.getState().dispatch({ type: 'ADD_ASSET', asset }, 'user');
           }
-        } catch {
+        } catch (caught) {
+          logCaught('components/SourceBin.tsx:importFromMyStorage', caught);
           // egy fájl hibája nem állítja meg a többit
         }
       }
@@ -110,7 +112,7 @@ export function SourceBin({
           );
         }
       })
-      .catch(() => {})
+      .catch((caught) => { logCaught('components/SourceBin.tsx:downloadAsset', caught); })
       .finally(() => setDownloading(null));
   };
 

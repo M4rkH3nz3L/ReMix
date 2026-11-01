@@ -10,6 +10,7 @@ import {
   type ModelManifestEntry,
 } from '@/lib/modelRegistry';
 import { Sha256 } from '@/lib/sha256';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📦 Modell-registry kliens (Ai §06.2) — a tiszta manifest-logika
@@ -59,7 +60,8 @@ function readIndex(): CachedModelRecord[] {
     }
     const parsed: unknown = JSON.parse(f.textSync());
     return Array.isArray(parsed) ? (parsed as CachedModelRecord[]) : [];
-  } catch {
+  } catch (caught) {
+    logCaught('lib/modelRegistryClient.ts:readIndex', caught);
     return [];
   }
 }
@@ -99,7 +101,8 @@ function deleteRecordFile(rec: CachedModelRecord): void {
     if (f.exists) {
       f.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/modelRegistryClient.ts:deleteRecordFile', caught);
     // a fájl hiánya nem hiba — az index-sor így is törlődik
   }
 }
@@ -154,7 +157,8 @@ export async function downloadModel(entry: ModelManifestEntry): Promise<Download
       return { ok: false, reason: 'network' };
     }
     bytes = new Uint8Array(await res.arrayBuffer());
-  } catch {
+  } catch (caught) {
+    logCaught('lib/modelRegistryClient.ts:downloadModel', caught);
     return { ok: false, reason: 'network' };
   }
 
@@ -193,7 +197,8 @@ export async function downloadModel(entry: ModelManifestEntry): Promise<Download
     writeIndex(records);
     runEviction();
     return { ok: true, uri: target.uri, sizeBytes: bytes.length };
-  } catch {
+  } catch (caught) {
+    logCaught('lib/modelRegistryClient.ts:downloadModel', caught);
     return { ok: false, reason: 'fs' };
   }
 }

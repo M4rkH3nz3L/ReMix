@@ -10,6 +10,7 @@ import { isAllowedPhone, isValidOtp, normalizeE164 } from '@/lib/phoneAuth';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { useEntitlement } from '@/store/entitlementStore';
 import { useRoles } from '@/store/roleStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔐 Auth-store — a bejelentkezett felhasználó EGYETLEN forrása.
@@ -157,7 +158,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (session) {
         const { error } = await supabase.auth.getUser();
         if (error && (error.status === 401 || error.status === 403)) {
-          await supabase.auth.signOut().catch(() => {});
+          await supabase.auth.signOut().catch((caught) => { logCaught('store/authStore.ts:useAuth', caught); });
           session = null;
         }
       }
@@ -172,7 +173,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (session?.user) {
         void registerCurrentDevice(session.user.id);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('store/authStore.ts:useAuth', caught);
       // best-effort; session nélkül indulunk (auth-képernyő)
     }
     // változás-figyelő (login/logout/token-refresh) — csak egyszer iratkozunk fel
@@ -383,6 +385,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       await verifyLoginTotp(code);
     } catch (e) {
+      logCaught('store/authStore.ts:useAuth', e);
       return { error: messageOf(e) };
     }
     // sikeres TOTP → a session aal2, a belépés befejezve
@@ -411,7 +414,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (uid) {
         await supabase.from('user_devices').delete().eq('user_id', uid).neq('fingerprint', fingerprint);
       }
-    } catch {
+    } catch (caught) {
+      logCaught('store/authStore.ts:useAuth', caught);
       // best-effort; a token-visszavonás a lényeg, a telemetria-sor másodlagos
     }
     return {};
@@ -423,7 +427,8 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
     try {
       await supabase.auth.signOut();
-    } catch {
+    } catch (caught) {
+      logCaught('store/authStore.ts:useAuth', caught);
       // best-effort; a lokális session-t az onAuthStateChange úgyis törli
     }
   },

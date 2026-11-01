@@ -12,8 +12,8 @@ const { redactSecrets } = require('../security/redact');
  * hiba újbóli előfordulása → `regressed` (a javítás nem tartott).
  */
 
-const KINDS = new Set(['js-fatal', 'js-error', 'unhandled-rejection', 'boundary', 'handled', 'native']);
-const PLATFORMS = new Set(['android', 'ios', 'web']);
+const KINDS = new Set(['js-fatal', 'js-error', 'unhandled-rejection', 'boundary', 'handled', 'native', 'server']);
+const PLATFORMS = new Set(['android', 'ios', 'web', 'server']);
 const MAX_OCCURRENCES = 10;
 const MAX_MAP_KEYS = 20;
 const MAX_USERS = 20;
@@ -115,8 +115,13 @@ function stackSignature(stack, frames = 5) {
 
 /** 12 hex-jegyű ujjlenyomat (fájlnév-biztos: csak [0-9a-f]). */
 function fingerprint(report) {
-  const basis = [report.kind === 'js-fatal' ? 'js-error' : report.kind, report.name, normalizeMessage(report.message), stackSignature(report.stack)].join('#');
-  return crypto.createHash('sha1').update(basis).digest('hex').slice(0, 12);
+  const basis = [report.kind === 'js-fatal' ? 'js-error' : report.kind, report.name, normalizeMessage(report.message), stackSignature(report.stack)];
+  // ugyanaz a hiba két különböző helyről két külön teendő (a régi jelentések ujjlenyomata nem változik)
+  if (report.extra?.where) {
+    basis.push(report.extra.where);
+  }
+  const joined = basis.join('#');
+  return crypto.createHash('sha1').update(joined).digest('hex').slice(0, 12);
 }
 
 /** olvasható, fájlnév-biztos rövid név az üzenetből (ékezetek nélkül) */

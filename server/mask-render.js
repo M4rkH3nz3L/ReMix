@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🎬 Animált maszk → szürke PNG-képsor (Chromium-canvas), a per-frame maszkhoz.
 //
 // A render EZT komponálja alfa-maszként (alphaextract × mask, majd alphamerge),
@@ -31,7 +32,8 @@ function findChromium() {
         return bin;
       }
     }
-  } catch {
+  } catch (caught) {
+    logCaught('mask-render.js:findChromium', caught);
     // nincs playwright-cache
   }
   return null;

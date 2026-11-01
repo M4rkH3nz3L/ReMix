@@ -2,6 +2,7 @@
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { ensureCloud } from '@/lib/backend';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🙂 Arc-detektor kliens: a worker /faces végpontja egy képkocka arcait adja
@@ -38,7 +39,8 @@ export async function fetchFaces(
     }
     const body = (await res.json()) as { faces: FaceBox[] };
     return Array.isArray(body.faces) ? body.faces : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/faceClient.ts:fetchFaces', caught);
     return null;
   }
 }

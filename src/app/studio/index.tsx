@@ -30,6 +30,7 @@ import { studioRoute } from '@/lib/projectUtils';
 import { formatBytes as formatStorageBytes } from '@/lib/storageQuota';
 import { formatTime } from '@/lib/time';
 import type { ProjectMeta } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎬 Stúdió / projekt-lista képernyő (expo-router route) — VÉKONY KOMPOZÍCIÓ.
@@ -231,7 +232,8 @@ export default function ProjectsScreen() {
         seoReady={s.seoReady}
         missingFields={s.missingFields}
         onCreate={() => {
-          s.create().catch(() => {
+          s.create().catch((caught) => {
+            logCaught('app/studio/index.tsx:ProjectsScreen', caught);
             /* a create() belül kezeli a hibát; a .catch csak a lebegő-promise-t zárja */
           });
         }}

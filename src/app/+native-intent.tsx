@@ -1,4 +1,5 @@
 import { incomingModelRoute } from '@/lib/model3dIncoming';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 📲 Rendszer-URL-ek átirányítása (expo-router native intent): a „Megnyitás a
@@ -8,7 +9,8 @@ import { incomingModelRoute } from '@/lib/model3dIncoming';
 export function redirectSystemPath({ path }: { path: string; initial: boolean }): string {
   try {
     return incomingModelRoute(path) ?? path;
-  } catch {
+  } catch (caught) {
+    logCaught('app/+native-intent.tsx:redirectSystemPath', caught);
     return path;
   }
 }

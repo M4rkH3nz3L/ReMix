@@ -14,6 +14,7 @@ import {
   listFollowingPeers,
   type ChatPeer,
 } from '@/lib/chat';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 👥 Csoport-létrehozó / tag-hozzáadó lap. A jelölt-halmaz azok, akiket KÖVETEK
@@ -52,7 +53,7 @@ export function GroupCreateSheet({
     /* eslint-enable react-hooks/set-state-in-effect */
     listFollowingPeers()
       .then(setCandidates)
-      .catch(() => setCandidates([]))
+      .catch((caught) => { logCaught('components/chat/GroupCreateSheet.tsx:GroupCreateSheet', caught); return setCandidates([]); })
       .finally(() => setLoading(false));
   }, [visible]);
 
@@ -86,6 +87,7 @@ export function GroupCreateSheet({
         onDone(cid);
       }
     } catch (e) {
+      logCaught('components/chat/GroupCreateSheet.tsx:confirm', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);

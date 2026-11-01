@@ -31,6 +31,7 @@ import { useRoles } from '@/store/roleStore';
 import { REPORT_REASONS, reportComment } from '@/lib/reports';
 import { requireSignIn } from '@/lib/webGate';
 import { filterBlocked, listMyBlockedIds, listMyRestrictedIds, restrictUser, unrestrictUser } from '@/lib/blocks';
+import { logCaught } from '@/lib/logCaught';
 
 /** Rövid relatív idő (pl. „3p", „2ó", „5n") — nincs külső függőség. */
 function ago(iso: string): string {
@@ -86,7 +87,8 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
           setLoadedFor(post.id);
         }
       })
-      .catch(() => {
+      .catch((caught) => {
+      logCaught('components/CommentSheet.tsx:CommentSheet', caught);
         if (alive) {
           setComments([]);
           setLoadedFor(post.id);
@@ -122,7 +124,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
     }
     listMyRestrictedIds()
       .then((ids) => setRestrictedIds(new Set(ids)))
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/CommentSheet.tsx:CommentSheet', caught); });
   }, [post, isPostOwner]);
 
   // a néző blokk-listája (bármely poszt megnyitásakor) → a blokkolt szerzők kommentjei rejtve
@@ -132,7 +134,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
     }
     listMyBlockedIds()
       .then(setBlockedIds)
-      .catch(() => {});
+      .catch((caught) => { logCaught('components/CommentSheet.tsx:CommentSheet', caught); });
   }, [post, me]);
 
   // a blokkolt szerzők kommentjeit kiszűrjük (a filterBlocked pure + tesztelt)
@@ -153,7 +155,8 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
       return next;
     });
     const op = isR ? unrestrictUser(c.authorId) : restrictUser(c.authorId);
-    op.catch(() => {
+    op.catch((caught) => {
+      logCaught('components/CommentSheet.tsx:onToggleRestrict', caught);
       setRestrictedIds((prev) => {
         const next = new Set(prev);
         if (isR) {
@@ -179,7 +182,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
         onCountChange(1);
       })
       .catch((e: unknown) =>
-        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+        { logCaught('components/CommentSheet.tsx:onSend', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
       )
       .finally(() => setSending(false));
   };
@@ -194,7 +197,8 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
           // optimista: azonnal eltűnik, hibánál visszakerül
           setComments((prev) => prev.filter((x) => x.id !== c.id));
           onCountChange(-1);
-          deleteComment(c.id).catch(() => {
+          deleteComment(c.id).catch((caught) => {
+            logCaught('components/CommentSheet.tsx:onDelete', caught);
             setComments((prev) => [c, ...prev.filter((x) => x.id !== c.id)]);
             onCountChange(1);
             Alert.alert(t('common.error'), t('feed.comments.deleteFailed'));
@@ -213,7 +217,7 @@ export function CommentSheet({ post, onClose, onCountChange }: Props) {
           reportComment(c.id, r)
             .then(() => Alert.alert(t('report.title'), t('report.done')))
             .catch((e: unknown) =>
-              Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e))
+              { logCaught('components/CommentSheet.tsx:onReport', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
             ),
       })),
       { text: t('common.cancel'), style: 'cancel' as const },

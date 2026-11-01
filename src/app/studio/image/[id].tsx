@@ -14,6 +14,7 @@ import { mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import { loadEvents, loadProject } from '@/lib/storage';
 import { findMissingMedia, pickRelinkPairs, relinkCommandsFor, type MissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🖼️ KÉP STÚDIÓ képernyő (`kind: 'image'` projekt). Vékony burkoló: betölti a
@@ -51,7 +52,7 @@ export default function ImageStudioScreen() {
         useEditorStore.getState().loadProject(loaded, events);
         setLoading(false);
       })
-      .catch(() => alive && setLoading(false));
+      .catch((caught) => { logCaught('app/studio/image/[id].tsx:ImageStudioScreen', caught); return alive && setLoading(false); });
     return () => {
       alive = false;
       const p = useEditorStore.getState().project;
@@ -78,7 +79,7 @@ export default function ImageStudioScreen() {
       }
       let remote = mediaRemoteMap(proj);
       if (Object.keys(remote).length === 0) {
-        const cloud = await pullProject(proj.id).catch(() => null);
+        const cloud = await pullProject(proj.id).catch((caught) => { logCaught('app/studio/image/[id].tsx:ImageStudioScreen', caught); return null; });
         remote = cloud ? mediaRemoteMap(cloud) : remote;
       }
       const { pairs } = await restoreMissingMedia(proj, remote);

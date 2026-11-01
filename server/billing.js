@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 💳 Billing — a Pro szint EGYETLEN hiteles forrása a `subscriptions` táblában.
 //
 // A kliens SOHA nem grantel Pro-t magának (a subscriptions írás service_role-only,
@@ -170,7 +171,8 @@ async function webhookEventSeen(sb, id) {
       .eq('id', id)
       .maybeSingle();
     return !!data;
-  } catch {
+  } catch (caught) {
+    logCaught('billing.js:webhookEventSeen', caught);
     return false;
   }
 }
@@ -182,7 +184,8 @@ async function recordWebhookEvent(sb, id, type) {
   }
   try {
     await sb.from('billing_webhook_events').insert({ id, type: type || null });
-  } catch {
+  } catch (caught) {
+    logCaught('billing.js:recordWebhookEvent', caught);
     /* best-effort: ha nincs tábla / ütközés, a feldolgozás már megtörtént */
   }
 }
@@ -254,7 +257,8 @@ async function activeTier(userId) {
       return 'free';
     }
     return asTier(data.tier);
-  } catch {
+  } catch (caught) {
+    logCaught('billing.js:activeTier', caught);
     return 'free';
   }
 }

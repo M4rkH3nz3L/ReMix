@@ -68,6 +68,7 @@ import type {
   LiveSourceKind,
   LiveTransform,
 } from '@/types/live';
+import { logCaught } from '@/lib/logCaught';
 
 const CHANNEL_ICON: Record<LiveChannelId, keyof typeof Ionicons.glyphMap> = {
   mic: 'mic',
@@ -275,7 +276,7 @@ export default function LiveStudioScreen() {
   const loadDests = useCallback(() => {
     listDestinations()
       .then(setDests)
-      .catch(() => {});
+      .catch((caught) => { logCaught('app/live/studio/[id].tsx:loadDests', caught); });
   }, []);
 
   // a projekt betöltése a közös store-ba (mint a többi stúdió-route)
@@ -292,13 +293,13 @@ export default function LiveStudioScreen() {
         const { doc: liveDoc, repaired } = repairLiveDoc(loaded.live, loaded.name, () => makeId('live'));
         const project = repaired ? { ...loaded, live: liveDoc } : loaded;
         if (repaired) {
-          void saveProject(project).catch(() => {});
+          void saveProject(project).catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); });
         }
         useEditorStore.getState().loadProject(project, events);
         setTitleDraft(liveDoc.title ?? loaded.name);
         if (liveDoc.cameraFacing) setFacing(liveDoc.cameraFacing);
       })
-      .catch(() => active && setLoadError(true));
+      .catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); return active && setLoadError(true); });
     loadDests();
     return () => {
       active = false;
@@ -382,7 +383,7 @@ export default function LiveStudioScreen() {
   // ezen megy (az router.replace-szel az /live/[id]-re lép), így a tényleges adást nem törli.
   const onCancel = () => {
     if (project?.kind === 'live') {
-      deleteProject(String(id)).catch(() => {});
+      deleteProject(String(id)).catch((caught) => { logCaught('app/live/studio/[id].tsx:onCancel', caught); });
     }
     goBackOrHome();
   };
@@ -407,6 +408,7 @@ export default function LiveStudioScreen() {
       // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).
       router.replace(`/live/${session.id}?project=${id}`);
     } catch (e) {
+      logCaught('app/live/studio/[id].tsx:onStart', e);
       setStarting(false);
       setReleasingCamera(false);
       Alert.alert(t('live.error', { defaultValue: 'Live' }), String((e as Error)?.message ?? e));
@@ -711,7 +713,7 @@ export default function LiveStudioScreen() {
             <View key={d.id} style={styles.destManageRow}>
               <Pressable
                 onPress={() => {
-                  setDestinationEnabled(d.id, !d.enabled).then(loadDests).catch(() => {});
+                  setDestinationEnabled(d.id, !d.enabled).then(loadDests).catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); });
                 }}
                 hitSlop={6}
               >
@@ -725,7 +727,7 @@ export default function LiveStudioScreen() {
                 <Text style={styles.destManageLabel} numberOfLines={1}>{d.label}</Text>
                 <Text style={styles.destManageUrl} numberOfLines={1}>{d.rtmpUrl} · {d.hasKey ? '•••• key' : t('live.studio.noKey', { defaultValue: 'no key' })}</Text>
               </View>
-              <Pressable onPress={() => removeRtmpDestination(d.id).then(loadDests).catch(() => {})} hitSlop={6}>
+              <Pressable onPress={() => removeRtmpDestination(d.id).then(loadDests).catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); })} hitSlop={6}>
                 <Ionicons name="trash-outline" size={17} color={palette.danger} />
               </Pressable>
             </View>
@@ -802,6 +804,7 @@ export default function LiveStudioScreen() {
                       loadDests();
                     })
                     .catch((e) => {
+                    logCaught('app/live/studio/[id].tsx:LiveStudioScreen', e);
                       // a validációs hiba i18n-kulcs (live.dest.*), a többi szerver-üzenet (kitakarva)
                       const msg = String(e?.message ?? e);
                       Alert.alert(t('common.error'), msg.startsWith('live.dest.') ? t(msg) : msg);

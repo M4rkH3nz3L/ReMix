@@ -1,4 +1,5 @@
 import { TurboModuleRegistry } from 'react-native';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔌 Natív AI-motor jelenlét-detektálás (local-ai). A JS-csomag telepítése ≠ a
@@ -12,7 +13,8 @@ import { TurboModuleRegistry } from 'react-native';
 export function whisperEngineAvailable(): boolean {
   try {
     return TurboModuleRegistry.get('RNWhisper') != null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/nativeEngines.ts:whisperEngineAvailable', caught);
     return false;
   }
 }
@@ -21,7 +23,8 @@ export function whisperEngineAvailable(): boolean {
 export function executorchEngineAvailable(): boolean {
   try {
     return TurboModuleRegistry.get('ExecutorchModule') != null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/nativeEngines.ts:executorchEngineAvailable', caught);
     return false;
   }
 }

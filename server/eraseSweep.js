@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🗑️ GDPR hard-erase SWEEP (03-production §03.4): a lejárt-cooldownú soft-delete-elt
 // fiókok VÉGLEGES törlése — ütemezetten (napi cron / compose-sidecar), service_role-lal.
 //
@@ -43,6 +44,7 @@ async function eraseAccount(sb, uid, bucket = ERASE_BUCKET) {
       }
     }
   } catch (e) {
+    logCaught('eraseSweep.js:eraseAccount', e);
     console.warn('[erase-sweep] storage-purge részleges:', e.message);
   }
   const { error } = await sb.auth.admin.deleteUser(uid);
@@ -77,6 +79,7 @@ async function sweepExpiredErasures({ sb, now = Date.now(), bucket = ERASE_BUCKE
       securityEvent('account.erased', { actor: uid, result: 'ok', meta: { via: 'cron', purgedObjects: r?.purgedObjects ?? 0 } });
       erased += 1;
     } catch (e) {
+      logCaught('eraseSweep.js:sweepExpiredErasures', e);
       securityEvent('account.erase_failed', { actor: uid, result: 'error', meta: { via: 'cron', error: e.message } });
       failed += 1;
     }
@@ -137,6 +140,7 @@ if (require.main === module) {
   runEraseSweepOnce({ sb })
     .then((s) => process.exit(s.failed > 0 ? 1 : 0))
     .catch((e) => {
+    logCaught('eraseSweep.js', e);
       console.error('[erase-sweep] hiba:', e.message);
       process.exit(1);
     });

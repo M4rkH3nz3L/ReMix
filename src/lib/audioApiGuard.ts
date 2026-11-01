@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🎚️ A `react-native-audio-api` natív dekóder KÖZÖS állapota (PRO-VIDEO B24).
@@ -44,7 +45,8 @@ export async function loadAudioApi(opts: { background?: boolean } = {}): Promise
   if (!canUseAudioApi(opts)) return null;
   try {
     return await import('react-native-audio-api');
-  } catch {
+  } catch (caught) {
+    logCaught('lib/audioApiGuard.ts:loadAudioApi', caught);
     markAudioApi(false);
     return null;
   }

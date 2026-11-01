@@ -28,6 +28,7 @@ import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, RenderedVersion } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * Render-kliens. Két út:
@@ -351,7 +352,8 @@ function cachedRenderFile(key: string): File | null {
   try {
     const file = new File(renderCacheDir(), `${key}.mp4`);
     return file.exists ? file : null;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:cachedRenderFile', caught);
     return null;
   }
 }
@@ -371,7 +373,8 @@ function storeRenderCache(key: string, file: File): File {
         if (e instanceof File) {
           try {
             e.delete();
-          } catch {
+          } catch (caught) {
+            logCaught('lib/render.ts:storeRenderCache', caught);
             /* ignore */
           }
         }
@@ -380,7 +383,8 @@ function storeRenderCache(key: string, file: File): File {
     const dest = new File(dir, `${key}.mp4`);
     file.copy(dest);
     return dest.exists ? dest : file;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:storeRenderCache', caught);
     return file;
   }
 }
@@ -402,7 +406,8 @@ export async function renderProjectVersion(
     if (!dir.exists) {
       dir.create({ intermediates: true });
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:renderProjectVersion', caught);
     // ha nem hozható létre, marad a cache-uri (a copy alább akkor is próbál)
   }
   const dest = new File(dir, `${project.id}.mp4`);
@@ -413,7 +418,8 @@ export async function renderProjectVersion(
     }
     file.copy(dest);
     uri = dest.uri;
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:renderProjectVersion', caught);
     // a másolás bukott → a (cache-beli) render-uri-t adjuk vissza
   }
   return {
@@ -475,7 +481,7 @@ export async function uploadMediaResult(
     throw new StorageQuotaError();
   }
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
+    const msg = await res.text().catch((caught) => { logCaught('lib/render.ts:uploadMediaResult', caught); return ''; });
     throw new Error(msg || tr('lib.render.uploadFailed'));
   }
   const data = await readJson<{ url?: string; size?: number }>(res, tr('lib.render.uploadFailed'));
@@ -496,7 +502,8 @@ export async function uploadMediaResult(
 async function cancelRender(base: string, id: string): Promise<void> {
   try {
     await fetch(`${base}/render/${id}/cancel`, { method: 'POST', headers: await workerAuthHeaders() });
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:cancelRender', caught);
     // best-effort — a kliens akkor is megszakítottnak tekinti
   }
 }
@@ -633,7 +640,7 @@ async function submitAndPollRender(
         zeroStreak = 0;
         const h = (await fetchWithTimeout(`${base}/health`, 3000)
           .then((r) => r.json())
-          .catch(() => ({}))) as RenderHealth;
+          .catch((caught) => { logCaught('lib/render.ts:submitAndPollRender', caught); return {}; })) as RenderHealth;
         if (cloudRenderStalled(h, prog)) {
           throw new Error(tr('lib.render.noWorker'));
         }
@@ -658,7 +665,8 @@ async function renderCloud(
     if (target.exists) {
       target.delete();
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:renderCloud', caught);
     // ha nem törölhető, a letöltés úgyis hibát ad
   }
   return await File.downloadFileAsync(`${base}/render/${id}/file`, target, {
@@ -925,7 +933,8 @@ export async function collectAndShareProject(
         if (target.exists) {
           target.delete();
         }
-      } catch {
+      } catch (caught) {
+        logCaught('lib/render.ts:collectAndShareProject', caught);
         // ha nem törölhető, a letöltés úgyis hibát ad
       }
       const file = await File.downloadFileAsync(
@@ -977,7 +986,8 @@ export async function renderAndShareMp4(
       await MediaLibrary.saveToLibraryAsync(file.uri);
       savedToPhotos = true;
     }
-  } catch {
+  } catch (caught) {
+    logCaught('lib/render.ts:renderAndShareMp4', caught);
     // engedély-megtagadás vagy hiba — a megosztó így is felajánlja a mentést
   }
 
@@ -1029,7 +1039,8 @@ export async function renderAndPost(
         const asset = await MediaLibrary.createAssetAsync(file.uri);
         assetId = asset?.id ?? null;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/render.ts:renderAndPost', caught);
       // engedély-megtagadás vagy hiba — a megosztó így is felajánlja a mentést
     }
   }
@@ -1043,7 +1054,8 @@ export async function renderAndPost(
         await Linking.openURL(igUrl);
         return;
       }
-    } catch {
+    } catch (caught) {
+      logCaught('lib/render.ts:renderAndPost', caught);
       // az Instagram nincs telepítve / nem nyílt — a megosztó-lap a fallback
     }
   }

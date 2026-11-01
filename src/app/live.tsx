@@ -21,6 +21,7 @@ import { palette } from '@/constants/editor';
 import { listLiveNow, subscribeLiveList, type LiveSession } from '@/lib/live';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { saveProject } from '@/lib/storage';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔴 Élő-képernyő (hub) — a feed felső sorának ÉLŐ-ikonja nyitja. Valódi
@@ -36,13 +37,13 @@ export default function LiveScreen() {
   const reload = () => {
     listLiveNow()
       .then(setLive)
-      .catch(() => setLive([]));
+      .catch((caught) => { logCaught('app/live.tsx:reload', caught); return setLive([]); });
   };
   useEffect(() => {
     let active = true;
     listLiveNow()
       .then((l) => active && setLive(l))
-      .catch(() => active && setLive([]));
+      .catch((caught) => { logCaught('app/live.tsx:LiveScreen', caught); return active && setLive([]); });
     const unsub = subscribeLiveList(() => active && reload());
     return () => {
       active = false;
@@ -64,7 +65,8 @@ export default function LiveScreen() {
       await saveProject(project);
       setTitle('');
       router.push(`/live/studio/${project.id}`);
-    } catch {
+    } catch (caught) {
+      logCaught('app/live.tsx:onGoLive', caught);
       // mentés/létrehozás hiba — csendben (a gomb újra aktív)
     } finally {
       setBusy(false);

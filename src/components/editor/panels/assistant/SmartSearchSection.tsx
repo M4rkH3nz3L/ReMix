@@ -13,6 +13,7 @@ import type { SearchHit } from '@/lib/visionIndex';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
 import type { VideoClip } from '@/types/project';
+import { logCaught } from '@/lib/logCaught';
 
 /**
  * 🔍 Smart Search (P0‑8): átirat- és vision-találatok EGY listában, idővonal-
@@ -42,7 +43,7 @@ export function SmartSearchSection({
     try {
       // 📝 átirat-találatok a vision-találatokkal EGY listában (P0‑8)
       const transcript =
-        (await getTimelineTranscript(state.project).catch(() => null)) ?? [];
+        (await getTimelineTranscript(state.project).catch((caught) => { logCaught('components/editor/panels/assistant/SmartSearchSection.tsx:runSearch', caught); return null; })) ?? [];
       const transcriptHits = searchTranscript(transcript, query);
       const index = await withProgress(t('panels.assistant.progressVisualIndex'), (report) =>
         indexProjectVision(state.project!, report)
@@ -112,7 +113,7 @@ export function SmartSearchSection({
         icon="search-outline"
         label={busy ?? t('panels.assistant.searchInVisual')}
         onPress={() => {
-          runSearch().catch((err: Error) => Alert.alert('Smart Search', err.message));
+          runSearch().catch((err: Error) => { logCaught('components/editor/panels/assistant/SmartSearchSection.tsx:SmartSearchSection', err); return Alert.alert('Smart Search', err.message); });
         }}
       />
       {searchHits !== null ? (

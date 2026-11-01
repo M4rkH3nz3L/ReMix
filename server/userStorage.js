@@ -1,3 +1,4 @@
+const { logCaught } = require('./lib/caught');
 // 🔌 Per-USER külső tárhely-források (Google Drive / Dropbox / WebDAV / S3).
 //
 // A user a SAJÁT felhőjét köti be a profilról; a média ott marad → NEM terheli a
@@ -81,7 +82,8 @@ function verifyState(state) {
   }
   try {
     return JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-  } catch {
+  } catch (caught) {
+    logCaught('userStorage.js:verifyState', caught);
     return null;
   }
 }
@@ -185,7 +187,7 @@ async function exchangeCode(provider, code, redirectUri) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:exchangeCode', caught); return {}; });
   if (!res.ok) {
     throw new Error(data.error_description || data.error || `Token-csere hiba (${res.status})`);
   }
@@ -233,7 +235,7 @@ async function ensureAccessToken(source) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:ensureAccessToken', caught); return {}; });
   if (!res.ok || !data.access_token) {
     throw new Error(data.error_description || data.error || `Token-frissítés hiba (${res.status})`);
   }
@@ -271,7 +273,7 @@ async function gdriveListMedia(source) {
     }).toString();
   // listázás: idempotens GET → időkorlát + retry átmeneti hibára
   const res = await fetchRetry(url, { headers: { Authorization: `Bearer ${token}` } });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:gdriveListMedia', caught); return {}; });
   if (!res.ok) {
     throw new Error(data.error?.message || `Drive lista hiba (${res.status})`);
   }
@@ -325,7 +327,7 @@ async function dropboxListMedia(source) {
     },
     { idempotent: true }
   );
-  let data = await res.json().catch(() => ({}));
+  let data = await res.json().catch((caught) => { logCaught('userStorage.js:dropboxListMedia', caught); return {}; });
   if (!res.ok) {
     throw new Error(data.error_summary || `Dropbox lista hiba (${res.status})`);
   }
@@ -359,7 +361,7 @@ async function dropboxListMedia(source) {
       },
       { idempotent: true }
     );
-    data = await res.json().catch(() => ({}));
+    data = await res.json().catch((caught) => { logCaught('userStorage.js:dropboxListMedia', caught); return {}; });
     if (!res.ok) {
       break;
     }
@@ -390,7 +392,7 @@ async function onedriveListMedia(source) {
   const url =
     'https://graph.microsoft.com/v1.0/me/drive/root/children?$top=200&$select=id,name,size,file,folder';
   const res = await fetchRetry(url, { headers: { Authorization: `Bearer ${token}` } });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:onedriveListMedia', caught); return {}; });
   if (!res.ok) {
     throw new Error(data.error?.message || `OneDrive lista hiba (${res.status})`);
   }
@@ -453,7 +455,7 @@ async function gdriveUpload(source, localPath, name, contentType) {
       body,
     }
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:gdriveUpload', caught); return {}; });
   if (!res.ok || !data.id) {
     throw new Error(data.error?.message || `Drive feltöltés hiba (${res.status})`);
   }
@@ -473,7 +475,7 @@ async function dropboxUpload(source, localPath, name) {
     },
     body,
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:dropboxUpload', caught); return {}; });
   if (!res.ok || !data.path_lower) {
     throw new Error(data.error_summary || `Dropbox feltöltés hiba (${res.status})`);
   }
@@ -492,7 +494,7 @@ async function onedriveUpload(source, localPath, name) {
       body,
     }
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch((caught) => { logCaught('userStorage.js:onedriveUpload', caught); return {}; });
   if (!res.ok || !data.id) {
     throw new Error(data.error?.message || `OneDrive feltöltés hiba (${res.status})`);
   }
@@ -659,7 +661,8 @@ function verifyFileToken(token, sourceId, path) {
   let uid;
   try {
     uid = Buffer.from(uidB64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-  } catch {
+  } catch (caught) {
+    logCaught('userStorage.js:verifyFileToken', caught);
     return null;
   }
   const expect = crypto

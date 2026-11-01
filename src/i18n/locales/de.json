@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "toPath": "In Pfad",
       "fx": "Effekte",
       "pattern": "Muster",
       "addFill": "Hintergrund",
@@ -3115,6 +3116,32 @@
       "layer": "Ebene"
     },
     "image": {
+      "stroke": {
+        "style": "Linie",
+        "solid": "Durchgehend",
+        "dotted": "Gepunktet",
+        "dashed": "Gestrichelt",
+        "cap": "Linienende",
+        "cap_round": "Rund",
+        "cap_butt": "Stumpf",
+        "cap_square": "Eckig",
+        "join": "Ecke",
+        "join_round": "Rund",
+        "join_miter": "Spitz",
+        "join_bevel": "Abgeschrägt"
+      },
+      "font": "Schriftart",
+      "textAlign": "Ausrichtung",
+      "align_left": "Links",
+      "align_center": "Mitte",
+      "align_right": "Rechts",
+      "align_justify": "Blocksatz",
+      "italic": "Kursiv",
+      "textBox": "Textfeld",
+      "textBoxWidth": "Feldbreite",
+      "sides": "Seiten",
+      "starPoints": "Zacken",
+      "innerRadius": "Innenradius",
       "importFrom": {
         "source": "Projektmedien",
         "svg": "SVG-Datei",
@@ -3482,6 +3509,7 @@
         "hint": "Zuschnitt ziehen · Verhältnis wählen"
       },
       "shapes": {
+        "polygon": "Vieleck",
         "title": "Form hinzufügen",
         "rectangle": "Rechteck",
         "ellipse": "Ellipse",
@@ -3494,7 +3522,7 @@
       "undoVisibility": "Ebene umschalten",
       "undoText": "Text bearbeiten",
       "preset": { "plain": "Einfach", "outline": "Kontur", "neon": "Neon", "bubble": "Blase" },
-      "shape": { "rectangle": "Rechteck", "ellipse": "Ellipse", "line": "Linie", "arrow": "Pfeil", "star": "Stern" },
+      "shape": { "rectangle": "Rechteck", "ellipse": "Ellipse", "line": "Linie", "arrow": "Pfeil", "star": "Stern", "polygon": "Vieleck" },
       "blend": { "normal": "Normal", "multiply": "Multiplizieren", "screen": "Negativ mult.", "overlay": "Überlagern", "softlight": "Weiches Licht", "darken": "Abdunkeln", "lighten": "Aufhellen", "hardlight": "Hartes Licht", "difference": "Differenz", "exclusion": "Ausschluss", "colordodge": "Farbig abwedeln", "colorburn": "Farbig nachbelichten" }
     },
     "audioTools": {

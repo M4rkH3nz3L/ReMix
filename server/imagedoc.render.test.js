@@ -235,3 +235,13 @@ describe('I29 — PSD: a rétegek valódi tartalommal', () => {
     expect(inked).toBeGreaterThan(200);
   });
 });
+
+describe('ellipszis nem négyzetes dobozban', () => {
+  it('valódi ellipszis, nem lekerekített téglalap', async () => {
+    const e = { kind: 'shape', id: 'e', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.9, h: 0.4, fill: '#ff0000' };
+    const out = decode(await renderImageDoc(doc([e]), 200, dir));
+    // a doboz sarka közelében (x=20%, y=33%) az ellipszis már üres, a kapszula még festene
+    expect(out.at(32, 70)[3]).toBe(0);
+    expect(out.at(100, 70)[3]).toBe(255);
+  });
+});

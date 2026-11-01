@@ -220,7 +220,10 @@ async function buildLayer(layer, ctx) {
     !layer.gradient &&
     !layer.fillGradient &&
     !layer.pattern &&
-    !layer.imageUri;
+    !layer.imageUri &&
+    layer.shape !== 'polygon' &&
+    layer.starPoints == null &&
+    layer.innerRadius == null;
   if (layer.kind === 'shape' && (plainShape || !ctx.rasterizeLayerPng)) {
     const vec = shapeToVector(layer, ctx.canvasW, ctx.canvasH);
     if (vec) {

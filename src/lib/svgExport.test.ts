@@ -80,7 +80,8 @@ describe('svgExport.imageDocToSvg', () => {
     const svg = imageDocToSvg(doc([L({ kind: 'shape', id: 's', shape: 'star', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#ffd166', borderColor: '#ffffff', borderWidth: 2 })]));
     expect(svg).toContain('<polygon points="');
     expect(svg).toContain('stroke="#ffffff"');
-    expect(svg).toContain('stroke-width="14.4"'); // 2/100*720
+    expect(svg).toContain('stroke-width="28.8"'); // 2/100*720, duplán: a sokszög körvonala kívülre esik
+    expect(svg).toContain('paint-order="stroke"');
   });
 
   test('path (toll, points) zárt → kitöltött <path d>', () => {

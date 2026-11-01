@@ -786,6 +786,12 @@ export interface TextClip extends ClipBase {
   fontWeight: 'normal' | 'bold';
   /** választott betűtípus (family-név, egyezik a renderrel); hiányzó = rendszer-alap */
   fontFamily?: string;
+  /** dőlt (a beépített fontoknak nincs dőlt változata, ezért döntött betűkép) */
+  fontStyle?: 'normal' | 'italic';
+  /** sorok igazítása a szövegdobozon belül; hiányzó = közép */
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  /** szövegdoboz szélessége a vászon törtjében: ebbe tördel; hiányzó = a szöveg saját szélessége */
+  boxWidth?: number;
   /** középpont, 0–1 normalizálva */
   position: { x: number; y: number };
   /**
@@ -964,7 +970,13 @@ export interface PathAnim {
 
 export interface ShapeClip extends ClipBase {
   kind: 'shape';
-  shape: 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'star' | 'path';
+  shape: 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'star' | 'polygon' | 'path';
+  /** sokszög oldalszáma (3–12) */
+  sides?: number;
+  /** csillag ágainak száma (3–12); hiányzó = az alap ötágú */
+  starPoints?: number;
+  /** csillag belső sugara a külsőhöz képest (0,1–0,9) */
+  innerRadius?: number;
   /** középpont, 0–1 normalizálva */
   position: { x: number; y: number };
   /** méret a vászon arányában (0–1) */

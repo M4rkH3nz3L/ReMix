@@ -3069,6 +3069,7 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "toPath": "Görbévé",
       "addFill": "Háttér",
       "addAdjust": "Korrekciós réteg",
       "import": "Importálás",
@@ -3115,6 +3116,32 @@
       "layer": "Réteg"
     },
     "image": {
+      "stroke": {
+        "style": "Vonal",
+        "solid": "Folytonos",
+        "dotted": "Pontozott",
+        "dashed": "Szaggatott",
+        "cap": "Vonalvég",
+        "cap_round": "Kerek",
+        "cap_butt": "Vágott",
+        "cap_square": "Szögletes",
+        "join": "Sarok",
+        "join_round": "Kerek",
+        "join_miter": "Hegyes",
+        "join_bevel": "Levágott"
+      },
+      "font": "Betűtípus",
+      "textAlign": "Igazítás",
+      "align_left": "Balra",
+      "align_center": "Középre",
+      "align_right": "Jobbra",
+      "align_justify": "Sorkizárt",
+      "italic": "Dőlt",
+      "textBox": "Szövegdoboz",
+      "textBoxWidth": "Doboz szélessége",
+      "sides": "Oldalak",
+      "starPoints": "Ágak",
+      "innerRadius": "Belső sugár",
       "importFrom": {
         "source": "A projekt médiái",
         "svg": "SVG-fájl",
@@ -3477,6 +3504,7 @@
         "hint": "Húzd a kivágást · válassz arányt"
       },
       "shapes": {
+        "polygon": "Sokszög",
         "title": "Forma hozzáadása",
         "rectangle": "Téglalap",
         "ellipse": "Ellipszis",
@@ -3489,7 +3517,7 @@
       "undoVisibility": "Réteg ki/be",
       "undoText": "Szöveg szerkesztése",
       "preset": { "plain": "Sima", "outline": "Kontúr", "neon": "Neon", "bubble": "Buborék" },
-      "shape": { "rectangle": "Téglalap", "ellipse": "Ellipszis", "line": "Vonal", "arrow": "Nyíl", "star": "Csillag" },
+      "shape": { "rectangle": "Téglalap", "ellipse": "Ellipszis", "line": "Vonal", "arrow": "Nyíl", "star": "Csillag", "polygon": "Sokszög" },
       "blend": { "normal": "Normál", "multiply": "Szorzás", "screen": "Kivonás", "overlay": "Fedés", "softlight": "Lágy fény", "darken": "Sötétítés", "lighten": "Világosítás", "hardlight": "Kemény fény", "difference": "Különbség", "exclusion": "Kizárás", "colordodge": "Színfakítás", "colorburn": "Színégetés" }
     },
     "audioTools": {

@@ -45,6 +45,7 @@ function findChromium() {
 // render EGYETLEN forrása a függőség-mentes ./fonts (a kliens↔worker parity-t a
 // src/lib/contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
 const { FONT_FILES } = require('./fonts');
+const { polygonFor } = require('./shapeGeometry');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
 const fontFaceCache = {};
 
@@ -500,12 +501,13 @@ async function renderTextPngs(textClips, canvas, outDir) {
         <style>${fontFaceCss(clip.fontFamily)}</style>
         <div id="t" style="
           display:inline-block;
-          max-width:${Math.round(canvas.w * 0.92)}px;
+          ${clip.boxWidth > 0 ? `width:${Math.round(clip.boxWidth * canvas.w)}px;box-sizing:border-box;` : `max-width:${Math.round(canvas.w * 0.92)}px;`}
           font-family: ${fontFamilyCss(clip.fontFamily)};
           font-size:${fontPx}px;
           font-weight:${clip.fontWeight === 'bold' ? 700 : 400};
+          font-style:${clip.fontStyle === 'italic' ? 'italic' : 'normal'};
           color:${clip.color};
-          text-align:center;
+          text-align:${['left', 'right', 'justify'].includes(clip.textAlign) ? clip.textAlign : 'center'};
           line-height:1.25;
           white-space:pre-wrap;
           word-wrap:break-word;
@@ -851,14 +853,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
 
       // nyíl/csillag: clip-path sokszög — a fill/gradiens/kép-kitöltéssel is
       // működik; keret ezekre nem értelmezett (a clip levágná)
-      // 0–100-as koordináták — az előnézet (ShapeOverlay) UGYANEZEKET használja
-      const POLY_POINTS = {
-        arrow: [[0, 35], [60, 35], [60, 12], [100, 50], [60, 88], [60, 65], [0, 65]],
-        star: [
-          [50, 0], [61, 35], [98, 35], [68, 57], [79, 91], [50, 70],
-          [21, 91], [32, 57], [2, 35], [39, 35],
-        ],
-      };
+      // 0–100-as koordináták — az előnézet (ShapeOverlay) ugyanezeket használja (shapeGeometry)
       // A sokszögek INLINE SVG-vel rajzolódnak, nem CSS clip-path-tal:
       //  · a Chromium az SVG-t ÉLSIMÍTJA, a clip-path élét nem (a csillag
       //    hegyei fűrészesek voltak),
@@ -866,7 +861,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       //    háttér-másolattal vagy drop-shadow-lánccal közelíteni.
       // Kép-kitöltésnél marad a clip-path: ott a kitöltés egy háttérkép, amit
       // az SVG polygon nem tudna átvenni.
-      const svgPoly = POLY_POINTS[clip.shape];
+      const svgPoly = polygonFor(clip);
       // konikus gradienst az SVG nem tud → az ilyen poligon clip-path-ra esik
       // vissza (a CSS-háttér konikus gradientjével)
       const polyConic = Boolean(clip.gradient && clip.gradient.type === 'conic');
@@ -979,7 +974,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       // screenshot levágná a szélüket (szimmetrikus, hogy a középre igazítás
       // ne csússzon el)
       // a path/sokszög kontúrja a vonal KÖZEPÉN ül: a fele a dobozon kívül esik
-      const svgStroke = pathSvg || clip.shape === 'arrow' || clip.shape === 'star'
+      const svgStroke = pathSvg || svgPoly
         ? Math.ceil(Math.max(clip.borderWidth ? borderWidth : 0, clip.shape === 'path' ? ((clip.strokeWidth ?? 0.9) / 100) * canvas.h : 0) / 2) + 1
         : 0;
       const shadowPad =
@@ -1004,8 +999,8 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
             ? ` stroke="${clip.borderColor ?? '#ffffff'}" stroke-width="${pStrokeW}"`
             : '';
         let geo;
-        if (clip.shape === 'arrow' || clip.shape === 'star') {
-          const pts = (POLY_POINTS[clip.shape] || [])
+        if (svgPoly) {
+          const pts = svgPoly
             .map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`)
             .join(' ');
           geo = `<polygon points="${pts}" fill="${pFill}"${pStroke}/>`;
@@ -1037,7 +1032,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           width:${w}px;height:${h}px;
           background:${pathSvg || polySvg || patternSvg ? 'transparent' : background};
           ${patternSvg ? '' : backgroundExtra}
-          border-radius:${radius}px;
+          border-radius:${clip.shape === 'ellipse' ? '50%' : `${radius}px`};
           ${patternSvg ? '' : clipPath}
           ${patternSvg ? '' : border}
           box-sizing:border-box;

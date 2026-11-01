@@ -14,6 +14,7 @@ const SHAPES: { kind: ShapeKind; icon: keyof typeof Ionicons.glyphMap; labelKey:
   { kind: 'line', icon: 'remove-outline', labelKey: 'studio.image.shapes.line' },
   { kind: 'arrow', icon: 'arrow-forward-outline', labelKey: 'studio.image.shapes.arrow' },
   { kind: 'star', icon: 'star-outline', labelKey: 'studio.image.shapes.star' },
+  { kind: 'polygon', icon: 'triangle-outline', labelKey: 'studio.image.shapes.polygon' },
 ];
 
 /** 🔷 Forma-választó — a vászonra kerülő forma TÍPUSA (nem csak téglalap). */

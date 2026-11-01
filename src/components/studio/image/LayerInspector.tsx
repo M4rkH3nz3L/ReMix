@@ -1,7 +1,8 @@
 import { GeometryFields } from '@/components/studio/image/GeometryFields';
+import { fontOptions } from '@/constants/fonts';
 import { normalizeRotation } from '@/lib/imageLayerGeometry';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/ui/controls';
 import { Slider, ToggleRow } from '@/components/studio/audio/primitives';
@@ -41,7 +42,15 @@ const BLENDS: (BlendMode | 'normal')[] = [
   'colordodge',
   'colorburn',
 ];
-const SHAPES: ShapeLayer['shape'][] = ['rectangle', 'ellipse', 'line', 'arrow', 'star'];
+const SHAPES: ShapeLayer['shape'][] = ['rectangle', 'ellipse', 'line', 'arrow', 'star', 'polygon'];
+const TEXT_ALIGNS: { key: NonNullable<TextLayer['textAlign']> }[] = [{ key: 'left' }, { key: 'center' }, { key: 'right' }, { key: 'justify' }];
+const DASHES: { value: number; labelKey: string }[] = [
+  { value: 0, labelKey: 'studio.image.stroke.solid' },
+  { value: 1, labelKey: 'studio.image.stroke.dotted' },
+  { value: 3, labelKey: 'studio.image.stroke.dashed' },
+];
+const CAPS: NonNullable<ShapeLayer['strokeCap']>[] = ['round', 'butt', 'square'];
+const JOINS: NonNullable<ShapeLayer['strokeJoin']>[] = ['round', 'miter', 'bevel'];
 
 /**
  * 🎛️ Réteg-tulajdonság szerkesztő (a kijelölt réteg kontextuális vezérlői):
@@ -140,6 +149,56 @@ export function LayerInspector({
             value={layer.color}
             onChange={(color) => commit(updateLayer<TextLayer>(doc, layer.id, { color }))}
           />
+          <Text style={styles.sectionLabel}>{t('studio.image.font')}</Text>
+          <View style={styles.chipRow}>
+            {fontOptions.filter((f) => f.family).map((f) => (
+              <Pressable
+                key={f.id}
+                style={[styles.fontChip, layer.fontFamily === f.family ? styles.fontChipActive : null]}
+                onPress={() => commit(updateLayer<TextLayer>(doc, layer.id, { fontFamily: f.family }), t('studio.image.font'))}
+                accessibilityRole="button"
+                accessibilityLabel={f.label}
+                accessibilityState={{ selected: layer.fontFamily === f.family }}
+              >
+                <Text style={[styles.fontChipText, { fontFamily: f.family }]} numberOfLines={1}>
+                  {f.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.sectionLabel}>{t('studio.image.textAlign')}</Text>
+          <View style={styles.chipRow}>
+            {TEXT_ALIGNS.map((a) => (
+              <Chip
+                key={a.key}
+                label={t(`studio.image.align_${a.key}`)}
+                active={(layer.textAlign ?? 'center') === a.key}
+                onPress={() => commit(updateLayer<TextLayer>(doc, layer.id, { textAlign: a.key }), t('studio.image.textAlign'))}
+              />
+            ))}
+          </View>
+          <ToggleRow
+            icon="text"
+            label={t('studio.image.italic')}
+            value={layer.fontStyle === 'italic'}
+            onValueChange={(v) => commit(updateLayer<TextLayer>(doc, layer.id, { fontStyle: v ? 'italic' : 'normal' }), t('studio.image.italic'))}
+          />
+          <ToggleRow
+            icon="albums-outline"
+            label={t('studio.image.textBox')}
+            value={!!layer.boxWidth}
+            onValueChange={(v) => commit(updateLayer<TextLayer>(doc, layer.id, { boxWidth: v ? 0.7 : undefined }), t('studio.image.textBox'))}
+          />
+          {layer.boxWidth ? (
+            <Slider
+              label={t('studio.image.textBoxWidth')}
+              value={layer.boxWidth}
+              min={0.1}
+              max={1}
+              onChange={(boxWidth) => commit(updateLayer<TextLayer>(doc, layer.id, { boxWidth }), 'text-box')}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          ) : null}
           <Slider
             label={t('studio.image.fontSize')}
             value={layer.fontSize}
@@ -559,6 +618,36 @@ export function LayerInspector({
               format={(v) => v.toFixed(2)}
             />
           ) : null}
+          {layer.shape === 'polygon' ? (
+            <Slider
+              label={t('studio.image.sides')}
+              value={layer.sides ?? 6}
+              min={3}
+              max={12}
+              onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { sides: Math.round(v) }), 'sides')}
+              format={(v) => String(Math.round(v))}
+            />
+          ) : null}
+          {layer.shape === 'star' ? (
+            <>
+              <Slider
+                label={t('studio.image.starPoints')}
+                value={layer.starPoints ?? 5}
+                min={3}
+                max={12}
+                onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { starPoints: Math.round(v) }), 'star-points')}
+                format={(v) => String(Math.round(v))}
+              />
+              <Slider
+                label={t('studio.image.innerRadius')}
+                value={layer.innerRadius ?? 0.5}
+                min={0.1}
+                max={0.9}
+                onChange={(v) => commit(updateLayer<ShapeLayer>(doc, layer.id, { innerRadius: v }), 'star-inner')}
+                format={(v) => `${Math.round(v * 100)}%`}
+              />
+            </>
+          ) : null}
           {/* I26: a nyitott path egy vonal (`strokeWidth`, a kitöltés színével), minden más kontúros */}
           {layer.shape === 'path' && !layer.closed && !layer.subpaths?.length ? (
             <Slider
@@ -585,6 +674,37 @@ export function LayerInspector({
               value={layer.borderColor ?? '#ffffff'}
               onChange={(borderColor) => commit(updateLayer<ShapeLayer>(doc, layer.id, { borderColor }))}
             />
+          ) : null}
+          {(layer.borderWidth ?? 0) > 0 || layer.shape === 'path' ? (
+            <>
+              <Text style={styles.sectionLabel}>{t('studio.image.stroke.style')}</Text>
+              <View style={styles.chipRow}>
+                {DASHES.map((d) => (
+                  <Chip
+                    key={d.value}
+                    label={t(d.labelKey)}
+                    active={(layer.strokeDash ?? 0) === d.value}
+                    onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeDash: d.value || undefined }), t('studio.image.stroke.style'))}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+          {layer.shape === 'path' ? (
+            <>
+              <Text style={styles.sectionLabel}>{t('studio.image.stroke.cap')}</Text>
+              <View style={styles.chipRow}>
+                {CAPS.map((c) => (
+                  <Chip key={c} label={t(`studio.image.stroke.cap_${c}`)} active={(layer.strokeCap ?? 'round') === c} onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeCap: c }), t('studio.image.stroke.cap'))} />
+                ))}
+              </View>
+              <Text style={styles.sectionLabel}>{t('studio.image.stroke.join')}</Text>
+              <View style={styles.chipRow}>
+                {JOINS.map((j) => (
+                  <Chip key={j} label={t(`studio.image.stroke.join_${j}`)} active={(layer.strokeJoin ?? 'round') === j} onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeJoin: j }), t('studio.image.stroke.join'))} />
+                ))}
+              </View>
+            </>
           ) : null}
           <ToggleRow
             icon="contrast"
@@ -815,6 +935,9 @@ export function LayerInspector({
 }
 
 const styles = StyleSheet.create({
+  fontChip: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border },
+  fontChipActive: { borderColor: palette.accent, backgroundColor: `${palette.accent}22` },
+  fontChipText: { color: palette.text, fontSize: 15 },
   nameInput: {
     height: 44,
     borderRadius: 8,

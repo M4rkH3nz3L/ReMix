@@ -313,7 +313,7 @@ export function TextOverlay({
             styles.inner,
             selected && editable ? styles.selected : null,
             {
-              maxWidth: '92%',
+              ...(clip.boxWidth ? { width: clip.boxWidth * box.w } : { maxWidth: '92%' as const }),
               transform: [
                 { translateY: '-50%' },
                 { translateY: anim.translateY },
@@ -373,8 +373,10 @@ export function TextOverlay({
                 fontSize,
                 fontWeight: clip.text3d ? '800' : clip.fontWeight,
                 fontFamily: clip.fontFamily,
-                textAlign: 'center',
+                textAlign: clip.textAlign ?? 'center',
               },
+              // a beépített fontoknak nincs dőlt változata: a render is döntött betűképet ad
+              clip.fontStyle === 'italic' ? { transform: [{ skewX: '-12deg' }] } : null,
               clip.text3d ? null : preset.text,
               // 🔡 tipográfia (tracking/leading) + 🎨 stílus-közelítés (a pontos
               // gradient/kontúr a renderben ég be; itt a gradient a from-színnel,

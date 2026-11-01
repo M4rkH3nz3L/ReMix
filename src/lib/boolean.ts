@@ -1,3 +1,4 @@
+import { polygonFor } from '@/lib/shapeGeometry';
 import type { PathPoint, ShapeClip } from '@/types/project';
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect' | 'exclude' | 'divide';
@@ -6,15 +7,6 @@ interface Pt {
   x: number;
   y: number;
 }
-
-/** nyíl/csillag egység-poligonjai (0–100), a renderrel/előnézettel közösek */
-const POLY = {
-  arrow: [[0, 35], [60, 35], [60, 12], [100, 50], [60, 88], [60, 65], [0, 65]],
-  star: [
-    [50, 0], [61, 35], [98, 35], [68, 57], [79, 91], [50, 70],
-    [21, 91], [32, 57], [2, 35], [39, 35],
-  ],
-} as const;
 
 function cubic(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
   const u = 1 - t;
@@ -44,8 +36,9 @@ export function flattenShape(clip: ShapeClip): Pt[] {
     }
     return out;
   }
-  if (clip.shape === 'arrow' || clip.shape === 'star') {
-    return POLY[clip.shape].map(([px, py]) => map(px / 100, py / 100));
+  const poly = polygonFor(clip);
+  if (poly) {
+    return poly.map(([px, py]) => map(px / 100, py / 100));
   }
   if (clip.shape === 'path' && Array.isArray(clip.points) && clip.points.length >= 2) {
     // a Bézier-szegmenseket sűrű polyline-ra bontjuk

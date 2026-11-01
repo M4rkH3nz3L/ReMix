@@ -13,6 +13,8 @@
 // vissza — ezeket a hívó tudja (a doc.format==='vector' alapvetően vektor-elemű).
 
 import { effectiveLayerOpacity } from '@/lib/imageDoc';
+import { textSize } from '@/lib/imageLayerLayout';
+import { polygonFor } from '@/lib/shapeGeometry';
 import type {
   GradientStop,
   ImageDoc,
@@ -178,14 +180,8 @@ function patternDef(p: PatternSpec, id: string, boxH: number): string {
 
 // ── forma-geometriák (star/arrow) ────────────────────────────────────────────
 
-// 0–100-as koordináták — az előnézet (ShapeOverlay) és a render (text-render.js) UGYANEZEK
-const POLY_POINTS: Record<'arrow' | 'star', [number, number][]> = {
-  arrow: [[0, 35], [60, 35], [60, 12], [100, 50], [60, 88], [60, 65], [0, 65]],
-  star: [[50, 0], [61, 35], [98, 35], [68, 57], [79, 91], [50, 70], [21, 91], [32, 57], [2, 35], [39, 35]],
-};
-
-function polyPoints(shape: 'arrow' | 'star', b: Box): string {
-  return POLY_POINTS[shape].map(([x, y]) => `${n(b.left + (x / 100) * b.bw)},${n(b.top + (y / 100) * b.bh)}`).join(' ');
+function polyPoints(poly: [number, number][], b: Box): string {
+  return poly.map(([x, y]) => `${n(b.left + (x / 100) * b.bw)},${n(b.top + (y / 100) * b.bh)}`).join(' ');
 }
 
 // ── réteg-emitterek ──────────────────────────────────────────────────────────
@@ -244,10 +240,12 @@ function shapeSvg(layer: ShapeLayer, i: number, W: number, H: number, defs: stri
   } else if (layer.shape === 'line') {
     // vonal = vékony kitöltött doboz (a rasterizáló is így rajzolja)
     el = `<rect x="${n(b.left)}" y="${n(b.top)}" width="${n(b.bw)}" height="${n(Math.max(1, b.bh))}" fill="${paint}"/>`;
-  } else if (layer.shape === 'star') {
-    el = `<polygon points="${polyPoints('star', b)}" fill="${paint}"${stroke}/>`;
-  } else if (layer.shape === 'arrow') {
-    el = `<polygon points="${polyPoints('arrow', b)}" fill="${paint}"${stroke}/>`;
+  } else if (polygonFor(layer)) {
+    // a render a sokszög körvonalát KÍVÜLRE rajzolja (dupla vastag vonal, a kitöltés fölötte)
+    const outer = stroke
+      ? ` stroke="${esc(layer.borderColor!)}" stroke-width="${n(strokeW * 2)}" stroke-linejoin="round" paint-order="stroke"`
+      : '';
+    el = `<polygon points="${polyPoints(polygonFor(layer)!, b)}" fill="${paint}"${outer}/>`;
   } else if (layer.shape === 'path' && (hasSub || hasPts)) {
     const subs: Subpath[] = hasSub
       ? (layer.subpaths as PathPoint[][]).map((pts) => ({ points: pts.map((p) => mapPt(p, b)), closed: true }))
@@ -302,6 +300,25 @@ function fillSvg(layer: Extract<ImageLayer, { kind: 'fill' }>, i: number, W: num
   return `<rect x="0" y="0" width="${n(W)}" height="${n(H)}" fill="${paint}"/>`;
 }
 
+/** szóhatáron tördelés adott karakterszámra */
+function wrapWords(text: string, perLine: number): string[] {
+  const out: string[] = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(' ')) {
+      const next = line ? `${line} ${word}` : word;
+      if (next.length > perLine && line) {
+        out.push(line);
+        line = word;
+      } else {
+        line = next;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 function textSvg(layer: Extract<ImageLayer, { kind: 'text' }>, W: number, H: number): string {
   const b = boxOf(layer, W, H);
   const fontPx = ((layer.fontSize ?? 8) / 100) * H;
@@ -309,17 +326,24 @@ function textSvg(layer: Extract<ImageLayer, { kind: 'text' }>, W: number, H: num
   const weight = layer.fontWeight === 'bold' ? 'bold' : 'normal';
   // a betűköz em-ben tárolt (text-render.js), az SVG user-egységet vár
   const ls = layer.letterSpacing ? ` letter-spacing="${n(layer.letterSpacing * fontPx)}"` : '';
-  // többsoros szöveg: soronként tspan, a blokk a középpontra ül (a render line-height-ja)
-  const lines = String(layer.text ?? '').split('\n');
+  const align = layer.textAlign === 'left' || layer.textAlign === 'right' ? layer.textAlign : 'center';
+  const size = textSize(layer, W / H);
+  const blockW = size.w * W;
+  const textX = align === 'left' ? b.cx - blockW / 2 : align === 'right' ? b.cx + blockW / 2 : b.cx;
+  const anchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
+  // többsoros szöveg: soronként tspan, a blokk a középpontra ül (a render line-height-ja);
+  // dobozos szövegnél szóhatáron tördelünk (a betűszélesség becslés, a raszter a pontos)
+  const lines = layer.boxWidth ? wrapWords(String(layer.text ?? ''), Math.max(1, Math.floor(blockW / (fontPx * 0.55)))) : String(layer.text ?? '').split('\n');
   const leading = fontPx * (layer.lineHeight ?? 1.2);
   const firstY = b.cy - ((lines.length - 1) * leading) / 2;
   const spans =
     lines.length === 1
       ? esc(lines[0])
-      : lines.map((line, i) => `<tspan x="${n(b.cx)}" y="${n(firstY + i * leading)}">${esc(line)}</tspan>`).join('');
+      : lines.map((line, i) => `<tspan x="${n(textX)}" y="${n(firstY + i * leading)}">${esc(line)}</tspan>`).join('');
+  const italic = layer.fontStyle === 'italic' ? ' font-style="italic"' : '';
   const el =
-    `<text x="${n(b.cx)}" y="${n(firstY)}" font-family="${family}" font-size="${n(fontPx)}" font-weight="${weight}"` +
-    ` fill="${esc(layer.color ?? '#ffffff')}" text-anchor="middle" dominant-baseline="central"${ls}>${spans}</text>`;
+    `<text x="${n(textX)}" y="${n(firstY)}" font-family="${family}" font-size="${n(fontPx)}" font-weight="${weight}"${italic}` +
+    ` fill="${esc(layer.color ?? '#ffffff')}" text-anchor="${anchor}" dominant-baseline="central"${ls}>${spans}</text>`;
   return wrap(el, layer, b, '');
 }
 

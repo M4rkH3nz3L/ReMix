@@ -19,13 +19,17 @@ const TEXT_ADVANCE = 0.55;
 
 /** A szöveg becsült mérete (a rétegnek nincs w/h-ja): a betűméret a vászon-magasság %-a. */
 export function textSize(layer: Extract<ImageLayer, { kind: 'text' }>, aspect: number): { w: number; h: number } {
-  const lines = String(layer.text ?? '').split('\n');
   const fontH = (layer.fontSize ?? 8) / 100;
+  const charW = (fontH * TEXT_ADVANCE) / aspect;
+  const lines = String(layer.text ?? '').split('\n');
+  const leading = fontH * (layer.lineHeight ?? 1.25);
+  if (layer.boxWidth) {
+    const perLine = Math.max(1, Math.floor(layer.boxWidth / charW));
+    const rows = lines.reduce((n, l) => n + Math.max(1, Math.ceil(l.length / perLine)), 0);
+    return { w: layer.boxWidth, h: rows * leading };
+  }
   const longest = Math.max(...lines.map((l) => l.length), 1);
-  return {
-    w: Math.min(0.92, (longest * fontH * TEXT_ADVANCE) / aspect),
-    h: lines.length * fontH * (layer.lineHeight ?? 1.2),
-  };
+  return { w: Math.min(0.92, longest * charW), h: lines.length * leading };
 }
 
 /**

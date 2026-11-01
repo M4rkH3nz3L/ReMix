@@ -29,6 +29,7 @@ export type LayerAction =
   | 'fx'
   | 'pattern'
   | 'editPath'
+  | 'toPath'
   | 'boolean'
   | 'align'
   | 'rotate'
@@ -69,6 +70,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   fx: 'sparkles-outline',
   pattern: 'apps-outline',
   editPath: 'git-network-outline',
+  toPath: 'analytics-outline',
   boolean: 'git-merge-outline',
   align: 'magnet-outline',
   rotate: 'refresh-outline',
@@ -103,7 +105,8 @@ export function selectionMenu(layer: ImageLayer, ctx: { canAlign: boolean; canBo
     case 'photo':
       return { actions: ['adjust', 'develop', 'style', ...placed, ...order, 'duplicate'], canDelete: true };
     case 'shape': {
-      const path: LayerAction[] = layer.shape === 'path' && (layer.points?.length ?? 0) >= 2 ? ['editPath'] : [];
+      const path: LayerAction[] =
+        layer.shape === 'path' ? ((layer.points?.length ?? 0) >= 2 ? ['editPath'] : []) : layer.shape === 'line' ? [] : ['toPath'];
       const bool: LayerAction[] = ctx.canBoolean ? ['boolean'] : [];
       return { actions: ['style', 'fx', 'pattern', ...path, ...bool, ...placed, ...order, 'duplicate'], canDelete: true };
     }

@@ -1,3 +1,4 @@
+import { polygonFor } from '@/lib/shapeGeometry';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
@@ -49,20 +50,8 @@ function SvgGradientDef({ id, gradient }: { id: string; gradient: ShapeGradient 
 }
 
 /** nyíl/csillag sokszögek 0–100-as koordinátákban — a renderrel megegyezőek */
-const POLYGONS: Record<'arrow' | 'star', [number, number][]> = {
-  arrow: [
-    [0, 35], [60, 35], [60, 12], [100, 50], [60, 88], [60, 65], [0, 65],
-  ],
-  star: [
-    [50, 0], [61, 35], [98, 35], [68, 57], [79, 91], [50, 70],
-    [21, 91], [32, 57], [2, 35], [39, 35],
-  ],
-};
-
-function polygonPoints(shape: 'arrow' | 'star', w: number, h: number): string {
-  return POLYGONS[shape]
-    .map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`)
-    .join(' ');
+function polygonPoints(poly: [number, number][], w: number, h: number): string {
+  return poly.map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`).join(' ');
 }
 
 /** egy csempe-primitív → react-native-svg elem (a worker SVG-stringjével AZONOS). */
@@ -137,8 +126,8 @@ function PatternShape({
           strokeWidth={sw}
           strokeLinejoin={clip.strokeJoin ?? 'round'}
         />
-      ) : clip.shape === 'arrow' || clip.shape === 'star' ? (
-        <Polygon points={polygonPoints(clip.shape, w, h)} fill={fillRef} stroke={stroke} strokeWidth={sw} />
+      ) : polygonFor(clip) ? (
+        <Polygon points={polygonPoints(polygonFor(clip)!, w, h)} fill={fillRef} stroke={stroke} strokeWidth={sw} />
       ) : (
         <Rect
           x={0}
@@ -373,7 +362,7 @@ export function ShapeOverlay({
               );
             })()}
           </Svg>
-        ) : clip.shape === 'arrow' || clip.shape === 'star' ? (
+        ) : polygonFor(clip) ? (
           <Svg width={w} height={h}>
             {clip.gradient ? (
               <Defs>
@@ -388,7 +377,7 @@ export function ShapeOverlay({
               </Defs>
             ) : null}
             <Polygon
-              points={polygonPoints(clip.shape, w, h)}
+              points={polygonPoints(polygonFor(clip)!, w, h)}
               fill={clip.gradient || clip.fillGradient ? `url(#g-${clip.id})` : clip.fill}
             />
           </Svg>

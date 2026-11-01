@@ -52,6 +52,7 @@ import type { ImageShareMode } from '@/lib/imageShare';
 import { exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
 import { type ToolKey, selectionMenu } from '@/lib/imageMenu';
+import { shapeToPathPoints } from '@/lib/shapeGeometry';
 import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { EdgeTab } from '@/components/studio/image/body/PanelChrome';
@@ -444,6 +445,8 @@ export function ImageStudioBody({
             backgroundColor: null,
             fontSize: 9,
             fontWeight: 'bold',
+            // saját font: a rendszer-font az előnézetben és az exportban eltérő lenne
+            fontFamily: 'Poppins',
             position: { x: 0.5, y: 0.5 },
             stylePreset: 'outline',
           }
@@ -477,7 +480,7 @@ export function ImageStudioBody({
         ? ({ ...base, shape: 'line', w: 0.6, h: 0.02, fill: '#ffffff', strokeWidth: 0.012 } as ShapeLayer)
         : shape === 'rectangle'
           ? ({ ...base, shape: 'rectangle', w: 0.4, h: 0.28, cornerRadius: 0.12 } as ShapeLayer)
-          : ({ ...base, shape, w: 0.4, h: 0.4 } as ShapeLayer);
+          : ({ ...base, shape, w: 0.4, h: 0.4, ...(shape === 'polygon' ? { sides: 6 } : {}) } as ShapeLayer);
     commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
     setSelectedId(id);
     setSheet(null);
@@ -646,6 +649,15 @@ export function ImageStudioBody({
       case 'unlock':
         if (selectedLayer) {
           commit(toggleLayerLocked(doc, selectedLayer.id), t('studio.image.undoLock'));
+        }
+        break;
+      case 'toPath':
+        // 🔷 forma → szerkeszthető pontok (a kinézet nem változik)
+        if (selectedLayer?.kind === 'shape') {
+          const points = shapeToPathPoints(selectedLayer);
+          if (points) {
+            commit(updateLayer<ShapeLayer>(doc, selectedLayer.id, { shape: 'path', points, closed: true, cornerRadius: undefined }), t('studio.imageTools.toPath'));
+          }
         }
         break;
       case 'editPath':

@@ -3069,6 +3069,7 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "toPath": "To path",
       "addFill": "Background",
       "addAdjust": "Adjustment layer",
       "import": "Import",
@@ -3115,6 +3116,32 @@
       "layer": "Layer"
     },
     "image": {
+      "stroke": {
+        "style": "Line",
+        "solid": "Solid",
+        "dotted": "Dotted",
+        "dashed": "Dashed",
+        "cap": "Line cap",
+        "cap_round": "Round",
+        "cap_butt": "Butt",
+        "cap_square": "Square",
+        "join": "Corner",
+        "join_round": "Round",
+        "join_miter": "Miter",
+        "join_bevel": "Bevel"
+      },
+      "font": "Font",
+      "textAlign": "Alignment",
+      "align_left": "Left",
+      "align_center": "Center",
+      "align_right": "Right",
+      "align_justify": "Justify",
+      "italic": "Italic",
+      "textBox": "Text box",
+      "textBoxWidth": "Box width",
+      "sides": "Sides",
+      "starPoints": "Points",
+      "innerRadius": "Inner radius",
       "importFrom": {
         "source": "Project media",
         "svg": "SVG file",
@@ -3477,6 +3504,7 @@
         "hint": "Drag the crop · pick a ratio"
       },
       "shapes": {
+        "polygon": "Polygon",
         "title": "Add a shape",
         "rectangle": "Rectangle",
         "ellipse": "Ellipse",
@@ -3489,7 +3517,7 @@
       "undoVisibility": "Toggle layer",
       "undoText": "Edit text",
       "preset": { "plain": "Plain", "outline": "Outline", "neon": "Neon", "bubble": "Bubble" },
-      "shape": { "rectangle": "Rectangle", "ellipse": "Ellipse", "line": "Line", "arrow": "Arrow", "star": "Star" },
+      "shape": { "rectangle": "Rectangle", "ellipse": "Ellipse", "line": "Line", "arrow": "Arrow", "star": "Star", "polygon": "Polygon" },
       "blend": { "normal": "Normal", "multiply": "Multiply", "screen": "Screen", "overlay": "Overlay", "softlight": "Soft light", "darken": "Darken", "lighten": "Lighten", "hardlight": "Hard light", "difference": "Difference", "exclusion": "Exclusion", "colordodge": "Color dodge", "colorburn": "Color burn" }
     },
     "audioTools": {

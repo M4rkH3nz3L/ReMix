@@ -203,7 +203,7 @@ function VideoVoice() {
 function TrackAudio({ trackType }: { trackType: TrackType }) {
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
-  // 🎚️ sáv-monitorozás: némítás/solo CSAK az előnézetre hat (a render nem tud róla)
+  // 🎚️ sáv-monitorozás: az audio-export ugyanezt követi (`mixForExport`)
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
   const audible =

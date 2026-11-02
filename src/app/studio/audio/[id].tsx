@@ -15,6 +15,7 @@ import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
+import { mixForExport } from '@/lib/audioExportMix';
 import { exportAudioFile } from '@/lib/render';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
@@ -101,16 +102,24 @@ export default function AudioStudioScreen() {
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:useInVideo', caught); });
   };
 
-  const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus') =>
-    guardPro(
+  const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus') => {
+    // A15: az export azt adja, amit hallasz
+    const store = useEditorStore.getState();
+    const mix = mixForExport(project, store.isTrackAudible, store.masterVolume);
+    if (!mix) {
+      Alert.alert(t('studio.export'), t('studio.audio.exportSilent'));
+      return Promise.resolve();
+    }
+    return guardPro(
       () =>
         withProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report) =>
-          exportAudioFile(project, format, report).then((url) => {
+          exportAudioFile(mix, format, report).then((url) => {
             Linking.openURL(url).catch((caught) => { logCaught('app/studio/audio/[id].tsx:downloadAudio', caught); });
           })
         ),
       (e) => Alert.alert(t('studio.export'), e.message)
     );
+  };
 
   const openDownload = () =>
     Alert.alert(t('studio.audio.exportDownload'), undefined, [

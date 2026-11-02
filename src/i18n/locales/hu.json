@@ -3763,6 +3763,7 @@
       "videoName": "{{name}} (videó)",
       "exportDownload": "Hang letöltése…",
       "exportRendering": "{{format}} exportálása…",
+      "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",
       "stemsWorking": "Stem-szeparáció…",

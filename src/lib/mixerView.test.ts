@@ -30,10 +30,14 @@ describe('mixerView — gain/dB/fader', () => {
     expect(formatGainDb(0.5)).toBe('-6.0');
     expect(formatGainDb(0)).toBe('-∞');
   });
+  it('a teljes fader-út hallható: nincs a lejátszó fölötti tartomány', () => {
+    expect(MAX_GAIN).toBe(1);
+  });
+
   it('fader ↔ gain oda-vissza', () => {
-    expect(faderToGain(0.5)).toBe(1);
+    expect(faderToGain(0.5)).toBe(0.5);
     expect(faderToGain(1)).toBe(MAX_GAIN);
-    expect(gainToFader(1)).toBe(0.5);
+    expect(gainToFader(0.5)).toBe(0.5);
     expect(gainToFader(MAX_GAIN)).toBe(1);
   });
 });

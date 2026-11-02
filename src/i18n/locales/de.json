@@ -3768,6 +3768,7 @@
       "videoName": "{{name}} (Video)",
       "exportDownload": "Audio herunterladen…",
       "exportRendering": "{{format}} wird exportiert…",
+      "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",
       "stemsWorking": "Stems werden getrennt…",

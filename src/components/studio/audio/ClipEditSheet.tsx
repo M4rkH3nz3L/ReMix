@@ -149,7 +149,7 @@ export function ClipEditSheet({
   };
 
   return (
-    <AudioSheetFrame id="clipEdit" onClose={onClose} sheetStyle={styles.sheet} tapToClose>
+    <AudioSheetFrame id="clipEdit" onClose={onDone} sheetStyle={styles.sheet} tapToClose>
       <View style={styles.head}>
         <Text style={styles.title} numberOfLines={1}>
           {clip.label || t('studio.audio.title')}

@@ -9,7 +9,8 @@
 import type { AudioClip, Clip, TrackType } from '@/types/project';
 
 export const MIN_GAIN = 0;
-export const MAX_GAIN = 2; // +6 dB-ig boostolható
+// 0 dB a teteje: az élő lejátszó nem erősít, így a fader felső fele csak az exportban hatna
+export const MAX_GAIN = 1;
 
 export function clampGain(gain: number): number {
   if (!Number.isFinite(gain)) {

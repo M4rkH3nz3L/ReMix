@@ -6,9 +6,9 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { UndoGestureArea } from '@/components/UndoGestureArea';
@@ -140,6 +140,16 @@ export function AudioStudioBody({
   zoomIndexRef.current = zoomIndex;
   const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
 
+  const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && recorder.getStatus().isRecording) {
+        void finishRecordingRef.current().catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:finishRecording', caught); });
+      }
+    });
+    return () => sub.remove();
+  }, [recorder]);
+
   if (!project) {
     return null;
   }
@@ -175,37 +185,52 @@ export function AudioStudioBody({
     });
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
+  // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
+  const finishRecording = async () => {
+    // a lekérdezett állapot fél másodpercet késhet: a recorder saját ideje pontos
+    const seconds = Math.max(recorder.getStatus().durationMillis / 1000, 0.5);
+    await recorder.stop();
+    // 🔊 KRITIKUS: a felvétel az audio-módot `allowsRecording:true`-ra állította,
+    // amiben iOS-en a kimenet a fülhallgató-hangszóróra megy (halk/„néma"
+    // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
+    // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught); });
+    // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
+    const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
+    if (uri) {
+      useEditorStore.getState().addClip(
+        'voiceover',
+        {
+          kind: 'audio',
+          id: makeId('clip'),
+          start: recordStartPlayhead.current,
+          duration: seconds,
+          trimIn: 0,
+          sourceDuration: seconds,
+          uri,
+          label: t('panels.audio.voiceoverLabel'),
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          source: 'voiceover',
+        },
+        { id: makeId('ast'), kind: 'audio', uri, provider: 'local', name: t('panels.audio.voiceoverLabel'), duration: seconds }
+      );
+    }
+  };
+  finishRecordingRef.current = finishRecording;
+
+  // kilépéskor a futó felvétel klip lesz, nem vész el
+  const exitStudio = () => {
+    const done = recorder.getStatus().isRecording ? finishRecording() : Promise.resolve();
+    void done
+      .catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:exitStudio', caught); })
+      .then(onExit);
+  };
+
   const toggleRecord = async () => {
     if (recorderState.isRecording) {
-      const seconds = Math.max(recorderState.durationMillis / 1000, 0.5);
-      await recorder.stop();
-      // 🔊 KRITIKUS: a felvétel az audio-módot `allowsRecording:true`-ra állította,
-      // amiben iOS-en a kimenet a fülhallgató-hangszóróra megy (halk/„néma"
-      // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
-      // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught); });
-      // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
-      const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
-      if (uri) {
-        useEditorStore.getState().addClip(
-          'voiceover',
-          {
-            kind: 'audio',
-            id: makeId('clip'),
-            start: recordStartPlayhead.current,
-            duration: seconds,
-            trimIn: 0,
-            sourceDuration: seconds,
-            uri,
-            label: t('panels.audio.voiceoverLabel'),
-            volume: 1,
-            fadeIn: 0,
-            fadeOut: 0,
-            source: 'voiceover',
-          },
-          { id: makeId('ast'), kind: 'audio', uri, provider: 'local', name: t('panels.audio.voiceoverLabel'), duration: seconds }
-        );
-      }
+      await finishRecording();
       return;
     }
     const permission = await AudioModule.requestRecordingPermissionsAsync();
@@ -498,7 +523,7 @@ export function AudioStudioBody({
     <UndoGestureArea>
     <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
       <View style={styles.topBar} onLayout={(e) => setTopBarH(e.nativeEvent.layout.height)}>
-        <Pressable onPress={onExit} hitSlop={10} style={styles.topBtn}>
+        <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
         <View style={styles.titleWrap}>
@@ -538,7 +563,7 @@ export function AudioStudioBody({
           </Pressable>
         ) : null}
         {mode === 'scoped' ? (
-          <Pressable onPress={onExit} hitSlop={10} style={styles.exportBtn}>
+          <Pressable onPress={exitStudio} hitSlop={10} style={styles.exportBtn}>
             <Ionicons name="checkmark" size={16} color="#fff" />
             <Text style={styles.exportText}>{t('common.done')}</Text>
           </Pressable>

@@ -1,6 +1,6 @@
 import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
@@ -10,6 +10,7 @@ import { gestures, haptics, motion } from '@/design';
 import { audioLaneTarget } from '@/lib/audioTimelineGestures';
 import { makeId } from '@/lib/id';
 import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType } from '@/types/project';
 
@@ -84,12 +85,11 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     const st = useEditorStore.getState();
     haptics.impact();
     const onClip = st.playhead > clip.start && st.playhead < clip.start + clip.duration;
-    Alert.alert(clip.label, undefined, [
-      { text: t('editor.toolbar.multiSelectTitle'), onPress: () => st.beginMultiSelect(clip.id) },
-      { text: t('editor.toolbar.splitHere'), onPress: () => st.splitClipAt(clip.id, onClip ? st.playhead : clip.start + clip.duration / 2) },
-      { text: t('common.duplicate'), onPress: () => st.addClip(laneType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }) },
-      { text: t('common.delete'), style: 'destructive', onPress: () => st.removeClip(clip.id) },
-      { text: t('common.cancel'), style: 'cancel' },
+    useActionMenu.getState().open(clip.label, [
+      { label: t('editor.toolbar.multiSelectTitle'), icon: 'checkmark-done-outline', onPress: () => st.beginMultiSelect(clip.id) },
+      { label: t('editor.toolbar.splitHere'), icon: 'cut-outline', onPress: () => st.splitClipAt(clip.id, onClip ? st.playhead : clip.start + clip.duration / 2) },
+      { label: t('common.duplicate'), icon: 'copy-outline', onPress: () => st.addClip(laneType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }) },
+      { label: t('common.delete'), icon: 'trash-outline', destructive: true, onPress: () => st.removeClip(clip.id) },
     ]);
   };
 

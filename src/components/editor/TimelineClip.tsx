@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { gestures, haptics, motion } from '@/design';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -382,26 +383,15 @@ function TimelineClipInner({
     haptics.impact();
     const onClip = st.playhead > clip.start && st.playhead < clip.start + clip.duration;
     const splitAt = onClip ? st.playhead : clip.start + clip.duration / 2;
-    Alert.alert(t('editor.track.' + trackType), undefined, [
+    useActionMenu.getState().open(t('editor.track.' + trackType), [
+      { label: t('editor.toolbar.multiSelectTitle'), icon: 'checkmark-done-outline', onPress: () => st.beginMultiSelect(clip.id) },
+      { label: t('editor.toolbar.splitHere'), icon: 'cut-outline', onPress: () => st.splitClipAt(clip.id, splitAt) },
       {
-        text: t('editor.toolbar.multiSelectTitle'),
-        onPress: () => st.beginMultiSelect(clip.id),
+        label: t('common.duplicate', { defaultValue: 'Duplikálás' }),
+        icon: 'copy-outline',
+        onPress: () => st.addClip(trackType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }),
       },
-      {
-        text: t('editor.toolbar.splitHere'),
-        onPress: () => st.splitClipAt(clip.id, splitAt),
-      },
-      {
-        text: t('common.duplicate', { defaultValue: 'Duplikálás' }),
-        onPress: () =>
-          st.addClip(trackType, { ...clip, id: makeId('clip'), start: clip.start + clip.duration }),
-      },
-      {
-        text: t('common.delete', { defaultValue: 'Törlés' }),
-        style: 'destructive',
-        onPress: () => st.removeClip(clip.id),
-      },
-      { text: t('common.cancel', { defaultValue: 'Mégse' }), style: 'cancel' },
+      { label: t('common.delete', { defaultValue: 'Törlés' }), icon: 'trash-outline', destructive: true, onPress: () => st.removeClip(clip.id) },
     ]);
   };
 

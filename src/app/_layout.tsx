@@ -53,6 +53,7 @@ import { TutorialMenu } from '@/components/tutorial/TutorialMenu';
 import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
 import { WebAlertHost } from '@/components/WebAlertHost';
 import { palette } from '@/constants/editor';
+import { ActionMenuHost } from '@/components/ActionMenuHost';
 import { windowControlsInset } from '@/lib/windowControls';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
@@ -294,6 +295,7 @@ export default function RootLayout() {
             <ActivityIndicator color={palette.accent} />
           </View>
         )}
+        <ActionMenuHost />
         <PaywallSheet />
         {/* futó hosszú műveletek: mit csinál · hol tart · mennyi van hátra */}
         <ProgressOverlay />

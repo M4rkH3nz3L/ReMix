@@ -1,11 +1,11 @@
 /** 🖐️ Hang-klip: hosszú nyomás menüt ad, a „Több kijelölése” után a koppintás hozzáad, a törlés egy undo. */
 import { act, create } from 'react-test-renderer';
-import { Alert } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { createEmptyProject } from '@/lib/projectUtils';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -57,24 +57,23 @@ const tap = (id: string) =>
   });
 
 describe('hang-klip hosszú nyomása', () => {
-  let alert: jest.SpyInstance;
+  const menu = () => useActionMenu.getState().items;
   beforeEach(() => {
     useEditorStore.getState().loadProject(make(), []);
-    alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useActionMenu.getState().close();
   });
-  afterEach(() => alert.mockRestore());
 
   it('mozgás nélkül menüt ad, a klip marad a helyén', async () => {
     mount('b', 3);
     await press('b');
-    expect(alert).toHaveBeenCalledTimes(1);
+    expect(menu()).toHaveLength(4);
     expect(useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips.find((c) => c.id === 'b')?.start).toBe(3);
   });
 
   it('húzásnál nincs menü, a klip mozog', async () => {
     mount('b', 3);
     await press('b', 60);
-    expect(alert).not.toHaveBeenCalled();
+    expect(menu()).toBeNull();
     expect(useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips.find((c) => c.id === 'b')?.start).toBe(4);
   });
 
@@ -82,8 +81,7 @@ describe('hang-klip hosszú nyomása', () => {
     mount('a', 0);
     mount('c', 6);
     await press('a');
-    const items = alert.mock.calls[0][2] as { onPress?: () => void }[];
-    act(() => items[0].onPress?.());
+    act(() => menu()?.[0].onPress());
     expect(useEditorStore.getState().multiSelectMode).toBe(true);
     await tap('c');
     expect(useEditorStore.getState().allSelectedIds()).toEqual(['a', 'c']);

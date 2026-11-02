@@ -60,6 +60,11 @@ export function coalesceKey(command: EditorCommand, project?: Project | null): s
       return `clip:${command.clipId}:${Object.keys(command.patch).sort().join(',')}`;
     case 'UPSERT_IMAGE_DOC':
       return imageDocKey(command.doc, command.label, project);
+    case 'SET_TRACK_GAIN':
+      // fader-húzás: egy sáv egy lépés
+      return `gain:${command.trackType}`;
+    case 'SET_BPM':
+      return 'bpm';
     case 'SET_MODEL3D_DOC':
       // ugyanaz a művelet-címke (pl. „Méret") egymás után = egy húzás → egy lépés
       return command.label ? `model3d:${command.doc.id}:${command.label}` : null;

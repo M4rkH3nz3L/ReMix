@@ -550,6 +550,15 @@ export function cropClip(clip: Clip, from: number, to: number): Clip {
   if ('keyframes' in clip && clip.keyframes) {
     (out as { keyframes?: ClipKeyframes }).keyframes = cropKeyframes(clip.keyframes, a, b - a);
   }
+  // 🎚️ a fade a klip széléhez tartozik: a vágásnál nem halkulhat el a hang
+  if (out.kind === 'audio') {
+    if (a > 0) {
+      out.fadeIn = 0;
+    }
+    if (b < clip.duration) {
+      out.fadeOut = 0;
+    }
+  }
   return out;
 }
 

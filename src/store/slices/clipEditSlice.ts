@@ -131,9 +131,9 @@ export const createClipEditSlice: EditorSlice<ClipEditSlice> = (set, get) => ({
     return get().dispatch({ type: 'SPLIT_CLIP', clipId, time: snapped });
   },
 
-  moveClip: (clipId, toTrackType, start) => {
-    // 🎞️ a cél-kezdet a frame-rácsra ül (mint a split); 0 alá nem
-    const snapped = Math.max(0, snapToFrame(start, projectFps(get().project)));
+  moveClip: (clipId, toTrackType, start, alreadySnapped = false) => {
+    // 🎞️ a cél-kezdet a frame-rácsra ül (mint a split), kivéve ha a hívó saját rácsra illesztett; 0 alá nem
+    const snapped = Math.max(0, alreadySnapped ? start : snapToFrame(start, projectFps(get().project)));
     return get().dispatch({ type: 'MOVE_CLIP', clipId, toTrackType, start: snapped });
   },
 

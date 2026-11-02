@@ -11,6 +11,9 @@ import { AudioLayer } from '@/components/preview/AudioLayer';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
 import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
+import { flushProjectSave } from '@/hooks/useProjectAutosave';
+import { useStudioSession } from '@/hooks/useStudioSession';
+import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
 import { exportAudioFile } from '@/lib/render';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
@@ -32,6 +35,8 @@ export default function AudioStudioScreen() {
   const [loading, setLoading] = useState(true);
 
   usePlaybackClock();
+  // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
+  const { saveFailed, missing, relinking, relink, exit } = useStudioSession(id, loading);
 
   // 🔊 néma-kapcsolónál is szóljon a lejátszás (mint a videó-editorban); a
   // felvétel ideiglenesen record-módra vált, de a ClipEditSheet/stúdió vissza is állítja
@@ -56,7 +61,8 @@ export default function AudioStudioScreen() {
       const p = useEditorStore.getState().project;
       if (p && p.id === id) {
         useEditorStore.getState().setPlaying(false);
-        saveProject(p).catch((caught) => { logCaught('app/studio/audio/[id].tsx:AudioStudioScreen', caught); });
+        void flushProjectSave();
+        useEditorStore.getState().closeProject();
       }
     };
   }, [id]);
@@ -81,14 +87,16 @@ export default function AudioStudioScreen() {
   }
 
   const preview = () =>
-    saveProject(project)
+    flushProjectSave()
       .then(() => router.push(`/player/${project.id}`))
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:preview', caught); });
 
   const useInVideo = () => {
     // 🎧→🎬 a hang átvitele egy ÚJ videó-projektbe (a userhez képet ad)
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
-    saveProject(vid)
+    // A13: előbb a hang-projekt, különben a kilépő mentéssel versenyezne
+    flushProjectSave()
+      .then(() => saveProject(vid))
       .then(() => router.replace(`/editor/${vid.id}`))
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:useInVideo', caught); });
   };
@@ -125,7 +133,8 @@ export default function AudioStudioScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
-      <AudioStudioBody mode="project" title={project.name} onExit={() => goBackOrHome()} onExport={openExport} />
+      <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
+      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={openExport} />
     </SafeAreaView>
   );
 }

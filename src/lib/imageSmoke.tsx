@@ -75,7 +75,7 @@ import { cloudBaseUrl } from '@/lib/backend';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
-import type { ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
+import type { AudioClip, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
 
@@ -2305,6 +2305,36 @@ async function smokeLogin(log: Log) {
   log('error' in out && out.error === 'invalidCredentials', 'ismeretlen azonosító: általános hiba', JSON.stringify(out));
 }
 
+const AUDIO_KILL_ID = 'prj_smoke_audiokill';
+
+/** Hang-autosave a valódi képernyőn: szerkesztés, majd a külső kilövés előtt megállunk. */
+async function smokeAudioKillPrepare(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  await deleteProject(AUDIO_KILL_ID).catch((caught) => logCaught('lib/imageSmoke.tsx:audioKill', caught));
+  await saveProject({ ...createEmptyProject('smoke hang-autosave', '9:16', undefined, 'audio'), id: AUDIO_KILL_ID });
+  router.push(`/studio/audio/${AUDIO_KILL_ID}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== AUDIO_KILL_ID; i++) {
+    await sleep(200);
+  }
+  await sleep(800);
+  useEditorStore.getState().addClip('music', { kind: 'audio', id: 'smoke-kill-clip', uri: 'file:///smoke.m4a', label: 'kilövés előtt', start: 0, duration: 4, volume: 1, fadeIn: 0, fadeOut: 0 } as AudioClip);
+  // a klip vágása is a mentésbe kerül
+  useEditorStore.getState().splitClipAt('smoke-kill-clip', 2);
+  await sleep(2500);
+  log(null, 'KILLREADY', AUDIO_KILL_ID);
+  await sleep(60000);
+}
+
+async function smokeAudioKillVerify(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const saved = await loadProject(AUDIO_KILL_ID);
+  const clips = saved?.tracks.find((t) => t.type === 'music')?.clips ?? [];
+  log(clips.length === 2, 'a kilövés előtti szerkesztés megmaradt', `${clips.length} klip a zene-sávon`);
+  const second = clips.find((c) => c.start > 0) as AudioClip | undefined;
+  log(second?.start === 2 && second.trimIn === 2, 'a vágás helyes a visszatöltött projektben', `start ${second?.start}, trimIn ${second?.trimIn}`);
+  await deleteProject(AUDIO_KILL_ID);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2513,6 +2543,14 @@ export async function runImageSmoke(
   }
   if (phase === 'login') {
     await step('login', () => smokeLogin(log));
+    return;
+  }
+  if (phase === 'audiokill1') {
+    await step('audiokill1', () => smokeAudioKillPrepare(log));
+    return;
+  }
+  if (phase === 'audiokill2') {
+    await step('audiokill2', () => smokeAudioKillVerify(log));
     return;
   }
   if (phase === 'menus') {

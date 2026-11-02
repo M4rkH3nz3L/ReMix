@@ -255,7 +255,7 @@ export interface EditorState {
   removeClip: (clipId: string) => void;
   splitClipAt: (clipId: string, time: number) => boolean;
   /** klip másik (kompatibilis) sávra mozgatása + frame-illesztett új kezdet */
-  moveClip: (clipId: string, toTrackType: TrackType, start: number) => boolean;
+  moveClip: (clipId: string, toTrackType: TrackType, start: number, alreadySnapped?: boolean) => boolean;
   /** a kijelölt klipet a KÖVETKEZŐ kompatibilis sávra lépteti (a kezdetét megtartva) → a cél-sáv típusa vagy null */
   moveSelectedClipToNextTrack: () => TrackType | null;
   /** ↕️ a klip EGY lépéssel a kompatibilis sávok közt a megadott irányba (drag-to-track);

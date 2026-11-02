@@ -1,4 +1,5 @@
 import { MIN_CLIP_DURATION } from '@/constants/editor';
+import { cropKeyframes } from '@/lib/keyframes';
 import type { AudioClip } from '@/types/project';
 
 /**
@@ -21,12 +22,19 @@ const sourceOf = (c: AudioClip): number => c.sourceDuration ?? c.duration;
 export function trimAudioLeft(
   clip: AudioClip,
   deltaSec: number
-): { start: number; duration: number; trimIn: number } {
+): { start: number; duration: number; trimIn: number; keyframes?: AudioClip['keyframes'] } {
   const trimIn = trimInOf(clip);
   const lo = Math.max(-trimIn, -clip.start); // nem a forrás elé ÉS nem 0 elé
   const hi = clip.duration - MIN_CLIP_DURATION; // maradjon legalább MIN hossz
   const d = Math.min(Math.max(deltaSec, lo), Math.max(lo, hi));
-  return { start: clip.start + d, duration: clip.duration - d, trimIn: trimIn + d };
+  const duration = clip.duration - d;
+  return {
+    start: clip.start + d,
+    duration,
+    trimIn: trimIn + d,
+    // az automáció a hanghoz tartozik: a kulcskockák a forrás-idejükön maradnak
+    ...(clip.keyframes ? { keyframes: cropKeyframes(clip.keyframes, d, duration) } : {}),
+  };
 }
 
 /**

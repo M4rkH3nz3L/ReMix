@@ -115,7 +115,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     const curIdx = laneTypes.indexOf(laneType);
     const tgtIdx = audioLaneTarget(curIdx, dy, laneH, laneTypes.length);
     if (curIdx >= 0 && tgtIdx !== curIdx) {
-      if (useEditorStore.getState().moveClip(clip.id, laneTypes[tgtIdx], next)) {
+      if (useEditorStore.getState().moveClip(clip.id, laneTypes[tgtIdx], next, true)) {
         haptics.snap();
         return;
       }

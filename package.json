@@ -85,7 +85,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
-    "audit": "npm run typecheck && npm run lint && npm test"
+    "audit": "npm run typecheck && npm run lint && npm test",
+    "test:rls": "docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < supabase/tests/social_security.sql | grep -E 'FAIL|rendben'"
   },
   "private": true
 }

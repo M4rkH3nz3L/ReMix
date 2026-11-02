@@ -29,7 +29,6 @@ import { examineProvider } from '@/lib/aiExamClient';
 import { DEFAULT_AVATAR, randomAvatar, type AvatarConfig } from '@/lib/avatar';
 import { generatePersona } from '@/lib/aiPersona';
 import { activateProDev, deactivateProDev, restorePurchases } from '@/lib/billing';
-import { syncMyPostsAvatar } from '@/lib/feed';
 import {
   type AccountProfile,
   emptyProfile,
@@ -270,8 +269,6 @@ export function useProfile() {
       const next: AccountProfile = { ...profile, avatarUrl: url };
       setProfile(next);
       await saveProfile(next);
-      // a profilkép változását a KORÁBBI posztokra is átvezetjük (denormalizált feed-avatar)
-      void syncMyPostsAvatar(url);
     } catch (e) {
       logCaught('hooks/useProfile.ts:onPickProfileImage', e);
       Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));

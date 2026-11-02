@@ -75,6 +75,7 @@ insert into public.cloud_projects (user_id, project_id, name, data) values
   ('a0000000-0000-0000-0000-000000000001', 'prj1', 'p', '{}');
 insert into public.project_members (owner_id, project_id, member_id, role) values
   ('a0000000-0000-0000-0000-000000000001', 'prj1', 'b0000000-0000-0000-0000-000000000002', 'editor');
+update public.project_members set status = 'active' where project_id = 'prj1';
 insert into public.messages (id, conversation_id, sender_id, body) values
   ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000003', 'Carol titka');
 insert into public.post_comments (id, post_id, author_id, body) values
@@ -169,6 +170,19 @@ select pg_temp.denied('S2 belépve sem kérhető e-mail', $$select public.resolv
 select pg_temp.admin();
 select set_config('role', 'service_role', true);
 select pg_temp.note('S2 a worker feloldhatja', public.resolve_login_email('alice_t') = 'alice@t.test');
+select pg_temp.admin();
+
+-- S18 meghívás: elfogadásig nem tag, a tulaj sem teheti azzá
+insert into public.cloud_projects (user_id, project_id, name, data) values ('a0000000-0000-0000-0000-000000000001', 'prj2', 'p2', '{"titok":1}');
+select pg_temp.act('a0000000-0000-0000-0000-000000000001');
+select pg_temp.allowed('S18 a tulaj meghívhat', $$insert into public.project_members (owner_id, project_id, member_id, role) values ('a0000000-0000-0000-0000-000000000001', 'prj2', 'c0000000-0000-0000-0000-000000000003', 'editor')$$);
+select pg_temp.act('c0000000-0000-0000-0000-000000000003');
+select pg_temp.note('S18 elfogadás előtt a projekt nem látszik', not exists (select 1 from public.cloud_projects where project_id = 'prj2'));
+select pg_temp.denied('S18 elfogadás előtt nem írható', $$update public.cloud_projects set name = 'x' where project_id = 'prj2'$$);
+select pg_temp.denied('S18 a státusz nem írható át kézzel', $$update public.project_members set status = 'active' where project_id = 'prj2' and member_id = 'c0000000-0000-0000-0000-000000000003'$$);
+select pg_temp.denied('S18 más meghívója nem fogadható el', $$select public.respond_project_invite('a0000000-0000-0000-0000-000000000001', 'prj1', true)$$);
+select pg_temp.allowed('S18 a meghívott elfogadhatja', $$select public.respond_project_invite('a0000000-0000-0000-0000-000000000001', 'prj2', true)$$);
+select pg_temp.note('S18 elfogadás után látszik a projekt', exists (select 1 from public.cloud_projects where project_id = 'prj2'));
 select pg_temp.admin();
 
 select (case when ok then 'PASS ' else 'FAIL ' end) || name || coalesce(' — ' || nullif(detail, ''), '') from t_results;

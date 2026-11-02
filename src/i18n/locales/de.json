@@ -3892,7 +3892,8 @@
       "placeholder": "E-Mail-Adresse",
       "cta": "Einladung senden",
       "badEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
-      "added": "{{email}} wurde zum Projekt hinzugefügt.",
+      "added": "{{email}} wurde eingeladen und hat bis zur Annahme keinen Zugriff.",
+      "received": {"title": "Du wurdest zu diesem Projekt eingeladen", "body": "Rolle: {{role}}. Nach der Annahme kannst du das Projekt sehen und bearbeiten.", "accept": "Annehmen", "decline": "Ablehnen", "pending": "eingeladen"},
       "pending": "Einladung an {{email}} gesendet — tritt bei der Registrierung bei.",
       "self": "Du kannst dich nicht selbst einladen."
     },

@@ -3887,7 +3887,8 @@
       "placeholder": "Email address",
       "cta": "Send invite",
       "badEmail": "Please enter a valid email address.",
-      "added": "{{email}} was added to the project.",
+      "added": "{{email}} was invited and has no access until accepting.",
+      "received": {"title": "You're invited to this project", "body": "Role: {{role}}. Accept to see and work on the project.", "accept": "Accept", "decline": "Decline", "pending": "invited"},
       "pending": "Invitation sent to {{email}} — they'll join when they sign up.",
       "self": "You can't invite yourself."
     },

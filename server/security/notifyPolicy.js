@@ -15,7 +15,8 @@
  * Engedélyezett, ha:
  *   • saját magának küldi (callerId === recipientId), VAGY
  *   • van közös projektjük (collab: owner↔member kapcsolat), VAGY
- *   • van follow-él köztük bármely irányban (social).
+ *   • a címzett követi a hívót (social): az egyoldalú követés nem nyit csatornát a címzett felé.
+ * A blokk mindent felülír, a saját magának küldést kivéve.
  * Minden más esetben tilos (idegen usernek nem lehet értesítést küldeni).
  *
  * @param {{callerId?:string|null, recipientId?:string|null,
@@ -23,14 +24,25 @@
  * @returns {boolean}
  */
 function decideNotify(ctx = {}) {
-  const { callerId, recipientId, shareProject, followEdge } = ctx;
+  const { callerId, recipientId, shareProject, followEdge, blocked } = ctx;
   if (!callerId || !recipientId) {
     return false;
   }
   if (callerId === recipientId) {
     return true;
   }
-  return Boolean(shareProject) || Boolean(followEdge);
+  return !blocked && (Boolean(shareProject) || Boolean(followEdge));
 }
 
-module.exports = { decideNotify };
+/** A kliens `isSafeNotificationRoute` tükre (szerződésteszt köti össze). */
+const ROUTE_PREFIXES = ['/chat/', '/channel/', '/live/', '/collab/'];
+const ROUTE_EXACT = ['/devices', '/schedules'];
+
+function isSafeRoute(route) {
+  if (typeof route !== 'string' || route.includes('..') || route.includes('://') || route.startsWith('//')) {
+    return false;
+  }
+  return ROUTE_EXACT.includes(route) || ROUTE_PREFIXES.some((p) => route.startsWith(p) && route.length > p.length);
+}
+
+module.exports = { decideNotify, isSafeRoute };

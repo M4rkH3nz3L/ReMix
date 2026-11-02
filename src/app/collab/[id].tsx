@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
+import { InviteResponseCard } from '@/components/collab/InviteResponseCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -28,6 +29,7 @@ import {
   loadProjectRoles,
   pullSharedProject,
   removeMember,
+  respondToInvite,
   type CollabRole,
 } from '@/lib/collab';
 import { defaultProjectRoles, type ProjectRole } from '@/lib/projectRoles';
@@ -206,6 +208,33 @@ export default function CollabScreen() {
       .finally(() => setBusy(false));
   };
 
+  // 👥 függő meghívó: a projekt helyett a válasz látszik
+  const myInvite = members.find((m) => m.memberId === me && m.status === 'invited');
+  if (myInvite) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.header}>
+          <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={22} color={palette.text} />
+            <Text style={styles.backText}>{t('common.back')}</Text>
+          </Pressable>
+        </View>
+        <InviteResponseCard
+          projectName={myInvite.projectName ?? projectId}
+          role={roleName(myInvite.role)}
+          onRespond={async (accept) => {
+            await respondToInvite(ownerId, projectId, accept);
+            if (accept) {
+              await refresh();
+            } else {
+              goBackOrHome();
+            }
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.header}>
@@ -304,6 +333,7 @@ export default function CollabScreen() {
                       <Text style={styles.memberName} numberOfLines={1}>
                         {name}
                         {isMe ? ` ${t('collab.you')}` : ''}
+                        {m.status === 'invited' ? ` · ${t('collab.invite.received.pending')}` : ''}
                       </Text>
                       {m.email && m.email !== name ? (
                         <Text style={styles.memberEmail} numberOfLines={1}>

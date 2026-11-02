@@ -32,6 +32,8 @@ export interface ProjectMember {
   projectId: string;
   memberId: string;
   role: CollabRole;
+  /** a meghívott elfogadásáig nem tag */
+  status: 'invited' | 'active';
   displayName?: string;
   email?: string;
   projectName?: string;
@@ -51,14 +53,15 @@ interface MemberRow {
   project_id: string;
   member_id: string;
   role: CollabRole;
+  /** a régebbi sémán nincs ilyen oszlop */
+  status?: 'invited' | 'active';
   display_name: string | null;
   email: string | null;
   project_name: string | null;
   created_at: string;
 }
 
-const MEMBER_COLUMNS =
-  'owner_id, project_id, member_id, role, display_name, email, project_name, created_at';
+const MEMBER_COLUMNS = '*';
 
 function toMember(r: MemberRow): ProjectMember {
   return {
@@ -66,6 +69,7 @@ function toMember(r: MemberRow): ProjectMember {
     projectId: r.project_id,
     memberId: r.member_id,
     role: r.role,
+    status: r.status ?? 'active',
     displayName: r.display_name ?? undefined,
     email: r.email ?? undefined,
     projectName: r.project_name ?? undefined,
@@ -150,11 +154,11 @@ export async function myMembership(
   }
   const { data } = await supabase
     .from('project_members')
-    .select('owner_id, role')
+    .select('*')
     .eq('project_id', projectId)
     .eq('member_id', uid)
     .maybeSingle();
-  if (!data) {
+  if (!data || data.status === 'invited') {
     return null;
   }
   return { ownerId: data.owner_id as string, role: data.role as CollabRole };
@@ -307,6 +311,18 @@ export async function saveProjectRoles(
   void logProjectActivity(ownerId, projectId, '🔑 A projekt szerepkörei frissültek');
 }
 
+/** A meghívott válasza: elfogadva tag lesz, elutasítva a meghívó törlődik. */
+export async function respondToInvite(ownerId: string, projectId: string, accept: boolean): Promise<void> {
+  const sb = requireSupabase();
+  const { error } = await sb.rpc('respond_project_invite', { p_owner: ownerId, p_project: projectId, p_accept: accept });
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (accept) {
+    void logProjectActivity(ownerId, projectId, '✅ Elfogadta a meghívást');
+  }
+}
+
 /** Kilépés a projektből (a saját tag-sor törlése — RLS engedi). */
 export async function leaveProject(ownerId: string, projectId: string): Promise<void> {
   const uid = requireUserId();
@@ -339,7 +355,7 @@ export async function listSharedWithMe(): Promise<SharedProject[]> {
   if (error) {
     return [];
   }
-  return (data as MemberRow[]).map((r) => ({
+  return (data as MemberRow[]).filter((r) => r.status !== 'invited').map((r) => ({
     ownerId: r.owner_id,
     projectId: r.project_id,
     projectName: r.project_name ?? undefined,

@@ -1,4 +1,4 @@
-const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('./accountErase');
+const { eraseCooldownElapsed, purgeUserMedia } = require('./accountErase');
 
 describe('accountErase — eraseCooldownElapsed (gating)', () => {
   const now = 1_700_000_000_000; // fix "most"
@@ -26,38 +26,56 @@ describe('accountErase — eraseCooldownElapsed (gating)', () => {
   });
 });
 
-describe('accountErase — storagePrefixes', () => {
-  it('projekt-id-nként egy mappa-prefix; üres/rossz kiszűrve', () => {
-    expect(storagePrefixes(['p1', 'p2'])).toEqual(['p1/', 'p2/']);
-    expect(storagePrefixes(['p1', '', null, undefined, 3])).toEqual(['p1/']);
-    expect(storagePrefixes(null)).toEqual([]);
-  });
-});
-
-describe('accountErase — listAllObjects (rekurzív, best-effort)', () => {
-  const fakeStorage = {
-    list: async (p) => {
-      if (p === 'proj1') {
-        return { data: [{ name: 'video', id: null }, { name: 'top.json', id: 'f0' }] };
-      }
-      if (p === 'proj1/video') {
-        return { data: [{ name: 'a.mp4', id: 'f1' }, { name: 'b.mp4', id: 'f2' }] };
-      }
-      return { data: [] };
+describe('purgeUserMedia — csak a saját napló (S7)', () => {
+  /** valós sorrendet és lapozást utánzó napló: a szűrés a user_id-re a lekérdezésben történik */
+  const ledger = (rows) => ({
+    from: () => {
+      const q = { uid: null };
+      const api = {
+        select: () => api,
+        eq: (_c, v) => ((q.uid = v), api),
+        order: () => api,
+        range: async (a, b) => ({ data: rows.filter((r) => r.user_id === q.uid).slice(a, b + 1), error: null }),
+      };
+      return api;
     },
-  };
-
-  it('a mappákba rekurzál, a fájlok teljes útját adja', async () => {
-    const out = await listAllObjects(fakeStorage, 'proj1/');
-    expect(out).toEqual(
-      expect.arrayContaining(['proj1/video/a.mp4', 'proj1/video/b.mp4', 'proj1/top.json'])
-    );
-    expect(out).toHaveLength(3);
   });
 
-  it('hiba/üres storage → [] (sosem dob)', async () => {
-    const throwing = { list: async () => { throw new Error('storage le'); } };
-    await expect(listAllObjects(throwing, 'x/')).resolves.toEqual([]);
-    await expect(listAllObjects(null, 'x/')).resolves.toEqual([]);
+  it('a támadó ugyanazzal a projekt-ID-val sem törölheti az áldozat fájlját', async () => {
+    const rows = [
+      { user_id: 'tamado', key: 'prj_aldozat/video/sajat.mp4' },
+      { user_id: 'aldozat', key: 'prj_aldozat/video/aldozat.mp4' },
+    ];
+    const removed = [];
+    await purgeUserMedia(ledger(rows), 'tamado', async (k) => removed.push(k));
+    expect(removed).toEqual(['prj_aldozat/video/sajat.mp4']);
+  });
+
+  it('1000 fájl fölött is mindent töröl', async () => {
+    const rows = Array.from({ length: 2345 }, (_, i) => ({ user_id: 'u', key: `k${i}` }));
+    const removed = [];
+    const out = await purgeUserMedia(ledger(rows), 'u', async (k) => removed.push(k));
+    expect(out).toEqual({ purged: 2345, failed: 0 });
+    expect(new Set(removed).size).toBe(2345);
+  });
+
+  it('a profilkép és a projekt nélküli fájl is benne van', async () => {
+    const rows = [{ user_id: 'u', key: 'profile/a.png' }, { user_id: 'u', key: 'media/b.png' }];
+    const removed = [];
+    await purgeUserMedia(ledger(rows), 'u', async (k) => removed.push(k));
+    expect(removed).toEqual(['profile/a.png', 'media/b.png']);
+  });
+
+  it('a hibás fájl számolódik, a többi törlődik', async () => {
+    const rows = [{ user_id: 'u', key: 'a' }, { user_id: 'u', key: 'b' }];
+    const out = await purgeUserMedia(ledger(rows), 'u', async (k) => {
+      if (k === 'a') throw new Error('x');
+    });
+    expect(out).toEqual({ purged: 1, failed: 1 });
+  });
+
+  it('a napló lekérési hibája megállít', async () => {
+    const sb = { from: () => ({ select: () => ({ eq: () => ({ order: () => ({ range: async () => ({ error: { message: 'le' } }) }) }) }) }) };
+    await expect(purgeUserMedia(sb, 'u', async () => {})).rejects.toThrow(/storage_objects/);
   });
 });

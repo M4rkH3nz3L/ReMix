@@ -1,5 +1,7 @@
 // 🗑️ GDPR hard-erase sweep (03-production §03.4) — a selector + az orchestrator
 // hálózat nélkül, injektált fake sb/erase-szel. (A destruktív storage/auth staging-e2e.)
+jest.mock('expo-server-sdk', () => ({ Expo: function Expo() {} }));
+
 const {
   eligibleForErase,
   eraseAccount,
@@ -30,15 +32,14 @@ describe('eligibleForErase — csak a lejárt-cooldownú soft-delete', () => {
 });
 
 /** fake service_role-kliens: a profiles-lekérés visszaadja a megadott sorokat. */
-function fakeSb(profiles, { profilesError = null } = {}) {
+function fakeSb(profiles, { profilesError = null, storage = [] } = {}) {
   return {
     from: () => ({
       select: () => ({
         not: () => Promise.resolve({ data: profiles, error: profilesError }),
-        eq: () => Promise.resolve({ data: [], error: null }),
+        eq: () => ({ order: () => ({ range: async () => ({ data: storage, error: null }) }) }),
       }),
     }),
-    storage: { from: () => ({ list: async () => ({ data: [] }), remove: async () => ({}) }) },
     auth: { admin: { deleteUser: async () => ({ error: null }) } },
   };
 }
@@ -94,6 +95,22 @@ describe('eraseAccount — per-fiók hard-erase (fake sb)', () => {
     const sb = fakeSb([]);
     sb.auth.admin.deleteUser = async () => ({ error: { message: 'nincs jogosultság' } });
     await expect(eraseAccount(sb, 'uid-1')).rejects.toThrow(/auth-user törlés/);
+  });
+});
+
+describe('eraseAccount — média', () => {
+  test('a saját napló fájljai törlődnek', async () => {
+    const removed = [];
+    const r = await eraseAccount(fakeSb([], { storage: [{ key: 'a' }, { key: 'b' }] }), 'uid-1', async (k) => removed.push(k));
+    expect(removed).toEqual(['a', 'b']);
+    expect(r).toEqual({ purgedObjects: 2 });
+  });
+
+  test('ha fájl nem törölhető, a fiók marad, hogy a kulcsok ne vesszenek el', async () => {
+    const sb = fakeSb([], { storage: [{ key: 'a' }] });
+    sb.auth.admin.deleteUser = jest.fn();
+    await expect(eraseAccount(sb, 'uid-1', async () => { throw new Error('tár le'); })).rejects.toThrow(/nem törölhető/);
+    expect(sb.auth.admin.deleteUser).not.toHaveBeenCalled();
   });
 });
 

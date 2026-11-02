@@ -10,7 +10,7 @@ const { logCaught } = require('./lib/caught');
 const { createClient } = require('@supabase/supabase-js');
 const { Expo } = require('expo-server-sdk');
 
-const { decideNotify } = require('./security/notifyPolicy');
+const { decideNotify, isSafeRoute } = require('./security/notifyPolicy');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
 const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -84,7 +84,7 @@ async function sendNotification(input) {
     type: TYPES.has(input.type) ? input.type : 'info',
     title: title.slice(0, 200),
     body: input?.body ? String(input.body).slice(0, 2000) : null,
-    route: input?.route ? String(input.route).slice(0, 500) : null,
+    route: isSafeRoute(input?.route) ? String(input.route).slice(0, 500) : null,
     data: input?.data && typeof input.data === 'object' ? input.data : null,
   };
 
@@ -201,10 +201,19 @@ async function canNotify(callerId, recipientId) {
   if (!sb) {
     return false;
   }
-  // közös projekt: owner↔member kapcsolat bármely irányban
+  const blockQ = await sb
+    .from('user_blocks')
+    .select('blocker_id')
+    .or(`and(blocker_id.eq.${callerId},blocked_id.eq.${recipientId}),and(blocker_id.eq.${recipientId},blocked_id.eq.${callerId})`)
+    .limit(1);
+  // ha a blokk nem olvasható, a tiltás a biztonságos válasz
+  const blocked = Boolean(blockQ.error) || (blockQ.data ?? []).length > 0;
+
+  // közös projekt: aktív tag és tulaj; a függő meghívó még nem kapcsolat
   const proj = await sb
     .from('project_members')
     .select('project_id')
+    .eq('status', 'active')
     .or(
       `and(owner_id.eq.${callerId},member_id.eq.${recipientId}),` +
         `and(owner_id.eq.${recipientId},member_id.eq.${callerId})`
@@ -212,20 +221,23 @@ async function canNotify(callerId, recipientId) {
     .limit(1);
   const shareProject = !proj.error && Array.isArray(proj.data) && proj.data.length > 0;
 
-  let followEdge = false;
-  if (!shareProject) {
-    const fol = await sb
-      .from('follows')
-      .select('follower_id')
-      .or(
-        `and(follower_id.eq.${callerId},following_id.eq.${recipientId}),` +
-          `and(follower_id.eq.${recipientId},following_id.eq.${callerId})`
-      )
-      .limit(1);
-    followEdge = !fol.error && Array.isArray(fol.data) && fol.data.length > 0;
-  }
+  // a címzett követi a hívót: az egyoldalú követés nem elég
+  const fol = await sb
+    .from('follows')
+    .select('follower_id')
+    .eq('follower_id', recipientId)
+    .eq('following_id', callerId)
+    .limit(1);
+  const followEdge = !fol.error && Array.isArray(fol.data) && fol.data.length > 0;
 
-  return decideNotify({ callerId, recipientId, shareProject, followEdge });
+  return decideNotify({ callerId, recipientId, shareProject, followEdge, blocked });
 }
 
-module.exports = { adminClient, notifyAvailable, sendNotification, inviteMember, canNotify };
+/** Más felhasználónak szóló értesítés címében mindig ott a feladó, nem adhatja ki magát rendszernek. */
+async function senderLabel(callerId) {
+  const sb = adminClient();
+  const { data } = sb ? await sb.from('profiles').select('full_name, username').eq('id', callerId).maybeSingle() : { data: null };
+  return (data?.full_name || data?.username || 'ReMix-felhasználó').trim();
+}
+
+module.exports = { adminClient, notifyAvailable, sendNotification, inviteMember, canNotify, senderLabel };

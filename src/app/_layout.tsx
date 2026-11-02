@@ -54,6 +54,7 @@ import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
 import { WebAlertHost } from '@/components/WebAlertHost';
 import { palette } from '@/constants/editor';
 import { ActionMenuHost } from '@/components/ActionMenuHost';
+import { isSafeNotificationRoute } from '@/lib/notificationRoute';
 import { windowControlsInset } from '@/lib/windowControls';
 // 🌍 i18n init (side-effect: az első useTranslation() előtt kell lefutnia)
 import { hydrateLanguage } from '@/i18n';
@@ -72,6 +73,10 @@ import { logCaught } from '@/lib/logCaught';
 
 /** Deep-link cél megnyitása egy notification koppintásából (best-effort). */
 function openNotificationRoute(route: string) {
+  if (!isSafeNotificationRoute(route)) {
+    logCaught('app/_layout.tsx:openNotificationRoute', new Error('Ismeretlen értesítés-útvonal'));
+    return;
+  }
   try {
     router.push(route as Parameters<typeof router.push>[0]);
   } catch (caught) {

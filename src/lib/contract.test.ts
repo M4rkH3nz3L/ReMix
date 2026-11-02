@@ -380,3 +380,13 @@ describe('contract: mirror-TELJESSÉG (drift-őr — egyoldali bővítés piros,
     expect(Object.keys(workerEntitlements.ENTITLEMENTS).sort()).toEqual(order);
   });
 });
+
+describe('értesítés-útvonal: kliens = worker', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { isSafeRoute } = require('../../server/security/notifyPolicy');
+  const { isSafeNotificationRoute } = require('@/lib/notificationRoute');
+
+  it.each(['/chat/1', '/channel/u', '/live/1', '/collab/p?owner=x', '/devices', '/schedules', 'https://x', '//x', '/chat/', '/a/../b', '/settings', '', null])('%j ugyanaz a döntés', (route) => {
+    expect(isSafeNotificationRoute(route as string)).toBe(isSafeRoute(route));
+  });
+});

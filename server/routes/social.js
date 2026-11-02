@@ -9,7 +9,7 @@ const express = require('express');
 const { callerId, requireAuth, INSECURE_DEV } = require('../auth');
 const { paidOnly } = require('../lib/guards');
 const { rateLimit } = require('../security/rateLimit');
-const { notifyAvailable, sendNotification, canNotify, inviteMember } = require('../notify');
+const { notifyAvailable, sendNotification, canNotify, inviteMember, senderLabel } = require('../notify');
 
 const router = express.Router();
 
@@ -42,7 +42,11 @@ router.post('/notify', express.json({ limit: '64kb' }), requireAuth, rateLimit('
           .json({ error: 'Nincs jogosultság értesítést küldeni ennek a felhasználónak.' });
         return undefined;
       }
-      return sendNotification(req.body ?? {}).then((result) => res.json(result));
+      // más felhasználónak szóló értesítésben mindig látszik, kitől jön
+      const named = caller === recipient
+        ? Promise.resolve(req.body?.title)
+        : senderLabel(caller).then((name) => `${name}: ${String(req.body?.title ?? '')}`);
+      return named.then((title) => sendNotification({ ...(req.body ?? {}), title })).then((result) => res.json(result));
     })
     .catch((err) => {
     logCaught('routes/social.js', err);

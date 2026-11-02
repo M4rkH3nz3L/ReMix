@@ -47,7 +47,6 @@ const { enforceQuota, trackUsage, userTier } = require('./usage');
 const { canAccessRenderJob } = require('./security/renderAuth');
 const { securityHeaders } = require('./security/securityHeaders');
 const { securityEvent } = require('./security/auditLog');
-const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('./security/accountErase');
 const {
   billingAvailable,
   activeTier,

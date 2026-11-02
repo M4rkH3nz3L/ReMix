@@ -9,10 +9,10 @@ const { logCaught } = require('./lib/caught');
 // SZÁNDÉKOSAN injektálható (sb/now/erase) → a selector + az orchestrator hálózat nélkül
 // tesztelhető; a destruktív storage/auth-hívás a valós service_role-kliensen fut (staging).
 
-const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('./security/accountErase');
+const { eraseCooldownElapsed, purgeUserMedia } = require('./security/accountErase');
+const { deleteMedia } = require('./mediastore');
 const { securityEvent } = require('./security/auditLog');
 
-const ERASE_BUCKET = process.env.MEDIA_BUCKET || 'renders';
 
 /**
  * PURE: a soft-delete-elt profilokból a VÉGLEGESEN törölhetők (lejárt cooldown) uid-jai.
@@ -31,21 +31,11 @@ function eligibleForErase(profiles, nowMs) {
  * Dob, ha az auth-user törlése nem sikerül (a sweep ezt failed-ként könyveli).
  * @returns {Promise<{purgedObjects:number}>}
  */
-async function eraseAccount(sb, uid, bucket = ERASE_BUCKET) {
-  let purged = 0;
-  try {
-    const { data: projs } = await sb.from('cloud_projects').select('project_id').eq('user_id', uid);
-    const storage = sb.storage.from(bucket);
-    for (const prefix of storagePrefixes((projs || []).map((p) => p.project_id))) {
-      const paths = await listAllObjects(storage, prefix);
-      if (paths.length > 0) {
-        await storage.remove(paths);
-        purged += paths.length;
-      }
-    }
-  } catch (e) {
-    logCaught('eraseSweep.js:eraseAccount', e);
-    console.warn('[erase-sweep] storage-purge részleges:', e.message);
+async function eraseAccount(sb, uid, removeObject = deleteMedia) {
+  const { purged, failed } = await purgeUserMedia(sb, uid, removeObject);
+  // a fiókkal a napló is törlődne: a bent ragadt fájlok kulcsa elveszne, ezért a sweep újrapróbálja
+  if (failed > 0) {
+    throw new Error(`${failed} média-fájl nem törölhető, a fiók marad`);
   }
   const { error } = await sb.auth.admin.deleteUser(uid);
   if (error) {
@@ -59,7 +49,7 @@ async function eraseAccount(sb, uid, bucket = ERASE_BUCKET) {
  * minden törlésről audit-eseményt ír. Injektálható deps (teszthez).
  * @returns {Promise<{eligible:number, erased:number, failed:number}>}
  */
-async function sweepExpiredErasures({ sb, now = Date.now(), bucket = ERASE_BUCKET, erase = eraseAccount } = {}) {
+async function sweepExpiredErasures({ sb, now = Date.now(), erase = eraseAccount } = {}) {
   if (!sb) {
     return { eligible: 0, erased: 0, failed: 0 };
   }
@@ -75,7 +65,7 @@ async function sweepExpiredErasures({ sb, now = Date.now(), bucket = ERASE_BUCKE
   let failed = 0;
   for (const uid of uids) {
     try {
-      const r = await erase(sb, uid, bucket);
+      const r = await erase(sb, uid);
       securityEvent('account.erased', { actor: uid, result: 'ok', meta: { via: 'cron', purgedObjects: r?.purgedObjects ?? 0 } });
       erased += 1;
     } catch (e) {
@@ -103,12 +93,11 @@ function eraseSweepEnabled(env = process.env, hasAdmin = false) {
 async function runEraseSweepOnce({
   sb,
   now = Date.now(),
-  bucket = ERASE_BUCKET,
   erase = eraseAccount,
   sweep = sweepExpiredErasures,
   logger,
 } = {}) {
-  const res = await sweep({ sb, now, bucket, erase });
+  const res = await sweep({ sb, now, erase });
   const summary = { eligible: res.eligible ?? 0, erased: res.erased ?? 0, failed: res.failed ?? 0 };
   if (logger && typeof logger.info === 'function') {
     logger.info('erase-sweep', summary);
@@ -124,7 +113,6 @@ module.exports = {
   sweepExpiredErasures,
   eraseSweepEnabled,
   runEraseSweepOnce,
-  ERASE_BUCKET,
 };
 
 // 🖥️ CLI: `node server/eraseSweep.js` — a host-cron / compose-sidecar EGYSZERI futtatása

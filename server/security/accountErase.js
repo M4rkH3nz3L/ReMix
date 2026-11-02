@@ -30,47 +30,47 @@ function eraseCooldownElapsed(deletedAt, nowMs, cooldownDays = ERASE_COOLDOWN_DA
   return nowMs - t >= Math.max(0, cooldownDays) * DAY_MS;
 }
 
-/** A user storage-prefixei a renders bucketben: projekt-id-nként egy mappa. */
-function storagePrefixes(projectIds) {
-  return (Array.isArray(projectIds) ? projectIds : [])
-    .filter((id) => typeof id === 'string' && id.length > 0)
-    .map((id) => `${id}/`);
-}
+const PAGE = 1000;
 
 /**
- * Rekurzív listázás a storage-ban egy prefix alatt → a teljes objektum-útvonalak
- * lapos listája (a kulcs `<projectId>/<kind>/<fájl>`, tehát 2 szint). Best-effort:
- * bármilyen hiba esetén a részeredménnyel tér vissza (a törlés sosem dobhat).
- * @param {object} storage a service_role storage-kliens (sb.storage.from(bucket))
+ * A fiók média-objektumainak törlése a `storage_objects` napló alapján (PRO-SOCIAL S7). A napló
+ * sorát a szerver írja a hitelesített feltöltőhöz, ezért idegen fájl nem kerülhet bele; a korábbi,
+ * projekt-ID-ból épített előtag szabadon írható volt, és más user mappájára is mutathatott.
+ * Lapoz, így 1000 fájl fölött sem marad ki semmi. A sorokat nem törli: a fiókkal együtt mennek.
+ * @param {object} sb service_role kliens
+ * @param {(key: string) => Promise<void>} removeObject a tárból töröl
+ * @returns {Promise<{purged:number, failed:number}>}
  */
-async function listAllObjects(storage, prefix, depth = 0) {
-  if (!storage || depth > 4) {
-    return [];
-  }
-  let entries = [];
-  try {
-    const { data } = await storage.list(prefix.replace(/\/$/, ''), { limit: 1000 });
-    entries = data || [];
-  } catch (caught) {
-    logCaught('security/accountErase.js:listAllObjects', caught);
-    return [];
-  }
-  const out = [];
-  for (const e of entries) {
-    const full = `${prefix.replace(/\/$/, '')}/${e.name}`;
-    // Supabase storage: a MAPPÁKnak nincs `id`-juk (null); a FÁJLoknak van
-    if (e.id) {
-      out.push(full);
-    } else {
-      out.push(...(await listAllObjects(storage, full, depth + 1)));
+async function purgeUserMedia(sb, uid, removeObject) {
+  let [purged, failed, from] = [0, 0, 0];
+  for (;;) {
+    const { data, error } = await sb
+      .from('storage_objects')
+      .select('key')
+      .eq('user_id', uid)
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) {
+      throw new Error(`storage_objects lekérés sikertelen: ${error.message}`);
     }
+    for (const { key } of data ?? []) {
+      try {
+        await removeObject(key);
+        purged += 1;
+      } catch (caught) {
+        logCaught('security/accountErase.js:purgeUserMedia', caught);
+        failed += 1;
+      }
+    }
+    if ((data ?? []).length < PAGE) {
+      return { purged, failed };
+    }
+    from += PAGE;
   }
-  return out;
 }
 
 module.exports = {
   eraseCooldownElapsed,
-  storagePrefixes,
-  listAllObjects,
+  purgeUserMedia,
   ERASE_COOLDOWN_DAYS,
 };

@@ -5,11 +5,11 @@ const { logCaught } = require('../lib/caught');
 const express = require('express');
 const { callerId, requireAuth } = require('../auth');
 const { adminClient } = require('../notify');
-const { eraseCooldownElapsed, storagePrefixes, listAllObjects } = require('../security/accountErase');
+const { eraseAccount } = require('../eraseSweep');
+const { eraseCooldownElapsed } = require('../security/accountErase');
 const { securityEvent } = require('../security/auditLog');
 
 const ALLOW_ERASE = process.env.ALLOW_ACCOUNT_ERASE === '1';
-const ERASE_BUCKET = process.env.MEDIA_BUCKET || 'renders';
 
 const router = express.Router();
 
@@ -41,30 +41,8 @@ router.post('/account/erase', express.json({ limit: '4kb' }), requireAuth, async
       });
       return;
     }
-    // 2) STORAGE-média purge (best-effort) — a user projektjeinek objektumai
-    let purged = 0;
-    try {
-      const { data: projs } = await sb
-        .from('cloud_projects')
-        .select('project_id')
-        .eq('user_id', uid);
-      const storage = sb.storage.from(ERASE_BUCKET);
-      for (const prefix of storagePrefixes((projs || []).map((p) => p.project_id))) {
-        const paths = await listAllObjects(storage, prefix);
-        if (paths.length > 0) {
-          await storage.remove(paths);
-          purged += paths.length;
-        }
-      }
-    } catch (e) {
-      logCaught('routes/account.js', e);
-      console.warn('[erase] storage-purge részleges:', e.message);
-    }
-    // 3) AUTH-felhasználó törlése → cascade a DB-ben (profiles/posts/…)
-    const { error: delErr } = await sb.auth.admin.deleteUser(uid);
-    if (delErr) {
-      throw new Error(`auth-user törlés sikertelen: ${delErr.message}`);
-    }
+    // 2) a saját média a napló alapján, majd az auth-user (cascade a DB-ben)
+    const { purgedObjects: purged } = await eraseAccount(sb, uid);
     securityEvent('account.erased', { actor: uid, result: 'ok', meta: { purgedObjects: purged } });
     res.json({ erased: true, purgedObjects: purged });
   } catch (e) {

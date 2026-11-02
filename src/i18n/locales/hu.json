@@ -3887,7 +3887,8 @@
       "placeholder": "E-mail-cím",
       "cta": "Meghívó küldése",
       "badEmail": "Adj meg egy érvényes e-mail-címet.",
-      "added": "{{email}} hozzáadva a projekthez.",
+      "added": "{{email}} meghívást kapott, elfogadásig nem fér hozzá.",
+      "received": {"title": "Meghívtak ebbe a projektbe", "body": "Szerep: {{role}}. Elfogadás után látod és szerkesztheted a projektet.", "accept": "Elfogadom", "decline": "Elutasítom", "pending": "meghívva"},
       "pending": "Meghívó elküldve: {{email}} — regisztrációkor csatlakozik.",
       "self": "Magadat nem hívhatod meg."
     },

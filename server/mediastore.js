@@ -79,4 +79,33 @@ async function uploadMedia(key, localPath, contentType, publicBase) {
   throw new Error('media store nincs konfigurálva (SUPABASE service_role vagy S3_*)');
 }
 
-module.exports = { mediaStoreEnabled, uploadMedia, BUCKET, LOCAL_DIR };
+/** Egy objektum törlése ugyanabból a tárból, ahová az `uploadMedia` írta; a hiányzó fájl nem hiba. */
+async function deleteMedia(key) {
+  const backend = (process.env.STORAGE_BACKEND || '').trim().toLowerCase();
+  if ((backend === 'r2' || backend === 's3') && s3.s3Enabled()) {
+    await s3.deleteFile(key);
+    return;
+  }
+  if (localEnabled()) {
+    const root = path.resolve(LOCAL_DIR);
+    const file = path.resolve(root, key);
+    if (!file.startsWith(root + path.sep)) {
+      throw new Error('Érvénytelen média-kulcs.');
+    }
+    fs.rmSync(file, { force: true });
+    return;
+  }
+  const sb = adminClient();
+  if (sb) {
+    const { error } = await sb.storage.from(BUCKET).remove([key]);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return;
+  }
+  if (s3.s3Enabled()) {
+    await s3.deleteFile(key);
+  }
+}
+
+module.exports = { deleteMedia, mediaStoreEnabled, uploadMedia, BUCKET, LOCAL_DIR };

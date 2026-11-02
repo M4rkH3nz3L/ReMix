@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { isSafeNotificationRoute } from '@/lib/notificationRoute';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { palette } from '@/constants/editor';
 import { notificationIconKind, notificationTimeLabel, type NotifIconKind } from '@/lib/notificationDisplay';
@@ -49,7 +50,7 @@ export function NotificationSheet({ visible, onClose }: { visible: boolean; onCl
   const openItem = (id: string, route?: string) => {
     markOneRead(id);
     onClose();
-    if (route) {
+    if (isSafeNotificationRoute(route)) {
       router.push(route as Parameters<typeof router.push>[0]);
     }
   };

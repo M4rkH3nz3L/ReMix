@@ -2097,10 +2097,14 @@ async function smokeGestureScreens(log: Log) {
   for (const [kind, path] of [['video', '/editor'], ['audio', '/studio/audio'], ['live', '/live/studio']] as const) {
     const project = createEmptyProject(`smoke gesztus ${kind}`, '9:16', undefined, kind);
     await saveProject(project);
+    const start = performance.now();
     router.push(`${path}/${project.id}` as Href);
-    await sleep(3500);
+    for (let i = 0; i < 100 && useEditorStore.getState().project?.id !== project.id; i++) {
+      await sleep(200);
+    }
     const open = useEditorStore.getState().project;
-    log(open?.id === project.id, `${kind}: a képernyő megnyílt a gesztus-területtel`, `${open?.kind}`);
+    log(open?.id === project.id, `${kind}: a képernyő megnyílt a gesztus-területtel`, `${Math.round(performance.now() - start)} ms`);
+    await sleep(1000);
     router.back();
     await sleep(1500);
     await deleteProject(project.id);

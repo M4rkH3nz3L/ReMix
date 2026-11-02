@@ -13,12 +13,13 @@ import { palette } from '@/constants/editor';
 import type { EditorCommand } from '@/lib/commands';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
+import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems } from '@/lib/stems';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
-import type { AudioClip, AudioFx, Project, TrackType } from '@/types/project';
+import type { AudioClip, AudioFx, Project } from '@/types/project';
 
 /**
  * 🎚️ Klip-szerkesztő lap — a kijelölt hangklip nem-destruktív szerkesztése
@@ -52,24 +53,11 @@ export function ClipEditSheet({
             if (stems.length === 0) {
               return;
             }
-            const commands: EditorCommand[] = stems.map((s) => {
-              const track: TrackType = s.name === 'vocals' ? 'voiceover' : 'sfx';
-              const stemClip: AudioClip = {
-                id: makeId('clip'),
-                kind: 'audio',
-                start: clip.start,
-                duration: clip.duration,
-                trimIn: 0,
-                sourceDuration: clip.duration,
-                uri: s.url,
-                label: s.name,
-                volume: 1,
-                fadeIn: 0,
-                fadeOut: 0,
-                source: track === 'voiceover' ? 'voiceover' : 'imported',
-              };
-              return { type: 'ADD_CLIP', trackType: track, clip: stemClip };
-            });
+            const commands: EditorCommand[] = stemClipsFrom(clip, stems, () => makeId('clip')).map((stem) => ({
+              type: 'ADD_CLIP',
+              trackType: stem.trackType,
+              clip: stem.clip,
+            }));
             commands.push({ type: 'UPDATE_CLIP', clipId: clip.id, patch: { volume: 0 } });
             applyBatch(commands, 'user');
             onClose();

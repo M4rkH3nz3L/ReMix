@@ -1,6 +1,6 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useIsFocused } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { resolveClipUri } from '@/lib/assetResolve';
 import { shouldResync, sourceTimeOf } from '@/lib/avSync';
@@ -310,7 +310,7 @@ function ClipAudioPlayer({
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
   }, [player, clip, playUri]);
 
-  // play/pause követés; a klip inaktívvá válásakor (unmount) elhallgat
+  // play/pause követés
   useEffect(() => {
     try {
       if (isPlaying) {
@@ -319,12 +319,18 @@ function ClipAudioPlayer({
         player.pause();
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
-    return () => {
+  }, [player, isPlaying]);
+
+  // a klip inaktívvá válásakor elhallgat; layout-effekt, mert a hook sima effektje addigra
+  // felszabadítja a lejátszót
+  useLayoutEffect(
+    () => () => {
       try {
         player.pause();
       } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
-    };
-  }, [player, isPlaying]);
+    },
+    [player]
+  );
 
   // álló óránál seek, futásnál hangerő + fade követés.
   // ⚡ A playhead ~60×/mp változik — csak érdemi hangerő-eltérésnél írunk (sima fade).

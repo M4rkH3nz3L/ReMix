@@ -54,14 +54,16 @@ function audioFxChain(fx) {
   }
   const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const parts = [];
-  // 🎚️ hangmagasság-eltolás (±12 félhang), HOSSZ-tartó: asetrate (pitch+sebesség) →
-  // aresample vissza 44.1k-ra → atempo a sebességet visszaállítja (a pitch marad eltolva).
+  // 🎚️ hangmagasság-eltolás (±12 félhang), HOSSZ-tartó: előbb ismert 44.1k-ra (az asetrate
+  // abszolút rátát kap, a forrás lehet 48k vagy a loudnorm utáni 192k) → asetrate (pitch+sebesség)
+  // → aresample vissza 44.1k-ra → atempo a sebességet visszaállítja (a pitch marad eltolva).
   // ELSŐ a láncban, hogy a nyers jelre hasson. A ±12-nél az atempo 0.5–2.0 közt marad.
   if (fx.pitchSemitones) {
     const semis = clampN(fx.pitchSemitones, -12, 12);
     if (semis !== 0) {
       const ratio = Math.pow(2, semis / 12);
       parts.push(
+        'aresample=44100',
         `asetrate=${Math.round(44100 * ratio)}`,
         'aresample=44100',
         `atempo=${(1 / ratio).toFixed(6)}`

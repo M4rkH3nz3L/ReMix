@@ -2,6 +2,7 @@ import { createRateLimiter } from '@/lib/liveRate';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { useAuth } from '@/store/authStore';
 import { logCaught } from '@/lib/logCaught';
+import type { LiveVisibility } from '@/types/live';
 
 /**
  * 🔴 Élő közvetítés (Live) — session-életciklus + „most élőben" lista + a LIVE-room
@@ -84,7 +85,7 @@ export async function buildLiveSelf(): Promise<LiveSelf | null> {
 }
 
 /** Élő indítása: létrehoz egy `live` sessiont a saját profillal denormalizálva. */
-export async function startLive(title: string): Promise<LiveSession> {
+export async function startLive(title: string, visibility: LiveVisibility = 'public'): Promise<LiveSession> {
   const sb = requireSupabase();
   const self = await buildLiveSelf();
   if (!self) {
@@ -105,6 +106,8 @@ export async function startLive(title: string): Promise<LiveSession> {
         host_username: (prof?.username as string | undefined) ?? null,
         host_name: self.name,
         host_avatar: self.avatar,
+        // az alapérték a nyilvános: csak az eltérést küldjük
+        ...(visibility === 'public' ? {} : { visibility }),
       })
       .select('id, host_id, title, status, host_username, host_name, host_avatar, started_at, viewer_peak')
       .single();

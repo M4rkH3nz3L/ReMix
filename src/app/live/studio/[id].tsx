@@ -431,7 +431,7 @@ export default function LiveStudioScreen() {
       // (különben „kamera foglalt" verseny, főleg Androidon)
       setReleasingCamera(true);
       await new Promise((r) => setTimeout(r, 350));
-      const session = await startLive(title);
+      const session = await startLive(title, live?.visibility);
       // 🎥 a room megkapja a live-projekt id-jét → a host betölti a live-docot és
       // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).
       router.replace(`/live/${session.id}?project=${id}`);

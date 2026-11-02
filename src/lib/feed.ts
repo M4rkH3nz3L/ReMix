@@ -829,11 +829,10 @@ export async function fetchViewEvents(postId: string): Promise<ViewEvent[]> {
   if (!supabase) {
     return [];
   }
-  const { data, error } = await supabase
-    .from('post_view_events')
-    .select('post_id, viewer_id, watched_ms, duration_ms')
-    .eq('post_id', postId);
+  // névtelen sorok: az alkotó azt látja, mennyit néztek, azt nem, hogy ki
+  const { data, error } = await supabase.rpc('post_view_stats', { p_post: postId });
   if (error) {
+    logCaught('lib/feed.ts:fetchViewEvents', error);
     return [];
   }
   return mapValid(data, (o) => {
@@ -843,7 +842,7 @@ export async function fetchViewEvents(postId: string): Promise<ViewEvent[]> {
     }
     return {
       postId: pid,
-      viewerId: str(o.viewer_id),
+      viewerId: str(o.viewer_key),
       watchedMs: finiteNum(o.watched_ms) ?? 0,
       durationMs: finiteNum(o.duration_ms) ?? 0,
     };

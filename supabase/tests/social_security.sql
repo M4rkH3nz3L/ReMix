@@ -185,6 +185,67 @@ select pg_temp.allowed('S18 a meghívott elfogadhatja', $$select public.respond_
 select pg_temp.note('S18 elfogadás után látszik a projekt', exists (select 1 from public.cloud_projects where project_id = 'prj2'));
 select pg_temp.admin();
 
+-- S19 nézettség: egy néző naponta egyszer számít, a saját és a rejtett poszt nem
+update public.posts set views = 0 where id in ('10000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000003');
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select public.record_post_view('10000000-0000-0000-0000-000000000002');
+select public.record_post_view('10000000-0000-0000-0000-000000000002');
+select public.record_post_view('10000000-0000-0000-0000-000000000003');
+select pg_temp.act('a0000000-0000-0000-0000-000000000001');
+select public.record_post_view('10000000-0000-0000-0000-000000000002');
+select pg_temp.admin();
+select pg_temp.note('S19 egy néző egy nézet, a saját nem számít', views = 1, views::text) from public.posts where id = '10000000-0000-0000-0000-000000000002';
+select pg_temp.note('S19 a rejtett poszt nem kap nézetet', views = 0, views::text) from public.posts where id = '10000000-0000-0000-0000-000000000003';
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.denied('S19 rejtett posztra nincs nézet-esemény', $$insert into public.post_view_events (post_id, viewer_id, watched_ms, duration_ms) values ('10000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000002', 1, 1)$$);
+select pg_temp.allowed('S19 látható posztra van', $$insert into public.post_view_events (post_id, viewer_id, watched_ms, duration_ms) values ('10000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 1000, 2000)$$);
+select pg_temp.act('a0000000-0000-0000-0000-000000000001');
+select pg_temp.note('S19 az alkotó nem látja a néző azonosítóját', not exists (select 1 from public.post_view_events where viewer_id = 'b0000000-0000-0000-0000-000000000002'));
+select pg_temp.note('S19 az alkotó névtelen statisztikát kap', count(*) = 1 and bool_and(viewer_key::text <> 'b0000000-0000-0000-0000-000000000002'), count(*)::text) from public.post_view_stats('10000000-0000-0000-0000-000000000002');
+select pg_temp.admin();
+
+-- S22 remix: a forrás-tulaj nem vonhatja vissza a moderátori döntést, az attribúció valódi
+insert into public.posts (id, creator_id, title, remix_of_post_id, moderation_status, removed_by_moderator) values
+  ('10000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000002', 'Remix', '10000000-0000-0000-0000-000000000002', 'removed', true);
+select pg_temp.act('a0000000-0000-0000-0000-000000000001');
+select pg_temp.denied('S22 moderátori eltávolítás nem vonható vissza', $$select public.moderate_remix('10000000-0000-0000-0000-000000000005', 'ok')$$);
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.allowed('S22 remix-poszt létrehozható', $$insert into public.posts (id, creator_id, title, remix_of_post_id, remix_of_creator) values ('10000000-0000-0000-0000-000000000006', 'b0000000-0000-0000-0000-000000000002', 'R', '10000000-0000-0000-0000-000000000002', 'Híresség')$$);
+select pg_temp.admin();
+select pg_temp.note('S22 az eredet neve szerveroldali', remix_of_creator = 'Alice', remix_of_creator) from public.posts where id = '10000000-0000-0000-0000-000000000006';
+
+-- S23 felfüggesztés: a tartalom eltűnik, és a felhasználó nem törölheti a jelzést
+update public.profiles set suspended_at = now() where id = 'c0000000-0000-0000-0000-000000000003';
+insert into public.posts (id, creator_id, title, visibility) values ('10000000-0000-0000-0000-000000000007', 'c0000000-0000-0000-0000-000000000003', 'Carol nyilvános', 'public');
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.note('S23 a felfüggesztett tartalma nem látszik', not exists (select 1 from public.posts where id = '10000000-0000-0000-0000-000000000007'));
+select pg_temp.act('c0000000-0000-0000-0000-000000000003');
+select pg_temp.denied('S23 a felfüggesztés nem törölhető', $$update public.profiles set suspended_at = null where id = 'c0000000-0000-0000-0000-000000000003'$$);
+select pg_temp.admin();
+
+-- S25 felhasználónév: a szabály a szerveren él
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.denied('S25 szóköz nem lehet', $$update public.profiles set username = 'bo b' where id = 'b0000000-0000-0000-0000-000000000002'$$);
+select pg_temp.denied('S25 homoglif nem lehet', $$update public.profiles set username = 'аdmin_x' where id = 'b0000000-0000-0000-0000-000000000002'$$);
+select pg_temp.denied('S25 foglalt szó nem lehet', $$update public.profiles set username = 'Admin' where id = 'b0000000-0000-0000-0000-000000000002'$$);
+select pg_temp.allowed('S25 érvényes név beállítható', $$update public.profiles set username = 'bob_uj' where id = 'b0000000-0000-0000-0000-000000000002'$$);
+select pg_temp.allowed('S25 a többi profil-mező a régi névvel is írható', $$update public.profiles set bio = 'x' where id = 'b0000000-0000-0000-0000-000000000002'$$);
+select pg_temp.admin();
+insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data) values
+  ('e0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'eve@t.test', '{"username":"alice_t"}'),
+  ('f0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '1@t.test', '{"username":"x y!"}');
+select pg_temp.note('S25 foglalt névvel is sikerül a regisztráció', username <> 'alice_t', username) from public.profiles where id = 'e0000000-0000-0000-0000-000000000005';
+select pg_temp.note('S25 érvénytelen névből érvényes lesz', username ~ '^[a-zA-Z][a-zA-Z0-9_]{2,19}$', username) from public.profiles where id = 'f0000000-0000-0000-0000-000000000006';
+
+-- S27 élő adás: a csak követőknek szóló adást csak ők látják
+insert into public.follows (follower_id, following_id) values ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001');
+insert into public.live_sessions (id, host_id, title, status, visibility) values ('50000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Élő', 'live', 'followers');
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.note('S27 a követő látja', exists (select 1 from public.live_sessions where id = '50000000-0000-0000-0000-000000000001'));
+select pg_temp.act('d0000000-0000-0000-0000-000000000004');
+select pg_temp.note('S27 a nem követő nem látja', not exists (select 1 from public.live_sessions where id = '50000000-0000-0000-0000-000000000001'));
+select pg_temp.admin();
+
 select (case when ok then 'PASS ' else 'FAIL ' end) || name || coalesce(' — ' || nullif(detail, ''), '') from t_results;
 select count(*) filter (where ok) || ' / ' || count(*) || ' rendben' from t_results;
 do $$ begin

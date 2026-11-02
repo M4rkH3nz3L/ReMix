@@ -4,12 +4,14 @@ jest.mock('expo-server-sdk', () => ({ Expo: function Expo() {} }));
 
 let mockRows = {};
 let mockFail = false;
+const mockFollows = new Set(['fan>host']);
 jest.mock('../../notify', () => ({
   adminClient: () => ({
     from: () => ({
       select: () => ({
         eq: (_col, id) => ({
           maybeSingle: async () => (mockFail ? { data: null, error: { message: 'db down' } } : { data: mockRows[id] ?? null, error: null }),
+          eq: (_c2, host) => ({ maybeSingle: async () => ({ data: mockFollows.has(`${id}>${host}`) ? {} : null, error: null }) }),
         }),
       }),
     }),
@@ -43,4 +45,11 @@ test('a néző eszközönként egyedi, a host identitása a fiók marad', () => 
   const [a, b] = [liveIdentity('u1', false), liveIdentity('u1', false)];
   expect(a).not.toBe('u1');
   expect(a).not.toBe(b);
+});
+
+test('a csak követőknek szóló adáshoz követés kell', async () => {
+  mockRows.fol = { host_id: 'host', status: 'live', visibility: 'followers' };
+  expect(await resolveLiveAccess('fol', 'fan', false)).toMatchObject({ status: 200 });
+  expect(await resolveLiveAccess('fol', 'idegen', false)).toMatchObject({ status: 403 });
+  expect(await resolveLiveAccess('fol', 'host', true)).toMatchObject({ status: 200, canPublish: true });
 });

@@ -40,7 +40,7 @@ async function resolveLiveAccess(room, uid, requested) {
   if (!sb) {
     return INSECURE_DEV ? { status: 200, canPublish: requested, hostId: null } : { status: 503, error: 'Nincs service_role a live-jogosultsághoz.' };
   }
-  const { data, error } = await sb.from('live_sessions').select('host_id, status').eq('id', room).maybeSingle();
+  const { data, error } = await sb.from('live_sessions').select('*').eq('id', room).maybeSingle();
   if (error) {
     return INSECURE_DEV ? { status: 200, canPublish: requested, hostId: null } : { status: 503, error: 'A live session nem ellenőrizhető.' };
   }
@@ -49,6 +49,12 @@ async function resolveLiveAccess(room, uid, requested) {
   }
   if (data.status !== 'live') {
     return { status: 410, error: 'Az adás már véget ért.' };
+  }
+  if (data.visibility === 'followers' && data.host_id !== uid) {
+    const { data: follow } = await sb.from('follows').select('follower_id').eq('follower_id', uid).eq('following_id', data.host_id).maybeSingle();
+    if (!follow) {
+      return { status: 403, error: 'Ez az adás csak követőknek szól.' };
+    }
   }
   return { status: 200, canPublish: requested && data.host_id === uid, hostId: data.host_id };
 }

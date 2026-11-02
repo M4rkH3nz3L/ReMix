@@ -20,6 +20,7 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { LayerMenuSheet } from '@/components/studio/image/LayerMenuSheet';
 import { LiveQuickGrid } from '@/components/live/LiveQuickGrid';
 import { MultiSelectBar } from '@/components/studio/image/body/MultiSelectBar';
@@ -2275,6 +2276,23 @@ async function smokeLiveStudio(log: Log) {
   await deleteProject(project.id);
 }
 
+/** A hosszú nyomás menüje a gyökérből, a valódi Modal-lal. */
+async function smokeActionMenu(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  useActionMenu.getState().open('Videó', [
+    { label: 'Több kijelölése', icon: 'checkmark-done-outline', onPress: () => {} },
+    { label: 'Vágás itt', icon: 'cut-outline', onPress: () => {} },
+    { label: 'Duplikálás', icon: 'copy-outline', onPress: () => {} },
+    { label: 'Törlés', icon: 'trash-outline', destructive: true, onPress: () => {} },
+  ]);
+  await sleep(1200);
+  log(useActionMenu.getState().items?.length === 4, 'a menü nyitva', '4 elem');
+  log(true, 'FOTÓZHATÓ', 'menülap');
+  await sleep(5000);
+  useActionMenu.getState().close();
+  await sleep(500);
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2475,6 +2493,10 @@ export async function runImageSmoke(
   }
   if (phase === 'studio') {
     await step('studio', () => smokeLiveStudio(log));
+    return;
+  }
+  if (phase === 'actionmenu') {
+    await step('actionmenu', () => smokeActionMenu(log));
     return;
   }
   if (phase === 'menus') {

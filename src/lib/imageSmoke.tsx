@@ -20,6 +20,7 @@ import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
 import { remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
+import { loginWithIdentifier } from '@/lib/loginIdentifier';
 import { useActionMenu } from '@/store/actionMenuStore';
 import { LayerMenuSheet } from '@/components/studio/image/LayerMenuSheet';
 import { LiveQuickGrid } from '@/components/live/LiveQuickGrid';
@@ -2293,6 +2294,13 @@ async function smokeActionMenu(log: Log) {
   await sleep(500);
 }
 
+/** Belépés azonosítóval a valódi hálózaton: a válasz nem különbözteti meg az ismeretlen fiókot. */
+async function smokeLogin(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const out = await loginWithIdentifier('nincs_ilyen_felhasznalo', 'rossz-jelszo');
+  log('error' in out && out.error === 'invalidCredentials', 'ismeretlen azonosító: általános hiba', JSON.stringify(out));
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2497,6 +2505,10 @@ export async function runImageSmoke(
   }
   if (phase === 'actionmenu') {
     await step('actionmenu', () => smokeActionMenu(log));
+    return;
+  }
+  if (phase === 'login') {
+    await step('login', () => smokeLogin(log));
     return;
   }
   if (phase === 'menus') {

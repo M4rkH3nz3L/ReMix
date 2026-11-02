@@ -14,7 +14,8 @@ const express = require('express');
 const { callerId, requireAuth } = require('../auth');
 const { proOnly } = require('../lib/guards');
 const { rateLimit } = require('../security/rateLimit');
-const { mediaGuard } = require('../security/uploadPolicy');
+const { blockActiveContent, mediaGuard, readHeader } = require('../security/uploadPolicy');
+const { safeContentType, safeExt } = require('../security/mediaPolicy');
 const { upload } = require('../lib/upload');
 const { composeThumbnail } = require('../thumbs');
 const { voiceChain } = require('../voicechain');
@@ -226,7 +227,7 @@ router.post('/waveform', requireAuth, rateLimit('analysis'), upload.any(), media
 
 // 🎞️ Média-feltöltés (renderelt videó / borító) → publikus Storage-URL. A kliens
 // a renderelt fájlt küldi (multipart), a feed ezt a URL-t játssza (cross-device).
-router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
+router.post('/media/upload', requireAuth, rateLimit('upload'), upload.any(), blockActiveContent, async (req, res) => {
   const f = (req.files ?? [])[0];
   if (!f) {
     res.status(400).json({ error: 'nincs fájl' });
@@ -235,8 +236,8 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
   // 👤 a hívó a VERIFIKÁLT tokenből (dev-ben body.userId fallback) — ő terhelődik
   const uid = callerId(req, req.body?.userId);
   const bytes = Number(f.size || 0);
-  const extRaw = path.extname(f.originalname || '') || `.${(f.mimetype || '').split('/')[1] || 'bin'}`;
-  const ext = extRaw.replace(/[^.\w]/g, '');
+  const ext = safeExt(f.originalname);
+  const contentType = safeContentType(f.mimetype, readHeader(f.path));
   // a KÉRÉSBŐL épített worker-origin (LAN-on is stimmel; a lokális-disk URL-hez is)
   const publicBase = `${req.protocol}://${req.get('host')}`;
   try {
@@ -260,7 +261,7 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
         target,
         f.path,
         filename,
-        f.mimetype
+        contentType
       );
       const url = `${publicBase}/storage/${encodeURIComponent(target)}/file?path=${encodeURIComponent(
         extPath
@@ -286,7 +287,7 @@ router.post('/media/upload', requireAuth, upload.any(), async (req, res) => {
     const projectId = String(req.body?.projectId || '').replace(/[^\w-]/g, '').slice(0, 64);
     const file = `${crypto.randomUUID()}${ext}`;
     const key = projectId ? `${projectId}/${kind}/${file}` : `${kind}/${file}`;
-    const url = await mediaStoreUpload(key, f.path, f.mimetype, publicBase);
+    const url = await mediaStoreUpload(key, f.path, contentType, publicBase);
     // 🗄️ felvétel a bájt-naplóba (atomikus kvóta-ellenőrzéssel — verseny-biztos)
     if (uid && quotaAvailable()) {
       await recordObject(uid, {

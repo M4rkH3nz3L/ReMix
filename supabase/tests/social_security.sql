@@ -50,7 +50,8 @@ begin
 exception when others then
   perform pg_temp.note(n, false, sqlerrm);
 end $$;
-grant execute on all functions in schema pg_temp to authenticated;
+grant execute on all functions in schema pg_temp to authenticated, anon, service_role;
+grant all on t_results to anon, service_role;
 
 insert into public.posts (id, creator_id, title, visibility, moderation_status) values
   ('10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Alice eltávolított', 'public', 'removed'),
@@ -159,6 +160,16 @@ update public.profiles set avatar_url = 'https://x/uj.png' where id = 'a0000000-
 select pg_temp.admin();
 select pg_temp.note('S5 a kirúgott tag kikerül a projekt-chatből', not exists (select 1 from public.conversation_members where conversation_id = '20000000-0000-0000-0000-000000000004' and user_id = 'b0000000-0000-0000-0000-000000000002'));
 select pg_temp.note('S1 az új profilkép a korábbi posztokon is látszik', creator_avatar = 'https://x/uj.png', creator_avatar) from public.posts where id = '10000000-0000-0000-0000-000000000002';
+
+-- S2: az e-mail nem kérdezhető le, sem kijelentkezve, sem belépve
+select set_config('role', 'anon', true);
+select pg_temp.denied('S2 kijelentkezve nem kérhető e-mail', $$select public.resolve_login_email('alice_t')$$);
+select pg_temp.act('b0000000-0000-0000-0000-000000000002');
+select pg_temp.denied('S2 belépve sem kérhető e-mail', $$select public.resolve_login_email('alice_t')$$);
+select pg_temp.admin();
+select set_config('role', 'service_role', true);
+select pg_temp.note('S2 a worker feloldhatja', public.resolve_login_email('alice_t') = 'alice@t.test');
+select pg_temp.admin();
 
 select (case when ok then 'PASS ' else 'FAIL ' end) || name || coalesce(' — ' || nullif(detail, ''), '') from t_results;
 select count(*) filter (where ok) || ' / ' || count(*) || ' rendben' from t_results;

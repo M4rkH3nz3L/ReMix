@@ -230,6 +230,11 @@ export interface SearchResults {
   creators: Creator[];
 }
 
+/** PostgREST `.or()`-érték: idézőjelben a vessző és a zárójel nem szűrő-szintaxis. */
+export function orFilterValue(value: string): string {
+  return `"${value.replace(/["\\]/g, '\\$&')}"`;
+}
+
 /**
  * 🔎 Keresés a nyilvános feedben: cím / alkotó-username / megjelenített név
  * (ilike), plusz hashtag-egyezés (a `#tag` és a sima szó is). A posztok mellett
@@ -246,7 +251,7 @@ export async function searchFeed(query: string, limit = 40): Promise<SearchResul
   const sb = requireSupabase();
   // ilike-biztos minta: a `%`, `_`, `\` speciális karaktereket kiöljük
   const safe = q.replace(/[%_\\]/g, ' ').trim();
-  const like = `%${safe}%`;
+  const like = orFilterValue(`%${safe}%`);
   const tag = safe.replace(/^#+/, '').toLowerCase();
 
   const base = () =>

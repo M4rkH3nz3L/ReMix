@@ -171,7 +171,31 @@ function validateUploads(files, kind) {
   return { ok: true };
 }
 
+const ACTIVE_EXTS = ['html', 'htm', 'xhtml', 'svg', 'xml', 'js', 'mjs'];
+const ACTIVE_HEAD = /^\s*(<!doctype html|<html|<svg|<script|<\?xml)/i;
+
+/** Böngészőben futó tartalom: a tár nyilvános, ilyen fájl ott tárolt XSS lenne. */
+function isActiveContent(name, header) {
+  return ACTIVE_EXTS.includes(extOf(name)) || ACTIVE_HEAD.test(Buffer.from(header || []).toString('latin1', 0, 256));
+}
+
+/** A tárolt típus a tartalomból jön: a kliens MIME-ja csak akkor marad, ha egyezik a valódi fajtával. */
+function safeContentType(clientMime, header) {
+  const kind = detectKind(header);
+  const mime = String(clientMime || '');
+  return kind && mime.startsWith(`${kind}/`) ? mime : 'application/octet-stream';
+}
+
+/** A kiterjesztés csak betű és szám lehet, aktív tartalom nem tárolható. */
+function safeExt(name) {
+  const ext = extOf(name);
+  return ext && !ACTIVE_EXTS.includes(ext) ? `.${ext}` : '.bin';
+}
+
 module.exports = {
+  isActiveContent,
+  safeContentType,
+  safeExt,
   detectKind,
   validateFile,
   validateUploads,

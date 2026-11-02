@@ -188,6 +188,7 @@
       "phoneCountryUnsupported": "Ez az országhívószám nem támogatott SMS-regisztrációhoz.",
       "otpLength": "A kód 6 számjegyből áll.",
       "invalidCredentials": "Hibás e-mail/felhasználónév vagy jelszó.",
+      "unavailable": "A belépés most nem érhető el. Próbáld újra, vagy lépj be e-maillel.",
       "emailNotConfirmed": "Az e-mail-címed még nincs megerősítve. Nézd meg a postaládád.",
       "userAlreadyExists": "Ez a fiók már létezik. Próbálj belépni.",
       "phoneExists": "Ez a telefonszám már regisztrálva van.",

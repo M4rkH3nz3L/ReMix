@@ -193,6 +193,9 @@ app.use(require('./routes/ai'));
 // 🔔 Social route-ok (notify + invite) — domain-router (§01.1).
 app.use(require('./routes/social'));
 
+// 🔐 Belépés felhasználónévvel vagy telefonnal.
+app.use(require('./routes/auth'));
+
 // 🔴 Live (LiveKit) route-ok — domain-router (§01.1).
 app.use(require('./routes/live'));
 

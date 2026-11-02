@@ -35,6 +35,7 @@ const DEFAULTS = {
   billing: { windowMs: 60_000, max: 30 },
   public: { windowMs: 60_000, max: 240 }, // library/music/health — laza, de van
   bugs: { windowMs: 60_000, max: 30 }, // app-hibajelentés (nyitott végpont — szűk)
+  login: { windowMs: 60_000, max: 10 }, // jelszó-próbálgatás ellen
   default: { windowMs: 60_000, max: 120 },
 };
 
@@ -60,7 +61,8 @@ function keyFor(req, className) {
   if (uid) {
     return `rl:${className}:u:${uid}`;
   }
-  const device = req.headers['x-device-id'];
+  // a belépésnél a fejléc hamisítható lenne: csak az IP számít
+  const device = className === 'login' ? null : req.headers['x-device-id'];
   if (device && typeof device === 'string') {
     return `rl:${className}:d:${device.slice(0, 64)}`;
   }

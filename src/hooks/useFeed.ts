@@ -1,5 +1,6 @@
 import { type Href, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { canRemix, remixRoute } from '@/lib/imageRemix';
+import { isValidActionUrl } from '@/lib/url';
 import { useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -657,6 +658,11 @@ export function useFeed() {
   const handleHotspot = (clip: InteractiveClip) => {
     const a = clip.action;
     if (a.type === 'url') {
+      // más felhasználó adata: csak http(s) nyitható meg
+      if (!isValidActionUrl(a.url)) {
+        logCaught('hooks/useFeed.ts:handleHotspot', new Error('Érvénytelen hotspot-cím'));
+        return;
+      }
       Linking.openURL(a.url).catch((caught) => { logCaught('hooks/useFeed.ts:handleHotspot', caught); });
     } else if (a.type === 'seek') {
       if (Platform.OS === 'web') {

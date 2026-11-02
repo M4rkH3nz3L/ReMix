@@ -113,7 +113,8 @@ export function socialUrl(link: Pick<SocialLink, 'platform' | 'username' | 'url'
   if (p.toUrl && link.username) {
     return p.toUrl(link.username);
   }
-  return link.url ?? '';
+  // a tárolt cím idegen adat: `javascript:` és hasonló séma nem kerülhet linkbe
+  return '';
 }
 
 // ── Social linkek ────────────────────────────────────────────────────────────

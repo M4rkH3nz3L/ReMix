@@ -209,6 +209,19 @@ export async function registerCurrentDevice(userId: string): Promise<void> {
  * amit a `registerCurrentDevice` írt. Best-effort. A workert (POST /notify) ez
  * táplálja a remote-push kézbesítéshez.
  */
+/** Kijelentkezéskor a token lekerül, különben az előző user értesítései a következőére mennének. */
+export async function clearCurrentDevicePushToken(userId: string): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+  try {
+    const fingerprint = await getInstallId();
+    await supabase.from('user_devices').update({ push_token: null }).eq('user_id', userId).eq('fingerprint', fingerprint);
+  } catch (caught) {
+    logCaught('lib/deviceInfo.ts:clearCurrentDevicePushToken', caught);
+  }
+}
+
 export async function saveCurrentDevicePushToken(userId: string, token: string): Promise<void> {
   if (!supabase) {
     return;

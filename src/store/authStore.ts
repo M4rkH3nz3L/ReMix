@@ -4,7 +4,8 @@ import { create } from 'zustand';
 
 import type { SignUpProfile } from '@/lib/accountValidation';
 import { CONSENT_VERSION } from '@/constants/legal';
-import { getInstallId, registerCurrentDevice } from '@/lib/deviceInfo';
+import { loginWithIdentifier } from '@/lib/loginIdentifier';
+import { clearCurrentDevicePushToken, getInstallId, registerCurrentDevice } from '@/lib/deviceInfo';
 import { loginNeedsMfa, verifyLoginTotp } from '@/lib/mfa';
 import { isAllowedPhone, isValidOtp, normalizeE164 } from '@/lib/phoneAuth';
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
@@ -244,21 +245,32 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (!supabase) {
       return { error: t('auth.errors.notConfigured') };
     }
-    // e-mail → közvetlen; felhasználónév/telefon → e-mailre feloldás (RPC, belépés
-    // előtt fut, anon szerepként). A profiles owner-only RLS-t a definer kerüli meg.
-    let email = identifier.trim();
+    const email = identifier.trim();
+    const afterSignIn = async (userId: string | undefined): Promise<AuthResult> => {
+      // 🔐 MFA: ha a usernek van verifikált TOTP-faktora, a session még csak aal1 →
+      // a belépés a TOTP-challenge teljesítéséig FÜGGŐBEN marad (a guard nem enged
+      // tovább). MFA-faktor nélkül `pending` mindig false → a flow a korábbival azonos.
+      const pending = await loginNeedsMfa();
+      set({ mfaPending: pending });
+      if (pending) {
+        return { needsMfa: true };
+      }
+      if (userId) {
+        void registerCurrentDevice(userId);
+      }
+      return {};
+    };
     if (!email.includes('@')) {
-      const resolved = await supabase.rpc('resolve_login_email', { p_identifier: email });
-      if (resolved.error) {
-        return { error: messageOf(resolved.error) };
+      // 🛡️ az e-mailt a szerver oldja fel és nem adja ki; ismeretlen azonosító és rossz jelszó ugyanaz
+      const tokens = await loginWithIdentifier(email, password);
+      if ('error' in tokens) {
+        return { error: t(`auth.errors.${tokens.error}`) };
       }
-      if (!resolved.data) {
-        // 🛡️ Enumeration-védelem (08 §B): ismeretlen felhasználónév/telefon ne
-        // legyen megkülönböztethető a rossz jelszótól — EGYSÉGES „hibás belépés"
-        // üzenet (a nyers „nincs ilyen user" elárulná, hogy létezik-e a fiók).
-        return { error: t('auth.errors.invalidCredentials') };
+      const { data, error } = await supabase.auth.setSession(tokens);
+      if (error) {
+        return { error: messageOf(error) };
       }
-      email = resolved.data as string;
+      return afterSignIn(data.user?.id);
     }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -267,18 +279,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (error) {
       return { error: messageOf(error) };
     }
-    // 🔐 MFA: ha a usernek van verifikált TOTP-faktora, a session még csak aal1 →
-    // a belépés a TOTP-challenge teljesítéséig FÜGGŐBEN marad (a guard nem enged
-    // tovább). MFA-faktor nélkül `pending` mindig false → a flow a korábbival azonos.
-    const pending = await loginNeedsMfa();
-    set({ mfaPending: pending });
-    if (pending) {
-      return { needsMfa: true };
-    }
-    if (data.user) {
-      void registerCurrentDevice(data.user.id);
-    }
-    return {};
+    return afterSignIn(data.user?.id);
   },
 
   signUpWithPhone: async (phone, password, profile) => {
@@ -424,6 +425,11 @@ export const useAuth = create<AuthState>((set, get) => ({
   signOut: async () => {
     if (!supabase) {
       return;
+    }
+    // a törléshez még kell a session (RLS: csak a saját sor)
+    const userId = get().user?.id;
+    if (userId) {
+      await clearCurrentDevicePushToken(userId);
     }
     try {
       await supabase.auth.signOut();

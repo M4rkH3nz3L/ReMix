@@ -188,6 +188,7 @@
       "phoneCountryUnsupported": "This country code isn't supported for SMS sign-up.",
       "otpLength": "The code is 6 digits.",
       "invalidCredentials": "Invalid email/username or password.",
+      "unavailable": "Sign-in isn't available right now. Try again or use your email.",
       "emailNotConfirmed": "Your email isn't confirmed yet. Check your inbox.",
       "userAlreadyExists": "This account already exists. Try signing in.",
       "phoneExists": "This phone number is already registered.",

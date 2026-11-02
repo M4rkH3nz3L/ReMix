@@ -11,7 +11,7 @@ const { logCaught } = require('../lib/caught');
 // globális 2 GB kiváltása) a cutover következő lépése (devs/tasks/remix/02) —
 // ez a guard a biztonságos első réteg.
 const fs = require('fs');
-const { validateUploads } = require('./mediaPolicy');
+const { isActiveContent, validateUploads } = require('./mediaPolicy');
 
 const HEADER_BYTES = 32; // elég a ftyp-brandig (offset 8–11)
 
@@ -78,4 +78,15 @@ function mediaGuard(kind) {
   };
 }
 
-module.exports = { mediaGuard, readHeader };
+/** 🛡️ Általános feltöltés: bármilyen projektfájl jöhet, de böngészőben futó tartalom nem. */
+function blockActiveContent(req, res, next) {
+  const bad = (req.files || []).find((f) => isActiveContent(f.originalname, readHeader(f.path)));
+  if (bad) {
+    cleanup(req.files);
+    res.status(415).json({ error: 'Ez a fájltípus nem tölthető fel.' });
+    return;
+  }
+  next();
+}
+
+module.exports = { blockActiveContent, mediaGuard, readHeader };

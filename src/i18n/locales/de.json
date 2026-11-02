@@ -188,6 +188,7 @@
       "phoneCountryUnsupported": "Diese Ländervorwahl wird für die SMS-Registrierung nicht unterstützt.",
       "otpLength": "Der Code besteht aus 6 Ziffern.",
       "invalidCredentials": "Ungültige E-Mail/Benutzername oder Passwort.",
+      "unavailable": "Anmeldung gerade nicht möglich. Versuche es erneut oder nutze deine E-Mail.",
       "emailNotConfirmed": "Deine E-Mail ist noch nicht bestätigt. Prüfe dein Postfach.",
       "userAlreadyExists": "Dieses Konto existiert bereits. Versuche dich anzumelden.",
       "phoneExists": "Diese Telefonnummer ist bereits registriert.",

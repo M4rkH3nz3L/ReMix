@@ -46,7 +46,10 @@ import { photoBytesPerPixel } from '@/components/studio/image/exportEstimate';
 import { readExportFacts } from '@/components/studio/image/exportVerify';
 import { expectsAlpha, exportProblems, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { customExportSize, formatBytes } from '@/lib/imageExport';
-import { ingestImageFile } from '@/lib/media';
+import { ingestImageFile, probeAudioDuration } from '@/lib/media';
+import { analyzeMix } from '@/lib/analyzeMix';
+import { mixForExport } from '@/lib/audioExportMix';
+import { classifyAudioIntake } from '@/lib/audioIntake';
 import { supabase } from '@/lib/supabase';
 import { layerHistogram } from '@/components/studio/image/HistogramView';
 import { HslSheet } from '@/components/studio/image/HslSheet';
@@ -2335,6 +2338,71 @@ async function smokeAudioKillVerify(log: Log) {
   await deleteProject(AUDIO_KILL_ID);
 }
 
+/** 16 bites mono szinusz WAV; a hang-mérés valódi fájlon megy, fixture nélkül. */
+function toneWav(name: string, seconds: number): string {
+  const rate = 44100;
+  const samples = Math.round(seconds * rate);
+  const bytes = new Uint8Array(44 + samples * 2);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, value: string) => [...value].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)));
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + samples * 2, true);
+  text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  text(36, 'data');
+  view.setUint32(40, samples * 2, true);
+  for (let i = 0; i < samples; i++) {
+    view.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * 16000), true);
+  }
+  const file = new File(Paths.document, name);
+  if (file.exists) {
+    file.delete();
+  }
+  file.write(bytes);
+  return file.uri;
+}
+
+/** A6 és A19 valódi fájlon: a sérült hang nem kerül be, a mérés a jelenlegi mixet adja. */
+async function smokeAudioMix(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_tone.wav', 3);
+  const broken = new File(Paths.document, 'smoke_broken.mp3');
+  if (broken.exists) {
+    broken.delete();
+  }
+  broken.write(new Uint8Array(4096).fill(7));
+  const good = await probeAudioDuration(uri);
+  log(Math.abs(good - 3) < 0.1, 'A6 az ép hang hossza a fájlból jön', `${good.toFixed(2)} s`);
+  const bad = await probeAudioDuration(broken.uri);
+  const intake = classifyAudioIntake({ uri: broken.uri, name: 'smoke_broken.mp3', durationSec: bad });
+  log(bad === 0 && !intake.ok, 'A6 a sérült fájl nem kerül be', `${bad} s, ok=${intake.ok}`);
+  broken.delete();
+
+  const base = createEmptyProject('smoke mix', '1:1', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'smoke-mix-clip', uri, label: 'tone', start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const project: Project = {
+    ...base,
+    tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [clip] } : tr)),
+  };
+  const measure = async (masterVolume: number) => {
+    const mix = mixForExport(project, () => true, masterVolume);
+    return mix ? analyzeMix(mix) : null;
+  };
+  const full = await measure(1);
+  const half = await measure(0.5);
+  log(!!full && Number.isFinite(full.lufs), 'A19 a jelenlegi mix mérhető a telefonról', `${full?.lufs} LUFS`);
+  const drop = (full?.lufs ?? 0) - (half?.lufs ?? 0);
+  log(Math.abs(drop - 6) < 1, 'A19 a master-hangerő a mért értékben is látszik', `${drop.toFixed(1)} dB esés`);
+  log(mixForExport(project, () => false, 1) === null, 'A15 némított projektből nincs export');
+  new File(uri).delete();
+}
+
 async function smokeWorker(log: Log) {
   const doc = testDoc();
   const height = exportSize(doc, 2).height;
@@ -2543,6 +2611,10 @@ export async function runImageSmoke(
   }
   if (phase === 'login') {
     await step('login', () => smokeLogin(log));
+    return;
+  }
+  if (phase === 'audiomix') {
+    await step('audiomix', () => smokeAudioMix(log));
     return;
   }
   if (phase === 'audiokill1') {

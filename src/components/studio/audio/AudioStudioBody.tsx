@@ -50,11 +50,12 @@ import type { DrumHit } from '@/lib/drums';
 import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
 import { detectBeats } from '@/lib/beats';
-import { beatsToTimelineLines } from '@/lib/beatMarkers';
+import { beatLinesForClips } from '@/lib/beatMarkers';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
-import { persistToLibrary } from '@/lib/media';
+import { UNREADABLE_DURATION_MESSAGE } from '@/lib/audioIntake';
+import { persistToLibrary, probeAudioDuration } from '@/lib/media';
 import { logCaught } from '@/lib/logCaught';
 
 const LANE_H = 70;
@@ -115,7 +116,7 @@ export function AudioStudioBody({
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
   const [bpmBusy, setBpmBusy] = useState(false);
-  const [detectedBeats, setDetectedBeats] = useState<number[]>([]);
+  const [detectedBeats, setDetectedBeats] = useState<{ uri: string; beats: number[] } | null>(null);
   const [source, setSource] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
   // 📐 MOBILE-UI §6.7: a nyitott inline lap (keverő/master/klip-szerk.) detentje laponként;
@@ -163,6 +164,13 @@ export function AudioStudioBody({
   const ticks = Array.from({ length: Math.min(180, Math.ceil(timelineW / pxPerSec)) + 1 }, (_, i) => i);
   const selClip = selectedAudioClip(project, selectedClipId);
   // 🎵 beat-rács (ütem-vonalak) a BPM szerint — a látható tartományra + max 300 vonalra sapkázva
+  const detectedLines = detectedBeats
+    ? beatLinesForClips(
+        detectedBeats.beats,
+        project.tracks.flatMap((tr) => tr.clips).filter((c): c is AudioClip => c.kind === 'audio' && c.uri === detectedBeats.uri),
+        fps
+      )
+    : [];
   const beatTimes = beatLines(bpm, 0, Math.min(duration + 2, (timelineW - 40) / pxPerSec)).slice(0, 300);
   const secPerBar = (60 / bpm) * 4; // 4/4 ütem hossza (a downbeat kiemeléséhez)
 
@@ -266,8 +274,8 @@ export function AudioStudioBody({
       const grid = await detectBeats(uri);
       if (grid && grid.bpm > 0) {
         useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: Math.round(grid.bpm) });
-        // 🥁📍 a felismert beatek vonalként az idővonalra (a klip start-jával eltolva)
-        setDetectedBeats(beatsToTimelineLines(grid.beats ?? [], sourceClip?.start ?? 0, fps));
+        // 🥁📍 a felismert beatek a forrás idejében maradnak, a vonalak a klipekből számolódnak
+        setDetectedBeats({ uri, beats: grid.beats ?? [] });
       } else {
         Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült tempót felismerni (fut a render-worker?).' }));
       }
@@ -388,11 +396,15 @@ export function AudioStudioBody({
   };
 
   // 🗂️ forrás-mappából a sávra: a HANG-forrás klipként a 'music' sávon, a playheadnél
-  const insertSource = (asset: Asset) => {
+  const insertSource = async (asset: Asset) => {
     if (asset.kind !== 'audio') {
       return;
     }
-    const dur = asset.duration || 5;
+    const dur = asset.duration || (await probeAudioDuration(asset.uri));
+    if (!dur) {
+      Alert.alert(t('studio.kind.audio'), UNREADABLE_DURATION_MESSAGE);
+      return;
+    }
     const clip: AudioClip = {
       kind: 'audio',
       id: makeId('clip'),
@@ -513,7 +525,9 @@ export function AudioStudioBody({
       onBakeSynth={(notes, wave) => void bakeSynth(notes, wave)}
       onBakeDrums={(hits, bars) => void bakeDrums(hits, bars)}
       onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
-      onInsertSource={insertSource}
+      onInsertSource={(asset) => {
+        void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
+      }}
       onShareAlbum={() => void shareAlbum()}
       frame={sheetFrame}
     />
@@ -633,7 +647,7 @@ export function AudioStudioBody({
                 );
               })}
               {/* 🥁📍 detektált beat-vonalak (az importált zene VALÓS beatjei) */}
-              {detectedBeats.map((sec, i) => (
+              {detectedLines.map((sec, i) => (
                 <View
                   key={`db${i}`}
                   pointerEvents="none"

@@ -8,11 +8,14 @@ import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { Slider } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
-import { analyzeAudio, type LoudnessStats } from '@/lib/audioAnalyze';
+import { analyzeMix } from '@/lib/analyzeMix';
+import type { LoudnessStats } from '@/lib/audioAnalyze';
+import { mixForExport } from '@/lib/audioExportMix';
 import { AUDIO_MASTER_TARGETS, masterPreset } from '@/lib/audioMaster';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, AudioMaster, AudioMasterDynamics, TrackType } from '@/types/project';
+import { guardPro } from '@/store/paywallStore';
+import type { AudioMaster, AudioMasterDynamics, TrackType } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 const MIX_LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
@@ -41,34 +44,28 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
   const [stats, setStats] = useState<LoudnessStats | null>(null);
   const [spectrum, setSpectrum] = useState<string | null>(null);
 
-  // az elemzés forrása: a renderelt mix, ha van; egyébként az első hangklip (proxy)
-  const analyzeSource = (() => {
-    const rendered = project?.rendered?.url || project?.rendered?.uri;
-    if (rendered) {
-      return rendered;
-    }
-    for (const type of ['music', 'voiceover', 'sfx'] as const) {
-      const clip = project?.tracks
-        .find((tr) => tr.type === type)
-        ?.clips.find((c): c is AudioClip => c.kind === 'audio');
-      if (clip) {
-        return clip.uri;
-      }
-    }
-    return null;
-  })();
+  const hasAudio = !!project?.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio'));
 
+  // A19: a mérés a jelenlegi mixről szól, a beállított némítás, solo és master szerint
   const onAnalyze = () => {
-    if (!analyzeSource || analyzing) {
+    if (!project || analyzing) {
+      return;
+    }
+    const store = useEditorStore.getState();
+    const mix = mixForExport(project, store.isTrackAudible, store.masterVolume);
+    if (!mix) {
+      Alert.alert(t('studio.master.analyze'), t('studio.audio.exportSilent'));
       return;
     }
     setAnalyzing(true);
-    analyzeAudio(analyzeSource)
-      .then((r) => {
+    guardPro(
+      () => analyzeMix(mix).then((r) => {
         setStats(r);
         setSpectrum(r.spectrum ?? null);
-      })
-      .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); return Alert.alert(t('studio.master.analyze'), e.message); })
+      }),
+      (e) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); Alert.alert(t('studio.master.analyze'), e.message); }
+    )
+      .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); })
       .finally(() => setAnalyzing(false));
   };
 
@@ -150,7 +147,7 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
         {/* — Master — */}
         <View style={styles.divider} />
         <Text style={styles.section}>{t('studio.master.masterChain')}</Text>
-        {analyzeSource ? (
+        {hasAudio ? (
           <>
             <Pressable onPress={onAnalyze} disabled={analyzing} style={styles.analyzeRow}>
               {analyzing ? (

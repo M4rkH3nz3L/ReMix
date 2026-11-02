@@ -244,9 +244,12 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const importOwn = async () => {
     const picked = await pickAudio();
     if (picked) {
-      // a TELJES fájlt importáljuk a valós hosszával (a user utólag trimmelheti);
-      // ha a hossz nem olvasható ki, óvatos alapérték
-      addAudioClip(picked.uri, picked.name, picked.duration > 0 ? picked.duration : 10);
+      if (!picked.intake.ok) {
+        Alert.alert(t('common.error'), picked.intake.message);
+        return;
+      }
+      // a TELJES fájlt importáljuk a valós hosszával (a user utólag trimmelheti)
+      addAudioClip(picked.uri, picked.name, picked.duration);
     }
   };
 

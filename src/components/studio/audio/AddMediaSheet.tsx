@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
+import { UNREADABLE_DURATION_MESSAGE } from '@/lib/audioIntake';
 import { renderServerUrl } from '@/lib/backend';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -82,9 +84,9 @@ export function AddMediaSheet({
       id: makeId('clip'),
       kind: 'audio',
       start: snapToFrame(st.playhead, project.fps ?? 30),
-      duration: duration || 10,
+      duration,
       trimIn: 0,
-      sourceDuration: duration || 10,
+      sourceDuration: duration,
       uri,
       label: name,
       volume: 1,
@@ -98,7 +100,7 @@ export function AddMediaSheet({
       uri,
       provider: remoteUrl ? 'library' : 'local',
       name,
-      duration: duration || undefined,
+      duration,
       ...(remoteUrl ? { remoteUrl } : {}),
     });
     onClose();
@@ -113,7 +115,7 @@ export function AddMediaSheet({
       const picked = await pickAudio();
       if (picked) {
         // 🎵 §5 bevételi osztályozás: hard-stop a nem támogatott formátumra, egyébként
-        // figyelmeztetés (ismeretlen hossz / nagyon hosszú) — de a klip így is bekerül.
+        // figyelmeztetés (nagyon hosszú) — de a klip így is bekerül.
         if (!picked.intake.ok) {
           Alert.alert('Nem beolvasható', picked.intake.message ?? 'Ismeretlen hangformátum.');
           return;
@@ -143,6 +145,10 @@ export function AddMediaSheet({
       const remoteUrl = /^https?:\/\//i.test(resolved.uri)
         ? resolved.uri
         : `${renderServerUrl()}${entry.url}`;
+      if (!duration) {
+        Alert.alert('Nem beolvasható', UNREADABLE_DURATION_MESSAGE);
+        return;
+      }
       addAudio(resolved.uri, entry.name, duration, remoteUrl);
     } finally {
       setBusy(false);

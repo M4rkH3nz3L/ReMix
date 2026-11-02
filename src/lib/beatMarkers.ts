@@ -34,3 +34,24 @@ export function beatsToTimelineLines(beats: number[], clipStart: number, fps: nu
   }
   return out;
 }
+
+export interface BeatClip {
+  start: number;
+  duration: number;
+  trimIn?: number;
+}
+
+/**
+ * A forrás-idejű beatek a klipek AKTUÁLIS helyére vetítve: a vágott rész beatje nem
+ * látszik, a mozgatott vagy kettévágott klip viszi magával a vonalait.
+ */
+export function beatLinesForClips(beats: number[], clips: BeatClip[], fps: number): number[] {
+  const times = clips.flatMap((clip) => {
+    const trimIn = clip.trimIn ?? 0;
+    return (beats ?? [])
+      .filter((b) => b >= trimIn && b <= trimIn + clip.duration)
+      .map((b) => clip.start + (b - trimIn));
+  });
+  return beatsToTimelineLines(times.sort((a, b) => a - b), 0, fps);
+}
+

@@ -1,4 +1,4 @@
-import { beatsToTimelineLines } from '@/lib/beatMarkers';
+import { beatLinesForClips, beatsToTimelineLines } from '@/lib/beatMarkers';
 
 describe('beatMarkers — detektált beatek → idővonal-vonalak', () => {
   it('klip-offset + frame-snap (30 fps)', () => {
@@ -28,5 +28,32 @@ describe('beatMarkers — detektált beatek → idővonal-vonalak', () => {
 
   it('fps hiányában 30-cal számol', () => {
     expect(beatsToTimelineLines([1], 0, 0)).toEqual([1]);
+  });
+});
+
+describe('beatMarkers — a vonalak a klip aktuális helyét követik (A5)', () => {
+  const clip = (start: number, duration: number, trimIn?: number) => ({ start, duration, trimIn });
+
+  it('a bal-vágás eltolja a vonalakat, a levágott beat eltűnik', () => {
+    expect(beatLinesForClips([1, 2, 3, 4], [clip(10, 3, 2)], 30)).toEqual([10, 11, 12]);
+  });
+
+  it('a klip mozgatása után a vonalak is mozognak', () => {
+    expect(beatLinesForClips([1, 2], [clip(0, 5)], 30)).toEqual([1, 2]);
+    expect(beatLinesForClips([1, 2], [clip(4, 5)], 30)).toEqual([5, 6]);
+  });
+
+  it('split után mindkét fél vonalai megmaradnak, a klip vége után nincs vonal', () => {
+    const left = clip(0, 2);
+    const right = clip(2, 2, 2);
+    expect(beatLinesForClips([1, 3, 9], [left, right], 30)).toEqual([1, 3]);
+  });
+
+  it('több klip vonalai időrendben, duplikátum nélkül', () => {
+    expect(beatLinesForClips([1], [clip(5, 2), clip(0, 2), clip(0, 2)], 30)).toEqual([1, 6]);
+  });
+
+  it('nincs klip → nincs vonal', () => {
+    expect(beatLinesForClips([1, 2], [], 30)).toEqual([]);
   });
 });

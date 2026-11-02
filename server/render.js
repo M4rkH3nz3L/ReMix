@@ -126,6 +126,18 @@ function projectDuration(project) {
   return max;
 }
 
+/**
+ * 🎚️ sidechain-duck TRIGGER: alapból a voiceover sáv; ha a projekt `duckTrigger` sávot ad meg,
+ * AZ a sáv a kulcs (pl. 'sfx' → a zene a hangeffektek alatt duckol). A régi közös `audio`
+ * sávon a klip forrása dönt.
+ */
+function isDuckTrigger(clip, trackType, duckTrigger) {
+  if (duckTrigger) {
+    return trackType === duckTrigger;
+  }
+  return trackType === 'voiceover' || (trackType === 'audio' && clip.source === 'voiceover');
+}
+
 /** 0.5–2.0 közé bontott atempo-lánc tetszőleges sebességhez */
 function atempoChain(speed) {
   const parts = [];
@@ -2823,11 +2835,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     }
     chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
     graph.push(chain);
-    // 🎚️ sidechain-duck TRIGGER: alapból a voiceover/beszéd; ha a projekt `duckTrigger` sávot ad meg,
-    // AZ a sáv a kulcs (pl. 'sfx' → a zene a hangeffektek alatt duckol).
-    const isTrigger = duckTrigger
-      ? clipTrackType[clip.id] === duckTrigger
-      : clip.source === 'voiceover';
+    const isTrigger = isDuckTrigger(clip, clipTrackType[clip.id], duckTrigger);
     const pushToBus = (lbl) => {
       if (isTrigger) {
         speechLabels.push(lbl);
@@ -2973,6 +2981,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
 module.exports = {
   FILTERS,
+  isDuckTrigger,
   renderProject,
   outputColorFilter,
   projectDuration,

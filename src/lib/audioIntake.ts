@@ -54,6 +54,9 @@ export interface AudioIntakeInput {
  * de FIGYELMEZTETÉST kap (ok=true, warning=true), hogy a timeline-pozíció/render-idő
  * meglepetés ne legyen néma.
  */
+export const UNREADABLE_DURATION_MESSAGE =
+  'A hang hossza nem olvasható ki, a fájl sérült lehet. Próbáld újra, vagy mentsd el MP3/M4A/WAV formátumban.';
+
 export function classifyAudioIntake(input: AudioIntakeInput): AudioIntakeResult {
   const { uri, name, durationSec } = input;
   const label = name || audioExtOf(uri).toUpperCase() || 'fájl';
@@ -67,12 +70,8 @@ export function classifyAudioIntake(input: AudioIntakeInput): AudioIntakeResult 
   }
   const dur = Number(durationSec);
   if (!Number.isFinite(dur) || dur <= 0) {
-    return {
-      ok: true,
-      warning: true,
-      reason: 'unknownDuration',
-      message: 'A hang hossza nem olvasható ki — a klip alap-hosszal kerül az idővonalra, és kézzel igazítható.',
-    };
+    // a kitalált hossz néma vagy levágott klipet adna, ezért nem kerül be
+    return { ok: false, warning: false, reason: 'unknownDuration', message: UNREADABLE_DURATION_MESSAGE };
   }
   if (dur > AUDIO_INTAKE_WARN_SEC) {
     const hours = Math.round((dur / 3600) * 10) / 10;

@@ -140,6 +140,26 @@ function buildSmokeProjects() {
       ]),
     },
     {
+      name: 'duck-off',
+      description: 'A duck-mérés referenciája: zene + beszéd, duck nélkül.',
+      project: project('duckoff', [music([clip(MUSIC)]), voice([clip(VOICE, { id: 'v1', source: 'imported' })])]),
+    },
+    {
+      name: 'duck-dragged-speech',
+      description: 'A voiceover sávra húzott IMPORTÁLT beszéd is duckol (A17).',
+      project: project('duckdrag', [
+        music([clip(MUSIC, { autoDuck: true })]),
+        voice([clip(VOICE, { id: 'v1', source: 'imported' })]),
+      ]),
+    },
+    {
+      name: 'duck-rec-on-music',
+      description: 'A zene-sávra húzott felvétel nem kulcs (A17): a zene nem halkul.',
+      project: project('duckrec', [
+        music([clip(MUSIC, { autoDuck: true }), clip(VOICE, { id: 'r1', source: 'voiceover' })]),
+      ]),
+    },
+    {
       name: 'master-podcast',
       description: 'Master preset: podcast (−16 LUFS) → a kész mix a célon ±1 LU-n belül.',
       project: project('mpod', [music([clip(MUSIC)])], {

@@ -35,10 +35,9 @@ describe('classifyAudioIntake — barátságos osztályozás', () => {
     expect(r.message).toMatch(/nem tudjuk beolvasni/);
   });
 
-  it('ismeretlen hossz (0) → behozható, de figyelmeztet', () => {
+  it('ismeretlen hossz (0) → nem hozható be', () => {
     const r = classifyAudioIntake({ uri: 'file:///x.mp3', durationSec: 0 });
-    expect(r.ok).toBe(true);
-    expect(r.warning).toBe(true);
+    expect(r.ok).toBe(false);
     expect(r.reason).toBe('unknownDuration');
   });
 
@@ -57,5 +56,12 @@ describe('classifyAudioIntake — barátságos osztályozás', () => {
   it('normál hang → ok, nincs figyelmeztetés', () => {
     const r = classifyAudioIntake({ uri: 'file:///x.flac', name: 'dal.flac', durationSec: 180 });
     expect(r).toEqual({ ok: true, warning: false });
+  });
+});
+
+describe('classifyAudioIntake — mérhetetlen hossz (A6)', () => {
+  it('a nem mérhető fájl nem kerül be néma alap-hosszú klipként', () => {
+    expect(classifyAudioIntake({ uri: 'file:///x.mp3', durationSec: 0 }).ok).toBe(false);
+    expect(classifyAudioIntake({ uri: 'file:///x.mp3' }).ok).toBe(false);
   });
 });

@@ -3803,6 +3803,9 @@
         "savedTitle": "Elmentve",
         "savedBody": "A(z) {{name}} a projekt Export-mappájába került."
       },
+      "stemsEmpty": "A szétbontás nem adott stemeket.",
+      "stemsBusy": "Most egy másik szétbontás fut, próbáld újra pár perc múlva.",
+      "stemsDownloadFailed": "A(z) {{name}} stem nem töltődött le.",
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",

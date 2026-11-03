@@ -50,9 +50,6 @@ export function ClipEditSheet({
         withProgress(t('studio.audio.stemsWorking'), () => {
           setSeparating(true);
           return separateStems(clip.uri).then((stems) => {
-            if (stems.length === 0) {
-              return;
-            }
             const commands: EditorCommand[] = stemClipsFrom(clip, stems, () => makeId('clip')).map((stem) => ({
               type: 'ADD_CLIP',
               trackType: stem.trackType,

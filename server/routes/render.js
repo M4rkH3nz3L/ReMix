@@ -22,11 +22,15 @@ const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJo
 const { listWorkers } = require('../workers-registry');
 const { s3Enabled, uploadFile, publicUrl } = require('../s3store');
 const { canAccessRenderJob } = require('../security/renderAuth');
+const { StampedJobs, sweepFinishedJobs } = require('../lib/jobSweep');
 const { securityEvent } = require('../security/auditLog');
 const { trackUsage, userTier, enforceQuota } = require('../usage');
 
 const router = express.Router();
-const jobs = new Map(); // id → { state, file?, error?, dir, userId?, abort? }
+const jobs = new StampedJobs(); // id → { state, file?, error?, dir, userId?, abort?, updatedAt }
+// A38: a lezárt job (és a feltöltött hang, a kimenet) legfeljebb ennyi ideig marad a lemezen
+const JOB_TTL_MS = Number(process.env.RENDER_JOB_TTL_MS) || 60 * 60 * 1000;
+setInterval(() => sweepFinishedJobs(jobs, Date.now(), JOB_TTL_MS), Math.min(JOB_TTL_MS, 10 * 60 * 1000)).unref();
 
 router.post('/render', ...paidOnly, upload.any(), (req, res) => {
   let project;

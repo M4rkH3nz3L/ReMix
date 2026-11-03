@@ -3808,6 +3808,9 @@
         "savedTitle": "Gespeichert",
         "savedBody": "{{name}} liegt im Export-Ordner des Projekts."
       },
+      "stemsEmpty": "Die Trennung hat keine Stems geliefert.",
+      "stemsBusy": "Gerade läuft eine andere Trennung, versuch es in ein paar Minuten erneut.",
+      "stemsDownloadFailed": "Der Stem {{name}} konnte nicht geladen werden.",
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",

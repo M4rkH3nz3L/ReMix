@@ -1,4 +1,7 @@
+import { t as tr } from 'i18next';
+
 import { ensureCloud } from '@/lib/backend';
+import { downloadToCache } from '@/lib/media';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
 import { workerAuthHeaders } from '@/lib/workerAuth';
 import { logCaught } from '@/lib/logCaught';
@@ -26,7 +29,20 @@ export async function separateStems(uri: string): Promise<Stem[]> {
   });
   const body = (await res.json().catch((caught) => { logCaught('lib/stems.ts:separateStems', caught); return {}; })) as { stems?: Stem[]; error?: string };
   if (!res.ok) {
-    throw new Error(body.error || 'stems_failed');
+    throw new Error(body.error === 'stems_busy' ? tr('studio.audio.stemsBusy') : body.error || 'stems_failed');
   }
-  return body.stems ?? [];
+  const stems = body.stems ?? [];
+  if (stems.length === 0) {
+    throw new Error(tr('studio.audio.stemsEmpty'));
+  }
+  // A34: a stem a projekt mappájába kerül — a szerveres URL eltűnhet, a projekt ne függjön tőle
+  const local: Stem[] = [];
+  for (const stem of stems) {
+    const uri = await downloadToCache(stem.url, `${stem.name}.wav`);
+    if (!uri) {
+      throw new Error(tr('studio.audio.stemsDownloadFailed', { name: stem.name }));
+    }
+    local.push({ name: stem.name, url: uri });
+  }
+  return local;
 }

@@ -3803,6 +3803,9 @@
         "savedTitle": "Saved",
         "savedBody": "{{name}} was saved to the project's Export folder."
       },
+      "stemsEmpty": "The separation returned no stems.",
+      "stemsBusy": "Another separation is running, try again in a few minutes.",
+      "stemsDownloadFailed": "The {{name}} stem could not be downloaded.",
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",

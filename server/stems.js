@@ -23,13 +23,17 @@ function stemsConfigured() {
  * `[{ name, path }]` alakban. A Demucs a `<outDir>/<model>/<alap>/<stem>.wav`
  * struktúrába ír.
  */
-function separateStems(inputPath, outDir) {
+function separateStems(inputPath, outDir, signal) {
   return new Promise((resolve, reject) => {
     execFile(
       DEMUCS_BIN,
       ['-n', DEMUCS_MODEL, '--out', outDir, inputPath],
-      { timeout: 20 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 },
+      { timeout: 20 * 60 * 1000, maxBuffer: 4 * 1024 * 1024, ...(signal ? { signal } : {}) },
       (err) => {
+        if (signal && signal.aborted) {
+          reject(new Error('stems_aborted'));
+          return;
+        }
         if (err) {
           reject(new Error(`Demucs hiba: ${err.message}`));
           return;

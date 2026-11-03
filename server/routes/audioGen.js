@@ -18,6 +18,8 @@ const { renderSpectrum } = require('../spectrum');
 const { requireAuth } = require('../auth');
 const { paidOnly } = require('../lib/guards');
 const { uploadAudio } = require('../lib/upload');
+const { rateLimit } = require('../security/rateLimit');
+const { mediaGuard } = require('../security/uploadPolicy');
 const { validate, validateJsonField } = require('../lib/validate');
 const { synthBody, drumsBody, samplerSteps } = require('./schemas/audioGen');
 
@@ -46,7 +48,7 @@ router.post('/synth', express.json({ limit: '512kb' }), ...paidOnly, validate(sy
 });
 
 // 📊 Spektrogram (AUDIOT §7): feltöltött hangból frekvencia-kép → PNG. Elemző.
-router.post('/audio/spectrum', requireAuth, uploadAudio.any(), async (req, res) => {
+router.post('/audio/spectrum', requireAuth, rateLimit('analysis'), uploadAudio.any(), mediaGuard('audio'), async (req, res) => {
   const file = (req.files ?? [])[0];
   if (!file) {
     res.status(400).json({ error: 'Nincs hang-fájl.' });
@@ -54,7 +56,8 @@ router.post('/audio/spectrum', requireAuth, uploadAudio.any(), async (req, res) 
   }
   const opts = { width: Number(req.body?.width) || 720, height: Number(req.body?.height) || 360, mode: req.body?.mode };
   const out = path.join(req.workDir || os.tmpdir(), 'spectrum.png');
-  res.on('finish', () => {
+  // a megszakadt kérés (nincs 'finish') munkakönyvtára is törlődik
+  res.on('close', () => {
     if (req.workDir) {
       fs.rm(req.workDir, { recursive: true, force: true }, () => {});
     }

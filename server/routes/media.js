@@ -16,7 +16,8 @@ const { proOnly } = require('../lib/guards');
 const { rateLimit } = require('../security/rateLimit');
 const { blockActiveContent, mediaGuard, readHeader } = require('../security/uploadPolicy');
 const { safeContentType, safeExt } = require('../security/mediaPolicy');
-const { upload } = require('../lib/upload');
+const { upload, uploadAudio } = require('../lib/upload');
+const { createSlotLimiter } = require('../lib/slotLimiter');
 const { composeThumbnail } = require('../thumbs');
 const { voiceChain } = require('../voicechain');
 const { mediaStoreEnabled, uploadMedia: mediaStoreUpload, BUCKET: MEDIA_BUCKET } = require('../mediastore');
@@ -27,6 +28,18 @@ const userStorage = require('../userStorage');
 const WHISPER_MODEL = process.env.WHISPER_MODEL || path.join(__dirname, '..', 'models', 'ggml-base.bin');
 
 const router = express.Router();
+
+/** a kérés teljes feltöltési munkakönyvtára (nem csak az első fájl) — A37 */
+function removeWorkDir(req) {
+  if (!req.workDir) {
+    return;
+  }
+  try {
+    fs.rmSync(req.workDir, { recursive: true, force: true });
+  } catch (caught) {
+    logCaught('routes/media.js:removeWorkDir', caught);
+  }
+}
 
 // --- thumbnail-compose + voice-preview ---
 // 🎬 headline ráégetése a kiválasztott borítóra (Chromium-raszter + overlay)
@@ -365,91 +378,118 @@ router.post('/audio/analyze', requireAuth, rateLimit('analysis'), upload.any(), 
       logCaught('routes/media.js', caught);
       // az astats opcionális
     }
-    // 🎨 spektrum-kép (opcionális): showspectrumpic → média-tár
-    if (mediaStoreEnabled()) {
-      try {
-        const specPath = `${f.path}.png`;
-        await new Promise((resolve, reject) =>
-          execFile(
-            'ffmpeg',
-            ['-y', '-i', f.path, '-lavfi', 'showspectrumpic=s=600x220:legend=0', specPath],
-            { timeout: 60000 },
-            (e) => (e ? reject(e) : resolve())
-          )
-        );
-        const publicBase = `${req.protocol}://${req.get('host')}`;
-        out.spectrum = await mediaStoreUpload(`analyze/${crypto.randomUUID()}.png`, specPath, 'image/png', publicBase);
-        try {
-          fs.unlinkSync(specPath);
-        } catch (caught) {
-          logCaught('routes/media.js', caught);
-          // takarítás best-effort
-        }
-      } catch (caught) {
-        logCaught('routes/media.js', caught);
-        // a spektrum opcionális — a mérés attól még megy
-      }
+    // 🎨 spektrum-kép (opcionális): showspectrumpic → adat-URI a válaszban. A38: nem kerül
+    // a nyilvános tárba (tulajdonos és lejárat nélkül maradt ott, a fióktörlés sem találta)
+    try {
+      const specPath = `${f.path}.png`;
+      await new Promise((resolve, reject) =>
+        execFile(
+          'ffmpeg',
+          ['-y', '-i', f.path, '-lavfi', 'showspectrumpic=s=600x220:legend=0', specPath],
+          { timeout: 60000 },
+          (e) => (e ? reject(e) : resolve())
+        )
+      );
+      out.spectrum = `data:image/png;base64,${fs.readFileSync(specPath).toString('base64')}`;
+    } catch (caught) {
+      logCaught('routes/media.js', caught);
+      // a spektrum opcionális — a mérés attól még megy
     }
     res.json(out);
   } catch (err) {
     logCaught('routes/media.js', err);
     res.status(500).json({ error: err.message });
   } finally {
-    try {
-      fs.unlinkSync(f.path);
-    } catch (caught) {
-      logCaught('routes/media.js', caught);
-      // takarítás best-effort
-    }
+    removeWorkDir(req);
   }
 });
 
 // 🎚️ Stem-szeparáció (AI audio, Phase D) — Pro + Demucs (env-kapuzva). A feltöltött
 // hangot vocals/drums/bass/other WAV-okra bontja, feltölti a média-tárba, és
 // visszaadja a stemek URL-jeit. A kliens ezekből ÚJ hangklipeket rak a sávokra.
-router.post('/audio/stems', ...proOnly, upload.any(), async (req, res) => {
-  if (!stemsConfigured()) {
-    res.status(503).json({ error: 'A stem-szeparáció nincs konfigurálva (Demucs).' });
+// A37: egyszerre legfeljebb ennyi stem-menet fut (felhasználónként egy)
+const stemSlots = createSlotLimiter(Math.max(1, Number(process.env.STEMS_CONCURRENCY) || 1));
+
+function stemSlot(req, res, next) {
+  const release = stemSlots.tryAcquire(callerId(req) || req.ip);
+  if (!release) {
+    res.status(429).json({ error: 'stems_busy' });
     return;
   }
-  if (!mediaStoreEnabled()) {
-    res.status(503).json({ error: 'storage nincs konfigurálva (SUPABASE service_role vagy S3_* env)' });
-    return;
-  }
-  const f = (req.files ?? [])[0];
-  if (!f) {
-    res.status(400).json({ error: 'nincs fájl' });
-    return;
-  }
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-stems-'));
-  const publicBase = `${req.protocol}://${req.get('host')}`;
-  try {
-    const stems = await separateStems(f.path, workDir);
-    const out = [];
-    for (const s of stems) {
-      const key = `stems/${crypto.randomUUID()}-${s.name}.wav`;
-      const url = await mediaStoreUpload(key, s.path, 'audio/wav', publicBase);
-      out.push({ name: s.name, url });
+  res.on('close', release);
+  next();
+}
+
+router.post(
+  '/audio/stems',
+  ...proOnly,
+  rateLimit('render'),
+  stemSlot,
+  uploadAudio.any(),
+  mediaGuard('audio'),
+  async (req, res) => {
+    if (!stemsConfigured()) {
+      res.status(503).json({ error: 'A stem-szeparáció nincs konfigurálva (Demucs).' });
+      removeWorkDir(req);
+      return;
     }
-    res.json({ stems: out });
-  } catch (err) {
-    logCaught('routes/media.js', err);
-    console.error('Stem-szeparáció hiba:', err.message);
-    res.status(500).json({ error: err.message });
-  } finally {
+    if (!mediaStoreEnabled()) {
+      res.status(503).json({ error: 'storage nincs konfigurálva (SUPABASE service_role vagy S3_* env)' });
+      removeWorkDir(req);
+      return;
+    }
+    const f = (req.files ?? [])[0];
+    if (!f) {
+      res.status(400).json({ error: 'nincs fájl' });
+      return;
+    }
+    const uid = callerId(req, req.body?.userId);
+    // a kérés megszakadása (app háttérbe, ✕) a Demucs-t is leállítja: ne dolgozzon és
+    // töltsön fel árva stemeket olyan kérésre, amire senki nem vár
+    const controller = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        controller.abort();
+      }
+    });
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vided-stems-'));
+    const publicBase = `${req.protocol}://${req.get('host')}`;
     try {
-      fs.unlinkSync(f.path);
-    } catch (caught) {
-      logCaught('routes/media.js', caught);
-      // takarítás best-effort
-    }
-    try {
-      fs.rmSync(workDir, { recursive: true, force: true });
-    } catch (caught) {
-      logCaught('routes/media.js', caught);
-      // takarítás best-effort
+      const stems = await separateStems(f.path, workDir, controller.signal);
+      const out = [];
+      for (const s of stems) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        // A38: tulajdonos-előtag + bájt-napló → a kvóta számol vele, a fióktörlés megtalálja
+        const key = `stems/${uid || 'anon'}/${crypto.randomUUID()}-${s.name}.wav`;
+        const bytes = fs.statSync(s.path).size;
+        const url = await mediaStoreUpload(key, s.path, 'audio/wav', publicBase);
+        if (uid && quotaAvailable()) {
+          await recordObject(uid, { projectId: null, bucket: MEDIA_BUCKET, key, bytes, source: 'server' });
+        }
+        out.push({ name: s.name, url });
+      }
+      res.json({ stems: out });
+    } catch (err) {
+      logCaught('routes/media.js', err);
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (err instanceof QuotaExceededError) {
+        res.status(507).json({ error: 'quota_exceeded' });
+        return;
+      }
+      res.status(500).json({ error: err.message });
+    } finally {
+      removeWorkDir(req);
+      try {
+        fs.rmSync(workDir, { recursive: true, force: true });
+      } catch (caught) {
+        logCaught('routes/media.js', caught);
+      }
     }
   }
-});
+);
 
 module.exports = router;

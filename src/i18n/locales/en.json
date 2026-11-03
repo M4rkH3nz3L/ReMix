@@ -112,6 +112,13 @@
       "title": "My earnings",
       "statement": "Download {{year}} statement (CSV)",
       "kind": { "sale": "sales", "gift": "gifts", "commission": "remix commission", "referral": "referrals", "fund": "creator fund" }
+    },
+    "err": {
+      "minor_monthly_limit": "Under 18 you can spend at most 10 Coins a month. The limit resets at the start of the month.",
+      "minor_no_payout": "Payouts are not available under 18.",
+      "payout_under_review": "Your account is under review; the payout continues after the check.",
+      "insufficient_credits": "Not enough Coins.",
+      "insufficient_earned": "You do not have that many cashable earned Coins."
     }
   },
   "aiPicker": {

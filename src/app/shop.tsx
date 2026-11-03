@@ -39,7 +39,7 @@ import {
 import { listProjects, loadProject } from '@/lib/storage';
 import { visibleProjects } from '@/lib/projectKinds';
 import type { ProjectMeta } from '@/types/project';
-import { MIN_SHOP_PRICE_CENTS, coinsToCents, formatCoins } from '@/lib/coins';
+import { MIN_SHOP_PRICE_CENTS, coinsToCents, formatCoins, moneyErrorText } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 
 const KIND_EMOJI: Record<ShopKind, string> = {
@@ -165,7 +165,7 @@ export default function ShopScreen() {
             { text: t('shop.buyCredits'), onPress: () => router.push('/profile') },
           ]);
         } else {
-          Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+          Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       })
       .finally(() => setBusy(false));

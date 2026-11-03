@@ -112,6 +112,13 @@
       "title": "Meine Einnahmen",
       "statement": "Jahresübersicht {{year}} herunterladen (CSV)",
       "kind": { "sale": "Verkäufe", "gift": "Geschenke", "commission": "Remix-Provision", "referral": "Empfehlungen", "fund": "Creator-Fonds" }
+    },
+    "err": {
+      "minor_monthly_limit": "Unter 18 kannst du höchstens 10 Coins im Monat ausgeben. Das Limit startet am Monatsanfang neu.",
+      "minor_no_payout": "Unter 18 sind keine Auszahlungen möglich.",
+      "payout_under_review": "Dein Konto wird geprüft; die Auszahlung folgt nach der Prüfung.",
+      "insufficient_credits": "Nicht genug Coins.",
+      "insufficient_earned": "So viele auszahlbare verdiente Coins hast du nicht."
     }
   },
   "aiPicker": {

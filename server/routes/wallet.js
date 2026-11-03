@@ -57,7 +57,7 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
   try {
     const { data: reqRow, error: rpcErr } = await sb.rpc('request_payout_for', { p_user: uid, p_cents: cents });
     if (rpcErr) {
-      const known = /no_payout_account|kyc_required|insufficient_earned|below_min_payout|payout_weekly_limit/.exec(rpcErr.message);
+      const known = /no_payout_account|kyc_required|insufficient_earned|below_min_payout|payout_weekly_limit|minor_no_payout/.exec(rpcErr.message);
       if (known) {
         res.status(400).json({ error: known[0] });
         return;

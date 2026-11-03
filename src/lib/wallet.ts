@@ -4,7 +4,7 @@ import { EMPTY_WALLET, groupEarnings, parseWallet, type EarningsMonth, type Wall
 import { shareFile } from '@/lib/export';
 import type { AddonId } from '@/lib/subscriptionPlan';
 import { asTier, type Tier } from '@/lib/tiers';
-import { InsufficientCreditsError } from '@/lib/shop';
+import { InsufficientCreditsError, MinorLimitError } from '@/lib/shop';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
@@ -152,6 +152,9 @@ export async function subscribeWithCoins(
   const sb = requireSupabase();
   const { data, error } = await sb.rpc('subscribe_with_coins', { p_tier: tier, p_months: months, p_seats: seats });
   if (error) {
+    if (/minor_monthly_limit/.test(error.message)) {
+      throw new MinorLimitError();
+    }
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }
@@ -206,6 +209,9 @@ export async function sendGift(
     p_message: opts?.message ?? null,
   });
   if (error) {
+    if (/minor_monthly_limit/.test(error.message)) {
+      throw new MinorLimitError();
+    }
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }
@@ -305,6 +311,9 @@ export async function requestPayout(
     }
     if (body.error === 'kyc_required') {
       throw new KycRequiredError();
+    }
+    if (body.error === 'minor_no_payout') {
+      throw new Error('minor_no_payout');
     }
     throw new Error(body.error || 'payout_failed');
   }
@@ -429,6 +438,9 @@ export class AddonNotAllowedError extends Error {
 export async function addAddon(addon: AddonId, qty = 1): Promise<{ cost: number; renewalCost: number; balance: number }> {
   const { data, error } = await requireSupabase().rpc('add_addon', { p_addon: addon, p_qty: qty });
   if (error) {
+    if (/minor_monthly_limit/.test(error.message)) {
+      throw new MinorLimitError();
+    }
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }

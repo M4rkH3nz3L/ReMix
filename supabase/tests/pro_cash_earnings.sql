@@ -207,6 +207,26 @@ select pg_temp.note('8.6 az álnév alanyonként egységes és nem a régi azono
      where id::text = any(string_to_array((select detail from t_results where name = 'pre'), ',')))));
 delete from t_results where name = 'pre';
 
+-- ═══ 8.5 / D9 kiskorúak: havi 10 Coin költés, nincs kifizetés ══════════════════
+select pg_temp.mkuser('a4000000-0000-0000-0000-0000000000c1', 'kid_user');
+update public.profiles set birthday = current_date - interval '15 years' where id = 'a4000000-0000-0000-0000-0000000000c1';
+select public.grant_coins('a4000000-0000-0000-0000-0000000000c1', 5000, 'purchased', 'topup', 'teszt');
+insert into public.shop_items (id, seller_id, title, kind, price_cents, status) values
+  ('e4000000-0000-0000-0000-0000000000c1', 'a4000000-0000-0000-0000-000000000004', 'Matrica', 'sticker', 800, 'published'),
+  ('e4000000-0000-0000-0000-0000000000c2', 'a4000000-0000-0000-0000-000000000004', 'Matrica 2', 'sticker', 300, 'published');
+select pg_temp.act('a4000000-0000-0000-0000-0000000000c1');
+select public.purchase_shop_item('e4000000-0000-0000-0000-0000000000c1');
+select pg_temp.raises('8.5 18 év alatt a havi költés legfeljebb 10 Coin', $$select public.purchase_shop_item('e4000000-0000-0000-0000-0000000000c2')$$, 'minor_monthly_limit');
+select pg_temp.note('8.5 a túllépő vásárlás visszagördült (nincs tulajdon, nincs terhelés)',
+  not exists (select 1 from public.shop_purchases where item_id = 'e4000000-0000-0000-0000-0000000000c2')
+  and (select purchased_cents = 4200 from public.user_credits where user_id = 'a4000000-0000-0000-0000-0000000000c1'));
+select pg_temp.admin();
+select public.coin_credit('a4000000-0000-0000-0000-0000000000c1', 3000, 'earned', 'gift', 'teszt', gen_random_uuid(), 'a4000000-0000-0000-0000-000000000005');
+update public.coin_lots set available_at = now() - interval '1 minute' where user_id = 'a4000000-0000-0000-0000-0000000000c1';
+insert into public.payout_accounts (user_id, provider, email, kyc_status) values ('a4000000-0000-0000-0000-0000000000c1', 'paypal', 'k@t.test', 'verified');
+select pg_temp.raises('8.5 kiskorú nem kérhet kifizetést', $$select public.request_payout_for('a4000000-0000-0000-0000-0000000000c1', 2000)$$, 'minor_no_payout');
+select pg_temp.note('8.5 felnőttnél (vagy ismeretlen kornál) nincs korlát', not public.is_minor('a4000000-0000-0000-0000-000000000004'));
+
 select pg_temp.note('invariáns: a napló összege = az egyenleg',
   not exists (select 1 from public.user_credits u where u.user_id::text like 'a4000000-%' and u.balance <>
     coalesce((select sum(delta_cents) from public.credit_transactions t where t.user_id = u.user_id), 0)));

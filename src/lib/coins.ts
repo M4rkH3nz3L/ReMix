@@ -195,3 +195,10 @@ export function groupEarnings(rows: { month: string; kind: string; cents: number
   }
   return [...by.values()].sort((a, b) => b.month.localeCompare(a.month));
 }
+
+/** A pénzügyi RPC-k hibakódjai felhasználói szövegre (`wallet.err.<kód>`); ismeretlenre az eredeti üzenet. */
+export function moneyErrorText(t: (key: string, opts?: Record<string, unknown>) => string, e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = /minor_monthly_limit|minor_no_payout|payout_under_review|insufficient_credits|insufficient_earned/.exec(msg)?.[0];
+  return code ? t(`wallet.err.${code}`, { defaultValue: msg }) : msg;
+}

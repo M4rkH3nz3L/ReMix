@@ -112,6 +112,13 @@
       "title": "Bevételeim",
       "statement": "{{year}}. évi kimutatás letöltése (CSV)",
       "kind": { "sale": "eladás", "gift": "ajándék", "commission": "remix-jutalék", "referral": "ajánló", "fund": "alkotói alap" }
+    },
+    "err": {
+      "minor_monthly_limit": "18 év alatt havonta legfeljebb 10 Coint költhetsz. A keret a hónap elején újraindul.",
+      "minor_no_payout": "18 év alatt nem kérhető kifizetés.",
+      "payout_under_review": "A fiókod ellenőrzés alatt áll; a kifizetés a vizsgálat után folytatódik.",
+      "insufficient_credits": "Nincs elég Coinod.",
+      "insufficient_earned": "Nincs ennyi beváltható megkeresett Coinod."
     }
   },
   "aiPicker": {

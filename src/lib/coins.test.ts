@@ -7,6 +7,7 @@ import {
   creatorShare,
   formatCoins,
   formatEur,
+  moneyErrorText,
   parseWallet,
   payoutEur,
   spendPlan,
@@ -101,5 +102,13 @@ describe('coins — webes feltöltés elérhetősége', () => {
     expect(webTopupAvailable('ios', undefined)).toBe(false);
     expect(webTopupAvailable('ios', '1')).toBe(true);
     expect(webTopupAvailable('android', '0')).toBe(false);
+  });
+});
+
+describe('coins — pénzügyi hibakódok', () => {
+  it('ismert kód → fordítási kulcs, ismeretlen → eredeti üzenet', () => {
+    const t = (k: string) => `T:${k}`;
+    expect(moneyErrorText(t, new Error('P0001: minor_monthly_limit'))).toBe('T:wallet.err.minor_monthly_limit');
+    expect(moneyErrorText(t, new Error('valami más'))).toBe('valami más');
   });
 });

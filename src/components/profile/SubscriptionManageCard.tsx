@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
-import { formatCoins } from '@/lib/coins';
+import { formatCoins, moneyErrorText } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 import { InsufficientCreditsError } from '@/lib/shop';
 import { ADDONS, addonAllowed, addonDef, suggestUpgrade, type AddonId, type PaidTier } from '@/lib/subscriptionPlan';
@@ -68,7 +68,7 @@ export function SubscriptionManageCard({ onChanged, refreshKey }: { onChanged: (
       } else if (e instanceof AddonNotAllowedError) {
         Alert.alert(t('common.error'), t(`wallet.sub.addonError.${e.message}`, { defaultValue: e.message }));
       } else {
-        Alert.alert(t('common.error'), (e as Error).message);
+        Alert.alert(t('common.error'), moneyErrorText(t, e));
       }
     } finally {
       setBusy(false);

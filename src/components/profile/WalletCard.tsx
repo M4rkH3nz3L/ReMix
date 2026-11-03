@@ -21,6 +21,7 @@ import {
   coinsToCents,
   formatCoins,
   formatEur,
+  moneyErrorText,
   payoutEur,
   subscriptionCostCents,
   type WalletBreakdown,
@@ -151,7 +152,7 @@ export function WalletCard() {
         setBalance(await buyCreditsDev(amount));
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onBuyDev', e);
-        Alert.alert(t('common.error'), (e as Error).message);
+        Alert.alert(t('common.error'), moneyErrorText(t, e));
       }
     });
 
@@ -177,7 +178,7 @@ export function WalletCard() {
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onBuyPack', e);
         if (!(e instanceof PurchaseCancelledError)) {
-          Alert.alert(t('common.error'), (e as Error).message);
+          Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       }
     });
@@ -206,7 +207,7 @@ export function WalletCard() {
         } else if (e instanceof ManagedByStoreError) {
           Alert.alert(t('common.error'), t('wallet.sub.storeManaged'));
         } else {
-          Alert.alert(t('common.error'), (e as Error).message);
+          Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       }
     });
@@ -234,7 +235,7 @@ export function WalletCard() {
         } else if (e instanceof GiftNotFoundError) {
           Alert.alert(t('common.error'), t('wallet.gift.notFound'));
         } else {
-          Alert.alert(t('common.error'), (e as Error).message);
+          Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       }
     });
@@ -266,7 +267,7 @@ export function WalletCard() {
         Alert.alert(t('wallet.accountSavedTitle'), t('wallet.accountSavedMsg'));
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onSaveAccount', e);
-        Alert.alert(t('common.error'), (e as Error).message);
+        Alert.alert(t('common.error'), moneyErrorText(t, e));
       }
     });
 
@@ -283,7 +284,7 @@ export function WalletCard() {
         refresh();
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onKyc', e);
-        Alert.alert(t('common.error'), (e as Error).message);
+        Alert.alert(t('common.error'), moneyErrorText(t, e));
       }
     });
 
@@ -317,7 +318,7 @@ export function WalletCard() {
         } else if (e instanceof BelowMinPayoutError) {
           Alert.alert(t('common.error'), t('wallet.belowMin', { min: formatCoins(MIN_PAYOUT_CENTS) }));
         } else {
-          Alert.alert(t('common.error'), (e as Error).message);
+          Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       }
     });

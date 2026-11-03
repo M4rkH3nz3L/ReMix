@@ -176,6 +176,14 @@ export async function ownsItem(item: ShopItem): Promise<boolean> {
   return !!data;
 }
 
+/** 18 év alatt a havi Coin-költés korlátos (PRO-CASH 8.5). */
+export class MinorLimitError extends Error {
+  constructor() {
+    super('minor_monthly_limit');
+    this.name = 'MinorLimitError';
+  }
+}
+
 export class InsufficientCreditsError extends Error {
   constructor() {
     super('insufficient_credits');
@@ -191,6 +199,9 @@ export async function purchaseItem(itemId: string): Promise<unknown> {
   const sb = requireSupabase();
   const { data, error } = await sb.rpc('purchase_shop_item', { p_item: itemId });
   if (error) {
+    if (/minor_monthly_limit/.test(error.message)) {
+      throw new MinorLimitError();
+    }
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }

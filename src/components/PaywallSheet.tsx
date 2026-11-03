@@ -14,7 +14,7 @@ import {
   restorePurchases,
 } from '@/lib/billing';
 import { capabilityLabel } from '@/lib/capabilities';
-import { formatEur } from '@/lib/coins';
+import { formatEur, moneyErrorText } from '@/lib/coins';
 import { ANNUAL_FREE_MONTHS, planPrice, planRows, recommendedTier, type PlanCell } from '@/lib/paywallPlans';
 import { InsufficientCreditsError } from '@/lib/shop';
 import type { BillingPeriod } from '@/lib/storeProducts';
@@ -101,7 +101,7 @@ export function PaywallSheet() {
         Alert.alert(t('paywallSheet.errorTitle'), t('wallet.sub.storeManaged'));
         return;
       }
-      Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
+      Alert.alert(t('paywallSheet.errorTitle'), moneyErrorText(t, e));
     } finally {
       setBusy(false);
     }

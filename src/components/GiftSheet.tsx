@@ -14,7 +14,7 @@ import {
   listGifts,
   sendGift,
 } from '@/lib/wallet';
-import { formatCoins } from '@/lib/coins';
+import { formatCoins, moneyErrorText } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -92,7 +92,7 @@ export function GiftSheet({
               } else if (e instanceof GiftNotFoundError) {
                 Alert.alert(t('common.error'), t('wallet.gift.notFound'));
               } else {
-                Alert.alert(t('common.error'), (e as Error).message);
+                Alert.alert(t('common.error'), moneyErrorText(t, e));
               }
             } finally {
               setBusy(false);

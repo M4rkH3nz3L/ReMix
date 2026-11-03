@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ReferralCard } from '@/components/profile/ReferralCard';
 import { SubscriptionManageCard } from '@/components/profile/SubscriptionManageCard';
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
@@ -436,6 +437,9 @@ export function WalletCard() {
           disabled={busy}
         />
       </View>
+
+      {/* ajánlói program */}
+      <ReferralCard />
 
       {/* ajándék küldése (TikTok-modell): címzett + gift-katalógus */}
       <View style={styles.card}>

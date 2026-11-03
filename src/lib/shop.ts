@@ -243,13 +243,21 @@ export async function publishProjectAsItem(
     throw new Error(error.message);
   }
   const item = toItem(data as ItemRow);
-  // a payload a projekt JSON-je (id nélkül — importkor újat generálunk)
-  const payload = { type: 'project', project: { ...project, id: undefined } };
+  // a payload a projekt JSON-je (id és saját eredet nélkül — importkor újat generálunk)
+  const payload = { type: 'project', project: { ...project, id: undefined, shopOrigin: undefined } };
   const { error: pErr } = await sb.from('shop_item_payloads').insert({ item_id: item.id, payload });
   if (pErr) {
     // a payload nélkül a tétel használhatatlan → visszavonjuk
     await sb.from('shop_items').delete().eq('id', item.id);
     throw new Error(pErr.message);
+  }
+  // 🔀 megvett sablonból készült → az eredeti alkotó remix-jutalékot kap (PRO-CASH 6.1); a
+  // szerver ellenőrzi, hogy tényleg megvette-e, és nem a sajátja-e — hiba esetén a tétel él tovább
+  if (project.shopOrigin?.itemId && project.shopOrigin.itemId !== item.id) {
+    const { error: oErr } = await sb.rpc('set_item_origin', { p_item: item.id, p_origin: project.shopOrigin.itemId });
+    if (oErr) {
+      logCaught('lib/shop.ts:publishProjectAsItem:origin', oErr);
+    }
   }
   return item;
 }
@@ -264,12 +272,17 @@ export async function unpublishItem(itemId: string): Promise<void> {
  * Egy megvett/publikált SABLON payload → ÚJ helyi projekt (a szerkesztőben nyílik).
  * Visszaadja az új projekt id-ját, vagy null, ha a payload nem projekt-sablon.
  */
-export async function importPayloadAsProject(payload: unknown): Promise<string | null> {
+export async function importPayloadAsProject(payload: unknown, itemId?: string): Promise<string | null> {
   const p = payload as { type?: string; project?: Project } | null;
   if (!p || p.type !== 'project' || !p.project) {
     return null;
   }
-  const project = migrateProject({ ...(p.project as Project), id: makeId('prj') });
+  const project = migrateProject({
+    ...(p.project as Project),
+    id: makeId('prj'),
+    // a megvett sablon eredete (a remix-jutalékhoz); a saját korábbi eredetét felülírja
+    ...(itemId ? { shopOrigin: { itemId } } : {}),
+  });
   await saveProject(project);
   return project.id;
 }

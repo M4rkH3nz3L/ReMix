@@ -1690,6 +1690,9 @@ export interface Project {
    *  lánc a szülő-hivatkozások mentén bejárható; a `postId` a forrás FEED-poszté,
    *  hogy publikáláskor a remix a poszthoz csatolódjon (remix_of_post_id). */
   remixOf?: { projectId: string; name: string; postId?: string };
+  /** 🛒 a boltban megvett sablonból készült: az eredeti tétel — újra-közzétételkor a remix-
+   *  jutalék (PRO-CASH 6.1) ennek az alkotójának jár (a szerver ellenőrzi a vásárlást). */
+  shopOrigin?: { itemId: string };
   /** 🔗 link-csoportok: az egy csoportban lévő klipek együtt mozognak (persisztált) */
   links?: string[][];
   /**

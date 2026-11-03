@@ -97,6 +97,16 @@
       "required": "Kifizetés előtt azonosítás kell (név, cím, adószám, bankszámla) — ezt a Stripe végzi, mi csak az eredményt látjuk.",
       "start": "Azonosítás indítása",
       "status": { "none": "még nincs", "pending": "folyamatban", "verified": "ellenőrizve", "rejected": "elutasítva" }
+    },
+    "referral": {
+      "title": "Hívd meg ismerőseidet",
+      "hint": "Ha a meghívottad Coinból előfizet, az első hónap díjának 50%-át, utána 12 hónapig 10%-át kapod — megkeresett, pénzre váltható Coinként. Ezt a nevet adja meg ajánlóként:",
+      "stats": "{{n}} meghívott · eddig {{coins}} Coin",
+      "placeholder": "Ki hívott meg? (felhasználónév)",
+      "claim": "Megadom",
+      "claimedTitle": "Köszönjük!",
+      "claimedMsg": "Az ajánlód jutalékot kap, ha előfizetsz. Neked ez semmibe nem kerül.",
+      "error": { "referrer_not_found": "Nincs ilyen felhasználónév.", "cannot_refer_self": "Magadat nem adhatod meg.", "referral_already_set": "Az ajánlót már megadtad.", "referral_window_closed": "Az ajánló a regisztrációt követő 7 napon belül adható meg.", "referral_loop": "Kölcsönösen nem ajánlhatjátok egymást." }
     }
   },
   "aiPicker": {

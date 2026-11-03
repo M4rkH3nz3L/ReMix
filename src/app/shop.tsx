@@ -126,12 +126,12 @@ export default function ShopScreen() {
     setKind(next);
   };
 
-  const openInEditor = (payload: unknown) => {
+  const openInEditor = (payload: unknown, itemId?: string) => {
     // 🌐 weben nincs szerkesztő → a megvett tétel az appban használható
     if (!requireApp()) {
       return;
     }
-    importPayloadAsProject(payload)
+    importPayloadAsProject(payload, itemId)
       .then((pid) => {
         if (pid) {
           router.replace(`/editor/${pid}`);
@@ -154,7 +154,7 @@ export default function ShopScreen() {
         refreshBalance();
         Alert.alert(t('shop.boughtTitle'), t('shop.boughtBody', { title: item.title }), [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('shop.useInProject'), onPress: () => openInEditor(payload) },
+          { text: t('shop.useInProject'), onPress: () => openInEditor(payload, item.id) },
         ]);
       })
       .catch((e: unknown) => {
@@ -179,7 +179,7 @@ export default function ShopScreen() {
     getPayload(item.id)
       .then((payload) => {
         if (payload) {
-          openInEditor(payload);
+          openInEditor(payload, item.id);
         }
       })
       .catch((caught) => { logCaught('app/shop.tsx:onUseOwned', caught); })

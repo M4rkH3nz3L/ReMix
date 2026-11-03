@@ -97,6 +97,16 @@
       "required": "Für Auszahlungen ist eine Identitätsprüfung nötig (Name, Adresse, Steuer-ID, Bankkonto) — das übernimmt Stripe; wir sehen nur das Ergebnis.",
       "start": "Verifizierung starten",
       "status": { "none": "noch nicht", "pending": "läuft", "verified": "verifiziert", "rejected": "abgelehnt" }
+    },
+    "referral": {
+      "title": "Lade Freunde ein",
+      "hint": "Wenn jemand, den du eingeladen hast, mit Coins abonniert, bekommst du 50 % des ersten Monats und danach 12 Monate lang 10 % — als verdiente, auszahlbare Coins. Diesen Namen gibt er als Werber an:",
+      "stats": "{{n}} eingeladen · bisher {{coins}} Coins",
+      "placeholder": "Wer hat dich eingeladen? (Benutzername)",
+      "claim": "Speichern",
+      "claimedTitle": "Danke!",
+      "claimedMsg": "Dein Werber erhält eine Provision, wenn du abonnierst. Dich kostet das nichts.",
+      "error": { "referrer_not_found": "Diesen Benutzernamen gibt es nicht.", "cannot_refer_self": "Du kannst dich nicht selbst angeben.", "referral_already_set": "Du hast bereits einen Werber angegeben.", "referral_window_closed": "Ein Werber kann innerhalb von 7 Tagen nach der Registrierung angegeben werden.", "referral_loop": "Ihr könnt euch nicht gegenseitig werben." }
     }
   },
   "aiPicker": {

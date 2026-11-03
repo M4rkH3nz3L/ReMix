@@ -97,6 +97,16 @@
       "required": "Payouts need identity verification (name, address, tax ID, bank account) — Stripe does it; we only see the result.",
       "start": "Start verification",
       "status": { "none": "not yet", "pending": "in progress", "verified": "verified", "rejected": "rejected" }
+    },
+    "referral": {
+      "title": "Invite your friends",
+      "hint": "When someone you invited subscribes with Coins, you get 50% of their first month, then 10% for 12 months — as earned, cashable Coins. They enter this name as referrer:",
+      "stats": "{{n}} invited · {{coins}} Coins so far",
+      "placeholder": "Who invited you? (username)",
+      "claim": "Save",
+      "claimedTitle": "Thank you!",
+      "claimedMsg": "Your referrer earns a commission if you subscribe. It costs you nothing.",
+      "error": { "referrer_not_found": "No such username.", "cannot_refer_self": "You cannot enter yourself.", "referral_already_set": "You already entered a referrer.", "referral_window_closed": "A referrer can be entered within 7 days of signing up.", "referral_loop": "You cannot refer each other." }
     }
   },
   "aiPicker": {

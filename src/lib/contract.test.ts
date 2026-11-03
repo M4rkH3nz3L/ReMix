@@ -11,7 +11,8 @@
  * Megjegyzés: a worker-modulok sima CommonJS JS-ek — a kliens (jest-expo) projekt
  * babellel betölti őket; a `require` visszatérése `any`, ezért a tsc nem lép be a .js-be.
  */
-import { FEE_PCT, MIN_PAYOUT_CENTS, TIER_PRICE_CENTS, COIN_PAYOUT_EUR } from '@/lib/coins';
+import { COIN_PACKS, FEE_PCT, MIN_PAYOUT_CENTS, TIER_PRICE_CENTS, COIN_PAYOUT_EUR } from '@/lib/coins';
+import { STORE_TIERS, parseStoreProductId, storeProductId } from '@/lib/storeProducts';
 import { TIER_ORDER, activeTierFromRow, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
   TIER_QUOTAS,
@@ -47,6 +48,7 @@ const workerImageDoc = require('../../server/imagedoc');
 const workerFonts = require('../../server/fonts');
 const workerEntitlements = require('../../server/entitlements');
 const workerTiers = require('../../server/tiers');
+const workerRc = require('../../server/rcEvents');
 const fs = require('fs');
 const path = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -492,5 +494,24 @@ describe('contract: Coin-főkönyv (src/lib/coins.ts ⇄ DB)', () => {
   it('a kifizetési minimum és a beváltási ár azonos', () => {
     expect(latestSqlFunction('coin_min_payout_cents')).toContain(`select ${MIN_PAYOUT_CENTS}::bigint`);
     expect(latestSqlFunction('coin_payout_eur_cents')).toContain(`select p_cents * ${COIN_PAYOUT_EUR}`);
+  });
+});
+
+describe('contract: áruházi termékek (storeProducts.ts / coins.ts ⇄ server/rcEvents.js)', () => {
+  it('a Coin-csomagok (Coin + bónusz) azonosak', () => {
+    expect(workerRc.COIN_PACKS).toEqual(COIN_PACKS.map((p) => [p.id, p.coins, p.bonusCoins]));
+    for (const p of COIN_PACKS) {
+      expect(workerRc.coinPackFor(p.id)).toEqual({ id: p.id, cents: p.coins * 100, bonusCents: Math.round(p.bonusCoins * 100) });
+    }
+  });
+
+  it('az előfizetési termék-azonosítókat mindkét oldal ugyanúgy érti', () => {
+    for (const tier of STORE_TIERS) {
+      for (const period of ['monthly', 'annual'] as const) {
+        const id = storeProductId(tier, period);
+        expect(workerRc.subscriptionProduct(id)).toEqual(parseStoreProductId(id));
+      }
+    }
+    expect(workerRc.subscriptionProduct('remix_business_monthly')).toBeNull();
   });
 });

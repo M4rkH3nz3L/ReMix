@@ -11,6 +11,7 @@ const { logCaught } = require('./lib/caught');
 // lejárattól) hosszabbít 30 nappal (megújítás).
 const { adminClient } = require('./notify');
 const { TIER_ORDER, tierMeetsMin, isPaidTier, activeTierFromRow } = require('./tiers');
+const { planRevenueCatEvent } = require('./rcEvents');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 30;
@@ -126,46 +127,46 @@ async function deactivatePro(userId, opts = {}) {
   return { tier: 'free', proUntil: null };
 }
 
-// RevenueCat esemény-típusok: mikor GRANTolunk (a store-lejáratig) és mikor VONUNK VISSZA.
-// A CANCELLATION/BILLING_ISSUE NEM von vissza azonnal — a hozzáférés a lejáratig tart.
-const RC_GRANT = new Set([
-  'INITIAL_PURCHASE',
-  'RENEWAL',
-  'PRODUCT_CHANGE',
-  'UNCANCELLATION',
-  'NON_RENEWING_PURCHASE',
-  'SUBSCRIPTION_EXTENDED',
-]);
-const RC_REVOKE = new Set(['EXPIRATION', 'REFUND']);
+/**
+ * 🧾 Áruházi Coin-visszatérítés: a csomag Coinja (+ bónusza) visszavonva; ha a vevő már
+ * elköltötte, a hiány a fiókot ellenőrzésre jelöli (coin_clawback, PRO-CASH C0.5).
+ */
+async function clawbackCoins(userId, cents, note) {
+  const sb = adminClient();
+  if (!sb) {
+    throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY nincs beállítva a workeren.');
+  }
+  const { data, error } = await sb.rpc('coin_clawback', { p_user: userId, p_cents: cents, p_note: note });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+}
 
 /**
- * RevenueCat webhook-esemény feldolgozása. A `body.event.app_user_id` a mi
- * user-id-nk (a kliens `Purchases.logIn(userId)`-vel köti). `expiration_at_ms`
- * a hiteles lejárat.
+ * A tényleges entitlement-logika: a tiszta `planRevenueCatEvent` (server/rcEvents.js)
+ * terve szerint Coin-jóváírás / -visszavonás, szint-aktiválás vagy -visszavonás.
  */
-/** A tényleges entitlement-logika (VÁLTOZATLAN) — kredit / Pro-grant / revoke. */
-async function processRevenueCatEvent(ev, uid, type) {
-  // 🪙 Shop kredit-csomag (consumable): a product_id `credits_<n>` alakú → n kredit
-  const creditMatch = /^credits_(\d+)$/.exec(String(ev.product_id || ''));
-  if (creditMatch && (type === 'NON_RENEWING_PURCHASE' || type === 'INITIAL_PURCHASE')) {
-    const coins = parseInt(creditMatch[1], 10);
-    await grantCoins(uid, coins * 100, 'purchased', 'topup', ev.product_id);
-    return { credited: coins * 100 };
+async function processRevenueCatEvent(ev, uid) {
+  const plan = planRevenueCatEvent(ev);
+  const note = `${ev.product_id || ''}${ev.transaction_id ? `:${ev.transaction_id}` : ''}`;
+  switch (plan.action) {
+    case 'coins': {
+      await grantCoins(uid, plan.cents, 'purchased', 'topup', note);
+      if (plan.bonusCents > 0) {
+        await grantCoins(uid, plan.bonusCents, 'bonus', 'bonus', note);
+      }
+      return { credited: plan.cents, bonus: plan.bonusCents };
+    }
+    case 'coins_refund':
+      return { clawback: await clawbackCoins(uid, plan.cents, `refund:${note}`) };
+    case 'grant':
+      return activateTier(uid, plan.tier, { source: 'iap', until: plan.until, days: DEFAULT_DAYS });
+    case 'revoke':
+      return deactivatePro(uid, { source: 'iap', status: plan.status });
+    default:
+      return { ignored: plan.reason };
   }
-  if (RC_GRANT.has(type)) {
-    return activatePro(uid, {
-      source: 'iap',
-      until: ev.expiration_at_ms ?? null,
-      days: DEFAULT_DAYS,
-    });
-  }
-  if (RC_REVOKE.has(type)) {
-    return deactivatePro(uid, {
-      source: 'iap',
-      status: type === 'EXPIRATION' ? 'expired' : 'canceled',
-    });
-  }
-  return { ignored: type || 'unknown' };
 }
 
 /**
@@ -226,7 +227,7 @@ async function handleRevenueCatEvent(body) {
   if (eventId && (await webhookEventSeen(sb, eventId))) {
     return { duplicate: true, id: eventId };
   }
-  const result = await processRevenueCatEvent(ev, uid, type);
+  const result = await processRevenueCatEvent(ev, uid);
   if (eventId) {
     await recordWebhookEvent(sb, eventId, type);
   }
@@ -285,6 +286,8 @@ module.exports = {
   activatePro,
   deactivatePro,
   grantCoins,
+  clawbackCoins,
+  processRevenueCatEvent,
   handleRevenueCatEvent,
   webhookEventSeen,
   recordWebhookEvent,

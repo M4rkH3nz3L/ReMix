@@ -184,6 +184,22 @@ select pg_temp.admin();
 select pg_temp.note('C0.4 az előfizetés aktív, forrás: coins',
   (select tier = 'basic' and source = 'coins' from public.subscriptions where user_id = 'b1000000-0000-0000-0000-000000000002'));
 
+-- C0.5 áruházi visszatérítés: a csomag Coinja visszavonva; ha elköltötte, a hiány → ellenőrzés
+select public.grant_coins('c1000000-0000-0000-0000-000000000003', 1000, 'purchased', 'topup', 'coins_10');
+select public.grant_coins('c1000000-0000-0000-0000-000000000003', 50, 'bonus', 'bonus', 'coins_10');
+select pg_temp.note('C0.5 a visszatérített csomag teljesen visszavonható, ha megvan',
+  (select (r ->> 'unrecovered_cents')::bigint = 0 from (select public.coin_clawback('c1000000-0000-0000-0000-000000000003', 1050, 'refund:coins_10') as r) x));
+select pg_temp.note('C0.5 teljes visszavonásnál nincs ellenőrzés-jelzés',
+  not (select review_required from public.user_credits where user_id = 'c1000000-0000-0000-0000-000000000003'));
+select pg_temp.note('C0.5 elköltött csomag: a hiányzó rész visszaadva a válaszban',
+  (select (r ->> 'unrecovered_cents')::bigint > 0 from (select public.coin_clawback('b1000000-0000-0000-0000-000000000002', 999999, 'refund:coins_50') as r) x));
+select pg_temp.note('C0.5 …és a fiók ellenőrzésre jelölve, az egyenleg 0 (nem megy mínuszba)',
+  (select review_required and balance = 0 from public.user_credits where user_id = 'b1000000-0000-0000-0000-000000000002'));
+select pg_temp.raises('C0.5 ellenőrzés alatt álló fiók nem kérhet kifizetést', $$select public.request_payout_for('b1000000-0000-0000-0000-000000000002', 2000)$$, 'payout_under_review');
+select pg_temp.act('c1000000-0000-0000-0000-000000000003');
+select pg_temp.raises('C0.5 a kliens nem vonhat vissza Coint', $$select public.coin_clawback('a1000000-0000-0000-0000-000000000001', 1, 'x')$$, 'permission denied');
+select pg_temp.admin();
+
 -- invariánsok: a tételek összege = az alegyenleg, egyik sem negatív
 select pg_temp.note('C0.3 invariáns: bónusz-tételek = bónusz-egyenleg (minden tesztfiók)',
   not exists (select 1 from public.user_credits u where u.user_id::text like '_1000000-%' and u.bonus_cents <>

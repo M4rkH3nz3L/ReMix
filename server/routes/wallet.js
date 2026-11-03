@@ -68,7 +68,7 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
       p_cents: cents,
     });
     if (rpcErr) {
-      const known = /insufficient_earned|below_min_payout|payout_weekly_limit/.exec(rpcErr.message);
+      const known = /insufficient_earned|below_min_payout|payout_weekly_limit|payout_under_review/.exec(rpcErr.message);
       if (known) {
         res.status(400).json({ error: known[0] });
         return;

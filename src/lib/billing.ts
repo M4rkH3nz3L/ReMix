@@ -2,6 +2,8 @@ import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
 import { cloudBaseUrl } from '@/lib/backend';
+import { coinPack } from '@/lib/coins';
+import { highestActiveEntitlement, storeProductId, type BillingPeriod, type StoreTier } from '@/lib/storeProducts';
 import { asRecord, str } from '@/lib/parseGuards';
 import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
@@ -26,8 +28,8 @@ import { logCaught } from '@/lib/logCaught';
  * Go-ban (ahol nincs natív modul) ne dőljön el az app.
  */
 
-/** A RevenueCat „pro" entitlement azonosítója (a dashboardon így kell hívni). */
-const PRO_ENTITLEMENT = 'pro';
+// A RevenueCat-entitlementek neve a szint azonosítója (basic / pro / ultra); a termékek
+// `remix_<szint>_<monthly|annual>` és `coins_<n>` — lásd @/lib/storeProducts és coins.ts.
 
 let purchasesRef: any = null;
 let triedRequire = false;
@@ -100,11 +102,11 @@ export async function refreshEntitlement(): Promise<void> {
   await useEntitlement.getState().syncFromUser(userId);
 }
 
-/** A RevenueCat customerInfo alapján OPTIMISTA Pro-beállítás (a szerver megerősíti). */
+/** A RevenueCat customerInfo alapján OPTIMISTA szint-beállítás (a szerver megerősíti). */
 function applyCustomerInfo(customerInfo: any): void {
-  const ent = customerInfo?.entitlements?.active?.[PRO_ENTITLEMENT];
-  if (ent?.isActive) {
-    useEntitlement.getState().setTier('pro', ent.expirationDate ?? null);
+  const best = highestActiveEntitlement(customerInfo?.entitlements?.active);
+  if (best) {
+    useEntitlement.getState().setTier(best.tier, best.expirationDate);
   }
 }
 
@@ -116,19 +118,30 @@ export class PurchaseCancelledError extends Error {
   }
 }
 
+/** Az összes offering csomagja közül az adott áruházi termékhez tartozó, vagy null. */
+function findPackage(offerings: any, productId: string): any | null {
+  const all = Object.values(offerings?.all ?? {}) as any[];
+  for (const off of [offerings?.current, ...all]) {
+    const pkg = off?.availablePackages?.find((p: any) => p?.product?.identifier === productId);
+    if (pkg) {
+      return pkg;
+    }
+  }
+  return null;
+}
+
 /**
- * VALÓS Pro-vásárlás RevenueCat-tel: az aktuális offering első csomagja. Siker
- * után optimista beállítás + szerver-szinkron (a webhook írja a hiteles sort).
- * Dobás: PurchaseCancelledError (megszakítás) vagy Error (elérhetetlen/egyéb).
+ * VALÓS áruházi előfizetés RevenueCat-tel (`remix_<szint>_<periódus>`). Siker után
+ * optimista beállítás + szerver-szinkron (a hiteles sort a webhook írja). Dobás:
+ * PurchaseCancelledError (megszakítás) vagy Error (elérhetetlen/egyéb).
  */
-export async function purchasePro(): Promise<boolean> {
+export async function purchaseTier(tier: StoreTier, period: BillingPeriod = 'monthly'): Promise<boolean> {
   const Purchases = rc();
   if (!Purchases || !rcApiKey()) {
     throw new Error(tr('lib.billing.iapUnavailable'));
   }
   await configureBilling(useAuth.getState().user?.id ?? null);
-  const offerings = await Purchases.getOfferings();
-  const pkg = offerings?.current?.availablePackages?.[0];
+  const pkg = findPackage(await Purchases.getOfferings(), storeProductId(tier, period));
   if (!pkg) {
     throw new Error(tr('lib.billing.noOffer'));
   }
@@ -142,7 +155,38 @@ export async function purchasePro(): Promise<boolean> {
     throw e instanceof Error ? e : new Error(String(e));
   }
   await refreshEntitlement();
-  return useEntitlement.getState().isPro();
+  return useEntitlement.getState().effectiveTier() !== 'free';
+}
+
+/** A Haladó (pro) havi előfizetés — a régi hívók rövidítése. */
+export function purchasePro(): Promise<boolean> {
+  return purchaseTier('pro', 'monthly');
+}
+
+/**
+ * Coin-csomag vásárlása az áruházban (consumable, `coins_<n>`). A jóváírást a RevenueCat
+ * webhook végzi (vásárolt + bónusz alegyenleg); a hívó utána frissíti a pénztárcát.
+ */
+export async function purchaseCoinPack(packId: string): Promise<void> {
+  const Purchases = rc();
+  if (!Purchases || !rcApiKey() || !coinPack(packId)) {
+    throw new Error(tr('lib.billing.iapUnavailable'));
+  }
+  await configureBilling(useAuth.getState().user?.id ?? null);
+  const category = Purchases.PRODUCT_CATEGORY?.NON_SUBSCRIPTION;
+  const products = await Purchases.getProducts([packId], category);
+  const product = products?.[0];
+  if (!product) {
+    throw new Error(tr('lib.billing.noOffer'));
+  }
+  try {
+    await Purchases.purchaseStoreProduct(product);
+  } catch (e) {
+    if ((e as { userCancelled?: boolean })?.userCancelled) {
+      throw new PurchaseCancelledError();
+    }
+    throw e instanceof Error ? e : new Error(String(e));
+  }
 }
 
 /** Korábbi vásárlások visszaállítása (App Store / Play). */

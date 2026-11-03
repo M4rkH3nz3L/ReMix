@@ -50,7 +50,7 @@ function subscriptionProduct(productId) {
  * Egy RevenueCat-esemény terve. Alakok:
  *   { action: 'coins', cents, bonusCents, product }
  *   { action: 'coins_refund', cents, product }          (a csomag + bónusz visszavonása)
- *   { action: 'grant', tier, until }                    (until: ms vagy null)
+ *   { action: 'grant', tier, until, paid, period }      (until: ms vagy null; paid: valódi fizetés)
  *   { action: 'revoke', status: 'expired'|'canceled' }
  *   { action: 'ignore', reason }
  */
@@ -75,7 +75,9 @@ function planRevenueCatEvent(ev) {
   }
   if (GRANT_TYPES.has(type)) {
     const until = Number.isFinite(Number(ev.expiration_at_ms)) && ev.expiration_at_ms != null ? Number(ev.expiration_at_ms) : null;
-    return { action: 'grant', tier: sub.tier, until };
+    // valódi fizetés (nem csak állapotváltás) → ajánlói jutalék is jár (C3.6)
+    const paid = type === 'INITIAL_PURCHASE' || type === 'RENEWAL';
+    return { action: 'grant', tier: sub.tier, until, paid, period: sub.period };
   }
   if (type === 'EXPIRATION') {
     return { action: 'revoke', status: 'expired' };

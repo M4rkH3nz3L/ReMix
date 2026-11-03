@@ -34,6 +34,7 @@ describe('áruházi előfizetés szintenként', () => {
     (type) => {
       expect(planRevenueCatEvent(ev(type, 'remix_basic_monthly', { expiration_at_ms: 1800000000000 }))).toEqual({
         action: 'grant', tier: 'basic', until: 1800000000000,
+        paid: type === 'INITIAL_PURCHASE' || type === 'RENEWAL', period: 'monthly',
       });
     }
   );

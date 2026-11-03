@@ -44,11 +44,18 @@ test('áruházi előfizetés: a termék szintje íródik, forrás iap, a store-l
   await send({ id: 'e3', type: 'INITIAL_PURCHASE', product_id: 'remix_ultra_monthly', expiration_at_ms: until });
   const up = calls.find((c) => c[0] === 'upsert' && c[1] === 'subscriptions')[2];
   expect(up).toMatchObject({ user_id: 'u1', tier: 'ultra', seats: 1, status: 'active', source: 'iap', current_period_end: new Date(until).toISOString() });
+  // az első fizetés után az ajánlói jutalék is kiszámolódik (C3.6)
+  expect(calls.find((c) => c[1] === 'referral_on_store_payment')[2]).toEqual({ p_user: 'u1', p_tier: 'ultra', p_period: 'monthly' });
 });
 
 test('visszatérített előfizetés: azonnal Free', async () => {
   await send({ id: 'e4', type: 'CANCELLATION', cancel_reason: 'CUSTOMER_SUPPORT', product_id: 'remix_pro_annual' });
   expect(calls.find((c) => c[0] === 'update' && c[1] === 'subscriptions')[2]).toMatchObject({ tier: 'free', status: 'canceled', source: 'iap' });
+});
+
+test('állapotváltás (UNCANCELLATION) nem fizetés: nincs ajánlói jutalék', async () => {
+  await send({ id: 'e8', type: 'UNCANCELLATION', product_id: 'remix_pro_monthly', expiration_at_ms: Date.now() + 1e9 });
+  expect(calls.find((c) => c[1] === 'referral_on_store_payment')).toBeUndefined();
 });
 
 test('sima lemondás: nem nyúl a szinthez (a lejáratig megmarad)', async () => {

@@ -90,8 +90,19 @@ select public.subscribe_with_coins('basic', 12);
 select pg_temp.admin();
 select pg_temp.note('C3.6 éves fizetés: (50% + 11 × 10%) / 12 a 20 Coinból = 2,66 Coin',
   pg_temp.earned('a4000000-0000-0000-0000-000000000001', 'referral') = 120 + 266);
+-- áruházi (IAP) előfizetés: a webhook a szint Coin-árával jutalékol (Haladó havi 4 Coin → 50% = 2 Coin)
+select pg_temp.mkuser('a4000000-0000-0000-0000-000000000007', 'ern_iap');
+update auth.users set created_at = now() - interval '1 day' where id = 'a4000000-0000-0000-0000-000000000007';
+select pg_temp.act('a4000000-0000-0000-0000-000000000007');
+select public.claim_referral('ern_ref');
+select pg_temp.admin();
+select pg_temp.note('C3.6 áruházi első fizetés: 50% a szint Coin-árából',
+  public.referral_on_store_payment('a4000000-0000-0000-0000-000000000007', 'pro', 'monthly') = 200);
+update public.referrals set first_paid_at = now() - interval '2 months' where referred_id = 'a4000000-0000-0000-0000-000000000007';
+select pg_temp.note('C3.6 áruházi éves fizetés a 3. hónapban: a lefedett 3–14. hónapból 11 × 10% / 12 a 40 Coinból',
+  public.referral_on_store_payment('a4000000-0000-0000-0000-000000000007', 'pro', 'annual') = 366);
 select pg_temp.act('a4000000-0000-0000-0000-000000000001');
-select pg_temp.note('C3.6 az ajánló látja a meghívottjait', (select count(*) = 2 from public.referrals));
+select pg_temp.note('C3.6 az ajánló látja a meghívottjait', (select count(*) = 3 from public.referrals));
 select pg_temp.admin();
 
 -- ═══ C3.6 remix-jutalék ═══════════════════════════════════════════════════════

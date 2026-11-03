@@ -160,8 +160,18 @@ async function processRevenueCatEvent(ev, uid) {
     }
     case 'coins_refund':
       return { clawback: await clawbackCoins(uid, plan.cents, `refund:${note}`) };
-    case 'grant':
-      return activateTier(uid, plan.tier, { source: 'iap', until: plan.until, days: DEFAULT_DAYS });
+    case 'grant': {
+      const out = await activateTier(uid, plan.tier, { source: 'iap', until: plan.until, days: DEFAULT_DAYS });
+      if (plan.paid) {
+        // 🤝 C3.6: ajánlói jutalék az áruházi fizetés után is (best-effort: a szint már aktív)
+        const sb = adminClient();
+        const { error } = await sb.rpc('referral_on_store_payment', { p_user: uid, p_tier: plan.tier, p_period: plan.period });
+        if (error) {
+          logCaught('billing.js:referral_on_store_payment', new Error(error.message));
+        }
+      }
+      return out;
+    }
     case 'revoke':
       return deactivatePro(uid, { source: 'iap', status: plan.status });
     default:

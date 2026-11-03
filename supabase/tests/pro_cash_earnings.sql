@@ -191,6 +191,22 @@ select pg_temp.note('C3.5 DAC7: a kevés eladású, 2000 € alatti alkotó kiv�
 select pg_temp.note('C3.5 DAC7: az alkotói alap és az ajánlói jutalék nem eladás (nincs a jelentésben)',
   not exists (select 1 from public.dac7_report(extract(year from now())::int) where user_id = 'a4000000-0000-0000-0000-0000000000f1'));
 
+-- ═══ 8.6 a pénzügyi napló a fióktörlés után is megmarad, álnevesítve ════════════
+select pg_temp.mkuser('a4000000-0000-0000-0000-0000000000e1', 'erase_me');
+select public.grant_coins('a4000000-0000-0000-0000-0000000000e1', 1000, 'purchased', 'topup', 'teszt');
+select public.coin_credit('a4000000-0000-0000-0000-0000000000e1', 300, 'earned', 'sale', 'teszt', gen_random_uuid(), 'a4000000-0000-0000-0000-000000000005');
+insert into t_results select 'pre', true, string_agg(id::text, ',') from public.credit_transactions where user_id = 'a4000000-0000-0000-0000-0000000000e1';
+delete from auth.users where id = 'a4000000-0000-0000-0000-0000000000e1';
+select pg_temp.note('8.6 a fiók törlése után a tranzakciók megmaradnak, user-azonosító nélkül',
+  (select count(*) = 2 and bool_and(user_id is null) from public.credit_transactions
+    where id::text = any(string_to_array((select detail from t_results where name = 'pre'), ','))));
+select pg_temp.note('8.6 az álnév alanyonként egységes és nem a régi azonosító',
+  (select count(distinct subject_ref) = 1 and min(subject_ref) like 'erased:%' and min(subject_ref) not like '%a4000000%'
+     from public.credit_transactions where id::text = any(string_to_array((select detail from t_results where name = 'pre'), ',')))
+  and exists (select 1 from public.coin_lots where subject_ref = (select min(subject_ref) from public.credit_transactions
+     where id::text = any(string_to_array((select detail from t_results where name = 'pre'), ',')))));
+delete from t_results where name = 'pre';
+
 select pg_temp.note('invariáns: a napló összege = az egyenleg',
   not exists (select 1 from public.user_credits u where u.user_id::text like 'a4000000-%' and u.balance <>
     coalesce((select sum(delta_cents) from public.credit_transactions t where t.user_id = u.user_id), 0)));

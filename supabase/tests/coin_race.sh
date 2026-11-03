@@ -5,7 +5,7 @@
 set -euo pipefail
 DB=(docker exec -i supabase_db_ReMix psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1)
 UID_T='f1000000-0000-0000-0000-0000000000ff'
-cleanup() { "${DB[@]}" -c "delete from auth.users where id = '$UID_T'" >/dev/null; }
+cleanup() { "${DB[@]}" -c "delete from public.credit_transactions where user_id = '$UID_T'; delete from public.coin_lots where user_id = '$UID_T'; delete from auth.users where id = '$UID_T'" >/dev/null; }
 trap cleanup EXIT
 cleanup
 "${DB[@]}" >/dev/null <<SQL

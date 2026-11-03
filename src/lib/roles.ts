@@ -18,7 +18,8 @@ export type PermissionKey =
   | 'project.moderate'
   | 'user.manage'
   | 'user.suspend'
-  | 'role.manage';
+  | 'role.manage'
+  | 'payout.review';
 
 export interface AppPermission {
   key: string;

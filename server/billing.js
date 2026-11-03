@@ -255,6 +255,17 @@ async function handleStripeEvent(event) {
     result = { credited: plan.cents, bonus: plan.bonusCents };
   } else if (plan.action === 'coins_refund') {
     result = { clawback: await clawbackCoins(plan.userId, plan.cents, `refund:stripe:${plan.ref}`) };
+  } else if (plan.action === 'kyc') {
+    const { error } = await sb.rpc('set_kyc_status', {
+      p_user: plan.userId,
+      p_provider: 'stripe',
+      p_status: plan.status,
+      p_account_ref: plan.accountRef,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+    result = { kyc: plan.status };
   } else {
     result = { ignored: plan.reason };
   }

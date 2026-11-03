@@ -112,6 +112,7 @@ async function createCheckoutSession(args, env = process.env, fetchImpl = fetch)
  * Stripe-esemény → teendő (tiszta). Alakok:
  *   { action: 'coins', userId, cents, bonusCents, ref }
  *   { action: 'coins_refund', userId, cents, ref }     (visszatérítés / vitatott terhelés)
+ *   { action: 'kyc', userId, accountRef, status }        (Connect: account.updated)
  *   { action: 'ignore', reason }
  */
 function planStripeEvent(event) {
@@ -138,6 +139,14 @@ function planStripeEvent(event) {
     const refunded = type === 'charge.refunded' ? Number(obj.amount_refunded) || amount : amount;
     const cents = amount > 0 ? Math.min(total, Math.ceil((total * refunded) / amount)) : total;
     return { action: 'coins_refund', userId: meta.user_id, cents, ref: obj.payment_intent || obj.id };
+  }
+  // 🪪 Stripe Connect (C3.3): a kapcsolt fiók KYC-állapota
+  if (type === 'account.updated') {
+    const { kycStatusFromAccount } = require('./stripeConnect');
+    if (!meta.user_id || !obj.id) {
+      return { action: 'ignore', reason: 'account_without_user' };
+    }
+    return { action: 'kyc', userId: meta.user_id, accountRef: obj.id, status: kycStatusFromAccount(obj) };
   }
   return { action: 'ignore', reason: type || 'unknown' };
 }

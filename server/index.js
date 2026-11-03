@@ -295,8 +295,15 @@ if (require.main === module) {
   // a Coin-előfizetések megújítása és a 3 nappal előtti értesítés (kevés Coinnál).
   if (eraseAdmin) {
     const { runCoinSettleOnce, runSubscriptionCycleOnce } = require('./coinSettle');
+    const { runApprovedPayouts } = require('./payoutRunner');
     const coinTick = () => {
       void runCoinSettleOnce(eraseAdmin);
+      // 💸 C3.3: a kézi ellenőrzésen átment (approved) kifizetések végrehajtása
+      void runApprovedPayouts(eraseAdmin).then((r) => {
+        if (r.paid || r.failed) {
+          log.info('payouts', r);
+        }
+      });
       void runSubscriptionCycleOnce(eraseAdmin).then((r) => {
         if (r.renewed || r.failed || r.ended || r.notified) {
           log.info('subscription-cycle', r);

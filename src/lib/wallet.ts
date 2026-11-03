@@ -38,8 +38,10 @@ export interface PayoutRequest {
 }
 
 export interface PayoutAccount {
-  provider: 'paypal' | 'stripe';
+  provider: 'paypal' | 'stripe' | null;
   email: string | null;
+  /** a partner (Stripe Connect / PayPal) által végzett azonosítás állapota — kifizetés csak 'verified'-del */
+  kycStatus: 'none' | 'pending' | 'verified' | 'rejected';
 }
 
 export interface Gift {
@@ -104,6 +106,13 @@ export class ManagedByStoreError extends Error {
   constructor() {
     super('managed_by_store');
     this.name = 'ManagedByStoreError';
+  }
+}
+/** Kifizetés előtt azonosítás (KYC) kell. */
+export class KycRequiredError extends Error {
+  constructor() {
+    super('kyc_required');
+    this.name = 'KycRequiredError';
   }
 }
 /** Hetente legfeljebb egy kifizetés kérhető. */
@@ -242,10 +251,15 @@ export async function fetchPayoutAccount(): Promise<PayoutAccount | null> {
   }
   const { data } = await supabase
     .from('payout_accounts')
-    .select('provider, email')
+    .select('provider, email, kyc_status')
     .eq('user_id', uid)
     .maybeSingle();
-  return data ? (data as PayoutAccount) : null;
+  if (!data) {
+    return null;
+  }
+  const d = data as { provider: PayoutAccount['provider']; email: string | null; kyc_status?: string };
+  const kyc = d.kyc_status === 'pending' || d.kyc_status === 'verified' || d.kyc_status === 'rejected' ? d.kyc_status : 'none';
+  return { provider: d.provider, email: d.email, kycStatus: kyc };
 }
 
 /** A kifizetési célszámla beállítása (PayPal e-mail). */
@@ -287,6 +301,9 @@ export async function requestPayout(
     }
     if (body.error === 'payout_weekly_limit') {
       throw new PayoutWeeklyLimitError();
+    }
+    if (body.error === 'kyc_required') {
+      throw new KycRequiredError();
     }
     throw new Error(body.error || 'payout_failed');
   }
@@ -460,4 +477,47 @@ export async function startWebTopup(packId: string): Promise<string> {
     throw new Error(body.error || 'checkout_failed');
   }
   return body.url;
+}
+
+/** 🪪 Azonosítás (KYC) a Stripe Connecttel: az onboarding-oldal címe. Az eredményt a Stripe webhook írja. */
+export async function startStripeKyc(): Promise<string> {
+  const res = await fetch(`${cloudBaseUrl()}/wallet/kyc/stripe`, { method: 'POST', headers: await workerJsonHeaders(), body: '{}' });
+  const body = (await res.json().catch((caught) => { logCaught('lib/wallet.ts:startStripeKyc', caught); return {}; })) as { url?: string; error?: string };
+  if (!res.ok || !body.url) {
+    throw new Error(body.error || 'kyc_failed');
+  }
+  return body.url;
+}
+
+/** Ellenőrzésre váró kifizetés (admin, `payout.review`). */
+export interface PayoutReviewRow {
+  id: string;
+  username: string | null;
+  cents: number;
+  amountEurCents: number;
+  riskFlags: string[];
+  createdAt: string;
+}
+
+export async function listPayoutsUnderReview(): Promise<PayoutReviewRow[]> {
+  const { data, error } = await requireSupabase().rpc('payouts_under_review');
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    username: (r.username as string | null) ?? null,
+    cents: Number(r.cents ?? 0),
+    amountEurCents: Number(r.amount_eur_cents ?? 0),
+    riskFlags: Array.isArray(r.risk_flags) ? (r.risk_flags as string[]) : [],
+    createdAt: String(r.created_at ?? ''),
+  }));
+}
+
+/** Jóváhagyás / elutasítás (a saját kérését senki nem bírálhatja el; a DB dönt). */
+export async function reviewPayout(id: string, approve: boolean, note?: string): Promise<void> {
+  const { error } = await requireSupabase().rpc('review_payout', { p_request: id, p_approve: approve, p_note: note ?? null });
+  if (error) {
+    throw new Error(error.message);
+  }
 }

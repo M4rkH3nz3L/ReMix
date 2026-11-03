@@ -39,7 +39,7 @@
       "sentMsg": "{{icon}} {{name}} an {{user}} gesendet.",
       "notFound": "Dieses Geschenk ist nicht verfügbar."
     },
-    "status": { "pending": "ausstehend", "processing": "in Bearbeitung", "paid": "ausgezahlt", "failed": "fehlgeschlagen" },
+    "status": { "pending": "ausstehend", "processing": "in Bearbeitung", "paid": "ausgezahlt", "failed": "fehlgeschlagen", "requested": "eingegangen", "under_review": "in Prüfung", "approved": "freigegeben", "rejected": "abgelehnt" },
     "kind": { "topup": "Aufladung", "purchase": "Kauf", "sale": "Verkauf", "refund": "Erstattung", "payout": "Auszahlung", "transfer": "Überweisung", "gift": "Geschenk", "promo": "Promo", "subscription": "Abo", "addon": "Erweiterung", "bonus": "Bonus", "release": "Haltefrist beendet", "expire": "Bonus verfallen", "reversal": "Rückbuchung", "conversion": "Umrechnung" },
     "subTitle": "Abo mit Coins",
     "subHint": "Amateur 2 · Fortgeschritten 4 · Profi 8 Coins / Monat. Jährlich: 2 Monate geschenkt.",
@@ -90,6 +90,13 @@
       "storeDoneMsg": "Deine Coins erscheinen in wenigen Sekunden im Guthaben.",
       "webCheaper": "Im Web günstiger: {{price}} / Coin",
       "legal": "Coins werden sofort gutgeschrieben; mit der Lieferung erlischt das 14-tägige Widerrufsrecht. Gekaufte Coins sind ausgebbar, aber nicht auszahlbar, und verfallen nie."
+    },
+    "payoutReviewMsg": "{{amount}} — deine Anfrage wird geprüft, meist innerhalb von 1–2 Werktagen.",
+    "kyc": {
+      "title": "Verifizierung",
+      "required": "Für Auszahlungen ist eine Identitätsprüfung nötig (Name, Adresse, Steuer-ID, Bankkonto) — das übernimmt Stripe; wir sehen nur das Ergebnis.",
+      "start": "Verifizierung starten",
+      "status": { "none": "noch nicht", "pending": "läuft", "verified": "verifiziert", "rejected": "abgelehnt" }
     }
   },
   "aiPicker": {
@@ -4709,7 +4716,14 @@
     "appeals": "Einsprüche",
     "noAppeals": "Keine offenen Einsprüche.",
     "appealGrant": "Wiederherstellen",
-    "appealDeny": "Ablehnen"
+    "appealDeny": "Ablehnen",
+    "payouts": {
+      "title": "Auszahlungen prüfen",
+      "empty": "Keine Auszahlungen in Prüfung.",
+      "approve": "Freigeben",
+      "reject": "Ablehnen",
+      "flag": { "ring": "Geschenk-Ring", "new_accounts": "von neuen Konten", "concentration": "von einem einzigen Zahler", "shared_device": "gemeinsames Gerät", "review": "Fehlbetrag nach Erstattung" }
+    }
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",

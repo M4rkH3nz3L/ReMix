@@ -39,7 +39,7 @@
       "sentMsg": "{{icon}} {{name}} elküldve neki: {{user}}.",
       "notFound": "Ez az ajándék nem elérhető."
     },
-    "status": { "pending": "függőben", "processing": "folyamatban", "paid": "kifizetve", "failed": "sikertelen" },
+    "status": { "pending": "függőben", "processing": "folyamatban", "paid": "kifizetve", "failed": "sikertelen", "requested": "beérkezett", "under_review": "ellenőrzés alatt", "approved": "jóváhagyva", "rejected": "elutasítva" },
     "kind": { "topup": "Feltöltés", "purchase": "Vásárlás", "sale": "Eladás", "refund": "Visszatérítés", "payout": "Kiváltás", "transfer": "Utalás", "gift": "Ajándék", "promo": "Promó", "subscription": "Előfizetés", "addon": "Bővítés", "bonus": "Bónusz", "release": "Tartás feloldva", "expire": "Bónusz lejárt", "reversal": "Visszavonás", "conversion": "Átváltás" },
     "subTitle": "Előfizetés Coinból",
     "subHint": "Amatőr 2 · Haladó 4 · Profi 8 Coin / hó. Éves fizetésnél 2 hónap ajándék.",
@@ -90,6 +90,13 @@
       "storeDoneMsg": "A Coin pár másodpercen belül megjelenik az egyenlegeden.",
       "webCheaper": "A weben olcsóbb: {{price}} / Coin",
       "legal": "A Coin azonnal a fiókodba kerül; a teljesítéssel a 14 napos elállási jog megszűnik. A vásárolt Coin elkölthető, de pénzre nem váltható, és nem jár le."
+    },
+    "payoutReviewMsg": "{{amount}} — a kérésed ellenőrzésre vár, általában 1–2 munkanap.",
+    "kyc": {
+      "title": "Azonosítás",
+      "required": "Kifizetés előtt azonosítás kell (név, cím, adószám, bankszámla) — ezt a Stripe végzi, mi csak az eredményt látjuk.",
+      "start": "Azonosítás indítása",
+      "status": { "none": "még nincs", "pending": "folyamatban", "verified": "ellenőrizve", "rejected": "elutasítva" }
     }
   },
   "aiPicker": {
@@ -4704,7 +4711,14 @@
     "appeals": "Fellebbezések",
     "noAppeals": "Nincs nyitott fellebbezés.",
     "appealGrant": "Visszaállít",
-    "appealDeny": "Elutasít"
+    "appealDeny": "Elutasít",
+    "payouts": {
+      "title": "Kifizetések ellenőrzése",
+      "empty": "Nincs ellenőrzésre váró kifizetés.",
+      "approve": "Jóváhagyás",
+      "reject": "Elutasítás",
+      "flag": { "ring": "körbeajándékozás", "new_accounts": "friss fiókoktól", "concentration": "egyetlen fizetőtől", "shared_device": "közös eszköz", "review": "visszatérítés utáni hiány" }
+    }
   },
   "legal": {
     "privacyTitle": "Adatkezelési tájékoztató",

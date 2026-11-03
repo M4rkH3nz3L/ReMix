@@ -31,6 +31,7 @@ import {
   type GiftEvent,
   GiftNotFoundError,
   InsufficientEarnedError,
+  KycRequiredError,
   ManagedByStoreError,
   NoPayoutAccountError,
   type PayoutAccount,
@@ -48,6 +49,7 @@ import {
   requestPayout,
   sendGift,
   setPayoutAccount,
+  startStripeKyc,
   startWebTopup,
   subscribeWithCoins,
 } from '@/lib/wallet';
@@ -258,10 +260,27 @@ export function WalletCard() {
       }
       try {
         await setPayoutAccount(payoutEmail.trim());
-        setAccount({ provider: 'paypal', email: payoutEmail.trim() });
+        setAccount((a) => ({ provider: 'paypal', email: payoutEmail.trim(), kycStatus: a?.email === payoutEmail.trim() ? (a?.kycStatus ?? 'none') : 'none' }));
         Alert.alert(t('wallet.accountSavedTitle'), t('wallet.accountSavedMsg'));
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onSaveAccount', e);
+        Alert.alert(t('common.error'), (e as Error).message);
+      }
+    });
+
+  // 🪪 azonosítás (KYC) a Stripe Connecttel — az eredményt a Stripe webhook írja
+  const onKyc = () =>
+    guard(async () => {
+      try {
+        const url = await startStripeKyc();
+        if (Platform.OS === 'web') {
+          window.location.assign(url);
+          return;
+        }
+        await WebBrowser.openBrowserAsync(url);
+        refresh();
+      } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onKyc', e);
         Alert.alert(t('common.error'), (e as Error).message);
       }
     });
@@ -279,12 +298,16 @@ export function WalletCard() {
         refresh();
         Alert.alert(
           res.status === 'paid' ? t('wallet.payoutPaidTitle') : t('wallet.payoutPendingTitle'),
-          t('wallet.payoutMsg', { amount: formatEur(res.amountEurCents / 100) })
+          res.status === 'under_review'
+            ? t('wallet.payoutReviewMsg', { amount: formatEur(res.amountEurCents / 100) })
+            : t('wallet.payoutMsg', { amount: formatEur(res.amountEurCents / 100) })
         );
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onCashout', e);
         if (e instanceof NoPayoutAccountError) {
           Alert.alert(t('common.error'), t('wallet.noPayoutAccount'));
+        } else if (e instanceof KycRequiredError) {
+          Alert.alert(t('wallet.kyc.title'), t('wallet.kyc.required'));
         } else if (e instanceof InsufficientEarnedError) {
           Alert.alert(t('common.error'), t('wallet.insufficientEarned'));
         } else if (e instanceof PayoutWeeklyLimitError) {
@@ -467,6 +490,17 @@ export function WalletCard() {
             {account?.email ? t('wallet.updateAccount') : t('wallet.saveAccount')}
           </Text>
         </Pressable>
+        <View style={styles.bucketRow}>
+          <Text style={styles.bucketLabel}>
+            {t('wallet.kyc.title')}: {t(`wallet.kyc.status.${account?.kycStatus ?? 'none'}`)}
+          </Text>
+          {account?.kycStatus !== 'verified' ? (
+            <Pressable onPress={onKyc} disabled={busy} style={styles.linkBtn} accessibilityRole="button">
+              <Ionicons name="shield-checkmark-outline" size={15} color={palette.accent} />
+              <Text style={styles.linkText}>{t('wallet.kyc.start')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <TextInput
           value={payoutCoins}
           onChangeText={setPayoutCoins}

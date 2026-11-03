@@ -31,6 +31,7 @@ import {
   type AppRole,
   type UserWithRole,
 } from '@/lib/roles';
+import { PayoutReviewList } from '@/components/admin/PayoutReviewList';
 import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
 import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
@@ -49,6 +50,7 @@ export default function AdminScreen() {
   const canUser = useRoles((s) => s.permissions.includes('user.manage'));
   const canReview = useRoles((s) => s.permissions.includes('report.review'));
   const canSuspend = useRoles((s) => s.permissions.includes('user.suspend'));
+  const canPayouts = useRoles((s) => s.permissions.includes('payout.review'));
 
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [perms, setPerms] = useState<AppPermission[]>([]);
@@ -214,7 +216,7 @@ export default function AdminScreen() {
     });
   };
 
-  if (!canRole && !canUser && !canReview) {
+  if (!canRole && !canUser && !canReview && !canPayouts) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <Header t={t} />
@@ -404,6 +406,9 @@ export default function AdminScreen() {
               )}
             </>
           ) : null}
+
+          {/* — Kifizetések kézi ellenőrzése (PRO-CASH C3.4) — */}
+          {canPayouts ? <PayoutReviewList /> : null}
         </ScrollView>
       )}
     </SafeAreaView>

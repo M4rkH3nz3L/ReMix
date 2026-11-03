@@ -127,6 +127,9 @@ select pg_temp.note('C3.2 ajándék 80/20: 100 Coin-ból 80 az alkotóé (tartá
 select pg_temp.note('C3.2 a vevőtől a teljes ár ment le', (select purchased_cents = 9800 from public.user_credits where user_id = 'c1000000-0000-0000-0000-000000000003'));
 
 -- kifizetés: függőből nem, a tartás után igen
+insert into public.payout_accounts (user_id, provider, email, kyc_status) values
+  ('a1000000-0000-0000-0000-000000000001', 'paypal', 'a@t.test', 'verified'),
+  ('b1000000-0000-0000-0000-000000000002', 'paypal', 'b@t.test', 'verified');
 select pg_temp.raises('C0.3 tartásban lévő Coin nem váltható', $$select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 2000)$$, 'insufficient_earned');
 update public.coin_lots set available_at = now() - interval '1 minute' where user_id = 'a1000000-0000-0000-0000-000000000001' and kind = 'sale';
 select pg_temp.act('a1000000-0000-0000-0000-000000000001');
@@ -141,11 +144,12 @@ select pg_temp.note('C0.3 a feloldás után 83,50 Coin beváltható',
 select public.grant_coins('a1000000-0000-0000-0000-000000000001', 50000, 'purchased', 'topup', 'teszt');
 select pg_temp.raises('C0.3 a VÁSÁROLT Coin nem váltható (csak a megkeresett)', $$select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 9000)$$, 'insufficient_earned');
 select pg_temp.raises('2.5 a minimum 20 Coin', $$select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 1999)$$, 'below_min_payout');
-select pg_temp.note('2.5 20 Coin kifizetése: 60 €',
-  (select (r ->> 'amount_eur_cents')::bigint = 6000 from (select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 2000) as r) x));
+select pg_temp.note('2.5 20 Coin kifizetése: 60 € — egyetlen fizetőtől jött, ezért kézi ellenőrzésre megy',
+  (select (r ->> 'amount_eur_cents')::bigint = 6000 and r ->> 'status' = 'under_review' and r -> 'risk_flags' ? 'concentration'
+     from (select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 2000) as r) x));
 select pg_temp.raises('2.5 hetente legfeljebb 1 kifizetés', $$select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 2000)$$, 'payout_weekly_limit');
-select public.resolve_payout((select id from public.payout_requests where user_id = 'a1000000-0000-0000-0000-000000000001'), 'failed');
-select pg_temp.note('2.5 sikertelen kifizetés: vissza a beválthatóra',
+select public.payout_transition((select id from public.payout_requests where user_id = 'a1000000-0000-0000-0000-000000000001'), 'rejected');
+select pg_temp.note('2.5 elutasított kifizetés: vissza a beválthatóra',
   (select earned_available_cents = 8350 from public.user_credits where user_id = 'a1000000-0000-0000-0000-000000000001'));
 select pg_temp.act('a1000000-0000-0000-0000-000000000001');
 select pg_temp.raises('2.5 a kliens nem kérhet kifizetést közvetlenül', $$select public.request_payout_for('a1000000-0000-0000-0000-000000000001', 2000)$$, 'permission denied');
@@ -190,7 +194,8 @@ select pg_temp.note('C0.5 elköltött csomag: a hiányzó rész visszaadva a vá
   (select (r ->> 'unrecovered_cents')::bigint > 0 from (select public.coin_clawback('b1000000-0000-0000-0000-000000000002', 999999, 'refund:coins_50') as r) x));
 select pg_temp.note('C0.5 …és a fiók ellenőrzésre jelölve, az egyenleg 0 (nem megy mínuszba)',
   (select review_required and balance = 0 from public.user_credits where user_id = 'b1000000-0000-0000-0000-000000000002'));
-select pg_temp.raises('C0.5 ellenőrzés alatt álló fiók nem kérhet kifizetést', $$select public.request_payout_for('b1000000-0000-0000-0000-000000000002', 2000)$$, 'payout_under_review');
+select pg_temp.note('C0.5 az ellenőrzésre jelölt fiók kifizetése kézi ellenőrzésre menne (review jelző)',
+  'review' = any(public.payout_risk_flags('b1000000-0000-0000-0000-000000000002')));
 select pg_temp.act('c1000000-0000-0000-0000-000000000003');
 select pg_temp.raises('C0.5 a kliens nem vonhat vissza Coint', $$select public.coin_clawback('a1000000-0000-0000-0000-000000000001', 1, 'x')$$, 'permission denied');
 select pg_temp.admin();

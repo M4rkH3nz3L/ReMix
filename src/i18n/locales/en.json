@@ -39,7 +39,7 @@
       "sentMsg": "Sent {{icon}} {{name}} to {{user}}.",
       "notFound": "That gift is unavailable."
     },
-    "status": { "pending": "pending", "processing": "processing", "paid": "paid", "failed": "failed" },
+    "status": { "pending": "pending", "processing": "processing", "paid": "paid", "failed": "failed", "requested": "received", "under_review": "under review", "approved": "approved", "rejected": "rejected" },
     "kind": { "topup": "Top-up", "purchase": "Purchase", "sale": "Sale", "refund": "Refund", "payout": "Cash-out", "transfer": "Transfer", "gift": "Gift", "promo": "Promo", "subscription": "Subscription", "addon": "Add-on", "bonus": "Bonus", "release": "Hold released", "expire": "Bonus expired", "reversal": "Reversal", "conversion": "Conversion" },
     "subTitle": "Subscribe with Coins",
     "subHint": "Amateur 2 · Advanced 4 · Pro 8 Coins / month. Yearly billing gives 2 months free.",
@@ -90,6 +90,13 @@
       "storeDoneMsg": "Your Coins will appear in your balance within seconds.",
       "webCheaper": "Cheaper on the web: {{price}} / Coin",
       "legal": "Coins are delivered immediately; with delivery the 14-day right of withdrawal ends. Purchased Coins can be spent but not cashed out, and they never expire."
+    },
+    "payoutReviewMsg": "{{amount}} — your request is being reviewed, usually within 1–2 business days.",
+    "kyc": {
+      "title": "Verification",
+      "required": "Payouts need identity verification (name, address, tax ID, bank account) — Stripe does it; we only see the result.",
+      "start": "Start verification",
+      "status": { "none": "not yet", "pending": "in progress", "verified": "verified", "rejected": "rejected" }
     }
   },
   "aiPicker": {
@@ -4704,7 +4711,14 @@
     "appeals": "Appeals",
     "noAppeals": "No open appeals.",
     "appealGrant": "Reinstate",
-    "appealDeny": "Deny"
+    "appealDeny": "Deny",
+    "payouts": {
+      "title": "Payout review",
+      "empty": "No payouts waiting for review.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "flag": { "ring": "gift ring", "new_accounts": "from new accounts", "concentration": "from a single payer", "shared_device": "shared device", "review": "shortfall after refund" }
+    }
   },
   "legal": {
     "privacyTitle": "Privacy Policy",

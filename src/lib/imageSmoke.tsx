@@ -2334,6 +2334,27 @@ async function smokeAudioKillPrepare(log: Log) {
   await sleep(60000);
 }
 
+/** A42: egy órás hang-projekt a valódi stúdióban — a vonalzó és a rács látszik (képernyőkép). */
+async function smokeAudioRuler(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_audioruler';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioRuler', caught));
+  const base = createEmptyProject('smoke egy órás hang', '9:16', undefined, 'audio');
+  const long: AudioClip = { kind: 'audio', id: 'smoke-long', uri: 'file:///smoke-long.m4a', label: 'Podcast (60 perc)', start: 0, duration: 3600, trimIn: 0, sourceDuration: 3600, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [long] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  log(useEditorStore.getState().project?.id === id, 'az egy órás projekt megnyílt a stúdióban');
+  log(true, 'FOTÓZHATÓ', 'a vonalzó és az ütem-rács');
+  await sleep(6000);
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
+}
+
 async function smokeAudioKillVerify(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const saved = await loadProject(AUDIO_KILL_ID);
@@ -2752,6 +2773,10 @@ export async function runImageSmoke(
   }
   if (phase === 'audiomix') {
     await step('audiomix', () => smokeAudioMix(log, setHarness));
+    return;
+  }
+  if (phase === 'audioruler') {
+    await step('audioruler', () => smokeAudioRuler(log));
     return;
   }
   if (phase === 'audiokill1') {

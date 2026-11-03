@@ -23,6 +23,7 @@ import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import type { AudioClip, AudioFx, TextClip } from '@/types/project';
+import { audioIntakeText } from '@/lib/audioIntake';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -245,7 +246,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
     const picked = await pickAudio();
     if (picked) {
       if (!picked.intake.ok) {
-        Alert.alert(t('common.error'), picked.intake.message);
+        Alert.alert(t('studio.audio.intake.unreadableTitle'), audioIntakeText(picked.intake, t));
         return;
       }
       // a TELJES fájlt importáljuk a valós hosszával (a user utólag trimmelheti)

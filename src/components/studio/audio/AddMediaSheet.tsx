@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
-import { UNREADABLE_DURATION_MESSAGE } from '@/lib/audioIntake';
+import { audioIntakeText } from '@/lib/audioIntake';
 import { renderServerUrl } from '@/lib/backend';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
@@ -117,11 +117,11 @@ export function AddMediaSheet({
         // 🎵 §5 bevételi osztályozás: hard-stop a nem támogatott formátumra, egyébként
         // figyelmeztetés (nagyon hosszú) — de a klip így is bekerül.
         if (!picked.intake.ok) {
-          Alert.alert('Nem beolvasható', picked.intake.message ?? 'Ismeretlen hangformátum.');
+          Alert.alert(t('studio.audio.intake.unreadableTitle'), audioIntakeText(picked.intake, t));
           return;
         }
-        if (picked.intake.warning && picked.intake.message) {
-          Alert.alert('Figyelmeztetés', picked.intake.message);
+        if (picked.intake.warning) {
+          Alert.alert(t('studio.audio.intake.warningTitle'), audioIntakeText(picked.intake, t));
         }
         addAudio(picked.uri, picked.name, picked.duration);
       }
@@ -146,7 +146,7 @@ export function AddMediaSheet({
         ? resolved.uri
         : `${renderServerUrl()}${entry.url}`;
       if (!duration) {
-        Alert.alert('Nem beolvasható', UNREADABLE_DURATION_MESSAGE);
+        Alert.alert(t('studio.audio.intake.unreadableTitle'), t('studio.audio.intake.unknownDuration'));
         return;
       }
       addAudio(resolved.uri, entry.name, duration, remoteUrl);

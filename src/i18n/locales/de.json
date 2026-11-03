@@ -143,6 +143,7 @@
     }
   },
   "common": {
+    "clear": "Löschen",
     "error": "Fehler",
     "cancel": "Abbrechen",
     "delete": "Löschen",
@@ -3024,7 +3025,40 @@
     "filterAll": "Alle"
   },
   "studio": {
+    "sampler": {
+      "title": "Sampler",
+      "entry": "Sampler (eigenes Sample im Raster)",
+      "clipLabel": "Sampler",
+      "pick": "Sample wählen (One-Shot)"
+    },
+    "mixer": {
+      "title": "Mixer",
+      "mute": "Stumm",
+      "solo": "Solo",
+      "duck": "Duck",
+      "sidechainKey": "Schlüssel",
+      "openMaster": "Master-Kette (EQ · LUFS · Limiter)",
+      "duckHint": "DUCK: Musik/SFX werden automatisch leiser, wenn das Voiceover spricht (Sidechain)."
+    },
+    "drums": {
+      "title": "Drumcomputer",
+      "entry": "Drumcomputer (Step-Sequencer)",
+      "clipLabel": "Drums",
+      "stepHint": "tel-Schritte · fette Linien sind die Beats"
+    },
     "pianoRoll": {
+      "title": "Komponieren",
+      "entry": "Komponieren (Piano-Roll)",
+      "clipLabel": "Musik",
+      "bake": "Auf Spur",
+      "bars": "Takte",
+      "notes": "Noten",
+      "wave": {
+        "sine": "Sinus",
+        "square": "Rechteck",
+        "triangle": "Dreieck",
+        "sawtooth": "Sägezahn"
+      },
       "failed": "Das Umwandeln in Audio hat gerade nicht geklappt. Prüfe deine Verbindung und versuche es erneut."
     },
     "chooseKind": "Was möchtest du erstellen?",
@@ -3734,6 +3768,7 @@
       "blend": { "normal": "Normal", "multiply": "Multiplizieren", "screen": "Negativ mult.", "overlay": "Überlagern", "softlight": "Weiches Licht", "darken": "Abdunkeln", "lighten": "Aufhellen", "hardlight": "Hartes Licht", "difference": "Differenz", "exclusion": "Ausschluss", "colordodge": "Farbig abwedeln", "colorburn": "Farbig nachbelichten" }
     },
     "audioTools": {
+      "mixer": "Mixer",
       "trim": "Trimmen",
       "fade": "Fade",
       "volume": "Lautstärke",
@@ -3747,6 +3782,24 @@
       "master": "Master"
     },
     "audio": {
+      "spectrum": "Spektrum",
+      "panAutomation": "Panorama-Automation",
+      "fxPitch": "Tonhöhe (Halbtöne)",
+      "fxHarmony": "Harmoniestimme (Halbtöne)",
+      "fxGate": "Noise-Gate",
+      "fxStereoWide": "Stereo-Verbreiterung",
+      "autoBpm": "Tempo erkennen",
+      "autoBpmNoClip": "Kein Audio-Clip zum Analysieren.",
+      "fxPreset": {
+        "clean": "Klar",
+        "podcast": "Podcast",
+        "phone": "Telefon",
+        "radio": "Radio",
+        "deep": "Tief",
+        "bright": "Hell",
+        "hall": "Halle",
+        "wide": "Breit"
+      },
       "autoBpmFail": "Das Tempo konnte nicht erkannt werden. Versuche es erneut oder stelle die BPM manuell ein.",
       "emptyGuide": "Das Projekt ist leer. Füge Audio hinzu, komponiere oder nimm etwas auf.",
       "emptyGuideAdd": "Hinzufügen",
@@ -3769,6 +3822,16 @@
       "exportDownload": "Audio herunterladen…",
       "exportRendering": "{{format}} wird exportiert…",
       "album": {
+        "history": {
+          "created": "Album erstellt",
+          "added": "Neuer Song: {{name}}",
+          "imported": "Song importiert: {{name}}",
+          "switched": "Song gewechselt",
+          "removed": "Song gelöscht",
+          "renamed": "Song umbenannt",
+          "reordered": "Songs neu angeordnet",
+          "coverSet": "Cover gesetzt"
+        },
         "title": "Album",
         "enable": "Album erstellen",
         "enableHint": "Mach das Projekt zum Album: mehrere Songs + Cover in einem wischbaren Album-Post.",
@@ -3811,6 +3874,23 @@
       "stemsEmpty": "Die Trennung hat keine Stems geliefert.",
       "stemsBusy": "Gerade läuft eine andere Trennung, versuch es in ein paar Minuten erneut.",
       "stemsDownloadFailed": "Der Stem {{name}} konnte nicht geladen werden.",
+      "intake": {
+        "unreadableTitle": "Nicht lesbar",
+        "warningTitle": "Hinweis",
+        "unsupported": "Dieses Audioformat können wir nicht lesen ({{label}}). Versuch MP3/M4A/WAV/FLAC/OGG/Opus.",
+        "unknownDuration": "Die Länge des Audios ist nicht lesbar, die Datei ist evtl. beschädigt. Versuch es erneut oder speichere sie als MP3/M4A/WAV.",
+        "tooLong": "Sehr langes Audio (~{{hours}} Std.) — Verarbeitung und Rendern sind langsamer und brauchen mehr Speicher."
+      },
+      "transport": {
+        "auto": "Auto",
+        "snap_off": "Raster aus",
+        "snap_frame": "Frame",
+        "snap_beat": "Beat",
+        "rangeIn": "In",
+        "rangeOut": "Out",
+        "play": "Wiedergabe",
+        "pause": "Pause"
+      },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",
@@ -3825,6 +3905,11 @@
       "enhanceHint": "Die Verbesserungen werden beim finalen Rendern auf dem Gerät angewendet (die Vorschau nähert sie an)."
     },
     "master": {
+      "duckTrigger": "Auto-Duck-Schlüssel",
+      "duckAuto": "Sprache (auto)",
+      "track_voiceover": "Sprache",
+      "track_music": "Musik",
+      "track_sfx": "Effekte",
       "title": "Mixer & Master",
       "mixer": "Mixer",
       "masterVolume": "Master-Lautstärke",

@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
+import { audioIntakeText } from '@/lib/audioIntake';
 import { pickAudio } from '@/lib/media';
 import {
   emptySampler,
@@ -60,6 +61,7 @@ export function SamplerSheet({
       const picked = await pickAudio();
       if (picked) {
         if (!picked.intake.ok) {
+          Alert.alert(t('studio.audio.intake.unreadableTitle'), audioIntakeText(picked.intake, t));
           return;
         }
         setSampleUri(picked.uri);

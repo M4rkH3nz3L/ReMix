@@ -124,7 +124,7 @@ function WorkspaceTransport({ onBack }: { onBack: () => void }) {
         onPress={() => useEditorStore.getState().setPlaying(!isPlaying)}
         style={styles.wsPlay}
         accessibilityRole="button"
-        accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+        accessibilityLabel={isPlaying ? t('studio.audio.transport.pause') : t('studio.audio.transport.play')}
       >
         <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color="#fff" />
       </Pressable>

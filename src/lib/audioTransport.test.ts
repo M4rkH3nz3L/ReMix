@@ -1,3 +1,4 @@
+import { beatGridForView, rulerTicks } from '@/lib/audioTransport';
 import {
   barsBeatsLabel,
   beatLines,
@@ -60,3 +61,44 @@ describe('audioTransport — zenei transport-mag', () => {
     expect(pxPerSecAt(zoomOut(DEFAULT_ZOOM_INDEX))).toBe(44);
   });
 });
+
+describe('rulerTicks (A42)', () => {
+  it('egy órás projekt végén is van vonalzó, nem áll meg 180 mp-nél', () => {
+    const ticks = rulerTicks(3500, 3600, 20);
+    expect(ticks.length).toBeGreaterThan(0);
+    expect(ticks[ticks.length - 1].sec).toBe(3600);
+  });
+
+  it('a kirajzolt jelek száma a látható szélességtől függ, nem a hossztól', () => {
+    const visible = 1200 / 20; // 1200 px képernyő 20 px/mp-en
+    expect(rulerTicks(0, visible, 20).length).toBeLessThanOrEqual(1200 / 12 + 1);
+  });
+
+  it('a lépés a zoomhoz igazodik: a jelek legalább 12, a feliratok legalább 56 px-re', () => {
+    for (const pps of [2, 5, 20, 80, 300]) {
+      const ticks = rulerTicks(0, 600, pps);
+      expect((ticks[1].sec - ticks[0].sec) * pps).toBeGreaterThanOrEqual(12);
+      const majors = ticks.filter((t) => t.major);
+      if (majors.length > 1) {
+        expect((majors[1].sec - majors[0].sec) * pps).toBeGreaterThanOrEqual(56);
+      }
+    }
+  });
+});
+
+describe('beatGridForView (A42)', () => {
+  it('a rács a hosszú projekt végéig megy (régen 300 vonalnál megállt)', () => {
+    const lines = beatGridForView(120, 4, 3590, 3600, 40);
+    expect(lines[lines.length - 1].sec).toBeCloseTo(3600, 3);
+  });
+
+  it('sűrű nagyításnál minden beat, ritkánál csak az ütem-kezdők', () => {
+    const dense = beatGridForView(120, 4, 0, 4, 40); // beat = 20 px
+    expect(dense.map((l) => l.sec)).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
+    expect(dense.filter((l) => l.downbeat).map((l) => l.sec)).toEqual([0, 2, 4]);
+    const sparse = beatGridForView(120, 4, 0, 8, 4); // beat = 2 px, ütem = 8 px
+    expect(sparse.every((l) => l.downbeat)).toBe(true);
+    expect(sparse.map((l) => l.sec)).toEqual([0, 2, 4, 6, 8]);
+  });
+});
+

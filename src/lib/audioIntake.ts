@@ -35,8 +35,10 @@ export interface AudioIntakeResult {
   ok: boolean;
   /** hard-stop ok (ok=false), vagy a figyelmeztetés oka (ok=true) */
   reason?: AudioIntakeReason;
-  /** a felhasználónak szánt barátságos (magyar) üzenet */
+  /** a felhasználónak szánt barátságos (magyar) üzenet — a UI az `audioIntakeText`-tel fordítja */
   message?: string;
+  /** a fordított üzenet paraméterei */
+  params?: { label?: string; hours?: number };
   /** csak figyelmeztetés (behozható, de szólunk) — ok marad true */
   warning: boolean;
 }
@@ -65,6 +67,7 @@ export function classifyAudioIntake(input: AudioIntakeInput): AudioIntakeResult 
       ok: false,
       warning: false,
       reason: 'unsupported',
+      params: { label },
       message: `Ezt a hangformátumot nem tudjuk beolvasni (${label}). Próbáld MP3/M4A/WAV/FLAC/OGG/Opus formátumban.`,
     };
   }
@@ -79,8 +82,18 @@ export function classifyAudioIntake(input: AudioIntakeInput): AudioIntakeResult 
       ok: true,
       warning: true,
       reason: 'tooLong',
+      params: { hours },
       message: `Nagyon hosszú hang (~${hours} óra) — a feldolgozás/render lassabb és több memóriát igényel.`,
     };
   }
   return { ok: true, warning: false };
 }
+
+/** A41: a bevitel üzenete a felhasználó nyelvén (a `t` a hívó i18n-függvénye). */
+export function audioIntakeText(
+  intake: Pick<AudioIntakeResult, 'reason' | 'params'>,
+  t: (key: string, params?: Record<string, unknown>) => string
+): string {
+  return t(`studio.audio.intake.${intake.reason ?? 'unsupported'}`, intake.params ?? {});
+}
+

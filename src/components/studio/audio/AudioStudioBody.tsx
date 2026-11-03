@@ -25,12 +25,13 @@ import { setActiveSong, setSongRender, songCount, songNeedsRender, songRenderKey
 import { buildAlbumVideoProject } from '@/lib/albumShare';
 import {
   barsBeatsLabel,
-  beatLines,
+  beatGridForView,
   DEFAULT_BPM,
   DEFAULT_ZOOM_INDEX,
   nextBeatSec,
   prevBeatSec,
   pxPerSecAt,
+  rulerTicks,
   snapSec,
   type SnapMode,
   zoomIn,
@@ -59,7 +60,6 @@ import { beatLinesForClips } from '@/lib/beatMarkers';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
-import { UNREADABLE_DURATION_MESSAGE } from '@/lib/audioIntake';
 import { downloadToCache, persistToLibrary, probeAudioDuration } from '@/lib/media';
 import { logCaught } from '@/lib/logCaught';
 
@@ -137,6 +137,9 @@ export function AudioStudioBody({
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
   const [snapMode, setSnapMode] = useState<SnapMode>('frame');
+  // 📏 A42: a vonalzó és a rács csak a látható ablakra (± egy képernyő) rajzolódik
+  const [view, setView] = useState({ x: 0, w: 0 });
+  const viewXRef = useRef(0);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const recordStartPlayhead = useRef(0);
@@ -166,7 +169,10 @@ export function AudioStudioBody({
   const timelineW = Math.max(320, duration * pxPerSec + 40);
   const laneAreaH = RULER_H + LANE_H * LANES.length;
   const contentH = Math.max(tlH, laneAreaH); // a rács/playhead a teljes területet tölti
-  const ticks = Array.from({ length: Math.min(180, Math.ceil(timelineW / pxPerSec)) + 1 }, (_, i) => i);
+  const viewW = view.w || 1200;
+  const viewFrom = Math.max(0, (view.x - viewW) / pxPerSec);
+  const viewTo = Math.min((timelineW - 40) / pxPerSec, (view.x + 2 * viewW) / pxPerSec);
+  const ticks = rulerTicks(viewFrom, viewTo, pxPerSec);
   const selClip = selectedAudioClip(project, selectedClipId);
   // 🎵 beat-rács (ütem-vonalak) a BPM szerint — a látható tartományra + max 300 vonalra sapkázva
   const detectedLines = detectedBeats
@@ -176,8 +182,7 @@ export function AudioStudioBody({
         fps
       )
     : [];
-  const beatTimes = beatLines(bpm, 0, Math.min(duration + 2, (timelineW - 40) / pxPerSec)).slice(0, 300);
-  const secPerBar = (60 / bpm) * 4; // 4/4 ütem hossza (a downbeat kiemeléséhez)
+  const beatTimes = beatGridForView(bpm, 4, viewFrom, Math.min(duration + 2, viewTo), pxPerSec);
 
   const snapSecIn = (sec: number) => snapSec(sec, snapMode, fps, bpm);
   const seekAt = (e: GestureResponderEvent) =>
@@ -407,7 +412,7 @@ export function AudioStudioBody({
     }
     const dur = asset.duration || (await probeAudioDuration(asset.uri));
     if (!dur) {
-      Alert.alert(t('studio.kind.audio'), UNREADABLE_DURATION_MESSAGE);
+      Alert.alert(t('studio.audio.intake.unreadableTitle'), t('studio.audio.intake.unknownDuration'));
       return;
     }
     const clip: AudioClip = {
@@ -659,33 +664,46 @@ export function AudioStudioBody({
             })}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              setView((v) => (v.w === w ? v : { ...v, w }));
+            }}
+            onScroll={(e) => {
+              // csak negyed-képernyőnyi elmozdulásnál rajzol újra (nem minden képkockánál)
+              const x = e.nativeEvent.contentOffset.x;
+              if (Math.abs(x - viewXRef.current) > viewW / 4) {
+                viewXRef.current = x;
+                setView((v) => ({ ...v, x }));
+              }
+            }}
+          >
             <View style={{ width: timelineW, height: contentH }}>
               {/* másodperc-rács a teljes magasságon */}
-              {ticks.map((i) => (
+              {ticks.map((tick) => (
                 <View
-                  key={`g${i}`}
+                  key={`g${tick.sec}`}
                   pointerEvents="none"
                   style={[
                     styles.grid,
-                    { left: i * pxPerSec, height: contentH, backgroundColor: i % 5 === 0 ? palette.border : `${palette.border}66` },
+                    { left: tick.sec * pxPerSec, height: contentH, backgroundColor: tick.major ? palette.border : `${palette.border}66` },
                   ]}
                 />
               ))}
               {/* 🎵 beat-rács: az ütem-kezdő (downbeat) vonalak kiemelve */}
-              {beatTimes.map((sec, i) => {
-                const isDownbeat = Math.abs((sec % secPerBar) ) < 1e-3 || Math.abs((sec % secPerBar) - secPerBar) < 1e-3;
-                return (
-                  <View
-                    key={`beat${i}`}
-                    pointerEvents="none"
-                    style={[
-                      styles.beatLine,
-                      { left: sec * pxPerSec, height: contentH, opacity: isDownbeat ? 0.5 : 0.22, width: isDownbeat ? 1.5 : 1 },
-                    ]}
-                  />
-                );
-              })}
+              {beatTimes.map(({ sec, downbeat }) => (
+                <View
+                  key={`beat${sec}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.beatLine,
+                    { left: sec * pxPerSec, height: contentH, opacity: downbeat ? 0.5 : 0.22, width: downbeat ? 1.5 : 1 },
+                  ]}
+                />
+              ))}
               {/* 🥁📍 detektált beat-vonalak (az importált zene VALÓS beatjei) */}
               {detectedLines.map((sec, i) => (
                 <View
@@ -706,10 +724,10 @@ export function AudioStudioBody({
               ) : null}
               {/* idővonalzó (timecode) */}
               <View style={styles.ruler}>
-                {ticks.map((i) =>
-                  i % 5 === 0 ? (
-                    <Text key={`t${i}`} style={[styles.rulerLabel, { left: i * pxPerSec + 3 }]}>
-                      {formatTime(i)}
+                {ticks.map((tick) =>
+                  tick.major ? (
+                    <Text key={`t${tick.sec}`} style={[styles.rulerLabel, { left: tick.sec * pxPerSec + 3 }]}>
+                      {formatTime(tick.sec)}
                     </Text>
                   ) : null
                 )}
@@ -802,8 +820,8 @@ export function AudioStudioBody({
         <View style={styles.tSep} />
         {/* loop + In/Out + range törlés */}
         <TBtn icon="repeat" active={loop} onPress={() => useEditorStore.getState().setLoop(!loop)} />
-        <TBtn label="In" onPress={() => useEditorStore.getState().setRangeIn()} />
-        <TBtn label="Out" onPress={() => useEditorStore.getState().setRangeOut()} />
+        <TBtn label={t('studio.audio.transport.rangeIn')} onPress={() => useEditorStore.getState().setRangeIn()} />
+        <TBtn label={t('studio.audio.transport.rangeOut')} onPress={() => useEditorStore.getState().setRangeOut()} />
         {rangeIn != null || rangeOut != null ? (
           <TBtn icon="close" onPress={() => useEditorStore.getState().clearRange()} />
         ) : null}
@@ -825,7 +843,7 @@ export function AudioStudioBody({
         <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} />
         <TBtn
           icon={bpmBusy ? undefined : 'sparkles-outline'}
-          label={bpmBusy ? '…' : 'Auto'}
+          label={bpmBusy ? '…' : t('studio.audio.transport.auto')}
           active={bpmBusy}
           onPress={() => void autoDetectBpm()}
         />
@@ -834,7 +852,7 @@ export function AudioStudioBody({
         <TBtn icon="remove-circle-outline" onPress={() => setZoomIndex(zoomOut(zoomIndex))} />
         <TBtn icon="add-circle-outline" onPress={() => setZoomIndex(zoomIn(zoomIndex))} />
         <TBtn
-          label={snapMode === 'off' ? 'Snap' : snapMode === 'frame' ? 'Frame' : 'Beat'}
+          label={t(`studio.audio.transport.snap_${snapMode}`)}
           icon="magnet-outline"
           active={snapMode !== 'off'}
           onPress={() => setSnapMode(snapMode === 'off' ? 'frame' : snapMode === 'frame' ? 'beat' : 'off')}

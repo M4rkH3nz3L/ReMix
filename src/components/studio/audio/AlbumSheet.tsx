@@ -10,6 +10,7 @@ import { palette } from '@/constants/editor';
 import { activeSong, addSong, canRemoveSong, initAlbum, makeSong, removeSong, renameSong, renderedSongCount, reorderSongs, setActiveSong, setCover, songCount, songRenderKey } from '@/lib/albumDoc';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
+import { audioIntakeText } from '@/lib/audioIntake';
 import { pickAudio, pickImage } from '@/lib/media';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
@@ -43,7 +44,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
   /** Album létrehozása a JELENLEGI idővonalból (az első szám = a mostani project.tracks). */
   const enableAlbum = () => {
     const first = makeSong(makeId('song'), project.name || 'Szám 1', project.tracks, project.assets);
-    apply(initAlbum(first), 'Album létrehozva');
+    apply(initAlbum(first), t('studio.audio.album.history.created'));
   };
 
   const addEmptySong = () => {
@@ -51,7 +52,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
       return;
     }
     const s = makeSong(makeId('song'), `Szám ${songs.length + 1}`, emptyAudioTracks(), []);
-    apply(addSong(album, s), `Új szám: ${s.name}`);
+    apply(addSong(album, s), t('studio.audio.album.history.added', { name: s.name }));
   };
 
   const importSong = async () => {
@@ -65,7 +66,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
         return;
       }
       if (!picked.intake.ok) {
-        Alert.alert(t('common.error', { defaultValue: 'Hiba' }), picked.intake.message ?? '');
+        Alert.alert(t('studio.audio.intake.unreadableTitle'), audioIntakeText(picked.intake, t));
         return;
       }
       const clip: AudioClip = {
@@ -91,7 +92,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
         renderedKey: songRenderKey(tracks, { audioMaster: undefined, trackMix: undefined }),
         durationSec: picked.duration,
       };
-      apply(addSong(album, s), `Szám importálva: ${picked.name}`);
+      apply(addSong(album, s), t('studio.audio.album.history.imported', { name: picked.name }));
     } finally {
       setBusy(false);
     }
@@ -99,7 +100,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
 
   const switchTo = (id: string) => {
     if (album) {
-      apply(setActiveSong(album, id), 'Szám-váltás');
+      apply(setActiveSong(album, id), t('studio.audio.album.history.switched'));
     }
   };
 
@@ -109,7 +110,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
     }
     Alert.alert(t('common.delete'), `„${name}" szám törlése?`, [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: () => apply(removeSong(album, id), 'Szám törölve') },
+      { text: t('common.delete'), style: 'destructive', onPress: () => apply(removeSong(album, id), t('studio.audio.album.history.removed')) },
     ]);
   };
 
@@ -119,7 +120,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
     }
     Alert.prompt?.(t('common.rename', { defaultValue: 'Átnevezés' }), undefined, (text) => {
       if (text) {
-        apply(renameSong(album, id, text), 'Szám átnevezve');
+        apply(renameSong(album, id, text), t('studio.audio.album.history.renamed'));
       }
     }, 'plain-text', currentName);
   };
@@ -128,7 +129,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
     if (album) {
       const next = reorderSongs(album, idx, idx + dir);
       if (next !== album) {
-        apply(next, 'Számok átrendezése');
+        apply(next, t('studio.audio.album.history.reordered'));
       }
     }
   };
@@ -158,8 +159,8 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
       } as PhotoLayer;
       const coverDoc = { ...addLayer(base, photo), renderedUri: picked.uri };
       const s = useEditorStore.getState();
-      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: coverDoc as ImageDoc, label: 'Borító' });
-      s.dispatch({ type: 'APPLY_ALBUM', album: setCover(album, coverDoc.id), label: 'Borító beállítva' });
+      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: coverDoc as ImageDoc, label: t('studio.audio.album.cover') });
+      s.dispatch({ type: 'APPLY_ALBUM', album: setCover(album, coverDoc.id), label: t('studio.audio.album.history.coverSet') });
     } finally {
       setBusy(false);
     }

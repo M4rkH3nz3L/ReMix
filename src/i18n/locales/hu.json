@@ -143,6 +143,7 @@
     }
   },
   "common": {
+    "clear": "Törlés",
     "error": "Hiba",
     "cancel": "Mégse",
     "delete": "Törlés",
@@ -3024,7 +3025,40 @@
     "filterAll": "Mind"
   },
   "studio": {
+    "sampler": {
+      "title": "Sampler",
+      "entry": "Sampler (saját minta a rácsra)",
+      "clipLabel": "Sampler",
+      "pick": "Minta kiválasztása (one-shot)"
+    },
+    "mixer": {
+      "title": "Mixer",
+      "mute": "Némít",
+      "solo": "Szóló",
+      "duck": "Duck",
+      "sidechainKey": "Kulcs",
+      "openMaster": "Master-lánc (EQ · LUFS · limiter)",
+      "duckHint": "A DUCK: a zene/sfx automatikusan lehalkul, amikor a voiceover szól (sidechain)."
+    },
+    "drums": {
+      "title": "Dob-gép",
+      "entry": "Dob-gép (step-sequencer)",
+      "clipLabel": "Dob",
+      "stepHint": "-od lépések · a félkövér vonalak a beatek"
+    },
     "pianoRoll": {
+      "title": "Zeneszerzés",
+      "entry": "Zeneszerzés (piano-roll)",
+      "clipLabel": "Zene",
+      "bake": "Sávra",
+      "bars": "ütem",
+      "notes": "hang",
+      "wave": {
+        "sine": "Szinusz",
+        "square": "Négyszög",
+        "triangle": "Háromszög",
+        "sawtooth": "Fűrész"
+      },
       "failed": "Most nem sikerült hanggá alakítani. Ellenőrizd az internetkapcsolatot, és próbáld újra."
     },
     "chooseKind": "Mit készítesz?",
@@ -3729,6 +3763,7 @@
       "blend": { "normal": "Normál", "multiply": "Szorzás", "screen": "Kivonás", "overlay": "Fedés", "softlight": "Lágy fény", "darken": "Sötétítés", "lighten": "Világosítás", "hardlight": "Kemény fény", "difference": "Különbség", "exclusion": "Kizárás", "colordodge": "Színfakítás", "colorburn": "Színégetés" }
     },
     "audioTools": {
+      "mixer": "Mixer",
       "trim": "Vágás",
       "fade": "Fade",
       "volume": "Hangerő",
@@ -3742,6 +3777,24 @@
       "master": "Master"
     },
     "audio": {
+      "spectrum": "Spektrum",
+      "panAutomation": "Pásztázás-automáció",
+      "fxPitch": "Hangmagasság (félhang)",
+      "fxHarmony": "Harmónia-hang (félhang)",
+      "fxGate": "Zajkapu",
+      "fxStereoWide": "Sztereó-szélesítés",
+      "autoBpm": "Tempó felismerése",
+      "autoBpmNoClip": "Nincs hang-klip az elemzéshez.",
+      "fxPreset": {
+        "clean": "Tiszta",
+        "podcast": "Podcast",
+        "phone": "Telefon",
+        "radio": "Rádió",
+        "deep": "Mély",
+        "bright": "Magas",
+        "hall": "Terem",
+        "wide": "Széles"
+      },
       "autoBpmFail": "Nem sikerült felismerni a tempót. Próbáld újra, vagy állítsd be kézzel a BPM-et.",
       "emptyGuide": "Még üres a projekt. Adj hozzá hangot, komponálj, vagy vegyél fel egyet.",
       "emptyGuideAdd": "Hozzáadás",
@@ -3764,6 +3817,16 @@
       "exportDownload": "Hang letöltése…",
       "exportRendering": "{{format}} exportálása…",
       "album": {
+        "history": {
+          "created": "Album létrehozva",
+          "added": "Új szám: {{name}}",
+          "imported": "Szám importálva: {{name}}",
+          "switched": "Szám-váltás",
+          "removed": "Szám törölve",
+          "renamed": "Szám átnevezve",
+          "reordered": "Számok átrendezése",
+          "coverSet": "Borító beállítva"
+        },
         "title": "Album",
         "enable": "Album létrehozása",
         "enableHint": "Alakítsd a projektet albummá: több szám + borító, egy lapozható/album-posztban.",
@@ -3806,6 +3869,23 @@
       "stemsEmpty": "A szétbontás nem adott stemeket.",
       "stemsBusy": "Most egy másik szétbontás fut, próbáld újra pár perc múlva.",
       "stemsDownloadFailed": "A(z) {{name}} stem nem töltődött le.",
+      "intake": {
+        "unreadableTitle": "Nem beolvasható",
+        "warningTitle": "Figyelmeztetés",
+        "unsupported": "Ezt a hangformátumot nem tudjuk beolvasni ({{label}}). Próbáld MP3/M4A/WAV/FLAC/OGG/Opus formátumban.",
+        "unknownDuration": "A hang hossza nem olvasható ki, a fájl sérült lehet. Próbáld újra, vagy mentsd el MP3/M4A/WAV formátumban.",
+        "tooLong": "Nagyon hosszú hang (~{{hours}} óra) — a feldolgozás és a render lassabb, több memóriát igényel."
+      },
+      "transport": {
+        "auto": "Auto",
+        "snap_off": "Rács ki",
+        "snap_frame": "Kocka",
+        "snap_beat": "Ütem",
+        "rangeIn": "Eleje",
+        "rangeOut": "Vége",
+        "play": "Lejátszás",
+        "pause": "Szünet"
+      },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",
@@ -3820,6 +3900,11 @@
       "enhanceHint": "A javítások a végső renderben, az eszközön érvényesülnek (az előnézet közelítés)."
     },
     "master": {
+      "duckTrigger": "Auto-duck kulcs",
+      "duckAuto": "Beszéd (auto)",
+      "track_voiceover": "Beszéd",
+      "track_music": "Zene",
+      "track_sfx": "Effektek",
       "title": "Mixer és Master",
       "mixer": "Mixer",
       "masterVolume": "Master hangerő",

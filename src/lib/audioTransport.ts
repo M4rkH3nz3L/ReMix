@@ -88,3 +88,60 @@ export function secPerBeat(bpm?: number): number {
   const b = Number.isFinite(bpm) && (bpm as number) > 0 ? (bpm as number) : DEFAULT_BPM;
   return 60 / b;
 }
+
+const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600];
+const MIN_TICK_PX = 12;
+const MIN_LABEL_PX = 56;
+
+export interface RulerTick {
+  sec: number;
+  /** feliratozott (nagy) jel */
+  major: boolean;
+}
+
+/**
+ * 📏 Vonalzó-jelek a LÁTHATÓ ablakra (PRO-AUDIO A42): a lépés a zoomhoz igazodik (a jelek
+ * legalább 12 px-re, a feliratok legalább 56 px-re), így tetszőleges hosszú projekt végig
+ * vonalzót kap, és a kirajzolt elemek száma a képernyő szélességével arányos, nem a hosszal.
+ */
+export function rulerTicks(fromSec: number, toSec: number, pxPerSec: number): RulerTick[] {
+  const pps = Math.max(1e-6, pxPerSec);
+  const step = TICK_STEPS.find((s) => s * pps >= MIN_TICK_PX) ?? TICK_STEPS[TICK_STEPS.length - 1];
+  const labelStep = TICK_STEPS.find((s) => s >= step && s % step === 0 && s * pps >= MIN_LABEL_PX) ?? step * 10;
+  const out: RulerTick[] = [];
+  const start = Math.max(0, Math.floor(fromSec / step) * step);
+  for (let sec = start; sec <= toSec; sec += step) {
+    out.push({ sec, major: sec % labelStep === 0 });
+  }
+  return out;
+}
+
+export interface BeatGridLine {
+  sec: number;
+  downbeat: boolean;
+}
+
+/**
+ * 🎵 Ütem-rács a látható ablakra (A42): ha a beatek túl sűrűk (< 6 px), csak az ütem-kezdők,
+ * ha azok is, négyütemenként egy vonal — a rács a teljes hosszon megmarad.
+ */
+export function beatGridForView(
+  bpm: number | undefined,
+  beatsPerBar: number,
+  fromSec: number,
+  toSec: number,
+  pxPerSec: number
+): BeatGridLine[] {
+  const beat = secPerBeat(bpm);
+  const bar = beat * Math.max(1, beatsPerBar);
+  const stride = beat * pxPerSec >= 6 ? beat : bar * pxPerSec >= 6 ? bar : bar * 4;
+  const out: BeatGridLine[] = [];
+  const first = Math.max(0, Math.ceil(fromSec / stride - 1e-9));
+  for (let i = first; i * stride <= toSec + 1e-9; i++) {
+    const sec = Math.round(i * stride * 1e6) / 1e6;
+    const inBar = sec / bar;
+    out.push({ sec, downbeat: Math.abs(inBar - Math.round(inBar)) < 1e-6 });
+  }
+  return out;
+}
+

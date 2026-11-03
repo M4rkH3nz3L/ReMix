@@ -143,6 +143,7 @@
     }
   },
   "common": {
+    "clear": "Clear",
     "error": "Error",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -3024,7 +3025,40 @@
     "filterAll": "All"
   },
   "studio": {
+    "sampler": {
+      "title": "Sampler",
+      "entry": "Sampler (your own sample on the grid)",
+      "clipLabel": "Sampler",
+      "pick": "Pick a sample (one-shot)"
+    },
+    "mixer": {
+      "title": "Mixer",
+      "mute": "Mute",
+      "solo": "Solo",
+      "duck": "Duck",
+      "sidechainKey": "Key",
+      "openMaster": "Master chain (EQ · LUFS · limiter)",
+      "duckHint": "DUCK: music/sfx automatically dip while the voiceover plays (sidechain)."
+    },
+    "drums": {
+      "title": "Drum machine",
+      "entry": "Drum machine (step sequencer)",
+      "clipLabel": "Drums",
+      "stepHint": " steps · bold lines are the beats"
+    },
     "pianoRoll": {
+      "title": "Compose",
+      "entry": "Compose (piano roll)",
+      "clipLabel": "Music",
+      "bake": "To track",
+      "bars": "bars",
+      "notes": "notes",
+      "wave": {
+        "sine": "Sine",
+        "square": "Square",
+        "triangle": "Triangle",
+        "sawtooth": "Saw"
+      },
       "failed": "Couldn't turn this into audio right now. Check your connection and try again."
     },
     "chooseKind": "What are you creating?",
@@ -3729,6 +3763,7 @@
       "blend": { "normal": "Normal", "multiply": "Multiply", "screen": "Screen", "overlay": "Overlay", "softlight": "Soft light", "darken": "Darken", "lighten": "Lighten", "hardlight": "Hard light", "difference": "Difference", "exclusion": "Exclusion", "colordodge": "Color dodge", "colorburn": "Color burn" }
     },
     "audioTools": {
+      "mixer": "Mixer",
       "trim": "Trim",
       "fade": "Fade",
       "volume": "Volume",
@@ -3742,6 +3777,24 @@
       "master": "Master"
     },
     "audio": {
+      "spectrum": "Spectrum",
+      "panAutomation": "Pan automation",
+      "fxPitch": "Pitch (semitones)",
+      "fxHarmony": "Harmony voice (semitones)",
+      "fxGate": "Noise gate",
+      "fxStereoWide": "Stereo widening",
+      "autoBpm": "Detect tempo",
+      "autoBpmNoClip": "There is no audio clip to analyze.",
+      "fxPreset": {
+        "clean": "Clean",
+        "podcast": "Podcast",
+        "phone": "Phone",
+        "radio": "Radio",
+        "deep": "Deep",
+        "bright": "Bright",
+        "hall": "Hall",
+        "wide": "Wide"
+      },
       "autoBpmFail": "Couldn't detect the tempo. Try again, or set the BPM manually.",
       "emptyGuide": "The project is empty. Add audio, compose, or record something.",
       "emptyGuideAdd": "Add",
@@ -3764,6 +3817,16 @@
       "exportDownload": "Download audio…",
       "exportRendering": "Exporting {{format}}…",
       "album": {
+        "history": {
+          "created": "Album created",
+          "added": "New song: {{name}}",
+          "imported": "Song imported: {{name}}",
+          "switched": "Song switched",
+          "removed": "Song deleted",
+          "renamed": "Song renamed",
+          "reordered": "Songs reordered",
+          "coverSet": "Cover set"
+        },
         "title": "Album",
         "enable": "Create album",
         "enableHint": "Turn the project into an album: several songs + a cover, in one swipeable album post.",
@@ -3806,6 +3869,23 @@
       "stemsEmpty": "The separation returned no stems.",
       "stemsBusy": "Another separation is running, try again in a few minutes.",
       "stemsDownloadFailed": "The {{name}} stem could not be downloaded.",
+      "intake": {
+        "unreadableTitle": "Can't read this file",
+        "warningTitle": "Heads up",
+        "unsupported": "We can't read this audio format ({{label}}). Try MP3/M4A/WAV/FLAC/OGG/Opus.",
+        "unknownDuration": "The audio length can't be read; the file may be damaged. Try again, or save it as MP3/M4A/WAV.",
+        "tooLong": "Very long audio (~{{hours}} h) — processing and rendering are slower and need more memory."
+      },
+      "transport": {
+        "auto": "Auto",
+        "snap_off": "Snap off",
+        "snap_frame": "Frame",
+        "snap_beat": "Beat",
+        "rangeIn": "In",
+        "rangeOut": "Out",
+        "play": "Play",
+        "pause": "Pause"
+      },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",
@@ -3820,6 +3900,11 @@
       "enhanceHint": "Enhancements are applied on-device in the final render (the preview approximates them)."
     },
     "master": {
+      "duckTrigger": "Auto-duck key",
+      "duckAuto": "Speech (auto)",
+      "track_voiceover": "Speech",
+      "track_music": "Music",
+      "track_sfx": "Effects",
       "title": "Mixer & Master",
       "mixer": "Mixer",
       "masterVolume": "Master volume",

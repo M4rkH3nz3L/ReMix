@@ -1,4 +1,5 @@
 import {
+  audioIntakeText,
   audioExtOf,
   AUDIO_INTAKE_WARN_SEC,
   classifyAudioIntake,
@@ -65,3 +66,13 @@ describe('classifyAudioIntake — mérhetetlen hossz (A6)', () => {
     expect(classifyAudioIntake({ uri: 'file:///x.mp3' }).ok).toBe(false);
   });
 });
+
+describe('audioIntakeText (A41)', () => {
+  const t = (key: string, p?: Record<string, unknown>) => `${key}|${JSON.stringify(p ?? {})}`;
+  it('az okból fordított kulcs lesz, a paraméterekkel', () => {
+    expect(audioIntakeText(classifyAudioIntake({ uri: 'file:///x.xyz', name: 'x.xyz' }), t)).toBe('studio.audio.intake.unsupported|{"label":"x.xyz"}');
+    expect(audioIntakeText(classifyAudioIntake({ uri: 'file:///x.mp3', durationSec: 0 }), t)).toBe('studio.audio.intake.unknownDuration|{}');
+    expect(audioIntakeText(classifyAudioIntake({ uri: 'file:///x.mp3', durationSec: AUDIO_INTAKE_WARN_SEC + 3600 }), t)).toMatch(/tooLong\|\{"hours":/);
+  });
+});
+

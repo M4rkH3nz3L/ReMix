@@ -201,6 +201,9 @@ app.use(require('./routes/live'));
 // 💳 Billing / shop-kredit route-ok — domain-router (§01.1).
 app.use(require('./routes/billing'));
 
+// 🎬 Reklám-jutalom (AdMob SSV, PRO-CASH C2.2) — domain-router (§01.1).
+app.use(require('./routes/ads'));
+
 
 
 // 🎬🎧 Média route-ok — domain-router (§01.1).

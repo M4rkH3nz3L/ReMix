@@ -195,6 +195,21 @@ select pg_temp.act('c1000000-0000-0000-0000-000000000003');
 select pg_temp.raises('C0.5 a kliens nem vonhat vissza Coint', $$select public.coin_clawback('a1000000-0000-0000-0000-000000000001', 1, 'x')$$, 'permission denied');
 select pg_temp.admin();
 
+-- C2.2 jutalmazott reklám: 0,02 bónusz Coin, naponta 5, tranzakciónként egyszer
+select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-1', 'unit-x');
+select pg_temp.note('C2.2 ugyanaz az AdMob-tranzakció másodszor nem ír jóvá',
+  (select r ->> 'status' = 'duplicate' from (select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-1') as r) x));
+select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-' || g) from generate_series(2, 5) g;
+select pg_temp.note('C2.2 a napi 6. reklám már nem ad Coint',
+  (select r ->> 'status' = 'daily_limit' from (select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-6') as r) x));
+select pg_temp.note('C2.2 másnap újra jár',
+  (select r ->> 'status' = 'granted' from (select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-7', null, now() + interval '1 day') as r) x));
+select pg_temp.note('C2.2 a jutalom a BÓNUSZ alegyenlegre megy (6 × 0,02 Coin)',
+  (select sum(remaining_cents) = 12 from public.coin_lots where user_id = 'a1000000-0000-0000-0000-000000000001' and bucket = 'bonus' and kind = 'bonus'));
+select pg_temp.act('a1000000-0000-0000-0000-000000000001');
+select pg_temp.raises('C2.2 a kliens nem írhat jóvá reklám-jutalmat', $$select public.grant_ad_reward('a1000000-0000-0000-0000-000000000001', 'adtx-x')$$, 'permission denied');
+select pg_temp.admin();
+
 -- invariánsok: a tételek összege = az alegyenleg, egyik sem negatív
 select pg_temp.note('C0.3 invariáns: bónusz-tételek = bónusz-egyenleg (minden tesztfiók)',
   not exists (select 1 from public.user_credits u where u.user_id::text like '_1000000-%' and u.bonus_cents <>

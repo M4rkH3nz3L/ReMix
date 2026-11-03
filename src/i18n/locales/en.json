@@ -4502,6 +4502,10 @@
       "loginToComment": "Log in to comment"
     },
     "newBadge": "New",
+    "volume": "Volume",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "playTime": "{{cur}} of {{dur}}",
     "moderate": {
       "title": "Moderation",
       "body": "Remove this post from the public feed?",

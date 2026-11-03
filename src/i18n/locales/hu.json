@@ -4502,6 +4502,10 @@
       "loginToComment": "Jelentkezz be a kommenteléshez"
     },
     "newBadge": "Új",
+    "volume": "Hangerő",
+    "mute": "Némítás",
+    "unmute": "Hang bekapcsolása",
+    "playTime": "{{cur}} / {{dur}}",
     "moderate": {
       "title": "Moderáció",
       "body": "Eltávolítod ezt a posztot a nyilvános feedből?",

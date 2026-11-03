@@ -4507,6 +4507,10 @@
       "loginToComment": "Zum Kommentieren anmelden"
     },
     "newBadge": "Neu",
+    "volume": "Lautstärke",
+    "mute": "Stummschalten",
+    "unmute": "Ton einschalten",
+    "playTime": "{{cur}} von {{dur}}",
     "moderate": {
       "title": "Moderation",
       "body": "Diesen Beitrag aus dem öffentlichen Feed entfernen?",

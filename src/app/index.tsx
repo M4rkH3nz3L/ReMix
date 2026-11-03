@@ -70,10 +70,13 @@ export default function FeedScreen() {
                   muted={f.muted}
                   volume={f.volume}
                   volumeOpen={f.volumeOpen}
-                  volHeightRef={f.volHeightRef}
+                  volWidthRef={f.volWidthRef}
+                  nudgeVolume={f.nudgeVolume}
+                  onVolumeButton={f.onVolumeButton}
                   volumeGesture={f.volumeGesture}
                   onToggleMute={f.onToggleMute}
                   progress={f.progress}
+                  clock={f.clock}
                   seekWidthRef={f.seekWidthRef}
                   seekGesture={f.seekGesture}
                   hotspotTime={f.hotspotTime}

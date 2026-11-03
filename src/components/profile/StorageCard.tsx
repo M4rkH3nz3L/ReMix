@@ -30,13 +30,14 @@ import {
 import { InsufficientCreditsError, creditBalance } from '@/lib/shop';
 import type { StorageEntry } from '@/lib/storageProviders';
 import {
-  STORAGE_COIN_PER_GB_MONTH,
+  STORAGE_CENTS_PER_GB_MONTH,
   type StorageUsage,
   buyStorageBoost,
   fetchStorageUsage,
   formatBytes,
 } from '@/lib/storageQuota';
 import { useEntitlement } from '@/store/entitlementStore';
+import { formatCoins } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 
 /** A manuális (nem-OAuth) források mezői — a config a workeren tárolódik. */
@@ -97,7 +98,7 @@ export function StorageCard() {
     refresh();
   }, [refresh]);
 
-  const cost = boostGb * boostMonths * STORAGE_COIN_PER_GB_MONTH;
+  const cost = boostGb * boostMonths * STORAGE_CENTS_PER_GB_MONTH;
   const pct = usage && usage.quotaBytes > 0 ? Math.min(1, usage.usedBytes / usage.quotaBytes) : 0;
   const barColor = pct >= 0.9 ? palette.danger : palette.accent;
   // az aktív cél: a kijelölt provider, vagy null (= ReMix-tárhely az alap)
@@ -273,7 +274,7 @@ export function StorageCard() {
                   {t('profile.storage.monthsShort')}
                 </Text>
                 <Text style={styles.costCoins}>
-                  {cost} 🪙 · {t('profile.storage.balance')}: {balance}
+                  {formatCoins(cost)} 🪙 · {t('profile.storage.balance')}: {formatCoins(balance)}
                 </Text>
               </View>
               <PrimaryButton

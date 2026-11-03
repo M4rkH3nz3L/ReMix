@@ -9,12 +9,12 @@ import { useAuth } from '@/store/authStore';
  * A használat/kvóta SZERVER-HITELES: a `storage_usage` / `buy_storage_boost` /
  * `record_storage_object` SECURITY DEFINER RPC-ken megy (lásd a 20260927130000-
  * migrációt). Az alap fix: ingyenes 1 GiB / Pro 5 GiB (a subscriptions tier-ből);
- * a bónusz koinnal vehető (100 koin / GB / hó). A user SAJÁT Drive/Dropbox/WebDAV/
+ * a bónusz Coinnal vehető (0,10 Coin / GB / hó = 1 Coin / 10 GB / hó, csak fizetős szinten). A user SAJÁT Drive/Dropbox/WebDAV/
  * S3 forrásán fekvő média NEM számít bele (lásd `@/lib/externalStorage`).
  */
 
-/** 1 hónapnyi 1 GB-os bővítés ára koinban. */
-export const STORAGE_COIN_PER_GB_MONTH = 100;
+/** 1 hónapnyi 1 GB-os bővítés ára cent-Coinban (a DB `buy_storage_boost` tükre). */
+export const STORAGE_CENTS_PER_GB_MONTH = 10;
 
 export interface StorageUsage {
   usedBytes: number;
@@ -61,7 +61,7 @@ export async function fetchStorageUsage(): Promise<StorageUsage | null> {
 }
 
 /**
- * Koinos HAVI tárhely-bővítés (atomikus RPC). `gb` × `months` × 100 koin. Kevés
+ * Koinos HAVI tárhely-bővítés (atomikus RPC). `gb` × `months` × 10 cent-Coin. Kevés
  * kredit → InsufficientCreditsError (a UI a kredit-vásárlásra irányít).
  */
 export async function buyStorageBoost(

@@ -1,5 +1,7 @@
 import { cloudBaseUrl } from '@/lib/backend';
 import { refreshEntitlement } from '@/lib/billing';
+import { EMPTY_WALLET, parseWallet, type WalletBreakdown } from '@/lib/coins';
+import type { Tier } from '@/lib/tiers';
 import { InsufficientCreditsError } from '@/lib/shop';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
@@ -7,24 +9,20 @@ import { useAuth } from '@/store/authStore';
 import { logCaught } from '@/lib/logCaught';
 
 /**
- * 🪙 Koin-pénztárca — a pénzkeresés alaprendszere.
+ * 🪙 Coin-pénztárca kliens-réteg (PRO-CASH 2. fejezet).
  *
- * Ráták: 1 koin = 5 Ft VÉTELÁRON, 1 koin = 3 Ft KIVÁLTÁSKOR (a platform a
- * különbözetet tartja). A Pro koinnal is fizethető (500 koin / hó). Minden
- * pénzmozgás SZERVER-HITELES: a levonás/jóváírás SECURITY DEFINER RPC-ken megy
- * (`subscribe_pro_with_credits`, `send_credits`), a kifizetés a worker
- * `/wallet/payout`-ján (levon + provider-utalás). Lásd `@/lib/shop` (egyenleg).
+ * Minden összeg cent-Coinban (1 Coin = 100); az árak, díjak és a kijelzés a tiszta
+ * `@/lib/coins` magban. Minden pénzmozgás SZERVER-HITELES: a terhelés/jóváírás
+ * SECURITY DEFINER RPC-ken megy (`subscribe_with_coins`, `send_gift`, …), a kifizetés
+ * a worker `/wallet/payout`-ján (csak a beváltható megkeresett Coinból).
  */
-
-export const COIN_BUY_HUF = 5; // 1 koin vételára
-export const COIN_CASHOUT_HUF = 3; // 1 koin kiváltási értéke
-export const CURRENCY = 'Ft';
-export const PRO_MONTHLY_COINS = 500; // Pro / hó koinban
-export const MIN_PAYOUT_COINS = 100; // minimum kiváltható koin
 
 export interface CreditTx {
   id: string;
-  delta: number;
+  /** cent-Coin (+ jóváírás / − terhelés) */
+  deltaCents: number;
+  /** melyik alegyenleget érintette */
+  bucket: 'purchased' | 'bonus' | 'earned_pending' | 'earned_available' | null;
   kind: string;
   note: string | null;
   createdAt: string;
@@ -32,8 +30,8 @@ export interface CreditTx {
 
 export interface PayoutRequest {
   id: string;
-  coins: number;
-  amountHuf: number;
+  cents: number;
+  amountEurCents: number;
   status: string;
   createdAt: string;
 }
@@ -47,17 +45,18 @@ export interface Gift {
   id: string;
   name: string;
   icon: string;
-  costCoins: number;
+  costCents: number;
 }
 
 export interface GiftEvent {
   id: string;
   giftId: string;
-  coins: number;
+  /** az alkotónak jóváírt rész (80%), cent-Coin */
+  creatorCents: number;
   createdAt: string;
 }
 
-/** Címzett nem található (send_credits). */
+/** Címzett nem található. */
 export class RecipientNotFoundError extends Error {
   constructor() {
     super('recipient_not_found');
@@ -85,11 +84,25 @@ export class NoPayoutAccountError extends Error {
     this.name = 'NoPayoutAccountError';
   }
 }
-/** A kiváltandó koin a minimum alatt van. */
+/** A kiváltandó összeg a minimum (20 Coin) alatt van. */
 export class BelowMinPayoutError extends Error {
   constructor() {
     super('below_min_payout');
     this.name = 'BelowMinPayoutError';
+  }
+}
+/** Nincs ennyi BEVÁLTHATÓ megkeresett Coin (a vásárolt / függő nem váltható). */
+export class InsufficientEarnedError extends Error {
+  constructor() {
+    super('insufficient_earned');
+    this.name = 'InsufficientEarnedError';
+  }
+}
+/** Hetente legfeljebb egy kifizetés kérhető. */
+export class PayoutWeeklyLimitError extends Error {
+  constructor() {
+    super('payout_weekly_limit');
+    this.name = 'PayoutWeeklyLimitError';
   }
 }
 
@@ -97,24 +110,38 @@ function currentUid(): string | null {
   return useAuth.getState().user?.id ?? null;
 }
 
+/** A pénztárcám bontása (vásárolt / bónusz / függő / beváltható). A lejárt tartást a szerver feloldja. */
+export async function fetchWallet(): Promise<WalletBreakdown> {
+  if (!supabase || !currentUid()) {
+    return EMPTY_WALLET;
+  }
+  const { data, error } = await supabase.rpc('my_wallet');
+  if (error) {
+    throw new Error(error.message);
+  }
+  return parseWallet(data);
+}
+
 /**
- * Pro előfizetés fizetése KOINNAL (500 koin / hó). Kevés kredit →
- * InsufficientCreditsError. Sikeres aktiválás után szinkronizálja a jogosultságot.
+ * Előfizetés Coinból: havi (1) vagy éves (12 = 10 havi díj). Kevés Coin →
+ * InsufficientCreditsError. Siker után szinkronizálja a jogosultságot.
  */
-export async function subscribeProWithCredits(
-  months: number
-): Promise<{ balance: number; proUntil: string }> {
+export async function subscribeWithCoins(
+  tier: Exclude<Tier, 'free'>,
+  months: 1 | 12,
+  seats = 1
+): Promise<{ balance: number; until: string }> {
   const sb = requireSupabase();
-  const { data, error } = await sb.rpc('subscribe_pro_with_credits', { p_months: months });
+  const { data, error } = await sb.rpc('subscribe_with_coins', { p_tier: tier, p_months: months, p_seats: seats });
   if (error) {
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }
     throw new Error(error.message);
   }
-  await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:subscribeProWithCredits', caught); });
+  await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:subscribeWithCoins', caught); });
   const d = (data ?? {}) as Record<string, unknown>;
-  return { balance: Number(d.balance ?? 0), proUntil: String(d.pro_until ?? '') };
+  return { balance: Number(d.balance ?? 0), until: String(d.until ?? '') };
 }
 
 /** Az ajándék-katalógus (TikTok-modell): fix koin-áras tételek. */
@@ -124,14 +151,14 @@ export async function listGifts(): Promise<Gift[]> {
   }
   const { data } = await supabase
     .from('gifts')
-    .select('id, name, icon, cost_coins')
+    .select('id, name, icon, cost_cents')
     .eq('active', true)
     .order('sort_order', { ascending: true });
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
     name: String(r.name ?? ''),
     icon: String(r.icon ?? '🎁'),
-    costCoins: Number(r.cost_coins ?? 0),
+    costCents: Number(r.cost_cents ?? 0),
   }));
 }
 
@@ -143,7 +170,7 @@ export async function sendGift(
   toUsername: string,
   giftId: string,
   opts?: { postId?: string | null; message?: string | null }
-): Promise<{ balance: number; coins: number }> {
+): Promise<{ balance: number; cost: number }> {
   const sb = requireSupabase();
   const { data, error } = await sb.rpc('send_gift', {
     p_to_username: toUsername,
@@ -167,7 +194,7 @@ export async function sendGift(
     throw new Error(error.message);
   }
   const d = (data ?? {}) as Record<string, unknown>;
-  return { balance: Number(d.balance ?? 0), coins: Number(d.coins ?? 0) };
+  return { balance: Number(d.balance ?? 0), cost: Number(d.cost ?? 0) };
 }
 
 /** A nekem küldött ajándékok (bevétel-kijelzés). */
@@ -178,14 +205,14 @@ export async function receivedGifts(limit = 10): Promise<GiftEvent[]> {
   }
   const { data } = await supabase
     .from('gift_events')
-    .select('id, gift_id, coins, created_at')
+    .select('id, gift_id, creator_cents, created_at')
     .eq('to_user', uid)
     .order('created_at', { ascending: false })
     .limit(limit);
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
     giftId: String(r.gift_id ?? ''),
-    coins: Number(r.coins ?? 0),
+    creatorCents: Number(r.creator_cents ?? 0),
     createdAt: String(r.created_at ?? ''),
   }));
 }
@@ -214,40 +241,42 @@ export async function setPayoutAccount(email: string): Promise<void> {
 }
 
 /**
- * Koin kiváltása pénzre (3 Ft/koin) a worker `/wallet/payout`-ján: levon + provider-
- * utalás (PayPal). Provider nélkül a kérelem 'pending' marad. Visszaadja a státuszt
- * + az egyenleget.
+ * Megkeresett Coin beváltása (1 Coin = 3 €) a worker `/wallet/payout`-ján: levon + provider-
+ * utalás (PayPal). Provider nélkül a kérelem 'pending' marad. `cents`: cent-Coin.
  */
 export async function requestPayout(
-  coins: number
-): Promise<{ status: string; balance: number; amountHuf: number }> {
+  cents: number
+): Promise<{ status: string; balance: number; amountEurCents: number }> {
   const res = await fetch(`${cloudBaseUrl()}/wallet/payout`, {
     method: 'POST',
     headers: await workerJsonHeaders(),
-    body: JSON.stringify({ coins }),
+    body: JSON.stringify({ cents }),
   });
   const body = (await res.json().catch((caught) => { logCaught('lib/wallet.ts:requestPayout', caught); return {}; })) as {
     error?: string;
     status?: string;
     balance?: number;
-    amount_huf?: number;
+    amount_eur_cents?: number;
   };
   if (!res.ok) {
     if (body.error === 'no_payout_account') {
       throw new NoPayoutAccountError();
     }
-    if (body.error === 'insufficient_credits') {
-      throw new InsufficientCreditsError();
+    if (body.error === 'insufficient_earned') {
+      throw new InsufficientEarnedError();
     }
     if (body.error === 'below_min_payout') {
       throw new BelowMinPayoutError();
+    }
+    if (body.error === 'payout_weekly_limit') {
+      throw new PayoutWeeklyLimitError();
     }
     throw new Error(body.error || 'payout_failed');
   }
   return {
     status: String(body.status ?? 'pending'),
     balance: Number(body.balance ?? 0),
-    amountHuf: Number(body.amount_huf ?? 0),
+    amountEurCents: Number(body.amount_eur_cents ?? 0),
   };
 }
 
@@ -259,13 +288,14 @@ export async function creditHistory(limit = 20): Promise<CreditTx[]> {
   }
   const { data } = await supabase
     .from('credit_transactions')
-    .select('id, delta, kind, note, created_at')
+    .select('id, delta_cents, bucket, kind, note, created_at')
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(limit);
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
-    delta: Number(r.delta ?? 0),
+    deltaCents: Number(r.delta_cents ?? 0),
+    bucket: (r.bucket as CreditTx['bucket']) ?? null,
     kind: String(r.kind ?? ''),
     note: (r.note as string | null) ?? null,
     createdAt: String(r.created_at ?? ''),
@@ -280,14 +310,14 @@ export async function myPayoutRequests(limit = 10): Promise<PayoutRequest[]> {
   }
   const { data } = await supabase
     .from('payout_requests')
-    .select('id, coins, amount_huf, status, created_at')
+    .select('id, cents, amount_eur_cents, status, created_at')
     .eq('user_id', uid)
     .order('created_at', { ascending: false })
     .limit(limit);
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
-    coins: Number(r.coins ?? 0),
-    amountHuf: Number(r.amount_huf ?? 0),
+    cents: Number(r.cents ?? 0),
+    amountEurCents: Number(r.amount_eur_cents ?? 0),
     status: String(r.status ?? ''),
     createdAt: String(r.created_at ?? ''),
   }));

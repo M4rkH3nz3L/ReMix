@@ -39,6 +39,7 @@ import {
 import { listProjects, loadProject } from '@/lib/storage';
 import { visibleProjects } from '@/lib/projectKinds';
 import type { ProjectMeta } from '@/types/project';
+import { MIN_SHOP_PRICE_CENTS, coinsToCents, formatCoins } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 
 const KIND_EMOJI: Record<ShopKind, string> = {
@@ -72,7 +73,7 @@ export default function ShopScreen() {
   const [myProjects, setMyProjects] = useState<ProjectMeta[]>([]);
   const [pubProjectId, setPubProjectId] = useState<string | null>(null);
   const [pubTitle, setPubTitle] = useState('');
-  const [pubPrice, setPubPrice] = useState('50');
+  const [pubPrice, setPubPrice] = useState('0,40');
 
   const refreshBalance = useCallback(() => {
     creditBalance().then(setBalance).catch((caught) => { logCaught('app/shop.tsx:refreshBalance', caught); });
@@ -201,6 +202,11 @@ export default function ShopScreen() {
     if (!pubProjectId || !pubTitle.trim() || busy) {
       return;
     }
+    const priceCents = coinsToCents(pubPrice);
+    if (priceCents > 0 && priceCents < MIN_SHOP_PRICE_CENTS) {
+      Alert.alert(t('shop.title'), t('shop.priceMin', { min: formatCoins(MIN_SHOP_PRICE_CENTS) }));
+      return;
+    }
     setBusy(true);
     loadProject(pubProjectId)
       .then((p) => {
@@ -209,7 +215,7 @@ export default function ShopScreen() {
         }
         return publishProjectAsItem(p, {
           title: pubTitle.trim(),
-          priceCredits: Math.max(0, parseInt(pubPrice, 10) || 0),
+          priceCents,
           kind: 'template',
         });
       })
@@ -235,7 +241,7 @@ export default function ShopScreen() {
     ]);
   };
 
-  const priceLabel = (n: number) => (n > 0 ? `${n} 🪙` : t('shop.free'));
+  const priceLabel = (cents: number) => (cents > 0 ? `${formatCoins(cents)} 🪙` : t('shop.free'));
 
   const browseCard = (item: ShopItem) => (
     <View style={styles.card}>
@@ -249,7 +255,7 @@ export default function ShopScreen() {
             {item.sellerName ?? t('shop.creator')} · ⬇ {item.downloads}
           </Text>
         </View>
-        <Text style={styles.cardPrice}>{priceLabel(item.priceCredits)}</Text>
+        <Text style={styles.cardPrice}>{priceLabel(item.priceCents)}</Text>
       </View>
       {item.description ? (
         <Text style={styles.cardDesc} numberOfLines={2}>
@@ -257,7 +263,7 @@ export default function ShopScreen() {
         </Text>
       ) : null}
       <PrimaryButton
-        label={item.priceCredits > 0 ? t('shop.buyFor', { price: item.priceCredits }) : t('shop.getFree')}
+        label={item.priceCents > 0 ? t('shop.buyFor', { price: formatCoins(item.priceCents) }) : t('shop.getFree')}
         icon="cart-outline"
         onPress={() => onBuy(item)}
         disabled={busy}
@@ -294,7 +300,7 @@ export default function ShopScreen() {
             {item.title}
           </Text>
           <Text style={styles.cardMeta}>
-            {priceLabel(item.priceCredits)} · ⬇ {item.downloads} ·{' '}
+            {priceLabel(item.priceCents)} · ⬇ {item.downloads} ·{' '}
             {item.status === 'published' ? t('shop.live') : t('shop.removed')}
           </Text>
         </View>
@@ -319,7 +325,7 @@ export default function ShopScreen() {
         </Text>
         {/* egyenleg → a pénztárca (profil): koin-vétel/küldés/kiváltás + dev-adás */}
         <Pressable onPress={() => router.push('/profile')} hitSlop={8} style={styles.balancePill}>
-          <Text style={styles.balanceText}>{balance} 🪙</Text>
+          <Text style={styles.balanceText}>{formatCoins(balance)} 🪙</Text>
           <Ionicons name="wallet-outline" size={16} color={palette.accent} />
         </Pressable>
       </View>
@@ -430,8 +436,8 @@ export default function ShopScreen() {
               style={styles.input}
               value={pubPrice}
               onChangeText={setPubPrice}
-              keyboardType="number-pad"
-              placeholder="50"
+              keyboardType="decimal-pad"
+              placeholder="0,40"
               placeholderTextColor={palette.textDim}
             />
             <View style={{ marginTop: 12 }}>

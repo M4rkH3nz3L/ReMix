@@ -6,32 +6,43 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { InsufficientCreditsError, buyCreditsDev, creditBalance } from '@/lib/shop';
 import {
-  COIN_BUY_HUF,
-  COIN_CASHOUT_HUF,
-  CURRENCY,
+  COIN_PAYOUT_EUR,
+  COIN_PRICE_EUR_WEB,
+  EMPTY_WALLET,
+  MIN_PAYOUT_CENTS,
+  coinsToCents,
+  formatCoins,
+  formatEur,
+  payoutEur,
+  subscriptionCostCents,
+  type WalletBreakdown,
+} from '@/lib/coins';
+import { InsufficientCreditsError, buyCreditsDev } from '@/lib/shop';
+import { tierLabelKey, type Tier } from '@/lib/tiers';
+import {
   type CreditTx,
   type Gift,
   type GiftEvent,
   GiftNotFoundError,
-  MIN_PAYOUT_COINS,
+  InsufficientEarnedError,
   NoPayoutAccountError,
   type PayoutAccount,
   type PayoutRequest,
-  PRO_MONTHLY_COINS,
+  PayoutWeeklyLimitError,
   RecipientNotFoundError,
   SelfSendError,
   BelowMinPayoutError,
   creditHistory,
   fetchPayoutAccount,
+  fetchWallet,
   listGifts,
   myPayoutRequests,
   receivedGifts,
   requestPayout,
   sendGift,
   setPayoutAccount,
-  subscribeProWithCredits,
+  subscribeWithCoins,
 } from '@/lib/wallet';
 import { logCaught } from '@/lib/logCaught';
 
@@ -43,7 +54,17 @@ const KIND_ICON: Record<string, string> = {
   payout: 'cash',
   transfer: 'swap-horizontal',
   gift: 'gift',
+  promo: 'pricetags',
+  subscription: 'rocket',
+  addon: 'add',
+  bonus: 'sparkles',
+  release: 'lock-open',
+  expire: 'time',
+  reversal: 'arrow-undo',
 };
+
+/** A Coinnal megvehető egyéni szintek (a Vállalati a szervezeti fiókból jön, 4. fázis). */
+const COIN_TIERS: Exclude<Tier, 'free' | 'business'>[] = ['basic', 'pro', 'ultra'];
 
 function giftIcon(gifts: Gift[], id: string): string {
   return gifts.find((g) => g.id === id)?.icon ?? '🎁';
@@ -52,14 +73,17 @@ function giftIcon(gifts: Gift[], id: string): string {
 export function WalletCard() {
   const { t } = useTranslation();
 
-  const [balance, setBalance] = useState(0);
+  const [wallet, setWallet] = useState<WalletBreakdown>(EMPTY_WALLET);
+  const balance = wallet.balance;
+  const setBalance = (b: number) => setWallet((w) => ({ ...w, balance: b }));
   const [account, setAccount] = useState<PayoutAccount | null>(null);
   const [history, setHistory] = useState<CreditTx[]>([]);
   const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [proMonths, setProMonths] = useState(1);
+  const [subTier, setSubTier] = useState<Exclude<Tier, 'free' | 'business'>>('basic');
+  const [annual, setAnnual] = useState(false);
   const [sendTo, setSendTo] = useState('');
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [received, setReceived] = useState<GiftEvent[]>([]);
@@ -67,9 +91,9 @@ export function WalletCard() {
   const [payoutEmail, setPayoutEmail] = useState('');
 
   const refresh = useCallback(() => {
-    creditBalance()
-      .then((b) => {
-        setBalance(b);
+    fetchWallet()
+      .then((w) => {
+        setWallet(w);
         setLoading(false);
       })
       .catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); return setLoading(false); });
@@ -119,13 +143,17 @@ export function WalletCard() {
       }
     });
 
-  const onPayPro = () =>
+  const onSubscribe = () =>
     guard(async () => {
       try {
-        const res = await subscribeProWithCredits(proMonths);
+        const months = annual ? 12 : 1;
+        const res = await subscribeWithCoins(subTier, months);
         setBalance(res.balance);
         refresh();
-        Alert.alert(t('wallet.proDoneTitle'), t('wallet.proDoneMsg', { months: proMonths }));
+        Alert.alert(
+          t('wallet.subDoneTitle'),
+          t('wallet.subDoneMsg', { tier: t(tierLabelKey(subTier)), until: new Date(res.until).toLocaleDateString() })
+        );
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onPayPro', e);
         if (e instanceof InsufficientCreditsError) {
@@ -172,7 +200,7 @@ export function WalletCard() {
     }
     Alert.alert(
       t('wallet.gift.confirmTitle'),
-      t('wallet.gift.confirmMsg', { icon: gift.icon, name: gift.name, coins: gift.costCoins, user: to }),
+      t('wallet.gift.confirmMsg', { icon: gift.icon, name: gift.name, coins: formatCoins(gift.costCents), user: to }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('wallet.gift.send'), onPress: () => sendTheGift(gift) },
@@ -197,42 +225,43 @@ export function WalletCard() {
 
   const onCashout = () =>
     guard(async () => {
-      const coins = Math.trunc(Number(payoutCoins) || 0);
-      if (coins <= 0) {
+      const cents = coinsToCents(payoutCoins);
+      if (cents <= 0) {
         return;
       }
       try {
-        const res = await requestPayout(coins);
+        const res = await requestPayout(cents);
         setBalance(res.balance);
         setPayoutCoins('');
         refresh();
         Alert.alert(
           res.status === 'paid' ? t('wallet.payoutPaidTitle') : t('wallet.payoutPendingTitle'),
-          t('wallet.payoutMsg', { amount: res.amountHuf, currency: CURRENCY })
+          t('wallet.payoutMsg', { amount: formatEur(res.amountEurCents / 100) })
         );
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onCashout', e);
         if (e instanceof NoPayoutAccountError) {
           Alert.alert(t('common.error'), t('wallet.noPayoutAccount'));
-        } else if (e instanceof InsufficientCreditsError) {
-          toShop();
+        } else if (e instanceof InsufficientEarnedError) {
+          Alert.alert(t('common.error'), t('wallet.insufficientEarned'));
+        } else if (e instanceof PayoutWeeklyLimitError) {
+          Alert.alert(t('common.error'), t('wallet.payoutWeekly'));
         } else if (e instanceof BelowMinPayoutError) {
-          Alert.alert(t('common.error'), t('wallet.belowMin', { min: MIN_PAYOUT_COINS }));
+          Alert.alert(t('common.error'), t('wallet.belowMin', { min: formatCoins(MIN_PAYOUT_CENTS) }));
         } else {
           Alert.alert(t('common.error'), (e as Error).message);
         }
       }
     });
 
-  const cashoutCoins = Math.trunc(Number(payoutCoins) || 0);
-  const cashoutHuf = cashoutCoins * COIN_CASHOUT_HUF;
-  const proCost = PRO_MONTHLY_COINS * proMonths;
+  const cashoutCents = coinsToCents(payoutCoins);
+  const subCost = subscriptionCostCents(subTier, annual ? 12 : 1);
 
   return (
     <>
       <Text style={styles.sectionTitle}>{t('wallet.section')}</Text>
       <Text style={styles.sectionHint}>
-        {t('wallet.rates', { buy: COIN_BUY_HUF, cashout: COIN_CASHOUT_HUF, currency: CURRENCY })}
+        {t('wallet.rates', { buy: formatEur(COIN_PRICE_EUR_WEB), cashout: formatEur(COIN_PAYOUT_EUR) })}
       </Text>
       <View style={styles.card}>
         {loading ? (
@@ -241,41 +270,77 @@ export function WalletCard() {
           <>
             <View style={styles.balanceRow}>
               <Text style={styles.balanceLabel}>{t('wallet.balance')}</Text>
-              <Text style={styles.balanceValue}>{balance} 🪙</Text>
+              <Text style={styles.balanceValue}>{formatCoins(balance)} 🪙</Text>
             </View>
+            <BucketRow label={t('wallet.bucket.purchased')} cents={wallet.purchased} />
+            {wallet.bonus > 0 ? <BucketRow label={t('wallet.bucket.bonus')} cents={wallet.bonus} /> : null}
+            <BucketRow
+              label={t('wallet.bucket.earnedPending')}
+              cents={wallet.earnedPending}
+              note={
+                wallet.nextReleaseAt
+                  ? t('wallet.bucket.nextRelease', { date: new Date(wallet.nextReleaseAt).toLocaleDateString() })
+                  : undefined
+              }
+            />
+            <BucketRow
+              label={t('wallet.bucket.earnedAvailable')}
+              cents={wallet.earnedAvailable}
+              note={`≈ ${formatEur(payoutEur(wallet.earnedAvailable))}`}
+              strong
+            />
 
             {/* koin-vétel (dev: worker-grant; élesben IAP/áruház) */}
             {__DEV__ ? (
               <View style={styles.rowWrap}>
-                <Pressable onPress={() => onBuyDev(100)} disabled={busy} style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>+100 🪙 (dev)</Text>
+                <Pressable onPress={() => onBuyDev(1)} disabled={busy} style={styles.smallBtn}>
+                  <Text style={styles.smallBtnText}>+1 🪙 (dev)</Text>
                 </Pressable>
-                <Pressable onPress={() => onBuyDev(500)} disabled={busy} style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>+500 🪙 (dev)</Text>
+                <Pressable onPress={() => onBuyDev(10)} disabled={busy} style={styles.smallBtn}>
+                  <Text style={styles.smallBtnText}>+10 🪙 (dev)</Text>
                 </Pressable>
               </View>
             ) : (
-              <Text style={styles.dim}>{t('wallet.buyHint', { huf: COIN_BUY_HUF, currency: CURRENCY })}</Text>
+              <Text style={styles.dim}>{t('wallet.buyHint', { price: formatEur(COIN_PRICE_EUR_WEB) })}</Text>
             )}
           </>
         )}
       </View>
 
-      {/* Pro fizetése koinnal */}
+      {/* előfizetés Coinból: szint + havi/éves */}
       <View style={styles.card}>
-        <Text style={styles.blockTitle}>{t('wallet.payProTitle')}</Text>
-        <Text style={styles.dim}>{t('wallet.payProHint', { coins: PRO_MONTHLY_COINS })}</Text>
-        <Stepper label={t('wallet.months')} value={proMonths} min={1} max={12} onChange={setProMonths} />
+        <Text style={styles.blockTitle}>{t('wallet.subTitle')}</Text>
+        <Text style={styles.dim}>{t('wallet.subHint')}</Text>
+        <View style={styles.rowWrap}>
+          {COIN_TIERS.map((tier) => (
+            <Pressable
+              key={tier}
+              onPress={() => setSubTier(tier)}
+              style={[styles.smallBtn, subTier === tier && styles.chipActive]}
+              accessibilityState={{ selected: subTier === tier }}
+            >
+              <Text style={styles.smallBtnText}>{t(tierLabelKey(tier))}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.rowWrap}>
+          <Pressable onPress={() => setAnnual(false)} style={[styles.smallBtn, !annual && styles.chipActive]}>
+            <Text style={styles.smallBtnText}>{t('wallet.monthly')}</Text>
+          </Pressable>
+          <Pressable onPress={() => setAnnual(true)} style={[styles.smallBtn, annual && styles.chipActive]}>
+            <Text style={styles.smallBtnText}>{t('wallet.annual')}</Text>
+          </Pressable>
+        </View>
         <View style={styles.costRow}>
           <Text style={styles.costText}>
-            {proMonths} {t('wallet.monthsShort')} · Pro
+            {t(tierLabelKey(subTier))} · {annual ? t('wallet.annual') : t('wallet.monthly')}
           </Text>
-          <Text style={styles.costCoins}>{proCost} 🪙</Text>
+          <Text style={styles.costCoins}>{formatCoins(subCost)} 🪙</Text>
         </View>
         <PrimaryButton
           icon="rocket"
-          label={busy ? t('wallet.working') : t('wallet.payProCta')}
-          onPress={onPayPro}
+          label={busy ? t('wallet.working') : t('wallet.subCta')}
+          onPress={onSubscribe}
           disabled={busy}
         />
       </View>
@@ -297,7 +362,7 @@ export function WalletCard() {
           {gifts.map((g) => (
             <Pressable key={g.id} onPress={() => onPickGift(g)} disabled={busy} style={styles.giftChip}>
               <Text style={styles.giftIcon}>{g.icon}</Text>
-              <Text style={styles.giftCost}>{g.costCoins} 🪙</Text>
+              <Text style={styles.giftCost}>{formatCoins(g.costCents)} 🪙</Text>
             </Pressable>
           ))}
         </View>
@@ -315,7 +380,7 @@ export function WalletCard() {
       <View style={styles.card}>
         <Text style={styles.blockTitle}>{t('wallet.cashoutTitle')}</Text>
         <Text style={styles.dim}>
-          {t('wallet.cashoutHint', { rate: COIN_CASHOUT_HUF, currency: CURRENCY, min: MIN_PAYOUT_COINS })}
+          {t('wallet.cashoutHint', { rate: formatEur(COIN_PAYOUT_EUR), min: formatCoins(MIN_PAYOUT_CENTS) })}
         </Text>
         <TextInput
           value={payoutEmail}
@@ -338,12 +403,12 @@ export function WalletCard() {
           onChangeText={setPayoutCoins}
           placeholder={t('wallet.coinsPlaceholder')}
           placeholderTextColor={palette.textDim}
-          keyboardType="number-pad"
+          keyboardType="decimal-pad"
           style={styles.input}
         />
         <View style={styles.costRow}>
           <Text style={styles.costText}>
-            {cashoutCoins} 🪙 → {cashoutHuf} {CURRENCY}
+            {formatCoins(cashoutCents)} 🪙 → {formatEur(payoutEur(cashoutCents))}
           </Text>
         </View>
         <PrimaryButton
@@ -356,7 +421,7 @@ export function WalletCard() {
           <View style={styles.payoutList}>
             {payouts.map((p) => (
               <Text key={p.id} style={styles.payoutRow}>
-                {p.coins} 🪙 → {p.amountHuf} {CURRENCY} ·{' '}
+                {formatCoins(p.cents)} 🪙 → {formatEur(p.amountEurCents / 100)} ·{' '}
                 <Text style={{ color: p.status === 'paid' ? palette.accent : palette.textDim }}>
                   {t(`wallet.status.${p.status}`, { defaultValue: p.status })}
                 </Text>
@@ -375,15 +440,15 @@ export function WalletCard() {
               <Ionicons
                 name={(KIND_ICON[h.kind] ?? 'ellipse') as never}
                 size={15}
-                color={h.delta >= 0 ? palette.accent : palette.textDim}
+                color={h.deltaCents >= 0 ? palette.accent : palette.textDim}
               />
               <Text style={styles.histKind} numberOfLines={1}>
                 {t(`wallet.kind.${h.kind}`, { defaultValue: h.kind })}
                 {h.note ? ` · ${h.note}` : ''}
               </Text>
-              <Text style={[styles.histDelta, { color: h.delta >= 0 ? '#39d98a' : palette.danger }]}>
-                {h.delta >= 0 ? '+' : ''}
-                {h.delta} 🪙
+              <Text style={[styles.histDelta, { color: h.deltaCents >= 0 ? '#39d98a' : palette.danger }]}>
+                {h.deltaCents >= 0 ? '+' : ''}
+                {formatCoins(h.deltaCents)} 🪙
               </Text>
             </View>
           ))}
@@ -393,29 +458,14 @@ export function WalletCard() {
   );
 }
 
-function Stepper({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
+function BucketRow({ label, cents, note, strong }: { label: string; cents: number; note?: string; strong?: boolean }) {
   return (
-    <View style={styles.stepperRow}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <Pressable onPress={() => onChange(Math.max(min, value - 1))} hitSlop={8} style={styles.stepBtn}>
-        <Ionicons name="remove" size={16} color={palette.text} />
-      </Pressable>
-      <Text style={styles.stepValue}>{value}</Text>
-      <Pressable onPress={() => onChange(Math.min(max, value + 1))} hitSlop={8} style={styles.stepBtn}>
-        <Ionicons name="add" size={16} color={palette.text} />
-      </Pressable>
+    <View style={styles.bucketRow}>
+      <Text style={styles.bucketLabel}>
+        {label}
+        {note ? <Text style={styles.dim}> · {note}</Text> : null}
+      </Text>
+      <Text style={[styles.bucketValue, strong && { color: palette.accent }]}>{formatCoins(cents)} 🪙</Text>
     </View>
   );
 }
@@ -437,6 +487,10 @@ const styles = StyleSheet.create({
   balanceLabel: { color: palette.textDim, fontSize: 13 },
   balanceValue: { color: palette.text, fontSize: 22, fontWeight: '900' },
   rowWrap: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  bucketRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 },
+  bucketLabel: { color: palette.text, fontSize: 13, flexShrink: 1 },
+  bucketValue: { color: palette.text, fontSize: 13, fontWeight: '700' },
+  chipActive: { borderColor: palette.accent, borderWidth: 1 },
   smallBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -447,18 +501,6 @@ const styles = StyleSheet.create({
   },
   smallBtnText: { color: palette.text, fontSize: 12, fontWeight: '700' },
   blockTitle: { color: palette.text, fontSize: 13, fontWeight: '800' },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepperLabel: { color: palette.textDim, fontSize: 13, flex: 1 },
-  stepBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepValue: { color: palette.text, fontSize: 15, fontWeight: '800', minWidth: 28, textAlign: 'center' },
   costRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   costText: { color: palette.text, fontSize: 13, fontWeight: '600' },
   costCoins: { color: palette.accent, fontSize: 14, fontWeight: '800' },

@@ -14,6 +14,7 @@ import {
   listGifts,
   sendGift,
 } from '@/lib/wallet';
+import { formatCoins } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -59,7 +60,7 @@ export function GiftSheet({
       t('wallet.gift.confirmMsg', {
         icon: gift.icon,
         name: gift.name,
-        coins: gift.costCoins,
+        coins: formatCoins(gift.costCents),
         user: toName || toUsername,
       }),
       [
@@ -109,7 +110,7 @@ export function GiftSheet({
         <View style={styles.card}>
           <Text style={styles.title}>{t('wallet.gift.sendTo', { user: toName || toUsername })}</Text>
           <Text style={styles.balance}>
-            {t('wallet.balance')}: {balance} 🪙
+            {t('wallet.balance')}: {formatCoins(balance)} 🪙
           </Text>
           {gifts.length === 0 ? (
             <ActivityIndicator color={palette.accent} style={{ marginVertical: 16 }} />
@@ -118,7 +119,7 @@ export function GiftSheet({
               {gifts.map((g) => (
                 <Pressable key={g.id} onPress={() => onPick(g)} disabled={busy} style={styles.chip}>
                   <Text style={styles.icon}>{g.icon}</Text>
-                  <Text style={styles.cost}>{g.costCoins} 🪙</Text>
+                  <Text style={styles.cost}>{formatCoins(g.costCents)} 🪙</Text>
                 </Pressable>
               ))}
             </View>

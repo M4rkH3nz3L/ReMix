@@ -4,9 +4,10 @@
  * Szabály: ha a tárhely a MÁR HASZNÁLT tartalom alá csökkenne (tier-downgrade vagy a
  * bónusz lejárta), azt **NE engedjük némán adatvesztéshez vezetni** — vagy blokkoljuk,
  * vagy a hiányzó tárhelyet **coinból, HAVIDÍJBAN** tartjuk fenn (a havi ár ennyivel nő).
- * A coin/GB/hó ár a [storageQuota](./storageQuota) magból (`STORAGE_COIN_PER_GB_MONTH`).
+ * A GB/hó ár cent-Coinban a [storageQuota](./storageQuota) magból (`STORAGE_CENTS_PER_GB_MONTH`);
+ * a függvények „coin” eredményei is cent-Coinban értendők.
  */
-import { STORAGE_COIN_PER_GB_MONTH } from './storageQuota';
+import { STORAGE_CENTS_PER_GB_MONTH } from './storageQuota';
 
 /** 1 GB bájtban (GiB). */
 export const GB_BYTES = 1024 ** 3;
@@ -24,7 +25,7 @@ export function requiredBonusGB(usedBytes: number, baseBytes: number): number {
 
 /** A bónusz-tárhely HAVI coin-költsége (recurring) — ennyivel nő a havidíj. */
 export function monthlyCoinForBonus(bonusGB: number): number {
-  return Math.max(0, Math.ceil(bonusGB)) * STORAGE_COIN_PER_GB_MONTH;
+  return Math.max(0, Math.ceil(bonusGB)) * STORAGE_CENTS_PER_GB_MONTH;
 }
 
 /** A tartalom-megtartáshoz szükséges HAVI coin, ha a user az adott alap-kvótára esne vissza. */

@@ -78,24 +78,27 @@ function activatePro(userId, opts = {}) {
 }
 
 /**
- * 🪙 Kredit jóváírása (Shop top-up) — service_role, a grant_credits RPC-n át.
- * IAP consumable (RevenueCat) vagy dev/manuális. Visszaadja az új egyenleget.
+ * 🪙 Coin jóváírása — service_role, a grant_coins RPC-n át. `cents`: cent-Coin (1 Coin = 100);
+ * `bucket`: purchased (feltöltés) | bonus (csomag-bónusz, promó) | earned (bevétel, 30 nap tartás).
+ * Visszaadja az új összes egyenleget (cent-Coin).
  */
-async function grantCredits(userId, amount, kind = 'topup', note = null) {
+async function grantCoins(userId, cents, bucket = 'purchased', kind = 'topup', note = null, ref = null) {
   const sb = adminClient();
   if (!sb) {
     throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY nincs beállítva a workeren.');
   }
   const uid = String(userId || '').trim();
-  const amt = Math.trunc(Number(amount));
+  const amt = Math.trunc(Number(cents));
   if (!uid || !Number.isFinite(amt) || amt <= 0) {
-    throw new Error('userId és pozitív amount kötelező.');
+    throw new Error('userId és pozitív összeg (cent-Coin) kötelező.');
   }
-  const { data, error } = await sb.rpc('grant_credits', {
+  const { data, error } = await sb.rpc('grant_coins', {
     p_user: uid,
-    p_amount: amt,
+    p_cents: amt,
+    p_bucket: bucket,
     p_kind: kind,
     p_note: note,
+    p_ref: ref,
   });
   if (error) {
     throw new Error(error.message);
@@ -145,9 +148,9 @@ async function processRevenueCatEvent(ev, uid, type) {
   // 🪙 Shop kredit-csomag (consumable): a product_id `credits_<n>` alakú → n kredit
   const creditMatch = /^credits_(\d+)$/.exec(String(ev.product_id || ''));
   if (creditMatch && (type === 'NON_RENEWING_PURCHASE' || type === 'INITIAL_PURCHASE')) {
-    const amount = parseInt(creditMatch[1], 10);
-    await grantCredits(uid, amount, 'topup', ev.product_id);
-    return { credited: amount };
+    const coins = parseInt(creditMatch[1], 10);
+    await grantCoins(uid, coins * 100, 'purchased', 'topup', ev.product_id);
+    return { credited: coins * 100 };
   }
   if (RC_GRANT.has(type)) {
     return activatePro(uid, {
@@ -281,7 +284,7 @@ module.exports = {
   activateTier,
   activatePro,
   deactivatePro,
-  grantCredits,
+  grantCoins,
   handleRevenueCatEvent,
   webhookEventSeen,
   recordWebhookEvent,

@@ -11,6 +11,7 @@
  * Megjegyzés: a worker-modulok sima CommonJS JS-ek — a kliens (jest-expo) projekt
  * babellel betölti őket; a `require` visszatérése `any`, ezért a tsc nem lép be a .js-be.
  */
+import { FEE_PCT, MIN_PAYOUT_CENTS, TIER_PRICE_CENTS, COIN_PAYOUT_EUR } from '@/lib/coins';
 import { TIER_ORDER, activeTierFromRow, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
   TIER_QUOTAS,
@@ -469,5 +470,27 @@ describe('contract: PRO-CASH szintek (kliens ⇄ worker ⇄ DB)', () => {
     expect(m).not.toBeNull();
     const dbStatuses = m![1].split(',').map((x) => x.trim().replace(/'/g, '')).sort();
     expect(dbStatuses).toEqual([...workerTiers.ACTIVE_STATUSES].sort());
+  });
+});
+
+describe('contract: Coin-főkönyv (src/lib/coins.ts ⇄ DB)', () => {
+  it('a havidíj cent-Coinban: tier_price_cents = TIER_PRICE_CENTS', () => {
+    const sql = latestSqlFunction('tier_price_cents');
+    for (const tier of TIER_ORDER) {
+      const m = new RegExp(`when '${tier}' then (\\d+)`).exec(sql);
+      expect(m).not.toBeNull();
+      expect(Number(m![1])).toBe(TIER_PRICE_CENTS[tier]);
+    }
+  });
+
+  it('a platform-díj: coin_fee_pct = FEE_PCT (bolt, ajándék)', () => {
+    const sql = latestSqlFunction('coin_fee_pct');
+    expect(sql).toContain(`when 'sale' then ${FEE_PCT.sale}`);
+    expect(sql).toContain(`when 'gift' then ${FEE_PCT.gift}`);
+  });
+
+  it('a kifizetési minimum és a beváltási ár azonos', () => {
+    expect(latestSqlFunction('coin_min_payout_cents')).toContain(`select ${MIN_PAYOUT_CENTS}::bigint`);
+    expect(latestSqlFunction('coin_payout_eur_cents')).toContain(`select p_cents * ${COIN_PAYOUT_EUR}`);
   });
 });

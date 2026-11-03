@@ -288,6 +288,13 @@ if (require.main === module) {
     log.info('erase-sweep ütemezve', { intervalHours: 24 });
   }
 
+  // 🪙 PRO-CASH C0.3: a lejárt Coin-tartások feloldása és a bónusz-lejárat óránként
+  // (a DB minden olvasáskor lustán is feloldja; ez a napló időbeni frissítéséért fut).
+  if (eraseAdmin) {
+    const { runCoinSettleOnce } = require('./coinSettle');
+    setInterval(() => { void runCoinSettleOnce(eraseAdmin); }, 60 * 60 * 1000).unref();
+  }
+
   app.listen(PORT, () => {
     console.log(`vided render worker: http://localhost:${PORT}`);
     ensureSfx()

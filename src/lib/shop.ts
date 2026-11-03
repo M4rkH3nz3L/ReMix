@@ -29,7 +29,7 @@ export interface ShopItem {
   description?: string;
   kind: ShopKind;
   category?: string;
-  priceCredits: number;
+  priceCents: number;
   previewUrl?: string;
   sellerName?: string;
   downloads: number;
@@ -45,7 +45,7 @@ interface ItemRow {
   description: string | null;
   kind: string;
   category: string | null;
-  price_credits: number;
+  price_cents: number;
   preview_url: string | null;
   seller_name: string | null;
   downloads: number;
@@ -55,7 +55,7 @@ interface ItemRow {
 }
 
 const ITEM_COLUMNS =
-  'id, seller_id, title, description, kind, category, price_credits, preview_url, seller_name, downloads, rating, status, created_at';
+  'id, seller_id, title, description, kind, category, price_cents, preview_url, seller_name, downloads, rating, status, created_at';
 
 function toItem(r: ItemRow): ShopItem {
   return {
@@ -65,7 +65,7 @@ function toItem(r: ItemRow): ShopItem {
     description: r.description ?? undefined,
     kind: (r.kind as ShopKind) ?? 'template',
     category: r.category ?? undefined,
-    priceCredits: r.price_credits,
+    priceCents: r.price_cents,
     previewUrl: r.preview_url ?? undefined,
     sellerName: r.seller_name ?? undefined,
     downloads: r.downloads,
@@ -143,7 +143,7 @@ export async function myPurchases(): Promise<PurchasedItem[]> {
     .map((r) => ({ item: toItem(r.item as ItemRow), purchasedAt: r.created_at }));
 }
 
-/** A kredit-egyenlegem (0, ha nincs sor / nincs backend). */
+/** Az összes egyenlegem cent-Coinban (0, ha nincs sor / nincs backend). A bontás: wallet.fetchWallet. */
 export async function creditBalance(): Promise<number> {
   const uid = currentUserId();
   if (!supabase || !uid) {
@@ -216,7 +216,7 @@ export async function getPayload(itemId: string): Promise<unknown | null> {
  */
 export async function publishProjectAsItem(
   project: Project,
-  meta: { title: string; description?: string; priceCredits: number; kind?: ShopKind; category?: string; previewUrl?: string }
+  meta: { title: string; description?: string; priceCents: number; kind?: ShopKind; category?: string; previewUrl?: string }
 ): Promise<ShopItem> {
   const sb = requireSupabase();
   const uid = currentUserId();
@@ -232,7 +232,7 @@ export async function publishProjectAsItem(
       description: meta.description ?? null,
       kind: meta.kind ?? 'template',
       category: meta.category ?? null,
-      price_credits: Math.max(0, Math.trunc(meta.priceCredits)),
+      price_cents: Math.max(0, Math.trunc(meta.priceCents)),
       preview_url: meta.previewUrl ?? null,
       seller_name: user?.email ?? null,
       status: 'published',
@@ -275,9 +275,9 @@ export async function importPayloadAsProject(payload: unknown): Promise<string |
 }
 
 /**
- * DEV/manuális kredit-feltöltés a worker /shop/credits/grant-ján. Az ÉLES top-up
- * a RevenueCat consumable (`credits_<n>` product) → webhook. Visszaadja az új
- * egyenleget.
+ * DEV/manuális feltöltés a worker /shop/credits/grant-ján: `amount` Coin a VÁSÁROLT
+ * alegyenlegre. Az ÉLES feltöltés a RevenueCat consumable (`coins_<n>` csomag) →
+ * webhook. Visszaadja az új egyenleget (cent-Coin).
  */
 export async function buyCreditsDev(amount: number): Promise<number> {
   const userId = currentUserId();

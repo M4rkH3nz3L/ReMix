@@ -31,9 +31,10 @@ router.get('/storage/usage', requireAuth, async (req, res) => {
   }
 });
 
-// 💸 Kifizetés: koin → pénz (3 Ft/koin). A koin-levonást + a 'pending' payout-sort
-// az atomikus request_payout_for RPC végzi, majd megpróbáljuk a provider-utalást
-// (PayPal). Provider nélkül a kérelem 'pending' marad (manuális teljesítés). A
+// 💸 Kifizetés: MEGKERESETT Coin → pénz (1 Coin = 3 €), csak a beváltható alegyenlegből,
+// min. 20 Coin, hetente 1. A levonást + a 'pending' payout-sort az atomikus
+// request_payout_for RPC végzi (a szabályok a DB-ben), majd megpróbáljuk a provider-
+// utalást (PayPal). Provider nélkül a kérelem 'pending' marad (manuális teljesítés). A
 // hívó a VERIFIKÁLT tokenből — mást nem lehet a nevében kifizettetni.
 router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json({ limit: '4kb' }), async (req, res) => {
   const uid = callerId(req, req.body?.userId);
@@ -46,9 +47,9 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
     res.status(503).json({ error: 'A kifizetés nincs konfigurálva (service_role).' });
     return;
   }
-  const coins = Math.trunc(Number(req.body?.coins || 0));
-  if (!Number.isFinite(coins) || coins <= 0) {
-    res.status(400).json({ error: 'Érvénytelen koin-mennyiség.' });
+  const cents = Math.trunc(Number(req.body?.cents || 0));
+  if (!Number.isFinite(cents) || cents <= 0) {
+    res.status(400).json({ error: 'Érvénytelen összeg (cent-Coin).' });
     return;
   }
   try {
@@ -64,15 +65,12 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
     // levon + 'pending' payout-sor (atomikus, szerver-hiteles)
     const { data: reqRow, error: rpcErr } = await sb.rpc('request_payout_for', {
       p_user: uid,
-      p_coins: coins,
+      p_cents: cents,
     });
     if (rpcErr) {
-      if (/insufficient_credits/.test(rpcErr.message)) {
-        res.status(400).json({ error: 'insufficient_credits' });
-        return;
-      }
-      if (/below_min_payout/.test(rpcErr.message)) {
-        res.status(400).json({ error: 'below_min_payout' });
+      const known = /insufficient_earned|below_min_payout|payout_weekly_limit/.exec(rpcErr.message);
+      if (known) {
+        res.status(400).json({ error: known[0] });
         return;
       }
       throw new Error(rpcErr.message);
@@ -83,7 +81,7 @@ router.post('/wallet/payout', requireAuth, rateLimit('messaging'), express.json(
       return;
     }
     try {
-      const ref = await sendPayout(acct, reqRow.amount_huf, `ReMix payout ${reqRow.request_id}`);
+      const ref = await sendPayout(acct, reqRow.amount_eur_cents, `ReMix payout ${reqRow.request_id}`);
       await sb.rpc('resolve_payout', {
         p_request: reqRow.request_id,
         p_status: 'paid',

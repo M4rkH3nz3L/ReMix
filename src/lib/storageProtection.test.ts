@@ -14,7 +14,7 @@ import {
   storeDecision,
   usedFraction,
 } from './storageProtection';
-import { STORAGE_COIN_PER_GB_MONTH } from './storageQuota';
+import { STORAGE_CENTS_PER_GB_MONTH } from './storageQuota';
 
 describe('storageProtection — adatvesztés-védelem + coin-recurring (TECH-TOP §5)', () => {
   test('storageDowngradeBlocked: a használat fölé esés blokkolt', () => {
@@ -32,13 +32,13 @@ describe('storageProtection — adatvesztés-védelem + coin-recurring (TECH-TOP
 
   test('monthlyCoinForBonus: GB × a havi coin/GB', () => {
     expect(monthlyCoinForBonus(0)).toBe(0);
-    expect(monthlyCoinForBonus(3)).toBe(3 * STORAGE_COIN_PER_GB_MONTH);
-    expect(monthlyCoinForBonus(1.2)).toBe(2 * STORAGE_COIN_PER_GB_MONTH); // ceil
+    expect(monthlyCoinForBonus(3)).toBe(3 * STORAGE_CENTS_PER_GB_MONTH);
+    expect(monthlyCoinForBonus(1.2)).toBe(2 * STORAGE_CENTS_PER_GB_MONTH); // ceil
   });
 
   test('coinToKeepContent: a megtartás havi coin-költsége', () => {
     expect(coinToKeepContent(5 * GB_BYTES, 10 * GB_BYTES)).toBe(0); // belefér → 0
-    expect(coinToKeepContent(13 * GB_BYTES, 10 * GB_BYTES)).toBe(3 * STORAGE_COIN_PER_GB_MONTH); // 3 GB
+    expect(coinToKeepContent(13 * GB_BYTES, 10 * GB_BYTES)).toBe(3 * STORAGE_CENTS_PER_GB_MONTH); // 3 GB
   });
 
   test('checkDowngrade: biztonságos vs fizetős-megtartás', () => {
@@ -46,7 +46,7 @@ describe('storageProtection — adatvesztés-védelem + coin-recurring (TECH-TOP
     expect(checkDowngrade(14 * GB_BYTES, 10 * GB_BYTES)).toEqual({
       safe: false,
       bonusGB: 4,
-      monthlyCoin: 4 * STORAGE_COIN_PER_GB_MONTH,
+      monthlyCoin: 4 * STORAGE_CENTS_PER_GB_MONTH,
     });
   });
 });
@@ -87,7 +87,7 @@ describe('írás-idejű kvóta-döntés — record_storage_object szerver-tükre
   test('bonusGBToFit / coinToFit: a konkrét íráshoz hiányzó GB és havi coin', () => {
     expect(bonusGBToFit(8 * GB_BYTES, Q, 1 * GB_BYTES)).toBe(0); // belefér
     expect(bonusGBToFit(9 * GB_BYTES, Q, 2.5 * GB_BYTES)).toBe(2); // 1.5 GB túl → ceil 2
-    expect(coinToFit(9 * GB_BYTES, Q, 2.5 * GB_BYTES)).toBe(2 * STORAGE_COIN_PER_GB_MONTH);
+    expect(coinToFit(9 * GB_BYTES, Q, 2.5 * GB_BYTES)).toBe(2 * STORAGE_CENTS_PER_GB_MONTH);
     expect(coinToFit(1 * GB_BYTES, Q, 1 * GB_BYTES)).toBe(0);
   });
 });

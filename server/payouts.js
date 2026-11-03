@@ -1,5 +1,5 @@
 const { logCaught } = require('./lib/caught');
-// 💸 Kifizetés (koin → pénz) — provideres, automata utalás.
+// 💸 Kifizetés (megkeresett Coin → euró) — provideres, automata utalás.
 //
 // A koin-levonás + a payout-sor a DB-ben SZERVER-HITELES (request_payout_for RPC,
 // service_role). A tényleges pénzutalást EZ intézi: jelenleg PayPal Payouts (env-
@@ -33,11 +33,16 @@ async function paypalToken() {
   return data.access_token;
 }
 
+/** euró-cent → a PayPal által várt két tizedes szöveg ("60.00"). */
+function eurValue(amountEurCents) {
+  return (Math.trunc(amountEurCents) / 100).toFixed(2);
+}
+
 /**
  * Kifizetés a célszámlára. Visszaadja a provider-referenciát (batch id).
- * `account`: { provider, email }. `amountHuf`: egész forint (HUF 0-decimális).
+ * `account`: { provider, email }. `amountEurCents`: egész euró-cent (PRO-CASH: EUR-ban fizetünk).
  */
-async function sendPayout(account, amountHuf, note) {
+async function sendPayout(account, amountEurCents, note) {
   if (!account || account.provider !== 'paypal') {
     throw new Error('Jelenleg csak PayPal-kifizetés támogatott.');
   }
@@ -52,12 +57,12 @@ async function sendPayout(account, amountHuf, note) {
       sender_batch_header: {
         sender_batch_id: `remix-${crypto.randomUUID()}`,
         email_subject: 'ReMix kifizetés',
-        email_message: note || 'Koin-kiváltás a ReMixből.',
+        email_message: note || 'Coin-beváltás a ReMixből.',
       },
       items: [
         {
           recipient_type: 'EMAIL',
-          amount: { value: String(Math.trunc(amountHuf)), currency: 'HUF' },
+          amount: { value: eurValue(amountEurCents), currency: 'EUR' },
           receiver: account.email,
           note: note || 'ReMix payout',
         },
@@ -71,4 +76,4 @@ async function sendPayout(account, amountHuf, note) {
   return data.batch_header?.payout_batch_id || null;
 }
 
-module.exports = { payoutsConfigured, sendPayout };
+module.exports = { payoutsConfigured, sendPayout, eurValue };

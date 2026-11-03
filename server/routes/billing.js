@@ -15,7 +15,7 @@ const {
   billingAvailable,
   activatePro,
   deactivatePro,
-  grantCredits,
+  grantCoins,
   handleRevenueCatEvent,
 } = require('../billing');
 
@@ -42,7 +42,8 @@ router.post('/billing/activate', express.json({ limit: '16kb' }), devBillingGuar
     });
 });
 
-// 🪙 Shop kredit feltöltés — DEV/manuális (a valós top-up a RevenueCat consumable webhookon).
+// 🪙 Coin-feltöltés — DEV/manuális: `amount` Coin a VÁSÁROLT alegyenlegre (a valós
+// feltöltés a RevenueCat consumable / Stripe webhookon).
 router.post('/shop/credits/grant', express.json({ limit: '16kb' }), devBillingGuard, requireAuth, (req, res) => {
   if (!billingAvailable()) {
     res.status(503).json({ error: 'billing nincs konfigurálva' });
@@ -54,7 +55,8 @@ router.post('/shop/credits/grant', express.json({ limit: '16kb' }), devBillingGu
     res.status(401).json({ error: 'Nem azonosítható hívó.' });
     return;
   }
-  grantCredits(userId, Number.isFinite(amount) ? amount : 100, 'topup', 'manual')
+  const coins = Number.isFinite(amount) && amount > 0 ? Math.min(amount, 1000) : 10;
+  grantCoins(userId, Math.round(coins * 100), 'purchased', 'topup', 'manual')
     .then((result) => res.json(result))
     .catch((err) => {
     logCaught('routes/billing.js', err);

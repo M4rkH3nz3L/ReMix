@@ -3887,6 +3887,23 @@
         "play": "Lejátszás",
         "pause": "Szünet"
       },
+      "offline": {
+        "onDeviceHint": "Ingyenes export a telefonon: WAV, 16 bit, 44,1 kHz, sztereó — szerver nélkül. A többi formátum és a szerveres effektek Pro-val érhetők el.",
+        "tooLong": "A telefonos export legfeljebb {{minutes}} perces projektet tud. Hosszabbhoz a Pro szerveres exportja kell.",
+        "noDecoder": "A hangdekóder ezen az eszközön nem érhető el.",
+        "decodeFailed": "A(z) {{name}} hangfájl nem olvasható be a telefonon.",
+        "decoding": "Hangok beolvasása…",
+        "mixing": "Keverés a telefonon…",
+        "unsupportedTitle": "Néhány beállítás kimaradt",
+        "unsupportedBody": "A telefonos export nem tartalmazza: {{list}}. Ezek a Pro szerveres exportjában szólnak.",
+        "feature": {
+          "effects": "hangeffektek",
+          "voiceEnhance": "hangjavítás",
+          "deReverb": "visszhang-csökkentés",
+          "autoDuck": "automatikus halkítás",
+          "master": "master-lánc"
+        }
+      },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",

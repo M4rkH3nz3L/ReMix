@@ -3892,6 +3892,23 @@
         "play": "Wiedergabe",
         "pause": "Pause"
       },
+      "offline": {
+        "onDeviceHint": "Kostenloser Export auf dem Handy: WAV, 16 Bit, 44,1 kHz, Stereo — ohne Server. Weitere Formate und Server-Effekte gibt es mit Pro.",
+        "tooLong": "Der Export auf dem Handy schafft Projekte bis {{minutes}} Minuten. Für längere braucht es den Pro-Server-Export.",
+        "noDecoder": "Der Audio-Decoder ist auf diesem Gerät nicht verfügbar.",
+        "decodeFailed": "Die Audiodatei {{name}} kann auf dem Handy nicht gelesen werden.",
+        "decoding": "Audio wird gelesen…",
+        "mixing": "Mischen auf dem Handy…",
+        "unsupportedTitle": "Einige Einstellungen fehlen",
+        "unsupportedBody": "Der Export auf dem Handy enthält nicht: {{list}}. Diese erklingen im Pro-Server-Export.",
+        "feature": {
+          "effects": "Audioeffekte",
+          "voiceEnhance": "Stimmverbesserung",
+          "deReverb": "Hall-Reduktion",
+          "autoDuck": "Auto-Ducking",
+          "master": "Master-Kette"
+        }
+      },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",

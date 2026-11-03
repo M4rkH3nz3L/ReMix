@@ -53,6 +53,7 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
@@ -2350,6 +2351,64 @@ async function smokeAlbumSheet(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
+async function smokeOfflineExport(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_offline_src.wav', 3);
+  const base = createEmptyProject('smoke offline', '1:1', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'o1', uri, label: 'tone', start: 0.5, duration: 2, trimIn: 0.5, sourceDuration: 3, volume: 0.6, fadeIn: 0.3, fadeOut: 0.4, pan: -0.5, source: 'imported',
+    keyframes: { volume: [{ time: 0, value: 0.2, easing: 'linear' }, { time: 2, value: 0.9, easing: 'linear' }] } as AudioClip['keyframes'] };
+  const project: Project = { ...base, trackMix: { music: { gain: 0.8 } }, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [c] } : tr)) };
+  const started = Date.now();
+  const target = new File(projectExportDir(), 'smoke_offline.wav');
+  const { uri: out } = await exportOfflineWav(project, target);
+  const ms = Date.now() - started;
+  const size = new File(out).size ?? 0;
+  log(Math.abs(size - (44 + 2.5 * 44100 * 4)) < 8, 'A26 a WAV a telefonon készült, a várt hosszal', `${size} bájt, ${ms} ms`);
+  const serverFile = new File(projectExportDir(), 'smoke_server.wav');
+  await exportAudioToFile(project, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 24, sampleRate: 44100, channels: 2 }), serverFile);
+  const api = await loadAudioApi();
+  if (!api) {
+    log(false, 'dekóder', 'nincs');
+    return;
+  }
+  const mine = await api.decodeAudioData(out, 44100);
+  const theirs = await api.decodeAudioData(serverFile.uri, 44100);
+  const db = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * v, 0) / Math.max(1, xs.length) + 1e-30);
+  for (const ch of [0, 1]) {
+    const a = mine.getChannelData(ch);
+    const b = theirs.getChannelData(ch);
+    const n = Math.min(a.length, b.length);
+    const diff = Float32Array.from({ length: n }, (_, i) => a[i] - b[i]);
+    const snr = db(b.subarray(0, n)) - db(diff);
+    log(snr > 60, `A26 telefon = szerver (${ch === 0 ? 'bal' : 'jobb'} csatorna)`, `${snr.toFixed(1)} dB a jel alatt, hossz ${a.length}/${b.length}`);
+  }
+  new File(out).delete();
+  serverFile.delete();
+  new File(uri).delete();
+}
+
+/** A26 sebesség: 60 mp-es, három klipes projekt a telefonon (a 20 perces felső határhoz). */
+async function smokeOfflineSpeed(log: Log) {
+  const uri = toneWav('smoke_offline_long.wav', 60);
+  const base = createEmptyProject('smoke offline hosszú', '1:1', undefined, 'audio');
+  const mk = (id: string, start: number): AudioClip => ({ kind: 'audio', id, uri, label: id, start, duration: 40, trimIn: 0, sourceDuration: 60, volume: 0.5, fadeIn: 1, fadeOut: 1, source: 'imported' });
+  const project: Project = { ...base, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('a', 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('b', 10)] } : tr.type === 'voiceover' ? { ...tr, clips: [mk('c', 20)] } : tr)) };
+  const phases: string[] = [];
+  let last = Date.now();
+  const started = last;
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_long.wav'), (u) => {
+    if (phases[phases.length - 1]?.split(':')[0] !== u.phase) {
+      phases.push(`${u.phase}: +${Date.now() - last} ms`);
+      last = Date.now();
+    }
+  });
+  const ms = Date.now() - started;
+  log(ms < 30000, 'A26 egy perc keverés a telefonon', `${ms} ms (${(ms / 60).toFixed(0)} ms / mp hang) · ${phases.join(' · ')}`);
+  new File(out).delete();
+  new File(uri).delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -2879,6 +2938,14 @@ export async function runImageSmoke(
   }
   if (phase === 'albumsheet') {
     await step('albumsheet', () => smokeAlbumSheet(log, setHarness));
+    return;
+  }
+  if (phase === 'offlinespeed') {
+    await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'offline') {
+    await step('offline', () => smokeOfflineExport(log));
     return;
   }
   if (phase === 'recording') {

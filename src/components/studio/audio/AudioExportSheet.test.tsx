@@ -75,3 +75,21 @@ describe('AudioExportSheet', () => {
     expect(texts(r).some((x) => x.includes('studio.audio.exportSheet.lossyHint'))).toBe(true);
   });
 });
+
+describe('AudioExportSheet — telefonos export (A26)', () => {
+  it('Free módban a WAV az alap, a többi formátum a Pro-ajánlatot nyitja, minőség-választó nincs', () => {
+    const onDownload = jest.fn();
+    const onProRequired = jest.fn();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<AudioExportSheet onClose={() => {}} onPreview={() => {}} onUseInVideo={() => {}} onDownload={onDownload} onDevice onProRequired={onProRequired} />);
+    });
+    act(() => chip(r, 'MP3 · PRO').props.onPress());
+    expect(onProRequired).toHaveBeenCalledTimes(1);
+    expect(chip(r, '24 bit')).toBeUndefined();
+    expect(chip(r, '48 kHz')).toBeUndefined();
+    save(r);
+    expect(onDownload).toHaveBeenCalledWith('wav', expect.anything());
+  });
+});
+

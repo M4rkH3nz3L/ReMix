@@ -29,7 +29,9 @@ import {
 } from '@/lib/audioExportOptions';
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
-import { guardPro } from '@/store/paywallStore';
+import { guardPro, usePaywall } from '@/store/paywallStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { withCancellableProgress } from '@/store/progressStore';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
@@ -46,6 +48,7 @@ export default function AudioStudioScreen() {
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const isPro = useEntitlement((s) => s.isPro());
 
   usePlaybackClock();
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
@@ -124,6 +127,32 @@ export default function AudioStudioScreen() {
       return Promise.resolve();
     }
     const info = audioFormatInfo(format);
+    // A26: Free — a WAV szerver nélkül, a telefonon készül
+    if (!useEntitlement.getState().isPro()) {
+      return withCancellableProgress(t('studio.audio.exportRendering', { format: 'WAV' }), async (report, signal) => {
+        const target = new File(projectExportDir(), audioExportFileName(project.name, 'wav'));
+        const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal);
+        if (unsupported.length > 0) {
+          await new Promise<void>((resolve) =>
+            Alert.alert(
+              t('studio.audio.offline.unsupportedTitle'),
+              t('studio.audio.offline.unsupportedBody', { list: unsupported.map((u) => t(`studio.audio.offline.feature.${u}`)).join(', ') }),
+              [{ text: t('common.ok'), onPress: () => resolve() }]
+            )
+          );
+        }
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { mimeType: 'audio/wav', dialogTitle: t('studio.audio.exportSheet.shareTitle') });
+        } else {
+          Alert.alert(t('studio.audio.exportSheet.savedTitle'), t('studio.audio.exportSheet.savedBody', { name: target.name }));
+        }
+      }).catch((e: Error) => {
+        logCaught('app/studio/audio/[id].tsx:offlineExport', e);
+        if (!isRenderCancelledError(e)) {
+          Alert.alert(t('studio.export'), e.message);
+        }
+      });
+    }
     return guardPro(
       () =>
         // A29: a ✕ a szerveren futó menetet is leállítja
@@ -162,6 +191,11 @@ export default function AudioStudioScreen() {
             sendToVideo();
           }}
           onDownload={(format, quality) => void downloadAudio(format, quality)}
+          onDevice={!isPro}
+          onProRequired={() => {
+            setExporting(false);
+            usePaywall.getState().open('cloudRender');
+          }}
         />
       ) : null}
     </SafeAreaView>

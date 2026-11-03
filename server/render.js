@@ -101,6 +101,25 @@ async function hasAudioStream(file) {
   }
 }
 
+/** a forrás hang-csatornáinak száma (0 = nincs hangsáv) */
+async function audioChannelCount(file) {
+  try {
+    const { stdout } = await run('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=channels', '-of', 'csv=p=0', file]);
+    return Number(stdout.trim()) || 0;
+  } catch (caught) {
+    logCaught('render.js:audioChannelCount', caught);
+    return 0;
+  }
+}
+
+// 🎧 A monó forrás mindkét oldalra TELJES szinten (mint az élő lejátszó); az ffmpeg
+// alap-felkeverése −3 dB-lel tette, így az export halkabb volt, mint amit a user hallott
+const MONO_TO_STEREO = 'pan=stereo|c0=c0|c1=c0,';
+// 🎚️ hangerő-automációnál 64 mintás keretek: a `volume` kifejezése keretenként értékelődik
+// (alapból ~1024 minta ≈ 23 ms lépcső); így a görbe a klip elejétől 64 mintánként lép —
+// ugyanígy, mint a telefonos (offline) keverőben (`src/lib/offlineMix.ts`)
+const FINE_FRAMES = 'asetnsamples=n=64:p=0,';
+
 function trackOf(project, type) {
   return project.tracks.find((t) => t.type === type) ?? { clips: [] };
 }
@@ -2839,13 +2858,16 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     const aTrimIn = clip.trimIn || 0;
     // sávonkénti mixer-gain (fader) — a klip sávjának gainje (hiányzó = 1)
     const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
+    const mono = (await audioChannelCount(clip.uri)) === 1;
     let chain =
       `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration).toFixed(3)},asetpts=PTS-STARTPTS,` +
+      (mono ? MONO_TO_STEREO : '') +
       (clip.deReverb ? DEREVERB : '') +
       (clip.voiceEnhance ? VOICE_ENHANCE : '') +
       // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
       audioFxChain(clip.audioFx) +
       panChain(clip, 0) +
+      ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
       volumeExpr(clip, 0) +
       (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
     if (clip.fadeIn > 0) {

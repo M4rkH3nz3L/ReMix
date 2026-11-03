@@ -25,18 +25,27 @@ export function AudioExportSheet({
   onPreview,
   onUseInVideo,
   onDownload,
+  onDevice = false,
+  onProRequired,
 }: {
   onClose: () => void;
   onPreview: () => void;
   onUseInVideo: () => void;
   onDownload: (format: AudioExportFormat, quality: AudioExportQuality) => void;
+  /** A26: Free — a WAV a telefonon készül (16 bit, 44,1 kHz, sztereó), a többi formátum Pro */
+  onDevice?: boolean;
+  onProRequired?: () => void;
 }) {
   const { t } = useTranslation();
-  const [format, setFormat] = useState<AudioExportFormat>('mp3');
-  const [quality, setQuality] = useState<AudioExportQuality>(defaultAudioQuality('mp3'));
+  const [format, setFormat] = useState<AudioExportFormat>(onDevice ? 'wav' : 'mp3');
+  const [quality, setQuality] = useState<AudioExportQuality>(defaultAudioQuality(onDevice ? 'wav' : 'mp3'));
   const info = audioFormatInfo(format);
 
   const pickFormat = (next: AudioExportFormat) => {
+    if (onDevice && next !== 'wav') {
+      onProRequired?.();
+      return;
+    }
     setFormat(next);
     setQuality((q) => qualityForFormat(next, q));
   };
@@ -68,14 +77,23 @@ export function AudioExportSheet({
             <Text style={styles.section}>{t('studio.audio.exportSheet.format')}</Text>
             <View style={styles.row}>
               {AUDIO_EXPORT_FORMATS.map((f) => (
-                <Chip key={f.id} label={f.label} active={format === f.id} onPress={() => pickFormat(f.id)} />
+                <Chip
+                  key={f.id}
+                  label={onDevice && f.id !== 'wav' ? `${f.label} · PRO` : f.label}
+                  active={format === f.id}
+                  onPress={() => pickFormat(f.id)}
+                />
               ))}
             </View>
             <Text style={styles.hint}>
-              {info.lossy ? t('studio.audio.exportSheet.lossyHint') : t('studio.audio.exportSheet.losslessHint')}
+              {onDevice
+                ? t('studio.audio.offline.onDeviceHint')
+                : info.lossy
+                  ? t('studio.audio.exportSheet.lossyHint')
+                  : t('studio.audio.exportSheet.losslessHint')}
             </Text>
 
-            {info.lossy ? (
+            {onDevice ? null : info.lossy ? (
               <>
                 <Text style={styles.section}>{t('studio.audio.exportSheet.bitrate')}</Text>
                 <View style={styles.row}>
@@ -95,6 +113,8 @@ export function AudioExportSheet({
               </>
             )}
 
+            {onDevice ? null : (
+              <>
             <Text style={styles.section}>{t('studio.audio.exportSheet.sampleRate')}</Text>
             <View style={styles.row}>
               {([44100, 48000] as const).map((rate) => (
@@ -107,6 +127,8 @@ export function AudioExportSheet({
               <Chip label={t('studio.audio.exportSheet.stereo')} active={quality.channels === 2} onPress={() => set({ channels: 2 })} />
               <Chip label={t('studio.audio.exportSheet.mono')} active={quality.channels === 1} onPress={() => set({ channels: 1 })} />
             </View>
+              </>
+            )}
 
             <View style={styles.save}>
               <PrimaryButton icon="download-outline" label={t('studio.audio.exportSheet.save', { format: info.label })} onPress={() => onDownload(format, quality)} />

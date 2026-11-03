@@ -3887,6 +3887,23 @@
         "play": "Play",
         "pause": "Pause"
       },
+      "offline": {
+        "onDeviceHint": "Free export on your phone: WAV, 16-bit, 44.1 kHz, stereo — no server. Other formats and server effects come with Pro.",
+        "tooLong": "On-device export handles projects up to {{minutes}} minutes. Longer ones need the Pro server export.",
+        "noDecoder": "The audio decoder isn't available on this device.",
+        "decodeFailed": "The audio file {{name}} can't be read on the phone.",
+        "decoding": "Reading audio…",
+        "mixing": "Mixing on the phone…",
+        "unsupportedTitle": "Some settings were left out",
+        "unsupportedBody": "The on-device export doesn't include: {{list}}. They play in the Pro server export.",
+        "feature": {
+          "effects": "audio effects",
+          "voiceEnhance": "voice enhance",
+          "deReverb": "de-reverb",
+          "autoDuck": "auto-ducking",
+          "master": "master chain"
+        }
+      },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",

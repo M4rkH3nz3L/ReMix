@@ -86,7 +86,7 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "audit": "npm run typecheck && npm run lint && npm test",
-    "test:rls": "docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < supabase/tests/social_security.sql | grep -E 'FAIL|rendben'"
+    "test:rls": "set -o pipefail; for f in supabase/tests/*.sql; do echo \"── $f\"; docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < \"$f\" | grep -E 'FAIL|rendben' || exit 1; done"
   },
   "private": true
 }

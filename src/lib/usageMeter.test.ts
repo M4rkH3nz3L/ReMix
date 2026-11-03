@@ -9,7 +9,8 @@ import {
   quotaFor,
   remaining,
   resetIfNewPeriod,
-  TIER_QUOTAS,
+  seatQuota,
+  BUSINESS_MIN_SEATS,
   usageRatio,
   USAGE_METRICS,
   type UsageQuota,
@@ -26,26 +27,35 @@ describe('usageMeter — kvóták (audit §2.2)', () => {
     }
   });
 
-  it('monoton: magasabb tier ≥ alacsonyabb (a korlátlant -1=∞-ként kezelve)', () => {
+  it('monoton: magasabb tier ≥ alacsonyabb (a korlátlant -1=∞-ként, a Vállalatit min. ülésszámmal)', () => {
     const val = (q: UsageQuota, m: (typeof USAGE_METRICS)[number]) => (q[m] < 0 ? Infinity : q[m]);
     for (let i = 1; i < TIER_ORDER.length; i++) {
-      const lo = quotaFor(TIER_ORDER[i - 1]);
-      const hi = quotaFor(TIER_ORDER[i]);
+      const lo = seatQuota(TIER_ORDER[i - 1], BUSINESS_MIN_SEATS);
+      const hi = seatQuota(TIER_ORDER[i], BUSINESS_MIN_SEATS);
       for (const m of USAGE_METRICS) {
         expect(val(hi, m)).toBeGreaterThanOrEqual(val(lo, m));
       }
     }
   });
 
-  it('ultra mindenhol korlátlan (-1)', () => {
-    for (const m of USAGE_METRICS) {
-      expect(isUnlimited(TIER_QUOTAS.ultra, m)).toBe(true);
-    }
+  it('PRO-CASH 3.1: a Free a felhőből semmit nem kap (AI-token, render-perc = 0)', () => {
+    expect(quotaFor('free').aiTokens).toBe(0);
+    expect(quotaFor('free').renderMinutes).toBe(0);
+    expect(quotaFor('basic')).toMatchObject({ aiTokens: 200000, renderMinutes: 30 });
+    expect(quotaFor('pro')).toMatchObject({ aiTokens: 1000000, renderMinutes: 120 });
+    expect(quotaFor('ultra')).toMatchObject({ aiTokens: 3000000, renderMinutes: 400 });
+  });
+
+  it('a Vállalati kvóta fejenkénti: × ülésszám, min. 2 fő; a korlátlan korlátlan marad', () => {
+    expect(seatQuota('business', 5).aiTokens).toBe(10000000);
+    expect(seatQuota('business', 1).renderMinutes).toBe(600);
+    expect(isUnlimited(seatQuota('business', 5), 'exports')).toBe(true);
+    expect(seatQuota('pro', 9)).toEqual(quotaFor('pro'));
   });
 });
 
 describe('usageMeter — fogyasztás + kvóta-ellenőrzés', () => {
-  const q = quotaFor('free'); // aiTokens: 20000
+  const q = { aiTokens: 20000, renderMinutes: 10, exports: 15, cloudJobs: 25 }; // rögzített tesztkvóta
 
   it('addUsage immutábilis + akkumulál; negatív → 0', () => {
     const c0 = {};
@@ -67,16 +77,16 @@ describe('usageMeter — fogyasztás + kvóta-ellenőrzés', () => {
   });
 
   it('korlátlan metrika: remaining=∞, mindig canUse, sosem over', () => {
-    const uq = quotaFor('ultra');
-    expect(remaining({ aiTokens: 1e9 }, uq, 'aiTokens')).toBe(Infinity);
-    expect(canUse({ aiTokens: 1e9 }, uq, 'aiTokens', 1e9)).toBe(true);
-    expect(isOverQuota({ aiTokens: 1e9 }, uq, 'aiTokens')).toBe(false);
+    const uq = quotaFor('pro'); // exports: korlátlan
+    expect(remaining({ exports: 1e9 }, uq, 'exports')).toBe(Infinity);
+    expect(canUse({ exports: 1e9 }, uq, 'exports', 1e9)).toBe(true);
+    expect(isOverQuota({ exports: 1e9 }, uq, 'exports')).toBe(false);
   });
 
   it('usageRatio 0–1; korlátlanra 0', () => {
     expect(usageRatio({ aiTokens: 10000 }, q, 'aiTokens')).toBeCloseTo(0.5);
     expect(usageRatio({ aiTokens: 40000 }, q, 'aiTokens')).toBe(1); // clamp
-    expect(usageRatio({ aiTokens: 1e9 }, quotaFor('ultra'), 'aiTokens')).toBe(0);
+    expect(usageRatio({ exports: 1e9 }, quotaFor('pro'), 'exports')).toBe(0);
   });
 });
 

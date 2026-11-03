@@ -75,7 +75,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   },
   basic: {
     renderEngine: 'device+cloud', renderMaxRes: 1080, watermark: false, renderPriority: false,
-    storageLocation: 'device+cloud', storageCloudBackup: true, storageSync: false, storageQuotaGB: 10,
+    storageLocation: 'device+cloud', storageCloudBackup: true, storageSync: false, storageQuotaGB: 3,
     aiOnDevice: true, aiCloud: false,
     publishEnabled: true, publishMaxAccounts: 1, publishSchedule: true, platformProfiles: 'one',
     analyticsLevel: 'basic', planner: true, creatorMemory: false,
@@ -84,7 +84,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   },
   pro: {
     renderEngine: 'cloud', renderMaxRes: 2160, watermark: false, renderPriority: false,
-    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: 50,
+    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: 25,
     aiOnDevice: true, aiCloud: true,
     publishEnabled: true, publishMaxAccounts: 3, publishSchedule: true, platformProfiles: 'all',
     analyticsLevel: 'full', planner: true, creatorMemory: true,
@@ -93,7 +93,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   },
   ultra: {
     renderEngine: 'cloud', renderMaxRes: 2160, watermark: false, renderPriority: true,
-    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: 200,
+    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: 100,
     aiOnDevice: true, aiCloud: true,
     publishEnabled: true, publishMaxAccounts: 10, publishSchedule: true, platformProfiles: 'all',
     analyticsLevel: 'insights', planner: true, creatorMemory: true,
@@ -102,7 +102,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   },
   business: {
     renderEngine: 'cloud', renderMaxRes: 2160, watermark: false, renderPriority: true,
-    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: -1,
+    storageLocation: 'cloud', storageCloudBackup: true, storageSync: true, storageQuotaGB: 100,
     aiOnDevice: true, aiCloud: true,
     publishEnabled: true, publishMaxAccounts: -1, publishSchedule: true, platformProfiles: 'all',
     analyticsLevel: 'team', planner: true, creatorMemory: true,

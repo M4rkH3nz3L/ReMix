@@ -15,7 +15,7 @@
 export type Tier = 'free' | 'basic' | 'pro' | 'ultra' | 'business';
 
 /** A szintek növekvő sorrendben (a rang = az index). Csomag-nevek (SCOPES.md §3):
- *  free=Free · basic=Amatőr · pro=Haladó · ultra=Profi · business=Céges. */
+ *  free=Free · basic=Amatőr · pro=Haladó · ultra=Profi · business=Vállalati. */
 export const TIER_ORDER: readonly Tier[] = ['free', 'basic', 'pro', 'ultra', 'business'] as const;
 
 /** A szint rangja (0 = free … 4 = business). Ismeretlen értékre free-rang (0). */
@@ -44,4 +44,26 @@ export function asTier(value: unknown): Tier {
   return typeof value === 'string' && (TIER_ORDER as readonly string[]).includes(value)
     ? (value as Tier)
     : 'free';
+}
+
+/** Aktív előfizetési státuszok (a DB `active_tier_for` tükre). */
+export const ACTIVE_STATUSES: readonly string[] = ['active', 'trialing'] as const;
+
+/**
+ * A HITELES aktív szint egy `subscriptions`-sorból (a DB `active_tier_for` és a
+ * server/tiers.js tükre): aktív státusz ÉS nem lejárt periódus → a sor szintje; FAIL-CLOSED:
+ * hiányzó/hibás lejárat, ismeretlen státusz → `free`.
+ */
+export function activeTierFromRow(
+  row: { tier?: unknown; status?: unknown; current_period_end?: string | null } | null | undefined,
+  nowMs: number = Date.now()
+): Tier {
+  if (!row || typeof row.status !== 'string' || !ACTIVE_STATUSES.includes(row.status)) {
+    return 'free';
+  }
+  const end = row.current_period_end ? Date.parse(row.current_period_end) : NaN;
+  if (Number.isNaN(end) || end <= nowMs) {
+    return 'free';
+  }
+  return asTier(row.tier);
 }

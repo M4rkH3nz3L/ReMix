@@ -10,7 +10,7 @@ const { logCaught } = require('./lib/caught');
 // használja (hiteles lejárat); a manuális aktiválás mosttól (vagy a meglévő
 // lejárattól) hosszabbít 30 nappal (megújítás).
 const { adminClient } = require('./notify');
-const { tierMeetsMin, isPaidTier, asTier } = require('./tiers');
+const { TIER_ORDER, tierMeetsMin, isPaidTier, activeTierFromRow } = require('./tiers');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 30;
@@ -21,11 +21,12 @@ function billingAvailable() {
 }
 
 /**
- * Pro aktiválása/megújítása a `subscriptions`-ben (service_role → RLS-bypass).
+ * Egy fizetős szint aktiválása/megújítása a `subscriptions`-ben (service_role → RLS-bypass).
  * `opts.until` (ISO/ms): explicit lejárat (webhook). Különben `opts.days` (def. 30)
- * a meglévő érvényes lejárattól, vagy mosttól.
+ * a meglévő, UGYANILYEN szintű érvényes lejárattól, vagy mosttól. `opts.seats`: ülésszám
+ * (Vállalati: min. 2).
  */
-async function activatePro(userId, opts = {}) {
+async function activateTier(userId, tier, opts = {}) {
   const sb = adminClient();
   if (!sb) {
     throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY nincs beállítva a workeren.');
@@ -34,7 +35,11 @@ async function activatePro(userId, opts = {}) {
   if (!uid) {
     throw new Error('userId kötelező.');
   }
+  if (!TIER_ORDER.includes(tier) || !isPaidTier(tier)) {
+    throw new Error(`Érvénytelen fizetős szint: ${tier}`);
+  }
   const source = opts.source || 'manual';
+  const seats = tier === 'business' ? Math.max(2, Math.trunc(Number(opts.seats) || 2)) : 1;
   const now = Date.now();
 
   let endMs;
@@ -45,26 +50,31 @@ async function activatePro(userId, opts = {}) {
     }
   } else {
     const days = Number.isFinite(opts.days) ? opts.days : DEFAULT_DAYS;
-    // megújítás: ha még érvényes a Pro, ONNAN hosszabbítunk, különben mosttól
+    // megújítás: ha még érvényes UGYANEZ a szint, ONNAN hosszabbítunk, különben mosttól
     const { data: cur } = await sb
       .from('subscriptions')
       .select('current_period_end, tier')
       .eq('user_id', uid)
       .maybeSingle();
     const curEnd = cur?.current_period_end ? Date.parse(cur.current_period_end) : NaN;
-    const base = cur?.tier === 'pro' && !Number.isNaN(curEnd) && curEnd > now ? curEnd : now;
+    const base = cur?.tier === tier && !Number.isNaN(curEnd) && curEnd > now ? curEnd : now;
     endMs = base + days * DAY_MS;
   }
 
   const end = new Date(endMs).toISOString();
   const { error } = await sb.from('subscriptions').upsert(
-    { user_id: uid, tier: 'pro', status: 'active', current_period_end: end, source },
+    { user_id: uid, tier, seats, status: 'active', current_period_end: end, source },
     { onConflict: 'user_id' }
   );
   if (error) {
     throw new Error(error.message);
   }
-  return { tier: 'pro', proUntil: end };
+  return { tier, proUntil: end };
+}
+
+/** Haladó (`pro`) aktiválása — a régi hívók rövidítése az `activateTier`-re. */
+function activatePro(userId, opts = {}) {
+  return activateTier(userId, 'pro', opts);
 }
 
 /**
@@ -105,7 +115,7 @@ async function deactivatePro(userId, opts = {}) {
   }
   const { error } = await sb
     .from('subscriptions')
-    .update({ tier: 'free', status: opts.status || 'canceled', source: opts.source || 'manual' })
+    .update({ tier: 'free', seats: 1, status: opts.status || 'canceled', source: opts.source || 'manual' })
     .eq('user_id', uid);
   if (error) {
     throw new Error(error.message);
@@ -141,14 +151,14 @@ async function processRevenueCatEvent(ev, uid, type) {
   }
   if (RC_GRANT.has(type)) {
     return activatePro(uid, {
-      source: 'revenuecat',
+      source: 'iap',
       until: ev.expiration_at_ms ?? null,
       days: DEFAULT_DAYS,
     });
   }
   if (RC_REVOKE.has(type)) {
     return deactivatePro(uid, {
-      source: 'revenuecat',
+      source: 'iap',
       status: type === 'EXPIRATION' ? 'expired' : 'canceled',
     });
   }
@@ -246,17 +256,10 @@ async function activeTier(userId) {
       .select('tier, status, current_period_end')
       .eq('user_id', uid)
       .maybeSingle();
-    if (error || !data) {
+    if (error) {
       return 'free';
     }
-    if (data.status && !['active', 'trialing', 'in_grace_period'].includes(data.status)) {
-      return 'free';
-    }
-    const end = data.current_period_end ? Date.parse(data.current_period_end) : NaN;
-    if (Number.isNaN(end) || end <= Date.now()) {
-      return 'free';
-    }
-    return asTier(data.tier);
+    return activeTierFromRow(data);
   } catch (caught) {
     logCaught('billing.js:activeTier', caught);
     return 'free';
@@ -275,6 +278,7 @@ async function isPaid(userId) {
 
 module.exports = {
   billingAvailable,
+  activateTier,
   activatePro,
   deactivatePro,
   grantCredits,

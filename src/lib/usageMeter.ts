@@ -27,19 +27,40 @@ export type UsageQuota = Record<UsageMetric, number>;
 
 /**
  * Tierenkénti HAVI kvóták. `-1` = korlátlan. (Termék-döntés, hangolható — a billing-
- * bekötéskor env/DB-ből is jöhet; a storage NEM itt van.) A rangsor monoton: magasabb
- * tier ≥ alacsonyabb (ultra mindenhol a legbővebb / korlátlan).
+ * bekötéskor env/DB-ből is jöhet; a storage NEM itt van.) A számok a PRO-CASH 3.1 táblázata;
+ * a Free a felhőből semmit nem kap (AI: on-device + BYOK, render: a telefonon). A Vállalati
+ * kvóta FEJENKÉNT értendő (`seatQuota`), így min. 2 fővel is a Profi fölött van.
  */
 export const TIER_QUOTAS: Record<Tier, UsageQuota> = {
-  free: { aiTokens: 20000, renderMinutes: 10, exports: 15, cloudJobs: 25 },
-  basic: { aiTokens: 100000, renderMinutes: 60, exports: 100, cloudJobs: 150 },
-  pro: { aiTokens: 500000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
-  ultra: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
-  business: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
+  free: { aiTokens: 0, renderMinutes: 0, exports: 15, cloudJobs: 25 },
+  basic: { aiTokens: 200000, renderMinutes: 30, exports: 100, cloudJobs: 150 },
+  pro: { aiTokens: 1000000, renderMinutes: 120, exports: -1, cloudJobs: -1 },
+  ultra: { aiTokens: 3000000, renderMinutes: 400, exports: -1, cloudJobs: -1 },
+  business: { aiTokens: 2000000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
 };
 
 export function quotaFor(tier: Tier): UsageQuota {
   return TIER_QUOTAS[tier];
+}
+
+/** A Vállalati csomag legkisebb ülésszáma (PRO-CASH 5.1). */
+export const BUSINESS_MIN_SEATS = 2;
+
+/**
+ * A szervezet KÖZÖS havi kerete: a Vállalati kvóta fejenként értendő (× ülésszám, min. 2),
+ * a többi szint egyéni (az ülésszám nem számít). A korlátlan (-1) korlátlan marad.
+ */
+export function seatQuota(tier: Tier, seats: number): UsageQuota {
+  const q = quotaFor(tier);
+  if (tier !== 'business') {
+    return q;
+  }
+  const n = Math.max(BUSINESS_MIN_SEATS, Math.trunc(seats) || BUSINESS_MIN_SEATS);
+  const out = { ...q };
+  for (const m of USAGE_METRICS) {
+    out[m] = q[m] < 0 ? -1 : q[m] * n;
+  }
+  return out;
 }
 
 export function getUsage(c: UsageCounters, m: UsageMetric): number {

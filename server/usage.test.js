@@ -3,23 +3,28 @@
 const usage = require('./usage');
 
 describe('usage — kvóta-logika', () => {
-  test('TIER_QUOTAS monoton + ultra korlátlan (-1)', () => {
-    const order = ['free', 'basic', 'pro', 'ultra'];
-    const val = (t, m) => (usage.TIER_QUOTAS[t][m] < 0 ? Infinity : usage.TIER_QUOTAS[t][m]);
+  test('TIER_QUOTAS monoton (a Vállalati min. 2 fővel) + a Free felhő-kerete 0', () => {
+    const order = ['free', 'basic', 'pro', 'ultra', 'business'];
+    const val = (t, m) => {
+      const q = usage.seatQuota(t, usage.BUSINESS_MIN_SEATS)[m];
+      return q < 0 ? Infinity : q;
+    };
     for (const m of usage.USAGE_METRICS) {
       for (let i = 1; i < order.length; i++) {
         expect(val(order[i], m)).toBeGreaterThanOrEqual(val(order[i - 1], m));
       }
-      expect(usage.isUnlimited(usage.TIER_QUOTAS.ultra, m)).toBe(true);
     }
+    expect(usage.TIER_QUOTAS.free.aiTokens).toBe(0);
+    expect(usage.TIER_QUOTAS.free.renderMinutes).toBe(0);
   });
 
   test('remaining / canUse', () => {
-    const q = usage.quotaFor('free'); // aiTokens: 20000
-    expect(usage.remaining(19000, q, 'aiTokens')).toBe(1000);
-    expect(usage.canUse(19000, q, 'aiTokens', 1000)).toBe(true);
-    expect(usage.canUse(19000, q, 'aiTokens', 1001)).toBe(false);
-    expect(usage.remaining(1e9, usage.quotaFor('ultra'), 'aiTokens')).toBe(Infinity);
+    const q = usage.quotaFor('basic'); // aiTokens: 200000
+    expect(usage.remaining(199000, q, 'aiTokens')).toBe(1000);
+    expect(usage.canUse(199000, q, 'aiTokens', 1000)).toBe(true);
+    expect(usage.canUse(199000, q, 'aiTokens', 1001)).toBe(false);
+    expect(usage.remaining(1e9, usage.quotaFor('ultra'), 'exports')).toBe(Infinity);
+    expect(usage.canUse(0, usage.quotaFor('free'), 'aiTokens', 1)).toBe(false);
   });
 
   test('periodKey UTC YYYY-MM', () => {
@@ -37,12 +42,12 @@ describe('enforceQuota — DB nélkül best-effort MEGENGED', () => {
     expect(await usage.enforceQuota('u1', 'free', 'nincs', 1)).toEqual({ ok: true, remaining: Infinity });
   });
   test('korlátlan tier → ok (nincs is DB-olvasás)', async () => {
-    expect(await usage.enforceQuota('u1', 'ultra', 'aiTokens', 1e9)).toEqual({ ok: true, remaining: Infinity });
+    expect(await usage.enforceQuota('u1', 'ultra', 'exports', 1e9)).toEqual({ ok: true, remaining: Infinity });
   });
   test('free + van metrika, de nincs DB → used=0 → belefér a kvótáig', async () => {
-    const r = await usage.enforceQuota('u1', 'free', 'aiTokens', 100);
+    const r = await usage.enforceQuota('u1', 'free', 'exports', 10);
     expect(r.ok).toBe(true);
-    expect(r.remaining).toBe(usage.TIER_QUOTAS.free.aiTokens); // used=0
+    expect(r.remaining).toBe(usage.TIER_QUOTAS.free.exports); // used=0
   });
   test('getUsage DB nélkül 0', async () => {
     expect(await usage.getUsage('u1', 'aiTokens')).toBe(0);

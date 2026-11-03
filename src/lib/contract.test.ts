@@ -11,7 +11,7 @@
  * Megjegyzés: a worker-modulok sima CommonJS JS-ek — a kliens (jest-expo) projekt
  * babellel betölti őket; a `require` visszatérése `any`, ezért a tsc nem lép be a .js-be.
  */
-import { TIER_ORDER, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
+import { TIER_ORDER, activeTierFromRow, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
   TIER_QUOTAS,
   USAGE_METRICS,
@@ -20,6 +20,7 @@ import {
   periodKey,
   quotaFor,
   remaining,
+  seatQuota,
   type UsageCounters,
   type UsageMetric,
 } from '@/lib/usageMeter';
@@ -388,5 +389,85 @@ describe('értesítés-útvonal: kliens = worker', () => {
 
   it.each(['/chat/1', '/channel/u', '/live/1', '/collab/p?owner=x', '/devices', '/schedules', 'https://x', '//x', '/chat/', '/a/../b', '/settings', '', null])('%j ugyanaz a döntés', (route) => {
     expect(isSafeNotificationRoute(route as string)).toBe(isSafeRoute(route));
+  });
+});
+
+/** A migrációk közül a LEGUTOLSÓ, amelyik a `fnName` függvényt definiálja — a DB aktuális állapota. */
+function latestSqlFunction(fnName: string): string {
+  const dir = path.join(process.cwd(), 'supabase', 'migrations');
+  const files: string[] = fs.readdirSync(dir).filter((f: string) => f.endsWith('.sql')).sort();
+  const re = new RegExp(`create or replace function public\\.${fnName}\\([\\s\\S]*?\\$\\$;`, 'g');
+  let found = '';
+  for (const f of files) {
+    const m = fs.readFileSync(path.join(dir, f), 'utf8').match(re);
+    if (m) {
+      found = m[m.length - 1];
+    }
+  }
+  return found;
+}
+
+describe('contract: PRO-CASH szintek (kliens ⇄ worker ⇄ DB)', () => {
+  it('a felhő-tárhely GB / szint a DB tier_storage_gb-ben = ENTITLEMENTS.storageQuotaGB (mindkét oldal)', () => {
+    const sql = latestSqlFunction('tier_storage_gb');
+    expect(sql).not.toBe('');
+    for (const tier of TIER_ORDER) {
+      const m = new RegExp(`when '${tier}' then (\\d+)`).exec(sql);
+      expect(m).not.toBeNull();
+      expect(Number(m![1])).toBe(ENTITLEMENTS[tier].storageQuotaGB);
+      expect(workerEntitlements.ENTITLEMENTS[tier].storageQuotaGB).toBe(ENTITLEMENTS[tier].storageQuotaGB);
+    }
+  });
+
+  it('a DB subscriptions.tier mind az 5 szintet engedi (TIER_ORDER)', () => {
+    const dir = path.join(process.cwd(), 'supabase', 'migrations');
+    const files: string[] = fs.readdirSync(dir).filter((f: string) => f.endsWith('.sql')).sort();
+    let check = '';
+    for (const f of files) {
+      const m = fs.readFileSync(path.join(dir, f), 'utf8').match(/subscriptions_tier_check\s+check \(tier in \(([^)]*)\)\)/g);
+      if (m) {
+        check = m[m.length - 1];
+      }
+    }
+    for (const tier of TIER_ORDER) {
+      expect(check).toContain(`'${tier}'`);
+    }
+  });
+
+  it('activeTierFromRow azonos a kliensen és a workeren (státusz × lejárat × szint)', () => {
+    const now = Date.parse('2026-11-03T12:00:00Z');
+    const rows = [
+      null,
+      { tier: 'ultra', status: 'active', current_period_end: '2026-12-01T00:00:00Z' },
+      { tier: 'ultra', status: 'active', current_period_end: '2026-11-01T00:00:00Z' },
+      { tier: 'basic', status: 'trialing', current_period_end: '2026-11-10T00:00:00Z' },
+      { tier: 'pro', status: 'canceled', current_period_end: '2026-12-01T00:00:00Z' },
+      { tier: 'business', status: 'active', current_period_end: null },
+      { tier: 'nope', status: 'active', current_period_end: null },
+      { tier: 'pro', status: 'active', current_period_end: 'nem-dátum' },
+    ];
+    for (const r of rows) {
+      expect(workerTiers.activeTierFromRow(r, now)).toBe(activeTierFromRow(r, now));
+    }
+    expect(activeTierFromRow(rows[1], now)).toBe('ultra');
+    expect(activeTierFromRow(rows[2], now)).toBe('free');
+    expect(activeTierFromRow(rows[5], now)).toBe('free'); // lejárat nélkül: fail-closed
+    expect(activeTierFromRow(rows[7], now)).toBe('free');
+  });
+
+  it('seatQuota azonos (Vállalati × ülésszám, min. 2)', () => {
+    for (const tier of TIER_ORDER) {
+      for (const seats of [1, 2, 7]) {
+        expect(workerUsage.seatQuota(tier, seats)).toEqual(seatQuota(tier, seats));
+      }
+    }
+  });
+
+  it('a DB active_tier_for ugyanazokat a státuszokat engedi, mint az ACTIVE_STATUSES', () => {
+    const sql = latestSqlFunction('active_tier_for');
+    const m = /s\.status in \(([^)]*)\)/.exec(sql);
+    expect(m).not.toBeNull();
+    const dbStatuses = m![1].split(',').map((x) => x.trim().replace(/'/g, '')).sort();
+    expect(dbStatuses).toEqual([...workerTiers.ACTIVE_STATUSES].sort());
   });
 });

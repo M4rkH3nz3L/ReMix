@@ -9,6 +9,7 @@ const { loggedFetch } = require('./lib/caught');
 // degradál — a rate-limit (security/rateLimit.js) a második védvonal.
 const { createClient } = require('@supabase/supabase-js');
 const { AsyncLocalStorage } = require('async_hooks');
+const { activeTierFromRow } = require('./tiers');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -17,15 +18,32 @@ const USAGE_METRICS = ['aiTokens', 'renderMinutes', 'exports', 'cloudJobs'];
 
 // Havi kvóták tierenként (-1 = korlátlan). AZONOS a kliens TIER_QUOTAS-szal.
 const TIER_QUOTAS = {
-  free: { aiTokens: 20000, renderMinutes: 10, exports: 15, cloudJobs: 25 },
-  basic: { aiTokens: 100000, renderMinutes: 60, exports: 100, cloudJobs: 150 },
-  pro: { aiTokens: 500000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
-  ultra: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
-  business: { aiTokens: -1, renderMinutes: -1, exports: -1, cloudJobs: -1 },
+  free: { aiTokens: 0, renderMinutes: 0, exports: 15, cloudJobs: 25 },
+  basic: { aiTokens: 200000, renderMinutes: 30, exports: 100, cloudJobs: 150 },
+  pro: { aiTokens: 1000000, renderMinutes: 120, exports: -1, cloudJobs: -1 },
+  ultra: { aiTokens: 3000000, renderMinutes: 400, exports: -1, cloudJobs: -1 },
+  business: { aiTokens: 2000000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
 };
 
 function quotaFor(tier) {
   return TIER_QUOTAS[tier] || TIER_QUOTAS.free;
+}
+
+// A Vállalati csomag legkisebb ülésszáma (PRO-CASH 5.1); a kliens seatQuota tükre.
+const BUSINESS_MIN_SEATS = 2;
+
+/** A szervezet KÖZÖS havi kerete: Vállalati = fejenkénti kvóta × ülésszám (min. 2). */
+function seatQuota(tier, seats) {
+  const q = quotaFor(tier);
+  if (tier !== 'business') {
+    return q;
+  }
+  const n = Math.max(BUSINESS_MIN_SEATS, Math.trunc(seats) || BUSINESS_MIN_SEATS);
+  const out = { ...q };
+  for (const m of USAGE_METRICS) {
+    out[m] = q[m] < 0 ? -1 : q[m] * n;
+  }
+  return out;
 }
 
 /** A dátum havi periódus-kulcsa: `YYYY-MM` (UTC). */
@@ -135,9 +153,9 @@ async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) 
 }
 
 /**
- * A user AKTUÁLIS tier-je a `subscriptions`-ből (aktív period figyelembevételével).
- * Hiba/nincs/lejárt → `free`. Ma free/pro; a basic/ultra a billing-bekötéssel jön —
- * a kvóta-logika már kész rá. (A kvóta ENFORCE-hoz a HITELES, server-oldali tier kell.)
+ * A user AKTUÁLIS tier-je a `subscriptions`-ből — ugyanaz a szabály, mint a billing
+ * `activeTier`-é és a DB `active_tier_for`-é (server/tiers.js `activeTierFromRow`).
+ * Hiba/nincs/lejárt → `free`. (A kvóta ENFORCE-hoz a HITELES, server-oldali tier kell.)
  */
 async function userTier(userId, now = new Date()) {
   const sb = getAdmin();
@@ -149,11 +167,7 @@ async function userTier(userId, now = new Date()) {
     .select('tier, current_period_end, status')
     .eq('user_id', userId)
     .maybeSingle();
-  if (!data || data.status !== 'active' || !TIER_QUOTAS[data.tier]) {
-    return 'free';
-  }
-  const end = data.current_period_end ? Date.parse(data.current_period_end) : NaN;
-  return Number.isNaN(end) || end > now.getTime() ? data.tier : 'free';
+  return activeTierFromRow(data, now.getTime());
 }
 
 /** Fogyasztás könyvelése a hívás UTÁN (best-effort, atomikus upsert-increment). */
@@ -178,6 +192,8 @@ module.exports = {
   USAGE_METRICS,
   TIER_QUOTAS,
   quotaFor,
+  seatQuota,
+  BUSINESS_MIN_SEATS,
   periodKey,
   remaining,
   canUse,

@@ -44,10 +44,7 @@ describe('billing.isPro — szerver-hiteles előfizetés-ellenőrzés', () => {
     await expect(isPro('u1')).resolves.toBe(true);
   });
 
-  it.each([
-    ['trialing', 'próbaidő'],
-    ['in_grace_period', 'fizetési türelmi idő'],
-  ])('a(z) "%s" státusz is Pro (%s)', async (status) => {
+  it.each([['trialing', 'próbaidő']])('a(z) "%s" státusz is Pro (%s)', async (status) => {
     mockState.row = { tier: 'pro', status, current_period_end: future() };
     await expect(isPro('u1')).resolves.toBe(true);
   });
@@ -57,7 +54,9 @@ describe('billing.isPro — szerver-hiteles előfizetés-ellenőrzés', () => {
     await expect(isPro('u1')).resolves.toBe(false);
   });
 
-  it.each([['canceled'], ['expired'], ['paused']])(
+  // in_grace_period: a DB-ben nem létező státusz (a store a türelmi időt a lejárat
+  // kitolásával adja, lásd RevenueCat expiration_at_ms) → nem ad szintet
+  it.each([['canceled'], ['expired'], ['paused'], ['in_grace_period'], ['past_due']])(
     'a(z) "%s" státusz NEM Pro',
     async (status) => {
       mockState.row = { tier: 'pro', status, current_period_end: future() };

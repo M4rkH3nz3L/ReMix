@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Modal } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,7 +34,15 @@ export function AudioStudioModal() {
       }
     }
   }
-  const open = clip?.kind === 'audio';
+  // A45: hangklipre nyílik, de nyitva marad akkor is, ha a fókusz-klipet közben törlik
+  // (eddig a stúdió a felhasználó keze alól eltűnt); csak a bezárás (clipId = null) zárja
+  const openedFor = useRef<string | null>(null);
+  if (!clipId) {
+    openedFor.current = null;
+  } else if (clip?.kind === 'audio') {
+    openedFor.current = clipId;
+  }
+  const open = !!clipId && openedFor.current === clipId;
 
   // nyitáskor a fókusz-klipre ugrunk + kijelöljük (a szerkesztő-lapot a felhasználó
   // a „Szerkeszt" gombbal nyitja); a store-akciók nem React-setState-ek

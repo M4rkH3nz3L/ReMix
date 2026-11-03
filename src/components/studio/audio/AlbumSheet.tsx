@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
@@ -26,6 +26,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [busy, setBusy] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; text: string } | null>(null);
 
   if (!project) {
     return null;
@@ -108,21 +109,22 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
     if (!album || !canRemoveSong(album)) {
       return;
     }
-    Alert.alert(t('common.delete'), `„${name}" szám törlése?`, [
+    Alert.alert(t('common.delete'), t('studio.audio.album.deleteConfirm', { name }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => apply(removeSong(album, id), t('studio.audio.album.history.removed')) },
     ]);
   };
 
-  const rename = (id: string, currentName: string) => {
-    if (!album) {
-      return;
+  // A45: soron belüli szövegmező — az Alert.prompt csak iOS-en létezik
+  const startRename = (id: string, currentName: string) => setRenaming({ id, text: currentName });
+  const commitRename = () => {
+    const edit = renaming;
+    setRenaming(null);
+    const name = edit?.text.trim();
+    const song = album?.songs.find((x) => x.id === edit?.id);
+    if (album && edit && name && song && name !== song.name) {
+      apply(renameSong(album, edit.id, name), t('studio.audio.album.history.renamed'));
     }
-    Alert.prompt?.(t('common.rename', { defaultValue: 'Átnevezés' }), undefined, (text) => {
-      if (text) {
-        apply(renameSong(album, id, text), t('studio.audio.album.history.renamed'));
-      }
-    }, 'plain-text', currentName);
   };
 
   const move = (idx: number, dir: -1 | 1) => {
@@ -241,16 +243,40 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
                 const isActive = s.id === current?.id;
                 return (
                   <View key={s.id} style={[styles.songRow, isActive && styles.songRowActive]}>
-                    <Pressable style={styles.songMain} onPress={() => switchTo(s.id)} onLongPress={() => rename(s.id, s.name)}>
-                      <Ionicons
-                        name={isActive ? 'musical-note' : 'musical-note-outline'}
-                        size={16}
-                        color={isActive ? palette.accent : palette.textDim}
+                    {renaming?.id === s.id ? (
+                      <TextInput
+                        style={styles.songInput}
+                        value={renaming.text}
+                        onChangeText={(text) => setRenaming({ id: s.id, text })}
+                        onSubmitEditing={commitRename}
+                        onBlur={commitRename}
+                        autoFocus
+                        selectTextOnFocus
+                        returnKeyType="done"
+                        maxLength={80}
+                        accessibilityLabel={t('common.rename')}
                       />
-                      <Text style={[styles.songName, isActive && { color: palette.text }]} numberOfLines={1}>
-                        {i + 1}. {s.name}
-                      </Text>
-                      {s.renderedUri ? <Ionicons name="checkmark-circle" size={13} color="#39d98a" /> : null}
+                    ) : (
+                      <Pressable style={styles.songMain} onPress={() => switchTo(s.id)} onLongPress={() => startRename(s.id, s.name)}>
+                        <Ionicons
+                          name={isActive ? 'musical-note' : 'musical-note-outline'}
+                          size={16}
+                          color={isActive ? palette.accent : palette.textDim}
+                        />
+                        <Text style={[styles.songName, isActive && { color: palette.text }]} numberOfLines={1}>
+                          {i + 1}. {s.name}
+                        </Text>
+                        {s.renderedUri ? <Ionicons name="checkmark-circle" size={13} color="#39d98a" /> : null}
+                      </Pressable>
+                    )}
+                    <Pressable
+                      testID={`album-rename-${s.id}`}
+                      onPress={() => startRename(s.id, s.name)}
+                      hitSlop={6}
+                      style={styles.songBtn}
+                      accessibilityLabel={t('common.rename')}
+                    >
+                      <Ionicons name="pencil-outline" size={15} color={palette.textDim} />
                     </Pressable>
                     <Pressable onPress={() => move(i, -1)} disabled={i === 0} hitSlop={6} style={styles.songBtn}>
                       <Ionicons name="chevron-up" size={16} color={i === 0 ? palette.border : palette.textDim} />
@@ -319,6 +345,17 @@ const styles = StyleSheet.create({
   songRowActive: { borderWidth: 1, borderColor: palette.accent },
   songMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   songName: { flex: 1, color: palette.textDim, fontSize: 14, fontWeight: '600' },
+  songInput: {
+    flex: 1,
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.accent,
+  },
   songBtn: { padding: 6 },
   addRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   primary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: palette.accent, borderRadius: 12, paddingVertical: 13, marginTop: 14 },

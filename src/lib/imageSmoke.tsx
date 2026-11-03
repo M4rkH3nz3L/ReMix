@@ -53,6 +53,8 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
+import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
@@ -2337,6 +2339,17 @@ async function smokeAudioKillPrepare(log: Log) {
   await sleep(60000);
 }
 
+/** A45: az album-lap a szám-sorokkal (ceruza = átnevezés) — képernyőkép. */
+async function smokeAlbumSheet(log: Log, setHarness: (n: ReactNode) => void) {
+  const base = createEmptyProject('smoke album', '1:1', undefined, 'audio');
+  const album = addSong(initAlbum(makeSong('s1', 'Első dal', base.tracks)), makeSong('s2', 'Második, nagyon hosszú című dal a lapon', base.tracks));
+  useEditorStore.getState().loadProject({ ...base, album }, []);
+  setHarness(<AlbumSheet onClose={() => {}} onShareAlbum={() => {}} />);
+  log(true, 'FOTÓZHATÓ', 'az album-lap a szám-sorokkal');
+  await sleep(5000);
+  setHarness(null);
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -2854,6 +2867,10 @@ export async function runImageSmoke(
   }
   if (phase === 'audioruler') {
     await step('audioruler', () => smokeAudioRuler(log));
+    return;
+  }
+  if (phase === 'albumsheet') {
+    await step('albumsheet', () => smokeAlbumSheet(log, setHarness));
     return;
   }
   if (phase === 'recording') {

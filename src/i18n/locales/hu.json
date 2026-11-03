@@ -3817,6 +3817,7 @@
       "exportDownload": "Hang letöltése…",
       "exportRendering": "{{format}} exportálása…",
       "album": {
+        "deleteConfirm": "„{{name}}” szám törlése?",
         "history": {
           "created": "Album létrehozva",
           "added": "Új szám: {{name}}",

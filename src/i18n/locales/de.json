@@ -3822,6 +3822,7 @@
       "exportDownload": "Audio herunterladen…",
       "exportRendering": "{{format}} wird exportiert…",
       "album": {
+        "deleteConfirm": "Song „{{name}}“ löschen?",
         "history": {
           "created": "Album erstellt",
           "added": "Neuer Song: {{name}}",

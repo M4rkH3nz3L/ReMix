@@ -178,12 +178,16 @@ export function FeedPostBody({
                 },
               })
             ) : (
-              <VideoView
-                player={player}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-                nativeControls={false}
-              />
+              // pointerEvents="none": iOS-en a natív lejátszó-nézet ne nyelje el a
+              // koppintást — a play/pause + dupla-tap like a szülő GestureDetectoré
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <VideoView
+                  player={player}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  nativeControls={false}
+                />
+              </View>
             )
           ) : sub.posterUri ? (
             <Image source={{ uri: sub.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />

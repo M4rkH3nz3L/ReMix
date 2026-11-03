@@ -146,6 +146,37 @@ select pg_temp.act('b2000000-0000-0000-0000-000000000002');
 select pg_temp.raises('C1.2 Free nem vehet add-ont', $$select public.add_addon('ai_1m')$$, 'paid_tier_required');
 select pg_temp.admin();
 
+-- ═══ C2.4 próba ═══════════════════════════════════════════════════════════════
+insert into auth.users (id, instance_id, aud, role, email) values
+  ('e2000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'cy5@t.test');
+select pg_temp.act('e2000000-0000-0000-0000-000000000005');
+select pg_temp.note('C2.4 Free-ről a próba elérhető', (select (public.my_subscription() ->> 'trial_available')::boolean));
+select public.start_trial();
+select pg_temp.note('C2.4 a próba: 7 nap Amatőr, terhelés és automatikus megújítás nélkül',
+  (select tier = 'basic' and status = 'trialing' and source = 'trial' and not auto_renew and current_period_end = now() + interval '7 days'
+     from public.subscriptions where user_id = 'e2000000-0000-0000-0000-000000000005')
+  and coalesce((select balance from public.user_credits where user_id = 'e2000000-0000-0000-0000-000000000005'), 0) = 0);
+select pg_temp.raises('C2.4 próba közben nem indítható újra', $$select public.start_trial()$$, 'already_subscribed');
+select pg_temp.admin();
+select pg_temp.note('C2.4 a próba alatt Amatőr', public.active_tier_for('e2000000-0000-0000-0000-000000000005') = 'basic');
+select pg_temp.note('C2.4 5 nap múlva még nincs értesítés',
+  not exists (select 1 from public.take_trial_notices(now() + interval '4 days') where user_id = 'e2000000-0000-0000-0000-000000000005'));
+select pg_temp.note('C2.4 2 nappal a vége előtt értesítés, egyszer',
+  exists (select 1 from public.take_trial_notices(now() + interval '5 days') where user_id = 'e2000000-0000-0000-0000-000000000005')
+  );
+select pg_temp.note('C2.4 …és nem kétszer',
+  not exists (select 1 from public.take_trial_notices(now() + interval '6 days') where user_id = 'e2000000-0000-0000-0000-000000000005'));
+select public.renew_due_subscriptions(now() + interval '8 days');
+update public.subscriptions set current_period_end = now() - interval '1 second' where user_id = 'e2000000-0000-0000-0000-000000000005';
+select pg_temp.note('C2.4 a próba után magától Free, terhelés nélkül', public.active_tier_for('e2000000-0000-0000-0000-000000000005') = 'free');
+select pg_temp.act('e2000000-0000-0000-0000-000000000005');
+select pg_temp.raises('C2.4 a próba fiókonként egyszer', $$select public.start_trial()$$, 'trial_used');
+select pg_temp.note('C2.4 a felhasznált próba már nem ajánlható', not (select (public.my_subscription() ->> 'trial_available')::boolean));
+select pg_temp.admin();
+select pg_temp.act('a2000000-0000-0000-0000-000000000001');
+select pg_temp.raises('C2.4 előfizető nem kérhet próbát', $$select public.start_trial()$$, 'already_subscribed');
+select pg_temp.admin();
+
 select pg_temp.note('invariáns: a napló összege = az egyenleg',
   not exists (select 1 from public.user_credits u where u.user_id::text like '_2000000-%' and u.balance <>
     coalesce((select sum(delta_cents) from public.credit_transactions t where t.user_id = u.user_id), 0)));

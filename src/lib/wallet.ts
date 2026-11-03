@@ -352,6 +352,8 @@ export interface MySubscription {
   pendingTier: Tier | null;
   /** a következő megújítás díja cent-Coinban (szint + megmaradó add-onok) */
   renewalCost: number;
+  /** indítható-e még a 7 napos próba (Free, és még nem használta) */
+  trialAvailable: boolean;
   addons: { id: string; addon: AddonId; qty: number; cancelAtPeriodEnd: boolean }[];
 }
 
@@ -368,6 +370,7 @@ export function parseSubscription(raw: unknown): MySubscription {
     autoRenew: r.auto_renew === true,
     pendingTier: typeof r.pending_tier === 'string' ? asTier(r.pending_tier) : null,
     renewalCost: Number(r.renewal_cost ?? 0) || 0,
+    trialAvailable: r.trial_available === true,
     addons: addons.map((a) => ({
       id: String(a.id),
       addon: String(a.addon) as AddonId,
@@ -427,4 +430,14 @@ export async function removeAddon(id: string): Promise<void> {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+/** 7 napos Amatőr-próba indítása (kártya és Coin nélkül, fiókonként egyszer, PRO-CASH 4.4). */
+export async function startTrial(): Promise<{ until: string }> {
+  const { data, error } = await requireSupabase().rpc('start_trial');
+  if (error) {
+    throw new Error(/trial_used|already_subscribed/.exec(error.message)?.[0] ?? error.message);
+  }
+  await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:startTrial', caught); });
+  return { until: String((data as Record<string, unknown> | null)?.until ?? '') };
 }

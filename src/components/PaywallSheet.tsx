@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -8,25 +9,34 @@ import { accentGradient, palette } from '@/constants/editor';
 import {
   activateProDev,
   billingClientAvailable,
-  purchasePro,
+  purchaseTier,
   PurchaseCancelledError,
   restorePurchases,
 } from '@/lib/billing';
-import { capabilityLabel, proCapabilities } from '@/lib/capabilities';
+import { capabilityLabel } from '@/lib/capabilities';
+import { formatEur } from '@/lib/coins';
+import { ANNUAL_FREE_MONTHS, planPrice, planRows, recommendedTier, type PlanCell } from '@/lib/paywallPlans';
+import { InsufficientCreditsError } from '@/lib/shop';
+import type { BillingPeriod } from '@/lib/storeProducts';
+import { TIER_ORDER, tierLabelKey, type Tier } from '@/lib/tiers';
+import { ManagedByStoreError, fetchSubscription, startTrial, subscribeWithCoins } from '@/lib/wallet';
 import { usePaywall } from '@/store/paywallStore';
 import { logCaught } from '@/lib/logCaught';
 
 /**
- * 🔒 Remix Pro paywall — a felhő-funkciók (AI + felhő-HD render) ajánlata.
+ * 💳 Paywall v2 (PRO-CASH C1.4) — 5 szintes összehasonlítás, havi/éves, Coin- és áruházi út, próba.
  *
- * Egyetlen példány él a szerkesztő gyökerében; a `usePaywall` store nyitja.
- * A vásárlás VALÓS: RevenueCat IAP (App Store / Play), ha elérhető (natív build
- * + kulcs); dev-ben a szerver-hiteles /billing/activate (30 nap). A Pro-t a
- * szerver (`subscriptions`) tartja — a kliens onnan szinkronizál.
+ * Egyetlen példány él az app gyökerében; a `usePaywall` store nyitja (a kiváltó képesség
+ * minimum-szintje lesz a kiemelt csomag). A tábla minden száma a `paywallPlans` magból jön
+ * (ENTITLEMENTS / TIER_QUOTAS / árak), így nem csúszhat el a valódi kaputól. Fizetés:
+ *   • Coinból — a legolcsóbb út (1 Coin = 5 € a weben), szerver-hiteles `subscribe_with_coins`;
+ *   • áruházban — RevenueCat IAP (`remix_<szint>_<periódus>`), ha elérhető;
+ *   • 7 napos Amatőr-próba kártya és Coin nélkül, ha még nem használta;
+ *   • dev-ben a szerver-hiteles /billing/activate.
  */
 
-/** amit a Pro NEM zár el — hangsúlyozza, hogy az alap ingyen marad */
-const FREE_PERKS = ['editor', 'camera', 'export'];
+type BuyTier = Exclude<Tier, 'free' | 'business'>;
+const BUY_TIERS: BuyTier[] = ['basic', 'pro', 'ultra'];
 
 export function PaywallSheet() {
   const { t } = useTranslation();
@@ -34,144 +44,224 @@ export function PaywallSheet() {
   const capability = usePaywall((s) => s.capability);
   const close = usePaywall((s) => s.close);
   const [busy, setBusy] = useState(false);
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
+  // a kiemelt szint a kiváltó képességből jön; a user választása erre a megnyitásra szól
+  const [override, setOverride] = useState<{ capability: typeof capability; tier: BuyTier } | null>(null);
+  const picked: BuyTier = override && override.capability === capability ? override.tier : recommendedTier(capability);
+  const setPicked = (tier: BuyTier) => setOverride({ capability, tier });
+  const [trialAvailable, setTrialAvailable] = useState(false);
 
-  const perks = proCapabilities();
+  const rows = useMemo(() => planRows(), []);
   const trigger = capability ? capabilityLabel(capability) : null;
   const canBuy = billingClientAvailable();
+  const price = planPrice(picked, period);
 
-  const onUpgrade = async () => {
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    fetchSubscription()
+      .then((sub) => setTrialAvailable(!!sub?.trialAvailable))
+      .catch((caught) => { logCaught('components/PaywallSheet.tsx:trial', caught); });
+  }, [visible, capability]);
+
+  const run = async (fn: () => Promise<boolean>) => {
     if (busy) {
       return;
     }
     setBusy(true);
     try {
-      // 1) VALÓS IAP (RevenueCat) — natív build + kulcs esetén
-      if (canBuy) {
-        const ok = await purchasePro();
-        if (ok) {
-          close();
-        }
-        return;
-      }
-      // 2) DEV: szerver-hiteles aktiválás (30 nap) a workeren át
-      if (__DEV__) {
-        const ok = await activateProDev();
-        if (ok) {
-          close();
-        }
-        return;
-      }
-      // 3) nincs natív build / store-termék → tájékoztatás
-      Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
-    } catch (e) {
-      logCaught('components/PaywallSheet.tsx:onUpgrade', e);
-      if (e instanceof PurchaseCancelledError) {
-        return; // felhasználó megszakította — nincs hibajelzés
-      }
-      Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onRestore = async () => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const ok = await restorePurchases();
-      Alert.alert(
-        t('paywallSheet.restoreTitle'),
-        ok ? t('paywallSheet.restoreOk') : t('paywallSheet.restoreNone')
-      );
-      if (ok) {
+      if (await fn()) {
         close();
       }
     } catch (e) {
-      logCaught('components/PaywallSheet.tsx:onRestore', e);
+      logCaught('components/PaywallSheet.tsx:run', e);
+      if (e instanceof PurchaseCancelledError) {
+        return; // felhasználó megszakította — nincs hibajelzés
+      }
+      if (e instanceof InsufficientCreditsError) {
+        Alert.alert(t('wallet.notEnoughTitle'), t('paywallSheet.needCoins', { coins: price.coins }), [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('wallet.goToShop'), onPress: () => { close(); router.push('/shop'); } },
+        ]);
+        return;
+      }
+      if (e instanceof ManagedByStoreError) {
+        Alert.alert(t('paywallSheet.errorTitle'), t('wallet.sub.storeManaged'));
+        return;
+      }
       Alert.alert(t('paywallSheet.errorTitle'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+
+  const onCoins = () =>
+    run(async () => {
+      const res = await subscribeWithCoins(picked, period === 'annual' ? 12 : 1);
+      Alert.alert(t('wallet.subDoneTitle'), t('wallet.subDoneMsg', { tier: t(tierLabelKey(picked)), until: new Date(res.until).toLocaleDateString() }));
+      return true;
+    });
+
+  const onStore = () =>
+    run(async () => {
+      if (canBuy) {
+        return purchaseTier(picked, period);
+      }
+      if (__DEV__) {
+        return activateProDev();
+      }
+      Alert.alert(t('paywallSheet.comingSoonTitle'), t('paywallSheet.comingSoonBody'));
+      return false;
+    });
+
+  const onTrial = () =>
+    run(async () => {
+      const res = await startTrial();
+      Alert.alert(t('paywallSheet.trialStartedTitle'), t('paywallSheet.trialStartedMsg', { date: new Date(res.until).toLocaleDateString() }));
+      return true;
+    });
+
+  const onRestore = () =>
+    run(async () => {
+      const ok = await restorePurchases();
+      Alert.alert(t('paywallSheet.restoreTitle'), ok ? t('paywallSheet.restoreOk') : t('paywallSheet.restoreNone'));
+      return ok;
+    });
+
+  const cell = (c: PlanCell, highlight: boolean) =>
+    c.kind === 'bool' ? (
+      <Ionicons
+        name={c.value ? 'checkmark-circle' : 'remove'}
+        size={16}
+        color={c.value ? (highlight ? palette.accent : palette.text) : palette.textDim}
+      />
+    ) : (
+      <Text style={[styles.cellText, highlight && styles.cellTextHi]} numberOfLines={2}>
+        {t(c.key, c.params)}
+      </Text>
+    );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={styles.backdrop}>
         <Pressable style={styles.backdropTap} onPress={close} />
         <View style={styles.sheet}>
-          <LinearGradient
-            colors={[...accentGradient]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.hero}
-          >
+          <LinearGradient colors={[...accentGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
             <View style={styles.badge}>
               <Ionicons name="sparkles" size={14} color={palette.text} />
-              <Text style={styles.badgeText}>REMIX PRO</Text>
+              <Text style={styles.badgeText}>REMIX</Text>
             </View>
             <Text style={styles.heroTitle}>{t('paywallSheet.heroTitle')}</Text>
             <Text style={styles.heroSub}>
-              {trigger
-                ? t('paywallSheet.heroSubTrigger', { trigger })
-                : t('paywallSheet.heroSub')}
+              {trigger ? t('paywallSheet.heroSubTrigger', { trigger }) : t('paywallSheet.heroSub')}
             </Text>
           </LinearGradient>
 
           <ScrollView style={styles.body} contentContainerStyle={{ gap: 14, paddingBottom: 8 }}>
-            <View>
-              <Text style={styles.groupTitle}>{t('paywallSheet.groupPro')}</Text>
-              <View style={{ gap: 7 }}>
-                {perks.map((p) => (
-                  <View key={p} style={styles.row}>
-                    <Ionicons name="cloud-done" size={16} color={palette.accent} />
-                    <Text style={styles.rowText}>{p}</Text>
-                  </View>
-                ))}
-              </View>
+            {/* havi / éves */}
+            <View style={styles.segment}>
+              {(['monthly', 'annual'] as const).map((p) => (
+                <Pressable
+                  key={p}
+                  onPress={() => setPeriod(p)}
+                  style={[styles.segBtn, period === p && styles.segBtnOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: period === p }}
+                >
+                  <Text style={[styles.segText, period === p && styles.segTextOn]}>
+                    {p === 'monthly' ? t('wallet.monthly') : t('paywallSheet.annualGift', { n: ANNUAL_FREE_MONTHS })}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
 
-            <View>
-              <Text style={styles.groupTitle}>{t('paywallSheet.groupFree')}</Text>
-              <View style={{ gap: 7 }}>
-                {FREE_PERKS.map((p) => (
-                  <View key={p} style={styles.row}>
-                    <Ionicons name="checkmark-circle" size={16} color={palette.textDim} />
-                    <Text style={[styles.rowText, { color: palette.textDim }]}>
-                      {t('paywallSheet.freePerk_' + p)}
+            {/* szintválasztó */}
+            <View style={styles.tierRow}>
+              {BUY_TIERS.map((tier) => {
+                const p = planPrice(tier, period);
+                const on = picked === tier;
+                return (
+                  <Pressable
+                    key={tier}
+                    onPress={() => setPicked(tier)}
+                    style={[styles.tierCard, on && styles.tierCardOn]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                  >
+                    {tier === recommendedTier(capability) ? <Text style={styles.reco}>{t('paywallSheet.recommended')}</Text> : null}
+                    <Text style={styles.tierName}>{t(tierLabelKey(tier))}</Text>
+                    <Text style={styles.tierPrice}>{p.coins} 🪙</Text>
+                    <Text style={styles.tierSub}>
+                      {period === 'monthly' ? t('paywallSheet.perMonth') : t('paywallSheet.perYear')}
                     </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* összehasonlítás: Free | Amatőr | Haladó | Profi | Vállalati */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View>
+                <View style={styles.tRow}>
+                  <View style={styles.tLabel} />
+                  {TIER_ORDER.map((tier) => (
+                    <View key={tier} style={[styles.tCell, tier === picked && styles.tCellHi]}>
+                      <Text style={[styles.tHead, tier === picked && styles.cellTextHi]}>{t(tierLabelKey(tier))}</Text>
+                    </View>
+                  ))}
+                </View>
+                {rows.map((row) => (
+                  <View key={row.label} style={styles.tRow}>
+                    <View style={styles.tLabel}>
+                      <Text style={styles.tLabelText} numberOfLines={2}>{t(row.label)}</Text>
+                    </View>
+                    {TIER_ORDER.map((tier) => (
+                      <View key={tier} style={[styles.tCell, tier === picked && styles.tCellHi]}>
+                        {cell(row.cells[tier], tier === picked)}
+                      </View>
+                    ))}
                   </View>
                 ))}
               </View>
-            </View>
+            </ScrollView>
+            <Text style={styles.note}>{t('paywallSheet.businessNote')}</Text>
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable onPress={onUpgrade} disabled={busy} style={styles.ctaPressable}>
-              <LinearGradient
-                colors={[...accentGradient]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.cta}
-              >
-                <Ionicons name="rocket" size={16} color={palette.text} />
+            <Pressable onPress={onCoins} disabled={busy} style={styles.ctaPressable} accessibilityRole="button">
+              <LinearGradient colors={[...accentGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
+                <Ionicons name="wallet" size={16} color={palette.text} />
                 <Text style={styles.ctaText}>
-                  {busy
-                    ? t('paywallSheet.activating')
-                    : t('paywallSheet.activatePro')}
-                  {!canBuy && __DEV__ ? ' (DEV)' : ''}
+                  {busy ? t('paywallSheet.activating') : t('paywallSheet.payCoins', { tier: t(tierLabelKey(picked)), coins: price.coins })}
                 </Text>
               </LinearGradient>
             </Pressable>
-            {canBuy ? (
-              <Pressable onPress={onRestore} disabled={busy} style={styles.dismiss}>
-                <Text style={styles.dismissText}>{t('paywallSheet.restore')}</Text>
+            <Text style={styles.cheapest}>{t('paywallSheet.coinsCheapest', { eur: formatEur(price.coins * 5) })}</Text>
+            {canBuy || __DEV__ ? (
+              <Pressable onPress={onStore} disabled={busy} style={styles.secondary} accessibilityRole="button">
+                <Text style={styles.secondaryText}>
+                  {canBuy && price.storeEur != null
+                    ? t('paywallSheet.payStore', { price: formatEur(price.storeEur) })
+                    : `${t('paywallSheet.activatePro')} (DEV)`}
+                </Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={close} disabled={busy} style={styles.dismiss}>
-              <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
-            </Pressable>
+            {trialAvailable ? (
+              <Pressable onPress={onTrial} disabled={busy} style={styles.secondary} accessibilityRole="button">
+                <Text style={styles.secondaryText}>{t('paywallSheet.trialCta')}</Text>
+              </Pressable>
+            ) : null}
+            <View style={styles.linksRow}>
+              {canBuy ? (
+                <Pressable onPress={onRestore} disabled={busy} style={styles.dismiss}>
+                  <Text style={styles.dismissText}>{t('paywallSheet.restore')}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={close} disabled={busy} style={styles.dismiss}>
+                <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
+              </Pressable>
+            </View>
             <Text style={styles.legal}>{t('paywallSheet.legal')}</Text>
           </View>
         </View>
@@ -233,30 +323,56 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   body: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
-  groupTitle: {
-    color: palette.textDim,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  rowText: {
-    color: palette.text,
-    fontSize: 13,
+  segment: { flexDirection: 'row', backgroundColor: palette.surfaceHigh, borderRadius: 12, padding: 3 },
+  segBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 40, borderRadius: 10 },
+  segBtnOn: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.accent },
+  segText: { color: palette.textDim, fontSize: 13, fontWeight: '700' },
+  segTextOn: { color: palette.text },
+  tierRow: { flexDirection: 'row', gap: 8 },
+  tierCard: {
     flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    minHeight: 92,
+    justifyContent: 'center',
   },
+  tierCardOn: { borderColor: palette.accent, borderWidth: 2 },
+  reco: { color: palette.accent, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  tierName: { color: palette.text, fontSize: 14, fontWeight: '800' },
+  tierPrice: { color: palette.text, fontSize: 18, fontWeight: '900' },
+  tierSub: { color: palette.textDim, fontSize: 11 },
+  tRow: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border },
+  tLabel: { width: 118, paddingVertical: 8, justifyContent: 'center' },
+  tLabelText: { color: palette.textDim, fontSize: 12 },
+  tCell: { width: 82, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  tCellHi: { backgroundColor: '#ffffff0d' },
+  tHead: { color: palette.text, fontSize: 12, fontWeight: '800' },
+  cellText: { color: palette.text, fontSize: 11, textAlign: 'center' },
+  cellTextHi: { color: palette.accent, fontWeight: '700' },
+  note: { color: palette.textDim, fontSize: 11 },
+  cheapest: { color: palette.textDim, fontSize: 11, textAlign: 'center' },
+  secondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  secondaryText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  linksRow: { flexDirection: 'row', justifyContent: 'center', gap: 18 },
   footer: {
-    padding: 20,
+    padding: 16,
     paddingTop: 12,
-    gap: 10,
+    gap: 8,
     borderTopWidth: 1,
     borderTopColor: palette.border,
   },
@@ -283,7 +399,8 @@ const styles = StyleSheet.create({
   },
   dismiss: {
     alignItems: 'center',
-    paddingVertical: 6,
+    justifyContent: 'center',
+    minHeight: 40,
   },
   dismissText: {
     color: palette.textDim,

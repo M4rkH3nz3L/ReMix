@@ -5,7 +5,7 @@ const { logCaught } = require('./lib/caught');
 //   2. a lejárt Coin-előfizetések megújítása (`renew_due_subscriptions`): a függő lefelé
 //      váltás és a levett add-onok ilyenkor lépnek életbe; kevés Coinnál past_due → Free;
 //   3. megújítási értesítés 3 nappal a lejárat előtt, ha kevés a Coin (`take_renewal_notices`,
-//      periódusonként egyszer).
+//      periódusonként egyszer), és a próba végéről 2 nappal előtte (`take_trial_notices`, C2.4).
 // Az `sb`, a `now` és az értesítő injektálható (teszt); service_role nélkül no-op.
 
 /** Egy futás: a coin_release_due RPC. Visszaadja az érintett userek számát (hibánál 0). */
@@ -74,7 +74,37 @@ async function runSubscriptionCycleOnce(sb, now = new Date(), notify = null) {
   } catch (caught) {
     logCaught('coinSettle.js:runSubscriptionCycleOnce:notices', caught);
   }
+  try {
+    const { data: trials, error } = await sb.rpc('take_trial_notices', { p_now: now.toISOString() });
+    if (error) {
+      throw new Error(error.message);
+    }
+    const send = notify || require('./notify').sendNotification;
+    for (const row of trials || []) {
+      try {
+        await send(trialNotice(row));
+        out.notified += 1;
+      } catch (caught) {
+        logCaught('coinSettle.js:runSubscriptionCycleOnce:trialNotify', caught);
+      }
+    }
+  } catch (caught) {
+    logCaught('coinSettle.js:runSubscriptionCycleOnce:trials', caught);
+  }
   return out;
 }
 
-module.exports = { runCoinSettleOnce, runSubscriptionCycleOnce, renewalNotice };
+/** A próba végéről szóló értesítés (C2.4): automatikus terhelés nincs, a user dönt. */
+function trialNotice(row) {
+  const date = new Date(row.ends_at).toISOString().slice(0, 10);
+  return {
+    userId: row.user_id,
+    type: 'info',
+    title: 'Hamarosan véget ér az Amatőr-próbád',
+    body: `${date}-án lejár, utána Free-re váltasz — semmit nem terhelünk. Ha maradnál, válassz csomagot.`,
+    route: '/profile',
+    data: { kind: 'trial_ending', ends_at: row.ends_at },
+  };
+}
+
+module.exports = { runCoinSettleOnce, runSubscriptionCycleOnce, renewalNotice, trialNotice };

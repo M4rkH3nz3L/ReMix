@@ -354,19 +354,36 @@ export function useFeed() {
   };
 
   // egyszeres tap = play/pause (onTapItem), dupla tap = like — a gesture-handler
-  // a dupla-tap elbukásáig vár az egyszeressel, így nincs kézi késleltetés/flicker
-  const tapGesture = (post: FeedPost) =>
-    Gesture.Exclusive(
+  // a dupla-tap elbukásáig vár az egyszeressel, így nincs kézi késleltetés/flicker.
+  // A gesztus posztonként STABIL (gyorsítótár): a feed 200 ms-onként újrarajzol (tekerő-
+  // csík, óra), és egy minden rendernél ÚJ gesztus-objektum a GestureDetectort újrakötné
+  // — az egyszeres tap a dupla-tap elbukására várva elveszne (iOS: nem vált a play/pause).
+  // A handlerek ref-en át a legfrissebb posztot és logikát kapják.
+  const tapCacheRef = useRef(new Map<string, ReturnType<typeof Gesture.Exclusive>>());
+  const tapPostRef = useRef(new Map<string, FeedPost>());
+  const onTapItemRef = useRef<(post: FeedPost) => void>(() => {});
+  const onDoubleTapRef = useRef<(post: FeedPost) => void>(() => {});
+  const tapGesture = (post: FeedPost) => {
+    tapPostRef.current.set(post.id, post);
+    const cached = tapCacheRef.current.get(post.id);
+    if (cached) {
+      return cached;
+    }
+    const latest = () => tapPostRef.current.get(post.id) ?? post;
+    const g = Gesture.Exclusive(
       Gesture.Tap()
         .numberOfTaps(2)
         .maxDuration(260)
-        .onEnd(() => onDoubleTapLike(post))
+        .onEnd(() => onDoubleTapRef.current(latest()))
         .runOnJS(true),
       Gesture.Tap()
         .maxDuration(260)
-        .onEnd(() => onTapItem(post))
+        .onEnd(() => onTapItemRef.current(latest()))
         .runOnJS(true)
     );
+    tapCacheRef.current.set(post.id, g);
+    return g;
+  };
 
   const onSave = (post: FeedPost) => {
     bumpChrome();
@@ -729,6 +746,8 @@ export function useFeed() {
       router.push(`/player/${post.projectId}`);
     }
   };
+  onTapItemRef.current = onTapItem;
+  onDoubleTapRef.current = onDoubleTapLike;
 
   const pageHeight = height;
   // 🖥️ weben/széles nézetben a feed egy KÖZÉPRE igazított, 9:16 „telefon"-oszlop —

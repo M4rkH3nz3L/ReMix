@@ -20,7 +20,7 @@ const { upload } = require('../lib/upload');
 const { renderProject, MAX_RENDER_DURATION_SEC } = require('../render');
 const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJobs, renderConcurrency } = require('../queue');
 const { listWorkers } = require('../workers-registry');
-const { s3Enabled, uploadFile, publicUrl } = require('../s3store');
+const { s3Enabled, uploadFile, streamFile } = require('../s3store');
 const { canAccessRenderJob } = require('../security/renderAuth');
 const { StampedJobs, sweepFinishedJobs } = require('../lib/jobSweep');
 const { securityEvent } = require('../security/auditLog');
@@ -597,10 +597,17 @@ router.get('/render/:id/file', renderJobAuth, async (req, res) => {
         denyRenderJob(req, res, j.userId);
         return;
       }
+      // A38: a kész fájl az API-n át megy (a jogosultság fent ellenőrizve), nem nyilvános
+      // tár-linkre irányítva — azt bárki letölthette, akinél a link volt
       if (j.state === 'completed' && j.returnvalue?.outKey) {
-        const url = publicUrl(j.returnvalue.outKey);
-        if (url) {
-          res.redirect(url);
+        const sent = await streamFile(j.returnvalue.outKey, res).catch((caught) => {
+          logCaught('routes/render.js:file', caught);
+          return null;
+        });
+        if (sent === null && !res.headersSent) {
+          res.status(502).json({ error: 'A kész fájl nem olvasható a tárból.' });
+        }
+        if (sent !== false) {
           return;
         }
       }

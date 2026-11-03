@@ -65,10 +65,38 @@ function publicUrl(key) {
     : `${PUBLIC_BASE}/${BUCKET}/${key}`; // Supabase: .../object/public/<bucket>/<key>
 }
 
+/**
+ * Objektum továbbítása egy HTTP-válaszba (PRO-AUDIO A38): a hívó route már ellenőrizte a
+ * jogosultságot, így a fájl nem igényel nyilvános linket — a bucket nyilvános elérése
+ * kikapcsolható. `false`, ha az objektum nincs meg.
+ */
+async function streamFile(key, res) {
+  let obj;
+  try {
+    obj = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  } catch (caught) {
+    if (caught?.name === 'NoSuchKey' || caught?.$metadata?.httpStatusCode === 404) {
+      return false;
+    }
+    throw caught;
+  }
+  res.setHeader('Content-Type', obj.ContentType || 'application/octet-stream');
+  if (obj.ContentLength != null) {
+    res.setHeader('Content-Length', String(obj.ContentLength));
+  }
+  res.setHeader('Cache-Control', 'private, no-store');
+  await new Promise((resolve, reject) => {
+    obj.Body.on('error', reject);
+    res.on('close', resolve);
+    obj.Body.pipe(res);
+  });
+  return true;
+}
+
 /** Objektum törlése (pl. átviteli csomag TTL-söprése / felülírás előtti takarítás). */
 async function deleteFile(key) {
   const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
   await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-module.exports = { s3Enabled, client, uploadFile, downloadFile, deleteFile, publicUrl, BUCKET };
+module.exports = { s3Enabled, client, uploadFile, downloadFile, deleteFile, publicUrl, streamFile, BUCKET };

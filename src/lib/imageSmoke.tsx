@@ -2425,7 +2425,7 @@ async function smokeRecording(log: Log, setHarness: (n: ReactNode) => void) {
 }
 
 /** A42: egy órás hang-projekt a valódi stúdióban — a vonalzó és a rács látszik (képernyőkép). */
-async function smokeAudioRuler(log: Log) {
+async function smokeAudioRuler(log: Log, lockMusic = false) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const id = 'prj_smoke_audioruler';
   await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioRuler', caught));
@@ -2438,8 +2438,16 @@ async function smokeAudioRuler(log: Log) {
   }
   await sleep(1500);
   log(useEditorStore.getState().project?.id === id, 'az egy órás projekt megnyílt a stúdióban');
+  if (lockMusic && !useEditorStore.getState().lockedTracks.includes('music')) {
+    // A47: a videó-szerkesztővel közös zár — a stúdióban látszania kell
+    useEditorStore.getState().toggleTrackFlag('music', 'lock');
+    await sleep(500);
+  }
   log(true, 'FOTÓZHATÓ', 'a vonalzó és az ütem-rács');
   await sleep(6000);
+  if (lockMusic) {
+    useEditorStore.getState().toggleTrackFlag('music', 'lock');
+  }
   router.back();
   await sleep(800);
   await deleteProject(id);
@@ -2865,8 +2873,8 @@ export async function runImageSmoke(
     await step('audiomix', () => smokeAudioMix(log, setHarness));
     return;
   }
-  if (phase === 'audioruler') {
-    await step('audioruler', () => smokeAudioRuler(log));
+  if (phase === 'audioruler' || phase === 'audiolock') {
+    await step(phase, () => smokeAudioRuler(log, phase === 'audiolock'));
     return;
   }
   if (phase === 'albumsheet') {

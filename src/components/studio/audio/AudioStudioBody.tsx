@@ -104,6 +104,7 @@ export function AudioStudioBody({
   const multiSelectIds = useEditorStore((s) => s.multiSelectIds);
   const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
+  const lockedTracks = useEditorStore((s) => s.lockedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
   const loop = useEditorStore((s) => s.loop);
   const rangeIn = useEditorStore((s) => s.rangeIn);
@@ -624,6 +625,19 @@ export function AudioStudioBody({
                     </Pressable>
                     <Pressable onPress={() => toggleFlag(lane.type, 'solo')} hitSlop={6}>
                       <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
+                    </Pressable>
+                    {/* 🔒 A47: a videó-szerkesztőben zárolt sáv itt is látszik, és itt is feloldható */}
+                    <Pressable
+                      onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'lock')}
+                      hitSlop={6}
+                      testID={`audio-lane-lock-${lane.type}`}
+                      accessibilityLabel={lockedTracks.includes(lane.type) ? t('editor.timeline.unlock') : t('editor.timeline.lock')}
+                    >
+                      <Ionicons
+                        name={lockedTracks.includes(lane.type) ? 'lock-closed' : 'lock-open-outline'}
+                        size={13}
+                        color={lockedTracks.includes(lane.type) ? palette.accent2 : palette.textDim}
+                      />
                     </Pressable>
                   </View>
                 </View>

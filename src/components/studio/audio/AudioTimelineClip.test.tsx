@@ -1,5 +1,6 @@
 /** 🖐️ Hang-klip: hosszú nyomás menüt ad, a „Több kijelölése” után a koppintás hozzáad, a törlés egy undo. */
 import { act, create } from 'react-test-renderer';
+import { Alert } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
@@ -93,3 +94,33 @@ describe('hang-klip hosszú nyomása', () => {
     expect(left()).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('zárolt sáv a Hang Stúdióban (A47)', () => {
+  const startOf = (id: string) => useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips.find((c) => c.id === id)?.start;
+  beforeEach(() => {
+    useEditorStore.getState().loadProject(make(), []);
+    useActionMenu.getState().close();
+    if (!useEditorStore.getState().lockedTracks.includes('music')) {
+      useEditorStore.getState().toggleTrackFlag('music', 'lock');
+    }
+  });
+
+  it('a koppintás elmondja, hogy a sáv zárolt, és egy gombbal feloldható', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mount('b', 3);
+    await tap('b');
+    expect(alert).toHaveBeenCalledTimes(1);
+    const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    act(() => buttons[buttons.length - 1].onPress?.());
+    expect(useEditorStore.getState().lockedTracks).not.toContain('music');
+    alert.mockRestore();
+  });
+
+  it('a húzás nem mozgatja, és menü sem nyílik (nincs látszólagos szerkesztés)', async () => {
+    mount('b', 3);
+    await press('b', 60);
+    expect(startOf('b')).toBe(3);
+    expect(useActionMenu.getState().items).toBeNull();
+  });
+});
+

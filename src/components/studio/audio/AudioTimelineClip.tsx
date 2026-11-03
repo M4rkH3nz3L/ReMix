@@ -1,6 +1,6 @@
 import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
@@ -60,6 +60,8 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   const leftDelta = useSharedValue(0);
   const rightDelta = useSharedValue(0);
   const lift = useSharedValue(0);
+  // 🔒 A47: a videó-szerkesztővel közös sáv-zár itt is érvényes, és látszik
+  const locked = useEditorStore((s) => s.lockedTracks.includes(laneType));
 
   // committed állapot után a vizuális eltolások nullázódnak (a klip a helyén áll)
   useEffect(() => {
@@ -71,6 +73,14 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
 
   const selectAndSeek = () => {
     const st = useEditorStore.getState();
+    if (locked) {
+      // A47: a videó-szerkesztőben zárolt sáv itt sem szerkeszthető — de nem némán
+      Alert.alert(t('editor.timelineClip.lockedTitle'), t('editor.timelineClip.lockedBody', { track: t('editor.track.' + laneType) }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('editor.timeline.unlock'), onPress: () => useEditorStore.getState().toggleTrackFlag(laneType, 'lock') },
+      ]);
+      return;
+    }
     if (st.multiSelectMode) {
       st.toggleMultiSelect(clip.id);
       haptics.snap();
@@ -155,6 +165,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
 
   const movePan = Gesture.Pan()
     .withTestId(`audio-clip-move-${clip.id}`)
+    .enabled(!locked)
     .activateAfterLongPress(gestures.longPress.drag)
     .onStart(() => {
       lift.value = withSpring(1, motion.spring.snappy);
@@ -182,6 +193,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   // a trim-fogantyúk SAJÁT pan-je (nincs long-press → azonnal aktiválódik a szélen,
   // és NEM mozgatja az egész klipet). A hitSlop a kényelmes érintésért.
   const trimLeftPan = Gesture.Pan()
+    .enabled(!locked)
     .hitSlop({ left: 10, top: 6, bottom: 6 })
     .onUpdate((e) => {
       leftDelta.value = e.translationX;
@@ -191,6 +203,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     });
 
   const trimRightPan = Gesture.Pan()
+    .enabled(!locked)
     .hitSlop({ right: 10, top: 6, bottom: 6 })
     .onUpdate((e) => {
       rightDelta.value = e.translationX;
@@ -214,7 +227,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   return (
     <GestureDetector gesture={bodyGesture}>
       <Animated.View
-        style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99` }, animStyle]}
+        style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99`, opacity: locked ? 0.55 : 1 }, animStyle]}
       >
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>
           <ClipWaveform clip={clip} widthPx={w} heightPx={laneH - 22} color={laneColor} userInitiated />

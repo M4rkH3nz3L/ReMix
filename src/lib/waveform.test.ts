@@ -1,4 +1,5 @@
-import { barHeights, clipWindowPeaks, peaksFromChannels, resamplePeaks, waveformCacheKey } from '@/lib/waveform';
+import { ZOOM_LEVELS } from '@/lib/audioTransport';
+import { WAVEFORM_PPS, barHeights, clipWindowPeaks, peaksFromChannels, resamplePeaks, waveformCacheKey } from '@/lib/waveform';
 
 // 〰️ A hullámforma újramintázás (a klip-waveform kirajzolás magja) pure
 // regressziós pajzsa: oszloponkénti MAXIMUM (a csúcsok ne tűnjenek el ritkításkor).
@@ -73,6 +74,13 @@ describe('waveformCacheKey (A24)', () => {
   it('azonos nevű és méretű, de más fájl nem ütközik', () => {
     expect(waveformCacheKey('file:///a/song.m4a', 100, 1)).not.toBe(waveformCacheKey('file:///b/song.m4a', 100, 1));
     expect(waveformCacheKey('file:///a/song.m4a', 100, 1)).not.toBe(waveformCacheKey('file:///a/song.m4a', 100, 2));
+  });
+});
+
+describe('hullámforma-felbontás (A24)', () => {
+  it('a legnagyobb nagyításnál is van csúcs minden oszlopra (nem kockás)', () => {
+    const barsPerSec = Math.max(...ZOOM_LEVELS) / 3.5;
+    expect(WAVEFORM_PPS).toBeGreaterThanOrEqual(barsPerSec);
   });
 });
 

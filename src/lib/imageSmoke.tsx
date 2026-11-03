@@ -59,7 +59,7 @@ import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
-import { clearWaveformMemory, clipWindowPeaks, getWaveform } from '@/lib/waveform';
+import { clearWaveformMemory, clipWindowPeaks, getWaveform, WAVEFORM_PPS } from '@/lib/waveform';
 import { mixForExport } from '@/lib/audioExportMix';
 import { classifyAudioIntake } from '@/lib/audioIntake';
 import { supabase } from '@/lib/supabase';
@@ -2627,7 +2627,7 @@ async function smokeWaveform(log: Log) {
     const max = (xs: number[]) => Math.max(0, ...xs);
     log(max(head) < 0.02, 'A22 a csendes szakasz csendes', `max ${max(head)}`);
     log(Math.abs(max(tail) - 0.5) < 0.05, 'A24 a csak jobb csatornás jel is látszik, helyes szinten', `max ${max(tail)}`);
-    log(tail.length === 40 && head.length === 40, 'A22 a vágott ablak pontos hosszú', `${head.length} + ${tail.length} csúcs`);
+    log(tail.length === 2 * WAVEFORM_PPS && head.length === 2 * WAVEFORM_PPS, 'A22 a vágott ablak pontos hosszú', `${head.length} + ${tail.length} csúcs`);
   }
   new File(uri).delete();
 }

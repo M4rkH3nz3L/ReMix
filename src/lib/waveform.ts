@@ -19,6 +19,13 @@ export interface WaveformData {
   peaks: number[];
 }
 
+/**
+ * A24: csúcs / másodperc — a Hang Stúdió legnagyobb nagyításán (220 px/mp, 3,5 px-es
+ * oszlopok ≈ 63 oszlop/mp) is jusson csúcs minden oszlopra; kisebb zoomnál a
+ * `resamplePeaks` maximummal ritkít. (Régen 20 volt: nagy zoomnál háromszoros kockák.)
+ */
+export const WAVEFORM_PPS = 64;
+
 // A24: a session-cache korlátos (a legrégebben kért esik ki), nem nő a munkamenet végéig
 const MEMORY_LIMIT = 64;
 const memory = new Map<string, Promise<WaveformData | null>>();
@@ -90,7 +97,7 @@ export function barHeights(bars: number[]): number[] {
 
 /** A24: a lemez-cache kulcsa a teljes uri + méret + módosítás ideje (a név+méret ütközött). */
 export function waveformCacheKey(uri: string, size: number, modified: number): string {
-  return `wf2_${hashKey(`${uri}|${size}|${modified}`)}`;
+  return `wf3_${hashKey(`${uri}|${size}|${modified}`)}`;
 }
 
 /** ESZKÖZÖN (natív) dekódolás → csúcsok, worker nélkül (react-native-audio-api). */
@@ -106,7 +113,7 @@ async function computeNativeWaveform(uri: string, userInitiated: boolean): Promi
     const audio = await api.decodeAudioData(uri, 8000);
     markAudioApi(true);
     const channels = Array.from({ length: Math.max(1, audio.numberOfChannels) }, (_, i) => audio.getChannelData(i));
-    return peaksFromChannels(channels, audio.sampleRate, audio.duration, 20);
+    return peaksFromChannels(channels, audio.sampleRate, audio.duration, WAVEFORM_PPS);
   } catch (caught) {
     logCaught('lib/waveform.ts:computeNativeWaveform', caught);
     return null; // az adott fájl nem dekódolható → worker-fallback
@@ -128,7 +135,7 @@ async function computeWebWaveform(uri: string): Promise<WaveformData | null> {
     const audio = await ctx.decodeAudioData(buf);
     const channels = Array.from({ length: Math.max(1, audio.numberOfChannels) }, (_, i) => audio.getChannelData(i));
     void ctx.close?.();
-    return peaksFromChannels(channels, audio.sampleRate, audio.duration, 20);
+    return peaksFromChannels(channels, audio.sampleRate, audio.duration, WAVEFORM_PPS);
   } catch (caught) {
     logCaught('lib/waveform.ts:computeWebWaveform', caught);
     return null;

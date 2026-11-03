@@ -9,13 +9,28 @@ jobs:
   quality:
     name: Minőség-kapu (typecheck · lint · teszt)
     runs-on: ubuntu-latest
+    # 🎧🖼️ Az éles render-kép alapja (server/Dockerfile: Debian bookworm + chromium + betűk),
+    # így a hang- és kép-minőségkapuk (render-paritás, null-teszt, kattanás, képpont-
+    # összevetés) ugyanazon a rendszeren mérnek, mint az éles render.
+    container:
+      image: node:22-bookworm
+      # a Chromium a /dev/shm-et használja; a Docker 64 MB-os alapja terhelés alatt
+      # „Page crashed”-et ad a képpont-tesztekben
+      options: --shm-size=2g
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      # ffmpeg 8.1 (statikus): a minőségkapuk erre a verzióra mértek; a bookworm 5.1-e négy
+      # szín-pontossági képtesztet elront (lásd devs/HUMAN/PRO-AUDIO-EDITOR.md, 14. kör)
+      - name: Rendszer-függőségek (chromium, betűk, ffmpeg 8.1)
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends xz-utils chromium fonts-liberation fonts-noto-color-emoji fonts-dejavu-core
+          curl -fsSL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz | tar -xJ -C /opt
+          ln -sf /opt/ffmpeg-n8.1-latest-linux64-gpl-8.1/bin/ffmpeg /usr/local/bin/ffmpeg
+          ln -sf /opt/ffmpeg-n8.1-latest-linux64-gpl-8.1/bin/ffprobe /usr/local/bin/ffprobe
+          ffmpeg -version | head -1
+          chromium --version
 
       - name: Függőségek (kliens)
         run: npm ci
@@ -31,8 +46,13 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      # 3 worker a 4 vCPU-s futtatón: több párhuzamos Chromium időtúllépést okoz (mérve)
+      # a Chromium rootként sandbox nélkül nem indul (a render szándékosan nem ad
+      # --no-sandbox-ot), ezért a tesztek a konténer `node` felhasználójaként futnak
       - name: Tesztek (kliens + worker)
-        run: npm test -- --ci
+        run: |
+          chown -R node:node .
+          su node -c "CI=true CHROMIUM_PATH=/usr/bin/chromium npm test -- --ci --maxWorkers=3"
 
       - name: Worker syntax-ellenőrzés
         run: for f in server/*.js; do node -c "$f" || exit 1; done

@@ -17,6 +17,10 @@ import { EDGE_FADE_SEC, offlineMixPlan } from '@/lib/offlineMix';
 import type { AudioClip, Project } from '@/types/project';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
+// CI-ben kötelező: egy csendben átugrott minőségkapu nem kapu
+if (process.env.CI && !hasFfmpeg) {
+  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
+}
 const SR = 44100;
 const decode = (file: string): Float32Array => {
   const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', String(SR), '-'], { maxBuffer: 1 << 26 });
@@ -52,7 +56,9 @@ describe('mikro-fade terv (telefonos keverő)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'click-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
   const src = path.join(dir, 'sine.wav');
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100:duration=3', '-ac', '2', src]);
+  beforeAll(() => {
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100:duration=3', '-ac', '2', src]);
+  });
   const render = async (p: Project) => {
     const { renderProject } = jest.requireActual('../../server/render');
     const work = fs.mkdtempSync(path.join(dir, 'w-'));

@@ -13,7 +13,13 @@ const peakHz = (file) => {
 };
 const seconds = (file) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' }));
 
-describe('audioFxChain pitch', () => {
+const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
+// CI-ben kötelező: egy csendben átugrott minőségkapu nem kapu
+if (process.env.CI && !hasFfmpeg) {
+  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
+}
+
+(hasFfmpeg ? describe : describe.skip)('audioFxChain pitch', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pitch-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

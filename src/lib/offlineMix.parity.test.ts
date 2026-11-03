@@ -18,6 +18,10 @@ import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
+// CI-ben kötelező: egy csendben átugrott minőségkapu nem kapu
+if (process.env.CI && !hasFfmpeg) {
+  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
+}
 const SR = OFFLINE_SAMPLE_RATE;
 
 function decode(file: string, channels: number): Float32Array[] {
@@ -33,8 +37,10 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
 
   const stereo = path.join(dir, 'noise.flac');
   const mono = path.join(dir, 'tone.wav');
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.25:duration=4:seed=5', '-ar', '44100', '-ac', '2', stereo]);
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=44100:duration=3', '-ac', '1', mono]);
+  beforeAll(() => {
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.25:duration=4:seed=5', '-ar', '44100', '-ac', '2', stereo]);
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=44100:duration=3', '-ac', '1', mono]);
+  });
 
   const clip = (over: Partial<AudioClip>): AudioClip =>
     ({ kind: 'audio', label: 'c', trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', ...over }) as AudioClip;

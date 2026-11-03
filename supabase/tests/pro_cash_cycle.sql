@@ -177,6 +177,35 @@ select pg_temp.act('a2000000-0000-0000-0000-000000000001');
 select pg_temp.raises('C2.4 előfizető nem kérhet próbát', $$select public.start_trial()$$, 'already_subscribed');
 select pg_temp.admin();
 
+-- ═══ C1.6 türelmi idő, csak olvasható mód, nincs törlés ═══════════════════════
+insert into auth.users (id, instance_id, aud, role, email) values
+  ('f2000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'cy6@t.test');
+update public.subscriptions set tier = 'pro', source = 'coins', status = 'active', period_start = now(), current_period_end = now() + interval '1 month'
+ where user_id = 'f2000000-0000-0000-0000-000000000006';
+insert into public.storage_objects (user_id, key, bytes) values
+  ('f2000000-0000-0000-0000-000000000006', 'g/a', public.gib(12)), ('f2000000-0000-0000-0000-000000000006', 'g/b', public.gib(8));
+select pg_temp.note('C1.6 Haladón 20 GB belefér (25 GB)', not (public.storage_usage_for('f2000000-0000-0000-0000-000000000006') ->> 'over_quota')::boolean);
+update public.subscriptions set tier = 'basic' where user_id = 'f2000000-0000-0000-0000-000000000006';
+select pg_temp.note('C1.6 Amatőrre váltva a kereten túl: 30 nap türelmi idő, 90 nap megőrzés',
+  (select (u ->> 'over_quota')::boolean and (u ->> 'grace_until')::timestamptz = now() + interval '30 days'
+          and (u ->> 'archive_at')::timestamptz = now() + interval '90 days'
+     from (select public.storage_usage_for('f2000000-0000-0000-0000-000000000006') as u) x));
+select pg_temp.raises('C1.6 csak olvasható: új feltöltés nem megy', $$select public.record_storage_object_for('f2000000-0000-0000-0000-000000000006', 'renders', 'g/c', 1, null, 'server')$$, 'quota_exceeded');
+select pg_temp.note('C1.6 automatikus törlés nincs: mind a 20 GB megvan',
+  (select sum(bytes) = public.gib(20) from public.storage_objects where user_id = 'f2000000-0000-0000-0000-000000000006'));
+select pg_temp.note('C1.6 a türelmi idő vége előtt 7 nappal még korai (ma)',
+  not exists (select 1 from public.take_storage_grace_notices(now()) where user_id = 'f2000000-0000-0000-0000-000000000006'));
+select pg_temp.note('C1.6 értesítés 7 nappal a türelmi idő vége előtt, a túllógó bájtokkal',
+  exists (select 1 from public.take_storage_grace_notices(now() + interval '24 days')
+           where user_id = 'f2000000-0000-0000-0000-000000000006' and over_bytes = public.gib(17)));
+select pg_temp.note('C1.6 …egyszer', not exists (select 1 from public.take_storage_grace_notices(now() + interval '25 days') where user_id = 'f2000000-0000-0000-0000-000000000006'));
+delete from public.storage_objects where user_id = 'f2000000-0000-0000-0000-000000000006' and key = 'g/a';
+delete from public.storage_objects where user_id = 'f2000000-0000-0000-0000-000000000006' and key = 'g/b';
+select pg_temp.note('C1.6 a keret alá kerülve a korlátozás megszűnik',
+  (select not (u ->> 'over_quota')::boolean and u ->> 'grace_until' is null from (select public.storage_usage_for('f2000000-0000-0000-0000-000000000006') as u) x)
+  );
+select pg_temp.note('C1.6 …és a jelző törlődött', (select over_quota_since is null from public.storage_quotas where user_id = 'f2000000-0000-0000-0000-000000000006'));
+
 select pg_temp.note('invariáns: a napló összege = az egyenleg',
   not exists (select 1 from public.user_credits u where u.user_id::text like '_2000000-%' and u.balance <>
     coalesce((select sum(delta_cents) from public.credit_transactions t where t.user_id = u.user_id), 0)));

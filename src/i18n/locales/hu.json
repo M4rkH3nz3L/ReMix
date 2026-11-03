@@ -395,6 +395,7 @@
       "addonDoneMsg": "+{{gb}} GB hozzáadva. Most {{paid}} Coin (a hónap hátralévő része), utána {{monthly}} Coin / hó a megújításkor.",
       "addonLabel": "bővítés",
       "freeHint": "Free-ben a média a telefonodon marad, vagy a saját felhődben (lent). ReMix-felhőtárhely az Amatőrtől jár: 3 GB, bővíthető.",
+      "readOnly": "Csak olvasható: a felhő-tárhelyed a kereten túl van. Új fájl nem tölthető fel; {{date}}-ig töltsd le, költöztesd a saját felhődbe vagy bővíts. Semmit nem törlünk.",
       "gb": "Gigabájt",
       "months": "Hónap",
       "monthsShort": "hó",

@@ -5,7 +5,8 @@ const { logCaught } = require('./lib/caught');
 //   2. a lejárt Coin-előfizetések megújítása (`renew_due_subscriptions`): a függő lefelé
 //      váltás és a levett add-onok ilyenkor lépnek életbe; kevés Coinnál past_due → Free;
 //   3. megújítási értesítés 3 nappal a lejárat előtt, ha kevés a Coin (`take_renewal_notices`,
-//      periódusonként egyszer), és a próba végéről 2 nappal előtte (`take_trial_notices`, C2.4).
+//      periódusonként egyszer), a próba végéről 2 nappal előtte (`take_trial_notices`, C2.4), és a
+//      kereten túli felhő-tárhely türelmi idejének vége előtt 7 nappal (`take_storage_grace_notices`, C1.6).
 // Az `sb`, a `now` és az értesítő injektálható (teszt); service_role nélkül no-op.
 
 /** Egy futás: a coin_release_due RPC. Visszaadja az érintett userek számát (hibánál 0). */
@@ -91,7 +92,38 @@ async function runSubscriptionCycleOnce(sb, now = new Date(), notify = null) {
   } catch (caught) {
     logCaught('coinSettle.js:runSubscriptionCycleOnce:trials', caught);
   }
+  try {
+    const { data: graces, error } = await sb.rpc('take_storage_grace_notices', { p_now: now.toISOString() });
+    if (error) {
+      throw new Error(error.message);
+    }
+    const send = notify || require('./notify').sendNotification;
+    for (const row of graces || []) {
+      try {
+        await send(storageGraceNotice(row));
+        out.notified += 1;
+      } catch (caught) {
+        logCaught('coinSettle.js:runSubscriptionCycleOnce:graceNotify', caught);
+      }
+    }
+  } catch (caught) {
+    logCaught('coinSettle.js:runSubscriptionCycleOnce:grace', caught);
+  }
   return out;
+}
+
+/** A felhő-tárhely türelmi idejének vége (C1.6): semmit nem törlünk, de a feltöltés zárva marad. */
+function storageGraceNotice(row) {
+  const date = new Date(row.grace_until).toISOString().slice(0, 10);
+  const gb = (Number(row.over_bytes) / 1073741824).toFixed(1).replace('.', ',');
+  return {
+    userId: row.user_id,
+    type: 'info',
+    title: 'A felhő-tárhelyed a kereten túl van',
+    body: `${gb} GB-tal több a keretednél. ${date}-ig töltsd le vagy költöztesd a saját felhődbe, vagy bővíts — törölni semmit nem fogunk.`,
+    route: '/profile',
+    data: { kind: 'storage_grace', grace_until: row.grace_until },
+  };
 }
 
 /** A próba végéről szóló értesítés (C2.4): automatikus terhelés nincs, a user dönt. */
@@ -107,4 +139,4 @@ function trialNotice(row) {
   };
 }
 
-module.exports = { runCoinSettleOnce, runSubscriptionCycleOnce, renewalNotice, trialNotice };
+module.exports = { runCoinSettleOnce, runSubscriptionCycleOnce, renewalNotice, trialNotice, storageGraceNotice };

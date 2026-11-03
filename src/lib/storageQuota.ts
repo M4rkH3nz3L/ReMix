@@ -24,6 +24,10 @@ export interface StorageUsage {
   bonusBytes: number;
   quotaBytes: number;
   bonusExpiresAt: string | null;
+  /** a kereten túl (C1.6): csak olvasható — új feltöltés nem megy, törlés nincs */
+  overQuota: boolean;
+  /** eddig a türelmi idő; utána a fölösleg letölthető marad */
+  graceUntil: string | null;
 }
 
 function currentUid(): string | null {
@@ -39,6 +43,8 @@ function mapUsage(j: unknown): StorageUsage {
     bonusBytes: Number(o.bonus_bytes ?? 0),
     quotaBytes: Number(o.quota_bytes ?? 0),
     bonusExpiresAt: (o.bonus_expires_at as string | null) ?? null,
+    overQuota: o.over_quota === true,
+    graceUntil: typeof o.grace_until === 'string' ? o.grace_until : null,
   };
 }
 

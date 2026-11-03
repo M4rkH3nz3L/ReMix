@@ -266,6 +266,17 @@ export function StorageCard() {
               </Text>
             ) : null}
 
+            {usage.overQuota ? (
+              <View style={styles.graceBox}>
+                <Ionicons name="lock-closed" size={15} color={palette.danger} />
+                <Text style={styles.graceText}>
+                  {t('profile.storage.readOnly', {
+                    date: usage.graceUntil ? new Date(usage.graceUntil).toLocaleDateString() : '—',
+                  })}
+                </Text>
+              </View>
+            ) : null}
+
             {/* bővítés: +10 GB / hó ismétlődő add-on — csak fizetős szinten */}
             {tier === 'free' ? (
               <Text style={styles.dim}>{t('profile.storage.freeHint')}</Text>
@@ -465,6 +476,16 @@ const styles = StyleSheet.create({
   barTrack: { height: 8, borderRadius: 4, backgroundColor: palette.surfaceHigh, overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4 },
   breakdown: { color: palette.textDim, fontSize: 12, marginTop: 8 },
+  graceBox: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.danger,
+    padding: 10,
+  },
+  graceText: { color: palette.text, fontSize: 12, flex: 1, lineHeight: 17 },
   boostBox: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: palette.border, gap: 8 },
   boostTitle: { color: palette.text, fontSize: 13, fontWeight: '700' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },

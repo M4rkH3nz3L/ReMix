@@ -395,6 +395,7 @@
       "addonDoneMsg": "+{{gb}} GB hinzugefügt. Jetzt {{paid}} Coins (Rest dieses Monats), danach {{monthly}} Coins / Monat bei der Verlängerung.",
       "addonLabel": "Erweiterung",
       "freeHint": "Bei Free bleiben deine Medien auf dem Handy oder in deiner eigenen Cloud (unten). ReMix-Cloudspeicher gibt es ab Amateur: 3 GB, erweiterbar.",
+      "readOnly": "Nur lesbar: dein Cloud-Speicher liegt über dem Limit. Neue Uploads sind pausiert; bis {{date}} herunterladen, in deine eigene Cloud verschieben oder erweitern. Wir löschen nichts.",
       "gb": "Gigabyte",
       "months": "Monate",
       "monthsShort": "Mon.",

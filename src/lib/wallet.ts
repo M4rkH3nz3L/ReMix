@@ -1,7 +1,8 @@
 import { cloudBaseUrl } from '@/lib/backend';
 import { refreshEntitlement } from '@/lib/billing';
 import { EMPTY_WALLET, parseWallet, type WalletBreakdown } from '@/lib/coins';
-import type { Tier } from '@/lib/tiers';
+import type { AddonId } from '@/lib/subscriptionPlan';
+import { asTier, type Tier } from '@/lib/tiers';
 import { InsufficientCreditsError } from '@/lib/shop';
 import { requireSupabase, supabase } from '@/lib/supabase';
 import { workerJsonHeaders } from '@/lib/workerAuth';
@@ -98,6 +99,13 @@ export class InsufficientEarnedError extends Error {
     this.name = 'InsufficientEarnedError';
   }
 }
+/** Az előfizetést az áruház kezeli (App Store / Play) — ott módosítható. */
+export class ManagedByStoreError extends Error {
+  constructor() {
+    super('managed_by_store');
+    this.name = 'ManagedByStoreError';
+  }
+}
 /** Hetente legfeljebb egy kifizetés kérhető. */
 export class PayoutWeeklyLimitError extends Error {
   constructor() {
@@ -130,18 +138,27 @@ export async function subscribeWithCoins(
   tier: Exclude<Tier, 'free'>,
   months: 1 | 12,
   seats = 1
-): Promise<{ balance: number; until: string }> {
+): Promise<{ balance: number; until: string; kind: 'start' | 'extend' | 'change' | 'downgrade'; cost: number; credit: number }> {
   const sb = requireSupabase();
   const { data, error } = await sb.rpc('subscribe_with_coins', { p_tier: tier, p_months: months, p_seats: seats });
   if (error) {
     if (/insufficient_credits/.test(error.message)) {
       throw new InsufficientCreditsError();
     }
+    if (/managed_by_store/.test(error.message)) {
+      throw new ManagedByStoreError();
+    }
     throw new Error(error.message);
   }
   await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:subscribeWithCoins', caught); });
   const d = (data ?? {}) as Record<string, unknown>;
-  return { balance: Number(d.balance ?? 0), until: String(d.until ?? '') };
+  return {
+    balance: Number(d.balance ?? 0),
+    until: String(d.until ?? ''),
+    kind: String(d.kind ?? 'start') as 'start' | 'extend' | 'change' | 'downgrade',
+    cost: Number(d.cost ?? 0),
+    credit: Number(d.credit ?? 0),
+  };
 }
 
 /** Az ajándék-katalógus (TikTok-modell): fix koin-áras tételek. */
@@ -321,4 +338,93 @@ export async function myPayoutRequests(limit = 10): Promise<PayoutRequest[]> {
     status: String(r.status ?? ''),
     createdAt: String(r.created_at ?? ''),
   }));
+}
+
+/** Az előfizetésem (a DB `my_subscription()` válasza). */
+export interface MySubscription {
+  tier: Tier;
+  status: string;
+  source: string;
+  seats: number;
+  billingPeriod: 'month' | 'year';
+  until: string | null;
+  autoRenew: boolean;
+  pendingTier: Tier | null;
+  /** a következő megújítás díja cent-Coinban (szint + megmaradó add-onok) */
+  renewalCost: number;
+  addons: { id: string; addon: AddonId; qty: number; cancelAtPeriodEnd: boolean }[];
+}
+
+export function parseSubscription(raw: unknown): MySubscription {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const addons = Array.isArray(r.addons) ? (r.addons as Record<string, unknown>[]) : [];
+  return {
+    tier: asTier(r.tier),
+    status: String(r.status ?? 'active'),
+    source: String(r.source ?? 'manual'),
+    seats: Number(r.seats ?? 1) || 1,
+    billingPeriod: r.billing_period === 'year' ? 'year' : 'month',
+    until: typeof r.until === 'string' ? r.until : null,
+    autoRenew: r.auto_renew === true,
+    pendingTier: typeof r.pending_tier === 'string' ? asTier(r.pending_tier) : null,
+    renewalCost: Number(r.renewal_cost ?? 0) || 0,
+    addons: addons.map((a) => ({
+      id: String(a.id),
+      addon: String(a.addon) as AddonId,
+      qty: Number(a.qty ?? 1) || 1,
+      cancelAtPeriodEnd: a.cancel_at_period_end === true,
+    })),
+  };
+}
+
+export async function fetchSubscription(): Promise<MySubscription | null> {
+  if (!supabase || !currentUid()) {
+    return null;
+  }
+  const { data, error } = await supabase.rpc('my_subscription');
+  if (error) {
+    throw new Error(error.message);
+  }
+  return parseSubscription(data);
+}
+
+/** Automatikus megújítás be/ki (lemondás egy koppintással; a periódus végéig marad). */
+export async function setAutoRenew(on: boolean): Promise<void> {
+  const { error } = await requireSupabase().rpc('set_auto_renew', { p_on: on });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Az add-on nem vehető (szint / számlázás). */
+export class AddonNotAllowedError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'AddonNotAllowedError';
+  }
+}
+
+/** Add-on felvétele: a periódus hátralévő részét most időarányosan fizeted. */
+export async function addAddon(addon: AddonId, qty = 1): Promise<{ cost: number; renewalCost: number; balance: number }> {
+  const { data, error } = await requireSupabase().rpc('add_addon', { p_addon: addon, p_qty: qty });
+  if (error) {
+    if (/insufficient_credits/.test(error.message)) {
+      throw new InsufficientCreditsError();
+    }
+    const m = /paid_tier_required|tier_too_low|addon_requires_coin_billing/.exec(error.message);
+    if (m) {
+      throw new AddonNotAllowedError(m[0]);
+    }
+    throw new Error(error.message);
+  }
+  const d = (data ?? {}) as Record<string, unknown>;
+  return { cost: Number(d.cost ?? 0), renewalCost: Number(d.renewal_cost ?? 0), balance: Number(d.balance ?? 0) };
+}
+
+/** Add-on levétele a következő ciklustól. */
+export async function removeAddon(id: string): Promise<void> {
+  const { error } = await requireSupabase().rpc('remove_addon', { p_id: id });
+  if (error) {
+    throw new Error(error.message);
+  }
 }

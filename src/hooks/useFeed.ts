@@ -27,6 +27,7 @@ import { runOptimistic } from '@/lib/optimistic';
 import { REPORT_REASONS, reportPost } from '@/lib/reports';
 import { blockUser, filterBlocked, listMyBlockedIds } from '@/lib/blocks';
 import type { FeedMode, FeedPost } from '@/types/social';
+import { toVolumeStep } from '@/lib/feedPlayback';
 import { moderatePostGlobal } from '@/lib/roles';
 import { useRoles } from '@/store/roleStore';
 import { requireApp, requireSignIn } from '@/lib/webGate';
@@ -62,9 +63,10 @@ export function useFeed() {
   const insets = useSafeAreaInsets();
   // az akció-sor és a felirat az alsó menü FÖLÖTT üljön — a menü valós magassága
   // BOTTOM_NAV_HEIGHT + a képernyő-alji biztonságos zóna (home indicator), nem csak 56
-  const chromeBottom = BOTTOM_NAV_HEIGHT + insets.bottom + 24;
-  // ▶️ a tekerő-csík az alsó menü FÖLÖTT, közvetlenül a képernyő alján
-  const seekBottom = BOTTOM_NAV_HEIGHT + insets.bottom + 6;
+  // (a lejátszási sor — hangerő-gomb · tekerő-csík · óra — 32 pt magas, ez fölött)
+  const chromeBottom = BOTTOM_NAV_HEIGHT + insets.bottom + 34;
+  // ▶️ a lejátszási sor alja: az alsó menü FÖLÖTT, közvetlenül a képernyő alján
+  const seekBottom = BOTTOM_NAV_HEIGHT + insets.bottom - 2;
   const [mode, setMode] = useState<FeedMode>('foryou');
   // 📺 CHANNEL-mód: a feed EGY csatorna videóit lapozza (a rácsból megnyitva) —
   // `?channel=<userId>&start=<postId>`. Ilyenkor a mód-váltó helyett vissza-gomb megy.
@@ -132,6 +134,8 @@ export function useFeed() {
   const [hotspotTime, setHotspotTime] = useState(0);
   // ▶️ videó-haladás (0–1) az alsó tekerő-csíkhoz + tekerés-állapot/szélesség
   const [progress, setProgress] = useState(0);
+  // ⏱️ lejátszási óra (EGÉSZ mp-re kerekítve → másodpercenként legfeljebb egy render)
+  const [clock, setClock] = useState({ cur: 0, dur: 0 });
   const seekingRef = useRef(false);
   const seekWidthRef = useRef(1);
   // TikTok-szerű: minden vezérlő (rail + felirat + menü) MINDIG látszik — nincs
@@ -150,11 +154,11 @@ export function useFeed() {
   // némítás-állapot (weben alapból néma az autoplayhez)
   const [muted, setMuted] = useState(Platform.OS === 'web');
   const mutedRef = useRef(Platform.OS === 'web');
-  // 🔊 hangerő (0–1) + a szabályzó-csúszka nyitva van-e + a csúszka magassága
+  // 🔊 hangerő (0–1, egész százalékos lépcsőben) + a szabályzó nyitva van-e + a csúszka szélessége
   const [volume, setVolume] = useState(1);
   const volumeRef = useRef(1);
   const [volumeOpen, setVolumeOpen] = useState(false);
-  const volHeightRef = useRef(1);
+  const volWidthRef = useRef(1);
   // a feed `push`-sal nyit más képernyőt → mountolva marad; a videó ne szóljon takarva
   const isFocused = useIsFocused();
 
@@ -614,6 +618,7 @@ export function useFeed() {
       }
       if (!activePost?.videoUri || !isFocused) {
         setProgress(0);
+        setClock((c) => (c.cur === 0 && c.dur === 0 ? c : { cur: 0, dur: 0 }));
         return;
       }
       let cur = 0;
@@ -628,6 +633,8 @@ export function useFeed() {
       }
       watchedRef.current = cur;
       setProgress(dur > 0 ? Math.min(1, Math.max(0, cur / dur)) : 0);
+      const c2 = { cur: Math.floor(cur), dur: Math.round(dur) };
+      setClock((c) => (c.cur === c2.cur && c.dur === c2.dur ? c : c2));
     }, 200);
     return () => clearInterval(iv);
   }, [activePost, isFocused, player]);
@@ -773,11 +780,13 @@ export function useFeed() {
       const v = activeVideoElRef.current;
       if (v && Number.isFinite(v.duration)) {
         v.currentTime = r * v.duration;
+        setClock({ cur: Math.floor(r * v.duration), dur: Math.round(v.duration) });
       }
     } else {
       const dur = player.duration ?? 0;
       if (dur > 0) {
         player.currentTime = r * dur;
+        setClock({ cur: Math.floor(r * dur), dur: Math.round(dur) });
       }
     }
   };
@@ -796,10 +805,10 @@ export function useFeed() {
     []
   );
 
-  // 🔊 hangerő beállítása (0–1): a videó/lejátszó volume + muted egyben. 0 = néma.
+  // 🔊 hangerő beállítása 0–100%-ig (egész százalék): a videó/lejátszó volume + muted egyben. 0 = néma.
   const doVolumeRef = useRef<(v: number) => void>(() => {});
   doVolumeRef.current = (v: number) => {
-    const vol = Math.max(0, Math.min(1, v));
+    const vol = toVolumeStep(v);
     volumeRef.current = vol;
     setVolume(vol);
     const m = vol === 0;
@@ -819,17 +828,30 @@ export function useFeed() {
       player.muted = m;
     }
   };
-  // a függőleges csúszkán: fent = 1, lent = 0 (e.y a csúszka tetejétől)
+  // a VÍZSZINTES csúszkán: bal = 0%, jobb = 100% (e.x a sáv bal szélétől) — vízszintes,
+  // hogy a húzás ne lapozza a függőleges feedet (a tekerő-csíkkal azonos irány)
   const volumeGesture = useMemo(
     () =>
       Gesture.Pan()
-        .onBegin((e) => doVolumeRef.current(1 - e.y / volHeightRef.current))
-        .onUpdate((e) => doVolumeRef.current(1 - e.y / volHeightRef.current))
+        .onBegin((e) => doVolumeRef.current(e.x / volWidthRef.current))
+        .onUpdate((e) => doVolumeRef.current(e.x / volWidthRef.current))
         .runOnJS(true),
     []
   );
+  // ♿ VoiceOver/TalkBack „adjustable": felfelé/lefelé söprés ±10%
+  const nudgeVolume = (delta: number) => doVolumeRef.current(volumeRef.current + delta);
 
-  // 🔊 a hang-gomb: némít/hangosít + a hangerő-csúszka megnyitása (hangosításkor)
+  // 🔊 a bal alsó hang-gomb: némán → hangosít + nyitja a csúszkát; hangosan → a csúszkát
+  // nyitja/zárja (a némítás a csúszka hangszóró-ikonján vagy 0%-ra húzva)
+  const onVolumeButton = (sub: FeedPost) => {
+    if (mutedRef.current) {
+      onToggleMute(sub);
+      return;
+    }
+    setVolumeOpen((o) => !o);
+  };
+
+  // 🔊 némít/hangosít + a hangerő-csúszka megnyitása (hangosításkor)
   const onToggleMute = (sub: FeedPost) => {
     const nm = !mutedRef.current;
     if (!nm && volumeRef.current === 0) {
@@ -892,11 +914,14 @@ export function useFeed() {
     muted,
     volume,
     volumeOpen,
-    volHeightRef,
+    volWidthRef,
     volumeGesture,
+    nudgeVolume,
+    onVolumeButton,
     onToggleMute,
     // haladás / tekerés
     progress,
+    clock,
     seekWidthRef,
     seekGesture,
     // hotspot

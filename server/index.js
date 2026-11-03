@@ -288,11 +288,20 @@ if (require.main === module) {
     log.info('erase-sweep ütemezve', { intervalHours: 24 });
   }
 
-  // 🪙 PRO-CASH C0.3: a lejárt Coin-tartások feloldása és a bónusz-lejárat óránként
-  // (a DB minden olvasáskor lustán is feloldja; ez a napló időbeni frissítéséért fut).
+  // 🪙 PRO-CASH C0.3 + C1.3: óránként a lejárt Coin-tartások feloldása, a bónusz-lejárat,
+  // a Coin-előfizetések megújítása és a 3 nappal előtti értesítés (kevés Coinnál).
   if (eraseAdmin) {
-    const { runCoinSettleOnce } = require('./coinSettle');
-    setInterval(() => { void runCoinSettleOnce(eraseAdmin); }, 60 * 60 * 1000).unref();
+    const { runCoinSettleOnce, runSubscriptionCycleOnce } = require('./coinSettle');
+    const coinTick = () => {
+      void runCoinSettleOnce(eraseAdmin);
+      void runSubscriptionCycleOnce(eraseAdmin).then((r) => {
+        if (r.renewed || r.failed || r.ended || r.notified) {
+          log.info('subscription-cycle', r);
+        }
+      });
+    };
+    setTimeout(coinTick, 2 * 60 * 1000).unref();
+    setInterval(coinTick, 60 * 60 * 1000).unref();
   }
 
   app.listen(PORT, () => {

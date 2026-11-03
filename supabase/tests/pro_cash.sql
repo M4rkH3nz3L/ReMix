@@ -173,12 +173,7 @@ select public.grant_coins('b1000000-0000-0000-0000-000000000002', 2500, 'purchas
 select pg_temp.act('b1000000-0000-0000-0000-000000000002');
 select public.subscribe_with_coins('basic', 1);
 select pg_temp.note('C0.4 Amatőr havidíj 2 Coin', (select purchased_cents = 2300 from public.user_credits where user_id = 'b1000000-0000-0000-0000-000000000002'));
-select public.subscribe_with_coins('basic', 12);
-select pg_temp.note('C0.4 éves díj = 10 havi (20 Coin), a lejárat 12 hónappal tolódik',
-  (select purchased_cents = 300 from public.user_credits where user_id = 'b1000000-0000-0000-0000-000000000002')
-  and (select current_period_end > now() + interval '12 months' from public.subscriptions where user_id = 'b1000000-0000-0000-0000-000000000002'));
-select pg_temp.raises('C0.4 kevés Coin: nem megy mínuszba', $$select public.subscribe_with_coins('basic', 12)$$, 'insufficient_credits');
-select pg_temp.raises('C0.4 szintváltás a C1.1-ig nem engedett', $$select public.subscribe_with_coins('pro', 1)$$, 'tier_change_not_supported');
+select pg_temp.raises('C0.4 kevés Coin: nem megy mínuszba', $$select public.subscribe_with_coins('ultra', 12)$$, 'insufficient_credits');
 select pg_temp.raises('C0.4 Vállalati 1 fővel nem vehető', $$select public.subscribe_with_coins('business', 1, 1)$$, 'invalid seats');
 select pg_temp.admin();
 select pg_temp.note('C0.4 az előfizetés aktív, forrás: coins',

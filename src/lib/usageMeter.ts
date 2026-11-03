@@ -63,6 +63,21 @@ export function seatQuota(tier: Tier, seats: number): UsageQuota {
   return out;
 }
 
+/**
+ * A ténylegesen érvényes havi kvóta: a szint kvótája × ülésszám (Vállalati) + az add-onok
+ * többlete (PRO-CASH C1.2). A worker tükre: server/usage.js `effectiveQuota`.
+ */
+export function effectiveQuota(tier: Tier, seats = 1, extras: Partial<Record<UsageMetric, number>> = {}): UsageQuota {
+  const q = { ...seatQuota(tier, seats) };
+  for (const m of USAGE_METRICS) {
+    const add = Math.max(0, Math.trunc(Number(extras[m]) || 0));
+    if (add > 0 && q[m] >= 0) {
+      q[m] += add;
+    }
+  }
+  return q;
+}
+
 export function getUsage(c: UsageCounters, m: UsageMetric): number {
   return c[m] ?? 0;
 }

@@ -1,4 +1,4 @@
-const { loggedFetch } = require('./lib/caught');
+const { loggedFetch, logCaught } = require('./lib/caught');
 // 📊 Usage-metering a workerben (audit §2.2) — a drága felhő-erőforrások havi
 // mérése + tier-kvóta ENFORCE-olása. A kvóta-logika AZONOS a kliens
 // src/lib/usageMeter.ts-sel (preview/kliens == worker konzisztencia); a tárolás a
@@ -139,11 +139,49 @@ async function getUsage(userId, metric, now = new Date()) {
  * 🔒 Kvóta-ellenőrzés a drága hívás ELŐTT. `{ ok, remaining }`. Ha a tábla/service_role
  * hiányzik (vagy ismeretlen metrika), MEGENGED degradál (a rate-limit a második védvonal).
  */
+/**
+ * A ténylegesen érvényes havi kvóta: a szint kvótája × ülésszám (Vállalati) + az add-onok
+ * többlete (PRO-CASH C1.2: +1 M AI-token, +60 render-perc). A kliens tükre: usageMeter.ts
+ * `effectiveQuota`. A korlátlan (-1) korlátlan marad.
+ */
+function effectiveQuota(tier, seats = 1, extras = {}) {
+  const q = { ...seatQuota(tier, seats) };
+  for (const m of USAGE_METRICS) {
+    const add = Math.max(0, Math.trunc(Number(extras && extras[m]) || 0));
+    if (add > 0 && q[m] >= 0) {
+      q[m] += add;
+    }
+  }
+  return q;
+}
+
+/** A user ülésszáma és add-on többlete a DB-ből (subscription_quota_for); hiba/nincs DB → üres. */
+async function quotaExtras(userId) {
+  const sb = getAdmin();
+  if (!sb || !userId) {
+    return { seats: 1, extras: {} };
+  }
+  try {
+    const { data, error } = await sb.rpc('subscription_quota_for', { p_user: userId });
+    if (error || !data) {
+      return { seats: 1, extras: {} };
+    }
+    return {
+      seats: Number(data.seats) || 1,
+      extras: { aiTokens: Number(data.aiTokens) || 0, renderMinutes: Number(data.renderMinutes) || 0 },
+    };
+  } catch (caught) {
+    logCaught('usage.js:quotaExtras', caught);
+    return { seats: 1, extras: {} };
+  }
+}
+
 async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) {
   if (!USAGE_METRICS.includes(metric)) {
     return { ok: true, remaining: Infinity };
   }
-  const quota = quotaFor(tier);
+  const { seats, extras } = tier === 'free' ? { seats: 1, extras: {} } : await quotaExtras(userId);
+  const quota = effectiveQuota(tier, seats, extras);
   if (isUnlimited(quota, metric)) {
     return { ok: true, remaining: Infinity };
   }
@@ -193,6 +231,7 @@ module.exports = {
   TIER_QUOTAS,
   quotaFor,
   seatQuota,
+  effectiveQuota,
   BUSINESS_MIN_SEATS,
   periodKey,
   remaining,

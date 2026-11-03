@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { SubscriptionManageCard } from '@/components/profile/SubscriptionManageCard';
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import {
@@ -26,6 +27,7 @@ import {
   type GiftEvent,
   GiftNotFoundError,
   InsufficientEarnedError,
+  ManagedByStoreError,
   NoPayoutAccountError,
   type PayoutAccount,
   type PayoutRequest,
@@ -84,6 +86,7 @@ export function WalletCard() {
 
   const [subTier, setSubTier] = useState<Exclude<Tier, 'free' | 'business'>>('basic');
   const [annual, setAnnual] = useState(false);
+  const [subKey, setSubKey] = useState(0);
   const [sendTo, setSendTo] = useState('');
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [received, setReceived] = useState<GiftEvent[]>([]);
@@ -150,14 +153,22 @@ export function WalletCard() {
         const res = await subscribeWithCoins(subTier, months);
         setBalance(res.balance);
         refresh();
+        setSubKey((k) => k + 1);
+        const until = new Date(res.until).toLocaleDateString();
         Alert.alert(
           t('wallet.subDoneTitle'),
-          t('wallet.subDoneMsg', { tier: t(tierLabelKey(subTier)), until: new Date(res.until).toLocaleDateString() })
+          res.kind === 'downgrade'
+            ? t('wallet.sub.downgradeMsg', { tier: t(tierLabelKey(subTier)), date: until })
+            : res.credit > 0
+              ? t('wallet.sub.changeMsg', { tier: t(tierLabelKey(subTier)), credit: formatCoins(res.credit), until })
+              : t('wallet.subDoneMsg', { tier: t(tierLabelKey(subTier)), until })
         );
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onPayPro', e);
         if (e instanceof InsufficientCreditsError) {
           toShop();
+        } else if (e instanceof ManagedByStoreError) {
+          Alert.alert(t('common.error'), t('wallet.sub.storeManaged'));
         } else {
           Alert.alert(t('common.error'), (e as Error).message);
         }
@@ -306,6 +317,9 @@ export function WalletCard() {
           </>
         )}
       </View>
+
+      {/* az előfizetésem: lejárat, lemondás, add-onok */}
+      <SubscriptionManageCard onChanged={refresh} refreshKey={subKey} />
 
       {/* előfizetés Coinból: szint + havi/éves */}
       <View style={styles.card}>

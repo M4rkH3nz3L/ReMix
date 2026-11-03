@@ -19,6 +19,8 @@ export const STORAGE_CENTS_PER_GB_MONTH = 10;
 export interface StorageUsage {
   usedBytes: number;
   baseBytes: number;
+  /** az ismétlődő tárhely-add-onok (PRO-CASH 3.3) */
+  addonBytes: number;
   bonusBytes: number;
   quotaBytes: number;
   bonusExpiresAt: string | null;
@@ -33,6 +35,7 @@ function mapUsage(j: unknown): StorageUsage {
   return {
     usedBytes: Number(o.used_bytes ?? 0),
     baseBytes: Number(o.base_bytes ?? 0),
+    addonBytes: Number(o.addon_bytes ?? 0),
     bonusBytes: Number(o.bonus_bytes ?? 0),
     quotaBytes: Number(o.quota_bytes ?? 0),
     bonusExpiresAt: (o.bonus_expires_at as string | null) ?? null,

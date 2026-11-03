@@ -26,6 +26,7 @@ import { FeedImageCarousel } from '@/components/feed/FeedImageCarousel';
 import { HotspotOverlay } from '@/components/preview/HotspotOverlay';
 import { palette } from '@/constants/editor';
 import { currentUserId } from '@/lib/feed';
+import { formatPlayClock } from '@/lib/feedPlayback';
 import type { FeedPost } from '@/types/social';
 import type { InteractiveClip } from '@/types/project';
 
@@ -63,11 +64,14 @@ export function FeedPostBody({
   muted,
   volume,
   volumeOpen,
-  volHeightRef,
+  volWidthRef,
   volumeGesture,
+  nudgeVolume,
+  onVolumeButton,
   onToggleMute,
   // haladás / tekerés / hotspot
   progress,
+  clock,
   seekWidthRef,
   seekGesture,
   hotspotTime,
@@ -110,10 +114,13 @@ export function FeedPostBody({
   muted: boolean;
   volume: number;
   volumeOpen: boolean;
-  volHeightRef: React.MutableRefObject<number>;
+  volWidthRef: React.MutableRefObject<number>;
   volumeGesture: ComposedGesture | GestureType;
+  nudgeVolume: (delta: number) => void;
+  onVolumeButton: (sub: FeedPost) => void;
   onToggleMute: (sub: FeedPost) => void;
   progress: number;
+  clock: { cur: number; dur: number };
   seekWidthRef: React.MutableRefObject<number>;
   seekGesture: ComposedGesture | GestureType;
   hotspotTime: number;
@@ -222,21 +229,6 @@ export function FeedPostBody({
         </Animated.View>
       ) : null}
 
-      {/* 🔊 függőleges hangerő-csúszka (a hang-gomb nyitja) — húzva állítható, 0 = néma */}
-      {volumeOpen && sub.id === activeId ? (
-        <GestureDetector gesture={volumeGesture}>
-          <View
-            style={[styles.volSlider, { bottom: chromeBottom + 40 }]}
-            hitSlop={12}
-            onLayout={(e) => {
-              volHeightRef.current = e.nativeEvent.layout.height || 1;
-            }}
-          >
-            <View style={[styles.volFill, { height: `${Math.round(volume * 100)}%` }]} />
-          </View>
-        </GestureDetector>
-      ) : null}
-
       {/* jobb oldali akció-sor (like/komment/mentés/remix/…) — a többi chrome-mal
           EGYÜTT rejtőzik/jelenik meg (hármas koppintás / auto-hide): immerzív módban
           csak a videó + a user-hotspotok látszanak. */}
@@ -267,14 +259,6 @@ export function FeedPostBody({
               color={sub.viewerLiked ? palette.danger : '#fff'}
             />
             <Text style={styles.railCount}>{compact(sub.counts.likes)}</Text>
-          </Pressable>
-          {/* 🔊 hang: koppintás = némít/hangosít ÉS megnyitja a hangerő-csúszkát */}
-          <Pressable style={styles.railBtn} onPress={() => onToggleMute(sub)}>
-            <Ionicons
-              name={muted || volume === 0 ? 'volume-mute' : volume < 0.5 ? 'volume-low' : 'volume-high'}
-              size={30}
-              color="#fff"
-            />
           </Pressable>
           <Pressable style={styles.railBtn} onPress={() => setCommentFor(sub)}>
             <View style={styles.commentIconWrap}>
@@ -390,21 +374,85 @@ export function FeedPostBody({
         </View>
       ) : null}
 
-      {/* ▶️ alsó tekerő-csík: hol jár a videó + húzva/koppintva tekerés */}
-      {sub.id === activeId && sub.videoUri ? (
-        <GestureDetector gesture={seekGesture}>
-          <View
-            style={[styles.seekBar, { bottom: seekBottom }]}
-            hitSlop={{ top: 14, bottom: 14 }}
-            onLayout={(e) => {
-              seekWidthRef.current = e.nativeEvent.layout.width || 1;
-            }}
+      {/* 🔊 hangerő-panel (a bal alsó hang-gomb nyitja): hangszóró = némít/hangosít,
+          VÍZSZINTES sáv húzva/koppintva 0–100%, mellette a pontos százalék */}
+      {volumeOpen && sub.id === activeId && sub.videoUri ? (
+        <View
+          style={[
+            styles.volPanel,
+            { bottom: seekBottom + 36, width: Math.min(240, Math.max(180, contentW * 0.6)) },
+          ]}
+        >
+          <Pressable
+            onPress={() => onToggleMute(sub)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t(muted ? 'feed.unmute' : 'feed.mute')}
           >
-            <View style={styles.seekTrack} />
-            <View style={[styles.seekFill, { width: `${Math.round(progress * 100)}%` }]} />
-            <View style={[styles.seekThumb, { left: `${Math.round(progress * 100)}%` }]} />
-          </View>
-        </GestureDetector>
+            <Ionicons name={volumeIcon(muted, volume)} size={20} color="#fff" />
+          </Pressable>
+          <GestureDetector gesture={volumeGesture}>
+            <View
+              style={styles.volTrackHit}
+              hitSlop={{ top: 12, bottom: 12 }}
+              onLayout={(e) => {
+                volWidthRef.current = e.nativeEvent.layout.width || 1;
+              }}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel={t('feed.volume')}
+              accessibilityValue={{ min: 0, max: 100, now: muted ? 0 : Math.round(volume * 100) }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={(e) => nudgeVolume(e.nativeEvent.actionName === 'increment' ? 0.1 : -0.1)}
+            >
+              <View style={styles.volTrack} />
+              <View style={[styles.volFill, { width: `${muted ? 0 : Math.round(volume * 100)}%` }]} />
+              <View style={[styles.volThumb, { left: `${muted ? 0 : Math.round(volume * 100)}%` }]} />
+            </View>
+          </GestureDetector>
+          <Text style={styles.volValue}>{muted ? 0 : Math.round(volume * 100)}</Text>
+        </View>
+      ) : null}
+
+      {/* ▶️ alsó lejátszási sor: bal = hang-gomb · közép = tekerő-csík (húzva/koppintva
+          tekerés) · jobb = óra (hol járunk / teljes hossz) */}
+      {sub.id === activeId && sub.videoUri ? (
+        <View style={[styles.playRow, { bottom: seekBottom }]}>
+          <Pressable
+            style={styles.playRowBtn}
+            onPress={() => onVolumeButton(sub)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.volume')}
+            accessibilityState={{ expanded: volumeOpen }}
+          >
+            <Ionicons name={volumeIcon(muted, volume)} size={20} color="#fff" />
+          </Pressable>
+          <GestureDetector gesture={seekGesture}>
+            <View
+              style={styles.seekBar}
+              hitSlop={{ top: 14, bottom: 14 }}
+              onLayout={(e) => {
+                seekWidthRef.current = e.nativeEvent.layout.width || 1;
+              }}
+            >
+              <View style={styles.seekTrack} />
+              <View style={[styles.seekFill, { width: `${Math.round(progress * 100)}%` }]} />
+              <View style={[styles.seekThumb, { left: `${Math.round(progress * 100)}%` }]} />
+            </View>
+          </GestureDetector>
+          <Text
+            style={[styles.playClock, contentW < 360 && styles.playClockSmall]}
+            numberOfLines={1}
+            accessibilityLabel={t('feed.playTime', {
+              cur: formatPlayClock(clock.cur),
+              dur: formatPlayClock(clock.dur),
+            })}
+          >
+            {formatPlayClock(clock.cur)}
+            <Text style={styles.playClockDur}> / {formatPlayClock(clock.dur)}</Text>
+          </Text>
+        </View>
       ) : null}
 
       {/* interaktív hotspotok (az aktív, épp látható időablakban) — MINDIG legfelül,
@@ -426,4 +474,12 @@ export function FeedPostBody({
         : null}
     </>
   );
+}
+
+/** a hang-ikon a tényleges állapotból: néma / halk (<50%) / hangos */
+function volumeIcon(muted: boolean, volume: number): 'volume-mute' | 'volume-low' | 'volume-high' {
+  if (muted || volume === 0) {
+    return 'volume-mute';
+  }
+  return volume < 0.5 ? 'volume-low' : 'volume-high';
 }

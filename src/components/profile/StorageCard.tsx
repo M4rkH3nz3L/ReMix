@@ -29,13 +29,10 @@ import {
 } from '@/lib/externalStorage';
 import { InsufficientCreditsError, creditBalance } from '@/lib/shop';
 import type { StorageEntry } from '@/lib/storageProviders';
-import {
-  STORAGE_CENTS_PER_GB_MONTH,
-  type StorageUsage,
-  buyStorageBoost,
-  fetchStorageUsage,
-  formatBytes,
-} from '@/lib/storageQuota';
+import { type StorageUsage, fetchStorageUsage, formatBytes } from '@/lib/storageQuota';
+import { addonDef } from '@/lib/subscriptionPlan';
+import { tierLabelKey } from '@/lib/tiers';
+import { AddonNotAllowedError, addAddon } from '@/lib/wallet';
 import { useEntitlement } from '@/store/entitlementStore';
 import { formatCoins } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
@@ -60,7 +57,7 @@ const MANUAL_FIELDS: Record<'webdav' | 's3', { key: string; label: string; secre
 
 export function StorageCard() {
   const { t } = useTranslation();
-  const isPro = useEntitlement((s) => s.isPro());
+  const tier = useEntitlement((s) => s.effectiveTier());
 
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [providers, setProviders] = useState<ConnectedProvider[]>([]);
@@ -68,8 +65,8 @@ export function StorageCard() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [boostGb, setBoostGb] = useState(1);
-  const [boostMonths, setBoostMonths] = useState(1);
+  // a felhő-tárhely bővítése: +10 GB-os blokkok, havi ismétlődő add-on (PRO-CASH 3.3)
+  const [boostBlocks, setBoostBlocks] = useState(1);
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [files, setFiles] = useState<StorageEntry[] | null>(null);
@@ -98,7 +95,7 @@ export function StorageCard() {
     refresh();
   }, [refresh]);
 
-  const cost = boostGb * boostMonths * STORAGE_CENTS_PER_GB_MONTH;
+  const cost = boostBlocks * (addonDef('storage_10gb')?.priceCents ?? 0);
   const pct = usage && usage.quotaBytes > 0 ? Math.min(1, usage.usedBytes / usage.quotaBytes) : 0;
   const barColor = pct >= 0.9 ? palette.danger : palette.accent;
   // az aktív cél: a kijelölt provider, vagy null (= ReMix-tárhely az alap)
@@ -110,10 +107,13 @@ export function StorageCard() {
     }
     setBusy(true);
     try {
-      const res = await buyStorageBoost(boostGb, boostMonths);
+      const res = await addAddon('storage_10gb', boostBlocks);
       setBalance(res.balance);
-      setUsage(res.usage);
-      Alert.alert(t('profile.storage.boostDoneTitle'), t('profile.storage.boostDoneMsg', { gb: boostGb, months: boostMonths }));
+      refresh();
+      Alert.alert(
+        t('profile.storage.boostDoneTitle'),
+        t('profile.storage.addonDoneMsg', { gb: boostBlocks * 10, paid: formatCoins(res.cost), monthly: formatCoins(cost) })
+      );
     } catch (e) {
       logCaught('components/profile/StorageCard.tsx:onBuy', e);
       if (e instanceof InsufficientCreditsError) {
@@ -121,6 +121,8 @@ export function StorageCard() {
           { text: t('common.cancel'), style: 'cancel' },
           { text: t('profile.storage.goToShop'), onPress: () => router.push('/shop') },
         ]);
+      } else if (e instanceof AddonNotAllowedError) {
+        Alert.alert(t('common.error'), t(`wallet.sub.addonError.${e.message}`, { defaultValue: e.message }));
       } else {
         Alert.alert(t('common.error'), (e as Error).message);
       }
@@ -252,7 +254,8 @@ export function StorageCard() {
               <View style={[styles.barFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: barColor }]} />
             </View>
             <Text style={styles.breakdown}>
-              {t('profile.storage.baseLabel', { plan: isPro ? 'Pro' : 'Free' })}: {formatBytes(usage.baseBytes)}
+              {t('profile.storage.baseLabel', { plan: t(tierLabelKey(tier)) })}: {formatBytes(usage.baseBytes)}
+              {usage.addonBytes > 0 ? ` · ${t('profile.storage.addonLabel')}: ${formatBytes(usage.addonBytes)}` : ''}
               {usage.bonusBytes > 0 ? ` · ${t('profile.storage.bonusLabel')}: ${formatBytes(usage.bonusBytes)}` : ''}
             </Text>
             {usage.bonusExpiresAt ? (
@@ -263,18 +266,19 @@ export function StorageCard() {
               </Text>
             ) : null}
 
-            {/* koinos bővítés */}
+            {/* bővítés: +10 GB / hó ismétlődő add-on — csak fizetős szinten */}
+            {tier === 'free' ? (
+              <Text style={styles.dim}>{t('profile.storage.freeHint')}</Text>
+            ) : (
             <View style={styles.boostBox}>
               <Text style={styles.boostTitle}>{t('profile.storage.boostTitle')}</Text>
-              <Stepper label={t('profile.storage.gb')} value={boostGb} min={1} max={10} onChange={setBoostGb} />
-              <Stepper label={t('profile.storage.months')} value={boostMonths} min={1} max={12} onChange={setBoostMonths} />
+              <Stepper label={t('profile.storage.blocks')} value={boostBlocks} min={1} max={10} onChange={setBoostBlocks} />
               <View style={styles.costRow}>
                 <Text style={styles.costText}>
-                  <Ionicons name="server" size={13} color={palette.accent} /> +{boostGb} GB · {boostMonths}{' '}
-                  {t('profile.storage.monthsShort')}
+                  <Ionicons name="server" size={13} color={palette.accent} /> +{boostBlocks * 10} GB / {t('profile.storage.monthsShort')}
                 </Text>
                 <Text style={styles.costCoins}>
-                  {formatCoins(cost)} 🪙 · {t('profile.storage.balance')}: {formatCoins(balance)}
+                  {formatCoins(cost)} 🪙 / {t('profile.storage.monthsShort')} · {t('profile.storage.balance')}: {formatCoins(balance)}
                 </Text>
               </View>
               <PrimaryButton
@@ -284,6 +288,7 @@ export function StorageCard() {
                 disabled={busy}
               />
             </View>
+            )}
           </>
         )}
       </View>

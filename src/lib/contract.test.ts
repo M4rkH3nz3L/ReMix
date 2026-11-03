@@ -12,6 +12,7 @@
  * babellel betölti őket; a `require` visszatérése `any`, ezért a tsc nem lép be a .js-be.
  */
 import { COIN_PACKS, FEE_PCT, MIN_PAYOUT_CENTS, TIER_PRICE_CENTS, COIN_PAYOUT_EUR } from '@/lib/coins';
+import { ADDONS } from '@/lib/subscriptionPlan';
 import { STORE_TIERS, parseStoreProductId, storeProductId } from '@/lib/storeProducts';
 import { TIER_ORDER, activeTierFromRow, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
@@ -23,6 +24,7 @@ import {
   quotaFor,
   remaining,
   seatQuota,
+  effectiveQuota,
   type UsageCounters,
   type UsageMetric,
 } from '@/lib/usageMeter';
@@ -513,5 +515,34 @@ describe('contract: áruházi termékek (storeProducts.ts / coins.ts ⇄ server/
       }
     }
     expect(workerRc.subscriptionProduct('remix_business_monthly')).toBeNull();
+  });
+});
+
+describe('contract: előfizetési ciklus (subscriptionPlan.ts / usageMeter.ts ⇄ worker ⇄ DB)', () => {
+  it('az add-onok havi ára és minimum-szintje a DB-ben azonos', () => {
+    const price = latestSqlFunction('addon_price_cents');
+    const minTier = latestSqlFunction('addon_min_tier');
+    for (const a of ADDONS) {
+      expect(price).toContain(`when '${a.id}' then ${a.priceCents}`);
+      const proOnly = minTier.includes(`'${a.id}'`);
+      expect(proOnly ? 'pro' : 'basic').toBe(a.minTier);
+    }
+  });
+
+  it('effectiveQuota azonos (ülésszám + add-on többlet, a korlátlan korlátlan marad)', () => {
+    const extras = { aiTokens: 2000000, renderMinutes: 60 };
+    for (const tier of TIER_ORDER) {
+      for (const seats of [1, 3]) {
+        expect(workerUsage.effectiveQuota(tier, seats, extras)).toEqual(effectiveQuota(tier, seats, extras));
+      }
+    }
+    expect(effectiveQuota('pro', 1, extras).aiTokens).toBe(3000000);
+    expect(effectiveQuota('pro', 1, extras).exports).toBe(-1);
+  });
+
+  it('a DB add-on-többlet kulcsai a usage-metrikák (subscription_quota_for)', () => {
+    const sql = latestSqlFunction('subscription_quota_for');
+    expect(sql).toContain("'aiTokens', coalesce((select sum(qty) * 1000000");
+    expect(sql).toContain("'renderMinutes', coalesce((select sum(qty) * 60");
   });
 });

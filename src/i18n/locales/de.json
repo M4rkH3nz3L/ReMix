@@ -2604,6 +2604,9 @@
       "tag_hook": "Hook"
     }
   },
+  "upsell": {
+    "msg": { "exportWatermark": "Ohne Wasserzeichen, in 4K? Amateur kostet 2 Coins (10 €) im Monat, ohne Werbung.", "deviceStorage": "Deine Projekte liegen auf dem Handy — Amateur bringt 3 GB Cloud dazu.", "longExport": "Langer Export? In der Cloud viel schneller — ab Fortgeschritten.", "aiWithoutKey": "Unsere eigene KI, ohne Schlüssel: ab Amateur.", "liveGift": "Du hast ein Geschenk bekommen! Mit Fortgeschritten streamst du auf mehrere Plattformen gleichzeitig.", "shopSale": "Glückwunsch zum Verkauf! Als Profi bekommst du einen hervorgehobenen Platz im Shop.", "milestone": "Schau, wie viel du geschafft hast! Teste Amateur 7 Tage gratis.", "winback": "Willkommen zurück! Sieh dir an, was Amateur dir jetzt bietet." }
+  },
   "paywallSheet": {
     "heroTitle": "Ohne Werbung und Wasserzeichen, mit der Kraft der Cloud",
     "heroSubTrigger": "„{{trigger}}“ ist Teil eines bezahlten Plans.",

@@ -2604,6 +2604,9 @@
       "tag_hook": "hook"
     }
   },
+  "upsell": {
+    "msg": { "exportWatermark": "No watermark, in 4K? Amateur is 2 Coins (€10) a month, without ads.", "deviceStorage": "Your projects live on your phone — Amateur adds 3 GB of cloud for them.", "longExport": "Long export? Much faster in the cloud — from Advanced.", "aiWithoutKey": "Our own AI, no key needed: from Amateur.", "liveGift": "You got a gift! With Advanced you can stream to several platforms at once.", "shopSale": "Congrats on the sale! As Pro you get a featured spot in the shop.", "milestone": "Look how much you have made! Try Amateur free for 7 days.", "winback": "Welcome back! See what Amateur gives you now." }
+  },
   "paywallSheet": {
     "heroTitle": "No ads, no watermark, the power of the cloud",
     "heroSubTrigger": "“{{trigger}}” is part of a paid plan.",

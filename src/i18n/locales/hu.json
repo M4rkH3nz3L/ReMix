@@ -2604,6 +2604,9 @@
       "tag_hook": "hook"
     }
   },
+  "upsell": {
+    "msg": { "exportWatermark": "Vízjel nélkül, 4K-ban? Az Amatőr havi 2 Coin (10 €), reklám nélkül.", "deviceStorage": "A projektjeid a telefonon vannak — az Amatőrben 3 GB felhő jár hozzájuk.", "longExport": "Hosszú export? A felhőben sokkal gyorsabb — Haladótól.", "aiWithoutKey": "Saját AI, kulcs nélkül: Amatőrtől.", "liveGift": "Ajándékot kaptál! Haladóként egyszerre több platformra is adhatsz.", "shopSale": "Gratulálunk az eladáshoz! Profiként kiemelt helyet kapsz a boltban.", "milestone": "Mennyit dolgoztál! Próbáld ki az Amatőrt 7 napig ingyen.", "winback": "Visszavártunk! Nézd meg, mit ad most az Amatőr." }
+  },
   "paywallSheet": {
     "heroTitle": "Reklám és vízjel nélkül, a felhő erejével",
     "heroSubTrigger": "A(z) „{{trigger}}” fizetős csomagban érhető el.",

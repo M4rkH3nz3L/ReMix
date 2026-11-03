@@ -9,6 +9,7 @@ import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { deactivateProDev } from '@/lib/billing';
 import { isNativeRenderAvailable } from '@/lib/nativeRender';
+import { nudgeUpsell } from '@/store/upsellStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
 import { withCancellableProgress, withProgress } from '@/store/progressStore';
@@ -226,6 +227,8 @@ export function ExportPanel() {
     withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
       renderAndShareMp4(project, report, buildSettings(), { mode, signal })
     )
+      // 💡 C2.3: a Free export vízjeles → az export UTÁN (nem közben) ajánlat, ha a motor engedi
+      .then(() => { void nudgeUpsell('export_watermark', 'export_done'); })
       .catch((err: Error) => {
       logCaught('components/editor/panels/ExportPanel.tsx:exportLocal', err);
         if (!isRenderCancelledError(err)) {

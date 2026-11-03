@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { isProRequiredError } from '@/lib/backend';
 import type { CapabilityId } from '@/lib/capabilities';
+import type { UpsellOffer } from '@/lib/upsell';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -16,14 +17,19 @@ interface PaywallState {
   visible: boolean;
   /** melyik funkció váltotta ki (a fejléchez) */
   capability: CapabilityId | null;
+  /** ösztönző pillanatból nyílt (C2.3): az ajánlott szint és az üzenet */
+  offer: UpsellOffer | null;
   open: (capability?: CapabilityId) => void;
+  openOffer: (offer: UpsellOffer) => void;
   close: () => void;
 }
 
 export const usePaywall = create<PaywallState>((set) => ({
   visible: false,
   capability: null,
-  open: (capability) => set({ visible: true, capability: capability ?? null }),
+  offer: null,
+  open: (capability) => set({ visible: true, capability: capability ?? null, offer: null }),
+  openOffer: (offer) => set({ visible: true, capability: null, offer }),
   close: () => set({ visible: false }),
 }));
 

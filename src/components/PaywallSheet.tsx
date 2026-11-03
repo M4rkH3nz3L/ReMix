@@ -21,6 +21,7 @@ import type { BillingPeriod } from '@/lib/storeProducts';
 import { TIER_ORDER, tierLabelKey, type Tier } from '@/lib/tiers';
 import { ManagedByStoreError, fetchSubscription, startTrial, subscribeWithCoins } from '@/lib/wallet';
 import { usePaywall } from '@/store/paywallStore';
+import { useUpsell } from '@/store/upsellStore';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -42,12 +43,22 @@ export function PaywallSheet() {
   const { t } = useTranslation();
   const visible = usePaywall((s) => s.visible);
   const capability = usePaywall((s) => s.capability);
-  const close = usePaywall((s) => s.close);
+  const closeSheet = usePaywall((s) => s.close);
+  const offer = usePaywall((s) => s.offer);
+  // „Most nem” egy ösztönző ajánlatnál: 72 óra csend (PRO-CASH 4.4)
+  const dismiss = () => {
+    if (offer) {
+      useUpsell.getState().dismiss();
+    }
+    closeSheet();
+  };
+  const close = closeSheet;
   const [busy, setBusy] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>('monthly');
   // a kiemelt szint a kiváltó képességből jön; a user választása erre a megnyitásra szól
   const [override, setOverride] = useState<{ capability: typeof capability; tier: BuyTier } | null>(null);
-  const picked: BuyTier = override && override.capability === capability ? override.tier : recommendedTier(capability);
+  const defaultTier: BuyTier = offer ? offer.tier : recommendedTier(capability);
+  const picked: BuyTier = override && override.capability === capability ? override.tier : defaultTier;
   const setPicked = (tier: BuyTier) => setOverride({ capability, tier });
   const [trialAvailable, setTrialAvailable] = useState(false);
 
@@ -143,9 +154,9 @@ export function PaywallSheet() {
     );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={dismiss}>
       <View style={styles.backdrop}>
-        <Pressable style={styles.backdropTap} onPress={close} />
+        <Pressable style={styles.backdropTap} onPress={dismiss} />
         <View style={styles.sheet}>
           <LinearGradient colors={[...accentGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
             <View style={styles.badge}>
@@ -154,7 +165,7 @@ export function PaywallSheet() {
             </View>
             <Text style={styles.heroTitle}>{t('paywallSheet.heroTitle')}</Text>
             <Text style={styles.heroSub}>
-              {trigger ? t('paywallSheet.heroSubTrigger', { trigger }) : t('paywallSheet.heroSub')}
+              {offer ? t(offer.messageKey) : trigger ? t('paywallSheet.heroSubTrigger', { trigger }) : t('paywallSheet.heroSub')}
             </Text>
           </LinearGradient>
 
@@ -189,7 +200,7 @@ export function PaywallSheet() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: on }}
                   >
-                    {tier === recommendedTier(capability) ? <Text style={styles.reco}>{t('paywallSheet.recommended')}</Text> : null}
+                    {tier === defaultTier ? <Text style={styles.reco}>{t('paywallSheet.recommended')}</Text> : null}
                     <Text style={styles.tierName}>{t(tierLabelKey(tier))}</Text>
                     <Text style={styles.tierPrice}>{p.coins} 🪙</Text>
                     <Text style={styles.tierSub}>
@@ -258,7 +269,7 @@ export function PaywallSheet() {
                   <Text style={styles.dismissText}>{t('paywallSheet.restore')}</Text>
                 </Pressable>
               ) : null}
-              <Pressable onPress={close} disabled={busy} style={styles.dismiss}>
+              <Pressable onPress={dismiss} disabled={busy} style={styles.dismiss}>
                 <Text style={styles.dismissText}>{t('paywallSheet.notNow')}</Text>
               </Pressable>
             </View>

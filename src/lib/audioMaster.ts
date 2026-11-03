@@ -4,7 +4,8 @@ import type { AudioMaster, AudioMasterDynamics, AudioMasterTarget } from '@/type
  * 🎚️ Audio-master presetek + a renderbe menő FFmpeg master-lánc (AUDIO-MASTER).
  *
  * A master a TELJES keverékre hat: `loudnorm` viszi a cél-hangosságra (LUFS) és a
- * true-peak plafonra (dBTP), egy `alimiter` a biztonsági plafon. A `dynamics` a
+ * true-peak plafonra (dBTP) — a true-peak határt maga a loudnorm tartja, külön limiter
+ * nincs (az +1 LU-t adott, lásd `server/render.js` applyMaster). A `dynamics` a
  * loudnorm LRA-ját hangolja (kisebb LRA = tömörebb, „punchy"). Ez a modul TISZTA
  * (expo-mentes) → tesztelhető; a szerver-render UGYANEZT a láncot építi (paritás).
  */

@@ -523,7 +523,7 @@ function measureLoudnorm(inFile, graphStr, I, TP, LRA, signal) {
 }
 
 // 🎚️ MASTER 2. menet: EQ+multiband + loudnorm a MÉRT értékekkel (linear=true →
-// PONTOS cél-LUFS + true-peak plafon). A videó változatlan (-c:v copy).
+// PONTOS cél-LUFS + true-peak plafon). Videónál a kép változatlan (-c:v copy).
 //
 // ⚠️ NINCS külön alimiter a loudnorm UTÁN: a live-teszt kimutatta, hogy a záró
 // limiter +1 LU-t adott (a csúcs-limitálás megemeli az integrált hangosságot). A

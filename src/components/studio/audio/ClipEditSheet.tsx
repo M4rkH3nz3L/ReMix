@@ -17,7 +17,8 @@ import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems } from '@/lib/stems';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import { guardPro } from '@/store/paywallStore';
+import { guardPro, usePaywall } from '@/store/paywallStore';
+import { useEntitlement } from '@/store/entitlementStore';
 import { withProgress } from '@/store/progressStore';
 import type { AudioClip, AudioFx, Project } from '@/types/project';
 
@@ -97,7 +98,17 @@ export function ClipEditSheet({
   const maxFade = Math.min(5, duration / 2);
   const clipPlayhead = playhead - clip.start;
 
-  const patchFx = (p: Partial<AudioFx>) => setFx((prev) => ({ ...prev, ...p }));
+  // A48: a PRO effekt-lánc a renderben hat (felhő, Pro) — Free-nél a paywall nyílik, nem egy
+  // olyan beállítás, ami se nem hallható, se nem exportálható
+  const isPro = useEntitlement((s) => s.isPro());
+  const proFx = (apply: () => void) => {
+    if (!isPro) {
+      usePaywall.getState().open('cloudRender');
+      return;
+    }
+    apply();
+  };
+  const patchFx = (p: Partial<AudioFx>) => proFx(() => setFx((prev) => ({ ...prev, ...p })));
   const eq = fx.eq ?? { low: 0, mid: 0, high: 0 };
   const setEq = (p: Partial<typeof eq>) => patchFx({ eq: { ...eq, ...p } });
 
@@ -261,7 +272,12 @@ export function ClipEditSheet({
         {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
           {AUDIO_FX_PRESETS.map((p) => (
-            <Pressable key={p.key} style={styles.presetChip} onPress={() => setFx(presetFx(p.key))}>
+            <Pressable
+              key={p.key}
+              testID={`audio-fx-preset-${p.key}`}
+              style={styles.presetChip}
+              onPress={() => proFx(() => setFx(presetFx(p.key)))}
+            >
               <Ionicons name={p.icon as keyof typeof Ionicons.glyphMap} size={14} color={palette.accent} />
               <Text style={styles.presetChipText}>{t(`studio.audio.fxPreset.${p.key}`, { defaultValue: p.label })}</Text>
             </Pressable>

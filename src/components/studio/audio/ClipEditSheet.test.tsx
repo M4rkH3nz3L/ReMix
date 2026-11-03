@@ -3,6 +3,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ClipEditSheet } from '@/components/studio/audio/ClipEditSheet';
 import { useEditorStore } from '@/store/editorStore';
+import { useEntitlement } from '@/store/entitlementStore';
+import { usePaywall } from '@/store/paywallStore';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip } from '@/types/project';
 
@@ -56,4 +58,39 @@ describe('ClipEditSheet', () => {
     const saved = useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip;
     expect(saved.volume).toBe(0.25);
   });
+
+  describe('PRO effektek (A48)', () => {
+    const presetChip = (view: ReactTestRenderer) => view.root.findAll((n) => n.props.testID === 'audio-fx-preset-podcast')[0];
+    const mount = async () => {
+      const p = createEmptyProject('t', '9:16', undefined, 'audio');
+      useEditorStore.getState().loadProject({ ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) }, []);
+      let view!: ReactTestRenderer;
+      await act(async () => {
+        view = create(<ClipEditSheet clip={clip} fps={30} onClose={() => {}} />);
+      });
+      return view;
+    };
+    const savedFx = () => (useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip).audioFx;
+
+    it('Free felhasználónál az effekt a paywallt nyitja, és nem kerül a klipre', async () => {
+      useEntitlement.setState({ tier: 'free', devPro: false });
+      usePaywall.setState({ visible: false });
+      const view = await mount();
+      await act(async () => presetChip(view).props.onPress());
+      await act(async () => frameClose());
+      expect(usePaywall.getState().visible).toBe(true);
+      expect(savedFx()).toBeUndefined();
+    });
+
+    it('Pro felhasználónál az effekt a klipre kerül', async () => {
+      useEntitlement.setState({ tier: 'pro', proUntil: null, devPro: false });
+      usePaywall.setState({ visible: false });
+      const view = await mount();
+      await act(async () => presetChip(view).props.onPress());
+      await act(async () => frameClose());
+      expect(usePaywall.getState().visible).toBe(false);
+      expect(savedFx()).toBeDefined();
+    });
+  });
 });
+

@@ -26,8 +26,7 @@ import type { AudioClip, TrackType } from '@/types/project';
  * elengedéskor íródik a command-buson át (`updateClip`, egy undo-lépés) — a videó
  * `TimelineClip` bizonyított mintáját követve. A snap a transport frame/beat-módja
  * szerint, a küszöbök a `@/design` gestures-ből (render-időben olvasva).
- *
- * NYITOTT (Touch/04 következő increment): sáv-váltás (függőleges drag), pinch-zoom.
+ * A függőleges húzás sávot vált (`audioLaneTarget`), a kétujjas csippentés az idővonalon zoomol.
  */
 export const AudioTimelineClip = memo(function AudioTimelineClip({
   clip,

@@ -2,6 +2,9 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { Text } from 'react-native';
 
+import { PaywallSheet } from '@/components/PaywallSheet';
+import { usePaywall } from '@/store/paywallStore';
+
 const mockSubscribe = jest.fn(async () => ({ balance: 0, until: '2026-12-03T00:00:00Z', kind: 'start', cost: 200, credit: 0 }));
 const mockStartTrial = jest.fn(async () => ({ until: '2026-11-10T00:00:00Z' }));
 let mockTrialAvailable = true;
@@ -25,9 +28,6 @@ jest.mock('@/lib/wallet', () => ({
   subscribeWithCoins: (...a: unknown[]) => mockSubscribe(...(a as [])),
 }));
 jest.mock('@/lib/shop', () => ({ InsufficientCreditsError: class extends Error {} }));
-
-import { PaywallSheet } from '@/components/PaywallSheet';
-import { usePaywall } from '@/store/paywallStore';
 
 const texts = (v: ReactTestRenderer) => v.root.findAllByType(Text).map((n) => [].concat(n.props.children).join(''));
 const press = (v: ReactTestRenderer, startsWith: string) =>

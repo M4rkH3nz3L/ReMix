@@ -546,3 +546,18 @@ describe('contract: előfizetési ciklus (subscriptionPlan.ts / usageMeter.ts �
     expect(sql).toContain("'renderMinutes', coalesce((select sum(qty) * 60");
   });
 });
+
+describe('kattogásmentes vágás — kliens = worker (mikro-fade szabály)', () => {
+  it('ugyanaz a fade-hossz és ugyanaz a split-felismerés', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { edgeFades: clientEdgeFades, EDGE_FADE_SEC } = require('./offlineMix');
+    const c = (id: string, start: number, duration: number, trimIn: number, extra = {}) =>
+      ({ kind: 'audio', id, uri: 'u', start, duration, trimIn, volume: 1, fadeIn: 0, fadeOut: 0, ...extra });
+    const clips = [c('a', 0, 1, 0), c('b', 1, 1, 1), c('x', 5, 1, 0.3, { fadeOut: 0.4 }), { ...c('y', 6, 1, 1.3), uri: 'masik' }];
+    expect(workerRender.EDGE_FADE_SEC).toBe(EDGE_FADE_SEC);
+    const server = workerRender.edgeFades({ tracks: [{ type: 'music', clips }] });
+    const client = Object.fromEntries(clientEdgeFades(clips));
+    expect(client).toEqual(server);
+  });
+});
+

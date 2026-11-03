@@ -13,6 +13,32 @@ import type { AudioClip, Keyframe, Project, TrackType } from '@/types/project';
 
 const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 export const OFFLINE_SAMPLE_RATE = 44100;
+/** kattogásmentes vágás: mikro-fade a klip szélén (a szerver `EDGE_FADE_SEC`-je; szerződés-teszt) */
+export const EDGE_FADE_SEC = 0.01; // 44,1 és 48 kHz-en is egész mintaszám (441 / 480)
+const EDGE_EPS = 1e-4;
+
+/**
+ * A klip ténylegesen alkalmazott fade-jei: a felhasználói fade, ennek hiányában 5 ms-os
+ * mikro-fade — kivéve a kettévágott klip illesztését (ugyanaz a forrás folytatódik).
+ * A szerver `edgeFades`-ének tükre.
+ */
+export function edgeFades(clips: AudioClip[]): Map<string, { in: number; out: number }> {
+  const out = new Map<string, { in: number; out: number }>();
+  for (const c of clips) {
+    const trim = c.trimIn ?? 0;
+    const joinedBefore = clips.some(
+      (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs((p.trimIn ?? 0) + p.duration - trim) < EDGE_EPS
+    );
+    const joinedAfter = clips.some(
+      (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(trim + c.duration - (n.trimIn ?? 0)) < EDGE_EPS
+    );
+    out.set(c.id, {
+      in: c.fadeIn > 0 ? c.fadeIn : joinedBefore ? 0 : EDGE_FADE_SEC,
+      out: c.fadeOut > 0 ? c.fadeOut : joinedAfter ? 0 : EDGE_FADE_SEC,
+    });
+  }
+  return out;
+}
 
 export interface DecodedSource {
   channels: Float32Array[];
@@ -51,11 +77,9 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       continue;
     }
     const gain = project.trackMix?.[track.type]?.gain ?? 1;
-    for (const c of track.clips) {
-      if (c.kind !== 'audio') {
-        continue;
-      }
-      const clip = c as AudioClip;
+    const audio = track.clips.filter((c): c is AudioClip => c.kind === 'audio');
+    const fades = edgeFades(audio);
+    for (const clip of audio) {
       if (clip.audioFx && Object.values(clip.audioFx).some((v) => v)) unsupported.add('effects');
       if (clip.voiceEnhance) unsupported.add('voiceEnhance');
       if (clip.deReverb) unsupported.add('deReverb');
@@ -67,8 +91,8 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         trimIn: clip.trimIn ?? 0,
         volume: clip.volume,
         volumeKf: clip.keyframes?.volume,
-        fadeIn: clip.fadeIn ?? 0,
-        fadeOut: clip.fadeOut ?? 0,
+        fadeIn: fades.get(clip.id)?.in ?? 0,
+        fadeOut: fades.get(clip.id)?.out ?? 0,
         pan: clip.pan ?? 0,
         panKf: clip.keyframes?.pan,
         gain,

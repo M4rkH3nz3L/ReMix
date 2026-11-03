@@ -22,7 +22,8 @@ describe('offlineMix (A26)', () => {
   it('a forrás-ablak a trimIn-től indul, a klip a start-jára kerül', () => {
     const src = ramp(2 * SR);
     const [l] = mix(project([clip({ start: 0.5, trimIn: 1, duration: 0.5 })]), [src, src]);
-    expect(l[Math.round(0.5 * SR)]).toBeCloseTo(src[SR], 5);
+    // a mikro-fade (10 ms) után mérve
+    expect(l[Math.round(0.5 * SR) + 1000]).toBeCloseTo(src[SR + 1000], 5);
     expect(l[Math.round(0.25 * SR)]).toBe(0);
   });
 
@@ -31,8 +32,8 @@ describe('offlineMix (A26)', () => {
     expect(panGains(0.5)).toEqual([0.5, 1]);
     const one = new Float32Array(SR).fill(0.5);
     const [l, r] = mix(project([clip({ pan: -1 })]), [one, one]);
-    expect(l[100]).toBeCloseTo(0.5, 5);
-    expect(r[100]).toBe(0);
+    expect(l[1000]).toBeCloseTo(0.5, 5);
+    expect(r[1000]).toBe(0);
   });
 
   it('fade be és ki szorzatként, a hangerő- és sáv-erősítés szorzódik', () => {
@@ -50,7 +51,7 @@ describe('offlineMix (A26)', () => {
   it('két klip összeadódik, normalizálás nélkül (mint az amix normalize=0)', () => {
     const one = new Float32Array(SR).fill(0.25);
     const [l] = mix(project([clip({ id: 'a' }), clip({ id: 'b' })]), [one, one]);
-    expect(l[10]).toBeCloseTo(0.5, 5);
+    expect(l[1000]).toBeCloseTo(0.5, 5);
   });
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {

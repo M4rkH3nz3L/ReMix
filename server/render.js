@@ -120,6 +120,35 @@ const MONO_TO_STEREO = 'pan=stereo|c0=c0|c1=c0,';
 // ugyanígy, mint a telefonos (offline) keverőben (`src/lib/offlineMix.ts`)
 const FINE_FRAMES = 'asetnsamples=n=64:p=0,';
 
+// 🎧 kattogásmentes vágás: a klip széle a hullámforma közepén ugrásszerű → hallható kattanás.
+// Ha ott nincs felhasználói fade, 10 ms-os mikro-fade kerül rá — kivéve a kettévágott klip
+// illesztését (ugyanaz a forrás folytatódik), ahol a fade beesést adna. A telefonos keverő
+// UGYANEZT a szabályt követi (`src/lib/offlineMix.ts` EDGE_FADE_SEC / edgeFades; szerződés-teszt).
+const EDGE_FADE_SEC = 0.01; // 44,1 és 48 kHz-en is egész mintaszám (441 / 480)
+const EDGE_EPS = 1e-4;
+
+/** klip-id → a ténylegesen alkalmazott { in, out } fade (mp) a hang-sávokon */
+function edgeFades(project) {
+  const out = {};
+  for (const track of project.tracks ?? []) {
+    const clips = (track.clips ?? []).filter((c) => c.kind === 'audio');
+    for (const c of clips) {
+      const trim = c.trimIn || 0;
+      const joinedBefore = clips.some(
+        (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs((p.trimIn || 0) + p.duration - trim) < EDGE_EPS
+      );
+      const joinedAfter = clips.some(
+        (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(trim + c.duration - (n.trimIn || 0)) < EDGE_EPS
+      );
+      out[c.id] = {
+        in: c.fadeIn > 0 ? c.fadeIn : joinedBefore ? 0 : EDGE_FADE_SEC,
+        out: c.fadeOut > 0 ? c.fadeOut : joinedAfter ? 0 : EDGE_FADE_SEC,
+      };
+    }
+  }
+  return out;
+}
+
 function trackOf(project, type) {
   return project.tracks.find((t) => t.type === type) ?? { clips: [] };
 }
@@ -2841,6 +2870,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       clipTrackType[c.id] = tr.type;
     }
   }
+  const clipFades = edgeFades(project);
   // 🎚️ sidechain-duck trigger-sáv (AudioMaster.duckTrigger); hiányzó = voiceover-viselkedés
   const duckTrigger = project.audioMaster?.duckTrigger;
   for (const clip of audioClips) {
@@ -2870,11 +2900,12 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
       volumeExpr(clip, 0) +
       (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
-    if (clip.fadeIn > 0) {
-      chain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`;
+    const fades = clipFades[clip.id] ?? { in: clip.fadeIn, out: clip.fadeOut };
+    if (fades.in > 0) {
+      chain += `,afade=t=in:st=0:d=${fades.in.toFixed(4)}`;
     }
-    if (clip.fadeOut > 0) {
-      chain += `,afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`;
+    if (fades.out > 0) {
+      chain += `,afade=t=out:st=${Math.max(0, clip.duration - fades.out).toFixed(4)}:d=${fades.out.toFixed(4)}`;
     }
     chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
     graph.push(chain);
@@ -2909,7 +2940,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         `,volume=0.7` + // a harmónia halkabb (háttér-réteg)
         (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
       if (clip.fadeIn > 0) {
-        hchain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`;
+        hchain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`; // a harmónia-hang a felhasználói fade-et követi
       }
       if (clip.fadeOut > 0) {
         hchain += `,afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`;
@@ -3037,6 +3068,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
 // képjavítás menjen a fotó-rétegre, mint a videóklipre
 module.exports = {
   FILTERS,
+  EDGE_FADE_SEC,
+  edgeFades,
   isDuckTrigger,
   renderProject,
   outputColorFilter,

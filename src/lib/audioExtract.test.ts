@@ -43,8 +43,9 @@ describe('detachAudioCommands', () => {
     expect(audioClip.source).toBe('voiceover');
     expect(audioClip.voiceEnhance).toBe(true);
 
-    expect(commands).toHaveLength(2);
+    expect(commands).toHaveLength(3);
     expect(commands[0]).toMatchObject({ type: 'ADD_CLIP', trackType: 'voiceover' });
     expect(commands[1]).toMatchObject({ type: 'UPDATE_CLIP', clipId: 'v1', patch: { volume: 0 } });
+    expect(commands[2]).toMatchObject({ type: 'SET_LINKS', links: [['v1', audioClip.id]] });
   });
 });

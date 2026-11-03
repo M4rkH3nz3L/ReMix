@@ -282,7 +282,11 @@ export function SpeedPanel({ clip }: { clip: VideoClip }) {
             icon="mic-outline"
             label={t('panels.speed.detachAudio')}
             onPress={() => {
-              const { audioClip, commands } = detachAudioCommands(clip, t('panels.speed.detachedLabel'));
+              const { audioClip, commands } = detachAudioCommands(
+                clip,
+                t('panels.speed.detachedLabel'),
+                useEditorStore.getState().project?.links
+              );
               if (useEditorStore.getState().applyBatch(commands, 'user') > 0) {
                 useEditorStore.getState().openAudioStudio(audioClip.id);
               }

@@ -6,6 +6,7 @@
  * (roll/slip/slide/ripple) a `src/lib/`-ben él (store-mentes, tesztelt); itt a
  * projekt-keresés + dispatch marad.
  */
+import { mergeLinkGroup } from '@/lib/linkGroups';
 import { t as tr } from 'i18next';
 
 import { applyBatchPatch, batchablePatch } from '@/lib/batchEdit';
@@ -231,15 +232,7 @@ export const createClipEditSlice: EditorSlice<ClipEditSlice> = (set, get) => ({
       return; // legalább 2 klip kell a linkeléshez
     }
     // az új csoport + a beleérő MEGLÉVŐ csoportok összeolvasztása
-    const merged = new Set<string>([selectedClipId, ...multiSelectIds]);
-    const rest = (project.links ?? []).filter((g) => {
-      if (g.some((id) => merged.has(id))) {
-        g.forEach((id) => merged.add(id));
-        return false;
-      }
-      return true;
-    });
-    get().dispatch({ type: 'SET_LINKS', links: [...rest, [...merged]] });
+    get().dispatch({ type: 'SET_LINKS', links: mergeLinkGroup(project.links, [selectedClipId, ...multiSelectIds]) });
   },
 
   preCompose: () => {

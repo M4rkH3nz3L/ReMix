@@ -1,5 +1,6 @@
 import type { EditorCommand } from '@/lib/commands';
 import { makeId } from '@/lib/id';
+import { mergeLinkGroup } from '@/lib/linkGroups';
 import type { AudioClip, VideoClip } from '@/types/project';
 
 /**
@@ -8,7 +9,7 @@ import type { AudioClip, VideoClip } from '@/types/project';
  * Egy külön `AudioClip`-et teszünk a `voiceover` sávra (a videóklip URI-jára
  * hivatkozva), és a videóklipet ELNÉMÍTJUK (volume 0). Így a hang a közös hang-
  * stúdióban teljes fegyverzettel szerkeszthető, a videó képe érintetlen, és a
- * lépés EGY undo (applyBatch).
+ * lépés EGY undo (applyBatch). A hang és a kép link-csoportba kerül, így együtt mozognak.
  *
  * A leválasztott `AudioClip` átveszi a videóklip `trimIn`/`sourceDuration`-jét, így
  * a TRIMMELT klip hangja is korrekt (a render `atrim`-mel honorálja). Sebesség-
@@ -20,7 +21,8 @@ export function canDetachAudio(clip: VideoClip): boolean {
 
 export function detachAudioCommands(
   clip: VideoClip,
-  label: string
+  label: string,
+  links?: string[][]
 ): { audioClip: AudioClip; commands: EditorCommand[] } {
   const audioClip: AudioClip = {
     id: makeId('clip'),
@@ -42,6 +44,8 @@ export function detachAudioCommands(
     { type: 'ADD_CLIP', trackType: 'voiceover', clip: audioClip },
     // a videóklip elnémul (a hangot mostantól a leválasztott AudioClip viszi)
     { type: 'UPDATE_CLIP', clipId: clip.id, patch: { volume: 0 } },
+    // A44: a hang a képpel együtt mozog (link-csoport), különben szétcsúszik a szinkron
+    { type: 'SET_LINKS', links: mergeLinkGroup(links, [clip.id, audioClip.id]) },
   ];
   return { audioClip, commands };
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
-import { getWaveform, resamplePeaks } from '@/lib/waveform';
+import { barHeights, clipWindowPeaks, getWaveform, resamplePeaks } from '@/lib/waveform';
 import type { WaveformData } from '@/lib/waveform';
 import { clamp } from '@/lib/time';
 import type { AudioClip } from '@/types/project';
@@ -15,18 +15,20 @@ interface Props {
   widthPx: number;
   heightPx: number;
   color: string;
+  /** a Hang Stúdióban a megjelenítés a felhasználó kérése (iOS-en nem háttér-hívás, A20) */
+  userInitiated?: boolean;
 }
 
 /**
- * Hullámforma a hangklipek hátterében. A csúcsokat a worker számolja
- * (lemez-cache-elve); worker nélkül a komponens csendben üres marad.
+ * Hullámforma a hangklipek hátterében: a klip VÁGOTT szakasza, abszolút szinttel. A csúcsokat
+ * az eszköz számolja (lemez-cache-elve); ha a dekódolás nem megy, a komponens üres marad.
  */
-export function ClipWaveform({ clip, widthPx, heightPx, color }: Props) {
+export function ClipWaveform({ clip, widthPx, heightPx, color, userInitiated = false }: Props) {
   const [wave, setWave] = useState<WaveformData | null>(null);
 
   useEffect(() => {
     let active = true;
-    getWaveform(clip.uri).then((data) => {
+    getWaveform(clip.uri, { userInitiated }).then((data) => {
       if (active) {
         setWave(data);
       }
@@ -34,26 +36,16 @@ export function ClipWaveform({ clip, widthPx, heightPx, color }: Props) {
     return () => {
       active = false;
     };
-  }, [clip.uri]);
+  }, [clip.uri, userInitiated]);
 
   if (!wave) {
     return null;
   }
 
-  const columns = clamp(Math.floor(widthPx / 3), 8, 200);
-  // a hangklip mindig a forrás elejétől szól — az első `duration` mp látszik
-  const visible = wave.peaks.slice(
-    0,
-    Math.max(1, Math.floor(clip.duration * wave.peaksPerSecond))
-  );
-  const bars = resamplePeaks(visible, columns);
-  // megjelenítés-normalizálás: az egyenletes hangerejű (pl. steady zene) jel
-  // hulláma is látsszon — a dinamika-tartomány a teljes magasságra nyílik
-  const mx = Math.max(...bars);
-  const mn = Math.min(...bars);
-  const norm = bars.map((p) =>
-    mx - mn > 0.02 ? 0.3 + 0.7 * ((p - mn) / (mx - mn)) : 0.6
-  );
+  // A22: annyi oszlop, amennyi kifér (≥3.5 px), és a sor pontosan kitölti a klipet
+  const columns = clamp(Math.floor((widthPx - 8) / 3.5), 1, 400);
+  const bars = resamplePeaks(clipWindowPeaks(wave, clip.trimIn, clip.duration), columns);
+  const heights = barHeights(bars);
   // ⚠️ clipping: a NYERS (full-scale) csúcs 0 dBFS közelében — torzulhat a hang
   const clipping = bars.map((p) => p >= CLIP_THRESHOLD);
   // a hullám a klip TELJES magasságát használja — markáns, telt megjelenés
@@ -61,11 +53,11 @@ export function ClipWaveform({ clip, widthPx, heightPx, color }: Props) {
 
   return (
     <View pointerEvents="none" style={styles.wrap}>
-      {norm.map((p, i) => (
+      {heights.map((p, i) => (
         <View
           key={i}
           style={{
-            width: 2.5,
+            flex: 1,
             marginRight: 1,
             borderRadius: 1.5,
             height: Math.max(3, p * maxBar),

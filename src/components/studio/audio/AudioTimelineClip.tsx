@@ -217,7 +217,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
         style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99` }, animStyle]}
       >
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>
-          <ClipWaveform clip={clip} widthPx={w} heightPx={laneH - 22} color={laneColor} />
+          <ClipWaveform clip={clip} widthPx={w} heightPx={laneH - 22} color={laneColor} userInitiated />
         </View>
         {/* kijelölve a 16 pt-os trim-fogók ne takarják a címke elejét/végét (élő teszt H-a) */}
         <Text style={[styles.clipLabel, selected ? styles.clipLabelSelected : null]} numberOfLines={1}>

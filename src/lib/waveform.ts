@@ -19,7 +19,16 @@ export interface WaveformData {
   peaks: number[];
 }
 
+// A24: a session-cache korlátos (a legrégebben kért esik ki), nem nő a munkamenet végéig
+const MEMORY_LIMIT = 64;
 const memory = new Map<string, Promise<WaveformData | null>>();
+
+function remember(uri: string, pending: Promise<WaveformData | null>): void {
+  memory.set(uri, pending);
+  while (memory.size > MEMORY_LIMIT) {
+    memory.delete(memory.keys().next().value as string);
+  }
+}
 
 /** A hullámforma session-cache (memória) ürítése — cache-kezeléshez. */
 export function clearWaveformMemory(): void {
@@ -35,22 +44,28 @@ function hashKey(input: string): string {
   return h.toString(36);
 }
 
-/** csúcsok kinyerése egy dekódolt csatornából (közös a natív + web úthoz) */
-function peaksFromChannel(
-  channel: Float32Array,
+/**
+ * Csúcsok a dekódolt csatornákból (közös a natív + web úthoz). A24: minden csatorna és
+ * minden minta számít — a ritkítás a rövid csúcsokat (dob, clipping) elhagyta. A 8 kHz-es
+ * dekódolásnál ez percenként ~480 ezer minta csatornánként, gyors.
+ */
+export function peaksFromChannels(
+  channels: Float32Array[],
   sampleRate: number,
   duration: number,
   pps: number
 ): WaveformData | null {
+  const length = Math.min(...channels.map((c) => c.length));
   const samplesPerPeak = Math.max(1, Math.floor(sampleRate / pps));
   const peaks: number[] = [];
-  for (let i = 0; i + samplesPerPeak <= channel.length; i += samplesPerPeak) {
+  for (let i = 0; i + samplesPerPeak <= length; i += samplesPerPeak) {
     let max = 0;
-    // ritkított mintavétel a csúcson belül — gyors, a burkológörbe megmarad
-    for (let j = i; j < i + samplesPerPeak; j += 4) {
-      const v = Math.abs(channel[j]);
-      if (v > max) {
-        max = v;
+    for (const channel of channels) {
+      for (let j = i; j < i + samplesPerPeak; j++) {
+        const v = Math.abs(channel[j]);
+        if (v > max) {
+          max = v;
+        }
       }
     }
     peaks.push(Math.round(max * 100) / 100);
@@ -58,10 +73,31 @@ function peaksFromChannel(
   return peaks.length > 0 ? { duration, peaksPerSecond: pps, peaks } : null;
 }
 
+/** A22: a klip a forrás `trimIn`-től kezdődő `duration` hosszú szakaszát mutatja. */
+export function clipWindowPeaks(wave: WaveformData, trimIn: number | undefined, duration: number): number[] {
+  const from = Math.max(0, Math.floor((trimIn ?? 0) * wave.peaksPerSecond));
+  const to = Math.max(from + 1, Math.ceil(((trimIn ?? 0) + duration) * wave.peaksPerSecond));
+  return wave.peaks.slice(from, Math.min(to, wave.peaks.length));
+}
+
+/**
+ * A22: oszlop-magasság (0–1) az abszolút csúcsból. A korábbi min-max széthúzás a halk,
+ * egyenletes hangot is teljes magasságúnak rajzolta; a gyök csak a halk részt emeli ki.
+ */
+export function barHeights(bars: number[]): number[] {
+  return bars.map((p) => Math.min(1, Math.max(0.08, Math.sqrt(Math.max(0, p)))));
+}
+
+/** A24: a lemez-cache kulcsa a teljes uri + méret + módosítás ideje (a név+méret ütközött). */
+export function waveformCacheKey(uri: string, size: number, modified: number): string {
+  return `wf2_${hashKey(`${uri}|${size}|${modified}`)}`;
+}
+
 /** ESZKÖZÖN (natív) dekódolás → csúcsok, worker nélkül (react-native-audio-api). */
-async function computeNativeWaveform(uri: string): Promise<WaveformData | null> {
-  // a közös guard dönt (B24): iOS-en a háttér-hívás csak bizonyított modullal megy
-  const api = await loadAudioApi({ background: true });
+async function computeNativeWaveform(uri: string, userInitiated: boolean): Promise<WaveformData | null> {
+  // a közös guard dönt (B24): iOS-en a háttér-hívás csak bizonyított modullal megy; a
+  // Hang Stúdió megnyitása felhasználói szándék (A20), az ott kért hullámforma nem háttér-hívás
+  const api = await loadAudioApi({ background: !userInitiated });
   if (!api) {
     return null;
   }
@@ -69,7 +105,8 @@ async function computeNativeWaveform(uri: string): Promise<WaveformData | null> 
     // alacsony mintavétel: a görbéhez elég, gyors és kevés memória
     const audio = await api.decodeAudioData(uri, 8000);
     markAudioApi(true);
-    return peaksFromChannel(audio.getChannelData(0), audio.sampleRate, audio.duration, 20);
+    const channels = Array.from({ length: Math.max(1, audio.numberOfChannels) }, (_, i) => audio.getChannelData(i));
+    return peaksFromChannels(channels, audio.sampleRate, audio.duration, 20);
   } catch (caught) {
     logCaught('lib/waveform.ts:computeNativeWaveform', caught);
     return null; // az adott fájl nem dekódolható → worker-fallback
@@ -89,38 +126,23 @@ async function computeWebWaveform(uri: string): Promise<WaveformData | null> {
     }
     const ctx = new Ctx();
     const audio = await ctx.decodeAudioData(buf);
-    const channel = audio.getChannelData(0);
-    const pps = 20;
-    const samplesPerPeak = Math.floor(audio.sampleRate / pps);
-    const peaks: number[] = [];
-    for (let i = 0; i + samplesPerPeak <= channel.length; i += samplesPerPeak) {
-      let max = 0;
-      for (let j = i; j < i + samplesPerPeak; j += 8) {
-        const v = Math.abs(channel[j]);
-        if (v > max) {
-          max = v;
-        }
-      }
-      peaks.push(Math.round(max * 100) / 100);
-    }
+    const channels = Array.from({ length: Math.max(1, audio.numberOfChannels) }, (_, i) => audio.getChannelData(i));
     void ctx.close?.();
-    return peaks.length > 0
-      ? { duration: audio.duration, peaksPerSecond: pps, peaks }
-      : null;
+    return peaksFromChannels(channels, audio.sampleRate, audio.duration, 20);
   } catch (caught) {
     logCaught('lib/waveform.ts:computeWebWaveform', caught);
     return null;
   }
 }
 
-export function getWaveform(uri: string): Promise<WaveformData | null> {
+export function getWaveform(uri: string, opts: { userInitiated?: boolean } = {}): Promise<WaveformData | null> {
   let pending = memory.get(uri);
   if (pending) {
     return pending;
   }
   if (Platform.OS === 'web') {
     pending = computeWebWaveform(uri);
-    memory.set(uri, pending);
+    remember(uri, pending);
     pending.then((data) => {
       if (data === null) {
         memory.delete(uri);
@@ -132,10 +154,7 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
     let cacheFile: File | null = null;
     try {
       const source = new File(uri);
-      cacheFile = new File(
-        Paths.cache,
-        `wf_${hashKey(`${source.name}_${source.size ?? 0}`)}.json`
-      );
+      cacheFile = new File(Paths.cache, `${waveformCacheKey(uri, source.size ?? 0, source.modificationTime ?? 0)}.json`);
       if (cacheFile.exists) {
         return JSON.parse(await cacheFile.text()) as WaveformData;
       }
@@ -144,7 +163,7 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
       cacheFile = null;
     }
     try {
-      const data = await computeNativeWaveform(uri);
+      const data = await computeNativeWaveform(uri, !!opts.userInitiated);
       if (data && cacheFile) {
         try {
           cacheFile.write(JSON.stringify(data));
@@ -159,7 +178,7 @@ export function getWaveform(uri: string): Promise<WaveformData | null> {
       return null;
     }
   })();
-  memory.set(uri, pending);
+  remember(uri, pending);
   // sikertelen próbálkozás ne ragadjon be a session-cache-be
   pending.then((data) => {
     if (data === null) {

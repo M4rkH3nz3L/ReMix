@@ -52,6 +52,8 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
+import { clearWaveformMemory, clipWindowPeaks, getWaveform } from '@/lib/waveform';
 import { mixForExport } from '@/lib/audioExportMix';
 import { classifyAudioIntake } from '@/lib/audioIntake';
 import { supabase } from '@/lib/supabase';
@@ -2372,6 +2374,86 @@ function toneWav(name: string, seconds: number): string {
   return file.uri;
 }
 
+/** 16 bites sztereó WAV: bal csatorna csend, jobb csatornán szinusz `amp` szinttel, `from` mp-től. */
+function stereoRightWav(name: string, seconds: number, amp: number, from: number): string {
+  const rate = 44100;
+  const samples = Math.round(seconds * rate);
+  const bytes = new Uint8Array(44 + samples * 4);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, value: string) => [...value].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)));
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + samples * 4, true);
+  text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 2, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 4, true);
+  view.setUint16(32, 4, true);
+  view.setUint16(34, 16, true);
+  text(36, 'data');
+  view.setUint32(40, samples * 4, true);
+  for (let i = 0; i < samples; i++) {
+    const v = i / rate >= from ? Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * amp * 32767) : 0;
+    view.setInt16(44 + i * 4 + 2, v, true);
+  }
+  const file = new File(Paths.document, name);
+  if (file.exists) {
+    file.delete();
+  }
+  file.write(bytes);
+  return file.uri;
+}
+
+/** A20: új munkamenetben a háttér-hullámforma a korábbi bizonyításon múlik (`reset` törli). */
+async function smokeWaveformBackground(log: Log, reset: boolean) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  if (reset) {
+    for (const name of Paths.document.list().map((e) => e.name).filter((n) => n.startsWith('.audioapi-ok-'))) {
+      new File(Paths.document, name).delete();
+    }
+    log(null, 'bizonyítás törölve', 'a következő indítás bizonyítás nélkül fut');
+    return;
+  }
+  const uri = stereoRightWav(`smoke_wavebg_${Date.now().toString(36)}.wav`, 2, 0.5, 0);
+  log(null, 'dekóder-állapot az új munkamenet elején', audioApiState());
+  const wave = await getWaveform(uri);
+  log(null, 'A20 háttér-hullámforma új munkamenetben', wave ? `${wave.peaks.length} csúcs, max ${Math.max(...wave.peaks)}` : 'nincs');
+  const studio = await getWaveform(`${uri}`, { userInitiated: true });
+  log(!!studio, 'A20 a Hang Stúdió hullámformája bizonyítás nélkül is megjön', studio ? `${studio.peaks.length} csúcs` : 'nincs');
+  new File(uri).delete();
+}
+
+/** A20/A22/A24 a valódi natív dekóderrel: iOS-en is fut, a jobb csatorna és a vágás számít. */
+async function smokeWaveform(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  clearWaveformMemory();
+  // 2 mp csend, majd 2 mp 0.5-ös szinusz CSAK a jobb csatornán
+  const uri = stereoRightWav(`smoke_wave_${Date.now().toString(36)}.wav`, 4, 0.5, 2);
+  log(null, 'dekóder-állapot indulás előtt', audioApiState());
+  const background = await getWaveform(uri);
+  log(null, 'háttér-hívás az első dekódolás előtt', background ? 'van hullámforma' : 'nincs (iOS-őr)');
+  clearWaveformMemory();
+  const started = Date.now();
+  const api = await loadAudioApi();
+  const decoded = api ? await api.decodeAudioData(uri, 8000) : null;
+  log(!!decoded, 'A20 a natív dekóder iOS-en fut, összeomlás nélkül', decoded ? `${decoded.numberOfChannels} csatorna, ${decoded.duration.toFixed(2)} s, ${Date.now() - started} ms` : 'nincs modul');
+  if (decoded) {
+    markAudioApi(true);
+  }
+  const wave = await getWaveform(uri);
+  log(!!wave, 'A20 a háttér-hívás a bizonyítás után hullámformát ad', wave ? `${wave.peaks.length} csúcs` : 'null');
+  if (wave) {
+    const head = clipWindowPeaks(wave, 0, 2);
+    const tail = clipWindowPeaks(wave, 2, 2);
+    const max = (xs: number[]) => Math.max(0, ...xs);
+    log(max(head) < 0.02, 'A22 a csendes szakasz csendes', `max ${max(head)}`);
+    log(Math.abs(max(tail) - 0.5) < 0.05, 'A24 a csak jobb csatornás jel is látszik, helyes szinten', `max ${max(tail)}`);
+    log(tail.length === 40 && head.length === 40, 'A22 a vágott ablak pontos hosszú', `${head.length} + ${tail.length} csúcs`);
+  }
+  new File(uri).delete();
+}
+
 /** A6 és A19 valódi fájlon: a sérült hang nem kerül be, a mérés a jelenlegi mixet adja. */
 async function smokeAudioMix(log: Log, setHarness: (n: ReactNode) => void) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -2658,6 +2740,14 @@ export async function runImageSmoke(
   }
   if (phase === 'login') {
     await step('login', () => smokeLogin(log));
+    return;
+  }
+  if (phase === 'wavereset' || phase === 'wavebg') {
+    await step(phase, () => smokeWaveformBackground(log, phase === 'wavereset'));
+    return;
+  }
+  if (phase === 'waveform') {
+    await step('waveform', () => smokeWaveform(log));
     return;
   }
   if (phase === 'audiomix') {

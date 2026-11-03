@@ -26,7 +26,8 @@ export function useWaveform(uri: string | null): WaveformData | null {
       return;
     }
     let alive = true;
-    getWaveform(uri)
+    // a Hang Stúdió lapjai a felhasználó kérésére mutatják (A20)
+    getWaveform(uri, { userInitiated: true })
       .then((w) => {
         if (alive && w) {
           setWave({ uri, data: w });

@@ -11,6 +11,7 @@ import {
   payoutEur,
   spendPlan,
   subscriptionCostCents,
+  webTopupAvailable,
 } from '@/lib/coins';
 
 describe('coins — árak és díjak (PRO-CASH 2–3.)', () => {
@@ -91,5 +92,14 @@ describe('coins — költési sorrend és kifizetés (a DB coin_debit tükre)', 
       nextReleaseAt: '2026-12-01',
     });
     expect(parseWallet(null)).toEqual(EMPTY_WALLET);
+  });
+});
+
+describe('coins — webes feltöltés elérhetősége', () => {
+  it('weben mindig, appból csak bekapcsolt link-outtal', () => {
+    expect(webTopupAvailable('web', undefined)).toBe(true);
+    expect(webTopupAvailable('ios', undefined)).toBe(false);
+    expect(webTopupAvailable('ios', '1')).toBe(true);
+    expect(webTopupAvailable('android', '0')).toBe(false);
   });
 });

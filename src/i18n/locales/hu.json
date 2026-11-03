@@ -79,6 +79,17 @@
       "changeMsg": "{{tier}} aktív eddig: {{until}}. A korábbi szint fel nem használt részéből {{credit}} Coint jóváírtunk.",
       "addon": { "storage_10gb": "+10 GB tárhely", "storage_100gb": "+100 GB tárhely", "ai_1m": "+1 M AI-token", "render_60": "+60 perc felhő-render", "publish_account": "+1 publikálási fiók", "multistream_target": "+1 multistream-cél", "collab_5": "+5 kollaborátor" },
       "addonError": { "paid_tier_required": "Bővítés fizetős előfizetéshez vehető.", "tier_too_low": "Ez a bővítés magasabb szinttől érhető el.", "addon_requires_coin_billing": "Bővítést Coinból fizetett előfizetéshez vehetsz." }
+    },
+    "topup": {
+      "webOkTitle": "Sikeres fizetés",
+      "webOkMsg": "A Coinod pár másodpercen belül megjelenik a pénztárcádban.",
+      "webCancelTitle": "A fizetés megszakadt",
+      "webCancelMsg": "Nem terheltünk semmit. Bármikor újrapróbálhatod.",
+      "toWallet": "Tovább a pénztárcához",
+      "storeDoneTitle": "Köszönjük!",
+      "storeDoneMsg": "A Coin pár másodpercen belül megjelenik az egyenlegeden.",
+      "webCheaper": "A weben olcsóbb: {{price}} / Coin",
+      "legal": "A Coin azonnal a fiókodba kerül; a teljesítéssel a 14 napos elállási jog megszűnik. A vásárolt Coin elkölthető, de pénzre nem váltható, és nem jár le."
     }
   },
   "aiPicker": {

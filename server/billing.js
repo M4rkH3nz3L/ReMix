@@ -235,6 +235,36 @@ async function handleRevenueCatEvent(body) {
 }
 
 /**
+ * 💶 Stripe-esemény végrehajtása (C1.5) — a tiszta `planStripeEvent` terve szerint.
+ * Idempotens: a `stripe:<event id>` csak egyszer dolgozódik fel (a rögzítés SIKER UTÁN).
+ */
+async function handleStripeEvent(event) {
+  const { planStripeEvent } = require('./stripe');
+  const sb = adminClient();
+  const eventId = event && event.id ? `stripe:${event.id}` : null;
+  if (eventId && (await webhookEventSeen(sb, eventId))) {
+    return { duplicate: true, id: eventId };
+  }
+  const plan = planStripeEvent(event);
+  let result;
+  if (plan.action === 'coins') {
+    await grantCoins(plan.userId, plan.cents, 'purchased', 'topup', `stripe:${plan.ref}`);
+    if (plan.bonusCents > 0) {
+      await grantCoins(plan.userId, plan.bonusCents, 'bonus', 'bonus', `stripe:${plan.ref}`);
+    }
+    result = { credited: plan.cents, bonus: plan.bonusCents };
+  } else if (plan.action === 'coins_refund') {
+    result = { clawback: await clawbackCoins(plan.userId, plan.cents, `refund:stripe:${plan.ref}`) };
+  } else {
+    result = { ignored: plan.reason };
+  }
+  if (eventId) {
+    await recordWebhookEvent(sb, eventId, event.type);
+  }
+  return result;
+}
+
+/**
  * 💳 Van-e ÉRVÉNYES Pro-előfizetése a felhasználónak (szerver-hiteles).
  *
  * A kliens `isProNow()`-ja csak a lokális zustand-állapotot olvassa, tehát
@@ -289,6 +319,7 @@ module.exports = {
   clawbackCoins,
   processRevenueCatEvent,
   handleRevenueCatEvent,
+  handleStripeEvent,
   webhookEventSeen,
   recordWebhookEvent,
   isPro,

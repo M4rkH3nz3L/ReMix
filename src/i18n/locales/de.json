@@ -79,6 +79,17 @@
       "changeMsg": "{{tier}} ist aktiv bis {{until}}. Für den ungenutzten Teil deiner bisherigen Stufe haben wir {{credit}} Coins gutgeschrieben.",
       "addon": { "storage_10gb": "+10 GB Speicher", "storage_100gb": "+100 GB Speicher", "ai_1m": "+1 Mio. KI-Token", "render_60": "+60 Min. Cloud-Render", "publish_account": "+1 Veröffentlichungskonto", "multistream_target": "+1 Multistream-Ziel", "collab_5": "+5 Mitwirkende" },
       "addonError": { "paid_tier_required": "Erweiterungen gibt es mit einem bezahlten Abo.", "tier_too_low": "Diese Erweiterung braucht eine höhere Stufe.", "addon_requires_coin_billing": "Erweiterungen gibt es für mit Coins bezahlte Abos." }
+    },
+    "topup": {
+      "webOkTitle": "Zahlung erfolgreich",
+      "webOkMsg": "Deine Coins erscheinen in wenigen Sekunden im Wallet.",
+      "webCancelTitle": "Zahlung abgebrochen",
+      "webCancelMsg": "Es wurde nichts abgebucht. Du kannst es jederzeit erneut versuchen.",
+      "toWallet": "Zum Wallet",
+      "storeDoneTitle": "Danke!",
+      "storeDoneMsg": "Deine Coins erscheinen in wenigen Sekunden im Guthaben.",
+      "webCheaper": "Im Web günstiger: {{price}} / Coin",
+      "legal": "Coins werden sofort gutgeschrieben; mit der Lieferung erlischt das 14-tägige Widerrufsrecht. Gekaufte Coins sind ausgebbar, aber nicht auszahlbar, und verfallen nie."
     }
   },
   "aiPicker": {

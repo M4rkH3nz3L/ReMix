@@ -2,14 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SubscriptionManageCard } from '@/components/profile/SubscriptionManageCard';
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
+import { PurchaseCancelledError, billingClientAvailable, purchaseCoinPack } from '@/lib/billing';
 import {
+  COIN_PACKS,
   COIN_PAYOUT_EUR,
   COIN_PRICE_EUR_WEB,
+  webTopupAvailable,
   EMPTY_WALLET,
   MIN_PAYOUT_CENTS,
   coinsToCents,
@@ -44,6 +48,7 @@ import {
   requestPayout,
   sendGift,
   setPayoutAccount,
+  startWebTopup,
   subscribeWithCoins,
 } from '@/lib/wallet';
 import { logCaught } from '@/lib/logCaught';
@@ -143,6 +148,33 @@ export function WalletCard() {
       } catch (e) {
         logCaught('components/profile/WalletCard.tsx:onBuyDev', e);
         Alert.alert(t('common.error'), (e as Error).message);
+      }
+    });
+
+  const storeTopup = billingClientAvailable();
+  const webTopup = webTopupAvailable(Platform.OS, process.env.EXPO_PUBLIC_WEB_TOPUP_LINKOUT);
+
+  // 🪙 Coin-csomag: az áruházban (IAP, a webhook ír jóvá) vagy a weben (Stripe, 5 € / Coin)
+  const onBuyPack = (packId: string, via: 'store' | 'web') =>
+    guard(async () => {
+      try {
+        if (via === 'store') {
+          await purchaseCoinPack(packId);
+          Alert.alert(t('wallet.topup.storeDoneTitle'), t('wallet.topup.storeDoneMsg'));
+        } else {
+          const url = await startWebTopup(packId);
+          if (Platform.OS === 'web') {
+            window.location.assign(url);
+            return;
+          }
+          await WebBrowser.openBrowserAsync(url);
+        }
+        refresh();
+      } catch (e) {
+        logCaught('components/profile/WalletCard.tsx:onBuyPack', e);
+        if (!(e instanceof PurchaseCancelledError)) {
+          Alert.alert(t('common.error'), (e as Error).message);
+        }
       }
     });
 
@@ -311,9 +343,32 @@ export function WalletCard() {
                   <Text style={styles.smallBtnText}>+10 🪙 (dev)</Text>
                 </Pressable>
               </View>
+            ) : null}
+            {storeTopup || webTopup ? (
+              <View style={styles.packGrid}>
+                {COIN_PACKS.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => onBuyPack(p.id, storeTopup ? 'store' : 'web')}
+                    disabled={busy}
+                    style={styles.packChip}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.packCoins}>{p.coins} 🪙{p.bonusCoins ? ` +${formatCoins(p.bonusCoins * 100)}` : ''}</Text>
+                    <Text style={styles.dim}>{formatEur(storeTopup ? p.priceEurStore : p.priceEurWeb)}</Text>
+                  </Pressable>
+                ))}
+              </View>
             ) : (
               <Text style={styles.dim}>{t('wallet.buyHint', { price: formatEur(COIN_PRICE_EUR_WEB) })}</Text>
             )}
+            {storeTopup && webTopup ? (
+              <Pressable onPress={() => onBuyPack('coins_10', 'web')} disabled={busy} style={styles.linkBtn}>
+                <Ionicons name="globe-outline" size={15} color={palette.accent} />
+                <Text style={styles.linkText}>{t('wallet.topup.webCheaper', { price: formatEur(COIN_PRICE_EUR_WEB) })}</Text>
+              </Pressable>
+            ) : null}
+            <Text style={styles.dim}>{t('wallet.topup.legal')}</Text>
           </>
         )}
       </View>
@@ -501,6 +556,19 @@ const styles = StyleSheet.create({
   balanceLabel: { color: palette.textDim, fontSize: 13 },
   balanceValue: { color: palette.text, fontSize: 22, fontWeight: '900' },
   rowWrap: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  packGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  packChip: {
+    minWidth: 92,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceHigh,
+    paddingHorizontal: 10,
+  },
+  packCoins: { color: palette.text, fontSize: 14, fontWeight: '800' },
   bucketRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 },
   bucketLabel: { color: palette.text, fontSize: 13, flexShrink: 1 },
   bucketValue: { color: palette.text, fontSize: 13, fontWeight: '700' },

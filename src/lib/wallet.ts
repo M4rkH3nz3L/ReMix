@@ -441,3 +441,23 @@ export async function startTrial(): Promise<{ until: string }> {
   await refreshEntitlement().catch((caught) => { logCaught('lib/wallet.ts:startTrial', caught); });
   return { until: String((data as Record<string, unknown> | null)?.until ?? '') };
 }
+
+/**
+ * 💶 Webes Coin-feltöltés (Stripe Checkout, 5 € / Coin, PRO-CASH C1.5): a worker Checkout
+ * Sessiont nyit, a fizetett összeget a Stripe webhook írja jóvá. Visszaadja a fizetési oldal címét.
+ */
+export async function startWebTopup(packId: string): Promise<string> {
+  const res = await fetch(`${cloudBaseUrl()}/billing/stripe/checkout`, {
+    method: 'POST',
+    headers: await workerJsonHeaders(),
+    body: JSON.stringify({ packId }),
+  });
+  const body = (await res.json().catch((caught) => { logCaught('lib/wallet.ts:startWebTopup', caught); return {}; })) as {
+    url?: string;
+    error?: string;
+  };
+  if (!res.ok || !body.url) {
+    throw new Error(body.error || 'checkout_failed');
+  }
+  return body.url;
+}

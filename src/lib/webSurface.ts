@@ -32,4 +32,5 @@ export const PUBLIC_WEB_SCREENS = [
   'live',
   'live/[id]',
   'shop',
+  'coins',
 ] as const;

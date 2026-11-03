@@ -56,6 +56,14 @@ export const COIN_PACKS: readonly CoinPack[] = [
   { id: 'coins_50', coins: 50, bonusCoins: 5, priceEurWeb: 250, priceEurStore: 299.99 },
 ];
 
+/**
+ * Hol kínálható a webes (Stripe) feltöltés: a weben mindig; az appból csak akkor, ha a link-out
+ * be van kapcsolva (EU/DMA — élesítés előtt jogilag ellenőrizendő, PRO-CASH 8.1).
+ */
+export function webTopupAvailable(platform: string, linkoutFlag: string | undefined): boolean {
+  return platform === 'web' || linkoutFlag === '1';
+}
+
 export function coinPack(id: string): CoinPack | null {
   return COIN_PACKS.find((p) => p.id === id) ?? null;
 }

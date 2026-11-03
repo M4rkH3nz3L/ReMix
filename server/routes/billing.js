@@ -17,7 +17,10 @@ const {
   deactivatePro,
   grantCoins,
   handleRevenueCatEvent,
+  handleStripeEvent,
 } = require('../billing');
+const { stripeConfigured, verifyStripeSignature, createCheckoutSession } = require('../stripe');
+const { coinPackFor } = require('../rcEvents');
 
 const router = express.Router();
 
@@ -107,3 +110,61 @@ router.post('/billing/revenuecat', express.json({ limit: '256kb' }), (req, res) 
 });
 
 module.exports = router;
+
+// 💶 Webes Coin-feltöltés (PRO-CASH C1.5): Checkout Session a választott csomagra. A hívó a
+// VERIFIKÁLT tokenből; a sikeres fizetést a webhook írja jóvá (nem ez a válasz).
+router.post('/billing/stripe/checkout', express.json({ limit: '4kb' }), requireAuth, (req, res) => {
+  if (!stripeConfigured() || !billingAvailable()) {
+    res.status(503).json({ error: 'A webes fizetés nincs konfigurálva (STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET).' });
+    return;
+  }
+  const userId = callerId(req, (req.body ?? {}).userId);
+  const packId = String((req.body ?? {}).packId || '');
+  if (!userId) {
+    res.status(401).json({ error: 'Nem azonosítható hívó.' });
+    return;
+  }
+  if (!coinPackFor(packId)) {
+    res.status(400).json({ error: 'invalid_pack' });
+    return;
+  }
+  const base = (process.env.WEB_BASE_URL || '').replace(/\/$/, '');
+  createCheckoutSession({
+    userId,
+    packId,
+    successUrl: `${base}/coins?status=ok`,
+    cancelUrl: `${base}/coins?status=cancel`,
+  })
+    .then((session) => res.json(session))
+    .catch((err) => {
+      logCaught('routes/billing.js', err);
+      res.status(502).json({ error: err.message });
+    });
+});
+
+// 💶 Stripe webhook — a NYERS törzs kell az aláíráshoz (Stripe-Signature, HMAC-SHA256).
+router.post('/billing/stripe/webhook', express.raw({ type: '*/*', limit: '512kb' }), (req, res) => {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret || !billingAvailable()) {
+    res.status(503).json({ error: 'Stripe webhook nincs konfigurálva' });
+    return;
+  }
+  if (!verifyStripeSignature(req.body, req.headers['stripe-signature'], secret)) {
+    res.status(400).json({ error: 'invalid_signature' });
+    return;
+  }
+  let event;
+  try {
+    event = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body));
+  } catch (caught) {
+    logCaught('routes/billing.js:stripeWebhook', caught);
+    res.status(400).json({ error: 'invalid_json' });
+    return;
+  }
+  handleStripeEvent(event)
+    .then((result) => res.json(result))
+    .catch((err) => {
+      logCaught('routes/billing.js', err);
+      res.status(400).json({ error: err.message });
+    });
+});

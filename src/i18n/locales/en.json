@@ -79,6 +79,17 @@
       "changeMsg": "{{tier}} is active until {{until}}. We credited {{credit}} Coins for the unused part of your previous tier.",
       "addon": { "storage_10gb": "+10 GB storage", "storage_100gb": "+100 GB storage", "ai_1m": "+1M AI tokens", "render_60": "+60 min cloud render", "publish_account": "+1 publishing account", "multistream_target": "+1 multistream target", "collab_5": "+5 collaborators" },
       "addonError": { "paid_tier_required": "Add-ons need a paid subscription.", "tier_too_low": "This add-on needs a higher tier.", "addon_requires_coin_billing": "Add-ons are available for subscriptions paid with Coins." }
+    },
+    "topup": {
+      "webOkTitle": "Payment successful",
+      "webOkMsg": "Your Coins will appear in your wallet within seconds.",
+      "webCancelTitle": "Payment cancelled",
+      "webCancelMsg": "Nothing was charged. You can try again any time.",
+      "toWallet": "Go to my wallet",
+      "storeDoneTitle": "Thank you!",
+      "storeDoneMsg": "Your Coins will appear in your balance within seconds.",
+      "webCheaper": "Cheaper on the web: {{price}} / Coin",
+      "legal": "Coins are delivered immediately; with delivery the 14-day right of withdrawal ends. Purchased Coins can be spent but not cashed out, and they never expire."
     }
   },
   "aiPicker": {

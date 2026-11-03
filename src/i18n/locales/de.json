@@ -2629,6 +2629,42 @@
   "upsell": {
     "msg": { "exportWatermark": "Ohne Wasserzeichen, in 4K? Amateur kostet 2 Coins (10 €) im Monat, ohne Werbung.", "deviceStorage": "Deine Projekte liegen auf dem Handy — Amateur bringt 3 GB Cloud dazu.", "longExport": "Langer Export? In der Cloud viel schneller — ab Fortgeschritten.", "aiWithoutKey": "Unsere eigene KI, ohne Schlüssel: ab Amateur.", "liveGift": "Du hast ein Geschenk bekommen! Mit Fortgeschritten streamst du auf mehrere Plattformen gleichzeitig.", "shopSale": "Glückwunsch zum Verkauf! Als Profi bekommst du einen hervorgehobenen Platz im Shop.", "milestone": "Schau, wie viel du geschafft hast! Teste Amateur 7 Tage gratis.", "winback": "Willkommen zurück! Sieh dir an, was Amateur dir jetzt bietet." }
   },
+  "org": {
+    "title": "Firmenkonto",
+    "entry": "Firmenkonto (Business)",
+    "createTitle": "Organisation anlegen",
+    "createHint": "Business ist für eingetragene Firmen: Wir prüfen die USt-IdNr. über VIES und die Firmendomain über die E-Mail-Adresse; die erste Freigabe erfolgt manuell. 10 Coins pro Platz / Monat, mind. 2 Plätze.",
+    "createCta": "Organisation anlegen",
+    "created": "Organisation angelegt. Starte die Prüfung.",
+    "field": { "name": "Firmenname", "country": "Land (z. B. DE)", "vatId": "USt-IdNr. (z. B. DE123456789)", "regNumber": "Handelsregisternummer", "domain": "Firmendomain (z. B. firma.de)", "billingEmail": "Rechnungs-E-Mail (auf der Firmendomain)", "billingAddress": "Rechnungsadresse" },
+    "status": { "pending": "wartet auf Prüfung", "verified": "geprüft", "rejected": "abgelehnt", "suspended": "gesperrt" },
+    "vies": "VIES",
+    "domain": "Domain",
+    "verifyCta": "Prüfung starten (VIES + Domain)",
+    "verifySent": "Prüfung erledigt; die Freigabe erfolgt manuell, meist innerhalb eines Werktags.",
+    "pendingHint": "Ein Abo ist nach der Freigabe möglich.",
+    "planTitle": "Abo",
+    "activeUntil": "Aktiv bis {{date}} · {{seats}} Plätze",
+    "inactive": "Noch kein aktives Abo.",
+    "pendingSeats": "ab dem nächsten Zyklus {{n}} Plätze",
+    "seatPrice": "{{coins}} Coins pro Platz / Monat (netto {{eur}})",
+    "storage": "Gemeinsamer Speicher: {{used}} / {{quota}}",
+    "seats": "Plätze",
+    "setSeatsCta": "Platzanzahl speichern",
+    "seatsSaved": "Gespeichert. Erhöhungen gelten sofort (anteilig), Senkungen ab dem nächsten Zyklus.",
+    "payCoinsCta": "Mit Coins zahlen · {{coins}} Coins",
+    "subscribed": "Dein Business-Abo ist aktiv.",
+    "invoiceCta": "Rechnung per Überweisung anfordern (netto 15 Tage)",
+    "invoiceRequested": "Die Rechnung ist fertig — unten herunterladen. Nach Zahlungseingang aktivieren wir.",
+    "membersTitle": "Mitglieder ({{n}} / {{seats}})",
+    "role": { "owner": "Inhaber", "admin": "Admin", "member": "Mitglied" },
+    "removeMember": "Mitglied entfernen",
+    "addPlaceholder": "Benutzername",
+    "addCta": "Hinzufügen",
+    "invoicesTitle": "Rechnungen",
+    "invoiceStatus": { "open": "offen", "paid": "bezahlt", "void": "storniert" },
+    "error": { "already_in_org": "Dieser Nutzer ist bereits in einer Organisation.", "forbidden": "Dafür sind Inhaber- oder Admin-Rechte nötig.", "user_not_found": "Diesen Benutzernamen gibt es nicht.", "no_free_seat": "Kein freier Platz — erhöhe die Platzanzahl.", "seats_below_members": "Die Plätze dürfen nicht weniger als die Mitglieder sein.", "org_not_verified": "Die Organisation ist noch nicht freigegeben.", "insufficient_credits": "Nicht genug Coins.", "cannot_remove_owner": "Der Inhaber kann nicht entfernt werden." }
+  },
   "paywallSheet": {
     "heroTitle": "Ohne Werbung und Wasserzeichen, mit der Kraft der Cloud",
     "heroSubTrigger": "„{{trigger}}“ ist Teil eines bezahlten Plans.",
@@ -4739,7 +4775,16 @@
       "reject": "Ablehnen",
       "flag": { "ring": "Geschenk-Ring", "new_accounts": "von neuen Konten", "concentration": "von einem einzigen Zahler", "shared_device": "gemeinsames Gerät", "review": "Fehlbetrag nach Erstattung" }
     },
-    "dac7Export": "DAC7-Export: {{year}} (CSV)"
+    "dac7Export": "DAC7-Export: {{year}} (CSV)",
+    "orgs": {
+      "title": "Firmenfreigaben",
+      "empty": "Keine Firmen in Prüfung.",
+      "domain": "Domain",
+      "invoicesTitle": "Offene Rechnungen (Überweisung)",
+      "invoicesEmpty": "Keine offenen Rechnungen.",
+      "due": "Fällig: {{date}}",
+      "markPaid": "Eingegangen — bezahlt"
+    }
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",

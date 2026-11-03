@@ -57,7 +57,7 @@ update public.subscriptions set tier = 'ultra' where user_id = 'a1000000-0000-00
 select pg_temp.note('C0.1 a Profi (ultra) beírható', public.active_tier_for('a1000000-0000-0000-0000-000000000001') = 'ultra');
 select pg_temp.raises('C0.1 Vállalati 1 fővel nem lehet', $$update public.subscriptions set tier = 'business', seats = 1 where user_id = 'a1000000-0000-0000-0000-000000000001'$$, 'seats_check');
 update public.subscriptions set tier = 'business', seats = 3 where user_id = 'a1000000-0000-0000-0000-000000000001';
-select pg_temp.note('C0.1 Vállalati 3 fővel beírható', public.active_tier_for('a1000000-0000-0000-0000-000000000001') = 'business');
+select pg_temp.note('C0.1 Vállalati 3 fővel beírható, de ellenőrzött szervezet nélkül nem aktív (5.1)', public.active_tier_for('a1000000-0000-0000-0000-000000000001') = 'free');
 select pg_temp.raises('C0.1 ismeretlen szint nem írható', $$update public.subscriptions set tier = 'gold' where user_id = 'a1000000-0000-0000-0000-000000000001'$$, 'tier_check');
 select pg_temp.raises('C0.1 a régi revenuecat-forrás már nem írható', $$update public.subscriptions set source = 'revenuecat' where user_id = 'a1000000-0000-0000-0000-000000000001'$$, 'source_check');
 
@@ -84,7 +84,7 @@ select pg_temp.note('C0.2 Haladó: 25 GB', (public.storage_usage_for('b1000000-0
 update public.subscriptions set tier = 'ultra' where user_id = 'b1000000-0000-0000-0000-000000000002';
 select pg_temp.note('C0.2 Profi: 100 GB', (public.storage_usage_for('b1000000-0000-0000-0000-000000000002') ->> 'base_bytes')::bigint = public.gib(100));
 update public.subscriptions set tier = 'business', seats = 5 where user_id = 'b1000000-0000-0000-0000-000000000002';
-select pg_temp.note('C0.2 Vállalati 5 fő: 500 GB közös keret', (public.storage_usage_for('b1000000-0000-0000-0000-000000000002') ->> 'base_bytes')::bigint = public.gib(500));
+select pg_temp.note('C0.2 Vállalati szervezet nélkül: nincs céges keret (a közös keretet a pro_cash_org.sql bizonyítja)', (public.storage_usage_for('b1000000-0000-0000-0000-000000000002') ->> 'base_bytes')::bigint = public.gib(1));
 update public.subscriptions set current_period_end = now() - interval '1 day' where user_id = 'b1000000-0000-0000-0000-000000000002';
 select pg_temp.note('C0.2 lejárt előfizetés: vissza a Free-keretre', (public.storage_usage_for('b1000000-0000-0000-0000-000000000002') ->> 'base_bytes')::bigint = public.gib(1));
 

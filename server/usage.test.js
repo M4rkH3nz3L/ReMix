@@ -91,3 +91,17 @@ describe('aiUsageContext — AsyncLocalStorage a hívó uid-jához', () => {
     expect(usage.aiUsageContext.getStore()).toBeUndefined();
   });
 });
+
+describe('orgRemaining (C4.3)', () => {
+  const q = usage.seatQuota('business', 5); // aiTokens 10 M
+  test('a közös keretből a szervezet összes fogyasztása jön le', () => {
+    expect(usage.orgRemaining(q, 'aiTokens', { pool: 9500000, self: 100 }, null)).toBe(500000);
+  });
+  test('a taghatár a saját fogyasztást köti', () => {
+    expect(usage.orgRemaining(q, 'aiTokens', { pool: 1000000, self: 400000 }, 500000)).toBe(100000);
+  });
+  test('korlátlan metrikánál csak a taghatár számít', () => {
+    expect(usage.orgRemaining(q, 'exports', { pool: 1e9, self: 5 }, null)).toBe(Infinity);
+    expect(usage.orgRemaining(q, 'exports', { pool: 1e9, self: 5 }, 10)).toBe(5);
+  });
+});

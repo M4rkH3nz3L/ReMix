@@ -2629,6 +2629,42 @@
   "upsell": {
     "msg": { "exportWatermark": "No watermark, in 4K? Amateur is 2 Coins (€10) a month, without ads.", "deviceStorage": "Your projects live on your phone — Amateur adds 3 GB of cloud for them.", "longExport": "Long export? Much faster in the cloud — from Advanced.", "aiWithoutKey": "Our own AI, no key needed: from Amateur.", "liveGift": "You got a gift! With Advanced you can stream to several platforms at once.", "shopSale": "Congrats on the sale! As Pro you get a featured spot in the shop.", "milestone": "Look how much you have made! Try Amateur free for 7 days.", "winback": "Welcome back! See what Amateur gives you now." }
   },
+  "org": {
+    "title": "Company account",
+    "entry": "Company account (Business)",
+    "createTitle": "Create organization",
+    "createHint": "Business is for registered companies: we check the VAT ID on VIES and the company domain via the email address; the first approval is manual. 10 Coins per seat / month, min. 2 seats.",
+    "createCta": "Create organization",
+    "created": "Organization created. Start the verification.",
+    "field": { "name": "Company name", "country": "Country (e.g. DE)", "vatId": "EU VAT ID (e.g. DE123456789)", "regNumber": "Company registration number", "domain": "Company domain (e.g. company.com)", "billingEmail": "Billing email (on the company domain)", "billingAddress": "Billing address" },
+    "status": { "pending": "awaiting review", "verified": "verified", "rejected": "rejected", "suspended": "suspended" },
+    "vies": "VIES",
+    "domain": "domain",
+    "verifyCta": "Run verification (VIES + domain)",
+    "verifySent": "Verification done; approval is manual, usually within 1 business day.",
+    "pendingHint": "You can subscribe after approval.",
+    "planTitle": "Subscription",
+    "activeUntil": "Active until {{date}} · {{seats}} seats",
+    "inactive": "No active subscription yet.",
+    "pendingSeats": "{{n}} seats from the next cycle",
+    "seatPrice": "{{coins}} Coins per seat / month (net {{eur}})",
+    "storage": "Shared storage: {{used}} / {{quota}}",
+    "seats": "Seats",
+    "setSeatsCta": "Save seat count",
+    "seatsSaved": "Saved. Increases apply now (prorated), decreases from the next cycle.",
+    "payCoinsCta": "Pay with Coins · {{coins}} Coins",
+    "subscribed": "Your Business subscription is active.",
+    "invoiceCta": "Request a bank-transfer invoice (net 15 days)",
+    "invoiceRequested": "The invoice is ready — download it below. We activate after the transfer arrives.",
+    "membersTitle": "Members ({{n}} / {{seats}})",
+    "role": { "owner": "owner", "admin": "admin", "member": "member" },
+    "removeMember": "Remove member",
+    "addPlaceholder": "Username",
+    "addCta": "Add",
+    "invoicesTitle": "Invoices",
+    "invoiceStatus": { "open": "open", "paid": "paid", "void": "void" },
+    "error": { "already_in_org": "This user is already in an organization.", "forbidden": "This needs owner or admin rights.", "user_not_found": "No such username.", "no_free_seat": "No free seat — increase the seat count.", "seats_below_members": "Seats cannot be fewer than members.", "org_not_verified": "The organization is not approved yet.", "insufficient_credits": "Not enough Coins.", "cannot_remove_owner": "The owner cannot be removed." }
+  },
   "paywallSheet": {
     "heroTitle": "No ads, no watermark, the power of the cloud",
     "heroSubTrigger": "“{{trigger}}” is part of a paid plan.",
@@ -4734,7 +4770,16 @@
       "reject": "Reject",
       "flag": { "ring": "gift ring", "new_accounts": "from new accounts", "concentration": "from a single payer", "shared_device": "shared device", "review": "shortfall after refund" }
     },
-    "dac7Export": "DAC7 export: {{year}} (CSV)"
+    "dac7Export": "DAC7 export: {{year}} (CSV)",
+    "orgs": {
+      "title": "Company approvals",
+      "empty": "No companies waiting for approval.",
+      "domain": "domain",
+      "invoicesTitle": "Open invoices (bank transfer)",
+      "invoicesEmpty": "No open invoices.",
+      "due": "Due: {{date}}",
+      "markPaid": "Received — mark paid"
+    }
   },
   "legal": {
     "privacyTitle": "Privacy Policy",

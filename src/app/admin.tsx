@@ -31,6 +31,7 @@ import {
   type AppRole,
   type UserWithRole,
 } from '@/lib/roles';
+import { FinanceReviewList } from '@/components/admin/FinanceReviewList';
 import { PayoutReviewList } from '@/components/admin/PayoutReviewList';
 import { downloadDac7 } from '@/lib/wallet';
 import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
@@ -411,6 +412,9 @@ export default function AdminScreen() {
 
           {/* — Kifizetések kézi ellenőrzése (PRO-CASH C3.4) — */}
           {canPayouts ? <PayoutReviewList /> : null}
+
+          {/* — Cégek jóváhagyása és átutalások (PRO-CASH C4.2/C4.4) — */}
+          {canFinance ? <FinanceReviewList /> : null}
 
           {/* — DAC7-export (PRO-CASH C3.5) — az előző év eladói bevétele — */}
           {canFinance ? (

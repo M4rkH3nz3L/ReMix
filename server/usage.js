@@ -169,6 +169,8 @@ async function quotaExtras(userId) {
     return {
       seats: Number(data.seats) || 1,
       extras: { aiTokens: Number(data.aiTokens) || 0, renderMinutes: Number(data.renderMinutes) || 0 },
+      orgId: data.orgId || null,
+      memberLimits: data.memberLimits || null,
     };
   } catch (caught) {
     logCaught('usage.js:quotaExtras', caught);
@@ -176,12 +178,32 @@ async function quotaExtras(userId) {
   }
 }
 
+/**
+ * 🏢 Szervezeti tag hátralévő kerete (PRO-CASH C4.3): a közös kvótából a szervezet összes
+ * fogyasztása jön le, és ha az admin taghatárt állított, a saját fogyasztás sem lépheti át.
+ * `usage`: { pool, self } · `limit`: a tag havi határa (null = nincs).
+ */
+function orgRemaining(quota, metric, usage, limit) {
+  const poolLeft = isUnlimited(quota, metric) ? Infinity : Math.max(0, (quota[metric] ?? 0) - (Number(usage.pool) || 0));
+  const selfLeft = limit == null ? Infinity : Math.max(0, Number(limit) - (Number(usage.self) || 0));
+  return Math.min(poolLeft, selfLeft);
+}
+
 async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) {
   if (!USAGE_METRICS.includes(metric)) {
     return { ok: true, remaining: Infinity };
   }
-  const { seats, extras } = tier === 'free' ? { seats: 1, extras: {} } : await quotaExtras(userId);
+  const { seats, extras, orgId, memberLimits } = tier === 'free' ? { seats: 1, extras: {} } : await quotaExtras(userId);
   const quota = effectiveQuota(tier, seats, extras);
+  if (orgId) {
+    const sb = getAdmin();
+    const { data } = sb
+      ? await sb.rpc('usage_for_quota', { p_user: userId, p_period: periodKey(now), p_metric: metric })
+      : { data: null };
+    const limit = memberLimits ? memberLimits[metric] : null;
+    const rem = orgRemaining(quota, metric, data || { pool: 0, self: 0 }, limit);
+    return { ok: rem >= amount, remaining: rem };
+  }
   if (isUnlimited(quota, metric)) {
     return { ok: true, remaining: Infinity };
   }
@@ -232,6 +254,7 @@ module.exports = {
   quotaFor,
   seatQuota,
   effectiveQuota,
+  orgRemaining,
   BUSINESS_MIN_SEATS,
   periodKey,
   remaining,

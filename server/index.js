@@ -204,6 +204,9 @@ app.use(require('./routes/billing'));
 // 🎬 Reklám-jutalom (AdMob SSV, PRO-CASH C2.2) — domain-router (§01.1).
 app.use(require('./routes/ads'));
 
+// 🏢 Szervezet: cégellenőrzés, céges számla (PRO-CASH C4.2, C4.4) — domain-router (§01.1).
+app.use(require('./routes/org'));
+
 
 
 // 🎬🎧 Média route-ok — domain-router (§01.1).

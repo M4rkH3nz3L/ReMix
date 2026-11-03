@@ -2629,6 +2629,42 @@
   "upsell": {
     "msg": { "exportWatermark": "Vízjel nélkül, 4K-ban? Az Amatőr havi 2 Coin (10 €), reklám nélkül.", "deviceStorage": "A projektjeid a telefonon vannak — az Amatőrben 3 GB felhő jár hozzájuk.", "longExport": "Hosszú export? A felhőben sokkal gyorsabb — Haladótól.", "aiWithoutKey": "Saját AI, kulcs nélkül: Amatőrtől.", "liveGift": "Ajándékot kaptál! Haladóként egyszerre több platformra is adhatsz.", "shopSale": "Gratulálunk az eladáshoz! Profiként kiemelt helyet kapsz a boltban.", "milestone": "Mennyit dolgoztál! Próbáld ki az Amatőrt 7 napig ingyen.", "winback": "Visszavártunk! Nézd meg, mit ad most az Amatőr." }
   },
+  "org": {
+    "title": "Céges fiók",
+    "entry": "Céges fiók (Vállalati)",
+    "createTitle": "Szervezet létrehozása",
+    "createHint": "A Vállalati csomag létező cégeknek jár: az adószámot a VIES-en, a céges domaint az e-mail-címen ellenőrizzük, az első jóváhagyás kézi. Fejenként 10 Coin / hó, min. 2 fő.",
+    "createCta": "Szervezet létrehozása",
+    "created": "A szervezet létrejött. Indítsd el az ellenőrzést.",
+    "field": { "name": "Cégnév", "country": "Ország (pl. HU)", "vatId": "Közösségi adószám (pl. HU12345678)", "regNumber": "Cégjegyzékszám", "domain": "Céges domain (pl. ceg.hu)", "billingEmail": "Számlázási e-mail (céges domainen)", "billingAddress": "Számlázási cím" },
+    "status": { "pending": "ellenőrzésre vár", "verified": "ellenőrizve", "rejected": "elutasítva", "suspended": "felfüggesztve" },
+    "vies": "VIES",
+    "domain": "domain",
+    "verifyCta": "Ellenőrzés indítása (VIES + domain)",
+    "verifySent": "Az ellenőrzés lefutott; a jóváhagyás kézi, általában 1 munkanap.",
+    "pendingHint": "Előfizetni a jóváhagyás után lehet.",
+    "planTitle": "Előfizetés",
+    "activeUntil": "Aktív eddig: {{date}} · {{seats}} ülés",
+    "inactive": "Még nincs aktív előfizetés.",
+    "pendingSeats": "a következő ciklustól {{n}} ülés",
+    "seatPrice": "Fejenként {{coins}} Coin / hó (nettó {{eur}})",
+    "storage": "Közös tárhely: {{used}} / {{quota}}",
+    "seats": "Ülések",
+    "setSeatsCta": "Ülésszám mentése",
+    "seatsSaved": "Mentve. A növelés azonnal él (időarányos díjjal), a csökkentés a következő ciklustól.",
+    "payCoinsCta": "Fizetés Coinból · {{coins}} Coin",
+    "subscribed": "A Vállalati előfizetés aktív.",
+    "invoiceCta": "Átutalásos számlát kérek (nettó 15 nap)",
+    "invoiceRequested": "A számla elkészült — lent letöltheted. A beérkezett átutalás után aktiváljuk.",
+    "membersTitle": "Tagok ({{n}} / {{seats}})",
+    "role": { "owner": "tulajdonos", "admin": "admin", "member": "tag" },
+    "removeMember": "Tag eltávolítása",
+    "addPlaceholder": "Felhasználónév",
+    "addCta": "Hozzáadás",
+    "invoicesTitle": "Számlák",
+    "invoiceStatus": { "open": "nyitott", "paid": "fizetve", "void": "sztornó" },
+    "error": { "already_in_org": "Ez a felhasználó már egy szervezet tagja.", "forbidden": "Ehhez tulajdonosi vagy admin jog kell.", "user_not_found": "Nincs ilyen felhasználónév.", "no_free_seat": "Nincs szabad ülés — növeld az ülésszámot.", "seats_below_members": "Az ülésszám nem lehet kevesebb a tagok számánál.", "org_not_verified": "A szervezet még nincs jóváhagyva.", "insufficient_credits": "Nincs elég Coin.", "cannot_remove_owner": "A tulajdonos nem távolítható el." }
+  },
   "paywallSheet": {
     "heroTitle": "Reklám és vízjel nélkül, a felhő erejével",
     "heroSubTrigger": "A(z) „{{trigger}}” fizetős csomagban érhető el.",
@@ -4734,7 +4770,16 @@
       "reject": "Elutasítás",
       "flag": { "ring": "körbeajándékozás", "new_accounts": "friss fiókoktól", "concentration": "egyetlen fizetőtől", "shared_device": "közös eszköz", "review": "visszatérítés utáni hiány" }
     },
-    "dac7Export": "DAC7-export: {{year}} (CSV)"
+    "dac7Export": "DAC7-export: {{year}} (CSV)",
+    "orgs": {
+      "title": "Cégek jóváhagyása",
+      "empty": "Nincs jóváhagyásra váró cég.",
+      "domain": "domain",
+      "invoicesTitle": "Nyitott számlák (átutalás)",
+      "invoicesEmpty": "Nincs nyitott számla.",
+      "due": "Határidő: {{date}}",
+      "markPaid": "Beérkezett — fizetve"
+    }
   },
   "legal": {
     "privacyTitle": "Adatkezelési tájékoztató",

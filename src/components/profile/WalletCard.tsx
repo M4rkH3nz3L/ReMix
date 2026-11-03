@@ -398,6 +398,12 @@ export function WalletCard() {
         )}
       </View>
 
+      {/* céges fiók (Vállalati, PRO-CASH 5.) */}
+      <Pressable onPress={() => router.push('/org')} style={styles.linkBtn} accessibilityRole="button">
+        <Ionicons name="business-outline" size={15} color={palette.accent} />
+        <Text style={styles.linkText}>{t('org.entry')}</Text>
+      </Pressable>
+
       {/* az előfizetésem: lejárat, lemondás, add-onok */}
       <SubscriptionManageCard onChanged={refresh} refreshKey={subKey} />
 

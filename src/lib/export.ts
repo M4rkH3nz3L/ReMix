@@ -35,7 +35,7 @@ export function buildInteractiveMetadata(project: Project) {
   };
 }
 
-async function shareFile(name: string, content: string, mimeType: string): Promise<void> {
+export async function shareFile(name: string, content: string, mimeType: string): Promise<void> {
   // 🌐 weben nincs natív fájlrendszer/megosztó (a `new File(Paths.cache)` +
   // `Sharing` elszáll) → a böngésző letölti a fájlt (Blob → `<a download>`).
   if (Platform.OS === 'web') {

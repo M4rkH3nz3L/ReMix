@@ -19,7 +19,8 @@ export type PermissionKey =
   | 'user.manage'
   | 'user.suspend'
   | 'role.manage'
-  | 'payout.review';
+  | 'payout.review'
+  | 'finance.manage';
 
 export interface AppPermission {
   key: string;

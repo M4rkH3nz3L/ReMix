@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { EarningsCard } from '@/components/profile/EarningsCard';
 import { ReferralCard } from '@/components/profile/ReferralCard';
 import { SubscriptionManageCard } from '@/components/profile/SubscriptionManageCard';
 import { PrimaryButton } from '@/components/ui/controls';
@@ -437,6 +438,9 @@ export function WalletCard() {
           disabled={busy}
         />
       </View>
+
+      {/* bevételi panel */}
+      <EarningsCard refreshKey={subKey} />
 
       {/* ajánlói program */}
       <ReferralCard />

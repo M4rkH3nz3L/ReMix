@@ -107,6 +107,11 @@
       "claimedTitle": "Thank you!",
       "claimedMsg": "Your referrer earns a commission if you subscribe. It costs you nothing.",
       "error": { "referrer_not_found": "No such username.", "cannot_refer_self": "You cannot enter yourself.", "referral_already_set": "You already entered a referrer.", "referral_window_closed": "A referrer can be entered within 7 days of signing up.", "referral_loop": "You cannot refer each other." }
+    },
+    "earnings": {
+      "title": "My earnings",
+      "statement": "Download {{year}} statement (CSV)",
+      "kind": { "sale": "sales", "gift": "gifts", "commission": "remix commission", "referral": "referrals", "fund": "creator fund" }
     }
   },
   "aiPicker": {
@@ -4728,7 +4733,8 @@
       "approve": "Approve",
       "reject": "Reject",
       "flag": { "ring": "gift ring", "new_accounts": "from new accounts", "concentration": "from a single payer", "shared_device": "shared device", "review": "shortfall after refund" }
-    }
+    },
+    "dac7Export": "DAC7 export: {{year}} (CSV)"
   },
   "legal": {
     "privacyTitle": "Privacy Policy",

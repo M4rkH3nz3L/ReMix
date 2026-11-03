@@ -7,6 +7,7 @@ const { callerId, requireAuth } = require('../auth');
 const { rateLimit } = require('../security/rateLimit');
 const { usageFor, quotaAvailable } = require('../quota');
 const { executeApproved } = require('../payoutRunner');
+const { statementCsv, dac7Csv } = require('../earningsReports');
 const { createExpressAccount, onboardingLink } = require('../stripeConnect');
 const { adminClient } = require('../notify');
 
@@ -110,6 +111,57 @@ router.post('/wallet/kyc/stripe', requireAuth, rateLimit('messaging'), express.j
   } catch (err) {
     logCaught('routes/wallet.js:kyc', err);
     res.status(502).json({ error: err.message });
+  }
+});
+
+// 📊 Az alkotó éves bevételi kimutatása CSV-ben (C3.5) — a saját adatai, a verifikált tokenből.
+router.get('/wallet/statement', requireAuth, async (req, res) => {
+  const uid = callerId(req, req.query.userId);
+  const sb = adminClient();
+  const year = Math.trunc(Number(req.query.year)) || new Date().getUTCFullYear();
+  if (!uid || !sb) {
+    res.status(uid ? 503 : 401).json({ error: uid ? 'service_role hiányzik' : 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    const { data, error } = await sb.rpc('earnings_statement_for', { p_user: uid, p_year: year });
+    if (error) {
+      throw new Error(error.message);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="remix-bevetel-${year}.csv"`);
+    res.send(statementCsv(data));
+  } catch (err) {
+    logCaught('routes/wallet.js:statement', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🧾 DAC7-export (C3.5, 8.4) — csak `finance.manage` jogú adminnak.
+router.get('/admin/dac7', requireAuth, async (req, res) => {
+  const uid = req.user?.id;
+  const sb = adminClient();
+  const year = Math.trunc(Number(req.query.year)) || new Date().getUTCFullYear() - 1;
+  if (!uid || !sb) {
+    res.status(uid ? 503 : 401).json({ error: uid ? 'service_role hiányzik' : 'Hiányzó felhasználó.' });
+    return;
+  }
+  try {
+    const { data: allowed } = await sb.rpc('has_permission', { p_uid: uid, p_key: 'finance.manage' });
+    if (allowed !== true) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    const { data, error } = await sb.rpc('dac7_report', { p_year: year });
+    if (error) {
+      throw new Error(error.message);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="remix-dac7-${year}.csv"`);
+    res.send(dac7Csv(year, data));
+  } catch (err) {
+    logCaught('routes/wallet.js:dac7', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

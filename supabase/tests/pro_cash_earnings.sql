@@ -165,6 +165,32 @@ select pg_temp.note('C3.7 az alkotó csak a saját részét látja', (select cou
 select pg_temp.raises('C3.7 jog nélkül adminból sem futtatható', $$select public.admin_run_creator_fund('2099-02', 1)$$, 'forbidden');
 select pg_temp.admin();
 
+-- ═══ C3.5 bevételi panel, kimutatás, DAC7 ═════════════════════════════════════
+-- D2: 31 eladás (DAC7-köteles a darabszám miatt) · F1: csak alkotói alap (nem DAC7-tétel)
+select public.coin_credit('a4000000-0000-0000-0000-000000000006', 100, 'earned', 'sale', 'teszt', gen_random_uuid(), 'a4000000-0000-0000-0000-000000000005')
+  from generate_series(1, 31);
+select public.coin_credit('a4000000-0000-0000-0000-000000000006', 500, 'earned', 'gift', 'teszt', gen_random_uuid(), 'a4000000-0000-0000-0000-000000000005');
+update public.coin_lots set status = 'reversed' where id = (select id from public.coin_lots
+  where user_id = 'a4000000-0000-0000-0000-000000000006' and kind = 'gift' limit 1);
+select public.coin_credit('a4000000-0000-0000-0000-000000000006', 200, 'earned', 'gift', 'teszt', gen_random_uuid(), 'a4000000-0000-0000-0000-000000000005');
+select pg_temp.act('a4000000-0000-0000-0000-000000000006');
+select pg_temp.note('C3.5 a panel forrásonként bont, a visszavont tétel nélkül',
+  (select array_agg(kind || '=' || cents || '/' || items order by kind) = array['gift=200/1', 'sale=3100/31']
+     from public.my_earnings(1)));
+select pg_temp.note('C3.5 az éves kimutatás összesít (33 Coin, 32 tétel)',
+  (select (s ->> 'earned_cents')::bigint = 3300 and (s ->> 'transactions')::int = 32 and (s -> 'by_kind' ->> 'sale')::bigint = 3100
+     from (select public.my_earnings_statement(extract(year from now())::int) as s) x));
+select pg_temp.raises('C3.5 más kimutatása nem kérhető', $$select public.earnings_statement_for('a4000000-0000-0000-0000-000000000001', 2026)$$, 'permission denied');
+select pg_temp.raises('C3.5 a DAC7-jelentés a kliensnek tilos', $$select * from public.dac7_report(2026)$$, 'permission denied');
+select pg_temp.admin();
+select pg_temp.note('C3.5 DAC7: 31 eladás → jelentendő; az ellenérték euróban (33 Coin × 3 € = 99 €)',
+  (select reportable and total_tx = 32 and total_eur_cents = 9900 from public.dac7_report(extract(year from now())::int)
+     where user_id = 'a4000000-0000-0000-0000-000000000006'));
+select pg_temp.note('C3.5 DAC7: a kevés eladású, 2000 € alatti alkotó kivétel',
+  (select not reportable from public.dac7_report(extract(year from now())::int) where user_id = 'a4000000-0000-0000-0000-000000000004'));
+select pg_temp.note('C3.5 DAC7: az alkotói alap és az ajánlói jutalék nem eladás (nincs a jelentésben)',
+  not exists (select 1 from public.dac7_report(extract(year from now())::int) where user_id = 'a4000000-0000-0000-0000-0000000000f1'));
+
 select pg_temp.note('invariáns: a napló összege = az egyenleg',
   not exists (select 1 from public.user_credits u where u.user_id::text like 'a4000000-%' and u.balance <>
     coalesce((select sum(delta_cents) from public.credit_transactions t where t.user_id = u.user_id), 0)));

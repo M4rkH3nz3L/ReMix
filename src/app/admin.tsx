@@ -32,6 +32,7 @@ import {
   type UserWithRole,
 } from '@/lib/roles';
 import { PayoutReviewList } from '@/components/admin/PayoutReviewList';
+import { downloadDac7 } from '@/lib/wallet';
 import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
 import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
@@ -51,6 +52,7 @@ export default function AdminScreen() {
   const canReview = useRoles((s) => s.permissions.includes('report.review'));
   const canSuspend = useRoles((s) => s.permissions.includes('user.suspend'));
   const canPayouts = useRoles((s) => s.permissions.includes('payout.review'));
+  const canFinance = useRoles((s) => s.permissions.includes('finance.manage'));
 
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [perms, setPerms] = useState<AppPermission[]>([]);
@@ -216,7 +218,7 @@ export default function AdminScreen() {
     });
   };
 
-  if (!canRole && !canUser && !canReview && !canPayouts) {
+  if (!canRole && !canUser && !canReview && !canPayouts && !canFinance) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <Header t={t} />
@@ -409,6 +411,21 @@ export default function AdminScreen() {
 
           {/* — Kifizetések kézi ellenőrzése (PRO-CASH C3.4) — */}
           {canPayouts ? <PayoutReviewList /> : null}
+
+          {/* — DAC7-export (PRO-CASH C3.5) — az előző év eladói bevétele — */}
+          {canFinance ? (
+            <Pressable
+              style={[styles.reportBtn, { marginTop: 18 }]}
+              onPress={() =>
+                downloadDac7(new Date().getFullYear() - 1).catch((e: unknown) => {
+                  logCaught('app/admin.tsx:dac7', e);
+                  Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+                })
+              }
+            >
+              <Text style={styles.reportBtnTextDim}>{t('admin.dac7Export', { year: new Date().getFullYear() - 1 })}</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       )}
     </SafeAreaView>

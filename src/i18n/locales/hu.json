@@ -107,6 +107,11 @@
       "claimedTitle": "Köszönjük!",
       "claimedMsg": "Az ajánlód jutalékot kap, ha előfizetsz. Neked ez semmibe nem kerül.",
       "error": { "referrer_not_found": "Nincs ilyen felhasználónév.", "cannot_refer_self": "Magadat nem adhatod meg.", "referral_already_set": "Az ajánlót már megadtad.", "referral_window_closed": "Az ajánló a regisztrációt követő 7 napon belül adható meg.", "referral_loop": "Kölcsönösen nem ajánlhatjátok egymást." }
+    },
+    "earnings": {
+      "title": "Bevételeim",
+      "statement": "{{year}}. évi kimutatás letöltése (CSV)",
+      "kind": { "sale": "eladás", "gift": "ajándék", "commission": "remix-jutalék", "referral": "ajánló", "fund": "alkotói alap" }
     }
   },
   "aiPicker": {
@@ -4728,7 +4733,8 @@
       "approve": "Jóváhagyás",
       "reject": "Elutasítás",
       "flag": { "ring": "körbeajándékozás", "new_accounts": "friss fiókoktól", "concentration": "egyetlen fizetőtől", "shared_device": "közös eszköz", "review": "visszatérítés utáni hiány" }
-    }
+    },
+    "dac7Export": "DAC7-export: {{year}} (CSV)"
   },
   "legal": {
     "privacyTitle": "Adatkezelési tájékoztató",

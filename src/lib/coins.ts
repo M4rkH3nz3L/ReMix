@@ -175,3 +175,23 @@ export function spendPlan(w: WalletBreakdown, cents: number): SpendPlan | null {
 export function canRequestPayout(w: WalletBreakdown, cents: number): boolean {
   return cents >= MIN_PAYOUT_CENTS && cents <= w.earnedAvailable;
 }
+
+/** Egy hónap bevétele forrásonként (cent-Coin) — a bevételi panelhez. */
+export interface EarningsMonth {
+  month: string;
+  byKind: Partial<Record<'sale' | 'gift' | 'commission' | 'referral' | 'fund', number>>;
+  totalCents: number;
+}
+
+/** A pénztárca `my_earnings` sorai hónaponként összefogva (legújabb elöl). */
+export function groupEarnings(rows: { month: string; kind: string; cents: number }[]): EarningsMonth[] {
+  const by = new Map<string, EarningsMonth>();
+  for (const r of rows) {
+    const m = by.get(r.month) ?? { month: r.month, byKind: {}, totalCents: 0 };
+    const k = r.kind as keyof EarningsMonth['byKind'];
+    m.byKind[k] = (m.byKind[k] ?? 0) + Number(r.cents || 0);
+    m.totalCents += Number(r.cents || 0);
+    by.set(r.month, m);
+  }
+  return [...by.values()].sort((a, b) => b.month.localeCompare(a.month));
+}

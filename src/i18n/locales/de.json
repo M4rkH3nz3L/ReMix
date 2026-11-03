@@ -107,6 +107,11 @@
       "claimedTitle": "Danke!",
       "claimedMsg": "Dein Werber erhält eine Provision, wenn du abonnierst. Dich kostet das nichts.",
       "error": { "referrer_not_found": "Diesen Benutzernamen gibt es nicht.", "cannot_refer_self": "Du kannst dich nicht selbst angeben.", "referral_already_set": "Du hast bereits einen Werber angegeben.", "referral_window_closed": "Ein Werber kann innerhalb von 7 Tagen nach der Registrierung angegeben werden.", "referral_loop": "Ihr könnt euch nicht gegenseitig werben." }
+    },
+    "earnings": {
+      "title": "Meine Einnahmen",
+      "statement": "Jahresübersicht {{year}} herunterladen (CSV)",
+      "kind": { "sale": "Verkäufe", "gift": "Geschenke", "commission": "Remix-Provision", "referral": "Empfehlungen", "fund": "Creator-Fonds" }
     }
   },
   "aiPicker": {
@@ -4733,7 +4738,8 @@
       "approve": "Freigeben",
       "reject": "Ablehnen",
       "flag": { "ring": "Geschenk-Ring", "new_accounts": "von neuen Konten", "concentration": "von einem einzigen Zahler", "shared_device": "gemeinsames Gerät", "review": "Fehlbetrag nach Erstattung" }
-    }
+    },
+    "dac7Export": "DAC7-Export: {{year}} (CSV)"
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",

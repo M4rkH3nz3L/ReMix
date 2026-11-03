@@ -2819,7 +2819,8 @@
       "assistCallFailed": "Az AI-asszisztens hívása nem sikerült."
     },
     "aiFetch": {
-      "timeout": "Az AI {{seconds}} másodperc alatt nem válaszolt. Ha a lokális modell fut, lehet, hogy még tölt vagy túlterhelt — próbáld újra, vagy állíts be ANTHROPIC_API_KEY-t a workeren."
+      "timeout": "Az AI {{seconds}} másodperc alatt nem válaszolt. Ha a lokális modell fut, lehet, hogy még tölt vagy túlterhelt — próbáld újra, vagy állíts be ANTHROPIC_API_KEY-t a workeren.",
+      "overloaded": "A saját AI most túlterhelt (kb. {{seconds}} mp várakozás). Próbáld újra, vagy használd a telefonos modellt, illetve a saját AI-kulcsodat (Profil → AI)."
     },
     "rpFile": {
       "nativeOnly": "A .rp csomagolás csak az appban érhető el (weben nem).",

@@ -2819,7 +2819,8 @@
       "assistCallFailed": "Der Aufruf des KI-Assistenten ist fehlgeschlagen."
     },
     "aiFetch": {
-      "timeout": "Die KI hat innerhalb von {{seconds}} Sekunden nicht geantwortet. Falls das lokale Modell läuft, lädt es vielleicht noch oder ist überlastet — versuch es erneut, oder setz ANTHROPIC_API_KEY auf dem Worker."
+      "timeout": "Die KI hat innerhalb von {{seconds}} Sekunden nicht geantwortet. Falls das lokale Modell läuft, lädt es vielleicht noch oder ist überlastet — versuch es erneut, oder setz ANTHROPIC_API_KEY auf dem Worker.",
+      "overloaded": "Unsere KI ist gerade ausgelastet (ca. {{seconds}} s Wartezeit). Versuche es erneut oder nutze das Modell auf dem Gerät bzw. deinen eigenen KI-Schlüssel (Profil → KI)."
     },
     "rpFile": {
       "nativeOnly": ".rp-Paketierung ist nur in der App verfügbar (nicht im Web).",

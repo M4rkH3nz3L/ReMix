@@ -2819,7 +2819,8 @@
       "assistCallFailed": "Calling the AI assistant failed."
     },
     "aiFetch": {
-      "timeout": "The AI did not respond within {{seconds}} seconds. If the local model is running, it may still be loading or overloaded — try again, or set ANTHROPIC_API_KEY on the worker."
+      "timeout": "The AI did not respond within {{seconds}} seconds. If the local model is running, it may still be loading or overloaded — try again, or set ANTHROPIC_API_KEY on the worker.",
+      "overloaded": "Our AI is busy right now (about {{seconds}} s wait). Try again, or use the on-device model or your own AI key (Profile → AI)."
     },
     "rpFile": {
       "nativeOnly": ".rp packaging is only available in the app (not on web).",

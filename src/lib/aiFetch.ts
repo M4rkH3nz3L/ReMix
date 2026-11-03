@@ -29,6 +29,20 @@ export class AiTimeoutError extends Error {
 }
 
 /**
+ * 🧠 A saját AI (ReMix AI / DGX Spark) épp túlterhelt (PRO-CASH 7.2, 503 `ai_overloaded`).
+ * A kerülőút: a telefonos modell vagy a saját kulcs (BYOK) — ha a user beállított kulcsot, a
+ * kliens azt küldi, és a szerver a sort meg sem kérdezi, így ez a hiba csak kulcs nélkül jön.
+ */
+export class AiOverloadedError extends Error {
+  readonly etaSec: number;
+  constructor(etaSec: number) {
+    super(tr('lib.aiFetch.overloaded', { seconds: etaSec }));
+    this.name = 'AiOverloadedError';
+    this.etaSec = etaSec;
+  }
+}
+
+/**
  * `fetch` időkorláttal. A megszakítást megkülönböztetjük a hálózati hibától,
  * mert a felhasználónak MÁS a teendője a kettőnél.
  */
@@ -78,7 +92,11 @@ export async function aiPostJson<T>(
   );
   const parsed = await res.json().catch((caught) => { logCaught('lib/aiFetch.ts:aiPostJson', caught); return {}; });
   if (!res.ok) {
-    throw new Error((parsed as { error?: string }).error ?? fallbackError);
+    const p = parsed as { error?: string; etaSec?: number };
+    if (res.status === 503 && p.error === 'ai_overloaded') {
+      throw new AiOverloadedError(Math.max(1, Math.trunc(Number(p.etaSec) || 30)));
+    }
+    throw new Error(p.error ?? fallbackError);
   }
   return parsed as T;
 }

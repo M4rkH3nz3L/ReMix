@@ -23,6 +23,7 @@ const {
   runCaptionStudio,
   runAssistant,
   runAutoEdit,
+  remixStatus,
 } = require('../ai');
 
 const { validate } = require('../lib/validate');
@@ -42,7 +43,7 @@ router.post('/ai/hooks', express.json({ limit: '256kb' }), ...authenticated({ me
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('Hook hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -70,7 +71,7 @@ router.post('/ai/translate', express.json({ limit: '512kb' }), ...proOnly, rateL
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('Translate hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -86,7 +87,7 @@ router.post('/ai/highlights', express.json({ limit: '512kb' }), ...proOnly, rate
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('Highlights hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -102,7 +103,7 @@ router.post('/ai/story', express.json({ limit: '512kb' }), ...proOnly, rateLimit
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('Story hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -118,7 +119,7 @@ router.post('/ai/thumbheadlines', express.json({ limit: '256kb' }), ...authentic
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('ThumbHeadline hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -134,7 +135,7 @@ router.post('/ai/captionstudio', express.json({ limit: '1mb' }), ...authenticate
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('CaptionStudio hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -150,7 +151,7 @@ router.post('/ai/assist', express.json({ limit: '2mb' }), ...authenticated({ met
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('AI hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
 });
 
@@ -166,8 +167,18 @@ router.post('/ai/autoedit', express.json({ limit: '2mb' }), ...proOnly, rateLimi
     .catch((err) => {
     logCaught('routes/ai.js', err);
       console.error('AutoEdit hiba:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message, ...(err.payload || {}) });
     });
+});
+
+// 🧠 A saját AI (Spark) állapota: konfigurálva, egészséges, sor — a felület ebből becsül várakozást.
+router.get('/ai/remix/health', async (_req, res) => {
+  try {
+    res.json(await remixStatus());
+  } catch (err) {
+    logCaught('routes/ai.js:remixHealth', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

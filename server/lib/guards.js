@@ -77,17 +77,19 @@ async function aiMeter(req, res, next) {
       next();
       return;
     }
-    if ((await aiProvider()) !== 'anthropic') {
+    // a MI költségünk: env-Anthropic és a saját ReMix AI (Spark); a lokális Ollama ingyenes
+    if (!['anthropic', 'remix'].includes(await aiProvider())) {
       next();
       return;
     }
     const uid = callerId(req, req.body && req.body.userId);
-    const gate = await enforceQuota(uid, await userTier(uid), 'aiTokens', 1);
+    const tier = await userTier(uid);
+    const gate = await enforceQuota(uid, tier, 'aiTokens', 1);
     if (!gate.ok) {
       res.status(429).json({ error: `Elérted a havi AI-token kvótád. Hátralévő: ${gate.remaining}.` });
       return;
     }
-    aiUsageContext.run({ uid }, () => next());
+    aiUsageContext.run({ uid, tier }, () => next());
   } catch (caught) {
     logCaught('lib/guards.js:aiMeter', caught);
     next(); // best-effort: a metering sosem blokkolja a funkciót hiba esetén

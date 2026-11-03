@@ -17,6 +17,20 @@ const MODEL = process.env.AI_MODEL || 'claude-opus-4-8';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const LOCAL_MODEL = process.env.LOCAL_AI_MODEL || 'qwen3:14b';
 
+// 🧠 Saját AI — „ReMix AI” (PRO-CASH 7., C5.3): a DGX Sparkon futó OpenAI-kompatibilis szerver
+// (vLLM / SGLang), privát hálózaton (WireGuard / Tailscale). A fizetős szintek ezt kapják, a mi
+// költségünkként mérve (aiTokens kvóta); a Free a telefonos modellt / saját kulcsot használja.
+// A gép véges kapacitás → prioritásos sor (server/aiQueue.js), túltelítéskor 503 + kerülőút.
+const { createAiQueue } = require('./aiQueue');
+const remixAiQueue = createAiQueue({
+  concurrency: Math.max(1, Number(process.env.REMIX_AI_MAX_CONCURRENCY) || 4),
+  maxQueue: Math.max(0, Number(process.env.REMIX_AI_QUEUE_MAX) || 32),
+});
+function remixAiConfig() {
+  const url = (process.env.REMIX_AI_URL || '').trim().replace(/\/+$/, '');
+  return url ? { baseUrl: url, model: process.env.REMIX_AI_MODEL || 'remix-default', apiKey: process.env.REMIX_AI_KEY || '' } : null;
+}
+
 /** csak az AI által szerkeszthető klip-mezők — ez a whitelist a validátor magja */
 const PatchSchema = z
   .object({
@@ -169,7 +183,44 @@ async function localAvailable() {
   return localProbe.ok;
 }
 
+/** a ReMix AI (Spark) elérhetősége — `GET /models`, rövid cache-sel (a /health gyors marad) */
+let remixProbe = { at: 0, ok: false, models: [] };
+async function remixAvailable() {
+  const cfg = remixAiConfig();
+  if (!cfg) {
+    return false;
+  }
+  if (Date.now() - remixProbe.at < 30 * 1000) {
+    return remixProbe.ok;
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${cfg.baseUrl}/models`, {
+      signal: controller.signal,
+      headers: cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {},
+    });
+    clearTimeout(timer);
+    const body = await res.json();
+    const models = (body.data ?? []).map((m) => m.id);
+    remixProbe = { at: Date.now(), ok: res.ok && models.includes(cfg.model), models };
+  } catch (caught) {
+    logCaught('ai.js:remixAvailable', caught);
+    remixProbe = { at: Date.now(), ok: false, models: [] };
+  }
+  return remixProbe.ok;
+}
+
+/** A ReMix AI állapota (egészség + sor) — a /ai/remix/health végponthoz. */
+async function remixStatus() {
+  const cfg = remixAiConfig();
+  return { configured: !!cfg, healthy: cfg ? await remixAvailable() : false, model: cfg ? cfg.model : null, queue: remixAiQueue.stats() };
+}
+
 async function aiProvider() {
+  if (await remixAvailable()) {
+    return 'remix';
+  }
   if (process.env.ANTHROPIC_API_KEY) {
     return 'anthropic';
   }
@@ -280,6 +331,11 @@ async function runOpenAICompatible(system, userContent, schema, cfg) {
   if (!safe.ok) {
     throw new Error(safe.error);
   }
+  return openAiCompatCall(system, userContent, schema, cfg);
+}
+
+/** Az OpenAI-kompatibilis hívás magja — a BYOK-út (SSRF-ellenőrzés után) és a ReMix AI (env) közös része. */
+async function openAiCompatCall(system, userContent, schema, cfg) {
   const base = cfg.baseUrl.replace(/\/+$/, '');
   const sys =
     `${system}\n\nVÁLASZ: kizárólag EGYETLEN JSON-objektum, ami megfelel ennek a ` +
@@ -337,6 +393,15 @@ async function runStructured(system, userContent, schema, aiConfig) {
     return r.data;
   }
   const provider = await aiProvider();
+  if (provider === 'remix') {
+    // 🧠 ReMix AI (Spark) = a MI költségünk → prioritásos sorban fut és meterelünk
+    const store = aiUsageContext.getStore();
+    const r = await remixAiQueue.run(store && store.tier, () => openAiCompatCall(system, userContent, schema, remixAiConfig()));
+    if (store && store.uid && r.tokens > 0) {
+      void trackUsage(store.uid, 'aiTokens', r.tokens);
+    }
+    return r.data;
+  }
   if (provider === 'anthropic') {
     // ☁️ env Anthropic = a MI felhő-token-költségünk → meterelünk (valós usage).
     const r = await runAnthropic(system, userContent, schema);
@@ -734,5 +799,7 @@ module.exports = {
   sanitizeAiConfig,
   aiAvailable,
   aiProvider,
+  remixStatus,
+  runStructured,
   LOCAL_MODEL,
 };

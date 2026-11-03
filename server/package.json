@@ -13,7 +13,8 @@
     "bugs": "node scripts/bugs-summary.js",
     "smoke:image": "node scripts/imagedoc-smoke.js",
     "smoke:audio": "node scripts/audio-smoke.js",
-    "perf:image": "node scripts/imagedoc-perf.js"
+    "perf:image": "node scripts/imagedoc-perf.js",
+    "bench:spark": "node --env-file-if-exists=.env scripts/spark-bench.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

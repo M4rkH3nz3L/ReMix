@@ -22,7 +22,7 @@ beforeEach(() => {
 describe('analyzeMix (A19)', () => {
   it('az aktuális mixet rendereli veszteségmentesen, és azt méri', async () => {
     await expect(analyzeMix(mix)).resolves.toMatchObject({ lufs: -14 });
-    expect(exportAudioFile).toHaveBeenCalledWith(mix, 'wav', undefined);
+    expect(exportAudioFile).toHaveBeenCalledWith(mix, 'wav', undefined, undefined);
     expect(analyzeAudio).toHaveBeenCalledWith('file:///media/mix.wav');
   });
 

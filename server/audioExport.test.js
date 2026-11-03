@@ -13,10 +13,19 @@ describe('audioExtractArgs (hang-export codec + minőség)', () => {
 
   test('WAV/FLAC = veszteségmentes (nincs -b:a)', () => {
     const wav = audioExtractArgs({ audioFormat: 'wav' });
-    expect(wav).toEqual({ ext: 'wav', args: ['-c:a', 'pcm_s16le'] });
+    expect(wav).toEqual({
+      ext: 'wav',
+      args: ['-c:a', 'pcm_s16le', '-af', 'aresample=dither_method=triangular,aformat=sample_fmts=s16'],
+    });
     const flac = audioExtractArgs({ audioFormat: 'flac' });
     expect(flac.ext).toBe('flac');
     expect(flac.args).not.toContain('-b:a');
+  });
+
+  test('24 bit kérhető, ilyenkor nincs 16 bites dither', () => {
+    expect(audioExtractArgs({ audioFormat: 'wav', bitDepth: 24 }).args).toEqual(['-c:a', 'pcm_s24le']);
+    expect(audioExtractArgs({ audioFormat: 'flac', bitDepth: 24 }).args).toContain('s32');
+    expect(audioExtractArgs({ audioFormat: 'mp3', bitDepth: 24 }).args).not.toContain('-af');
   });
 
   test('veszteséges formátumok per-formátum alap-bitrátája', () => {

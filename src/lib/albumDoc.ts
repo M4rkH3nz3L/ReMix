@@ -8,7 +8,7 @@
  *
  * SZÁNDÉKOSAN expo-mentes (csak típus-import) → tesztelhető. A `reorderPages`-mintát követi.
  */
-import type { AlbumDoc, AlbumSong, Asset, Track } from '@/types/project';
+import type { AlbumDoc, AlbumSong, Asset, Project, Track } from '@/types/project';
 import { buildAlbum, type AlbumManifest, type AlbumTrack } from './album';
 
 /** Album inicializálása a JELENLEGI idővonalból (az első szám = a mostani project.tracks). */
@@ -98,12 +98,32 @@ export function setCover(album: AlbumDoc, coverDocId: string | null): AlbumDoc {
   return { ...album, coverDocId: coverDocId ?? undefined };
 }
 
-/** A renderelt szám-fájl + hossz beírása (a megosztás előtti rasterizálás/render eredménye). */
-export function setSongRender(album: AlbumDoc, songId: string, uri: string, durationSec: number): AlbumDoc {
+/** A renderelt szám-fájl + hossz (+ a tartalom-kulcs) beírása (a megosztás előtti render eredménye). */
+export function setSongRender(album: AlbumDoc, songId: string, uri: string, durationSec: number, renderedKey?: string): AlbumDoc {
   return {
     ...album,
-    songs: album.songs.map((s) => (s.id === songId ? { ...s, renderedUri: uri, durationSec } : s)),
+    songs: album.songs.map((s) => (s.id === songId ? { ...s, renderedUri: uri, durationSec, renderedKey } : s)),
   };
+}
+
+/**
+ * A szám hangzását meghatározó tartalom kulcsa (A32): sávok + master + sáv-keverés. Ha a
+ * renderelt fájl kulcsa ettől eltér, a szám a render óta változott.
+ */
+export function songRenderKey(tracks: Track[], mix: Pick<Project, 'audioMaster' | 'trackMix'>): string {
+  const text = JSON.stringify({ tracks, audioMaster: mix.audioMaster ?? null, trackMix: mix.trackMix ?? null });
+  // FNV-1a 32 bit: elég az elavulás-észleléshez, nem biztonsági célú
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${text.length.toString(36)}-${hash.toString(36)}`;
+}
+
+/** Kell-e (újra) renderelni a számot: nincs render, vagy nem a mostani tartalomból készült. */
+export function songNeedsRender(song: AlbumSong, currentKey: string): boolean {
+  return !song.renderedUri || song.renderedKey !== currentKey;
 }
 
 /** Hány számnak van már renderelt hangja (a megosztáshoz). */

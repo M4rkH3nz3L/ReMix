@@ -16,10 +16,10 @@ import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
 import { mixForExport } from '@/lib/audioExportMix';
-import { exportAudioFile } from '@/lib/render';
+import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
-import { withProgress } from '@/store/progressStore';
+import { withCancellableProgress } from '@/store/progressStore';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
 
@@ -112,12 +112,17 @@ export default function AudioStudioScreen() {
     }
     return guardPro(
       () =>
-        withProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report) =>
-          exportAudioFile(mix, format, report).then((url) => {
+        // A29: a ✕ a szerveren futó menetet is leállítja
+        withCancellableProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report, signal) =>
+          exportAudioFile(mix, format, report, signal).then((url) => {
             Linking.openURL(url).catch((caught) => { logCaught('app/studio/audio/[id].tsx:downloadAudio', caught); });
           })
         ),
-      (e) => Alert.alert(t('studio.export'), e.message)
+      (e) => {
+        if (!isRenderCancelledError(e)) {
+          Alert.alert(t('studio.export'), e.message);
+        }
+      }
     );
   };
 

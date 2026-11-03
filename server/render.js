@@ -434,10 +434,10 @@ function audioEncoderArgs(settings) {
 // A kivonás egy KÜLÖN, egyszerű ffmpeg-menet (`-vn`) → a videó-filtergraph
 // érintetlen (biztonságos). Kulcs = `settings.audioFormat`.
 const AUDIO_FORMATS = {
-  wav: { ext: 'wav', lossy: false, codec: ['-c:a', 'pcm_s16le'] },
+  wav: { ext: 'wav', lossy: false, codec: ['-c:a', 'pcm_s16le'], codec24: ['-c:a', 'pcm_s24le'] },
   mp3: { ext: 'mp3', lossy: true, codec: ['-c:a', 'libmp3lame'], defaultKbps: 192 },
   aac: { ext: 'm4a', lossy: true, codec: ['-c:a', 'aac'], defaultKbps: 256 },
-  flac: { ext: 'flac', lossy: false, codec: ['-c:a', 'flac'] },
+  flac: { ext: 'flac', lossy: false, codec: ['-c:a', 'flac'], codec24: ['-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24'] },
   opus: { ext: 'opus', lossy: true, codec: ['-c:a', 'libopus'], defaultKbps: 192 },
 };
 
@@ -452,7 +452,12 @@ function audioExtractArgs(settings = {}) {
   if (!fmt) {
     return null;
   }
-  const args = [...fmt.codec];
+  // a veszteségmentes kimenet a lebegőpontos mixből: 16 biten dither (TPDF), 24 bit kérhető
+  const deep = !fmt.lossy && Number(settings.bitDepth) === 24;
+  const args = [...(deep ? fmt.codec24 : fmt.codec)];
+  if (!fmt.lossy && !deep) {
+    args.push('-af', 'aresample=dither_method=triangular,aformat=sample_fmts=s16');
+  }
   if (fmt.lossy) {
     const kbps = Math.max(32, Math.min(512, Math.round(Number(settings.audioBitrateKbps) || fmt.defaultKbps)));
     args.push('-b:a', `${kbps}k`);
@@ -482,14 +487,18 @@ function gifArgs(settings = {}) {
 
 // 🎚️ MASTER 1. menet: a master-gráf (EQ+multiband) + loudnorm MÉRÉS (JSON a
 // stderr-en) → a mért Integrated/TP/LRA/thresh/offset.
-function measureLoudnorm(inFile, graphStr, I, TP, LRA) {
+function measureLoudnorm(inFile, graphStr, I, TP, LRA, signal) {
   return new Promise((resolve, reject) => {
     const fc = `${graphStr};[mst]loudnorm=I=${I}:TP=${TP}:LRA=${LRA}:print_format=json[a]`;
     execFile(
       'ffmpeg',
       ['-hide_banner', '-nostats', '-i', inFile, '-filter_complex', fc, '-map', '[a]', '-f', 'null', '-'],
-      { timeout: 10 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 },
+      { timeout: 10 * 60 * 1000, maxBuffer: 8 * 1024 * 1024, ...(signal ? { signal } : {}) },
       (_e, _o, stderr) => {
+        if (signal && signal.aborted) {
+          reject(new Error('render megszakítva'));
+          return;
+        }
         const m = /\{[\s\S]*?"input_i"[\s\S]*?\}/.exec(stderr || '');
         if (!m) {
           reject(new Error('loudnorm mérés sikertelen'));
@@ -514,22 +523,27 @@ function measureLoudnorm(inFile, graphStr, I, TP, LRA) {
 // `loudnorm` maga true-peak-limitál a `TP`-re (linear mód clip esetén dinamikusra
 // vált), így a záró limiter redundáns volt ÉS rontotta a LUFS-pontosságot.
 // Mérés (48 kHz sztereó pink, cél −14): kimenet −14.00 LUFS · −2.25 dBTP.
-async function applyMaster(inFile, master, workDir, total, onProgress) {
+/**
+ * A master második menete. Hangexportnál a köztes fájl hang-only lebegőpontos PCM, így a
+ * mesterelés nem kódol veszteségesen; videónál a hang a beállított minőséggel kódolódik.
+ */
+async function applyMaster(inFile, master, workDir, total, onProgress, { audioOnly = false, settings = {}, signal } = {}) {
   const I = master.lufs;
   const TP = master.truePeak;
   const LRA = masterLra(master.dynamics);
   const graphStr = masterGraph(master, 'mst');
-  const m = await measureLoudnorm(inFile, graphStr, I, TP, LRA);
+  const m = await measureLoudnorm(inFile, graphStr, I, TP, LRA, signal);
   const fc =
     `${graphStr};[mst]loudnorm=I=${I}:TP=${TP}:LRA=${LRA}` +
     `:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}` +
-    `:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true[a]`;
+    `:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,` +
+    // a loudnorm belül 192 kHz-re mintavételez; vissza a mix rátájára (különben 96/192 kHz-es export)
+    `aresample=${Number(settings.sampleRate) || 44100}[a]`;
   const out = path.join(workDir, `mastered${path.extname(inFile)}`);
-  await runFfmpegWithProgress(
-    ['-y', '-i', inFile, '-filter_complex', fc, '-map', '[a]', '-map', '0:v', '-c:v', 'copy', out],
-    total,
-    onProgress
-  );
+  const streams = audioOnly
+    ? ['-map', '[a]', '-c:a', 'pcm_f32le']
+    : ['-map', '[a]', '-map', '0:v', '-c:v', 'copy', ...audioEncoderArgs(settings)];
+  await runFfmpegWithProgress(['-y', '-i', inFile, '-filter_complex', fc, ...streams, out], total, onProgress, signal);
   return out;
 }
 
@@ -2925,44 +2939,52 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     `${audioLabels.map((l) => `[${l}]`).join('')}amix=inputs=${audioLabels.length}:duration=first:normalize=0[aout]`
   );
 
+  // 🎧 hang-only export (WAV/MP3/AAC/FLAC/Opus, PRO-AUDIO A25): a mix videó nélkül, lebegőpontos
+  // PCM-ként kerül a köztes fájlba, így a veszteségmentes kimenet valóban az; a kép nem kódolódik
+  const audio = audioExtractArgs(settings);
+  if (audio) {
+    graph.push('[vout]nullsink');
+    // mintapontos hossz: a `-t` a PCM-csomag (1024 minta) határán vágna
+    const last = graph.length - 2;
+    graph[last] = graph[last].replace(/\[aout\]$/, `,atrim=end=${total.toFixed(6)}[aout]`);
+  }
+
   const scriptFile = path.join(workDir, 'filtergraph.txt');
   fs.writeFileSync(scriptFile, graph.join(';\n'));
 
   // ProRes-t .mov konténerbe (az mp4 nem szabványos hozzá)
-  const outFile = path.join(workDir, settings.codec === 'prores' ? 'out.mov' : 'out.mp4');
+  const outFile = path.join(workDir, audio ? 'out.mka' : settings.codec === 'prores' ? 'out.mov' : 'out.mp4');
+  const streams = audio
+    ? ['-map', '[aout]', '-c:a', 'pcm_f32le']
+    : ['-map', '[vout]', '-map', '[aout]', ...videoEncoderArgs(settings, FPS, CRF), ...audioEncoderArgs(settings)];
   const args = [
     '-y',
     ...inputs.flat(),
     '-filter_complex_script', scriptFile,
-    '-map', '[vout]',
-    '-map', '[aout]',
-    ...videoEncoderArgs(settings, FPS, CRF),
-    ...audioEncoderArgs(settings),
+    ...streams,
     '-t', total.toFixed(3),
-    '-movflags', '+faststart',
+    ...(audio ? [] : ['-movflags', '+faststart']),
     outFile,
   ];
   await runFfmpegWithProgress(args, total, onProgress, signal);
 
-  // 🎚️ MASTER (kétmenetes): EQ + multiband + loudnorm(mért, linear) + alimiter a
-  // kész keverékre. Hiba esetén a mester NÉLKÜLI kimenet marad (nem bukik a render).
+  // 🎚️ MASTER (kétmenetes): EQ + multiband + loudnorm(mért, linear) a kész keverékre. A hiba
+  // a render hibája (A30): a mester nélküli fájl hibás hangosságú volna, jelzés nélkül.
   let masteredFile = outFile;
   if (project.audioMaster) {
-    masteredFile = await applyMaster(outFile, project.audioMaster, workDir, total, onProgress).catch(
-      (e) => {
+    masteredFile = await applyMaster(outFile, project.audioMaster, workDir, total, onProgress, {
+      audioOnly: !!audio,
+      settings,
+      signal,
+    }).catch((e) => {
       logCaught('render.js:renderProject', e);
-        console.error('Master hiba — a mester nélküli kimenet marad:', e.message);
-        return outFile;
-      }
-    );
+      throw new Error(signal && signal.aborted ? 'render megszakítva' : `A mesterelés nem sikerült: ${e.message}`);
+    });
   }
 
-  // 🎧 hang-only export (WAV/MP3/AAC/FLAC/Opus): a (masterelt) MP4-ből KIVONÁS +
-  // minőség (bitráta/sample-rate/csatorna) a settings-ből.
-  const audio = audioExtractArgs(settings);
   if (audio) {
     const audioFile = path.join(workDir, `out.${audio.ext}`);
-    await runFfmpegWithProgress(['-y', '-i', masteredFile, '-vn', ...audio.args, audioFile], total, onProgress);
+    await runFfmpegWithProgress(['-y', '-i', masteredFile, ...audio.args, audioFile], total, onProgress, signal);
     return audioFile;
   }
 

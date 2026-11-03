@@ -10,6 +10,7 @@
 const MUSIC = 'smoke:music'; // 3 mp szinusz 220 Hz
 const VOICE = 'smoke:voice'; // 3 mp szinusz 660 Hz
 const SFX = 'smoke:sfx'; // 1 mp szinusz 440 Hz
+const NOISE = 'smoke:noise'; // 3 mp szélessávú zaj (FLAC) — a veszteségmentesség null-tesztjéhez
 const DUR = 3;
 
 function clip(uri, over = {}) {
@@ -140,6 +141,11 @@ function buildSmokeProjects() {
       ]),
     },
     {
+      name: 'lossless',
+      description: 'Szélessávú zaj, effekt nélkül: a WAV/FLAC export a forrással egyezik (A25).',
+      project: project('lossless', [music([clip(NOISE)])]),
+    },
+    {
       name: 'duck-off',
       description: 'A duck-mérés referenciája: zene + beszéd, duck nélkül.',
       project: project('duckoff', [music([clip(MUSIC)]), voice([clip(VOICE, { id: 'v1', source: 'imported' })])]),
@@ -209,4 +215,4 @@ function mediaUrisOf(p) {
   return [...out];
 }
 
-module.exports = { buildSmokeProjects, mediaUrisOf, SMOKE_AUDIO: { MUSIC, VOICE, SFX }, DUR };
+module.exports = { buildSmokeProjects, mediaUrisOf, SMOKE_AUDIO: { MUSIC, VOICE, SFX, NOISE }, DUR };

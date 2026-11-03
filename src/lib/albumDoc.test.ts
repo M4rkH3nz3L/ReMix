@@ -1,4 +1,6 @@
 import {
+  songNeedsRender,
+  songRenderKey,
   activeSong,
   addSong,
   albumManifest,
@@ -101,3 +103,33 @@ describe('albumDoc — album-manifeszt CRUD', () => {
     expect(m.tracks.map((t) => t.title)).toEqual(['Dal A', 'Dal C']);
   });
 });
+
+describe('albumDoc — elavult render (A32)', () => {
+  const mix = { audioMaster: undefined, trackMix: undefined };
+
+  it('a kulcs a tartalommal együtt változik', () => {
+    const a = tracks('x');
+    expect(songRenderKey(a, mix)).toBe(songRenderKey(tracks('x'), mix));
+    expect(songRenderKey(a, mix)).not.toBe(songRenderKey(tracks('y'), mix));
+    expect(songRenderKey(a, mix)).not.toBe(
+      songRenderKey(a, { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' }, trackMix: undefined })
+    );
+  });
+
+  it('render nélküli vagy szerkesztett szám újrarenderelendő, a friss nem', () => {
+    const t = tracks('x');
+    const key = songRenderKey(t, mix);
+    expect(songNeedsRender({ ...song('a'), renderedUri: undefined }, key)).toBe(true);
+    expect(songNeedsRender({ ...song('a'), renderedUri: 'file:///a.flac', renderedKey: key }, key)).toBe(false);
+    expect(songNeedsRender({ ...song('a'), renderedUri: 'file:///a.flac', renderedKey: key }, songRenderKey(tracks('y'), mix))).toBe(true);
+    // régi, kulcs nélküli render: nem tudni, mit tartalmaz
+    expect(songNeedsRender({ ...song('a'), renderedUri: 'file:///a.flac' }, key)).toBe(true);
+  });
+
+  it('a setSongRender a kulcsot is eltárolja', () => {
+    const album = initAlbum(song('a'));
+    const out = setSongRender(album, 'a', 'file:///a.flac', 3, 'k1');
+    expect(out.songs[0]).toMatchObject({ renderedUri: 'file:///a.flac', durationSec: 3, renderedKey: 'k1' });
+  });
+});
+

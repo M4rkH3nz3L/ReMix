@@ -46,7 +46,8 @@ import { photoBytesPerPixel } from '@/components/studio/image/exportEstimate';
 import { readExportFacts } from '@/components/studio/image/exportVerify';
 import { expectsAlpha, exportProblems, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { customExportSize, formatBytes } from '@/lib/imageExport';
-import { ingestImageFile, probeAudioDuration } from '@/lib/media';
+import { downloadToCache, ingestImageFile, probeAudioDuration } from '@/lib/media';
+import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
 import { analyzeMix } from '@/lib/analyzeMix';
 import { mixForExport } from '@/lib/audioExportMix';
 import { classifyAudioIntake } from '@/lib/audioIntake';
@@ -2400,6 +2401,30 @@ async function smokeAudioMix(log: Log) {
   const drop = (full?.lufs ?? 0) - (half?.lufs ?? 0);
   log(Math.abs(drop - 6) < 1, 'A19 a master-hangerő a mért értékben is látszik', `${drop.toFixed(1)} dB esés`);
   log(mixForExport(project, () => false, 1) === null, 'A15 némított projektből nincs export');
+
+  // A32 album-út: veszteségmentes render, helyi fájlba letöltve (nem lejáró link)
+  const url = await exportAudioFile(project, 'flac');
+  const local = await downloadToCache(url, 'smoke_album.flac');
+  const localDur = local ? await probeAudioDuration(local) : 0;
+  log(!!local && local.startsWith('file:') && !local.includes('?t='), 'A32 a szám helyi fájlként marad meg', local?.split('/').pop());
+  log(Math.abs(localDur - 3) < 0.1, 'A32 a letöltött FLAC teljes hosszú', `${localDur.toFixed(2)} s`);
+  if (local) {
+    new File(local).delete();
+  }
+
+  // A29: a ✕ a futó exportot leállítja, nem jön kész fájl
+  const long: Project = {
+    ...project,
+    tracks: project.tracks.map((tr) =>
+      tr.type === 'music' ? { ...tr, clips: Array.from({ length: 8 }, (_, i) => ({ ...clip, id: `smoke-long-${i}`, start: i * 3 })) } : tr
+    ),
+  };
+  const controller = new AbortController();
+  const started = Date.now();
+  const pending = exportAudioFile(long, 'wav', undefined, controller.signal);
+  setTimeout(() => controller.abort(), 1500);
+  const outcome = await pending.then(() => 'kész fájl', (e: Error) => (isRenderCancelledError(e) ? 'megszakítva' : e.message));
+  log(outcome === 'megszakítva', 'A29 a megszakítás leállítja az exportot', `${outcome}, ${Date.now() - started} ms`);
   new File(uri).delete();
 }
 

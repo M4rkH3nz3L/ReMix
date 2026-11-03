@@ -21,7 +21,7 @@ import { palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
 import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
-import { setActiveSong, setSongRender, songCount } from '@/lib/albumDoc';
+import { setActiveSong, setSongRender, songCount, songNeedsRender, songRenderKey } from '@/lib/albumDoc';
 import { buildAlbumVideoProject } from '@/lib/albumShare';
 import {
   barsBeatsLabel,
@@ -39,10 +39,15 @@ import {
 } from '@/lib/audioTransport';
 import { zoomIndexForPinch } from '@/lib/audioTimelineGestures';
 import { publishRenderedProject } from '@/lib/feed';
+import type { ProgressUpdate } from '@/lib/progress';
+import type { PostVisibility } from '@/types/social';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
-import { exportAudioFile } from '@/lib/render';
+import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
+import { mixForExport } from '@/lib/audioExportMix';
+import { guardPro } from '@/store/paywallStore';
+import { withCancellableProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
@@ -55,7 +60,7 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
 import { UNREADABLE_DURATION_MESSAGE } from '@/lib/audioIntake';
-import { persistToLibrary, probeAudioDuration } from '@/lib/media';
+import { downloadToCache, persistToLibrary, probeAudioDuration } from '@/lib/media';
 import { logCaught } from '@/lib/logCaught';
 
 const LANE_H = 70;
@@ -428,46 +433,81 @@ export function AudioStudioBody({
    * a workeren renderelem (swap az adott számra → audio-export → renderedUri), majd a borító +
    * a számok ALBUM-VIDEÓvá állnak össze (`buildAlbumVideoProject`) és a megszokott videó-úton
    * posztolódnak. Az IMPORTÁLT számok már „renderelt"-ek (a fájl maga), így azonnal mennek.
+   * A32: a render óta szerkesztett szám újra renderelődik, a hang veszteségmentes és helyi
+   * fájlként marad meg (nem lejáró linkként), hiba után is az eredeti szám aktív.
    */
-  const shareAlbum = async () => {
+  const renderAlbumSongs = async (report: (u: ProgressUpdate) => void, signal: AbortSignal) => {
     const store = useEditorStore.getState();
-    if (!store.project?.album || albumSharing) {
+    const album0 = store.project!.album!;
+    const originalActive = album0.activeSongId;
+    try {
+      for (const s of album0.songs) {
+        // váltás a számra → a project.tracks ezt tükrözi → audio-render
+        store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, s.id) });
+        const p = useEditorStore.getState().project!;
+        const key = songRenderKey(p.tracks, p);
+        const song = p.album!.songs.find((x) => x.id === s.id)!;
+        if (!songNeedsRender(song, key)) {
+          continue;
+        }
+        const st = useEditorStore.getState();
+        const mix = mixForExport(p, st.isTrackAudible, st.masterVolume);
+        if (!mix) {
+          throw new Error(t('studio.audio.album.silentSong', { name: s.name }));
+        }
+        const url = await exportAudioFile(mix, 'flac', report, signal);
+        const local = await downloadToCache(url, `album_${s.id}.flac`);
+        if (!local) {
+          throw new Error(t('studio.audio.album.downloadFailed', { name: s.name }));
+        }
+        store.dispatch({
+          type: 'APPLY_ALBUM',
+          album: setSongRender(useEditorStore.getState().project!.album!, s.id, local, projectDuration(p), key),
+        });
+      }
+    } finally {
+      // vissza az eredeti aktív számra — hibánál és megszakításnál is
+      store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, originalActive) });
+    }
+  };
+
+  const shareAlbum = async (visibility: PostVisibility) => {
+    if (!useEditorStore.getState().project?.album || albumSharing) {
       return;
     }
     setAlbumSharing(true);
     try {
-      const album0 = store.project.album;
-      const originalActive = album0.activeSongId;
-      for (const s of album0.songs) {
-        if (s.renderedUri) {
-          continue;
+      await guardPro(
+        () =>
+          withCancellableProgress(t('studio.audio.album.rendering'), async (report, signal) => {
+            await renderAlbumSongs(report, signal);
+            const albumProject = buildAlbumVideoProject(useEditorStore.getState().project!);
+            if (!albumProject) {
+              Alert.alert(t('common.error', { defaultValue: 'Hiba' }), t('studio.audio.album.needCover', { defaultValue: 'Az albumhoz borító és legalább egy renderelt szám kell.' }));
+              return;
+            }
+            await publishRenderedProject(albumProject, report, { visibility });
+            Alert.alert(t('studio.audio.album.doneTitle', { defaultValue: 'Megosztva' }), t('studio.audio.album.doneBody', { defaultValue: 'Az album felkerült a feedbe.' }));
+          }),
+        (e) => {
+          logCaught('components/studio/audio/AudioStudioBody.tsx:shareAlbum', e);
+          if (!isRenderCancelledError(e)) {
+            Alert.alert(t('common.error', { defaultValue: 'Hiba' }), e.message);
+          }
         }
-        // váltás a számra → a project.tracks ezt tükrözi → audio-render
-        store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, s.id) });
-        const p = useEditorStore.getState().project!;
-        const url = await exportAudioFile(p, 'aac');
-        store.dispatch({
-          type: 'APPLY_ALBUM',
-          album: setSongRender(useEditorStore.getState().project!.album!, s.id, url, projectDuration(p)),
-        });
-      }
-      // vissza az eredeti aktív számra
-      store.dispatch({ type: 'APPLY_ALBUM', album: setActiveSong(useEditorStore.getState().project!.album!, originalActive) });
-
-      const albumProject = buildAlbumVideoProject(useEditorStore.getState().project!);
-      if (!albumProject) {
-        Alert.alert(t('common.error', { defaultValue: 'Hiba' }), t('studio.audio.album.needCover', { defaultValue: 'Az albumhoz borító és legalább egy renderelt szám kell.' }));
-        return;
-      }
-      await publishRenderedProject(albumProject, undefined, { visibility: 'public' });
-      Alert.alert(t('studio.audio.album.doneTitle', { defaultValue: 'Megosztva' }), t('studio.audio.album.doneBody', { defaultValue: 'Az album felkerült a feedbe.' }));
-    } catch (e) {
-      logCaught('components/studio/audio/AudioStudioBody.tsx:shareAlbum', e);
-      Alert.alert(t('common.error', { defaultValue: 'Hiba' }), (e as Error).message);
+      );
     } finally {
       setAlbumSharing(false);
     }
   };
+
+  // A32: a közzététel nem indul megerősítés nélkül, és a láthatóság választható
+  const confirmShareAlbum = () =>
+    Alert.alert(t('studio.audio.album.confirmTitle'), t('studio.audio.album.confirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('studio.audio.album.shareFollowers'), onPress: () => void shareAlbum('followers') },
+      { text: t('studio.audio.album.sharePublic'), onPress: () => void shareAlbum('public') },
+    ]);
 
   // a nyitott inline lap (a többi workspace vagy modális — azok nem nyomják össze a sávokat)
   const inlineSheet: AudioSheetId | null =
@@ -528,7 +568,7 @@ export function AudioStudioBody({
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
       }}
-      onShareAlbum={() => void shareAlbum()}
+      onShareAlbum={confirmShareAlbum}
       frame={sheetFrame}
     />
   );

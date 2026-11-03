@@ -15,6 +15,8 @@ import { AUDIO_MASTER_TARGETS, masterPreset } from '@/lib/audioMaster';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
+import { withCancellableProgress } from '@/store/progressStore';
+import { isRenderCancelledError } from '@/lib/render';
 import type { AudioMaster, AudioMasterDynamics, TrackType } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
@@ -59,11 +61,19 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
     }
     setAnalyzing(true);
     guardPro(
-      () => analyzeMix(mix).then((r) => {
-        setStats(r);
-        setSpectrum(r.spectrum ?? null);
-      }),
-      (e) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); Alert.alert(t('studio.master.analyze'), e.message); }
+      () =>
+        withCancellableProgress(t('studio.master.analyze'), (report, signal) =>
+          analyzeMix(mix, report, signal).then((r) => {
+            setStats(r);
+            setSpectrum(r.spectrum ?? null);
+          })
+        ),
+      (e) => {
+        logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e);
+        if (!isRenderCancelledError(e)) {
+          Alert.alert(t('studio.master.analyze'), e.message);
+        }
+      }
     )
       .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); })
       .finally(() => setAnalyzing(false));

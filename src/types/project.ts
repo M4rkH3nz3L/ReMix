@@ -1572,6 +1572,8 @@ export interface AlbumSong {
   durationSec?: number;
   /** a szám renderelt hangja (helyi uri) — a megosztáskor ez megy az albumba */
   renderedUri?: string;
+  /** a `renderedUri` melyik tartalomból készült (`songRenderKey`) — elavulás-észlelés */
+  renderedKey?: string;
   /** a feltöltött publikus URL (feed/album-poszt) */
   renderedUrl?: string;
 }

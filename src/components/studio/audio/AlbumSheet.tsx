@@ -7,20 +7,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
-import {
-  activeSong,
-  addSong,
-  canRemoveSong,
-  initAlbum,
-  makeSong,
-  removeSong,
-  renameSong,
-  renderedSongCount,
-  reorderSongs,
-  setActiveSong,
-  setCover,
-  songCount,
-} from '@/lib/albumDoc';
+import { activeSong, addSong, canRemoveSong, initAlbum, makeSong, removeSong, renameSong, renderedSongCount, reorderSongs, setActiveSong, setCover, songCount, songRenderKey } from '@/lib/albumDoc';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
 import { pickAudio, pickImage } from '@/lib/media';
@@ -85,7 +72,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
         kind: 'audio',
         id: makeId('clip'),
         start: 0,
-        duration: picked.duration > 0 ? picked.duration : 10,
+        duration: picked.duration,
         uri: picked.uri,
         label: picked.name,
         volume: 1,
@@ -100,7 +87,9 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
           { id: makeId('ast'), kind: 'audio', uri: picked.uri, provider: 'local', name: picked.name, duration: picked.duration },
         ]),
         renderedUri: picked.uri,
-        durationSec: picked.duration > 0 ? picked.duration : 10,
+        // a nyers fájl a semleges keverésnek felel meg: master vagy sáv-keverés mellett renderelendő
+        renderedKey: songRenderKey(tracks, { audioMaster: undefined, trackMix: undefined }),
+        durationSec: picked.duration,
       };
       apply(addSong(album, s), `Szám importálva: ${picked.name}`);
     } finally {

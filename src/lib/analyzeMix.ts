@@ -14,9 +14,10 @@ import type { Project } from '@/types/project';
  */
 export async function analyzeMix(
   mix: Project,
-  onProgress?: (update: ProgressUpdate) => void
+  onProgress?: (update: ProgressUpdate) => void,
+  signal?: AbortSignal
 ): Promise<LoudnessStats> {
-  const url = await exportAudioFile(mix, 'wav', onProgress);
+  const url = await exportAudioFile(mix, 'wav', onProgress, signal);
   const local = await downloadToCache(url, `analyze_${mix.id}.wav`);
   if (!local) {
     throw new Error('mix_download_failed');

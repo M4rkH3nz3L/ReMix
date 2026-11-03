@@ -52,6 +52,11 @@ function generateMedia(dir) {
     [SMOKE_AUDIO.MUSIC]: mk('music', 220, DUR),
     [SMOKE_AUDIO.VOICE]: mk('voice', 660, DUR),
     [SMOKE_AUDIO.SFX]: mk('sfx', 440, 1),
+    [SMOKE_AUDIO.NOISE]: (() => {
+      const f = path.join(dir, 'noise.flac');
+      ffmpeg(['-f', 'lavfi', '-i', `anoisesrc=color=pink:amplitude=0.3:duration=${DUR}:seed=7`, '-ar', '44100', '-ac', '2', '-c:a', 'flac', f]);
+      return f;
+    })(),
   };
 }
 
@@ -107,6 +112,22 @@ function channelRms(file) {
     }
   }
   return rms;
+}
+
+/**
+ * Null-teszt (PRO-AUDIO A25): az exportból kivonva a forrást, a maradék szintje (dB).
+ * Veszteségmentes láncnál a kerekítési zaj szintje (~−90 dB), veszteséges köztesnél ~−40.
+ */
+function residualDb(file, source) {
+  const r = spawnSync('ffmpeg', [
+    '-i', file, '-i', source, '-filter_complex',
+    '[0]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a];' +
+      '[1]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=-1[b];' +
+      '[a][b]amix=inputs=2:normalize=0:duration=shortest,atrim=start=0.2:end=2.8,volumedetect',
+    '-f', 'null', '-',
+  ], { encoding: 'utf8', maxBuffer: 1 << 24 });
+  const m = /mean_volume: (-?[\d.]+|-inf) dB/.exec(r.stderr || '');
+  return m ? (m[1] === '-inf' ? -Infinity : Number(m[1])) : NaN;
 }
 
 /** dB formázás (−∞ a némának) */
@@ -230,6 +251,17 @@ async function main() {
       const meas = { ...p, lufs, tp, rms };
       if (name === 'baseline') {
         baseline = meas;
+      }
+      if (name === 'lossless') {
+        if (FMT === 'wav' || FMT === 'flac') {
+          const residual = residualDb(out, mediaFiles[SMOKE_AUDIO.NOISE]);
+          log(`null-teszt (export − forrás): ${db(residual)} dB`);
+          if (!(residual < -70)) {
+            manifest.push({ name: 'lossless-null', ok: false, residual });
+            log('✗ a veszteségmentes export nem egyezik a forrással (veszteséges köztes?)');
+            ok -= 1;
+          }
+        }
       }
       const verdict = evalExpect(expect, meas, baseline);
       const mark = verdict.ok ? '✓' : '✗';

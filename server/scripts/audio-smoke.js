@@ -193,8 +193,9 @@ function evalExpect(expect, meas, baseline) {
   if (expect.durationSec != null && Math.abs(meas.durationSec - expect.durationSec) > 0.3) {
     return { ok: false, note: `hossz ${meas.durationSec.toFixed(2)}≠${expect.durationSec}` };
   }
-  if (expect.channels != null && meas.channels !== expect.channels) {
-    return { ok: false, note: `csatorna ${meas.channels}≠${expect.channels}` };
+  const wantChannels = CH || expect.channels;
+  if (expect.channels != null && meas.channels !== wantChannels) {
+    return { ok: false, note: `csatorna ${meas.channels}≠${wantChannels}` };
   }
   if (expect.quieterThan && baseline && Number.isFinite(meas.lufs) && Number.isFinite(baseline.lufs)) {
     return meas.lufs < baseline.lufs - 1
@@ -253,7 +254,8 @@ async function main() {
         baseline = meas;
       }
       if (name === 'lossless') {
-        if (FMT === 'wav' || FMT === 'flac') {
+        // a null-teszt az alap kimenetre (44.1 kHz sztereó) érvényes
+        if ((FMT === 'wav' || FMT === 'flac') && !SR && !CH) {
           const residual = residualDb(out, mediaFiles[SMOKE_AUDIO.NOISE]);
           log(`null-teszt (export − forrás): ${db(residual)} dB`);
           if (!(residual < -70)) {

@@ -447,13 +447,19 @@ const AUDIO_FORMATS = {
  * alap), a veszteségmentesek (wav/flac) nem. A `sampleRate` (`-ar`) és `channels` (`-ac`)
  * mindkettőre érvényes. `null`, ha nincs/ismeretlen audioFormat. (pure → tesztelhető)
  */
+/** csak ismert mintavétel jut az ffmpeg-ig (a kliens beállítása nem megbízható) */
+function safeSampleRate(settings = {}) {
+  const rate = Number(settings.sampleRate);
+  return [22050, 32000, 44100, 48000, 88200, 96000].includes(rate) ? rate : null;
+}
+
 function audioExtractArgs(settings = {}) {
   const fmt = AUDIO_FORMATS[settings.audioFormat];
   if (!fmt) {
     return null;
   }
   // a veszteségmentes kimenet a lebegőpontos mixből: 16 biten dither (TPDF), 24 bit kérhető
-  const deep = !fmt.lossy && Number(settings.bitDepth) === 24;
+  const deep = !fmt.lossy && Number(settings.audioBitDepth) === 24;
   const args = [...(deep ? fmt.codec24 : fmt.codec)];
   if (!fmt.lossy && !deep) {
     args.push('-af', 'aresample=dither_method=triangular,aformat=sample_fmts=s16');
@@ -462,10 +468,11 @@ function audioExtractArgs(settings = {}) {
     const kbps = Math.max(32, Math.min(512, Math.round(Number(settings.audioBitrateKbps) || fmt.defaultKbps)));
     args.push('-b:a', `${kbps}k`);
   }
-  if (settings.sampleRate) {
-    args.push('-ar', String(settings.sampleRate));
+  const rate = safeSampleRate(settings);
+  if (rate) {
+    args.push('-ar', String(rate));
   }
-  if (settings.channels) {
+  if ([1, 2].includes(Number(settings.channels))) {
     args.push('-ac', String(settings.channels));
   }
   return { ext: fmt.ext, args };
@@ -538,7 +545,7 @@ async function applyMaster(inFile, master, workDir, total, onProgress, { audioOn
     `:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}` +
     `:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,` +
     // a loudnorm belül 192 kHz-re mintavételez; vissza a mix rátájára (különben 96/192 kHz-es export)
-    `aresample=${Number(settings.sampleRate) || 44100}[a]`;
+    `aresample=${safeSampleRate(settings) || 44100}[a]`;
   const out = path.join(workDir, `mastered${path.extname(inFile)}`);
   const streams = audioOnly
     ? ['-map', '[a]', '-c:a', 'pcm_f32le']
@@ -2942,11 +2949,16 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   // 🎧 hang-only export (WAV/MP3/AAC/FLAC/Opus, PRO-AUDIO A25): a mix videó nélkül, lebegőpontos
   // PCM-ként kerül a köztes fájlba, így a veszteségmentes kimenet valóban az; a kép nem kódolódik
   const audio = audioExtractArgs(settings);
+  // mono kimenetnél a lekeverés a master ELŐTT: különben a hangosság-cél a sztereó mixre
+  // teljesülne, és a mono fájl ~3 LU-val halkabb lenne
+  const mixIdx = graph.length - 1;
+  if (Number(settings.channels) === 1) {
+    graph[mixIdx] = graph[mixIdx].replace(/\[aout\]$/, ',aformat=channel_layouts=mono[aout]');
+  }
   if (audio) {
-    graph.push('[vout]nullsink');
     // mintapontos hossz: a `-t` a PCM-csomag (1024 minta) határán vágna
-    const last = graph.length - 2;
-    graph[last] = graph[last].replace(/\[aout\]$/, `,atrim=end=${total.toFixed(6)}[aout]`);
+    graph[mixIdx] = graph[mixIdx].replace(/\[aout\]$/, `,atrim=end=${total.toFixed(6)}[aout]`);
+    graph.push('[vout]nullsink');
   }
 
   const scriptFile = path.join(workDir, 'filtergraph.txt');

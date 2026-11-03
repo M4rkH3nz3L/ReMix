@@ -23,9 +23,15 @@ describe('audioExtractArgs (hang-export codec + minőség)', () => {
   });
 
   test('24 bit kérhető, ilyenkor nincs 16 bites dither', () => {
-    expect(audioExtractArgs({ audioFormat: 'wav', bitDepth: 24 }).args).toEqual(['-c:a', 'pcm_s24le']);
-    expect(audioExtractArgs({ audioFormat: 'flac', bitDepth: 24 }).args).toContain('s32');
-    expect(audioExtractArgs({ audioFormat: 'mp3', bitDepth: 24 }).args).not.toContain('-af');
+    expect(audioExtractArgs({ audioFormat: 'wav', audioBitDepth: 24 }).args).toEqual(['-c:a', 'pcm_s24le']);
+    expect(audioExtractArgs({ audioFormat: 'flac', audioBitDepth: 24 }).args).toContain('s32');
+    expect(audioExtractArgs({ audioFormat: 'mp3', audioBitDepth: 24 }).args).not.toContain('-af');
+  });
+
+  test('ismeretlen mintavétel és csatornaszám nem jut az ffmpeg-ig', () => {
+    expect(audioExtractArgs({ audioFormat: 'mp3', sampleRate: '44100;rm', channels: 7 }).args).not.toContain('-ar');
+    expect(audioExtractArgs({ audioFormat: 'mp3', channels: 7 }).args).not.toContain('-ac');
+    expect(audioExtractArgs({ audioFormat: 'mp3', sampleRate: 48000 }).args).toContain('48000');
   });
 
   test('veszteséges formátumok per-formátum alap-bitrátája', () => {

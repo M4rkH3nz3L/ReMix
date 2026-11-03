@@ -3793,6 +3793,21 @@
         "silentSong": "Alle Spuren von „{{name}}“ sind stumm.",
         "downloadFailed": "Das gerenderte Audio von „{{name}}“ konnte nicht geladen werden."
       },
+      "exportSheet": {
+        "format": "Format",
+        "lossyHint": "Kleinere Datei, komprimierter Klang — zum Teilen und für soziale Medien.",
+        "losslessHint": "Verlustfrei: genau das, was der Mix ergibt — zur Weiterarbeit und zum Mastering.",
+        "bitrate": "Qualität",
+        "bitDepth": "Bittiefe",
+        "sampleRate": "Abtastrate",
+        "channels": "Kanäle",
+        "stereo": "Stereo",
+        "mono": "Mono",
+        "save": "Exportieren ({{format}})",
+        "shareTitle": "Audio sichern oder teilen",
+        "savedTitle": "Gespeichert",
+        "savedBody": "{{name}} liegt im Export-Ordner des Projekts."
+      },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",

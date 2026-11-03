@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync } from 'expo-audio';
+import { File } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioLayer } from '@/components/preview/AudioLayer';
+import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
 import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
@@ -16,7 +19,15 @@ import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
 import { mixForExport } from '@/lib/audioExportMix';
-import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
+import { exportAudioToFile, isRenderCancelledError } from '@/lib/render';
+import {
+  audioExportFileName,
+  audioExportSettings,
+  audioFormatInfo,
+  type AudioExportFormat,
+  type AudioExportQuality,
+} from '@/lib/audioExportOptions';
+import { projectExportDir } from '@/lib/model3dRenderClient';
 import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { guardPro } from '@/store/paywallStore';
 import { withCancellableProgress } from '@/store/progressStore';
@@ -34,6 +45,7 @@ export default function AudioStudioScreen() {
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   usePlaybackClock();
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
@@ -92,17 +104,18 @@ export default function AudioStudioScreen() {
       .then(() => router.push(`/player/${project.id}`))
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:preview', caught); });
 
-  const useInVideo = () => {
+  const sendToVideo = () => {
     // 🎧→🎬 a hang átvitele egy ÚJ videó-projektbe (a userhez képet ad)
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
     // A13: előbb a hang-projekt, különben a kilépő mentéssel versenyezne
     flushProjectSave()
       .then(() => saveProject(vid))
       .then(() => router.replace(`/editor/${vid.id}`))
-      .catch((caught) => { logCaught('app/studio/audio/[id].tsx:useInVideo', caught); });
+      .catch((caught) => { logCaught('app/studio/audio/[id].tsx:sendToVideo', caught); });
   };
 
-  const downloadAudio = (format: 'wav' | 'mp3' | 'aac' | 'flac' | 'opus') => {
+  const downloadAudio = (format: AudioExportFormat, quality: AudioExportQuality) => {
+    setExporting(false);
     // A15: az export azt adja, amit hallasz
     const store = useEditorStore.getState();
     const mix = mixForExport(project, store.isTrackAudible, store.masterVolume);
@@ -110,14 +123,20 @@ export default function AudioStudioScreen() {
       Alert.alert(t('studio.export'), t('studio.audio.exportSilent'));
       return Promise.resolve();
     }
+    const info = audioFormatInfo(format);
     return guardPro(
       () =>
         // A29: a ✕ a szerveren futó menetet is leállítja
-        withCancellableProgress(t('studio.audio.exportRendering', { format: format.toUpperCase() }), (report, signal) =>
-          exportAudioFile(mix, format, report, signal).then((url) => {
-            Linking.openURL(url).catch((caught) => { logCaught('app/studio/audio/[id].tsx:downloadAudio', caught); });
-          })
-        ),
+        withCancellableProgress(t('studio.audio.exportRendering', { format: info.label }), async (report, signal) => {
+          // A28: a fájl a projekt Export-mappájába kerül, a token nem megy URL-ben a böngészőnek
+          const target = new File(projectExportDir(), audioExportFileName(project.name, format));
+          const uri = await exportAudioToFile(mix, audioExportSettings(format, quality), target, report, signal);
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, { mimeType: info.mime, dialogTitle: t('studio.audio.exportSheet.shareTitle') });
+          } else {
+            Alert.alert(t('studio.audio.exportSheet.savedTitle'), t('studio.audio.exportSheet.savedBody', { name: target.name }));
+          }
+        }),
       (e) => {
         if (!isRenderCancelledError(e)) {
           Alert.alert(t('studio.export'), e.message);
@@ -126,29 +145,25 @@ export default function AudioStudioScreen() {
     );
   };
 
-  const openDownload = () =>
-    Alert.alert(t('studio.audio.exportDownload'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: 'MP3', onPress: () => downloadAudio('mp3') },
-      { text: 'WAV', onPress: () => downloadAudio('wav') },
-      { text: 'AAC (M4A)', onPress: () => downloadAudio('aac') },
-      { text: 'FLAC', onPress: () => downloadAudio('flac') },
-      { text: 'Opus (OGG)', onPress: () => downloadAudio('opus') },
-    ]);
-
-  const openExport = () =>
-    Alert.alert(t('studio.export'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('studio.audio.exportPreview'), onPress: preview },
-      { text: t('studio.audio.exportToVideo'), onPress: useInVideo },
-      { text: t('studio.audio.exportDownload'), onPress: openDownload },
-    ]);
-
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
       <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
-      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={openExport} />
+      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={() => setExporting(true)} />
+      {exporting ? (
+        <AudioExportSheet
+          onClose={() => setExporting(false)}
+          onPreview={() => {
+            setExporting(false);
+            void preview();
+          }}
+          onUseInVideo={() => {
+            setExporting(false);
+            sendToVideo();
+          }}
+          onDownload={(format, quality) => void downloadAudio(format, quality)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

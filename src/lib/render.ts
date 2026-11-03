@@ -133,6 +133,8 @@ export interface RenderSettings {
   sampleRate?: 44100 | 48000;
   /** hang csatorna-elrendezés: 1 (mono) / 2 (sztereó) */
   channels?: 1 | 2;
+  /** veszteségmentes hangexport bitmélysége (WAV/FLAC; alap 16, ditherrel) */
+  audioBitDepth?: 16 | 24;
   /** hang bitráta kbps (alap 192) */
   audioBitrateKbps?: number;
   /** 🎧 HANG-ONLY export: a kész keverékből a worker ezt a formátumot vonja ki
@@ -698,6 +700,39 @@ export async function exportAudioFile(
     { resolution: 480, fps: project.fps ?? 30, quality: 'high', audioFormat: format },
     signal
   );
+}
+
+/**
+ * 🎧 Hangexport FÁJLBA (PRO-AUDIO A28): a kész fájl a projekt Export-mappájába kerül, a
+ * hitelesítés fejlécben megy — a token nem kerül URL-be, böngészőbe, előzménybe. A hívó a
+ * helyi fájlt a rendszer megosztólapjával adja tovább (Fájlok, AirDrop, üzenet).
+ */
+export async function exportAudioToFile(
+  project: Project,
+  settings: Partial<RenderSettings>,
+  target: File,
+  onProgress?: (update: ProgressUpdate) => void,
+  signal?: AbortSignal
+): Promise<string> {
+  const base = cloudBaseUrl();
+  const id = await submitAndPollRender(
+    base,
+    project,
+    onProgress,
+    { resolution: 480, fps: project.fps ?? 30, quality: 'high', ...settings },
+    signal
+  );
+  const res = await fetch(`${base}/render/${id}/file`, { headers: await workerAuthHeaders(), signal });
+  if (!res.ok) {
+    throw new Error(tr('lib.render.renderError'));
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (target.exists) {
+    target.delete();
+  }
+  target.create();
+  target.write(bytes);
+  return target.uri;
 }
 
 export async function renderCloudFileUrl(

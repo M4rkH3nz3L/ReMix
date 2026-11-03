@@ -3788,6 +3788,21 @@
         "silentSong": "A(z) „{{name}}” szám minden sávja némítva van.",
         "downloadFailed": "A(z) „{{name}}” szám renderelt hangja nem töltődött le."
       },
+      "exportSheet": {
+        "format": "Formátum",
+        "lossyHint": "Kisebb fájl, tömörített hang — megosztáshoz, közösségi médiához.",
+        "losslessHint": "Veszteségmentes: pontosan az, amit a keverés ad — további munkához, mastereléshez.",
+        "bitrate": "Minőség",
+        "bitDepth": "Bitmélység",
+        "sampleRate": "Mintavétel",
+        "channels": "Csatornák",
+        "stereo": "Sztereó",
+        "mono": "Mono",
+        "save": "Exportálás ({{format}})",
+        "shareTitle": "Hang mentése vagy megosztása",
+        "savedTitle": "Elmentve",
+        "savedBody": "A(z) {{name}} a projekt Export-mappájába került."
+      },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",

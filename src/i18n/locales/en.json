@@ -3788,6 +3788,21 @@
         "silentSong": "Every track of “{{name}}” is muted.",
         "downloadFailed": "The rendered audio of “{{name}}” could not be downloaded."
       },
+      "exportSheet": {
+        "format": "Format",
+        "lossyHint": "Smaller file, compressed audio — for sharing and social media.",
+        "losslessHint": "Lossless: exactly what the mix produces — for further work and mastering.",
+        "bitrate": "Quality",
+        "bitDepth": "Bit depth",
+        "sampleRate": "Sample rate",
+        "channels": "Channels",
+        "stereo": "Stereo",
+        "mono": "Mono",
+        "save": "Export ({{format}})",
+        "shareTitle": "Save or share audio",
+        "savedTitle": "Saved",
+        "savedBody": "{{name}} was saved to the project's Export folder."
+      },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",

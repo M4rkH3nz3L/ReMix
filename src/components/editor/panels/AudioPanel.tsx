@@ -1,7 +1,6 @@
 import {
   AudioModule,
   RecordingPresets,
-  setAudioModeAsync,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
@@ -14,7 +13,9 @@ import { Chip, PanelSection, PrimaryButton, Stepper } from '@/components/ui/cont
 import { palette } from '@/constants/editor';
 import { detectBeats, timelineBeats } from '@/lib/beats';
 import { makeId } from '@/lib/id';
-import { pickAudio, persistToLibrary } from '@/lib/media';
+import { pickAudio } from '@/lib/media';
+import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
+import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
 import { projectMusicTarget, rankLibrary, trackMatchScore } from '@/lib/musicMatch';
@@ -112,6 +113,17 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const recordStartPlayhead = useRef(0);
+  // A43: ugyanaz a felvétel-út, mint a Hang Stúdióban (mód-visszaállítás, frame-rács, megmaradás)
+  const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
+  useFinishRecordingOnLeave(recorder, finishRecordingRef);
+  finishRecordingRef.current = async () => {
+    const { uri, seconds } = await stopVoiceRecording(recorder);
+    if (uri) {
+      const st = useEditorStore.getState();
+      const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, st.project?.fps ?? 30, t('panels.audio.voiceoverLabel'), makeId);
+      st.addClip('voiceover', clip, asset);
+    }
+  };
 
   const [library, setLibrary] = useState<LibraryTrack[] | null>(null);
   const [libraryError, setLibraryError] = useState(false);
@@ -256,35 +268,7 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
 
   const toggleRecord = async () => {
     if (recorderState.isRecording) {
-      const seconds = Math.max(recorderState.durationMillis / 1000, 0.5);
-      await recorder.stop();
-      // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
-      const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
-      if (uri) {
-        addClip(
-          'voiceover',
-          {
-            kind: 'audio',
-            id: makeId('clip'),
-            start: recordStartPlayhead.current,
-            duration: seconds,
-            uri,
-            label: t('panels.audio.voiceoverLabel'),
-            volume: 1,
-            fadeIn: 0,
-            fadeOut: 0,
-            source: 'voiceover',
-          },
-          {
-            id: makeId('ast'),
-            kind: 'audio',
-            uri,
-            provider: 'local',
-            name: t('panels.audio.voiceoverLabel'),
-            duration: seconds,
-          }
-        );
-      }
+      await finishRecordingRef.current();
       return;
     }
     const permission = await AudioModule.requestRecordingPermissionsAsync();
@@ -292,10 +276,8 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
       Alert.alert(t('panels.audio.micPermissionTitle'), t('panels.audio.micPermissionMessage'));
       return;
     }
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     recordStartPlayhead.current = useEditorStore.getState().playhead;
-    await recorder.prepareToRecordAsync();
-    recorder.record();
+    await startVoiceRecording(recorder);
   };
 
   return (

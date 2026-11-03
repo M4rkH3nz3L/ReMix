@@ -1,7 +1,8 @@
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
 import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
-import { createRef, Profiler } from 'react';
+import { createRef, Profiler, useEffect, useRef } from 'react';
+import { createAudioPlayer, getRecordingPermissionsAsync, RecordingPresets, useAudioRecorder, type AudioRecorder } from 'expo-audio';
 import { Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
@@ -52,6 +53,8 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
+import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { clearWaveformMemory, clipWindowPeaks, getWaveform } from '@/lib/waveform';
 import { mixForExport } from '@/lib/audioExportMix';
@@ -2334,6 +2337,80 @@ async function smokeAudioKillPrepare(log: Log) {
   await sleep(60000);
 }
 
+type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
+
+/** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
+function RecordHarness({ onReady, start }: { onReady: (h: RecordHandle) => void; start: () => number }) {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const finish = useRef<() => Promise<void>>(async () => {});
+  useFinishRecordingOnLeave(recorder, finish);
+  finish.current = async () => {
+    const { uri, seconds } = await stopVoiceRecording(recorder);
+    if (uri) {
+      const { clip, asset } = voiceoverClip(uri, seconds, start(), 30, 'smoke felvétel', makeId);
+      useEditorStore.getState().addClip('voiceover', clip, asset);
+    }
+  };
+  useEffect(() => {
+    onReady({ recorder, finish });
+  }, [onReady, recorder]);
+  return null;
+}
+
+/** A10/A43 valódi mikrofonnal: leállítva és a felület bezárásakor is klip lesz, utána szól a lejátszás. */
+async function smokeRecording(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const perm = await getRecordingPermissionsAsync();
+  if (!perm.granted) {
+    log(false, 'mikrofon-engedély', `nincs megadva (${perm.status}) — a felvétel nem mérhető ember nélkül`);
+    return;
+  }
+  const project = createEmptyProject('smoke felvétel', '9:16');
+  useEditorStore.getState().loadProject(project, []);
+  const voiceClips = () => (useEditorStore.getState().project?.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+  const mount = () =>
+    new Promise<RecordHandle>((resolve) => {
+      // a felvétel indításakor rögzített lejátszófej (üres projektben a playhead 0-ra korlátos)
+      setHarness(<RecordHarness onReady={resolve} start={() => 1.01} />);
+    });
+
+  // A: felvétel → leállítás
+  let h = await mount();
+  await startVoiceRecording(h.recorder);
+  await sleep(1500);
+  await h.finish.current();
+  const a = voiceClips()[0];
+  const aDur = a ? await probeAudioDuration(a.uri) : 0;
+  log(!!a && Math.abs(a.duration - 1.5) < 0.3, 'A10 a leállított felvétel klip lett, a recorder idejével', `${a?.duration.toFixed(2)} s`);
+  log(!!a && Math.abs(aDur - a.duration) < 0.3, 'a fájl hossza egyezik a klipével', `${aDur.toFixed(2)} s`);
+  log(a?.start === 1 && a.trimIn === 0 && a.sourceDuration === a.duration, 'A43 frame-rácsra ül, van trimIn és sourceDuration', `start ${a?.start}`);
+  log(!!a && !a.uri.includes('/Caches/'), 'a felvétel a projekt-mappába került', a?.uri.split('/').slice(-2).join('/'));
+
+  // a lejátszás a felvétel után halad (a felvételi mód nem ragadt be)
+  const tone = toneWav('smoke_after_rec.wav', 2);
+  const player = createAudioPlayer(tone);
+  await sleep(400);
+  player.play();
+  await sleep(900);
+  const pos = player.currentTime;
+  player.remove();
+  new File(tone).delete();
+  log(pos > 0.4, 'A43 a lejátszás a felvétel után halad', `${pos.toFixed(2)} s`);
+
+  // B: felvétel közben a felület bezárul
+  h = await mount();
+  await startVoiceRecording(h.recorder);
+  await sleep(1500);
+  setHarness(null);
+  await sleep(1500);
+  const b = voiceClips()[1];
+  const bDur = b ? await probeAudioDuration(b.uri) : 0;
+  log(!!b && bDur > 1, 'A10 a bezáráskor futó felvétel is klip lett, a fájl ép', b ? `${b.duration.toFixed(2)} s klip, ${bDur.toFixed(2)} s fájl` : 'nincs klip');
+  for (const c of voiceClips()) {
+    new File(c.uri).delete();
+  }
+}
+
 /** A42: egy órás hang-projekt a valódi stúdióban — a vonalzó és a rács látszik (képernyőkép). */
 async function smokeAudioRuler(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -2777,6 +2854,10 @@ export async function runImageSmoke(
   }
   if (phase === 'audioruler') {
     await step('audioruler', () => smokeAudioRuler(log));
+    return;
+  }
+  if (phase === 'recording') {
+    await step('recording', () => smokeRecording(log, setHarness));
     return;
   }
   if (phase === 'audiokill1') {

@@ -2,13 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   AudioModule,
   RecordingPresets,
-  setAudioModeAsync,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, AppState, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { UndoGestureArea } from '@/components/UndoGestureArea';
@@ -60,7 +59,9 @@ import { beatLinesForClips } from '@/lib/beatMarkers';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
-import { downloadToCache, persistToLibrary, probeAudioDuration } from '@/lib/media';
+import { downloadToCache, probeAudioDuration } from '@/lib/media';
+import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
+import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { logCaught } from '@/lib/logCaught';
 
 const LANE_H = 70;
@@ -150,14 +151,7 @@ export function AudioStudioBody({
   const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
 
   const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active' && recorder.getStatus().isRecording) {
-        void finishRecordingRef.current().catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:finishRecording', caught); });
-      }
-    });
-    return () => sub.remove();
-  }, [recorder]);
+  useFinishRecordingOnLeave(recorder, finishRecordingRef);
 
   if (!project) {
     return null;
@@ -205,35 +199,10 @@ export function AudioStudioBody({
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
   const finishRecording = async () => {
-    // a lekérdezett állapot fél másodpercet késhet: a recorder saját ideje pontos
-    const seconds = Math.max(recorder.getStatus().durationMillis / 1000, 0.5);
-    await recorder.stop();
-    // 🔊 KRITIKUS: a felvétel az audio-módot `allowsRecording:true`-ra állította,
-    // amiben iOS-en a kimenet a fülhallgató-hangszóróra megy (halk/„néma"
-    // lejátszás). Felvétel UTÁN vissza kell állni lejátszó-módra, különben a
-    // stúdió-lejátszás elnémul — ez volt a fő „nem működik" tünet.
-    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught); });
-    // 🎙️ a felvétel a cache-ből a projekt-mappába (az OS a cache-t bármikor üríti)
-    const uri = recorder.uri ? persistToLibrary(recorder.uri) : null;
+    const { uri, seconds } = await stopVoiceRecording(recorder);
     if (uri) {
-      useEditorStore.getState().addClip(
-        'voiceover',
-        {
-          kind: 'audio',
-          id: makeId('clip'),
-          start: recordStartPlayhead.current,
-          duration: seconds,
-          trimIn: 0,
-          sourceDuration: seconds,
-          uri,
-          label: t('panels.audio.voiceoverLabel'),
-          volume: 1,
-          fadeIn: 0,
-          fadeOut: 0,
-          source: 'voiceover',
-        },
-        { id: makeId('ast'), kind: 'audio', uri, provider: 'local', name: t('panels.audio.voiceoverLabel'), duration: seconds }
-      );
+      const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, fps, t('panels.audio.voiceoverLabel'), makeId);
+      useEditorStore.getState().addClip('voiceover', clip, asset);
     }
   };
   finishRecordingRef.current = finishRecording;
@@ -256,10 +225,8 @@ export function AudioStudioBody({
       Alert.alert(t('panels.audio.micPermissionTitle'), t('panels.audio.micPermissionMessage'));
       return;
     }
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    recordStartPlayhead.current = snapToFrame(playhead, fps);
-    await recorder.prepareToRecordAsync();
-    recorder.record();
+    recordStartPlayhead.current = playhead;
+    await startVoiceRecording(recorder);
   };
 
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>

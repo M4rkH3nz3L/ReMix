@@ -1,3 +1,4 @@
+const { shouldNotifyOwner } = require('./lib/renderNotify');
 const { logCaught } = require('./lib/caught');
 // Render-worker: a queue-ból húzza a render-jobokat, letölti az S3-inputokat,
 // renderel (renderProject), és a kész MP4-et S3-ba tölti + progresszt jelent.
@@ -167,7 +168,7 @@ const worker = new Worker(
 // service_role nincs bekötve (notifyAvailable=false), csak logolunk.
 function notifyOwner(job, ok, errMessage) {
   const d = job?.data || {};
-  if (!d.userId || !notifyAvailable()) {
+  if (!shouldNotifyOwner(d) || !notifyAvailable()) {
     return;
   }
   const name = d.projectName ? `„${d.projectName}"` : 'A videód';

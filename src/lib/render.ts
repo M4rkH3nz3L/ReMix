@@ -133,6 +133,8 @@ export interface RenderSettings {
   sampleRate?: 44100 | 48000;
   /** hang csatorna-elrendezés: 1 (mono) / 2 (sztereó) */
   channels?: 1 | 2;
+  /** false = belső render (mérés, album-szám): a worker nem küld „kész” értesítést */
+  notify?: boolean;
   /** veszteségmentes hangexport bitmélysége (WAV/FLAC; alap 16, ditherrel) */
   audioBitDepth?: 16 | 24;
   /** hang bitráta kbps (alap 192) */
@@ -223,6 +225,11 @@ export class RenderCancelledError extends Error {
     super(tr('lib.render.cancelled'));
     this.name = 'RenderCancelledError';
   }
+}
+
+/** A ✕ után a hálózati hívás nyers AbortError-ral bukik: ezt is megszakításként adjuk vissza. */
+function asCancelled(e: unknown, signal?: AbortSignal): unknown {
+  return signal?.aborted ? new RenderCancelledError() : e;
 }
 
 export function isRenderCancelledError(e: unknown): boolean {
@@ -583,6 +590,9 @@ async function submitAndPollRender(
     method: 'POST',
     body: form,
     headers: await workerAuthHeaders(),
+    signal,
+  }).catch((e: unknown) => {
+    throw asCancelled(e, signal);
   });
   // ⚠️ a `.json()` KORÁBBAN itt futott, mint az `!ok` ág — egy 502-es HTML-oldal
   // parse-hibát dobott, épp a beszédes üzenet helyett
@@ -616,6 +626,11 @@ async function submitAndPollRender(
       timeoutMs: 5000,
       signal,
       headers: await workerAuthHeaders(), // 🔒 BOLA: a poll a saját jobhoz
+    }).catch((e: unknown) => {
+      if (signal?.aborted) {
+        void cancelRender(base, id); // 🛑 a lekérdezés közben jött ✕ is leállítja a szervert
+      }
+      throw asCancelled(e, signal);
     });
     const status = await readJson<{ state?: string; error?: string; progress?: number }>(
       res,
@@ -692,12 +707,13 @@ export async function exportAudioFile(
   project: Project,
   format: NonNullable<RenderSettings['audioFormat']>,
   onProgress?: (update: ProgressUpdate) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  extra?: Partial<RenderSettings>
 ): Promise<string> {
   return renderCloudFileUrl(
     project,
     onProgress,
-    { resolution: 480, fps: project.fps ?? 30, quality: 'high', audioFormat: format },
+    { resolution: 480, fps: project.fps ?? 30, quality: 'high', audioFormat: format, ...extra },
     signal
   );
 }
@@ -722,7 +738,9 @@ export async function exportAudioToFile(
     { resolution: 480, fps: project.fps ?? 30, quality: 'high', ...settings },
     signal
   );
-  const res = await fetch(`${base}/render/${id}/file`, { headers: await workerAuthHeaders(), signal });
+  const res = await fetch(`${base}/render/${id}/file`, { headers: await workerAuthHeaders(), signal }).catch((e: unknown) => {
+    throw asCancelled(e, signal);
+  });
   if (!res.ok) {
     throw new Error(tr('lib.render.renderError'));
   }

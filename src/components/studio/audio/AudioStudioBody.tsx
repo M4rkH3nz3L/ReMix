@@ -455,7 +455,7 @@ export function AudioStudioBody({
         if (!mix) {
           throw new Error(t('studio.audio.album.silentSong', { name: s.name }));
         }
-        const url = await exportAudioFile(mix, 'flac', report, signal);
+        const url = await exportAudioFile(mix, 'flac', report, signal, { notify: false });
         const local = await downloadToCache(url, `album_${s.id}.flac`);
         if (!local) {
           throw new Error(t('studio.audio.album.downloadFailed', { name: s.name }));

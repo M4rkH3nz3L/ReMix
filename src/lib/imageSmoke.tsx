@@ -47,7 +47,10 @@ import { readExportFacts } from '@/components/studio/image/exportVerify';
 import { expectsAlpha, exportProblems, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { customExportSize, formatBytes } from '@/lib/imageExport';
 import { downloadToCache, ingestImageFile, probeAudioDuration } from '@/lib/media';
-import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
+import { exportAudioFile, exportAudioToFile, isRenderCancelledError } from '@/lib/render';
+import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptions';
+import { projectExportDir } from '@/lib/model3dRenderClient';
+import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
 import { mixForExport } from '@/lib/audioExportMix';
 import { classifyAudioIntake } from '@/lib/audioIntake';
@@ -2370,7 +2373,7 @@ function toneWav(name: string, seconds: number): string {
 }
 
 /** A6 és A19 valódi fájlon: a sérült hang nem kerül be, a mérés a jelenlegi mixet adja. */
-async function smokeAudioMix(log: Log) {
+async function smokeAudioMix(log: Log, setHarness: (n: ReactNode) => void) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const uri = toneWav('smoke_tone.wav', 3);
   const broken = new File(Paths.document, 'smoke_broken.mp3');
@@ -2425,7 +2428,26 @@ async function smokeAudioMix(log: Log) {
   setTimeout(() => controller.abort(), 1500);
   const outcome = await pending.then(() => 'kész fájl', (e: Error) => (isRenderCancelledError(e) ? 'megszakítva' : e.message));
   log(outcome === 'megszakítva', 'A29 a megszakítás leállítja az exportot', `${outcome}, ${Date.now() - started} ms`);
+
+  // A28/A31: fájlba exportálás fejléces hitelesítéssel, a kért formátumban
+  const target = new File(projectExportDir(), audioExportFileName('Smoke export', 'wav'));
+  const saved = await exportAudioToFile(
+    project,
+    audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 24, sampleRate: 48000, channels: 1 }),
+    target
+  );
+  const size = new File(saved).size ?? 0;
+  // 3 s × 48 000 minta × 3 bájt (24 bit, mono) + WAV-fejléc
+  const expected = 3 * 48000 * 3;
+  log(Math.abs(size - expected) < 2000, 'A31 24 bit 48 kHz mono WAV készült', `${size} bájt (várt ~${expected})`);
+  log(saved.includes('/Export/') && saved.endsWith('Smoke_export.wav'), 'A28 a fájl a projekt Export-mappájában van', saved.split('/').slice(-2).join('/'));
+  new File(saved).delete();
   new File(uri).delete();
+
+  setHarness(<AudioExportSheet onClose={() => {}} onPreview={() => {}} onUseInVideo={() => {}} onDownload={() => {}} />);
+  log(true, 'FOTÓZHATÓ', 'a hangexport-lap a kijelzőn');
+  await sleep(5000);
+  setHarness(null);
 }
 
 async function smokeWorker(log: Log) {
@@ -2639,7 +2661,7 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'audiomix') {
-    await step('audiomix', () => smokeAudioMix(log));
+    await step('audiomix', () => smokeAudioMix(log, setHarness));
     return;
   }
   if (phase === 'audiokill1') {

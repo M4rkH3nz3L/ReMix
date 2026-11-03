@@ -17,7 +17,7 @@ export async function analyzeMix(
   onProgress?: (update: ProgressUpdate) => void,
   signal?: AbortSignal
 ): Promise<LoudnessStats> {
-  const url = await exportAudioFile(mix, 'wav', onProgress, signal);
+  const url = await exportAudioFile(mix, 'wav', onProgress, signal, { notify: false });
   const local = await downloadToCache(url, `analyze_${mix.id}.wav`);
   if (!local) {
     throw new Error('mix_download_failed');

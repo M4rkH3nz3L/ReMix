@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler, useEffect, useRef } from 'react';
 import { createAudioPlayer, getRecordingPermissionsAsync, RecordingPresets, useAudioRecorder, type AudioRecorder } from 'expo-audio';
-import { Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
+import { AppState, Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -55,6 +55,7 @@ import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
 import { runDevAction } from '@/lib/devActions';
+import { recordingPhase } from '@/lib/interruption';
 import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
 import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
@@ -2791,6 +2792,120 @@ function RecordHarness({ onReady, start }: { onReady: (h: RecordHandle) => void;
   return null;
 }
 
+/**
+ * 📞 PRO-AUDIO 17/18 megszakítás. A hívás / Siri hatását ugyanazzal a natív hívással
+ * idézzük elő, amit az iOS megszakításkor tesz (felvevő `pause()`, lejátszók `pause()`, a hívás
+ * végén `play()`); a háttér-ágat (`bg`) a gazda-szkript valódi app-váltással (Beállítások) adja.
+ */
+async function smokeInterrupt(log: Log, setHarness: (n: ReactNode) => void, background: boolean) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const perm = await getRecordingPermissionsAsync();
+  if (!perm.granted) {
+    log(false, 'mikrofon-engedély', `nincs megadva (${perm.status})`);
+    return;
+  }
+  const id = 'prj_smoke_interrupt';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:interrupt', caught));
+  const uri = toneWav('smoke_interrupt.wav', 20);
+  const base = createEmptyProject('smoke megszakítás', '9:16', undefined, 'audio');
+  const mk = (cid: string, start: number): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start, duration: 16, trimIn: 0, sourceDuration: 20, volume: 0.3, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('zene', 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('effekt', 0)] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  const st = () => useEditorStore.getState();
+  const voiceClips = () => (st().project?.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+  const mount = () => new Promise<RecordHandle>((resolve) => setHarness(<RecordHarness onReady={resolve} start={() => st().playhead} />));
+  const cleanup = () => {
+    st().setPlaying(false);
+    setHarness(null);
+    for (const c of voiceClips()) {
+      new File(c.uri).delete();
+    }
+  };
+
+  if (background) {
+    const h = await mount();
+    await startVoiceRecording(h.recorder);
+    st().setPlayhead(0);
+    st().setPlaying(true);
+    await sleep(2000);
+    let left = -1;
+    let back = false;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && left < 0) left = st().playhead;
+      if (state === 'active' && left >= 0) back = true;
+    });
+    log(null, 'HÁTTÉR-KÉSZ', 'most vált a gazda-szkript másik appra');
+    for (let i = 0; i < 150 && !back; i++) {
+      await sleep(200);
+    }
+    sub.remove();
+    await sleep(1500);
+    log(back, 'az app háttérbe ment és visszajött', back ? `a lejátszófej távozáskor ${left.toFixed(2)} s` : 'nem történt app-váltás');
+    log(!st().isPlaying, 'a lejátszás megállt a háttérbe lépéskor');
+    log(Math.abs(st().playhead - left) < 0.3, 'a lejátszófej nem ugrott előre a kiesett idővel', `${left.toFixed(2)} → ${st().playhead.toFixed(2)} s`);
+    const c = voiceClips()[0];
+    const dur = c ? await probeAudioDuration(c.uri) : 0;
+    log(!!c && dur > 1.5, 'a háttérbe lépéskor futó felvétel klip lett, a fájl ép', c ? `${c.duration.toFixed(2)} s klip, ${dur.toFixed(2)} s fájl` : 'nincs klip');
+    log(recordingPhase(h.recorder.getStatus()) === 'idle' && voiceClips().length === 1, 'a felvevő lezárult, egyetlen klip', `${voiceClips().length} klip`);
+    await sleep(1500);
+    log(!st().isPlaying && ['zene', 'effekt'].every((cid) => runDevAction(`audio.nativePlaying.${cid}`) !== true), 'visszatérés után sem szól magától a hang');
+    cleanup();
+    return;
+  }
+
+  // A: felvétel — megszakítás nélkül nem zárul le idő előtt; a rendszer-szünet klip lesz
+  let h = await mount();
+  await startVoiceRecording(h.recorder);
+  await sleep(2000);
+  log(voiceClips().length === 0 && recordingPhase(h.recorder.getStatus()) === 'recording', 'zavartalan felvétel nem zárul le magától', `${voiceClips().length} klip`);
+  h.recorder.pause();
+  for (let i = 0; i < 20 && voiceClips().length === 0; i++) {
+    await sleep(100);
+  }
+  const a = voiceClips()[0];
+  const aDur = a ? await probeAudioDuration(a.uri) : 0;
+  log(!!a && Math.abs(a.duration - 2) < 0.4, 'a megszakított felvétel klip lett, a felvett hosszal', a ? `${a.duration.toFixed(2)} s klip` : 'nincs klip');
+  log(!!a && Math.abs(aDur - a.duration) < 0.3, 'a megszakított felvétel fájlja ép', `${aDur.toFixed(2)} s fájl`);
+  log(recordingPhase(h.recorder.getStatus()) === 'idle', 'a felvevő lezárult (új felvétel nem írja felül)');
+  // a lezárás után ugyanazzal a felvevővel új take indulhat
+  await startVoiceRecording(h.recorder);
+  await sleep(1000);
+  await h.finish.current();
+  log(voiceClips().length === 2 && voiceClips()[0].uri !== voiceClips()[1].uri, 'utána új felvétel külön fájlba megy', `${voiceClips().length} klip`);
+  setHarness(null);
+
+  // B: lejátszás — zavartalanul nem áll meg; a rendszer-némításra a transzport is megáll
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  await sleep(4000);
+  log(st().isPlaying, 'zavartalan lejátszás nem áll meg magától (indulás + korrekciók)', `${st().playhead.toFixed(2)} s`);
+  const pausedAt = st().playhead;
+  for (const cid of ['zene', 'effekt']) {
+    runDevAction(`audio.nativePause.${cid}`);
+  }
+  const t0 = Date.now();
+  for (let i = 0; i < 30 && st().isPlaying; i++) {
+    await sleep(50);
+  }
+  const reaction = Date.now() - t0;
+  log(!st().isPlaying, 'a rendszer elnémította a hangot → a lejátszás megállt', `${reaction} ms alatt`);
+  log(st().playhead - pausedAt < 1.2, 'a lejátszófej nem futott tovább néma hangra', `+${(st().playhead - pausedAt).toFixed(2)} s`);
+  // C: a hívás végén az iOS magától folytatná — álló óránál nem szólhat
+  await sleep(300);
+  runDevAction('audio.nativePlay.zene');
+  await sleep(700);
+  log(runDevAction('audio.nativePlaying.zene') === false, 'a magától újrainduló hangot leállítja (álló óra)');
+  // D: újraindítás után ismét szól
+  st().setPlaying(true);
+  await sleep(1500);
+  log(st().isPlaying && runDevAction('audio.nativePlaying.zene') === true, 'újra lejátszva ismét szól');
+  cleanup();
+}
+
 /** A10/A43 valódi mikrofonnal: leállítva és a felület bezárásakor is klip lesz, utána szól a lejátszás. */
 async function smokeRecording(log: Log, setHarness: (n: ReactNode) => void) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3336,6 +3451,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'interrupt' || phase === 'interruptbg') {
+    await step(phase, () => smokeInterrupt(log, setHarness, phase === 'interruptbg'));
     return;
   }
   if (phase === 'recording') {

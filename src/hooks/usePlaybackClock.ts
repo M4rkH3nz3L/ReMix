@@ -1,5 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 import { projectDuration } from '@/lib/projectUtils';
 import { stepPreviewPlayhead } from '@/lib/variantPreview';
@@ -18,10 +19,23 @@ import { useEditorStore } from '@/store/editorStore';
  * két rAF-ciklus futna, és mivel mindkettő a store-ból olvas és `playhead + dt`-t
  * ír vissza, a lejátszófej DUPLA sebességgel haladna. Csak a fókuszált képernyő
  * tickel.
+ *
+ * 📞 PRO-AUDIO 17/18: háttérbe vagy inaktívba (hívás, Siri, értesítési központ) lépve a
+ * lejátszás MEGÁLL. A rendszer ilyenkor natívan elnémítja a hangot, a rAF is leáll — futva
+ * hagyva a visszatérés első lépése a teljes kiesett időt ugraná át, néma hangra.
  */
 export function usePlaybackClock(): void {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const isFocused = useIsFocused();
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && useEditorStore.getState().isPlaying) {
+        useEditorStore.getState().setPlaying(false);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!isPlaying || !isFocused) {

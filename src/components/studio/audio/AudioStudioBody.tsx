@@ -68,6 +68,7 @@ import type { Asset, AudioClip, TrackType } from '@/types/project';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
+import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
 
 const LANE_H = 70;
@@ -265,7 +266,7 @@ export function AudioStudioBody({
 
   // kilépéskor a futó felvétel klip lesz, nem vész el
   const exitStudio = () => {
-    const done = recorder.getStatus().isRecording ? finishRecording() : Promise.resolve();
+    const done = recordingPhase(recorder.getStatus()) !== 'idle' ? finishRecording() : Promise.resolve();
     void done
       .catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:exitStudio', caught); })
       .then(onExit);

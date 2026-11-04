@@ -2401,16 +2401,35 @@ async function smokeOfflineSpeed(log: Log) {
   const base = createEmptyProject('smoke offline hosszú', '1:1', undefined, 'audio');
   const mk = (id: string, start: number): AudioClip => ({ kind: 'audio', id, uri, label: id, start, duration: 40, trimIn: 0, sourceDuration: 60, volume: 0.5, fadeIn: 1, fadeOut: 1, source: 'imported' });
   const project: Project = { ...base, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('a', 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('b', 10)] } : tr.type === 'voiceover' ? { ...tr, clips: [mk('c', 20)] } : tr)) };
+  // T2: a felület folyékonysága export közben — a leghosszabb szünet két képkocka között
+  let frameGap = 0;
+  let lastFrame = Date.now();
+  let watching = true;
+  let gapPhase = '';
+  let currentPhase = 'indul';
+  const tick = () => {
+    const now = Date.now();
+    if (now - lastFrame > frameGap) {
+      frameGap = now - lastFrame;
+      gapPhase = currentPhase;
+    }
+    lastFrame = now;
+    if (watching) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
   const phases: string[] = [];
   let last = Date.now();
   const started = last;
   const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_long.wav'), (u) => {
+    currentPhase = `${u.phase} ${Math.round((u.ratio ?? 0) * 100)}%`;
     if (phases[phases.length - 1]?.split(':')[0] !== u.phase) {
       phases.push(`${u.phase}: +${Date.now() - last} ms`);
       last = Date.now();
     }
   });
   const ms = Date.now() - started;
+  watching = false;
+  log(frameGap <= 100, 'T2 a felület export közben is folyékony (leghosszabb képkocka-szünet)', `${frameGap} ms — ${gapPhase} után`);
   log(ms < 30000, 'A26 egy perc keverés a telefonon', `${ms} ms (${(ms / 60).toFixed(0)} ms / mp hang) · ${phases.join(' · ')}`);
   new File(out).delete();
   new File(uri).delete();

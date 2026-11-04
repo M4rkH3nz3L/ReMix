@@ -10,7 +10,9 @@ import type { Project } from '@/types/project';
 
 /** a telefonos export felső határa (a dekódolt források a memóriában vannak) */
 export const OFFLINE_MAX_SEC = 20 * 60;
-const CHUNK_SEC = 5;
+const CHUNK_SEC = 0.25;
+/** egy szeletben legfeljebb ennyi munka, utána a felület jön (60 Hz-en egy képkocka ~16 ms) */
+const FRAME_BUDGET_MS = 12;
 
 /**
  * 🎧📱 PRO-AUDIO A26: a hang-mix WAV-ként, TELJESEN a telefonon (Free, szerver nélkül). A
@@ -45,10 +47,13 @@ export async function exportOfflineWav(
     try {
       const buf = await api.decodeAudioData(uris[i], OFFLINE_SAMPLE_RATE);
       markAudioApi(true);
-      sources.set(uris[i], {
-        channels: Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c)),
-        sampleRate: buf.sampleRate,
-      });
+      // a csatornák átvétele között is a felület jön (egy hosszú forrás csatornája nagy tömb)
+      const channels: Float32Array[] = [];
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        channels.push(buf.getChannelData(c));
+      }
+      sources.set(uris[i], { channels, sampleRate: buf.sampleRate });
     } catch (caught) {
       logCaught('lib/offlineMixClient.ts:decode', caught);
       throw new Error(tr('studio.audio.offline.decodeFailed', { name: uris[i].split('/').pop() }));
@@ -63,7 +68,10 @@ export async function exportOfflineWav(
   const handle = target.open();
   try {
     handle.writeBytes(wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE));
-    const chunk = CHUNK_SEC * OFFLINE_SAMPLE_RATE;
+    // T2: időkeretes feldolgozás — negyed mp-es darabok, és ~12 ms munka után mindig visszaadjuk
+    // a vezérlést (mérve: az 5 mp-es darabok 392 ms-ig fogták a felületet, látható akadás)
+    const chunk = Math.round(CHUNK_SEC * OFFLINE_SAMPLE_RATE);
+    let sliceStart = Date.now();
     for (let from = 0; from < frames; from += chunk) {
       if (signal?.aborted) {
         throw new RenderCancelledError();
@@ -72,9 +80,11 @@ export async function exportOfflineWav(
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
       mixRange(plan, sources, out, from, to);
       handle.writeBytes(pcm16(out));
-      onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
-      // a felület ne fagyjon: darabonként visszaadjuk a vezérlést
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
+        onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        sliceStart = Date.now();
+      }
     }
   } catch (caught) {
     handle.close();

@@ -108,4 +108,75 @@ async function deleteMedia(key) {
   }
 }
 
-module.exports = { deleteMedia, mediaStoreEnabled, uploadMedia, BUCKET, LOCAL_DIR };
+function useS3() {
+  const backend = (process.env.STORAGE_BACKEND || '').trim().toLowerCase();
+  return (backend === 'r2' || backend === 's3') && s3.s3Enabled();
+}
+
+function localFile(key) {
+  const root = path.resolve(LOCAL_DIR);
+  const file = path.resolve(root, key);
+  if (!file.startsWith(root + path.sep)) {
+    throw new Error('Érvénytelen média-kulcs.');
+  }
+  return file;
+}
+
+/** ⬇️ Egy objektum letöltése helyi fájlba ugyanabból a tárból, ahová az `uploadMedia` írta (PRO-CASH C2.7). */
+async function downloadMedia(key, localPath) {
+  if (useS3()) {
+    return s3.downloadFile(key, localPath);
+  }
+  if (localEnabled()) {
+    fs.copyFileSync(localFile(key), localPath);
+    return localPath;
+  }
+  const sb = adminClient();
+  if (sb) {
+    const { data, error } = await sb.storage.from(BUCKET).download(key);
+    if (error) {
+      throw new Error(error.message);
+    }
+    fs.writeFileSync(localPath, Buffer.from(await data.arrayBuffer()));
+    return localPath;
+  }
+  if (s3.s3Enabled()) {
+    return s3.downloadFile(key, localPath);
+  }
+  throw new Error('media store nincs konfigurálva');
+}
+
+/**
+ * 🔐 Egy objektum kiszolgálása HTTP-válaszba, nyilvános link nélkül (a hívó route ellenőrizte a
+ * jogosultságot / aláírást). `filename`: letöltésként (Content-Disposition). `false`, ha nincs meg.
+ */
+async function serveMedia(key, res, filename) {
+  if (filename) {
+    res.setHeader('Content-Disposition', `attachment; filename="${String(filename).replace(/[^\w.-]/g, '_')}"`);
+  }
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (useS3() || (!localEnabled() && !adminClient() && s3.s3Enabled())) {
+    return s3.streamFile(key, res);
+  }
+  if (localEnabled()) {
+    const file = localFile(key);
+    if (!fs.existsSync(file)) {
+      return false;
+    }
+    await new Promise((resolve, reject) => res.sendFile(file, (err) => (err ? reject(err) : resolve())));
+    return true;
+  }
+  const sb = adminClient();
+  if (!sb) {
+    throw new Error('media store nincs konfigurálva');
+  }
+  const { data, error } = await sb.storage.from(BUCKET).download(key);
+  if (error) {
+    return false;
+  }
+  res.setHeader('Content-Type', data.type || 'video/mp4');
+  res.end(Buffer.from(await data.arrayBuffer()));
+  return true;
+}
+
+module.exports = { deleteMedia, mediaStoreEnabled, uploadMedia, downloadMedia, serveMedia, BUCKET, LOCAL_DIR };

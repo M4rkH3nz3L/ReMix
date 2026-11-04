@@ -207,6 +207,9 @@ app.use(require('./routes/ads'));
 // 🏢 Szervezet: cégellenőrzés, céges számla (PRO-CASH C4.2, C4.4) — domain-router (§01.1).
 app.use(require('./routes/org'));
 
+// ⬇️ Feed-videó letöltése vízjellel + aláírt média-link (PRO-CASH C2.5–C2.7) — domain-router (§01.1).
+app.use(require('./routes/postDownload'));
+
 
 
 // 🎬🎧 Média route-ok — domain-router (§01.1).

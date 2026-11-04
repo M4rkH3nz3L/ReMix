@@ -55,7 +55,8 @@ function buildOpenApi(routes, inventory = []) {
   return {
     openapi: '3.1.0',
     info: { title: 'ReMix backend (vided render worker)', version: '0.1.0' },
-    paths,
+    // a kézzel rögzített végpont-szerződések (pontos válaszalak, hibakódok) a generált leírás fölé
+    paths: require('../openapiContracts').applyContracts(paths),
   };
 }
 

@@ -1,5 +1,8 @@
 import { setAudioModeAsync, type AudioRecorder } from 'expo-audio';
+import { t as tr } from 'i18next';
 
+import { canStartRecording, megabytes } from '@/lib/diskSpace';
+import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { snapToFrame } from '@/lib/frames';
 import { logCaught } from '@/lib/logCaught';
 import { persistToLibrary } from '@/lib/media';
@@ -10,6 +13,11 @@ import type { Asset, AudioClip } from '@/types/project';
  * két felület ugyanúgy viselkedjen (PRO-AUDIO A10, A43).
  */
 export async function startVoiceRecording(recorder: AudioRecorder): Promise<void> {
+  // 💾 kevés helynél el sem indul (a hívó az üzenetet mutatja)
+  const free = freeDiskBytes();
+  if (!canStartRecording(free)) {
+    throw new Error(tr('panels.audio.noSpaceToRecord', { free: megabytes(free) }));
+  }
   await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
   await recorder.prepareToRecordAsync();
   recorder.record();

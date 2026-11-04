@@ -1603,6 +1603,10 @@
       "downloadFailed": "A hang letöltése nem sikerült.",
       "micPermissionTitle": "Nincs mikrofon-engedély",
       "micPermissionMessage": "A voiceoverhez engedélyezd a mikrofont.",
+      "noSpaceTitle": "Elfogyott a hely",
+      "lowSpaceStopped": "A készüléken elfogyóban a tárhely, ezért a felvétel leállt. A felvett rész megmaradt klipként.",
+      "noSpaceToRecord": "Nincs elég szabad hely a felvételhez (szabad: {{free}} MB, legalább 100 MB kell). Szabadíts fel helyet, és próbáld újra.",
+      "recordFailedTitle": "A felvétel nem indult",
       "libraryTitle": "Hang-könyvtár",
       "libraryLoading": "Könyvtár betöltése…",
       "libraryError": "A hang-könyvtárhoz indítsd el a workert (cd server && npm start). Saját zenéidet a server/music mappába teheted.",
@@ -4062,6 +4066,7 @@
       "offline": {
         "onDeviceHint": "Ingyenes export a telefonon: WAV, 16 bit, 44,1 kHz, sztereó — szerver nélkül. A többi formátum és a szerveres effektek Pro-val érhetők el.",
         "tooLong": "A telefonos export legfeljebb {{minutes}} perces projektet tud. Hosszabbhoz a Pro szerveres exportja kell.",
+        "noSpace": "Nincs elég szabad hely az exporthoz: {{need}} MB kell (+50 MB tartalék), szabad {{free}} MB. Szabadíts fel helyet, és próbáld újra.",
         "noDecoder": "A hangdekóder ezen az eszközön nem érhető el.",
         "decodeFailed": "A(z) {{name}} hangfájl nem olvasható be a telefonon.",
         "decoding": "Hangok beolvasása…",

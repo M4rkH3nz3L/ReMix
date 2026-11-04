@@ -1603,6 +1603,10 @@
       "downloadFailed": "Audio konnte nicht heruntergeladen werden.",
       "micPermissionTitle": "Keine Mikrofonberechtigung",
       "micPermissionMessage": "Erlaube das Mikrofon fürs Voiceover.",
+      "noSpaceTitle": "Speicher voll",
+      "lowSpaceStopped": "Der Speicher des Geräts wird knapp, daher wurde die Aufnahme gestoppt. Der aufgenommene Teil bleibt als Clip erhalten.",
+      "noSpaceToRecord": "Nicht genug freier Speicher für die Aufnahme (frei: {{free}} MB, mindestens 100 MB nötig). Gib Speicher frei und versuche es erneut.",
+      "recordFailedTitle": "Aufnahme nicht gestartet",
       "libraryTitle": "Sound-Bibliothek",
       "libraryLoading": "Bibliothek wird geladen…",
       "libraryError": "Starte den Worker für die Sound-Bibliothek (cd server && npm start). Eigene Musik legst du in den Ordner server/music.",
@@ -4067,6 +4071,7 @@
       "offline": {
         "onDeviceHint": "Kostenloser Export auf dem Handy: WAV, 16 Bit, 44,1 kHz, Stereo — ohne Server. Weitere Formate und Server-Effekte gibt es mit Pro.",
         "tooLong": "Der Export auf dem Handy schafft Projekte bis {{minutes}} Minuten. Für längere braucht es den Pro-Server-Export.",
+        "noSpace": "Nicht genug freier Speicher für den Export: {{need}} MB nötig (+50 MB Reserve), {{free}} MB frei. Gib Speicher frei und versuche es erneut.",
         "noDecoder": "Der Audio-Decoder ist auf diesem Gerät nicht verfügbar.",
         "decodeFailed": "Die Audiodatei {{name}} kann auf dem Handy nicht gelesen werden.",
         "decoding": "Audio wird gelesen…",

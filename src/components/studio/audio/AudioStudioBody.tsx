@@ -159,7 +159,9 @@ export function AudioStudioBody({
   const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
 
   const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
-  useFinishRecordingOnLeave(recorder, finishRecordingRef);
+  useFinishRecordingOnLeave(recorder, finishRecordingRef, () =>
+    Alert.alert(t('panels.audio.noSpaceTitle'), t('panels.audio.lowSpaceStopped'))
+  );
 
   // 🔍 „illeszd” nagyítás: folytonos px/mp (null = a lépcsős nagyítás él)
   const [fitPps, setFitPps] = useState<number | null>(null);
@@ -283,7 +285,13 @@ export function AudioStudioBody({
       return;
     }
     recordStartPlayhead.current = playhead;
-    await startVoiceRecording(recorder);
+    try {
+      await startVoiceRecording(recorder);
+    } catch (caught) {
+      // 💾 kevés hely / foglalt mikrofon: érthető üzenet, a felvétel nem indul
+      logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught);
+      Alert.alert(t('panels.audio.recordFailedTitle'), caught instanceof Error ? caught.message : String(caught));
+    }
   };
 
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>

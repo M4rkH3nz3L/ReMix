@@ -115,7 +115,9 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const recordStartPlayhead = useRef(0);
   // A43: ugyanaz a felvétel-út, mint a Hang Stúdióban (mód-visszaállítás, frame-rács, megmaradás)
   const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
-  useFinishRecordingOnLeave(recorder, finishRecordingRef);
+  useFinishRecordingOnLeave(recorder, finishRecordingRef, () =>
+    Alert.alert(t('panels.audio.noSpaceTitle'), t('panels.audio.lowSpaceStopped'))
+  );
   finishRecordingRef.current = async () => {
     const { uri, seconds } = await stopVoiceRecording(recorder);
     if (uri) {
@@ -277,7 +279,13 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
       return;
     }
     recordStartPlayhead.current = useEditorStore.getState().playhead;
-    await startVoiceRecording(recorder);
+    try {
+      await startVoiceRecording(recorder);
+    } catch (caught) {
+      // 💾 kevés hely / foglalt mikrofon: érthető üzenet, a felvétel nem indul
+      logCaught('components/editor/panels/AudioPanel.tsx:toggleRecord', caught);
+      Alert.alert(t('panels.audio.recordFailedTitle'), caught instanceof Error ? caught.message : String(caught));
+    }
   };
 
   return (

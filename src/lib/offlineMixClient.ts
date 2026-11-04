@@ -2,6 +2,8 @@ import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 
 import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
+import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
+import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
 import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, wavHeader16, type DecodedSource, type OfflineUnsupported } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
@@ -28,6 +30,12 @@ export async function exportOfflineWav(
   const plan = offlineMixPlan(mix);
   if (plan.duration > OFFLINE_MAX_SEC) {
     throw new Error(tr('studio.audio.offline.tooLong', { minutes: OFFLINE_MAX_SEC / 60 }));
+  }
+  // 💾 a WAV mérete előre ismert: ha nem fér el, a dekódolás el sem indul
+  const needed = wavBytes(Math.round(plan.duration * OFFLINE_SAMPLE_RATE), 2);
+  const free = freeDiskBytes();
+  if (!hasRoomFor(needed, free)) {
+    throw new Error(tr('studio.audio.offline.noSpace', { need: megabytes(needed), free: megabytes(free) }));
   }
   const api = await loadAudioApi();
   if (!api) {
@@ -92,6 +100,10 @@ export async function exportOfflineWav(
       target.delete();
     } catch (cleanup) {
       logCaught('lib/offlineMixClient.ts:cleanup', cleanup);
+    }
+    // menet közben betelt (más app is írt): érthető üzenet a natív hiba helyett
+    if (isDiskFullError(caught)) {
+      throw new Error(tr('studio.audio.offline.noSpace', { need: megabytes(needed), free: megabytes(freeDiskBytes()) }));
     }
     throw caught;
   }

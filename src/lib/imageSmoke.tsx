@@ -61,6 +61,8 @@ import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
+import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
+import { EXPORT_SPACE_MARGIN, RECORD_STOP_FREE, wavBytes } from '@/lib/diskSpace';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
@@ -2775,10 +2777,10 @@ async function smokeVideoSync(log: Log) {
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
-function RecordHarness({ onReady, start }: { onReady: (h: RecordHandle) => void; start: () => number }) {
+function RecordHarness({ onReady, start, onLowSpace }: { onReady: (h: RecordHandle) => void; start: () => number; onLowSpace?: () => void }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const finish = useRef<() => Promise<void>>(async () => {});
-  useFinishRecordingOnLeave(recorder, finish);
+  useFinishRecordingOnLeave(recorder, finish, onLowSpace);
   finish.current = async () => {
     const { uri, seconds } = await stopVoiceRecording(recorder);
     if (uri) {
@@ -2790,6 +2792,72 @@ function RecordHarness({ onReady, start }: { onReady: (h: RecordHandle) => void;
     onReady({ recorder, finish });
   }, [onReady, recorder]);
   return null;
+}
+
+/**
+ * 💾 PRO-AUDIO 17/18 tárhelyhiány. A szabad hely a valódi `Paths.availableDiskSpace`; a betelt
+ * lemezt a `setFreeDiskOverride` adja ugyanazon a kódúton (a lemez tényleges teleírása nélkül).
+ */
+async function smokeDiskSpace(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const MB = 1024 * 1024;
+  const real = freeDiskBytes();
+  log(real > 0, 'a valódi szabad hely lekérdezhető', `${(real / MB / 1024).toFixed(1)} GB`);
+  const uri = toneWav('smoke_disk_src.wav', 3);
+  const base = createEmptyProject('smoke tárhely', '1:1', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'd1', uri, label: 'tone', start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const project: Project = { ...base, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [c] } : tr)) };
+  const need = wavBytes(3 * 44100, 2);
+  try {
+    // A: export — nem fér el → azonnal, érthető üzenettel áll le, fájl nélkül
+    const target = new File(projectExportDir(), 'smoke_disk.wav');
+    if (target.exists) target.delete();
+    setFreeDiskOverride(need + EXPORT_SPACE_MARGIN - 1);
+    const t0 = Date.now();
+    const err = await exportOfflineWav(project, target).then(() => 'nincs hiba', (e: Error) => e.message);
+    const ms = Date.now() - t0;
+    log(err.includes('MB') && /hely|space|Speicher/i.test(err), 'export: kevés helynél érthető üzenet', err.slice(0, 90));
+    log(ms < 300, 'export: a dekódolás el sem indul', `${ms} ms`);
+    log(!target.exists, 'export: nem marad félkész fájl');
+    // B: épp elfér → elkészül
+    setFreeDiskOverride(need + EXPORT_SPACE_MARGIN);
+    const ok = await exportOfflineWav(project, target).then((r) => new File(r.uri).size ?? 0, (e: Error) => { log(false, 'export: épp elfér', e.message); return 0; });
+    log(Math.abs(ok - need) < 8, 'export: ha épp elfér, elkészül', `${ok} bájt`);
+    if (target.exists) target.delete();
+
+    // C: felvétel — kevés helynél nem indul
+    const perm = await getRecordingPermissionsAsync();
+    if (!perm.granted) {
+      log(false, 'mikrofon-engedély', perm.status);
+      return;
+    }
+    useEditorStore.getState().loadProject(createEmptyProject('smoke tárhely felvétel', '9:16'), []);
+    const voiceClips = () => (useEditorStore.getState().project?.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+    let lowSpace = 0;
+    const h = await new Promise<RecordHandle>((resolve) => setHarness(<RecordHarness onReady={resolve} start={() => 0} onLowSpace={() => { lowSpace += 1; }} />));
+    setFreeDiskOverride(50 * MB);
+    const startErr = await startVoiceRecording(h.recorder).then(() => 'elindult', (e: Error) => e.message);
+    log(startErr.includes('MB') && h.recorder.getStatus().isRecording === false, 'felvétel: kevés helynél nem indul, érthető üzenettel', startErr.slice(0, 90));
+    // D: felvétel közben fogy a hely → a take magától lezárul, a felvett rész megmarad
+    setFreeDiskOverride(null);
+    await startVoiceRecording(h.recorder);
+    await sleep(2000);
+    setFreeDiskOverride(RECORD_STOP_FREE - 1);
+    const t1 = Date.now();
+    for (let i = 0; i < 40 && voiceClips().length === 0; i++) {
+      await sleep(100);
+    }
+    const clip = voiceClips()[0];
+    const dur = clip ? await probeAudioDuration(clip.uri) : 0;
+    log(!!clip && h.recorder.getStatus().isRecording === false, 'felvétel: fogyó helynél magától lezárul', `${Date.now() - t1} ms alatt`);
+    log(!!clip && dur > 1.8 && Math.abs(dur - clip.duration) < 0.3, 'felvétel: a felvett rész ép klip', clip ? `${clip.duration.toFixed(2)} s klip, ${dur.toFixed(2)} s fájl` : 'nincs klip');
+    log(lowSpace === 1, 'felvétel: a felhasználó egyszer kap üzenetet', `${lowSpace}×`);
+    for (const v of voiceClips()) new File(v.uri).delete();
+  } finally {
+    setFreeDiskOverride(null);
+    setHarness(null);
+    new File(uri).delete();
+  }
 }
 
 /**
@@ -3451,6 +3519,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'diskspace') {
+    await step(phase, () => smokeDiskSpace(log, setHarness));
     return;
   }
   if (phase === 'interrupt' || phase === 'interruptbg') {

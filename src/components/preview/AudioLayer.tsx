@@ -3,14 +3,18 @@ import { useIsFocused } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { resolveClipUri } from '@/lib/assetResolve';
-import { shouldResync, sourceTimeOf } from '@/lib/avSync';
+import { clipsForPlayback, INITIAL_DRIFT, learnStartLatency, planDriftCorrection, sourceTimeOf, type DriftState } from '@/lib/avSync';
+import { probeDrift, probeSeek, probeStart, syncProbeOn } from '@/lib/audioSyncProbe';
 import { sampleChannel } from '@/lib/keyframes';
-import { clipsAt } from '@/lib/projectUtils';
+
 import { clamp } from '@/lib/time';
 import { ensureVoiceProxy, getVoiceProxySync, needsVoiceProxy } from '@/lib/voiceProxy';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+
+/** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
+let startLatencySec = 0;
 
 /** a hangot hordozó sávok — mindhez saját lejátszó, egyszerre szólnak */
 const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
@@ -128,6 +132,7 @@ function VideoVoice() {
       : null;
 
   const player = useAudioPlayer(null);
+  const driftRef = useRef<DriftState>(INITIAL_DRIFT);
   const loadedRef = useRef<string | null>(null);
 
   // a videó saját hangját csak akkor némítjuk, ha a javított tényleg szól
@@ -178,9 +183,13 @@ function VideoVoice() {
         if (!player.playing) {
           player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
           player.play();
-        } else if (shouldResync(sourceTime, player.currentTime)) {
-          // 🎚️ A/V-drift-korrekció: a natív hang elcsúszott a mestéróra playheadjétől → vissza
-          player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
+        } else {
+          // 🎚️ A/V-szinkron: tanuló, 40 ms tűréssel (`planDriftCorrection`)
+          const plan = planDriftCorrection(driftRef.current, sourceTime, player.currentTime, Date.now());
+          driftRef.current = plan.next;
+          if (plan.seekTo !== null) {
+            player.seekTo(plan.seekTo).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:VideoVoice', caught); });
+          }
         }
       } else {
         player.pause();
@@ -212,8 +221,9 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
   // 🎚️ sávonkénti mixer-gain (fader) — az előnézetben (a render is honorálja)
   const trackGain = project?.trackMix?.[trackType]?.gain ?? 1;
   const track = project ? project.tracks.find((t) => t.type === trackType) : null;
+  // ⏱️ a hamarosan kezdődő klip lejátszója is elkészül (preroll — betöltve, a forrás elején)
   const active = track
-    ? clipsAt<AudioClip>(track, playhead).filter((c) => c.kind === 'audio')
+    ? clipsForPlayback(track.clips.filter((c): c is AudioClip => c.kind === 'audio'), playhead)
     : [];
 
   return (
@@ -243,8 +253,11 @@ function ClipAudioPlayer({
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   // gyors vissza és előre alatt a hang néma: a lejátszók csak 1×-en szólnak helyesen
-  const isPlaying = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
+  const clockRunning = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
   const masterVolume = useEditorStore((s) => s.masterVolume);
+  // ⏱️ preroll alatt a klip még nem szól: betöltve vár a forrás elején
+  const sounding = playhead >= clip.start;
+  const isPlaying = clockRunning && sounding;
 
   // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
   const resolvedUri = useMemo(
@@ -303,22 +316,31 @@ function ClipAudioPlayer({
     try {
       player.replace(playUri);
       const state = useEditorStore.getState();
-      player.seekTo(sourceTimeOf(clip, state.playhead)).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
-      if (state.isPlaying) {
+      player.seekTo(Math.max(clip.trimIn ?? 0, sourceTimeOf(clip, state.playhead))).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+      if (state.isPlaying && state.playhead >= clip.start) {
         player.play();
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
   }, [player, clip, playUri]);
 
-  // play/pause követés
+  // play/pause követés; indításkor a tanult indítási késéssel előrébb indul
+  const playStartRef = useRef(0);
   useEffect(() => {
     try {
       if (isPlaying) {
+        if (startLatencySec > 0) {
+          const st = useEditorStore.getState();
+          player.seekTo(sourceTimeOf(clip, st.playhead) + startLatencySec).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+        }
+        playStartRef.current = Date.now();
+        latencyLearnedRef.current = false;
         player.play();
       } else {
         player.pause();
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
+    // a klip-adat (trimIn/start) a store-ból jön; az indítás csak a play/pause váltásra fut
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, isPlaying]);
 
   // a klip inaktívvá válásakor elhallgat; layout-effekt, mert a hook sima effektje addigra
@@ -335,6 +357,9 @@ function ClipAudioPlayer({
   // álló óránál seek, futásnál hangerő + fade követés.
   // ⚡ A playhead ~60×/mp változik — csak érdemi hangerő-eltérésnél írunk (sima fade).
   const lastVolRef = useRef<number | null>(null);
+  const driftRef = useRef<DriftState>(INITIAL_DRIFT);
+  const prerolledRef = useRef<string | null>(null);
+  const latencyLearnedRef = useRef(false);
   useEffect(() => {
     const t = playhead - clip.start;
     try {
@@ -345,16 +370,41 @@ function ClipAudioPlayer({
         player.volume = vol;
         lastVolRef.current = vol;
       }
+      if (!sounding) {
+        // preroll: egyszer a forrás elejére, és ott vár (nem tekergetünk minden képkockán)
+        if (prerolledRef.current !== playUri) {
+          prerolledRef.current = playUri;
+          player.seekTo(clip.trimIn ?? 0).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+        }
+        return;
+      }
+      prerolledRef.current = null;
       const sourceTime = sourceTimeOf(clip, playhead);
+      if (syncProbeOn() && isPlaying && player.playing) {
+        probeStart(clip.id, sourceTime - player.currentTime);
+        probeDrift(clip.id, sourceTime, player.currentTime, playhead - clip.start);
+      }
       if (!isPlaying) {
         // álló óránál a forrás-időre tekerünk (egységes seek-pont)
         player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
-      } else if (player.playing && shouldResync(sourceTime, player.currentTime)) {
-        // 🎚️ A/V-drift-korrekció lejátszás közben (a jank miatti elcsúszás behúzása)
-        player.seekTo(sourceTime).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+      } else if (player.playing) {
+        const now = Date.now();
+        const sinceStart = now - playStartRef.current;
+        // ⏱️ az indulás után ~0,5 mp-cel mért eltérés = az indítási késés (eszköz-szintű tanulás)
+        if (!latencyLearnedRef.current && sinceStart > 400 && sinceStart < 1200) {
+          latencyLearnedRef.current = true;
+          startLatencySec = learnStartLatency(startLatencySec, startLatencySec + (sourceTime - player.currentTime));
+        }
+        // 🎚️ A/V-szinkron lejátszás közben: tanuló, 40 ms tűréssel (`planDriftCorrection`)
+        const plan = planDriftCorrection(driftRef.current, sourceTime, player.currentTime, now);
+        driftRef.current = plan.next;
+        if (plan.seekTo !== null) {
+          probeSeek();
+          player.seekTo(plan.seekTo).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+        }
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
-  }, [player, playhead, isPlaying, clip, audible, masterVolume, trackGain]);
+  }, [player, playhead, isPlaying, sounding, playUri, clip, audible, masterVolume, trackGain]);
 
   return null;
 }

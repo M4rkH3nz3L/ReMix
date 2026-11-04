@@ -53,6 +53,7 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
@@ -2409,6 +2410,54 @@ async function smokeOfflineSpeed(log: Log) {
   new File(uri).delete();
 }
 
+/** PRO-AUDIO 17/5: többsávos lejátszás szinkronja a valódi stúdióban (két sáv, egyik később kezd). */
+async function smokeAudioSync(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_audiosync';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioSync', caught));
+  const uri = toneWav('smoke_sync.wav', 12);
+  const base = createEmptyProject('smoke szinkron', '9:16', undefined, 'audio');
+  const mk = (cid: string, start: number, trimIn: number): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start, duration: 8, trimIn, sourceDuration: 12, volume: 0.3, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('elejetol', 0, 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('kesobb', 2, 1)] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  // 1. kör: a tanulás (az indítási késést itt méri meg); 2. kör: a mért szinkron
+  useEditorStore.getState().setPlayhead(0);
+  useEditorStore.getState().setPlaying(true);
+  await sleep(3000);
+  useEditorStore.getState().setPlaying(false);
+  await sleep(600);
+  useEditorStore.getState().setPlayhead(0);
+  await sleep(600);
+  startSyncProbe();
+  useEditorStore.getState().setPlaying(true);
+  await sleep(9000);
+  useEditorStore.getState().setPlaying(false);
+  const { samples, starts, seeks } = stopSyncProbe();
+  for (const [cid, st] of summarizeDrift(samples)) {
+    log(null, `drift ${cid} (teljes)`, `átlag ${st.meanMs.toFixed(0)} ms, max ${st.maxMs.toFixed(0)} ms (${st.n} minta)`);
+  }
+  // a beállás után (a klip első 3 mp-e utáni szakasz) — ez a hallható, tartós szinkron
+  for (const [cid, st] of summarizeDrift(samples.filter((x) => x.sinceStart > 3))) {
+    log(st.maxMs <= 45, `szinkron beállás után: ${cid}`, `átlag ${st.meanMs.toFixed(0)} ms, max ${st.maxMs.toFixed(0)} ms`);
+  }
+  for (const [cid, late] of starts) {
+    log(null, `megszólalás ${cid}`, `${(late * 1000).toFixed(0)} ms késéssel`);
+  }
+  log(null, 'korrekciós ugrások', String(seeks));
+  const trace = samples.filter((x) => x.clipId === 'kesobb');
+  for (let k = 0; k < trace.length; k += Math.max(1, Math.floor(trace.length / 30))) {
+    log(null, 'nyom kesobb', `${trace[k].sinceStart.toFixed(2)} s → ${(trace[k].drift * 1000).toFixed(0)} ms`);
+  }
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
+  new File(uri).delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -2942,6 +2991,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'audiosync') {
+    await step('audiosync', () => smokeAudioSync(log));
     return;
   }
   if (phase === 'offline') {

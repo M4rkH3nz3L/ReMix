@@ -4046,6 +4046,7 @@
       },
       "transport": {
         "auto": "Auto",
+        "fit": "Illeszd",
         "snap_off": "Rács ki",
         "snap_frame": "Kocka",
         "snap_beat": "Ütem",

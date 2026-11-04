@@ -4051,6 +4051,7 @@
       },
       "transport": {
         "auto": "Auto",
+        "fit": "Einpassen",
         "snap_off": "Raster aus",
         "snap_frame": "Frame",
         "snap_beat": "Beat",

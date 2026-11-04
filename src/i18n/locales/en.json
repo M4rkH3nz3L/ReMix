@@ -4046,6 +4046,7 @@
       },
       "transport": {
         "auto": "Auto",
+        "fit": "Fit",
         "snap_off": "Snap off",
         "snap_frame": "Frame",
         "snap_beat": "Beat",

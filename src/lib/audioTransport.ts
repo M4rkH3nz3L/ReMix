@@ -145,3 +145,47 @@ export function beatGridForView(
   return out;
 }
 
+/**
+ * 🔍 „Illeszd” nagyítás (PRO-AUDIO 17/2): a teljes projekt kifér a látható szélességbe. Folytonos
+ * px/mp (a lépcsők legkisebbje, 16 px/mp, egy órás projektnél 57 600 px volna); alsó határ, hogy
+ * egy üres vagy rövid projekt se nyúljon szét értelmetlenül.
+ */
+export function fitPxPerSec(viewWidth: number, durationSec: number, padding = 40): number {
+  if (durationSec <= 0 || viewWidth <= padding) {
+    return ZOOM_LEVELS[DEFAULT_ZOOM_INDEX];
+  }
+  return Math.max(0.05, Math.min(ZOOM_LEVELS[ZOOM_LEVELS.length - 1], (viewWidth - padding) / durationSec));
+}
+
+/** Az „illeszd” után a nagyítás-gomb innen lép: a px/mp-hez legközelebbi lépcső. */
+export function nearestZoomIndex(pxPerSec: number): number {
+  let best = 0;
+  for (let i = 1; i < ZOOM_LEVELS.length; i++) {
+    if (Math.abs(Math.log(ZOOM_LEVELS[i] / pxPerSec)) < Math.abs(Math.log(ZOOM_LEVELS[best] / pxPerSec))) {
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Scrub: a vonalzón az ujj x-e (tartalom-koordináta) → idő, a projekt hosszára vágva. */
+export function scrubTime(contentX: number, pxPerSec: number, durationSec: number): number {
+  return Math.max(0, Math.min(durationSec, contentX / Math.max(1e-6, pxPerSec)));
+}
+
+/**
+ * Lejátszófej-követés: ha a lejátszófej a látható sáv jobb 15%-ába ér (vagy kiesik balra),
+ * a nézet úgy lapoz, hogy a lejátszófej a bal 15%-ra kerüljön. `null` = nem kell görgetni.
+ */
+export function followScrollX(playheadX: number, viewX: number, viewWidth: number, contentWidth: number): number | null {
+  if (viewWidth <= 0) {
+    return null;
+  }
+  const inView = playheadX >= viewX && playheadX <= viewX + viewWidth * 0.85;
+  if (inView) {
+    return null;
+  }
+  const target = playheadX - viewWidth * 0.15;
+  return Math.max(0, Math.min(Math.max(0, contentWidth - viewWidth), target));
+}
+

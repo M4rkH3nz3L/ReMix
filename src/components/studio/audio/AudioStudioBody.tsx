@@ -5,7 +5,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -30,7 +30,11 @@ import {
   DEFAULT_ZOOM_INDEX,
   nextBeatSec,
   prevBeatSec,
+  fitPxPerSec,
+  followScrollX,
+  nearestZoomIndex,
   pxPerSecAt,
+  scrubTime,
   rulerTicks,
   snapSec,
   type SnapMode,
@@ -57,6 +61,7 @@ import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
 import { detectBeats } from '@/lib/beats';
 import { beatLinesForClips } from '@/lib/beatMarkers';
+import { registerDevAction } from '@/lib/devActions';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
@@ -155,12 +160,40 @@ export function AudioStudioBody({
   const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
   useFinishRecordingOnLeave(recorder, finishRecordingRef);
 
+  // 🔍 „illeszd” nagyítás: folytonos px/mp (null = a lépcsős nagyítás él)
+  const [fitPps, setFitPps] = useState<number | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollXRef = useRef(0);
+  // a követéshez a friss méretek (a hook a korai return előtt fut, ezért ref-ből olvas)
+  const followRef = useRef({ pps: 56, viewW: 0, contentW: 0 });
+  useEffect(() => {
+    if (!isPlaying) {
+      return;
+    }
+    const { pps, viewW, contentW } = followRef.current;
+    const x = followScrollX(playhead * pps, scrollXRef.current, viewW, contentW);
+    if (x !== null) {
+      scrollRef.current?.scrollTo({ x, animated: false });
+    }
+  }, [playhead, isPlaying]);
+
+  // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void }>({ fit: () => {}, zoomIn: () => {} });
+  useEffect(() => {
+    const offs = [
+      registerDevAction('audio.fit', () => devRef.current.fit()),
+      registerDevAction('audio.zoomIn', () => devRef.current.zoomIn()),
+      registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+
   if (!project) {
     return null;
   }
   const fps = project.fps ?? 30;
   const bpm = project.bpm ?? DEFAULT_BPM;
-  const pxPerSec = pxPerSecAt(zoomIndex);
+  const pxPerSec = fitPps ?? pxPerSecAt(zoomIndex);
   const duration = projectDuration(project);
   const timelineW = Math.max(320, duration * pxPerSec + 40);
   const laneAreaH = RULER_H + LANE_H * LANES.length;
@@ -169,6 +202,7 @@ export function AudioStudioBody({
   const viewFrom = Math.max(0, (view.x - viewW) / pxPerSec);
   const viewTo = Math.min((timelineW - 40) / pxPerSec, (view.x + 2 * viewW) / pxPerSec);
   const ticks = rulerTicks(viewFrom, viewTo, pxPerSec);
+  followRef.current = { pps: pxPerSec, viewW: view.w, contentW: timelineW };
   const selClip = selectedAudioClip(project, selectedClipId);
   // 🎵 beat-rács (ütem-vonalak) a BPM szerint — a látható tartományra + max 300 vonalra sapkázva
   const detectedLines = detectedBeats
@@ -189,14 +223,34 @@ export function AudioStudioBody({
   const timelinePinch = Gesture.Pinch()
     .runOnJS(true)
     .onStart(() => {
-      pinchStartRef.current = zoomIndexRef.current;
+      // az „illeszd” állapotból a legközelebbi lépcsőről indul a csippentés
+      pinchStartRef.current = fitPps !== null ? nearestZoomIndex(fitPps) : zoomIndexRef.current;
     })
     .onUpdate((e) => {
       const next = zoomIndexForPinch(pinchStartRef.current, e.scale, ZOOM_LEVELS.length);
-      if (next !== zoomIndexRef.current) {
+      if (next !== zoomIndexRef.current || fitPps !== null) {
+        setFitPps(null);
         setZoomIndex(next);
       }
     });
+
+  // ↔️ scrub: a vonalzón húzva a lejátszófej követi az ujjat
+  const rulerScrub = Gesture.Pan()
+    .runOnJS(true)
+    .withTestId('audio-ruler-scrub')
+    .minDistance(0)
+    .onBegin((e) => useEditorStore.getState().setPlayhead(scrubTime(e.x, pxPerSec, duration)))
+    .onUpdate((e) => useEditorStore.getState().setPlayhead(scrubTime(e.x, pxPerSec, duration)));
+  const zoomStep = (dir: 1 | -1) => {
+    const from = fitPps !== null ? nearestZoomIndex(fitPps) : zoomIndex;
+    setFitPps(null);
+    setZoomIndex(dir > 0 ? zoomIn(from) : zoomOut(from));
+  };
+  const fitToView = () => {
+    setFitPps(fitPxPerSec(view.w || 1200, duration));
+    scrollRef.current?.scrollTo({ x: 0, animated: false });
+  };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -648,6 +702,7 @@ export function AudioStudioBody({
           </View>
 
           <ScrollView
+            ref={scrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             scrollEventThrottle={16}
@@ -658,6 +713,7 @@ export function AudioStudioBody({
             onScroll={(e) => {
               // csak negyed-képernyőnyi elmozdulásnál rajzol újra (nem minden képkockánál)
               const x = e.nativeEvent.contentOffset.x;
+              scrollXRef.current = x;
               if (Math.abs(x - viewXRef.current) > viewW / 4) {
                 viewXRef.current = x;
                 setView((v) => ({ ...v, x }));
@@ -706,15 +762,17 @@ export function AudioStudioBody({
                 />
               ) : null}
               {/* idővonalzó (timecode) */}
-              <View style={styles.ruler}>
-                {ticks.map((tick) =>
-                  tick.major ? (
-                    <Text key={`t${tick.sec}`} style={[styles.rulerLabel, { left: tick.sec * pxPerSec + 3 }]}>
-                      {formatTime(tick.sec)}
-                    </Text>
-                  ) : null
-                )}
-              </View>
+              <GestureDetector gesture={rulerScrub}>
+                <View style={styles.ruler} testID="audio-ruler">
+                  {ticks.map((tick) =>
+                    tick.major ? (
+                      <Text key={`t${tick.sec}`} style={[styles.rulerLabel, { left: tick.sec * pxPerSec + 3 }]}>
+                        {formatTime(tick.sec)}
+                      </Text>
+                    ) : null
+                  )}
+                </View>
+              </GestureDetector>
               {/* sávok */}
               {LANES.map((lane) => {
                 const track = project.tracks.find((tr) => tr.type === lane.type);
@@ -832,8 +890,9 @@ export function AudioStudioBody({
         />
         <View style={styles.tSep} />
         {/* zoom + snap */}
-        <TBtn icon="remove-circle-outline" onPress={() => setZoomIndex(zoomOut(zoomIndex))} />
-        <TBtn icon="add-circle-outline" onPress={() => setZoomIndex(zoomIn(zoomIndex))} />
+        <TBtn icon="remove-circle-outline" onPress={() => zoomStep(-1)} />
+        <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
+        <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
         <TBtn
           label={t(`studio.audio.transport.snap_${snapMode}`)}
           icon="magnet-outline"

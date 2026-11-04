@@ -53,6 +53,7 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { runDevAction } from '@/lib/devActions';
 import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
 import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
@@ -2500,6 +2501,49 @@ async function smokeAudioMeter(log: Log) {
   new File(loud).delete();
 }
 
+/** PRO-AUDIO 17/2: „illeszd” nagyítás és lejátszófej-követés a valódi stúdióban. */
+async function smokeAudioFit(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_audiofit';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioFit', caught));
+  const uri = toneWav('smoke_fit.wav', 60);
+  const base = createEmptyProject('smoke illeszd', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'h', uri, label: 'hosszú', start: 0, duration: 60, trimIn: 0, sourceDuration: 60, volume: 0.2, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [c] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  const view = () => runDevAction('audio.view') as { scrollX: number; pps: number; viewW: number; contentW: number };
+
+  // követés: nagy nagyítás (220 px/mp), 7 mp lejátszás — a lejátszófejnek a nézetben kell maradnia
+  for (let i = 0; i < 4; i++) {
+    runDevAction('audio.zoomIn');
+    await sleep(300);
+  }
+  useEditorStore.getState().setPlayhead(0);
+  useEditorStore.getState().setPlaying(true);
+  await sleep(9000);
+  useEditorStore.getState().setPlaying(false);
+  await sleep(300);
+  const v1 = view();
+  const x = useEditorStore.getState().playhead * v1.pps;
+  log(x > v1.viewW && v1.scrollX > 0 && x >= v1.scrollX && x <= v1.scrollX + v1.viewW, 'a lejátszófej az első képernyőn túl is a nézetben marad (lapozott)', `lejátszófej ${x.toFixed(0)} px, nézet ${v1.scrollX.toFixed(0)}–${(v1.scrollX + v1.viewW).toFixed(0)} px (${v1.pps} px/mp)`);
+
+  // illeszd: a teljes 60 mp kifér a nézetbe
+  runDevAction('audio.fit');
+  await sleep(600);
+  const v2 = view();
+  log(60 * v2.pps <= v2.viewW && v2.scrollX === 0, '„Illeszd”: a teljes projekt látszik', `${(60 * v2.pps).toFixed(0)} px a ${v2.viewW.toFixed(0)} px-es nézetben`);
+  log(true, 'FOTÓZHATÓ', 'az illesztett idővonal');
+  await sleep(4000);
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
+  new File(uri).delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -3033,6 +3077,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'audiofit') {
+    await step('audiofit', () => smokeAudioFit(log));
     return;
   }
   if (phase === 'audiometer') {

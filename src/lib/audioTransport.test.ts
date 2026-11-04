@@ -1,4 +1,4 @@
-import { beatGridForView, rulerTicks } from '@/lib/audioTransport';
+import { beatGridForView, fitPxPerSec, followScrollX, nearestZoomIndex, rulerTicks, scrubTime } from '@/lib/audioTransport';
 import {
   barsBeatsLabel,
   beatLines,
@@ -99,6 +99,37 @@ describe('beatGridForView (A42)', () => {
     const sparse = beatGridForView(120, 4, 0, 8, 4); // beat = 2 px, ütem = 8 px
     expect(sparse.every((l) => l.downbeat)).toBe(true);
     expect(sparse.map((l) => l.sec)).toEqual([0, 2, 4, 6, 8]);
+  });
+});
+
+describe('illeszd / scrub / követés (PRO-AUDIO 17/2)', () => {
+  it('az egy órás projekt kifér egy 1240 px-es nézetbe', () => {
+    const pps = fitPxPerSec(1240, 3600);
+    expect(3600 * pps).toBeCloseTo(1200, 5);
+  });
+
+  it('rövid projektnél sem nyúlik a legnagyobb nagyítás fölé, üresnél az alap', () => {
+    expect(fitPxPerSec(1240, 1)).toBe(220);
+    expect(fitPxPerSec(1240, 0)).toBe(56);
+  });
+
+  it('az illesztés után a nagyítás a legközelebbi lépcsőről lép', () => {
+    expect(nearestZoomIndex(0.3)).toBe(0);
+    expect(nearestZoomIndex(50)).toBe(3);
+    expect(nearestZoomIndex(1000)).toBe(6);
+  });
+
+  it('scrub: az ujj helye → idő, a projekten belül', () => {
+    expect(scrubTime(560, 56, 60)).toBeCloseTo(10, 5);
+    expect(scrubTime(-20, 56, 60)).toBe(0);
+    expect(scrubTime(99999, 56, 60)).toBe(60);
+  });
+
+  it('követés: a jobb szélre érve lapoz, a nézeten belül nem', () => {
+    expect(followScrollX(500, 0, 1000, 5000)).toBeNull();
+    expect(followScrollX(900, 0, 1000, 5000)).toBe(750);
+    expect(followScrollX(100, 2000, 1000, 5000)).toBe(0);
+    expect(followScrollX(4990, 0, 1000, 5000)).toBe(4000);
   });
 });
 

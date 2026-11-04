@@ -31,7 +31,8 @@ function separateStems(inputPath, outDir, signal) {
       { timeout: 20 * 60 * 1000, maxBuffer: 4 * 1024 * 1024, ...(signal ? { signal } : {}) },
       (err) => {
         if (signal && signal.aborted) {
-          reject(new Error('stems_aborted'));
+          // 499: a kliens lezárta a kérést — nem szerverhiba (`lib/caught.js` isClientError)
+          reject(Object.assign(new Error('stems_aborted'), { status: 499 }));
           return;
         }
         if (err) {

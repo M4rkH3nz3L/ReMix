@@ -18,10 +18,27 @@ function bugStore() {
   return store;
 }
 
+/**
+ * Csak a valódi hiba kerül a `server/bugs/`-ba: a 4xx-es státuszú hiba a KLIENS kérésének a
+ * hibája (nincs ilyen fájl, hiányzó mező), a betelt tárhely a felhasználó állapota — a route
+ * rendesen megválaszolja.
+ */
+function isClientError(error) {
+  if (error && error.name === 'QuotaExceededError') {
+    return true;
+  }
+  const status = error && Number(error.status);
+  return Number.isFinite(status) && status >= 400 && status < 500;
+}
+
 function logCaught(where, error) {
   try {
     const name = (error && error.name) || 'Error';
     const message = redactSecrets(String((error && error.message) || error));
+    if (isClientError(error)) {
+      log.info('caught-client-error', { where, status: error.status, error: message });
+      return;
+    }
     log.warn('caught', { where, error: message });
     if (process.env.NODE_ENV === 'test') {
       return;
@@ -65,4 +82,4 @@ function loggedFetch(impl = fetch) {
   };
 }
 
-module.exports = { logCaught, loggedFetch };
+module.exports = { logCaught, loggedFetch, isClientError };

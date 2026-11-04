@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { AppState, Platform } from 'react-native';
 
+import { caughtVerdict } from '@/lib/caughtPolicy';
 import { cloudBaseUrl } from '@/lib/backend';
 import {
   buildBugPayload,
@@ -378,10 +379,15 @@ function timeout(ms: number): Promise<void> {
 export function installGlobalBugHandlers(): void {
   // 📋 minden elkapott hiba ugyanezen a kímélő úton megy (ritkítás, sor, kötegelés)
   setCaughtSink((error, where, errorClass) => {
+    // 📋 csak a valódi hiba megy a naplóba; a várt állapot (offline, …) csak a fejlesztői konzolba
+    const verdict = caughtVerdict(error, where);
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      console.log(`[CAUGHT] ${where} (${errorClass}): ${normalizeError(error).message.slice(0, 160)}`);
+      const tag = verdict.report ? `[CAUGHT] ${where} (${errorClass})` : `[VÁRT] ${where} (${verdict.reason})`;
+      console.log(`${tag}: ${normalizeError(error).message.slice(0, 160)}`);
     }
-    void reportBug(error, { kind: 'handled', extra: { where, errorClass } });
+    if (verdict.report) {
+      void reportBug(error, { kind: 'handled', extra: { where, errorClass } });
+    }
   });
   const g = globalThis as BugGlobals;
   if (g.__remixBugHandlersInstalled || !reportsEnabled() || Platform.OS === 'web') {

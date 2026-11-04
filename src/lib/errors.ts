@@ -57,7 +57,7 @@ export function classifyError(e: unknown): ErrorKind {
     return 'unknown';
   }
   if (
-    /(network request failed|failed to fetch|network error|timeout|timed out|abort|offline|econnrefused|enotfound|nincs kapcsolat|hálózat)/.test(
+    /(network request failed|failed to fetch|network error|timeout|timed out|abort|offline|econnrefused|enotfound|nincs kapcsolat|hálózat|could not connect|connection (was )?lost|kapcsolódni|nem válaszolt)/.test(
       s
     )
   ) {

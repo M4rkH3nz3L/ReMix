@@ -46,6 +46,8 @@ export interface DecodedSource {
 }
 
 export interface OfflineMixClip {
+  /** a sáv, amin a klip ül (a sávonkénti szintmérőhöz) */
+  track: TrackType;
   uri: string;
   start: number;
   duration: number;
@@ -85,6 +87,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       if (clip.deReverb) unsupported.add('deReverb');
       if (clip.autoDuck) unsupported.add('autoDuck');
       clips.push({
+        track: track.type,
         uri: clip.uri,
         start: clip.start,
         duration: clip.duration,

@@ -53,6 +53,9 @@ import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptio
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { analyzeMix } from '@/lib/analyzeMix';
+import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
+import { offlineMixPlan } from '@/lib/offlineMix';
+import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
@@ -2458,6 +2461,45 @@ async function smokeAudioSync(log: Log) {
   new File(uri).delete();
 }
 
+/** PRO-AUDIO 17/8: élő szintmérő a valódi stúdióban (képernyőkép lejátszás közben). */
+async function smokeAudioMeter(log: Log) {
+  const id = 'prj_smoke_audiometer';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioMeter', caught));
+  const half = toneWav('smoke_meter_half.wav', 6);
+  const loud = stereoRightWav('smoke_meter_loud.wav', 6, 0.99, 0);
+  const base = createEmptyProject('smoke szintmérő', '9:16', undefined, 'audio');
+  const mk = (cid: string, uri: string): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start: 0, duration: 6, trimIn: 0, sourceDuration: 6, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('fel', half)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('hangos1', loud), mk('hangos2', loud)] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  useEditorStore.getState().setPlayhead(0);
+  useEditorStore.getState().setPlaying(true);
+  await sleep(2000);
+  const p = useEditorStore.getState().project!;
+  const plan = offlineMixPlan(p);
+  const waves = new Map<string, WaveformData>();
+  for (const u of [half, loud]) {
+    const w = await getWaveform(u, { userInitiated: true });
+    if (w) waves.set(u, w);
+  }
+  const t = useEditorStore.getState().playhead;
+  const music = trackLevelAt(plan.clips.filter((c) => c.track === 'music'), (u) => waves.get(u), t);
+  const sfx = trackLevelAt(plan.clips.filter((c) => c.track === 'sfx'), (u) => waves.get(u), t);
+  log(Math.abs(levelDb(music) + 6.2) < 1, 'zene-sáv szintje', `${levelDb(music).toFixed(1)} dB`);
+  log(sfx >= CLIP_LEVEL, 'effekt-sáv túlvezérelt', `${levelDb(sfx).toFixed(1)} dB`);
+  log(true, 'FOTÓZHATÓ', 'a szintmérők lejátszás közben');
+  await sleep(2500);
+  useEditorStore.getState().setPlaying(false);
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
+  new File(half).delete();
+  new File(loud).delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -2991,6 +3033,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'audiometer') {
+    await step('audiometer', () => smokeAudioMeter(log));
     return;
   }
   if (phase === 'audiosync') {

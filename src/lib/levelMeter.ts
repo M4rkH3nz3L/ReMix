@@ -41,3 +41,39 @@ export function levelDb(level: number): number {
 export function meterFill(level: number): number {
   return Math.max(0, Math.min(1, (levelDb(level) + 60) / 60));
 }
+
+export interface ClipRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * 🔴 Túlvezérlés-pontok a teljes projekten (PRO-AUDIO 17/8): a mix szintje (`trackLevelAt` az
+ * összes sávon) `stepSec`-enként; a 0 dBFS fölötti szakaszok összevonva. A vonalzón jelölve
+ * lejátszás nélkül is látszik, hol kell halkítani.
+ */
+export function clipRanges(
+  clips: OfflineMixClip[],
+  waveOf: (uri: string) => WaveformData | null | undefined,
+  durationSec: number,
+  stepSec = 1 / 32
+): ClipRange[] {
+  const out: ClipRange[] = [];
+  let open: ClipRange | null = null;
+  for (let t = 0; t < durationSec; t += stepSec) {
+    const over = trackLevelAt(clips, waveOf, t) >= CLIP_LEVEL;
+    if (over && !open) {
+      open = { start: t, end: t + stepSec };
+    } else if (over && open) {
+      open.end = t + stepSec;
+    } else if (!over && open) {
+      out.push(open);
+      open = null;
+    }
+  }
+  if (open) {
+    out.push({ start: open.start, end: Math.min(durationSec, open.end) });
+  }
+  return out;
+}
+

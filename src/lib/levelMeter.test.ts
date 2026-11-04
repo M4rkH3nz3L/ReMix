@@ -1,4 +1,4 @@
-import { CLIP_LEVEL, levelDb, meterFill, trackLevelAt } from '@/lib/levelMeter';
+import { CLIP_LEVEL, clipRanges, levelDb, meterFill, trackLevelAt } from '@/lib/levelMeter';
 import type { OfflineMixClip } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 
@@ -40,3 +40,21 @@ describe('levelDb / meterFill', () => {
     expect(meterFill(0.5)).toBeCloseTo((60 - 6.02) / 60, 2);
   });
 });
+
+describe('clipRanges — túlvezérlés-pontok', () => {
+  // 0–1 mp halk (0.4), 1–2 mp hangos (0.9); két egymásra tett klip → 1–2 mp között 1.8
+  const w: WaveformData = { duration: 3, peaksPerSecond: 4, peaks: [0.4, 0.4, 0.4, 0.4, 0.9, 0.9, 0.9, 0.9, 0.4, 0.4, 0.4, 0.4] };
+  const c = (id: string): OfflineMixClip => ({ track: 'music', uri: id, start: 0, duration: 3, trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, pan: 0, gain: 1 });
+
+  it('csak a túlvezérelt szakaszt jelöli, összevonva', () => {
+    const r = clipRanges([c('a'), c('b')], () => w, 3, 0.25);
+    expect(r).toHaveLength(1);
+    expect(r[0].start).toBeCloseTo(1, 5);
+    expect(r[0].end).toBeCloseTo(2, 5);
+  });
+
+  it('tiszta mixnél nincs jelölés', () => {
+    expect(clipRanges([c('a')], () => w, 3, 0.25)).toEqual([]);
+  });
+});
+

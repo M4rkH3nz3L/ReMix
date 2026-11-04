@@ -2,7 +2,7 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { StyleSheet } from 'react-native';
 
-import { LaneMeter } from '@/components/studio/audio/LaneMeter';
+import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { palette } from '@/constants/editor';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
@@ -50,3 +50,35 @@ describe('LaneMeter', () => {
     useEditorStore.setState({ mutedTracks: [] });
   });
 });
+
+describe('MasterMeter és ClipMarkers', () => {
+  it('a master a sávok összegét mutatja: két fél szintű sáv együtt teli', async () => {
+    const p = createEmptyProject('m', '1:1', undefined, 'audio');
+    useEditorStore.getState().loadProject(
+      { ...p, tracks: p.tracks.map((t) => (t.type === 'music' || t.type === 'sfx' ? { ...t, clips: [clip({ id: t.type })] } : t)) },
+      []
+    );
+    useEditorStore.getState().setPlayhead(1);
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(<MasterMeter />);
+    });
+    await act(async () => {});
+    expect(StyleSheet.flatten(r.root.findByProps({ testID: 'master-meter-fill' }).props.style).backgroundColor).toBe(palette.danger);
+  });
+
+  it('a vonalzó a teljes szintű szakaszt jelöli (2–4 mp), a fél szintűt nem', async () => {
+    await mount([clip({ volume: 1 })], 0);
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(<ClipMarkers pxPerSec={10} />);
+    });
+    await act(async () => {});
+    const markers = r.root.findAll((n) => n.props.testID === 'clip-marker' && typeof n.type !== 'string' && n.props.pointerEvents === 'none');
+    expect(markers).toHaveLength(1);
+    const st = StyleSheet.flatten(markers[0].props.style);
+    expect(st.left).toBeCloseTo(20, 0);
+    expect(st.width).toBeCloseTo(20, 0);
+  });
+});
+

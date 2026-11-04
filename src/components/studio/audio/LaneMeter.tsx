@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { mixForExport } from '@/lib/audioExportMix';
-import { CLIP_LEVEL, levelDb, meterFill, trackLevelAt } from '@/lib/levelMeter';
-import { offlineMixPlan } from '@/lib/offlineMix';
+import { CLIP_LEVEL, clipRanges, levelDb, meterFill, trackLevelAt } from '@/lib/levelMeter';
+import { offlineMixPlan, type OfflineMixClip } from '@/lib/offlineMix';
 import { getWaveform, type WaveformData } from '@/lib/waveform';
 import { useEditorStore } from '@/store/editorStore';
 import type { TrackType } from '@/types/project';
@@ -17,22 +17,21 @@ const CLIP_HOLD_SEC = 2;
  * hullámforma-csúcsokból × az export erősítéseivel (`trackLevelAt`). −6 dB fölött sárga,
  * túlvezérlésnél piros, és a piros 2 mp-ig megmarad (a pillanatnyi túllépés is látszik).
  */
-export function LaneMeter({ type }: { type: TrackType }) {
+/** A keverési terv (ugyanaz, mint az exportban: némítás, solo, master) + a forrás-hullámformák. */
+function useMixMeterData(): { clips: OfflineMixClip[]; waveOf: (uri: string) => WaveformData | undefined; duration: number } {
   const project = useEditorStore((s) => s.project);
-  const playhead = useEditorStore((s) => s.playhead);
   const masterVolume = useEditorStore((s) => s.masterVolume);
   const muted = useEditorStore((s) => s.mutedTracks);
   const solo = useEditorStore((s) => s.soloTracks);
-
-  // a keverési terv: ugyanaz, mint az exportban (némítás, solo, master)
-  const clips = useMemo(() => {
+  const { clips, duration } = useMemo(() => {
     if (!project) {
-      return [];
+      return { clips: [] as OfflineMixClip[], duration: 0 };
     }
     const audible = (t: TrackType) => (solo.length > 0 ? solo.includes(t) : !muted.includes(t));
     const mix = mixForExport(project, audible, masterVolume);
-    return mix ? offlineMixPlan(mix).clips.filter((c) => c.track === type) : [];
-  }, [project, masterVolume, muted, solo, type]);
+    const plan = mix ? offlineMixPlan(mix) : null;
+    return { clips: plan?.clips ?? [], duration: plan?.duration ?? 0 };
+  }, [project, masterVolume, muted, solo]);
 
   const [waves, setWaves] = useState<Map<string, WaveformData>>(new Map());
   const uris = useMemo(() => [...new Set(clips.map((c) => c.uri))].sort().join('|'), [clips]);
@@ -51,8 +50,14 @@ export function LaneMeter({ type }: { type: TrackType }) {
       alive = false;
     };
   }, [uris]);
+  const waveOf = useCallback((uri: string) => waves.get(uri), [waves]);
+  return { clips, waveOf, duration };
+}
 
-  const level = trackLevelAt(clips, (uri) => waves.get(uri), playhead);
+export function LaneMeter({ type }: { type: TrackType }) {
+  const playhead = useEditorStore((s) => s.playhead);
+  const { clips, waveOf } = useMixMeterData();
+  const level = trackLevelAt(clips.filter((c) => c.track === type), waveOf, playhead);
   // a piros a lejátszófej idejében tart ki (a túllépés után 2 mp-ig), szünetben is
   const clipAt = useRef<number | null>(null);
   if (level >= CLIP_LEVEL) {
@@ -81,4 +86,42 @@ export function LaneMeter({ type }: { type: TrackType }) {
 const styles = StyleSheet.create({
   track: { width: 44, height: 4, borderRadius: 2, backgroundColor: `${palette.border}`, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2 },
+  master: { width: 56, height: 6, borderRadius: 3, backgroundColor: `${palette.border}`, overflow: 'hidden', alignSelf: 'center' },
+  masterFill: { height: 6, borderRadius: 3 },
+  marker: { position: 'absolute', bottom: 0, height: 3, backgroundColor: palette.danger },
 });
+
+/** 📶 Master-mérő: a teljes mix szintje a lejátszófejnél (a sávok összege — felső becslés). */
+export function MasterMeter() {
+  const playhead = useEditorStore((s) => s.playhead);
+  const { clips, waveOf } = useMixMeterData();
+  const level = trackLevelAt(clips, waveOf, playhead);
+  const clipping = level >= CLIP_LEVEL;
+  const db = levelDb(level);
+  return (
+    <View style={styles.master} testID="master-meter" accessibilityLabel={`Master ${Math.round(db)} dB${clipping ? ' — túlvezérlés' : ''}`}>
+      <View
+        testID="master-meter-fill"
+        style={[styles.masterFill, { width: `${Math.round(meterFill(level) * 100)}%`, backgroundColor: clipping ? palette.danger : db > -6 ? '#f5c542' : '#39d98a' }]}
+      />
+    </View>
+  );
+}
+
+/** 🔴 A vonalzó alján: a túlvezérelt szakaszok a teljes projekten (lejátszás nélkül is látszik). */
+export function ClipMarkers({ pxPerSec }: { pxPerSec: number }) {
+  const { clips, waveOf, duration } = useMixMeterData();
+  const ranges = useMemo(() => clipRanges(clips, waveOf, duration), [clips, waveOf, duration]);
+  return (
+    <>
+      {ranges.map((r) => (
+        <View
+          key={`clip${r.start}`}
+          testID="clip-marker"
+          pointerEvents="none"
+          style={[styles.marker, { left: r.start * pxPerSec, width: Math.max(2, (r.end - r.start) * pxPerSec) }]}
+        />
+      ))}
+    </>
+  );
+}

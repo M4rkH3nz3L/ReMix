@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
-import { LaneMeter } from '@/components/studio/audio/LaneMeter';
+import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
@@ -764,6 +764,7 @@ export function AudioStudioBody({
               {/* idővonalzó (timecode) */}
               <GestureDetector gesture={rulerScrub}>
                 <View style={styles.ruler} testID="audio-ruler">
+                  <ClipMarkers pxPerSec={pxPerSec} />
                   {ticks.map((tick) =>
                     tick.major ? (
                       <Text key={`t${tick.sec}`} style={[styles.rulerLabel, { left: tick.sec * pxPerSec + 3 }]}>
@@ -873,6 +874,7 @@ export function AudioStudioBody({
             {formatTime(playhead)} / {formatTime(duration)}
           </Text>
           <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead)}</Text>
+          <MasterMeter />
         </View>
         <View style={styles.tSep} />
         {/* BPM léptető + auto-felismerés (a kiválasztott/első hang-klipből) */}

@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useIsFocused } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { probeDrift, syncProbeOn } from '@/lib/audioSyncProbe';
+import { INITIAL_DRIFT, INITIAL_START_LATENCY_SEC, learnStartLatency, planDriftCorrection, VIDEO_SYNC_TOLERANCE_SEC, type DriftState } from '@/lib/avSync';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -64,6 +66,9 @@ import type {
   VideoClip,
 } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+
+/** ⏱️ a videólejátszó tanult indítási késése (mp) — eszköz-szintű, mért kezdőértékkel */
+let videoStartLatencySec = INITIAL_START_LATENCY_SEC;
 
 const IDENTITY: CanvasTransform = { scale: 1, x: 0, y: 0 };
 
@@ -229,6 +234,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   const splitStartX = useSharedValue(0);
 
   const player = useVideoPlayer(null);
+  const driftRef = useRef<DriftState>(INITIAL_DRIFT);
   const loadedUriRef = useRef<string | null>(null);
 
   // az előnézet a 720p vágási proxyt játssza, ha már elkészült — a klip
@@ -295,13 +301,48 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
   // play/pause követése — ⚠️ csak a FÓKUSZÁLT képernyőn. A szerkesztő mountolva
   // marad a lejátszó képernyő mögött (`push`), kapu nélkül tehát két videó szólna
   // egyszerre ugyanarra az `isPlaying` állapotra.
+  const playStartRef = useRef(0);
+  const latencyLearnedRef = useRef(false);
   useEffect(() => {
     if (isPlaying && videoClip && isFocused) {
+      // ⏱️ T1: a tanult indítási késéssel előrébb indul (a lejátszó ~0,2 mp-ig áll a play után)
+      if (videoStartLatencySec > 0) {
+        try {
+          player.currentTime = sourceTimeAt(videoClip, useEditorStore.getState().playhead) + videoStartLatencySec;
+        } catch (caught) {
+          logCaught('components/preview/PreviewSurface.tsx:playStart', caught);
+        }
+      }
+      playStartRef.current = Date.now();
+      latencyLearnedRef.current = false;
       player.play();
     } else {
       player.pause();
     }
-  }, [player, isPlaying, videoClip, isFocused]);
+    // a klip-adat a store-ból jön; az indítás csak a lejátszás / fókusz váltására fut
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, isPlaying, videoClip?.id, isFocused]);
+
+  // 🎬 T1: klipváltás UGYANABBÓL a fájlból (nincs forráscsere): a lejátszó a régi helyről
+  // futna tovább (mérve: ~1 mp-es tévedés) — azonnal a helyes pontra ugrik
+  const clipIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const idNow = videoClip?.id ?? null;
+    if (idNow === clipIdRef.current) {
+      return;
+    }
+    clipIdRef.current = idNow;
+    if (!videoClip || !useEditorStore.getState().isPlaying || loadedUriRef.current !== playbackUri) {
+      return;
+    }
+    try {
+      player.currentTime = sourceTimeAt(videoClip, useEditorStore.getState().playhead) + videoStartLatencySec;
+      driftRef.current = { ...driftRef.current, lastSeekMs: Date.now() };
+    } catch (caught) {
+      logCaught('components/preview/PreviewSurface.tsx:clipSwitch', caught);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoClip?.id]);
 
   // 🔒 a natív lejátszó néha MAGÁTÓL elindul (iOS AVPlayer seek után) — ilyenkor a
   // store SZÜNETEL, a mesteróra áll (a lejátszófej/timeline nem mozog), a gomb
@@ -348,8 +389,21 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     }
     const want = sourceTimeAt(videoClip, playhead);
     try {
-      if (Math.abs(player.currentTime - want) > 0.35) {
-        player.currentTime = want;
+      if (syncProbeOn() && player.playing) {
+        probeDrift('kép', want, player.currentTime, playhead - videoClip.start);
+      }
+      // 🎚️ T1: tanuló korrekció 40 ms tűréssel (mérve: a kép régen ~220 ms-mal ÁLLANDÓAN a
+      // lejátszófej mögött járt — a zene, a felirat és a vágás ennyivel előbb volt a képnél)
+      const now = Date.now();
+      const sinceStart = now - playStartRef.current;
+      if (!latencyLearnedRef.current && player.playing && sinceStart > 400 && sinceStart < 1200) {
+        latencyLearnedRef.current = true;
+        videoStartLatencySec = learnStartLatency(videoStartLatencySec, videoStartLatencySec + (want - player.currentTime));
+      }
+      const plan = planDriftCorrection(driftRef.current, want, player.currentTime, now, VIDEO_SYNC_TOLERANCE_SEC);
+      driftRef.current = plan.next;
+      if (plan.seekTo !== null) {
+        player.currentTime = plan.seekTo;
       }
     } catch (caught) {
       logCaught('components/preview/PreviewSurface.tsx:PreviewSurface', caught);

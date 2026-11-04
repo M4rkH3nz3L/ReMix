@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /**
  * 🎚️ A/V-szinkron mag (CORE §2.6) — a lejátszófejhez tartozó FORRÁS-idő egy
  * média-klipen, és a drift-korrekció döntése. Pure → headless tesztelhető (nincs
@@ -46,7 +48,15 @@ export function shouldResync(
  * sebesség-váltás leállást okoz, az eltérés 1,3–1,7 mp-ig nőtt — nem használható.
  */
 export const SYNC_TOLERANCE_SEC = 0.04;
+/**
+ * A KÉP tűrése: a videólejátszónál minden seek ~0,2 mp leállást okoz, ezért a 40 ms körüli
+ * maradéknál folyton igazítana (mérve: kiugrások). A kép–hang szinkron szabványos tűrése
+ * aszimmetrikus (~ +45 / −125 ms); 60 ms-sal a beállt eltérés 22–46 ms (iPad, mérve), kiugrás nélkül.
+ */
+export const VIDEO_SYNC_TOLERANCE_SEC = 0.06;
 export const MIN_SEEK_GAP_MS = 600;
+/** ennyi egymást követő tűrésen kívüli mérés kell a seekhez (~80 ms a 60 Hz-es órán) */
+export const PERSIST_SAMPLES = 5;
 const MAX_COMP_SEC = 0.5;
 
 export interface DriftState {
@@ -54,25 +64,34 @@ export interface DriftState {
   comp: number;
   lastSeekMs: number;
   seeks: number;
+  /** hány egymást követő mérés volt a tűrésen kívül */
+  over: number;
 }
 
-export const INITIAL_DRIFT: DriftState = { comp: 0, lastSeekMs: -Infinity, seeks: 0 };
+export const INITIAL_DRIFT: DriftState = { comp: 0, lastSeekMs: -Infinity, seeks: 0, over: 0 };
 
 export function planDriftCorrection(
   st: DriftState,
   expectedSec: number,
   actualSec: number,
-  nowMs: number
+  nowMs: number,
+  toleranceSec: number = SYNC_TOLERANCE_SEC
 ): { seekTo: number | null; next: DriftState } {
   const drift = expectedSec - actualSec;
-  if (Math.abs(drift) <= SYNC_TOLERANCE_SEC || nowMs - st.lastSeekMs < MIN_SEEK_GAP_MS) {
-    return { seekTo: null, next: st };
+  if (Math.abs(drift) <= toleranceSec) {
+    return { seekTo: null, next: st.over === 0 ? st : { ...st, over: 0 } };
+  }
+  // szűrés: csak a TARTÓS eltérés indít seeket (mérve: egyetlen ugráló mérésre indított
+  // utólagos seek maga okozta a ~100 ms-os kiugrást — a seek közben a lejátszó ideje ugrál)
+  const over = st.over + 1;
+  if (over < PERSIST_SAMPLES || nowMs - st.lastSeekMs < MIN_SEEK_GAP_MS) {
+    return { seekTo: null, next: { ...st, over } };
   }
   // csillapítva (a felét tanulja): a seek-késés ingadozik, a teljes átvétel túllövést adott
   const comp = st.seeks > 0 ? Math.max(-MAX_COMP_SEC, Math.min(MAX_COMP_SEC, st.comp + drift * 0.5)) : st.comp;
   return {
     seekTo: Math.max(0, expectedSec + comp),
-    next: { comp, lastSeekMs: nowMs, seeks: st.seeks + 1 },
+    next: { comp, lastSeekMs: nowMs, seeks: st.seeks + 1, over: 0 },
   };
 }
 
@@ -97,4 +116,10 @@ export function learnStartLatency(prevSec: number, observedSec: number): number 
   const next = prevSec === 0 ? observedSec : prevSec * 0.5 + observedSec * 0.5;
   return Math.max(0, Math.min(0.5, next));
 }
+
+/**
+ * ⏱️ A KÉP-lejátszó indítási késésének kezdőértéke a tanulás előtt: iOS-en mérve ~0,2 mp —
+ * 0,15-ről indul; máshol 0 (tanul). A hang-lejátszó 0-ról tanul (mérve: ott a kezdőérték rontott).
+ */
+export const INITIAL_START_LATENCY_SEC = Platform.OS === 'ios' ? 0.15 : 0;
 

@@ -2454,9 +2454,14 @@ async function smokeAudioSync(log: Log) {
     log(null, `megszólalás ${cid}`, `${(late * 1000).toFixed(0)} ms késéssel`);
   }
   log(null, 'korrekciós ugrások', String(seeks));
-  const trace = samples.filter((x) => x.clipId === 'kesobb');
-  for (let k = 0; k < trace.length; k += Math.max(1, Math.floor(trace.length / 30))) {
-    log(null, 'nyom kesobb', `${trace[k].sinceStart.toFixed(2)} s → ${(trace[k].drift * 1000).toFixed(0)} ms`);
+  for (const cid of ['elejetol', 'kesobb']) {
+    const trace = samples.filter((x) => x.clipId === cid && x.sinceStart > 3);
+    let worst = 0;
+    trace.forEach((x, k) => {
+      if (Math.abs(x.drift) > Math.abs(trace[worst]?.drift ?? 0)) worst = k;
+    });
+    const around = trace.slice(Math.max(0, worst - 6), worst + 10).map((x) => `${x.sinceStart.toFixed(2)}:${(x.drift * 1000).toFixed(0)}`).join(' ');
+    log(null, `kiugrás ${cid}`, around);
   }
   router.back();
   await sleep(800);
@@ -2710,6 +2715,41 @@ async function smokeAudioEdge(log: Log) {
   await sleep(800);
   await deleteProject(id);
   new File(uri).delete();
+}
+
+/** T1: a videó-szerkesztő képe a lejátszófejhez képest (a zene, a felirat és a vágások ehhez igazodnak). */
+async function smokeVideoSync(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const asset = Asset.fromModule(require('../../assets/videos/fekvo.mp4'));
+  await asset.downloadAsync();
+  const uri = asset.localUri ?? asset.uri;
+  const id = 'prj_smoke_videosync';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:videoSync', caught));
+  const base = createEmptyProject('smoke kép-szinkron', '16:9');
+  const v = (cid: string, start: number, trimIn: number) => ({ id: cid, kind: 'video', uri, start, duration: 4, trimIn, sourceDuration: 10, speed: 1, volume: 0.2, filterId: 'none' }) as VideoClip;
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [v('elso', 0, 0), v('masodik', 4, 5)] } : tr)) });
+  router.push(`/editor/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(2500);
+  useEditorStore.getState().setPlayhead(0);
+  await sleep(600);
+  startSyncProbe();
+  useEditorStore.getState().setPlaying(true);
+  await sleep(7500);
+  useEditorStore.getState().setPlaying(false);
+  const { samples } = stopSyncProbe();
+  // a klip-idő (sinceStart) mindkét klipnél a saját elejétől számol; a korrekció ~2,5 mp alatt áll be
+  const steady = summarizeDrift(samples.filter((x) => x.sinceStart > 2.5)).get('kép');
+  log(steady ? steady.maxMs <= 60 : false, 'kép-szinkron beállás után a kép-tűrésen (60 ms) belül (mindkét klip)', steady ? `átlag ${steady.meanMs.toFixed(0)} ms, max ${steady.maxMs.toFixed(0)} ms (${steady.n} minta)` : 'nincs minta');
+  const start = summarizeDrift(samples.filter((x) => x.sinceStart <= 2.5)).get('kép');
+  log(null, 'átmenetek (indulás, klipváltás: első 2,5 mp)', start ? `átlag ${start.meanMs.toFixed(0)} ms, max ${start.maxMs.toFixed(0)} ms` : 'nincs minta');
+  const trace = samples.filter((x) => x.clipId === 'kép');
+  log(null, 'nyom kép', trace.filter((_, k) => k % Math.max(1, Math.floor(trace.length / 16)) === 0).map((x) => `${x.sinceStart.toFixed(1)}→${(x.drift * 1000).toFixed(0)}`).join(' '));
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
 }
 
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
@@ -3245,6 +3285,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'videosync') {
+    await step('videosync', () => smokeVideoSync(log));
     return;
   }
   if (phase === 'audioedge') {

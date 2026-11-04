@@ -14,6 +14,7 @@ import type { AudioClip, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 /** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
+// a hangnál 0-ról tanul: a 0,15-ös kezdőérték mérve időnként utólagos igazítást okozott
 let startLatencySec = 0;
 
 /** a hangot hordozó sávok — mindhez saját lejátszó, egyszerre szólnak */

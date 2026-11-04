@@ -11,6 +11,7 @@ import { parseSrt } from '@/lib/srt';
 import type { SrtCue } from '@/lib/srt';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { readAudioTags, tagLabel, type AudioTags } from '@/lib/audioTags';
 
 export interface PickedVideo {
   uri: string;
@@ -256,7 +257,30 @@ export async function pickAudio(): Promise<PickedAudio | null> {
   const duration = await probeAudioDuration(uri).catch((caught) => { logCaught('lib/media.ts:pickAudio', caught); return 0; });
   // 🎵 §5 bevételi osztályozás: barátságos hiba/figyelmeztetés a néma kudarc helyett
   const intake = classifyAudioIntake({ uri, name: asset.name, durationSec: duration });
-  return { uri, name: asset.name, duration, intake };
+  // 🏷️ a klip neve a fájl címkéjéből („előadó – cím”), ha van — különben a fájlnév
+  return { uri, name: tagLabel(readFileTags(uri), asset.name), duration, intake };
+}
+
+const TAG_WINDOW = 256 * 1024;
+
+/** A hangfájl címkéje: a fájl elejét és végét olvassa (az MP4/WAV címkéje a végén is lehet). */
+export function readFileTags(uri: string): AudioTags {
+  try {
+    const file = new File(uri);
+    const size = file.size ?? 0;
+    const handle = file.open();
+    try {
+      const head = handle.readBytes(Math.min(size, TAG_WINDOW));
+      handle.offset = Math.max(0, size - TAG_WINDOW);
+      const tail = handle.readBytes(Math.min(size, TAG_WINDOW));
+      return readAudioTags(head, tail);
+    } finally {
+      handle.close();
+    }
+  } catch (caught) {
+    logCaught('lib/media.ts:readFileTags', caught);
+    return {};
+  }
 }
 
 export interface PickedLut {

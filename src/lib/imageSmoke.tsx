@@ -47,7 +47,8 @@ import { photoBytesPerPixel } from '@/components/studio/image/exportEstimate';
 import { readExportFacts } from '@/components/studio/image/exportVerify';
 import { expectsAlpha, exportProblems, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { customExportSize, formatBytes } from '@/lib/imageExport';
-import { downloadToCache, ingestImageFile, probeAudioDuration } from '@/lib/media';
+import { downloadToCache, ingestImageFile, probeAudioDuration, readFileTags } from '@/lib/media';
+import { tagLabel } from '@/lib/audioTags';
 import { exportAudioFile, exportAudioToFile, isRenderCancelledError } from '@/lib/render';
 import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptions';
 import { projectExportDir } from '@/lib/model3dRenderClient';
@@ -2618,6 +2619,31 @@ async function smokeVideoAudioExport(log: Log, setHarness: (n: ReactNode) => voi
   setHarness(null);
 }
 
+/** PRO-AUDIO 17/1: a címke a fájl VÉGÉN (WAV LIST/INFO a data után) — a telefonos fájlolvasással. */
+async function smokeAudioTags(log: Log) {
+  const uri = toneWav('smoke_tags.wav', 1);
+  const enc = (str: string) => Array.from(unescape(encodeURIComponent(str)), (ch) => ch.charCodeAt(0));
+  const sub = (id: string, text: string) => {
+    const v = [...enc(text), 0];
+    if (v.length % 2) v.push(0);
+    const n = v.length;
+    return [...enc(id), n & 255, (n >> 8) & 255, (n >> 16) & 255, n >>> 24, ...v];
+  };
+  const info = [...enc('INFO'), ...sub('INAM', 'Őszi éjszaka'), ...sub('IART', 'Kovács Béla')];
+  const list = [...enc('LIST'), info.length & 255, (info.length >> 8) & 255, 0, 0, ...info];
+  const file = new File(uri);
+  const old = file.bytesSync();
+  const out = new Uint8Array(old.length + list.length);
+  out.set(old, 0);
+  out.set(list, old.length);
+  new DataView(out.buffer).setUint32(4, out.length - 8, true);
+  file.write(out);
+  const tags = readFileTags(uri);
+  log(tags.title === 'Őszi éjszaka' && tags.artist === 'Kovács Béla', 'a fájl végén lévő címke a telefonon kiolvasva', JSON.stringify(tags));
+  log(tagLabel(tags, 'smoke_tags.wav') === 'Kovács Béla – Őszi éjszaka', 'a klip neve a címkéből', tagLabel(tags, 'smoke_tags.wav'));
+  file.delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -3151,6 +3177,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'audiotags') {
+    await step('audiotags', () => smokeAudioTags(log));
     return;
   }
   if (phase === 'videoaudio') {

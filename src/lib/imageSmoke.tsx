@@ -2644,6 +2644,74 @@ async function smokeAudioTags(log: Log) {
   file.delete();
 }
 
+/** Stabilitás: szélsőséges esetek a hang-oldalon — semmi ne essen szét, minden hiba érthető legyen. */
+async function smokeAudioEdge(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // 1) üres projekt
+  const empty = createEmptyProject('smoke üres', '1:1', undefined, 'audio');
+  const plan = offlineMixPlan(empty);
+  log(mixForExport(empty, () => true, 1) === null && plan.clips.length === 0 && trackLevelAt(plan.clips, () => undefined, 0) === 0, 'üres projekt: nincs export, nincs hiba');
+  // 2) hiányzó fájl a telefonos exportban: érthető hiba
+  const missing: AudioClip = { kind: 'audio', id: 'm', uri: `${Paths.document.uri}nincs_ilyen.wav`, label: 'hiányzik', start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const withMissing: Project = { ...empty, tracks: empty.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [missing] } : tr)) };
+  const err = await exportOfflineWav(withMissing, new File(projectExportDir(), 'smoke_missing.wav')).then(() => 'nincs hiba', (e: Error) => e.message);
+  log(err.includes('nincs_ilyen.wav'), 'hiányzó fájl: érthető hibaüzenet, a fájl nevével', err);
+  log(!new File(projectExportDir(), 'smoke_missing.wav').exists, 'hiányzó fájl: nem marad félkész export');
+  // 3) túl hosszú projekt: a felső határ érthető
+  const long: Project = { ...withMissing, tracks: withMissing.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [{ ...missing, duration: 21 * 60, sourceDuration: 21 * 60 }] } : tr)) };
+  const errLong = await exportOfflineWav(long, new File(projectExportDir(), 'smoke_long.wav')).then(() => 'nincs hiba', (e: Error) => e.message);
+  log(/20/.test(errLong), 'túl hosszú projekt: érthető üzenet a határral', errLong);
+  // 4) gyors nyitás-zárás a stúdióban
+  const id = 'prj_smoke_audioedge';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioEdge', caught));
+  const uri = toneWav('smoke_edge.wav', 4);
+  const clip: AudioClip = { ...missing, id: 'e', uri, label: 'él', duration: 4, sourceDuration: 4, volume: 0.3 };
+  await saveProject({ ...empty, id, tracks: empty.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [clip] } : tr)) });
+  for (let k = 0; k < 5; k++) {
+    router.push(`/studio/audio/${id}` as Href);
+    await sleep(700);
+    useEditorStore.getState().setPlaying(true);
+    await sleep(300);
+    router.back();
+    await sleep(500);
+  }
+  log(useEditorStore.getState().project?.id !== id && !useEditorStore.getState().isPlaying, 'ötszöri gyors nyitás-zárás után a stúdió rendben bezárult');
+  // 5) szerkesztés- és visszavonás-vihar
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(800);
+  const st = useEditorStore.getState();
+  const clipsNow = () => JSON.stringify(useEditorStore.getState().project?.tracks.find((tr) => tr.type === 'music')?.clips);
+  void st;
+  // a) a napló korlátján (50) belül: 20 szerkesztés (40 művelet) teljesen visszavonható
+  const before = clipsNow();
+  for (let i = 0; i < 20; i++) {
+    useEditorStore.getState().updateClip('e', { volume: (i % 10) / 10 + 0.05 });
+    useEditorStore.getState().moveClip('e', 'music', (i % 5) * 0.5);
+  }
+  for (let i = 0; i < 100 && useEditorStore.getState().past.length > 0; i++) {
+    useEditorStore.getState().undo();
+  }
+  log(clipsNow() === before, '20 gyors szerkesztés után a visszavonás az eredeti állapotot adja');
+  for (let i = 0; i < 100 && useEditorStore.getState().future.length > 0; i++) {
+    useEditorStore.getState().redo();
+  }
+  const redone = clipsNow();
+  log(redone !== before && JSON.parse(redone ?? '[]')[0]?.start === 2, 'az újra-lépések a végállapotot adják', `start ${JSON.parse(redone ?? '[]')[0]?.start}`);
+  // b) 100 művelet: a napló a korlátnál (50) megáll, nem nő tovább
+  for (let i = 0; i < 50; i++) {
+    useEditorStore.getState().updateClip('e', { volume: (i % 10) / 10 + 0.05 });
+    useEditorStore.getState().moveClip('e', 'music', (i % 5) * 0.5);
+  }
+  log(useEditorStore.getState().past.length <= 50, 'a visszavonási napló a korlátnál (50) megáll', `${useEditorStore.getState().past.length} lépés`);
+  router.back();
+  await sleep(800);
+  await deleteProject(id);
+  new File(uri).delete();
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -3177,6 +3245,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'audioedge') {
+    await step('audioedge', () => smokeAudioEdge(log));
     return;
   }
   if (phase === 'audiotags') {

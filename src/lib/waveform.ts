@@ -142,6 +142,18 @@ async function computeWebWaveform(uri: string): Promise<WaveformData | null> {
   }
 }
 
+function isMissingLocalFile(uri: string): boolean {
+  if (!uri.startsWith('file:')) {
+    return false;
+  }
+  try {
+    return !new File(uri).exists;
+  } catch (caught) {
+    logCaught('lib/waveform.ts:isMissingLocalFile', caught);
+    return false;
+  }
+}
+
 export function getWaveform(uri: string, opts: { userInitiated?: boolean } = {}): Promise<WaveformData | null> {
   let pending = memory.get(uri);
   if (pending) {
@@ -159,6 +171,10 @@ export function getWaveform(uri: string, opts: { userInitiated?: boolean } = {})
   }
   pending = (async () => {
     let cacheFile: File | null = null;
+    // a hiányzó helyi fájl nem hiba, hanem állapot (újracsatolásra vár): nincs dekódolás, nincs napló
+    if (isMissingLocalFile(uri)) {
+      return null;
+    }
     try {
       const source = new File(uri);
       cacheFile = new File(Paths.cache, `${waveformCacheKey(uri, source.size ?? 0, source.modificationTime ?? 0)}.json`);

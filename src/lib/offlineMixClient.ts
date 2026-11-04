@@ -38,6 +38,10 @@ export async function exportOfflineWav(
       throw new RenderCancelledError();
     }
     onProgress?.({ phase: tr('studio.audio.offline.decoding'), ratio: (i / uris.length) * 0.4 });
+    // a hiányzó fájl elvárt helyzet (újracsatolásra vár), nem programhiba: érthető üzenet, napló nélkül
+    if (uris[i].startsWith('file:') && !new File(uris[i]).exists) {
+      throw new Error(tr('studio.audio.offline.decodeFailed', { name: decodeURIComponent(uris[i].split('/').pop() ?? '') }));
+    }
     try {
       const buf = await api.decodeAudioData(uris[i], OFFLINE_SAMPLE_RATE);
       markAudioApi(true);

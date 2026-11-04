@@ -565,7 +565,7 @@
     "apiKeyHint": "In deinem Konto gespeichert (Supabase), nur für dich lesbar.",
     "defaultBadge": "STANDARD",
     "deleteModelConfirm": "Diese Modellkonfiguration löschen?",
-    "subscriptionSection": "Pro-Abo",
+    "subscriptionSection": "Abo",
     "subActive": "Aktiv",
     "subStatusLabel": "Status",
     "subUntilLabel": "Gültig bis",
@@ -2671,6 +2671,23 @@
     "invoicesTitle": "Rechnungen",
     "invoiceStatus": { "open": "offen", "paid": "bezahlt", "void": "storniert" },
     "error": { "already_in_org": "Dieser Nutzer ist bereits in einer Organisation.", "forbidden": "Dafür sind Inhaber- oder Admin-Rechte nötig.", "user_not_found": "Diesen Benutzernamen gibt es nicht.", "no_free_seat": "Kein freier Platz — erhöhe die Platzanzahl.", "seats_below_members": "Die Plätze dürfen nicht weniger als die Mitglieder sein.", "org_not_verified": "Die Organisation ist noch nicht freigegeben.", "insufficient_credits": "Nicht genug Coins.", "cannot_remove_owner": "Der Inhaber kann nicht entfernt werden." }
+  },
+  "devBilling": {
+    "title": "DEV-Admin — PRO-CASH-Test",
+    "tier": "Stufe (30 Tage; Business: mit Dev-Organisation, 3 Plätze)",
+    "coinBilledOff": "Zahlung: manuell",
+    "coinBilledOn": "Zahlung: Coins (verlängert)",
+    "coins": "Coins auf dein eigenes Konto",
+    "bucket": { "purchased": "gekauft", "bonus": "Bonus", "earned": "verdient, gehalten", "earnedAvailable": "verdient, auszahlbar" },
+    "more": "Weiteres",
+    "kycOn": "KYC ✓ (für Auszahlungen)",
+    "kycDone": "Auszahlungs-Verifizierung auf verifiziert gesetzt.",
+    "release": "Haltefrist jetzt beenden",
+    "releaseDone": "Gehaltene verdiente Coins sind jetzt auszahlbar.",
+    "expire": "Zeitraum jetzt beenden",
+    "expireDone": "Der Zeitraum ist abgelaufen; die Verlängerung lief.",
+    "reset": "Wallet zurücksetzen",
+    "resetConfirm": "Dein Guthaben wird auf null gesetzt (als Rückbuchung protokolliert)."
   },
   "paywallSheet": {
     "heroTitle": "Ohne Werbung und Wasserzeichen, mit der Kraft der Cloud",

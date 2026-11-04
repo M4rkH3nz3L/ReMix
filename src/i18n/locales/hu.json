@@ -565,7 +565,7 @@
     "apiKeyHint": "A fiókodban tárolva (Supabase), csak te olvashatod.",
     "defaultBadge": "ALAP",
     "deleteModelConfirm": "Törlöd ezt a modell-beállítást?",
-    "subscriptionSection": "Pro előfizetés",
+    "subscriptionSection": "Előfizetés",
     "subActive": "Aktív",
     "subStatusLabel": "Állapot",
     "subUntilLabel": "Érvényes eddig",
@@ -2671,6 +2671,23 @@
     "invoicesTitle": "Számlák",
     "invoiceStatus": { "open": "nyitott", "paid": "fizetve", "void": "sztornó" },
     "error": { "already_in_org": "Ez a felhasználó már egy szervezet tagja.", "forbidden": "Ehhez tulajdonosi vagy admin jog kell.", "user_not_found": "Nincs ilyen felhasználónév.", "no_free_seat": "Nincs szabad ülés — növeld az ülésszámot.", "seats_below_members": "Az ülésszám nem lehet kevesebb a tagok számánál.", "org_not_verified": "A szervezet még nincs jóváhagyva.", "insufficient_credits": "Nincs elég Coin.", "cannot_remove_owner": "A tulajdonos nem távolítható el." }
+  },
+  "devBilling": {
+    "title": "DEV-admin — PRO-CASH teszt",
+    "tier": "Szint (30 napra; Vállalati: dev-szervezettel, 3 ülés)",
+    "coinBilledOff": "Fizetés: kézi",
+    "coinBilledOn": "Fizetés: Coinból (megújul)",
+    "coins": "Coin a saját fiókodra",
+    "bucket": { "purchased": "vásárolt", "bonus": "bónusz", "earned": "megkeresett, tartásban", "earnedAvailable": "megkeresett, beváltható" },
+    "more": "Egyéb",
+    "kycOn": "KYC ✓ (kifizetéshez)",
+    "kycDone": "A kifizetési azonosítás ellenőrzöttre állítva.",
+    "release": "Tartás feloldása most",
+    "releaseDone": "A tartásban lévő megkeresett Coin beválthatóvá vált.",
+    "expire": "Periódus lejár most",
+    "expireDone": "A periódus lejárt; a megújítás lefutott.",
+    "reset": "Pénztárca nullázása",
+    "resetConfirm": "Az egyenleged nullázódik (a naplóban visszavonásként)."
   },
   "paywallSheet": {
     "heroTitle": "Reklám és vízjel nélkül, a felhő erejével",

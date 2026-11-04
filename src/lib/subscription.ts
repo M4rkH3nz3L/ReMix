@@ -1,5 +1,5 @@
 /**
- * 💳 Előfizetés-lekérdezés — a per-user Pro szint SZERVER-oldali forrása.
+ * 💳 Előfizetés-lekérdezés — a per-user szint (Free / Amatőr / Haladó / Profi / Vállalati) SZERVER-oldali forrása.
  *
  * A `subscriptions` tábla (RLS: csak a sajátját olvashatja) a tier egyetlen
  * hiteles forrása. A kliens (entitlementStore) bejelentkezéskor ezt lekéri és
@@ -8,16 +8,18 @@
  * A billing (RevenueCat/Stripe) később ír a táblába; ide nem kell nyúlni.
  */
 import { supabase } from '@/lib/supabase';
+import { activeTierFromRow, asTier, type Tier } from '@/lib/tiers';
 
 export interface SubscriptionInfo {
-  tier: 'free' | 'pro';
+  /** az AKTÍV szint (mind az 5: free / basic / pro / ultra / business — a szervezettől örökölt Vállalati is) */
+  tier: Tier;
   /** ISO dátum, ameddig a Pro érvényes; `null` = lejárat nélkül */
   proUntil: string | null;
 }
 
 /** A teljes előfizetés-sor a profil megjelenítéséhez (minden adat). */
 export interface SubscriptionDetails {
-  tier: 'free' | 'pro';
+  tier: Tier;
   status: string;
   currentPeriodEnd: string | null;
   source: string;
@@ -25,8 +27,6 @@ export interface SubscriptionDetails {
   updatedAt: string | null;
 }
 
-/** A státuszok, amelyeknél a Pro még aktívnak számít (a lejáratot külön nézzük). */
-const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 /**
  * A bejelentkezett user előfizetése a Supabase-ből, vagy `null`, ha nincs
@@ -37,6 +37,14 @@ export async function fetchMySubscription(userId: string): Promise<SubscriptionI
   if (!supabase || !userId) {
     return null;
   }
+  // a hiteles aktív szint a szervertől (my_subscription: státusz, lejárat ÉS a szervezeti tagság)
+  const { data: rpcData, error: rpcError } = await supabase.rpc('my_subscription');
+  if (!rpcError && rpcData && typeof rpcData === 'object') {
+    const r = rpcData as { tier?: unknown; until?: unknown };
+    const tier = asTier(r.tier);
+    return { tier, proUntil: tier !== 'free' && typeof r.until === 'string' ? r.until : null };
+  }
+  // tartalék (régi szerver): a saját sor, ugyanazzal a szabállyal, mint a DB active_tier_for
   const { data, error } = await supabase
     .from('subscriptions')
     .select('tier, status, current_period_end')
@@ -45,10 +53,8 @@ export async function fetchMySubscription(userId: string): Promise<SubscriptionI
   if (error || !data) {
     return null;
   }
-  const active = ACTIVE_STATUSES.has(String(data.status ?? 'active'));
-  const tier: SubscriptionInfo['tier'] = data.tier === 'pro' && active ? 'pro' : 'free';
-  const proUntil = typeof data.current_period_end === 'string' ? data.current_period_end : null;
-  return { tier, proUntil };
+  const tier = activeTierFromRow(data);
+  return { tier, proUntil: typeof data.current_period_end === 'string' ? data.current_period_end : null };
 }
 
 /**
@@ -71,7 +77,7 @@ export async function fetchSubscriptionDetails(
     return null;
   }
   return {
-    tier: data.tier === 'pro' ? 'pro' : 'free',
+    tier: activeTierFromRow(data),
     status: String(data.status ?? 'active'),
     currentPeriodEnd:
       typeof data.current_period_end === 'string' ? data.current_period_end : null,

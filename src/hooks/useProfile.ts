@@ -96,6 +96,7 @@ export function useProfile() {
   const signOutOtherSessions = useAuth((s) => s.signOutOtherSessions);
   // 💳 Pro-állapot reaktívan (aktiválás után azonnal frissül a szekció)
   const isPro = useEntitlement((s) => s.isPro());
+  const tierNow = useEntitlement((s) => s.effectiveTier());
   // 🛡️ admin-belépő: csak szerep-/user-kezelő jog birtokosának látszik
   const canAdmin = useRoles(
     (s) => s.permissions.includes('role.manage') || s.permissions.includes('user.manage')
@@ -177,7 +178,7 @@ export function useProfile() {
         setProMeta({ untilText, updatedText });
       })
       .catch((caught) => { logCaught('hooks/useProfile.ts:useProfile', caught); });
-  }, [userId, isPro, proUntil, t]);
+  }, [userId, isPro, tierNow, proUntil, t]);
 
   // — személyes adatok —
   const setField = (key: keyof AccountProfile, value: string) =>

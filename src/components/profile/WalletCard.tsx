@@ -57,6 +57,7 @@ import {
   subscribeWithCoins,
 } from '@/lib/wallet';
 import { logCaught } from '@/lib/logCaught';
+import { useWalletEvents } from '@/store/walletEvents';
 
 const KIND_ICON: Record<string, string> = {
   topup: 'add-circle',
@@ -124,9 +125,11 @@ export function WalletCard() {
     receivedGifts(8).then(setReceived).catch((caught) => { logCaught('components/profile/WalletCard.tsx:refresh', caught); });
   }, []);
 
+  // a dev-admin és a vásárlások után újratöltünk (a jelzőt a walletEvents store adja)
+  const walletTick = useWalletEvents((s) => s.tick);
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, walletTick]);
 
   const guard = async (fn: () => Promise<void>) => {
     if (busy) {
@@ -406,7 +409,7 @@ export function WalletCard() {
       </Pressable>
 
       {/* az előfizetésem: lejárat, lemondás, add-onok */}
-      <SubscriptionManageCard onChanged={refresh} refreshKey={subKey} />
+      <SubscriptionManageCard onChanged={refresh} refreshKey={subKey + walletTick} />
 
       {/* előfizetés Coinból: szint + havi/éves */}
       <View style={styles.card}>
@@ -447,7 +450,7 @@ export function WalletCard() {
       </View>
 
       {/* bevételi panel */}
-      <EarningsCard refreshKey={subKey} />
+      <EarningsCard refreshKey={subKey + walletTick} />
 
       {/* ajánlói program */}
       <ReferralCard />

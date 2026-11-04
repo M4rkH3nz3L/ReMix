@@ -171,17 +171,8 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* — Pro előfizetés — */}
-          <SubscriptionCard
-            isPro={p.isPro}
-            sub={p.sub}
-            proMeta={p.proMeta}
-            onSubscribe={p.onSubscribe}
-            onRestore={p.onRestore}
-            devBusy={p.devBusy}
-            onDevActivate={p.onDevActivate}
-            onDevDeactivate={p.onDevDeactivate}
-          />
+          {/* — Előfizetés (+ DEV: a teljes PRO-CASH dev-admin) — */}
+          <SubscriptionCard sub={p.sub} proMeta={p.proMeta} onSubscribe={p.onSubscribe} onRestore={p.onRestore} />
 
           {/* — Koin-pénztárca (vétel / Pro / küldés / kiváltás) — */}
           <WalletCard />

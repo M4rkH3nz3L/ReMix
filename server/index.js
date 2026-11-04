@@ -201,6 +201,9 @@ app.use(require('./routes/live'));
 // 💳 Billing / shop-kredit route-ok — domain-router (§01.1).
 app.use(require('./routes/billing'));
 
+// 🧪 DEV-admin a PRO-CASH teszteléséhez (csak ALLOW_DEV_BILLING=1, a hívó saját fiókjára).
+app.use(require('./routes/devBilling'));
+
 // 🎬 Reklám-jutalom (AdMob SSV, PRO-CASH C2.2) — domain-router (§01.1).
 app.use(require('./routes/ads'));
 

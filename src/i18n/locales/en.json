@@ -565,7 +565,7 @@
     "apiKeyHint": "Stored in your account (Supabase), readable only by you.",
     "defaultBadge": "DEFAULT",
     "deleteModelConfirm": "Delete this model configuration?",
-    "subscriptionSection": "Pro subscription",
+    "subscriptionSection": "Subscription",
     "subActive": "Active",
     "subStatusLabel": "Status",
     "subUntilLabel": "Valid until",
@@ -2671,6 +2671,23 @@
     "invoicesTitle": "Invoices",
     "invoiceStatus": { "open": "open", "paid": "paid", "void": "void" },
     "error": { "already_in_org": "This user is already in an organization.", "forbidden": "This needs owner or admin rights.", "user_not_found": "No such username.", "no_free_seat": "No free seat — increase the seat count.", "seats_below_members": "Seats cannot be fewer than members.", "org_not_verified": "The organization is not approved yet.", "insufficient_credits": "Not enough Coins.", "cannot_remove_owner": "The owner cannot be removed." }
+  },
+  "devBilling": {
+    "title": "DEV admin — PRO-CASH testing",
+    "tier": "Tier (30 days; Business: with a dev organization, 3 seats)",
+    "coinBilledOff": "Billing: manual",
+    "coinBilledOn": "Billing: Coins (renews)",
+    "coins": "Coins to your own account",
+    "bucket": { "purchased": "purchased", "bonus": "bonus", "earned": "earned, on hold", "earnedAvailable": "earned, cashable" },
+    "more": "More",
+    "kycOn": "KYC ✓ (for payouts)",
+    "kycDone": "Payout verification set to verified.",
+    "release": "Release hold now",
+    "releaseDone": "Earned Coins on hold are now cashable.",
+    "expire": "Expire period now",
+    "expireDone": "The period expired; renewal ran.",
+    "reset": "Reset wallet",
+    "resetConfirm": "Your balance is reset to zero (logged as a clawback)."
   },
   "paywallSheet": {
     "heroTitle": "No ads, no watermark, the power of the cloud",

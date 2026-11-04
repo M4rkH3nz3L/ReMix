@@ -2,36 +2,35 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 
+import { DevBillingPanel } from '@/components/profile/DevBillingPanel';
 import { PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { billingClientAvailable } from '@/lib/billing';
 import type { SubscriptionDetails } from '@/lib/subscription';
+import { tierLabelKey } from '@/lib/tiers';
+import { useEntitlement } from '@/store/entitlementStore';
 import { profileStyles as styles } from './styles';
 
 /**
- * 💳 Pro-előfizetés szekció: aktív (részletek + visszaállítás) VAGY free (CTA + visszaállítás),
- * plus CSAK DEV a közvetlen Pro be/ki kapcsoló. Prezentációs — minden adat/handler propból.
+ * 💳 Előfizetés szekció: aktív fizetős szint (Amatőr / Haladó / Profi / Vállalati — részletek +
+ * visszaállítás) VAGY Free (CTA + visszaállítás), plusz CSAK DEV a teljes dev-admin panel
+ * (szint, Coin, KYC, ciklus). Az adatok propból; a szint az entitlement-store-ból.
  */
 export function SubscriptionCard({
-  isPro,
   sub,
   proMeta,
   onSubscribe,
   onRestore,
-  devBusy,
-  onDevActivate,
-  onDevDeactivate,
 }: {
-  isPro: boolean;
   sub: SubscriptionDetails | null;
   proMeta: { untilText: string; updatedText: string | null };
   onSubscribe: () => void;
   onRestore: () => void;
-  devBusy: boolean;
-  onDevActivate: () => void;
-  onDevDeactivate: () => void;
 }) {
   const { t } = useTranslation();
+  // a valódi aktív szint (az Amatőr is fizetős — eddig az `isPro` miatt Free-nek látszott)
+  const tier = useEntitlement((st) => st.effectiveTier());
+  const paid = tier !== 'free';
   const subRow = (label: string, value: string) => (
     <View style={styles.subRow}>
       <Text style={styles.subRowLabel}>{label}</Text>
@@ -42,12 +41,12 @@ export function SubscriptionCard({
     <>
       <Text style={styles.sectionTitle}>{t('profile.subscriptionSection')}</Text>
       <View style={styles.card}>
-        {isPro ? (
+        {paid ? (
           <>
             <View style={styles.subHeader}>
               <View style={styles.proBadge}>
                 <Ionicons name="sparkles" size={13} color={palette.accent} />
-                <Text style={styles.proBadgeText}>PRO</Text>
+                <Text style={styles.proBadgeText}>{t(tierLabelKey(tier)).toUpperCase()}</Text>
               </View>
               <Text style={styles.subActive}>{t('profile.subActive')}</Text>
             </View>
@@ -94,33 +93,7 @@ export function SubscriptionCard({
             </View>
           </>
         )}
-        {__DEV__ ? (
-          <Pressable
-            onPress={isPro ? onDevDeactivate : onDevActivate}
-            disabled={devBusy}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              marginTop: 12,
-              paddingVertical: 9,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: palette.border,
-              borderStyle: 'dashed',
-            }}
-          >
-            <Ionicons name="construct-outline" size={14} color={palette.accent2} />
-            <Text style={{ color: palette.accent2, fontSize: 12, fontWeight: '700' }}>
-              {devBusy
-                ? t('profile.devProBusy')
-                : isPro
-                  ? t('profile.devProOff')
-                  : t('profile.devProOn')}
-            </Text>
-          </Pressable>
-        ) : null}
+        {__DEV__ ? <DevBillingPanel /> : null}
       </View>
     </>
   );

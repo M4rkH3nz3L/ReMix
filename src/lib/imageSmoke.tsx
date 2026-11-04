@@ -61,6 +61,7 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
+import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
@@ -2544,6 +2545,42 @@ async function smokeAudioFit(log: Log) {
   new File(uri).delete();
 }
 
+/** PRO-AUDIO 17/20: csak hang export egy videó-projektből — a videóklip hangja, a master rá is hat. */
+async function smokeVideoAudioExport(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const asset = Asset.fromModule(require('../../assets/videos/fekvo.mp4'));
+  await asset.downloadAsync();
+  const uri = asset.localUri ?? asset.uri;
+  const base = createEmptyProject('smoke videó-hang', '16:9');
+  const clip = { id: 'v', kind: 'video', uri, start: 0, duration: 10, trimIn: 0, sourceDuration: 10, speed: 1, volume: 1, filterId: 'none' } as VideoClip;
+  const project: Project = { ...base, tracks: base.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [clip] } : tr)) };
+  log(mixForExport(project, (t) => t !== 'video', 1) === null, 'a némított videósávból nincs hang-export');
+  const api = await loadAudioApi();
+  const measure = async (master: number, name: string) => {
+    const mix = mixForExport(project, () => true, master)!;
+    const target = new File(projectExportDir(), name);
+    const out = await exportAudioToFile(mix, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 2 }), target);
+    const buf = await api!.decodeAudioData(out, 44100);
+    const ch = buf.getChannelData(0);
+    const rms = Math.sqrt(ch.reduce((acc, v) => acc + v * v, 0) / ch.length);
+    new File(out).delete();
+    return { db: 20 * Math.log10(rms + 1e-12), dur: buf.duration };
+  };
+  const full = await measure(1, 'smoke_videohang_1.wav');
+  log(Math.abs(full.dur - 10) < 0.1 && full.db > -40, 'a videóklip hangja exportálódik', `${full.dur.toFixed(2)} s, ${full.db.toFixed(1)} dB`);
+  const half = await measure(0.5, 'smoke_videohang_05.wav');
+  log(Math.abs(full.db - half.db - 6.02) < 0.5, 'a master a videóklip hangjára is hat', `${(full.db - half.db).toFixed(2)} dB esés`);
+  useEditorStore.getState().loadProject(project, []);
+  setHarness(
+    <View style={{ width: Math.min(420, Dimensions.get('window').width), alignSelf: 'center' }}>
+      <AudioOnlyExportSection />
+    </View>
+  );
+  log(true, 'FOTÓZHATÓ', 'a „Csak hang” szakasz az export-panelen');
+  await sleep(4000);
+  setHarness(null);
+}
+
 type RecordHandle = { recorder: AudioRecorder; finish: { current: () => Promise<void> } };
 
 /** a valódi `useAudioRecorder` + a közös felvétel-út, ahogy a Hang panel és a stúdió használja */
@@ -3077,6 +3114,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offlinespeed') {
     await step('offlinespeed', () => smokeOfflineSpeed(log));
+    return;
+  }
+  if (phase === 'videoaudio') {
+    await step('videoaudio', () => smokeVideoAudioExport(log, setHarness));
     return;
   }
   if (phase === 'audiofit') {

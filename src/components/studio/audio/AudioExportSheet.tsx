@@ -29,8 +29,9 @@ export function AudioExportSheet({
   onProRequired,
 }: {
   onClose: () => void;
-  onPreview: () => void;
-  onUseInVideo: () => void;
+  /** hiányzik = nincs „Előnézet” / „Videóba” gomb (pl. a videó-szerkesztőből nyitva) */
+  onPreview?: () => void;
+  onUseInVideo?: () => void;
   onDownload: (format: AudioExportFormat, quality: AudioExportQuality) => void;
   /** A26: Free — a WAV a telefonon készül (16 bit, 44,1 kHz, sztereó), a többi formátum Pro */
   onDevice?: boolean;
@@ -63,6 +64,7 @@ export function AudioExportSheet({
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.body}>
+            {onPreview && onUseInVideo ? (
             <View style={styles.actions}>
               <Pressable style={styles.action} onPress={onPreview} testID="audio-export-preview">
                 <Ionicons name="play-circle-outline" size={20} color={palette.accent} />
@@ -73,6 +75,7 @@ export function AudioExportSheet({
                 <Text style={styles.actionText}>{t('studio.audio.exportToVideo')}</Text>
               </Pressable>
             </View>
+            ) : null}
 
             <Text style={styles.section}>{t('studio.audio.exportSheet.format')}</Text>
             <View style={styles.row}>

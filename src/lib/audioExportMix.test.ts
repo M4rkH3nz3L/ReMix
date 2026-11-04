@@ -35,3 +35,28 @@ describe('mixForExport', () => {
     expect(mixForExport(project(), () => true, 1)?.trackMix).toBeUndefined();
   });
 });
+
+describe('mixForExport — videó-projekt (PRO-AUDIO 17/20)', () => {
+  const video = (volume: number, kf?: number[]): Project => {
+    const p = createEmptyProject('v', '9:16');
+    const clip = { id: 'v1', kind: 'video', volume, keyframes: kf ? { volume: kf.map((value, i) => ({ time: i, value, easing: 'linear' })) } : undefined } as unknown as Clip;
+    return { ...p, tracks: p.tracks.map((t) => (t.type === 'video' ? { ...t, clips: [clip] } : t)) };
+  };
+  const vclip = (p: Project | null) => p?.tracks.find((t) => t.type === 'video')?.clips[0] as unknown as { volume: number; keyframes?: { volume: { value: number }[] } };
+
+  it('a csak videóklip-hangos projekt nem „néma”', () => {
+    expect(mixForExport(video(1), () => true, 1)).not.toBeNull();
+  });
+
+  it('a néma videóklip és a némított videósáv nem ad hangot', () => {
+    expect(mixForExport(video(0), () => true, 1)).toBeNull();
+    expect(mixForExport(video(1), (t) => t !== 'video', 1)).toBeNull();
+  });
+
+  it('a master a videóklip hangerejére és automációjára is hat (mint az élő lejátszóban)', () => {
+    const out = vclip(mixForExport(video(0.8, [0.5, 1]), () => true, 0.5));
+    expect(out.volume).toBeCloseTo(0.4, 5);
+    expect(out.keyframes?.volume.map((k) => k.value)).toEqual([0.25, 0.5]);
+  });
+});
+

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
+import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
 import { palette } from '@/constants/editor';
 import { deactivateProDev } from '@/lib/billing';
 import { isNativeRenderAvailable } from '@/lib/nativeRender';
@@ -686,6 +687,8 @@ export function ExportPanel() {
             : ''}
         </Text>
       </PanelSection>
+
+      <AudioOnlyExportSection />
 
       <PanelSection title={t('panels.export.postSection')}>
         <View style={styles.postRow}>

@@ -1820,7 +1820,7 @@
       "videoNoteExpoGo": " (Ebben a futtatásban — Expo Go — az eszközön-render még nem elérhető; natív buildben aktiválódik.)",
       "audioOnlySection": "Csak hang",
       "audioOnlyHint": "A videó teljes hangja egy fájlba (a videóklipek hangja + a hangsávok), azzal a keveréssel, amit hallasz.",
-      "audioOnlyHintFree": "A videó teljes hangja egy fájlba — a videóklipek hangját a szerver keveri, ezért Pro-val érhető el.",
+      "audioOnlyHintFree": "A videó teljes hangja egy fájlba, ingyen a telefonon (WAV). Más formátumok és a szerveres effektek Pro-val.",
       "audioOnlyButton": "Hang exportálása",
       "postSection": "📲 Posztolás közösségi platformra",
       "otherPlatform": "Egyéb",
@@ -4073,7 +4073,8 @@
           "voiceEnhance": "hangjavítás",
           "deReverb": "visszhang-csökkentés",
           "autoDuck": "automatikus halkítás",
-          "master": "master-lánc"
+          "master": "master-lánc",
+          "videoSpeed": "a gyorsított vagy visszafelé játszott videóklipek hangja"
         }
       },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",

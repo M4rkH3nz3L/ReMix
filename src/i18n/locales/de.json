@@ -1820,7 +1820,7 @@
       "videoNoteExpoGo": " (In diesem Durchlauf — Expo Go — ist der Render auf dem Gerät noch nicht verfügbar; er wird in einem nativen Build aktiviert.)",
       "audioOnlySection": "Nur Audio",
       "audioOnlyHint": "Der komplette Ton des Videos in einer Datei (Clip-Ton + Audiospuren), so gemischt, wie du ihn hörst.",
-      "audioOnlyHintFree": "Der komplette Ton des Videos in einer Datei — der Clip-Ton wird auf dem Server gemischt, daher mit Pro.",
+      "audioOnlyHintFree": "Der komplette Ton des Videos in einer Datei, kostenlos auf dem Handy (WAV). Weitere Formate und Server-Effekte mit Pro.",
       "audioOnlyButton": "Audio exportieren",
       "postSection": "📲 Auf einer Social-Plattform posten",
       "otherPlatform": "Andere",
@@ -4078,7 +4078,8 @@
           "voiceEnhance": "Stimmverbesserung",
           "deReverb": "Hall-Reduktion",
           "autoDuck": "Auto-Ducking",
-          "master": "Master-Kette"
+          "master": "Master-Kette",
+          "videoSpeed": "der Ton beschleunigter oder rückwärts laufender Videoclips"
         }
       },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",

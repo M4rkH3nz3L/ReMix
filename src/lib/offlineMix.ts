@@ -1,6 +1,6 @@
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import type { AudioClip, Keyframe, Project, TrackType } from '@/types/project';
+import type { AudioClip, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
  * 🎧📱 Telefonos (offline) hang-keverés — PRO-AUDIO A26: a Free felhasználó szerver nélkül
@@ -62,7 +62,7 @@ export interface OfflineMixClip {
   gain: number;
 }
 
-export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master';
+export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master' | 'videoSpeed';
 
 export interface OfflineMixPlan {
   duration: number;
@@ -102,6 +102,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       });
     }
   }
+  clips.push(...videoAudioClips(project, unsupported));
   if (project.audioMaster) unsupported.add('master');
   return { duration: projectDuration(project), clips, unsupported: [...unsupported] };
 }
@@ -233,3 +234,60 @@ export function encodeWav16(channels: Float32Array[], sampleRate: number, rand: 
   out.set(body, head.length);
   return out;
 }
+
+/**
+ * 🎬 A videóklipek hangja (PRO-AUDIO 17/20) — a szerver `visualSegments` + videó-hang
+ * láncának tükre: a vizuális sáv nem átfedő szakaszokra bomlik (átfedésnél a később kezdődő
+ * klip nyer, a képklip is takar), a klip hangja csak a látható szakaszán szól, a hangerő-
+ * automáció a klip saját idejében fut, fade és sáv-erősítés nincs. A gyorsított vagy
+ * visszafelé játszott klip hangját a telefon nem tudja (a szerver atempo/areverse-e) — ezt az
+ * `unsupported` jelzi, és a klip hangja kimarad.
+ */
+export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupported>): OfflineMixClip[] {
+  const visual = (project.tracks.find((t) => t.type === 'video')?.clips ?? [])
+    .slice()
+    .sort((a, b) => a.start - b.start || a.start + a.duration - (b.start + b.duration));
+  const out: OfflineMixClip[] = [];
+  let cursor = 0;
+  for (let i = 0; i < visual.length; i++) {
+    const clip: Clip = visual[i];
+    const next = visual[i + 1];
+    const visStart = Math.max(clip.start, cursor);
+    const visEnd = Math.min(clip.start + clip.duration, next ? next.start : Infinity);
+    if (visEnd <= visStart) {
+      continue;
+    }
+    cursor = visEnd;
+    if (clip.kind !== 'video') {
+      continue;
+    }
+    const v = clip as VideoClip;
+    const kf = v.keyframes?.volume;
+    if (!(v.volume > 0 || (kf ?? []).some((k) => k.value > 0))) {
+      continue;
+    }
+    if (v.speed !== 1 || v.reversed) {
+      unsupported.add('videoSpeed');
+      continue;
+    }
+    if (v.voiceEnhance) unsupported.add('voiceEnhance');
+    if (v.deReverb) unsupported.add('deReverb');
+    const skip = visStart - v.start;
+    out.push({
+      track: 'video',
+      uri: v.uri,
+      start: visStart,
+      duration: visEnd - visStart,
+      trimIn: v.trimIn + skip,
+      volume: v.volume,
+      // a szakasz a klip közepén is kezdődhet: a görbe a klip saját idejében fut
+      volumeKf: kf?.map((k) => ({ ...k, time: k.time - skip })),
+      fadeIn: 0,
+      fadeOut: 0,
+      pan: 0,
+      gain: 1,
+    });
+  }
+  return out;
+}
+

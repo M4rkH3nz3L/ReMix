@@ -58,6 +58,45 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
     ),
   };
 
+  it('videóklipek hangja (átfedéssel, automációval, monó videóval): telefon = szerver', async () => {
+    const vid = path.join(dir, 'v.mp4');
+    const vidMono = path.join(dir, 'vm.mp4');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=4', '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.25:duration=4:seed=9', '-ac', '2', '-ar', '44100', '-c:v', 'libx264', '-c:a', 'flac', '-shortest', vid]);
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=500:sample_rate=44100:duration=4', '-ac', '1', '-c:v', 'libx264', '-c:a', 'flac', '-shortest', vidMono]);
+    const v = (over: Record<string, unknown>) => ({ kind: 'video', speed: 1, volume: 1, filterId: 'none', trimIn: 0, sourceDuration: 4, ...over });
+    const lin2 = (pts: [number, number][]) => pts.map(([time, value]) => ({ time, value, easing: 'linear' as const }));
+    const vp: Project = {
+      ...base,
+      tracks: base.tracks.map((t) =>
+        t.type === 'video'
+          ? {
+              ...t,
+              clips: [
+                // az első klip végét a második (később kezdődő) takarja
+                v({ id: 'v1', uri: vid, start: 0, duration: 3, trimIn: 0.5, volume: 0.7, keyframes: { volume: lin2([[0, 0.2], [3, 1]]) } }),
+                v({ id: 'v2', uri: vidMono, start: 2, duration: 2, trimIn: 1, volume: 0.6 }),
+              ],
+            }
+          : t
+      ),
+    } as unknown as Project;
+    const { renderProject } = jest.requireActual('../../server/render');
+    const work = fs.mkdtempSync(path.join(dir, 'wv-'));
+    const out: string = await renderProject(vp, work, () => {}, { audioFormat: 'wav', audioBitDepth: 24 });
+    const server = decode(out, 2);
+    const plan = offlineMixPlan(vp);
+    expect(plan.unsupported).toEqual([]);
+    const n = server[0].length;
+    const mine: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    mixRange(plan, new Map([[vid, { channels: decode(vid, 2), sampleRate: SR }], [vidMono, { channels: decode(vidMono, 1), sampleRate: SR }]]), mine, 0, n);
+    for (const c of [0, 1]) {
+      const diff = server[c].map((x, i) => x - mine[c][i]);
+      // eslint-disable-next-line no-console
+      console.log(`videó csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
+      expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(90);
+    }
+  }, 120000);
+
   it('a különbség a jel alatt legalább 90 dB-lel', async () => {
     const { renderProject } = jest.requireActual('../../server/render');
     const work = fs.mkdtempSync(path.join(dir, 'w-'));

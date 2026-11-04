@@ -1820,7 +1820,7 @@
       "videoNoteExpoGo": " (In this run — Expo Go — on-device render is not yet available; it activates in a native build.)",
       "audioOnlySection": "Audio only",
       "audioOnlyHint": "The video's full sound in one file (the clips' audio + the audio tracks), with the mix you hear.",
-      "audioOnlyHintFree": "The video's full sound in one file — the clips' audio is mixed on the server, so it comes with Pro.",
+      "audioOnlyHintFree": "The video's full sound in one file, free on your phone (WAV). Other formats and server effects with Pro.",
       "audioOnlyButton": "Export audio",
       "postSection": "📲 Post to a social platform",
       "otherPlatform": "Other",
@@ -4073,7 +4073,8 @@
           "voiceEnhance": "voice enhance",
           "deReverb": "de-reverb",
           "autoDuck": "auto-ducking",
-          "master": "master chain"
+          "master": "master chain",
+          "videoSpeed": "the audio of sped-up or reversed video clips"
         }
       },
       "exportSilent": "All tracks are muted, nothing to export.",

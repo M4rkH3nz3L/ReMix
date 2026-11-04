@@ -2570,6 +2570,43 @@ async function smokeVideoAudioExport(log: Log, setHarness: (n: ReactNode) => voi
   log(Math.abs(full.dur - 10) < 0.1 && full.db > -40, 'a videóklip hangja exportálódik', `${full.dur.toFixed(2)} s, ${full.db.toFixed(1)} dB`);
   const half = await measure(0.5, 'smoke_videohang_05.wav');
   log(Math.abs(full.db - half.db - 6.02) < 0.5, 'a master a videóklip hangjára is hat', `${(full.db - half.db).toFixed(2)} dB esés`);
+  {
+    const probe = await api!.decodeAudioData(uri, 44100);
+    log(null, 'mp4 dekódolás 44,1 kHz-re kérve', `sampleRate ${probe.sampleRate}, ${probe.length} minta, ${probe.duration.toFixed(3)} s → ${(probe.length / probe.duration).toFixed(0)} minta/s`);
+  }
+  // Free út: a telefon dekódolja az mp4 hangját és kever — a szerveres renderrel kivonva
+  const onPhone = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_videohang_tel.wav'));
+  const srv = await exportAudioToFile(project, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 2 }), new File(projectExportDir(), 'smoke_videohang_srv.wav'));
+  const a1 = await api!.decodeAudioData(onPhone.uri, 44100);
+  const b1 = await api!.decodeAudioData(srv, 44100);
+  const lvl = (xs: Float32Array) => 10 * Math.log10(xs.reduce((acc, x) => acc + x * x, 0) / Math.max(1, xs.length) + 1e-30);
+  {
+    // eltolás keresése: a telefonos és a szerveres jel keresztkorrelációja ±4096 mintán
+    const x = a1.getChannelData(0);
+    const y = b1.getChannelData(0);
+    let best = -Infinity;
+    let lag = 0;
+    for (let d = -4096; d <= 4096; d += 1) {
+      let acc = 0;
+      for (let i = 44100; i < 88200; i += 3) acc += y[i] * (x[i + d] ?? 0);
+      if (acc > best) {
+        best = acc;
+        lag = d;
+      }
+    }
+    // a szerver régen 1-es sebességen is atempo-t tett a videó hangjára (287 minta késés)
+    log(Math.abs(lag) <= 2, 'Free: a telefonos és a szerveres videó-hang nincs eltolva', `${lag} minta`);
+    for (const ch of [0, 1]) {
+      const xc = a1.getChannelData(ch);
+      const yc = b1.getChannelData(ch);
+      const n = Math.min(xc.length - Math.max(0, lag), yc.length) - 4410;
+      const diff = Float32Array.from({ length: n }, (_, i) => xc[i + Math.max(0, lag)] - yc[i]);
+      const snr = lvl(yc.subarray(0, n)) - lvl(diff);
+      log(snr > 50 && Math.abs(xc.length - yc.length) < 64, `Free: telefon = szerver a videó hangján (${ch === 0 ? 'bal' : 'jobb'})`, `${snr.toFixed(1)} dB, hossz ${xc.length}/${yc.length}`);
+    }
+  }
+  new File(onPhone.uri).delete();
+  new File(srv).delete();
   useEditorStore.getState().loadProject(project, []);
   setHarness(
     <View style={{ width: Math.min(420, Dimensions.get('window').width), alignSelf: 'center' }}>

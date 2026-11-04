@@ -10,6 +10,7 @@ import { palette } from '@/constants/editor';
 import { mixForExport } from '@/lib/audioExportMix';
 import { audioExportFileName, audioExportSettings, audioFormatInfo, type AudioExportFormat, type AudioExportQuality } from '@/lib/audioExportOptions';
 import { projectExportDir } from '@/lib/model3dRenderClient';
+import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { exportAudioToFile, isRenderCancelledError } from '@/lib/render';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -21,7 +22,8 @@ import { logCaught } from '@/lib/logCaught';
  * 🎧 Csak hang export a videó-szerkesztőből (PRO-AUDIO 17/20): a videó-projekt teljes hangja
  * (a videóklipek hangja + a hangsávok) egy fájlba, ugyanazzal a formátum- és minőségválasztóval,
  * mint a Hang Stúdióban, és azzal a keveréssel, amit a felhasználó hall (`mixForExport`).
- * A videóklipek hangját ma a szerver keveri (Pro); a telefonos változat külön lépés.
+ * Pro: a szerver keveri, minden formátum; Free: WAV a telefonon (`exportOfflineWav`), a
+ * videóklipek hangjával együtt — a szerveres renderrel paritás-tesztelt.
  */
 export function AudioOnlyExportSection() {
   const { t } = useTranslation();
@@ -40,11 +42,32 @@ export function AudioOnlyExportSection() {
       Alert.alert(t('studio.export'), t('studio.audio.exportSilent'));
       return;
     }
+    const info = audioFormatInfo(format);
     if (!isPro) {
-      usePaywall.getState().open('cloudRender');
+      // A26 / 17-20: Free — WAV a telefonon, szerver nélkül (a videóklipek hangjával együtt)
+      void withCancellableProgress(t('studio.audio.exportRendering', { format: 'WAV' }), async (report, signal) => {
+        const target = new File(projectExportDir(), audioExportFileName(project.name, 'wav'));
+        const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal);
+        if (unsupported.length > 0) {
+          await new Promise<void>((resolve) =>
+            Alert.alert(
+              t('studio.audio.offline.unsupportedTitle'),
+              t('studio.audio.offline.unsupportedBody', { list: unsupported.map((u) => t(`studio.audio.offline.feature.${u}`)).join(', ') }),
+              [{ text: t('common.ok'), onPress: () => resolve() }]
+            )
+          );
+        }
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { mimeType: 'audio/wav', dialogTitle: t('studio.audio.exportSheet.shareTitle') });
+        }
+      }).catch((e: Error) => {
+        logCaught('components/editor/panels/AudioOnlyExportSection.tsx:offline', e);
+        if (!isRenderCancelledError(e)) {
+          Alert.alert(t('studio.export'), e.message);
+        }
+      });
       return;
     }
-    const info = audioFormatInfo(format);
     void guardPro(
       () =>
         withCancellableProgress(t('studio.audio.exportRendering', { format: info.label }), async (report, signal) => {
@@ -69,7 +92,17 @@ export function AudioOnlyExportSection() {
     <PanelSection title={t('panels.export.audioOnlySection')}>
       <Text style={styles.hint}>{isPro ? t('panels.export.audioOnlyHint') : t('panels.export.audioOnlyHintFree')}</Text>
       <PrimaryButton icon="musical-notes-outline" label={t('panels.export.audioOnlyButton')} onPress={() => setOpen(true)} />
-      {open ? <AudioExportSheet onClose={() => setOpen(false)} onDownload={download} /> : null}
+      {open ? (
+        <AudioExportSheet
+          onClose={() => setOpen(false)}
+          onDownload={download}
+          onDevice={!isPro}
+          onProRequired={() => {
+            setOpen(false);
+            usePaywall.getState().open('cloudRender');
+          }}
+        />
+      ) : null}
     </PanelSection>
   );
 }

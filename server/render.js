@@ -2849,14 +2849,20 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     }
     const idx = addInput(['-i', clip.uri], `v|${clip.uri}`);
     const { srcStart, srcEnd } = segSourceWindow(clip, seg);
+    const videoMono = (await audioChannelCount(clip.uri)) === 1;
     const delayMs = Math.round((clip.start + seg.skip) * 1000);
     const label = `av${audioIdx++}`;
     graph.push(
       `[${idx}:a]atrim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
         (clip.reversed ? 'areverse,' : '') + // ⏪ a trimmelt hang-ablak megfordítása
-        `asetpts=PTS-STARTPTS,${atempoChain(clip.speed)},` +
+        `asetpts=PTS-STARTPTS,` +
+        (videoMono ? MONO_TO_STEREO : '') + // a monó videóhang is teljes szinten, mint az élő lejátszóban
+        // ⚠️ 1-es sebességnél NINCS atempo: a WSOLA-szűrő 1,0-n sem semleges (mérve: 287 minta =
+        // 6,5 ms késés + mintaszintű átdolgozás) — a videó hangja eltolódott és torzult
+        (clip.speed !== 1 ? `${atempoChain(clip.speed)},` : '') +
         (clip.deReverb ? DEREVERB : '') +
         (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+        ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
         `${volumeExpr(clip, seg.skip)},` +
         `aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`
     );
@@ -2988,7 +2994,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   for (let k = 0; k < pipAudio.length; k++) {
     const pa = pipAudio[k];
     const ms = Math.round(pa.start * 1000);
-    const tempo = pa.speed >= 0.5 && pa.speed <= 2 ? `,atempo=${pa.speed}` : '';
+    const tempo = pa.speed !== 1 && pa.speed >= 0.5 && pa.speed <= 2 ? `,atempo=${pa.speed}` : '';
     graph.push(
       `[${pa.idx}:a]${pa.reversed ? 'areverse,' : ''}asetpts=PTS-STARTPTS${tempo},adelay=${ms}|${ms},volume=${pa.volume}[pipa${k}]`
     );

@@ -545,7 +545,7 @@ export function cropClip(clip: Clip, from: number, to: number): Clip {
       ? clip.trimIn + (clip.duration - b) * clip.speed
       : clip.trimIn + a * clip.speed;
   } else if (out.kind === 'audio' && clip.kind === 'audio' && (a !== 0 || clip.trimIn !== undefined)) {
-    out.trimIn = (clip.trimIn ?? 0) + a;
+    out.trimIn = (clip.trimIn ?? 0) + a * (clip.speed && clip.speed > 0 ? clip.speed : 1);
   }
   if ('keyframes' in clip && clip.keyframes) {
     (out as { keyframes?: ClipKeyframes }).keyframes = cropKeyframes(clip.keyframes, a, b - a);

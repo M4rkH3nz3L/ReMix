@@ -115,3 +115,11 @@ describe('planDriftCorrection — szűrés', () => {
   });
 });
 
+describe('⏩ sourceTimeOf sebességgel', () => {
+  it('a forrás-idő speed-del halad, hiányzó speed = 1', () => {
+    expect(sourceTimeOf({ start: 10, trimIn: 2, speed: 2 }, 13)).toBe(8);
+    expect(sourceTimeOf({ start: 10, trimIn: 2 }, 13)).toBe(5);
+    expect(sourceTimeOf({ start: 10, trimIn: 2, speed: 0.5 }, 14)).toBe(4);
+  });
+});
+

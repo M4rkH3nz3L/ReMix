@@ -12,11 +12,16 @@ import type { AudioClip, VideoClip } from '@/types/project';
  * lépés EGY undo (applyBatch). A hang és a kép link-csoportba kerül, így együtt mozognak.
  *
  * A leválasztott `AudioClip` átveszi a videóklip `trimIn`/`sourceDuration`-jét, így
- * a TRIMMELT klip hangja is korrekt (a render `atrim`-mel honorálja). Sebesség-
- * változás (speed !== 1) NEM reprezentálható hangklipen → az még kizárt.
+ * a TRIMMELT klip hangja is korrekt (a render `atrim`-mel honorálja). ⏩ A gyorsított/lassított
+ * klip sebessége is átjön (`AudioClip.speed`, hangmagasság-tartással) — az előnézet (expo-audio)
+ * 0,5–2× között tart hangmagasságot, ezért eddig engedjük; a visszafelé játszott kizárt.
  */
+export const DETACH_SPEED_MIN = 0.5;
+export const DETACH_SPEED_MAX = 2;
+
 export function canDetachAudio(clip: VideoClip): boolean {
-  return clip.kind === 'video' && clip.speed === 1 && clip.volume > 0;
+  const speed = clip.speed || 1;
+  return clip.kind === 'video' && !clip.reversed && speed >= DETACH_SPEED_MIN && speed <= DETACH_SPEED_MAX && clip.volume > 0;
 }
 
 export function detachAudioCommands(
@@ -31,6 +36,7 @@ export function detachAudioCommands(
     duration: clip.duration,
     trimIn: clip.trimIn,
     sourceDuration: clip.sourceDuration,
+    ...((clip.speed || 1) !== 1 ? { speed: clip.speed } : {}),
     uri: clip.uri,
     label,
     volume: clip.volume,

@@ -1,3 +1,4 @@
+import { audioSpeedOf } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
 import type { AudioClip, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
@@ -24,13 +25,15 @@ const EDGE_EPS = 1e-4;
  */
 export function edgeFades(clips: AudioClip[]): Map<string, { in: number; out: number }> {
   const out = new Map<string, { in: number; out: number }>();
+  // ⏩ a forrás-szakasz vége: trimIn + duration·speed (a szerver tükre)
+  const srcEnd = (k: AudioClip) => (k.trimIn ?? 0) + k.duration * audioSpeedOf(k);
   for (const c of clips) {
     const trim = c.trimIn ?? 0;
     const joinedBefore = clips.some(
-      (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs((p.trimIn ?? 0) + p.duration - trim) < EDGE_EPS
+      (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs(srcEnd(p) - trim) < EDGE_EPS
     );
     const joinedAfter = clips.some(
-      (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(trim + c.duration - (n.trimIn ?? 0)) < EDGE_EPS
+      (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(srcEnd(c) - (n.trimIn ?? 0)) < EDGE_EPS
     );
     out.set(c.id, {
       in: c.fadeIn > 0 ? c.fadeIn : joinedBefore ? 0 : EDGE_FADE_SEC,
@@ -86,6 +89,11 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       if (clip.voiceEnhance) unsupported.add('voiceEnhance');
       if (clip.deReverb) unsupported.add('deReverb');
       if (clip.autoDuck) unsupported.add('autoDuck');
+      // ⏩ hangmagasság-tartó időnyújtás a telefonon nincs: a gyorsított hang a Pro szerveres exportjában
+      if (audioSpeedOf(clip) !== 1) {
+        unsupported.add('videoSpeed');
+        continue;
+      }
       clips.push({
         track: track.type,
         uri: clip.uri,

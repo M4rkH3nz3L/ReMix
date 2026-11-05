@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { audioSpeedOf } from '@/lib/audioTrim';
 import { barHeights, clipWindowPeaks, getWaveform, resamplePeaks } from '@/lib/waveform';
 import type { WaveformData } from '@/lib/waveform';
 import { clamp } from '@/lib/time';
@@ -44,7 +45,7 @@ export function ClipWaveform({ clip, widthPx, heightPx, color, userInitiated = f
 
   // A22: annyi oszlop, amennyi kifér (≥3.5 px), és a sor pontosan kitölti a klipet
   const columns = clamp(Math.floor((widthPx - 8) / 3.5), 1, 400);
-  const bars = resamplePeaks(clipWindowPeaks(wave, clip.trimIn, clip.duration), columns);
+  const bars = resamplePeaks(clipWindowPeaks(wave, clip.trimIn, clip.duration * audioSpeedOf(clip)), columns);
   const heights = barHeights(bars);
   // ⚠️ clipping: a NYERS (full-scale) csúcs 0 dBFS közelében — torzulhat a hang
   const clipping = bars.map((p) => p >= CLIP_THRESHOLD);

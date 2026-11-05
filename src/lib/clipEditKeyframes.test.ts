@@ -77,3 +77,11 @@ describe('vágás / trim: forrás-be-pont + kulcskockák minden fajtán (B1–B5
     expect(clips[1].id).not.toBe('a1');
   });
 });
+
+describe('⏩ gyorsított hangklip vágása', () => {
+  it('cropClip: a második darab trimIn-je az idővonal-eltolás × speed', () => {
+    const a: AudioClip = { kind: 'audio', id: 'a', uri: 'a.m4a', label: 'a', start: 0, duration: 6, trimIn: 1, sourceDuration: 20, speed: 1.5, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover' };
+    expect((cropClip(a, 2, 6) as AudioClip).trimIn).toBeCloseTo(4);
+    expect((cropClip(a, 0, 2) as AudioClip).trimIn).toBe(1);
+  });
+});

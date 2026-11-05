@@ -1127,6 +1127,11 @@ export interface AudioClip extends ClipBase {
   trimIn?: number;
   /** a forrás teljes hossza (mp) — a trim ENNYIN belül mozoghat; hiányzó = duration */
   sourceDuration?: number;
+  /**
+   * ⏩ lejátszási sebesség, hangmagasság-tartással (a gyorsított videóklip leválasztott hangja);
+   * hiányzó = 1. A forrás-idő: `trimIn + (t − start) · speed`.
+   */
+  speed?: number;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */

@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { t as tr } from 'i18next';
 import { PixelRatio, Platform } from 'react-native';
 
+import { audioSpeedOf } from '@/lib/audioTrim';
 import { resolveClipUri } from '@/lib/assetResolve';
 import { deviceTextClips, deviceTextOverlaySpecs } from '@/lib/overlayPlan';
 import { hasOverlayRasterHost, rasterTextOverlays } from '@/lib/overlayRasterBridge';
@@ -223,6 +224,11 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
   }
   const platform = Platform.OS === 'android' ? 'android' : 'ios';
   if (!localRenderMatchesPreview(project, platform)) {
+    return false;
+  }
+  // ⏩ a natív motor hangsávja nem ismer sebességet (csak a videóé): a gyorsított hangklip
+  // (leválasztott gyorsított videó-hang) a felhő-úton szól helyesen
+  if (project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && audioSpeedOf(c) !== 1))) {
     return false;
   }
   // 🖼️ szöveg-overlay kell → csak raszter-hosttal megy (a szerkesztő adja); host

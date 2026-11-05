@@ -21,9 +21,20 @@ describe('canDetachAudio', () => {
     expect(canDetachAudio(vclip({}))).toBe(true);
     expect(canDetachAudio(vclip({ trimIn: 1 }))).toBe(true); // trimIn átkerül az AudioClipre
   });
-  it('gyorsított / néma klip → NEM', () => {
-    expect(canDetachAudio(vclip({ speed: 2 }))).toBe(false);
+  it('⏩ gyorsított / lassított klip 0,5–2× között leválasztható (hangmagasság-tartással)', () => {
+    expect(canDetachAudio(vclip({ speed: 2 }))).toBe(true);
+    expect(canDetachAudio(vclip({ speed: 0.5 }))).toBe(true);
+    expect(canDetachAudio(vclip({ speed: 1.5 }))).toBe(true);
+  });
+  it('az előnézet tartományán kívüli, visszafelé játszott vagy néma klip → NEM', () => {
+    expect(canDetachAudio(vclip({ speed: 3 }))).toBe(false);
+    expect(canDetachAudio(vclip({ speed: 0.25 }))).toBe(false);
+    expect(canDetachAudio(vclip({ reversed: true }))).toBe(false);
     expect(canDetachAudio(vclip({ volume: 0 }))).toBe(false);
+  });
+  it('⏩ a sebesség átkerül a hangklipre; 1×-nél nincs mező (a régi alak)', () => {
+    expect(detachAudioCommands(vclip({ speed: 1.5 }), 'D').audioClip.speed).toBe(1.5);
+    expect('speed' in detachAudioCommands(vclip({}), 'D').audioClip).toBe(false);
   });
 });
 

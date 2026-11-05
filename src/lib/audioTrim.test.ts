@@ -45,3 +45,23 @@ describe('trimAudioRight', () => {
     expect(trimAudioRight(c, 20).duration).toBe(4);
   });
 });
+
+describe('⏩ gyorsított hangklip (speed)', () => {
+  // 2× sebesség: 4 s idővonal = 8 s forrás; a forrás 20 s, a trimIn 2 s
+  const fast: AudioClip = { kind: 'audio', id: 'f', uri: 'f.m4a', label: 'f', start: 10, duration: 4, trimIn: 2, sourceDuration: 20, speed: 2, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover' };
+
+  it('bal-él trim: 1 s idővonal = 2 s forrás', () => {
+    expect(trimAudioLeft(fast, 1)).toMatchObject({ start: 11, duration: 3, trimIn: 4 });
+  });
+  it('bal-él nyújtás: a forrás elejéig (trimIn / speed = 1 s)', () => {
+    expect(trimAudioLeft(fast, -5)).toMatchObject({ start: 9, duration: 5, trimIn: 0 });
+  });
+  it('jobb-él: legfeljebb (forrás − trimIn) / speed = 9 s', () => {
+    expect(trimAudioRight(fast, 30).duration).toBe(9);
+  });
+  it('hiányzó speed = 1 (változatlan viselkedés)', () => {
+    const plain = { ...fast, speed: undefined };
+    expect(trimAudioLeft(plain, 1)).toMatchObject({ trimIn: 3 });
+    expect(trimAudioRight(plain, 30).duration).toBe(18);
+  });
+});

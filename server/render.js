@@ -128,17 +128,37 @@ const EDGE_FADE_SEC = 0.01; // 44,1 és 48 kHz-en is egész mintaszám (441 / 48
 const EDGE_EPS = 1e-4;
 
 /** klip-id → a ténylegesen alkalmazott { in, out } fade (mp) a hang-sávokon */
+/** ⏩ a hangklip sebessége (hiányzó = 1) — a kliens `audioSpeedOf` tükre */
+function audioSpeed(clip) {
+  return clip.speed > 0 ? clip.speed : 1;
+}
+
+/**
+ * ⏩ A gyorsított hangklip: a forrás-ablak `duration·speed`, utána hangmagasság-tartó atempo, és
+ * a kimenet pontosan `duration` hosszú (az atempo kerekít) — így a további lánc (fade, kulcskocka,
+ * pan) idővonal-időben dolgozik. 1× sebességnél üres: a lánc bájtra a régi (WSOLA-késés nélkül).
+ */
+function audioSpeedChain(clip) {
+  const speed = audioSpeed(clip);
+  if (speed === 1) {
+    return '';
+  }
+  return `${atempoChain(speed)},apad,atrim=end=${clip.duration.toFixed(4)},asetpts=PTS-STARTPTS,`;
+}
+
 function edgeFades(project) {
   const out = {};
   for (const track of project.tracks ?? []) {
     const clips = (track.clips ?? []).filter((c) => c.kind === 'audio');
+    // ⏩ a forrás-szakasz vége: trimIn + duration·speed (a gyorsított hangklipnél is folytonos a split)
+    const srcEnd = (k) => (k.trimIn || 0) + k.duration * audioSpeed(k);
     for (const c of clips) {
       const trim = c.trimIn || 0;
       const joinedBefore = clips.some(
-        (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs((p.trimIn || 0) + p.duration - trim) < EDGE_EPS
+        (p) => p !== c && p.uri === c.uri && Math.abs(p.start + p.duration - c.start) < EDGE_EPS && Math.abs(srcEnd(p) - trim) < EDGE_EPS
       );
       const joinedAfter = clips.some(
-        (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(trim + c.duration - (n.trimIn || 0)) < EDGE_EPS
+        (n) => n !== c && n.uri === c.uri && Math.abs(c.start + c.duration - n.start) < EDGE_EPS && Math.abs(srcEnd(c) - (n.trimIn || 0)) < EDGE_EPS
       );
       out[c.id] = {
         in: c.fadeIn > 0 ? c.fadeIn : joinedBefore ? 0 : EDGE_FADE_SEC,
@@ -2896,7 +2916,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
     const mono = (await audioChannelCount(clip.uri)) === 1;
     let chain =
-      `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration).toFixed(3)},asetpts=PTS-STARTPTS,` +
+      `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},asetpts=PTS-STARTPTS,` +
+      audioSpeedChain(clip) +
       (mono ? MONO_TO_STEREO : '') +
       (clip.deReverb ? DEREVERB : '') +
       (clip.voiceEnhance ? VOICE_ENHANCE : '') +
@@ -2937,7 +2958,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       const total = Math.max(-12, Math.min(12, Math.round(clip.audioFx.pitchSemitones || 0) + Math.round(harm)));
       const hFx = { ...clip.audioFx, pitchSemitones: total, harmony: 0 };
       let hchain =
-        `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration).toFixed(3)},asetpts=PTS-STARTPTS,` +
+        `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},asetpts=PTS-STARTPTS,` +
+        audioSpeedChain(clip) +
         (clip.deReverb ? DEREVERB : '') +
         (clip.voiceEnhance ? VOICE_ENHANCE : '') +
         audioFxChain(hFx) +

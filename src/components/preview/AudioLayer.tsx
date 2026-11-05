@@ -7,6 +7,7 @@ import { clipsForPlayback, INITIAL_DRIFT, learnStartLatency, planDriftCorrection
 import { probeDrift, probeSeek, probeStart, syncProbeOn } from '@/lib/audioSyncProbe';
 import { registerDevAction } from '@/lib/devActions';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
+import { audioSpeedOf } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 
 import { clamp } from '@/lib/time';
@@ -104,11 +105,13 @@ function useSystemInterruptGuard(player: AudioPlayer, isPlaying: boolean, source
     const offPause = registerDevAction(`audio.nativePause.${devId}`, () => player.pause());
     const offPlay = registerDevAction(`audio.nativePlay.${devId}`, () => player.play());
     const offState = registerDevAction(`audio.nativePlaying.${devId}`, () => player.playing);
+    const offRate = registerDevAction(`audio.nativeRate.${devId}`, () => player.playbackRate);
     return () => {
       clearInterval(timer);
       offPause();
       offPlay();
       offState();
+      offRate();
     };
   }, [player, devId]);
 }
@@ -374,6 +377,11 @@ function ClipAudioPlayer({
     loadedUriRef.current = playUri;
     try {
       player.replace(playUri);
+      // ⏩ gyorsított hangklip: hangmagasság-tartással (a render atempo-jának megfelelője)
+      if (audioSpeedOf(clip) !== 1) {
+        player.shouldCorrectPitch = true;
+        player.setPlaybackRate(audioSpeedOf(clip), 'high');
+      }
       const state = useEditorStore.getState();
       player.seekTo(Math.max(clip.trimIn ?? 0, sourceTimeOf(clip, state.playhead))).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
       if (state.isPlaying && state.playhead >= clip.start) {
@@ -387,9 +395,13 @@ function ClipAudioPlayer({
   useEffect(() => {
     try {
       if (isPlaying) {
+        if (audioSpeedOf(clip) !== 1) {
+          player.setPlaybackRate(audioSpeedOf(clip), 'high');
+        }
         if (startLatencySec > 0) {
           const st = useEditorStore.getState();
-          player.seekTo(sourceTimeOf(clip, st.playhead) + startLatencySec).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+          // a késés idővonal-idő; a gyorsított klip forrása ennyiszer gyorsabban halad
+          player.seekTo(sourceTimeOf(clip, st.playhead) + startLatencySec * audioSpeedOf(clip)).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
         }
         playStartRef.current = Date.now();
         latencyLearnedRef.current = false;

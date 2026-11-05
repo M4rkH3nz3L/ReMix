@@ -61,6 +61,7 @@ import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
+import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
 import { EXPORT_SPACE_MARGIN, RECORD_STOP_FREE, wavBytes } from '@/lib/diskSpace';
 import { addSong, initAlbum, makeSong } from '@/lib/albumDoc';
@@ -2361,6 +2362,64 @@ async function smokeAlbumSheet(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/**
+ * ⏩ A gyorsított videóklip hangja leválasztható (lista #21): a valódi parancs-út (egy undo), és a
+ * Hang Stúdióban a hangmagasság-tartó, 1,5×-es előnézet szinkronja a szondával.
+ */
+async function smokeAudioSpeed(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const asset = Asset.fromModule(require('../../assets/videos/fekvo.mp4'));
+  await asset.downloadAsync();
+  const uri = asset.localUri ?? asset.uri;
+  const id = 'prj_smoke_audiospeed';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioSpeed', caught));
+  const base = createEmptyProject('smoke gyorsított hang', '16:9', undefined, 'audio');
+  const video = { id: 'v', kind: 'video', uri, start: 0, duration: 6, trimIn: 0.5, sourceDuration: 10, speed: 1.5, volume: 1, filterId: 'none' } as VideoClip;
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [video] } : tr)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  const st = () => useEditorStore.getState();
+  const voice = () => (st().project?.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+  const vol = () => (st().project?.tracks.find((t) => t.type === 'video')?.clips[0] as VideoClip | undefined)?.volume;
+  log(canDetachAudio(video), 'az 1,5×-es videóklip hangja leválasztható');
+  const detach = () => st().applyBatch(detachAudioCommands(video, 'leválasztott', st().project?.links).commands, 'user');
+  detach();
+  const a = voice()[0];
+  log(a?.speed === 1.5 && a.trimIn === 0.5 && a.duration === 6 && vol() === 0, 'a hangklip átvette a sebességet és a vágást, a videó elnémult', a ? `${a.speed}×, trimIn ${a.trimIn}` : 'nincs');
+  st().undo();
+  log(voice().length === 0 && vol() === 1, 'egy visszavonás mindent visszaállít');
+  detach();
+  const clipId = voice()[0]?.id ?? '';
+  st().setPlayhead(0);
+  await sleep(600);
+  // 1. kör: a tanulás; 2. kör: a mért szinkron
+  st().setPlaying(true);
+  await sleep(2500);
+  st().setPlaying(false);
+  await sleep(500);
+  st().setPlayhead(0);
+  await sleep(600);
+  startSyncProbe();
+  st().setPlaying(true);
+  await sleep(1500);
+  const rate = runDevAction(`audio.nativeRate.${clipId}`) as number | undefined;
+  await sleep(3500);
+  const head = st().playhead;
+  st().setPlaying(false);
+  const { samples, seeks } = stopSyncProbe();
+  log(Math.abs((rate ?? 0) - 1.5) < 0.01, 'az előnézet 1,5×-en szól (hangmagasság-tartással)', `rate ${rate}`);
+  // a szonda forrás-időben mér: idővonal-időre a sebességgel osztva
+  for (const [cid, d] of summarizeDrift(samples.filter((x) => x.sinceStart > 2))) {
+    log(d.maxMs / 1.5 <= 45, `szinkron beállás után (${cid === clipId ? 'gyorsított hang' : cid})`, `max ${(d.maxMs / 1.5).toFixed(0)} ms idővonal-időben, ${d.n} minta`);
+  }
+  log(seeks <= 3, 'a lejátszás nem tekereget folyamatosan', `${seeks} korrekció`);
+  log(Math.abs(head - 5) < 0.4, 'a lejátszófej a valós idővel halad', `${head.toFixed(2)} s`);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3519,6 +3578,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'audiospeed') {
+    await step(phase, () => smokeAudioSpeed(log));
     return;
   }
   if (phase === 'diskspace') {

@@ -12,8 +12,10 @@ import { Platform } from 'react-native';
  * start)`, 0-ra vágva (a klip előtti playhead nem ad negatív forrás-időt). Hang-
  * klipekre (sebesség nélkül); a videó forrás-ideje a `sourceTimeAt` (speed/reversed).
  */
-export function sourceTimeOf(clip: { start: number; trimIn?: number }, playhead: number): number {
-  return Math.max(0, (clip.trimIn ?? 0) + (playhead - clip.start));
+export function sourceTimeOf(clip: { start: number; trimIn?: number; speed?: number }, playhead: number): number {
+  // ⏩ a gyorsított hangklip forrás-ideje `speed`-del halad (hiányzó = 1)
+  const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+  return Math.max(0, (clip.trimIn ?? 0) + (playhead - clip.start) * speed);
 }
 
 /**

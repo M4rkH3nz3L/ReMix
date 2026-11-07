@@ -154,3 +154,22 @@ describe('PRO-VIDEO B10/B14 — a natív terv', () => {
     expect(() => buildRenderPlan(bad, DEFAULT_SETTINGS)).toThrow(/képarány/);
   });
 });
+
+describe('⏩ gyorsított hangklip az eszközön-renderben', () => {
+  const withVoice = (speed?: number): Project => {
+    const p = projectWithClips([videoClip('a', 0, 10)]);
+    const voice: Track = {
+      id: 'vo', type: 'voiceover', name: 'Voice',
+      clips: [{ kind: 'audio', id: 'h', uri: 'file:///h.m4a', label: 'h', start: 1, duration: 4, trimIn: 0.5, sourceDuration: 20, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover', ...(speed ? { speed } : {}) }],
+    };
+    return { ...p, tracks: [...p.tracks, voice] };
+  };
+  it('a terv a sebességet csak ≠ 1-nél küldi (a régi natív build változatlan tervet kap)', () => {
+    expect(buildRenderPlan(withVoice(1.5), DEFAULT_SETTINGS).audio[0]).toMatchObject({ inSec: 0.5, durationSec: 4, speed: 1.5 });
+    expect('speed' in buildRenderPlan(withVoice(), DEFAULT_SETTINGS).audio[0]).toBe(false);
+  });
+  it('a sebességet nem ismerő natív modul mellett a gyorsított hang a felhő-útra megy', () => {
+    // a tesztben nincs natív modul (supportsAudioSpeed hiányzik)
+    expect(canRenderLocally(withVoice(1.5), DEFAULT_SETTINGS)).toBe(false);
+  });
+});

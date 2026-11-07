@@ -289,7 +289,8 @@ function TimelineClipInner({
         ? trimClipRight(clip, desired)
         : clip.kind === 'audio'
           ? // a hang nem nyújtható a valós forrás végén túl
-            { ...trimAudioRight(clip, desired), trimIn: undefined }
+            // ⏪ visszafelé szóló hangnál a trimIn is mozdul (a jobb él a forrás eleje)
+            trimAudioRight(clip, desired)
           : { duration: clamp(desired, MIN_CLIP_DURATION, Number.POSITIVE_INFINITY), trimIn: undefined };
     // ⏭️ ripple: a hossz-változás tolja a mögötte lévőket (minden sávon). Explicit
     // ripple trim-mód VAGY a globális ripple-kapcsoló bekapcsolja.
@@ -299,7 +300,7 @@ function TimelineClipInner({
     }
     updateClip(
       clip.id,
-      clip.kind === 'video' ? { duration: patch.duration, trimIn: patch.trimIn } : { duration: patch.duration }
+      patch.trimIn !== undefined ? { duration: patch.duration, trimIn: patch.trimIn } : { duration: patch.duration }
     );
   };
 

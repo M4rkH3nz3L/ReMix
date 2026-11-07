@@ -1132,6 +1132,9 @@ export interface AudioClip extends ClipBase {
    * hiányzó = 1. A forrás-idő: `trimIn + (t − start) · speed`.
    */
   speed?: number;
+  /** ⏪ visszafelé szól (a visszafelé játszott videóklip leválasztott hangja); a forrás-ablak
+   * ugyanaz (`trimIn` … `trimIn + duration·speed`), csak a végéről indul */
+  reversed?: boolean;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */

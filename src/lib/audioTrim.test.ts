@@ -1,5 +1,5 @@
 import { MIN_CLIP_DURATION } from '@/constants/editor';
-import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
+import { continuesInSource, needsStretchProxy, trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
 import type { AudioClip } from '@/types/project';
 
 const clip = (over: Partial<AudioClip> = {}): AudioClip => ({
@@ -63,5 +63,38 @@ describe('⏩ gyorsított hangklip (speed)', () => {
     const plain = { ...fast, speed: undefined };
     expect(trimAudioLeft(plain, 1)).toMatchObject({ trimIn: 3 });
     expect(trimAudioRight(plain, 30).duration).toBe(18);
+  });
+});
+
+describe('⏪ visszafelé szóló hangklip (reversed)', () => {
+  // forrás-ablak 2 … 2 + 4·1,5 = 8 (a 20 s-os forrásban), visszafelé
+  const rev: AudioClip = { kind: 'audio', id: 'r', uri: 'r.m4a', label: 'r', start: 10, duration: 4, trimIn: 2, sourceDuration: 20, speed: 1.5, reversed: true, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover' };
+
+  it('bal-él: a trimIn marad (a bal él a forrás vége)', () => {
+    expect(trimAudioLeft(rev, 1)).toMatchObject({ start: 11, duration: 3, trimIn: 2 });
+  });
+  it('bal-él nyújtás: a forrás végéig ((20 − 8) / 1,5 = 8 s), de nem 0 elé', () => {
+    expect(trimAudioLeft(rev, -20)).toMatchObject({ start: 2, duration: 12, trimIn: 2 });
+  });
+  it('jobb-él: a hossz a trimIn-t mozgatja, legfeljebb a forrás elejéig', () => {
+    expect(trimAudioRight(rev, 3)).toEqual({ duration: 3, trimIn: 3.5 });
+    expect(trimAudioRight(rev, 30)).toEqual({ duration: 4 + 2 / 1.5, trimIn: 0 });
+  });
+  it('a split illesztése a forrásban: visszafelé a bal darab forrása a jobbé után van', () => {
+    const left = { trimIn: 5, duration: 2, speed: 1.5, reversed: true };
+    const right = { trimIn: 2, duration: 2, speed: 1.5, reversed: true };
+    expect(continuesInSource(left, right, 1e-3)).toBe(true);
+    expect(continuesInSource(right, left, 1e-3)).toBe(false);
+    expect(continuesInSource({ ...left, reversed: false }, right, 1e-3)).toBe(false);
+  });
+});
+
+describe('needsStretchProxy', () => {
+  it('visszafelé, vagy 0,5–2×-en kívül kell előre nyújtott szakasz', () => {
+    expect(needsStretchProxy({ speed: 1.5 })).toBe(false);
+    expect(needsStretchProxy({})).toBe(false);
+    expect(needsStretchProxy({ speed: 3 })).toBe(true);
+    expect(needsStretchProxy({ speed: 0.25 })).toBe(true);
+    expect(needsStretchProxy({ reversed: true })).toBe(true);
   });
 });

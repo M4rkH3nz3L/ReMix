@@ -45,7 +45,9 @@ export function ClipWaveform({ clip, widthPx, heightPx, color, userInitiated = f
 
   // A22: annyi oszlop, amennyi kifér (≥3.5 px), és a sor pontosan kitölti a klipet
   const columns = clamp(Math.floor((widthPx - 8) / 3.5), 1, 400);
-  const bars = resamplePeaks(clipWindowPeaks(wave, clip.trimIn, clip.duration * audioSpeedOf(clip)), columns);
+  const window = clipWindowPeaks(wave, clip.trimIn, clip.duration * audioSpeedOf(clip));
+  // ⏪ a visszafelé szóló klip hullámformája is visszafelé fut
+  const bars = resamplePeaks(clip.reversed ? window.slice().reverse() : window, columns);
   const heights = barHeights(bars);
   // ⚠️ clipping: a NYERS (full-scale) csúcs 0 dBFS közelében — torzulhat a hang
   const clipping = bars.map((p) => p >= CLIP_THRESHOLD);

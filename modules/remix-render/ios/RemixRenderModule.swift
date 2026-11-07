@@ -36,6 +36,8 @@ struct RenderAudioSegment: Codable {
   let inSec: Double
   let durationSec: Double
   let volume: Double
+  // ⏩ opcionális: a gyorsított hangklip sebessége (forrás-mp / idővonal-mp); hiányzó = 1
+  let speed: Double?
 }
 
 struct RenderPlan: Codable {
@@ -133,6 +135,10 @@ public class RemixRenderModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("RemixRender")
+
+    // ⏩ képesség-jelző: ez a build a hang-szegmens `speed` mezőjét is skálázza (a régi build
+    // csendben figyelmen kívül hagyná → a JS ilyenkor a felhő-útra küldi a gyorsított hangot)
+    Constant("supportsAudioSpeed") { true }
 
     Events("onProgress")
 
@@ -282,6 +288,7 @@ public class RemixRenderModule: Module {
     }
 
     if cursor == .zero { throw RenderError.noVideo }
+    mainAudioParams.audioTimePitchAlgorithm = .spectral
     mixParams.append(mainAudioParams)
 
     // külön hang-szegmensek (zene/voiceover/SFX) — az abszolút idejükre helyezve
@@ -294,16 +301,25 @@ public class RemixRenderModule: Module {
         withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
         throw RenderError.noTracks("audio")
       }
+      // ⏩ a gyorsított hangklip `durationSec · speed` forrást fogyaszt, majd a cél-hosszra skálázzuk
+      // (a hangmagasságot az export `.spectral` algoritmusa tartja — mint a felhő atempo-ja)
+      let audioSpeed = (seg.speed ?? 1) > 0 ? (seg.speed ?? 1) : 1.0
       let srcRange = CMTimeRange(
         start: CMTime(seconds: max(0, seg.inSec), preferredTimescale: timescale),
-        duration: CMTime(seconds: seg.durationSec, preferredTimescale: timescale))
+        duration: CMTime(seconds: seg.durationSec * audioSpeed, preferredTimescale: timescale))
       let at = CMTime(seconds: max(0, seg.atSec), preferredTimescale: timescale)
       do {
         try extra.insertTimeRange(srcRange, of: srcAudio, at: at)
       } catch {
         throw RenderError.badSegment("\(fileName(seg.uri)) — \(error.localizedDescription)")
       }
+      if abs(audioSpeed - 1.0) > 0.001 {
+        extra.scaleTimeRange(
+          CMTimeRange(start: at, duration: srcRange.duration),
+          toDuration: CMTime(seconds: seg.durationSec, preferredTimescale: timescale))
+      }
       let params = AVMutableAudioMixInputParameters(track: extra)
+      params.audioTimePitchAlgorithm = .spectral
       params.setVolume(Float(max(0, min(1, seg.volume))), at: .zero)
       mixParams.append(params)
     }
@@ -367,6 +383,8 @@ public class RemixRenderModule: Module {
     let mix = AVMutableAudioMix()
     mix.inputParameters = mixParams
     export.audioMix = mix
+    // ⏩ a skálázott (gyorsított) hang hangmagasság-tartással — a videó- és a hangklipeké is
+    export.audioTimePitchAlgorithm = .spectral
     // B13: NINCS fájlméret-plafon. A korábbi `fileLengthLimit = bitráta × hossz × 1.08`
     // VBR-nél (minden platform-preset az) levágta a videó VÉGÉT. Az export-session nem
     // fogad nyers bitrátát — a preset minősége dönt; a csonka videónál ez a kisebb rossz.

@@ -85,3 +85,12 @@ describe('⏩ gyorsított hangklip vágása', () => {
     expect((cropClip(a, 0, 2) as AudioClip).trimIn).toBe(1);
   });
 });
+
+describe('⏪ visszafelé szóló hangklip vágása', () => {
+  it('cropClip: a darab forrása a klip végéről számol', () => {
+    const r: AudioClip = { kind: 'audio', id: 'r', uri: 'r.m4a', label: 'r', start: 0, duration: 6, trimIn: 1, sourceDuration: 20, speed: 1.5, reversed: true, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover' };
+    // bal darab 0–2: a forrás 1 + (6 − 2)·1,5 = 7-től; jobb darab 2–6: a forrás elejéről (1)
+    expect((cropClip(r, 0, 2) as AudioClip).trimIn).toBeCloseTo(7);
+    expect((cropClip(r, 2, 6) as AudioClip).trimIn).toBeCloseTo(1);
+  });
+});

@@ -114,4 +114,17 @@ describe('⏩ gyorsított hangklip — pure részek', () => {
     expect(freqAt(out, 0.05, 0.45)).toBeCloseTo(440, -1);
     expect(freqAt(out, 0.6, 1.7)).toBeCloseTo(880, -1);
   });
+
+  it('⏪ visszafelé 2×: a forrás 4 → 0 s, az idővonalon előbb 880, aztán 440 Hz', async () => {
+    const out = await render({ start: 0, duration: 2, speed: 2, reversed: true });
+    expect(Math.abs(out.length / SR - 2)).toBeLessThan(0.01);
+    expect(freqAt(out, 0.1, 0.9)).toBeCloseTo(880, -1);
+    expect(freqAt(out, 1.1, 1.9)).toBeCloseTo(440, -1);
+  });
+
+  it('⏪ visszafelé 1× trimIn-nel: a forrás 3 → 1 s (880 Hz 1 s-ig, utána 440 Hz)', async () => {
+    const out = await render({ start: 0, duration: 2, trimIn: 1, reversed: true });
+    expect(freqAt(out, 0.1, 0.9)).toBeCloseTo(880, -1);
+    expect(freqAt(out, 1.1, 1.9)).toBeCloseTo(440, -1);
+  });
 });

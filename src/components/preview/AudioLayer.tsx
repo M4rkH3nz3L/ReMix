@@ -6,8 +6,9 @@ import { resolveClipUri } from '@/lib/assetResolve';
 import { clipsForPlayback, INITIAL_DRIFT, learnStartLatency, planDriftCorrection, sourceTimeOf, type DriftState } from '@/lib/avSync';
 import { probeDrift, probeSeek, probeStart, syncProbeOn } from '@/lib/audioSyncProbe';
 import { registerDevAction } from '@/lib/devActions';
+import { ensureStretchProxy, getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
-import { audioSpeedOf } from '@/lib/audioTrim';
+import { audioSpeedOf, needsStretchProxy } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 
 import { clamp } from '@/lib/time';
@@ -303,8 +304,8 @@ function TrackAudio({ trackType }: { trackType: TrackType }) {
  * válásakor a komponens unmountol → a lejátszó elhallgat + felszabadul.
  */
 function ClipAudioPlayer({
-  clip,
-  audible,
+  clip: editClip,
+  audible: audibleProp,
   trackGain,
 }: {
   clip: AudioClip;
@@ -317,17 +318,16 @@ function ClipAudioPlayer({
   const clockRunning = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
   const masterVolume = useEditorStore((s) => s.masterVolume);
   // ⏱️ preroll alatt a klip még nem szól: betöltve vár a forrás elején
-  const sounding = playhead >= clip.start;
+  const sounding = playhead >= editClip.start;
   const isPlaying = clockRunning && sounding;
 
   // 🔗 ADR-012: a feloldott (asseten át) forrás-uri; memoizált (nem per-frame)
   const resolvedUri = useMemo(
-    () => (project ? (resolveClipUri(project, clip) ?? clip.uri) : null),
-    [project, clip]
+    () => (project ? (resolveClipUri(project, editClip) ?? editClip.uri) : null),
+    [project, editClip]
   );
 
   const player = useAudioPlayer(null);
-  useSystemInterruptGuard(player, isPlaying, sourceTimeOf(clip, clip.start + clip.duration), clip.id);
   const loadedUriRef = useRef<string | null>(null);
 
   /**
@@ -336,15 +336,15 @@ function ClipAudioPlayer({
    * proxy készül, a nyers hang szól — így a lejátszás sosem akad meg. A kész
    * proxyt RENDER-IDŐBEN olvassuk a cache-ből (nincs setState az effektben).
    */
-  const voiceOpts = { voiceEnhance: clip.voiceEnhance, deReverb: clip.deReverb };
+  const voiceOpts = { voiceEnhance: editClip.voiceEnhance, deReverb: editClip.deReverb };
   const needsProxy = needsVoiceProxy(voiceOpts);
-  const voiceKey = `${resolvedUri ?? clip.uri}|${clip.voiceEnhance ? 'e' : ''}${clip.deReverb ? 'd' : ''}`;
+  const voiceKey = `${resolvedUri ?? editClip.uri}|${editClip.voiceEnhance ? 'e' : ''}${editClip.deReverb ? 'd' : ''}`;
   const [fetched, setFetched] = useState<{ key: string; uri: string | null } | null>(null);
 
   // csak primitív függőségek → őszinte dep-lista, elnémított hook-szabály nélkül
-  const voiceSrcUri = needsProxy ? (resolvedUri ?? clip.uri) : null;
-  const voiceEnhance = clip.voiceEnhance ?? false;
-  const voiceDeReverb = clip.deReverb ?? false;
+  const voiceSrcUri = needsProxy ? (resolvedUri ?? editClip.uri) : null;
+  const voiceEnhance = editClip.voiceEnhance ?? false;
+  const voiceDeReverb = editClip.deReverb ?? false;
   useEffect(() => {
     if (!voiceSrcUri) {
       return;
@@ -364,10 +364,42 @@ function ClipAudioPlayer({
   }, [voiceSrcUri, voiceEnhance, voiceDeReverb, voiceKey]);
 
   const voiceUri = needsProxy
-    ? (getVoiceProxySync(resolvedUri ?? clip.uri, voiceOpts) ??
+    ? (getVoiceProxySync(resolvedUri ?? editClip.uri, voiceOpts) ??
       (fetched?.key === voiceKey ? fetched.uri : null))
     : null;
-  const playUri = voiceUri ?? resolvedUri ?? clip.uri ?? null;
+  // ⏩⏪ visszafelé vagy 0,5–2×-en kívül: az előre elkészített szakasz szól 1×-en (amíg készül, csend)
+  const stretchNeeded = needsStretchProxy(editClip);
+  const stretchSrc = resolvedUri ?? editClip.uri;
+  const stretchKey = stretchNeeded ? stretchProxyKey(stretchSrc, editClip) : null;
+  const [stretched, setStretched] = useState<{ key: string; uri: string | null } | null>(null);
+  const stretchTrimIn = editClip.trimIn;
+  const stretchDuration = editClip.duration;
+  const stretchSpeed = editClip.speed;
+  const stretchReversed = editClip.reversed;
+  useEffect(() => {
+    if (!stretchKey) {
+      return;
+    }
+    let alive = true;
+    void ensureStretchProxy(stretchSrc, { trimIn: stretchTrimIn, duration: stretchDuration, speed: stretchSpeed, reversed: stretchReversed }).then((uri) => {
+      if (alive) {
+        setStretched({ key: stretchKey, uri });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [stretchKey, stretchSrc, stretchTrimIn, stretchDuration, stretchSpeed, stretchReversed]);
+  const stretchUri = stretchKey ? (getStretchProxySync(stretchKey) ?? (stretched?.key === stretchKey ? stretched.uri : null)) : null;
+  // a lejátszás szemszögéből a klip: a kész szakasz a klip elejétől, 1×-en, előre
+  const clip = useMemo(
+    () => (stretchUri ? { ...editClip, uri: stretchUri, trimIn: 0, speed: undefined, reversed: undefined } : editClip),
+    [editClip, stretchUri]
+  );
+  useSystemInterruptGuard(player, isPlaying, sourceTimeOf(clip, clip.start + clip.duration), clip.id);
+  const playUri = stretchNeeded ? stretchUri : (voiceUri ?? resolvedUri ?? clip.uri ?? null);
+  // amíg az új szakasz készül (pl. vágás után), a régi nem szólhat rossz időzítéssel
+  const audible = audibleProp && (!stretchNeeded || stretchUri !== null);
 
   // betöltés + kezdő seek/play (forrás-idő = trimIn + klip-eleji offset, avSync)
   useEffect(() => {

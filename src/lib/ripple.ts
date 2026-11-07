@@ -1,5 +1,6 @@
+import { trimAudioRight } from '@/lib/audioTrim';
 import { trimClipRight } from '@/lib/projectUtils';
-import type { Clip, Project, TrackType, VideoClip } from '@/types/project';
+import type { AudioClip, Clip, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
  * ⏭️ Ripple szerkesztés — pure réteg.
@@ -150,6 +151,10 @@ export function buildRippleResizePlan(
     if (c.kind === 'video') {
       const { duration, trimIn } = trimClipRight(c as VideoClip, nextDuration);
       return { ...c, duration, trimIn } as Clip;
+    }
+    if (c.kind === 'audio' && (c as AudioClip).reversed) {
+      // ⏪ a visszafelé szóló hangklip jobb éle a forrás eleje: a trimIn is mozdul
+      return { ...c, ...trimAudioRight(c as AudioClip, nextDuration) } as Clip;
     }
     return { ...c, duration: nextDuration } as Clip;
   });

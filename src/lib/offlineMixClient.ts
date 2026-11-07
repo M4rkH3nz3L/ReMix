@@ -175,7 +175,7 @@ async function stretchLatency(api: AudioApi, speed: number, sr: number): Promise
  * késleltetését kompenzáljuk: a kimenet elejéről a késés leesik, a bemenet a végén ennyivel
  * hosszabb — így a kimenet pontosan `duration` hosszú és a helyén szól.
  */
-async function stretchSegment(api: AudioApi, src: DecodedSource, job: StretchJob): Promise<DecodedSource> {
+export async function stretchSegment(api: AudioApi, src: DecodedSource, job: StretchJob): Promise<DecodedSource> {
   const sr = src.sampleRate;
   const n = Math.max(1, Math.round(job.sourceSec * sr));
   if (job.speed === 1) {

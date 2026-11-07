@@ -21,16 +21,16 @@ describe('canDetachAudio', () => {
     expect(canDetachAudio(vclip({}))).toBe(true);
     expect(canDetachAudio(vclip({ trimIn: 1 }))).toBe(true); // trimIn átkerül az AudioClipre
   });
-  it('⏩ gyorsított / lassított klip 0,5–2× között leválasztható (hangmagasság-tartással)', () => {
-    expect(canDetachAudio(vclip({ speed: 2 }))).toBe(true);
-    expect(canDetachAudio(vclip({ speed: 0.5 }))).toBe(true);
-    expect(canDetachAudio(vclip({ speed: 1.5 }))).toBe(true);
+  it('⏩⏪ bármilyen sebességű és a visszafelé játszott klip hangja is leválasztható', () => {
+    for (const speed of [0.25, 0.5, 1.5, 2, 3, 4]) expect(canDetachAudio(vclip({ speed }))).toBe(true);
+    expect(canDetachAudio(vclip({ reversed: true }))).toBe(true);
   });
-  it('az előnézet tartományán kívüli, visszafelé játszott vagy néma klip → NEM', () => {
-    expect(canDetachAudio(vclip({ speed: 3 }))).toBe(false);
-    expect(canDetachAudio(vclip({ speed: 0.25 }))).toBe(false);
-    expect(canDetachAudio(vclip({ reversed: true }))).toBe(false);
+  it('a néma klip → NEM', () => {
     expect(canDetachAudio(vclip({ volume: 0 }))).toBe(false);
+  });
+  it('⏪ az irány is átkerül', () => {
+    expect(detachAudioCommands(vclip({ reversed: true, speed: 3 }), 'D').audioClip).toMatchObject({ reversed: true, speed: 3 });
+    expect('reversed' in detachAudioCommands(vclip({}), 'D').audioClip).toBe(false);
   });
   it('⏩ a sebesség átkerül a hangklipre; 1×-nél nincs mező (a régi alak)', () => {
     expect(detachAudioCommands(vclip({ speed: 1.5 }), 'D').audioClip.speed).toBe(1.5);

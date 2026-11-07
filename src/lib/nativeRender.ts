@@ -9,7 +9,7 @@ import { deviceTextClips, deviceTextOverlaySpecs } from '@/lib/overlayPlan';
 import { hasOverlayRasterHost, rasterTextOverlays } from '@/lib/overlayRasterBridge';
 import type { RenderSettings } from '@/lib/render';
 import { localRenderMatchesPreview } from '@/lib/renderParity';
-import type { Project } from '@/types/project';
+import type { AudioClip, Project } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 /**
@@ -38,6 +38,8 @@ interface RemixRenderModule {
   exportPlan(planJson: string, outputPath: string): Promise<string>;
   /** A futó render megszakítása — a natív loop kilép + a részfájlt törli. */
   cancel(): Promise<void>;
+  /** ⏩ az iOS-build a hang-szegmens sebességét is skálázza (régi buildben hiányzik) */
+  readonly supportsAudioSpeed?: boolean;
   addListener(
     event: 'onProgress',
     listener: (e: NativeProgressEvent) => void
@@ -92,6 +94,8 @@ interface PlanAudioSegment {
   inSec: number;
   durationSec: number;
   volume: number;
+  /** ⏩ a gyorsított hangklip sebessége (csak ha ≠ 1 — a régi natív build nem ismeri) */
+  speed?: number;
 }
 
 interface RenderPlan {
@@ -187,6 +191,7 @@ export function buildRenderPlan(
           inSec: (clip as { trimIn?: number }).trimIn ?? 0,
           durationSec: clip.duration,
           volume: clip.volume ?? 1,
+          ...(audioSpeedOf(clip as AudioClip) !== 1 ? { speed: audioSpeedOf(clip as AudioClip) } : {}),
         });
       }
     }
@@ -226,9 +231,13 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
   if (!localRenderMatchesPreview(project, platform)) {
     return false;
   }
-  // ⏩ a natív motor hangsávja nem ismer sebességet (csak a videóé): a gyorsított hangklip
-  // (leválasztott gyorsított videó-hang) a felhő-úton szól helyesen
-  if (project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && audioSpeedOf(c) !== 1))) {
+  // ⏩ a gyorsított hangklipet az ezt jelző motor skálázza (`supportsAudioSpeed`, iOS,
+  // hangmagasság-tartással); a régi build és az Android-motor nem → ott a felhő-út szól helyesen
+  if (Native?.supportsAudioSpeed !== true && project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && audioSpeedOf(c) !== 1))) {
+    return false;
+  }
+  // ⏪ visszafelé szóló hangot az AVFoundation-kompozíció nem tud — a felhő areverse-e szól helyesen
+  if (project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && (c as AudioClip).reversed))) {
     return false;
   }
   // 🖼️ szöveg-overlay kell → csak raszter-hosttal megy (a szerkesztő adja); host

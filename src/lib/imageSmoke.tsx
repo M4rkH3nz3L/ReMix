@@ -62,6 +62,7 @@ import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
+import { previewEngine } from '@/lib/previewEngine';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
 import type { RenderSettings } from '@/lib/render';
@@ -2697,6 +2698,44 @@ async function smokeEngineSpike(log: Log) {
   await ctx.close();
 }
 
+/**
+ * 🎧 Előre renderelt előnézet (az exporttal azonos keverés): 3 sáv, pan, fade — a szeletek
+ * rés nélkül, időben ütemeződnek; a lejátszófej a hangórával halad; a futás közbeni
+ * szerkesztés (pan-váltás) a még el nem indult szeleteket cseréli.
+ */
+async function smokePreviewEngine(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_engine.wav', 12);
+  const base = createEmptyProject('smoke motor', '9:16', undefined, 'audio');
+  const mk = (id: string, start: number, pan: number): AudioClip => ({ kind: 'audio', id, uri, label: id, start, duration: 8, trimIn: 0, sourceDuration: 12, volume: 0.3, fadeIn: 0.2, fadeOut: 0.3, pan, source: 'imported' });
+  const project = (pan: number): Project => ({ ...base, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('a', 0, pan)] } : t.type === 'sfx' ? { ...t, clips: [mk('b', 1, 0.5)] } : t.type === 'voiceover' ? { ...t, clips: [mk('c', 2, 0)] } : t)) });
+  const t0 = Date.now();
+  await previewEngine.setPlan(offlineMixPlan(project(-1)));
+  log(null, 'terv + dekódolás', `${Date.now() - t0} ms`);
+  previewEngine.takeStats();
+  const w0 = Date.now();
+  await previewEngine.play(0.5);
+  await sleep(1500);
+  const p1 = previewEngine.position();
+  const w1 = (Date.now() - w0) / 1000;
+  // futás közbeni szerkesztés: a pan átvált
+  const e0 = Date.now();
+  await previewEngine.setPlan(offlineMixPlan(project(1)));
+  const editMs = Date.now() - e0;
+  await sleep(2500);
+  const p2 = previewEngine.position();
+  const w2 = (Date.now() - w0) / 1000;
+  previewEngine.pause();
+  const st = previewEngine.takeStats();
+  log(st.late === 0, 'a szeletek rés nélkül, időben szólnak', `${st.chunks} szelet, ${st.late} késett, legkisebb előny ${st.minLeadMs.toFixed(0)} ms`);
+  // a két mérés közti haladás (az indítás ideje — a hangmotor ébresztése — kiesik)
+  log(Math.abs(p2 - p1 - (w2 - w1)) < 0.03, 'a lejátszófej a hangórával halad (nincs elcsúszás)', `${(p2 - p1).toFixed(3)} s hang · ${(w2 - w1).toFixed(3)} s fal`);
+  log(st.replaced > 0 && st.replaced <= 8, 'a szerkesztés csak a még el nem indult szeleteket cseréli', `${st.replaced} szelet, az új terv ${editMs} ms alatt`);
+  await sleep(300);
+  log(Math.abs(previewEngine.position() - p2) < 0.01, 'szünetnél a lejátszófej megáll', `${previewEngine.position().toFixed(3)} s`);
+  new File(uri).delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3855,6 +3894,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'previewengine') {
+    await step(phase, () => smokePreviewEngine(log));
     return;
   }
   if (phase === 'enginespike') {

@@ -18,7 +18,11 @@ import type {
 export const KF_EPS = 0.05;
 
 // a `pan` (hangklip-pásztázás) is csatorna — nélküle a vágás / törlés csendben eldobta (B4)
-export const KEYFRAME_CHANNELS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume', 'pan'] as const;
+export const KEYFRAME_CHANNELS = [
+  'scale', 'x', 'y', 'rotation', 'opacity', 'volume', 'pan',
+  // 🎛️ hang-effekt automáció (a vágás/split ezeket is követi)
+  'fxLowpass', 'fxHighpass', 'fxReverb', 'fxDelay', 'fxEqLow', 'fxEqMid', 'fxEqHigh',
+] as const;
 export type KeyframeChannel = (typeof KEYFRAME_CHANNELS)[number];
 
 const EASE_FNS: Record<Exclude<KeyframeEasing, 'bezier'>, (p: number) => number> = {

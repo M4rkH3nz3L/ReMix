@@ -4052,6 +4052,16 @@
         "unknownDuration": "A hang hossza nem olvasható ki, a fájl sérült lehet. Próbáld újra, vagy mentsd el MP3/M4A/WAV formátumban.",
         "tooLong": "Nagyon hosszú hang (~{{hours}} óra) — a feldolgozás és a render lassabb, több memóriát igényel."
       },
+      "fxAutomation": {
+        "title": "Effekt-automáció",
+        "fxLowpass": "Szűrő ↓",
+        "fxHighpass": "Szűrő ↑",
+        "fxReverb": "Zengés",
+        "fxDelay": "Visszhang",
+        "fxEqLow": "EQ mély",
+        "fxEqMid": "EQ közép",
+        "fxEqHigh": "EQ magas"
+      },
       "markers": {
         "add": "Marker",
         "defaultLabel": "Marker {{number}}",

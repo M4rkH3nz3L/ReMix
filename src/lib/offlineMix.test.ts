@@ -1,5 +1,6 @@
 import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains, crossfades, type DecodedSource } from '@/lib/offlineMix';
 import { integratedLoudness } from '@/lib/loudness';
+import { cropKeyframes } from '@/lib/keyframes';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -193,6 +194,49 @@ describe('offlineMix (A26)', () => {
     const out: [Float32Array, Float32Array] = [new Float32Array(5 * SR), new Float32Array(5 * SR)];
     mixRange(plan, new Map([[plan.clips[0].uri, { channels: [dc], sampleRate: SR }]]), out, 0, 5 * SR);
     for (const t of [1.5, 2.0, 2.25, 2.5, 2.75, 3.5]) expect(out[0][Math.round(t * SR)]).toBeCloseTo(0.5, 2);
+  });
+
+  it('🎛️ effekt-automáció: aluláteresztő-söprés — a magas tartomány időben elhal, szeletelés-független, a split megtartja', () => {
+    const SR = 44100;
+    const n = 3 * SR;
+    let a = 7;
+    const rnd = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+    };
+    const noise = Float32Array.from({ length: n }, () => 0.3 * rnd());
+    const sweep = [{ time: 0, value: 20000, easing: 'linear' as const }, { time: 3, value: 300, easing: 'linear' as const }];
+    const p = project([clip({ id: 's', start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 1, fadeIn: 0, fadeOut: 0, keyframes: { fxLowpass: sweep } as AudioClip['keyframes'] })]);
+    const plan = offlineMixPlan(p);
+    expect(plan.clips[0].fxKf?.fxLowpass).toHaveLength(2);
+    const sources = new Map<string, DecodedSource>([[plan.clips[0].uri, { channels: [noise], sampleRate: SR }]]);
+    const render = (chunk: number) => {
+      const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+      const st = new Map();
+      for (let x = 0; x < n; x += chunk) {
+        const y = Math.min(n, x + chunk);
+        mixRange(plan, sources, [out[0].subarray(x, y), out[1].subarray(x, y)], x, y, 1, st);
+      }
+      return out[0];
+    };
+    const y = render(5512);
+    // magas tartomány: első differencia energiája (≈ felüláteresztő) — az elején nagy, a végén kicsi
+    const hfDb = (from: number, to: number) => {
+      let e = 0;
+      for (let i = Math.round(from * SR) + 1; i < Math.round(to * SR); i++) e += (y[i] - y[i - 1]) ** 2;
+      return 10 * Math.log10(e / ((to - from) * SR) + 1e-30);
+    };
+    expect(hfDb(0.1, 0.4) - hfDb(2.6, 2.9)).toBeGreaterThan(20);
+    const z = render(11025);
+    let maxDiff = 0;
+    for (let i = 0; i < n; i++) maxDiff = Math.max(maxDiff, Math.abs(y[i] - z[i]));
+    expect(maxDiff).toBeLessThan(1e-6);
+    // split: a második darab görbéje a saját idejére tolva folytatódik
+    const right = cropKeyframes({ fxLowpass: sweep }, 1.5, 1.5);
+    expect(right?.fxLowpass?.[0].time).toBeCloseTo(0);
+    expect(right?.fxLowpass?.[0].value).toBeCloseTo(10150, 0);
   });
 });
 

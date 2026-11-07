@@ -1,4 +1,5 @@
-import type { AudioFx } from '@/types/project';
+import { sampleChannel } from '@/lib/keyframes';
+import type { AudioFx, Keyframe } from '@/types/project';
 
 /**
  * 🎛️ A KÖZÖS hang-DSP (PRO-AUDIO „azt kapod, amit hallasz”): az előnézet és a telefonos export
@@ -33,6 +34,15 @@ export class Biquad implements Processor {
   private y2 = [0, 0];
 
   constructor(c: { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number }) {
+    this.b0 = c.b0 / c.a0;
+    this.b1 = c.b1 / c.a0;
+    this.b2 = c.b2 / c.a0;
+    this.a1 = c.a1 / c.a0;
+    this.a2 = c.a2 / c.a0;
+  }
+
+  /** új együtthatók (az állapot marad — automációhoz) */
+  setCoeffs(c: { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number }): void {
     this.b0 = c.b0 / c.a0;
     this.b1 = c.b1 / c.a0;
     this.b2 = c.b2 / c.a0;
@@ -77,29 +87,80 @@ export class Biquad implements Processor {
 
 const omega = (f: number, sr: number) => (2 * Math.PI * f) / sr;
 
-/** ffmpeg `highpass=f=…` (2 pólus, Q = 0,707) */
-export function highpass(f: number, sr: number, q = 0.707): Biquad {
+type Coeffs = { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number };
+
+function highpassCoeffs(f: number, sr: number, q = 0.707): Coeffs {
   const w = omega(f, sr);
   const cos = Math.cos(w);
   const alpha = Math.sin(w) / (2 * q);
-  return new Biquad({ b0: (1 + cos) / 2, b1: -(1 + cos), b2: (1 + cos) / 2, a0: 1 + alpha, a1: -2 * cos, a2: 1 - alpha });
+  return { b0: (1 + cos) / 2, b1: -(1 + cos), b2: (1 + cos) / 2, a0: 1 + alpha, a1: -2 * cos, a2: 1 - alpha };
 }
 
-/** ffmpeg `lowpass=f=…` (2 pólus, Q = 0,707) */
-export function lowpass(f: number, sr: number, q = 0.707): Biquad {
+function lowpassCoeffs(f: number, sr: number, q = 0.707): Coeffs {
   const w = omega(f, sr);
   const cos = Math.cos(w);
   const alpha = Math.sin(w) / (2 * q);
-  return new Biquad({ b0: (1 - cos) / 2, b1: 1 - cos, b2: (1 - cos) / 2, a0: 1 + alpha, a1: -2 * cos, a2: 1 - alpha });
+  return { b0: (1 - cos) / 2, b1: 1 - cos, b2: (1 - cos) / 2, a0: 1 + alpha, a1: -2 * cos, a2: 1 - alpha };
 }
 
-/** ffmpeg `equalizer=f=…:t=q:w=…:g=…` (csúcs-EQ) */
-export function peaking(f: number, gainDb: number, sr: number, q = 1): Biquad {
+function peakingCoeffs(f: number, gainDb: number, sr: number, q = 1): Coeffs {
   const w = omega(f, sr);
   const cos = Math.cos(w);
   const alpha = Math.sin(w) / (2 * q);
   const A = Math.pow(10, gainDb / 40);
-  return new Biquad({ b0: 1 + alpha * A, b1: -2 * cos, b2: 1 - alpha * A, a0: 1 + alpha / A, a1: -2 * cos, a2: 1 - alpha / A });
+  return { b0: 1 + alpha * A, b1: -2 * cos, b2: 1 - alpha * A, a0: 1 + alpha / A, a1: -2 * cos, a2: 1 - alpha / A };
+}
+
+/** ffmpeg `highpass=f=…` (2 pólus, Q = 0,707) */
+export function highpass(f: number, sr: number, q = 0.707): Biquad {
+  return new Biquad(highpassCoeffs(f, sr, q));
+}
+
+/** ffmpeg `lowpass=f=…` (2 pólus, Q = 0,707) */
+export function lowpass(f: number, sr: number, q = 0.707): Biquad {
+  return new Biquad(lowpassCoeffs(f, sr, q));
+}
+
+/** ffmpeg `equalizer=f=…:t=q:w=…:g=…` (csúcs-EQ) */
+export function peaking(f: number, gainDb: number, sr: number, q = 1): Biquad {
+  return new Biquad(peakingCoeffs(f, gainDb, sr, q));
+}
+
+/** az automáció rácsa (minta): a klip saját idejéhez igazítva — a darabolás nem hagy nyomot */
+const AUTO_BLOCK = 64;
+
+/**
+ * 🎛️ Automatizált szűrő: a paraméter (frekvencia vagy erősítés) a kulcskocka-görbéből, 64
+ * mintánként frissül (a klip saját rácsán); az állapot folytonos — nincs kattogás.
+ */
+export class AutoBiquad implements Processor {
+  private readonly bq: Biquad;
+  private last = Number.NaN;
+
+  constructor(
+    private readonly design: (v: number) => Coeffs,
+    private readonly kfs: Keyframe[],
+    private readonly fallback: number,
+    private readonly sr: number
+  ) {
+    this.bq = new Biquad(design(fallback));
+  }
+
+  processStereo(l: Float32Array, r: Float32Array, pos: number): void {
+    let i = 0;
+    while (i < l.length) {
+      const at = pos + i;
+      const next = Math.min(l.length, i + (AUTO_BLOCK - (at % AUTO_BLOCK)));
+      // az érték a RÁCSPONTBÓL (nem a darab kezdetéből) — így a darabolás nem hagy nyomot
+      const v = sampleChannel(this.kfs, (at - (at % AUTO_BLOCK)) / this.sr, this.fallback);
+      if (v !== this.last) {
+        this.bq.setCoeffs(this.design(v));
+        this.last = v;
+      }
+      this.bq.processStereo(l.subarray(i, next), r.subarray(i, next));
+      i = next;
+    }
+  }
 }
 
 
@@ -343,7 +404,7 @@ export class Echo implements Processor {
     private readonly inGain: number,
     private readonly outGain: number,
     delaysMs: number[],
-    private readonly decays: number[],
+    private decays: number[],
     sr: number
   ) {
     this.taps = delaysMs.map((ms) => Math.round((ms / 1000) * sr));
@@ -351,16 +412,24 @@ export class Echo implements Processor {
     this.lines = [new DelayLine(max), new DelayLine(max)];
   }
 
-  processStereo(l: Float32Array, r: Float32Array): void {
+  /** 🎛️ a csillapítások automációja: a mérték (0–1) görbéje → csillapítások (64 mintánként) */
+  auto?: { kfs: Keyframe[]; fallback: number; decaysOf: (amount: number) => number[]; sr: number };
+
+  processStereo(l: Float32Array, r: Float32Array, pos = 0): void {
     const io = [l, r];
     for (let ch = 0; ch < 2; ch++) {
       const buf = io[ch];
       const line = this.lines[ch];
+      let decays = this.decays;
       for (let i = 0; i < buf.length; i++) {
+        if (this.auto && (i === 0 || (pos + i) % AUTO_BLOCK === 0)) {
+          const at = pos + i;
+          decays = this.auto.decaysOf(sampleChannel(this.auto.kfs, (at - (at % AUTO_BLOCK)) / this.auto.sr, this.auto.fallback));
+        }
         const x = buf[i];
         line.write(x);
         let y = x * this.inGain;
-        for (let k = 0; k < this.taps.length; k++) y += line.tap(this.taps[k]) * this.decays[k];
+        for (let k = 0; k < this.taps.length; k++) y += line.tap(this.taps[k]) * decays[k];
         buf[i] = y * this.outGain;
       }
     }
@@ -555,8 +624,22 @@ export function voiceFx(fx: AudioFx | undefined, enhance: boolean, deReverb: boo
  * A klip effekt-lánca a szerver sorrendjében (szűrők → EQ). Üres = nincs feldolgozás. A
  * paraméter-szorítás a szerverével azonos.
  */
-export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, deReverb = false): Processor[] {
-  if (!fx && !deReverb) {
+/** 🎛️ a klip effekt-automációs görbéi */
+export interface FxAutomation {
+  fxLowpass?: Keyframe[];
+  fxHighpass?: Keyframe[];
+  fxReverb?: Keyframe[];
+  fxDelay?: Keyframe[];
+  fxEqLow?: Keyframe[];
+  fxEqMid?: Keyframe[];
+  fxEqHigh?: Keyframe[];
+}
+
+export const FX_AUTO_KEYS = ['fxLowpass', 'fxHighpass', 'fxReverb', 'fxDelay', 'fxEqLow', 'fxEqMid', 'fxEqHigh'] as const;
+
+export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, deReverb = false, auto?: FxAutomation): Processor[] {
+  const has = (k: keyof FxAutomation) => (auto?.[k]?.length ?? 0) > 0;
+  if (!fx && !deReverb && !FX_AUTO_KEYS.some(has)) {
     return [];
   }
   fx = fx ?? {};
@@ -566,29 +649,52 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
   if (deReverb) {
     chain.push(new Gate(0.02, 2.5, 8, 90, 0.06, sr), peaking(300, -3, sr, 1.2));
   }
-  if (fx.highpass && fx.highpass > 0) {
-    chain.push(highpass(Math.round(clampN(fx.highpass, 20, 2000)), sr));
+  // 🎛️ automatizált paraméternél a görbe szól (a statikus érték az alap); a szorítás a statikussal azonos
+  const hpF = (v: number) => clampN(v, 20, 2000);
+  const lpF = (v: number) => clampN(v, 1000, 20000);
+  const g = (v: number | undefined) => clampN(v || 0, -12, 12);
+  if (has('fxHighpass')) {
+    chain.push(new AutoBiquad((v) => highpassCoeffs(hpF(v), sr), auto!.fxHighpass!, fx.highpass || 20, sr));
+  } else if (fx.highpass && fx.highpass > 0) {
+    chain.push(highpass(Math.round(hpF(fx.highpass)), sr));
   }
-  if (fx.lowpass && fx.lowpass > 0) {
-    chain.push(lowpass(Math.round(clampN(fx.lowpass, 1000, 20000)), sr));
+  if (has('fxLowpass')) {
+    chain.push(new AutoBiquad((v) => lowpassCoeffs(lpF(v), sr), auto!.fxLowpass!, fx.lowpass || 20000, sr));
+  } else if (fx.lowpass && fx.lowpass > 0) {
+    chain.push(lowpass(Math.round(lpF(fx.lowpass)), sr));
   }
-  if (fx.eq) {
-    const g = (v: number | undefined) => clampN(v || 0, -12, 12);
-    if (g(fx.eq.low)) chain.push(peaking(100, g(fx.eq.low), sr));
-    if (g(fx.eq.mid)) chain.push(peaking(1000, g(fx.eq.mid), sr));
-    if (g(fx.eq.high)) chain.push(peaking(8000, g(fx.eq.high), sr));
-  }
+  const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', f: number, base: number | undefined) => {
+    if (has(key)) {
+      chain.push(new AutoBiquad((v) => peakingCoeffs(f, g(v), sr), auto![key]!, g(base), sr));
+    } else if (g(base)) {
+      chain.push(peaking(f, g(base), sr));
+    }
+  };
+  band('fxEqLow', 100, fx.eq?.low);
+  band('fxEqMid', 1000, fx.eq?.mid);
+  band('fxEqHigh', 8000, fx.eq?.high);
   // a szerver sorrendje: szűrők → zajszűrés (előmenet: `denoiseStereo`) → kapu → de-esser → kompresszor → … → limiter
   if (fx.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
   if (fx.deEsser) chain.push(new DeEsser(sr));
   if (fx.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
-  if (fx.reverb && fx.reverb > 0) {
-    const dec = Number((0.3 + clampN(fx.reverb, 0, 1) * 0.5).toFixed(2));
-    chain.push(new Echo(0.8, 0.9, [40, 75], [dec, Number((dec * 0.7).toFixed(2))], sr));
+  const reverbDecays = (amount: number) => {
+    // a mérték 0-nál a zengés elhal (a 0,3-as alap is lehalkul) — a görbe 0-ja tényleg száraz
+    const a = clampN(amount, 0, 1);
+    const dec = a > 0 ? Number((0.3 + a * 0.5).toFixed(2)) : 0;
+    return [dec, Number((dec * 0.7).toFixed(2))];
+  };
+  if ((fx.reverb && fx.reverb > 0) || has('fxReverb')) {
+    const e = new Echo(0.8, 0.9, [40, 75], reverbDecays(fx.reverb ?? 0), sr);
+    if (has('fxReverb')) e.auto = { kfs: auto!.fxReverb!, fallback: fx.reverb ?? 0, decaysOf: reverbDecays, sr };
+    chain.push(e);
   }
-  if (fx.delay && fx.delay > 0) {
-    const a = clampN(fx.delay, 0, 1);
-    chain.push(new Echo(0.8, 0.6, [Math.round(120 + a * 380)], [Number((0.2 + a * 0.5).toFixed(2))], sr));
+  if ((fx.delay && fx.delay > 0) || has('fxDelay')) {
+    // a delay ideje a statikus mértékből (a késleltetési vonal hossza nem automatizálható kattogás nélkül)
+    const a = clampN(fx.delay ?? 0.5, 0, 1);
+    const delayDecay = (amount: number) => [clampN(amount, 0, 1) > 0 ? Number((0.2 + clampN(amount, 0, 1) * 0.5).toFixed(2)) : 0];
+    const e = new Echo(0.8, 0.6, [Math.round(120 + a * 380)], delayDecay(fx.delay ?? 0), sr);
+    if (has('fxDelay')) e.auto = { kfs: auto!.fxDelay!, fallback: fx.delay ?? 0, decaysOf: delayDecay, sr };
+    chain.push(e);
   }
   if (fx.stereoWide) chain.push(new Haas(sr));
   // 📏 normalizálás: az előmenetben mért fix erősítés −16 LUFS-re + csúcsplafon −1,5 dB

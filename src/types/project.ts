@@ -779,6 +779,18 @@ export interface ClipKeyframes {
   /** pásztázás-automáció −1…1 (hangklipen; a statikus pan az alap). A render per-frame
    *  (aeval) sztereó-balanszként égeti be — kulcskocka nélkül a statikus pan érvényes. */
   pan?: Keyframe[];
+  /**
+   * 🎛️ effekt-automáció (hangklipen; a klip `audioFx` statikus értéke az alap): az alul-/
+   * felüláteresztő frekvenciája (Hz), a zengés és a visszhang mértéke (0–1), a három EQ-sáv
+   * erősítése (dB, ±12). A közös DSP 64 mintánként frissít (előnézet = export).
+   */
+  fxLowpass?: Keyframe[];
+  fxHighpass?: Keyframe[];
+  fxReverb?: Keyframe[];
+  fxDelay?: Keyframe[];
+  fxEqLow?: Keyframe[];
+  fxEqMid?: Keyframe[];
+  fxEqHigh?: Keyframe[];
 }
 
 export interface TextClip extends ClipBase {

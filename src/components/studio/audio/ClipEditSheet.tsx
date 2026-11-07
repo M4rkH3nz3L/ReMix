@@ -22,6 +22,19 @@ import { useEntitlement } from '@/store/entitlementStore';
 import { withProgress } from '@/store/progressStore';
 import type { AudioClip, AudioFx, Project } from '@/types/project';
 
+type FxAutoKey = 'fxLowpass' | 'fxHighpass' | 'fxReverb' | 'fxDelay' | 'fxEqLow' | 'fxEqMid' | 'fxEqHigh';
+
+/** 🎛️ az automatizálható effekt-paraméterek: tartomány, alapérték (a statikus beállítás), kiírás */
+const FX_AUTO: { key: FxAutoKey; min: number; max: number; fallback: (fx?: AudioFx) => number; format: (v: number) => string }[] = [
+  { key: 'fxLowpass', min: 1000, max: 20000, fallback: (fx) => fx?.lowpass || 20000, format: (v) => `${(v / 1000).toFixed(1)} kHz` },
+  { key: 'fxHighpass', min: 20, max: 2000, fallback: (fx) => fx?.highpass || 20, format: (v) => `${Math.round(v)} Hz` },
+  { key: 'fxReverb', min: 0, max: 1, fallback: (fx) => fx?.reverb ?? 0, format: (v) => `${Math.round(v * 100)}%` },
+  { key: 'fxDelay', min: 0, max: 1, fallback: (fx) => fx?.delay ?? 0, format: (v) => `${Math.round(v * 100)}%` },
+  { key: 'fxEqLow', min: -12, max: 12, fallback: (fx) => fx?.eq?.low ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
+  { key: 'fxEqMid', min: -12, max: 12, fallback: (fx) => fx?.eq?.mid ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
+  { key: 'fxEqHigh', min: -12, max: 12, fallback: (fx) => fx?.eq?.high ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
+];
+
 /**
  * 🎚️ Klip-szerkesztő lap — a kijelölt hangklip nem-destruktív szerkesztése
  * (trim / fade / hangerő / pan / enhance / Pro FX). Minden a `HangStudio`-ból
@@ -42,6 +55,7 @@ export function ClipEditSheet({
   const applyBatch = useEditorStore((s) => s.applyBatch);
   const playhead = useEditorStore((s) => s.playhead);
   const [separating, setSeparating] = useState(false);
+  const [autoChannel, setAutoChannel] = useState<FxAutoKey>('fxLowpass');
 
   // 🎚️ AI stem-szeparáció (Pro): a klip hangját vocals/drums/bass/other klipekre
   // bontja (voiceover/sfx sávra), és az eredetit elnémítja — EGY undo.
@@ -245,6 +259,48 @@ export function ClipEditSheet({
           formatValue={(v) => (Math.abs(v) < 0.02 ? 'C' : `${v < 0 ? 'L' : 'R'} ${Math.round(Math.abs(v) * 100)}`)}
         />
 
+        {/* 🎛️ effekt-automáció: a kiválasztott paraméter görbéje (szűrő-söprés, zengés, EQ…) */}
+        <Text style={styles.autoLabel}>{t('studio.audio.fxAutomation.title')}</Text>
+        <View style={styles.autoChips}>
+          {FX_AUTO.map((ch) => {
+            const active = autoChannel === ch.key;
+            const used = (clip.keyframes?.[ch.key]?.length ?? 0) > 0;
+            return (
+              <Pressable
+                key={ch.key}
+                testID={`fx-auto-${ch.key}`}
+                onPress={() => setAutoChannel(ch.key)}
+                style={[styles.autoChip, active && styles.autoChipActive]}
+              >
+                <Text style={[styles.autoChipText, active && styles.autoChipTextActive]}>
+                  {t(`studio.audio.fxAutomation.${ch.key}`)}
+                  {used ? ' •' : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {(() => {
+          const ch = FX_AUTO.find((c) => c.key === autoChannel)!;
+          return (
+            <KeyframeGraphEditor
+              keyframes={clip.keyframes?.[ch.key] ?? []}
+              duration={clip.duration}
+              min={ch.min}
+              max={ch.max}
+              fallback={ch.fallback(clip.audioFx)}
+              playhead={clamp(playhead - clip.start, 0, clip.duration)}
+              onChange={(next) =>
+                updateClip(clip.id, {
+                  keyframes: { ...clip.keyframes, [ch.key]: next.length > 0 ? next : undefined },
+                })
+              }
+              onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
+              formatValue={ch.format}
+            />
+          );
+        })()}
+
         <View style={styles.divider} />
         <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
         <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />
@@ -417,6 +473,11 @@ const styles = StyleSheet.create({
   spectrumImg: { width: '100%', height: 150, borderRadius: 8, marginBottom: 8, backgroundColor: '#000' },
   hint: { color: palette.textDim, fontSize: 11, lineHeight: 16, marginTop: 10 },
   autoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 4 },
+  autoChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  autoChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: palette.border },
+  autoChipActive: { backgroundColor: palette.accent, borderColor: palette.accent },
+  autoChipText: { color: palette.textDim, fontSize: 12, fontWeight: '600' },
+  autoChipTextActive: { color: '#fff' },
   stemsBtn: {
     flexDirection: 'row',
     alignItems: 'center',

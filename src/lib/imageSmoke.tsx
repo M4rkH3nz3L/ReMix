@@ -3242,6 +3242,58 @@ async function smokeAudioMarkers(log: Log) {
   router.back();
 }
 
+/** 🎛️ Effekt-automáció: aluláteresztő-söprés a telefonos exportban és a motorban (valós időben). */
+async function smokeFxAutomation(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let a = 21;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  const noise = Float32Array.from({ length: 6 * SR }, () => 0.3 * rnd());
+  const src = new File(Paths.document, 'smoke_sweep.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([noise, noise], SR, () => 0.5));
+  const id = 'prj_smoke_sweep';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:sweep', caught));
+  const base = createEmptyProject('smoke söprés', '9:16', undefined, 'audio');
+  const sweep = [{ time: 0, value: 20000, easing: 'linear' as const }, { time: 6, value: 300, easing: 'linear' as const }];
+  const c: AudioClip = { kind: 'audio', id: 'sw', uri: src.uri, label: 'söprés', start: 0, duration: 6, trimIn: 0, sourceDuration: 6, volume: 0.6, fadeIn: 0, fadeOut: 0, keyframes: { fxLowpass: sweep, fxReverb: [{ time: 0, value: 0, easing: 'linear' }, { time: 6, value: 1, easing: 'linear' }] }, source: 'imported' };
+  const project: Project = { ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_sweep_out.wav'));
+  const api = await loadAudioApi();
+  const y = (await api!.decodeAudioData(out, SR)).getChannelData(0);
+  const hf = (from: number, to: number) => {
+    let e = 0;
+    for (let i = Math.round(from * SR) + 1; i < Math.round(to * SR); i++) e += (y[i] - y[i - 1]) ** 2;
+    return 10 * Math.log10(e / ((to - from) * SR) + 1e-30);
+  };
+  const drop = hf(0.2, 0.7) - hf(5.2, 5.7);
+  // az 5,2–5,7 s-os ablakban a söprés kb. 2 kHz-nél jár (300 Hz-et 6 s-nál éri el), és nő a zengés is
+  log(drop > 15, 'telefonos export: a szűrő-söprés a magas tartományt elnyomja', `${drop.toFixed(1)} dB`);
+  new File(out).delete();
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  const st = useEditorStore.getState;
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(4000);
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(stats.late === 0, 'a motor valós időben, akadás nélkül játssza (szűrő + zengés automáció)', `${stats.chunks} szelet, ${stats.late} késett`);
+  router.back();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4406,6 +4458,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'fxautomation') {
+    await step(phase, () => smokeFxAutomation(log));
     return;
   }
   if (phase === 'audiomarkers') {

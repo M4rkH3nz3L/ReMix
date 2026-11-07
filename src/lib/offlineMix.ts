@@ -1,7 +1,7 @@
 import { audioSpeedOf, continuesInSource } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import { buildFxChain, buildMasterChain, Ducker, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
+import { buildFxChain, buildMasterChain, Ducker, FX_AUTO_KEYS, FX_WARMUP, type FxAutomation, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
 import { integratedLoudness } from '@/lib/loudness';
 import type { AudioClip, AudioFx, AudioMaster, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
@@ -117,6 +117,8 @@ export interface OfflineMixClip {
   normGain?: number;
   /** 🏚️ visszhang-csökkentés (a lánc elején) */
   deReverb?: boolean;
+  /** 🎛️ az effekt-automáció görbéi (a klip saját idejében) */
+  fxKf?: FxAutomation;
   /** 🦆 a halkítás szerepe: `key` = a beszéd (vezérel), `duck` = halkul alatta */
   role?: 'key' | 'duck';
 }
@@ -162,10 +164,14 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       const role: OfflineMixClip['role'] = isKey ? 'key' : clip.autoDuck ? 'duck' : undefined;
       // 🎙️ hangjavítás / visszhang-csökkentés: a közös DSP elemeiből (`voiceFx`)
       const fx = voiceFx(clip.audioFx, !!clip.voiceEnhance, !!clip.deReverb);
+      // 🎛️ effekt-automáció: csak a nem üres görbék
+      const fxKf = Object.fromEntries(FX_AUTO_KEYS.filter((k) => (clip.keyframes?.[k]?.length ?? 0) > 0).map((k) => [k, clip.keyframes![k]])) as FxAutomation;
+      const hasAuto = Object.keys(fxKf).length > 0;
       const main: OfflineMixClip = {
         id: clip.id,
         ...(clip.sourceDuration ? { sourceDuration: clip.sourceDuration } : {}),
-        ...(fxActive(fx) || clip.deReverb ? { fx: fx ?? {} } : {}),
+        ...(fxActive(fx) || clip.deReverb || hasAuto ? { fx: fx ?? {} } : {}),
+        ...(hasAuto ? { fxKf } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
         ...(role ? { role } : {}),
         track: track.type,
@@ -308,10 +314,10 @@ export function mixRange(
         }
         return [l, r];
       };
-      const key = `${clip.id}|${JSON.stringify(clip.fx)}|${clip.normGain ?? 1}|${clip.deReverb ? 'dr' : ''}`;
+      const key = `${clip.id}|${JSON.stringify(clip.fx)}|${clip.normGain ?? 1}|${clip.deReverb ? 'dr' : ''}|${clip.fxKf ? JSON.stringify(clip.fxKf) : ''}`;
       let st = fxState.get(key);
       if (!st || st.next !== a) {
-        st = { chain: buildFxChain(clip.fx, sr, clip.normGain, clip.deReverb), next: a };
+        st = { chain: buildFxChain(clip.fx, sr, clip.normGain, clip.deReverb, clip.fxKf), next: a };
         const w0 = Math.max(clipFrom, a - FX_WARMUP);
         if (w0 < a) {
           const [wl, wr] = read(w0, a);
@@ -625,7 +631,7 @@ export function withNormalizeGains(
     const n = Math.round(c.duration * sr);
     const from = Math.round(c.trimIn * src.sampleRate);
     const [l, r] = sliceSource([src.channels[0], src.channels[1] ?? src.channels[0]], from, n, false);
-    runChain(buildFxChain({ ...c.fx, normalize: false, limiter: false }, sr, 1, c.deReverb), l, r, 0);
+    runChain(buildFxChain({ ...c.fx, normalize: false, limiter: false }, sr, 1, c.deReverb, c.fxKf), l, r, 0);
     const lufs = integratedLoudness(l, r, sr);
     const normGain = Number.isFinite(lufs) ? Math.pow(10, (NORMALIZE_LUFS - lufs) / 20) : 1;
     cache?.set(key, normGain);

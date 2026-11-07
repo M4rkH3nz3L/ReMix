@@ -10,8 +10,9 @@ import {
 } from '@/lib/modelRegistryClient';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import type { TranscriptLine } from '@/lib/transcripts';
-import { bytesToBase64, floatPcmToBytes, makeTestTone, WHISPER_SAMPLE_RATE } from '@/lib/wav';
+import { makeTestTone, pcm16ForWhisper, WHISPER_SAMPLE_RATE } from '@/lib/wav';
 import { logCaught } from '@/lib/logCaught';
+import { tokensToWords, type SrcWord } from '@/lib/speechEdit';
 
 /**
  * 🎙️ On-device Whisper kliens (local-ai Fázis A) — a whisper.rn natív motor
@@ -31,7 +32,7 @@ interface WhisperContextLike {
     options?: Record<string, unknown>,
   ): { stop: () => Promise<void>; promise: Promise<WhisperResultLike> };
   transcribeData(
-    data: string,
+    data: string | ArrayBuffer,
     options?: Record<string, unknown>,
   ): { stop: () => Promise<void>; promise: Promise<WhisperResultLike> };
   release(): Promise<void>;
@@ -120,7 +121,8 @@ export async function transcribeWavOnDevice(
   }
   try {
     const { promise } = ctx.transcribe(wavUri.replace(/^file:\/\//, ''), {
-      language: opts.language,
+      // üres nyelvnél a natív alapérték az angol (nem auto) — a magyar beszéd így angolként íródott át
+      language: opts.language ?? 'auto',
       onProgress: opts.onProgress,
     });
     const result = await promise;
@@ -174,8 +176,9 @@ export async function transcribeMediaOnDevice(
   }
   try {
     const started = Date.now();
-    const { promise } = ctx.transcribeData(bytesToBase64(floatPcmToBytes(pcm)), {
-      language: opts.language,
+    const { promise } = ctx.transcribeData(pcm16ForWhisper(pcm), {
+      // üres nyelvnél a natív alapérték az angol (nem auto) — a magyar beszéd így angolként íródott át
+      language: opts.language ?? 'auto',
     });
     const result = await promise;
     if (result.isAborted) {
@@ -199,6 +202,47 @@ export async function transcribeMediaOnDevice(
 }
 
 /**
+ * ✂️💬 Szó-szintű átirat az eszközön egy 16 kHz-es mono PCM-ből (a beszédvágáshoz): a whisper
+ * token-időbélyegekkel, tokenenként szegmentálva (`maxLen: 1`), majd szavakká fűzve. Az idők a
+ * PCM elejétől + `offsetSec` (a forrás-ablak kezdete). `null`: nincs motor/modell vagy hiba.
+ */
+/** 🧪 a legutóbbi nyers token-szegmensek (csak fejlesztéshez) */
+export let lastRawTokens: SrcWord[] = [];
+
+export async function transcribeWordsOnDevice(
+  pcm: Float32Array,
+  offsetSec: number,
+  opts: { modelId?: string; language?: string } = {},
+): Promise<{ words: SrcWord[]; language?: string } | null> {
+  const modelId = opts.modelId ?? bestUsableWhisperModelId();
+  if (!modelId || pcm.length === 0) {
+    return null;
+  }
+  const ctx = await getContext(modelId);
+  if (!ctx) {
+    return null;
+  }
+  try {
+    const { promise } = ctx.transcribeData(pcm16ForWhisper(pcm), {
+      // üres nyelvnél a natív alapérték az angol (nem auto) — a magyar beszéd így angolként íródott át
+      language: opts.language ?? 'auto',
+      maxLen: 1,
+      tokenTimestamps: true,
+    });
+    const result = await promise;
+    if (result.isAborted) {
+      return null;
+    }
+    const tokens = (result.segments ?? []).map((s) => ({ text: s.text, start: offsetSec + s.t0 / 100, end: offsetSec + s.t1 / 100 }));
+    if (__DEV__) lastRawTokens = tokens;
+    return { words: tokensToWords(tokens), language: result.language };
+  } catch (caught) {
+    logCaught('lib/whisperClient.ts:transcribeWordsOnDevice', caught);
+    return null;
+  }
+}
+
+/**
  * 🧪 Használat-előtti smoke-test (local-ai 5.3): determinista 1 mp-es teszt-hang
  * megy át a motor+modell pároson. Siker → 'pass' (a katalógus 'validated'),
  * futási hiba → 'fail' (nem választható). Ha a MOTOR hiányzik, nem minősítünk
@@ -216,7 +260,7 @@ export async function runWhisperSmokeTest(modelId: string): Promise<boolean> {
   try {
     // 5 mp-es minta: az 1 mp-esen a fix betöltési költség eltorzítaná a sebesség-mérést
     const SAMPLE_SEC = 5;
-    const pcm = bytesToBase64(floatPcmToBytes(makeTestTone(SAMPLE_SEC)));
+    const pcm = pcm16ForWhisper(makeTestTone(SAMPLE_SEC));
     const started = Date.now();
     const { promise } = ctx.transcribeData(pcm, {});
     const result = await promise;

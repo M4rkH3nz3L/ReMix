@@ -51,6 +51,20 @@ export function encodeWavPcm16(
 }
 
 /** Float32 PCM → nyers little-endian float32 bájtok (whisper.rn `transcribeData`). */
+/**
+ * 🎙️ A whisper.rn `transcribeData` bemenete: előjeles 16 bites little-endian PCM (a natív
+ * `decodePcm16` ezt olvassa — a csomag dokumentációja tévesen float32-t ír; float32-vel a
+ * modell kétszer olyan hosszú zajt „hall”, és értelmetlen szöveget ad).
+ */
+export function pcm16ForWhisper(samples: Float32Array): ArrayBuffer {
+  const out = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    const v = Math.max(-1, Math.min(1, samples[i]));
+    out[i] = Math.round(v * 32767);
+  }
+  return out.buffer;
+}
+
 export function floatPcmToBytes(samples: Float32Array | readonly number[]): Uint8Array {
   const out = new Uint8Array(samples.length * 4);
   const view = new DataView(out.buffer);

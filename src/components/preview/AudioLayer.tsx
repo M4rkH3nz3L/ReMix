@@ -493,17 +493,20 @@ function ClipAudioPlayer({
       } else if (player.playing) {
         const now = Date.now();
         const sinceStart = now - playStartRef.current;
+        // ⏩ a gyorsított klip eltérése idővonal-időben számít (a hallható csúszás): a forrás-idő
+        // `speed`-del halad, ezért minden összevetés és a tanult késés is el van osztva vele
+        const speed = audioSpeedOf(clip);
         // ⏱️ az indulás után ~0,5 mp-cel mért eltérés = az indítási késés (eszköz-szintű tanulás)
         if (!latencyLearnedRef.current && sinceStart > 400 && sinceStart < 1200) {
           latencyLearnedRef.current = true;
-          startLatencySec = learnStartLatency(startLatencySec, startLatencySec + (sourceTime - player.currentTime));
+          startLatencySec = learnStartLatency(startLatencySec, startLatencySec + (sourceTime - player.currentTime) / speed);
         }
         // 🎚️ A/V-szinkron lejátszás közben: tanuló, 40 ms tűréssel (`planDriftCorrection`)
-        const plan = planDriftCorrection(driftRef.current, sourceTime, player.currentTime, now);
+        const plan = planDriftCorrection(driftRef.current, sourceTime / speed, player.currentTime / speed, now);
         driftRef.current = plan.next;
         if (plan.seekTo !== null) {
           probeSeek();
-          player.seekTo(plan.seekTo).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
+          player.seekTo(plan.seekTo * speed).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); });
         }
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }

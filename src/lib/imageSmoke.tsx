@@ -2421,6 +2421,8 @@ async function smokeAudioSpeed(log: Log) {
     log(d.maxMs / 1.5 <= 45, `szinkron beállás után (${cid === clipId ? 'gyorsított hang' : cid})`, `max ${(d.maxMs / 1.5).toFixed(0)} ms idővonal-időben, ${d.n} minta`);
   }
   log(seeks <= 3, 'a lejátszás nem tekereget folyamatosan', `${seeks} korrekció`);
+  const tr = samples.filter((x) => x.clipId === clipId);
+  log(null, 'nyom gyorsított', tr.filter((_, k) => k % 8 === 0).map((x) => `${x.sinceStart.toFixed(1)}:${((x.drift * 1000) / 1.5).toFixed(0)}`).join(' '));
   log(Math.abs(head - 5) < 0.4, 'a lejátszófej a valós idővel halad', `${head.toFixed(2)} s`);
   router.back();
 }

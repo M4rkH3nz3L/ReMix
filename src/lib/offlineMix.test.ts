@@ -55,7 +55,7 @@ describe('offlineMix (A26)', () => {
   });
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {
-    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, reverb: 0.4 } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
+    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, denoise: true } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
     expect(plan.unsupported.sort()).toEqual(['effects', 'master', 'voiceEnhance']);
   });
 

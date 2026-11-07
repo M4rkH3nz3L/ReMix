@@ -1,4 +1,4 @@
-import { buildFxChain, Compressor, DeEsser, Gate, Limiter, fxUnsupported, runChain } from './audioDsp';
+import { buildFxChain, Compressor, DeEsser, Echo, Gate, Haas, Limiter, fxUnsupported, runChain, type Processor } from './audioDsp';
 
 const SR = 44100;
 const sine = (freq: number, amp: number, sec = 1) => Float32Array.from({ length: Math.round(sec * SR) }, (_, i) => amp * Math.sin((2 * Math.PI * freq * i) / SR));
@@ -83,7 +83,43 @@ describe('lánc', () => {
   });
   it('a még nem támogatott effektek jelzése', () => {
     expect(fxUnsupported({ compressor: true, limiter: true, gate: true, deEsser: true, eq: { low: 1, mid: 0, high: 0 } })).toBe(false);
-    expect(fxUnsupported({ reverb: 0.3 })).toBe(true);
+    expect(fxUnsupported({ reverb: 0.3, delay: 0.5, stereoWide: true })).toBe(false);
     expect(fxUnsupported({ denoise: true })).toBe(true);
   });
 });
+
+describe('🏛️ Echo / Haas', () => {
+  it('impulzus: a leágazások a helyükön, a beállított csillapítással', () => {
+    const x = new Float32Array(SR / 5);
+    x[0] = 1;
+    const y = run(new Echo(0.8, 0.9, [40, 75], [0.5, 0.35], SR), x);
+    expect(y[0]).toBeCloseTo(0.72, 6);
+    expect(y[Math.round(0.04 * SR)]).toBeCloseTo(0.45, 6);
+    expect(y[Math.round(0.075 * SR)]).toBeCloseTo(0.315, 6);
+    expect(y[100]).toBe(0);
+  });
+  it('a késleltetés darabok között is folytonos', () => {
+    const x = new Float32Array(SR);
+    x[1000] = 1;
+    const whole = run(new Echo(1, 1, [300], [0.5], SR), x);
+    const e = new Echo(1, 1, [300], [0.5], SR);
+    const parts = Float32Array.from(x);
+    for (let a = 0; a < SR; a += 5512) {
+      const l = parts.subarray(a, Math.min(SR, a + 5512));
+      (e as Processor).processStereo(l, Float32Array.from(l), a);
+    }
+    expect(parts[1000 + Math.round(0.3 * SR)]).toBeCloseTo(0.5, 6);
+    expect(Array.from(parts)).toEqual(Array.from(whole));
+  });
+  it('Haas: a közép jel a két oldalra eltérő késéssel', () => {
+    const l = new Float32Array(400);
+    const r = new Float32Array(400);
+    l[0] = 1;
+    r[0] = 1;
+    (new Haas(SR) as Processor).processStereo(l, r, 0);
+    expect(l[Math.round(0.00205 * SR)]).toBe(1);
+    expect(r[Math.round(0.00212 * SR)]).toBe(1);
+    expect(l[0]).toBe(0);
+  });
+});
+

@@ -299,10 +299,97 @@ export class Limiter implements Processor {
   }
 }
 
+/** késleltetési vonal (gyűrűpuffer) — a darabok között folytonos */
+class DelayLine {
+  private buf: Float32Array;
+  private w = 0;
+  constructor(maxSamples: number) {
+    this.buf = new Float32Array(Math.max(1, maxSamples + 1));
+  }
+  /** beírja `x`-et, és visszaadja a `d` mintával korábbit */
+  push(x: number, d: number): number {
+    this.buf[this.w] = x;
+    const len = this.buf.length;
+    const out = this.buf[(this.w - d + len) % len];
+    this.w = (this.w + 1) % len;
+    return out;
+  }
+  /** a `d` mintával korábbi érték (beírás nélkül, a most beírt utánra számolva) */
+  tap(d: number): number {
+    const len = this.buf.length;
+    return this.buf[(this.w - 1 - d + 2 * len) % len];
+  }
+  write(x: number): void {
+    this.buf[this.w] = x;
+    this.w = (this.w + 1) % this.buf.length;
+  }
+}
+
+/**
+ * 🏛️/🔁 Visszhang (előrecsatolt, több leágazás): kimenet = (be·inGain + Σ késleltetett_be·decayᵢ)·outGain
+ * — a szerver `aecho=in:out:késések:csillapítások` beállításaival. A zengés két korai
+ * visszaverődés (40 / 75 ms), a delay egy hosszú (120–500 ms).
+ */
+export class Echo implements Processor {
+  private lines: [DelayLine, DelayLine];
+  private readonly taps: number[];
+
+  constructor(
+    private readonly inGain: number,
+    private readonly outGain: number,
+    delaysMs: number[],
+    private readonly decays: number[],
+    sr: number
+  ) {
+    this.taps = delaysMs.map((ms) => Math.round((ms / 1000) * sr));
+    const max = Math.max(...this.taps);
+    this.lines = [new DelayLine(max), new DelayLine(max)];
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    const io = [l, r];
+    for (let ch = 0; ch < 2; ch++) {
+      const buf = io[ch];
+      const line = this.lines[ch];
+      for (let i = 0; i < buf.length; i++) {
+        const x = buf[i];
+        line.write(x);
+        let y = x * this.inGain;
+        for (let k = 0; k < this.taps.length; k++) y += line.tap(this.taps[k]) * this.decays[k];
+        buf[i] = y * this.outGain;
+      }
+    }
+  }
+}
+
+/**
+ * 🎧 Haas-szélesítés: a közép (L+R)/2 jel a bal oldalra 2,05, a jobbra 2,12 ms késéssel kerül —
+ * a szerver `haas` alapbeállítása (mono vagy szűk jelből széles sztereó-kép).
+ */
+export class Haas implements Processor {
+  private readonly line: DelayLine;
+  private readonly dl: number;
+  private readonly dr: number;
+
+  constructor(sr: number, leftMs = 2.05, rightMs = 2.12) {
+    this.dl = Math.round((leftMs / 1000) * sr);
+    this.dr = Math.round((rightMs / 1000) * sr);
+    this.line = new DelayLine(Math.max(this.dl, this.dr));
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    for (let i = 0; i < l.length; i++) {
+      this.line.write((l[i] + r[i]) / 2);
+      l[i] = this.line.tap(this.dl);
+      r[i] = this.line.tap(this.dr);
+    }
+  }
+}
+
 const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** a közös DSP-ben már megvalósított effektek */
-const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter']);
+const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide']);
 
 /** van-e a klipen olyan effekt, amit a közös DSP még nem tud (akkor a régi úton szól) */
 export function fxUnsupported(fx: AudioFx | undefined): boolean {
@@ -346,6 +433,15 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number): Processor[] {
   if (fx.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
   if (fx.deEsser) chain.push(new DeEsser(sr));
   if (fx.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
+  if (fx.reverb && fx.reverb > 0) {
+    const dec = Number((0.3 + clampN(fx.reverb, 0, 1) * 0.5).toFixed(2));
+    chain.push(new Echo(0.8, 0.9, [40, 75], [dec, Number((dec * 0.7).toFixed(2))], sr));
+  }
+  if (fx.delay && fx.delay > 0) {
+    const a = clampN(fx.delay, 0, 1);
+    chain.push(new Echo(0.8, 0.6, [Math.round(120 + a * 380)], [Number((0.2 + a * 0.5).toFixed(2))], sr));
+  }
+  if (fx.stereoWide) chain.push(new Haas(sr));
   if (fx.limiter) chain.push(new Limiter(0.95, 50, sr));
   return chain;
 }

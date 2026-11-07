@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import { LANE_HEIGHTS, useAudioEditMode } from '@/store/audioEditModeStore';
 import { MixAssistSheet } from '@/components/studio/audio/MixAssistSheet';
 import { useMixAssist } from '@/store/mixAssistStore';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
@@ -91,7 +92,8 @@ import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
 
-const LANE_H = 70;
+/** a sávmagasság alapértéke (a „nagy sávok” kapcsolóval 120) */
+const LANE_H = LANE_HEIGHTS.normal;
 const RULER_H = 24;
 const HEADER_W = 62;
 
@@ -164,6 +166,9 @@ export function AudioStudioBody({
   const [pianoBusy, setPianoBusy] = useState(false);
   const [drumMachine, setDrumMachine] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const editMode = useAudioEditMode((s) => s.mode);
+  const largeLanes = useAudioEditMode((s) => s.large);
+  const laneH = largeLanes ? LANE_HEIGHTS.large : LANE_H;
   const [drumBusy, setDrumBusy] = useState(false);
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
@@ -264,7 +269,7 @@ export function AudioStudioBody({
   const pxPerSec = fitPps ?? pxPerSecAt(zoomIndex);
   const duration = projectDuration(project);
   const timelineW = Math.max(320, duration * pxPerSec + 40);
-  const laneAreaH = RULER_H + LANE_H * LANES.length;
+  const laneAreaH = RULER_H + laneH * LANES.length;
   const contentH = Math.max(tlH, laneAreaH); // a rács/playhead a teljes területet tölti
   const viewW = view.w || 1200;
   const viewFrom = Math.max(0, (view.x - viewW) / pxPerSec);
@@ -881,7 +886,7 @@ export function AudioStudioBody({
               return (
                 <Pressable
                   key={lane.type}
-                  style={styles.laneHeader}
+                  style={[styles.laneHeader, { height: laneH }]}
                   testID={`audio-lane-head-${lane.type}`}
                   disabled={!lane.extra}
                   onLongPress={() => laneActions(lane)}
@@ -921,7 +926,7 @@ export function AudioStudioBody({
             {nextExtraTrack(LANE_TYPES) ? (
               <Pressable style={styles.addLane} onPress={addLane} testID="audio-add-lane">
                 <Ionicons name="add" size={14} color={palette.textDim} />
-                <Text style={styles.addLaneText}>{t('studio.audio.lanes.add')}</Text>
+                <Text style={styles.addLaneText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3}>{t('studio.audio.lanes.add')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -1006,7 +1011,7 @@ export function AudioStudioBody({
                 const track = project.tracks.find((tr) => tr.type === lane.type);
                 const clips = (track?.clips ?? []).filter((c): c is AudioClip => c.kind === 'audio');
                 return (
-                  <Pressable key={lane.type} style={[styles.lane, { backgroundColor: `${lane.color}10` }]} onPress={seekAt}>
+                  <Pressable key={lane.type} style={[styles.lane, { height: laneH, backgroundColor: `${lane.color}10` }]} onPress={seekAt}>
                     {clips.length === 0 ? (
                       <Text style={styles.laneEmpty} numberOfLines={1}>
                         {t(lane.labelKey)}
@@ -1018,7 +1023,8 @@ export function AudioStudioBody({
                         clip={clip}
                         pxPerSec={pxPerSec}
                         laneColor={lane.color}
-                        laneH={LANE_H}
+                        laneH={laneH}
+                        editMode={editMode}
                         laneType={lane.type}
                         laneTypes={LANE_TYPES}
                         selected={clip.id === selectedClipId}
@@ -1026,9 +1032,9 @@ export function AudioStudioBody({
                         snap={snapSecIn}
                       />
                     ))}
-                    <CrossfadeMarks clips={clips} pxPerSec={pxPerSec} height={LANE_H} color={lane.color} />
-                    <SilenceMarks trackType={lane.type} pxPerSec={pxPerSec} height={LANE_H} />
-                    <SpeechCutMarks trackType={lane.type} pxPerSec={pxPerSec} height={LANE_H} />
+                    <CrossfadeMarks clips={clips} pxPerSec={pxPerSec} height={laneH} color={lane.color} />
+                    <SilenceMarks trackType={lane.type} pxPerSec={pxPerSec} height={laneH} />
+                    <SpeechCutMarks trackType={lane.type} pxPerSec={pxPerSec} height={laneH} />
                   </Pressable>
                 );
               })}
@@ -1043,7 +1049,7 @@ export function AudioStudioBody({
           {LANES.every((lane) => !project.tracks.find((tr) => tr.type === lane.type)?.clips.length) ? (
             <View
               pointerEvents="box-none"
-              style={[styles.emptyGuide, { top: RULER_H + LANES.length * LANE_H + 32 }]}
+              style={[styles.emptyGuide, { top: RULER_H + LANES.length * laneH + 32 }]}
             >
               <Ionicons name="musical-notes-outline" size={28} color={palette.textDim} />
               <Text style={styles.emptyGuideText}>{t('studio.audio.emptyGuide')}</Text>
@@ -1128,6 +1134,11 @@ export function AudioStudioBody({
         <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
         <TBtn icon="bookmark-outline" label={t('studio.audio.markers.add')} onPress={markerAtPlayhead} />
         <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
+        {/* ✋✂️↔️ érintéses szerkesztési mód + nagy sávok (nagyobb hullámforma) */}
+        <TBtn icon="hand-left-outline" active={editMode === 'select'} onPress={() => useAudioEditMode.getState().setMode('select')} accessibilityLabel={t('studio.audio.mode.select')} />
+        <TBtn icon="cut-outline" active={editMode === 'cut'} onPress={() => useAudioEditMode.getState().setMode('cut')} accessibilityLabel={t('studio.audio.mode.cut')} />
+        <TBtn icon="move-outline" active={editMode === 'move'} onPress={() => useAudioEditMode.getState().setMode('move')} accessibilityLabel={t('studio.audio.mode.move')} />
+        <TBtn icon={largeLanes ? 'contract' : 'expand'} active={largeLanes} onPress={() => useAudioEditMode.getState().toggleLarge()} accessibilityLabel={t('studio.audio.mode.large')} />
         {/* 🎙️🤖 hang-asszisztens (a telefonon, offline) */}
         <TBtn icon="sparkles-outline" label={t('studio.audio.assistant.button')} active={assistantOpen} onPress={() => setAssistantOpen(!assistantOpen)} />
         {/* 🅰️🅱️ A/B: az eredeti (feldolgozás nélkül) ↔ a feldolgozott — csak az előnézetben */}
@@ -1208,6 +1219,8 @@ function TBtn({
   onLongPress?: () => void;
   onPressOut?: () => void;
   delayLongPress?: number;
+  /** csak ikonos gombnál kötelező értelme van (VoiceOver/TalkBack) */
+  accessibilityLabel?: string;
 }) {
   const color = disabled ? palette.border : active ? palette.accent : palette.text;
   return (
@@ -1217,9 +1230,15 @@ function TBtn({
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active, disabled: !!disabled }}
     >
       {icon ? <Ionicons name={icon} size={18} color={color} /> : null}
-      {label ? <Text style={[styles.tBtnLabel, { color }]}>{label}</Text> : null}
+      {label ? (
+        <Text style={[styles.tBtnLabel, { color }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+          {label}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }

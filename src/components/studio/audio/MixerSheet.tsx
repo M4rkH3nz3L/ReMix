@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
+import { VerticalFader } from '@/components/studio/audio/VerticalFader';
 import { useMixAssist } from '@/store/mixAssistStore';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Slider } from '@/components/studio/audio/primitives';
@@ -31,6 +32,10 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
   const project = useEditorStore((s) => s.project);
   const mutedTracks = useEditorStore((s) => s.mutedTracks);
   const soloTracks = useEditorStore((s) => s.soloTracks);
+  // 🎚️ tableten (széles képernyőn) keverőpult-nézet: a csatorna-sávok sora vízszintesen görgethető,
+  // így az iPad keskeny oldalpaneljében is használható
+  const { width: screenW } = useWindowDimensions();
+  const wide = screenW >= 700;
 
   if (!project) {
     return null;
@@ -86,7 +91,70 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
         <Pressable style={[styles.chip, styles.chipAccent, { alignSelf: 'flex-start', marginBottom: 10 }]} onPress={() => useMixAssist.getState().show('mix')} testID="mixer-mix-assist">
           <Text style={[styles.chipText, { color: '#fff' }]}>✨ {t('studio.audio.mixAssist.openMix')}</Text>
         </Pressable>
-        {LANES.map((lane) => {
+        {/* 🎚️ széles képernyőn (iPad) keverőpult: egymás melletti csatorna-sávok, függőleges faderrel */}
+        {wide ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.console} testID="mixer-console">
+              {LANES.map((lane) => {
+                const track = project.tracks.find((tr) => tr.type === lane.type);
+                const clipCount = track ? track.clips.filter((c) => c.kind === 'audio').length : 0;
+                const gain = project.trackMix?.[lane.type]?.gain ?? 1;
+                const muted = mutedTracks.includes(lane.type);
+                const solo = soloTracks.includes(lane.type);
+                const ducked = track ? trackDucked(track.clips) : false;
+                return (
+                  <View key={lane.type} style={styles.column}>
+                    <Ionicons name={lane.icon} size={16} color={lane.color} />
+                    <Text style={styles.colName} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                      {laneLabel(lane, t)}
+                    </Text>
+                    <Text style={[styles.db, { color: lane.color }]} maxFontSizeMultiplier={1.3}>{formatGainDb(gain)} dB</Text>
+                    <VerticalFader
+                      testID={`mixer-fader-${lane.type}`}
+                      value={gain}
+                      max={MAX_GAIN}
+                      color={lane.color}
+                      onChange={(v) => setGain(lane.type, v)}
+                      label={laneLabel(lane, t)}
+                      valueText={`${formatGainDb(gain)} dB`}
+                    />
+                    <Pressable onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')} style={[styles.colBtn, muted && styles.chipDanger]} accessibilityRole="button" accessibilityLabel={t('studio.mixer.mute', { defaultValue: 'Némít' })}>
+                      <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={15} color={muted ? '#fff' : palette.textDim} />
+                    </Pressable>
+                    <Pressable onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')} style={[styles.colBtn, solo && styles.chipAccent]} accessibilityRole="button" accessibilityLabel={t('studio.mixer.solo', { defaultValue: 'Szóló' })}>
+                      <Text style={[styles.chipText, solo && { color: '#fff' }]}>S</Text>
+                    </Pressable>
+                    {canDuckTrack(lane.type) ? (
+                      <Pressable onPress={() => toggleDuck(lane.type)} disabled={clipCount === 0} style={[styles.colBtn, ducked && styles.chipAccent, clipCount === 0 && styles.chipDisabled]} accessibilityRole="button" accessibilityLabel={t('studio.mixer.duck', { defaultValue: 'Duck' })}>
+                        <Ionicons name="volume-low-outline" size={15} color={ducked ? '#fff' : palette.textDim} />
+                      </Pressable>
+                    ) : (
+                      <View style={[styles.colBtn, styles.chipGhost]}>
+                        <Ionicons name="key-outline" size={14} color={palette.textDim} />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+            {buses.length > 0
+              ? LANES.map((lane) =>
+                  buses.map((b) => (
+                    <Slider
+                      key={`${lane.type}-${b.id}`}
+                      label={`${laneLabel(lane, t)} → ${b.name}`}
+                      value={project.audioSends?.[lane.type]?.[b.id] ?? 0}
+                      min={0}
+                      max={1}
+                      onChange={(v) => useEditorStore.getState().dispatch({ type: 'SET_TRACK_SEND', trackType: lane.type, busId: b.id, amount: v })}
+                      format={(v) => `${Math.round(v * 100)}%`}
+                    />
+                  ))
+                )
+              : null}
+          </>
+        ) : null}
+        {wide ? null : LANES.map((lane) => {
           const track = project.tracks.find((tr) => tr.type === lane.type);
           const clipCount = track ? track.clips.filter((c) => c.kind === 'audio').length : 0;
           const gain = project.trackMix?.[lane.type]?.gain ?? 1;
@@ -210,6 +278,10 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
 }
 
 const styles = StyleSheet.create({
+  console: { gap: 10, paddingVertical: 6, paddingHorizontal: 2 },
+  column: { width: 84, alignItems: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface },
+  colName: { color: palette.text, fontSize: 12, fontWeight: '700', maxWidth: 76 },
+  colBtn: { width: 44, height: 32, borderRadius: 8, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center' },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, maxHeight: '86%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },

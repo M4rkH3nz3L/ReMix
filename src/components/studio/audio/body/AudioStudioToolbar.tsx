@@ -81,7 +81,10 @@ function Tool({
   return (
     <Pressable style={styles.tool} onPress={onPress} onLongPress={onLongPress} disabled={disabled}>
       <Ionicons name={icon} size={22} color={color} />
-      <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}>{label}</Text>
+      {/* Dynamic Type: a sűrű eszköztáron a felirat egy sorban marad (zsugorodik), legfeljebb 1,3× */}
+      <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

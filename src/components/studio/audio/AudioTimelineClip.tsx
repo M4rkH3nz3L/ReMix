@@ -1,9 +1,11 @@
 import { memo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, PointerType } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
+import { snapToFrame } from '@/lib/frames';
+import type { AudioEditMode } from '@/store/audioEditModeStore';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { palette } from '@/constants/editor';
 import { gestures, haptics, motion } from '@/design';
@@ -38,6 +40,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   selected,
   multiSelected = false,
   snap,
+  editMode = 'select',
 }: {
   clip: AudioClip;
   pxPerSec: number;
@@ -51,6 +54,8 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   multiSelected?: boolean;
   /** frame/beat-illesztés a transport snap-módja szerint (AudioStudioBody adja) */
   snap: (sec: number) => number;
+  /** ✋✂️↔️ érintéses mód: kijelölés / vágás (koppintásra ott vág) / mozgatás (azonnali húzás) */
+  editMode?: AudioEditMode;
 }) {
   const { t } = useTranslation();
   // élő eltolások (px): test-mozgatás + bal/jobb trim; a „lift" visszajelzi a fogást
@@ -115,10 +120,16 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     moveDY.value = 0;
   };
 
-  const commitMove = (dx: number, dy: number) => {
+  /**
+   * ✏️ Apple Pencil / toll: a húzás és a vágás pontos — az ütem-/marker-illesztést kihagyja, de a
+   * frame-rácsra (a projekt szabálya) továbbra is kerekít
+   */
+  const place = (sec: number, precise: boolean) => (precise ? snapToFrame(sec, useEditorStore.getState().project?.fps ?? 30) : snap(sec));
+
+  const commitMove = (dx: number, dy: number, precise = false) => {
     moveDX.value = 0;
     moveDY.value = 0;
-    const next = Math.max(0, snap(clip.start + dx / pxPerSec));
+    const next = Math.max(0, place(clip.start + dx / pxPerSec, precise));
     // ↕️ függőleges szándék → szomszédos sávra (a moveClip ellenőrzi a kompatibilitást;
     // inkompatibilis vagy nincs-hova esetben no-op → marad a vízszintes mozgatás)
     const curIdx = laneTypes.indexOf(laneType);
@@ -135,9 +146,9 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     }
   };
 
-  const commitTrimLeft = (dx: number) => {
+  const commitTrimLeft = (dx: number, precise = false) => {
     leftDelta.value = 0;
-    const snappedStart = Math.max(0, snap(clip.start + dx / pxPerSec));
+    const snappedStart = Math.max(0, place(clip.start + dx / pxPerSec, precise));
     const patch = trimAudioLeft(clip, snappedStart - clip.start);
     if (Math.abs(patch.start - clip.start) > 1e-4 || Math.abs(patch.duration - clip.duration) > 1e-4) {
       useEditorStore.getState().updateClip(clip.id, patch);
@@ -145,9 +156,9 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     }
   };
 
-  const commitTrimRight = (dx: number) => {
+  const commitTrimRight = (dx: number, precise = false) => {
     rightDelta.value = 0;
-    const snappedEnd = snap(clip.start + clip.duration + dx / pxPerSec);
+    const snappedEnd = place(clip.start + clip.duration + dx / pxPerSec, precise);
     const patch = trimAudioRight(clip, snappedEnd - clip.start);
     if (Math.abs(patch.duration - clip.duration) > 1e-4) {
       useEditorStore.getState().updateClip(clip.id, patch);
@@ -155,17 +166,24 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     }
   };
 
+  // ✂️ vágás-mód: ott vág, ahol az ujj ér (a rácsra igazítva; a klip széléhez túl közel nem)
+  const cutAt = (x: number, precise = false) => {
+    const at = place(clip.start + x / pxPerSec, precise);
+    if (useEditorStore.getState().splitClipAt(clip.id, at)) haptics.snap();
+  };
   const tap = Gesture.Tap()
     .withTestId(`audio-clip-tap-${clip.id}`)
     .maxDistance(gestures.slop.tap)
-    .onEnd(() => {
-      runOnJS(selectAndSeek)();
+    .onEnd((e) => {
+      if (editMode === 'cut' && !locked) runOnJS(cutAt)(e.x, e.pointerType === PointerType.STYLUS);
+      else runOnJS(selectAndSeek)();
     });
 
   const movePan = Gesture.Pan()
     .withTestId(`audio-clip-move-${clip.id}`)
-    .enabled(!locked)
-    .activateAfterLongPress(gestures.longPress.drag)
+    .enabled(!locked && editMode !== 'cut')
+    // mozgatás-módban azonnal húzható; különben csak hosszú nyomás után (véletlen mozgatás ellen)
+    .activateAfterLongPress(editMode === 'move' ? 0 : gestures.longPress.drag)
     .onStart(() => {
       lift.value = withSpring(1, motion.spring.snappy);
       runOnJS(selectForMove)();
@@ -179,7 +197,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
         runOnJS(cancelMove)();
         runOnJS(showMenu)();
       } else {
-        runOnJS(commitMove)(e.translationX, e.translationY);
+        runOnJS(commitMove)(e.translationX, e.translationY, e.pointerType === PointerType.STYLUS);
       }
     })
     .onFinalize(() => {
@@ -198,7 +216,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
       leftDelta.value = e.translationX;
     })
     .onEnd((e) => {
-      runOnJS(commitTrimLeft)(e.translationX);
+      runOnJS(commitTrimLeft)(e.translationX, e.pointerType === PointerType.STYLUS);
     });
 
   const trimRightPan = Gesture.Pan()
@@ -208,7 +226,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
       rightDelta.value = e.translationX;
     })
     .onEnd((e) => {
-      runOnJS(commitTrimRight)(e.translationX);
+      runOnJS(commitTrimRight)(e.translationX, e.pointerType === PointerType.STYLUS);
     });
 
   const left = clip.start * pxPerSec;
@@ -226,6 +244,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   return (
     <GestureDetector gesture={bodyGesture}>
       <Animated.View
+        testID={`audio-clip-${clip.id}`}
         style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99`, opacity: locked ? 0.55 : 1 }, animStyle]}
       >
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>

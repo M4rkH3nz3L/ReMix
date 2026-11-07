@@ -77,6 +77,7 @@ import { auditionDrum, auditionNote, lastStartMs, playPcm, previewLooping, previ
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
+import { useAudioEditMode } from '@/store/audioEditModeStore';
 import type { CheckIssue } from '@/lib/audioCheck';
 import { runAudioCheck } from '@/lib/audioCheckClient';
 import { devTypeAssistant, parseNow } from '@/components/studio/audio/AudioAssistantBar';
@@ -89,7 +90,7 @@ import { crc32, localDataOffset, parseCentralDirectory, parseEocd } from '@/lib/
 import { t as i18nT, type TFunction } from 'i18next';
 import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
-import { catalogRuntime, downloadModel, listCachedModels } from '@/lib/modelRegistryClient';
+import { catalogRuntime, downloadModel, listCachedModels, removeModel } from '@/lib/modelRegistryClient';
 import { bestUsableWhisperModelId, lastRawTokens, runWhisperSmokeTest, transcribeMediaOnDevice, transcribeWordsOnDevice } from '@/lib/whisperClient';
 import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
 import { decodeToMono16k } from '@/lib/audioDecode';
@@ -3472,6 +3473,97 @@ function sortedJson(v: unknown): string {
   return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 }
 
+/** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
+async function smokeConsole(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_console';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:console', caught));
+  const base = createEmptyProject('smoke keverőpult', '9:16', undefined, 'audio');
+  const uri = toneWav('smoke_console.wav', 4);
+  const ac = (cid: string): AudioClip => ({ kind: 'audio', id: cid, label: cid, uri, start: 0, duration: 4, trimIn: 0, sourceDuration: 4, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, trackMix: { music: { gain: 0.5 }, voiceover: { gain: 1 }, sfx: { gain: 0.25 } }, tracks: base.tracks.map((t) => (['music', 'voiceover', 'sfx'].includes(t.type) ? { ...t, clips: [ac(t.type)] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.mixer');
+  await sleep(1200);
+  log(Dimensions.get('window').width >= 700, 'tablet-szélesség: keverőpult-nézet', `${Dimensions.get('window').width} pt`);
+  log(true, 'FOTÓZHATÓ', 'a keverőpult: zene −6 dB, beszéd 0 dB, effekt −12 dB függőleges faderen');
+  await sleep(3000);
+  router.back();
+}
+
+/** ✋✂️↔️ Érintéses módok (Android emulátoron valódi adb-koppintással/-húzással): vágás, kijelölés, mozgatás; nagy sávok. */
+async function smokeTouchModes(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_touch';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:touch', caught));
+  const base = createEmptyProject('smoke érintés', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_touch.wav', 6), start: 1, duration: 6, trimIn: 0, sourceDuration: 6, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  await sleep(500);
+  const clips = () => (st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[]).slice().sort((a, b) => a.start - b.start);
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  // 1) vágás-mód: egy koppintás a klip közepén → két darab (a vágás a koppintás helyén, a rácson)
+  useAudioEditMode.getState().setMode('cut');
+  log(null, 'READY', 'cut');
+  const cut = await waitFor(() => clips().length === 2, 25000);
+  const at = cut ? clips()[1].start : NaN;
+  log(cut && Math.abs(at - 4) < 0.6 && Math.abs(at * 30 - Math.round(at * 30)) < 1e-6, 'vágás-mód: egy koppintás a klipen → ott vág, a frame-rácson', `${clips().length} darab, vágás ${at.toFixed(3)} s`);
+  st().undo();
+  await sleep(300);
+  // 2) kijelölés-mód: a gyors (hosszú nyomás nélküli) húzás NEM mozdítja a klipet
+  useAudioEditMode.getState().setMode('select');
+  log(null, 'READY', 'select');
+  await sleep(6000);
+  log(clips().length === 1 && clips()[0].start === 1, 'kijelölés-mód: a gyors húzás nem mozdítja a klipet (véletlen mozgatás ellen)', `kezdet ${clips()[0].start} s`);
+  // 3) mozgatás-mód: ugyanez a húzás azonnal mozgat
+  useAudioEditMode.getState().setMode('move');
+  log(null, 'READY', 'move');
+  const moved = await waitFor(() => clips()[0].start !== 1, 25000);
+  log(moved && clips()[0].start > 1.5, 'mozgatás-mód: a gyors húzás azonnal mozgatja a klipet', `kezdet 1 → ${clips()[0].start.toFixed(3)} s`);
+  st().undo();
+  useAudioEditMode.getState().setMode('select');
+  // 4) nagy sávok
+  if (!useAudioEditMode.getState().large) useAudioEditMode.getState().toggleLarge();
+  await sleep(500);
+  log(true, 'FOTÓZHATÓ', 'nagy sávok (nagyobb hullámforma), a módváltó gombok a transzporton');
+  await sleep(3000);
+  useAudioEditMode.getState().toggleLarge();
+  router.back();
+}
+
+/** ⬇️ Modell-letöltés fájlba (nem memóriába): a 181 MB-os Whisper small újratöltve, ellenőrizve; hibás checksum → elutasítva, nincs maradék. */
+async function smokeModelDownload(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const entry = catalogEntry('whisper-small-q5')!.manifest!;
+  removeModel('whisper-small-q5');
+  const t0 = Date.now();
+  const res = await downloadModel(entry);
+  const dt = ((Date.now() - t0) / 1000).toFixed(1);
+  log(res.ok && res.sizeBytes === entry.sizeBytes && !!res.uri && new File(res.uri).exists, 'a 181 MB-os modell fájlba töltve, a mérete pontos, a checksum egyezik', res.ok ? `${res.sizeBytes} B, ${dt} s` : `${res.reason}`);
+  const smoke = res.ok ? await runWhisperSmokeTest('whisper-small-q5') : false;
+  log(smoke && bestUsableWhisperModelId() === 'whisper-small-q5', 'a letöltött modell fut (próba) és ez lett a legjobb', `${bestUsableWhisperModelId()}`);
+  // hibás checksum: elutasítva, a félkész fájl sem marad
+  const tiny = catalogEntry('whisper-tiny-q8')!.manifest!;
+  const bad = await downloadModel({ ...tiny, id: 'smoke-bad', sha256: '0'.repeat(64) });
+  const leftovers = (listCachedModels().some((m) => m.id === 'smoke-bad') ? 1 : 0) + (new File(Paths.document, 'models', 'smoke-bad-1.0.0.bin.part').exists ? 1 : 0);
+  log(!bad.ok && bad.reason === 'checksum' && leftovers === 0, 'hibás checksum: elutasítva, nincs maradék fájl', `${bad.ok ? 'ok?!' : bad.reason}, maradék ${leftovers}`);
+}
+
 /** 🎚️🤖 Mixjavaslat és mastering-segéd: egy rossz keverés javaslatai, alkalmazás után eltűnnek; a master eléri a célt. */
 async function smokeMixAssist(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5689,6 +5781,18 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'console') {
+    await step(phase, () => smokeConsole(log));
+    return;
+  }
+  if (phase === 'touchmodes') {
+    await step(phase, () => smokeTouchModes(log));
+    return;
+  }
+  if (phase === 'modeldl') {
+    await step(phase, () => smokeModelDownload(log));
     return;
   }
   if (phase === 'mixassist') {

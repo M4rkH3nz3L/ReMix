@@ -61,6 +61,15 @@ class PreviewEngine {
   /** a következő keverendő idővonal-minta */
   private nextSample = 0;
   private scheduled: Scheduled[] = [];
+  /** 📏 a normalizálás mért erősítései (az A/B-váltás nem mér újra) */
+  private normCache = new Map<string, number>();
+
+  /** 🧪 mérés: az utolsó terv elkészülésének ideje (ms) */
+  lastPlanMs = 0;
+
+  /** ⏩🧹 a kész feldolgozott szakaszok (legfeljebb 8, a legrégebbi esik ki) */
+  private jobCache = new Map<string, DecodedSource>();
+
   /** 🎧 a hosszú (szakaszos) források */
   private long = new Map<string, LongSource>();
   private longUris = new Set<string>();
@@ -130,6 +139,7 @@ class PreviewEngine {
    */
   async setPlan(raw: OfflineMixPlan | null): Promise<void> {
     const seq = ++this.planSeq;
+    const t0 = Date.now();
     if (!raw || !(await this.available())) {
       this.plan = null;
       return;
@@ -155,18 +165,26 @@ class PreviewEngine {
     }
     for (const job of jobs) {
       const src = this.decoded.get(job.uri);
-      const done = this.sources.get(job.key);
+      // a kész szakaszok (zajszűrt, nyújtott) megmaradnak: az A/B oda-vissza váltás nem számol újra
+      const done = this.jobCache.get(job.key);
       if (done) {
         sources.set(job.key, done);
       } else if (src) {
-        sources.set(job.key, await stretchSegment(api, src, job));
+        const made = await stretchSegment(api, src, job);
+        this.jobCache.set(job.key, made);
+        while (this.jobCache.size > 8) {
+          const oldest = this.jobCache.keys().next().value;
+          if (oldest === undefined) break;
+          this.jobCache.delete(oldest);
+        }
+        sources.set(job.key, made);
       }
     }
     if (seq !== this.planSeq) {
       return; // közben újabb terv jött
     }
     // 📏 a normalizálás erősítése (ugyanaz az előmenet, mint az exportban)
-    let next = withNormalizeGains(plan, sources);
+    let next = withNormalizeGains(plan, sources, this.normCache);
     // 🎛️ a master mérése a háttérben: addig a legutóbbi mért erősítés szól (azonos keverésnél a
     // tárolt), utána a pontos — ugyanaz a kétmenetes mérés, mint az exportban
     if (next.master) {
@@ -196,6 +214,7 @@ class PreviewEngine {
     }
     this.plan = next;
     this.sources = sources;
+    this.lastPlanMs = Date.now() - t0;
     this.endSample = Math.round(plan.duration * SR);
     if (this.playing) {
       this.rescheduleFrom(this.position() + EDIT_LEAD_SEC);

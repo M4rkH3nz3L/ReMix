@@ -81,7 +81,7 @@ const METHOD_KEYS = [
 
 const STATE_KEYS = [
   'project', 'selectedClipId', 'clipLocks', 'collabSelf', 'multiSelectIds', 'multiSelectMode',
-  'styleClipboard', 'clipClipboard', 'mutedTracks', 'soloTracks', 'lockedTracks', 'collapsedTracks',
+  'styleClipboard', 'clipClipboard', 'mutedTracks', 'fxBypass', 'soloTracks', 'lockedTracks', 'collapsedTracks',
   'trackHeightScale', 'suggestedCuts', 'pacingInsight', 'searchMatchTimes', 'rippleMode', 'drawBrush',
   'drawMaskMode', 'snapGrid', 'snapStrength', 'snapTargets', 'razorMode', 'trimMode', 'hiddenTracks',
   'autoTrackHeight', 'playbackRate', 'rangeIn', 'rangeOut', 'showSafeZones', 'focusMode',

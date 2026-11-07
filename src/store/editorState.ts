@@ -125,6 +125,12 @@ export interface EditorState {
   mutedTracks: TrackType[];
   soloTracks: TrackType[];
   lockedTracks: TrackType[];
+  /**
+   * 🅰️🅱️ A/B összehasonlítás (session-szintű, mint a mute): bekapcsolva az előnézet a
+   * feldolgozás NÉLKÜLI eredetit játssza (klip-effektek, hangjavítás, master nélkül). Az
+   * exportot nem érinti.
+   */
+  fxBypass: boolean;
   /** 🔽 összecsukott sávok (session-szintű; a klip-terület elrejtve, thin lane marad) */
   collapsedTracks: TrackType[];
   /** 📏 sáv-magasság szorzó (session-szintű; hiányzó = 1×) — precíz munkához nagyítható */
@@ -284,6 +290,8 @@ export interface EditorState {
   /** van-e a cél-sávra illeszthető klip a vágólapon (a UI Beilleszt-gombjához) */
   canPasteTo: (trackType: TrackType) => boolean;
   toggleTrackFlag: (type: TrackType, flag: 'mute' | 'solo' | 'lock' | 'collapse' | 'hidden') => void;
+  /** 🅰️🅱️ az A/B összehasonlítás kapcsolója (eredeti ↔ feldolgozott) */
+  setFxBypass: (on: boolean) => void;
   /** sáv-magasság léptetése: 1× → 1.6× → 2.4× → 1× */
   cycleTrackHeight: (type: TrackType) => void;
   /** látszik-e a (vizuális) sáv az ELŐNÉZETBEN (hiddenTracks alapján) */
@@ -468,6 +476,7 @@ export const SESSION_RESET = {
   mutedTracks: [] as TrackType[],
   soloTracks: [] as TrackType[],
   lockedTracks: [] as TrackType[],
+  fxBypass: false,
   collapsedTracks: [] as TrackType[],
   trackHeightScale: {} as Partial<Record<TrackType, number>>,
   suggestedCuts: [] as number[],

@@ -3153,6 +3153,57 @@ async function smokeCrossfade(log: Log) {
   router.back();
 }
 
+/** 🅰️🅱️ A/B: lejátszás közben eredeti ↔ feldolgozott (zajszűrés + normalizálás) — gyors, akadás nélkül. */
+async function smokeAbCompare(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let a = 11;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  const x = Float32Array.from({ length: 12 * SR }, (_, i) => (Math.floor(i / (SR / 2)) % 2 === 0 ? 0.05 * Math.sin((2 * Math.PI * 330 * i) / SR) : 0) + 0.005 * rnd());
+  const src = new File(Paths.document, 'smoke_ab.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_ab';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:ab', caught));
+  const base = createEmptyProject('smoke A/B', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'ab', uri: src.uri, label: 'beszéd', start: 0, duration: 12, trimIn: 0, sourceDuration: 12, volume: 1, fadeIn: 0, fadeOut: 0, audioFx: { denoise: true, normalize: true }, source: 'voiceover' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c] } : t)) });
+  const st = useEditorStore.getState;
+  st().setFxBypass(false);
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  // az első terv a zajszűréssel (előmenet)
+  for (let i = 0; i < 100 && previewEngine.lastPlanMs === 0; i++) await sleep(100);
+  await sleep(6000);
+  const first = previewEngine.lastPlanMs;
+  log(null, 'első terv (zajszűrés + normalizálás)', `${first} ms`);
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(1500);
+  st().setFxBypass(true);
+  await sleep(1200);
+  const toOriginal = previewEngine.lastPlanMs;
+  st().setFxBypass(false);
+  await sleep(1200);
+  const back = previewEngine.lastPlanMs;
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(toOriginal < 300, 'A/B: az eredetire váltás gyors', `${toOriginal} ms`);
+  log(back < 300, 'A/B: a visszaváltás nem számolja újra a zajszűrést', `${back} ms (az első ${first} ms volt)`);
+  log(stats.late === 0 && stats.replaced > 0, 'a váltások lejátszás közben, akadás nélkül', `${stats.chunks} szelet, ${stats.late} késett, ${stats.replaced} cserélve`);
+  router.back();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4317,6 +4368,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'abcompare') {
+    await step(phase, () => smokeAbCompare(log));
     return;
   }
   if (phase === 'crossfade') {

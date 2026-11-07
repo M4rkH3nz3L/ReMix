@@ -4055,6 +4055,8 @@
       "transport": {
         "auto": "Auto",
         "fit": "Illeszd",
+        "ab": "A/B",
+        "abOriginal": "Eredeti",
         "snap_off": "Rács ki",
         "snap_frame": "Kocka",
         "snap_beat": "Ütem",

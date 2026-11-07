@@ -4060,6 +4060,8 @@
       "transport": {
         "auto": "Auto",
         "fit": "Einpassen",
+        "ab": "A/B",
+        "abOriginal": "Original",
         "snap_off": "Raster aus",
         "snap_frame": "Frame",
         "snap_beat": "Beat",

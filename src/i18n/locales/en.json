@@ -4055,6 +4055,8 @@
       "transport": {
         "auto": "Auto",
         "fit": "Fit",
+        "ab": "A/B",
+        "abOriginal": "Original",
         "snap_off": "Snap off",
         "snap_frame": "Frame",
         "snap_beat": "Beat",

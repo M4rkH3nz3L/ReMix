@@ -602,11 +602,21 @@ export function stretchJobs(plan: OfflineMixPlan): { jobs: StretchJob[]; plan: O
  * (−16 LUFS-re). Az előnézet és az export is ezt futtatja (a `stretchJobs` után; a zajszűrés
  * addigra a szakaszon van).
  */
-export function withNormalizeGains(plan: OfflineMixPlan, sources: Map<string, DecodedSource>): OfflineMixPlan {
+export function withNormalizeGains(
+  plan: OfflineMixPlan,
+  sources: Map<string, DecodedSource>,
+  /** a mért erősítések klip-beállításonként (az előnézet A/B-váltása ne mérjen újra) */
+  cache?: Map<string, number>
+): OfflineMixPlan {
   const sr = OFFLINE_SAMPLE_RATE;
   const clips = plan.clips.map((c) => {
     if (!c.fx?.normalize) {
       return c;
+    }
+    const key = JSON.stringify([c.uri, c.trimIn, c.duration, c.fx, c.deReverb ?? false]);
+    const known = cache?.get(key);
+    if (known !== undefined) {
+      return { ...c, normGain: known };
     }
     const src = sources.get(c.uri);
     if (!src || src.channels.length === 0) {
@@ -618,6 +628,7 @@ export function withNormalizeGains(plan: OfflineMixPlan, sources: Map<string, De
     runChain(buildFxChain({ ...c.fx, normalize: false, limiter: false }, sr, 1, c.deReverb), l, r, 0);
     const lufs = integratedLoudness(l, r, sr);
     const normGain = Number.isFinite(lufs) ? Math.pow(10, (NORMALIZE_LUFS - lufs) / 20) : 1;
+    cache?.set(key, normGain);
     return { ...c, normGain };
   });
   return { ...plan, clips };

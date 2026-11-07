@@ -46,6 +46,8 @@ type ViewSlice = Pick<
   | 'rotoMask'
   | 'showSafeZones'
   | 'mutedTracks'
+  | 'fxBypass'
+  | 'setFxBypass'
   | 'soloTracks'
   | 'lockedTracks'
   | 'collapsedTracks'
@@ -119,6 +121,8 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
   rotoMask: SESSION_RESET.rotoMask,
   showSafeZones: SESSION_RESET.showSafeZones,
   mutedTracks: SESSION_RESET.mutedTracks,
+  fxBypass: SESSION_RESET.fxBypass,
+  setFxBypass: (on) => set({ fxBypass: on }),
   soloTracks: SESSION_RESET.soloTracks,
   lockedTracks: SESSION_RESET.lockedTracks,
   collapsedTracks: SESSION_RESET.collapsedTracks,

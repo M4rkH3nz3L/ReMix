@@ -18,7 +18,7 @@ import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
 import { ensureVoiceProxy, getVoiceProxySync, needsVoiceProxy } from '@/lib/voiceProxy';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, TrackType, VideoClip } from '@/types/project';
+import type { AudioClip, Clip, Project, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 /** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
@@ -56,15 +56,17 @@ export function AudioLayer() {
   const masterVolume = useEditorStore((s) => s.masterVolume);
   const muted = useEditorStore((s) => s.mutedTracks);
   const solo = useEditorStore((s) => s.soloTracks);
-  // 🎧 az exporttal AZONOS keverési terv (mute/solo/fader/master is) — ezt játssza a motor
+  const fxBypass = useEditorStore((s) => s.fxBypass);
+  // 🎧 az exporttal AZONOS keverési terv (mute/solo/fader/master is) — ezt játssza a motor;
+  // 🅰️🅱️ A/B-nél a feldolgozás nélküli eredeti (az exportot nem érinti)
   const plan = useMemo(() => {
     if (!project) {
       return null;
     }
     const audible = (t: TrackType) => (solo.length > 0 ? solo.includes(t) : !muted.includes(t));
-    const mix = mixForExport(project, audible, masterVolume);
+    const mix = mixForExport(fxBypass ? withoutProcessing(project) : project, audible, masterVolume);
     return mix ? offlineMixPlan(mix) : null;
-  }, [project, masterVolume, muted, solo]);
+  }, [project, masterVolume, muted, solo, fxBypass]);
   const [engineOk, setEngineOk] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -89,6 +91,24 @@ export function AudioLayer() {
       <VideoVoice />
     </>
   );
+}
+
+/** 🅰️🅱️ a projekt feldolgozás nélkül: klip-effektek, hangjavítás, visszhang-csökkentés, master nélkül */
+export function withoutProcessing(project: Project): Project {
+  return {
+    ...project,
+    audioMaster: undefined,
+    tracks: project.tracks.map((t) => ({
+      ...t,
+      clips: t.clips.map((c) =>
+        c.kind === 'audio'
+          ? ({ ...c, audioFx: undefined, voiceEnhance: false, deReverb: false } as Clip)
+          : c.kind === 'video'
+            ? ({ ...c, voiceEnhance: false, deReverb: false } as Clip)
+            : c
+      ),
+    })),
+  };
 }
 
 /**

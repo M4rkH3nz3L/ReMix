@@ -103,6 +103,7 @@ export function AudioStudioBody({
   onExport?: () => void;
 }) {
   const { t } = useTranslation();
+  const fxBypass = useEditorStore((s) => s.fxBypass);
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
@@ -906,6 +907,8 @@ export function AudioStudioBody({
         <TBtn icon="remove-circle-outline" onPress={() => zoomStep(-1)} />
         <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
         <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
+        {/* 🅰️🅱️ A/B: az eredeti (feldolgozás nélkül) ↔ a feldolgozott — csak az előnézetben */}
+        <TBtn icon="git-compare-outline" label={fxBypass ? t('studio.audio.transport.abOriginal') : t('studio.audio.transport.ab')} active={fxBypass} onPress={() => useEditorStore.getState().setFxBypass(!fxBypass)} />
         <TBtn
           label={t(`studio.audio.transport.snap_${snapMode}`)}
           icon="magnet-outline"

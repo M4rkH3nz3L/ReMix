@@ -4140,6 +4140,21 @@
       },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
+      "speech": {
+        "title": "Sprachschnitt",
+        "open": "Per Text schneiden (Transkript)",
+        "openHint": "Transkribiert die Sprache der Spur auf dem Telefon; markierte Wörter werden aus dem Ton geschnitten.",
+        "working": "Transkript wird erstellt…",
+        "none": "Auf dieser Spur ist keine Sprache zu hören.",
+        "failed": "Das Transkript ist fehlgeschlagen (Ton nicht lesbar oder Modellfehler).",
+        "header": "Transkript · {{count}} Wörter",
+        "fillers": "Füllwörter",
+        "cut": "Schneiden ({{count}})",
+        "modelTitle": "Spracherkennungsmodell",
+        "modelBody": "Für den Textschnitt wird das Whisper-Modell einmalig geladen ({{mb}} MB); danach läuft es offline auf dem Telefon.",
+        "modelDownload": "Laden",
+        "modelWorking": "Whisper-Modell wird geladen…"
+      },
       "silence": {
         "title": "Stille",
         "find": "Stille suchen",

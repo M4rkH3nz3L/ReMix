@@ -4135,6 +4135,21 @@
       },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
+      "speech": {
+        "title": "Beszédvágás",
+        "open": "Szöveges vágás (átirat)",
+        "openHint": "Átírja a sáv beszédét a telefonon; a kijelölt szavakat kivágja a hangból.",
+        "working": "Átirat készül…",
+        "none": "Ezen a sávon nem hallható beszéd.",
+        "failed": "Az átirat nem sikerült (a hang nem olvasható, vagy a modell hibázott).",
+        "header": "Átirat · {{count}} szó",
+        "fillers": "Töltelékek",
+        "cut": "Kivágás ({{count}})",
+        "modelTitle": "Beszédfelismerő modell",
+        "modelBody": "A szöveges vágáshoz egyszer le kell tölteni a Whisper modellt ({{mb}} MB); utána offline, a telefonon fut.",
+        "modelDownload": "Letöltés",
+        "modelWorking": "Whisper modell letöltése…"
+      },
       "silence": {
         "title": "Csendek",
         "find": "Csendek keresése",

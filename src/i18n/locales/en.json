@@ -4135,6 +4135,21 @@
       },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
+      "speech": {
+        "title": "Speech editing",
+        "open": "Edit by text (transcript)",
+        "openHint": "Transcribes the track's speech on the phone; selected words are cut from the audio.",
+        "working": "Transcribing…",
+        "none": "No speech is audible on this track.",
+        "failed": "Transcription failed (the audio could not be read or the model failed).",
+        "header": "Transcript · {{count}} words",
+        "fillers": "Fillers",
+        "cut": "Cut ({{count}})",
+        "modelTitle": "Speech recognition model",
+        "modelBody": "Editing by text needs the Whisper model, downloaded once ({{mb}} MB); after that it runs offline on the phone.",
+        "modelDownload": "Download",
+        "modelWorking": "Downloading the Whisper model…"
+      },
       "silence": {
         "title": "Silences",
         "find": "Find silences",

@@ -3949,6 +3949,9 @@
       "blend": { "normal": "Normál", "multiply": "Szorzás", "screen": "Kivonás", "overlay": "Fedés", "softlight": "Lágy fény", "darken": "Sötétítés", "lighten": "Világosítás", "hardlight": "Kemény fény", "difference": "Különbség", "exclusion": "Kizárás", "colordodge": "Színfakítás", "colorburn": "Színégetés" }
     },
     "audioTools": {
+      "copy": "Másol",
+      "paste": "Beilleszt",
+      "duplicate": "Duplikál",
       "mixer": "Mixer",
       "trim": "Vágás",
       "fade": "Fade",

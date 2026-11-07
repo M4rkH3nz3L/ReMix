@@ -3949,6 +3949,9 @@
       "blend": { "normal": "Normal", "multiply": "Multiply", "screen": "Screen", "overlay": "Overlay", "softlight": "Soft light", "darken": "Darken", "lighten": "Lighten", "hardlight": "Hard light", "difference": "Difference", "exclusion": "Exclusion", "colordodge": "Color dodge", "colorburn": "Color burn" }
     },
     "audioTools": {
+      "copy": "Copy",
+      "paste": "Paste",
+      "duplicate": "Duplicate",
       "mixer": "Mixer",
       "trim": "Trim",
       "fade": "Fade",

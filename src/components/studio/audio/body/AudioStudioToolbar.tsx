@@ -20,6 +20,10 @@ export function AudioStudioToolbar({
   onEdit,
   onDelete,
   onMixer,
+  onCopy,
+  onPaste,
+  onDuplicate,
+  canPaste,
 }: {
   hasSelection: boolean;
   isRecording: boolean;
@@ -29,6 +33,10 @@ export function AudioStudioToolbar({
   onEdit: () => void;
   onDelete: () => void;
   onMixer: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
+  onDuplicate: () => void;
+  canPaste: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -41,6 +49,9 @@ export function AudioStudioToolbar({
         danger={isRecording}
       />
       <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={onSplit} disabled={!hasSelection} />
+      <Tool icon="copy-outline" label={t('studio.audioTools.copy')} onPress={onCopy} disabled={!hasSelection} />
+      <Tool icon="clipboard-outline" label={t('studio.audioTools.paste')} onPress={onPaste} disabled={!canPaste} />
+      <Tool icon="duplicate-outline" label={t('studio.audioTools.duplicate')} onPress={onDuplicate} disabled={!hasSelection} />
       <Tool icon="options-outline" label={t('studio.audioTools.edit')} onPress={onEdit} disabled={!hasSelection} />
       <Tool icon="trash-outline" label={t('studio.audioTools.delete')} onPress={onDelete} disabled={!hasSelection} danger />
       <Tool icon="options" label={t('studio.audioTools.mixer', { defaultValue: 'Mixer' })} onPress={onMixer} />

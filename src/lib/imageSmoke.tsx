@@ -3356,6 +3356,42 @@ async function smokeTracksBuses(log: Log) {
   src.delete();
 }
 
+/** 📑 Másol / Beilleszt / Duplikál a Hang Stúdió eszköztárán (parancs-busz, undo). */
+async function smokeClipboard(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_clip.wav', 6);
+  const id = 'prj_smoke_clipboard';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:clipboard', caught));
+  const base = createEmptyProject('smoke vágólap', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'cb', uri, label: 'minta', start: 1, duration: 2, trimIn: 0, sourceDuration: 6, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'sfx' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  const sfx = () => (st().project?.tracks.find((t) => t.type === 'sfx')?.clips ?? []).slice().sort((a, b) => a.start - b.start);
+  st().selectClip('cb');
+  runDevAction('audio.duplicate');
+  await sleep(200);
+  log(sfx().length === 2 && Math.abs(sfx()[1].start - 3) < 1e-6, 'Duplikál: a másolat közvetlenül utána (3 s)', sfx().map((x) => x.start).join(', '));
+  log(st().clipClipboard === null, 'a duplikálás a vágólapot nem írja felül');
+  st().undo();
+  log(sfx().length === 1, 'a duplikálás visszavonható');
+  st().selectClip('cb');
+  runDevAction('audio.copy');
+  // a lejátszófej a projekt hosszán belül (a store a végére korlátozza)
+  st().setPlayhead(2.5);
+  runDevAction('audio.paste');
+  await sleep(200);
+  log(sfx().length === 2 && Math.abs(sfx()[1].start - 2.5) < 0.05, 'Másol + Beilleszt: a lejátszófejnél, a kijelölt klip sávjára', sfx().map((x) => x.start.toFixed(2)).join(', '));
+  runDevAction('audio.fit');
+  log(true, 'FOTÓZHATÓ', 'az eszköztár: Másol · Beilleszt · Duplikál');
+  await sleep(4000);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4520,6 +4556,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'clipboard') {
+    await step(phase, () => smokeClipboard(log));
     return;
   }
   if (phase === 'tracksbuses') {

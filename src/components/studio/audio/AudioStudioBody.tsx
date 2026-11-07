@@ -16,6 +16,8 @@ import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { AudioMarkerFlags, markerActions } from '@/components/studio/audio/AudioMarkerFlags';
 import { audioLanes, laneLabel, type AudioLane } from '@/components/studio/audio/audioLanes';
 import { AUDIO_TRACKS, nextExtraTrack } from '@/lib/audioTracks';
+import { duplicateAfter } from '@/lib/clipDuplicate';
+import type { EditorCommand } from '@/lib/commands';
 import { CrossfadeMarks } from '@/components/studio/audio/CrossfadeMarks';
 import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
@@ -82,6 +84,12 @@ const HEADER_W = 62;
 
 /* a sávok: `audioLanes(project)` (az alap három + a „+ Sáv”-val hozzáadottak) */
 
+/** 📋 a beillesztés cél-sávja a store-állapotból (a kijelölt klip sávja, különben a zene) */
+function pasteTargetOf(s: { selectedClipId: string | null; project: { tracks: { type: TrackType; clips: { id: string }[] }[] } | null }): TrackType {
+  const id = s.selectedClipId;
+  return (id && s.project?.tracks.find((tr) => tr.clips.some((c) => c.id === id))?.type) || 'music';
+}
+
 /**
  * 🎧 A hang-stúdió TÖRZSE — store-vezérelt, UI-only. A projektet a hívó tölti a
  * `useEditorStore`-ba (route-mód) VAGY már betöltve van (scoped, a videó-editorból),
@@ -102,6 +110,7 @@ export function AudioStudioBody({
 }) {
   const { t } = useTranslation();
   const fxBypass = useEditorStore((s) => s.fxBypass);
+  const canPaste = useEditorStore((s) => (s.clipClipboard ? s.canPasteTo(pasteTargetOf(s)) : false));
   const projectTracks = useEditorStore((s) => s.project?.tracks);
   const LANES = useMemo(() => audioLanes(projectTracks ? { tracks: projectTracks } : null), [projectTracks]);
   const LANE_TYPES = useMemo(() => LANES.map((l) => l.type), [LANES]);
@@ -184,7 +193,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -192,6 +201,9 @@ export function AudioStudioBody({
       registerDevAction('audio.marker', () => devRef.current.marker()),
       registerDevAction('audio.addLane', () => devRef.current.addLane()),
       registerDevAction('audio.mixer', () => devRef.current.mixer()),
+      registerDevAction('audio.copy', () => devRef.current.copy()),
+      registerDevAction('audio.paste', () => devRef.current.paste()),
+      registerDevAction('audio.duplicate', () => devRef.current.duplicate()),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
     ];
     return () => offs.forEach((off) => off());
@@ -225,6 +237,33 @@ export function AudioStudioBody({
 
   // 🔖 a markerek is snap-pontok (10 képpontnyi közelségben)
   const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm), project.markers ?? [], 10 / pxPerSec);
+
+  /** 📋 a kijelölt klip sávja (beillesztés célja), ennek hiányában az első sáv */
+  const pasteTarget = (): TrackType => {
+    const st = useEditorStore.getState();
+    const id = st.selectedClipId;
+    return (id && st.project?.tracks.find((tr) => tr.clips.some((c) => c.id === id))?.type) || LANE_TYPES[0];
+  };
+  const copySelection = () => {
+    useEditorStore.getState().copyClips();
+  };
+  const pasteAtPlayhead = () => {
+    const st = useEditorStore.getState();
+    st.pasteClipsAt(pasteTarget(), st.playhead);
+  };
+  /** 📑 duplikálás: a kijelölés másolata közvetlenül utána, sávonként (a vágólapot nem írja felül) */
+  const duplicateSelection = () => {
+    const st = useEditorStore.getState();
+    const ids = st.allSelectedIds();
+    const cmds: EditorCommand[] = [];
+    for (const tr of st.project?.tracks ?? []) {
+      const picked = tr.clips.filter((c) => ids.includes(c.id));
+      if (picked.length > 0) {
+        cmds.push({ type: 'ADD_CLIPS', trackType: tr.type, clips: duplicateAfter(picked, fps, () => makeId('clip')) });
+      }
+    }
+    if (cmds.length > 0) st.applyBatch(cmds, 'user');
+  };
 
   /** ➕ új hangsáv a következő szabad helyre (undo-zható) */
   const addLane = () => {
@@ -309,7 +348,7 @@ export function AudioStudioBody({
     setFitPps(fitPxPerSec(view.w || 1200, duration));
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   };
-  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true) };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true), copy: copySelection, paste: pasteAtPlayhead, duplicate: duplicateSelection };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -1012,6 +1051,10 @@ export function AudioStudioBody({
           onEdit={() => selClip && setEditing(true)}
           onDelete={() => selClip && useEditorStore.getState().removeSelectedClips()}
           onMixer={() => setMixerOpen(true)}
+          onCopy={copySelection}
+          onPaste={pasteAtPlayhead}
+          onDuplicate={duplicateSelection}
+          canPaste={canPaste}
         />
       )}
 

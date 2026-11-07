@@ -2,6 +2,7 @@ import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { previewEngine } from '@/lib/previewEngine';
 import { projectDuration } from '@/lib/projectUtils';
 import { stepPreviewPlayhead } from '@/lib/variantPreview';
 import { useEditorStore } from '@/store/editorStore';
@@ -71,7 +72,9 @@ export function usePlaybackClock(): void {
           const confined = loop && rangeIn != null && rangeOut != null && rangeOut > rangeIn;
           const loStart = confined ? rangeIn : 0;
           const hiEnd = confined ? rangeOut : duration;
-          const next = playhead + dt * rate;
+          // 🎧 bekötött előnézeti motornál (1×) a lejátszófej a HANGÓRÁBÓL jön — a kép követi a hangot
+          const engine = rate === 1 ? previewEngine.clock() : null;
+          const next = engine ?? playhead + dt * rate;
           if (rate < 0) {
             if (next <= loStart) {
               if (loop && hiEnd > loStart) {

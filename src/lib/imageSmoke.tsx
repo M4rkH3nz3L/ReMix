@@ -2736,6 +2736,80 @@ async function smokePreviewEngine(log: Log) {
   new File(uri).delete();
 }
 
+/** 🎧 A Hang Stúdió az előre renderelt motorról szól: óra, némítás és ugrás futás közben, megszakítás. */
+async function smokeEngineStudio(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_enginestudio';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:engineStudio', caught));
+  const uri = toneWav('smoke_enginestudio.wav', 20);
+  const base = createEmptyProject('smoke motor-stúdió', '9:16', undefined, 'audio');
+  const mk = (cid: string, start: number, pan: number): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start, duration: 16, trimIn: 0, sourceDuration: 20, volume: 0.3, fadeIn: 0, fadeOut: 0, pan, source: 'imported' });
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('m', 0, -0.8)] } : t.type === 'sfx' ? { ...t, clips: [mk('s', 1, 0.8)] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  const st = useEditorStore.getState;
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(800);
+  {
+    const proj = st().project;
+    const plan = proj ? offlineMixPlan(proj) : null;
+    log(null, 'motor-állapot', `armed ${previewEngine.clock() !== null}, playing ${previewEngine.isPlaying()}, unsupported [${plan?.unsupported.join(',')}], uris ${plan?.clips.map((c) => c.uri.slice(0, 12)).join(' ')}`);
+  }
+  log(previewEngine.isPlaying() && st().videoVoiceActive, 'a stúdió az előre renderelt motorról szól');
+  const h1 = st().playhead;
+  const w1 = Date.now();
+  await sleep(2000);
+  const h2 = st().playhead;
+  const w2 = Date.now();
+  log(Math.abs(h2 - h1 - (w2 - w1) / 1000) < 0.05, 'a lejátszófej a hangórával halad', `${(h2 - h1).toFixed(3)} s fej · ${((w2 - w1) / 1000).toFixed(3)} s fal`);
+  // némítás futás közben → az exporttal azonos terv, a még el nem indult szeletek cserélődnek
+  st().toggleTrackFlag('sfx', 'mute');
+  await sleep(500);
+  // ugrás futás közben
+  st().setPlayhead(8);
+  await sleep(400);
+  log(Math.abs(previewEngine.position() - st().playhead) < 0.05 && st().playhead > 8 && st().playhead < 8.6, 'ugrás futás közben: a motor onnan folytatja', `fej ${st().playhead.toFixed(2)} · motor ${previewEngine.position().toFixed(2)}`);
+  const stats = previewEngine.takeStats();
+  log(stats.late === 0, 'rés nélkül szólt (némítás és ugrás közben is)', `${stats.chunks} szelet, ${stats.late} késett, ${stats.replaced} cserélve, legkisebb előny ${stats.minLeadMs.toFixed(0)} ms`);
+  // rendszer-megszakítás (a hangmotor felfüggesztése, mint híváskor)
+  await previewEngine.debugSuspend();
+  await sleep(300);
+  log(!st().isPlaying && !previewEngine.isPlaying(), 'hívás / Siri: a felfüggesztett motorral a transzport megáll');
+  st().setPlaying(true);
+  await sleep(1000);
+  log(previewEngine.isPlaying() && st().isPlaying, 'újraindítva ismét szól');
+  st().setPlaying(false);
+  st().toggleTrackFlag('sfx', 'mute');
+  // 🎙️ rájátszás: felvétel indul, közben a motor játssza a többi sávot
+  const perm = await getRecordingPermissionsAsync();
+  if (perm.granted) {
+    const voice = () => (st().project?.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+    const h = await new Promise<RecordHandle>((resolve) => setHarness(<RecordHarness onReady={resolve} start={() => st().playhead} />));
+    st().setPlayhead(2);
+    await startVoiceRecording(h.recorder);
+    st().setPlaying(true);
+    await sleep(2000);
+    const h1 = st().playhead;
+    log(previewEngine.isPlaying() && h.recorder.getStatus().isRecording && h1 > 3.5, 'rájátszás: felvétel közben a motor szól és halad', `fej ${h1.toFixed(2)} s`);
+    st().setPlaying(false);
+    await h.finish.current();
+    const v = voice()[0];
+    log(!!v && v.duration > 1.5, 'rájátszás: a felvétel klip lett', v ? `${v.duration.toFixed(2)} s` : 'nincs');
+    setHarness(null);
+    // előbb a klip kerül ki a projektből, csak utána a fájl (különben a hullámforma a hiányzót keresi)
+    const files = voice().map((c) => c.uri);
+    for (const c of voice()) st().removeClip(c.id);
+    await sleep(300);
+    for (const f of files) new File(f).delete();
+  }
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3889,11 +3963,21 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'audiosync') {
-    await step('audiosync', () => smokeAudioSync(log));
+    // a klipenkénti lejátszók szinkronja (a még csak a renderben szóló effektes projektek útja)
+    previewEngine.forceFallback = true;
+    try {
+      await step('audiosync', () => smokeAudioSync(log));
+    } finally {
+      previewEngine.forceFallback = false;
+    }
     return;
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'enginestudio') {
+    await step(phase, () => smokeEngineStudio(log, setHarness));
     return;
   }
   if (phase === 'previewengine') {
@@ -3905,7 +3989,13 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'audioreverse') {
-    await step(phase, () => smokeAudioReverse(log));
+    // a klipenkénti lejátszók útja (a még csak a renderben szóló effektes projekteké) — ezt méri
+    previewEngine.forceFallback = true;
+    try {
+      await step(phase, () => smokeAudioReverse(log));
+    } finally {
+      previewEngine.forceFallback = false;
+    }
     return;
   }
   if (phase === 'nativespeed') {
@@ -3917,7 +4007,13 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'audiospeed') {
-    await step(phase, () => smokeAudioSpeed(log));
+    // a klipenkénti lejátszók útja (a még csak a renderben szóló effektes projekteké) — ezt méri
+    previewEngine.forceFallback = true;
+    try {
+      await step(phase, () => smokeAudioSpeed(log));
+    } finally {
+      previewEngine.forceFallback = false;
+    }
     return;
   }
   if (phase === 'diskspace') {
@@ -3925,7 +4021,13 @@ export async function runImageSmoke(
     return;
   }
   if (phase === 'interrupt' || phase === 'interruptbg') {
-    await step(phase, () => smokeInterrupt(log, setHarness, phase === 'interruptbg'));
+    // a klipenkénti lejátszók útja (a még csak a renderben szóló effektes projekteké) — ezt méri
+    previewEngine.forceFallback = true;
+    try {
+      await step(phase, () => smokeInterrupt(log, setHarness, phase === 'interruptbg'));
+    } finally {
+      previewEngine.forceFallback = false;
+    }
     return;
   }
   if (phase === 'recording') {

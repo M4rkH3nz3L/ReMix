@@ -27,9 +27,10 @@ export const CHUNK_SAMPLES = Math.round(0.125 * SR);
 /** ennyit keverünk előre a lejátszófej elé */
 const AHEAD_SEC = 0.75;
 /** az indításkori ütemezési tartalék (a natív szál ennyi idő alatt biztosan átveszi az első szeletet) */
-const START_LEAD_SEC = 0.06;
-/** szerkesztéskor az ennél később induló szeletek cserélődnek */
-const EDIT_LEAD_SEC = 0.05;
+const START_LEAD_SEC = 0.08;
+/** szerkesztéskor csak az ennél később induló szeletek cserélődnek (a közelebbiek már a natív
+ * szálé — mérve: 50 ms-os határnál egy újrakevert szelet 5 ms-ot késett, ami kattanás) */
+const EDIT_LEAD_SEC = 0.1;
 const FILL_MS = 40;
 
 interface Scheduled {
@@ -46,6 +47,11 @@ class PreviewEngine {
   private plan: OfflineMixPlan | null = null;
   private sources = new Map<string, DecodedSource>();
   private planSeq = 0;
+  private playSeq = 0;
+  /** a stúdió bekötötte (az óra a motorból jön) */
+  private armed = false;
+  /** 📞 a rendszer felfüggesztette a hangmotort (hívás, Siri): a transzport megáll */
+  onInterrupted: (() => void) | null = null;
   private playing = false;
   /** a lejátszás kezdete: idővonal-minta és hangóra-idő */
   private startSample = 0;
@@ -58,9 +64,22 @@ class PreviewEngine {
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
   private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0 };
 
+  /** 🧪 füstteszt: a klipenkénti lejátszók útja (a még nem támogatott effektes projektek útja) */
+  forceFallback = false;
+
   /** a motor elérhető-e (natív modul) */
   async available(): Promise<boolean> {
-    this.api = this.api ?? (await loadAudioApi());
+    if (!this.api) {
+      this.api = await loadAudioApi();
+      // 🎙️ az iOS hang-munkamenetet EGY helyen kezeljük: az expo-audio (lejátszás néma kapcsolónál
+      // is, felvételnél rögzítő mód). Két kezelő összeakad: felvétel közben a motor saját módot
+      // próbált állítani, és nem indult el („Failed to resume audio context”, mérve).
+      try {
+        this.api?.AudioManager.disableSessionManagement();
+      } catch (caught) {
+        logCaught('lib/previewEngine.ts:available', caught);
+      }
+    }
     return this.api !== null;
   }
 
@@ -74,6 +93,22 @@ class PreviewEngine {
 
   isPlaying(): boolean {
     return this.playing;
+  }
+
+  /** a motor hajtja-e az előnézetet (a stúdió `MixEngineLayer`-e kapcsolja) */
+  arm(on: boolean): void {
+    this.armed = on;
+    if (!on) {
+      this.pause();
+    }
+  }
+
+  /**
+   * ⏱️ A mesteróra forrása: bekötött motornál a hangóra szerinti lejátszófej (indításkor a
+   * kezdőpont, amíg a hang el nem indul); különben null (a rAF-óra a saját lépésével halad).
+   */
+  clock(): number | null {
+    return this.armed ? this.position() : null;
   }
 
   /**
@@ -152,13 +187,19 @@ class PreviewEngine {
     if (!(await this.available())) {
       return;
     }
+    // a kezdőpont AZONNAL érvényes (az ébresztés alatt a lejátszófej itt áll, nem a régi helyen)
+    this.stopNodes(0);
+    this.playing = false;
+    this.startSample = Math.round(fromSec * SR);
+    const seq = ++this.playSeq;
     if (!this.ctx) {
       this.ctx = new this.api!.AudioContext({ sampleRate: SR });
     }
     await this.ctx.resume();
-    this.stopNodes(0);
+    if (seq !== this.playSeq) {
+      return; // közben újabb indítás vagy szünet jött
+    }
     this.playing = true;
-    this.startSample = Math.round(fromSec * SR);
     this.startCtx = this.ctx.currentTime + START_LEAD_SEC;
     this.nextSample = this.startSample;
     this.fill();
@@ -166,6 +207,7 @@ class PreviewEngine {
   }
 
   pause(): void {
+    this.playSeq += 1;
     const pos = this.position();
     this.playing = false;
     this.stopNodes(0);
@@ -192,8 +234,8 @@ class PreviewEngine {
   /** a `fromSec` után induló szeletek cseréje (szerkesztés futás közben) */
   private rescheduleFrom(fromSec: number): void {
     const cut = Math.max(this.startSample, Math.ceil(fromSec * SR));
-    // a cut-ot TARTALMAZÓ szelet végig szól; az utána indulók cserélődnek
-    const keep = this.scheduled.filter((s) => s.from < cut - CHUNK_SAMPLES + 1);
+    // a `cut` ELŐTT induló szeletek végig szólnak; csak az utána indulók cserélődnek
+    const keep = this.scheduled.filter((s) => s.from < cut);
     const drop = this.scheduled.filter((s) => !keep.includes(s));
     for (const s of drop) {
       try {
@@ -224,6 +266,12 @@ class PreviewEngine {
     if (!this.playing || !ctx) {
       return;
     }
+    // 📞 hívás / Siri: az iOS felfüggeszti a hangmotort (az óra áll) — a transzport is megáll
+    if (ctx.state !== 'running') {
+      this.pause();
+      this.onInterrupted?.();
+      return;
+    }
     // a lejátszott szeletek kiesnek a listából
     const now = ctx.currentTime;
     this.scheduled = this.scheduled.filter((s) => this.ctxTimeOf(s.from + CHUNK_SAMPLES) > now);
@@ -251,6 +299,11 @@ class PreviewEngine {
       this.scheduled.push({ node, from });
       this.nextSample = to;
     }
+  }
+
+  /** 🧪 füstteszt: a rendszer-megszakítás hatása (ugyanaz a felfüggesztés, amit az iOS tesz) */
+  async debugSuspend(): Promise<void> {
+    await this.ctx?.suspend();
   }
 
   /** 🧪 füstteszt: az ütemezés mérőszámai (a nullázás a lekérdezéssel) */

@@ -5,7 +5,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { resolveClipUri } from '@/lib/assetResolve';
 import { clipsForPlayback, INITIAL_DRIFT, learnStartLatency, planDriftCorrection, sourceTimeOf, type DriftState } from '@/lib/avSync';
 import { probeDrift, probeSeek, probeStart, syncProbeOn } from '@/lib/audioSyncProbe';
+import { mixForExport } from '@/lib/audioExportMix';
 import { registerDevAction } from '@/lib/devActions';
+import { offlineMixPlan, type OfflineMixPlan } from '@/lib/offlineMix';
+import { OFFLINE_MAX_SEC } from '@/lib/offlineMixClient';
+import { previewEngine } from '@/lib/previewEngine';
 import { ensureStretchProxy, getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
 import { audioSpeedOf, needsStretchProxy } from '@/lib/audioTrim';
@@ -48,8 +52,34 @@ function fadeFactor(clip: AudioClip, t: number): number {
  */
 export function AudioLayer() {
   const isFocused = useIsFocused();
+  const project = useEditorStore((s) => s.project);
+  const masterVolume = useEditorStore((s) => s.masterVolume);
+  const muted = useEditorStore((s) => s.mutedTracks);
+  const solo = useEditorStore((s) => s.soloTracks);
+  // 🎧 az exporttal AZONOS keverési terv (mute/solo/fader/master is) — ezt játssza a motor
+  const plan = useMemo(() => {
+    if (!project) {
+      return null;
+    }
+    const audible = (t: TrackType) => (solo.length > 0 ? solo.includes(t) : !muted.includes(t));
+    const mix = mixForExport(project, audible, masterVolume);
+    return mix ? offlineMixPlan(mix) : null;
+  }, [project, masterVolume, muted, solo]);
+  const [engineOk, setEngineOk] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void previewEngine.available().then((ok) => {
+      if (alive) setEngineOk(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   if (!isFocused) {
     return null;
+  }
+  if (engineOk && !previewEngine.forceFallback && engineCanPlay(plan)) {
+    return <MixEngineLayer plan={plan} />;
   }
   return (
     <>
@@ -59,6 +89,62 @@ export function AudioLayer() {
       <VideoVoice />
     </>
   );
+}
+
+/**
+ * 🎧 A motor játszhatja-e a projektet: amit a közös keverő (= az export) tud, és helyi, legfeljebb
+ * 20 perces forrásokból áll. Ami még csak a szerveres renderben szól (effektek, master,
+ * duck, hangjavítás), annál egyelőre a klipenkénti lejátszók szólnak.
+ */
+function engineCanPlay(plan: OfflineMixPlan | null): boolean {
+  return !plan || (plan.unsupported.length === 0 && plan.duration <= OFFLINE_MAX_SEC && plan.clips.every((c) => c.uri.startsWith('file:')));
+}
+
+/**
+ * 🎧 „Azt kapod, amit hallasz”: az előre renderelt előnézet (`previewEngine`) bekötése. A terv
+ * változására (szerkesztés, mute/solo, fader) a még el nem indult szeletek újrakeverődnek; a
+ * lejátszófej a hangórából jön (`usePlaybackClock`); a videók saját hangja néma, mert azt is a
+ * motor keveri (`videoVoiceActive`).
+ */
+function MixEngineLayer({ plan }: { plan: OfflineMixPlan | null }) {
+  const isPlaying = useEditorStore((s) => s.isPlaying && s.playbackRate === 1);
+  const setVideoVoiceActive = useEditorStore((s) => s.setVideoVoiceActive);
+
+  useEffect(() => {
+    previewEngine.arm(true);
+    setVideoVoiceActive(true);
+    // 📞 hívás / Siri: a felfüggesztett motorral a transzport is megáll (nem fut tovább némán)
+    previewEngine.onInterrupted = () => useEditorStore.getState().setPlaying(false);
+    return () => {
+      previewEngine.onInterrupted = null;
+      previewEngine.arm(false);
+      setVideoVoiceActive(false);
+    };
+  }, [setVideoVoiceActive]);
+
+  useEffect(() => {
+    void previewEngine.setPlan(plan).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:MixEngineLayer', caught); });
+  }, [plan]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      void previewEngine.play(useEditorStore.getState().playhead).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:MixEngineLayer', caught); });
+    } else {
+      previewEngine.pause();
+    }
+  }, [isPlaying]);
+
+  // ugrás lejátszás közben (scrub, hurok, kattintás a vonalzón): a motor onnan folytatja
+  useEffect(
+    () =>
+      useEditorStore.subscribe((st, prev) => {
+        if (st.playhead !== prev.playhead && previewEngine.isPlaying() && Math.abs(st.playhead - previewEngine.position()) > 0.15) {
+          previewEngine.seek(st.playhead);
+        }
+      }),
+    []
+  );
+  return null;
 }
 
 /** 📞 a megszakítás-figyelés ütemezése (a rendszer-szünet küszöbe 700 ms, `interruption.ts`) */

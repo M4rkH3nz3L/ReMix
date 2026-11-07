@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { Slider } from '@/components/studio/audio/primitives';
@@ -189,6 +190,8 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
             />
           ))}
         </View>
+        {/* ⭐ saját master-presetek (a halkítás kulcs-sávja a projekté marad) */}
+        <UserPresetRow kind="master" getValue={() => m} onApply={(v) => setM({ ...v, ...(m.duckTrigger ? { duckTrigger: m.duckTrigger } : {}) })} />
         <Stepper
           label={t('studio.master.lufs')}
           value={`${m.lufs} LUFS`}

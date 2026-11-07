@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
 import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
@@ -75,6 +76,7 @@ import { exportParts } from '@/components/studio/audio/exportParts';
 import { auditionDrum, auditionNote, lastStartMs, playPcm, previewLooping, previewPosition, stopPreview, warmPreview } from '@/lib/instrumentPreview';
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
+import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { renderSamplerToClip } from '@/lib/samplerClient';
@@ -3461,6 +3463,121 @@ function laneLabelFor(type: string, t: TFunction): string {
   return lane ? laneLabel(lane, t) : type;
 }
 
+/** kulcs-sorrendtől független JSON (szerkezeti egyezéshez) */
+function sortedJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+}
+
+/** ⭐ A klipszerkesztő presetsora (képernyőkép): beépített presetek alatt a saját. */
+async function smokePresetPhoto(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const backup = await AsyncStorage.getItem(USER_PRESETS_KEY);
+  try {
+    await AsyncStorage.removeItem(USER_PRESETS_KEY);
+    useUserPresets.setState({ list: [], loaded: false });
+    await useUserPresets.getState().save('clipFx', 'Meleg hang', { compressor: true, eq: { low: 2, mid: 0, high: -1 } });
+    await useUserPresets.getState().save('clipFx', 'Termi beszéd', { reverb: 0.5, highpass: 90 });
+    const id = 'prj_smoke_presetphoto';
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:presetphoto', caught));
+    const base = createEmptyProject('smoke preset-sor', '9:16', undefined, 'audio');
+    const vo: AudioClip = { kind: 'audio', id: 'vo', label: 'hang', uri: toneWav('smoke_presetphoto.wav', 3), start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+    await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [vo] } : t)) });
+    router.push(`/studio/audio/${id}` as Href);
+    const st = useEditorStore.getState;
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+      await sleep(200);
+    }
+    await sleep(1200);
+    st().selectClip('vo');
+    runDevAction('audio.editClip');
+    await sleep(1000);
+    runDevAction('clipEdit.scrollToPresets');
+    await sleep(400);
+    log(true, 'FOTÓZHATÓ', 'a klipszerkesztő: beépített presetek, alattuk a két saját (csillag) + Mentés');
+    await sleep(3000);
+    runDevAction('clipEdit.done');
+    router.back();
+  } finally {
+    if (backup !== null) await AsyncStorage.setItem(USER_PRESETS_KEY, backup);
+    else await AsyncStorage.removeItem(USER_PRESETS_KEY);
+    useUserPresets.setState({ list: [], loaded: false });
+  }
+}
+
+/** ⭐ Saját presetek: klip-effekt és dobminta mentése, alkalmazása, megmaradása „újraindítás” után, sérült tár. */
+async function smokeUserPresets(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // a teszteszköz meglévő presetjei a végén visszakerülnek
+  const backup = await AsyncStorage.getItem(USER_PRESETS_KEY);
+  await AsyncStorage.removeItem(USER_PRESETS_KEY);
+  useUserPresets.setState({ list: [], loaded: false });
+  try {
+    const id = 'prj_smoke_presets';
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:presets', caught));
+    const base = createEmptyProject('smoke presetek', '9:16', undefined, 'audio');
+    const fx = { compressor: true, reverb: 0.4, eq: { low: 2, mid: 0, high: 1 } };
+    const vo: AudioClip = { kind: 'audio', id: 'vo', label: 'hang', uri: toneWav('smoke_presets.wav', 4), start: 0, duration: 4, trimIn: 0, sourceDuration: 4, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported', audioFx: fx };
+    await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [vo] } : t)) });
+    router.push(`/studio/audio/${id}` as Href);
+    const st = useEditorStore.getState;
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+      await sleep(200);
+    }
+    await sleep(1200);
+    const clipFx = () => (st().project!.tracks.find((t) => t.type === 'voiceover')!.clips[0] as AudioClip).audioFx ?? {};
+    // klip-effekt: mentés → a klip effektjei törölve → alkalmazás → a „Kész” a klipre írja
+    st().selectClip('vo');
+    runDevAction('audio.editClip');
+    await sleep(800);
+    const saved = await runDevAction('presets.clipFx.saveAs');
+    runDevAction('clipEdit.done');
+    st().dispatch({ type: 'UPDATE_CLIP', clipId: 'vo', patch: { audioFx: {} } }, 'user');
+    await sleep(300);
+    runDevAction('audio.editClip');
+    await sleep(800);
+    const applied = runDevAction('presets.clipFx.applyFirst');
+    await sleep(300); // a lap az új effektekkel újrarajzol (mint egy valódi koppintás után)
+    runDevAction('clipEdit.done');
+    await sleep(300);
+    log(saved === true && applied === 'Füstteszt clipFx' && sortedJson(clipFx()) === sortedJson(fx), 'klip-effekt preset: mentés, a klip effektjei törölve, alkalmazás → a klipen újra a mentett lánc', JSON.stringify(clipFx()));
+    st().undo();
+    log(JSON.stringify(clipFx()) === '{}', 'az alkalmazás egy visszavonással visszavonható', JSON.stringify(clipFx()));
+    // dobminta
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    runDevAction('drums.demo');
+    await sleep(200);
+    const demo = runDevAction('drums.hits') as string;
+    await runDevAction('presets.drums.saveAs');
+    log(true, 'FOTÓZHATÓ', 'a dobgép a saját preset csillagos chipjével');
+    await sleep(2500);
+    runDevAction('audio.closeDrums');
+    await sleep(400);
+    // „újraindítás”: a memória üres, a tárból töltődik
+    useUserPresets.setState({ list: [], loaded: false });
+    await useUserPresets.getState().load();
+    const kinds = useUserPresets.getState().list.map((p) => p.kind).sort().join(',');
+    log(kinds === 'clipFx,drums', 'a presetek megmaradnak (a tárból újratöltve)', kinds);
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    const empty = runDevAction('drums.hits') as string;
+    runDevAction('presets.drums.applyFirst');
+    await sleep(200);
+    const back = runDevAction('drums.hits') as string;
+    log(empty === '' && back === demo && demo.length > 0, 'dobminta preset: az újranyitott üres gépen alkalmazva = a mentett ütem', `${demo.split(',').length} ütés`);
+    runDevAction('audio.closeDrums');
+    // sérült tár: csak az érvényes bejegyzés töltődik be
+    await AsyncStorage.setItem(USER_PRESETS_KEY, JSON.stringify([{ kind: 'clipFx', id: 'x', name: 'Jó', value: { gate: true } }, { kind: 'bad' }, 'x', { kind: 'master', id: 'm', name: 'M', value: { lufs: 'sok' } }]));
+    await useUserPresets.getState().load();
+    log(useUserPresets.getState().list.length === 1, 'sérült tár: csak az érvényes bejegyzés töltődik be, nincs összeomlás', `${useUserPresets.getState().list.length} preset`);
+    router.back();
+  } finally {
+    if (backup !== null) await AsyncStorage.setItem(USER_PRESETS_KEY, backup);
+    else await AsyncStorage.removeItem(USER_PRESETS_KEY);
+    useUserPresets.setState({ list: [], loaded: false });
+  }
+}
+
 /** 🎹🥁🎛️ Hangszerek offline: beégetés a telefonon (WAV = az előhallgatott PCM), élő előhallgatás, a dobgép szól. */
 async function smokeInstruments(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5345,6 +5462,14 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'presetphoto') {
+    await step(phase, () => smokePresetPhoto(log));
+    return;
+  }
+  if (phase === 'userpresets') {
+    await step(phase, () => smokeUserPresets(log));
     return;
   }
   if (phase === 'instruments') {

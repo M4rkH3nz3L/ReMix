@@ -4155,6 +4155,7 @@
       },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
+      "presets": {"save": "Speichern", "saveTitle": "Name des Presets", "defaultName": "Eigenes {{n}}", "rename": "Umbenennen", "hint": "Lange drücken: umbenennen oder löschen"},
       "sync": {
         "title": "Synchronisieren",
         "open": "Mit anderer Spur synchronisieren (externer Ton)",

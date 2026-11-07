@@ -211,7 +211,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -234,6 +234,8 @@ export function AudioStudioBody({
       registerDevAction('audio.speechUpgrade', () => devRef.current.speechUpgrade()),
       registerDevAction('audio.syncSelected', () => devRef.current.syncSelected()),
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
+      registerDevAction('audio.editClip', () => devRef.current.editClip()),
+      registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
       registerDevAction('audio.beatSplitBars', () => devRef.current.beatSplit('bar')),
       registerDevAction('audio.beatSplitBeats', () => devRef.current.beatSplit('beat')),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
@@ -417,7 +419,7 @@ export function AudioStudioBody({
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const ref = c ? syncCandidates(c)[0] : undefined;
     return c && ref ? runAudioSync(c, ref, fps, t, true) : null;
-  }, openDrums: () => setDrumMachine(true) };
+  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul

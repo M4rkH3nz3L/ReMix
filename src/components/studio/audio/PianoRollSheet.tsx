@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
 import { auditionNote } from '@/lib/instrumentPreview';
 import { padTo, renderSynthPcm } from '@/lib/instrumentRender';
@@ -94,6 +95,17 @@ export function PianoRollSheet({
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
       </View>
+
+      {/* ⭐ saját dallamok (hangjegyek + hullámforma + ütemszám) */}
+      <UserPresetRow
+        kind="synth"
+        getValue={() => (notes.length > 0 ? { bars, wave, notes: notes.map(({ id: _id, ...n }) => n) } : null)}
+        onApply={(v) => {
+          setBars(v.bars);
+          setWave(v.wave);
+          setNotes(v.notes.map((n) => ({ ...n, id: makeId('note') })));
+        }}
+      />
 
       {/* rács: függőleges (hangmagasság) + vízszintes (ütem) görgetés */}
       <ScrollView style={styles.gridV} contentContainerStyle={{ paddingBottom: 4 }}>

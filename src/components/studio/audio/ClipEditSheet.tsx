@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { registerDevAction } from '@/lib/devActions';
+import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { startSilenceSearch } from '@/components/studio/audio/SilenceReview';
 import { startSpeechEdit } from '@/components/studio/audio/SpeechEditBar';
@@ -160,6 +162,14 @@ export function ClipEditSheet({
     }
     onClose();
   };
+  // 🧪 füstteszt: a „Kész” (csak __DEV__)
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => registerDevAction('clipEdit.done', () => onDoneRef.current()), []);
+  // 🧪 a füstteszt a presetekhez görget (képernyőkép)
+  const scrollRef = useRef<ScrollView>(null);
+  const presetsY = useRef(0);
+  useEffect(() => registerDevAction('clipEdit.scrollToPresets', () => scrollRef.current?.scrollTo({ y: Math.max(0, presetsY.current - 40), animated: false })), []);
 
   return (
     <AudioSheetFrame id="clipEdit" onClose={onDone} sheetStyle={styles.sheet} tapToClose>
@@ -173,7 +183,7 @@ export function ClipEditSheet({
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         <RegionBar
           trimIn={trimIn}
           duration={duration}
@@ -351,7 +361,7 @@ export function ClipEditSheet({
           <Image source={{ uri: spectrumUri }} style={styles.spectrumImg} contentFit="contain" transition={120} />
         ) : null}
         {/* 🎙️✨ egy-koppintásos hang-FX presetek (a lenti szabályzókat előre beállítják) */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow} onLayout={(e) => (presetsY.current = e.nativeEvent.layout.y)}>
           {AUDIO_FX_PRESETS.map((p) => (
             <Pressable
               key={p.key}
@@ -364,6 +374,8 @@ export function ClipEditSheet({
             </Pressable>
           ))}
         </ScrollView>
+        {/* ⭐ saját presetek: a mostani effektek mentése, egy koppintással vissza */}
+        <UserPresetRow kind="clipFx" getValue={() => fx} onApply={(v) => proFx(() => setFx(JSON.parse(JSON.stringify(v))))} />
         {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
         <Slider
           label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}

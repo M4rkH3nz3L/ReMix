@@ -4150,6 +4150,7 @@
       },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
+      "presets": {"save": "Save", "saveTitle": "Preset name", "defaultName": "My preset {{n}}", "rename": "Rename", "hint": "Long press: rename or delete"},
       "sync": {
         "title": "Sync",
         "open": "Sync to another track (external audio)",

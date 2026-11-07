@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
 import { registerDevAction } from '@/lib/devActions';
 import { auditionDrum } from '@/lib/instrumentPreview';
@@ -59,6 +60,9 @@ export function DrumMachineSheet({
       }),
     []
   );
+  const patternRef = useRef(pattern);
+  patternRef.current = pattern;
+  useEffect(() => registerDevAction('drums.hits', () => patternHits(patternRef.current).map((h) => `${h.voice}${h.step}`).join(',')), []);
 
   const steps = stepCount(bars);
   const cols = Array.from({ length: steps }, (_, i) => i);
@@ -104,6 +108,16 @@ export function DrumMachineSheet({
         <View style={{ flex: 1 }} />
         <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
       </View>
+
+      {/* ⭐ saját dobminták */}
+      <UserPresetRow
+        kind="drums"
+        getValue={() => (hasHits(pattern) ? { bars, pattern } : null)}
+        onApply={(v) => {
+          setBars(v.bars);
+          setPattern(v.pattern);
+        }}
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View>

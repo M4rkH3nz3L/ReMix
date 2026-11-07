@@ -4150,6 +4150,7 @@
       },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
+      "presets": {"save": "Mentés", "saveTitle": "Preset neve", "defaultName": "Saját {{n}}", "rename": "Átnevezés", "hint": "Hosszan: átnevezés vagy törlés"},
       "sync": {
         "title": "Szinkron",
         "open": "Szinkron a másik sávhoz (külső hang)",

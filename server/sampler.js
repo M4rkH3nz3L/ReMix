@@ -32,7 +32,7 @@ function samplerFilterComplex(steps, opts = {}) {
     mixLabels.push(`d${i}`);
   });
   chains.push(
-    `${mixLabels.map((l) => `[${l}]`).join('')}amix=inputs=${n}:normalize=0,alimiter=limit=0.95[aout]`
+    `${mixLabels.map((l) => `[${l}]`).join('')}amix=inputs=${n}:normalize=0,alimiter=limit=0.95,apad[aout]`
   );
   return { fc: chains.join(';\n'), totalSec: Math.round(bars * STEPS_PER_BAR * s * 1000) / 1000 };
 }

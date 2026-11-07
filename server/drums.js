@@ -67,7 +67,8 @@ function drumFilterComplex(hits, opts = {}) {
   }
   const mix =
     `${labels.map((l) => `[${l}]`).join('')}amix=inputs=${labels.length}:duration=longest:normalize=0,` +
-    `alimiter=limit=0.95[aout]`;
+    // apad: a -t csak vág — a rács végéig csenddel kell kitölteni (különben a minta rövidebb a rácsnál)
+    `alimiter=limit=0.95,apad[aout]`;
   return { fc: [...chains, mix].join(';\n'), totalSec };
 }
 

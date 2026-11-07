@@ -47,10 +47,11 @@ function synthNoteChains(notes, opts = {}) {
     const dur = Math.max(0.05, (Number(nt.lengthBeats) || 1) * spb);
     const vel = Math.max(0, Math.min(1, (Number(nt.velocity) || 100) / 127));
     const startMs = Math.round(start * 1000);
-    // tiszta sine a `sine` szűrővel (legtisztább a frekvencia-méréshez), egyéb hullám aevalsrc-vel
+    // tiszta sine a `sine` szűrővel (legtisztább a frekvencia-méréshez), egyéb hullám aevalsrc-vel;
+    // a `sine` forrás amplitúdója 1/8 → ×4 = 0,5, mint a többi hullámé (a telefonos synth tükre)
     const src =
       wave === 'sine'
-        ? `sine=frequency=${f.toFixed(3)}:duration=${dur.toFixed(3)}:sample_rate=44100`
+        ? `sine=frequency=${f.toFixed(3)}:duration=${dur.toFixed(3)}:sample_rate=44100,volume=4`
         : `aevalsrc=exprs='${waveExpr(wave, f)}':s=44100:d=${dur.toFixed(3)}`;
     const atk = Math.min(0.008, dur / 4);
     const rel = Math.min(0.06, dur / 3);

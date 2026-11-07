@@ -2622,6 +2622,81 @@ async function smokeAudioReverse(log: Log) {
   }
 }
 
+/**
+ * 🎛️ Hangmotor-próba (#6/#7): a react-native-audio-api (natív Web Audio) gráfja. Offline:
+ * a StereoPanner és a BiquadFilter mintapontos hatása (L/R szint, szűrés). Valós időben: a gráf
+ * szól (analyser) és az órája a falióra szerint halad (master-órának alkalmas-e).
+ */
+async function smokeEngineSpike(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const api = await loadAudioApi();
+  if (!api) {
+    log(false, 'react-native-audio-api elérhető');
+    return;
+  }
+  const SR = 44100;
+  const rms = (x: Float32Array) => 10 * Math.log10(x.reduce((a, v) => a + v * v, 0) / x.length + 1e-30);
+  const A = api;
+  type Off = InstanceType<typeof A.OfflineAudioContext>;
+  const render = async (build: (ctx: Off, src: AudioNode) => AudioNode, freq: number) => {
+    const ctx = new A.OfflineAudioContext({ numberOfChannels: 2, length: SR, sampleRate: SR });
+    const buf = ctx.createBuffer(2, SR, SR);
+    const tone = Float32Array.from({ length: SR }, (_, i) => 0.5 * Math.sin((2 * Math.PI * freq * i) / SR));
+    buf.copyToChannel(tone, 0);
+    buf.copyToChannel(tone, 1);
+    const node = ctx.createBufferSource();
+    node.buffer = buf;
+    build(ctx, node as unknown as AudioNode).connect(ctx.destination);
+    node.start(0);
+    const out = await ctx.startRendering();
+    return [out.getChannelData(0).slice(), out.getChannelData(1).slice()];
+  };
+  type AudioNode = { connect: (n: unknown) => AudioNode };
+  // pan
+  for (const pan of [-1, -0.5, 0, 1]) {
+    const [l, r] = await render((ctx, src) => {
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      return src.connect(p);
+    }, 440);
+    log(null, `pan ${pan}`, `L ${rms(l).toFixed(1)} dB · R ${rms(r).toFixed(1)} dB`);
+  }
+  const [hl, hr] = await render((ctx, src) => { const p = ctx.createStereoPanner(); p.pan.value = -1; return src.connect(p); }, 440);
+  log(rms(hl) > -10 && rms(hr) < -60, 'pan −1: a hang csak balra szól', `L ${rms(hl).toFixed(1)} · R ${rms(hr).toFixed(1)} dB`);
+  // EQ: 5 kHz-es hang 500 Hz-es aluláteresztőn
+  const [dry] = await render((_ctx, src) => src, 5000);
+  const [wet] = await render((ctx, src) => { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 500; return src.connect(f); }, 5000);
+  log(rms(dry) - rms(wet) > 30, 'EQ (biquad): az 500 Hz-es aluláteresztő az 5 kHz-et elnyomja', `${(rms(dry) - rms(wet)).toFixed(1)} dB`);
+  // valós idő: szól + óra
+  const ctx = new api.AudioContext({ sampleRate: SR });
+  const buf = ctx.createBuffer(2, SR * 4, SR);
+  const tone = Float32Array.from({ length: SR * 4 }, (_, i) => 0.2 * Math.sin((2 * Math.PI * 440 * i) / SR));
+  buf.copyToChannel(tone, 0);
+  buf.copyToChannel(tone, 1);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const pan = ctx.createStereoPanner();
+  pan.pan.value = 0.6;
+  const an = ctx.createAnalyser();
+  src.connect(pan);
+  pan.connect(an);
+  an.connect(ctx.destination);
+  await ctx.resume();
+  src.start(ctx.currentTime + 0.05);
+  const c0 = ctx.currentTime;
+  const w0 = Date.now();
+  await sleep(600);
+  const td = new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(td);
+  log(rms(td) > -40, 'valós idő: a gráf szól (analyser a pan után)', `${rms(td).toFixed(1)} dB`);
+  await sleep(2400);
+  const dc = ctx.currentTime - c0;
+  const dw = (Date.now() - w0) / 1000;
+  log(Math.abs(dc - dw) < 0.03, 'valós idő: a hangóra a falióra szerint halad', `hang ${dc.toFixed(3)} s · fal ${dw.toFixed(3)} s`);
+  src.stop();
+  await ctx.close();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3780,6 +3855,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'enginespike') {
+    await step(phase, () => smokeEngineSpike(log));
     return;
   }
   if (phase === 'audioreverse') {

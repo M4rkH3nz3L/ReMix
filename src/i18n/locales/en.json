@@ -3949,6 +3949,10 @@
       "blend": { "normal": "Normal", "multiply": "Multiply", "screen": "Screen", "overlay": "Overlay", "softlight": "Soft light", "darken": "Darken", "lighten": "Lighten", "hardlight": "Hard light", "difference": "Difference", "exclusion": "Exclusion", "colordodge": "Color dodge", "colorburn": "Color burn" }
     },
     "audioTools": {
+      "beatSplitTitle": "Split on the grid",
+      "beatSplitBars": "Every bar",
+      "beatSplitBeats": "Every beat",
+      "beatSplitNone": "There is no beat boundary inside this clip.",
       "copy": "Copy",
       "paste": "Paste",
       "duplicate": "Duplicate",

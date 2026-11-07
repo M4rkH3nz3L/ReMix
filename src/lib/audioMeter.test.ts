@@ -1,4 +1,4 @@
-import { barsBeatsLabel, beatGridForView, meterLabel, nextMeter, snapSec } from '@/lib/audioTransport';
+import { barsBeatsLabel, beatGridForView, beatSplitTimes, meterLabel, nextMeter, snapSec } from '@/lib/audioTransport';
 
 describe('🎼 ütemjelzés', () => {
   it('3/4 @ 120 BPM: 3 negyed egy ütem', () => {
@@ -27,5 +27,17 @@ describe('🎼 ütemjelzés', () => {
     let m = nextMeter(undefined);
     for (let i = 0; i < 6; i++) m = nextMeter(m);
     expect(meterLabel(m)).toBe('4/4');
+  });
+});
+
+describe('✂️ beatSplitTimes', () => {
+  it('ütemenként 4/4 @ 120: 2 s-onként, a klip belsejében', () => {
+    expect(beatSplitTimes({ start: 0.5, duration: 6 }, 120, { beatsPerBar: 4, beatUnit: 4 }, 'bar')).toEqual([2, 4, 6]);
+  });
+  it('ütemrészenként 3/4: fél másodpercenként; a szélhez túl közel nem vág', () => {
+    expect(beatSplitTimes({ start: 0, duration: 2.02 }, 120, { beatsPerBar: 3, beatUnit: 4 }, 'beat')).toEqual([0.5, 1, 1.5]);
+  });
+  it('6/8: nyolcadonként', () => {
+    expect(beatSplitTimes({ start: 0, duration: 1 }, 120, { beatsPerBar: 6, beatUnit: 8 }, 'beat')).toEqual([0.25, 0.5, 0.75]);
   });
 });

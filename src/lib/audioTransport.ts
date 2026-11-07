@@ -218,3 +218,25 @@ export function followScrollX(playheadX: number, viewX: number, viewWidth: numbe
   return Math.max(0, Math.min(Math.max(0, contentWidth - viewWidth), target));
 }
 
+/**
+ * ✂️🥁 A klip vágáspontjai az ütemrácson (ütemenként vagy ütemrészenként), a klip belsejében —
+ * a széleihez `minSeg` mp-nél közelebb nem vág. A rács a projekt 0-jától indul (a BPM negyedre
+ * értendő, /8-nál az ütemrész a nyolcad).
+ */
+export function beatSplitTimes(
+  clip: { start: number; duration: number },
+  bpm: number | undefined,
+  meter: Meter,
+  every: 'bar' | 'beat',
+  minSeg = 0.05
+): number[] {
+  const unit = (secPerBeat(bpm) * 4) / meter.beatUnit;
+  const step = every === 'bar' ? unit * meter.beatsPerBar : unit;
+  const end = clip.start + clip.duration;
+  const out: number[] = [];
+  for (let k = Math.ceil((clip.start + minSeg) / step - 1e-9); k * step < end - minSeg + 1e-9; k++) {
+    out.push(Math.round(k * step * 1e6) / 1e6);
+  }
+  return out;
+}
+

@@ -33,6 +33,7 @@ import { buildAlbumVideoProject } from '@/lib/albumShare';
 import {
   barsBeatsLabel,
   beatGridForView,
+  beatSplitTimes,
   DEFAULT_BPM,
   DEFAULT_METER,
   meterLabel,
@@ -196,7 +197,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0 });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -208,6 +209,8 @@ export function AudioStudioBody({
       registerDevAction('audio.paste', () => devRef.current.paste()),
       registerDevAction('audio.duplicate', () => devRef.current.duplicate()),
       registerDevAction('audio.meter', () => devRef.current.meter()),
+      registerDevAction('audio.beatSplitBars', () => devRef.current.beatSplit('bar')),
+      registerDevAction('audio.beatSplitBeats', () => devRef.current.beatSplit('beat')),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
     ];
     return () => offs.forEach((off) => off());
@@ -269,6 +272,27 @@ export function AudioStudioBody({
       }
     }
     if (cmds.length > 0) st.applyBatch(cmds, 'user');
+  };
+
+  /** ✂️🥁 a kijelölt klip szétvágása az ütemrácson — egy undo-lépés; hátulról előre, mert a bal
+   *  darab tartja meg az azonosítót. @returns a vágások száma */
+  const beatSplitSelection = (every: 'bar' | 'beat'): number => {
+    const st = useEditorStore.getState();
+    const clip = st.allSelectedIds().length <= 1 ? selectedAudioClip(st.project, st.selectedClipId) : null;
+    if (!clip || !st.project) return 0;
+    const times = beatSplitTimes(clip, st.project.bpm ?? DEFAULT_BPM, st.project.timeSignature ?? DEFAULT_METER, every);
+    const cmds: EditorCommand[] = times.reverse().map((time) => ({ type: 'SPLIT_CLIP', clipId: clip.id, time }));
+    return cmds.length > 0 ? st.applyBatch(cmds, 'user') : 0;
+  };
+  const askBeatSplit = () => {
+    const run = (every: 'bar' | 'beat') => {
+      if (beatSplitSelection(every) === 0) Alert.alert(t('studio.audioTools.beatSplitTitle'), t('studio.audioTools.beatSplitNone'));
+    };
+    Alert.alert(t('studio.audioTools.beatSplitTitle'), `${bpm} BPM · ${meterLabel(meter)}`, [
+      { text: t('studio.audioTools.beatSplitBars'), onPress: () => run('bar') },
+      { text: t('studio.audioTools.beatSplitBeats'), onPress: () => run('beat') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   /** ➕ új hangsáv a következő szabad helyre (undo-zható) */
@@ -354,7 +378,7 @@ export function AudioStudioBody({
     setFitPps(fitPxPerSec(view.w || 1200, duration));
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   };
-  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true), copy: copySelection, paste: pasteAtPlayhead, duplicate: duplicateSelection, meter: () => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) }) };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true), copy: copySelection, paste: pasteAtPlayhead, duplicate: duplicateSelection, meter: () => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) }), beatSplit: beatSplitSelection };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -1056,6 +1080,7 @@ export function AudioStudioBody({
           onAdd={() => setAdding(true)}
           onRecord={toggleRecord}
           onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
+          onBeatSplit={() => selClip && askBeatSplit()}
           onEdit={() => selClip && setEditing(true)}
           onDelete={() => selClip && useEditorStore.getState().removeSelectedClips()}
           onMixer={() => setMixerOpen(true)}

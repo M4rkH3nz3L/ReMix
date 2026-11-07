@@ -17,6 +17,7 @@ export function AudioStudioToolbar({
   onAdd,
   onRecord,
   onSplit,
+  onBeatSplit,
   onEdit,
   onDelete,
   onMixer,
@@ -30,6 +31,8 @@ export function AudioStudioToolbar({
   onAdd: () => void;
   onRecord: () => void;
   onSplit: () => void;
+  /** ✂️🥁 hosszú nyomás: vágás az ütemrácson */
+  onBeatSplit: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onMixer: () => void;
@@ -48,7 +51,7 @@ export function AudioStudioToolbar({
         onPress={onRecord}
         danger={isRecording}
       />
-      <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={onSplit} disabled={!hasSelection} />
+      <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={onSplit} onLongPress={onBeatSplit} disabled={!hasSelection} />
       <Tool icon="copy-outline" label={t('studio.audioTools.copy')} onPress={onCopy} disabled={!hasSelection} />
       <Tool icon="clipboard-outline" label={t('studio.audioTools.paste')} onPress={onPaste} disabled={!canPaste} />
       <Tool icon="duplicate-outline" label={t('studio.audioTools.duplicate')} onPress={onDuplicate} disabled={!hasSelection} />
@@ -63,18 +66,20 @@ function Tool({
   icon,
   label,
   onPress,
+  onLongPress,
   disabled,
   danger,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  onLongPress?: () => void;
   disabled?: boolean;
   danger?: boolean;
 }) {
   const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
   return (
-    <Pressable style={styles.tool} onPress={onPress} disabled={disabled}>
+    <Pressable style={styles.tool} onPress={onPress} onLongPress={onLongPress} disabled={disabled}>
       <Ionicons name={icon} size={22} color={color} />
       <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]}>{label}</Text>
     </Pressable>

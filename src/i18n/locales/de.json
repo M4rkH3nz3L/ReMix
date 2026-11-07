@@ -3954,6 +3954,10 @@
       "blend": { "normal": "Normal", "multiply": "Multiplizieren", "screen": "Negativ mult.", "overlay": "Überlagern", "softlight": "Weiches Licht", "darken": "Abdunkeln", "lighten": "Aufhellen", "hardlight": "Hartes Licht", "difference": "Differenz", "exclusion": "Ausschluss", "colordodge": "Farbig abwedeln", "colorburn": "Farbig nachbelichten" }
     },
     "audioTools": {
+      "beatSplitTitle": "Am Raster teilen",
+      "beatSplitBars": "Jeden Takt",
+      "beatSplitBeats": "Jeden Schlag",
+      "beatSplitNone": "In diesem Clip liegt keine Taktgrenze.",
       "copy": "Kopieren",
       "paste": "Einfügen",
       "duplicate": "Duplizieren",

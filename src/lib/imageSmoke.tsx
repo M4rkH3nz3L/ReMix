@@ -63,7 +63,7 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
-import { barsBeatsLabel } from '@/lib/audioTransport';
+import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { canSegment, LongSource } from '@/lib/longSource';
 import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
@@ -3426,6 +3426,61 @@ async function smokeMeter(log: Log) {
   router.back();
 }
 
+/** ✂️🥁 Vágás az ütemrácson: 3/4 @ 120 — darabszám, határok a rácson, egy undo, a hang változatlan. */
+async function smokeBeatSplit(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const uri = toneWav('smoke_beatsplit.wav', 8);
+  const id = 'prj_smoke_beatsplit';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:beatsplit', caught));
+  const base = createEmptyProject('smoke ütem-vágás', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'bs', uri, label: 'dal', start: 0.3, duration: 8, trimIn: 0, sourceDuration: 8, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const meter = { beatsPerBar: 3, beatUnit: 4 as const };
+  const project: Project = { ...base, id, bpm: 120, timeSignature: meter, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  const clips = () => (st().project?.tracks.find((t) => t.type === 'music')?.clips ?? []).slice().sort((a, b) => a.start - b.start);
+  st().selectClip('bs');
+  const nBars = runDevAction('audio.beatSplitBars') as number;
+  const bars = clips();
+  const cuts = bars.slice(1).map((x) => x.start);
+  log(nBars === 5 && bars.length === 6, 'ütemenként (3/4 @ 120 = 1,5 s): 5 vágás → 6 darab', `${nBars} vágás, ${bars.length} darab`);
+  log(cuts.every((x, i) => Math.abs(x - 1.5 * (i + 1)) < 1e-6), 'a határok az ütemvonalakon', cuts.join(' · '));
+  const seamless = bars.every((x, i) => i === 0 || Math.abs(bars[i - 1].start + bars[i - 1].duration - x.start) < 1e-6);
+  const trims = bars.every((x) => x.kind === 'audio' && Math.abs((x.trimIn ?? 0) - (x.start - 0.3)) < 1e-6);
+  log(seamless && trims && bars[0].id === 'bs', 'hézag nélkül, a forrás-pozíció (trimIn) folytonos, az első darab tartja az azonosítót', `${bars.map((x) => x.duration.toFixed(2)).join('+')} s`);
+  const split = { ...project, tracks: st().project!.tracks };
+  const render = async (p: Project, name: string) => {
+    const { uri: out } = await exportOfflineWav(p, new File(projectExportDir(), name));
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0);
+    new File(out).delete();
+    return y;
+  };
+  const whole = await render(project, 'smoke_bs_whole.wav');
+  const parts = await render(split, 'smoke_bs_split.wav');
+  let diff = 0;
+  for (let i = 0; i < Math.min(whole.length, parts.length); i++) diff = Math.max(diff, Math.abs(whole[i] - parts[i]));
+  log(whole.length === parts.length && diff < 1e-4, 'a vágás nem hallható: a darabolt export = az egész klip exportja', `max eltérés ${diff.toExponential(1)}, ${parts.length} minta`);
+  st().undo();
+  log(clips().length === 1 && clips()[0].duration === 8, 'egyetlen visszavonás visszaállítja az egész klipet', `${clips().length} klip`);
+  st().selectClip('bs');
+  const nBeats = runDevAction('audio.beatSplitBeats') as number;
+  const expect = beatSplitTimes(c, 120, meter, 'beat').length;
+  log(nBeats === 16 && nBeats === expect && clips().length === 17, 'ütemrészenként (0,5 s): 0,5 … 8,0 → 16 vágás, 17 darab', `${nBeats} vágás, ${clips().length} darab`);
+  st().undo();
+  st().selectClip('bs');
+  runDevAction('audio.beatSplitBars');
+  runDevAction('audio.fit');
+  log(true, 'FOTÓZHATÓ', '6 darab a 3/4-es ütemvonalakon');
+  await sleep(4000);
+  router.back();
+}
+
 /** 🔁 Loop-klip: 1 s-os minta 4 s-ig ismétlődik (export + motor), a jobb él a forráson túl húzható. */
 async function smokeLoopClip(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4640,6 +4695,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'beatsplit') {
+    await step(phase, () => smokeBeatSplit(log));
     return;
   }
   if (phase === 'loopclip') {

@@ -131,13 +131,14 @@ export async function exportOfflineWav(
 type AudioApi = NonNullable<Awaited<ReturnType<typeof loadAudioApi>>>;
 
 /** a natív nyújtás egy futása: `input` csatornái `speed`-del, `length` kimeneti mintára */
-async function renderStretched(api: AudioApi, input: Float32Array[], speed: number, length: number, sr: number): Promise<Float32Array[]> {
+async function renderStretched(api: AudioApi, input: Float32Array[], speed: number, length: number, sr: number, cents = 0): Promise<Float32Array[]> {
   const ctx = new api.OfflineAudioContext({ numberOfChannels: input.length, length: Math.max(1, length), sampleRate: sr });
   const buf = ctx.createBuffer(input.length, Math.max(1, input[0].length), sr);
   input.forEach((ch, c) => buf.copyToChannel(ch as Float32Array<ArrayBuffer>, c));
   const node = ctx.createBufferSource({ pitchCorrection: true });
   node.buffer = buf;
   node.playbackRate.value = speed;
+  node.detune.value = cents;
   node.connect(ctx.destination);
   node.start(0);
   const out = await ctx.startRendering();
@@ -149,48 +150,51 @@ async function renderStretched(api: AudioApi, input: Float32Array[], speed: numb
  * ~115 ms (iPad), tehát sebességfüggő. Egy rövid kattanás nyújtása után a kimenet csúcsa és a
  * várt helye közti különbség; sebességenként egyszer.
  */
-const latencyCache = new Map<number, number>();
-/** 🧪 füstteszt: a mért késés (minta) és a kattanás-kimenet csúcsa */
-export async function measureStretchLatency(speed: number): Promise<number | null> {
+/** 🧪 füstteszt: a mért késés (minta) */
+export async function measureStretchLatency(speed: number, cents = 0): Promise<number | null> {
   const api = await loadAudioApi();
-  return api ? stretchLatency(api, speed, OFFLINE_SAMPLE_RATE) : null;
+  return api ? stretchLatency(api, speed, OFFLINE_SAMPLE_RATE, cents) : null;
 }
 
-async function stretchLatency(api: AudioApi, speed: number, sr: number): Promise<number> {
-  const cached = latencyCache.get(speed);
+const latencyCache = new Map<string, number>();
+async function stretchLatency(api: AudioApi, speed: number, sr: number, cents = 0): Promise<number> {
+  const id = `${speed}|${cents}`;
+  const cached = latencyCache.get(id);
   if (cached !== undefined) {
     return cached;
   }
   const at = Math.round(0.25 * sr);
   const click = new Float32Array(Math.round(1 * sr));
   for (let i = 0; i < 32; i++) click[at + i] = Math.sin((Math.PI * i) / 32);
-  const out = (await renderStretched(api, [click], speed, Math.round((1 / speed + 0.5) * sr), sr))[0];
+  const out = (await renderStretched(api, [click], speed, Math.round((1 / speed + 0.5) * sr), sr, cents))[0];
   let peak = 0;
   for (let i = 1; i < out.length; i++) if (Math.abs(out[i]) > Math.abs(out[peak])) peak = i;
   const latency = Math.max(0, peak - Math.round(at / speed));
-  latencyCache.set(speed, latency);
+  latencyCache.set(id, latency);
   return latency;
 }
 
 /**
  * Egy szakasz nyújtása: a natív `OfflineAudioContext` hangmagasság-tartó (`pitchCorrection`)
- * forrása `speed`-del játssza le a kivágott (és igény szerint megfordított) ablakot. A nyújtó
+ * forrása `speed`-del játssza le a kivágott (és igény szerint megfordított) ablakot, a
+ * hangmagasságot `detune` tolja el (a hossz marad — eszközön mérve). A nyújtó
  * késleltetését kompenzáljuk: a kimenet elejéről a késés leesik, a bemenet a végén ennyivel
  * hosszabb — így a kimenet pontosan `duration` hosszú és a helyén szól.
  */
 export async function stretchSegment(api: AudioApi, src: DecodedSource, job: StretchJob): Promise<DecodedSource> {
   const sr = src.sampleRate;
   const n = Math.max(1, Math.round(job.sourceSec * sr));
-  if (job.speed === 1) {
+  const cents = Math.round((job.pitch ?? 0) * 100);
+  if (job.speed === 1 && cents === 0) {
     return { channels: sliceSource(src.channels, Math.round(job.from * sr), n, job.reversed), sampleRate: sr };
   }
-  const lat = await stretchLatency(api, job.speed, sr);
+  const lat = await stretchLatency(api, job.speed, sr, cents);
   // a kimenet `lat` mintával késik: elejéről ennyi esik le, ezért a bemenet a VÉGÉN hosszabb
   // (a forrás következő részével; a megfordított ablaké a forrásban előtte van)
   const extra = Math.round(lat * job.speed);
   const from = Math.round(job.from * sr);
   const slice = job.reversed ? sliceSource(src.channels, from - extra, n + extra, true) : sliceSource(src.channels, from, n + extra, false);
   const outLen = Math.round(job.duration * sr);
-  const out = await renderStretched(api, slice, job.speed, outLen + lat, sr);
+  const out = await renderStretched(api, slice, job.speed, outLen + lat, sr, cents);
   return { channels: out.map((ch) => ch.slice(lat, lat + outLen)), sampleRate: sr };
 }

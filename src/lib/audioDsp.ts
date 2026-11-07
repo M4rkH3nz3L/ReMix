@@ -389,7 +389,7 @@ export class Haas implements Processor {
 const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** a közös DSP-ben már megvalósított effektek */
-const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide']);
+const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide', 'pitchSemitones', 'harmony']);
 
 /** van-e a klipen olyan effekt, amit a közös DSP még nem tud (akkor a régi úton szól) */
 export function fxUnsupported(fx: AudioFx | undefined): boolean {

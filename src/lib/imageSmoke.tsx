@@ -2484,6 +2484,14 @@ async function smokeOfflineStretch(log: Log) {
     log(Math.abs(slow.dur - 4) < 0.01 && Math.abs(s1 - 440) < 8 && Math.abs(s2 - 880) < 8, '0,5×: hossz és hangmagasság', `${slow.dur.toFixed(3)} s, ${s1.toFixed(0)} → ${s2.toFixed(0)} Hz`);
     const sw2 = switchAt(slow.x, 1.7, 2.3);
     log(Math.abs(sw2 - 2) < 0.04, '0,5×: a hangváltás a helyén', `${sw2.toFixed(3)} s (várt 2,000)`);
+    // 🎚️ hangmagasság +7 félhang (a hossz marad): 440 → 659 Hz, 880 → 1319 Hz, a váltás a helyén
+    const up = await run('smoke_pitch_7', { start: 0, duration: 4, audioFx: { pitchSemitones: 7 } });
+    const u1 = freqAt(up.x, 0.3, 1.7);
+    const u2 = freqAt(up.x, 2.3, 3.7);
+    log(up.unsupported.length === 0 && Math.abs(u1 - 659.3) < 8 && Math.abs(u2 - 1318.5) < 12, 'hangmagasság +7: 440 → 659, 880 → 1319 Hz', `${u1.toFixed(0)} → ${u2.toFixed(0)} Hz, ${up.dur.toFixed(3)} s`);
+    let usw = Number.NaN;
+    for (let t = 1.7; t < 2.3 && Number.isNaN(usw); t += 0.005) if (freqAt(up.x, t, t + 0.02) > 990) usw = t + 0.01;
+    log(Math.abs(usw - 2) < 0.04, 'hangmagasság: a váltás a helyén (a nyújtó késése kalibrálva)', `${usw.toFixed(3)} s (várt 2,000)`);
   } finally {
     src.delete();
   }
@@ -2876,6 +2884,34 @@ async function smokeEngineFx(log: Log) {
   const stats = previewEngine.takeStats();
   log(stats.late === 0 && stats.minLeadMs > 20, 'valós időben, akadás nélkül (3 sáv × teljes lánc)', `${stats.chunks} szelet, ${stats.late} késett, legkisebb előny ${stats.minLeadMs.toFixed(0)} ms`);
   router.back();
+}
+
+/** 🎚️ Próba: a natív nyújtó `detune`-ja hangmagasság-tartással (pitch eltolás, hossz marad?). */
+async function smokePitchSpike(log: Log) {
+  const api = await loadAudioApi();
+  const SR = 44100;
+  const tone = Float32Array.from({ length: 2 * SR }, (_, i) => 0.4 * Math.sin((2 * Math.PI * 440 * i) / SR));
+  const freq = (x: Float32Array, a: number, b: number) => {
+    let n = 0;
+    for (let i = Math.round(a * SR) + 1; i < Math.round(b * SR); i++) if ((x[i - 1] < 0) !== (x[i] < 0)) n++;
+    return n / 2 / (b - a);
+  };
+  for (const cents of [1200, 700, -500]) {
+    const ctx = new api!.OfflineAudioContext({ numberOfChannels: 1, length: 2 * SR, sampleRate: SR });
+    const buf = ctx.createBuffer(1, 2 * SR, SR);
+    buf.copyToChannel(tone, 0);
+    const node = ctx.createBufferSource({ pitchCorrection: true });
+    node.buffer = buf;
+    node.detune.value = cents;
+    node.connect(ctx.destination);
+    node.start(0);
+    const out = (await ctx.startRendering()).getChannelData(0).slice();
+    const want = 440 * Math.pow(2, cents / 1200);
+    const f = freq(out, 0.3, 1.7);
+    let lastLoud = 0;
+    for (let i = 0; i < out.length; i++) if (Math.abs(out[i]) > 0.05) lastLoud = i;
+    log(Math.abs(f - want) < 6, `detune ${cents} cent: ${want.toFixed(0)} Hz várt`, `${f.toFixed(1)} Hz, hang vége ${(lastLoud / SR).toFixed(3)} s`);
+  }
 }
 
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
@@ -4042,6 +4078,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'pitchspike') {
+    await step(phase, () => smokePitchSpike(log));
     return;
   }
   if (phase === 'enginefx') {

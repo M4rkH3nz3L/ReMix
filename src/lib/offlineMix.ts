@@ -70,6 +70,8 @@ export interface OfflineMixClip {
   speed: number;
   /** ⏪ a forrás-ablak visszafelé szól (a videóklip `reversed`-je) */
   reversed: boolean;
+  /** 🎚️ hangmagasság-eltolás félhangban (a hossz marad); 0 = nincs */
+  pitch: number;
 }
 
 export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master' | 'videoSpeed';
@@ -78,6 +80,11 @@ export interface OfflineMixPlan {
   duration: number;
   clips: OfflineMixClip[];
   unsupported: OfflineUnsupported[];
+}
+
+/** a klip hangmagasság-eltolása félhangban, a szerverrel azonosan ±12-re szorítva */
+function pitchOf(semitones: number | undefined): number {
+  return Math.max(-12, Math.min(12, Math.round(semitones ?? 0)));
 }
 
 /** A keverés terve a (`mixForExport` utáni) projektből. */
@@ -97,7 +104,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       if (clip.voiceEnhance) unsupported.add('voiceEnhance');
       if (clip.deReverb) unsupported.add('deReverb');
       if (clip.autoDuck) unsupported.add('autoDuck');
-      clips.push({
+      const main: OfflineMixClip = {
         id: clip.id,
         ...(fxActive(clip.audioFx) ? { fx: clip.audioFx } : {}),
         track: track.type,
@@ -114,7 +121,23 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         gain,
         speed: audioSpeedOf(clip),
         reversed: !!clip.reversed,
-      });
+        pitch: pitchOf(clip.audioFx?.pitchSemitones),
+      };
+      clips.push(main);
+      // 🎵 harmónia (a szerver tükre): a klip MELLÉ egy eltolt, 0,7-szeres másodhang, a felhasználói
+      // fade-ekkel; a teljes eltolás (klip + harmónia) ±12 félhangra szorítva
+      const harm = Math.round(clip.audioFx?.harmony ?? 0);
+      if (harm !== 0) {
+        clips.push({
+          ...main,
+          id: `${clip.id}#harmonia`,
+          pitch: pitchOf(Math.round(clip.audioFx?.pitchSemitones ?? 0) + harm),
+          volume: main.volume * 0.7,
+          volumeKf: main.volumeKf?.map((k) => ({ ...k, value: k.value * 0.7 })),
+          fadeIn: clip.fadeIn,
+          fadeOut: clip.fadeOut,
+        });
+      }
     }
   }
   clips.push(...videoAudioClips(project, unsupported));
@@ -339,6 +362,7 @@ export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupp
       gain: 1,
       speed,
       reversed: !!v.reversed,
+      pitch: 0,
     });
   }
   return out;
@@ -357,6 +381,8 @@ export interface StretchJob {
   duration: number;
   speed: number;
   reversed: boolean;
+  /** 🎚️ hangmagasság-eltolás félhangban (a hossz marad) */
+  pitch: number;
 }
 
 /**
@@ -366,14 +392,14 @@ export interface StretchJob {
 export function stretchJobs(plan: OfflineMixPlan): { jobs: StretchJob[]; plan: OfflineMixPlan } {
   const jobs = new Map<string, StretchJob>();
   const clips = plan.clips.map((c) => {
-    if (c.speed === 1 && !c.reversed) {
+    if (c.speed === 1 && !c.reversed && c.pitch === 0) {
       return c;
     }
-    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}`;
+    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}|${c.pitch}`;
     if (!jobs.has(key)) {
-      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed });
+      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed, pitch: c.pitch });
     }
-    return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false };
+    return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false, pitch: 0 };
   });
   return { jobs: [...jobs.values()], plan: { ...plan, clips } };
 }

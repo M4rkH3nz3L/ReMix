@@ -1,4 +1,4 @@
-import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains } from '@/lib/offlineMix';
+import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs } from '@/lib/offlineMix';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -100,6 +100,20 @@ describe('offlineMix (A26)', () => {
     for (let i = 0; i < n; i++) maxDiff = Math.max(maxDiff, Math.abs(preview[0][i] - exported[0][i]), Math.abs(preview[1][i] - exported[1][i]));
     expect(maxDiff).toBeLessThan(1e-6);
     expect(preview[0].some((v) => v !== 0)).toBe(true);
+  });
+
+  it('🎚️🎵 hangmagasság és harmónia: a harmónia második hang (0,7×, a felhasználói fade-ekkel), ±12-re szorítva', () => {
+    const p = project([clip({ id: 'h', fadeIn: 0.3, fadeOut: 0.4, volume: 0.8, audioFx: { pitchSemitones: 3, harmony: 7 } })]);
+    const plan = offlineMixPlan(p);
+    expect(plan.unsupported).toEqual([]);
+    const [main, harm] = plan.clips;
+    expect(main).toMatchObject({ id: 'h', pitch: 3, volume: 0.8 });
+    expect(harm).toMatchObject({ id: 'h#harmonia', pitch: 10, fadeIn: 0.3, fadeOut: 0.4 });
+    expect(harm.volume).toBeCloseTo(0.56);
+    const clamped = offlineMixPlan(project([clip({ id: 'x', audioFx: { pitchSemitones: 10, harmony: 7 } })])).clips[1];
+    expect(clamped.pitch).toBe(12);
+    const { jobs } = stretchJobs(plan);
+    expect(jobs.map((j) => j.pitch).sort((a, b) => a - b)).toEqual([3, 10]);
   });
 });
 

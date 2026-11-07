@@ -7,7 +7,7 @@ import { Biquad } from '@/lib/audioDsp';
  */
 
 /** a K-súlyozás két szakasza tetszőleges mintavételre (a szabvány analóg paramétereiből, RBJ) */
-function kWeighting(sr: number): Biquad[] {
+export function kWeighting(sr: number): Biquad[] {
   // 1. magas-polc: f0 ≈ 1682 Hz, +4 dB, Q ≈ 0,7072
   const f0 = 1681.974450955533;
   const G = 3.999843853973347;

@@ -4155,6 +4155,7 @@
       },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
+      "check": {"open": "Ton prüfen", "title": "Tonprüfung", "working": "Ton wird geprüft…", "summary": "Lautheit {{lufs}} LUFS · Spitze {{peak}} · {{dur}}", "ok": "Keine Probleme gefunden — der Mix ist exportbereit.", "kind": {"clipping": "Übersteuerung: das Signal liegt an der Grenze (kann verzerren)", "loudness": "Lautheit {{lufs}} LUFS — {{dir}} als das Ziel {{target}} LUFS", "silence": "Lange Stille ({{sec}} s)", "phase": "Phasenauslöschung: links und rechts gegenphasig (in Mono leiser)", "missing": "Fehlende Audiodatei (Spur {{track}}) — wird ausgelassen", "muted": "Spur {{track}} ist stumm — fehlt im Export", "solo": "Solo ist aktiv — Spur {{track}} fehlt im Export", "zeroVolume": "Stummer Clip auf Spur {{track}} (Lautstärke 0)", "sliver": "Schnittrest auf Spur {{track}} ({{ms}} ms)", "empty": "Nichts hörbar — alle Spuren stumm oder leer"}, "dir": {"quiet": "leiser", "loud": "lauter"}},
       "presets": {"save": "Speichern", "saveTitle": "Name des Presets", "defaultName": "Eigenes {{n}}", "rename": "Umbenennen", "hint": "Lange drücken: umbenennen oder löschen"},
       "sync": {
         "title": "Synchronisieren",

@@ -4150,6 +4150,7 @@
       },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
+      "check": {"open": "Check audio", "title": "Audio check", "working": "Checking the audio…", "summary": "Loudness {{lufs}} LUFS · peak {{peak}} · {{dur}}", "ok": "No problems found — the mix is ready to export.", "kind": {"clipping": "Clipping: the signal hits the ceiling (may distort)", "loudness": "Loudness {{lufs}} LUFS — {{dir}} than the {{target}} LUFS target", "silence": "Long silence ({{sec}} s)", "phase": "Phase cancellation: left and right are opposite (drops out in mono)", "missing": "Missing audio file ({{track}} track) — left out", "muted": "The {{track}} track is muted — left out of the export", "solo": "Solo is on — the {{track}} track is left out of the export", "zeroVolume": "Silent clip on the {{track}} track (volume 0)", "sliver": "Leftover sliver on the {{track}} track ({{ms}} ms)", "empty": "Nothing audible — every track is muted or empty"}, "dir": {"quiet": "quieter", "loud": "louder"}},
       "presets": {"save": "Save", "saveTitle": "Preset name", "defaultName": "My preset {{n}}", "rename": "Rename", "hint": "Long press: rename or delete"},
       "sync": {
         "title": "Sync",

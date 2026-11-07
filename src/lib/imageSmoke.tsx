@@ -77,6 +77,8 @@ import { auditionDrum, auditionNote, lastStartMs, playPcm, previewLooping, previ
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
+import type { CheckIssue } from '@/lib/audioCheck';
+import { runAudioCheck } from '@/lib/audioCheckClient';
 import { renderSynthToClip } from '@/lib/synthClient';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { renderSamplerToClip } from '@/lib/samplerClient';
@@ -3468,6 +3470,92 @@ function sortedJson(v: unknown): string {
   return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 }
 
+/** 🩺 Hangellenőrzés: egy szándékosan hibás projekt minden hibája a helyén, a hangosság = a WAV-exporté; a jó projekt hibátlan. */
+async function smokeAudioCheck(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const wav = (name: string, sec: number, amp: number, invertRight = false) => {
+    const x = Float32Array.from({ length: Math.round(sec * SR) }, (_, i) => amp * Math.sin((2 * Math.PI * 330 * i) / SR));
+    const f = new File(Paths.document, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, invertRight ? x.map((v) => -v) : x], SR, () => 0.5));
+    return f.uri;
+  };
+  const loud = wav('smoke_chk_loud.wav', 3, 0.7);
+  const anti = wav('smoke_chk_anti.wav', 2, 0.4, true);
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', uri: loud, start: 0, duration: 3, sourceDuration: 3, id: 'x', ...over });
+  const id = 'prj_smoke_check';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:check', caught));
+  const base = createEmptyProject('smoke hangellenőrzés', '9:16', undefined, 'audio');
+  const bad: Project = {
+    ...base,
+    id,
+    tracks: base.tracks.map((t) =>
+      t.type === 'voiceover'
+        ? { ...t, clips: [ac({ id: 'a' }), ac({ id: 'ph', uri: anti, start: 8, duration: 2, sourceDuration: 2 }), ac({ id: 'sl', start: 10.2, duration: 0.05 })] }
+        : t.type === 'sfx'
+          ? { ...t, clips: [ac({ id: 'b', start: 2, duration: 2 }), ac({ id: 'gone', uri: 'file:///nincs/ilyen.wav', start: 4.5, duration: 1 }), ac({ id: 'z', start: 10.5, duration: 1, volume: 0 })] }
+          : t.type === 'music'
+            ? { ...t, clips: [ac({ id: 'm', start: 10, duration: 2 })] }
+            : t
+    ),
+  };
+  await saveProject(bad);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  if (!st().mutedTracks.includes('music')) st().toggleTrackFlag('music', 'mute');
+  const t0 = Date.now();
+  const issues = ((await runDevAction('audio.runCheck')) as CheckIssue[] | null) ?? [];
+  const ms = Date.now() - t0;
+  const at = (k: string) => issues.find((i) => i.kind === k);
+  const near = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) <= 0.11;
+  log(near(at('clipping')?.start, 2) && near(at('clipping')?.end, 3), 'túlvezérlés a két átfedő hang alatt (2–3 s)', `${at('clipping')?.start?.toFixed(2)}–${at('clipping')?.end?.toFixed(2)} s`);
+  log(near(at('silence')?.start, 4) && near(at('silence')?.end, 8), 'hosszú csend (4–8 s: a 4 s-nál véget érő hang és a 8 s-nál induló közt; a hiányzó fájl helyén is)', `${at('silence')?.start?.toFixed(2)}–${at('silence')?.end?.toFixed(2)} s`);
+  log(near(at('phase')?.start, 8) && near(at('phase')?.end, 10), 'fázis-kioltás (8–10 s)', `${at('phase')?.start}–${at('phase')?.end} s`);
+  log(at('missing')?.start === 4.5 && at('sliver')?.start === 10.2 && at('zeroVolume')?.start === 10.5 && at('muted')?.params?.track === 'music', 'szerkezeti: hiányzó fájl (4,5 s), vágási maradék (10,2 s), néma klip (10,5 s), némított zene-sáv', issues.map((i) => i.kind).join(', '));
+  log(issues.findIndex((i) => i.severity === 'warn') > issues.findIndex((i) => i.severity === 'error') && issues.filter((i) => i.severity === 'error').every((i, k, a) => k === 0 || (a[k - 1].start ?? -1) <= (i.start ?? -1)), 'a lista: hibák elöl, időrendben', `${issues.length} tétel, ${ms} ms alatt`);
+  log(true, 'FOTÓZHATÓ', 'a hangellenőrzés eredmény-lapja');
+  await sleep(3000);
+  runDevAction('audio.closeCheck');
+  // a mért hangosság = a WAV-exporté (ugyanaz a keverés)
+  const mix = mixForExport(st().project!, st().isTrackAudible, st().masterVolume)!;
+  const playable = { ...mix, tracks: mix.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== 'gone') })) };
+  const out = await exportOfflineWav(playable, new File(projectExportDir(), 'smoke_chk.wav'), undefined, undefined, 'float32');
+  const buf = await (await loadAudioApi())!.decodeAudioData(out.uri, SR);
+  const ref = integratedLoudness(buf.getChannelData(0), buf.getChannelData(1), SR);
+  new File(out.uri).delete();
+  const measured = (await runAudioCheck(st().project!, { isTrackAudible: st().isTrackAudible, masterVolume: st().masterVolume, mutedTracks: st().mutedTracks, soloTracks: st().soloTracks })).stats!.lufs;
+  log(Math.abs(measured - ref) < 0.01, 'a mért hangosság = a WAV-export hangossága (BS.1770)', `${measured.toFixed(3)} / ${ref.toFixed(3)} LUFS`);
+  st().toggleTrackFlag('music', 'mute');
+  router.back();
+  await sleep(800);
+  // a jó projekt (masterrel): nincs hiba
+  const id2 = 'prj_smoke_check_ok';
+  await deleteProject(id2).catch((caught) => logCaught('lib/imageSmoke.tsx:check2', caught));
+  const good: Project = {
+    ...base,
+    id: id2,
+    audioMaster: { target: 'custom', lufs: -16, truePeak: -1, dynamics: 'balanced' },
+    tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [ac({ id: 'g', uri: wav('smoke_chk_ok.wav', 6, 0.3), duration: 6, sourceDuration: 6 })] } : t)),
+  };
+  await saveProject(good);
+  router.push(`/studio/audio/${id2}` as Href);
+  for (let i = 0; i < 60 && st().project?.id !== id2; i++) {
+    await sleep(200);
+  }
+  await sleep(1000);
+  const okIssues = ((await runDevAction('audio.runCheck')) as CheckIssue[] | null) ?? ['x'];
+  log(Array.isArray(okIssues) && okIssues.length === 0, 'a rendben lévő, masterelt projektre nincs hiba', JSON.stringify(okIssues));
+  runDevAction('audio.closeCheck');
+  router.back();
+}
+
 /** ⭐ A klipszerkesztő presetsora (képernyőkép): beépített presetek alatt a saját. */
 async function smokePresetPhoto(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5462,6 +5550,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'audiocheck') {
+    await step(phase, () => smokeAudioCheck(log));
     return;
   }
   if (phase === 'presetphoto') {

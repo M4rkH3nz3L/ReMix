@@ -29,6 +29,7 @@ export function AudioExportSheet({
   onProRequired,
   range = null,
   onExportParts,
+  onCheck,
 }: {
   onClose: () => void;
   /** hiányzik = nincs „Előnézet” / „Videóba” gomb (pl. a videó-szerkesztőből nyitva) */
@@ -42,6 +43,8 @@ export function AudioExportSheet({
   range?: { from: number; to: number } | null;
   /** ✂️🎚️ tartomány és/vagy sávonkénti (stem) export — WAV, a telefonon */
   onExportParts?: (scope: { range: boolean; stems: boolean }, bitDepth: 16 | 24) => void;
+  /** 🩺 hangellenőrzés a telefonon (export előtt) */
+  onCheck?: () => void;
 }) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<AudioExportFormat>(onDevice ? 'wav' : 'mp3');
@@ -86,6 +89,12 @@ export function AudioExportSheet({
                 <Text style={styles.actionText}>{t('studio.audio.exportToVideo')}</Text>
               </Pressable>
             </View>
+            ) : null}
+            {onCheck ? (
+              <Pressable style={[styles.action, { marginTop: 10 }]} onPress={onCheck} testID="audio-export-check">
+                <Ionicons name="pulse-outline" size={20} color={palette.accent} />
+                <Text style={styles.actionText}>{t('studio.audio.check.open')}</Text>
+              </Pressable>
             ) : null}
 
             {onExportParts ? (

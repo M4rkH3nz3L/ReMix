@@ -119,19 +119,17 @@ async function prepareOffline(mix: Project, onProgress?: (u: ProgressUpdate) => 
 }
 
 /**
- * A keverés kiírása a `write`-ba: WAV-fejléc + a `[a, b)` minták. A keverés mindig 0-tól fut (az
- * effektek, a halkítás és a master állapota így pontosan az, ami a teljes exportban ott van).
+ * A keverés darabonként 0-tól `b`-ig; az `[a, b)` darabjai mennek az `onOut`-ba. A keverés mindig
+ * 0-tól fut (az effektek, a halkítás és a master állapota így pontosan az, ami a teljes exportban).
  */
-async function writeWav(
+async function mixLoop(
   prep: Prepared,
   plan: OfflineMixPlan,
   [a, b]: [number, number],
-  bits: WavBits,
-  write: (bytes: Uint8Array) => void,
+  onOut: (l: Float32Array, r: Float32Array) => void,
   onRatio: (r: number) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  write(wavHeader(bits, b - a));
   // 🎛️ az effektek állapota szeletről szeletre megmarad (folytonos szűrés)
   const fxState = new Map<string, FxState>();
   // T2: időkeretes feldolgozás — negyed mp-es darabok, és ~12 ms munka után mindig visszaadjuk
@@ -150,7 +148,7 @@ async function writeWav(
     mixRange(plan, prep.sources, out, from, to, 1, fxState);
     if (to > a) {
       const skip = Math.max(0, a - from);
-      write(wavData(bits, skip > 0 ? [out[0].subarray(skip), out[1].subarray(skip)] : out));
+      onOut(skip > 0 ? out[0].subarray(skip) : out[0], skip > 0 ? out[1].subarray(skip) : out[1]);
     }
     if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
       onRatio(to / b);
@@ -158,6 +156,37 @@ async function writeWav(
       sliceStart = Date.now();
     }
   }
+}
+
+/** a keverés WAV-ként a `write`-ba: fejléc + a `[a, b)` minták */
+async function writeWav(
+  prep: Prepared,
+  plan: OfflineMixPlan,
+  range: [number, number],
+  bits: WavBits,
+  write: (bytes: Uint8Array) => void,
+  onRatio: (r: number) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  write(wavHeader(bits, range[1] - range[0]));
+  await mixLoop(prep, plan, range, (l, r) => write(wavData(bits, [l, r])), onRatio, signal);
+}
+
+/**
+ * 🩺 A keverés darabonként a hívónak (fájl nélkül) — a hangellenőrzés ugyanazt a keverést méri,
+ * amit az export kiír (masterrel együtt).
+ */
+export async function streamOfflineMix(
+  mix: Project,
+  onChunk: (l: Float32Array, r: Float32Array) => void,
+  onProgress?: (u: ProgressUpdate) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const prep = await prepareOffline(mix, onProgress, signal);
+  const plan = prep.plan.master
+    ? { ...prep.plan, masterGain: await measureMasterGain(prep.plan, prep.sources, signal ?? undefined, prep.prepare) }
+    : prep.plan;
+  await mixLoop(prep, plan, frameRange(plan), onChunk, (r) => onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * r }), signal);
 }
 
 /** a kimeneti fájl írása (hiba esetén a félkész fájl törlődik, a betelt lemez érthető üzenet) */

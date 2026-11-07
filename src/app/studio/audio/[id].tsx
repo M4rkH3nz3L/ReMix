@@ -4,7 +4,7 @@ import { File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
 import { exportParts } from '@/components/studio/audio/exportParts';
+import { AudioCheckSheet } from '@/components/studio/audio/AudioCheckSheet';
+import { runAudioCheck } from '@/lib/audioCheckClient';
+import type { CheckIssue, MixStats } from '@/lib/audioCheck';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
 import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
@@ -50,6 +53,9 @@ export default function AudioStudioScreen() {
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [checkResult, setCheckResult] = useState<{ issues: CheckIssue[]; stats: MixStats | null } | null>(null);
+  // a hook a korai return-ök előtt; az értéke lent, a projekt betöltése után kap függvényt
+  const runCheckRef = useRef<() => Promise<CheckIssue[] | null>>(async () => null);
   const rangeIn = useEditorStore((s) => s.rangeIn);
   const rangeOut = useEditorStore((s) => s.rangeOut);
   const isPro = useEntitlement((s) => s.isPro());
@@ -57,6 +63,8 @@ export default function AudioStudioScreen() {
   usePlaybackClock();
   // 🧪 a füstteszt az export-lapot is megnyithatja (csak __DEV__)
   useEffect(() => registerDevAction('audio.exportSheet', () => setExporting(true)), []);
+  useEffect(() => registerDevAction('audio.runCheck', () => runCheckRef.current()), []);
+  useEffect(() => registerDevAction('audio.closeCheck', () => setCheckResult(null)), []);
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
   const { saveFailed, missing, relinking, relink, exit } = useStudioSession(id, loading);
 
@@ -112,6 +120,24 @@ export default function AudioStudioScreen() {
     flushProjectSave()
       .then(() => router.push(`/player/${project.id}`))
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:preview', caught); });
+
+  // 🩺 hangellenőrzés a telefonon (szerver nélkül) → az eredmény-lap
+  const runCheck = async (): Promise<CheckIssue[] | null> => {
+    const st = useEditorStore.getState();
+    if (!st.project) return null;
+    try {
+      const r = await withCancellableProgress(t('studio.audio.check.working'), (report, signal) =>
+        runAudioCheck(st.project!, { isTrackAudible: st.isTrackAudible, masterVolume: st.masterVolume, mutedTracks: st.mutedTracks, soloTracks: st.soloTracks }, report, signal)
+      );
+      setCheckResult(r);
+      return r.issues;
+    } catch (e) {
+      logCaught('app/studio/audio/[id].tsx:runCheck', e);
+      if (!isRenderCancelledError(e)) Alert.alert(t('studio.audio.check.title'), (e as Error).message);
+      return null;
+    }
+  };
+  runCheckRef.current = runCheck;
 
   const sendToVideo = () => {
     // 🎧→🎬 a hang átvitele egy ÚJ videó-projektbe (a userhez képet ad)
@@ -203,6 +229,10 @@ export default function AudioStudioScreen() {
             usePaywall.getState().open('cloudRender');
           }}
           range={rangeIn != null && rangeOut != null && rangeOut > rangeIn ? { from: rangeIn, to: rangeOut } : null}
+          onCheck={() => {
+            setExporting(false);
+            void runCheck();
+          }}
           onExportParts={(scope, bits) => {
             setExporting(false);
             exportParts(project, scope, bits, t).catch((e: Error) => {
@@ -212,6 +242,7 @@ export default function AudioStudioScreen() {
           }}
         />
       ) : null}
+      {checkResult ? <AudioCheckSheet issues={checkResult.issues} stats={checkResult.stats} onClose={() => setCheckResult(null)} /> : null}
     </SafeAreaView>
   );
 }

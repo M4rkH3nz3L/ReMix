@@ -65,7 +65,8 @@ import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
-import { canSegment, LongSource } from '@/lib/longSource';
+import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
+import { findClipSilences } from '@/lib/audioSilenceClient';
 import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
@@ -3479,6 +3480,12 @@ async function smokeSilence(log: Log) {
   log(found === 2, 'a keresés 2 csendet talál; a 0,4 s-os szünet marad', `${found} csend: ${fr} (${Date.now() - t0} ms)`);
   const near = (a: number, b: number) => Math.abs(a - b) <= 1 / 30 + 0.011;
   log(r.length === 2 && near(r[0].start, 1.62) && near(r[0].end, 2.88) && near(r[1].start, 4.62) && near(r[1].end, 5.08), 'a határok: a beszéd felől 0,12 s levegő, frame-rácson', fr);
+  // 🎧 hosszú forrás útja (szakaszos natív dekóder, 44,1 kHz) ugyanazokat a csendeket adja
+  setLongThresholdForTest(1);
+  const longR = await findClipSilences(track('voiceover')[0] as AudioClip, 30);
+  setLongThresholdForTest(null);
+  const lr = (longR ?? []).map((q) => `${q.start.toFixed(3)}–${q.end.toFixed(3)}`).join(', ');
+  log(canSegment() && lr === fr, 'hosszú forrás (szakaszos dekódolás): ugyanazok a csendek', lr);
   log(true, 'FOTÓZHATÓ', 'a két csend pirosan a beszéd-sávon, alul a jóváhagyó sáv');
   await sleep(2500);
   runDevAction('audio.silenceToggle1');

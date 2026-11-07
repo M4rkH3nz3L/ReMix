@@ -32,20 +32,33 @@ const PUNCT = /^[^\p{L}\p{N}]+$/u;
  */
 export function tokensToWords(tokens: SrcWord[]): SrcWord[] {
   const out: SrcWord[] = [];
+  // a szóközzel kezdődő írásjel-token (nyitó idézőjel: ` "` → `Um`) után új szó jön
+  let forceNew = false;
   for (const tok of tokens) {
     if (!tok.text || NON_SPEECH.test(tok.text) || !(tok.end >= tok.start)) continue;
-    const last = out[out.length - 1];
-    const startsWord = /^\s/.test(tok.text) || !last;
     const body = tok.text.trim();
     if (!body) continue;
-    if (startsWord && !(last && PUNCT.test(body))) {
+    const last = out[out.length - 1];
+    const spaced = /^\s/.test(tok.text);
+    if (PUNCT.test(body)) {
+      if (spaced) forceNew = true;
+      else if (last) {
+        last.text += body;
+        last.end = Math.max(last.end, tok.end);
+      }
+      continue;
+    }
+    // a small modell az írásjel utáni szót néha szóköz nélkül adja („show” „,” „um”)
+    if (spaced || forceNew || !last || (ENDS_PHRASE.test(last.text) && /^[\p{L}\p{N}]/u.test(body))) {
       out.push({ text: body, start: tok.start, end: tok.end });
-    } else if (last) {
+    } else {
       last.text += body;
       last.end = Math.max(last.end, tok.end);
     }
+    forceNew = false;
   }
-  return out.filter((w) => !PUNCT.test(w.text));
+  // az idézőjel nem a szó része (a small a töltelékeket idézőjelbe teszi)
+  return out.map((w) => ({ ...w, text: w.text.replace(/["“”„]/g, '') })).filter((w) => w.text.length > 0);
 }
 
 /**
@@ -139,7 +152,7 @@ export function speechIslands(levels: Float32Array, from: number, thresholdDb: n
   return out;
 }
 
-const ENDS_PHRASE = /[,.;:!?…]$/;
+const ENDS_PHRASE = /[,.;:!?…"'”“)]$/;
 
 /**
  * A whisper szó-időbélyegei a valódi hanghoz igazítva. A token-idők ismerten pontatlanok (a

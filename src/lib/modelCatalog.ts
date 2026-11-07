@@ -111,6 +111,28 @@ export const MODEL_CATALOG: CatalogEntry[] = [
     },
   },
   {
+    // opcionális, pontosabb (főleg magyarul) — a beszédvágás „Pontosabb felismerés” gombja tölti le
+    id: 'whisper-small-q5',
+    label: 'Whisper small',
+    emoji: '🎙️',
+    where: 'device',
+    engine: 'whisper-rn',
+    modalities: ['transcribe'],
+    tasks: [],
+    manifest: {
+      id: 'whisper-small-q5',
+      version: '1.0.0',
+      url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin',
+      // a HF x-linked-etag-jével egyezik (2026-11-07, letöltve és ellenőrizve)
+      sha256: 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb',
+      sizeBytes: 190_085_487, // ~181 MB
+      kind: 'whisper',
+      modalities: ['transcribe'],
+    },
+    // a small ~0,5 GB-ot foglal futás közben
+    minRamGb: 4,
+  },
+  {
     // a Silero VAD a whisper.rn-nel érkezik (nem külön letöltés) — csend/beszéd szegmensek
     id: 'silero-vad',
     label: 'Silero VAD',

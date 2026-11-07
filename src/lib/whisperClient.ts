@@ -141,10 +141,10 @@ export async function transcribeWavOnDevice(
   }
 }
 
-/** a legjobb HASZNÁLHATÓ (letöltött + smoke-PASS) whisper-modell; base > tiny */
+/** a legjobb HASZNÁLHATÓ (letöltött + smoke-PASS) whisper-modell; small > base > tiny */
 export function bestUsableWhisperModelId(): string | null {
   const rt = catalogRuntime();
-  for (const id of ['whisper-base-q5', 'whisper-tiny-q8']) {
+  for (const id of ['whisper-small-q5', 'whisper-base-q5', 'whisper-tiny-q8']) {
     const entry = catalogEntry(id);
     if (entry && catalogAvailability(entry, rt) === 'validated') {
       return id;

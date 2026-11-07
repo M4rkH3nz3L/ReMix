@@ -70,8 +70,15 @@ describe('modelCatalog — cél-kötés', () => {
   it('catalogForModality: transcribe-ra a whisper-variánsok + VAD + OS-beszéd', () => {
     const ids = catalogForModality('transcribe').map((e) => e.id);
     expect(ids).toEqual(
-      expect.arrayContaining(['whisper-tiny-q8', 'whisper-base-q5', 'silero-vad', 'os-speech']),
+      expect.arrayContaining(['whisper-tiny-q8', 'whisper-base-q5', 'whisper-small-q5', 'silero-vad', 'os-speech']),
     );
+  });
+
+  it('a pontosabb whisper small: ellenőrzött letöltés, 4 GB RAM alatt zárolva', () => {
+    const small = catalogEntry('whisper-small-q5')!;
+    expect(small.manifest?.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(small.manifest?.sizeBytes).toBe(190_085_487);
+    expect(catalogAvailability(small, { engines: { 'whisper-rn': true }, deviceRamGb: 3 } as never)).toBe('gated');
   });
 });
 

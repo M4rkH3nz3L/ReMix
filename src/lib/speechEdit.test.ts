@@ -12,6 +12,18 @@ describe('💬 tokensToWords', () => {
   });
 });
 
+describe('💬 tokensToWords — whisper small', () => {
+  it('az írásjel utáni, szóköz nélküli token új szó („show” „,” „um” → show, | um)', () => {
+    const w = tokensToWords([tok(' show', 1.4, 1.7), tok(',', 1.7, 1.75), tok('um', 1.76, 2.0), tok(',', 2.0, 2.1), tok(' today', 2.3, 2.6), tok('s', 2.6, 2.7)]);
+    expect(w.map((x) => x.text)).toEqual(['show,', 'um,', 'todays']);
+  });
+  it('idézőjelbe tett töltelék (a small így írja: ` "` `Um` `".`) külön szó', () => {
+    const w = tokensToWords([tok(' show', 1.25, 1.51), tok(',', 1.51, 1.76), tok(' "', 1.76, 1.76), tok('Um', 1.76, 1.91), tok('".', 1.91, 2.24), tok(' Today', 2.24, 2.66)]);
+    expect(w.map((x) => x.text)).toEqual(['show,', 'Um.', 'Today']);
+    expect([w[1].start, w[1].end]).toEqual([1.76, 2.24]);
+  });
+});
+
 describe('💬 trackWords', () => {
   const words = new Map([['f', [tok('a', 1, 1.4), tok('b', 2, 2.4), tok('c', 3, 3.4), tok('d', 4, 4.4)]]]);
   const clip = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', id: 'x', uri: 'f', label: 'x', start: 0, duration: 5, trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', ...over }) as AudioClip;

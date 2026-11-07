@@ -53,7 +53,7 @@ export async function ensureLocalAiReady(
     }
     const rt = catalogRuntime();
     const availability = catalogAvailability(entry, rt);
-    const usableAny = ['whisper-tiny-q8', 'whisper-base-q5'].some((id) => {
+    const usableAny = ['whisper-tiny-q8', 'whisper-base-q5', 'whisper-small-q5'].some((id) => {
       const e = catalogEntry(id);
       return e != null && catalogAvailability(e, rt) === 'validated';
     });

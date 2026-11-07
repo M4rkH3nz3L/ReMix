@@ -6,10 +6,10 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { palette } from '@/constants/editor';
 import { silenceCutCommands } from '@/lib/audioSilence';
-import { catalogEntry } from '@/lib/modelCatalog';
-import { downloadModel } from '@/lib/modelRegistryClient';
+import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
+import { catalogRuntime, downloadModel } from '@/lib/modelRegistryClient';
 import { trackWords, wordCutRanges, type SrcWord, type TimelineWord } from '@/lib/speechEdit';
-import { speechWordsFor } from '@/lib/speechEditClient';
+import { clearSpeechWordCache, speechWordsFor } from '@/lib/speechEditClient';
 import { findFillerAndRepeats } from '@/lib/textedit';
 import { bestUsableWhisperModelId, runWhisperSmokeTest } from '@/lib/whisperClient';
 import { useEditorStore } from '@/store/editorStore';
@@ -23,29 +23,63 @@ import type { AudioClip, Project, TrackType } from '@/types/project';
  * Az átirat a vágás után magától frissül (a szavak forrás-időben tárolódnak).
  */
 
-/** a whisper base modell (a magyarhoz a tiny gyenge) */
-const SPEECH_MODEL = 'whisper-base-q5';
+/** az alap (a magyarhoz a tiny gyenge) és az opcionális pontosabb modell */
+const BASE_MODEL = 'whisper-base-q5';
+const SMALL_MODEL = 'whisper-small-q5';
 
 const audioClipsOf = (project: Project | null, trackType: TrackType | null): AudioClip[] =>
   (project?.tracks.find((t) => t.type === trackType)?.clips ?? []).filter((c): c is AudioClip => c.kind === 'audio');
 
-/** van-e használható modell; ha nincs, a felhasználó jóváhagyásával letölti és bepróbálja */
+const mbOf = (id: string) => Math.round((catalogEntry(id)?.manifest?.sizeBytes ?? 0) / 1024 / 1024);
+
+/** egy whisper-modell letöltése (sha256-ellenőrzéssel) és bepróbálása; @returns használható-e */
+export async function installWhisperModel(id: string, t: TFunction): Promise<boolean> {
+  const entry = catalogEntry(id);
+  if (!entry?.manifest) return false;
+  if (catalogAvailability(entry, catalogRuntime()) === 'gated') {
+    Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.modelGated'));
+    return false;
+  }
+  const ok = await withProgress(t('studio.audio.speech.modelWorking'), async () => {
+    const res = await downloadModel(entry.manifest!);
+    return res.ok && (await runWhisperSmokeTest(id));
+  });
+  if (!ok) Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.modelFailed'));
+  return ok;
+}
+
+/** van-e használható modell; ha nincs, a felhasználó választ: alap vagy pontosabb */
 async function ensureWhisperModel(t: TFunction): Promise<boolean> {
   if (bestUsableWhisperModelId()) return true;
-  const entry = catalogEntry(SPEECH_MODEL);
-  if (!entry?.manifest) return false;
-  const mb = Math.round(entry.manifest.sizeBytes / 1024 / 1024);
-  const ok = await new Promise<boolean>((resolve) =>
-    Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.modelBody', { mb }), [
-      { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(false) },
-      { text: t('studio.audio.speech.modelDownload'), onPress: () => resolve(true) },
+  const pick = await new Promise<string | null>((resolve) =>
+    Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.modelChoose'), [
+      { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+      { text: t('studio.audio.speech.modelBase', { mb: mbOf(BASE_MODEL) }), onPress: () => resolve(BASE_MODEL) },
+      { text: t('studio.audio.speech.modelSmall', { mb: mbOf(SMALL_MODEL) }), onPress: () => resolve(SMALL_MODEL) },
     ])
   );
-  if (!ok) return false;
-  return withProgress(t('studio.audio.speech.modelWorking'), async () => {
-    const res = await downloadModel(entry.manifest!);
-    return res.ok && (await runWhisperSmokeTest(SPEECH_MODEL));
-  });
+  return pick ? installWhisperModel(pick, t) : false;
+}
+
+/**
+ * ⬆️ a pontosabb (small) modell letöltése a felhasználó jóváhagyásával, majd a sáv újra-átírása
+ * (a régi átirat eldobva). @returns a szavak száma, vagy null
+ */
+export async function upgradeSpeechModel(t: TFunction, confirm = true): Promise<number | null> {
+  const trackType = useSpeechEdit.getState().trackType;
+  if (!trackType) return null;
+  if (confirm) {
+    const ok = await new Promise<boolean>((resolve) =>
+      Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.upgradeBody', { mb: mbOf(SMALL_MODEL) }), [
+        { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(false) },
+        { text: t('studio.audio.speech.modelDownload'), onPress: () => resolve(true) },
+      ])
+    );
+    if (!ok) return null;
+  }
+  if (!(await installWhisperModel(SMALL_MODEL, t))) return null;
+  clearSpeechWordCache();
+  return startSpeechEdit(trackType, t);
 }
 
 /** az átirat elkészítése a sáv klipjeire és a sáv megnyitása; @returns a szavak száma vagy null */
@@ -142,6 +176,11 @@ export function SpeechEditBar() {
         <Ionicons name="chatbubble-ellipses-outline" size={16} color={palette.accent} />
         <Text style={styles.title}>{t('studio.audio.speech.header', { count: words.length })}</Text>
         <View style={{ flex: 1 }} />
+        {bestUsableWhisperModelId() !== SMALL_MODEL ? (
+          <Pressable onPress={() => void upgradeSpeechModel(t)} style={styles.chip} accessibilityRole="button" testID="speech-upgrade-model">
+            <Text style={styles.chipText}>{t('studio.audio.speech.upgrade')}</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => useSpeechEdit.getState().close()} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={20} color={palette.textDim} />
         </Pressable>

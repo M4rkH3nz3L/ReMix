@@ -21,7 +21,7 @@ import type { EditorCommand } from '@/lib/commands';
 import { CrossfadeMarks } from '@/components/studio/audio/CrossfadeMarks';
 import { applySilenceReview, SilenceMarks, SilenceReviewBar, startSilenceSearch } from '@/components/studio/audio/SilenceReview';
 import { useSilenceReview } from '@/store/silenceReviewStore';
-import { applySpeechCut, selectSpeechFillers, SpeechCutMarks, SpeechEditBar, startSpeechEdit } from '@/components/studio/audio/SpeechEditBar';
+import { applySpeechCut, selectSpeechFillers, SpeechCutMarks, SpeechEditBar, startSpeechEdit, upgradeSpeechModel } from '@/components/studio/audio/SpeechEditBar';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
@@ -210,7 +210,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null> }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null> }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -230,6 +230,7 @@ export function AudioStudioBody({
       registerDevAction('audio.speechFillers', () => selectSpeechFillers()),
       registerDevAction('audio.speechModeAll', () => useSpeechEdit.getState().setMode('all')),
       registerDevAction('audio.speechApply', () => applySpeechCut()),
+      registerDevAction('audio.speechUpgrade', () => devRef.current.speechUpgrade()),
       registerDevAction('audio.beatSplitBars', () => devRef.current.beatSplit('bar')),
       registerDevAction('audio.beatSplitBeats', () => devRef.current.beatSplit('beat')),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
@@ -408,7 +409,7 @@ export function AudioStudioBody({
     const st = useEditorStore.getState();
     const tr = st.project?.tracks.find((x) => x.clips.some((y) => y.id === st.selectedClipId));
     return tr ? startSpeechEdit(tr.type, t) : null;
-  } };
+  }, speechUpgrade: () => upgradeSpeechModel(t, false) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul

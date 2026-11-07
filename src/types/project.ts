@@ -1158,6 +1158,11 @@ export interface AudioClip extends ClipBase {
    * (a jobb él a forrás végén túl is húzható). Hiányzó = nincs ismétlés.
    */
   loopLength?: number;
+  /**
+   * 🔁 a hurok fázisa a klip elején (mp, 0 ≤ … < `loopLength`): a vágott/balról húzott loop-klip
+   * a minta közepéről folytatódik, a hurok-ablak (`trimIn` … `trimIn + loopLength`) marad. Hiányzó = 0.
+   */
+  loopOffset?: number;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */

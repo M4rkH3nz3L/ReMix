@@ -123,6 +123,8 @@ export interface OfflineMixClip {
   sends?: Record<string, number>;
   /** 🔁 loop-klip: a forrás `trimIn`-től ennyi mp-es szakasza ismétlődik */
   loopLength?: number;
+  /** 🔁 a hurok fázisa a klip elején (mp) */
+  loopOffset?: number;
   /** 🦆 a halkítás szerepe: `key` = a beszéd (vezérel), `duck` = halkul alatta */
   role?: 'key' | 'duck';
 }
@@ -186,7 +188,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         ...(fxActive(fx) || clip.deReverb || hasAuto ? { fx: fx ?? {} } : {}),
         ...(hasAuto ? { fxKf } : {}),
         ...(sendsOf(project, track.type) ? { sends: sendsOf(project, track.type) } : {}),
-        ...(clip.loopLength && clip.loopLength > 0 ? { loopLength: clip.loopLength } : {}),
+        ...(clip.loopLength && clip.loopLength > 0 ? { loopLength: clip.loopLength, ...(clip.loopOffset ? { loopOffset: clip.loopOffset } : {}) } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
         ...(role ? { role } : {}),
         track: track.type,
@@ -299,7 +301,8 @@ export function mixRange(
     // 🔁 loop-klip: a klipen belüli minta a hurok hosszával körbejár (a forrás `trimIn`-től)
     const loopN = clip.loopLength && clip.loopLength > 0 ? Math.max(1, Math.round(clip.loopLength * src.sampleRate)) : 0;
     const trimN = Math.round(clip.trimIn * src.sampleRate);
-    const srcIndex = (i: number) => (loopN ? trimN + ((((i - clipFrom) % loopN) + loopN) % loopN) : i + srcOffset);
+    const phaseN = loopN ? Math.round((clip.loopOffset ?? 0) * src.sampleRate) - clipFrom : 0;
+    const srcIndex = (i: number) => (loopN ? trimN + ((((i + phaseN) % loopN) + loopN) % loopN) : i + srcOffset);
     // 🎧 hosszú (szakaszos) forrásnál csak a most kellő ablak: a mintaindex az ablakon belül
     let left = src.channels[0];
     let right = src.channels[1] ?? src.channels[0];

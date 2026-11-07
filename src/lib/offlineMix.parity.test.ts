@@ -15,7 +15,7 @@ const path = jest.requireActual('path') as { join: (...p: string[]) => string };
 
 import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan } from '@/lib/offlineMix';
 import { integratedLoudness } from '@/lib/loudness';
-import { createEmptyProject } from '@/lib/projectUtils';
+import { createEmptyProject, splitClip } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
@@ -344,6 +344,29 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
       const diff = server[c].map((v, i) => v - mine[c][i]);
       // eslint-disable-next-line no-console
       console.log(`loop csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
+      expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
+    }
+  }, 60000);
+
+  it('🔁✂️ a kettévágott loop-klip (fázissal): telefon = szerver, és = a vágatlan klip', async () => {
+    const whole = clip({ id: 'L', uri: stereo, start: 0.3, trimIn: 0.5, duration: 3.2, sourceDuration: 4, loopLength: 1, volume: 0.8 });
+    const [a, b] = splitClip(whole, 1.75) as [AudioClip, AudioClip];
+    const lp: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [a, b] } : t)) };
+    const sources = new Map([[stereo, { channels: decode(stereo, 2), sampleRate: SR }]]);
+    const { renderProject } = jest.requireActual('../../server/render');
+    const server = decode(await renderProject(lp, fs.mkdtempSync(path.join(dir, 'wls-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    const n = server[0].length;
+    const mix = (p: Project) => {
+      const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+      mixRange(offlineMixPlan(p), sources, out, 0, n, 1, new Map());
+      return out;
+    };
+    const mine = mix(lp);
+    const ref = mix({ ...lp, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [whole] } : t)) });
+    for (const c of [0, 1]) {
+      expect(mine[c].reduce((m, v, i) => Math.max(m, Math.abs(v - ref[c][i])), 0)).toBeLessThan(1e-6);
+      const diff = server[c].map((v, i) => v - mine[c][i]);
+      console.log(`vágott loop csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
       expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
     }
   }, 60000);

@@ -552,7 +552,13 @@ export function cropClip(clip: Clip, from: number, to: number): Clip {
   } else if (out.kind === 'audio' && clip.kind === 'audio' && (a !== 0 || clip.trimIn !== undefined)) {
     const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
     // ⏪ visszafelé a darab forrása a klip végéről számol (mint a videónál)
-    out.trimIn = (clip.trimIn ?? 0) + (clip.reversed ? clip.duration - b : a) * speed;
+    if (clip.loopLength && clip.loopLength > 0) {
+      // 🔁 loop-klip: a hurok-ablak marad, csak a fázisa lép előre
+      out.trimIn = clip.trimIn ?? 0;
+      out.loopOffset = loopPhase(clip.loopLength, (clip.loopOffset ?? 0) + a);
+    } else {
+      out.trimIn = (clip.trimIn ?? 0) + (clip.reversed ? clip.duration - b : a) * speed;
+    }
   }
   if ('keyframes' in clip && clip.keyframes) {
     (out as { keyframes?: ClipKeyframes }).keyframes = cropKeyframes(clip.keyframes, a, b - a);
@@ -567,6 +573,12 @@ export function cropClip(clip: Clip, from: number, to: number): Clip {
     }
   }
   return out;
+}
+
+/** 🔁 a hurok fázisa [0, loopLength) között, µs-ra kerekítve (0 közelében 0) */
+export function loopPhase(loopLength: number, sec: number): number {
+  const v = Math.round((((sec % loopLength) + loopLength) % loopLength) * 1e6) / 1e6;
+  return v >= loopLength - 1e-6 ? 0 : v;
 }
 
 /** Klip kettévágása a t időpontban; null, ha t nem esik szigorúan a klip belsejébe. */

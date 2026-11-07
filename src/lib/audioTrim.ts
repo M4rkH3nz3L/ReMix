@@ -1,5 +1,6 @@
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { cropKeyframes } from '@/lib/keyframes';
+import { loopPhase } from '@/lib/projectUtils';
 import type { AudioClip } from '@/types/project';
 
 /**
@@ -25,9 +26,21 @@ const sourceOf = (c: AudioClip): number => c.sourceDuration ?? c.duration * audi
 export function trimAudioLeft(
   clip: AudioClip,
   deltaSec: number
-): { start: number; duration: number; trimIn: number; keyframes?: AudioClip['keyframes'] } {
+): { start: number; duration: number; trimIn: number; loopOffset?: number; keyframes?: AudioClip['keyframes'] } {
   const trimIn = trimInOf(clip);
   const speed = audioSpeedOf(clip);
+  if (clip.loopLength && clip.loopLength > 0) {
+    // 🔁 loop-klip: a bal él is szabadon húzható (0-ig), a hurok-ablak marad, a fázis követi
+    const d = Math.min(Math.max(deltaSec, -clip.start), clip.duration - MIN_CLIP_DURATION);
+    const duration = clip.duration - d;
+    return {
+      start: clip.start + d,
+      duration,
+      trimIn,
+      loopOffset: loopPhase(clip.loopLength, (clip.loopOffset ?? 0) + d),
+      ...(clip.keyframes ? { keyframes: cropKeyframes(clip.keyframes, d, duration) } : {}),
+    };
+  }
   // ⏪ visszafelé a bal él a forrás VÉGE: a trimIn marad, a nyújtás a forrás végéig mehet
   const room = clip.reversed ? sourceOf(clip) - (trimIn + clip.duration * speed) : trimIn;
   const lo = Math.max(-room / speed, -clip.start); // nem a forrás szélén túl ÉS nem 0 elé
@@ -67,12 +80,19 @@ export function trimAudioRight(clip: AudioClip, nextDuration: number): { duratio
  * illesztése) — ott nincs mikro-fade. Visszafelé a bal darab forrása a jobb darabé UTÁN van.
  */
 export function continuesInSource(
-  prev: Pick<AudioClip, 'trimIn' | 'duration' | 'speed' | 'reversed'>,
-  next: Pick<AudioClip, 'trimIn' | 'duration' | 'speed' | 'reversed'>,
+  prev: Pick<AudioClip, 'trimIn' | 'duration' | 'speed' | 'reversed' | 'loopLength' | 'loopOffset'>,
+  next: Pick<AudioClip, 'trimIn' | 'duration' | 'speed' | 'reversed' | 'loopLength' | 'loopOffset'>,
   eps: number
 ): boolean {
   if (!!prev.reversed !== !!next.reversed) {
     return false;
+  }
+  const loop = prev.loopLength ?? 0;
+  if (loop > 0 || (next.loopLength ?? 0) > 0) {
+    // 🔁 a kettévágott loop-klip: ugyanaz a hurok-ablak, a fázis pontosan folytatódik
+    if (loop !== next.loopLength || Math.abs((prev.trimIn ?? 0) - (next.trimIn ?? 0)) >= eps) return false;
+    const d = Math.abs((prev.loopOffset ?? 0) + prev.duration - (next.loopOffset ?? 0)) % loop;
+    return d < eps || loop - d < eps;
   }
   const p = prev.trimIn ?? 0;
   const n = next.trimIn ?? 0;

@@ -49,7 +49,11 @@ export function ClipWaveform({ clip, widthPx, heightPx, color, userInitiated = f
   const loopLen = clip.loopLength && clip.loopLength > 0 ? clip.loopLength : 0;
   const one = clipWindowPeaks(wave, clip.trimIn, loopLen || clip.duration * audioSpeedOf(clip));
   const window = loopLen && one.length > 0
-    ? Array.from({ length: Math.max(1, Math.round((clip.duration / loopLen) * one.length)) }, (_, i) => one[i % one.length])
+    ? Array.from(
+        { length: Math.max(1, Math.round((clip.duration / loopLen) * one.length)) },
+        // a vágott loop-klip a minta közepéről indul (fázis)
+        (_, i) => one[(i + Math.round(((clip.loopOffset ?? 0) / loopLen) * one.length)) % one.length]
+      )
     : one;
   // ⏪ a visszafelé szóló klip hullámformája is visszafelé fut
   const bars = resamplePeaks(clip.reversed ? window.slice().reverse() : window, columns);

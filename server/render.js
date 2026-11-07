@@ -151,6 +151,13 @@ function continuesInSource(prev, next) {
   if (!!prev.reversed !== !!next.reversed) {
     return false;
   }
+  const loop = prev.loopLength || 0;
+  if (loop > 0 || (next.loopLength || 0) > 0) {
+    // 🔁 a kettévágott loop-klip: ugyanaz a hurok-ablak, a fázis pontosan folytatódik
+    if (loop !== next.loopLength || Math.abs((prev.trimIn || 0) - (next.trimIn || 0)) >= EDGE_EPS) return false;
+    const d = Math.abs((prev.loopOffset || 0) + prev.duration - (next.loopOffset || 0)) % loop;
+    return d < EDGE_EPS || loop - d < EDGE_EPS;
+  }
   const p = prev.trimIn || 0;
   const n = next.trimIn || 0;
   return prev.reversed
@@ -2938,7 +2945,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       let chain =
         // 🔁 loop-klip: a hurok-szakasz ismétlődik (aloop), majd a klip hosszára vágva
       (clip.loopLength > 0
-        ? `[${idx}:a]aresample=44100,atrim=start=${aTrimIn.toFixed(6)}:end=${(aTrimIn + clip.loopLength).toFixed(6)},asetpts=PTS-STARTPTS,aloop=loop=-1:size=${Math.round(clip.loopLength * 44100)},atrim=end=${clip.duration.toFixed(6)},`
+        ? `[${idx}:a]aresample=44100,atrim=start=${aTrimIn.toFixed(6)}:end=${(aTrimIn + clip.loopLength).toFixed(6)},asetpts=PTS-STARTPTS,aloop=loop=-1:size=${Math.round(clip.loopLength * 44100)},atrim=start=${(clip.loopOffset || 0).toFixed(6)}:end=${((clip.loopOffset || 0) + clip.duration).toFixed(6)},`
         : `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},`) +
           (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
           `asetpts=PTS-STARTPTS,` +

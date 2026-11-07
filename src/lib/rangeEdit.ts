@@ -15,7 +15,9 @@ import type { Clip, Project, TrackType } from '@/types/project';
  * a hívó dolga.
  */
 
-const round = (n: number) => Math.round(n * 1000) / 1000;
+// µs-ra: a ms-os kerekítés a kezdetet és a forrás-pontot (trimIn) külön tolta el — a hangban
+// akár 0,67 ms-os fázisugrás a vágásnál (mérve); µs-on az eltérés < 0,05 minta
+const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
 /** ennél rövidebb range-et nem érdemes törölni */
 export const MIN_RANGE = 0.05;

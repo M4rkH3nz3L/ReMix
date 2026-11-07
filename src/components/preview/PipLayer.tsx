@@ -216,11 +216,12 @@ function PipVideoClip({
       .catch((caught) => { logCaught('components/preview/PipLayer.tsx:PipVideoClip', caught); });
   }, [player, clip, srcUri]);
 
-  // sebesség + hangerő
+  // sebesség + hangerő; 🎧 ha az előnézeti motor szól, a PiP hangját is az keveri (`videoVoiceActive`)
+  const engineMix = useEditorStore((s) => s.videoVoiceActive);
   useEffect(() => {
     player.playbackRate = clip.speed;
-    player.volume = clip.volume ?? 1;
-  }, [player, clip]);
+    player.volume = engineMix ? 0 : (clip.volume ?? 1);
+  }, [player, clip, engineMix]);
 
   // play/pause + álló seek
   useEffect(() => {

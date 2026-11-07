@@ -11,10 +11,10 @@ export function mixForExport(project: Project, audible: (type: TrackType) => boo
     if (AUDIO_TRACKS.includes(t.type)) {
       return audible(t.type) ? t : { ...t, clips: [] };
     }
-    if (t.type === 'video') {
-      // 🎬 a videóklip hangja: a némított videósáv néma, a master rá is hat (az élő lejátszó
-      // `VideoVoice`-a is szorozza) — a szerver a videó-hangra nem alkalmaz sáv-erősítést
-      const gain = audible('video') ? masterVolume : 0;
+    if (t.type === 'video' || t.type === 'pip') {
+      // 🎬 a videóklip (és a PiP-videó) hangja: a némított sáv néma, a master rá is hat — a
+      // szerver a videó-hangra nem alkalmaz sáv-erősítést
+      const gain = audible(t.type) ? masterVolume : 0;
       return gain === 1 ? t : { ...t, clips: t.clips.map((c) => (c.kind === 'video' ? scaleVideoVolume(c as VideoClip, gain) : c)) };
     }
     return t;

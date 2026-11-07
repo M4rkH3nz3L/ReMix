@@ -258,5 +258,69 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
     expect(20 * Math.log10(peak)).toBeLessThanOrEqual(-1 + 1e-3);
     expect(Math.abs(mine - theirs)).toBeLessThan(0.7);
   }, 120000);
+
+  it('🎧 feltöltött telefonos keverés: a szerver NEM keveri újra és nem mesterel kétszer — a kimenet = a keverés', async () => {
+    // a „telefonos keverés”: a közös DSP kimenete egy dinamika-effektes, masteres projektre
+    const mp: Project = {
+      ...project,
+      audioMaster: { target: 'custom', lufs: -14, truePeak: -1, dynamics: 'balanced', multiband: true },
+      tracks: project.tracks.map((t) => (t.type === 'music' ? { ...t, clips: t.clips.map((c) => ({ ...c, audioFx: { compressor: true, reverb: 0.4 } })) } : t)),
+    } as Project;
+    const plan = offlineMixPlan(mp);
+    const sources = new Map([
+      [stereo, { channels: decode(stereo, 2), sampleRate: SR }],
+      [mono, { channels: decode(mono, 1), sampleRate: SR }],
+    ]);
+    const gain = await measureMasterGain(plan, sources);
+    const n = Math.round(plan.duration * SR);
+    const mixL = new Float32Array(n);
+    const mixR = new Float32Array(n);
+    mixRange({ ...plan, masterGain: gain }, sources, [mixL, mixR], 0, n, 1, new Map());
+    const mixFile = path.join(dir, 'phone_mix.f32');
+    const inter = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      inter[2 * i] = mixL[i];
+      inter[2 * i + 1] = mixR[i];
+    }
+    jest.requireActual('fs').writeFileSync(mixFile, new Uint8Array(inter.buffer));
+    const mixWav = path.join(dir, 'phone_mix.wav');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'f32le', '-ar', String(SR), '-ac', '2', '-i', mixFile, '-c:a', 'pcm_f32le', mixWav]);
+    const { renderProject } = jest.requireActual('../../server/render');
+    const out = decode(await renderProject({ ...mp, audioMixUri: mixWav }, fs.mkdtempSync(path.join(dir, 'wmix-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    for (const c of [0, 1]) {
+      const ref = c === 0 ? mixL : mixR;
+      const diff = Float32Array.from(ref, (v, i) => v - (out[c][i] ?? 0));
+      // eslint-disable-next-line no-console
+      console.log(`feltöltött keverés csatorna ${c}: jel ${rmsDb(ref).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
+      expect(rmsDb(ref) - rmsDb(diff)).toBeGreaterThan(90);
+    }
+    // a szerver SAJÁT keverése ugyanerre a projektre más (a dinamika saját DSP vs. ffmpeg) —
+    // épp ezért kell a feltöltés
+    const own = decode(await renderProject(mp, fs.mkdtempSync(path.join(dir, 'wown-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    const ownDiff = Float32Array.from(mixL, (v, i) => v - (own[0][i] ?? 0));
+    // eslint-disable-next-line no-console
+    console.log(`a szerver saját keverése a telefonéhoz képest: ${(rmsDb(mixL) - rmsDb(ownDiff)).toFixed(1)} dB`);
+  }, 120000);
+
+  it('🎬 videó-render a feltöltött keveréssel: az MP4 hangja = a keverés (AAC-n át, szintben és alakban)', async () => {
+    const vid = path.join(dir, 'silent.mp4');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', vid]);
+    const mixWav = path.join(dir, 'video_mix.wav');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=500:sample_rate=44100:duration=3', '-ac', '2', '-c:a', 'pcm_f32le', mixWav]);
+    const vp = {
+      ...base,
+      // a szerver saját keverése ebből a hang nélküli videóból csendet adna — a feltöltött keverés szól
+      tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: [{ id: 'v', kind: 'video', uri: vid, start: 0, duration: 3, trimIn: 0, sourceDuration: 3, speed: 1, volume: 1, filterId: 'none' }] } : t)),
+      audioMixUri: mixWav,
+    } as unknown as Project;
+    const { renderProject } = jest.requireActual('../../server/render');
+    const out = await renderProject(vp, fs.mkdtempSync(path.join(dir, 'wv2-')), () => {}, { resolution: 480, fps: 30, quality: 'high', codec: 'h264' });
+    const got = decode(out, 2)[0];
+    const ref = decode(mixWav, 2)[0];
+    const lvl = rmsDb(got.subarray(SR / 2, 2 * SR)) - rmsDb(ref.subarray(SR / 2, 2 * SR));
+    // eslint-disable-next-line no-console
+    console.log(`videó: a hang szintje a keveréshez képest ${lvl.toFixed(2)} dB`);
+    expect(Math.abs(lvl)).toBeLessThan(0.5);
+  }, 120000);
 });
 

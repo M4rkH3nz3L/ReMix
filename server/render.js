@@ -2825,221 +2825,232 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   // a kimeneti szín-tér pixel-szinten (B22) — a tagek ehhez igazodnak (videoEncoderArgs)
   graph.push(`[${vLabel}]${outputColorFilter(settings)}[vout]`);
 
-  // hang: néma alap + hozzájárulások; a beszéd (videó-hang + voiceover) külön
-  // buszra gyűlik, hogy az autoDuck-os zene sidechain-nel halkulhasson alatta
-  const audioLabels = ['abase'];
-  const speechLabels = [];
-  const duckLabels = [];
-  graph.push(
-    `anullsrc=channel_layout=stereo:sample_rate=44100:d=${total.toFixed(3)}[abase]`
-  );
-
-  // Voice Studio (P0-9) — a láncok a voicechain.js-ben élnek, mert az
-  // ELŐNÉZETI PROXY pontosan ugyanezt kell hogy alkalmazza (különben az
-  // előnézet és az export hangja szétcsúszna)
-  const DEREVERB = dereverbChain();
-
-  let audioIdx = 0;
-  // 🎚️ hangerő-automáció (P0-5): volume-kulcskockákkal a statikus érték
-  // helyett t-kifejezés megy (eval=frame); a kf-idő klip-idő (t + skip)
-  const volumeExpr = (clip, skip) => {
-    const kfs = clip.keyframes?.volume;
-    if (!kfs || kfs.length === 0) {
-      return `volume=${clip.volume}`;
-    }
-    const T = skip > 0 ? `(t+${skip.toFixed(3)})` : 't';
-    return `volume='${kfChannelExpr(kfs, clip.volume, T)}':eval=frame`;
-  };
-  const hasAnyVolume = (clip) =>
-    clip.volume > 0 || (clip.keyframes?.volume ?? []).some((k) => k.value > 0);
-
-  // 🎚️ pásztázás: statikus (panFilter) VAGY automáció (pan-kulcskockák → per-frame aeval).
-  // A dinamikus balansz ugyanazt a lineáris törvényt követi, mint a statikus panFilter
-  // (lg=1-max(0,pan), rg=1-max(0,-pan)), csak a `pan` itt t-függő kifejezés.
-  const panChain = (clip, skip) => {
-    const pk = clip.keyframes?.pan;
-    if (!pk || pk.length === 0) {
-      return panFilter(clip.pan);
-    }
-    const T = skip > 0 ? `(t+${skip.toFixed(3)})` : 't';
-    const PAN = kfChannelExpr(pk, clip.pan ?? 0, T);
-    return (
-      `aformat=channel_layouts=stereo,` +
-      `aeval='val(0)*(1-max(0,${PAN}))|val(1)*(1-max(0,-(${PAN})))':c=stereo,`
-    );
-  };
-
-  for (const seg of segments) {
-    if (seg.kind !== 'video' || !hasAnyVolume(seg.clip)) {
-      continue;
-    }
-    const clip = seg.clip;
-    if (!(await hasAudioStream(clip.uri))) {
-      continue;
-    }
-    const idx = addInput(['-i', clip.uri], `v|${clip.uri}`);
-    const { srcStart, srcEnd } = segSourceWindow(clip, seg);
-    const videoMono = (await audioChannelCount(clip.uri)) === 1;
-    const delayMs = Math.round((clip.start + seg.skip) * 1000);
-    const label = `av${audioIdx++}`;
+  // 🎧 „azt kapod, amit hallasz”: ha a telefon feltöltötte a kész keverést (előnézet = export —
+  // effektek, duck, master is), a szerver NEM keveri újra: ez a sáv kerül a videó alá / a
+  // hangfájlba. A régi kliens (keverés nélkül) a szerveres keverést kapja.
+  const mixPath = typeof project.audioMixUri === 'string' && fs.existsSync(project.audioMixUri) ? project.audioMixUri : null;
+  if (mixPath) {
+    const mixIn = addInput(['-i', mixPath], 'audiomix');
     graph.push(
-      `[${idx}:a]atrim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
-        (clip.reversed ? 'areverse,' : '') + // ⏪ a trimmelt hang-ablak megfordítása
-        `asetpts=PTS-STARTPTS,` +
-        (videoMono ? MONO_TO_STEREO : '') + // a monó videóhang is teljes szinten, mint az élő lejátszóban
-        // ⚠️ 1-es sebességnél NINCS atempo: a WSOLA-szűrő 1,0-n sem semleges (mérve: 287 minta =
-        // 6,5 ms késés + mintaszintű átdolgozás) — a videó hangja eltolódott és torzult
-        (clip.speed !== 1 ? `${atempoChain(clip.speed)},` : '') +
-        (clip.deReverb ? DEREVERB : '') +
-        (clip.voiceEnhance ? VOICE_ENHANCE : '') +
-        ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
-        `${volumeExpr(clip, seg.skip)},` +
-        `aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`
+      `[${mixIn}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,aresample=44100,apad,atrim=end=${total.toFixed(6)}[aout]`
     );
-    speechLabels.push(label);
-  }
-
-  // 🎚️ klip → sáv-típus térkép a sávonkénti mixer-gainhez (fader)
-  const clipTrackType = {};
-  for (const tr of project.tracks) {
-    for (const c of tr.clips) {
-      clipTrackType[c.id] = tr.type;
-    }
-  }
-  const clipFades = edgeFades(project);
-  // 🎚️ sidechain-duck trigger-sáv (AudioMaster.duckTrigger); hiányzó = voiceover-viselkedés
-  const duckTrigger = project.audioMaster?.duckTrigger;
-  for (const clip of audioClips) {
-    if (!hasAnyVolume(clip)) {
-      continue;
-    }
-    if (!(await hasAudioStream(clip.uri))) {
-      continue;
-    }
-    const idx = addInput(['-i', clip.uri], `a|${clip.uri}`);
-    const delayMs = Math.round(clip.start * 1000);
-    const label = `aa${audioIdx++}`;
-    // 🎚️ a forráson belüli kezdet (trimIn) → atrim=start; a szegmens ennyitől
-    // szól `duration` hosszan (a fade-ek az asetpts után 0-tól számolnak)
-    const aTrimIn = clip.trimIn || 0;
-    // sávonkénti mixer-gain (fader) — a klip sávjának gainje (hiányzó = 1)
-    const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
-    const mono = (await audioChannelCount(clip.uri)) === 1;
-    let chain =
-      `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
-        (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
-        `asetpts=PTS-STARTPTS,` +
-      audioSpeedChain(clip) +
-      (mono ? MONO_TO_STEREO : '') +
-      (clip.deReverb ? DEREVERB : '') +
-      (clip.voiceEnhance ? VOICE_ENHANCE : '') +
-      // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
-      audioFxChain(clip.audioFx) +
-      panChain(clip, 0) +
-      ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
-      volumeExpr(clip, 0) +
-      (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
-    const fades = clipFades[clip.id] ?? { in: clip.fadeIn, out: clip.fadeOut };
-    if (fades.in > 0) {
-      chain += `,afade=t=in:st=0:d=${fades.in.toFixed(4)}`;
-    }
-    if (fades.out > 0) {
-      chain += `,afade=t=out:st=${Math.max(0, clip.duration - fades.out).toFixed(4)}:d=${fades.out.toFixed(4)}`;
-    }
-    chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
-    graph.push(chain);
-    const isTrigger = isDuckTrigger(clip, clipTrackType[clip.id], duckTrigger);
-    const pushToBus = (lbl) => {
-      if (isTrigger) {
-        speechLabels.push(lbl);
-      } else if (clip.autoDuck) {
-        duckLabels.push(lbl);
-      } else {
-        audioLabels.push(lbl);
-      }
-    };
-    pushToBus(label);
-
-    // 🎵 HARMÓNIA-hang (AUDIOT §5): a klip MELLÉ egy félhang-intervallummal eltolt, halkabb
-    // másodhang (külön dekód → ugyanaz a test + kombinált pitch-eltolás → a száraz busz). A
-    // teljes eltolás (klip-pitch + harmónia) ±12-re szorítva, hogy az atempo biztonságos maradjon.
-    const harm = clip.audioFx?.harmony;
-    if (harm && Math.round(harm) !== 0) {
-      const idx2 = addInput(['-i', clip.uri], `harm|${clip.uri}`);
-      const hlabel = `ah${audioIdx++}`;
-      const total = Math.max(-12, Math.min(12, Math.round(clip.audioFx.pitchSemitones || 0) + Math.round(harm)));
-      const hFx = { ...clip.audioFx, pitchSemitones: total, harmony: 0 };
-      let hchain =
-        `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
-        (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
-        `asetpts=PTS-STARTPTS,` +
-        audioSpeedChain(clip) +
-        (clip.deReverb ? DEREVERB : '') +
-        (clip.voiceEnhance ? VOICE_ENHANCE : '') +
-        audioFxChain(hFx) +
-        panChain(clip, 0) +
-        volumeExpr(clip, 0) +
-        `,volume=0.7` + // a harmónia halkabb (háttér-réteg)
-        (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
-      if (clip.fadeIn > 0) {
-        hchain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`; // a harmónia-hang a felhasználói fade-et követi
-      }
-      if (clip.fadeOut > 0) {
-        hchain += `,afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`;
-      }
-      hchain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${hlabel}]`;
-      graph.push(hchain);
-      pushToBus(hlabel);
-    }
-  }
-
-  if (duckLabels.length > 0 && speechLabels.length > 0) {
-    // beszéd-busz kettéosztva: egyik a mixbe, másik a sidechain kulcsa
-    const speechMix =
-      speechLabels.length > 1
-        ? (graph.push(
-            `${speechLabels.map((l) => `[${l}]`).join('')}amix=inputs=${speechLabels.length}:duration=longest:normalize=0[spmix]`
-          ),
-          'spmix')
-        : speechLabels[0];
-    graph.push(
-      `[${speechMix}]aformat=sample_fmts=fltp:channel_layouts=stereo,asplit[spOut][spKeyRaw]`
-    );
-    // a kulcs-ág csenddel párnázva — különben a sidechaincompress a beszéd
-    // végénél levágná a zene-buszt is
-    graph.push(`[spKeyRaw]apad[spKey]`);
-    const duckMix =
-      duckLabels.length > 1
-        ? (graph.push(
-            `${duckLabels.map((l) => `[${l}]`).join('')}amix=inputs=${duckLabels.length}:duration=longest:normalize=0[dkmix]`
-          ),
-          'dkmix')
-        : duckLabels[0];
-    graph.push(
-      `[${duckMix}]aformat=sample_fmts=fltp:channel_layouts=stereo[dkin]`
-    );
-    graph.push(
-      `[dkin][spKey]sidechaincompress=threshold=0.02:ratio=6:attack=25:release=350[ducked]`
-    );
-    audioLabels.push('spOut', 'ducked');
   } else {
-    audioLabels.push(...speechLabels, ...duckLabels);
-  }
-
-  // 🎬 PiP-audio: a pip-videók hangja a klip kezdetére késleltetve, a mixbe
-  for (let k = 0; k < pipAudio.length; k++) {
-    const pa = pipAudio[k];
-    const ms = Math.round(pa.start * 1000);
-    const tempo = pa.speed !== 1 && pa.speed >= 0.5 && pa.speed <= 2 ? `,atempo=${pa.speed}` : '';
+    // hang: néma alap + hozzájárulások; a beszéd (videó-hang + voiceover) külön
+    // buszra gyűlik, hogy az autoDuck-os zene sidechain-nel halkulhasson alatta
+    const audioLabels = ['abase'];
+    const speechLabels = [];
+    const duckLabels = [];
     graph.push(
-      `[${pa.idx}:a]${pa.reversed ? 'areverse,' : ''}asetpts=PTS-STARTPTS${tempo},adelay=${ms}|${ms},volume=${pa.volume}[pipa${k}]`
+      `anullsrc=channel_layout=stereo:sample_rate=44100:d=${total.toFixed(3)}[abase]`
     );
-    audioLabels.push(`pipa${k}`);
-  }
 
-  graph.push(
-    `${audioLabels.map((l) => `[${l}]`).join('')}amix=inputs=${audioLabels.length}:duration=first:normalize=0[aout]`
-  );
+    // Voice Studio (P0-9) — a láncok a voicechain.js-ben élnek, mert az
+    // ELŐNÉZETI PROXY pontosan ugyanezt kell hogy alkalmazza (különben az
+    // előnézet és az export hangja szétcsúszna)
+    const DEREVERB = dereverbChain();
+
+    let audioIdx = 0;
+    // 🎚️ hangerő-automáció (P0-5): volume-kulcskockákkal a statikus érték
+    // helyett t-kifejezés megy (eval=frame); a kf-idő klip-idő (t + skip)
+    const volumeExpr = (clip, skip) => {
+      const kfs = clip.keyframes?.volume;
+      if (!kfs || kfs.length === 0) {
+        return `volume=${clip.volume}`;
+      }
+      const T = skip > 0 ? `(t+${skip.toFixed(3)})` : 't';
+      return `volume='${kfChannelExpr(kfs, clip.volume, T)}':eval=frame`;
+    };
+    const hasAnyVolume = (clip) =>
+      clip.volume > 0 || (clip.keyframes?.volume ?? []).some((k) => k.value > 0);
+
+    // 🎚️ pásztázás: statikus (panFilter) VAGY automáció (pan-kulcskockák → per-frame aeval).
+    // A dinamikus balansz ugyanazt a lineáris törvényt követi, mint a statikus panFilter
+    // (lg=1-max(0,pan), rg=1-max(0,-pan)), csak a `pan` itt t-függő kifejezés.
+    const panChain = (clip, skip) => {
+      const pk = clip.keyframes?.pan;
+      if (!pk || pk.length === 0) {
+        return panFilter(clip.pan);
+      }
+      const T = skip > 0 ? `(t+${skip.toFixed(3)})` : 't';
+      const PAN = kfChannelExpr(pk, clip.pan ?? 0, T);
+      return (
+        `aformat=channel_layouts=stereo,` +
+        `aeval='val(0)*(1-max(0,${PAN}))|val(1)*(1-max(0,-(${PAN})))':c=stereo,`
+      );
+    };
+
+    for (const seg of segments) {
+      if (seg.kind !== 'video' || !hasAnyVolume(seg.clip)) {
+        continue;
+      }
+      const clip = seg.clip;
+      if (!(await hasAudioStream(clip.uri))) {
+        continue;
+      }
+      const idx = addInput(['-i', clip.uri], `v|${clip.uri}`);
+      const { srcStart, srcEnd } = segSourceWindow(clip, seg);
+      const videoMono = (await audioChannelCount(clip.uri)) === 1;
+      const delayMs = Math.round((clip.start + seg.skip) * 1000);
+      const label = `av${audioIdx++}`;
+      graph.push(
+        `[${idx}:a]atrim=start=${srcStart.toFixed(3)}:end=${srcEnd.toFixed(3)},` +
+          (clip.reversed ? 'areverse,' : '') + // ⏪ a trimmelt hang-ablak megfordítása
+          `asetpts=PTS-STARTPTS,` +
+          (videoMono ? MONO_TO_STEREO : '') + // a monó videóhang is teljes szinten, mint az élő lejátszóban
+          // ⚠️ 1-es sebességnél NINCS atempo: a WSOLA-szűrő 1,0-n sem semleges (mérve: 287 minta =
+          // 6,5 ms késés + mintaszintű átdolgozás) — a videó hangja eltolódott és torzult
+          (clip.speed !== 1 ? `${atempoChain(clip.speed)},` : '') +
+          (clip.deReverb ? DEREVERB : '') +
+          (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+          ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
+          `${volumeExpr(clip, seg.skip)},` +
+          `aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`
+      );
+      speechLabels.push(label);
+    }
+
+    // 🎚️ klip → sáv-típus térkép a sávonkénti mixer-gainhez (fader)
+    const clipTrackType = {};
+    for (const tr of project.tracks) {
+      for (const c of tr.clips) {
+        clipTrackType[c.id] = tr.type;
+      }
+    }
+    const clipFades = edgeFades(project);
+    // 🎚️ sidechain-duck trigger-sáv (AudioMaster.duckTrigger); hiányzó = voiceover-viselkedés
+    const duckTrigger = project.audioMaster?.duckTrigger;
+    for (const clip of audioClips) {
+      if (!hasAnyVolume(clip)) {
+        continue;
+      }
+      if (!(await hasAudioStream(clip.uri))) {
+        continue;
+      }
+      const idx = addInput(['-i', clip.uri], `a|${clip.uri}`);
+      const delayMs = Math.round(clip.start * 1000);
+      const label = `aa${audioIdx++}`;
+      // 🎚️ a forráson belüli kezdet (trimIn) → atrim=start; a szegmens ennyitől
+      // szól `duration` hosszan (a fade-ek az asetpts után 0-tól számolnak)
+      const aTrimIn = clip.trimIn || 0;
+      // sávonkénti mixer-gain (fader) — a klip sávjának gainje (hiányzó = 1)
+      const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
+      const mono = (await audioChannelCount(clip.uri)) === 1;
+      let chain =
+        `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
+          (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
+          `asetpts=PTS-STARTPTS,` +
+        audioSpeedChain(clip) +
+        (mono ? MONO_TO_STEREO : '') +
+        (clip.deReverb ? DEREVERB : '') +
+        (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+        // 🎛️ granuláris Pro-audio FX (EQ/HPF/LPF/komp/limiter/de-esser/denoise/reverb/delay/normalize)
+        audioFxChain(clip.audioFx) +
+        panChain(clip, 0) +
+        ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
+        volumeExpr(clip, 0) +
+        (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
+      const fades = clipFades[clip.id] ?? { in: clip.fadeIn, out: clip.fadeOut };
+      if (fades.in > 0) {
+        chain += `,afade=t=in:st=0:d=${fades.in.toFixed(4)}`;
+      }
+      if (fades.out > 0) {
+        chain += `,afade=t=out:st=${Math.max(0, clip.duration - fades.out).toFixed(4)}:d=${fades.out.toFixed(4)}`;
+      }
+      chain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${label}]`;
+      graph.push(chain);
+      const isTrigger = isDuckTrigger(clip, clipTrackType[clip.id], duckTrigger);
+      const pushToBus = (lbl) => {
+        if (isTrigger) {
+          speechLabels.push(lbl);
+        } else if (clip.autoDuck) {
+          duckLabels.push(lbl);
+        } else {
+          audioLabels.push(lbl);
+        }
+      };
+      pushToBus(label);
+
+      // 🎵 HARMÓNIA-hang (AUDIOT §5): a klip MELLÉ egy félhang-intervallummal eltolt, halkabb
+      // másodhang (külön dekód → ugyanaz a test + kombinált pitch-eltolás → a száraz busz). A
+      // teljes eltolás (klip-pitch + harmónia) ±12-re szorítva, hogy az atempo biztonságos maradjon.
+      const harm = clip.audioFx?.harmony;
+      if (harm && Math.round(harm) !== 0) {
+        const idx2 = addInput(['-i', clip.uri], `harm|${clip.uri}`);
+        const hlabel = `ah${audioIdx++}`;
+        const total = Math.max(-12, Math.min(12, Math.round(clip.audioFx.pitchSemitones || 0) + Math.round(harm)));
+        const hFx = { ...clip.audioFx, pitchSemitones: total, harmony: 0 };
+        let hchain =
+          `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
+          (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
+          `asetpts=PTS-STARTPTS,` +
+          audioSpeedChain(clip) +
+          (clip.deReverb ? DEREVERB : '') +
+          (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+          audioFxChain(hFx) +
+          panChain(clip, 0) +
+          volumeExpr(clip, 0) +
+          `,volume=0.7` + // a harmónia halkabb (háttér-réteg)
+          (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '');
+        if (clip.fadeIn > 0) {
+          hchain += `,afade=t=in:st=0:d=${clip.fadeIn.toFixed(3)}`; // a harmónia-hang a felhasználói fade-et követi
+        }
+        if (clip.fadeOut > 0) {
+          hchain += `,afade=t=out:st=${Math.max(0, clip.duration - clip.fadeOut).toFixed(3)}:d=${clip.fadeOut.toFixed(3)}`;
+        }
+        hchain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${hlabel}]`;
+        graph.push(hchain);
+        pushToBus(hlabel);
+      }
+    }
+
+    if (duckLabels.length > 0 && speechLabels.length > 0) {
+      // beszéd-busz kettéosztva: egyik a mixbe, másik a sidechain kulcsa
+      const speechMix =
+        speechLabels.length > 1
+          ? (graph.push(
+              `${speechLabels.map((l) => `[${l}]`).join('')}amix=inputs=${speechLabels.length}:duration=longest:normalize=0[spmix]`
+            ),
+            'spmix')
+          : speechLabels[0];
+      graph.push(
+        `[${speechMix}]aformat=sample_fmts=fltp:channel_layouts=stereo,asplit[spOut][spKeyRaw]`
+      );
+      // a kulcs-ág csenddel párnázva — különben a sidechaincompress a beszéd
+      // végénél levágná a zene-buszt is
+      graph.push(`[spKeyRaw]apad[spKey]`);
+      const duckMix =
+        duckLabels.length > 1
+          ? (graph.push(
+              `${duckLabels.map((l) => `[${l}]`).join('')}amix=inputs=${duckLabels.length}:duration=longest:normalize=0[dkmix]`
+            ),
+            'dkmix')
+          : duckLabels[0];
+      graph.push(
+        `[${duckMix}]aformat=sample_fmts=fltp:channel_layouts=stereo[dkin]`
+      );
+      graph.push(
+        `[dkin][spKey]sidechaincompress=threshold=0.02:ratio=6:attack=25:release=350[ducked]`
+      );
+      audioLabels.push('spOut', 'ducked');
+    } else {
+      audioLabels.push(...speechLabels, ...duckLabels);
+    }
+
+    // 🎬 PiP-audio: a pip-videók hangja a klip kezdetére késleltetve, a mixbe
+    for (let k = 0; k < pipAudio.length; k++) {
+      const pa = pipAudio[k];
+      const ms = Math.round(pa.start * 1000);
+      const tempo = pa.speed !== 1 && pa.speed >= 0.5 && pa.speed <= 2 ? `,atempo=${pa.speed}` : '';
+      graph.push(
+        `[${pa.idx}:a]${pa.reversed ? 'areverse,' : ''}asetpts=PTS-STARTPTS${tempo},adelay=${ms}|${ms},volume=${pa.volume}[pipa${k}]`
+      );
+      audioLabels.push(`pipa${k}`);
+    }
+
+    graph.push(
+      `${audioLabels.map((l) => `[${l}]`).join('')}amix=inputs=${audioLabels.length}:duration=first:normalize=0[aout]`
+    );
+  }
 
   // 🎧 hang-only export (WAV/MP3/AAC/FLAC/Opus, PRO-AUDIO A25): a mix videó nélkül, lebegőpontos
   // PCM-ként kerül a köztes fájlba, így a veszteségmentes kimenet valóban az; a kép nem kódolódik
@@ -3078,7 +3089,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   // 🎚️ MASTER (kétmenetes): EQ + multiband + loudnorm(mért, linear) a kész keverékre. A hiba
   // a render hibája (A30): a mester nélküli fájl hibás hangosságú volna, jelzés nélkül.
   let masteredFile = outFile;
-  if (project.audioMaster) {
+  // a telefon keverésében a master már benne van (nem mesterelünk kétszer)
+  if (project.audioMaster && !mixPath) {
     masteredFile = await applyMaster(outFile, project.audioMaster, workDir, total, onProgress, {
       audioOnly: !!audio,
       settings,

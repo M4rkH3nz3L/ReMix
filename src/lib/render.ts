@@ -517,6 +517,36 @@ async function cancelRender(base: string, id: string): Promise<void> {
   }
 }
 
+/**
+ * 🎧 A projekt keverése a telefonon, 32 bites lebegőpontos WAV-ba (a Pro export köztes fájlja).
+ * null, ha nem készülhet el (a szerver keveri).
+ */
+async function phoneMixFile(project: Project, onProgress?: (u: ProgressUpdate) => void, signal?: AbortSignal): Promise<File | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  try {
+    const [{ offlineMixPlan }, { exportOfflineWav, OFFLINE_MAX_SEC }] = await Promise.all([
+      import('@/lib/offlineMix'),
+      import('@/lib/offlineMixClient'),
+    ]);
+    const plan = offlineMixPlan(project);
+    if (plan.clips.length === 0 || plan.duration > OFFLINE_MAX_SEC || plan.clips.some((c) => !c.uri.startsWith('file:'))) {
+      return null;
+    }
+    const target = new File(Paths.cache, `remix_mix_${Date.now()}.wav`);
+    await exportOfflineWav(project, target, onProgress, signal, 'float32');
+    return target;
+  } catch (caught) {
+    if (signal?.aborted) {
+      throw new RenderCancelledError();
+    }
+    // a telefonos keverés hibája nem állítja meg az exportot: a szerver keveri (régi út)
+    logCaught('lib/render.ts:phoneMixFile', caught);
+    return null;
+  }
+}
+
 async function submitAndPollRender(
   base: string,
   project: Project,
@@ -571,6 +601,13 @@ async function submitAndPollRender(
       unit: tr('lib.render.unitFile'),
     });
   }
+  // 🎧 „azt kapod, amit hallasz”: a telefon kész keverése (az előnézettel azonos kód — effektek,
+  // duck, master is) megy fel, a szerver nem keveri újra. Ha itt nem készülhet el (nincs natív
+  // dekóder, távoli vagy túl hosszú forrás), a szerver keveri — ez a régi út.
+  const mix = await phoneMixFile(flat, onProgress, signal);
+  if (mix) {
+    await appendMediaPart(form, 'audioMix', mix.uri, 'mix.wav');
+  }
   form.append('project', JSON.stringify(flat));
   form.append('uriMap', JSON.stringify(uriMap));
   if (settings) {
@@ -591,9 +628,18 @@ async function submitAndPollRender(
     body: form,
     headers: await workerAuthHeaders(),
     signal,
-  }).catch((e: unknown) => {
-    throw asCancelled(e, signal);
-  });
+  })
+    .catch((e: unknown) => {
+      throw asCancelled(e, signal);
+    })
+    .finally(() => {
+      // a feltöltött keverés helyi másolata már nem kell
+      try {
+        if (mix?.exists) mix.delete();
+      } catch (caught) {
+        logCaught('lib/render.ts:submitAndPollRender', caught);
+      }
+    });
   // ⚠️ a `.json()` KORÁBBAN itt futott, mint az `!ok` ág — egy 502-es HTML-oldal
   // parse-hibát dobott, épp a beszédes üzenet helyett
   const submitBody = await readJson<{ id?: string; error?: string }>(

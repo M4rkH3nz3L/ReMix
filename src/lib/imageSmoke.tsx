@@ -2976,6 +2976,53 @@ async function smokeDenoise(log: Log) {
   src.delete();
 }
 
+/**
+ * 🎧 Pro szerveres export = a telefon keverése: dinamika-effektes, masteres projekt — a szerverre
+ * a telefon kész keverése megy fel; a letöltött 24 bites fájl = a telefonos keverés (kivonva).
+ */
+async function smokeProExport(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let a = 3;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  const x = Float32Array.from({ length: 4 * SR }, (_, i) => 0.3 * rnd() * (i % 22050 < 11025 ? 1 : 0.2));
+  const src = new File(Paths.document, 'smoke_pro_src.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([x, x], SR, () => 0.5));
+  const base = createEmptyProject('smoke pro export', '1:1', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'p', uri: src.uri, label: 'p', start: 0.2, duration: 3.5, trimIn: 0.1, sourceDuration: 4, volume: 0.8, fadeIn: 0.1, fadeOut: 0.2, pan: -0.3, audioFx: { compressor: true, reverb: 0.4, deEsser: true }, source: 'imported' };
+  const project: Project = { ...base, audioMaster: { target: 'custom', lufs: -14, truePeak: -1, dynamics: 'balanced', multiband: true }, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  // a telefon saját keverése (referencia)
+  const phone = new File(projectExportDir(), 'smoke_pro_phone.wav');
+  await exportOfflineWav(project, phone, undefined, undefined, 'float32');
+  // a Pro szerveres export (24 bit) — a feltöltött keverésből
+  const server = new File(projectExportDir(), 'smoke_pro_server.wav');
+  const t0 = Date.now();
+  await exportAudioToFile(project, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 24, sampleRate: 44100, channels: 2 }), server);
+  log(null, 'Pro export', `${Date.now() - t0} ms`);
+  const api = await loadAudioApi();
+  const mine = await api!.decodeAudioData(phone.uri, SR);
+  const theirs = await api!.decodeAudioData(server.uri, SR);
+  const db = (xs: Float32Array) => 10 * Math.log10(xs.reduce((acc, v) => acc + v * v, 0) / Math.max(1, xs.length) + 1e-30);
+  for (const ch of [0, 1]) {
+    const m = mine.getChannelData(ch);
+    const t = theirs.getChannelData(ch);
+    const n = Math.min(m.length, t.length);
+    const diff = Float32Array.from({ length: n }, (_, i) => m[i] - t[i]);
+    const snr = db(t.subarray(0, n)) - db(diff);
+    log(snr > 80, `Pro szerveres export = telefonos keverés (${ch === 0 ? 'bal' : 'jobb'})`, `${snr.toFixed(1)} dB a jel alatt, hossz ${m.length}/${t.length}`);
+  }
+  phone.delete();
+  server.delete();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4140,6 +4187,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'proexport') {
+    await step(phase, () => smokeProExport(log));
     return;
   }
   if (phase === 'denoise') {

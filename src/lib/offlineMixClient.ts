@@ -7,7 +7,7 @@ import { denoiseStereo } from '@/lib/denoise';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, withNormalizeGains, measureMasterGain, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -27,14 +27,16 @@ export async function exportOfflineWav(
   mix: Project,
   target: File,
   onProgress?: (u: ProgressUpdate) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** `float32`: a Pro szerveres export köztes keveréke (veszteségmentes) */
+  format: 'pcm16' | 'float32' = 'pcm16'
 ): Promise<{ uri: string; unsupported: OfflineUnsupported[] }> {
   const plan = offlineMixPlan(mix);
   if (plan.duration > OFFLINE_MAX_SEC) {
     throw new Error(tr('studio.audio.offline.tooLong', { minutes: OFFLINE_MAX_SEC / 60 }));
   }
   // 💾 a WAV mérete előre ismert: ha nem fér el, a dekódolás el sem indul
-  const needed = wavBytes(Math.round(plan.duration * OFFLINE_SAMPLE_RATE), 2);
+  const needed = wavBytes(Math.round(plan.duration * OFFLINE_SAMPLE_RATE), 2) * (format === 'float32' ? 2 : 1);
   const free = freeDiskBytes();
   if (!hasRoomFor(needed, free)) {
     throw new Error(tr('studio.audio.offline.noSpace', { need: megabytes(needed), free: megabytes(free) }));
@@ -101,7 +103,7 @@ export async function exportOfflineWav(
   target.create();
   const handle = target.open();
   try {
-    handle.writeBytes(wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE));
+    handle.writeBytes(format === 'float32' ? wavHeaderF32(frames, 2, OFFLINE_SAMPLE_RATE) : wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE));
     // T2: időkeretes feldolgozás — negyed mp-es darabok, és ~12 ms munka után mindig visszaadjuk
     // a vezérlést (mérve: az 5 mp-es darabok 392 ms-ig fogták a felületet, látható akadás)
     const chunk = Math.round(CHUNK_SEC * OFFLINE_SAMPLE_RATE);
@@ -113,7 +115,7 @@ export async function exportOfflineWav(
       const to = Math.min(frames, from + chunk);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
       mixRange(finalPlan, sources, out, from, to, 1, fxState);
-      handle.writeBytes(pcm16(out));
+      handle.writeBytes(format === 'float32' ? pcmF32(out) : pcm16(out));
       if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
         onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
         await new Promise((resolve) => setTimeout(resolve, 0));

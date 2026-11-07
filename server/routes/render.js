@@ -1,3 +1,4 @@
+const { bindAudioMix } = require('../lib/audioMix');
 const { logCaught } = require('../lib/caught');
 // 🎬 Render route-ok + lokális job-állapot (render/proxy/collect/queue/:id*).
 //
@@ -47,6 +48,8 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
 
   // a klip-uri-k átírása a feltöltött fájlokra
   const fieldToFile = new Map((req.files ?? []).map((f) => [f.fieldname, f.path]));
+  // 🎧 „azt kapod, amit hallasz”: a telefon kész keveréke (előnézet = export) — csak feltöltött fájl
+  bindAudioMix(project, fieldToFile);
   const missing = [];
   for (const track of project.tracks ?? []) {
     for (const clip of track.clips ?? []) {
@@ -175,6 +178,9 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
             clip.imageUri = localToKey.get(clip.imageUri);
           }
         }
+      }
+      if (project.audioMixUri && localToKey.has(project.audioMixUri)) {
+        project.audioMixUri = localToKey.get(project.audioMixUri);
       }
       await enqueueRender(id, {
         project,

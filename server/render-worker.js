@@ -90,6 +90,10 @@ async function rehydrateInputs(project, workDir) {
       }
     }
   }
+  // 🎧 a telefon kész keveréke (ha a kliens feltöltötte)
+  if (project.audioMixUri) {
+    project.audioMixUri = await resolve(project.audioMixUri);
+  }
 }
 
 const worker = new Worker(

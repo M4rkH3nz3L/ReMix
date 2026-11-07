@@ -160,6 +160,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     }
   }
   clips.push(...videoAudioClips(project, unsupported));
+  clips.push(...pipAudioClips(project));
   const ducking = clips.some((c) => c.role === 'duck') && clips.some((c) => c.role === 'key');
   return {
     duration: projectDuration(project),
@@ -318,6 +319,43 @@ export function mixRange(
   }
 }
 
+/**
+ * 32 bites lebegőpontos WAV fejléc (WAVE_FORMAT_IEEE_FLOAT) — a Pro szerveres export
+ * köztes keveréke: veszteségmentes, a 24 bites kimenethez is (nincs 16 bites kerekítés).
+ */
+export function wavHeaderF32(frames: number, channels: number, sampleRate: number): Uint8Array {
+  const bytes = new Uint8Array(44);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, value: string) => {
+    for (let i = 0; i < value.length; i++) view.setUint8(at + i, value.charCodeAt(i));
+  };
+  const data = frames * channels * 4;
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + data, true);
+  text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 3, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * 4, true);
+  view.setUint16(32, channels * 4, true);
+  view.setUint16(34, 32, true);
+  text(36, 'data');
+  view.setUint32(40, data, true);
+  return bytes;
+}
+
+/** összefésült (interleaved) 32 bites lebegőpontos minták */
+export function pcmF32(channels: Float32Array[]): Uint8Array {
+  const n = channels[0]?.length ?? 0;
+  const ch = channels.length;
+  const out = new Float32Array(n * ch);
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < ch; c++) out[i * ch + c] = channels[c][i];
+  }
+  return new Uint8Array(out.buffer);
+}
+
 /** 16 bites PCM WAV fejléc (`frames` minta csatornánként). */
 export function wavHeader16(frames: number, channels: number, sampleRate: number): Uint8Array {
   const bytes = new Uint8Array(44);
@@ -430,6 +468,33 @@ export function videoAudioClips(project: Project, _unsupported: Set<OfflineUnsup
     });
   }
   return out;
+}
+
+/**
+ * 🖼️ A PiP-videók hangja (a szerver `pipAudio`-jának tükre): a klip teljes ideje alatt, a
+ * forrás-ablakával, sebességével (hangmagasság-tartással) és irányával, statikus hangerővel,
+ * fade és sáv-erősítés nélkül.
+ */
+export function pipAudioClips(project: Project): OfflineMixClip[] {
+  const pip = project.tracks.find((t) => t.type === 'pip');
+  return (pip?.clips ?? [])
+    .filter((c): c is VideoClip => c.kind === 'video' && ((c as VideoClip).volume ?? 1) > 0)
+    .map((v) => ({
+      id: `pip:${v.id}`,
+      track: 'pip' as TrackType,
+      uri: v.uri,
+      start: v.start,
+      duration: v.duration,
+      trimIn: v.trimIn ?? 0,
+      volume: v.volume ?? 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      pan: 0,
+      gain: 1,
+      speed: v.speed > 0 ? v.speed : 1,
+      reversed: !!v.reversed,
+      pitch: 0,
+    }));
 }
 
 /**

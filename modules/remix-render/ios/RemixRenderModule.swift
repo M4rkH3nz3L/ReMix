@@ -155,6 +155,22 @@ public class RemixRenderModule: Module {
       }
     }
 
+    // 🎧 hosszú forrás szakaszos dekódolása: a fájlnak CSAK a [start, start+duration) ablaka,
+    // 44,1 kHz-es, összefésült 32 bites lebegőpontos PCM-ként (a forrás csatornaszámával) egy
+    // nyers fájlba — a keverő így 20 percnél hosszabb forrást is a memória töredékével játszik.
+    Constant("supportsDecodeWindow") { true }
+
+    AsyncFunction("decodeWindow") { (uri: String, start: Double, duration: Double, outputPath: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let info = try RemixRenderModule.decodeWindow(url: self.fileURL(uri), start: start, duration: duration, outputPath: outputPath)
+          DispatchQueue.main.async { promise.resolve(info) }
+        } catch {
+          DispatchQueue.main.async { promise.reject(error) }
+        }
+      }
+    }
+
     // a futó render tényleges leállítása (a JS AbortSignal → ide jut)
     // A téma maszkja az eszközön (Vision, iOS 17+): a kép nem hagyja el a telefont.
     AsyncFunction("foregroundMask") { (uri: String, outputPath: String, promise: Promise) in
@@ -175,6 +191,56 @@ public class RemixRenderModule: Module {
       self.stateLock.unlock()
       session?.cancelExport()
     }
+  }
+
+  /// a hang-ablak dekódolása (AVAssetReader, 44,1 kHz, float32, összefésült, forrás-csatornaszám)
+  static func decodeWindow(url: URL, start: Double, duration: Double, outputPath: String) throws -> [String: Any] {
+    let asset = AVURLAsset(url: url)
+    guard let track = asset.tracks(withMediaType: .audio).first else {
+      throw RenderError.noTracks("audio")
+    }
+    var channels = 2
+    if let desc = track.formatDescriptions.first,
+       let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc as! CMAudioFormatDescription) {
+      channels = max(1, min(2, Int(asbd.pointee.mChannelsPerFrame)))
+    }
+    let reader = try AVAssetReader(asset: asset)
+    // mintára kerekítve (a CMTime(seconds:) csonkol: 19,9 × 44100 = 877589,999… → egy mintával korábbi
+    // kezdet, mérve a szakaszhatáron)
+    reader.timeRange = CMTimeRange(
+      start: CMTime(value: CMTimeValue((max(0, start) * 44100).rounded()), timescale: 44100),
+      duration: CMTime(value: CMTimeValue((max(0, duration) * 44100).rounded()), timescale: 44100))
+    let settings: [String: Any] = [
+      AVFormatIDKey: kAudioFormatLinearPCM,
+      AVSampleRateKey: 44100,
+      AVNumberOfChannelsKey: channels,
+      AVLinearPCMBitDepthKey: 32,
+      AVLinearPCMIsFloatKey: true,
+      AVLinearPCMIsNonInterleaved: false,
+      AVLinearPCMIsBigEndianKey: false,
+    ]
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
+    output.alwaysCopiesSampleData = false
+    reader.add(output)
+    guard reader.startReading() else {
+      throw RenderError.exportFailed(reader.error?.localizedDescription ?? "hang-ablak olvasása")
+    }
+    var data = Data()
+    while let sample = output.copyNextSampleBuffer() {
+      if let block = CMSampleBufferGetDataBuffer(sample) {
+        let length = CMBlockBufferGetDataLength(block)
+        var chunk = Data(count: length)
+        _ = chunk.withUnsafeMutableBytes { ptr in
+          CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: ptr.baseAddress!)
+        }
+        data.append(chunk)
+      }
+    }
+    if reader.status == .failed {
+      throw RenderError.exportFailed(reader.error?.localizedDescription ?? "hang-ablak olvasása")
+    }
+    try data.write(to: URL(fileURLWithPath: outputPath))
+    return ["frames": data.count / (4 * channels), "channels": channels]
   }
 
   private func fileURL(_ uri: String) -> URL {

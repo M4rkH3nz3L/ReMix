@@ -531,7 +531,11 @@ async function phoneMixFile(project: Project, onProgress?: (u: ProgressUpdate) =
       import('@/lib/offlineMixClient'),
     ]);
     const plan = offlineMixPlan(project);
-    if (plan.clips.length === 0 || plan.duration > OFFLINE_MAX_SEC || plan.clips.some((c) => !c.uri.startsWith('file:'))) {
+    const { longUris } = await import('@/lib/longSource');
+    const { needsWholeWindow } = await import('@/lib/offlineMix');
+    const long = longUris(plan.clips);
+    // a hosszú forrás egész-ablakos feldolgozása a telefonon nem fér bele: ilyenkor a szerver keveri
+    if (plan.clips.length === 0 || plan.duration > OFFLINE_MAX_SEC || plan.clips.some((c) => !c.uri.startsWith('file:') || (long.has(c.uri) && needsWholeWindow(c)))) {
       return null;
     }
     const target = new File(Paths.cache, `remix_mix_${Date.now()}.wav`);

@@ -4072,6 +4072,7 @@
         "onDeviceHint": "Kostenloser Export auf dem Handy: WAV, 16 Bit, 44,1 kHz, Stereo — ohne Server. Weitere Formate und Server-Effekte gibt es mit Pro.",
         "tooLong": "Der Export auf dem Handy schafft Projekte bis {{minutes}} Minuten. Für längere braucht es den Pro-Server-Export.",
         "noSpace": "Nicht genug freier Speicher für den Export: {{need}} MB nötig (+50 MB Reserve), {{free}} MB frei. Gib Speicher frei und versuche es erneut.",
+        "longProcessing": "Bei langen Quellen (über 10 Minuten) sind Rauschunterdrückung, Normalisierung, Stimmverbesserung, Tempo, Rückwärts und Tonhöhe im Export auf dem Gerät nicht verfügbar. Mit Pro rendert der Server.",
         "noDecoder": "Der Audio-Decoder ist auf diesem Gerät nicht verfügbar.",
         "decodeFailed": "Die Audiodatei {{name}} kann auf dem Handy nicht gelesen werden.",
         "decoding": "Audio wird gelesen…",

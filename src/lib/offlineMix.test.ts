@@ -1,4 +1,4 @@
-import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains } from '@/lib/offlineMix';
+import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains, type DecodedSource } from '@/lib/offlineMix';
 import { integratedLoudness } from '@/lib/loudness';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
@@ -139,6 +139,40 @@ describe('offlineMix (A26)', () => {
     expect(integratedLoudness(out[0], out[1], SR)).toBeCloseTo(-16, 0);
     const peak = out[0].reduce((m, v) => Math.max(m, Math.abs(v)), 0);
     expect(20 * Math.log10(peak)).toBeLessThanOrEqual(-1.5 + 1e-3);
+  });
+
+  it('🎧 szakaszos (hosszú) forrás: a keverés mintára azonos a teljes forráséval — effektekkel, szeletenként', () => {
+    const SR = 44100;
+    const n = 6 * SR;
+    const tone = Float32Array.from({ length: n }, (_, i) => Math.sin((2 * Math.PI * 220 * i) / SR) * (i % 30000 < 15000 ? 0.8 : 0.05));
+    const p = project([clip({ start: 0.5, duration: 4, trimIn: 1, sourceDuration: 6, audioFx: { highpass: 90, compressor: true, reverb: 0.3 } })]);
+    const plan = offlineMixPlan(p);
+    const uri = plan.clips[0].uri;
+    const full = new Map<string, DecodedSource>([[uri, { channels: [tone], sampleRate: SR }]]);
+    const reads: number[] = [];
+    const seg = new Map<string, DecodedSource>([[uri, { channels: [] as Float32Array[], sampleRate: SR, segmented: { read: (from: number, to: number) => {
+      reads.push(to - from);
+      const out = new Float32Array(to - from);
+      for (let i = from; i < to; i++) if (i >= 0 && i < n) out[i - from] = tone[i];
+      return [out];
+    } } }]]);
+    const render = (sources: typeof full, chunk: number) => {
+      const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+      const st = new Map();
+      for (let a = 0; a < n; a += chunk) {
+        const b = Math.min(n, a + chunk);
+        const part: [Float32Array, Float32Array] = [out[0].subarray(a, b), out[1].subarray(a, b)];
+        mixRange(plan, sources, part, a, b, 1, st);
+      }
+      return out;
+    };
+    const a = render(full, 5512);
+    const b = render(seg, 5512);
+    let maxDiff = 0;
+    for (let i = 0; i < n; i++) maxDiff = Math.max(maxDiff, Math.abs(a[0][i] - b[0][i]), Math.abs(a[1][i] - b[1][i]));
+    expect(maxDiff).toBeLessThan(1e-6);
+    // csak a szelet (és az első szeletnél a bejáratás) ablakát kérte — nem a teljes forrást
+    expect(Math.max(...reads)).toBeLessThan(Math.round(0.8 * SR));
   });
 });
 

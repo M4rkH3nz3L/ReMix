@@ -4067,6 +4067,7 @@
         "onDeviceHint": "Ingyenes export a telefonon: WAV, 16 bit, 44,1 kHz, sztereó — szerver nélkül. A többi formátum és a szerveres effektek Pro-val érhetők el.",
         "tooLong": "A telefonos export legfeljebb {{minutes}} perces projektet tud. Hosszabbhoz a Pro szerveres exportja kell.",
         "noSpace": "Nincs elég szabad hely az exporthoz: {{need}} MB kell (+50 MB tartalék), szabad {{free}} MB. Szabadíts fel helyet, és próbáld újra.",
+        "longProcessing": "Hosszú (10 percnél hosszabb) forráson a zajszűrés, a normalizálás, a hangjavítás, a sebesség, a visszafelé lejátszás és a hangmagasság a telefonos exportban nem érhető el. Pro-val a szerver elkészíti.",
         "noDecoder": "A hangdekóder ezen az eszközön nem érhető el.",
         "decodeFailed": "A(z) {{name}} hangfájl nem olvasható be a telefonon.",
         "decoding": "Hangok beolvasása…",

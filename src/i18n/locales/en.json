@@ -4067,6 +4067,7 @@
         "onDeviceHint": "Free export on your phone: WAV, 16-bit, 44.1 kHz, stereo — no server. Other formats and server effects come with Pro.",
         "tooLong": "On-device export handles projects up to {{minutes}} minutes. Longer ones need the Pro server export.",
         "noSpace": "Not enough free space to export: {{need}} MB needed (+50 MB reserve), {{free}} MB free. Free up some space and try again.",
+        "longProcessing": "On long sources (over 10 minutes), noise reduction, normalization, voice enhancement, speed, reverse and pitch are not available in the on-device export. With Pro, the server renders it.",
         "noDecoder": "The audio decoder isn't available on this device.",
         "decodeFailed": "The audio file {{name}} can't be read on the phone.",
         "decoding": "Reading audio…",

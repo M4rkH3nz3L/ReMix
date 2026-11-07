@@ -46,6 +46,11 @@ export function edgeFades(clips: AudioClip[]): Map<string, { in: number; out: nu
 export interface DecodedSource {
   channels: Float32Array[];
   sampleRate: number;
+  /**
+   * 🎧 hosszú forrás szakaszosan (a `channels` ilyenkor üres): a `[from, to)` mintatartomány
+   * csatornái (a forráson kívül csend), vagy null, ha a szükséges szakasz még nincs betöltve
+   */
+  segmented?: { read(from: number, to: number): Float32Array[] | null };
 }
 
 export interface OfflineMixClip {
@@ -65,6 +70,8 @@ export interface OfflineMixClip {
   gain: number;
   /** a klip azonosítója (az effekt-állapot kulcsa a darabos keverésben) */
   id: string;
+  /** a forrás teljes hossza (mp) — a hosszú forrás szakaszos olvasásához */
+  sourceDuration?: number;
   /** 🎛️ a klip effektjei (a közös DSP: `audioDsp.ts`) */
   fx?: AudioFx;
   /** ⏩ forrás-mp / idővonal-mp (hangmagasság-tartással); 1 = nincs nyújtás */
@@ -123,6 +130,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       const fx = voiceFx(clip.audioFx, !!clip.voiceEnhance, !!clip.deReverb);
       const main: OfflineMixClip = {
         id: clip.id,
+        ...(clip.sourceDuration ? { sourceDuration: clip.sourceDuration } : {}),
         ...(fxActive(fx) || clip.deReverb ? { fx: fx ?? {} } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
         ...(role ? { role } : {}),
@@ -219,17 +227,32 @@ export function mixRange(
     const dst = duckBus && clip.role === 'duck' ? duckBus : out;
     const key = keyBus && clip.role === 'key' ? keyBus : null;
     const src = sources.get(clip.uri);
-    if (!src || src.channels.length === 0) {
+    if (!src || (src.channels.length === 0 && !src.segmented)) {
       continue;
     }
-    const left = src.channels[0];
-    const right = src.channels[1] ?? src.channels[0];
-    const mono = src.channels.length === 1;
     const clipFrom = Math.round(clip.start * sr);
     const clipTo = clipFrom + Math.round(clip.duration * sr);
     const a = Math.max(fromSample, clipFrom);
     const b = Math.min(toSample, clipTo);
     const srcOffset = Math.round(clip.trimIn * src.sampleRate) - clipFrom;
+    // 🎧 hosszú (szakaszos) forrásnál csak a most kellő ablak: a mintaindex az ablakon belül
+    let left = src.channels[0];
+    let right = src.channels[1] ?? src.channels[0];
+    let base = 0;
+    if (src.segmented) {
+      if (b <= a) {
+        continue;
+      }
+      const w0 = clip.fx ? Math.max(clipFrom, a - FX_WARMUP) : a;
+      const win = src.segmented.read(w0 + srcOffset, b + srcOffset);
+      if (!win) {
+        continue; // a szakasz még töltődik: ebben a szeletben néma (a motor előre tölt)
+      }
+      left = win[0];
+      right = win[1] ?? win[0];
+      base = w0 + srcOffset;
+    }
+    const mono = src.segmented ? right === left : src.channels.length === 1;
     const staticPan = !clip.panKf || clip.panKf.length === 0 ? panGains(clip.pan) : null;
     const hasFade = clip.fadeIn > 0 || clip.fadeOut > 0;
     // 🎛️ effektek (a szerver sorrendjében: a pan és a hangerő ELŐTT): a forrás-szakasz előbb a
@@ -242,7 +265,7 @@ export function mixRange(
         const l = new Float32Array(to - from);
         const r = new Float32Array(to - from);
         for (let i = from; i < to; i++) {
-          const s = i + srcOffset;
+          const s = i + srcOffset - base;
           if (s >= 0 && s < left.length) {
             l[i - from] = left[s];
             r[i - from] = right[s];
@@ -271,7 +294,7 @@ export function mixRange(
       const blockEnd = Math.min(b, blockStart + BLOCK);
       const level = sampleChannel(clip.volumeKf, (blockStart - clipFrom) / sr, clip.volume) * clip.gain * (mono ? monoGain : 1);
       for (let i = Math.max(a, blockStart); i < blockEnd; i++) {
-        const s = i + srcOffset;
+        const s = i + srcOffset - base;
         if (!fxL && (s < 0 || s >= left.length)) {
           continue;
         }
@@ -447,6 +470,7 @@ export function videoAudioClips(project: Project, _unsupported: Set<OfflineUnsup
     const speed = v.speed > 0 ? v.speed : 1;
     out.push({
       id: `${v.id}@${visStart}`,
+      sourceDuration: v.sourceDuration,
       track: 'video',
       uri: v.uri,
       start: visStart,
@@ -481,6 +505,7 @@ export function pipAudioClips(project: Project): OfflineMixClip[] {
     .filter((c): c is VideoClip => c.kind === 'video' && ((c as VideoClip).volume ?? 1) > 0)
     .map((v) => ({
       id: `pip:${v.id}`,
+      sourceDuration: v.sourceDuration,
       track: 'pip' as TrackType,
       uri: v.uri,
       start: v.start,
@@ -568,7 +593,13 @@ export function withNormalizeGains(plan: OfflineMixPlan, sources: Map<string, De
  * végigviszi, és a cél-LUFS-hez szükséges erősítést adja (a második menet ezzel szól — mint a
  * szerver kétmenetes `loudnorm`-ja lineáris módban). Kis darabokban, mindegyik után a felület jön.
  */
-export async function measureMasterGain(plan: OfflineMixPlan, sources: Map<string, DecodedSource>, signal?: { aborted: boolean }): Promise<number> {
+export async function measureMasterGain(
+  plan: OfflineMixPlan,
+  sources: Map<string, DecodedSource>,
+  signal?: { aborted: boolean },
+  /** 🎧 a hosszú (szakaszos) forrás betöltése a darab előtt */
+  prepare?: (from: number, to: number) => Promise<void>
+): Promise<number> {
   if (!plan.master) {
     return 1;
   }
@@ -586,6 +617,7 @@ export async function measureMasterGain(plan: OfflineMixPlan, sources: Map<strin
       return Number.NaN;
     }
     const b = Math.min(n, a + chunk);
+    await prepare?.(a, b);
     const part: [Float32Array, Float32Array] = [l.subarray(a, b), r.subarray(a, b)];
     mixRange(measuring, sources, part, a, b, 1, state);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -604,5 +636,31 @@ export function sliceSource(channels: Float32Array[], from: number, n: number, r
     if (reversed) out.reverse();
     return out;
   });
+}
+
+/** a feldolgozás az egész forrás-ablakot igényli (nyújtás, fordítás, hangmagasság, zajszűrés, normalizálás) */
+export function needsWholeWindow(c: OfflineMixClip): boolean {
+  return c.speed !== 1 || c.reversed || c.pitch !== 0 || !!c.fx?.denoise || !!c.fx?.normalize;
+}
+
+/**
+ * 🎧 A hosszú (szakaszos) forrás klipjeinek forrás-mintatartományai egy idővonal-tartományra
+ * (a bejáratással) — ennyit kell betölteni a keverés előtt.
+ */
+export function sourceRanges(plan: OfflineMixPlan, isLong: (uri: string) => boolean, from: number, to: number): { uri: string; from: number; to: number }[] {
+  const sr = OFFLINE_SAMPLE_RATE;
+  const out: { uri: string; from: number; to: number }[] = [];
+  for (const c of plan.clips) {
+    if (!isLong(c.uri)) continue;
+    const clipFrom = Math.round(c.start * sr);
+    const clipTo = clipFrom + Math.round(c.duration * sr);
+    const a = Math.max(from, clipFrom);
+    const b = Math.min(to, clipTo);
+    if (b <= a) continue;
+    const off = Math.round(c.trimIn * sr) - clipFrom;
+    const w0 = c.fx ? Math.max(clipFrom, a - FX_WARMUP) : a;
+    out.push({ uri: c.uri, from: w0 + off, to: b + off });
+  }
+  return out;
 }
 

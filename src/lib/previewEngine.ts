@@ -3,7 +3,8 @@ import { File } from 'expo-file-system';
 import { loadAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
-import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
+import { LongSource, longUris } from '@/lib/longSource';
+import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, sourceRanges, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
 
 /**
@@ -60,12 +61,16 @@ class PreviewEngine {
   /** a következő keverendő idővonal-minta */
   private nextSample = 0;
   private scheduled: Scheduled[] = [];
+  /** 🎧 a hosszú (szakaszos) források */
+  private long = new Map<string, LongSource>();
+  private longUris = new Set<string>();
+
   /** 🎛️ a klip-effektek folytonos állapota (ugrásnál a `mixRange` bejáratja) */
   private fxState = new Map<string, FxState>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
-  private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0 };
+  private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [] as number[], startMs: 0 };
 
   /** 🎛️ a master mért erősítései keverésenként, és a legutóbbi (amíg az új mérés tart) */
   private masterGains = new Map<string, number>();
@@ -130,10 +135,21 @@ class PreviewEngine {
       return;
     }
     const api = this.api!;
-    await Promise.all([...new Set(raw.clips.map((c) => c.uri))].map((uri) => this.decode(api, uri)));
+    // 🎧 a hosszú forrás NEM dekódolódik egészben: szakaszosan szól (`LongSource`)
+    const long = longUris(raw.clips);
+    this.longUris = long;
+    for (const uri of long) {
+      if (!this.long.has(uri)) this.long.set(uri, new LongSource(uri));
+    }
+    await Promise.all([...new Set(raw.clips.map((c) => c.uri))].filter((uri) => !long.has(uri)).map((uri) => this.decode(api, uri)));
     const { jobs, plan } = stretchJobs(raw);
     const sources = new Map<string, DecodedSource>();
     for (const c of raw.clips) {
+      const longSrc = this.long.get(c.uri);
+      if (long.has(c.uri) && longSrc) {
+        sources.set(c.uri, { channels: [], sampleRate: SR, segmented: longSrc });
+        continue;
+      }
       const d = this.decoded.get(c.uri);
       if (d) sources.set(c.uri, d);
     }
@@ -159,7 +175,13 @@ class PreviewEngine {
       next = { ...next, masterGain: known ?? this.lastMasterGain };
       if (known === undefined) {
         const measuring = next;
-        void measureMasterGain(measuring, sources, { get aborted() { return false; } }).then((g) => {
+        // a mérés SAJÁT szakasztárral olvas (különben kiszorítaná a lejátszófej körüli szakaszokat)
+        const measureLong = new Map([...long].map((u) => [u, new LongSource(u)] as const));
+        const measureSources = new Map(sources);
+        for (const [u, l] of measureLong) measureSources.set(u, { channels: [], sampleRate: SR, segmented: l });
+        const prep = (a: number, b: number) =>
+          Promise.all(sourceRanges(measuring, (u) => long.has(u), a, b).map((r) => measureLong.get(r.uri)?.ensure(r.from, r.to))).then(() => undefined);
+        void measureMasterGain(measuring, measureSources, { get aborted() { return false; } }, prep).then((g) => {
           if (seq !== this.planSeq || !Number.isFinite(g)) {
             return;
           }
@@ -222,13 +244,17 @@ class PreviewEngine {
     this.playing = false;
     this.startSample = Math.round(fromSec * SR);
     const seq = ++this.playSeq;
+    const t0 = Date.now();
     if (!this.ctx) {
       this.ctx = new this.api!.AudioContext({ sampleRate: SR });
     }
-    await this.ctx.resume();
+    // 🎧 a hosszú forrás induláskor (és ugráskor) a következő 4 s-ig betöltve — a közeli
+    // szakaszhatár utáni szakasz is, hogy a betöltése ne a lejátszás alatt fogja a szálat
+    await Promise.all([this.ctx.resume(), this.prefetch(this.startSample, this.startSample + Math.round(4 * SR))]);
     if (seq !== this.playSeq) {
       return; // közben újabb indítás vagy szünet jött
     }
+    this.stats.startMs = Date.now() - t0;
     this.playing = true;
     this.startCtx = this.ctx.currentTime + START_LEAD_SEC;
     this.nextSample = this.startSample;
@@ -255,6 +281,20 @@ class PreviewEngine {
     } else {
       this.startSample = Math.round(sec * SR);
     }
+  }
+
+  /** 🎧 a hosszú források szakaszainak betöltése egy idővonal-tartományra */
+  private prefetch(from: number, to: number): Promise<void> {
+    if (!this.plan || this.longUris.size === 0) {
+      return Promise.resolve();
+    }
+    const ranges = sourceRanges(this.plan, (uri) => this.longUris.has(uri), from, to);
+    return Promise.all(ranges.map((r) => this.long.get(r.uri)?.ensure(r.from, r.to))).then(() => undefined);
+  }
+
+  /** 🧪 mérés: a betöltött szakaszok száma forrásonként */
+  loadedSegments(): number[] {
+    return [...this.long.values()].map((l) => l.loaded());
   }
 
   private ctxTimeOf(sample: number): number {
@@ -306,6 +346,10 @@ class PreviewEngine {
     const now = ctx.currentTime;
     this.scheduled = this.scheduled.filter((s) => this.ctxTimeOf(s.from + CHUNK_SAMPLES) > now);
     const until = Math.round((this.position() + AHEAD_SEC) * SR);
+    // 🎧 a hosszú források a lejátszófej előtt 3 s-mal töltődnek (a háttérben)
+    if (this.longUris.size > 0) {
+      void this.prefetch(this.nextSample, until + 3 * SR).catch((caught) => { logCaught('lib/previewEngine.ts:prefetch', caught); });
+    }
     while (this.nextSample < until && this.nextSample < this.endSample) {
       const from = this.nextSample;
       const to = Math.min(from + CHUNK_SAMPLES, this.endSample);
@@ -324,7 +368,10 @@ class PreviewEngine {
       const late = Math.max(0, now - at);
       this.stats.chunks += 1;
       this.stats.minLeadMs = Math.min(this.stats.minLeadMs, (at - now) * 1000);
-      if (late > 0) this.stats.late += 1;
+      if (late > 0) {
+        this.stats.late += 1;
+        this.stats.lateAt.push(Math.round(((from - this.startSample) / SR) * 1000));
+      }
       node.start(Math.max(at, now), late);
       this.scheduled.push({ node, from });
       this.nextSample = to;
@@ -337,9 +384,9 @@ class PreviewEngine {
   }
 
   /** 🧪 füstteszt: az ütemezés mérőszámai (a nullázás a lekérdezéssel) */
-  takeStats(): { late: number; minLeadMs: number; replaced: number; chunks: number } {
+  takeStats(): { late: number; minLeadMs: number; replaced: number; chunks: number; lateAt: number[]; startMs: number } {
     const out = this.stats;
-    this.stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0 };
+    this.stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [], startMs: 0 };
     return out;
   }
 }

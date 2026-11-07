@@ -63,11 +63,12 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
+import { canSegment, LongSource } from '@/lib/longSource';
 import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
 import type { RenderSettings } from '@/lib/render';
-import { encodeWav16 } from '@/lib/offlineMix';
+import { encodeWav16, wavHeader16 } from '@/lib/offlineMix';
 import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
 import { EXPORT_SPACE_MARGIN, RECORD_STOP_FREE, wavBytes } from '@/lib/diskSpace';
@@ -3023,6 +3024,96 @@ async function smokeProExport(log: Log) {
   src.delete();
 }
 
+/**
+ * 🎧 20 percnél hosszabb forrás: 25 perces fájl, szakaszos (natív ablak-) dekódolással — a minták
+ * a helyükön (szakaszhatáron is), a motor a 22. percnél akadás nélkül szól ≤ 8 szakasszal, és a
+ * telefonos export a fájl végéről is pontos.
+ */
+async function smokeLongSource(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const SEC = 25 * 60;
+  // a frekvencia 20 mp-enként lép: f(k) = 200 + 7k Hz — a minta értéke a helyéből számolható
+  const value = (i: number) => {
+    const k = Math.floor(i / (20 * SR));
+    return 0.3 * Math.sin((2 * Math.PI * (200 + 7 * k) * i) / SR);
+  };
+  const src = new File(Paths.document, 'smoke_long_25min.wav');
+  const t0 = Date.now();
+  if (!src.exists) {
+    src.create();
+    const h = src.open();
+    h.writeBytes(wavHeader16(SEC * SR, 1, SR));
+    const CH = SR * 10;
+    for (let a = 0; a < SEC * SR; a += CH) {
+      const n = Math.min(CH, SEC * SR - a);
+      const buf = new Int16Array(n);
+      for (let i = 0; i < n; i++) buf[i] = Math.round(value(a + i) * 32767);
+      h.writeBytes(new Uint8Array(buf.buffer));
+    }
+    h.close();
+  }
+  log(null, '25 perces forrás', `${((src.size ?? 0) / 1048576).toFixed(0)} MB, ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  log(canSegment(), 'a build szakaszosan dekódol (natív ablak)');
+  const long = new LongSource(src.uri);
+  const check = async (fromSec: number, sec: number) => {
+    const a = Math.round(fromSec * SR);
+    const b = a + Math.round(sec * SR);
+    const t1 = Date.now();
+    await long.ensure(a, b);
+    const ms = Date.now() - t1;
+    const w = long.read(a, b);
+    let max = 0;
+    for (let i = 0; i < b - a; i++) max = Math.max(max, Math.abs((w?.[0][i] ?? 9) - value(a + i)));
+    return { max, ms };
+  };
+  const edge = await check(39.9, 0.2);
+  log(edge.max < 1e-4, 'a szakaszhatáron (40 s) a minták a helyükön', `max eltérés ${edge.max.toExponential(1)}, ${edge.ms} ms`);
+  const far = await check(22 * 60 - 0.5, 1);
+  log(far.max < 1e-4, 'a 22. percnél a minták a helyükön (szakaszhatár is)', `max eltérés ${far.max.toExponential(1)}, ${far.ms} ms`);
+  log(long.loaded() <= 8, 'a memóriában legfeljebb 8 szakasz', `${long.loaded()} szakasz`);
+  // a motor a 22. percnél (a teljes 25 perces klip a projektben)
+  const id = 'prj_smoke_long';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:long', caught));
+  const base = createEmptyProject('smoke hosszú forrás', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'L', uri: src.uri, label: 'podcast', start: 0, duration: SEC, trimIn: 0, sourceDuration: SEC, volume: 0.5, fadeIn: 0, fadeOut: 0, audioFx: { highpass: 80, compressor: true }, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  const st = useEditorStore.getState;
+  st().setPlayhead(22 * 60 - 2);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(4500);
+  const head = st().playhead;
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(previewEngine.clock() !== null, 'a hosszú forrású projekt az előre renderelt motorról szól');
+  log(stats.late === 0 && head > 22 * 60 + 2, 'a 22. percnél akadás nélkül, a szakaszhatáron át', `${stats.chunks} szelet, ${stats.late} késett (${stats.lateAt.join(',')} ms-nál), indulás ${stats.startMs} ms, fej ${head.toFixed(1)} s`);
+  log(previewEngine.loadedSegments().every((n) => n <= 8), 'a motor memóriájában legfeljebb 8 szakasz', previewEngine.loadedSegments().join(','));
+  router.back();
+  // telefonos export a fájl végéről (2 perces részlet a 21. perctől)
+  const ep: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [{ ...c, start: 0, duration: 120, trimIn: 21 * 60 }] } : t)) };
+  const t2 = Date.now();
+  const { uri: out } = await exportOfflineWav(ep, new File(projectExportDir(), 'smoke_long_out.wav'), undefined, undefined, 'float32');
+  const api = await loadAudioApi();
+  const buf = await api!.decodeAudioData(out, SR);
+  const x = buf.getChannelData(0);
+  // a kimenet a 21. perctől: a magas-áteresztő miatt a hangnem (frekvencia) a mérce
+  const freq = (y: Float32Array, a: number, b: number) => {
+    let n = 0;
+    for (let i = Math.round(a * SR) + 1; i < Math.round(b * SR); i++) if ((y[i - 1] < 0) !== (y[i] < 0)) n++;
+    return n / 2 / (b - a);
+  };
+  const want1 = 200 + 7 * Math.floor((21 * 60 + 5) / 20);
+  const want2 = 200 + 7 * Math.floor((21 * 60 + 65) / 20);
+  log(Math.abs(buf.duration - 120) < 0.01 && Math.abs(freq(x, 5, 6) - want1) < 2 && Math.abs(freq(x, 65, 66) - want2) < 2, 'telefonos export a 21. perctől: hossz és hangmagasság pontos', `${buf.duration.toFixed(2)} s, ${freq(x, 5, 6).toFixed(1)}/${want1} Hz, ${freq(x, 65, 66).toFixed(1)}/${want2} Hz, ${((Date.now() - t2) / 1000).toFixed(1)} s`);
+  new File(out).delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4187,6 +4278,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'longsource') {
+    await step(phase, () => smokeLongSource(log));
     return;
   }
   if (phase === 'proexport') {

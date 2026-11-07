@@ -7,8 +7,8 @@ import { clipsForPlayback, INITIAL_DRIFT, learnStartLatency, planDriftCorrection
 import { probeDrift, probeSeek, probeStart, syncProbeOn } from '@/lib/audioSyncProbe';
 import { mixForExport } from '@/lib/audioExportMix';
 import { registerDevAction } from '@/lib/devActions';
-import { offlineMixPlan, type OfflineMixPlan } from '@/lib/offlineMix';
-import { OFFLINE_MAX_SEC } from '@/lib/offlineMixClient';
+import { canSegment, isLongSource } from '@/lib/longSource';
+import { needsWholeWindow, offlineMixPlan, type OfflineMixPlan } from '@/lib/offlineMix';
 import { previewEngine } from '@/lib/previewEngine';
 import { ensureStretchProxy, getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
@@ -92,12 +92,23 @@ export function AudioLayer() {
 }
 
 /**
- * 🎧 A motor játszhatja-e a projektet: amit a közös keverő (= az export) tud, és helyi, legfeljebb
- * 20 perces forrásokból áll. Ami még csak a szerveres renderben szól (effektek, master,
- * duck, hangjavítás), annál egyelőre a klipenkénti lejátszók szólnak.
+ * 🎧 A motor játszhatja-e a projektet: amit a közös keverő (= az export) tud, helyi forrásokból;
+ * a hosszú forrás szakaszosan (`longSource`). Különben a klipenkénti lejátszók szólnak.
  */
 function engineCanPlay(plan: OfflineMixPlan | null): boolean {
-  return !plan || (plan.unsupported.length === 0 && plan.duration <= OFFLINE_MAX_SEC && plan.clips.every((c) => c.uri.startsWith('file:')));
+  return !plan || (plan.unsupported.length === 0 && plan.clips.every((c) => c.uri.startsWith('file:') && longClipPlayable(c)));
+}
+
+/**
+ * 🎧 a hosszú (10 percnél hosszabb) forrás szakaszosan szól — ha a build tud szakaszosan
+ * dekódolni, és a klip nem kér egész-ablakos feldolgozást (azt a telefon hosszú forráson nem
+ * bírná: a 60 perces zajszűrés ~27 perc volna)
+ */
+function longClipPlayable(c: OfflineMixPlan['clips'][number]): boolean {
+  if (!isLongSource(c.sourceDuration)) {
+    return true;
+  }
+  return canSegment() && !needsWholeWindow(c);
 }
 
 /**

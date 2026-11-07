@@ -4,16 +4,20 @@ import { t as tr } from 'i18next';
 import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { denoiseStereo } from '@/lib/denoise';
+import { LongSource, longUris } from '@/lib/longSource';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, needsWholeWindow, sourceRanges, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
 
-/** a telefonos export felső határa (a dekódolt források a memóriában vannak) */
-export const OFFLINE_MAX_SEC = 20 * 60;
+/**
+ * a telefonos export felső határa: a hosszú forrás szakaszosan olvasódik (`longSource`), a
+ * kimenet a lemezre íródik szeletenként — a korlát a fájlméret (3 óra sztereó 16 bit ≈ 1,9 GB)
+ */
+export const OFFLINE_MAX_SEC = 3 * 60 * 60;
 const CHUNK_SEC = 0.25;
 /** egy szeletben legfeljebb ennyi munka, utána a felület jön (60 Hz-en egy képkocka ~16 ms) */
 const FRAME_BUDGET_MS = 12;
@@ -46,7 +50,17 @@ export async function exportOfflineWav(
     throw new Error(tr('studio.audio.offline.noDecoder'));
   }
   const sources = new Map<string, DecodedSource>();
-  const uris = [...new Set(plan.clips.map((c) => c.uri))];
+  // 🎧 a hosszú forrás szakaszosan (nem dekódolódik egészben); az egész-ablakos feldolgozás
+  // (zajszűrés, normalizálás, nyújtás…) hosszú forráson a telefonon nem érhető el
+  const long = longUris(plan.clips);
+  if (plan.clips.some((c) => long.has(c.uri) && needsWholeWindow(c))) {
+    throw new Error(tr('studio.audio.offline.longProcessing'));
+  }
+  const longSources = new Map([...long].map((u) => [u, new LongSource(u)] as const));
+  for (const [u, l] of longSources) sources.set(u, { channels: [], sampleRate: OFFLINE_SAMPLE_RATE, segmented: l });
+  const prepare = (a: number, b: number) =>
+    Promise.all(sourceRanges(plan, (u) => long.has(u), a, b).map((r) => longSources.get(r.uri)?.ensure(r.from, r.to))).then(() => undefined);
+  const uris = [...new Set(plan.clips.map((c) => c.uri))].filter((u) => !long.has(u));
   for (let i = 0; i < uris.length; i++) {
     if (signal?.aborted) {
       throw new RenderCancelledError();
@@ -89,7 +103,7 @@ export async function exportOfflineWav(
   // 📏 a normalizálás erősítése (előmenet a kész forrásokon), majd a master mérése (kétmenetes)
   const normalized = withNormalizeGains(mixPlan, sources);
   const finalPlan = normalized.master
-    ? { ...normalized, masterGain: await measureMasterGain(normalized, sources, signal ?? undefined) }
+    ? { ...normalized, masterGain: await measureMasterGain(normalized, sources, signal ?? undefined, prepare) }
     : normalized;
   if (signal?.aborted) {
     throw new RenderCancelledError();
@@ -113,6 +127,9 @@ export async function exportOfflineWav(
         throw new RenderCancelledError();
       }
       const to = Math.min(frames, from + chunk);
+      if (long.size > 0) {
+        await prepare(from, to);
+      }
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
       mixRange(finalPlan, sources, out, from, to, 1, fxState);
       handle.writeBytes(format === 'float32' ? pcmF32(out) : pcm16(out));

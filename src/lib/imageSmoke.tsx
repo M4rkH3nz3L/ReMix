@@ -63,6 +63,7 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
+import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
 import type { RenderSettings } from '@/lib/render';
@@ -2914,6 +2915,55 @@ async function smokePitchSpike(log: Log) {
   }
 }
 
+/** 🧹📏 Zajszűrés + normalizálás a telefonon: 60 mp-es zajos klip — idő, hatás és a −16 LUFS. */
+async function smokeDenoise(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // valódi fehér zaj (mulberry32; a túlcsorduló LCG rövid ciklusba ragadhat)
+  let a = 5;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  const n = 60 * SR;
+  // 0,5 s hang / 0,5 s szünet, végig halk zaj
+  const x = Float32Array.from({ length: n }, (_, i) => (Math.floor(i / (SR / 2)) % 2 === 0 ? 0.05 * Math.sin((2 * Math.PI * 330 * i) / SR) : 0) + 0.005 * rnd());
+  const src = new File(Paths.document, 'smoke_denoise.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([x, x], SR, () => 0.5));
+  const base = createEmptyProject('smoke zajszűrés', '1:1', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'dn', uri: src.uri, label: 'dn', start: 0, duration: 60, trimIn: 0, sourceDuration: 60, volume: 1, fadeIn: 0, fadeOut: 0, audioFx: { denoise: true, normalize: true }, source: 'voiceover' };
+  const project: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c] } : t)) };
+  log(offlineMixPlan(project).unsupported.length === 0, 'zajszűrés + normalizálás a közös DSP-ben (nem a régi úton)');
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_denoise_out.wav'));
+  const ms = Date.now() - t0;
+  log(ms < 40000, '60 mp zajszűrése + normalizálása a telefonon', `${(ms / 1000).toFixed(1)} s (${((ms / 60000) * 1000).toFixed(0)} ms / hang-mp)`);
+  const api = await loadAudioApi();
+  const buf = await api!.decodeAudioData(out, SR);
+  const l = buf.getChannelData(0).slice();
+  const r = buf.getChannelData(1).slice();
+  const lufs = integratedLoudness(l, r, SR);
+  log(Math.abs(lufs - -16) < 1, 'a kimenet −16 LUFS', `${lufs.toFixed(2)} LUFS`);
+  const gapDb = (y: Float32Array, scale: number) => {
+    let s = 0;
+    let k = 0;
+    for (let i = Math.round(10.6 * SR); i < Math.round(10.9 * SR); i++) {
+      s += (y[i] / scale) ** 2;
+      k++;
+    }
+    return 10 * Math.log10(s / k + 1e-30);
+  };
+  // a normalizálás erősítését kivéve: a szünetben a zaj a bemenethez képest
+  const gain = Math.pow(10, (lufs - integratedLoudness(x, x, SR)) / 20);
+  log(gapDb(l, gain) - gapDb(x, 1) < -8, 'a szünetekben a zaj legalább 8 dB-lel csökkent', `${(gapDb(l, gain) - gapDb(x, 1)).toFixed(1)} dB`);
+  new File(out).delete();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4078,6 +4128,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'denoise') {
+    await step(phase, () => smokeDenoise(log));
     return;
   }
   if (phase === 'pitchspike') {

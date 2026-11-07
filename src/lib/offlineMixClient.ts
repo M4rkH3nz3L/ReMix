@@ -3,10 +3,11 @@ import { t as tr } from 'i18next';
 
 import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
+import { denoiseStereo } from '@/lib/denoise';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, withNormalizeGains, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -83,6 +84,8 @@ export async function exportOfflineWav(
     }
   }
 
+  // 📏 a normalizálás erősítése (előmenet a kész forrásokon)
+  const finalPlan = withNormalizeGains(mixPlan, sources);
   const frames = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
   // 🎛️ az effektek állapota szeletről szeletre megmarad (folytonos szűrés)
   const fxState = new Map<string, FxState>();
@@ -103,7 +106,7 @@ export async function exportOfflineWav(
       }
       const to = Math.min(frames, from + chunk);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
-      mixRange(mixPlan, sources, out, from, to, 1, fxState);
+      mixRange(finalPlan, sources, out, from, to, 1, fxState);
       handle.writeBytes(pcm16(out));
       if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
         onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
@@ -185,8 +188,17 @@ export async function stretchSegment(api: AudioApi, src: DecodedSource, job: Str
   const sr = src.sampleRate;
   const n = Math.max(1, Math.round(job.sourceSec * sr));
   const cents = Math.round((job.pitch ?? 0) * 100);
+  // 🧹 a zajszűrés a kész (nyújtott) szakaszon fut — az egész szakaszból becsült zajprofillal
+  const finish = async (channels: Float32Array[]): Promise<DecodedSource> => {
+    if (!job.denoise) {
+      return { channels, sampleRate: sr };
+    }
+    const [l, r] = await denoiseStereo(channels[0], channels[1] ?? channels[0]);
+    return { channels: [l, r], sampleRate: sr };
+  };
+
   if (job.speed === 1 && cents === 0) {
-    return { channels: sliceSource(src.channels, Math.round(job.from * sr), n, job.reversed), sampleRate: sr };
+    return finish(sliceSource(src.channels, Math.round(job.from * sr), n, job.reversed));
   }
   const lat = await stretchLatency(api, job.speed, sr, cents);
   // a kimenet `lat` mintával késik: elejéről ennyi esik le, ezért a bemenet a VÉGÉN hosszabb
@@ -196,5 +208,5 @@ export async function stretchSegment(api: AudioApi, src: DecodedSource, job: Str
   const slice = job.reversed ? sliceSource(src.channels, from - extra, n + extra, true) : sliceSource(src.channels, from, n + extra, false);
   const outLen = Math.round(job.duration * sr);
   const out = await renderStretched(api, slice, job.speed, outLen + lat, sr, cents);
-  return { channels: out.map((ch) => ch.slice(lat, lat + outLen)), sampleRate: sr };
+  return finish(out.map((ch) => ch.slice(lat, lat + outLen)));
 }

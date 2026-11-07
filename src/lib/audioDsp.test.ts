@@ -83,8 +83,7 @@ describe('lánc', () => {
   });
   it('a még nem támogatott effektek jelzése', () => {
     expect(fxUnsupported({ compressor: true, limiter: true, gate: true, deEsser: true, eq: { low: 1, mid: 0, high: 0 } })).toBe(false);
-    expect(fxUnsupported({ reverb: 0.3, delay: 0.5, stereoWide: true })).toBe(false);
-    expect(fxUnsupported({ denoise: true })).toBe(true);
+    expect(fxUnsupported({ reverb: 0.3, delay: 0.5, stereoWide: true, denoise: true, normalize: true, pitchSemitones: 3, harmony: 4 })).toBe(false);
   });
 });
 

@@ -64,7 +64,7 @@ export function ensureStretchProxy(uri: string, w: Window): Promise<string | nul
         const channels = Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c));
         const speed = audioSpeedOf(w);
         const seg = await stretchSegment(api, { channels, sampleRate: buf.sampleRate }, {
-          key, uri, from: w.trimIn ?? 0, sourceSec: w.duration * speed, duration: w.duration, speed, reversed: !!w.reversed, pitch: 0,
+          key, uri, from: w.trimIn ?? 0, sourceSec: w.duration * speed, duration: w.duration, speed, reversed: !!w.reversed, pitch: 0, denoise: false,
         });
         out.create();
         out.write(encodeWav16(seg.channels, seg.sampleRate));

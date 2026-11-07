@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { loadAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
 
 /**
@@ -145,7 +145,8 @@ class PreviewEngine {
     if (seq !== this.planSeq) {
       return; // közben újabb terv jött
     }
-    this.plan = plan;
+    // 📏 a normalizálás erősítése (ugyanaz az előmenet, mint az exportban)
+    this.plan = withNormalizeGains(plan, sources);
     this.sources = sources;
     this.endSample = Math.round(plan.duration * SR);
     if (this.playing) {

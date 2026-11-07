@@ -1,7 +1,8 @@
 import { audioSpeedOf, continuesInSource } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import { buildFxChain, FX_WARMUP, fxActive, fxUnsupported, runChain, type FxState } from '@/lib/audioDsp';
+import { buildFxChain, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, type FxState } from '@/lib/audioDsp';
+import { integratedLoudness } from '@/lib/loudness';
 import type { AudioClip, AudioFx, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
@@ -72,6 +73,8 @@ export interface OfflineMixClip {
   reversed: boolean;
   /** 🎚️ hangmagasság-eltolás félhangban (a hossz marad); 0 = nincs */
   pitch: number;
+  /** 📏 a normalizálás előmenetben mért erősítése (`withNormalizeGains`) */
+  normGain?: number;
 }
 
 export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master' | 'videoSpeed';
@@ -218,10 +221,10 @@ export function mixRange(
         }
         return [l, r];
       };
-      const key = `${clip.id}|${JSON.stringify(clip.fx)}`;
+      const key = `${clip.id}|${JSON.stringify(clip.fx)}|${clip.normGain ?? 1}`;
       let st = fxState.get(key);
       if (!st || st.next !== a) {
-        st = { chain: buildFxChain(clip.fx, sr), next: a };
+        st = { chain: buildFxChain(clip.fx, sr, clip.normGain), next: a };
         const w0 = Math.max(clipFrom, a - FX_WARMUP);
         if (w0 < a) {
           const [wl, wr] = read(w0, a);
@@ -383,6 +386,8 @@ export interface StretchJob {
   reversed: boolean;
   /** 🎚️ hangmagasság-eltolás félhangban (a hossz marad) */
   pitch: number;
+  /** 🧹 spektrális zajszűrés a kész szakaszon (`denoise.ts`) */
+  denoise: boolean;
 }
 
 /**
@@ -392,16 +397,44 @@ export interface StretchJob {
 export function stretchJobs(plan: OfflineMixPlan): { jobs: StretchJob[]; plan: OfflineMixPlan } {
   const jobs = new Map<string, StretchJob>();
   const clips = plan.clips.map((c) => {
-    if (c.speed === 1 && !c.reversed && c.pitch === 0) {
+    const denoise = !!c.fx?.denoise;
+    if (c.speed === 1 && !c.reversed && c.pitch === 0 && !denoise) {
       return c;
     }
-    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}|${c.pitch}`;
+    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}|${c.pitch}|${denoise ? 'dn' : ''}`;
     if (!jobs.has(key)) {
-      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed, pitch: c.pitch });
+      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed, pitch: c.pitch, denoise });
     }
     return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false, pitch: 0 };
   });
   return { jobs: [...jobs.values()], plan: { ...plan, clips } };
+}
+
+/**
+ * 📏 A normalizálás előmenete: a `normalize`-os klip ablakát a normalizálás ELŐTTI láncon
+ * végigviszi, megméri az integrált hangosságát (BS.1770), és az erősítést a tervbe írja
+ * (−16 LUFS-re). Az előnézet és az export is ezt futtatja (a `stretchJobs` után; a zajszűrés
+ * addigra a szakaszon van).
+ */
+export function withNormalizeGains(plan: OfflineMixPlan, sources: Map<string, DecodedSource>): OfflineMixPlan {
+  const sr = OFFLINE_SAMPLE_RATE;
+  const clips = plan.clips.map((c) => {
+    if (!c.fx?.normalize) {
+      return c;
+    }
+    const src = sources.get(c.uri);
+    if (!src || src.channels.length === 0) {
+      return c;
+    }
+    const n = Math.round(c.duration * sr);
+    const from = Math.round(c.trimIn * src.sampleRate);
+    const [l, r] = sliceSource([src.channels[0], src.channels[1] ?? src.channels[0]], from, n, false);
+    runChain(buildFxChain({ ...c.fx, normalize: false, limiter: false }, sr), l, r, 0);
+    const lufs = integratedLoudness(l, r, sr);
+    const normGain = Number.isFinite(lufs) ? Math.pow(10, (NORMALIZE_LUFS - lufs) / 20) : 1;
+    return { ...c, normGain };
+  });
+  return { ...plan, clips };
 }
 
 /** A forrás `[from, from + n)` mintái csatornánként (a forráson túl csend), igény szerint fordítva. */

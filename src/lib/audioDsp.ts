@@ -386,10 +386,25 @@ export class Haas implements Processor {
   }
 }
 
+/** állandó erősítés (a normalizálás előre mért erősítése) */
+export class Gain implements Processor {
+  constructor(private readonly g: number) {}
+  processStereo(l: Float32Array, r: Float32Array): void {
+    for (let i = 0; i < l.length; i++) {
+      l[i] *= this.g;
+      r[i] *= this.g;
+    }
+  }
+}
+
+/** a normalizálás célja (a szerver `loudnorm=I=-16:TP=-1.5`-e) */
+export const NORMALIZE_LUFS = -16;
+export const NORMALIZE_PEAK_DB = -1.5;
+
 const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** a közös DSP-ben már megvalósított effektek */
-const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide', 'pitchSemitones', 'harmony']);
+const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide', 'pitchSemitones', 'harmony', 'normalize', 'denoise']);
 
 /** van-e a klipen olyan effekt, amit a közös DSP még nem tud (akkor a régi úton szól) */
 export function fxUnsupported(fx: AudioFx | undefined): boolean {
@@ -412,7 +427,7 @@ export function fxActive(fx: AudioFx | undefined): boolean {
  * A klip effekt-lánca a szerver sorrendjében (szűrők → EQ). Üres = nincs feldolgozás. A
  * paraméter-szorítás a szerverével azonos.
  */
-export function buildFxChain(fx: AudioFx | undefined, sr: number): Processor[] {
+export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1): Processor[] {
   if (!fx) {
     return [];
   }
@@ -429,7 +444,7 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number): Processor[] {
     if (g(fx.eq.mid)) chain.push(peaking(1000, g(fx.eq.mid), sr));
     if (g(fx.eq.high)) chain.push(peaking(8000, g(fx.eq.high), sr));
   }
-  // a szerver sorrendje: szűrők → (zajszűrés) → kapu → de-esser → kompresszor → … → limiter
+  // a szerver sorrendje: szűrők → zajszűrés (előmenet: `denoiseStereo`) → kapu → de-esser → kompresszor → … → limiter
   if (fx.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
   if (fx.deEsser) chain.push(new DeEsser(sr));
   if (fx.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
@@ -442,6 +457,10 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number): Processor[] {
     chain.push(new Echo(0.8, 0.6, [Math.round(120 + a * 380)], [Number((0.2 + a * 0.5).toFixed(2))], sr));
   }
   if (fx.stereoWide) chain.push(new Haas(sr));
+  // 📏 normalizálás: az előmenetben mért fix erősítés −16 LUFS-re + csúcsplafon −1,5 dB
+  if (fx.normalize) {
+    chain.push(new Gain(normGain), new Limiter(dbToLin(NORMALIZE_PEAK_DB), 50, sr));
+  }
   if (fx.limiter) chain.push(new Limiter(0.95, 50, sr));
   return chain;
 }

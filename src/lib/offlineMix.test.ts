@@ -1,4 +1,5 @@
-import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs } from '@/lib/offlineMix';
+import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains } from '@/lib/offlineMix';
+import { integratedLoudness } from '@/lib/loudness';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -56,7 +57,8 @@ describe('offlineMix (A26)', () => {
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {
     const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, denoise: true } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
-    expect(plan.unsupported.sort()).toEqual(['effects', 'master', 'voiceEnhance']);
+    // a klip-effektek mind a közös DSP-ben vannak; a hangjavítás és a master még a szerveré
+    expect(plan.unsupported.sort()).toEqual(['master', 'voiceEnhance']);
   });
 
   it('🎛️ a szűrők és az EQ már a közös DSP-ben szólnak (nem „csak szerveres”)', () => {
@@ -114,6 +116,26 @@ describe('offlineMix (A26)', () => {
     expect(clamped.pitch).toBe(12);
     const { jobs } = stretchJobs(plan);
     expect(jobs.map((j) => j.pitch).sort((a, b) => a - b)).toEqual([3, 10]);
+  });
+
+  it('📏 normalizálás: a halk klip −16 LUFS-re kerül, a csúcs −1,5 dB alatt marad', () => {
+    const SR = 44100;
+    let seed = 1;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 2 - 1;
+    const n = 4 * SR;
+    const quiet = Float32Array.from({ length: n }, () => 0.02 * rnd());
+    const p = project([clip({ id: 'n', start: 0, duration: 4, sourceDuration: 4, volume: 1, fadeIn: 0, fadeOut: 0, audioFx: { normalize: true } })]);
+    const base = offlineMixPlan(p);
+    expect(base.unsupported).toEqual([]);
+    const sources = new Map([[base.clips[0].uri, { channels: [quiet], sampleRate: SR }]]);
+    const plan = withNormalizeGains(base, sources);
+    expect(plan.clips[0].normGain).toBeGreaterThan(1);
+    const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    mixRange(plan, sources, out, 0, n, 1, new Map());
+    // a klip széleinek 10 ms-os mikro-fade-je elhanyagolható a 4 s-hoz képest
+    expect(integratedLoudness(out[0], out[1], SR)).toBeCloseTo(-16, 0);
+    const peak = out[0].reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    expect(20 * Math.log10(peak)).toBeLessThanOrEqual(-1.5 + 1e-3);
   });
 });
 

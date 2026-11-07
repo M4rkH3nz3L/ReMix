@@ -150,36 +150,52 @@ export async function downloadModel(entry: ModelManifestEntry): Promise<Download
   if (Platform.OS === 'web') {
     return { ok: false, reason: 'web' };
   }
-  let bytes: Uint8Array;
+  // ⬇️ a letöltés KÖZVETLENÜL fájlba megy (nem a memóriába): Androidon a 181 MB-os modell
+  // `arrayBuffer`-ként a Java-heap plafonján elszállt (OutOfMemoryError, mérve) — iOS-en is pazarló volt
+  const fileName = `${entry.id}-${entry.version}.bin`;
+  const target = new File(modelsDir(), fileName);
+  const tmp = new File(modelsDir(), `${fileName}.part`);
   try {
-    const res = await fetch(entry.url);
-    if (!res.ok) {
-      return { ok: false, reason: 'network' };
-    }
-    bytes = new Uint8Array(await res.arrayBuffer());
+    if (tmp.exists) tmp.delete();
+    await File.downloadFileAsync(entry.url, tmp);
   } catch (caught) {
     logCaught('lib/modelRegistryClient.ts:downloadModel', caught);
+    try {
+      if (tmp.exists) tmp.delete();
+    } catch (cleanup) {
+      logCaught('lib/modelRegistryClient.ts:downloadModel:cleanup', cleanup);
+    }
     return { ok: false, reason: 'network' };
   }
 
-  // 🔐 BP-2: checksum-eltérés → elutasítás, a tartalom nem ér lemezt
-  const hash = new Sha256();
-  const CHUNK = 4 * 1024 * 1024;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    hash.update(bytes.subarray(i, Math.min(i + CHUNK, bytes.length)));
-  }
-  if (!verifyChecksum(entry.sha256, hash.digestHex())) {
-    return { ok: false, reason: 'checksum' };
+  // 🔐 BP-2: checksum-eltérés → elutasítás (a félkész fájl törlődik); a hash 4 MB-os darabokban a fájlból
+  let size = 0;
+  try {
+    const hash = new Sha256();
+    const CHUNK = 4 * 1024 * 1024;
+    const handle = tmp.open();
+    try {
+      const total = handle.size ?? 0;
+      for (let at = 0; at < total; at += CHUNK) {
+        const part = handle.readBytes(Math.min(CHUNK, total - at));
+        hash.update(part);
+        size += part.length;
+      }
+    } finally {
+      handle.close();
+    }
+    if (!verifyChecksum(entry.sha256, hash.digestHex())) {
+      tmp.delete();
+      return { ok: false, reason: 'checksum' };
+    }
+    if (target.exists) target.delete();
+    tmp.move(target);
+  } catch (caught) {
+    logCaught('lib/modelRegistryClient.ts:downloadModel:verify', caught);
+    return { ok: false, reason: 'fs' };
   }
 
   try {
-    const fileName = `${entry.id}-${entry.version}.bin`;
-    const target = new File(modelsDir(), fileName);
-    if (!target.exists) {
-      target.create();
-    }
-    target.write(bytes);
-
     const records = readIndex().filter((r) => r.id !== entry.id);
     // frissítéskor a régi verzió fájlja nem maradhat árván
     const old = readIndex().find((r) => r.id === entry.id);
@@ -189,14 +205,14 @@ export async function downloadModel(entry: ModelManifestEntry): Promise<Download
     records.push({
       id: entry.id,
       version: entry.version,
-      sizeBytes: bytes.length, // a VALÓS méret (nem a manifest közelítése)
+      sizeBytes: size, // a VALÓS méret (nem a manifest közelítése)
       lastUsedMs: Date.now(),
       file: fileName,
       // új letöltés → a korábbi smoke-eredmény nem érvényes (local-ai 5.3)
     });
     writeIndex(records);
     runEviction();
-    return { ok: true, uri: target.uri, sizeBytes: bytes.length };
+    return { ok: true, uri: target.uri, sizeBytes: size };
   } catch (caught) {
     logCaught('lib/modelRegistryClient.ts:downloadModel', caught);
     return { ok: false, reason: 'fs' };

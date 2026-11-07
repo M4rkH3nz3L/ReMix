@@ -2810,6 +2810,45 @@ async function smokeEngineStudio(log: Log, setHarness: (n: ReactNode) => void) {
   router.back();
 }
 
+/** 🎛️ Szűrők + EQ a közös DSP-ben: a telefonos export = a szerveres (ffmpeg) export, kivonva. */
+async function smokeOfflineFx(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 2 - 1;
+  const noiseL = Float32Array.from({ length: 4 * SR }, () => 0.25 * rnd());
+  const noiseR = Float32Array.from({ length: 4 * SR }, () => 0.25 * rnd());
+  const src = new File(Paths.document, 'smoke_fx_noise.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([noiseL, noiseR], SR, () => 0.5));
+  const base = createEmptyProject('smoke fx', '1:1', undefined, 'audio');
+  const fx = { highpass: 200, lowpass: 6000, eq: { low: 4, mid: -3, high: 5 } };
+  const c: AudioClip = { kind: 'audio', id: 'fx', uri: src.uri, label: 'fx', start: 0.25, duration: 3, trimIn: 0.2, sourceDuration: 4, volume: 0.8, fadeIn: 0.2, fadeOut: 0.3, pan: 0.3, audioFx: fx, source: 'imported' };
+  const project: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  log(offlineMixPlan(project).unsupported.length === 0, 'a szűrős-EQ-s projekt az előnézeti motorról és a telefonos exporttal szól');
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_fx_phone.wav'));
+  log(null, 'telefonos export', `${Date.now() - t0} ms`);
+  const serverFile = new File(projectExportDir(), 'smoke_fx_server.wav');
+  await exportAudioToFile(project, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 24, sampleRate: 44100, channels: 2 }), serverFile);
+  const api = await loadAudioApi();
+  const mine = await api!.decodeAudioData(out, SR);
+  const theirs = await api!.decodeAudioData(serverFile.uri, SR);
+  const db = (xs: Float32Array) => 10 * Math.log10(xs.reduce((a, v) => a + v * v, 0) / Math.max(1, xs.length) + 1e-30);
+  for (const ch of [0, 1]) {
+    const a = mine.getChannelData(ch);
+    const b = theirs.getChannelData(ch);
+    const n = Math.min(a.length, b.length);
+    const diff = Float32Array.from({ length: n }, (_, i) => a[i] - b[i]);
+    const snr = db(b.subarray(0, n)) - db(diff);
+    log(snr > 60, `szűrők + EQ: telefon = szerver (${ch === 0 ? 'bal' : 'jobb'})`, `${snr.toFixed(1)} dB a jel alatt, hossz ${a.length}/${b.length}`);
+  }
+  new File(out).delete();
+  serverFile.delete();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3974,6 +4013,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'offlinefx') {
+    await step(phase, () => smokeOfflineFx(log));
     return;
   }
   if (phase === 'enginestudio') {

@@ -55,8 +55,14 @@ describe('offlineMix (A26)', () => {
   });
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {
-    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80 } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
+    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, compressor: true } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
     expect(plan.unsupported.sort()).toEqual(['effects', 'master', 'voiceEnhance']);
+  });
+
+  it('🎛️ a szűrők és az EQ már a közös DSP-ben szólnak (nem „csak szerveres”)', () => {
+    const plan = offlineMixPlan(project([clip({ audioFx: { highpass: 80, lowpass: 9000, eq: { low: 2, mid: 0, high: -1 } } })]));
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.clips[0].fx).toEqual({ highpass: 80, lowpass: 9000, eq: { low: 2, mid: 0, high: -1 } });
   });
 
   it('a WAV-fejléc és a minták helyesek (dither nélkül pontos)', () => {

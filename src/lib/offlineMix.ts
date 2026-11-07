@@ -1,7 +1,8 @@
 import { audioSpeedOf, continuesInSource } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import type { AudioClip, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
+import { buildFxChain, FX_WARMUP, fxActive, fxUnsupported, runChain, type FxState } from '@/lib/audioDsp';
+import type { AudioClip, AudioFx, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
  * 🎧📱 Telefonos (offline) hang-keverés — PRO-AUDIO A26: a Free felhasználó szerver nélkül
@@ -61,6 +62,10 @@ export interface OfflineMixClip {
   panKf?: Keyframe[];
   /** sáv- × master-erősítés */
   gain: number;
+  /** a klip azonosítója (az effekt-állapot kulcsa a darabos keverésben) */
+  id: string;
+  /** 🎛️ a klip effektjei (a közös DSP: `audioDsp.ts`) */
+  fx?: AudioFx;
   /** ⏩ forrás-mp / idővonal-mp (hangmagasság-tartással); 1 = nincs nyújtás */
   speed: number;
   /** ⏪ a forrás-ablak visszafelé szól (a videóklip `reversed`-je) */
@@ -87,11 +92,14 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     const audio = track.clips.filter((c): c is AudioClip => c.kind === 'audio');
     const fades = edgeFades(audio);
     for (const clip of audio) {
-      if (clip.audioFx && Object.values(clip.audioFx).some((v) => v)) unsupported.add('effects');
+      // 🎛️ a közös DSP-ben már megvalósított effektek szólnak; a többi még csak a szerveren
+      if (fxUnsupported(clip.audioFx)) unsupported.add('effects');
       if (clip.voiceEnhance) unsupported.add('voiceEnhance');
       if (clip.deReverb) unsupported.add('deReverb');
       if (clip.autoDuck) unsupported.add('autoDuck');
       clips.push({
+        id: clip.id,
+        ...(fxActive(clip.audioFx) ? { fx: clip.audioFx } : {}),
         track: track.type,
         uri: clip.uri,
         start: clip.start,
@@ -150,7 +158,8 @@ export function mixRange(
   out: [Float32Array, Float32Array],
   fromSample: number,
   toSample: number,
-  monoGain = 1
+  monoGain = 1,
+  fxState: Map<string, FxState> = new Map()
 ): void {
   const sr = OFFLINE_SAMPLE_RATE;
   for (const clip of plan.clips) {
@@ -168,6 +177,39 @@ export function mixRange(
     const srcOffset = Math.round(clip.trimIn * src.sampleRate) - clipFrom;
     const staticPan = !clip.panKf || clip.panKf.length === 0 ? panGains(clip.pan) : null;
     const hasFade = clip.fadeIn > 0 || clip.fadeOut > 0;
+    // 🎛️ effektek (a szerver sorrendjében: a pan és a hangerő ELŐTT): a forrás-szakasz előbb a
+    // láncon megy át. Az állapot szeletről szeletre megmarad; ugrás után a lánc a megelőző
+    // hanggal bejáratódik (különben az ugrás pontján kattanna).
+    let fxL: Float32Array | null = null;
+    let fxR: Float32Array | null = null;
+    if (clip.fx && b > a) {
+      const read = (from: number, to: number): [Float32Array, Float32Array] => {
+        const l = new Float32Array(to - from);
+        const r = new Float32Array(to - from);
+        for (let i = from; i < to; i++) {
+          const s = i + srcOffset;
+          if (s >= 0 && s < left.length) {
+            l[i - from] = left[s];
+            r[i - from] = right[s];
+          }
+        }
+        return [l, r];
+      };
+      const key = `${clip.id}|${JSON.stringify(clip.fx)}`;
+      let st = fxState.get(key);
+      if (!st || st.next !== a) {
+        st = { chain: buildFxChain(clip.fx, sr), next: a };
+        const w0 = Math.max(clipFrom, a - FX_WARMUP);
+        if (w0 < a) {
+          const [wl, wr] = read(w0, a);
+          runChain(st.chain, wl, wr);
+        }
+      }
+      [fxL, fxR] = read(a, b);
+      runChain(st.chain, fxL, fxR);
+      st.next = b;
+      fxState.set(key, st);
+    }
     // a blokk-rács a klip elejéhez igazodik (a darabos hívás se tolja el)
     const firstBlock = clipFrom + Math.floor((a - clipFrom) / BLOCK) * BLOCK;
     for (let blockStart = firstBlock; blockStart < b; blockStart += BLOCK) {
@@ -175,14 +217,16 @@ export function mixRange(
       const level = sampleChannel(clip.volumeKf, (blockStart - clipFrom) / sr, clip.volume) * clip.gain * (mono ? monoGain : 1);
       for (let i = Math.max(a, blockStart); i < blockEnd; i++) {
         const s = i + srcOffset;
-        if (s < 0 || s >= left.length) {
+        if (!fxL && (s < 0 || s >= left.length)) {
           continue;
         }
         const t = (i - clipFrom) / sr;
         const g = hasFade ? level * fadeAt(clip, t) : level;
         const [lg, rg] = staticPan ?? panGains(sampleChannel(clip.panKf, t, clip.pan));
-        out[0][i - fromSample] += left[s] * g * lg;
-        out[1][i - fromSample] += right[s] * g * rg;
+        const xl = fxL ? fxL[i - a] : left[s];
+        const xr = fxR ? fxR[i - a] : right[s];
+        out[0][i - fromSample] += xl * g * lg;
+        out[1][i - fromSample] += xr * g * rg;
       }
     }
   }
@@ -279,6 +323,7 @@ export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupp
     const duration = visEnd - visStart;
     const speed = v.speed > 0 ? v.speed : 1;
     out.push({
+      id: `${v.id}@${visStart}`,
       track: 'video',
       uri: v.uri,
       start: visStart,

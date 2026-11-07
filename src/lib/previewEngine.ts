@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 
 import { loadAudioApi } from '@/lib/audioApiGuard';
+import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
 import { mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
@@ -59,6 +60,8 @@ class PreviewEngine {
   /** a következő keverendő idővonal-minta */
   private nextSample = 0;
   private scheduled: Scheduled[] = [];
+  /** 🎛️ a klip-effektek folytonos állapota (ugrásnál a `mixRange` bejáratja) */
+  private fxState = new Map<string, FxState>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
@@ -281,7 +284,7 @@ class PreviewEngine {
       const to = Math.min(from + CHUNK_SAMPLES, this.endSample);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
       if (this.plan) {
-        mixRange(this.plan, this.sources, out, from, to);
+        mixRange(this.plan, this.sources, out, from, to, 1, this.fxState);
       }
       const buf = ctx.createBuffer(2, to - from, SR);
       buf.copyToChannel(out[0] as Float32Array<ArrayBuffer>, 0);

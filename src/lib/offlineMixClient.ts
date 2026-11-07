@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 import { t as tr } from 'i18next';
 
 import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
+import type { FxState } from '@/lib/audioDsp';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
@@ -83,6 +84,8 @@ export async function exportOfflineWav(
   }
 
   const frames = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
+  // 🎛️ az effektek állapota szeletről szeletre megmarad (folytonos szűrés)
+  const fxState = new Map<string, FxState>();
   if (target.exists) {
     target.delete();
   }
@@ -100,7 +103,7 @@ export async function exportOfflineWav(
       }
       const to = Math.min(frames, from + chunk);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
-      mixRange(mixPlan, sources, out, from, to);
+      mixRange(mixPlan, sources, out, from, to, 1, fxState);
       handle.writeBytes(pcm16(out));
       if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
         onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });

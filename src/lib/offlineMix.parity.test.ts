@@ -121,4 +121,48 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
       expect(signal - residual).toBeGreaterThan(90);
     }
   }, 60000);
+
+  it('🎛️ szűrők és EQ (közös DSP): telefon = szerver, szeletenként és ugrással is', async () => {
+    const fx = { highpass: 200, lowpass: 6000, eq: { low: 4, mid: -3, high: 5 } };
+    const fp: Project = {
+      ...base,
+      tracks: base.tracks.map((t) =>
+        t.type === 'music' ? { ...t, clips: [clip({ id: 'f', uri: stereo, start: 0.25, trimIn: 0.2, duration: 3, sourceDuration: 4, volume: 0.8, fadeIn: 0.2, fadeOut: 0.3, pan: 0.3, audioFx: fx })] } : t
+      ),
+    };
+    const { renderProject } = jest.requireActual('../../server/render');
+    const work = fs.mkdtempSync(path.join(dir, 'wf-'));
+    const server = decode(await renderProject(fp, work, () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    const plan = offlineMixPlan(fp);
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.clips[0].fx).toEqual(fx);
+    const n = server[0].length;
+    const sources = new Map([[stereo, { channels: decode(stereo, 2), sampleRate: SR }]]);
+    // darabosan, ahogy az export és az előnézet fut (folytonos szűrő-állapottal)
+    const chunked: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    const state = new Map();
+    for (let from = 0; from < n; from += 5512) {
+      const to = Math.min(n, from + 5512);
+      const part: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
+      mixRange(plan, sources, part, from, to, 1, state);
+      chunked[0].set(part[0], from);
+      chunked[1].set(part[1], from);
+    }
+    for (const c of [0, 1]) {
+      const diff = server[c].map((v, i) => v - chunked[c][i]);
+      // eslint-disable-next-line no-console
+      console.log(`FX csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
+      expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
+    }
+    // egyben keverve ugyanaz (a szeletelés nem hagy nyomot)
+    const whole: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    mixRange(plan, sources, whole, 0, n, 1, new Map());
+    expect(rmsDb(whole[0].map((v, i) => v - chunked[0][i]))).toBeLessThan(-140);
+    // ugrás a klip közepére: a bejáratott lánc a folytonossal egyezik
+    const at = Math.round(1.7 * SR);
+    const jumped: [Float32Array, Float32Array] = [new Float32Array(n - at), new Float32Array(n - at)];
+    mixRange(plan, sources, jumped, at, n, 1, new Map());
+    expect(rmsDb(jumped[0].map((v, i) => v - whole[0][at + i])) - rmsDb(whole[0].subarray(at))).toBeLessThan(-100);
+  }, 60000);
 });
+

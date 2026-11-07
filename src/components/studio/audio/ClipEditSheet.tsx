@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
+import { startSilenceSearch } from '@/components/studio/audio/SilenceReview';
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { AUDIO_FX_PRESETS, presetFx } from '@/lib/audioFxPresets';
 import { renderClipSpectrum } from '@/lib/audioSpectrum';
@@ -311,9 +312,10 @@ export function ClipEditSheet({
               updateClip(
                 clip.id,
                 on
-                  ? { loopLength: clip.duration }
+                  ? { loopLength: clip.duration, loopOffset: undefined }
                   : {
                       loopLength: undefined,
+                      loopOffset: undefined,
                       // ki: a klip nem lóghat túl a forráson
                       duration: Math.min(clip.duration, Math.max(0.1, (clip.sourceDuration ?? clip.duration) - (clip.trimIn ?? 0))),
                     }
@@ -424,6 +426,23 @@ export function ClipEditSheet({
           format={(v) => `${Math.round(v * 100)}%`}
         />
         <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>
+
+        {/* 🔇 csendek keresése → jóváhagyás az idővonalon */}
+        <View style={styles.divider} />
+        <Pressable
+          testID="clip-find-silence"
+          onPress={() => {
+            const track = useEditorStore.getState().project?.tracks.find((tr) => tr.clips.some((c) => c.id === clip.id));
+            if (!track) return;
+            onClose();
+            void startSilenceSearch(clip, track.type, fps, t);
+          }}
+          style={styles.stemsBtn}
+        >
+          <Ionicons name="cut-outline" size={16} color={palette.accent} />
+          <Text style={styles.stemsText}>{t('studio.audio.silence.find')}</Text>
+        </Pressable>
+        <Text style={styles.hint}>{t('studio.audio.silence.findHint')}</Text>
 
         {/* 🎚️ AI stem-szeparáció (Pro) */}
         <View style={styles.divider} />

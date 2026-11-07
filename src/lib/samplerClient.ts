@@ -5,11 +5,14 @@ import { activeSteps, samplerDurationSec, type SamplerPattern } from '@/lib/samp
 import { uploadFetch } from '@/lib/upload';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { samplerOnDevice } from '@/lib/instrumentClient';
 
 /**
  * 🎛️🔊 A sampler step-mintájának renderelése a worker `/sampler`-én: a feltöltött minta-fájlt
  * a lépés-időpontokra helyezi, keveri, a bájtokat helyi fájlba menti → `uri` + hossz. A hívó
  * sima `AudioClip`-et tesz a sávra. Hiba/web → null.
+ * 📱 Offline-first (2026-11-07): előbb a telefonon készül (`instrumentClient`, Free-n is,
+ * hálózat nélkül); a worker csak tartalék.
  */
 export async function renderSamplerToClip(
   sampleUri: string,
@@ -19,6 +22,11 @@ export async function renderSamplerToClip(
   const steps = activeSteps(pattern);
   if (steps.length === 0) {
     return null;
+  }
+  // 📱 offline-first: a telefonon készül; a szerver csak tartalék (web, vagy ha a telefonos út hibázik)
+  const local = await samplerOnDevice(sampleUri, pattern, opts);
+  if (local) {
+    return local;
   }
   try {
     const form = new FormData();

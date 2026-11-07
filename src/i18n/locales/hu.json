@@ -3949,6 +3949,7 @@
       "shape": { "rectangle": "Téglalap", "ellipse": "Ellipszis", "line": "Vonal", "arrow": "Nyíl", "star": "Csillag", "polygon": "Sokszög" },
       "blend": { "normal": "Normál", "multiply": "Szorzás", "screen": "Kivonás", "overlay": "Fedés", "softlight": "Lágy fény", "darken": "Sötétítés", "lighten": "Világosítás", "hardlight": "Kemény fény", "difference": "Különbség", "exclusion": "Kizárás", "colordodge": "Színfakítás", "colorburn": "Színégetés" }
     },
+    "instrument": {"play": "Lejátszás", "stop": "Állj"},
     "audioTools": {
       "beatSplitTitle": "Vágás a rácson",
       "beatSplitBars": "Ütemenként",

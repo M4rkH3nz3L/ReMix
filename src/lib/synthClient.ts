@@ -5,11 +5,14 @@ import { uploadFetch } from '@/lib/upload';
 import { synthDurationSec, type SynthNote, type SynthWave } from '@/lib/synth';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { synthOnDevice } from '@/lib/instrumentClient';
 
 /**
  * 🎹 A piano-roll hangjegyeinek renderelése hang-fájllá a worker `/synth`-jén (MIDI → generált
  * hang), és a visszakapott bájtok helyi fájlba mentése → az `uri` + a hossz. A hívó (Hang Stúdió)
  * ebből sima `AudioClip`-et tesz a sávra. Weben / hiba esetén `null`.
+ * 📱 Offline-first (2026-11-07): előbb a telefonon készül (`instrumentClient`, Free-n is,
+ * hálózat nélkül); a worker csak tartalék.
  */
 export async function renderSynthToClip(
   notes: SynthNote[],
@@ -17,6 +20,11 @@ export async function renderSynthToClip(
 ): Promise<{ uri: string; durationSec: number } | null> {
   if (!notes || notes.length === 0) {
     return null;
+  }
+  // 📱 offline-first: a telefonon készül; a szerver csak tartalék (web, vagy ha a telefonos út hibázik)
+  const local = await synthOnDevice(notes, opts);
+  if (local) {
+    return local;
   }
   try {
     const res = await uploadFetch(`${renderServerUrl()}/synth`, {

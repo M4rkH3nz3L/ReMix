@@ -72,6 +72,12 @@ import { wordCutRanges } from '@/lib/speechEdit';
 import { gccPhatLag, SYNC_MIN_CONFIDENCE } from '@/lib/audioSync';
 import { syncClipTo } from '@/lib/audioSyncClient';
 import { exportParts } from '@/components/studio/audio/exportParts';
+import { auditionDrum, auditionNote, lastStartMs, playPcm, previewLooping, previewPosition, stopPreview, warmPreview } from '@/lib/instrumentPreview';
+import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
+import { decodeSample } from '@/lib/instrumentClient';
+import { renderSynthToClip } from '@/lib/synthClient';
+import { renderDrumsToClip } from '@/lib/drumsClient';
+import { renderSamplerToClip } from '@/lib/samplerClient';
 import { audioLanes, laneLabel } from '@/components/studio/audio/audioLanes';
 import { crc32, localDataOffset, parseCentralDirectory, parseEocd } from '@/lib/zipStore';
 import { t as i18nT, type TFunction } from 'i18next';
@@ -3455,6 +3461,81 @@ function laneLabelFor(type: string, t: TFunction): string {
   return lane ? laneLabel(lane, t) : type;
 }
 
+/** 🎹🥁🎛️ Hangszerek offline: beégetés a telefonon (WAV = az előhallgatott PCM), élő előhallgatás, a dobgép szól. */
+async function smokeInstruments(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const api = (await loadAudioApi())!;
+  const left = async (uri: string) => (await api.decodeAudioData(uri, SR)).getChannelData(0);
+  const maxDiff = (a: Float32Array, b: Float32Array) => {
+    let d = 0;
+    for (let i = 0; i < Math.min(a.length, b.length); i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+    return d;
+  };
+  // 1) beégetés a telefonon — a fájl az, amit az előhallgatás játszik
+  const notes = [{ id: 'a', midi: 60, startBeat: 0, lengthBeats: 1 }, { id: 'b', midi: 64, startBeat: 1, lengthBeats: 1 }, { id: 'c', midi: 67, startBeat: 2, lengthBeats: 2, velocity: 80 }];
+  let t0 = Date.now();
+  const syn = await renderSynthToClip(notes, { bpm: 120, wave: 'square' });
+  const synMs = Date.now() - t0;
+  const synD = syn ? maxDiff(await left(syn.uri), renderSynthPcm(notes, 'square', 120)[0]) : 1;
+  log(!!syn && syn.uri.endsWith('.wav') && synD < 1e-4 && Math.abs(syn.durationSec - 2) < 1e-6, 'synth: a telefonon (WAV, szerver nélkül), a fájl = az előhallgatott hang', `${synMs} ms, ${syn?.durationSec} s, eltérés ${synD.toExponential(1)} (16 bit)`);
+  const hits = [{ voice: 'kick' as const, step: 0 }, { voice: 'snare' as const, step: 4 }, { voice: 'hihat' as const, step: 2 }, { voice: 'clap' as const, step: 12 }];
+  t0 = Date.now();
+  const dr = await renderDrumsToClip(hits, { bpm: 120, bars: 1 });
+  const drD = dr ? maxDiff(await left(dr.uri), renderDrumsPcm(hits, 1, 120)[0]) : 1;
+  log(!!dr && dr.uri.endsWith('.wav') && drD < 1e-4 && Math.abs(dr.durationSec - 2) < 1e-6, 'dobgép: a telefonon, pontosan a rács hossza (loopolható)', `${Date.now() - t0} ms, ${dr?.durationSec} s, eltérés ${drD.toExponential(1)}`);
+  const sampleUri = toneWav('smoke_instr_sample.wav', 0.2);
+  t0 = Date.now();
+  const pattern = Array.from({ length: 16 }, (_, i) => i % 4 === 0);
+  const sm = await renderSamplerToClip(sampleUri, pattern, { bpm: 120, bars: 1 });
+  const sample = await decodeSample(sampleUri);
+  const smD = sm && sample ? maxDiff(await left(sm.uri), renderSamplerPcm(sample, [0, 4, 8, 12], 1, 120)[0]) : 1;
+  log(!!sm && sm.uri.endsWith('.wav') && smD < 1e-4, 'sampler: a saját minta a telefonon a lépésekre', `${Date.now() - t0} ms, ${sm?.durationSec} s, eltérés ${smD.toExponential(1)}`);
+  for (const c of [syn, dr, sm]) if (c) new File(c.uri).delete();
+  // 2) élő előhallgatás (a lap megnyitása előkészíti a hangkontextust)
+  await warmPreview();
+  const a1 = await auditionNote(64, 'triangle', 120);
+  log(a1 && lastStartMs < 30, 'koppintás (a lap nyitása után): a hang azonnal megszólal', `indítás ${lastStartMs} ms`);
+  const a2 = await auditionDrum('snare');
+  log(a2 && lastStartMs < 30, 'koppintás: a dob azonnal megszólal', `indítás ${lastStartMs} ms`);
+  const loopPcm = renderDrumsPcm(hits, 1, 120);
+  await playPcm(loopPcm, true);
+  await sleep(700);
+  const p1 = previewPosition() ?? -1;
+  log(previewLooping() && p1 > 0.5 && p1 < 0.95, 'a minta loopolva szól, a lejátszófej halad (a hangkimenet órája)', `${p1.toFixed(3)} s 700 ms után`);
+  await playPcm(renderDrumsPcm([...hits, { voice: 'kick', step: 8 }], 1, 120), true, true);
+  const p2 = previewPosition() ?? -1;
+  log(Math.abs(p2 - p1) < 0.15, 'szerkesztés közben: az új minta a lejátszófej helyéről folytatódik', `${p1.toFixed(3)} → ${p2.toFixed(3)} s`);
+  await sleep(1800);
+  const p3 = previewPosition() ?? -1;
+  log(p3 >= 0 && p3 < 2, 'a loop körbefordul (2 s-os rács)', `${p3.toFixed(3)} s`);
+  stopPreview();
+  log(!previewLooping(), 'Állj: elhallgat', '');
+  // 3) a dobgép a stúdióban, a „▶” gombbal
+  const id = 'prj_smoke_instruments';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instruments', caught));
+  const base = createEmptyProject('smoke hangszerek', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.openDrums');
+  await sleep(800);
+  const n = runDevAction('drums.demo') as number;
+  await sleep(300);
+  const playing = (await runDevAction('preview.drums-play')) as boolean;
+  await sleep(600);
+  log(n === 12 && playing && previewLooping() && (previewPosition() ?? 0) > 0.3, 'a dobgép „▶” gombja: a demó-ütem (12 ütés) loopolva szól', `${n} ütés, ${(previewPosition() ?? -1).toFixed(2)} s`);
+  log(true, 'FOTÓZHATÓ', 'a dobgép a demó-ütemmel, a „Lejátszás” gomb aktív');
+  await sleep(3000);
+  await runDevAction('preview.drums-play');
+  log(!previewLooping(), 'a gomb újra: elhallgat', '');
+  router.back();
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5264,6 +5345,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'instruments') {
+    await step(phase, () => smokeInstruments(log));
     return;
   }
   if (phase === 'stemexport') {

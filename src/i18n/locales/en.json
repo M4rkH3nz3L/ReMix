@@ -3949,6 +3949,7 @@
       "shape": { "rectangle": "Rectangle", "ellipse": "Ellipse", "line": "Line", "arrow": "Arrow", "star": "Star", "polygon": "Polygon" },
       "blend": { "normal": "Normal", "multiply": "Multiply", "screen": "Screen", "overlay": "Overlay", "softlight": "Soft light", "darken": "Darken", "lighten": "Lighten", "hardlight": "Hard light", "difference": "Difference", "exclusion": "Exclusion", "colordodge": "Color dodge", "colorburn": "Color burn" }
     },
+    "instrument": {"play": "Play", "stop": "Stop"},
     "audioTools": {
       "beatSplitTitle": "Split on the grid",
       "beatSplitBars": "Every bar",

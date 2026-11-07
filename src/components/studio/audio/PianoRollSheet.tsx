@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
+import { auditionNote } from '@/lib/instrumentPreview';
+import { padTo, renderSynthPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { makeId } from '@/lib/id';
@@ -57,7 +60,11 @@ export function PianoRollSheet({
   const cols = Array.from({ length: beats }, (_, i) => i);
   const durSec = synthDurationSec(notes, bpm);
 
-  const tap = (midi: number, beat: number) => setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note')));
+  const tap = (midi: number, beat: number) => {
+    // 🎧 az új hang azonnal megszólal (offline, a telefonon)
+    if (!noteAt(notes, midi, beat)) void auditionNote(midi, wave, bpm);
+    setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note')));
+  };
 
   return (
     <AudioSheetFrame id="pianoRoll" onClose={onClose} sheetStyle={styles.sheet}>
@@ -126,6 +133,12 @@ export function PianoRollSheet({
         <Text style={styles.footerInfo}>
           {notes.length} {t('studio.pianoRoll.notes', { defaultValue: 'hang' })} · {durSec.toFixed(1)}s
         </Text>
+        <PreviewPlayButton
+          testID="pianoroll-play"
+          disabled={notes.length === 0}
+          version={`${wave}|${bpm}|${bars}|${notes.map((n) => `${n.midi}@${n.startBeat}`).join(',')}`}
+          build={() => (notes.length > 0 ? padTo(renderSynthPcm(notes, wave, bpm), Math.max(bars * 4, Math.ceil(synthDurationSec(notes, bpm) * (bpm / 60))) * (60 / bpm)) : null)}
+        />
         <Pressable onPress={() => setNotes([])} style={styles.clearBtn} disabled={notes.length === 0}>
           <Ionicons name="trash-outline" size={15} color={notes.length === 0 ? palette.border : palette.textDim} />
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>

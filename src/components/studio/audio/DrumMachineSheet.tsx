@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
+import { registerDevAction } from '@/lib/devActions';
+import { auditionDrum } from '@/lib/instrumentPreview';
+import { renderDrumsPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import {
@@ -42,6 +46,19 @@ export function DrumMachineSheet({
   const { t } = useTranslation();
   const [bars, setBars] = useState(1);
   const [pattern, setPattern] = useState<DrumPattern>(() => emptyPattern(1));
+  // 🧪 füstteszt: egy alap ütem (kick 1/3, snare 2/4, hihat nyolcadok)
+  useEffect(
+    () =>
+      registerDevAction('drums.demo', () => {
+        let p = emptyPattern(1);
+        for (const s of [0, 8]) p = toggleStep(p, 'kick', s);
+        for (const s of [4, 12]) p = toggleStep(p, 'snare', s);
+        for (let s = 0; s < 16; s += 2) p = toggleStep(p, 'hihat', s);
+        setPattern(p);
+        return patternHits(p).length;
+      }),
+    []
+  );
 
   const steps = stepCount(bars);
   const cols = Array.from({ length: steps }, (_, i) => i);
@@ -101,7 +118,11 @@ export function DrumMachineSheet({
                 return (
                   <Pressable
                     key={step}
-                    onPress={() => setPattern((p) => toggleStep(p, voice, step))}
+                    onPress={() => {
+                      // 🎧 az új ütés azonnal megszólal
+                      if (!on) void auditionDrum(voice);
+                      setPattern((p) => toggleStep(p, voice, step));
+                    }}
                     style={[
                       styles.cell,
                       beatStart && styles.cellBeat,
@@ -118,6 +139,12 @@ export function DrumMachineSheet({
       </ScrollView>
 
       <View style={styles.footer}>
+        <PreviewPlayButton
+          testID="drums-play"
+          disabled={!hasHits(pattern)}
+          version={`${bpm}|${bars}|${patternHits(pattern).map((h) => `${h.voice}${h.step}`).join(',')}`}
+          build={() => (hasHits(pattern) ? renderDrumsPcm(patternHits(pattern), bars, bpm) : null)}
+        />
         <Pressable onPress={() => setPattern(emptyPattern(bars))} style={styles.clearBtn} disabled={!hasHits(pattern)}>
           <Ionicons name="trash-outline" size={15} color={hasHits(pattern) ? palette.textDim : palette.border} />
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>

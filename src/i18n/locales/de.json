@@ -3954,6 +3954,7 @@
       "shape": { "rectangle": "Rechteck", "ellipse": "Ellipse", "line": "Linie", "arrow": "Pfeil", "star": "Stern", "polygon": "Vieleck" },
       "blend": { "normal": "Normal", "multiply": "Multiplizieren", "screen": "Negativ mult.", "overlay": "Überlagern", "softlight": "Weiches Licht", "darken": "Abdunkeln", "lighten": "Aufhellen", "hardlight": "Hartes Licht", "difference": "Differenz", "exclusion": "Ausschluss", "colordodge": "Farbig abwedeln", "colorburn": "Farbig nachbelichten" }
     },
+    "instrument": {"play": "Abspielen", "stop": "Stopp"},
     "audioTools": {
       "beatSplitTitle": "Am Raster teilen",
       "beatSplitBars": "Jeden Takt",

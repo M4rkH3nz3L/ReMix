@@ -3,11 +3,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
+import { decodeSample } from '@/lib/instrumentClient';
+import { playPcm } from '@/lib/instrumentPreview';
+import { renderSamplerPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { audioIntakeText } from '@/lib/audioIntake';
 import { pickAudio } from '@/lib/media';
 import {
+  activeSteps,
   emptySampler,
   resizeSampler,
   samplerDurationSec,
@@ -120,7 +125,11 @@ export function SamplerSheet({
             return (
               <Pressable
                 key={step}
-                onPress={() => setPattern((p) => toggleSamplerStep(p, step))}
+                onPress={() => {
+                  // 🎧 az új lépés: a minta azonnal megszólal
+                  if (!on && sampleUri) void decodeSample(sampleUri).then((x) => x && playPcm(x));
+                  setPattern((p) => toggleSamplerStep(p, step));
+                }}
                 style={[
                   styles.cell,
                   beatStart && styles.cellBeat,
@@ -135,6 +144,15 @@ export function SamplerSheet({
       </ScrollView>
 
       <View style={styles.footer}>
+        <PreviewPlayButton
+          testID="sampler-play"
+          disabled={!canBake}
+          version={`${bpm}|${bars}|${sampleUri}|${activeSteps(pattern).join(',')}`}
+          build={async () => {
+            const sample = sampleUri ? await decodeSample(sampleUri) : null;
+            return sample && samplerHasHits(pattern) ? renderSamplerPcm(sample, activeSteps(pattern), bars, bpm) : null;
+          }}
+        />
         <Pressable onPress={() => setPattern(emptySampler(bars))} style={styles.clearBtn} disabled={!samplerHasHits(pattern)}>
           <Ionicons name="trash-outline" size={15} color={samplerHasHits(pattern) ? palette.textDim : palette.border} />
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>

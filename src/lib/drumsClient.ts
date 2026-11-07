@@ -5,10 +5,13 @@ import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { drumsOnDevice } from '@/lib/instrumentClient';
 
 /**
  * 🥁 A dob-minta ütéseinek renderelése hang-fájllá a worker `/drums`-án (szintetizált dob-hangok),
  * a bájtok helyi fájlba mentése → `uri` + hossz. A hívó sima `AudioClip`-et tesz a sávra. Hiba/web → null.
+ * 📱 Offline-first (2026-11-07): előbb a telefonon készül (`instrumentClient`, Free-n is,
+ * hálózat nélkül); a worker csak tartalék.
  */
 export async function renderDrumsToClip(
   hits: DrumHit[],
@@ -16,6 +19,11 @@ export async function renderDrumsToClip(
 ): Promise<{ uri: string; durationSec: number } | null> {
   if (!hits || hits.length === 0) {
     return null;
+  }
+  // 📱 offline-first: a telefonon készül; a szerver csak tartalék (web, vagy ha a telefonos út hibázik)
+  const local = await drumsOnDevice(hits, opts);
+  if (local) {
+    return local;
   }
   try {
     const res = await uploadFetch(`${renderServerUrl()}/drums`, {

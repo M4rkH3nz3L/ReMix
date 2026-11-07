@@ -63,6 +63,10 @@ export interface OfflineMixClip {
   panKf?: Keyframe[];
   /** sáv- × master-erősítés */
   gain: number;
+  /** ⏩ forrás-mp / idővonal-mp (hangmagasság-tartással); 1 = nincs nyújtás */
+  speed: number;
+  /** ⏪ a forrás-ablak visszafelé szól (a videóklip `reversed`-je) */
+  reversed: boolean;
 }
 
 export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master' | 'videoSpeed';
@@ -89,11 +93,6 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
       if (clip.voiceEnhance) unsupported.add('voiceEnhance');
       if (clip.deReverb) unsupported.add('deReverb');
       if (clip.autoDuck) unsupported.add('autoDuck');
-      // ⏩ hangmagasság-tartó időnyújtás a telefonon nincs: a gyorsított hang a Pro szerveres exportjában
-      if (audioSpeedOf(clip) !== 1) {
-        unsupported.add('videoSpeed');
-        continue;
-      }
       clips.push({
         track: track.type,
         uri: clip.uri,
@@ -107,6 +106,8 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         pan: clip.pan ?? 0,
         panKf: clip.keyframes?.pan,
         gain,
+        speed: audioSpeedOf(clip),
+        reversed: false,
       });
     }
   }
@@ -247,9 +248,9 @@ export function encodeWav16(channels: Float32Array[], sampleRate: number, rand: 
  * 🎬 A videóklipek hangja (PRO-AUDIO 17/20) — a szerver `visualSegments` + videó-hang
  * láncának tükre: a vizuális sáv nem átfedő szakaszokra bomlik (átfedésnél a később kezdődő
  * klip nyer, a képklip is takar), a klip hangja csak a látható szakaszán szól, a hangerő-
- * automáció a klip saját idejében fut, fade és sáv-erősítés nincs. A gyorsított vagy
- * visszafelé játszott klip hangját a telefon nem tudja (a szerver atempo/areverse-e) — ezt az
- * `unsupported` jelzi, és a klip hangja kimarad.
+ * automáció a klip saját idejében fut, fade és sáv-erősítés nincs. ⏩⏪ A gyorsított vagy
+ * visszafelé játszott klip szakasza `speed`/`reversed`-del jön: a kliens előbb kivágja,
+ * megfordítja és hangmagasság-tartással nyújtja (`stretchJobs`), mint a szerver areverse/atempo-ja.
  */
 export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupported>): OfflineMixClip[] {
   const visual = (project.tracks.find((t) => t.type === 'video')?.clips ?? [])
@@ -274,19 +275,18 @@ export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupp
     if (!(v.volume > 0 || (kf ?? []).some((k) => k.value > 0))) {
       continue;
     }
-    if (v.speed !== 1 || v.reversed) {
-      unsupported.add('videoSpeed');
-      continue;
-    }
     if (v.voiceEnhance) unsupported.add('voiceEnhance');
     if (v.deReverb) unsupported.add('deReverb');
     const skip = visStart - v.start;
+    const duration = visEnd - visStart;
+    const speed = v.speed > 0 ? v.speed : 1;
     out.push({
       track: 'video',
       uri: v.uri,
       start: visStart,
-      duration: visEnd - visStart,
-      trimIn: v.trimIn + skip,
+      duration,
+      // a szerver `segSourceWindow`-jának tükre: visszafelé a forrás-ablak a klip végéről indul
+      trimIn: v.reversed ? v.trimIn + (v.duration - skip - duration) * speed : v.trimIn + skip * speed,
       volume: v.volume,
       // a szakasz a klip közepén is kezdődhet: a görbe a klip saját idejében fut
       volumeKf: kf?.map((k) => ({ ...k, time: k.time - skip })),
@@ -294,8 +294,56 @@ export function videoAudioClips(project: Project, unsupported: Set<OfflineUnsupp
       fadeOut: 0,
       pan: 0,
       gain: 1,
+      speed,
+      reversed: !!v.reversed,
     });
   }
   return out;
+}
+
+/**
+ * ⏩⏪ Egy nyújtandó/megfordítandó forrás-szakasz: a kliens a dekódolt forrásból kivágja a
+ * `[from, from + sourceSec)` ablakot, megfordítja (`reversed`), majd hangmagasság-tartással
+ * `duration` hosszúra nyújtja — a kész szakasz `key` néven 1×-es forrásként kerül a keverőbe.
+ */
+export interface StretchJob {
+  key: string;
+  uri: string;
+  from: number;
+  sourceSec: number;
+  duration: number;
+  speed: number;
+  reversed: boolean;
+}
+
+/**
+ * A terv átírása: a gyorsított/megfordított klip a kész szakaszra hivatkozik (`trimIn` 0,
+ * `speed` 1), így a `mixRange` változatlanul keveri. Az azonos szakaszok egy feladatot adnak.
+ */
+export function stretchJobs(plan: OfflineMixPlan): { jobs: StretchJob[]; plan: OfflineMixPlan } {
+  const jobs = new Map<string, StretchJob>();
+  const clips = plan.clips.map((c) => {
+    if (c.speed === 1 && !c.reversed) {
+      return c;
+    }
+    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}`;
+    if (!jobs.has(key)) {
+      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed });
+    }
+    return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false };
+  });
+  return { jobs: [...jobs.values()], plan: { ...plan, clips } };
+}
+
+/** A forrás `[from, from + n)` mintái csatornánként (a forráson túl csend), igény szerint fordítva. */
+export function sliceSource(channels: Float32Array[], from: number, n: number, reversed: boolean): Float32Array[] {
+  return channels.map((ch) => {
+    const out = new Float32Array(n);
+    const a = Math.max(0, from);
+    const b = Math.min(ch.length, from + n);
+    if (b > a) out.set(ch.subarray(a, b), a - from);
+    if (reversed) out.reverse();
+    return out;
+  });
 }
 

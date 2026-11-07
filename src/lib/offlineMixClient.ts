@@ -5,7 +5,7 @@ import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, wavHeader16, type DecodedSource, type OfflineUnsupported } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -68,6 +68,20 @@ export async function exportOfflineWav(
     }
   }
 
+  // ⏩⏪ a gyorsított / visszafelé játszott szakaszok: kivágás, fordítás, hangmagasság-tartó
+  // nyújtás a natív motorral (a szerver areverse/atempo-jának megfelelője) — utána 1×-es forrás
+  const { jobs, plan: mixPlan } = stretchJobs(plan);
+  for (const job of jobs) {
+    if (signal?.aborted) {
+      throw new RenderCancelledError();
+    }
+    const src = sources.get(job.uri);
+    if (src) {
+      sources.set(job.key, await stretchSegment(api, src, job));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
   const frames = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
   if (target.exists) {
     target.delete();
@@ -86,7 +100,7 @@ export async function exportOfflineWav(
       }
       const to = Math.min(frames, from + chunk);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
-      mixRange(plan, sources, out, from, to);
+      mixRange(mixPlan, sources, out, from, to);
       handle.writeBytes(pcm16(out));
       if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
         onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
@@ -109,4 +123,71 @@ export async function exportOfflineWav(
   }
   handle.close();
   return { uri: target.uri, unsupported: plan.unsupported };
+}
+
+type AudioApi = NonNullable<Awaited<ReturnType<typeof loadAudioApi>>>;
+
+/** a natív nyújtás egy futása: `input` csatornái `speed`-del, `length` kimeneti mintára */
+async function renderStretched(api: AudioApi, input: Float32Array[], speed: number, length: number, sr: number): Promise<Float32Array[]> {
+  const ctx = new api.OfflineAudioContext({ numberOfChannels: input.length, length: Math.max(1, length), sampleRate: sr });
+  const buf = ctx.createBuffer(input.length, Math.max(1, input[0].length), sr);
+  input.forEach((ch, c) => buf.copyToChannel(ch as Float32Array<ArrayBuffer>, c));
+  const node = ctx.createBufferSource({ pitchCorrection: true });
+  node.buffer = buf;
+  node.playbackRate.value = speed;
+  node.connect(ctx.destination);
+  node.start(0);
+  const out = await ctx.startRendering();
+  return Array.from({ length: out.numberOfChannels }, (_, c) => out.getChannelData(c));
+}
+
+/**
+ * ⏱️ A nyújtó késleltetése (kimeneti minta) az adott sebességen — mérve: 2×-en ~55 ms, 0,5×-en
+ * ~115 ms (iPad), tehát sebességfüggő. Egy rövid kattanás nyújtása után a kimenet csúcsa és a
+ * várt helye közti különbség; sebességenként egyszer.
+ */
+const latencyCache = new Map<number, number>();
+/** 🧪 füstteszt: a mért késés (minta) és a kattanás-kimenet csúcsa */
+export async function measureStretchLatency(speed: number): Promise<number | null> {
+  const api = await loadAudioApi();
+  return api ? stretchLatency(api, speed, OFFLINE_SAMPLE_RATE) : null;
+}
+
+async function stretchLatency(api: AudioApi, speed: number, sr: number): Promise<number> {
+  const cached = latencyCache.get(speed);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const at = Math.round(0.25 * sr);
+  const click = new Float32Array(Math.round(1 * sr));
+  for (let i = 0; i < 32; i++) click[at + i] = Math.sin((Math.PI * i) / 32);
+  const out = (await renderStretched(api, [click], speed, Math.round((1 / speed + 0.5) * sr), sr))[0];
+  let peak = 0;
+  for (let i = 1; i < out.length; i++) if (Math.abs(out[i]) > Math.abs(out[peak])) peak = i;
+  const latency = Math.max(0, peak - Math.round(at / speed));
+  latencyCache.set(speed, latency);
+  return latency;
+}
+
+/**
+ * Egy szakasz nyújtása: a natív `OfflineAudioContext` hangmagasság-tartó (`pitchCorrection`)
+ * forrása `speed`-del játssza le a kivágott (és igény szerint megfordított) ablakot. A nyújtó
+ * késleltetését kompenzáljuk: a kimenet elejéről a késés leesik, a bemenet a végén ennyivel
+ * hosszabb — így a kimenet pontosan `duration` hosszú és a helyén szól.
+ */
+async function stretchSegment(api: AudioApi, src: DecodedSource, job: StretchJob): Promise<DecodedSource> {
+  const sr = src.sampleRate;
+  const n = Math.max(1, Math.round(job.sourceSec * sr));
+  if (job.speed === 1) {
+    return { channels: sliceSource(src.channels, Math.round(job.from * sr), n, job.reversed), sampleRate: sr };
+  }
+  const lat = await stretchLatency(api, job.speed, sr);
+  // a kimenet `lat` mintával késik: elejéről ennyi esik le, ezért a bemenet a VÉGÉN hosszabb
+  // (a forrás következő részével; a megfordított ablaké a forrásban előtte van)
+  const extra = Math.round(lat * job.speed);
+  const from = Math.round(job.from * sr);
+  const slice = job.reversed ? sliceSource(src.channels, from - extra, n + extra, true) : sliceSource(src.channels, from, n + extra, false);
+  const outLen = Math.round(job.duration * sr);
+  const out = await renderStretched(api, slice, job.speed, outLen + lat, sr);
+  return { channels: out.map((ch) => ch.slice(lat, lat + outLen)), sampleRate: sr };
 }

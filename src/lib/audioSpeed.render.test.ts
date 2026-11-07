@@ -13,7 +13,7 @@ const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmS
 const os = jest.requireActual('os') as { tmpdir: () => string };
 const path = jest.requireActual('path') as { join: (...p: string[]) => string };
 
-import { edgeFades, offlineMixPlan } from '@/lib/offlineMix';
+import { edgeFades, offlineMixPlan, sliceSource, stretchJobs } from '@/lib/offlineMix';
 import { createEmptyProject, cropClip } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -51,12 +51,29 @@ describe('⏩ gyorsított hangklip — pure részek', () => {
     expect(f.get('l')?.out).toBe(0);
     expect(f.get('r')?.in).toBe(0);
   });
-  it('a telefonos export a gyorsított hangot kihagyottként jelzi (a Pro szerver szólaltatja meg)', () => {
+  it('a telefonos export a gyorsított hangot nyújtási feladatként keveri (nem marad ki)', () => {
     const base = createEmptyProject('speed', '1:1', undefined, 'audio');
-    const p: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [clip({ speed: 2 })] } : t)) };
+    const p: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [clip({ speed: 2, trimIn: 0.5 })] } : t)) };
     const plan = offlineMixPlan(p);
-    expect(plan.unsupported).toContain('videoSpeed');
-    expect(plan.clips).toHaveLength(0);
+    expect(plan.unsupported).toEqual([]);
+    const { jobs, plan: mixed } = stretchJobs(plan);
+    expect(jobs).toEqual([expect.objectContaining({ from: 0.5, sourceSec: 4, duration: 2, speed: 2, reversed: false })]);
+    expect(mixed.clips[0]).toMatchObject({ uri: jobs[0].key, trimIn: 0, speed: 1 });
+  });
+  it('⏪ a megfordított videóklip szakasza a klip végéről indul (a szerver segSourceWindow-ja)', () => {
+    const base = createEmptyProject('rev', '1:1');
+    const v = { id: 'v', kind: 'video', uri: 'v.mp4', start: 0, duration: 4, trimIn: 1, sourceDuration: 20, speed: 2, reversed: true, volume: 1, filterId: 'none' };
+    const img = { id: 'i', kind: 'image', uri: 'i.png', start: 1, duration: 1 };
+    const p = { ...base, tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: [v, img] } : t)) } as unknown as Project;
+    const segs = offlineMixPlan(p).clips.filter((c) => c.track === 'video');
+    // a látható szakasz 0–1 mp (a kép takarja 1–2-t) → a forrás-ablak a klip vége felől: 1 + (4 − 0 − 1)·2 = 7
+    expect(segs[0]).toMatchObject({ start: 0, duration: 1, trimIn: 7, speed: 2, reversed: true });
+  });
+  it('sliceSource: kivágás, csend a forráson túl, fordítás', () => {
+    const ch = Float32Array.from([1, 2, 3, 4, 5]);
+    expect(Array.from(sliceSource([ch], 3, 4, false)[0])).toEqual([4, 5, 0, 0]);
+    expect(Array.from(sliceSource([ch], 1, 3, true)[0])).toEqual([4, 3, 2]);
+    expect(Array.from(sliceSource([ch], -1, 2, false)[0])).toEqual([0, 1]);
   });
 });
 

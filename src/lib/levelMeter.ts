@@ -25,7 +25,9 @@ export function trackLevelAt(
     if (!wave) {
       continue;
     }
-    const src = c.trimIn + (t - c.start);
+    // ⏩⏪ a forrás-ablakon belüli pont (gyorsított: speed-del halad, megfordított: a végéről)
+    const local = (c.reversed ? c.duration - (t - c.start) : t - c.start) * c.speed;
+    const src = c.trimIn + local;
     const peak = wave.peaks[Math.floor(src * wave.peaksPerSecond)] ?? 0;
     level += peak * clipGainAt(c, t - c.start);
   }

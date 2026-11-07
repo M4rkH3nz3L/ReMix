@@ -4,7 +4,7 @@ import type { WaveformData } from '@/lib/waveform';
 
 const wave: WaveformData = { duration: 4, peaksPerSecond: 2, peaks: [0.1, 0.2, 0.5, 0.5, 0.8, 0.8, 0.2, 0.2] };
 const clip = (over: Partial<OfflineMixClip> = {}): OfflineMixClip => ({
-  track: 'music', uri: 'u', start: 1, duration: 2, trimIn: 1, volume: 0.5, fadeIn: 0, fadeOut: 0, pan: 0, gain: 1, ...over,
+  track: 'music', uri: 'u', start: 1, duration: 2, trimIn: 1, volume: 0.5, fadeIn: 0, fadeOut: 0, pan: 0, gain: 1, speed: 1, reversed: false, ...over,
 });
 const waveOf = () => wave;
 
@@ -44,7 +44,7 @@ describe('levelDb / meterFill', () => {
 describe('clipRanges — túlvezérlés-pontok', () => {
   // 0–1 mp halk (0.4), 1–2 mp hangos (0.9); két egymásra tett klip → 1–2 mp között 1.8
   const w: WaveformData = { duration: 3, peaksPerSecond: 4, peaks: [0.4, 0.4, 0.4, 0.4, 0.9, 0.9, 0.9, 0.9, 0.4, 0.4, 0.4, 0.4] };
-  const c = (id: string): OfflineMixClip => ({ track: 'music', uri: id, start: 0, duration: 3, trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, pan: 0, gain: 1 });
+  const c = (id: string): OfflineMixClip => ({ track: 'music', uri: id, start: 0, duration: 3, trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, pan: 0, gain: 1, speed: 1, reversed: false });
 
   it('csak a túlvezérelt szakaszt jelöli, összevonva', () => {
     const r = clipRanges([c('a'), c('b')], () => w, 3, 0.25);
@@ -58,3 +58,14 @@ describe('clipRanges — túlvezérlés-pontok', () => {
   });
 });
 
+
+describe('⏩⏪ trackLevelAt gyorsított és megfordított szakasszal', () => {
+  it('2×: a forrásban kétszer annyit lép; megfordítva a végéről olvas', () => {
+    // a forrás 1 mp-enként: 0.1/0.2 · 0.5/0.5 · 0.8/0.8 · 0.2/0.2 (2 csúcs/mp)
+    const fast = clip({ start: 0, duration: 1, trimIn: 0, speed: 2, volume: 1 });
+    expect(trackLevelAt([fast], waveOf, 0.75)).toBeCloseTo(0.5); // forrás 1,5 mp
+    const back = clip({ start: 0, duration: 2, trimIn: 1, speed: 1, reversed: true, volume: 1 });
+    expect(trackLevelAt([back], waveOf, 0.25)).toBeCloseTo(0.8); // a vége felől: forrás 1 + 1,75 = 2,75 mp
+    expect(trackLevelAt([back], waveOf, 1.75)).toBeCloseTo(0.5); // forrás 1 + 0,25 = 1,25 mp
+  });
+});

@@ -60,7 +60,8 @@ import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
 import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
-import { exportOfflineWav } from '@/lib/offlineMixClient';
+import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
+import { encodeWav16 } from '@/lib/offlineMix';
 import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
 import { EXPORT_SPACE_MARGIN, RECORD_STOP_FREE, wavBytes } from '@/lib/diskSpace';
@@ -2420,6 +2421,67 @@ async function smokeAudioSpeed(log: Log) {
   router.back();
 }
 
+/**
+ * ⏩ A gyorsított hang a TELEFONOS exportban (natív, hangmagasság-tartó nyújtás): forrás 2 s
+ * 440 Hz + 2 s 880 Hz. Mérve: a hossz, a frekvencia (marad-e a hangmagasság) és a hangváltás
+ * ideje (a nyújtó nem késleltet-e) — ugyanazok, mint a szerveres ffmpeg-tesztben.
+ */
+async function smokeOfflineStretch(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const tone = Float32Array.from({ length: 4 * SR }, (_, i) => 0.4 * Math.sin((2 * Math.PI * (i < 2 * SR ? 440 : 880) * i) / SR));
+  const src = new File(Paths.cache, 'smoke_two_tones.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([tone], SR, () => 0.5));
+  const api = await loadAudioApi();
+  const freqAt = (x: Float32Array, from: number, to: number) => {
+    let n = 0;
+    for (let i = Math.round(from * SR) + 1; i < Math.round(to * SR); i++) if ((x[i - 1] < 0) !== (x[i] < 0)) n++;
+    return n / 2 / (to - from);
+  };
+  /** az első 20 ms-os ablak, ahol a frekvencia 660 Hz fölé megy */
+  const switchAt = (x: Float32Array, from: number, to: number) => {
+    for (let t = from; t < to; t += 0.005) if (freqAt(x, t, t + 0.02) > 660) return t + 0.01;
+    return Number.NaN;
+  };
+  const run = async (name: string, over: Partial<AudioClip>) => {
+    const base = createEmptyProject('smoke nyújtás', '1:1', undefined, 'audio');
+    const c: AudioClip = { kind: 'audio', id: 's', uri: src.uri, label: 's', start: 0, duration: 2, trimIn: 0, sourceDuration: 4, volume: 1, fadeIn: 0, fadeOut: 0, source: 'voiceover', ...over };
+    const p: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c] } : t)) };
+    const t0 = Date.now();
+    const { uri, unsupported } = await exportOfflineWav(p, new File(projectExportDir(), `${name}.wav`));
+    const ms = Date.now() - t0;
+    const buf = await api!.decodeAudioData(uri, SR);
+    const x = buf.getChannelData(0).slice();
+    new File(uri).delete();
+    return { x, dur: buf.duration, ms, unsupported };
+  };
+  for (const sp of [2, 0.5]) {
+    const lat = await measureStretchLatency(sp);
+    log(null, `nyújtó késése ${sp}×`, `${lat} minta = ${(((lat ?? 0) / SR) * 1000).toFixed(1)} ms`);
+  }
+  try {
+    const fast = await run('smoke_stretch_2x', { start: 0.5, duration: 2, speed: 2 });
+    log(fast.unsupported.length === 0, '2×: a telefonos export nem hagyja ki', `${fast.ms} ms`);
+    log(Math.abs(fast.dur - 2.5) < 0.01, '2×: a hossz pontos', `${fast.dur.toFixed(3)} s`);
+    const f1 = freqAt(fast.x, 0.6, 1.4);
+    const f2 = freqAt(fast.x, 1.6, 2.4);
+    log(Math.abs(f1 - 440) < 8 && Math.abs(f2 - 880) < 8, '2×: a hangmagasság marad (nem 880 / 1760 Hz)', `${f1.toFixed(0)} Hz → ${f2.toFixed(0)} Hz`);
+    const sw = switchAt(fast.x, 1.2, 1.8);
+    log(Math.abs(sw - 1.5) < 0.03, '2×: a hangváltás a helyén (a nyújtó nem késleltet)', `${sw.toFixed(3)} s (várt 1,500)`);
+    const slow = await run('smoke_stretch_05x', { start: 0, duration: 4, speed: 0.5, trimIn: 1 });
+    // forrás 1–3 s: 440 Hz 1 s-ig, váltás a forrás 2 s-ánál = idővonal 2 s
+    const s1 = freqAt(slow.x, 0.2, 1.8);
+    const s2 = freqAt(slow.x, 2.2, 3.8);
+    log(Math.abs(slow.dur - 4) < 0.01 && Math.abs(s1 - 440) < 8 && Math.abs(s2 - 880) < 8, '0,5×: hossz és hangmagasság', `${slow.dur.toFixed(3)} s, ${s1.toFixed(0)} → ${s2.toFixed(0)} Hz`);
+    const sw2 = switchAt(slow.x, 1.7, 2.3);
+    log(Math.abs(sw2 - 2) < 0.04, '0,5×: a hangváltás a helyén', `${sw2.toFixed(3)} s (várt 2,000)`);
+  } finally {
+    src.delete();
+  }
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -3578,6 +3640,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'offlinestretch') {
+    await step(phase, () => smokeOfflineStretch(log));
     return;
   }
   if (phase === 'audiospeed') {

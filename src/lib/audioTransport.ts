@@ -18,13 +18,40 @@ import {
 export const DEFAULT_BPM = 120;
 
 /** Állandó-tempójú időzítés a projekt BPM-jéből (hiányzó/érvénytelen = 120, 4/4). */
-export function timingForBpm(bpm?: number): MusicTiming {
-  return createTiming(Number.isFinite(bpm) && (bpm as number) > 0 ? (bpm as number) : DEFAULT_BPM);
+/** 🎼 ütemjelzés: a BPM negyedhangra értendő — /8-nál a beat-egység a nyolcad (kétszeres ütemben) */
+export interface Meter {
+  beatsPerBar: number;
+  beatUnit: 4 | 8;
+}
+export const DEFAULT_METER: Meter = { beatsPerBar: 4, beatUnit: 4 };
+/** a kapcsoló sorrendje */
+export const METERS: Meter[] = [
+  { beatsPerBar: 4, beatUnit: 4 },
+  { beatsPerBar: 3, beatUnit: 4 },
+  { beatsPerBar: 2, beatUnit: 4 },
+  { beatsPerBar: 6, beatUnit: 8 },
+  { beatsPerBar: 5, beatUnit: 4 },
+  { beatsPerBar: 7, beatUnit: 8 },
+  { beatsPerBar: 12, beatUnit: 8 },
+];
+export function nextMeter(cur: Meter | undefined): Meter {
+  const m = cur ?? DEFAULT_METER;
+  const i = METERS.findIndex((x) => x.beatsPerBar === m.beatsPerBar && x.beatUnit === m.beatUnit);
+  return METERS[(i + 1) % METERS.length];
+}
+export function meterLabel(m: Meter | undefined): string {
+  const x = m ?? DEFAULT_METER;
+  return `${x.beatsPerBar}/${x.beatUnit}`;
 }
 
-/** „ütem.beat" címke (1-alapú), pl. 3.2 — a transport-kijelzőhöz. */
-export function barsBeatsLabel(bpm: number | undefined, sec: number): string {
-  const timing = timingForBpm(bpm);
+export function timingForBpm(bpm?: number, meter: Meter = DEFAULT_METER): MusicTiming {
+  const q = Number.isFinite(bpm) && (bpm as number) > 0 ? (bpm as number) : DEFAULT_BPM;
+  return createTiming((q * meter.beatUnit) / 4, { beatsPerBar: meter.beatsPerBar, beatUnit: meter.beatUnit });
+}
+
+/** „ütem.beat" címke (1-alapú), pl. 3.2 — a transport-kijelzőhöz (az ütemjelzés szerint). */
+export function barsBeatsLabel(bpm: number | undefined, sec: number, meter: Meter = DEFAULT_METER): string {
+  const timing = timingForBpm(bpm, meter);
   const bb = beatToBarsBeats(timing, Math.max(0, beatAtTime(timing, Math.max(0, sec))));
   return `${bb.bar}.${bb.beat}`;
 }
@@ -49,14 +76,14 @@ export type SnapMode = 'off' | 'frame' | 'beat';
  * Egy időpont igazítása a snap-mód szerint: 'off' = nincs, 'frame' = a frame-rácsra (fps),
  * 'beat' = a legközelebbi beatre (a BPM szerint, 1/1 felbontás).
  */
-export function snapSec(sec: number, mode: SnapMode, fps: number, bpm?: number): number {
+export function snapSec(sec: number, mode: SnapMode, fps: number, bpm?: number, meter: Meter = DEFAULT_METER): number {
   const t = Math.max(0, sec);
   if (mode === 'frame') {
     const f = fps > 0 ? fps : 30;
     return Math.round(t * f) / f;
   }
   if (mode === 'beat') {
-    return Math.max(0, quantizeTime(timingForBpm(bpm), t, { subdivision: 1 }));
+    return Math.max(0, quantizeTime(timingForBpm(bpm, meter), t, { subdivision: 1 }));
   }
   return t;
 }
@@ -130,9 +157,11 @@ export function beatGridForView(
   beatsPerBar: number,
   fromSec: number,
   toSec: number,
-  pxPerSec: number
+  pxPerSec: number,
+  beatUnit: 4 | 8 = 4
 ): BeatGridLine[] {
-  const beat = secPerBeat(bpm);
+  // /8-nál a rács-egység a nyolcad (a BPM negyedre értendő)
+  const beat = (secPerBeat(bpm) * 4) / beatUnit;
   const bar = beat * Math.max(1, beatsPerBar);
   const stride = beat * pxPerSec >= 6 ? beat : bar * pxPerSec >= 6 ? bar : bar * 4;
   const out: BeatGridLine[] = [];

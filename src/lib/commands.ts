@@ -85,6 +85,7 @@ export type EditorCommand =
   | { type: 'SET_LIVE_DOC'; doc: LiveDoc; label?: string }
   /** 🎵 Projekt-tempó (BPM) a Hang Stúdió ütem-rácsához/snap-jéhez. 20–300 közé szorítva. */
   | { type: 'SET_BPM'; bpm: number }
+  | { type: 'SET_TIME_SIGNATURE'; timeSignature: { beatsPerBar: number; beatUnit: 4 | 8 } }
   /**
    * 🎧💿 Album-dokumentum beírása (Hang Stúdió: több szám + borító). A manifeszt-CRUD pure
    * (`albumDoc.ts`), az eredményt EZ a parancs teszi a `project.album`-ba — ÉS az idővonalat
@@ -366,6 +367,15 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null; // semmi nem változott — ne szemetelje a history-t
       }
       return { ...project, model3d: cmd.doc };
+    }
+
+    case 'SET_TIME_SIGNATURE': {
+      const ts = { beatsPerBar: Math.max(1, Math.min(16, Math.round(cmd.timeSignature.beatsPerBar))), beatUnit: cmd.timeSignature.beatUnit === 8 ? 8 : 4 } as const;
+      const cur = project.timeSignature ?? { beatsPerBar: 4, beatUnit: 4 };
+      if (cur.beatsPerBar === ts.beatsPerBar && cur.beatUnit === ts.beatUnit) {
+        return null;
+      }
+      return { ...project, timeSignature: ts };
     }
 
     case 'SET_BPM': {
@@ -671,6 +681,8 @@ export function describeCommand(cmd: EditorCommand): string {
           defaultValue: `Live: ${cmd.doc.scenes.length} scene(s)`,
         })
       );
+    case 'SET_TIME_SIGNATURE':
+      return tr('lib.commands.setTimeSignature', { defaultValue: `Ütemjelzés: ${cmd.timeSignature.beatsPerBar}/${cmd.timeSignature.beatUnit}` });
     case 'SET_BPM':
       return tr('lib.commands.setBpm', { bpm: cmd.bpm, defaultValue: `BPM: ${cmd.bpm}` });
     case 'APPLY_ALBUM':

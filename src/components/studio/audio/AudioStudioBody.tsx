@@ -34,6 +34,9 @@ import {
   barsBeatsLabel,
   beatGridForView,
   DEFAULT_BPM,
+  DEFAULT_METER,
+  meterLabel,
+  nextMeter,
   DEFAULT_ZOOM_INDEX,
   nextBeatSec,
   prevBeatSec,
@@ -193,7 +196,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -204,6 +207,7 @@ export function AudioStudioBody({
       registerDevAction('audio.copy', () => devRef.current.copy()),
       registerDevAction('audio.paste', () => devRef.current.paste()),
       registerDevAction('audio.duplicate', () => devRef.current.duplicate()),
+      registerDevAction('audio.meter', () => devRef.current.meter()),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
     ];
     return () => offs.forEach((off) => off());
@@ -214,6 +218,8 @@ export function AudioStudioBody({
   }
   const fps = project.fps ?? 30;
   const bpm = project.bpm ?? DEFAULT_BPM;
+  // 🎼 ütemjelzés (hiányzó = 4/4) — a rács, a snap és az ütem.ütemrész kijelzés is ezt követi
+  const meter = project.timeSignature ?? DEFAULT_METER;
   const pxPerSec = fitPps ?? pxPerSecAt(zoomIndex);
   const duration = projectDuration(project);
   const timelineW = Math.max(320, duration * pxPerSec + 40);
@@ -233,10 +239,10 @@ export function AudioStudioBody({
         fps
       )
     : [];
-  const beatTimes = beatGridForView(bpm, 4, viewFrom, Math.min(duration + 2, viewTo), pxPerSec);
+  const beatTimes = beatGridForView(bpm, meter.beatsPerBar, viewFrom, Math.min(duration + 2, viewTo), pxPerSec, meter.beatUnit);
 
   // 🔖 a markerek is snap-pontok (10 képpontnyi közelségben)
-  const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm), project.markers ?? [], 10 / pxPerSec);
+  const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm, meter), project.markers ?? [], 10 / pxPerSec);
 
   /** 📋 a kijelölt klip sávja (beillesztés célja), ennek hiányában az első sáv */
   const pasteTarget = (): TrackType => {
@@ -348,7 +354,7 @@ export function AudioStudioBody({
     setFitPps(fitPxPerSec(view.w || 1200, duration));
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   };
-  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true), copy: copySelection, paste: pasteAtPlayhead, duplicate: duplicateSelection };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true), copy: copySelection, paste: pasteAtPlayhead, duplicate: duplicateSelection, meter: () => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) }) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -993,7 +999,7 @@ export function AudioStudioBody({
           <Text style={styles.time}>
             {formatTime(playhead)} / {formatTime(duration)}
           </Text>
-          <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead)}</Text>
+          <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead, meter)}</Text>
           <MasterMeter />
         </View>
         <View style={styles.tSep} />
@@ -1004,6 +1010,8 @@ export function AudioStudioBody({
           <Text style={styles.bpmLabel}>BPM</Text>
         </View>
         <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} />
+        {/* 🎼 ütemjelzés: koppintásra a következő (4/4 → 3/4 → 2/4 → 6/8 → 5/4 → 7/8 → 12/8) */}
+        <TBtn label={meterLabel(meter)} onPress={() => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) })} />
         <TBtn
           icon={bpmBusy ? undefined : 'sparkles-outline'}
           label={bpmBusy ? '…' : t('studio.audio.transport.auto')}

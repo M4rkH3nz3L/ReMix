@@ -63,6 +63,7 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
+import { barsBeatsLabel } from '@/lib/audioTransport';
 import { canSegment, LongSource } from '@/lib/longSource';
 import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
@@ -3392,6 +3393,39 @@ async function smokeClipboard(log: Log) {
   router.back();
 }
 
+/** 🎼 Ütemjelzés: a gomb 4/4 → 3/4 → 2/4 → 6/8; a kijelzés és a rács követi; undo. */
+async function smokeMeter(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_meter.wav', 8);
+  const id = 'prj_smoke_meter';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:meter', caught));
+  const base = createEmptyProject('smoke ütemjelzés', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'm', uri, label: 'dal', start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, bpm: 120, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  for (let i = 0; i < 3; i++) {
+    runDevAction('audio.meter');
+    await sleep(150);
+  }
+  const ts = st().project?.timeSignature;
+  log(ts?.beatsPerBar === 6 && ts.beatUnit === 8, 'a gomb háromszor: 4/4 → 3/4 → 2/4 → 6/8', `${ts?.beatsPerBar}/${ts?.beatUnit}`);
+  st().setPlayhead(1.75);
+  await sleep(200);
+  log(barsBeatsLabel(120, 1.75, ts) === '2.2', 'a kijelzés 6/8-ban: 1,75 s = 2. ütem 2. nyolcad', barsBeatsLabel(120, 1.75, ts));
+  st().undo();
+  log(st().project?.timeSignature?.beatsPerBar === 2, 'az ütemjelzés visszavonható (2/4)', `${st().project?.timeSignature?.beatsPerBar}/${st().project?.timeSignature?.beatUnit}`);
+  st().redo();
+  runDevAction('audio.fit');
+  log(true, 'FOTÓZHATÓ', '6/8: nyolcados rács, ütemvonal 1,5 s-onként, a kijelző „6/8”');
+  await sleep(4000);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4556,6 +4590,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'meter') {
+    await step(phase, () => smokeMeter(log));
     return;
   }
   if (phase === 'clipboard') {

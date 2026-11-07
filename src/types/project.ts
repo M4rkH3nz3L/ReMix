@@ -1710,6 +1710,8 @@ export interface Project {
   /** 🎵 zenei tempó (BPM) a Hang Stúdió ütem-rácsához/metronómjához/snap-jéhez.
    *  Hiányzó = 120. Csak a zenei időzítés-UI használja; a render-re nincs hatása. */
   bpm?: number;
+  /** 🎼 ütemjelzés (hiányzó = 4/4); a BPM negyedhangra értendő, /8-nál a rács nyolcadonként */
+  timeSignature?: { beatsPerBar: number; beatUnit: 4 | 8 };
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */

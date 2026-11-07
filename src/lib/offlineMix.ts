@@ -1,7 +1,7 @@
 import { audioSpeedOf, continuesInSource } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import { buildFxChain, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
+import { buildFxChain, Ducker, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
 import { integratedLoudness } from '@/lib/loudness';
 import type { AudioClip, AudioFx, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
@@ -77,6 +77,8 @@ export interface OfflineMixClip {
   normGain?: number;
   /** 🏚️ visszhang-csökkentés (a lánc elején) */
   deReverb?: boolean;
+  /** 🦆 a halkítás szerepe: `key` = a beszéd (vezérel), `duck` = halkul alatta */
+  role?: 'key' | 'duck';
 }
 
 export type OfflineUnsupported = 'effects' | 'voiceEnhance' | 'deReverb' | 'autoDuck' | 'master' | 'videoSpeed';
@@ -85,6 +87,8 @@ export interface OfflineMixPlan {
   duration: number;
   clips: OfflineMixClip[];
   unsupported: OfflineUnsupported[];
+  /** 🦆 van duck-klip ÉS beszéd-kulcs (a szerver csak ekkor halkít) */
+  ducking?: boolean;
 }
 
 /** a klip hangmagasság-eltolása félhangban, a szerverrel azonosan ±12-re szorítva */
@@ -106,13 +110,18 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     for (const clip of audio) {
       // 🎛️ a közös DSP-ben már megvalósított effektek szólnak; a többi még csak a szerveren
       if (fxUnsupported(clip.audioFx)) unsupported.add('effects');
-      if (clip.autoDuck) unsupported.add('autoDuck');
+      // 🦆 a szerver `isDuckTrigger` tükre: a beszéd-sáv (vagy a master kijelölt sávja) a kulcs
+      // (a szerver régi `audio` sávja a kliens típusaiban már nincs)
+      const trigger = project.audioMaster?.duckTrigger;
+      const isKey = trigger ? track.type === trigger : track.type === 'voiceover';
+      const role: OfflineMixClip['role'] = isKey ? 'key' : clip.autoDuck ? 'duck' : undefined;
       // 🎙️ hangjavítás / visszhang-csökkentés: a közös DSP elemeiből (`voiceFx`)
       const fx = voiceFx(clip.audioFx, !!clip.voiceEnhance, !!clip.deReverb);
       const main: OfflineMixClip = {
         id: clip.id,
         ...(fxActive(fx) || clip.deReverb ? { fx: fx ?? {} } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
+        ...(role ? { role } : {}),
         track: track.type,
         uri: clip.uri,
         start: clip.start,
@@ -148,7 +157,8 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
   }
   clips.push(...videoAudioClips(project, unsupported));
   if (project.audioMaster) unsupported.add('master');
-  return { duration: projectDuration(project), clips, unsupported: [...unsupported] };
+  const ducking = clips.some((c) => c.role === 'duck') && clips.some((c) => c.role === 'key');
+  return { duration: projectDuration(project), clips, unsupported: [...unsupported], ...(ducking ? { ducking } : {}) };
 }
 
 /** A klip-helyi `t` időpont erősítése (hangerő-automáció × fade be × fade ki × sáv). */
@@ -191,7 +201,13 @@ export function mixRange(
   fxState: Map<string, FxState> = new Map()
 ): void {
   const sr = OFFLINE_SAMPLE_RATE;
+  // 🦆 halkításnál a duck-klipek külön sínre, a beszéd a kimenetre ÉS a kulcsra is szól
+  const len = toSample - fromSample;
+  const duckBus: [Float32Array, Float32Array] | null = plan.ducking ? [new Float32Array(len), new Float32Array(len)] : null;
+  const keyBus: [Float32Array, Float32Array] | null = plan.ducking ? [new Float32Array(len), new Float32Array(len)] : null;
   for (const clip of plan.clips) {
+    const dst = duckBus && clip.role === 'duck' ? duckBus : out;
+    const key = keyBus && clip.role === 'key' ? keyBus : null;
     const src = sources.get(clip.uri);
     if (!src || src.channels.length === 0) {
       continue;
@@ -254,9 +270,29 @@ export function mixRange(
         const [lg, rg] = staticPan ?? panGains(sampleChannel(clip.panKf, t, clip.pan));
         const xl = fxL ? fxL[i - a] : left[s];
         const xr = fxR ? fxR[i - a] : right[s];
-        out[0][i - fromSample] += xl * g * lg;
-        out[1][i - fromSample] += xr * g * rg;
+        const vl = xl * g * lg;
+        const vr = xr * g * rg;
+        dst[0][i - fromSample] += vl;
+        dst[1][i - fromSample] += vr;
+        if (key) {
+          key[0][i - fromSample] += vl;
+          key[1][i - fromSample] += vr;
+        }
       }
+    }
+  }
+  if (duckBus && keyBus) {
+    // a halkító állapota szeletről szeletre megmarad (a sín kulcsa a mintapozíció)
+    const st = fxState.get('__duck');
+    let ducker = st?.ducker;
+    if (!ducker || st?.next !== fromSample) {
+      ducker = new Ducker(sr);
+    }
+    ducker.process(duckBus[0], duckBus[1], keyBus[0], keyBus[1]);
+    fxState.set('__duck', { chain: [], next: toSample, ducker });
+    for (let i = 0; i < len; i++) {
+      out[0][i] += duckBus[0][i];
+      out[1][i] += duckBus[1][i];
     }
   }
 }

@@ -386,6 +386,37 @@ export class Haas implements Processor {
   }
 }
 
+/**
+ * 🦆 Automatikus halkítás (oldalági kompresszor): a KULCS (beszéd) RMS-burkolója vezérli a duck-
+ * sín erősítését — a szerver `sidechaincompress=threshold=0.02:ratio=6:attack=25:release=350`
+ * beállításaival (saját megvalósítás, lágy térddel). A sín és a kulcs külön bemenet.
+ */
+export class Ducker {
+  private env = 0;
+  private readonly att: number;
+  private readonly rel: number;
+  private readonly curve: Compressor;
+
+  constructor(sr: number, thresholdLin = 0.02, ratio = 6, attackMs = 25, releaseMs = 350) {
+    this.att = coeff(attackMs, sr);
+    this.rel = coeff(releaseMs, sr);
+    this.curve = new Compressor(20 * Math.log10(thresholdLin), ratio, attackMs, releaseMs, sr);
+  }
+
+  /** a `bus` helyben halkul a `key` szerint */
+  process(busL: Float32Array, busR: Float32Array, keyL: Float32Array, keyR: Float32Array): void {
+    let env = this.env;
+    for (let i = 0; i < busL.length; i++) {
+      const p = (keyL[i] * keyL[i] + keyR[i] * keyR[i]) / 2;
+      env += (p - env) * (p > env ? this.att : this.rel);
+      const g = env > 1e-12 ? dbToLin(this.curve.gainDb(10 * Math.log10(env))) : 1;
+      busL[i] *= g;
+      busR[i] *= g;
+    }
+    this.env = env;
+  }
+}
+
 /** állandó erősítés (a normalizálás előre mért erősítése) */
 export class Gain implements Processor {
   constructor(private readonly g: number) {}
@@ -497,6 +528,8 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
  */
 export interface FxState {
   chain: Processor[];
+  /** 🦆 a halkító (a sín állapota) */
+  ducker?: Ducker;
   /** a következő feldolgozandó idővonal-minta */
   next: number;
 }

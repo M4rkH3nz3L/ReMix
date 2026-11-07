@@ -164,5 +164,67 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
     mixRange(plan, sources, jumped, at, n, 1, new Map());
     expect(rmsDb(jumped[0].map((v, i) => v - whole[0][at + i])) - rmsDb(whole[0].subarray(at))).toBeLessThan(-100);
   }, 60000);
+
+  it('🦆 automatikus halkítás: a beszéd alatt a zene halkul, előtte/utána nem; mélysége a szerverével összevethető', async () => {
+    const speech = path.join(dir, 'speech.wav');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=300:sample_rate=44100:duration=1.5', '-ac', '1', speech]);
+    const dp: Project = {
+      ...base,
+      tracks: base.tracks.map((t) =>
+        t.type === 'music'
+          ? { ...t, clips: [clip({ id: 'm', uri: stereo, start: 0, duration: 4, sourceDuration: 4, volume: 0.8, autoDuck: true })] }
+          : t.type === 'voiceover'
+            ? { ...t, clips: [clip({ id: 'v', uri: speech, start: 1.5, duration: 1.5, sourceDuration: 1.5, volume: 0.6, source: 'voiceover' })] }
+            : t
+      ),
+    };
+    const plan = offlineMixPlan(dp);
+    expect(plan.ducking).toBe(true);
+    expect(plan.unsupported).toEqual([]);
+    const n = Math.round(4 * SR);
+    const sources = new Map([[stereo, { channels: decode(stereo, 2), sampleRate: SR }], [speech, { channels: decode(speech, 1), sampleRate: SR }]]);
+    // csak a zene szintje: a beszéd nélküli tervvel összevetve (a halkítás aránya)
+    const render = (p: typeof plan, chunk: number) => {
+      const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+      const st = new Map();
+      for (let a = 0; a < n; a += chunk) {
+        const b = Math.min(n, a + chunk);
+        const part: [Float32Array, Float32Array] = [new Float32Array(b - a), new Float32Array(b - a)];
+        mixRange(p, sources, part, a, b, 1, st);
+        out[0].set(part[0], a);
+        out[1].set(part[1], a);
+      }
+      return out;
+    };
+    const musicOnly = { ...plan, clips: plan.clips.map((c) => (c.role === 'key' ? { ...c, volume: 0 } : c)) };
+    // a kulcs NÉMA lejátszás nélkül is kell: a beszéd hangját kivonva mérünk
+    const full = render(plan, 5512);
+    const keyOnly = render({ ...plan, ducking: false, clips: plan.clips.filter((c) => c.role === 'key') }, 5512);
+    const music = full[0].map((v, i) => v - keyOnly[0][i]);
+    const dry = render({ ...musicOnly, ducking: false }, 5512)[0];
+    const seg = (x: Float32Array, a: number, b: number) => rmsDb(x.subarray(Math.round(a * SR), Math.round(b * SR)));
+    const before = seg(music, 0.5, 1.4) - seg(dry, 0.5, 1.4);
+    const during = seg(music, 2.0, 2.9) - seg(dry, 2.0, 2.9);
+    const after = seg(music, 3.6, 3.95) - seg(dry, 3.6, 3.95);
+    // eslint-disable-next-line no-console
+    console.log(`halkítás: előtte ${before.toFixed(1)} dB, közben ${during.toFixed(1)} dB, utána ${after.toFixed(1)} dB`);
+    expect(Math.abs(before)).toBeLessThan(0.1);
+    expect(during).toBeLessThan(-6);
+    expect(after).toBeGreaterThan(during + 3);
+    // szeletelés-független
+    const whole = render(plan, n);
+    let maxDiff = 0;
+    for (let i = 0; i < n; i++) maxDiff = Math.max(maxDiff, Math.abs(full[0][i] - whole[0][i]));
+    expect(maxDiff).toBeLessThan(1e-6);
+    // a szerver halkításának mélysége (ugyanígy kivonva) — saját DSP, ezért csak összevethető
+    const { renderProject } = jest.requireActual('../../server/render');
+    const sFull = decode(await renderProject(dp, fs.mkdtempSync(path.join(dir, 'wd-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2)[0];
+    const sKey = decode(await renderProject({ ...dp, tracks: dp.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [] } : t)) }, fs.mkdtempSync(path.join(dir, 'wk-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2)[0];
+    const sMusic = sFull.map((v, i) => v - (sKey[i] ?? 0));
+    const sDuring = seg(sMusic, 2.0, 2.9) - seg(dry, 2.0, 2.9);
+    // eslint-disable-next-line no-console
+    console.log(`szerver halkítás közben ${sDuring.toFixed(1)} dB`);
+    expect(Math.abs(during - sDuring)).toBeLessThan(4);
+  }, 120000);
 });
 

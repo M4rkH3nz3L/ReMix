@@ -4052,6 +4052,20 @@
         "unknownDuration": "A hang hossza nem olvasható ki, a fájl sérült lehet. Próbáld újra, vagy mentsd el MP3/M4A/WAV formátumban.",
         "tooLong": "Nagyon hosszú hang (~{{hours}} óra) — a feldolgozás és a render lassabb, több memóriát igényel."
       },
+      "markers": {
+        "add": "Marker",
+        "defaultLabel": "Marker {{number}}",
+        "rename": "Átnevezés",
+        "section": "Zenei szakasz",
+        "sections": {
+          "intro": "Intro",
+          "verse": "Verze",
+          "preChorus": "Előrefrén",
+          "chorus": "Refrén",
+          "bridge": "Híd",
+          "outro": "Outro"
+        }
+      },
       "transport": {
         "auto": "Auto",
         "fit": "Illeszd",

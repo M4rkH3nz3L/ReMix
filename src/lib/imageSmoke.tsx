@@ -3204,6 +3204,44 @@ async function smokeAbCompare(log: Log) {
   src.delete();
 }
 
+/** 🔖 Markerek a Hang Stúdióban: a gomb a lejátszófejnél, undo, a közös projektben; képernyőkép. */
+async function smokeAudioMarkers(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const uri = toneWav('smoke_markers.wav', 12);
+  const id = 'prj_smoke_markers';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:markers', caught));
+  const base = createEmptyProject('smoke markerek', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'mk', uri, label: 'dal', start: 0, duration: 12, trimIn: 0, sourceDuration: 12, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  st().setPlayhead(2);
+  runDevAction('audio.marker');
+  await sleep(200);
+  const m1 = st().project?.markers ?? [];
+  log(m1.length === 1 && Math.abs(m1[0].time - 2) < 1e-6, 'a Marker gomb a lejátszófejnél jelöl', m1.map((m) => `${m.label}@${m.time}`).join(', '));
+  st().undo();
+  log((st().project?.markers ?? []).length === 0, 'a marker visszavonható (parancs-busz)');
+  st().redo();
+  st().setPlayhead(6);
+  runDevAction('audio.marker');
+  st().setPlayhead(9.5);
+  runDevAction('audio.marker');
+  // zenei szakasz-címke (ugyanaz, amit a hosszan nyomás menüje állít)
+  const list = st().project?.markers ?? [];
+  st().dispatch({ type: 'SET_MARKERS', markers: list.map((m, i) => (i === 1 ? { ...m, label: 'Refrén', color: '#f472b6' } : m)) });
+  await sleep(300);
+  log((st().project?.markers ?? []).length === 3, 'több marker, időrendben', (st().project?.markers ?? []).map((m) => `${m.label}@${m.time}`).join(', '));
+  log(true, 'FOTÓZHATÓ', 'markerek a vonalzón (2 s, Refrén 6 s, 9,5 s)');
+  await sleep(4000);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4368,6 +4406,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'audiomarkers') {
+    await step(phase, () => smokeAudioMarkers(log));
     return;
   }
   if (phase === 'abcompare') {

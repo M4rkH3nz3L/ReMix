@@ -13,7 +13,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
+import { AudioMarkerFlags, markerActions } from '@/components/studio/audio/AudioMarkerFlags';
 import { CrossfadeMarks } from '@/components/studio/audio/CrossfadeMarks';
+import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
@@ -183,11 +185,12 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void }>({ fit: () => {}, zoomIn: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
       registerDevAction('audio.zoomIn', () => devRef.current.zoomIn()),
+      registerDevAction('audio.marker', () => devRef.current.marker()),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
     ];
     return () => offs.forEach((off) => off());
@@ -219,7 +222,28 @@ export function AudioStudioBody({
     : [];
   const beatTimes = beatGridForView(bpm, 4, viewFrom, Math.min(duration + 2, viewTo), pxPerSec);
 
-  const snapSecIn = (sec: number) => snapSec(sec, snapMode, fps, bpm);
+  // 🔖 a markerek is snap-pontok (10 képpontnyi közelségben)
+  const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm), project.markers ?? [], 10 / pxPerSec);
+
+  /** 🔖 marker a lejátszófejnél (a közeli markerre a műveletei nyílnak) */
+  const markerAtPlayhead = () => {
+    const st = useEditorStore.getState();
+    const markers = st.project?.markers ?? [];
+    const near = nearestMarker(markers, st.playhead, 12 / pxPerSec);
+    if (near) {
+      markerActions(near, t);
+      return;
+    }
+    st.dispatch({
+      type: 'SET_MARKERS',
+      markers: addMarker(markers, {
+        id: makeId('mk'),
+        time: st.playhead,
+        label: t('studio.audio.markers.defaultLabel', { number: markers.length + 1 }),
+        color: SECTION_KINDS[markers.length % SECTION_KINDS.length].color,
+      }),
+    });
+  };
   const seekAt = (e: GestureResponderEvent) =>
     useEditorStore.getState().setPlayhead(snapSecIn(Math.max(0, e.nativeEvent.locationX / pxPerSec)));
 
@@ -255,7 +279,7 @@ export function AudioStudioBody({
     setFitPps(fitPxPerSec(view.w || 1200, duration));
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   };
-  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1) };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -785,6 +809,8 @@ export function AudioStudioBody({
                   )}
                 </View>
               </GestureDetector>
+              {/* 🔖 markerek (a vonalzó fölött, hogy a koppintás ne a csúsztatásé legyen) */}
+              <AudioMarkerFlags pxPerSec={pxPerSec} height={contentH} />
               {/* sávok */}
               {LANES.map((lane) => {
                 const track = project.tracks.find((tr) => tr.type === lane.type);
@@ -906,6 +932,7 @@ export function AudioStudioBody({
         {/* zoom + snap */}
         <TBtn icon="remove-circle-outline" onPress={() => zoomStep(-1)} />
         <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
+        <TBtn icon="bookmark-outline" label={t('studio.audio.markers.add')} onPress={markerAtPlayhead} />
         <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
         {/* 🅰️🅱️ A/B: az eredeti (feldolgozás nélkül) ↔ a feldolgozott — csak az előnézetben */}
         <TBtn icon="git-compare-outline" label={fxBypass ? t('studio.audio.transport.abOriginal') : t('studio.audio.transport.ab')} active={fxBypass} onPress={() => useEditorStore.getState().setFxBypass(!fxBypass)} />

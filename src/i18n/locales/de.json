@@ -4057,6 +4057,20 @@
         "unknownDuration": "Die Länge des Audios ist nicht lesbar, die Datei ist evtl. beschädigt. Versuch es erneut oder speichere sie als MP3/M4A/WAV.",
         "tooLong": "Sehr langes Audio (~{{hours}} Std.) — Verarbeitung und Rendern sind langsamer und brauchen mehr Speicher."
       },
+      "markers": {
+        "add": "Marker",
+        "defaultLabel": "Marker {{number}}",
+        "rename": "Umbenennen",
+        "section": "Songteil",
+        "sections": {
+          "intro": "Intro",
+          "verse": "Strophe",
+          "preChorus": "Pre-Chorus",
+          "chorus": "Refrain",
+          "bridge": "Bridge",
+          "outro": "Outro"
+        }
+      },
       "transport": {
         "auto": "Auto",
         "fit": "Einpassen",

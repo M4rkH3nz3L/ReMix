@@ -7,7 +7,7 @@ import { denoiseStereo } from '@/lib/denoise';
 import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, withNormalizeGains, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, withNormalizeGains, measureMasterGain, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -84,8 +84,14 @@ export async function exportOfflineWav(
     }
   }
 
-  // 📏 a normalizálás erősítése (előmenet a kész forrásokon)
-  const finalPlan = withNormalizeGains(mixPlan, sources);
+  // 📏 a normalizálás erősítése (előmenet a kész forrásokon), majd a master mérése (kétmenetes)
+  const normalized = withNormalizeGains(mixPlan, sources);
+  const finalPlan = normalized.master
+    ? { ...normalized, masterGain: await measureMasterGain(normalized, sources, signal ?? undefined) }
+    : normalized;
+  if (signal?.aborted) {
+    throw new RenderCancelledError();
+  }
   const frames = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
   // 🎛️ az effektek állapota szeletről szeletre megmarad (folytonos szűrés)
   const fxState = new Map<string, FxState>();

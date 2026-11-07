@@ -13,7 +13,8 @@ const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmS
 const os = jest.requireActual('os') as { tmpdir: () => string };
 const path = jest.requireActual('path') as { join: (...p: string[]) => string };
 
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan } from '@/lib/offlineMix';
+import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan } from '@/lib/offlineMix';
+import { integratedLoudness } from '@/lib/loudness';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -225,6 +226,37 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
     // eslint-disable-next-line no-console
     console.log(`szerver halkítás közben ${sDuring.toFixed(1)} dB`);
     expect(Math.abs(during - sDuring)).toBeLessThan(4);
+  }, 120000);
+
+  it('🎛️ master: a keverék a cél-LUFS-re kerül, a csúcs a plafon alatt — a szerverrel összevetve', async () => {
+    const mp: Project = { ...project, audioMaster: { target: 'custom', lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 2, mid: -1, high: 1.5 }, multiband: true } } as Project;
+    const plan = offlineMixPlan(mp);
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.master?.lufs).toBe(-14);
+    const sources = new Map([
+      [stereo, { channels: decode(stereo, 2), sampleRate: SR }],
+      [mono, { channels: decode(mono, 1), sampleRate: SR }],
+    ]);
+    const gain = await measureMasterGain(plan, sources);
+    const n = Math.round(plan.duration * SR);
+    const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    const st = new Map();
+    for (let a = 0; a < n; a += 5512) {
+      const b = Math.min(n, a + 5512);
+      const part: [Float32Array, Float32Array] = [out[0].subarray(a, b), out[1].subarray(a, b)];
+      mixRange({ ...plan, masterGain: gain }, sources, part, a, b, 1, st);
+    }
+    const mine = integratedLoudness(out[0], out[1], SR);
+    let peak = 0;
+    for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[0][i]), Math.abs(out[1][i]));
+    const { renderProject } = jest.requireActual('../../server/render');
+    const server = decode(await renderProject(mp, fs.mkdtempSync(path.join(dir, 'wm-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    const theirs = integratedLoudness(server[0], server[1], SR);
+    // eslint-disable-next-line no-console
+    console.log(`master: telefon ${mine.toFixed(2)} LUFS (csúcs ${(20 * Math.log10(peak)).toFixed(2)} dB), szerver ${theirs.toFixed(2)} LUFS`);
+    expect(Math.abs(mine - -14)).toBeLessThan(0.5);
+    expect(20 * Math.log10(peak)).toBeLessThanOrEqual(-1 + 1e-3);
+    expect(Math.abs(mine - theirs)).toBeLessThan(0.7);
   }, 120000);
 });
 

@@ -1,9 +1,9 @@
 import { audioSpeedOf, continuesInSource } from '@/lib/audioTrim';
 import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
-import { buildFxChain, Ducker, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
+import { buildFxChain, buildMasterChain, Ducker, FX_WARMUP, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
 import { integratedLoudness } from '@/lib/loudness';
-import type { AudioClip, AudioFx, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
+import type { AudioClip, AudioFx, AudioMaster, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
 
 /**
  * 🎧📱 Telefonos (offline) hang-keverés — PRO-AUDIO A26: a Free felhasználó szerver nélkül
@@ -89,6 +89,10 @@ export interface OfflineMixPlan {
   unsupported: OfflineUnsupported[];
   /** 🦆 van duck-klip ÉS beszéd-kulcs (a szerver csak ekkor halkít) */
   ducking?: boolean;
+  /** 🎛️ a projekt mastere (EQ, multiband, cél-LUFS, csúcsplafon) */
+  master?: AudioMaster;
+  /** 📏 a master mért erősítése a cél-LUFS-re (`measureMasterGain`); hiányzó = mérés folyik */
+  masterGain?: number;
 }
 
 /** a klip hangmagasság-eltolása félhangban, a szerverrel azonosan ±12-re szorítva */
@@ -156,9 +160,14 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     }
   }
   clips.push(...videoAudioClips(project, unsupported));
-  if (project.audioMaster) unsupported.add('master');
   const ducking = clips.some((c) => c.role === 'duck') && clips.some((c) => c.role === 'key');
-  return { duration: projectDuration(project), clips, unsupported: [...unsupported], ...(ducking ? { ducking } : {}) };
+  return {
+    duration: projectDuration(project),
+    clips,
+    unsupported: [...unsupported],
+    ...(ducking ? { ducking } : {}),
+    ...(project.audioMaster ? { master: project.audioMaster } : {}),
+  };
 }
 
 /** A klip-helyi `t` időpont erősítése (hangerő-automáció × fade be × fade ki × sáv). */
@@ -294,6 +303,18 @@ export function mixRange(
       out[0][i] += duckBus[0][i];
       out[1][i] += duckBus[1][i];
     }
+  }
+  if (plan.master) {
+    // 🎛️ a master a kész keveréken; az állapota szeletről szeletre megmarad (ugrásnál újraindul —
+    // az EQ azonnal, a kompresszorok ~250 ms alatt állnak be). Erősítés nélkül = a mérő menet.
+    const id = `__master|${JSON.stringify(plan.master)}|${plan.masterGain ?? 'mérés'}`;
+    let st = fxState.get(id);
+    if (!st || st.next !== fromSample) {
+      st = { chain: buildMasterChain(plan.master, sr, plan.masterGain), next: fromSample };
+    }
+    runChain(st.chain, out[0], out[1], fromSample);
+    st.next = toSample;
+    fxState.set(id, st);
   }
 }
 
@@ -475,6 +496,37 @@ export function withNormalizeGains(plan: OfflineMixPlan, sources: Map<string, De
     return { ...c, normGain };
   });
   return { ...plan, clips };
+}
+
+/**
+ * 📏 A master hangosság-mérése (az első menet): a teljes keveréket a master EQ/multiband láncán
+ * végigviszi, és a cél-LUFS-hez szükséges erősítést adja (a második menet ezzel szól — mint a
+ * szerver kétmenetes `loudnorm`-ja lineáris módban). Kis darabokban, mindegyik után a felület jön.
+ */
+export async function measureMasterGain(plan: OfflineMixPlan, sources: Map<string, DecodedSource>, signal?: { aborted: boolean }): Promise<number> {
+  if (!plan.master) {
+    return 1;
+  }
+  const sr = OFFLINE_SAMPLE_RATE;
+  const n = Math.round(plan.duration * sr);
+  const l = new Float32Array(n);
+  const r = new Float32Array(n);
+  const measuring: OfflineMixPlan = { ...plan, masterGain: undefined };
+  const state = new Map<string, FxState>();
+  // kis darabok, és MINDEN darab után a vezérlés visszaadása: az előnézet szeletei elsőbbséget
+  // kapnak (mérve: 0,25 s-os darabokkal a háttér-mérés alatt az iPaden 5 szelet elkésett)
+  const chunk = 4096;
+  for (let a = 0; a < n; a += chunk) {
+    if (signal?.aborted) {
+      return Number.NaN;
+    }
+    const b = Math.min(n, a + chunk);
+    const part: [Float32Array, Float32Array] = [l.subarray(a, b), r.subarray(a, b)];
+    mixRange(measuring, sources, part, a, b, 1, state);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  const lufs = integratedLoudness(l, r, sr);
+  return Number.isFinite(lufs) ? Math.pow(10, (plan.master.lufs - lufs) / 20) : 1;
 }
 
 /** A forrás `[from, from + n)` mintái csatornánként (a forráson túl csend), igény szerint fordítva. */

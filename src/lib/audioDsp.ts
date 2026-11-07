@@ -212,6 +212,11 @@ function highShelfCoeffs(f: number, gainDb: number, sr: number) {
   };
 }
 
+/** RBJ magas-polc szűrő */
+function highShelf(f: number, gainDb: number, sr: number): Biquad {
+  return new Biquad(highShelfCoeffs(f, gainDb, sr));
+}
+
 /**
  * 🐍 De-esser (dinamikus magas-polc): a sziszegő sáv (5,5 kHz fölött) szintjét a teljes jelhez
  * méri; ha a magas sáv a teljes jel 30%-ánál erősebb (sziszegő mássalhangzó — a magánhangzóké
@@ -415,6 +420,78 @@ export class Ducker {
     }
     this.env = env;
   }
+}
+
+/** RBJ mély-polc (low-shelf) együtthatók, S = 1 */
+function lowShelf(f: number, gainDb: number, sr: number): Biquad {
+  const A = Math.pow(10, gainDb / 40);
+  const w = omega(f, sr);
+  const cos = Math.cos(w);
+  const alpha = (Math.sin(w) / 2) * Math.SQRT2;
+  const sq = 2 * Math.sqrt(A) * alpha;
+  return new Biquad({
+    b0: A * (A + 1 - (A - 1) * cos + sq),
+    b1: 2 * A * (A - 1 - (A + 1) * cos),
+    b2: A * (A + 1 - (A - 1) * cos - sq),
+    a0: A + 1 + (A - 1) * cos + sq,
+    a1: -2 * (A - 1 + (A + 1) * cos),
+    a2: A + 1 + (A - 1) * cos - sq,
+  });
+}
+
+/**
+ * 🎚️ Háromsávos kompresszor (a master `multiband`-je): mély (< 250 Hz) · közép (250–4000) ·
+ * magas (> 4000), sávonként −18 dB, 2:1, 20 / 250 ms — a szerver `masterGraph`-jának felépítése.
+ */
+export class Multiband implements Processor {
+  private readonly lo: Biquad;
+  private readonly midHp: Biquad;
+  private readonly midLp: Biquad;
+  private readonly hi: Biquad;
+  private readonly comps: Compressor[];
+
+  constructor(sr: number) {
+    this.lo = lowpass(250, sr);
+    this.midHp = highpass(250, sr);
+    this.midLp = lowpass(4000, sr);
+    this.hi = highpass(4000, sr);
+    this.comps = [0, 1, 2].map(() => new Compressor(-18, 2, 20, 250, sr));
+  }
+
+  processStereo(l: Float32Array, r: Float32Array, pos: number): void {
+    const bands = [0, 1, 2].map(() => [l.slice(), r.slice()] as [Float32Array, Float32Array]);
+    this.lo.processStereo(bands[0][0], bands[0][1]);
+    this.midHp.processStereo(bands[1][0], bands[1][1]);
+    this.midLp.processStereo(bands[1][0], bands[1][1]);
+    this.hi.processStereo(bands[2][0], bands[2][1]);
+    bands.forEach(([bl, br], k) => this.comps[k].processStereo(bl, br));
+    for (let i = 0; i < l.length; i++) {
+      l[i] = bands[0][0][i] + bands[1][0][i] + bands[2][0][i];
+      r[i] = bands[0][1][i] + bands[1][1][i] + bands[2][1][i];
+    }
+    void pos;
+  }
+}
+
+/**
+ * 🎛️ A master-lánc a keveréken (a szerver kétmenetes masterének felépítése): EQ (mély polc
+ * 110 Hz, közép 1 kHz, magas polc 8 kHz) → (multiband) → a mért erősítés a cél-LUFS-re →
+ * csúcsplafon a `truePeak`-re. `gain` nélkül (a mérő előmenet) a hangosság-lépés kimarad.
+ */
+export function buildMasterChain(
+  master: { eq?: { low: number; mid: number; high: number }; multiband?: boolean; truePeak: number },
+  sr: number,
+  gain?: number
+): Processor[] {
+  const chain: Processor[] = [];
+  if (master.eq?.low) chain.push(lowShelf(110, master.eq.low, sr));
+  if (master.eq?.mid) chain.push(peaking(1000, master.eq.mid, sr));
+  if (master.eq?.high) chain.push(highShelf(8000, master.eq.high, sr));
+  if (master.multiband) chain.push(new Multiband(sr));
+  if (gain !== undefined) {
+    chain.push(new Gain(gain), new Limiter(dbToLin(master.truePeak), 50, sr));
+  }
+  return chain;
 }
 
 /** állandó erősítés (a normalizálás előre mért erősítése) */

@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { loadAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
+import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
 
 /**
@@ -66,6 +66,10 @@ class PreviewEngine {
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
   private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0 };
+
+  /** 🎛️ a master mért erősítései keverésenként, és a legutóbbi (amíg az új mérés tart) */
+  private masterGains = new Map<string, number>();
+  private lastMasterGain = 1;
 
   /** 🧪 füstteszt: a klipenkénti lejátszók útja (a még nem támogatott effektes projektek útja) */
   forceFallback = false;
@@ -146,7 +150,29 @@ class PreviewEngine {
       return; // közben újabb terv jött
     }
     // 📏 a normalizálás erősítése (ugyanaz az előmenet, mint az exportban)
-    this.plan = withNormalizeGains(plan, sources);
+    let next = withNormalizeGains(plan, sources);
+    // 🎛️ a master mérése a háttérben: addig a legutóbbi mért erősítés szól (azonos keverésnél a
+    // tárolt), utána a pontos — ugyanaz a kétmenetes mérés, mint az exportban
+    if (next.master) {
+      const fp = JSON.stringify({ c: next.clips, m: next.master, d: next.duration });
+      const known = this.masterGains.get(fp);
+      next = { ...next, masterGain: known ?? this.lastMasterGain };
+      if (known === undefined) {
+        const measuring = next;
+        void measureMasterGain(measuring, sources, { get aborted() { return false; } }).then((g) => {
+          if (seq !== this.planSeq || !Number.isFinite(g)) {
+            return;
+          }
+          this.masterGains.set(fp, g);
+          this.lastMasterGain = g;
+          this.plan = { ...measuring, masterGain: g };
+          if (this.playing) {
+            this.rescheduleFrom(this.position() + EDIT_LEAD_SEC);
+          }
+        }).catch((caught) => { logCaught('lib/previewEngine.ts:masterGain', caught); });
+      }
+    }
+    this.plan = next;
     this.sources = sources;
     this.endSample = Math.round(plan.duration * SR);
     if (this.playing) {

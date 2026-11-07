@@ -57,8 +57,9 @@ describe('offlineMix (A26)', () => {
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {
     const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, denoise: true } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
-    // a klip-effektek és a hangjavítás a közös DSP-ben vannak; a master még a szerveré
-    expect(plan.unsupported.sort()).toEqual(['master']);
+    // a klip-effektek, a hangjavítás és a master is a közös DSP-ben van
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.master?.target).toBe('podcast');
     // a hangjavítás csomagja: 75 Hz, zajszűrés, de-esser, kompresszor, −16 LUFS
     expect(plan.clips[0].fx).toMatchObject({ highpass: 80, denoise: true, deEsser: true, compressor: true, normalize: true });
   });

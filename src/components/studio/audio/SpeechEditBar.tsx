@@ -49,7 +49,7 @@ export async function installWhisperModel(id: string, t: TFunction): Promise<boo
 }
 
 /** van-e használható modell; ha nincs, a felhasználó választ: alap vagy pontosabb */
-async function ensureWhisperModel(t: TFunction): Promise<boolean> {
+export async function ensureWhisperModel(t: TFunction): Promise<boolean> {
   if (bestUsableWhisperModelId()) return true;
   const pick = await new Promise<string | null>((resolve) =>
     Alert.alert(t('studio.audio.speech.modelTitle'), t('studio.audio.speech.modelChoose'), [

@@ -79,6 +79,8 @@ import { decodeSample } from '@/lib/instrumentClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import type { CheckIssue } from '@/lib/audioCheck';
 import { runAudioCheck } from '@/lib/audioCheckClient';
+import { devTypeAssistant, parseNow } from '@/components/studio/audio/AudioAssistantBar';
+import { ASR_HINT, type AudioIntentResult } from '@/lib/audioIntent';
 import { renderSynthToClip } from '@/lib/synthClient';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { renderSamplerToClip } from '@/lib/samplerClient';
@@ -88,7 +90,7 @@ import { t as i18nT, type TFunction } from 'i18next';
 import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import { catalogRuntime, downloadModel, listCachedModels } from '@/lib/modelRegistryClient';
-import { bestUsableWhisperModelId, lastRawTokens, runWhisperSmokeTest, transcribeWordsOnDevice } from '@/lib/whisperClient';
+import { bestUsableWhisperModelId, lastRawTokens, runWhisperSmokeTest, transcribeMediaOnDevice, transcribeWordsOnDevice } from '@/lib/whisperClient';
 import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
 import { decodeToMono16k } from '@/lib/audioDecode';
 import { findClipSilences } from '@/lib/audioSilenceClient';
@@ -3470,6 +3472,75 @@ function sortedJson(v: unknown): string {
   return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 }
 
+/** 🎙️🤖 Hang-asszisztens: beírt mondat → lépések → végrehajtás egy undo-ban; kimondott parancs a Whisperrel → ugyanaz. */
+async function smokeAudioAssistant(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_assistant';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:assistant', caught));
+  const base = createEmptyProject('smoke asszisztens', '9:16', undefined, 'audio');
+  const uri = toneWav('smoke_assist.wav', 8);
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported', uri, start: 0, duration: 8, sourceDuration: 8, id: 'x', ...over });
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [ac({ id: 'v', label: 'beszéd' })] } : t.type === 'music' ? { ...t, clips: [ac({ id: 'm', label: 'zene' })] } : t.type === 'sfx' ? { ...t, clips: [ac({ id: 'f', label: 'effekt', start: 2, duration: 1 })] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  runDevAction('audio.assistant');
+  await sleep(500);
+  const sentence = 'Tegyél zengést a beszédre, halkítsd a zenét 3 dB-lel, halkuljon a zene a beszéd alatt és masterelj Spotify-ra';
+  devTypeAssistant(sentence);
+  await sleep(400);
+  const tt = i18nT as unknown as (k: string) => string;
+  const parsed = parseNow(sentence, tt);
+  log(parsed.unknown.length === 0 && parsed.steps.map((x) => x.key).join(',') === 'fxOn,trackGain,duckOn,master', 'a mondat 4 lépésre bomlik, nincs nem értett rész', parsed.steps.map((x) => x.key).join(' · '));
+  log(true, 'FOTÓZHATÓ', 'az asszisztens-sáv a felismert lépésekkel');
+  await sleep(3000);
+  const before = st().project!;
+  const n = runDevAction('assistant.apply') as number;
+  const p = st().project!;
+  const clipOf = (cid: string) => p.tracks.flatMap((x) => x.clips).find((c) => c.id === cid) as AudioClip;
+  const ok = clipOf('v').audioFx?.reverb === 0.4 && Math.abs((p.trackMix?.music?.gain ?? 1) - Math.pow(10, -3 / 20)) < 1e-3 && clipOf('m').autoDuck === true && p.audioMaster?.target === 'spotify';
+  log(n === 4 && ok, 'végrehajtva: zengés a beszéden, zene −3 dB, a zene halkul a beszéd alatt, Spotify-master', `${n} parancs; gain ${p.trackMix?.music?.gain}, master ${p.audioMaster?.target}`);
+  st().undo();
+  log(JSON.stringify(st().project!.tracks) === JSON.stringify(before.tracks) && !st().project!.audioMaster && !st().project!.trackMix?.music, 'egyetlen visszavonás mindent visszaállít', '');
+  devTypeAssistant('némítsd a zenét');
+  await sleep(300);
+  runDevAction('assistant.apply');
+  log(!st().isTrackAudible('music'), 'művelet: a zene némítva (munkamenet)', '');
+  st().toggleTrackFlag('music', 'mute');
+  // 🎤 kimondott parancsok: a telefon Whisperje írja át (a mikrofon helyett felolvasott fájl)
+  // ellenőrző mondatok: a hu2/hu3/hu5 kimenetére általános tűrés készült; a hu4, hu6, hu7 egyikre sem volt hangolva
+  const sig = (r: AudioIntentResult) => [...r.steps.map((x) => (x.key === 'master' ? `master:${x.params?.target}` : x.key)), ...r.actions.map((a) => a.kind)].join(',');
+  const cases: [string, string][] = [
+    ['cmd_hu.wav', 'fxOn,trackGain'],
+    ['cmd_en.wav', 'fxOn,master:spotify'],
+    ['cmd_hu2.wav', 'fxOn,master:spotify'],
+    ['cmd_hu3.wav', 'duckOn,fadeIn'],
+    ['cmd_hu4.wav', 'fxOn,trackGain'],
+    ['cmd_hu5.wav', 'master:youtube,marker'],
+    ['cmd_hu6.wav', 'fxOn,master:tiktok'],
+    ['cmd_hu7.wav', 'trackGain,silence'],
+  ];
+  let hits = 0;
+  for (const [file, expected] of cases) {
+    const local = await downloadToCache(`${smokeFileHost()}/${file}`, `smoke_${file}`);
+    const t0 = Date.now();
+    const r = local ? await transcribeMediaOnDevice(local, { prompt: ASR_HINT }) : null;
+    const said = (r?.lines ?? []).map((l) => l.text).join(' ').trim();
+    const res = parseNow(said, tt);
+    const ok = res.unknown.length === 0 && sig(res) === expected;
+    if (ok) hits++;
+    // egyenként naplózva (INFO): a felismerés a modell és a hang függvénye, a mérce az arány
+    log(null, `kimondott parancs ${ok ? '✓' : '✗'} (${file})`, `„${said}” → ${sig(res)}${res.unknown.length ? ` ?${res.unknown.join('|')}` : ''} (várt: ${expected}; ${Date.now() - t0} ms, ${bestUsableWhisperModelId()})`);
+  }
+  log(hits >= 7, 'kimondott parancsok: legalább 7/8 helyesen értelmezve (a lépések végrehajtás előtt mindig látszanak)', `${hits}/${cases.length}`);
+  devTypeAssistant('');
+  router.back();
+}
+
 /** 🩺 Hangellenőrzés: egy szándékosan hibás projekt minden hibája a helyén, a hangosság = a WAV-exporté; a jó projekt hibátlan. */
 async function smokeAudioCheck(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5550,6 +5621,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'audioassistant') {
+    await step(phase, () => smokeAudioAssistant(log));
     return;
   }
   if (phase === 'audiocheck') {

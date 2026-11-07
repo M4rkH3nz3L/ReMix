@@ -210,7 +210,7 @@ export default function AudioStudioScreen() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
       <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
-      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={() => setExporting(true)} />
+      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
       {exporting ? (
         <AudioExportSheet
           onClose={() => setExporting(false)}

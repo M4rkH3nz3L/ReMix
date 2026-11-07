@@ -160,7 +160,7 @@ export function bestUsableWhisperModelId(): string | null {
  */
 export async function transcribeMediaOnDevice(
   uri: string,
-  opts: { modelId?: string; language?: string } = {},
+  opts: { modelId?: string; language?: string; prompt?: string } = {},
 ): Promise<OnDeviceTranscript | null> {
   const modelId = opts.modelId ?? bestUsableWhisperModelId();
   if (!modelId) {
@@ -179,6 +179,8 @@ export async function transcribeMediaOnDevice(
     const { promise } = ctx.transcribeData(pcm16ForWhisper(pcm), {
       // üres nyelvnél a natív alapérték az angol (nem auto) — a magyar beszéd így angolként íródott át
       language: opts.language ?? 'auto',
+      // a szókincs-súgás (pl. a hang-asszisztens parancsai)
+      ...(opts.prompt ? { prompt: opts.prompt } : {}),
     });
     const result = await promise;
     if (result.isAborted) {

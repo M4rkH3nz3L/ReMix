@@ -23,7 +23,9 @@ import { applySilenceReview, SilenceMarks, SilenceReviewBar, startSilenceSearch 
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { applySpeechCut, selectSpeechFillers, SpeechCutMarks, SpeechEditBar, startSpeechEdit, upgradeSpeechModel } from '@/components/studio/audio/SpeechEditBar';
 import { useSpeechEdit } from '@/store/speechEditStore';
-import { runAudioSync, syncCandidates } from '@/components/studio/audio/audioSyncAction';
+import { AudioAssistantBar } from '@/components/studio/audio/AudioAssistantBar';
+import type { AudioAction } from '@/lib/audioIntent';
+import { runAudioSync, startAudioSync, syncCandidates } from '@/components/studio/audio/audioSyncAction';
 import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
@@ -111,11 +113,14 @@ export function AudioStudioBody({
   title,
   onExit,
   onExport,
+  onRequestCheck,
 }: {
   mode: 'project' | 'scoped';
   title: string;
   onExit: () => void;
   onExport?: () => void;
+  /** 🩺 a hangellenőrzés (a képernyő futtatja; az asszisztens is kérheti) */
+  onRequestCheck?: () => void;
 }) {
   const { t } = useTranslation();
   const fxBypass = useEditorStore((s) => s.fxBypass);
@@ -156,6 +161,7 @@ export function AudioStudioBody({
   const [pianoRoll, setPianoRoll] = useState(false);
   const [pianoBusy, setPianoBusy] = useState(false);
   const [drumMachine, setDrumMachine] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [drumBusy, setDrumBusy] = useState(false);
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
@@ -211,7 +217,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void; assistant: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {}, assistant: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -236,6 +242,7 @@ export function AudioStudioBody({
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
+      registerDevAction('audio.assistant', () => devRef.current.assistant()),
       registerDevAction('audio.beatSplitBars', () => devRef.current.beatSplit('bar')),
       registerDevAction('audio.beatSplitBeats', () => devRef.current.beatSplit('beat')),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
@@ -320,6 +327,30 @@ export function AudioStudioBody({
       { text: t('studio.audioTools.beatSplitBeats'), onPress: () => run('beat') },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
+  };
+
+  /** 🎙️🤖 az asszisztens folyamat-műveletei (a meglévő eszközök) */
+  const runAssistantActions = (actions: AudioAction[]) => {
+    const st = useEditorStore.getState();
+    const sel = selectedAudioClip(st.project, st.selectedClipId);
+    const trackOf = (id?: string) => st.project?.tracks.find((tr) => tr.clips.some((c) => c.id === id))?.type;
+    const voice = st.project?.tracks.find((tr) => tr.type === 'voiceover')?.clips.find((c): c is AudioClip => c.kind === 'audio');
+    for (const a of actions) {
+      if (a.kind === 'mute' || a.kind === 'unmute') {
+        if (st.isTrackAudible(a.track) === (a.kind === 'mute')) st.toggleTrackFlag(a.track, 'mute');
+      } else if (a.kind === 'solo') st.toggleTrackFlag(a.track, 'solo');
+      else if (a.kind === 'silence') {
+        const c = sel ?? voice;
+        const tt = trackOf(c?.id);
+        if (c && tt) void startSilenceSearch(c, tt, fps, t);
+      } else if (a.kind === 'beatSplitBars' || a.kind === 'beatSplitBeats') beatSplitSelection(a.kind === 'beatSplitBars' ? 'bar' : 'beat');
+      else if (a.kind === 'check') onRequestCheck?.();
+      else if (a.kind === 'sync') sel && startAudioSync(sel, fps, t);
+      else if (a.kind === 'transcript') {
+        const tt = trackOf((sel ?? voice)?.id);
+        if (tt) void startSpeechEdit(tt, t);
+      }
+    }
   };
 
   /** ➕ új hangsáv a következő szabad helyre (undo-zható) */
@@ -419,7 +450,7 @@ export function AudioStudioBody({
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const ref = c ? syncCandidates(c)[0] : undefined;
     return c && ref ? runAudioSync(c, ref, fps, t, true) : null;
-  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false) };
+  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -1091,6 +1122,8 @@ export function AudioStudioBody({
         <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
         <TBtn icon="bookmark-outline" label={t('studio.audio.markers.add')} onPress={markerAtPlayhead} />
         <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
+        {/* 🎙️🤖 hang-asszisztens (a telefonon, offline) */}
+        <TBtn icon="sparkles-outline" label={t('studio.audio.assistant.button')} active={assistantOpen} onPress={() => setAssistantOpen(!assistantOpen)} />
         {/* 🅰️🅱️ A/B: az eredeti (feldolgozás nélkül) ↔ a feldolgozott — csak az előnézetben */}
         <TBtn icon="git-compare-outline" label={fxBypass ? t('studio.audio.transport.abOriginal') : t('studio.audio.transport.ab')} active={fxBypass} onPress={() => useEditorStore.getState().setFxBypass(!fxBypass)} />
         <TBtn
@@ -1114,6 +1147,9 @@ export function AudioStudioBody({
           <Ionicons name="close" size={20} color={palette.text} />
         </Pressable>
       ) : null}
+
+      {/* 🎙️🤖 hang-asszisztens */}
+      {assistantOpen ? <AudioAssistantBar onActions={runAssistantActions} onClose={() => setAssistantOpen(false)} /> : null}
 
       {/* ✂️💬 beszédvágás szöveggel */}
       <SpeechEditBar />

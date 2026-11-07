@@ -420,18 +420,44 @@ export function fxUnsupported(fx: AudioFx | undefined): boolean {
 
 /** van-e a klipen bármilyen (támogatott) effekt */
 export function fxActive(fx: AudioFx | undefined): boolean {
-  return buildFxChain(fx, 44100).length > 0;
+  return buildFxChain(fx, 44100).length > 0 || !!fx?.denoise || !!fx?.pitchSemitones || !!fx?.harmony;
+}
+
+/**
+ * 🎙️ A Voice Studio egygombos csomagjai a közös DSP elemeiből (a szerver `voicechain.js`
+ * tükre): hangjavítás = 75 Hz-es felüláteresztő + zajszűrés + de-esser + kompresszor
+ * (−18 dB, 3:1) + −16 LUFS; visszhang-csökkentés = zajszűrés + kapu + −3 dB 300 Hz-en. A klip
+ * saját effektjei megmaradnak (a felüláteresztőből a nagyobb érvényes).
+ */
+export function voiceFx(fx: AudioFx | undefined, enhance: boolean, deReverb: boolean): AudioFx | undefined {
+  if (!enhance && !deReverb) {
+    return fx;
+  }
+  const out: AudioFx = { ...(fx ?? {}), denoise: true };
+  if (enhance) {
+    out.highpass = Math.max(out.highpass ?? 0, 75);
+    out.deEsser = true;
+    out.compressor = true;
+    out.normalize = true;
+  }
+  return out;
 }
 
 /**
  * A klip effekt-lánca a szerver sorrendjében (szűrők → EQ). Üres = nincs feldolgozás. A
  * paraméter-szorítás a szerverével azonos.
  */
-export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1): Processor[] {
-  if (!fx) {
+export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, deReverb = false): Processor[] {
+  if (!fx && !deReverb) {
     return [];
   }
+  fx = fx ?? {};
   const chain: Processor[] = [];
+  // 🏚️ visszhang-csökkentés (a szerver `dereverbChain`-je): lágy kapu a lecsengő farokra és a
+  // „dobozos” alsó-közép sáv visszavétele (a zajszűrés-része a szakasz-előmenetben fut)
+  if (deReverb) {
+    chain.push(new Gate(0.02, 2.5, 8, 90, 0.06, sr), peaking(300, -3, sr, 1.2));
+  }
   if (fx.highpass && fx.highpass > 0) {
     chain.push(highpass(Math.round(clampN(fx.highpass, 20, 2000)), sr));
   }

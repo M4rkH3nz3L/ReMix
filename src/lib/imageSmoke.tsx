@@ -2961,6 +2961,18 @@ async function smokeDenoise(log: Log) {
   const gain = Math.pow(10, (lufs - integratedLoudness(x, x, SR)) / 20);
   log(gapDb(l, gain) - gapDb(x, 1) < -8, 'a szünetekben a zaj legalább 8 dB-lel csökkent', `${(gapDb(l, gain) - gapDb(x, 1)).toFixed(1)} dB`);
   new File(out).delete();
+  // 🎙️ hangjavítás + visszhang-csökkentés (egygombos csomagok) ugyanezen a jelen, 20 mp
+  const c2: AudioClip = { ...c, id: 've', duration: 20, audioFx: undefined, voiceEnhance: true, deReverb: true };
+  const p2: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c2] } : t)) };
+  log(offlineMixPlan(p2).unsupported.length === 0, 'hangjavítás + visszhang-csökkentés a közös DSP-ben');
+  const t1 = Date.now();
+  const { uri: out2 } = await exportOfflineWav(p2, new File(projectExportDir(), 'smoke_voice_out.wav'));
+  const b2 = await api!.decodeAudioData(out2, SR);
+  const l2 = b2.getChannelData(0).slice();
+  const lufs2 = integratedLoudness(l2, b2.getChannelData(1).slice(), SR);
+  const g2 = Math.pow(10, (lufs2 - integratedLoudness(x.subarray(0, 20 * SR), x.subarray(0, 20 * SR), SR)) / 20);
+  log(Math.abs(lufs2 - -16) < 1 && gapDb(l2, g2) - gapDb(x, 1) < -8, 'hangjavítás: −16 LUFS, a szünetekben kevesebb zaj', `${lufs2.toFixed(2)} LUFS, zaj ${(gapDb(l2, g2) - gapDb(x, 1)).toFixed(1)} dB, ${((Date.now() - t1) / 1000).toFixed(1)} s`);
+  new File(out2).delete();
   src.delete();
 }
 

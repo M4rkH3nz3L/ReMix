@@ -6,11 +6,22 @@ import type { AudioFx } from '@/types/project';
  * `audioFxChain`) matematikáját követik — RBJ-biquad, direkt I. alak, 64 bites állapot —, így a
  * telefon és a szerver kimenete kivonva mérhetően egyezik.
  *
+ * A dinamika (kompresszor, kapu, de-esser, limiter) SAJÁT megvalósítás ugyanazokkal a
+ * beállításokkal (az ffmpeg C-kódja LGPL — nem portoljuk); az előnézet és a telefonos export
+ * mintára azonos, a szerveres export a telefon keverését kapja.
+ *
  * Ami itt még nincs, az a `fxUnsupported`-ban jelzett (a klip addig a régi úton szól).
  */
 
+/** egy sztereó feldolgozó lépés (helyben dolgozik; az állapota a darabok között megmarad) */
+export interface Processor {
+  /** `pos`: az `l[0]` minta helye a klipen belül — a blokkos frissítés rácsa ehhez igazodik,
+   * így a darabolás (előnézet 125 ms, export 250 ms) nem hagy nyomot */
+  processStereo(l: Float32Array, r: Float32Array, pos: number): void;
+}
+
 /** másodrendű IIR szűrő (direkt I. alak, csatornánkénti állapot) */
-export class Biquad {
+export class Biquad implements Processor {
   private b0: number;
   private b1: number;
   private b2: number;
@@ -34,6 +45,11 @@ export class Biquad {
     this.x2 = [0, 0];
     this.y1 = [0, 0];
     this.y2 = [0, 0];
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    this.process(l, 0);
+    this.process(r, 1);
   }
 
   /** helyben szűr egy csatornát */
@@ -86,10 +102,207 @@ export function peaking(f: number, gainDb: number, sr: number, q = 1): Biquad {
   return new Biquad({ b0: 1 + alpha * A, b1: -2 * cos, b2: 1 - alpha * A, a0: 1 + alpha / A, a1: -2 * cos, a2: 1 - alpha / A });
 }
 
+
+const dbToLin = (db: number) => Math.pow(10, db / 20);
+/** egypólusú simítás együtthatója `ms` időállandóra */
+const coeff = (ms: number, sr: number) => 1 - Math.exp(-1 / ((ms / 1000) * sr));
+
+/**
+ * 🗜️ Kompresszor (lefelé): összekapcsolt sztereó, RMS-érzékelés egypólusú felfutás/lecsengés
+ * simítással, lágy térd (a küszöb körül `kneeDb` szélesen), a többi a hangerő-arány szerint.
+ * A szerver alapbeállítása: −18 dB, 3:1, 5 / 150 ms.
+ */
+export class Compressor implements Processor {
+  private env = 0;
+  private readonly att: number;
+  private readonly rel: number;
+
+  constructor(
+    private readonly thresholdDb: number,
+    private readonly ratio: number,
+    attackMs: number,
+    releaseMs: number,
+    sr: number,
+    private readonly kneeDb = 9
+  ) {
+    this.att = coeff(attackMs, sr);
+    this.rel = coeff(releaseMs, sr);
+  }
+
+  /** a statikus görbe: bemeneti szint (dB) → erősítés (dB) */
+  gainDb(levelDb: number): number {
+    const over = levelDb - this.thresholdDb;
+    const half = this.kneeDb / 2;
+    if (over <= -half) return 0;
+    if (over >= half) return (1 / this.ratio - 1) * over;
+    // lágy térd: négyzetes átmenet
+    return ((1 / this.ratio - 1) * (over + half) ** 2) / (2 * this.kneeDb);
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    let env = this.env;
+    for (let i = 0; i < l.length; i++) {
+      const p = (l[i] * l[i] + r[i] * r[i]) / 2;
+      env += (p - env) * (p > env ? this.att : this.rel);
+      const g = env > 1e-12 ? dbToLin(this.gainDb(10 * Math.log10(env))) : 1;
+      l[i] *= g;
+      r[i] *= g;
+    }
+    this.env = env;
+  }
+}
+
+/**
+ * 🚪 Zajkapu (lefelé tágító): a küszöb alatti részt az arány szerint halkítja, legfeljebb a
+ * `rangeLin` szintig. A szerver alapbeállítása: küszöb 0,05 (≈ −26 dB), 9:1, 5 / 80 ms, 0,06.
+ */
+export class Gate implements Processor {
+  private env = 0;
+  private gain = 1;
+  private readonly att: number;
+  private readonly rel: number;
+
+  constructor(
+    private readonly thresholdLin: number,
+    private readonly ratio: number,
+    attackMs: number,
+    releaseMs: number,
+    private readonly rangeLin: number,
+    sr: number
+  ) {
+    this.att = coeff(attackMs, sr);
+    this.rel = coeff(releaseMs, sr);
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    let env = this.env;
+    let gain = this.gain;
+    const thrDb = 20 * Math.log10(this.thresholdLin);
+    const floorDb = 20 * Math.log10(this.rangeLin);
+    for (let i = 0; i < l.length; i++) {
+      const p = Math.max(Math.abs(l[i]), Math.abs(r[i]));
+      env += (p - env) * (p > env ? this.att : this.rel);
+      const lev = 20 * Math.log10(env + 1e-12);
+      const targetDb = lev >= thrDb ? 0 : Math.max(floorDb, (lev - thrDb) * (this.ratio - 1));
+      const target = dbToLin(targetDb);
+      // nyitás gyorsan, zárás lassan (nincs kattogás)
+      gain += (target - gain) * (target > gain ? this.att : this.rel);
+      l[i] *= gain;
+      r[i] *= gain;
+    }
+    this.env = env;
+    this.gain = gain;
+  }
+}
+
+/** RBJ magas-polc (high-shelf) együtthatók, S = 1 */
+function highShelfCoeffs(f: number, gainDb: number, sr: number) {
+  const A = Math.pow(10, gainDb / 40);
+  const w = omega(f, sr);
+  const cos = Math.cos(w);
+  const alpha = (Math.sin(w) / 2) * Math.SQRT2;
+  const sq = 2 * Math.sqrt(A) * alpha;
+  return {
+    b0: A * (A + 1 + (A - 1) * cos + sq),
+    b1: -2 * A * (A - 1 + (A + 1) * cos),
+    b2: A * (A + 1 + (A - 1) * cos - sq),
+    a0: A + 1 - (A - 1) * cos + sq,
+    a1: 2 * (A - 1 - (A + 1) * cos),
+    a2: A + 1 - (A - 1) * cos - sq,
+  };
+}
+
+/**
+ * 🐍 De-esser (dinamikus magas-polc): a sziszegő sáv (5,5 kHz fölött) szintjét a teljes jelhez
+ * méri; ha a magas sáv a teljes jel 30%-ánál erősebb (sziszegő mássalhangzó — a magánhangzóké
+ * ~1%), egy 6 kHz-es magas-polc annál jobban vág, legfeljebb −12 dB-ig. A polc a klip saját
+ * 32 mintás rácsán frissül (a darabolástól független), az állapota folytonos (nincs kattogás).
+ */
+export class DeEsser implements Processor {
+  private readonly detect: Biquad;
+  private envHi = 0;
+  private envAll = 0;
+  private gain = 1;
+  private readonly att: number;
+  private readonly rel: number;
+  private x1 = [0, 0];
+  private x2 = [0, 0];
+  private y1 = [0, 0];
+  private y2 = [0, 0];
+  /** a polc aktuális (normált) együtthatói: b0, b1, b2, a1, a2 — kezdetben átengedő */
+  private k: [number, number, number, number, number] = [1, 0, 0, 0, 0];
+
+  constructor(private readonly sr: number, private readonly maxCutDb = 12) {
+    this.detect = highpass(5500, sr);
+    this.att = coeff(2, sr);
+    this.rel = coeff(60, sr);
+  }
+
+  processStereo(l: Float32Array, r: Float32Array, pos: number): void {
+    const hl = Float32Array.from(l);
+    const hr = Float32Array.from(r);
+    this.detect.processStereo(hl, hr);
+    const floor = dbToLin(-this.maxCutDb);
+    // az együtthatók CSAK a rácspontokon változnak (a darab eleje nem rácspont)
+    let [b0, b1, b2, a1, a2] = this.k;
+    const coeffs = () => {
+      const c = highShelfCoeffs(6000, 20 * Math.log10(this.gain), this.sr);
+      [b0, b1, b2, a1, a2] = this.k = [c.b0 / c.a0, c.b1 / c.a0, c.b2 / c.a0, c.a1 / c.a0, c.a2 / c.a0];
+    };
+    for (let i = 0; i < l.length; i++) {
+      const ph = (hl[i] * hl[i] + hr[i] * hr[i]) / 2;
+      const pa = (l[i] * l[i] + r[i] * r[i]) / 2;
+      this.envHi += (ph - this.envHi) * (ph > this.envHi ? this.att : this.rel);
+      this.envAll += (pa - this.envAll) * (pa > this.envAll ? this.att : this.rel);
+      const ratio = this.envAll > 1e-12 ? this.envHi / this.envAll : 0;
+      const target = ratio > 0.3 ? Math.max(floor, (0.3 / ratio) ** 2) : 1;
+      this.gain += (target - this.gain) * (target < this.gain ? this.att : this.rel);
+      // a polc a klip saját 32 mintás rácsán frissül
+      if ((pos + i) % 32 === 0) coeffs();
+      for (let ch = 0; ch < 2; ch++) {
+        const buf = ch === 0 ? l : r;
+        const x = buf[i];
+        const y = b0 * x + b1 * this.x1[ch] + b2 * this.x2[ch] - a1 * this.y1[ch] - a2 * this.y2[ch];
+        this.x2[ch] = this.x1[ch];
+        this.x1[ch] = x;
+        this.y2[ch] = this.y1[ch];
+        this.y1[ch] = y;
+        buf[i] = y;
+      }
+    }
+  }
+}
+
+/**
+ * 🧱 Limiter: kemény plafon (`limit`, lineáris). A csúcsra azonnal reagál (a kimenet SOSEM lépi
+ * át), utána simán enged vissza (`releaseMs`). A szerver alapbeállítása: 0,95.
+ */
+export class Limiter implements Processor {
+  private gain = 1;
+  private readonly rel: number;
+
+  constructor(private readonly limit: number, releaseMs: number, sr: number) {
+    this.rel = coeff(releaseMs, sr);
+  }
+
+  processStereo(l: Float32Array, r: Float32Array): void {
+    let gain = this.gain;
+    for (let i = 0; i < l.length; i++) {
+      const p = Math.max(Math.abs(l[i]), Math.abs(r[i]));
+      const need = p * gain > this.limit ? this.limit / p : 1;
+      gain = need < gain ? need : gain + (1 - gain) * this.rel;
+      if (p * gain > this.limit) gain = this.limit / p;
+      l[i] *= gain;
+      r[i] *= gain;
+    }
+    this.gain = gain;
+  }
+}
+
 const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** a közös DSP-ben már megvalósított effektek */
-const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq']);
+const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter']);
 
 /** van-e a klipen olyan effekt, amit a közös DSP még nem tud (akkor a régi úton szól) */
 export function fxUnsupported(fx: AudioFx | undefined): boolean {
@@ -112,11 +325,11 @@ export function fxActive(fx: AudioFx | undefined): boolean {
  * A klip effekt-lánca a szerver sorrendjében (szűrők → EQ). Üres = nincs feldolgozás. A
  * paraméter-szorítás a szerverével azonos.
  */
-export function buildFxChain(fx: AudioFx | undefined, sr: number): Biquad[] {
+export function buildFxChain(fx: AudioFx | undefined, sr: number): Processor[] {
   if (!fx) {
     return [];
   }
-  const chain: Biquad[] = [];
+  const chain: Processor[] = [];
   if (fx.highpass && fx.highpass > 0) {
     chain.push(highpass(Math.round(clampN(fx.highpass, 20, 2000)), sr));
   }
@@ -129,6 +342,11 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number): Biquad[] {
     if (g(fx.eq.mid)) chain.push(peaking(1000, g(fx.eq.mid), sr));
     if (g(fx.eq.high)) chain.push(peaking(8000, g(fx.eq.high), sr));
   }
+  // a szerver sorrendje: szűrők → (zajszűrés) → kapu → de-esser → kompresszor → … → limiter
+  if (fx.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
+  if (fx.deEsser) chain.push(new DeEsser(sr));
+  if (fx.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
+  if (fx.limiter) chain.push(new Limiter(0.95, 50, sr));
   return chain;
 }
 
@@ -137,18 +355,18 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number): Biquad[] {
  * következő minta nem ott van, ahol a lánc abbahagyta) a hívó újraindítja és bejáratja.
  */
 export interface FxState {
-  chain: Biquad[];
+  chain: Processor[];
   /** a következő feldolgozandó idővonal-minta */
   next: number;
 }
 
-/** a bejáratás hossza (minta): a biquadok ennyi alatt bőven lecsengenek (20 Hz-es HPF ~8 ms) */
-export const FX_WARMUP = Math.round(0.2 * 44100);
+/** a bejáratás hossza (minta): a biquadok ~10 ms, a dinamika-burkolók (150 ms lecsengés) ennyi
+ * alatt bőven beállnak */
+export const FX_WARMUP = Math.round(0.6 * 44100);
 
 /** helyben feldolgoz egy sztereó szakaszt a láncon */
-export function runChain(chain: Biquad[], l: Float32Array, r: Float32Array): void {
-  for (const bq of chain) {
-    bq.process(l, 0);
-    bq.process(r, 1);
+export function runChain(chain: Processor[], l: Float32Array, r: Float32Array, pos = 0): void {
+  for (const p of chain) {
+    p.processStereo(l, r, pos);
   }
 }

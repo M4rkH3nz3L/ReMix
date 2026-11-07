@@ -55,7 +55,7 @@ describe('offlineMix (A26)', () => {
   });
 
   it('a szerveres effektek listázódnak, hogy a felület szólhasson', () => {
-    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, compressor: true } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
+    const plan = offlineMixPlan(project([clip({ voiceEnhance: true, audioFx: { highpass: 80, reverb: 0.4 } })], { audioMaster: { target: 'podcast', lufs: -16, truePeak: -1.5, dynamics: 'balanced' } }));
     expect(plan.unsupported.sort()).toEqual(['effects', 'master', 'voiceEnhance']);
   });
 
@@ -73,4 +73,33 @@ describe('offlineMix (A26)', () => {
     expect(v.getUint32(24, true)).toBe(44100);
     expect([v.getInt16(44, true), v.getInt16(46, true), v.getInt16(48, true), v.getInt16(52, true)]).toEqual([0, 32767, 16384, -32767]);
   });
+
+  it('🎧 előnézet = export: a 125 ms-os és a 250 ms-os szeletelés minden effekttel mintára azonos', () => {
+    const SR = 44100;
+    const n = 3 * SR;
+    const tone = Float32Array.from({ length: n }, (_, i) => Math.sin((2 * Math.PI * (i % 30000 < 9000 ? 7000 : 180) * i) / SR) * (i % 40000 < 20000 ? 0.9 : 0.03));
+    const p = project([clip({ duration: 2.5, sourceDuration: 3, audioFx: { highpass: 90, lowpass: 12000, eq: { low: 3, mid: -2, high: 2 }, gate: true, deEsser: true, compressor: true, limiter: true } })]);
+    const plan = offlineMixPlan(p);
+    expect(plan.unsupported).toEqual([]);
+    const sources = new Map([[plan.clips[0].uri, { channels: [tone], sampleRate: SR }]]);
+    const render = (chunk: number) => {
+      const out: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+      const state = new Map();
+      for (let a = 0; a < n; a += chunk) {
+        const b = Math.min(n, a + chunk);
+        const part: [Float32Array, Float32Array] = [new Float32Array(b - a), new Float32Array(b - a)];
+        mixRange(plan, sources, part, a, b, 1, state);
+        out[0].set(part[0], a);
+        out[1].set(part[1], a);
+      }
+      return out;
+    };
+    const preview = render(5512);
+    const exported = render(11025);
+    let maxDiff = 0;
+    for (let i = 0; i < n; i++) maxDiff = Math.max(maxDiff, Math.abs(preview[0][i] - exported[0][i]), Math.abs(preview[1][i] - exported[1][i]));
+    expect(maxDiff).toBeLessThan(1e-6);
+    expect(preview[0].some((v) => v !== 0)).toBe(true);
+  });
 });
+

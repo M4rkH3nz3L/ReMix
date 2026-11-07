@@ -2849,6 +2849,35 @@ async function smokeOfflineFx(log: Log) {
   src.delete();
 }
 
+/** 🗜️ Három sáv, mindegyiken a teljes támogatott effekt-lánc: a motor valós időben, akadás nélkül. */
+async function smokeEngineFx(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_enginefx';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:engineFx', caught));
+  const uri = toneWav('smoke_enginefx.wav', 20);
+  const fx = { highpass: 90, lowpass: 12000, eq: { low: 3, mid: -2, high: 2 }, gate: true, deEsser: true, compressor: true, limiter: true };
+  const base = createEmptyProject('smoke motor-fx', '9:16', undefined, 'audio');
+  const mk = (cid: string, start: number, pan: number): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start, duration: 16, trimIn: 0, sourceDuration: 20, volume: 0.3, fadeIn: 0, fadeOut: 0, pan, audioFx: fx, source: 'imported' });
+  const project: Project = { ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('m', 0, -0.5)] } : t.type === 'sfx' ? { ...t, clips: [mk('s', 0.5, 0.5)] } : t.type === 'voiceover' ? { ...t, clips: [mk('v', 1, 0)] } : t)) };
+  const plan = offlineMixPlan(project);
+  log(plan.unsupported.length === 0, 'a teljes támogatott lánc a motorral szól (nem a régi úton)', `[${plan.unsupported.join(',')}]`);
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  const st = useEditorStore.getState;
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(5000);
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(stats.late === 0 && stats.minLeadMs > 20, 'valós időben, akadás nélkül (3 sáv × teljes lánc)', `${stats.chunks} szelet, ${stats.late} késett, legkisebb előny ${stats.minLeadMs.toFixed(0)} ms`);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4013,6 +4042,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'enginefx') {
+    await step(phase, () => smokeEngineFx(log));
     return;
   }
   if (phase === 'offlinefx') {

@@ -202,11 +202,11 @@ export function mixRange(
         const w0 = Math.max(clipFrom, a - FX_WARMUP);
         if (w0 < a) {
           const [wl, wr] = read(w0, a);
-          runChain(st.chain, wl, wr);
+          runChain(st.chain, wl, wr, w0 - clipFrom);
         }
       }
       [fxL, fxR] = read(a, b);
-      runChain(st.chain, fxL, fxR);
+      runChain(st.chain, fxL, fxR, a - clipFrom);
       st.next = b;
       fxState.set(key, st);
     }

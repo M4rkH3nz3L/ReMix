@@ -4047,6 +4047,18 @@
         "downloadFailed": "The rendered audio of “{{name}}” could not be downloaded."
       },
       "exportSheet": {
+        "scope": "Range",
+        "whole": "Whole project",
+        "rangeChip": "In–Out ({{from}}–{{to}})",
+        "rangeNone": "In–Out (not set)",
+        "rangeHint": "Set the range with the In and Out buttons on the transport.",
+        "content": "Content",
+        "mix": "Mix",
+        "stems": "Per track (stems)",
+        "stemsHint": "One WAV per track, in one ZIP, made on the phone. Stems are pre-master (their sum = the mix without the master chain); ducking and bus sends are included.",
+        "rangeWavHint": "WAV, made on the phone — sample for sample what plays there in the full export.",
+        "saveStems": "Save stems (ZIP)",
+        "saveRange": "Save range (WAV)",
         "format": "Format",
         "lossyHint": "Smaller file, compressed audio — for sharing and social media.",
         "losslessHint": "Lossless: exactly what the mix produces — for further work and mastering.",
@@ -4115,6 +4127,7 @@
         "pause": "Pause"
       },
       "offline": {
+        "stems": "Stem: {{name}} ({{n}}/{{of}})",
         "onDeviceHint": "Free export on your phone: WAV, 16-bit, 44.1 kHz, stereo — no server. Other formats and server effects come with Pro.",
         "tooLong": "On-device export handles projects up to {{minutes}} minutes. Longer ones need the Pro server export.",
         "noSpace": "Not enough free space to export: {{need}} MB needed (+50 MB reserve), {{free}} MB free. Free up some space and try again.",

@@ -4047,6 +4047,18 @@
         "downloadFailed": "A(z) „{{name}}” szám renderelt hangja nem töltődött le."
       },
       "exportSheet": {
+        "scope": "Tartomány",
+        "whole": "Teljes projekt",
+        "rangeChip": "In–Out ({{from}}–{{to}})",
+        "rangeNone": "In–Out (nincs kijelölve)",
+        "rangeHint": "A tartományt a transzport In és Out gombjával jelölöd ki.",
+        "content": "Tartalom",
+        "mix": "Keverék",
+        "stems": "Sávonként (stemek)",
+        "stemsHint": "Sávonként egy WAV, egy ZIP-ben, a telefonon. A stemek a master-lánc előtt készülnek (összegük = a keverés master nélkül); a halkítás és a busz-küldések benne vannak.",
+        "rangeWavHint": "WAV, a telefonon — mintára az, ami a teljes exportban ott szól.",
+        "saveStems": "Stemek mentése (ZIP)",
+        "saveRange": "Tartomány mentése (WAV)",
         "format": "Formátum",
         "lossyHint": "Kisebb fájl, tömörített hang — megosztáshoz, közösségi médiához.",
         "losslessHint": "Veszteségmentes: pontosan az, amit a keverés ad — további munkához, mastereléshez.",
@@ -4115,6 +4127,7 @@
         "pause": "Szünet"
       },
       "offline": {
+        "stems": "Stem: {{name}} ({{n}}/{{of}})",
         "onDeviceHint": "Ingyenes export a telefonon: WAV, 16 bit, 44,1 kHz, sztereó — szerver nélkül. A többi formátum és a szerveres effektek Pro-val érhetők el.",
         "tooLong": "A telefonos export legfeljebb {{minutes}} perces projektet tud. Hosszabbhoz a Pro szerveres exportja kell.",
         "noSpace": "Nincs elég szabad hely az exporthoz: {{need}} MB kell (+50 MB tartalék), szabad {{free}} MB. Szabadíts fel helyet, és próbáld újra.",

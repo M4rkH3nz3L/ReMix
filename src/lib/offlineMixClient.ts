@@ -5,10 +5,11 @@ import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { denoiseStereo } from '@/lib/denoise';
 import { LongSource, longUris } from '@/lib/longSource';
-import { hasRoomFor, isDiskFullError, megabytes, wavBytes } from '@/lib/diskSpace';
+import { hasRoomFor, isDiskFullError, megabytes } from '@/lib/diskSpace';
 import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
-import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, sliceSource, stretchJobs, wavHeader16, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, needsWholeWindow, sourceRanges, type DecodedSource, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, pcm24, sliceSource, stretchJobs, wavHeader16, wavHeader24, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, needsWholeWindow, sourceRanges, type DecodedSource, type OfflineMixPlan, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
+import { ZipStoreWriter } from '@/lib/zipStore';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -22,28 +23,42 @@ const CHUNK_SEC = 0.25;
 /** egy szeletben legfeljebb ennyi munka, utána a felület jön (60 Hz-en egy képkocka ~16 ms) */
 const FRAME_BUDGET_MS = 12;
 
-/**
- * 🎧📱 PRO-AUDIO A26: a hang-mix WAV-ként, TELJESEN a telefonon (Free, szerver nélkül). A
- * források a natív dekóderrel 44,1 kHz-re dekódolódnak, a keverés a `offlineMix` pure magja
- * (a szerveres renderrel paritás-tesztelt), a WAV darabonként íródik a fájlba.
- */
-export async function exportOfflineWav(
-  mix: Project,
-  target: File,
-  onProgress?: (u: ProgressUpdate) => void,
-  signal?: AbortSignal,
-  /** `float32`: a Pro szerveres export köztes keveréke (veszteségmentes) */
-  format: 'pcm16' | 'float32' = 'pcm16'
-): Promise<{ uri: string; unsupported: OfflineUnsupported[] }> {
+/** WAV-mélység: 16 bit (TPDF-dither), 24 bit, vagy 32 bites lebegőpontos (a Pro köztes keveréke) */
+export type WavBits = 16 | 24 | 32;
+
+export interface OfflineExportOptions {
+  /** ✂️ csak ez a tartomány (mp) — a keverés az elejétől fut, így a tartomány mintára az, ami a teljes exportban ott szól */
+  range?: { from: number; to: number };
+  bits?: WavBits;
+}
+
+interface Prepared {
+  plan: OfflineMixPlan;
+  sources: Map<string, DecodedSource>;
+  prepare: (a: number, b: number) => Promise<void>;
+  long: Set<string>;
+  unsupported: OfflineUnsupported[];
+}
+
+const bytesPerSample = (bits: WavBits) => bits / 8;
+const wavHeader = (bits: WavBits, frames: number) =>
+  bits === 32 ? wavHeaderF32(frames, 2, OFFLINE_SAMPLE_RATE) : bits === 24 ? wavHeader24(frames, 2, OFFLINE_SAMPLE_RATE) : wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE);
+const wavData = (bits: WavBits, out: Float32Array[]) => (bits === 32 ? pcmF32(out) : bits === 24 ? pcm24(out) : pcm16(out));
+
+/** a tartomány mintákban (a projekt hosszára szorítva) */
+function frameRange(plan: OfflineMixPlan, range?: { from: number; to: number }): [number, number] {
+  const total = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
+  if (!range) return [0, total];
+  const a = Math.max(0, Math.min(total, Math.round(range.from * OFFLINE_SAMPLE_RATE)));
+  const b = Math.max(a, Math.min(total, Math.round(range.to * OFFLINE_SAMPLE_RATE)));
+  return [a, b];
+}
+
+/** a források dekódolása, a nyújtott szakaszok és a normalizálás — a kiírás előtti közös rész */
+async function prepareOffline(mix: Project, onProgress?: (u: ProgressUpdate) => void, signal?: AbortSignal): Promise<Prepared> {
   const plan = offlineMixPlan(mix);
   if (plan.duration > OFFLINE_MAX_SEC) {
     throw new Error(tr('studio.audio.offline.tooLong', { minutes: OFFLINE_MAX_SEC / 60 }));
-  }
-  // 💾 a WAV mérete előre ismert: ha nem fér el, a dekódolás el sem indul
-  const needed = wavBytes(Math.round(plan.duration * OFFLINE_SAMPLE_RATE), 2) * (format === 'float32' ? 2 : 1);
-  const free = freeDiskBytes();
-  if (!hasRoomFor(needed, free)) {
-    throw new Error(tr('studio.audio.offline.noSpace', { need: megabytes(needed), free: megabytes(free) }));
   }
   const api = await loadAudioApi();
   if (!api) {
@@ -99,46 +114,61 @@ export async function exportOfflineWav(
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
+  // 📏 a klipek normalizálási erősítése (előmenet a kész forrásokon)
+  return { plan: withNormalizeGains(mixPlan, sources), sources, prepare, long, unsupported: plan.unsupported };
+}
 
-  // 📏 a normalizálás erősítése (előmenet a kész forrásokon), majd a master mérése (kétmenetes)
-  const normalized = withNormalizeGains(mixPlan, sources);
-  const finalPlan = normalized.master
-    ? { ...normalized, masterGain: await measureMasterGain(normalized, sources, signal ?? undefined, prepare) }
-    : normalized;
-  if (signal?.aborted) {
-    throw new RenderCancelledError();
-  }
-  const frames = Math.round(plan.duration * OFFLINE_SAMPLE_RATE);
+/**
+ * A keverés kiírása a `write`-ba: WAV-fejléc + a `[a, b)` minták. A keverés mindig 0-tól fut (az
+ * effektek, a halkítás és a master állapota így pontosan az, ami a teljes exportban ott van).
+ */
+async function writeWav(
+  prep: Prepared,
+  plan: OfflineMixPlan,
+  [a, b]: [number, number],
+  bits: WavBits,
+  write: (bytes: Uint8Array) => void,
+  onRatio: (r: number) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  write(wavHeader(bits, b - a));
   // 🎛️ az effektek állapota szeletről szeletre megmarad (folytonos szűrés)
   const fxState = new Map<string, FxState>();
+  // T2: időkeretes feldolgozás — negyed mp-es darabok, és ~12 ms munka után mindig visszaadjuk
+  // a vezérlést (mérve: az 5 mp-es darabok 392 ms-ig fogták a felületet, látható akadás)
+  const chunk = Math.round(CHUNK_SEC * OFFLINE_SAMPLE_RATE);
+  let sliceStart = Date.now();
+  for (let from = 0; from < b; from += chunk) {
+    if (signal?.aborted) {
+      throw new RenderCancelledError();
+    }
+    const to = Math.min(b, from + chunk);
+    if (prep.long.size > 0) {
+      await prep.prepare(from, to);
+    }
+    const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
+    mixRange(plan, prep.sources, out, from, to, 1, fxState);
+    if (to > a) {
+      const skip = Math.max(0, a - from);
+      write(wavData(bits, skip > 0 ? [out[0].subarray(skip), out[1].subarray(skip)] : out));
+    }
+    if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
+      onRatio(to / b);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      sliceStart = Date.now();
+    }
+  }
+}
+
+/** a kimeneti fájl írása (hiba esetén a félkész fájl törlődik, a betelt lemez érthető üzenet) */
+async function withTargetFile(target: File, needed: number, body: (write: (bytes: Uint8Array) => void) => Promise<void>): Promise<void> {
   if (target.exists) {
     target.delete();
   }
   target.create();
   const handle = target.open();
   try {
-    handle.writeBytes(format === 'float32' ? wavHeaderF32(frames, 2, OFFLINE_SAMPLE_RATE) : wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE));
-    // T2: időkeretes feldolgozás — negyed mp-es darabok, és ~12 ms munka után mindig visszaadjuk
-    // a vezérlést (mérve: az 5 mp-es darabok 392 ms-ig fogták a felületet, látható akadás)
-    const chunk = Math.round(CHUNK_SEC * OFFLINE_SAMPLE_RATE);
-    let sliceStart = Date.now();
-    for (let from = 0; from < frames; from += chunk) {
-      if (signal?.aborted) {
-        throw new RenderCancelledError();
-      }
-      const to = Math.min(frames, from + chunk);
-      if (long.size > 0) {
-        await prepare(from, to);
-      }
-      const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
-      mixRange(finalPlan, sources, out, from, to, 1, fxState);
-      handle.writeBytes(format === 'float32' ? pcmF32(out) : pcm16(out));
-      if (Date.now() - sliceStart >= FRAME_BUDGET_MS) {
-        onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * (to / frames) });
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        sliceStart = Date.now();
-      }
-    }
+    await body((bytes) => handle.writeBytes(bytes));
   } catch (caught) {
     handle.close();
     try {
@@ -153,7 +183,89 @@ export async function exportOfflineWav(
     throw caught;
   }
   handle.close();
-  return { uri: target.uri, unsupported: plan.unsupported };
+}
+
+/** 💾 elfér-e (a WAV mérete előre ismert): ha nem, a dekódolás el sem indul */
+function ensureRoom(needed: number): void {
+  const free = freeDiskBytes();
+  if (!hasRoomFor(needed, free)) {
+    throw new Error(tr('studio.audio.offline.noSpace', { need: megabytes(needed), free: megabytes(free) }));
+  }
+}
+
+/**
+ * 🎧📱 PRO-AUDIO A26: a hang-mix WAV-ként, TELJESEN a telefonon (Free, szerver nélkül). A
+ * források a natív dekóderrel 44,1 kHz-re dekódolódnak, a keverés a `offlineMix` pure magja
+ * (a szerveres renderrel paritás-tesztelt), a WAV darabonként íródik a fájlba.
+ */
+export async function exportOfflineWav(
+  mix: Project,
+  target: File,
+  onProgress?: (u: ProgressUpdate) => void,
+  signal?: AbortSignal,
+  /** `float32`: a Pro szerveres export köztes keveréke (veszteségmentes) */
+  format: 'pcm16' | 'float32' = 'pcm16',
+  opts: OfflineExportOptions = {}
+): Promise<{ uri: string; unsupported: OfflineUnsupported[] }> {
+  const bits: WavBits = format === 'float32' ? 32 : (opts.bits ?? 16);
+  const draft = offlineMixPlan(mix);
+  const [a, b] = frameRange(draft, opts.range);
+  const needed = 44 + (b - a) * 2 * bytesPerSample(bits);
+  ensureRoom(needed);
+  const prep = await prepareOffline(mix, onProgress, signal);
+  // 📏 a master mérése (kétmenetes) — a teljes projekten, a tartomány is ugyanazt a szintet kapja
+  const finalPlan = prep.plan.master
+    ? { ...prep.plan, masterGain: await measureMasterGain(prep.plan, prep.sources, signal ?? undefined, prep.prepare) }
+    : prep.plan;
+  if (signal?.aborted) {
+    throw new RenderCancelledError();
+  }
+  await withTargetFile(target, needed, (write) =>
+    writeWav(prep, finalPlan, [a, b], bits, write, (r) => onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * r }), signal)
+  );
+  return { uri: target.uri, unsupported: prep.unsupported };
+}
+
+/** egy stem: a sáv típusa és a fájl neve a csomagban */
+export interface StemSpec {
+  track: string;
+  name: string;
+}
+
+/**
+ * 🎚️ Sávonkénti (stem) export a telefonon, egy STORE-zipbe (folyamatosan írva — a memóriában
+ * sosem egy egész fájl). Minden stem a teljes keverésből jön, csak a saját sávja szól: a
+ * klip-effektek, a sáv szintje, a buszra küldött része és a halkítás (a többi sáv beszéde
+ * vezérli) benne van; a master-lánc nincs — a stemek összege a keverés master nélkül.
+ */
+export async function exportOfflineStems(
+  mix: Project,
+  target: File,
+  stems: StemSpec[],
+  onProgress?: (u: ProgressUpdate) => void,
+  signal?: AbortSignal,
+  opts: OfflineExportOptions = {}
+): Promise<{ uri: string; files: string[] }> {
+  const bits: WavBits = opts.bits ?? 16;
+  const draft = offlineMixPlan(mix);
+  const [a, b] = frameRange(draft, opts.range);
+  const needed = stems.length * (44 + (b - a) * 2 * bytesPerSample(bits)) + 4096;
+  ensureRoom(needed);
+  const prep = await prepareOffline(mix, onProgress, signal);
+  const zip = new ZipStoreWriter();
+  const files: string[] = [];
+  await withTargetFile(target, needed, async (write) => {
+    for (let k = 0; k < stems.length; k++) {
+      const name = `${stems[k].name}.wav`;
+      files.push(name);
+      write(zip.beginFile(name));
+      const plan: OfflineMixPlan = { ...prep.plan, master: undefined, masterGain: undefined, solo: [stems[k].track] };
+      await writeWav(prep, plan, [a, b], bits, (bytes) => write(zip.chunk(bytes)), (r) => onProgress?.({ phase: tr('studio.audio.offline.stems', { name: stems[k].name, n: k + 1, of: stems.length }), ratio: 0.4 + 0.6 * ((k + r) / stems.length) }), signal);
+      write(zip.endFile());
+    }
+    write(zip.finish());
+  });
+  return { uri: target.uri, files };
 }
 
 type AudioApi = NonNullable<Awaited<ReturnType<typeof loadAudioApi>>>;

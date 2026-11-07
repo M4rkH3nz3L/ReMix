@@ -71,6 +71,10 @@ import { clearSpeechWordCache } from '@/lib/speechEditClient';
 import { wordCutRanges } from '@/lib/speechEdit';
 import { gccPhatLag, SYNC_MIN_CONFIDENCE } from '@/lib/audioSync';
 import { syncClipTo } from '@/lib/audioSyncClient';
+import { exportParts } from '@/components/studio/audio/exportParts';
+import { audioLanes, laneLabel } from '@/components/studio/audio/audioLanes';
+import { crc32, localDataOffset, parseCentralDirectory, parseEocd } from '@/lib/zipStore';
+import { t as i18nT, type TFunction } from 'i18next';
 import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import { catalogRuntime, downloadModel, listCachedModels } from '@/lib/modelRegistryClient';
@@ -3445,6 +3449,133 @@ function smokeFileHost(): string {
   return `http://${serverHost(undefined, Constants.expoConfig?.hostUri, true)}:8799`;
 }
 
+/** a sáv megjelenített neve (a stem-fájlnévhez) */
+function laneLabelFor(type: string, t: TFunction): string {
+  const lane = audioLanes(useEditorStore.getState().project).find((l) => l.type === type);
+  return lane ? laneLabel(lane, t) : type;
+}
+
+/** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
+async function smokeStemExport(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const mk = (name: string, sec: number, f: number, gate?: (t: number) => number) => {
+    const x = Float32Array.from({ length: Math.round(sec * SR) }, (_, i) => 0.4 * Math.sin((2 * Math.PI * f * i) / SR) * (gate ? gate(i / SR) : 1));
+    const file = new File(Paths.document, name);
+    if (file.exists) file.delete();
+    file.create();
+    file.write(encodeWav16([x, x], SR, () => 0.5));
+    return file.uri;
+  };
+  const voice = mk('smoke_stem_voice.wav', 4, 220, (t) => (t > 1 && t < 2.5 ? 1 : 0));
+  const music = mk('smoke_stem_music.wav', 4, 440);
+  const fx = mk('smoke_stem_fx.wav', 1, 880);
+  const id = 'prj_smoke_stems';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:stems', caught));
+  const base = createEmptyProject('smoke stemek', '9:16', undefined, 'audio');
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported', uri: voice, start: 0, duration: 4, sourceDuration: 4, id: 'x', ...over });
+  const project: Project = {
+    ...base,
+    id,
+    audioMaster: { target: 'custom', lufs: -16, truePeak: -1, dynamics: 'balanced', eq: { low: 2, mid: 0, high: 1 }, multiband: true },
+    audioBuses: [{ id: 'rev', name: 'Zengés', fx: { reverb: 0.5 }, gain: 0.8 }],
+    audioSends: { sfx: { rev: 0.6 } },
+    tracks: base.tracks.map((t) =>
+      t.type === 'voiceover'
+        ? { ...t, clips: [ac({ id: 'v', label: 'beszéd' })] }
+        : t.type === 'music'
+          ? { ...t, clips: [ac({ id: 'm', label: 'zene', uri: music, autoDuck: true })] }
+          : t.type === 'sfx'
+            ? { ...t, clips: [ac({ id: 'f', label: 'hang', uri: fx, start: 2, duration: 1, sourceDuration: 1 })] }
+            : t
+    ),
+  };
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  const tt = i18nT as unknown as TFunction;
+  /** 24 bites, sztereó WAV-bájtok → bal csatorna (dither nélkül pontos) */
+  const wav24Left = (b: Uint8Array) => {
+    const n = (b.length - 44) / 6;
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const o = 44 + i * 6;
+      let v = b[o] | (b[o + 1] << 8) | (b[o + 2] << 16);
+      if (v & 0x800000) v -= 0x1000000;
+      out[i] = v / 8388607;
+    }
+    return out;
+  };
+  const readAll = (uri: string) => {
+    const h = new File(uri).open();
+    try {
+      return h.readBytes(h.size ?? 0);
+    } finally {
+      h.close();
+    }
+  };
+  // a teljes export (masterrel), 24 bit
+  const mix = mixForExport(st().project!, st().isTrackAudible, st().masterVolume)!;
+  const full = await exportOfflineWav(mix, new File(projectExportDir(), 'smoke_stem_full.wav'), undefined, undefined, 'pcm16', { bits: 24 });
+  const fullL = wav24Left(readAll(full.uri));
+  // In–Out a transzporttal
+  st().setPlayhead(1.2);
+  st().setRangeIn();
+  st().setPlayhead(3.1);
+  st().setRangeOut();
+  const rng = await exportParts(st().project!, { range: true, stems: false }, 24, tt, false);
+  const rL = rng ? wav24Left(readAll(rng.uri)) : new Float32Array();
+  const a0 = Math.round(1.2 * SR);
+  let d = 0;
+  for (let i = 0; i < rL.length; i++) d = Math.max(d, Math.abs(rL[i] - fullL[a0 + i]));
+  log(rL.length === Math.round(3.1 * SR) - a0 && d === 0, 'tartomány (In 1,2 – Out 3,1 s, master-lánccal): mintára a teljes export szelete', `${(rL.length / SR).toFixed(3)} s, max eltérés ${d}`);
+  // stemek
+  const zipRes = await exportParts(st().project!, { range: false, stems: true }, 24, tt, false);
+  const zb = zipRes ? readAll(zipRes.uri) : new Uint8Array();
+  const eocd = parseEocd(zb, 0)!;
+  const entries = parseCentralDirectory(zb.subarray(eocd.cdOffset, eocd.cdOffset + eocd.cdSize), eocd.count);
+  const stems = entries.map((e) => {
+    const off = localDataOffset(zb.subarray(e.headerOffset, e.headerOffset + 300), e.headerOffset);
+    const data = zb.subarray(off, off + e.size);
+    return { name: e.name, crcOk: crc32(data) === e.crc, left: wav24Left(data) };
+  });
+  log(stems.length === 3 && stems.every((x) => x.crcOk), 'a ZIP: 3 stem, mind ép (CRC)', stems.map((x) => x.name).join(' · '));
+  const ref = await exportOfflineWav({ ...mix, audioMaster: undefined }, new File(projectExportDir(), 'smoke_stem_ref.wav'), undefined, undefined, 'pcm16', { bits: 24 });
+  const refL = wav24Left(readAll(ref.uri));
+  let ds = 0;
+  for (let i = 0; i < refL.length; i++) ds = Math.max(ds, Math.abs(stems.reduce((s2, x) => s2 + (x.left[i] ?? 0), 0) - refL[i]));
+  log(ds < 4e-7, 'Σ stem = a keverés master nélkül (a halkítás és a zengés-busz is benne)', `max eltérés ${ds.toExponential(1)} (24 bit: 1 LSB = 1,2e-7)`);
+  const musicStem = stems.find((x) => x.name.includes(laneLabelFor('music', tt)))?.left;
+  const lvl = (x: Float32Array | undefined, s0: number, s1: number) => {
+    if (!x) return -999;
+    let e = 0;
+    for (let i = Math.round(s0 * SR); i < Math.round(s1 * SR); i++) e += x[i] * x[i];
+    return 10 * Math.log10(e / ((s1 - s0) * SR) + 1e-30);
+  };
+  const duck = lvl(musicStem, 1.6, 2.3) - lvl(musicStem, 0.3, 0.9);
+  log(duck < -6, 'a zene-stem a beszéd alatt halkul (a némított beszéd a kulcs)', `${duck.toFixed(1)} dB`);
+  // a némított sáv kimarad; tartomány + stemek
+  st().toggleTrackFlag('sfx', 'mute');
+  const muted = await exportParts(st().project!, { range: true, stems: true }, 16, tt, false);
+  const mb = muted ? readAll(muted.uri) : new Uint8Array();
+  const me = parseEocd(mb, 0)!;
+  const ment = parseCentralDirectory(mb.subarray(me.cdOffset, me.cdOffset + me.cdSize), me.count);
+  const frames = (bytes: number) => (bytes - 44) / 4;
+  log(ment.length === 2 && ment.every((e) => frames(e.size) === Math.round(3.1 * SR) - a0), 'a némított effekt-sáv kimarad; tartomány + stemek: minden stem pontosan a tartomány hosszú (16 bit)', ment.map((e) => `${e.name} ${(frames(e.size) / SR).toFixed(3)} s`).join(' · '));
+  st().toggleTrackFlag('sfx', 'mute');
+  for (const u of [full.uri, ref.uri, rng?.uri, zipRes?.uri, muted?.uri]) if (u) new File(u).delete();
+  runDevAction('audio.exportSheet');
+  log(true, 'FOTÓZHATÓ', 'az export-lap: Tartomány és Tartalom');
+  await sleep(3500);
+  st().clearRange();
+  router.back();
+}
+
 /** 🔗 Külső hang szinkronja: ismert eltolású, tompább, zajos „külön mikrofon” a kamera hangjához. */
 async function smokeExtSync(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5133,6 +5264,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'stemexport') {
+    await step(phase, () => smokeStemExport(log));
     return;
   }
   if (phase === 'extsync') {

@@ -143,6 +143,11 @@ export interface OfflineMixPlan {
   masterGain?: number;
   /** 🎚️ effekt-buszok (a sávok küldéseiből, a master előtt) */
   buses?: AudioBus[];
+  /**
+   * 🎚️ stem: csak ezek a sávok szólnak a kimenetre (és a buszokra); a többi sáv beszéde csak a
+   * halkítás kulcsát adja — így a stem pontosan úgy halkul, mint a keverésben
+   */
+  solo?: string[];
 }
 
 /** a sáv nem nulla küldései egy létező buszra (vagy undefined) */
@@ -289,6 +294,10 @@ export function mixRange(
     const dst = duckBus && clip.role === 'duck' ? duckBus : out;
     const sendTo = clip.sends ? Object.entries(clip.sends).map(([id, amt]) => [busBufs.get(id), amt] as const).filter(([b]) => b) : [];
     const key = keyBus && clip.role === 'key' ? keyBus : null;
+    const heard = !plan.solo || plan.solo.includes(clip.track);
+    if (!heard && !key) {
+      continue;
+    }
     const src = sources.get(clip.uri);
     if (!src || (src.channels.length === 0 && !src.segmented)) {
       continue;
@@ -373,12 +382,15 @@ export function mixRange(
         const xr = fxR ? fxR[i - a] : right[s];
         const vl = xl * g * lg;
         const vr = xr * g * rg;
-        dst[0][i - fromSample] += vl;
-        dst[1][i - fromSample] += vr;
         if (key) {
           key[0][i - fromSample] += vl;
           key[1][i - fromSample] += vr;
         }
+        if (!heard) {
+          continue;
+        }
+        dst[0][i - fromSample] += vl;
+        dst[1][i - fromSample] += vr;
         for (const [bus, amt] of sendTo) {
           bus![0][i - fromSample] += vl * amt;
           bus![1][i - fromSample] += vr * amt;
@@ -488,6 +500,37 @@ export function wavHeader16(frames: number, channels: number, sampleRate: number
   view.setUint16(34, 16, true);
   text(36, 'data');
   view.setUint32(40, data, true);
+  return bytes;
+}
+
+/** 24 bites PCM WAV fejléc */
+export function wavHeader24(frames: number, channels: number, sampleRate: number): Uint8Array {
+  const bytes = wavHeader16(frames, channels, sampleRate);
+  const view = new DataView(bytes.buffer);
+  const data = frames * channels * 3;
+  view.setUint32(4, 36 + data, true);
+  view.setUint32(28, sampleRate * channels * 3, true);
+  view.setUint16(32, channels * 3, true);
+  view.setUint16(34, 24, true);
+  view.setUint32(40, data, true);
+  return bytes;
+}
+
+/** a lebegőpontos minták 24 bites PCM-ként (a kvantálási zaj −144 dB: dither nélkül) */
+export function pcm24(channels: Float32Array[]): Uint8Array {
+  const n = channels[0]?.length ?? 0;
+  const ch = channels.length;
+  const bytes = new Uint8Array(n * ch * 3);
+  let at = 0;
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < ch; c++) {
+      const v = Math.max(-8388608, Math.min(8388607, Math.round(channels[c][i] * 8388607)));
+      bytes[at] = v & 0xff;
+      bytes[at + 1] = (v >> 8) & 0xff;
+      bytes[at + 2] = (v >> 16) & 0xff;
+      at += 3;
+    }
+  }
   return bytes;
 }
 

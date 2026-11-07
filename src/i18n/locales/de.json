@@ -4052,6 +4052,18 @@
         "downloadFailed": "Das gerenderte Audio von „{{name}}“ konnte nicht geladen werden."
       },
       "exportSheet": {
+        "scope": "Bereich",
+        "whole": "Ganzes Projekt",
+        "rangeChip": "In–Out ({{from}}–{{to}})",
+        "rangeNone": "In–Out (nicht gesetzt)",
+        "rangeHint": "Den Bereich setzt du mit den In- und Out-Tasten am Transport.",
+        "content": "Inhalt",
+        "mix": "Mix",
+        "stems": "Pro Spur (Stems)",
+        "stemsHint": "Eine WAV pro Spur, in einer ZIP, auf dem Telefon erstellt. Stems sind vor dem Master (ihre Summe = der Mix ohne Master); Ducking und Bus-Sends sind enthalten.",
+        "rangeWavHint": "WAV, auf dem Telefon — sample-genau das, was im vollen Export dort klingt.",
+        "saveStems": "Stems speichern (ZIP)",
+        "saveRange": "Bereich speichern (WAV)",
         "format": "Format",
         "lossyHint": "Kleinere Datei, komprimierter Klang — zum Teilen und für soziale Medien.",
         "losslessHint": "Verlustfrei: genau das, was der Mix ergibt — zur Weiterarbeit und zum Mastering.",
@@ -4120,6 +4132,7 @@
         "pause": "Pause"
       },
       "offline": {
+        "stems": "Stem: {{name}} ({{n}}/{{of}})",
         "onDeviceHint": "Kostenloser Export auf dem Handy: WAV, 16 Bit, 44,1 kHz, Stereo — ohne Server. Weitere Formate und Server-Effekte gibt es mit Pro.",
         "tooLong": "Der Export auf dem Handy schafft Projekte bis {{minutes}} Minuten. Für längere braucht es den Pro-Server-Export.",
         "noSpace": "Nicht genug freier Speicher für den Export: {{need}} MB nötig (+50 MB Reserve), {{free}} MB frei. Gib Speicher frei und versuche es erneut.",

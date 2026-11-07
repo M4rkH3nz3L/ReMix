@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioLayer } from '@/components/preview/AudioLayer';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
+import { exportParts } from '@/components/studio/audio/exportParts';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
 import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
@@ -35,6 +36,7 @@ import { exportOfflineWav } from '@/lib/offlineMixClient';
 import { withCancellableProgress } from '@/store/progressStore';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
+import { registerDevAction } from '@/lib/devActions';
 
 /**
  * 🎧 HANG STÚDIÓ képernyő (`kind: 'audio'` projekt). Vékony burkoló: betölti a
@@ -48,9 +50,13 @@ export default function AudioStudioScreen() {
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const rangeIn = useEditorStore((s) => s.rangeIn);
+  const rangeOut = useEditorStore((s) => s.rangeOut);
   const isPro = useEntitlement((s) => s.isPro());
 
   usePlaybackClock();
+  // 🧪 a füstteszt az export-lapot is megnyithatja (csak __DEV__)
+  useEffect(() => registerDevAction('audio.exportSheet', () => setExporting(true)), []);
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
   const { saveFailed, missing, relinking, relink, exit } = useStudioSession(id, loading);
 
@@ -195,6 +201,14 @@ export default function AudioStudioScreen() {
           onProRequired={() => {
             setExporting(false);
             usePaywall.getState().open('cloudRender');
+          }}
+          range={rangeIn != null && rangeOut != null && rangeOut > rangeIn ? { from: rangeIn, to: rangeOut } : null}
+          onExportParts={(scope, bits) => {
+            setExporting(false);
+            exportParts(project, scope, bits, t).catch((e: Error) => {
+              logCaught('app/studio/audio/[id].tsx:exportParts', e);
+              if (!isRenderCancelledError(e)) Alert.alert(t('studio.export'), e.message);
+            });
           }}
         />
       ) : null}

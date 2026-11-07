@@ -27,6 +27,8 @@ export function AudioExportSheet({
   onDownload,
   onDevice = false,
   onProRequired,
+  range = null,
+  onExportParts,
 }: {
   onClose: () => void;
   /** hiányzik = nincs „Előnézet” / „Videóba” gomb (pl. a videó-szerkesztőből nyitva) */
@@ -36,11 +38,20 @@ export function AudioExportSheet({
   /** A26: Free — a WAV a telefonon készül (16 bit, 44,1 kHz, sztereó), a többi formátum Pro */
   onDevice?: boolean;
   onProRequired?: () => void;
+  /** ✂️ az In–Out tartomány (mp), ha ki van jelölve */
+  range?: { from: number; to: number } | null;
+  /** ✂️🎚️ tartomány és/vagy sávonkénti (stem) export — WAV, a telefonon */
+  onExportParts?: (scope: { range: boolean; stems: boolean }, bitDepth: 16 | 24) => void;
 }) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<AudioExportFormat>(onDevice ? 'wav' : 'mp3');
   const [quality, setQuality] = useState<AudioExportQuality>(defaultAudioQuality(onDevice ? 'wav' : 'mp3'));
   const info = audioFormatInfo(format);
+  const [useRange, setUseRange] = useState(false);
+  const [stems, setStems] = useState(false);
+  const parts = !!onExportParts && (useRange || stems);
+  const [partsBits, setPartsBits] = useState<16 | 24>(16);
+  const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
   const pickFormat = (next: AudioExportFormat) => {
     if (onDevice && next !== 'wav') {
@@ -77,6 +88,44 @@ export function AudioExportSheet({
             </View>
             ) : null}
 
+            {onExportParts ? (
+              <>
+                <Text style={styles.section}>{t('studio.audio.exportSheet.scope')}</Text>
+                <View style={styles.row}>
+                  <Chip label={t('studio.audio.exportSheet.whole')} active={!useRange} onPress={() => setUseRange(false)} />
+                  <Chip
+                    label={range ? t('studio.audio.exportSheet.rangeChip', { from: mmss(range.from), to: mmss(range.to) }) : t('studio.audio.exportSheet.rangeNone')}
+                    active={useRange}
+                    onPress={() => range && setUseRange(true)}
+                  />
+                </View>
+                {range ? null : <Text style={styles.hint}>{t('studio.audio.exportSheet.rangeHint')}</Text>}
+                <Text style={styles.section}>{t('studio.audio.exportSheet.content')}</Text>
+                <View style={styles.row}>
+                  <Chip label={t('studio.audio.exportSheet.mix')} active={!stems} onPress={() => setStems(false)} />
+                  <Chip label={t('studio.audio.exportSheet.stems')} active={stems} onPress={() => setStems(true)} />
+                </View>
+              </>
+            ) : null}
+
+            {parts ? (
+              <>
+                <Text style={styles.section}>{t('studio.audio.exportSheet.bitDepth')}</Text>
+                <View style={styles.row}>
+                  <Chip label="16 bit" active={partsBits === 16} onPress={() => setPartsBits(16)} />
+                  <Chip label={onDevice ? '24 bit · PRO' : '24 bit'} active={partsBits === 24} onPress={() => (onDevice ? onProRequired?.() : setPartsBits(24))} />
+                </View>
+                <Text style={styles.hint}>{t(stems ? 'studio.audio.exportSheet.stemsHint' : 'studio.audio.exportSheet.rangeWavHint')}</Text>
+                <View style={styles.save}>
+                  <PrimaryButton
+                    icon="download-outline"
+                    label={t(stems ? 'studio.audio.exportSheet.saveStems' : 'studio.audio.exportSheet.saveRange')}
+                    onPress={() => onExportParts?.({ range: useRange, stems }, partsBits)}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
             <Text style={styles.section}>{t('studio.audio.exportSheet.format')}</Text>
             <View style={styles.row}>
               {AUDIO_EXPORT_FORMATS.map((f) => (
@@ -136,6 +185,8 @@ export function AudioExportSheet({
             <View style={styles.save}>
               <PrimaryButton icon="download-outline" label={t('studio.audio.exportSheet.save', { format: info.label })} onPress={() => onDownload(format, quality)} />
             </View>
+              </>
+            )}
           </ScrollView>
         </SafeAreaView>
       </View>

@@ -91,5 +91,33 @@ describe('AudioExportSheet — telefonos export (A26)', () => {
     save(r);
     expect(onDownload).toHaveBeenCalledWith('wav', expect.anything());
   });
-});
 
+  it('✂️🎚️ stemek: a formátum-választó eltűnik, a mentés a tartománnyal és a bitmélységgel hív', () => {
+    const onExportParts = jest.fn();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<AudioExportSheet onClose={() => {}} onDownload={() => {}} range={{ from: 1.2, to: 3.1 }} onExportParts={onExportParts} />);
+    });
+    press(r, 'studio.audio.exportSheet.stems');
+    press(r, 'studio.audio.exportSheet.rangeChip');
+    press(r, '24 bit');
+    expect(chip(r, 'MP3')).toBeUndefined();
+    act(() => r.root.findAll((n) => n.props.icon === 'download-outline' && typeof n.props.onPress === 'function')[0].props.onPress());
+    expect(onExportParts).toHaveBeenCalledWith({ range: true, stems: true }, 24);
+  });
+
+  it('In–Out nélkül a tartomány nem választható; Free-n a 24 bit Pro', () => {
+    const onExportParts = jest.fn();
+    const onProRequired = jest.fn();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<AudioExportSheet onClose={() => {}} onDownload={() => {}} onDevice onProRequired={onProRequired} onExportParts={onExportParts} />);
+    });
+    press(r, 'studio.audio.exportSheet.rangeNone');
+    press(r, 'studio.audio.exportSheet.stems');
+    press(r, '24 bit · PRO');
+    expect(onProRequired).toHaveBeenCalled();
+    act(() => r.root.findAll((n) => n.props.icon === 'download-outline' && typeof n.props.onPress === 'function')[0].props.onPress());
+    expect(onExportParts).toHaveBeenCalledWith({ range: false, stems: true }, 16);
+  });
+});

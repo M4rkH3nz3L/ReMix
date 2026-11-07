@@ -3,7 +3,8 @@ import { sampleChannel } from '@/lib/keyframes';
 import { projectDuration } from '@/lib/projectUtils';
 import { buildFxChain, buildMasterChain, Ducker, FX_AUTO_KEYS, FX_WARMUP, type FxAutomation, fxActive, fxUnsupported, NORMALIZE_LUFS, runChain, voiceFx, type FxState } from '@/lib/audioDsp';
 import { integratedLoudness } from '@/lib/loudness';
-import type { AudioClip, AudioFx, AudioMaster, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
+import type { AudioBus, AudioClip, AudioFx, AudioMaster, Clip, Keyframe, Project, TrackType, VideoClip } from '@/types/project';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /**
  * 🎧📱 Telefonos (offline) hang-keverés — PRO-AUDIO A26: a Free felhasználó szerver nélkül
@@ -14,7 +15,6 @@ import type { AudioClip, AudioFx, AudioMaster, Clip, Keyframe, Project, TrackTyp
  * effektjei (Pro) itt nincsenek: ezeket az `unsupported` sorolja fel.
  */
 
-const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 export const OFFLINE_SAMPLE_RATE = 44100;
 /** kattogásmentes vágás: mikro-fade a klip szélén (a szerver `EDGE_FADE_SEC`-je; szerződés-teszt) */
 export const EDGE_FADE_SEC = 0.01; // 44,1 és 48 kHz-en is egész mintaszám (441 / 480)
@@ -119,6 +119,8 @@ export interface OfflineMixClip {
   deReverb?: boolean;
   /** 🎛️ az effekt-automáció görbéi (a klip saját idejében) */
   fxKf?: FxAutomation;
+  /** 🎚️ a sáv küldései: busz-azonosító → mérték 0–1 (a fader után) */
+  sends?: Record<string, number>;
   /** 🦆 a halkítás szerepe: `key` = a beszéd (vezérel), `duck` = halkul alatta */
   role?: 'key' | 'duck';
 }
@@ -135,6 +137,15 @@ export interface OfflineMixPlan {
   master?: AudioMaster;
   /** 📏 a master mért erősítése a cél-LUFS-re (`measureMasterGain`); hiányzó = mérés folyik */
   masterGain?: number;
+  /** 🎚️ effekt-buszok (a sávok küldéseiből, a master előtt) */
+  buses?: AudioBus[];
+}
+
+/** a sáv nem nulla küldései egy létező buszra (vagy undefined) */
+function sendsOf(project: Project, type: TrackType): Record<string, number> | undefined {
+  const ids = new Set((project.audioBuses ?? []).map((b) => b.id));
+  const sends = Object.fromEntries(Object.entries(project.audioSends?.[type] ?? {}).filter(([id, v]) => ids.has(id) && v > 0));
+  return Object.keys(sends).length > 0 ? sends : undefined;
 }
 
 /** a klip hangmagasság-eltolása félhangban, a szerverrel azonosan ±12-re szorítva */
@@ -172,6 +183,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         ...(clip.sourceDuration ? { sourceDuration: clip.sourceDuration } : {}),
         ...(fxActive(fx) || clip.deReverb || hasAuto ? { fx: fx ?? {} } : {}),
         ...(hasAuto ? { fxKf } : {}),
+        ...(sendsOf(project, track.type) ? { sends: sendsOf(project, track.type) } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
         ...(role ? { role } : {}),
         track: track.type,
@@ -217,6 +229,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     unsupported: [...unsupported],
     ...(ducking ? { ducking } : {}),
     ...(project.audioMaster ? { master: project.audioMaster } : {}),
+    ...((project.audioBuses ?? []).length > 0 ? { buses: project.audioBuses } : {}),
   };
 }
 
@@ -264,8 +277,12 @@ export function mixRange(
   const len = toSample - fromSample;
   const duckBus: [Float32Array, Float32Array] | null = plan.ducking ? [new Float32Array(len), new Float32Array(len)] : null;
   const keyBus: [Float32Array, Float32Array] | null = plan.ducking ? [new Float32Array(len), new Float32Array(len)] : null;
+  // 🎚️ busz-pufferek (a küldések ide is szólnak)
+  const busBufs = new Map<string, [Float32Array, Float32Array]>();
+  for (const b of plan.buses ?? []) busBufs.set(b.id, [new Float32Array(len), new Float32Array(len)]);
   for (const clip of plan.clips) {
     const dst = duckBus && clip.role === 'duck' ? duckBus : out;
+    const sendTo = clip.sends ? Object.entries(clip.sends).map(([id, amt]) => [busBufs.get(id), amt] as const).filter(([b]) => b) : [];
     const key = keyBus && clip.role === 'key' ? keyBus : null;
     const src = sources.get(clip.uri);
     if (!src || (src.channels.length === 0 && !src.segmented)) {
@@ -352,7 +369,28 @@ export function mixRange(
           key[0][i - fromSample] += vl;
           key[1][i - fromSample] += vr;
         }
+        for (const [bus, amt] of sendTo) {
+          bus![0][i - fromSample] += vl * amt;
+          bus![1][i - fromSample] += vr * amt;
+        }
       }
+    }
+  }
+  // 🎚️ a buszok: a saját effekt-láncukon át (folytonos állapottal), a visszatérő szinttel a kimenetre
+  for (const b of plan.buses ?? []) {
+    const buf = busBufs.get(b.id)!;
+    const id = `__bus:${b.id}|${JSON.stringify(b.fx)}`;
+    let st = fxState.get(id);
+    if (!st || st.next !== fromSample) {
+      st = { chain: buildFxChain(b.fx, sr), next: fromSample };
+    }
+    runChain(st.chain, buf[0], buf[1], fromSample);
+    st.next = toSample;
+    fxState.set(id, st);
+    const g = Math.max(0, Math.min(1, b.gain));
+    for (let i = 0; i < len; i++) {
+      out[0][i] += buf[0][i] * g;
+      out[1][i] += buf[1][i] * g;
     }
   }
   if (duckBus && keyBus) {

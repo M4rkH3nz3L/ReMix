@@ -62,7 +62,13 @@ export type TrackType =
   | 'interactive'
   | 'music'
   | 'voiceover'
-  | 'sfx';
+  | 'sfx'
+  // 🎚️ további általános hangsávok (Hang Stúdió „+ Sáv”; a név a `Track.name`)
+  | 'aux1'
+  | 'aux2'
+  | 'aux3'
+  | 'aux4'
+  | 'aux5';
 
 export type FilterId =
   | 'none'
@@ -1679,6 +1685,19 @@ export interface AudioMaster {
   duckTrigger?: TrackType;
 }
 
+/**
+ * 🎚️ Effekt-busz (pl. közös zengés): a sávok küldés-mértékkel (`audioSends`) kevernek rá, a busz
+ * a saját effekt-láncán át (a klip-effektekkel azonos DSP) a master elé kerül.
+ */
+export interface AudioBus {
+  id: string;
+  name: string;
+  /** a busz effektjei (tipikusan zengés / visszhang) */
+  fx: AudioFx;
+  /** a busz visszatérő szintje 0–1 */
+  gain: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -1731,6 +1750,10 @@ export interface Project {
   /** 🎚️ sávonkénti mixer-gain (fader, 0–1) — a music/voiceover/sfx sávokra; a
    *  hiányzó sáv = 1.0. Az előnézetben ÉS a renderben érvényesül (persistált). */
   trackMix?: Partial<Record<TrackType, { gain: number }>>;
+  /** 🎚️ effekt-buszok (a Hang Stúdió keverőjében) */
+  audioBuses?: AudioBus[];
+  /** 🎚️ küldések: sáv → busz-azonosító → mérték 0–1 (a fader UTÁN) */
+  audioSends?: Partial<Record<TrackType, Record<string, number>>>;
   /** 🎥 Live-produkció dokumentum (`kind: 'live'` esetén; additív/opcionális —
    *  a régi projektek `live` nélkül érvényesek). Lásd `@/types/live` + LIVE.md. */
   live?: LiveDoc;

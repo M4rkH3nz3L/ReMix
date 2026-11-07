@@ -14,13 +14,10 @@ import {
 } from '@/lib/mixerView';
 import { useEditorStore } from '@/store/editorStore';
 import type { EditorCommand } from '@/lib/commands';
-import type { TrackType } from '@/types/project';
+import { audioLanes, laneLabel } from '@/components/studio/audio/audioLanes';
+import { makeId } from '@/lib/id';
+import type { AudioBus, TrackType } from '@/types/project';
 
-const LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; color: string; labelKey: string }[] = [
-  { type: 'music', icon: 'musical-notes', color: palette.accent, labelKey: 'editor.track.music' },
-  { type: 'voiceover', icon: 'mic', color: palette.accent2, labelKey: 'editor.track.voiceover' },
-  { type: 'sfx', icon: 'flash', color: '#39d98a', labelKey: 'editor.track.sfx' },
-];
 
 /**
  * 🎚️ MIXER — profi keverő-felület (AUDIOT §2): csatornánként **fader (gain)** + **némít/szóló** +
@@ -37,6 +34,23 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
   if (!project) {
     return null;
   }
+  const LANES = audioLanes(project);
+  const buses = project.audioBuses ?? [];
+
+  /** ➕ busz a sablonból (zengés / visszhang) */
+  const addBus = (kind: 'reverb' | 'delay') => {
+    const bus: AudioBus = {
+      id: makeId('bus'),
+      name: t(`studio.mixer.bus.${kind}`),
+      fx: kind === 'reverb' ? { reverb: 0.6 } : { delay: 0.4 },
+      gain: 0.8,
+    };
+    useEditorStore.getState().dispatch({ type: 'SET_AUDIO_BUSES', buses: [...buses, bus] });
+  };
+  const patchBus = (id: string, patch: Partial<AudioBus>) =>
+    useEditorStore.getState().dispatch({ type: 'SET_AUDIO_BUSES', buses: buses.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
+  const removeBus = (id: string) =>
+    useEditorStore.getState().dispatch({ type: 'SET_AUDIO_BUSES', buses: buses.filter((b) => b.id !== id) });
 
   const setGain = (type: TrackType, gain: number) =>
     useEditorStore.getState().dispatch({ type: 'SET_TRACK_GAIN', trackType: type, gain });
@@ -79,7 +93,7 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
               <View style={styles.stripHead}>
                 <Ionicons name={lane.icon} size={15} color={lane.color} />
                 <Text style={styles.stripName} numberOfLines={1}>
-                  {t(lane.labelKey)}
+                  {laneLabel(lane, t)}
                 </Text>
                 <Text style={styles.clipCount}>{clipCount}</Text>
                 <Text style={[styles.db, { color: lane.color }]}>{formatGainDb(gain)} dB</Text>
@@ -93,6 +107,19 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
                 onChange={(v) => setGain(lane.type, v)}
                 format={(v) => `${formatGainDb(v)} dB`}
               />
+
+              {/* 🎚️ küldések a buszokra (a fader után) */}
+              {buses.map((b) => (
+                <Slider
+                  key={b.id}
+                  label={`→ ${b.name}`}
+                  value={project.audioSends?.[lane.type]?.[b.id] ?? 0}
+                  min={0}
+                  max={1}
+                  onChange={(v) => useEditorStore.getState().dispatch({ type: 'SET_TRACK_SEND', trackType: lane.type, busId: b.id, amount: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+              ))}
 
               <View style={styles.btnRow}>
                 <Pressable
@@ -129,6 +156,39 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
           );
         })}
 
+        {/* 🎚️ effekt-buszok: a sávok küldései ide kevernek, a busz effektje után a master elé */}
+        <Text style={styles.section}>{t('studio.mixer.bus.title')}</Text>
+        {buses.map((b) => (
+          <View key={b.id} style={styles.strip} testID={`mixer-bus-${b.id}`}>
+            <View style={styles.stripHead}>
+              <Ionicons name="git-merge-outline" size={15} color={palette.accent} />
+              <Text style={styles.stripName} numberOfLines={1}>
+                {b.name}
+              </Text>
+              <Pressable onPress={() => removeBus(b.id)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+                <Ionicons name="trash-outline" size={16} color={palette.textDim} />
+              </Pressable>
+            </View>
+            <Slider label={t('studio.mixer.bus.return')} value={b.gain} min={0} max={1} onChange={(v) => patchBus(b.id, { gain: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            {b.fx.reverb !== undefined ? (
+              <Slider label={t('studio.mixer.bus.reverb')} value={b.fx.reverb} min={0.05} max={1} onChange={(v) => patchBus(b.id, { fx: { ...b.fx, reverb: v } })} format={(v) => `${Math.round(v * 100)}%`} />
+            ) : null}
+            {b.fx.delay !== undefined ? (
+              <Slider label={t('studio.mixer.bus.delay')} value={b.fx.delay} min={0.05} max={1} onChange={(v) => patchBus(b.id, { fx: { ...b.fx, delay: v } })} format={(v) => `${Math.round(v * 100)}%`} />
+            ) : null}
+          </View>
+        ))}
+        <View style={styles.btnRow}>
+          <Pressable style={styles.chip} onPress={() => addBus('reverb')} testID="mixer-add-reverb-bus">
+            <Ionicons name="add" size={14} color={palette.textDim} />
+            <Text style={styles.chipText}>{t('studio.mixer.bus.reverb')}</Text>
+          </Pressable>
+          <Pressable style={styles.chip} onPress={() => addBus('delay')} testID="mixer-add-delay-bus">
+            <Ionicons name="add" size={14} color={palette.textDim} />
+            <Text style={styles.chipText}>{t('studio.mixer.bus.delay')}</Text>
+          </Pressable>
+        </View>
+
         {/* Master-szalag → a Master-lánc (EQ/LUFS/limiter) a külön lapon */}
         <Pressable style={styles.masterBtn} onPress={onOpenMaster}>
           <Ionicons name="pulse-outline" size={16} color="#fff" />
@@ -163,4 +223,5 @@ const styles = StyleSheet.create({
   masterBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border, borderRadius: 12, paddingVertical: 13, marginTop: 4 },
   masterText: { color: palette.text, fontSize: 14, fontWeight: '700' },
   hint: { color: palette.textDim, fontSize: 12, marginTop: 10, lineHeight: 17 },
+  section: { color: palette.textDim, fontSize: 12, fontWeight: '800', marginTop: 6, marginBottom: 8, textTransform: 'uppercase' },
 });

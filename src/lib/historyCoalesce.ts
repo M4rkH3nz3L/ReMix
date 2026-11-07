@@ -63,6 +63,9 @@ export function coalesceKey(command: EditorCommand, project?: Project | null): s
     case 'SET_TRACK_GAIN':
       // fader-húzás: egy sáv egy lépés
       return `gain:${command.trackType}`;
+    case 'SET_TRACK_SEND':
+      // küldés-húzás: egy sáv × busz egy lépés
+      return `send:${command.trackType}:${command.busId}`;
     case 'SET_BPM':
       return 'bpm';
     case 'SET_MODEL3D_DOC':

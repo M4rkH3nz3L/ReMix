@@ -1,6 +1,6 @@
 import type { Clip, Project, TrackType, VideoClip } from '@/types/project';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
-const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 
 /**
  * 🎚️ A hangexport azt adja, amit a felhasználó hall (PRO-AUDIO A15): a némított vagy solóból

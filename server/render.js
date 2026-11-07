@@ -1281,7 +1281,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   const shapeClips = clipsOfTypes(project, ['overlay'])
     .filter((c) => c.kind === 'shape')
     .sort((a, b) => a.start - b.start);
-  const audioClips = clipsOfTypes(project, ['music', 'voiceover', 'sfx', 'audio']).filter(
+  const audioClips = clipsOfTypes(project, ['music', 'voiceover', 'sfx', 'audio', 'aux1', 'aux2', 'aux3', 'aux4', 'aux5']).filter(
     (c) => c.kind === 'audio'
   );
 

@@ -47,6 +47,11 @@ export const trackColors: Record<TrackType, string> = {
   music: '#2ecc8f',
   voiceover: '#48dbfb',
   sfx: '#ff8c5a',
+  aux1: '#f4d35e',
+  aux2: '#c39bd3',
+  aux3: '#7fdbca',
+  aux4: '#f78fb3',
+  aux5: '#9ad0ec',
 };
 
 /** 🌍 A `label` értékek i18n-kulcsok — a fogyasztó `t(trackLabels[type])`-ként fordítja. */
@@ -61,6 +66,11 @@ export const trackLabels: Record<TrackType, string> = {
   music: 'editor.track.music',
   voiceover: 'editor.track.voiceover',
   sfx: 'editor.track.sfx',
+  aux1: 'editor.track.aux1',
+  aux2: 'editor.track.aux2',
+  aux3: 'editor.track.aux3',
+  aux4: 'editor.track.aux4',
+  aux5: 'editor.track.aux5',
 };
 
 export const trackOrder: TrackType[] = [
@@ -74,6 +84,11 @@ export const trackOrder: TrackType[] = [
   'music',
   'voiceover',
   'sfx',
+  'aux1',
+  'aux2',
+  'aux3',
+  'aux4',
+  'aux5',
 ];
 
 export const trackHeights: Record<TrackType, number> = {
@@ -88,6 +103,11 @@ export const trackHeights: Record<TrackType, number> = {
   music: 42,
   voiceover: 40,
   sfx: 30,
+  aux1: 34,
+  aux2: 34,
+  aux3: 34,
+  aux4: 34,
+  aux5: 34,
 };
 
 // 🌍 A `label` i18n-kulcs — a fogyasztó `t(option.label)`-ként fordítja.

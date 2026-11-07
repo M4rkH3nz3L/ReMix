@@ -1,4 +1,5 @@
-import type { Project, TrackType } from '@/types/project';
+import type { Project } from '@/types/project';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /**
  * 🎧 Producer mixer-mag (S-PRODUCER — MASTER §7) — a keverő ROUTING-modellje:
@@ -413,7 +414,6 @@ export function toRenderPlan(mixer: MixerGraph): MixerRenderPlan {
 // ── Bridge: projekt-audiosávok → mixer ───────────────────────────────────────
 
 /** a projekt audio-sávjai (ezekből lesz alap-csatorna). */
-const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 
 /**
  * Alap-mixer a projekt audio-sávjaiból: minden nem-üres music/voiceover/sfx sáv

@@ -300,6 +300,11 @@ const TRACK_HOSTS: Record<TrackType, Clip['kind'][]> = {
   music: ['audio'],
   voiceover: ['audio'],
   sfx: ['audio'],
+  aux1: ['audio'],
+  aux2: ['audio'],
+  aux3: ['audio'],
+  aux4: ['audio'],
+  aux5: ['audio'],
 };
 
 export function canHostClip(trackType: TrackType, kind: Clip['kind']): boolean {

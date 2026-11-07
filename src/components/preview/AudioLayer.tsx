@@ -20,13 +20,13 @@ import { ensureVoiceProxy, getVoiceProxySync, needsVoiceProxy } from '@/lib/voic
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Clip, Project, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
 // a hangnál 0-ról tanul: a 0,15-ös kezdőérték mérve időnként utólagos igazítást okozott
 let startLatencySec = 0;
 
 /** a hangot hordozó sávok — mindhez saját lejátszó, egyszerre szólnak */
-const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 
 function fadeFactor(clip: AudioClip, t: number): number {
   let factor = 1;

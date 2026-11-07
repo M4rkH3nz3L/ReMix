@@ -5,7 +5,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -14,6 +14,8 @@ import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
 import { AudioMarkerFlags, markerActions } from '@/components/studio/audio/AudioMarkerFlags';
+import { audioLanes, laneLabel, type AudioLane } from '@/components/studio/audio/audioLanes';
+import { AUDIO_TRACKS, nextExtraTrack } from '@/lib/audioTracks';
 import { CrossfadeMarks } from '@/components/studio/audio/CrossfadeMarks';
 import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
@@ -78,13 +80,7 @@ const LANE_H = 70;
 const RULER_H = 24;
 const HEADER_W = 62;
 
-const LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; color: string; labelKey: string }[] = [
-  { type: 'music', icon: 'musical-notes', color: palette.accent, labelKey: 'editor.track.music' },
-  { type: 'voiceover', icon: 'mic', color: palette.accent2, labelKey: 'editor.track.voiceover' },
-  { type: 'sfx', icon: 'flash', color: '#39d98a', labelKey: 'editor.track.sfx' },
-];
-/** a sávok típusai fentről le — stabil referencia az AudioTimelineClip sáv-váltásához */
-const LANE_TYPES = LANES.map((l) => l.type);
+/* a sávok: `audioLanes(project)` (az alap három + a „+ Sáv”-val hozzáadottak) */
 
 /**
  * 🎧 A hang-stúdió TÖRZSE — store-vezérelt, UI-only. A projektet a hívó tölti a
@@ -106,6 +102,9 @@ export function AudioStudioBody({
 }) {
   const { t } = useTranslation();
   const fxBypass = useEditorStore((s) => s.fxBypass);
+  const projectTracks = useEditorStore((s) => s.project?.tracks);
+  const LANES = useMemo(() => audioLanes(projectTracks ? { tracks: projectTracks } : null), [projectTracks]);
+  const LANE_TYPES = useMemo(() => LANES.map((l) => l.type), [LANES]);
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   const isPlaying = useEditorStore((s) => s.isPlaying);
@@ -185,12 +184,14 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
       registerDevAction('audio.zoomIn', () => devRef.current.zoomIn()),
       registerDevAction('audio.marker', () => devRef.current.marker()),
+      registerDevAction('audio.addLane', () => devRef.current.addLane()),
+      registerDevAction('audio.mixer', () => devRef.current.mixer()),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
     ];
     return () => offs.forEach((off) => off());
@@ -224,6 +225,35 @@ export function AudioStudioBody({
 
   // 🔖 a markerek is snap-pontok (10 képpontnyi közelségben)
   const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm), project.markers ?? [], 10 / pxPerSec);
+
+  /** ➕ új hangsáv a következő szabad helyre (undo-zható) */
+  const addLane = () => {
+    const type = nextExtraTrack(LANE_TYPES);
+    if (!type) {
+      return;
+    }
+    const number = AUDIO_TRACKS.indexOf(type) + 1;
+    useEditorStore.getState().dispatch({ type: 'ADD_TRACK', track: { id: makeId('trk'), type, name: t('studio.audio.lanes.defaultName', { number }), clips: [] } });
+  };
+
+  /** a hozzáadott sáv műveletei (hosszan nyomva): átnevezés, törlés (csak üresen) */
+  const laneActions = (lane: AudioLane) => {
+    const st = useEditorStore.getState();
+    const track = st.project?.tracks.find((tr) => tr.type === lane.type);
+    const rename = () => {
+      if (typeof Alert.prompt !== 'function') return;
+      Alert.prompt(t('studio.audio.lanes.rename'), undefined, (text) => {
+        if (text?.trim()) st.dispatch({ type: 'RENAME_TRACK', trackType: lane.type, name: text });
+      }, 'plain-text', laneLabel(lane, t));
+    };
+    Alert.alert(laneLabel(lane, t), undefined, [
+      { text: t('studio.audio.lanes.rename'), onPress: rename },
+      ...(track && track.clips.length === 0
+        ? [{ text: t('common.delete'), style: 'destructive' as const, onPress: () => st.dispatch({ type: 'REMOVE_TRACK', trackType: lane.type }) }]
+        : []),
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  };
 
   /** 🔖 marker a lejátszófejnél (a közeli markerre a műveletei nyílnak) */
   const markerAtPlayhead = () => {
@@ -279,7 +309,7 @@ export function AudioStudioBody({
     setFitPps(fitPxPerSec(view.w || 1200, duration));
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   };
-  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead };
+  devRef.current = { fit: fitToView, zoomIn: () => zoomStep(1), marker: markerAtPlayhead, addLane, mixer: () => setMixerOpen(true) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -702,11 +732,17 @@ export function AudioStudioBody({
               const muted = mutedTracks.includes(lane.type);
               const solo = soloTracks.includes(lane.type);
               return (
-                <View key={lane.type} style={styles.laneHeader}>
+                <Pressable
+                  key={lane.type}
+                  style={styles.laneHeader}
+                  testID={`audio-lane-head-${lane.type}`}
+                  disabled={!lane.extra}
+                  onLongPress={() => laneActions(lane)}
+                >
                   <View style={styles.laneHeadTop}>
                     <Ionicons name={lane.icon} size={13} color={lane.color} />
                     <Text style={styles.trackName} numberOfLines={1}>
-                      {t(lane.labelKey)}
+                      {laneLabel(lane, t)}
                     </Text>
                   </View>
                   <View style={styles.flagRow}>
@@ -731,9 +767,16 @@ export function AudioStudioBody({
                     </Pressable>
                   </View>
                   <LaneMeter type={lane.type} />
-                </View>
+                </Pressable>
               );
             })}
+            {/* ➕ új hangsáv (legfeljebb 8) */}
+            {nextExtraTrack(LANE_TYPES) ? (
+              <Pressable style={styles.addLane} onPress={addLane} testID="audio-add-lane">
+                <Ionicons name="add" size={14} color={palette.textDim} />
+                <Text style={styles.addLaneText}>{t('studio.audio.lanes.add')}</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <ScrollView
@@ -1012,6 +1055,8 @@ function TBtn({
 }
 
 const styles = StyleSheet.create({
+  addLane: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 8 },
+  addLaneText: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
   multiBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingHorizontal: 14, backgroundColor: palette.surfaceHigh },
   multiText: { color: palette.text, fontSize: 13, fontWeight: '700' },
   root: { flex: 1, backgroundColor: '#05060a' },

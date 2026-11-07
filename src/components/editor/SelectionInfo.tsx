@@ -9,11 +9,11 @@ import { findClip } from '@/lib/projectUtils';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Clip, TrackType } from '@/types/project';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 /** Hang-sávok — ezekre a „nem látható a képkockán" figyelmeztetés nem vonatkozik. */
-const AUDIO_TRACKS: TrackType[] = ['music', 'voiceover', 'sfx'];
 
 /** Sáv-típus → ikon (a kijelölt elem fajtájának azonnali felismeréséhez). */
 const TRACK_ICON: Record<TrackType, IoniconName> = {
@@ -27,6 +27,11 @@ const TRACK_ICON: Record<TrackType, IoniconName> = {
   music: 'musical-notes',
   voiceover: 'mic',
   sfx: 'pulse',
+  aux1: 'musical-note',
+  aux2: 'musical-note',
+  aux3: 'musical-note',
+  aux4: 'musical-note',
+  aux5: 'musical-note',
 };
 
 /** A kijelölt klip rövid, emberi neve (szöveg / címke / fájlnév). */

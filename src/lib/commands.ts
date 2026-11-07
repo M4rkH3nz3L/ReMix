@@ -5,20 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type {
-  AlbumDoc,
-  AspectRatio,
-  Asset,
-  AudioMaster,
-  Chapter,
-  Clip,
-  ImageDoc,
-  Marker,
-  ParticlesConfig,
-  Project,
-  TimelineRegion,
-  TrackType,
-} from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
 
 /**
  * Command-réteg (full-plan F0): minden szerkesztő-művelet nevesített command,
@@ -72,6 +59,11 @@ export type EditorCommand =
   | { type: 'SET_CHAPTERS'; chapters: Chapter[] }
   | { type: 'SET_AUDIO_MASTER'; audioMaster: AudioMaster | null }
   | { type: 'SET_TRACK_GAIN'; trackType: TrackType; gain: number }
+  | { type: 'ADD_TRACK'; track: Track }
+  | { type: 'REMOVE_TRACK'; trackType: TrackType }
+  | { type: 'RENAME_TRACK'; trackType: TrackType; name: string }
+  | { type: 'SET_AUDIO_BUSES'; buses: AudioBus[] }
+  | { type: 'SET_TRACK_SEND'; trackType: TrackType; busId: string; amount: number }
   | { type: 'SET_REGIONS'; regions: TimelineRegion[] }
   | { type: 'SET_LINKS'; links: string[][] }
   /**
@@ -451,6 +443,54 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, trackMix: { ...prev, [cmd.trackType]: { gain: g } } };
     }
 
+    case 'ADD_TRACK': {
+      // csak új típus (a sávokat a típus azonosítja)
+      if (project.tracks.some((t) => t.type === cmd.track.type)) {
+        return null;
+      }
+      return { ...project, tracks: [...project.tracks, { ...cmd.track, clips: cmd.track.clips ?? [] }] };
+    }
+
+    case 'REMOVE_TRACK': {
+      // csak az üres, hozzáadott sáv törölhető (klip nem vész el csendben)
+      const track = project.tracks.find((t) => t.type === cmd.trackType);
+      if (!track || track.clips.length > 0 || !cmd.trackType.startsWith('aux')) {
+        return null;
+      }
+      const { [cmd.trackType]: _gain, ...trackMix } = project.trackMix ?? {};
+      const { [cmd.trackType]: _sends, ...audioSends } = project.audioSends ?? {};
+      void _gain;
+      void _sends;
+      return { ...project, tracks: project.tracks.filter((t) => t.type !== cmd.trackType), trackMix, audioSends };
+    }
+
+    case 'RENAME_TRACK': {
+      const name = cmd.name.trim();
+      const track = project.tracks.find((t) => t.type === cmd.trackType);
+      if (!track || !name || track.name === name) {
+        return null;
+      }
+      return { ...project, tracks: project.tracks.map((t) => (t.type === cmd.trackType ? { ...t, name } : t)) };
+    }
+
+    case 'SET_AUDIO_BUSES': {
+      // a törölt buszra szóló küldések is eltűnnek
+      const ids = new Set(cmd.buses.map((b) => b.id));
+      const audioSends = Object.fromEntries(
+        Object.entries(project.audioSends ?? {}).map(([tt, sends]) => [tt, Object.fromEntries(Object.entries(sends ?? {}).filter(([id]) => ids.has(id)))])
+      ) as Project['audioSends'];
+      return { ...project, audioBuses: cmd.buses, audioSends };
+    }
+
+    case 'SET_TRACK_SEND': {
+      const amount = Math.max(0, Math.min(1, cmd.amount));
+      const prev = project.audioSends?.[cmd.trackType] ?? {};
+      if ((prev[cmd.busId] ?? 0) === amount || !(project.audioBuses ?? []).some((b) => b.id === cmd.busId)) {
+        return null;
+      }
+      return { ...project, audioSends: { ...project.audioSends, [cmd.trackType]: { ...prev, [cmd.busId]: amount } } };
+    }
+
     case 'SET_LINKS': {
       // csak a 2+ elemű csoportok érdekesek; rendezve az összehasonlításhoz
       const next = cmd.links.filter((g) => g.length > 1).map((g) => [...g].sort());
@@ -586,6 +626,16 @@ export function describeCommand(cmd: EditorCommand): string {
         track: cmd.trackType,
         defaultValue: `Track gain: ${cmd.trackType}`,
       });
+    case 'ADD_TRACK':
+      return tr('lib.commands.addTrack', { name: cmd.track.name, defaultValue: `Sáv hozzáadva: ${cmd.track.name}` });
+    case 'REMOVE_TRACK':
+      return tr('lib.commands.removeTrack', { defaultValue: 'Sáv törölve' });
+    case 'RENAME_TRACK':
+      return tr('lib.commands.renameTrack', { name: cmd.name, defaultValue: `Sáv átnevezve: ${cmd.name}` });
+    case 'SET_AUDIO_BUSES':
+      return tr('lib.commands.setAudioBuses', { count: cmd.buses.length, defaultValue: `Buszok: ${cmd.buses.length}` });
+    case 'SET_TRACK_SEND':
+      return tr('lib.commands.setTrackSend', { defaultValue: 'Küldés' });
     case 'SET_REGIONS':
       return tr('lib.commands.setRegions', { count: cmd.regions.length });
     case 'SET_LINKS':

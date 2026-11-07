@@ -30,9 +30,10 @@ import { useCollabLive } from '@/store/collabLiveStore';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project, TrackType } from '@/types/project';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /** ezeken a sávokon van hang — csak ezek kapnak némítás/solo gombot */
-const AUDIBLE_TRACKS: TrackType[] = ['video', 'music', 'voiceover', 'sfx'];
+const AUDIBLE_TRACKS: TrackType[] = ['video', ...AUDIO_TRACKS];
 
 /** vizuális sávok — ezek kapnak láthatóság (szem) kapcsolót az előnézethez */
 const VISUAL_TRACKS: TrackType[] = [
@@ -60,6 +61,11 @@ const AUTO_HEIGHT_FACTOR: Record<TrackType, number> = {
   music: 1.4,
   voiceover: 1.3,
   sfx: 1,
+  aux1: 1,
+  aux2: 1,
+  aux3: 1,
+  aux4: 1,
+  aux5: 1,
 };
 
 /** sáv-ikonok a tablet-fejléchez (látványterv: ikon + címke oszlop) */
@@ -74,6 +80,11 @@ const trackIcons: Record<TrackType, keyof typeof Ionicons.glyphMap> = {
   music: 'musical-notes',
   voiceover: 'mic',
   sfx: 'volume-high',
+  aux1: 'musical-note',
+  aux2: 'musical-note',
+  aux3: 'musical-note',
+  aux4: 'musical-note',
+  aux5: 'musical-note',
 };
 
 /**

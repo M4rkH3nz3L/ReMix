@@ -11,6 +11,7 @@ import type { RenderSettings } from '@/lib/render';
 import { localRenderMatchesPreview } from '@/lib/renderParity';
 import type { AudioClip, Project } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /**
  * 📱 Eszközön futó render — a #1 termék-blokkoló feloldása.
@@ -127,7 +128,7 @@ interface RenderPlan {
   bitRate?: number;
 }
 
-const AUDIO_TRACKS = new Set(['music', 'voiceover', 'sfx']);
+const AUDIO_TRACK_SET = new Set<string>(AUDIO_TRACKS);
 
 function evenDim(n: number): number {
   const r = Math.round(n);
@@ -184,7 +185,7 @@ export function buildRenderPlan(
           volume: clip.volume ?? 1,
           filter: clip.filterId ?? 'none',
         });
-      } else if (clip.kind === 'audio' && AUDIO_TRACKS.has(track.type) && uri && !uri.startsWith('http')) {
+      } else if (clip.kind === 'audio' && AUDIO_TRACK_SET.has(track.type) && uri && !uri.startsWith('http')) {
         audio.push({
           uri,
           atSec: clip.start,

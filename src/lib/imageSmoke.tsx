@@ -3294,6 +3294,68 @@ async function smokeFxAutomation(log: Log) {
   src.delete();
 }
 
+/** 🎚️ Több sáv + effekt-busz: „+ Sáv”, a negyedik sáv klipje és a zengés-busz szól (motor + export). */
+async function smokeTracksBuses(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // rövid hangcsomag 0,5 s-onként (a zengés a szünetekben hallható)
+  const burst = Float32Array.from({ length: 4 * SR }, (_, i) => (i % (SR / 2) < 2205 ? 0.5 * Math.sin((2 * Math.PI * 660 * i) / SR) : 0));
+  const src = new File(Paths.document, 'smoke_bursts.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([burst, burst], SR, () => 0.5));
+  const id = 'prj_smoke_tracks';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tracks', caught));
+  const base = createEmptyProject('smoke sávok + busz', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.addLane');
+  await sleep(200);
+  const aux = st().project?.tracks.find((t) => t.type === 'aux1');
+  log(!!aux, 'a „+ Sáv” gomb új hangsávot ad', aux?.name ?? 'nincs');
+  st().undo();
+  log(!st().project?.tracks.some((t) => t.type === 'aux1'), 'az új sáv visszavonható');
+  st().redo();
+  const c: AudioClip = { kind: 'audio', id: 'b4', uri: src.uri, label: 'csomagok', start: 0, duration: 4, trimIn: 0, sourceDuration: 4, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  st().dispatch({ type: 'ADD_CLIP', trackType: 'aux1', clip: c });
+  st().dispatch({ type: 'SET_AUDIO_BUSES', buses: [{ id: 'rv', name: 'Zengés-busz', fx: { reverb: 0.8 }, gain: 1 }] });
+  st().dispatch({ type: 'SET_TRACK_SEND', trackType: 'aux1', busId: 'rv', amount: 0.8 });
+  await sleep(600);
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(3000);
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(stats.chunks > 10 && stats.late === 0, 'a negyedik sáv és a busz a motorral szól, akadás nélkül', `${stats.chunks} szelet, ${stats.late} késett`);
+  // export: a busz zengése a hangcsomag UTÁN (50–90 ms) hallható; küldés nélkül csend
+  const tail = async (project: Project) => {
+    const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_tracks.wav'));
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0);
+    new File(out).delete();
+    let e = 0;
+    const a = Math.round(0.56 * SR);
+    const b = Math.round(0.6 * SR);
+    for (let i = a; i < b; i++) e += y[i] * y[i];
+    return 10 * Math.log10(e / (b - a) + 1e-30);
+  };
+  const p = st().project!;
+  const wet = await tail(p);
+  const dry = await tail({ ...p, audioSends: {} });
+  log(wet > -45 && dry < -80, 'telefonos export: a busz zengése a hang után szól, küldés nélkül nem', `küldéssel ${wet.toFixed(1)} dB, nélküle ${dry.toFixed(1)} dB`);
+  runDevAction('audio.mixer');
+  await sleep(800);
+  log(true, 'FOTÓZHATÓ', 'a keverő: 4 sáv, küldés a zengés-buszra, a busz szintje');
+  await sleep(4000);
+  router.back();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4458,6 +4520,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'tracksbuses') {
+    await step(phase, () => smokeTracksBuses(log));
     return;
   }
   if (phase === 'fxautomation') {

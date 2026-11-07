@@ -17,14 +17,10 @@ import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
 import { withCancellableProgress } from '@/store/progressStore';
 import { isRenderCancelledError } from '@/lib/render';
-import type { AudioMaster, AudioMasterDynamics, TrackType } from '@/types/project';
+import type { AudioMaster, AudioMasterDynamics } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { audioLanes, laneLabel } from '@/components/studio/audio/audioLanes';
 
-const MIX_LANES: { type: TrackType; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
-  { type: 'music', icon: 'musical-notes', labelKey: 'editor.track.music' },
-  { type: 'voiceover', icon: 'mic', labelKey: 'editor.track.voiceover' },
-  { type: 'sfx', icon: 'flash', labelKey: 'editor.track.sfx' },
-];
 
 const DYNAMICS: AudioMasterDynamics[] = ['natural', 'balanced', 'punchy'];
 
@@ -116,7 +112,7 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
           onChange={(v) => useEditorStore.getState().setMasterVolume(v)}
           format={(v) => `${Math.round(v * 100)}%`}
         />
-        {MIX_LANES.map((lane) => {
+        {audioLanes(project).map((lane) => {
           const muted = mutedTracks.includes(lane.type);
           const solo = soloTracks.includes(lane.type);
           const gain = project?.trackMix?.[lane.type]?.gain ?? 1;
@@ -124,7 +120,7 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
             <View key={lane.type} style={styles.mixBlock}>
               <View style={styles.mixRow}>
                 <Ionicons name={lane.icon} size={16} color={palette.accent} />
-                <Text style={styles.mixLabel}>{t(lane.labelKey)}</Text>
+                <Text style={styles.mixLabel}>{laneLabel(lane, t)}</Text>
                 <Text style={styles.mixGain}>{Math.round(gain * 100)}%</Text>
                 <Pressable
                   onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}

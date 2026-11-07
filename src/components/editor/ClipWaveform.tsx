@@ -45,7 +45,12 @@ export function ClipWaveform({ clip, widthPx, heightPx, color, userInitiated = f
 
   // A22: annyi oszlop, amennyi kifér (≥3.5 px), és a sor pontosan kitölti a klipet
   const columns = clamp(Math.floor((widthPx - 8) / 3.5), 1, 400);
-  const window = clipWindowPeaks(wave, clip.trimIn, clip.duration * audioSpeedOf(clip));
+  // 🔁 loop-klipnél a minta ismétlődik: a hurok csúcsai a klip hosszán végig
+  const loopLen = clip.loopLength && clip.loopLength > 0 ? clip.loopLength : 0;
+  const one = clipWindowPeaks(wave, clip.trimIn, loopLen || clip.duration * audioSpeedOf(clip));
+  const window = loopLen && one.length > 0
+    ? Array.from({ length: Math.max(1, Math.round((clip.duration / loopLen) * one.length)) }, (_, i) => one[i % one.length])
+    : one;
   // ⏪ a visszafelé szóló klip hullámformája is visszafelé fut
   const bars = resamplePeaks(clip.reversed ? window.slice().reverse() : window, columns);
   const heights = barHeights(bars);

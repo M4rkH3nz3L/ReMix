@@ -322,5 +322,30 @@ const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * 
     console.log(`videó: a hang szintje a keveréshez képest ${lvl.toFixed(2)} dB`);
     expect(Math.abs(lvl)).toBeLessThan(0.5);
   }, 120000);
+
+  it('🔁 loop-klip: a hurok ismétlődik — telefon = szerver (aloop), a 2. kör a forrás ugyanazon pontja', async () => {
+    const lp: Project = {
+      ...base,
+      tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip({ id: 'L', uri: stereo, start: 0.3, trimIn: 0.5, duration: 3.2, sourceDuration: 4, loopLength: 1, volume: 0.8 })] } : t)),
+    };
+    const plan = offlineMixPlan(lp);
+    expect(plan.clips[0].loopLength).toBe(1);
+    const sources = new Map([[stereo, { channels: decode(stereo, 2), sampleRate: SR }]]);
+    const { renderProject } = jest.requireActual('../../server/render');
+    const server = decode(await renderProject(lp, fs.mkdtempSync(path.join(dir, 'wl-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
+    const n = server[0].length;
+    const mine: [Float32Array, Float32Array] = [new Float32Array(n), new Float32Array(n)];
+    mixRange(plan, sources, mine, 0, n, 1, new Map());
+    // a hurok 2. köre (1,3 s után) a forrás ugyanazon pontja, mint az 1. (0,3 s után) — a mikro-fade-en túl
+    const a0 = Math.round(0.5 * SR);
+    const a1 = a0 + SR;
+    expect(mine[0][a1] / mine[0][a0]).toBeCloseTo(1, 4);
+    for (const c of [0, 1]) {
+      const diff = server[c].map((v, i) => v - mine[c][i]);
+      // eslint-disable-next-line no-console
+      console.log(`loop csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
+      expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
+    }
+  }, 60000);
 });
 

@@ -4066,6 +4066,7 @@
         "unknownDuration": "A hang hossza nem olvasható ki, a fájl sérült lehet. Próbáld újra, vagy mentsd el MP3/M4A/WAV formátumban.",
         "tooLong": "Nagyon hosszú hang (~{{hours}} óra) — a feldolgozás és a render lassabb, több memóriát igényel."
       },
+      "loopClip": "Ismétlés (loop)",
       "fxAutomation": {
         "title": "Effekt-automáció",
         "fxLowpass": "Szűrő ↓",

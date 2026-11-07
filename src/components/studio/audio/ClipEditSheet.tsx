@@ -301,6 +301,27 @@ export function ClipEditSheet({
           );
         })()}
 
+        {/* 🔁 loop-klip: a jelenlegi szakasz ismétlődik, a jobb él a forrás végén túl is húzható */}
+        {(clip.speed ?? 1) === 1 && !clip.reversed ? (
+          <ToggleRow
+            icon="repeat-outline"
+            label={t('studio.audio.loopClip')}
+            value={!!clip.loopLength}
+            onValueChange={(on) =>
+              updateClip(
+                clip.id,
+                on
+                  ? { loopLength: clip.duration }
+                  : {
+                      loopLength: undefined,
+                      // ki: a klip nem lóghat túl a forráson
+                      duration: Math.min(clip.duration, Math.max(0.1, (clip.sourceDuration ?? clip.duration) - (clip.trimIn ?? 0))),
+                    }
+              )
+            }
+          />
+        ) : null}
+
         <View style={styles.divider} />
         <ToggleRow icon="sparkles-outline" label={t('studio.audio.enhance')} value={voiceEnhance} onValueChange={setVoiceEnhance} />
         <ToggleRow icon="mic-outline" label={t('studio.audio.deReverb')} value={deReverb} onValueChange={setDeReverb} />

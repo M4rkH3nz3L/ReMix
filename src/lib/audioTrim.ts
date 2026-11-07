@@ -57,7 +57,8 @@ export function trimAudioRight(clip: AudioClip, nextDuration: number): { duratio
     const duration = Math.min(Math.max(nextDuration, MIN_CLIP_DURATION), max);
     return { duration, trimIn: Math.max(0, Math.round((trimIn + (clip.duration - duration) * speed) * 1e9) / 1e9) };
   }
-  const max = Math.max(MIN_CLIP_DURATION, (sourceOf(clip) - trimIn) / speed);
+  // 🔁 loop-klip: a jobb él a forrás végén túl is húzható (a minta ismétlődik), legfeljebb 1 óra
+  const max = clip.loopLength && clip.loopLength > 0 ? 3600 : Math.max(MIN_CLIP_DURATION, (sourceOf(clip) - trimIn) / speed);
   return { duration: Math.min(Math.max(nextDuration, MIN_CLIP_DURATION), max) };
 }
 

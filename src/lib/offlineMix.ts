@@ -121,6 +121,8 @@ export interface OfflineMixClip {
   fxKf?: FxAutomation;
   /** 🎚️ a sáv küldései: busz-azonosító → mérték 0–1 (a fader után) */
   sends?: Record<string, number>;
+  /** 🔁 loop-klip: a forrás `trimIn`-től ennyi mp-es szakasza ismétlődik */
+  loopLength?: number;
   /** 🦆 a halkítás szerepe: `key` = a beszéd (vezérel), `duck` = halkul alatta */
   role?: 'key' | 'duck';
 }
@@ -184,6 +186,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         ...(fxActive(fx) || clip.deReverb || hasAuto ? { fx: fx ?? {} } : {}),
         ...(hasAuto ? { fxKf } : {}),
         ...(sendsOf(project, track.type) ? { sends: sendsOf(project, track.type) } : {}),
+        ...(clip.loopLength && clip.loopLength > 0 ? { loopLength: clip.loopLength } : {}),
         ...(clip.deReverb ? { deReverb: true } : {}),
         ...(role ? { role } : {}),
         track: track.type,
@@ -293,6 +296,10 @@ export function mixRange(
     const a = Math.max(fromSample, clipFrom);
     const b = Math.min(toSample, clipTo);
     const srcOffset = Math.round(clip.trimIn * src.sampleRate) - clipFrom;
+    // 🔁 loop-klip: a klipen belüli minta a hurok hosszával körbejár (a forrás `trimIn`-től)
+    const loopN = clip.loopLength && clip.loopLength > 0 ? Math.max(1, Math.round(clip.loopLength * src.sampleRate)) : 0;
+    const trimN = Math.round(clip.trimIn * src.sampleRate);
+    const srcIndex = (i: number) => (loopN ? trimN + ((((i - clipFrom) % loopN) + loopN) % loopN) : i + srcOffset);
     // 🎧 hosszú (szakaszos) forrásnál csak a most kellő ablak: a mintaindex az ablakon belül
     let left = src.channels[0];
     let right = src.channels[1] ?? src.channels[0];
@@ -323,7 +330,7 @@ export function mixRange(
         const l = new Float32Array(to - from);
         const r = new Float32Array(to - from);
         for (let i = from; i < to; i++) {
-          const s = i + srcOffset - base;
+          const s = srcIndex(i) - base;
           if (s >= 0 && s < left.length) {
             l[i - from] = left[s];
             r[i - from] = right[s];
@@ -352,7 +359,7 @@ export function mixRange(
       const blockEnd = Math.min(b, blockStart + BLOCK);
       const level = sampleChannel(clip.volumeKf, (blockStart - clipFrom) / sr, clip.volume) * clip.gain * (mono ? monoGain : 1);
       for (let i = Math.max(a, blockStart); i < blockEnd; i++) {
-        const s = i + srcOffset - base;
+        const s = srcIndex(i) - base;
         if (!fxL && (s < 0 || s >= left.length)) {
           continue;
         }
@@ -730,7 +737,7 @@ export function sliceSource(channels: Float32Array[], from: number, n: number, r
 
 /** a feldolgozás az egész forrás-ablakot igényli (nyújtás, fordítás, hangmagasság, zajszűrés, normalizálás) */
 export function needsWholeWindow(c: OfflineMixClip): boolean {
-  return c.speed !== 1 || c.reversed || c.pitch !== 0 || !!c.fx?.denoise || !!c.fx?.normalize;
+  return c.speed !== 1 || c.reversed || c.pitch !== 0 || !!c.fx?.denoise || !!c.fx?.normalize || !!c.loopLength;
 }
 
 /**

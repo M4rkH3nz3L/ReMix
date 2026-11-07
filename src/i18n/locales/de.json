@@ -4071,6 +4071,7 @@
         "unknownDuration": "Die Länge des Audios ist nicht lesbar, die Datei ist evtl. beschädigt. Versuch es erneut oder speichere sie als MP3/M4A/WAV.",
         "tooLong": "Sehr langes Audio (~{{hours}} Std.) — Verarbeitung und Rendern sind langsamer und brauchen mehr Speicher."
       },
+      "loopClip": "Loop (wiederholen)",
       "fxAutomation": {
         "title": "Effekt-Automation",
         "fxLowpass": "Tiefpass",

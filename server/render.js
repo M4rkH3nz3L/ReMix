@@ -2936,7 +2936,10 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
       const mono = (await audioChannelCount(clip.uri)) === 1;
       let chain =
-        `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
+        // 🔁 loop-klip: a hurok-szakasz ismétlődik (aloop), majd a klip hosszára vágva
+      (clip.loopLength > 0
+        ? `[${idx}:a]aresample=44100,atrim=start=${aTrimIn.toFixed(6)}:end=${(aTrimIn + clip.loopLength).toFixed(6)},asetpts=PTS-STARTPTS,aloop=loop=-1:size=${Math.round(clip.loopLength * 44100)},atrim=end=${clip.duration.toFixed(6)},`
+        : `[${idx}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},`) +
           (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
           `asetpts=PTS-STARTPTS,` +
         audioSpeedChain(clip) +

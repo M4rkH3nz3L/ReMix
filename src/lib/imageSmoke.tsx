@@ -3426,6 +3426,56 @@ async function smokeMeter(log: Log) {
   router.back();
 }
 
+/** 🔁 Loop-klip: 1 s-os minta 4 s-ig ismétlődik (export + motor), a jobb él a forráson túl húzható. */
+async function smokeLoopClip(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // 1 s: 0,15 s hang, utána csend — a hurok minden másodpercben megszólal
+  const x = Float32Array.from({ length: SR }, (_, i) => (i < 0.15 * SR ? 0.5 * Math.sin((2 * Math.PI * 440 * i) / SR) : 0));
+  const src = new File(Paths.document, 'smoke_loop_src.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_loop';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:loop', caught));
+  const base = createEmptyProject('smoke loop-klip', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'lp', uri: src.uri, label: 'ütem', start: 0, duration: 1, trimIn: 0, sourceDuration: 1, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported', loopLength: 1 };
+  const ext = trimAudioRight(c, 4);
+  log(Math.abs(ext.duration - 4) < 1e-9, 'loop-klipnél a jobb él a forrás végén túl húzható', `${ext.duration} s (a forrás 1 s)`);
+  const looped: AudioClip = { ...c, duration: ext.duration };
+  const project: Project = { ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [looped] } : t)) };
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_loop_out.wav'));
+  const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0);
+  new File(out).delete();
+  const lvl = (t: number) => {
+    let e = 0;
+    for (let i = Math.round(t * SR); i < Math.round((t + 0.1) * SR); i++) e += y[i] * y[i];
+    return 10 * Math.log10(e / (0.1 * SR) + 1e-30);
+  };
+  const hits = [0.02, 1.02, 2.02, 3.02].map(lvl);
+  const gaps = [0.5, 1.5, 2.5, 3.5].map(lvl);
+  log(hits.every((h) => Math.abs(h - hits[0]) < 0.5) && gaps.every((g) => g < -80), 'export: a minta minden másodpercben megszólal, köztük csend', `${hits.map((h) => h.toFixed(1)).join(' / ')} dB, szünetek ${Math.max(...gaps).toFixed(0)} dB`);
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(3000);
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(stats.chunks > 10 && stats.late === 0, 'a motor a loop-klipet akadás nélkül játssza', `${stats.chunks} szelet, ${stats.late} késett`);
+  log(true, 'FOTÓZHATÓ', 'a loop-klip hullámformája négyszer ismétlődik');
+  await sleep(4000);
+  router.back();
+  src.delete();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4590,6 +4640,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'loopclip') {
+    await step(phase, () => smokeLoopClip(log));
     return;
   }
   if (phase === 'meter') {

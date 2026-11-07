@@ -1153,6 +1153,11 @@ export interface AudioClip extends ClipBase {
   /** ⏪ visszafelé szól (a visszafelé játszott videóklip leválasztott hangja); a forrás-ablak
    * ugyanaz (`trimIn` … `trimIn + duration·speed`), csak a végéről indul */
   reversed?: boolean;
+  /**
+   * 🔁 loop-klip: a forrás `trimIn`-től kezdődő, ennyi mp-es szakasza ismétlődik, amíg a klip tart
+   * (a jobb él a forrás végén túl is húzható). Hiányzó = nincs ismétlés.
+   */
+  loopLength?: number;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */

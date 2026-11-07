@@ -4066,6 +4066,7 @@
         "unknownDuration": "The audio length can't be read; the file may be damaged. Try again, or save it as MP3/M4A/WAV.",
         "tooLong": "Very long audio (~{{hours}} h) — processing and rendering are slower and need more memory."
       },
+      "loopClip": "Loop clip",
       "fxAutomation": {
         "title": "Effect automation",
         "fxLowpass": "Low-pass",

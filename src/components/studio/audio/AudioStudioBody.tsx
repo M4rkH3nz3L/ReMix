@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import { MixAssistSheet } from '@/components/studio/audio/MixAssistSheet';
+import { useMixAssist } from '@/store/mixAssistStore';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
@@ -243,6 +245,8 @@ export function AudioStudioBody({
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
       registerDevAction('audio.assistant', () => devRef.current.assistant()),
+      registerDevAction('audio.mixAssist', () => useMixAssist.getState().show('mix')),
+      registerDevAction('audio.mixAssistClose', () => useMixAssist.getState().close()),
       registerDevAction('audio.beatSplitBars', () => devRef.current.beatSplit('bar')),
       registerDevAction('audio.beatSplitBeats', () => devRef.current.beatSplit('beat')),
       registerDevAction('audio.view', () => ({ scrollX: scrollXRef.current, ...followRef.current })),
@@ -345,6 +349,8 @@ export function AudioStudioBody({
         if (c && tt) void startSilenceSearch(c, tt, fps, t);
       } else if (a.kind === 'beatSplitBars' || a.kind === 'beatSplitBeats') beatSplitSelection(a.kind === 'beatSplitBars' ? 'bar' : 'beat');
       else if (a.kind === 'check') onRequestCheck?.();
+      else if (a.kind === 'mixSuggest') useMixAssist.getState().show('mix');
+      else if (a.kind === 'masterAssist') useMixAssist.getState().show('master');
       else if (a.kind === 'sync') sel && startAudioSync(sel, fps, t);
       else if (a.kind === 'transcript') {
         const tt = trackOf((sel ?? voice)?.id);
@@ -1147,6 +1153,9 @@ export function AudioStudioBody({
           <Ionicons name="close" size={20} color={palette.text} />
         </Pressable>
       ) : null}
+
+      {/* 🎚️🤖 mixjavaslat / mastering-segéd */}
+      <MixAssistSheet />
 
       {/* 🎙️🤖 hang-asszisztens */}
       {assistantOpen ? <AudioAssistantBar onActions={runAssistantActions} onClose={() => setAssistantOpen(false)} /> : null}

@@ -24,7 +24,7 @@ export interface AudioStep {
 /** a parancs-buszon kívüli műveletek (munkamenet-állapot vagy meglévő folyamat) */
 export type AudioAction =
   | { kind: 'mute' | 'unmute' | 'solo'; track: TrackType }
-  | { kind: 'silence' | 'beatSplitBars' | 'beatSplitBeats' | 'check' | 'sync' | 'transcript' };
+  | { kind: 'silence' | 'beatSplitBars' | 'beatSplitBeats' | 'check' | 'sync' | 'transcript' | 'mixSuggest' | 'masterAssist' };
 
 export interface AudioIntentResult {
   steps: AudioStep[];
@@ -283,6 +283,8 @@ function clause(raw: string, ctx: AudioIntentContext, out: AudioIntentResult): b
   if (/\b(utem\w*|bar\w*|beat\w*)\b/.test(t) && /\b(vag\w*|szetvag\w*|darabol\w*|split\w*|cut)\b/.test(t)) {
     return out.actions.push({ kind: /\b(utemresz\w*|beat\w*|negyed\w*)\b/.test(t) ? 'beatSplitBeats' : 'beatSplitBars' }) > 0;
   }
+  if (/\b(javasol\w*|mixjavaslat\w*|suggest\w*|tanacs\w*|vorschlag\w*)\b/.test(t) || /\bmix\w* (javit\w*|improve)/.test(t)) return out.actions.push({ kind: 'mixSuggest' }) > 0;
+  if (/\b(automatikus\w*|auto|segits\w*|seged\w*|assist\w*)\b/.test(t) && /\b(master\w*|maszter\w*|mastering)\b/.test(t)) return out.actions.push({ kind: 'masterAssist' }) > 0;
   if (/\b(ellenoriz\w*|check|vizsgald|nezd at|prufe\w*|uberprufe\w*)\b/.test(t)) return out.actions.push({ kind: 'check' }) > 0;
   if (/\b(szinkron\w*|sync\w*)\b/.test(t)) return out.actions.push({ kind: 'sync' }) > 0;
   if (/\b(atirat\w*|transcri\w*|szoveges vagas\w*)\b/.test(t)) return out.actions.push({ kind: 'transcript' }) > 0;

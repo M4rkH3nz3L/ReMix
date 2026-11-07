@@ -96,6 +96,10 @@ describe('🎙️ magyar mondatok', () => {
     expect(r.unknown).toEqual([]);
     expect(r.steps.map((x) => [x.key, x.params?.target ?? x.params?.label])).toEqual([['master', 'youtube'], ['marker', '0:03']]);
   });
+  it('mixjavaslat és mastering-segéd műveletként; a „masterelj Spotify-ra” továbbra is közvetlen master', () => {
+    expect(parseAudioIntent('javasolj valamit a mixre, és automatikus mastert kérek', ctx()).actions).toEqual([{ kind: 'mixSuggest' }, { kind: 'masterAssist' }]);
+    expect(parseAudioIntent('masterelj Spotify-ra', ctx()).steps[0].key).toBe('master');
+  });
   it('a nem értett részt nem találgatja', () => {
     const r = parseAudioIntent('tegyél zengést a beszédre és főzz egy kávét', ctx());
     expect(r.steps).toHaveLength(1);

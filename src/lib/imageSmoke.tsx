@@ -3472,6 +3472,74 @@ function sortedJson(v: unknown): string {
   return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 }
 
+/** 🎚️🤖 Mixjavaslat és mastering-segéd: egy rossz keverés javaslatai, alkalmazás után eltűnnek; a master eléri a célt. */
+async function smokeMixAssist(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let seed = 3;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  // a beszéd: nagy dinamikájú (váltakozó hangos/halk mondatok), zajos és dübörgő
+  const voice = Float32Array.from({ length: 13 * SR }, (_, i) => {
+    const t = i / SR;
+    const on = t % 1.3 < 1;
+    const lvl = Math.floor(t / 1.3) % 2 === 0 ? 0.4 : 0.04;
+    let v = on ? lvl * (0.6 * Math.sin(2 * Math.PI * 150 * t) + 0.3 * Math.sin(2 * Math.PI * 450 * t) + 0.15 * Math.sin(2 * Math.PI * 1200 * t)) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 4 * t)) : 0;
+    return v + 0.2 * Math.sin(2 * Math.PI * 35 * t) + 0.01 * rnd();
+  });
+  const musicPcm = Float32Array.from({ length: 13 * SR }, (_, i) => 0.25 * Math.sin((2 * Math.PI * 440 * i) / SR));
+  const write = (name: string, x: Float32Array) => {
+    const f = new File(Paths.document, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, x], SR, () => 0.5));
+    return f.uri;
+  };
+  const vUri = write('smoke_mix_voice.wav', voice);
+  const mUri = write('smoke_mix_music.wav', musicPcm);
+  const id = 'prj_smoke_mixassist';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:mixassist', caught));
+  const base = createEmptyProject('smoke mixjavaslat', '9:16', undefined, 'audio');
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', uri: vUri, start: 0, duration: 13, sourceDuration: 13, id: 'x', ...over });
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [ac({ id: 'v', label: 'beszéd' })] } : t.type === 'music' ? { ...t, clips: [ac({ id: 'm', label: 'zene', uri: mUri })] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  const t0 = Date.now();
+  runDevAction('audio.mixAssist');
+  let keys: string[] = [];
+  for (let i = 0; i < 120 && keys.length === 0; i++) {
+    await sleep(250);
+    keys = (runDevAction('mixAssist.suggestions') as string[]) ?? [];
+  }
+  const ms = Date.now() - t0;
+  const want = ['duckMusic', 'compressVoice', 'highpassVoice', 'denoiseVoice'];
+  log(want.every((k) => keys.includes(k)), 'a rossz keverés javaslatai: zene a beszéd alatt, dinamika, dübörgés, zaj', `${keys.join(', ')} (${ms} ms)`);
+  log(true, 'FOTÓZHATÓ', 'a mixjavaslat-lap a javaslatokkal és a mastering-segéddel');
+  await sleep(3000);
+  const n = runDevAction('mixAssist.applyAll') as number;
+  const v = st().project!.tracks.find((t) => t.type === 'voiceover')!.clips[0] as AudioClip;
+  const m = st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip;
+  log(n >= 4 && m.autoDuck === true && !!v.audioFx?.compressor && v.audioFx?.highpass === 80 && !!v.audioFx?.denoise, 'mind alkalmazva (egy visszavonás): halkítás, kompresszor, felüláteresztő, zajszűrés', `${n} parancs`);
+  await runDevAction('mixAssist.reanalyze');
+  await sleep(600); // a lap újrarajzol (a javaslat-lista a render után frissül)
+  const after = (runDevAction('mixAssist.suggestions') as string[]) ?? [];
+  log(!['duckMusic', 'compressVoice', 'highpassVoice', 'denoiseVoice'].some((k) => after.includes(k)), 'újramérés: az alkalmazott javaslatok nem térnek vissza', after.join(', ') || '—');
+  runDevAction('mixAssist.targetSpotify');
+  await sleep(200);
+  const res = (await runDevAction('mixAssist.applyMaster')) as { stats: { lufs: number; peak: number }; lufs: number; tp: number } | null;
+  const peakDb = res ? 20 * Math.log10(res.stats.peak) : 99;
+  log(!!res && Math.abs(res.stats.lufs - -14) <= 1 && peakDb <= -1 + 0.3 && st().project!.audioMaster?.target === 'spotify', 'mastering-segéd (Spotify): alkalmazás után a mérés −14 ± 1 LUFS, csúcs ≤ −1 dBFS', res ? `${res.stats.lufs.toFixed(2)} LUFS, csúcs ${peakDb.toFixed(2)} dBFS` : 'null');
+  st().undo();
+  st().undo();
+  log(!st().project!.audioMaster && !(st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).autoDuck, 'két visszavonás: a master és a javaslatok is vissza', '');
+  runDevAction('audio.mixAssistClose');
+  router.back();
+}
+
 /** 🎙️🤖 Hang-asszisztens: beírt mondat → lépések → végrehajtás egy undo-ban; kimondott parancs a Whisperrel → ugyanaz. */
 async function smokeAudioAssistant(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5621,6 +5689,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'mixassist') {
+    await step(phase, () => smokeMixAssist(log));
     return;
   }
   if (phase === 'audioassistant') {

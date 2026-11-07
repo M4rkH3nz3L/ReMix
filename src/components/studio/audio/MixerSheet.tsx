@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useMixAssist } from '@/store/mixAssistStore';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Slider } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
@@ -81,6 +82,10 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+        {/* 🎚️🤖 mixjavaslat (mérés a telefonon) */}
+        <Pressable style={[styles.chip, styles.chipAccent, { alignSelf: 'flex-start', marginBottom: 10 }]} onPress={() => useMixAssist.getState().show('mix')} testID="mixer-mix-assist">
+          <Text style={[styles.chipText, { color: '#fff' }]}>✨ {t('studio.audio.mixAssist.openMix')}</Text>
+        </Pressable>
         {LANES.map((lane) => {
           const track = project.tracks.find((tr) => tr.type === lane.type);
           const clipCount = track ? track.clips.filter((c) => c.kind === 'audio').length : 0;

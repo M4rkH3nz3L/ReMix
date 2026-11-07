@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useMixAssist } from '@/store/mixAssistStore';
 import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
@@ -191,6 +192,10 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
           ))}
         </View>
         {/* ⭐ saját master-presetek (a halkítás kulcs-sávja a projekté marad) */}
+        {/* 🎛️🤖 mastering-segéd: mérés + javaslat + ellenőrzés */}
+        <Pressable onPress={() => useMixAssist.getState().show('master')} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: palette.accent, marginBottom: 6 }} testID="master-assist">
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✨ {t('studio.audio.mixAssist.openMaster')}</Text>
+        </Pressable>
         <UserPresetRow kind="master" getValue={() => m} onApply={(v) => setM({ ...v, ...(m.duckTrigger ? { duckTrigger: m.duckTrigger } : {}) })} />
         <Stepper
           label={t('studio.master.lufs')}

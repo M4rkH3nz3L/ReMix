@@ -255,6 +255,29 @@ export async function exportOfflineWav(
   return { uri: target.uri, unsupported: prep.unsupported };
 }
 
+/** egy keverési menet: a megadott sávok (vagy mind), masterrel vagy anélkül, a darabok a `sink`-be */
+export interface MixPass {
+  solo?: string[];
+  master: boolean;
+  sink: (l: Float32Array, r: Float32Array) => void;
+}
+
+/**
+ * 🎚️🤖 Több keverési menet EGY előkészítéssel (a dekódolás, a nyújtás és a normalizálás egyszer):
+ * a mixjavaslat a sávonkénti szóló menetekből, a mastering-segéd a master nélküli és a masteres
+ * teljes keverésből mér. A halkítás a szóló menetben is a teljes kulcsból jön (mint a stemeknél).
+ */
+export async function streamOfflinePasses(mix: Project, passes: MixPass[], onProgress?: (u: ProgressUpdate) => void, signal?: AbortSignal): Promise<void> {
+  const prep = await prepareOffline(mix, onProgress, signal);
+  for (let k = 0; k < passes.length; k++) {
+    const pass = passes[k];
+    let plan: OfflineMixPlan = { ...prep.plan, ...(pass.solo ? { solo: pass.solo } : {}) };
+    if (!pass.master) plan = { ...plan, master: undefined, masterGain: undefined };
+    else if (plan.master) plan = { ...plan, masterGain: await measureMasterGain(prep.plan, prep.sources, signal ?? undefined, prep.prepare) };
+    await mixLoop(prep, plan, frameRange(plan), pass.sink, (r) => onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * ((k + r) / passes.length) }), signal);
+  }
+}
+
 /** egy stem: a sáv típusa és a fájl neve a csomagban */
 export interface StemSpec {
   track: string;

@@ -4141,6 +4141,17 @@
       },
       "exportSilent": "Alle Spuren sind stumm, nichts zu exportieren.",
       "stems": "Stems trennen (KI)",
+      "sync": {
+        "title": "Synchronisieren",
+        "open": "Mit anderer Spur synchronisieren (externer Ton)",
+        "openHint": "Richtet den Clip anhand seines Tons an der Aufnahme einer anderen Spur aus (z. B. separates Mikro zum Kameraton). Ungefähr platzieren (±{{sec}} s).",
+        "working": "Töne werden verglichen…",
+        "pick": "An welcher Aufnahme ausrichten?",
+        "noRef": "Keine Aufnahme auf einer anderen Spur im Bereich ±{{sec}} s.",
+        "noMatch": "Keine sichere Übereinstimmung gefunden. Clip ungefähr platzieren (±{{sec}} s) und erneut versuchen.",
+        "unsupported": "Beschleunigte, rückwärts laufende oder Loop-Clips lassen sich nicht synchronisieren.",
+        "done": "Synchron mit „{{name}}“: um {{ms}} ms verschoben (Übereinstimmung: {{conf}})."
+      },
       "speech": {
         "modelChoose": "Für den Textschnitt wird einmalig ein Spracherkennungsmodell geladen; danach läuft es offline auf dem Telefon. Das genauere Modell versteht Ungarisch deutlich besser.",
         "modelBase": "Standard ({{mb}} MB)",

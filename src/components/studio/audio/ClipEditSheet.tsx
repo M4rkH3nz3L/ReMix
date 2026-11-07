@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { startSilenceSearch } from '@/components/studio/audio/SilenceReview';
 import { startSpeechEdit } from '@/components/studio/audio/SpeechEditBar';
+import { startAudioSync } from '@/components/studio/audio/audioSyncAction';
 import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
 import { AUDIO_FX_PRESETS, presetFx } from '@/lib/audioFxPresets';
 import { renderClipSpectrum } from '@/lib/audioSpectrum';
@@ -460,6 +461,20 @@ export function ClipEditSheet({
           <Text style={styles.stemsText}>{t('studio.audio.speech.open')}</Text>
         </Pressable>
         <Text style={styles.hint}>{t('studio.audio.speech.openHint')}</Text>
+
+        {/* 🔗 külső hang szinkronja a hangja alapján */}
+        <Pressable
+          testID="clip-audio-sync"
+          onPress={() => {
+            onClose();
+            startAudioSync(clip, fps, t);
+          }}
+          style={[styles.stemsBtn, { marginTop: 12 }]}
+        >
+          <Ionicons name="git-compare-outline" size={16} color={palette.accent} />
+          <Text style={styles.stemsText}>{t('studio.audio.sync.open')}</Text>
+        </Pressable>
+        <Text style={styles.hint}>{t('studio.audio.sync.openHint', { sec: 30 })}</Text>
 
         {/* 🎚️ AI stem-szeparáció (Pro) */}
         <View style={styles.divider} />

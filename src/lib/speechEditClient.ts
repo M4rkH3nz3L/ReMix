@@ -18,7 +18,7 @@ export function clearSpeechWordCache(): void {
   cache.clear();
 }
 
-async function windowPcm16k(uri: string, from: number, to: number, sourceDuration?: number): Promise<Float32Array | null> {
+export async function windowPcm16k(uri: string, from: number, to: number, sourceDuration?: number): Promise<Float32Array | null> {
   if (canSegment() && isLongSource(sourceDuration)) {
     const SR = 44100;
     const src = new LongSource(uri);

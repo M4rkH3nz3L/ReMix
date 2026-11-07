@@ -4136,6 +4136,17 @@
       },
       "exportSilent": "Minden sáv némítva van, nincs mit exportálni.",
       "stems": "Stemek szétbontása (AI)",
+      "sync": {
+        "title": "Szinkron",
+        "open": "Szinkron a másik sávhoz (külső hang)",
+        "openHint": "A klipet a hangja alapján a másik sáv felvételéhez igazítja (pl. külön mikrofon a kamera hangjához). Tedd nagyjából a helyére (±{{sec}} s).",
+        "working": "Hangok összevetése…",
+        "pick": "Melyik felvételhez igazítsam?",
+        "noRef": "Nincs másik sávon felvétel a klip ±{{sec}} s-os környezetében.",
+        "noMatch": "Nem találtam biztos egyezést. Tedd a klipet nagyjából a helyére (±{{sec}} s), és próbáld újra.",
+        "unsupported": "Gyorsított, visszafelé játszott vagy loop-klip nem szinkronizálható.",
+        "done": "Szinkronban a(z) „{{name}}” felvétellel: {{ms}} ms-mal arrébb (egyezés: {{conf}})."
+      },
       "speech": {
         "modelChoose": "A szöveges vágáshoz egyszer le kell tölteni egy beszédfelismerő modellt; utána offline, a telefonon fut. A pontosabb modell magyarul sokkal jobban ért.",
         "modelBase": "Alap ({{mb}} MB)",

@@ -69,6 +69,8 @@ import { useSpeechEdit } from '@/store/speechEditStore';
 import { currentSpeechWords } from '@/components/studio/audio/SpeechEditBar';
 import { clearSpeechWordCache } from '@/lib/speechEditClient';
 import { wordCutRanges } from '@/lib/speechEdit';
+import { gccPhatLag, SYNC_MIN_CONFIDENCE } from '@/lib/audioSync';
+import { syncClipTo } from '@/lib/audioSyncClient';
 import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
 import { catalogRuntime, downloadModel, listCachedModels } from '@/lib/modelRegistryClient';
@@ -3443,6 +3445,95 @@ function smokeFileHost(): string {
   return `http://${serverHost(undefined, Constants.expoConfig?.hostUri, true)}:8799`;
 }
 
+/** 🔗 Külső hang szinkronja: ismert eltolású, tompább, zajos „külön mikrofon” a kamera hangjához. */
+async function smokeExtSync(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const refUri = await downloadToCache(`${smokeFileHost()}/speech_en.wav`, 'smoke_sync_ref.wav');
+  const huUri = await downloadToCache(`${smokeFileHost()}/speech_hu.wav`, 'smoke_sync_hu.wav');
+  if (!refUri || !huUri) {
+    log(false, 'a próbahangok letöltése', '-');
+    return;
+  }
+  const api = (await loadAudioApi())!;
+  const x = (await api.decodeAudioData(refUri, SR)).getChannelData(0);
+  // „külön mikrofon”: 1,2345 s szobazaj elöl, tompább (egypólusú aluláteresztő), halkabb, zajos
+  const P = Math.round(1.2345 * SR);
+  let seed = 5;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  let lp = 0;
+  const y = new Float32Array(P + x.length);
+  for (let i = 0; i < y.length; i++) {
+    const v = i >= P ? x[i - P] : 0;
+    lp = 0.6 * lp + 0.4 * v;
+    y[i] = 0.4 * lp + 0.01 * rnd();
+  }
+  const extFile = new File(Paths.document, 'smoke_sync_ext.wav');
+  if (extFile.exists) extFile.delete();
+  extFile.create();
+  extFile.write(encodeWav16([y, y], SR, () => 0.5));
+  const truth = 2 - P / SR; // a kamera-hang 2 s-nál indul → a külön mikrofon helye
+  const id = 'prj_smoke_sync';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:sync', caught));
+  const base = createEmptyProject('smoke szinkron', '9:16', undefined, 'audio');
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported', uri: refUri, start: 0, duration: 8.2, sourceDuration: 8.2, id: 'x', ...over });
+  const extDur = Math.floor((y.length / SR) * 1000) / 1000;
+  const project: Project = {
+    ...base,
+    id,
+    tracks: base.tracks.map((t) =>
+      t.type === 'voiceover'
+        ? { ...t, clips: [ac({ id: 'cam', label: 'kamera', start: 2 })] }
+        : t.type === 'sfx'
+          ? { ...t, clips: [ac({ id: 'mic', label: 'mikrofon', uri: extFile.uri, start: 1, duration: extDur, sourceDuration: extDur })] }
+          : t
+    ),
+  };
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  st().selectClip('mic');
+  const t0 = Date.now();
+  const r = (await runDevAction('audio.syncSelected')) as { target: number; confidence: number; lag: number } | null;
+  const mic = st().project!.tracks.find((t) => t.type === 'sfx')!.clips[0] as AudioClip;
+  const placed = mic.start - (mic.trimIn ?? 0); // a forrás 0 pontja az idővonalon
+  const errMs = r ? (r.target - truth) * 1000 : NaN;
+  log(!!r && Math.abs(errMs) < 0.1 && r.confidence >= SYNC_MIN_CONFIDENCE, 'a talált eltolás a valóditól < 0,1 ms (más hangszín, halkabb, zajos)', `hiba ${errMs.toFixed(4)} ms, egyezés ${r?.confidence.toFixed(1)}, ${Date.now() - t0} ms alatt`);
+  log(Math.abs(placed - truth) < 1e-4 && Math.abs(mic.start * 30 - Math.round(mic.start * 30)) < 1e-4, 'a klip a frame-rácson, a maradék a trimIn-ben — a hang mintapontosan a helyén', `kezdet ${mic.start.toFixed(6)} (rács), trimIn ${mic.trimIn?.toFixed(6)}, forrás-0 @ ${placed.toFixed(6)} (valódi ${truth.toFixed(6)})`);
+  log(true, 'FOTÓZHATÓ', 'a mikrofon-klip a kamera-hang alá igazítva');
+  await sleep(2500);
+  // a keverőn át: a két sáv külön exportja egymáshoz mérve
+  const render = async (keep: string, name: string) => {
+    const p: Project = { ...st().project!, tracks: st().project!.tracks.map((t) => (t.type === keep ? t : { ...t, clips: [] })) };
+    const { uri: o } = await exportOfflineWav(p, new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const d = (await api.decodeAudioData(o, SR)).getChannelData(0);
+    new File(o).delete();
+    return d;
+  };
+  const camOut = await render('voiceover', 'smoke_sync_cam.wav');
+  const micOut = await render('sfx', 'smoke_sync_mic.wav');
+  const w0 = Math.round(3 * SR);
+  const w1 = Math.round(7 * SR);
+  const check = gccPhatLag(camOut.subarray(w0 - SR, w1 + SR), micOut.subarray(w0, w1), SR, 1.5);
+  const mixErr = (check.lag - 1) * 1000;
+  log(Math.abs(mixErr) < 0.1, 'a lejátszásban (export) a két sáv együtt szól: eltérés < 0,1 ms', `${mixErr.toFixed(4)} ms (${((mixErr / 1000) * SR).toFixed(2)} minta)`);
+  st().undo();
+  const back = st().project!.tracks.find((t) => t.type === 'sfx')!.clips[0];
+  log(back.start === 1, 'egy visszavonás: a klip vissza az eredeti helyére', `${back.start}`);
+  // idegen felvétel: nincs egyezés, a klip nem mozdul
+  const hu: AudioClip = ac({ id: 'hu', uri: huUri, start: 1, duration: 9.3, sourceDuration: 9.3 });
+  const camClip = st().project!.tracks.find((t) => t.type === 'voiceover')!.clips[0] as AudioClip;
+  const neg = await syncClipTo(camClip, hu, 30);
+  log(!!neg && neg.confidence < SYNC_MIN_CONFIDENCE, 'idegen felvételre (magyar beszéd) nincs egyezés', `egyezés ${neg?.confidence.toFixed(2)} < ${SYNC_MIN_CONFIDENCE}`);
+  await sleep(1000);
+  router.back();
+}
+
 /** 🇭🇺 Magyar beszédvágás: az alap modell szóhibái, a pontosabb (small) modell letöltése az átirat-sávból, újra-mérés, egy szó kivágása. */
 async function smokeSpeechHu(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5042,6 +5133,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'extsync') {
+    await step(phase, () => smokeExtSync(log));
     return;
   }
   if (phase === 'speechhu') {

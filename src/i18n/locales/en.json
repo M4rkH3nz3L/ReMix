@@ -4136,6 +4136,17 @@
       },
       "exportSilent": "All tracks are muted, nothing to export.",
       "stems": "Separate stems (AI)",
+      "sync": {
+        "title": "Sync",
+        "open": "Sync to another track (external audio)",
+        "openHint": "Aligns the clip by its sound to the recording on another track (e.g. a separate mic to the camera audio). Place it roughly (±{{sec}} s).",
+        "working": "Comparing audio…",
+        "pick": "Which recording should it align to?",
+        "noRef": "No recording on another track within ±{{sec}} s of the clip.",
+        "noMatch": "No reliable match found. Place the clip roughly (±{{sec}} s) and try again.",
+        "unsupported": "Sped-up, reversed or loop clips can't be synced.",
+        "done": "In sync with “{{name}}”: moved by {{ms}} ms (match: {{conf}})."
+      },
       "speech": {
         "modelChoose": "Editing by text needs a speech recognition model, downloaded once; after that it runs offline on the phone. The more accurate model understands Hungarian much better.",
         "modelBase": "Standard ({{mb}} MB)",

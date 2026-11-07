@@ -21,6 +21,39 @@ export const EDGE_FADE_SEC = 0.01; // 44,1 és 48 kHz-en is egész mintaszám (4
 const EDGE_EPS = 1e-4;
 
 /**
+ * ✖️ Automatikus crossfade (a DAW-ok alapértelmezése): ha egy sávon a következő klip az előző
+ * VÉGÉBE lóg bele, az átfedés alatt az előző kihalkul, a következő felhangosodik — a crossfade
+ * hossza az átfedés (a klip mozgatásával állítható). Ha a klip teljesen a másikon belül van,
+ * az rétegezés: nincs crossfade.
+ */
+export function crossfadePairs(clips: Pick<AudioClip, 'id' | 'start' | 'duration'>[]): { outId: string; inId: string; start: number; length: number }[] {
+  const pairs: { outId: string; inId: string; start: number; length: number }[] = [];
+  const sorted = clips.slice().sort((a, b) => a.start - b.start);
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    const aEnd = a.start + a.duration;
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      if (b.start >= aEnd - EDGE_EPS) break;
+      if (b.start + b.duration <= aEnd + EDGE_EPS || b.start <= a.start + EDGE_EPS) continue; // rétegezés
+      pairs.push({ outId: a.id, inId: b.id, start: b.start, length: aEnd - b.start });
+    }
+  }
+  return pairs;
+}
+
+export function crossfades(clips: AudioClip[]): Map<string, { in: number; out: number }> {
+  const out = new Map<string, { in: number; out: number }>();
+  for (const p of crossfadePairs(clips)) {
+    const ea = out.get(p.outId) ?? { in: 0, out: 0 };
+    const eb = out.get(p.inId) ?? { in: 0, out: 0 };
+    out.set(p.outId, { ...ea, out: Math.max(ea.out, p.length) });
+    out.set(p.inId, { ...eb, in: Math.max(eb.in, p.length) });
+  }
+  return out;
+}
+
+/**
  * A klip ténylegesen alkalmazott fade-jei: a felhasználói fade, ennek hiányában 5 ms-os
  * mikro-fade — kivéve a kettévágott klip illesztését (ugyanaz a forrás folytatódik).
  * A szerver `edgeFades`-ének tükre.
@@ -118,6 +151,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
     const gain = project.trackMix?.[track.type]?.gain ?? 1;
     const audio = track.clips.filter((c): c is AudioClip => c.kind === 'audio');
     const fades = edgeFades(audio);
+    const xf = crossfades(audio);
     for (const clip of audio) {
       // 🎛️ a közös DSP-ben már megvalósított effektek szólnak; a többi még csak a szerveren
       if (fxUnsupported(clip.audioFx)) unsupported.add('effects');
@@ -141,8 +175,9 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         trimIn: clip.trimIn ?? 0,
         volume: clip.volume,
         volumeKf: clip.keyframes?.volume,
-        fadeIn: fades.get(clip.id)?.in ?? 0,
-        fadeOut: fades.get(clip.id)?.out ?? 0,
+        // ✖️ az átfedő szomszéd crossfade-je a nagyobb (a felhasználói fade-nél rövidebb nem vág)
+        fadeIn: Math.max(fades.get(clip.id)?.in ?? 0, xf.get(clip.id)?.in ?? 0),
+        fadeOut: Math.max(fades.get(clip.id)?.out ?? 0, xf.get(clip.id)?.out ?? 0),
         pan: clip.pan ?? 0,
         panKf: clip.keyframes?.pan,
         gain,

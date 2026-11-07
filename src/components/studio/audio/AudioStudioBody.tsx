@@ -13,6 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { useShuttleHold } from '@/hooks/useShuttleHold';
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
+import { CrossfadeMarks } from '@/components/studio/audio/CrossfadeMarks';
 import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
@@ -808,6 +809,7 @@ export function AudioStudioBody({
                         snap={snapSecIn}
                       />
                     ))}
+                    <CrossfadeMarks clips={clips} pxPerSec={pxPerSec} height={LANE_H} color={lane.color} />
                   </Pressable>
                 );
               })}

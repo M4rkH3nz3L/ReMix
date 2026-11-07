@@ -1,4 +1,4 @@
-import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains, type DecodedSource } from '@/lib/offlineMix';
+import { clipGainAt, encodeWav16, mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, panGains, stretchJobs, withNormalizeGains, crossfades, type DecodedSource } from '@/lib/offlineMix';
 import { integratedLoudness } from '@/lib/loudness';
 import { createEmptyProject } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
@@ -173,6 +173,26 @@ describe('offlineMix (A26)', () => {
     expect(maxDiff).toBeLessThan(1e-6);
     // csak a szelet (és az első szeletnél a bejáratás) ablakát kérte — nem a teljes forrást
     expect(Math.max(...reads)).toBeLessThan(Math.round(0.8 * SR));
+  });
+
+  it('✖️ crossfade: az átfedésben az előző kihalkul, a következő felhangosodik — a szint folytonos', () => {
+    const a = clip({ id: 'a', start: 0, duration: 3, volume: 1 });
+    const b = clip({ id: 'b', start: 2, duration: 3, volume: 1 });
+    const inner = clip({ id: 'c', start: 0.5, duration: 1, volume: 1 });
+    const x = crossfades([a, b, inner]);
+    expect(x.get('a')?.out).toBeCloseTo(1);
+    expect(x.get('b')?.in).toBeCloseTo(1);
+    // a teljesen belül lévő klip rétegezés: nincs crossfade
+    expect(x.get('c')).toBeUndefined();
+    // a keverésben: ugyanaz a jel két klipben → az átfedésben a szint állandó (lineáris crossfade)
+    const SR = 44100;
+    const p = project([clip({ id: 'a', start: 0, duration: 3, trimIn: 0, sourceDuration: 6, volume: 1 }), clip({ id: 'b', start: 2, duration: 3, trimIn: 2, sourceDuration: 6, volume: 1 })]);
+    const plan = offlineMixPlan(p);
+    expect(plan.clips.find((c) => c.id === 'a')?.fadeOut).toBeCloseTo(1);
+    const dc = new Float32Array(6 * SR).fill(0.5);
+    const out: [Float32Array, Float32Array] = [new Float32Array(5 * SR), new Float32Array(5 * SR)];
+    mixRange(plan, new Map([[plan.clips[0].uri, { channels: [dc], sampleRate: SR }]]), out, 0, 5 * SR);
+    for (const t of [1.5, 2.0, 2.25, 2.5, 2.75, 3.5]) expect(out[0][Math.round(t * SR)]).toBeCloseTo(0.5, 2);
   });
 });
 

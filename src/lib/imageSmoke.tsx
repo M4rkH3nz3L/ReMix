@@ -3114,6 +3114,45 @@ async function smokeLongSource(log: Log) {
   new File(out).delete();
 }
 
+/** ✖️ Automatikus crossfade: átfedő klipek — a szint folytonos (telefonos export), X a sávon. */
+async function smokeCrossfade(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const uri = toneWav('smoke_xfade.wav', 8);
+  const id = 'prj_smoke_crossfade';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:crossfade', caught));
+  const base = createEmptyProject('smoke crossfade', '9:16', undefined, 'audio');
+  // ugyanaz a hang folytatódik: a második klip forrása ott kezdődik, ahol az idővonalon belép
+  const a: AudioClip = { kind: 'audio', id: 'xa', uri, label: 'A', start: 0, duration: 4, trimIn: 0, sourceDuration: 8, volume: 0.6, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const b: AudioClip = { ...a, id: 'xb', label: 'B', start: 3, duration: 4, trimIn: 3 };
+  const project: Project = { ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [a, b] } : t)) };
+  const plan = offlineMixPlan(project);
+  log(Math.abs((plan.clips.find((c) => c.id === 'xa')?.fadeOut ?? 0) - 1) < 1e-6 && Math.abs((plan.clips.find((c) => c.id === 'xb')?.fadeIn ?? 0) - 1) < 1e-6, 'az 1 s-os átfedés crossfade lett (A ki, B be)');
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_xfade.wav'));
+  const api = await loadAudioApi();
+  const x = (await api!.decodeAudioData(out, SR)).getChannelData(0);
+  const db = (from: number, to: number) => {
+    let acc = 0;
+    for (let i = Math.round(from * SR); i < Math.round(to * SR); i++) acc += x[i] * x[i];
+    return 10 * Math.log10(acc / ((to - from) * SR) + 1e-30);
+  };
+  const before = db(2.0, 2.8);
+  const levels = [3.1, 3.4, 3.7].map((t) => db(t, t + 0.1) - before);
+  const after = db(4.2, 5.0) - before;
+  log(levels.every((d) => Math.abs(d) < 0.5) && Math.abs(after) < 0.5, 'a szint az átfedésen át folytonos (nincs lyuk, nincs dupla hangerő)', `${levels.map((d) => d.toFixed(2)).join(' / ')} dB, utána ${after.toFixed(2)} dB`);
+  new File(out).delete();
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1500);
+  useEditorStore.getState().setPlayhead(2);
+  log(true, 'FOTÓZHATÓ', 'a crossfade X-e a zene sávon (3–4 s)');
+  await sleep(4000);
+  router.back();
+}
+
 /** A26: a telefonos WAV-export a valódi natív dekóderrel — és a szerveres renderrel kivonva. */
 async function smokeOfflineExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4278,6 +4317,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'crossfade') {
+    await step(phase, () => smokeCrossfade(log));
     return;
   }
   if (phase === 'longsource') {

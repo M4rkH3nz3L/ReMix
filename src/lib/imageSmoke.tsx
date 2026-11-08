@@ -3124,7 +3124,8 @@ async function smokeLongSource(log: Log) {
   st().setPlaying(false);
   const stats = previewEngine.takeStats();
   log(previewEngine.clock() !== null, 'a hosszú forrású projekt az előre renderelt motorról szól');
-  log(stats.late === 0 && head > 22 * 60 + 2, 'a 22. percnél akadás nélkül, a szakaszhatáron át', `${stats.chunks} szelet, ${stats.late} késett (${stats.lateAt.join(',')} ms-nál), indulás ${stats.startMs} ms, fej ${head.toFixed(1)} s`);
+  // a mérce a 1320 s-os szakaszhatár átlépése akadás nélkül (az indulás eszközönként eltér: az emulátoron ~0,5 s)
+  log(stats.late === 0 && head > 22 * 60 + 1, 'a 22. percnél akadás nélkül, a szakaszhatáron át', `${stats.chunks} szelet, ${stats.late} késett (${stats.lateAt.join(',')} ms-nál), indulás ${stats.startMs} ms, fej ${head.toFixed(1)} s`);
   log(previewEngine.loadedSegments().every((n) => n <= 8), 'a motor memóriájában legfeljebb 8 szakasz', previewEngine.loadedSegments().join(','));
   router.back();
   // telefonos export a fájl végéről (2 perces részlet a 21. perctől)
@@ -3471,6 +3472,63 @@ function laneLabelFor(type: string, t: TFunction): string {
 /** kulcs-sorrendtől független JSON (szerkezeti egyezéshez) */
 function sortedJson(v: unknown): string {
   return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+}
+
+/** 🎧 Hosszú tömörített forrás szakaszosan (mp3 44,1/48 kHz, m4a 48 kHz): időzítés (eltolás) és pontosság a jel ismert értékéhez. */
+async function smokeLongCodec(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  log(canSegment(), 'a build szakaszosan dekódol (natív ablak)', `${Platform.OS}`);
+  const SR = 44100;
+  // a frekvencia 0,1 s-onként vált (200 + 37·(k mod 50) Hz): a mérőablakban az eltolás egyértelmű
+  const value = (i: number) => 0.3 * Math.sin((2 * Math.PI * (200 + 37 * (Math.floor((i / SR) * 10) % 50)) * i) / SR);
+  for (const name of ['hop_44k.mp3', 'hop_48k.mp3', 'hop_48k.m4a']) {
+    const t0 = Date.now();
+    const local = await downloadToCache(`${smokeFileHost()}/${name}`, `smoke_${name}`);
+    if (!local) {
+      log(false, `${name}: letöltés`, '-');
+      continue;
+    }
+    const long = new LongSource(local);
+    // a mérőablakok frekvencia-határon (20 s-onként vált) — a tiszta szinuszon a korreláció periodikus, ott az eltolás nem egyértelmű
+    for (const [label, from] of [['1 s', 1.0], ['40 s (szakaszhatár)', 39.95], ['22. perc (1320 s)', 22 * 60 - 0.05]] as const) {
+      const a = Math.round(from * SR);
+      const n = 4410;
+      const pad = 6000;
+      const t1 = Date.now();
+      await long.ensure(a - pad, a + n + pad);
+      const w = long.read(a - pad, a + n + pad);
+      const ms = Date.now() - t1;
+      if (!w) {
+        log(false, `${name} @ ${label}`, 'nincs adat');
+        continue;
+      }
+      const x = w[0];
+      // az eltolás: a legjobb egyezés a referenciával ±6000 mintán belül
+      let bestLag = 0;
+      let best = -Infinity;
+      for (let lag = -pad; lag <= pad; lag++) {
+        let c = 0;
+        for (let i = 0; i < n; i += 2) c += x[pad + lag + i] * value(a + i);
+        if (c > best) {
+          best = c;
+          bestLag = lag;
+        }
+      }
+      let sig = 0;
+      let err = 0;
+      for (let i = 0; i < n; i++) {
+        const r = value(a + i);
+        sig += r * r;
+        err += (x[pad + i] - r) * (x[pad + i] - r);
+      }
+      const snr = 10 * Math.log10(sig / Math.max(1e-20, err));
+      let errB = 0;
+      for (let i = 0; i < n; i++) errB += (x[pad + bestLag + i] - value(a + i)) ** 2;
+      log(null, `${name} @ ${label}: a legjobb illesztés`, `eltolás ${bestLag}, SNR ott ${(10 * Math.log10(sig / Math.max(1e-20, errB))).toFixed(1)} dB`);
+      log(Math.abs(bestLag) <= 1 && snr > 25, `${name} @ ${label}: a minták a helyükön`, `eltolás ${bestLag} minta, SNR ${snr.toFixed(1)} dB, ${ms} ms`);
+    }
+    log(long.loaded() <= 8, `${name}: a memóriában legfeljebb 8 szakasz`, `${long.loaded()} (letöltés+mérés ${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  }
 }
 
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
@@ -5781,6 +5839,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'longcodec') {
+    await step(phase, () => smokeLongCodec(log));
     return;
   }
   if (phase === 'console') {

@@ -195,6 +195,11 @@ public class RemixRenderModule: Module {
 
   /// a hang-ablak dekódolása (AVAssetReader, 44,1 kHz, float32, összefésült, forrás-csatornaszám)
   static func decodeWindow(url: URL, start: Double, duration: Double, outputPath: String) throws -> [String: Any] {
+    // 🎧 mp3: az AVAssetReader időtartománya mp3-nál pontatlan (mérve: 576 / −1494 minta csúszás) —
+    // az AVAudioFile mintapontosan keres, és a kódolói késleltetést is kezeli
+    if url.pathExtension.lowercased() == "mp3" {
+      return try decodeWindowAudioFile(url: url, start: start, duration: duration, outputPath: outputPath)
+    }
     let asset = AVURLAsset(url: url)
     guard let track = asset.tracks(withMediaType: .audio).first else {
       throw RenderError.noTracks("audio")
@@ -241,6 +246,92 @@ public class RemixRenderModule: Module {
     }
     try data.write(to: URL(fileURLWithPath: outputPath))
     return ["frames": data.count / (4 * channels), "channels": channels]
+  }
+
+  /** a Xing/Info-fejléc kódoló-címkéjének (LAME, Lavc) késleltetése (minta); nincs ilyen fejléc → 0 */
+  static func lameEncoderDelay(_ url: URL) -> Int {
+    guard let h = try? FileHandle(forReadingFrom: url) else { return 0 }
+    defer { try? h.close() }
+    let head = h.readData(ofLength: 256 * 1024)
+    let bytes = [UInt8](head)
+    var start = 0
+    // ID3v2 átugrása (szinkron-biztos méret)
+    if bytes.count > 10, bytes[0] == 0x49, bytes[1] == 0x44, bytes[2] == 0x33 {
+      start = 10 + (Int(bytes[6] & 0x7f) << 21 | Int(bytes[7] & 0x7f) << 14 | Int(bytes[8] & 0x7f) << 7 | Int(bytes[9] & 0x7f))
+    }
+    // a Xing/Info fejléc után (a jelzőbitek szerinti mezőkkel) jön a kódoló-címke (LAME… vagy Lavc…);
+    // a késleltetés a címke 21–22. bájtjának 12 bitje
+    let xing: [UInt8] = Array("Xing".utf8)
+    let info: [UInt8] = Array("Info".utf8)
+    var i = start
+    while i + 8 < bytes.count && i < start + 4096 {
+      let tag = Array(bytes[i..<(i + 4)])
+      if tag == xing || tag == info {
+        let flags = Int(bytes[i + 4]) << 24 | Int(bytes[i + 5]) << 16 | Int(bytes[i + 6]) << 8 | Int(bytes[i + 7])
+        var at = i + 8
+        if flags & 1 != 0 { at += 4 }
+        if flags & 2 != 0 { at += 4 }
+        if flags & 4 != 0 { at += 100 }
+        if flags & 8 != 0 { at += 4 }
+        if at + 23 < bytes.count {
+          return Int(bytes[at + 21]) << 4 | Int(bytes[at + 22]) >> 4
+        }
+        return 0
+      }
+      i += 1
+    }
+    return 0
+  }
+
+  /** az mp3-ablak AVAudioFile-lal: mintapontos `framePosition`, 44,1 kHz-től eltérőnél AVAudioConverter */
+  static func decodeWindowAudioFile(url: URL, start: Double, duration: Double, outputPath: String) throws -> [String: Any] {
+    let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+    let src = file.processingFormat
+    let channels = max(1, min(2, Int(src.channelCount)))
+    let outFrames = Int((max(0, duration) * 44100).rounded())
+    var out = [Float](repeating: 0, count: outFrames * channels)
+    let srcRate = src.sampleRate
+    // az AVAudioFile a dekóder késleltetését levágja, a LAME-kódolóét (576) nem (mérve: +576 minta) — a fejlécből
+    let encoderDelay = AVAudioFramePosition(lameEncoderDelay(url))
+    let startFrame = AVAudioFramePosition((max(0, start) * srcRate).rounded()) + encoderDelay
+    if startFrame < file.length {
+      file.framePosition = startFrame
+      let want = AVAudioFrameCount(min(Double(file.length - startFrame), Double(outFrames) * srcRate / 44100 + 256))
+      guard let inBuf = AVAudioPCMBuffer(pcmFormat: src, frameCapacity: max(1, want)) else { throw RenderError.exportFailed("hang-ablak puffer") }
+      try file.read(into: inBuf, frameCount: want)
+      if abs(srcRate - 44100) < 0.5 {
+        let n = min(Int(inBuf.frameLength), outFrames)
+        for c in 0..<channels {
+          let ch = inBuf.floatChannelData![min(c, Int(src.channelCount) - 1)]
+          for i in 0..<n { out[i * channels + c] = ch[i] }
+        }
+      } else {
+        guard let dstFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: AVAudioChannelCount(channels), interleaved: false),
+              let conv = AVAudioConverter(from: src, to: dstFormat),
+              let outBuf = AVAudioPCMBuffer(pcmFormat: dstFormat, frameCapacity: AVAudioFrameCount(outFrames + 64)) else {
+          throw RenderError.exportFailed("hang-átalakító")
+        }
+        // .normal: az átalakító a saját késleltetését kiegyenlíti (a .none-nal ~15 minta csúszás, mérve)
+        conv.primeMethod = .normal
+        var given = false
+        var err: NSError?
+        _ = conv.convert(to: outBuf, error: &err) { _, status in
+          if given { status.pointee = .endOfStream; return nil }
+          given = true
+          status.pointee = .haveData
+          return inBuf
+        }
+        if let err { throw err }
+        let n = min(Int(outBuf.frameLength), outFrames)
+        for c in 0..<channels {
+          let ch = outBuf.floatChannelData![c]
+          for i in 0..<n { out[i * channels + c] = ch[i] }
+        }
+      }
+    }
+    let data = out.withUnsafeBufferPointer { Data(buffer: $0) }
+    try data.write(to: URL(fileURLWithPath: outputPath))
+    return ["frames": outFrames, "channels": channels]
   }
 
   private func fileURL(_ uri: String) -> URL {

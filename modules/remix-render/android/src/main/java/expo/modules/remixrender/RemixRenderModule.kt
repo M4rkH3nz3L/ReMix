@@ -41,6 +41,19 @@ class RemixRenderModule : Module() {
       }
     }
 
+    // 🎧 hosszú forrás szakaszosan (az iOS decodeWindow párja): csak az ablak dekódolódik,
+    // 44,1 kHz float32, összefésülve a kimeneti fájlba
+    Constant("supportsDecodeWindow") { true }
+
+    AsyncFunction("decodeWindow") { uri: String, start: Double, duration: Double, outputPath: String, promise: Promise ->
+      try {
+        val r = WindowDecoder.decodeWindow(toPath(uri), start, duration, toPath(outputPath))
+        promise.resolve(mapOf("frames" to r.frames, "channels" to r.channels, "encoderDelay" to r.encoderDelay, "firstPtsUs" to r.firstPtsUs, "mime" to r.mime, "out" to r.outInfo))
+      } catch (e: Exception) {
+        promise.reject("ERR_DECODE_WINDOW", e.message ?: "hang-ablak olvasása", e)
+      }
+    }
+
     // A futó render megszakítása — a natív decode/encode loop a következő
     // iterációnál kilép, a részfájlt törli. (Az `exportPlan` indításkor nullázza.)
     AsyncFunction("cancel") {

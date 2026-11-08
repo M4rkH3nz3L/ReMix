@@ -179,38 +179,81 @@ object WindowDecoder {
     val ch = max(1, min(2, srcCh))
     val out = ByteBuffer.allocate(outFrames * ch * 4).order(ByteOrder.LITTLE_ENDIAN)
     val base = firstFrame.coerceAtLeast(0)
-    val sample = { c: Int, idx: Long -> val k = (idx - base).toInt(); if (k in 0 until have) buf[c][k] else 0f }
     if (srcRate == OUT_SR) {
       // bitpontos: az ablak eleje egész minta
       val s0 = (start * OUT_SR).roundToLong()
-      for (i in 0 until outFrames) for (c in 0 until ch) out.putFloat(sample(c, s0 + i))
+      for (i in 0 until outFrames) {
+        val k = (s0 + i - base).toInt()
+        for (c in 0 until ch) out.putFloat(if (k in 0 until have) buf[c][k] else 0f)
+      }
     } else {
       // Blackman-ablakos sinc: a levágás a kisebbik Nyquist 95%-a. A mag előre kiszámolt táblából
-      // (egységenként 512 pont, lineáris interpolációval) — mintánként nincs sin/cos (mérve: a
-      // közvetlen számolás egy 20 s-os ablakon az emulátoron ~23 s volt)
+      // (egységenként 512 pont, lineáris interpolációval), a súlyok kimeneti mintánként egyszer, a
+      // csatornák közvetlenül a tömbből — lambda (dobozolt Long/Double) nélkül (mérve: a lambdás
+      // változat 48 kHz-es 20 s-os ablakon az emulátoron ~9 s volt)
       val ratio = srcRate.toDouble() / OUT_SR
       val cutoff = 0.95 * min(1.0, 1.0 / ratio)
       val half = (TAPS / cutoff).toInt()
       val res = 512
-      val table = FloatArray(half * res + 2) { j ->
+      val limit = half * res
+      val table = FloatArray(limit + 2) { j ->
         val x = j.toDouble() / res
         val sinc = if (x < 1e-9) 1.0 else sin(PI * x * cutoff) / (PI * x * cutoff)
         val w = if (x >= half) 0.0 else 0.42 + 0.5 * cos(PI * x / half) + 0.08 * cos(2 * PI * x / half)
         (cutoff * sinc * w).toFloat()
       }
-      val kernel = { x: Double ->
-        val ax = abs(x) * res
-        val j = ax.toInt()
-        if (j >= half * res) 0f else { val f = (ax - j).toFloat(); table[j] + (table[j + 1] - table[j]) * f }
-      }
+      val taps = 2 * half
+      // a súly-minta `period` kimeneti mintánként ismétlődik (48 → 44,1 kHz: 147), ezért fázisonként
+      // egyszer számolódik; a fázis az ablak kezdetétől számít (a kezdő tört rész mindegyikben ugyanaz)
+      var g = srcRate; var h = OUT_SR
+      while (h != 0) { val r = g % h; g = h; h = r }
+      val period = OUT_SR / g
+      val cache = if (period <= 4096) FloatArray(period * taps) else null
+      val filled = BooleanArray(if (cache != null) period else 0)
+      val scratch = FloatArray(taps)
+      // a pozíció a fázisból: p0 + (i / period)·(srcRate / g) + (f0 + fázis·ratio) — így ugyanaz a
+      // fázis mindig ugyanazt a tört részt és egész lépést adja (a mintánkénti lebegőpontos számolás
+      // egész-közeli pozíción hol 0,9999-et, hol 0,0000-t adott: a tárolt súly egy mintát csúszott)
+      val p0 = start * srcRate
+      val base0 = floor(p0).toLong()
+      val f0 = p0 - base0
+      val step = (srcRate / g).toLong()
       for (i in 0 until outFrames) {
-        val pos = (start + i.toDouble() / OUT_SR) * srcRate
-        val centre = floor(pos).toLong()
+        val phase = if (cache != null) i % period else -1
+        val offs = if (cache != null) f0 + phase * ratio else f0 + i * ratio
+        val whole = floor(offs).toLong()
+        val frac = offs - whole
+        val centre = base0 + (if (cache != null) (i / period) * step + whole else whole)
+        val weights: FloatArray
+        val w0: Int
+        if (cache != null && filled[phase]) {
+          weights = cache; w0 = phase * taps
+        } else {
+          for (t in 0 until taps) {
+            // a k = t − half + 1 mag-pont távolsága: |pos − (centre + k)|
+            val ax = abs(frac - (t - half + 1)) * res
+            val j = ax.toInt()
+            scratch[t] = if (j >= limit) 0f else { val f = (ax - j).toFloat(); table[j] + (table[j + 1] - table[j]) * f }
+          }
+          if (cache != null) {
+            System.arraycopy(scratch, 0, cache, phase * taps, taps)
+            filled[phase] = true
+            weights = cache; w0 = phase * taps
+          } else {
+            weights = scratch; w0 = 0
+          }
+        }
+        val k0 = (centre - half + 1 - base).toInt()
         for (c in 0 until ch) {
+          val src = buf[c]
           var acc = 0f
-          for (k in -half + 1..half) {
-            val idx = centre + k
-            acc += sample(c, idx) * kernel(pos - idx)
+          if (k0 >= 0 && k0 + taps <= have) {
+            for (t in 0 until taps) acc += src[k0 + t] * weights[w0 + t]
+          } else {
+            for (t in 0 until taps) {
+              val k = k0 + t
+              if (k in 0 until have) acc += src[k] * weights[w0 + t]
+            }
           }
           out.putFloat(acc)
         }

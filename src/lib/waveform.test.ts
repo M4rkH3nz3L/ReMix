@@ -1,5 +1,5 @@
 import { ZOOM_LEVELS } from '@/lib/audioTransport';
-import { WAVEFORM_PPS, barHeights, clipWindowPeaks, peaksFromChannels, resamplePeaks, waveformCacheKey } from '@/lib/waveform';
+import { WAVEFORM_PPS, barHeights, clipWindowPeaks, peaksFromChannels, resamplePeaks, waveformCacheKey, PeakAccumulator } from '@/lib/waveform';
 
 // 〰️ A hullámforma újramintázás (a klip-waveform kirajzolás magja) pure
 // regressziós pajzsa: oszloponkénti MAXIMUM (a csúcsok ne tűnjenek el ritkításkor).
@@ -84,3 +84,31 @@ describe('hullámforma-felbontás (A24)', () => {
   });
 });
 
+
+describe('PeakAccumulator (hosszú forrás, szakaszonként)', () => {
+  it('a darabolás nem számít, a csúcs-határok a pontos rácson (44,1 kHz / 64 nem egész)', () => {
+    const SR = 44100;
+    const n = SR * 3;
+    const x = Float32Array.from({ length: n }, (_, i) => Math.abs(Math.sin(i * 0.37)) * ((i % 9973) / 9973));
+    const whole = new PeakAccumulator(SR, 64);
+    whole.push([x]);
+    const chunked = new PeakAccumulator(SR, 64);
+    for (let a = 0; a < n; a += 12345) chunked.push([x.subarray(a, Math.min(n, a + 12345))]);
+    const w = whole.finish(3)!;
+    expect(chunked.finish(3)!.peaks).toEqual(w.peaks);
+    expect(w.peaks).toHaveLength(192);
+    // a p. csúcs = a [round(p·sr/64), round((p+1)·sr/64)) maximuma
+    for (const p of [0, 1, 63, 64, 191]) {
+      const from = Math.round((p * SR) / 64);
+      const to = Math.round(((p + 1) * SR) / 64);
+      let m = 0;
+      for (let i = from; i < to; i++) m = Math.max(m, Math.abs(x[i]));
+      expect(w.peaks[p]).toBe(Math.round(m * 100) / 100);
+    }
+  });
+  it('minden csatorna számít', () => {
+    const acc = new PeakAccumulator(64, 64);
+    acc.push([Float32Array.from([0.1, 0]), Float32Array.from([0, 0.7])]);
+    expect(acc.finish(2 / 64)!.peaks).toEqual([0.1, 0.7]);
+  });
+});

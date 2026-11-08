@@ -110,7 +110,7 @@ import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExpo
 import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { audioApiState, loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
-import { clearWaveformMemory, clipWindowPeaks, getWaveform, WAVEFORM_PPS } from '@/lib/waveform';
+import { clearWaveformMemory, clipWindowPeaks, getWaveform, lastWaveformMode, WAVEFORM_PPS, waveformCacheKey } from '@/lib/waveform';
 import { mixForExport } from '@/lib/audioExportMix';
 import { classifyAudioIntake } from '@/lib/audioIntake';
 import { supabase } from '@/lib/supabase';
@@ -3720,6 +3720,48 @@ async function smokeAiUndo(log: Log) {
   router.back();
 }
 
+/** 〰️🎧 Hosszú forrás hullámformája szakaszosan: 30 perces mp3/m4a, percenként 0,25 s-os impulzus a 30. mp-nél — a csúcsok a helyükön a fájl végén is. */
+async function smokeLongWave(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  for (const name of ['env_44k.mp3', 'env_48k.m4a']) {
+    const local = await downloadToCache(`${smokeFileHost()}/${name}`, `smoke_${name}`);
+    if (!local) {
+      log(false, `${name}: letöltés`, '-');
+      continue;
+    }
+    const f = new File(local);
+    const cached = new File(Paths.cache, `${waveformCacheKey(local, f.size ?? 0, f.modificationTime ?? 0)}.json`);
+    if (cached.exists) cached.delete();
+    clearWaveformMemory();
+    const t0 = Date.now();
+    const w = await getWaveform(local, { userInitiated: true });
+    const ms = Date.now() - t0;
+    if (!w) {
+      log(false, `${name}: hullámforma`, 'null');
+      continue;
+    }
+    log(lastWaveformMode() === 'segmented' && Math.abs(w.peaks.length - 1800 * 64) <= 2, `${name}: szakaszosan számolva, 30 perc × 64 csúcs`, `${lastWaveformMode()}, ${w.peaks.length} csúcs, ${(ms / 1000).toFixed(1)} s`);
+    // az impulzus a perc 30,00–30,25 mp-e = a 1920–1935. csúcs; a széleken ±1 csúcs (16 ms) tűrés
+    const rows: string[] = [];
+    let ok = true;
+    for (const m of [1, 15, 29]) {
+      const b = m * 3840 + 1920;
+      const inside = w.peaks.slice(b + 1, b + 15);
+      const before = w.peaks.slice(b - 6, b - 1);
+      const after = w.peaks.slice(b + 17, b + 22);
+      // a próbafájl szintjei: alap 0,1·0,707, impulzus 0,8·0,707 (az ffmpeg mono→sztereó −3 dB)
+      const good = inside.every((x) => x >= 0.45) && before.every((x) => x <= 0.15) && after.every((x) => x <= 0.15);
+      ok &&= good;
+      rows.push(`${m}. perc: bent ${Math.min(...inside).toFixed(2)}–${Math.max(...inside).toFixed(2)}, előtte ≤ ${Math.max(...before).toFixed(2)}, utána ≤ ${Math.max(...after).toFixed(2)}`);
+    }
+    log(ok, `${name}: az impulzusok a helyükön (1., 15., 29. perc, ±16 ms)`, rows.join(' · '));
+    const again = Date.now();
+    clearWaveformMemory();
+    const w2 = await getWaveform(local, { userInitiated: true });
+    log(!!w2 && w2.peaks.length === w.peaks.length && Date.now() - again < 3000, `${name}: másodszor a lemez-cache-ből`, `${Date.now() - again} ms`);
+  }
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6028,6 +6070,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'longwave') {
+    await step(phase, () => smokeLongWave(log));
     return;
   }
   if (phase === 'aiundo') {

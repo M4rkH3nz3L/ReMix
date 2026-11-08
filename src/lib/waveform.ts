@@ -2,6 +2,7 @@ import { loadAudioApi, markAudioApi } from '@/lib/audioApiGuard';
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { logCaught } from '@/lib/logCaught';
+import { canSegment, isLongSource, LongSource } from '@/lib/longSource';
 
 /**
  * Hang-hullámforma az idővonalhoz ÉS a Hang Stúdióhoz. A csúcsokat AZ ESZKÖZÖN
@@ -78,6 +79,85 @@ export function peaksFromChannels(
     peaks.push(Math.round(max * 100) / 100);
   }
   return peaks.length > 0 ? { duration, peaksPerSecond: pps, peaks } : null;
+}
+
+/**
+ * 🎧 Csúcsok darabonként érkező mintákból (a hosszú forrás szakaszaihoz): a p. csúcs pontosan a
+ * `[round(p·sr/pps), round((p+1)·sr/pps))` minták maximuma — 44,1 kHz / 64 nem egész, a lefelé
+ * kerekített lépés egy órán át 0,17 s-ot csúszna. A darabhatár nem számít (a csúcs átnyúlik).
+ */
+export class PeakAccumulator {
+  private peaks: number[] = [];
+  private pos = 0;
+  private max = 0;
+  private nextEdge: number;
+
+  constructor(
+    private readonly sampleRate: number,
+    private readonly pps: number
+  ) {
+    this.nextEdge = Math.round(sampleRate / pps);
+  }
+
+  push(channels: Float32Array[]): void {
+    const n = Math.min(...channels.map((c) => c.length));
+    for (let i = 0; i < n; i++) {
+      for (const ch of channels) {
+        const v = Math.abs(ch[i]);
+        if (v > this.max) this.max = v;
+      }
+      this.pos++;
+      if (this.pos === this.nextEdge) {
+        this.peaks.push(Math.round(this.max * 100) / 100);
+        this.max = 0;
+        this.nextEdge = Math.round(((this.peaks.length + 1) * this.sampleRate) / this.pps);
+      }
+    }
+  }
+
+  finish(duration: number): WaveformData | null {
+    return this.peaks.length > 0 ? { duration, peaksPerSecond: this.pps, peaks: this.peaks } : null;
+  }
+}
+
+/** ennél nagyobb fájlnál érdemes a hosszt megnézni (10 perc 128 kbps-os mp3 ≈ 9,6 MB) */
+const LONG_PROBE_BYTES = 8 * 1024 * 1024;
+const SEG_SAMPLES = 20 * 44100;
+
+/**
+ * 🎧 Hosszú forrás (> 10 perc) hullámformája szakaszosan: a natív ablak-dekóder 20 s-onként
+ * olvas, a memóriában egyszerre csak pár szakasz van — a teljes dekódolás egy 60 perces sztereó
+ * fájlnál 8 kHz-en is ~230 MB lenne.
+ */
+async function computeLongWaveform(uri: string, duration: number): Promise<WaveformData | null> {
+  const src = new LongSource(uri);
+  const acc = new PeakAccumulator(44100, WAVEFORM_PPS);
+  const total = Math.floor(duration * 44100);
+  // négy szakasz egyszerre (a natív dekódolás párhuzamos), utána sorban a csúcsokba
+  const BATCH = 4 * SEG_SAMPLES;
+  for (let a = 0; a < total; a += BATCH) {
+    await src.ensure(a, Math.min(total, a + BATCH));
+    for (let c = a; c < Math.min(total, a + BATCH); c += SEG_SAMPLES) {
+      const w = src.read(c, Math.min(total, c + SEG_SAMPLES));
+      if (!w) return null;
+      acc.push(w);
+    }
+  }
+  return acc.finish(duration);
+}
+
+let lastMode: 'segmented' | 'whole' | null = null;
+/** 🧪 mérés: az utoljára számolt hullámforma útja */
+export function lastWaveformMode(): 'segmented' | 'whole' | null {
+  return lastMode;
+}
+
+/** a hosszú forrás hossza (csak nagy fájlnál kérdezzük), különben null */
+async function longSourceDuration(uri: string, size: number): Promise<number | null> {
+  if (!canSegment() || size < LONG_PROBE_BYTES) return null;
+  const { probeAudioDuration } = await import('@/lib/media');
+  const d = await probeAudioDuration(uri);
+  return isLongSource(d) ? d : null;
 }
 
 /** A22: a klip a forrás `trimIn`-től kezdődő `duration` hosszú szakaszát mutatja. */
@@ -186,7 +266,9 @@ export function getWaveform(uri: string, opts: { userInitiated?: boolean } = {})
       cacheFile = null;
     }
     try {
-      const data = await computeNativeWaveform(uri, !!opts.userInitiated);
+      const long = await longSourceDuration(uri, new File(uri).size ?? 0);
+      lastMode = long ? 'segmented' : 'whole';
+      const data = long ? await computeLongWaveform(uri, long) : await computeNativeWaveform(uri, !!opts.userInitiated);
       if (data && cacheFile) {
         try {
           cacheFile.write(JSON.stringify(data));

@@ -3983,6 +3983,7 @@
       "fromFiles": "Fájlok",
       "noAudioInVideo": "Ebben a videóban nincs hangsáv.",
       "extractFailed": "A videó hangját nem sikerült kinyerni.",
+      "tempo": {"title": "Tempó", "source": "Forrás", "match": "Illeszd: {{bpm}} BPM", "reset": "Eredeti tempó", "outOfRange": "A tempó-arány 0,5× és 2× között lehet."},
       "rec": {"pause": "Szünet", "resume": "Folytatás", "level": "Bemeneti szint", "hot": "Túl hangos — vedd lejjebb vagy távolodj", "paused": "Szünetel", "options": "Felvétel beállításai", "countIn": "Előszámlálás: {{v}}", "off": "ki", "bars_one": "{{count}} ütem", "bars_other": "{{count}} ütem", "punch": "Punch-in (In–Out): {{v}}", "on": "be", "done": "Kész", "countingIn": "Előszámlálás…", "punchArmed": "Punch — In-nél indul", "noRange": "A punch-inhez jelölj ki In–Out tartományt (legalább 0,2 s).", "takes": "Take-ek ({{count}})", "take": "Take {{n}}", "activeTake": "szól"},
       "spectrum": "Spektrum",
       "panAutomation": "Pásztázás-automáció",

@@ -21,6 +21,7 @@ import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
 import { selectTakeCommand } from '@/lib/punchRecord';
+import { tempoMatchPatch, tempoResetPatch } from '@/lib/tempoMatch';
 import { CLIP_DB_MAX, CLIP_DB_MIN, CLIP_VOLUME_MAX, dbToVolume, formatDb, volumeToDb } from '@/lib/clipGain';
 import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
@@ -159,6 +160,20 @@ export function ClipEditSheet({
     if (cmd) useEditorStore.getState().dispatch(cmd);
   };
 
+  // 🥁↔️ ütemhez nyújtás: a forrás-tempó → sebesség (hangmagasság-tartással), a forrás-szakasz marad
+  const projectBpm = useEditorStore((s) => s.project?.bpm ?? 120);
+  const [srcBpm, setSrcBpm] = useState(clip.sourceBpm ?? projectBpm);
+  const applyTempo = (patch: Partial<AudioClip> | null) => {
+    if (!patch) {
+      Alert.alert(t('studio.audio.tempo.title'), t('studio.audio.tempo.outOfRange'));
+      return;
+    }
+    if (dirty) {
+      updateClip(clip.id, { volume, pan, fadeIn: Math.min(fadeIn, clip.duration), fadeOut: Math.min(fadeOut, clip.duration), voiceEnhance, deReverb, autoDuck, audioFx: fx } as Partial<AudioClip>);
+    }
+    useEditorStore.getState().dispatch({ type: 'UPDATE_CLIP', clipId: clip.id, patch });
+  };
+
   const onDone = () => {
     if (dirty) {
       const snapped = geometryChanged ? snapToFrame(duration, fps) : clip.duration;
@@ -200,6 +215,26 @@ export function ClipEditSheet({
 
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         <TakePicker clip={clip} onSelect={pickTake} />
+        {!clip.reversed && !clip.loopLength ? (
+          <View style={styles.tempoRow} testID="tempo-match">
+            <Text style={styles.tempoLabel}>{t('studio.audio.tempo.source')}</Text>
+            <Pressable onPress={() => setSrcBpm((b) => Math.max(20, b - 1))} style={styles.tempoBtn} hitSlop={6} accessibilityLabel="−1 BPM">
+              <Ionicons name="remove" size={16} color={palette.text} />
+            </Pressable>
+            <Text style={styles.tempoVal}>{srcBpm}</Text>
+            <Pressable onPress={() => setSrcBpm((b) => Math.min(300, b + 1))} style={styles.tempoBtn} hitSlop={6} accessibilityLabel="+1 BPM">
+              <Ionicons name="add" size={16} color={palette.text} />
+            </Pressable>
+            <Pressable onPress={() => applyTempo(tempoMatchPatch(clip, srcBpm, projectBpm))} style={styles.tempoGo}>
+              <Text style={styles.tempoGoText} numberOfLines={1} maxFontSizeMultiplier={1.3}>{t('studio.audio.tempo.match', { bpm: projectBpm })}</Text>
+            </Pressable>
+            {(clip.speed ?? 1) !== 1 ? (
+              <Pressable onPress={() => applyTempo(tempoResetPatch(clip))} hitSlop={6} accessibilityLabel={t('studio.audio.tempo.reset')}>
+                <Text style={styles.tempoSpeed}>×{(clip.speed ?? 1).toFixed(3)} ↺</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <RegionBar
           trimIn={trimIn}
           duration={duration}
@@ -571,6 +606,13 @@ const styles = StyleSheet.create({
   proTag: { backgroundColor: palette.accentSoft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   proTagText: { color: palette.accent, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   presetRow: { gap: 6, paddingVertical: 2, paddingRight: 8, marginBottom: 6 },
+  tempoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
+  tempoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
+  tempoBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border },
+  tempoVal: { color: palette.text, fontSize: 15, fontWeight: '800', minWidth: 34, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  tempoGo: { paddingHorizontal: 12, minHeight: 36, justifyContent: 'center', borderRadius: 10, backgroundColor: palette.accent },
+  tempoGoText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  tempoSpeed: { color: palette.accent, fontSize: 13, fontWeight: '700' },
   presetChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: palette.surface },
   presetChipText: { color: palette.text, fontSize: 12, fontWeight: '700' },
   specBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: palette.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },

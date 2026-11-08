@@ -92,7 +92,7 @@ export function AudioStudioSheets({
 }) {
   return (
     <AudioSheetFrameContext.Provider value={frame}>
-      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? (selClip.activeTake ?? '') : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
+      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? `${selClip.activeTake ?? ''}:${selClip.speed ?? 1}` : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
       {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
       {mixerOpen ? (
         <MixerSheet

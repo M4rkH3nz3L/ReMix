@@ -1176,6 +1176,8 @@ export interface AudioClip extends ClipBase {
    * a minta közepéről folytatódik, a hurok-ablak (`trimIn` … `trimIn + loopLength`) marad. Hiányzó = 0.
    */
   loopOffset?: number;
+  /** 🥁 a forrás tempója (BPM) — az „Illeszd a projekt tempójához” ebből számolja a `speed`-et */
+  sourceBpm?: number;
   /**
    * 🎙️🔁 take-ek: ugyanarra a helyre ismételt felvételek (punch-in). Az aktív take adatai a klip saját
    * mezői (`uri`, `trimIn`, `sourceDuration`, `start`, `duration`) — az export és a lejátszás így

@@ -62,7 +62,7 @@ import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
 import { offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
-import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient';
+import { exportOfflineWav, measureStretchLatency, probeStretchTiming } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
@@ -71,6 +71,7 @@ import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { dbToVolume } from '@/lib/clipGain';
+import { tempoMatchPatch } from '@/lib/tempoMatch';
 import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
@@ -4452,6 +4453,111 @@ async function smokeFromVideo(log: Log) {
   router.back();
 }
 
+/** 🥁↔️ T9 ütemhez nyújtás: 120 BPM-es kattanás 100 BPM-es projektben → az exportban 0,600 s-onként, a hangmagasság változatlan (1000 Hz ± 1 %). */
+async function smokeTempoMatch(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // 1 kHz-es, 40 ms-os ütések 0,5 s-onként (120 BPM), szinusz-burkolóval (nincs kattanás a széleken)
+  const x = Float32Array.from({ length: 8 * SR }, (_, i) => {
+    const ph = (i / SR) % 0.5;
+    return ph < 0.04 ? 0.5 * Math.sin(Math.PI * (ph / 0.04)) * Math.sin(2 * Math.PI * 1000 * (i / SR)) : 0;
+  });
+  const f = new File(Paths.document, 'smoke_tempo_click120.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_tempo';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tempo', caught));
+  const base = createEmptyProject('smoke tempó-illesztés', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'k', uri: f.uri, label: 'klikk 120', start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, bpm: 100, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const before = JSON.stringify(st().project);
+  // a gomb útja: ugyanaz a függvény, egy lépés
+  st().selectClip('k');
+  runDevAction('audio.editClip');
+  await sleep(600);
+  log(true, 'FOTÓZHATÓ', 'a klipszerkesztőben a tempó-illesztés (forrás 120, „Illeszd: 100 BPM”)');
+  await sleep(2500);
+  // ellenpróba: az első ütés energia-középpontja nyújtás NÉLKÜL (a klip-eleji mikro-fade hatása)
+  {
+    const { uri: o0 } = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_tempo0.wav'), undefined, undefined, 'float32');
+    const y0 = (await (await loadAudioApi())!.decodeAudioData(o0, SR)).getChannelData(0);
+    new File(o0).delete();
+    const cAt = (from: number) => {
+      let e = 0;
+      let te = 0;
+      for (let i = Math.round(from * SR); i < Math.round((from + 0.13) * SR); i++) {
+        const p = y0[i] * y0[i];
+        e += p;
+        te += (i / SR) * p;
+      }
+      return te / e;
+    };
+    log(null, 'nyújtás nélkül: az 1. és a 2. ütés energia-középpontja', `${(cAt(0) * 1000).toFixed(1)} / ${((cAt(0.47) - 0.5) * 1000).toFixed(1)} ms (az ütés elejéhez)`);
+  }
+  const patch = tempoMatchPatch(st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip, 120, 100)!;
+  st().dispatch({ type: 'UPDATE_CLIP', clipId: 'k', patch });
+  runDevAction('clipEdit.done');
+  await sleep(300);
+  const k = st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip;
+  log(Math.abs((k.speed ?? 1) - 100 / 120) < 1e-9 && Math.abs(k.duration - 9.6) < 1e-9 && k.sourceBpm === 120, 'illesztve: sebesség 0,8333, a klip 9,6 s (ugyanaz a forrás)', `×${k.speed?.toFixed(4)}, ${k.duration.toFixed(3)} s`);
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_tempo.wav'), undefined, undefined, 'float32');
+  const ms = Date.now() - t0;
+  const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0);
+  new File(out).delete();
+  // az ütések kezdete (a legnagyobb csúcs negyedénél)
+  let peak = 0;
+  for (let i = 0; i < y.length; i++) peak = Math.max(peak, Math.abs(y[i]));
+  const onsets: number[] = [];
+  for (let i = 0; i < y.length; i++) {
+    if (Math.abs(y[i]) > peak * 0.25) {
+      onsets.push(i / SR);
+      i += Math.round(0.3 * SR);
+    }
+  }
+  // az ütés ideje = az energia-középpontja (a nyújtás az ütés elejét elkeni — a küszöb-átlépés ütésenként mást mérne)
+  const centroid = (o: number) => {
+    let e = 0;
+    let te = 0;
+    for (let i = Math.max(0, Math.round((o - 0.03) * SR)); i < Math.min(y.length, Math.round((o + 0.1) * SR)); i++) {
+      const p = y[i] * y[i];
+      e += p;
+      te += (i / SR) * p;
+    }
+    return te / e;
+  };
+  const cs = onsets.map(centroid);
+  {
+    const pr = await probeStretchTiming(100 / 120);
+    log(null, 'szonda: burstönkénti késés 0,5 s-onként (0,8333×)', pr ? pr.map((x) => `${((x / SR) * 1000).toFixed(1)}`).join(' / ') + ' ms' : '—');
+  }
+  log(null, 'a nyújtó mért késése (0,8333×)', `${(((await measureStretchLatency(100 / 120)) ?? 0) / SR * 1000).toFixed(1)} ms`);
+  log(null, 'nyújtva: az 1. és a 2. ütés energia-középpontja', `${(cs[0] * 1000).toFixed(1)} / ${((cs[1] - 0.6) * 1000).toFixed(1)} ms`);
+  const gaps = cs.slice(1).map((o, i) => o - cs[i]);
+  const worst = gaps.reduce((m, g) => Math.max(m, Math.abs(g - 0.6)), 0);
+  const drift = cs.length > 1 ? cs[cs.length - 1] - cs[0] - 0.6 * (cs.length - 1) : NaN;
+  log(onsets.length === 16 && worst <= 0.005 && Math.abs(drift) <= 0.005, 'az exportban az ütések 0,600 s-onként (100 BPM): ütésenként ± 5 ms, 15 ütésen át sincs csúszás', `${onsets.length} ütés, a legnagyobb eltérés ${(worst * 1000).toFixed(1)} ms, összcsúszás ${(drift * 1000).toFixed(1)} ms; közök ${gaps.map((g) => (g * 1000).toFixed(0)).join(' ')} ms (export ${ms} ms)`);
+  // a hangmagasság: az ütésen belüli nullátmenetek (a középső 24 ms)
+  const hz: number[] = [];
+  for (const o of onsets.slice(1, 6)) {
+    const a = Math.round((o + 0.008) * SR);
+    const b = a + Math.round(0.024 * SR);
+    let zc = 0;
+    for (let i = a + 1; i < b; i++) if ((y[i - 1] < 0) !== (y[i] < 0)) zc++;
+    hz.push(zc / 2 / 0.024);
+  }
+  const worstHz = hz.reduce((m, h) => Math.max(m, Math.abs(h - 1000) / 1000), 0);
+  log(worstHz <= 0.01 ? true : worstHz <= 0.03 ? null : false, 'a hangmagasság változatlan: 1000 Hz ± 1 % (nem lassult le a hang)', `${hz.map((h) => h.toFixed(0)).join(' / ')} Hz`);
+  st().undo();
+  log(JSON.stringify(st().project) === before, 'egy visszavonás: az eredeti tempó', '');
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6768,6 +6874,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'tempo') {
+    await step(phase, () => smokeTempoMatch(log));
     return;
   }
   if (phase === 'fromvideo') {

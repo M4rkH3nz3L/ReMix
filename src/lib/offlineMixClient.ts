@@ -338,9 +338,8 @@ async function renderStretched(api: AudioApi, input: Float32Array[], speed: numb
 }
 
 /**
- * ⏱️ A nyújtó késleltetése (kimeneti minta) az adott sebességen — mérve: 2×-en ~55 ms, 0,5×-en
- * ~115 ms (iPad), tehát sebességfüggő. Egy rövid kattanás nyújtása után a kimenet csúcsa és a
- * várt helye közti különbség; sebességenként egyszer.
+ * ⏱️ A nyújtó késleltetése (kimeneti minta) az adott sebességen — sebességfüggő. Egy tonális
+ * burst nyújtása után a kimenet energia-középpontja és a várt helye közti különbség; sebességenként egyszer.
  */
 /** 🧪 füstteszt: a mért késés (minta) */
 export async function measureStretchLatency(speed: number, cents = 0): Promise<number | null> {
@@ -349,22 +348,58 @@ export async function measureStretchLatency(speed: number, cents = 0): Promise<n
 }
 
 const latencyCache = new Map<string, number>();
-async function stretchLatency(api: AudioApi, speed: number, sr: number, cents = 0): Promise<number> {
+async function stretchLatency(api: AudioApi, speed: number, _sr: number, cents = 0): Promise<number> {
   const id = `${speed}|${cents}`;
   const cached = latencyCache.get(id);
   if (cached !== undefined) {
     return cached;
   }
-  const at = Math.round(0.25 * sr);
-  const click = new Float32Array(Math.round(1 * sr));
-  for (let i = 0; i < 32; i++) click[at + i] = Math.sin((Math.PI * i) / 32);
-  const out = (await renderStretched(api, [click], speed, Math.round((1 / speed + 0.5) * sr), sr, cents))[0];
-  let peak = 0;
-  for (let i = 1; i < out.length; i++) if (Math.abs(out[i]) > Math.abs(out[peak])) peak = i;
-  const latency = Math.max(0, peak - Math.round(at / speed));
+  // 🎯 a nyújtó késése tonális burstökön (250 Hz + 1 kHz + 3 kHz, 40 ms, Hann), az energia-középpontjuk
+  // eltolódása a várt helyhez képest. A késés NEM állandó: az első burstnél nagyobb (beindulás — mérve
+  // 0,8333×-en 88,9 ms, utána 78–82 ms). A nyújtás ezért előtöltéssel indul (`STRETCH_PREROLL`), és a
+  // BEÁLLT érték (a 2. bursttől a medián) a kompenzáció. (Régen egy impulzus csúcsa volt: ~15 ms-mal
+  // túllőtt, a nyújtott klip ütései korábban szóltak.)
+  const offs = (await probeStretchTimingWith(api, speed, cents, 6)).slice(1).sort((x, y) => x - y);
+  const latency = Math.max(0, offs[offs.length >> 1]);
   latencyCache.set(id, latency);
   return latency;
 }
+
+/** tonális burstök 0,5 s-onként (az első 0,25 s-nál) nyújtva — burstönként a kimeneti energia-középpont eltérése a várt helytől (minta) */
+async function probeStretchTimingWith(api: AudioApi, speed: number, cents: number, count: number): Promise<number[]> {
+  const sr = OFFLINE_SAMPLE_RATE;
+  const len = Math.round(0.04 * sr);
+  const input = new Float32Array(Math.round((0.5 * count + 0.5) * sr));
+  const starts = Array.from({ length: count }, (_, k) => Math.round((0.25 + 0.5 * k) * sr));
+  for (const at of starts) {
+    for (let i = 0; i < len; i++) {
+      const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (len - 1));
+      const t = i / sr;
+      input[at + i] = 0.3 * w * (Math.sin(2 * Math.PI * 250 * t) + Math.sin(2 * Math.PI * 1000 * t) + Math.sin(2 * Math.PI * 3000 * t));
+    }
+  }
+  const out = (await renderStretched(api, [input], speed, Math.round((input.length / sr / speed + 0.5) * sr), sr, cents))[0];
+  return starts.map((at) => {
+    const exp = (at + (len - 1) / 2) / speed;
+    let e = 0;
+    let te = 0;
+    for (let i = Math.max(0, Math.round(exp - 0.1 * sr)); i < Math.min(out.length, Math.round(exp + 0.2 * sr)); i++) {
+      const p = out[i] * out[i];
+      e += p;
+      te += i * p;
+    }
+    return e > 0 ? Math.round(te / e - exp) : 0;
+  });
+}
+
+/** 🧪 füstteszt: a nyújtó burstönkénti késése (minta) */
+export async function probeStretchTiming(speed: number, count = 6): Promise<number[] | null> {
+  const api = await loadAudioApi();
+  return api ? probeStretchTimingWith(api, speed, 0, count) : null;
+}
+
+/** a nyújtás előtöltése (mp): a beindulási tranziens ide esik, a kimenetből levágva */
+const STRETCH_PREROLL = 0.5;
 
 /**
  * Egy szakasz nyújtása: a natív `OfflineAudioContext` hangmagasság-tartó (`pitchCorrection`)
@@ -391,11 +426,15 @@ export async function stretchSegment(api: AudioApi, src: DecodedSource, job: Str
   }
   const lat = await stretchLatency(api, job.speed, sr, cents);
   // a kimenet `lat` mintával késik: elejéről ennyi esik le, ezért a bemenet a VÉGÉN hosszabb
-  // (a forrás következő részével; a megfordított ablaké a forrásban előtte van)
+  // (a forrás következő részével; a megfordított ablaké a forrásban előtte van). Az ELEJÉN előtöltés
+  // (a lejátszás irányában az ablak előtti forrás; a forráson kívül csend): a nyújtó beindulási
+  // késése ide esik, a kimenetből levágva — így a szakasz eleje is a beállt késéssel szól.
   const extra = Math.round(lat * job.speed);
+  const pre = Math.round(STRETCH_PREROLL * sr);
   const from = Math.round(job.from * sr);
-  const slice = job.reversed ? sliceSource(src.channels, from - extra, n + extra, true) : sliceSource(src.channels, from, n + extra, false);
+  const slice = job.reversed ? sliceSource(src.channels, from - extra, n + extra + pre, true) : sliceSource(src.channels, from - pre, n + extra + pre, false);
   const outLen = Math.round(job.duration * sr);
-  const out = await renderStretched(api, slice, job.speed, outLen + lat, sr, cents);
-  return finish(out.map((ch) => ch.slice(lat, lat + outLen)));
+  const preOut = Math.round(pre / job.speed);
+  const out = await renderStretched(api, slice, job.speed, preOut + outLen + lat, sr, cents);
+  return finish(out.map((ch) => ch.slice(preOut + lat, preOut + lat + outLen)));
 }

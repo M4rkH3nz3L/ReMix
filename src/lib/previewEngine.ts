@@ -4,6 +4,7 @@ import { loadAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
 import { LongSource, longUris } from '@/lib/longSource';
+import { LiveLoudness, type LoudnessReading } from '@/lib/liveLoudness';
 import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, sourceRanges, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
 
@@ -74,6 +75,8 @@ class PreviewEngine {
   private long = new Map<string, LongSource>();
   private longUris = new Set<string>();
 
+  /** 📊 élő hangosság + true-peak a ténylegesen szóló (exporttal azonos) keverésből */
+  private meter = new LiveLoudness(SR);
   /** 🎛️ a klip-effektek folytonos állapota (ugrásnál a `mixRange` bejáratja) */
   private fxState = new Map<string, FxState>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -376,6 +379,7 @@ class PreviewEngine {
       if (this.plan) {
         mixRange(this.plan, this.sources, out, from, to, 1, this.fxState);
       }
+      this.meter.push(from, out[0], out[1]);
       const buf = ctx.createBuffer(2, to - from, SR);
       buf.copyToChannel(out[0] as Float32Array<ArrayBuffer>, 0);
       buf.copyToChannel(out[1] as Float32Array<ArrayBuffer>, 1);
@@ -395,6 +399,12 @@ class PreviewEngine {
       this.scheduled.push({ node, from });
       this.nextSample = to;
     }
+  }
+
+  /** 📊 a hangosság és a true-peak a lejátszófejnél (a még csak előre renderelt rész nem számít); áll → null */
+  loudness(): LoudnessReading | null {
+    if (!this.playing) return null;
+    return this.meter.readAt(Math.round(this.position() * SR));
   }
 
   /** 🧪 füstteszt: a rendszer-megszakítás hatása (ugyanaz a felfüggesztés, amit az iOS tesz) */

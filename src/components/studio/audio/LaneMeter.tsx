@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { mixForExport } from '@/lib/audioExportMix';
@@ -9,6 +9,8 @@ import { getWaveform, type WaveformData } from '@/lib/waveform';
 import { useEditorStore } from '@/store/editorStore';
 import type { TrackType } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import type { LoudnessReading } from '@/lib/liveLoudness';
+import { previewEngine } from '@/lib/previewEngine';
 
 const CLIP_HOLD_SEC = 2;
 
@@ -84,6 +86,7 @@ export function LaneMeter({ type }: { type: TrackType }) {
 }
 
 const styles = StyleSheet.create({
+  lufs: { color: palette.textDim, fontSize: 10, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 2 },
   track: { width: 44, height: 4, borderRadius: 2, backgroundColor: `${palette.border}`, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2 },
   master: { width: 56, height: 6, borderRadius: 3, backgroundColor: `${palette.border}`, overflow: 'hidden', alignSelf: 'center' },
@@ -123,5 +126,28 @@ export function ClipMarkers({ pxPerSec }: { pxPerSec: number }) {
         />
       ))}
     </>
+  );
+}
+
+/**
+ * 📊 Élő hangosság a masteren (lejátszás közben): short-term LUFS és true-peak a ténylegesen szóló,
+ * az exporttal azonos keverésből (az előnézet-motor méri). A true-peak a master plafonja fölött piros.
+ */
+export function LoudnessReadout() {
+  const isPlaying = useEditorStore((s) => s.isPlaying);
+  const ceiling = useEditorStore((s) => s.project?.audioMaster?.truePeak ?? -1);
+  const [r, setR] = useState<LoudnessReading | null>(null);
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => setR(previewEngine.loudness()), 200);
+    return () => clearInterval(id);
+  }, [isPlaying]);
+  const reading = isPlaying ? r : null;
+  const fmt = (x: number) => (Number.isFinite(x) ? x.toFixed(1) : '—');
+  const over = !!reading && Number.isFinite(reading.truePeak) && reading.truePeak > ceiling;
+  return (
+    <Text style={[styles.lufs, over && { color: palette.danger }]} testID="loudness-readout" numberOfLines={1} maxFontSizeMultiplier={1.3}>
+      {reading ? `S ${fmt(reading.shortTerm)} LUFS · TP ${fmt(reading.truePeak)}` : 'LUFS —'}
+    </Text>
   );
 }

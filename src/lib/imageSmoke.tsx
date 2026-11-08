@@ -4218,6 +4218,55 @@ async function smokeTakes(log: Log) {
   router.back();
 }
 
+/** 📊 T5 élő LUFS + true-peak: a lejátszott (exporttal azonos) keverésből — ismert jeleken a mért érték az elméleti. */
+async function smokeLiveLufs(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const write = (name: string, x: Float32Array) => {
+    const f = new File(Paths.document, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, x], SR, () => 0.5));
+    return f.uri;
+  };
+  // 0–5 s: 1 kHz −14 dBFS (sztereó) = −14 LUFS; 5–10 s: fs/4 szinusz 45°-os fázissal, 0,5 → true-peak −6,02 dBTP (mintacsúcs −9,03)
+  const a14 = Math.pow(10, -14 / 20);
+  const x = Float32Array.from({ length: 10 * SR }, (_, i) => (i < 5 * SR ? a14 * Math.sin((2 * Math.PI * 1000 * i) / SR) : 0.5 * Math.sin((Math.PI / 2) * i + Math.PI / 4)));
+  const uri = write('smoke_lufs_ref.wav', x);
+  const id = 'prj_smoke_lufs';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:lufs', caught));
+  const base = createEmptyProject('smoke élő LUFS', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'm', uri, label: 'ref', start: 0, duration: 10, trimIn: 0, sourceDuration: 10, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  st().setPlayhead(0);
+  previewEngine.takeStats();
+  const tPlay = Date.now();
+  st().setPlaying(true);
+  for (let i = 0; i < 40 && !previewEngine.isPlaying(); i++) await sleep(50);
+  log(null, 'az előnézet-motor szól', `${previewEngine.isPlaying()} (${Date.now() - tPlay} ms után)`);
+  await sleep(4200);
+  const r1 = previewEngine.loudness();
+  log(true, 'FOTÓZHATÓ', 'a transzporton az élő short-term LUFS és true-peak');
+  await sleep(600);
+  log(!!r1 && Math.abs(r1.shortTerm - -14) <= 0.5 && Math.abs(r1.momentary - -14) <= 0.5, 'élő hangosság: 1 kHz −14 dBFS sztereó → short-term és momentary −14 ± 0,5 LUFS', r1 ? `S ${r1.shortTerm.toFixed(2)} · M ${r1.momentary.toFixed(2)} · I ${r1.integrated.toFixed(2)} LUFS` : 'null');
+  st().setPlaying(false);
+  await sleep(300);
+  st().setPlayhead(5.2);
+  await sleep(200);
+  st().setPlaying(true);
+  await sleep(2500);
+  const r2 = previewEngine.loudness();
+  st().setPlaying(false);
+  const stats = previewEngine.takeStats();
+  log(!!r2 && Math.abs(r2.truePeak - -6.02) <= 0.2, 'élő true-peak: fs/4 szinusz 45°-kal, 0,5 → −6,02 ± 0,2 dBTP (a mintacsúcs −9,03 dB — a minták közti csúcsot is látja)', r2 ? `TP ${r2.truePeak.toFixed(2)} dBTP (max ${r2.truePeakMax.toFixed(2)})` : 'null');
+  log(stats.late === 0, 'a mérés mellett sem késik szelet', `${stats.chunks} szelet, ${stats.late} késett`);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6534,6 +6583,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'livelufs') {
+    await step(phase, () => smokeLiveLufs(log));
     return;
   }
   if (phase === 'takes') {

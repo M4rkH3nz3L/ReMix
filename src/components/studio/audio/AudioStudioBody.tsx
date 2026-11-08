@@ -29,7 +29,7 @@ import { AudioAssistantBar } from '@/components/studio/audio/AudioAssistantBar';
 import type { AudioAction } from '@/lib/audioIntent';
 import { runAudioSync, startAudioSync, syncCandidates } from '@/components/studio/audio/audioSyncAction';
 import { addMarker, nearestMarker, SECTION_KINDS, snapToMarkers } from '@/lib/audioMarkers';
-import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/LaneMeter';
+import { ClipMarkers, LaneMeter, LoudnessReadout, MasterMeter } from '@/components/studio/audio/LaneMeter';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
@@ -1230,6 +1230,7 @@ export function AudioStudioBody({
           </Text>
           <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead, meter)}</Text>
           <MasterMeter />
+          <LoudnessReadout />
         </View>
         <View style={styles.tSep} />
         {/* BPM léptető + auto-felismerés (a kiválasztott/első hang-klipből) */}

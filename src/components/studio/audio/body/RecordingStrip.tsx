@@ -15,25 +15,31 @@ export function RecordingStrip({
   hot,
   durationMs,
   onPauseResume,
+  canPause = true,
+  status = null,
 }: {
   paused: boolean;
   meterDb: number | null | undefined;
   hot: boolean;
   durationMs: number;
   onPauseResume: () => void;
+  /** count-in / punch alatt a szünet nem értelmezhető */
+  canPause?: boolean;
+  /** állapot-felirat (előszámlálás, punch élesítve) */
+  status?: string | null;
 }) {
   const { t } = useTranslation();
   const level = paused ? 0 : meterLevel(meterDb);
   return (
     <View style={styles.strip} testID="recording-strip">
-      <Pressable onPress={onPauseResume} style={styles.btn} hitSlop={6} accessibilityRole="button" accessibilityLabel={t(paused ? 'studio.audio.rec.resume' : 'studio.audio.rec.pause')}>
+      <Pressable onPress={onPauseResume} disabled={!canPause} style={[styles.btn, !canPause && { opacity: 0.35 }]} hitSlop={6} accessibilityRole="button" accessibilityLabel={t(paused ? 'studio.audio.rec.resume' : 'studio.audio.rec.pause')}>
         <Ionicons name={paused ? 'play' : 'pause'} size={18} color={palette.text} />
       </Pressable>
       <Text style={styles.clock}>{recordingClock(durationMs)}</Text>
       <View style={styles.meter} accessible accessibilityLabel={t('studio.audio.rec.level')} accessibilityValue={{ now: Math.round(level * 100), min: 0, max: 100 }}>
         <View style={[styles.fill, { width: `${level * 100}%`, backgroundColor: hot ? palette.danger : level > 0.85 ? '#f5a524' : '#39d98a' }]} />
       </View>
-      {paused ? <Text style={styles.paused}>{t('studio.audio.rec.paused')}</Text> : null}
+      {status ? <Text style={styles.paused}>{status}</Text> : paused ? <Text style={styles.paused}>{t('studio.audio.rec.paused')}</Text> : null}
       {hot ? (
         <View style={styles.hot} accessibilityRole="alert">
           <Ionicons name="warning" size={14} color="#fff" />

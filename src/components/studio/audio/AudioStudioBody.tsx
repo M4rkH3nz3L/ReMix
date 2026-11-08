@@ -34,7 +34,7 @@ import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
 import { RecordingStrip } from '@/components/studio/audio/body/RecordingStrip';
-import { palette } from '@/constants/editor';
+import { MIN_CLIP_DURATION, palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
 import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
@@ -58,6 +58,7 @@ import {
   scrubTime,
   rulerTicks,
   snapSec,
+  type Meter,
   type SnapMode,
   zoomIn,
   zoomOut,
@@ -87,8 +88,11 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
-import { pauseVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
+import { pauseVoiceRecording, prepareVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
 import { nextHot } from '@/lib/recordingMeter';
+import { punchCommands, punchWindow } from '@/lib/punchRecord';
+import { alignCountInTake, alignPunchTake, PunchSession, runCountIn } from '@/lib/recordTakeClient';
+import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
@@ -199,7 +203,12 @@ export function AudioStudioBody({
   const [recPaused, setRecPaused] = useState(false);
   const recPausedRef = useRef(false);
   recPausedRef.current = recPaused;
-  const recActive = recorderState.isRecording || recPaused;
+  // ⏱️🎯 count-in / punch-in: élesítve (a punch preroll-ja alatt a felvevő még nem fut), és a módok állapota
+  const [recArmed, setRecArmed] = useState(false);
+  const [recCountingIn, setRecCountingIn] = useState(false);
+  const punchRef = useRef<PunchSession | null>(null);
+  const countInRef = useRef<{ trim: number | null; alive: boolean; bars: number; bpm: number | undefined; meter: Meter } | null>(null);
+  const recActive = recorderState.isRecording || recPaused || recArmed;
   // 🧪 füstteszt: felvétel indítása/leállítása, szünet/folytatás, a felvételi sáv állapota (csak __DEV__)
   const recDevRef = useRef<{ toggle: () => Promise<void>; pause: () => void; state: () => Record<string, unknown> }>({ toggle: async () => {}, pause: () => {}, state: () => ({}) });
   useEffect(() => {
@@ -492,11 +501,39 @@ export function AudioStudioBody({
     setRecPaused(false);
     recPausedRef.current = false;
     recHotRef.current = false;
+    setRecArmed(false);
+    setRecCountingIn(false);
+    const punch = punchRef.current;
+    punchRef.current = null;
+    punch?.halt();
+    const countIn = countInRef.current;
+    countInRef.current = null;
+    if (countIn) countIn.alive = false;
     const { uri, seconds } = await stopVoiceRecording(recorder);
-    if (uri) {
-      const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, fps, t('panels.audio.voiceoverLabel'), makeId);
-      useEditorStore.getState().addClip('voiceover', clip, asset);
+    if (!uri) return;
+    const label = t('panels.audio.voiceoverLabel');
+    const st = useEditorStore.getState();
+    if (punch) {
+      // 🎯 punch: a klip pontosan In-től Out-ig (a felvevő idejéből), alatta kivágva — egy undo
+      const clockStart = punch.recording ? punch.startAt() : null;
+      if (clockStart === null || !st.project) return;
+      // a take oda, amihez a felhasználó énekelt: a közben szóló klip áthallásához igazítva
+      const startAt = await alignPunchTake(st.project, 'voiceover', uri, clockStart, punch.win, st.isTrackAudible);
+      const cmds = punchCommands(st.project, 'voiceover', { uri, seconds, startAt, label }, punch.win, makeId);
+      if (cmds.length > 0) st.applyBatch(cmds, 'user');
+      return;
     }
+    const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, fps, label, makeId);
+    if (countIn) {
+      // ⏱️ az előszámlálás kimarad: a take ott kezdődik, ahol a következő ütés lenne (a felvevő idejében)
+      if (countIn.trim === null) return;
+      // a levágás a ténylegesen hallott kattanásokhoz igazítva (a lejátszó és a hangszóró késése)
+      const trim = await alignCountInTake(uri, countIn.bars, countIn.bpm, countIn.meter, countIn.trim);
+      if (seconds - trim < MIN_CLIP_DURATION) return;
+      st.addClip('voiceover', { ...clip, trimIn: trim, duration: seconds - trim }, asset);
+      return;
+    }
+    st.addClip('voiceover', clip, asset);
   };
   finishRecordingRef.current = finishRecording;
 
@@ -519,14 +556,51 @@ export function AudioStudioBody({
       Alert.alert(t('panels.audio.micPermissionTitle'), t('panels.audio.micPermissionMessage'));
       return;
     }
-    recordStartPlayhead.current = playhead;
+    const prefs = useRecordPrefs.getState();
+    const st = useEditorStore.getState();
     try {
+      if (prefs.punch) {
+        const win = punchWindow(st.rangeIn, st.rangeOut);
+        if (!win) {
+          Alert.alert(t('studio.audio.rec.options'), t('studio.audio.rec.noRange'));
+          return;
+        }
+        await prepareVoiceRecording(recorder);
+        const session = new PunchSession(recorder, win, () => void finishRecordingRef.current());
+        punchRef.current = session;
+        setRecArmed(true);
+        session.start();
+        return;
+      }
+      recordStartPlayhead.current = playhead;
       await startVoiceRecording(recorder);
+      if (prefs.countInBars > 0) {
+        const ci = { trim: null as number | null, alive: true, bars: prefs.countInBars, bpm, meter };
+        countInRef.current = ci;
+        setRecCountingIn(true);
+        void runCountIn(recorder, prefs.countInBars, bpm, meter, () => ci.alive)
+          .then((trim) => {
+            if (ci.alive) ci.trim = trim;
+          })
+          .catch((caught) => logCaught('components/studio/audio/AudioStudioBody.tsx:countIn', caught))
+          .finally(() => setRecCountingIn(false));
+      }
     } catch (caught) {
       // 💾 kevés hely / foglalt mikrofon: érthető üzenet, a felvétel nem indul
       logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught);
       Alert.alert(t('panels.audio.recordFailedTitle'), caught instanceof Error ? caught.message : String(caught));
     }
+  };
+
+  // 🎙️ hosszú nyomás a felvétel-gombon: előszámlálás (ki / 1 / 2 ütem) és punch-in
+  const recordOptions = () => {
+    const p = useRecordPrefs.getState();
+    const ci = p.countInBars === 0 ? t('studio.audio.rec.off') : t('studio.audio.rec.bars', { count: p.countInBars });
+    Alert.alert(t('studio.audio.rec.options'), undefined, [
+      { text: t('studio.audio.rec.countIn', { v: ci }), onPress: () => { p.setCountIn(((p.countInBars + 1) % 3) as 0 | 1 | 2); recordOptions(); } },
+      { text: t('studio.audio.rec.punch', { v: t(p.punch ? 'studio.audio.rec.on' : 'studio.audio.rec.off') }), onPress: () => { p.setPunch(!p.punch); recordOptions(); } },
+      { text: t('studio.audio.rec.done'), style: 'cancel' },
+    ]);
   };
 
   const pauseResumeRecording = () => {
@@ -1224,7 +1298,15 @@ export function AudioStudioBody({
 
       {/* 🎙️ felvételi sáv: szünet/folytatás, szintmérő, idő, „túl hangos” */}
       {recActive ? (
-        <RecordingStrip paused={recPaused} meterDb={recorderState.metering} hot={recHot} durationMs={recorderState.durationMillis} onPauseResume={pauseResumeRecording} />
+        <RecordingStrip
+          paused={recPaused}
+          meterDb={recorderState.metering}
+          hot={recHot}
+          durationMs={recorderState.durationMillis}
+          onPauseResume={pauseResumeRecording}
+          canPause={!punchRef.current && !recCountingIn}
+          status={recArmed && !recorderState.isRecording ? t('studio.audio.rec.punchArmed') : recCountingIn ? t('studio.audio.rec.countingIn') : null}
+        />
       ) : null}
 
       {/* eszköz-sor — nyitott inline lapnál rejtve (a lap fejléce a kilépés; a transport marad) */}
@@ -1234,6 +1316,7 @@ export function AudioStudioBody({
           isRecording={recActive}
           onAdd={() => setAdding(true)}
           onRecord={toggleRecord}
+          onRecordLongPress={recordOptions}
           onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
           onBeatSplit={() => selClip && askBeatSplit()}
           onEdit={() => selClip && setEditing(true)}

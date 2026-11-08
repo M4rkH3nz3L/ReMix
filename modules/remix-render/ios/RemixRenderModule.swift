@@ -160,6 +160,13 @@ public class RemixRenderModule: Module {
     // nyers fájlba — a keverő így 20 percnél hosszabb forrást is a memória töredékével játszik.
     Constant("supportsDecodeWindow") { true }
 
+    /// 🎙️⏱️ a hangrendszer késései (mp) a jelenlegi munkamenetben — a felvétel késés-kompenzációjához
+    Function("ioLatency") { () -> [String: Any] in
+      let s = AVAudioSession.sharedInstance()
+      let route = s.currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: ",")
+      return ["output": s.outputLatency, "input": s.inputLatency, "buffer": s.ioBufferDuration, "category": s.category.rawValue, "route": route, "options": s.categoryOptions.rawValue]
+    }
+
     AsyncFunction("decodeWindow") { (uri: String, start: Double, duration: Double, outputPath: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         do {

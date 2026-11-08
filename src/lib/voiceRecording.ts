@@ -13,6 +13,12 @@ import type { Asset, AudioClip } from '@/types/project';
  * két felület ugyanúgy viselkedjen (PRO-AUDIO A10, A43).
  */
 export async function startVoiceRecording(recorder: AudioRecorder): Promise<void> {
+  await prepareVoiceRecording(recorder);
+  recorder.record();
+}
+
+/** előkészítés indítás nélkül (a punch-in a felvevőt később, a lejátszófejhez igazítva indítja) */
+export async function prepareVoiceRecording(recorder: AudioRecorder): Promise<void> {
   // 💾 kevés helynél el sem indul (a hívó az üzenetet mutatja)
   const free = freeDiskBytes();
   if (!canStartRecording(free)) {
@@ -20,7 +26,6 @@ export async function startVoiceRecording(recorder: AudioRecorder): Promise<void
   }
   await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
   await recorder.prepareToRecordAsync();
-  recorder.record();
 }
 
 /** a felvétel beállításai: jó minőség + szintmérés (a felvételi sáv mérőjéhez) */

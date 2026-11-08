@@ -16,6 +16,7 @@ export function AudioStudioToolbar({
   isRecording,
   onAdd,
   onRecord,
+  onRecordLongPress,
   onSplit,
   onBeatSplit,
   onEdit,
@@ -30,6 +31,8 @@ export function AudioStudioToolbar({
   isRecording: boolean;
   onAdd: () => void;
   onRecord: () => void;
+  /** 🎙️ hosszú nyomás: felvételi beállítások (előszámlálás, punch-in) */
+  onRecordLongPress?: () => void;
   onSplit: () => void;
   /** ✂️🥁 hosszú nyomás: vágás az ütemrácson */
   onBeatSplit: () => void;
@@ -49,6 +52,7 @@ export function AudioStudioToolbar({
         icon={isRecording ? 'stop-circle' : 'mic-outline'}
         label={t('studio.audioTools.record')}
         onPress={onRecord}
+        onLongPress={onRecordLongPress}
         danger={isRecording}
       />
       <Tool icon="cut-outline" label={t('studio.audioTools.split')} onPress={onSplit} onLongPress={onBeatSplit} disabled={!hasSelection} />

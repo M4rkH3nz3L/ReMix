@@ -45,6 +45,17 @@ class RemixRenderModule : Module() {
     // 44,1 kHz float32, összefésülve a kimeneti fájlba
     Constant("supportsDecodeWindow") { true }
 
+    // 🎙️⏱️ a hangrendszer késései (mp): a kimeneti a rejtett AudioManager.getOutputLatency-ből (ms), a puffer a tulajdonságokból
+    Function("ioLatency") {
+      val am = appContext.reactContext?.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+      val outMs = try {
+        am?.javaClass?.getMethod("getOutputLatency", Int::class.javaPrimitiveType)?.invoke(am, android.media.AudioManager.STREAM_MUSIC) as? Int
+      } catch (e: Exception) { null }
+      val frames = am?.getProperty(android.media.AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toDoubleOrNull()
+      val rate = am?.getProperty(android.media.AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toDoubleOrNull()
+      mapOf("output" to (outMs?.div(1000.0) ?: -1.0), "input" to -1.0, "buffer" to (if (frames != null && rate != null && rate > 0) frames / rate else -1.0), "category" to "android")
+    }
+
     AsyncFunction("decodeWindow") { uri: String, start: Double, duration: Double, outputPath: String, promise: Promise ->
       try {
         val r = WindowDecoder.decodeWindow(toPath(uri), start, duration, toPath(outputPath))

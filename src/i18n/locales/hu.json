@@ -3972,7 +3972,7 @@
       "master": "Master"
     },
     "audio": {
-      "rec": {"pause": "Szünet", "resume": "Folytatás", "level": "Bemeneti szint", "hot": "Túl hangos — vedd lejjebb vagy távolodj", "paused": "Szünetel"},
+      "rec": {"pause": "Szünet", "resume": "Folytatás", "level": "Bemeneti szint", "hot": "Túl hangos — vedd lejjebb vagy távolodj", "paused": "Szünetel", "options": "Felvétel beállításai", "countIn": "Előszámlálás: {{v}}", "off": "ki", "bars_one": "{{count}} ütem", "bars_other": "{{count}} ütem", "punch": "Punch-in (In–Out): {{v}}", "on": "be", "done": "Kész", "countingIn": "Előszámlálás…", "punchArmed": "Punch — In-nél indul", "noRange": "A punch-inhez jelölj ki In–Out tartományt (legalább 0,2 s)."},
       "spectrum": "Spektrum",
       "panAutomation": "Pásztázás-automáció",
       "fxPitch": "Hangmagasság (félhang)",

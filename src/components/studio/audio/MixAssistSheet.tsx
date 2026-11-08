@@ -17,7 +17,7 @@ import { applyCommand, type EditorCommand } from '@/lib/commands';
 import { useEditorStore } from '@/store/editorStore';
 import { useMixAssist } from '@/store/mixAssistStore';
 import { withCancellableProgress } from '@/store/progressStore';
-import type { AudioMasterTarget } from '@/types/project';
+import type { AudioMaster, AudioMasterTarget, Project } from '@/types/project';
 
 /**
  * 🎚️🤖 Mixjavaslat és mastering-segéd (a telefonon, offline): a keverés sávonkénti mérése után
@@ -28,11 +28,18 @@ export function MixAssistSheet() {
   const { t } = useTranslation();
   const open = useMixAssist((s) => s.open);
   const project = useEditorStore((s) => s.project);
+  const past = useEditorStore((s) => s.past);
   const [analysis, setAnalysis] = useState<MixAnalysis | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [applied, setApplied] = useState<Set<string>>(new Set());
+  // javaslat → az alkalmazása utáni projekt-állapot: „alkalmazva”, amíg ez az állapot a jelenlegi vagy a
+  // visszavonható múltban van — visszavonás után a javaslat újra alkalmazható (nem ragad be a ✓)
+  const [appliedAt, setAppliedAt] = useState<Map<string, Project>>(new Map());
   const [target, setTarget] = useState<AudioMasterTarget>(project?.audioMaster?.target ?? 'youtube');
-  const [verify, setVerify] = useState<{ stats: TrackStats; lufs: number; tp: number } | 'busy' | null>(null);
+  const [verify, setVerify] = useState<{ stats: TrackStats; lufs: number; tp: number; master: AudioMaster } | 'busy' | null>(null);
+  const isApplied = (key: string) => {
+    const r = appliedAt.get(key);
+    return !!r && (r === project || past.includes(r));
+  };
 
   const view = () => {
     const st = useEditorStore.getState();
@@ -43,7 +50,7 @@ export function MixAssistSheet() {
     if (!st.project) return null;
     setAnalysis(null);
     setFailed(null);
-    setApplied(new Set());
+    setAppliedAt(new Map());
     setVerify(null);
     try {
       const a = await withCancellableProgress(t('studio.audio.mixAssist.working'), (report, signal) => analyzeMixTracks(st.project!, view(), report, signal));
@@ -86,20 +93,16 @@ export function MixAssistSheet() {
     }
     return out;
   };
-  const applyOne = (key: MixSuggestion['key']) => {
-    if (applied.has(key)) return 0;
-    const cmds = commandsFor([key]);
-    const n = cmds.length > 0 ? useEditorStore.getState().applyBatch(cmds, 'ai') : 0;
-    setApplied((prev) => new Set([...prev, key]));
-    return n;
-  };
-  const applyAll = () => {
-    const keys = suggestions.map((s) => s.key).filter((k) => !applied.has(k));
+  /** egy köteg (egy visszavonás); az eredmény-állapot jelöli a javaslatokat alkalmazottnak */
+  const applyKeys = (keys: MixSuggestion['key'][]) => {
     const cmds = commandsFor(keys);
     const n = cmds.length > 0 ? useEditorStore.getState().applyBatch(cmds, 'ai') : 0;
-    setApplied(new Set(suggestions.map((s) => s.key)));
+    const result = useEditorStore.getState().project;
+    if (n > 0 && result) setAppliedAt((prev) => new Map([...prev, ...keys.map((k) => [k, result] as const)]));
     return n;
   };
+  const applyOne = (key: MixSuggestion['key']) => (isApplied(key) ? 0 : applyKeys([key]));
+  const applyAll = () => applyKeys(suggestions.map((s) => s.key).filter((k) => !isApplied(k)));
   const applyMaster = async () => {
     if (!proposal) return null;
     useEditorStore.getState().dispatch({ type: 'SET_AUDIO_MASTER', audioMaster: proposal.master }, 'ai');
@@ -107,7 +110,7 @@ export function MixAssistSheet() {
     try {
       const st = useEditorStore.getState();
       const stats = await withCancellableProgress(t('studio.audio.mixAssist.verifying'), (report, signal) => measureMastered(st.project!, view(), report, signal));
-      const v = stats ? { stats, lufs: proposal.master.lufs, tp: proposal.master.truePeak } : null;
+      const v = stats ? { stats, lufs: proposal.master.lufs, tp: proposal.master.truePeak, master: proposal.master } : null;
       setVerify(v);
       return v;
     } catch (e) {
@@ -118,8 +121,8 @@ export function MixAssistSheet() {
   };
 
   // 🧪 füstteszt (csak __DEV__)
-  const ref = useRef({ analyze, applyAll, applyMaster, setTarget, suggestions, proposal });
-  ref.current = { analyze, applyAll, applyMaster, setTarget, suggestions, proposal };
+  const ref = useRef({ analyze, applyAll, applyMaster, setTarget, suggestions, proposal, isApplied, verified: null as unknown });
+  ref.current = { analyze, applyAll, applyMaster, setTarget, suggestions, proposal, isApplied, verified: null };
   useEffect(() => {
     const offs = [
       registerDevAction('mixAssist.suggestions', () => ref.current.suggestions.map((s) => s.key)),
@@ -128,6 +131,8 @@ export function MixAssistSheet() {
       registerDevAction('mixAssist.proposal', () => ref.current.proposal),
       registerDevAction('mixAssist.targetSpotify', () => ref.current.setTarget('spotify')),
       registerDevAction('mixAssist.applyMaster', () => ref.current.applyMaster()),
+      registerDevAction('mixAssist.appliedKeys', () => ref.current.suggestions.filter((s) => ref.current.isApplied(s.key)).map((s) => s.key)),
+      registerDevAction('mixAssist.verifiedShown', () => ref.current.verified !== null),
     ];
     return () => offs.forEach((off) => off());
   }, []);
@@ -139,7 +144,10 @@ export function MixAssistSheet() {
     return lane ? laneLabel(lane, t) : String(type ?? '');
   };
   const db = (x: number) => (x > 0 ? (20 * Math.log10(x)).toFixed(1) : '−∞');
-  const verified = verify && verify !== 'busy' ? verify : null;
+  // a mérés eredménye csak addig látszik, amíg ugyanez a master van a projekten (visszavonás után nem)
+  const verified = verify && verify !== 'busy' && JSON.stringify(project?.audioMaster) === JSON.stringify(verify.master) ? verify : null;
+  ref.current.verified = verified;
+  const allApplied = suggestions.every((s) => isApplied(s.key));
   const hit = verified ? Math.abs(verified.stats.lufs - verified.lufs) <= 1 && 20 * Math.log10(verified.stats.peak) <= verified.tp + 0.3 : false;
 
   return (
@@ -169,14 +177,14 @@ export function MixAssistSheet() {
                     <View key={i} style={styles.item}>
                       <Ionicons name={s.severity === 'error' ? 'alert-circle' : s.severity === 'warn' ? 'warning-outline' : 'bulb-outline'} size={18} color={s.severity === 'error' ? palette.danger : s.severity === 'warn' ? '#f5a524' : palette.accent} />
                       <Text style={styles.itemText}>{t(`studio.audio.mixAssist.s.${s.key}`, { ...s.params, track: name(s.params.track) })}</Text>
-                      <Pressable onPress={() => applyOne(s.key)} disabled={applied.has(s.key)} style={[styles.apply, applied.has(s.key) && styles.applied]} accessibilityRole="button">
-                        <Text style={styles.applyText}>{applied.has(s.key) ? '✓' : t('studio.audio.mixAssist.apply')}</Text>
+                      <Pressable onPress={() => applyOne(s.key)} disabled={isApplied(s.key)} style={[styles.apply, isApplied(s.key) && styles.applied]} accessibilityRole="button">
+                        <Text style={styles.applyText}>{isApplied(s.key) ? '✓' : t('studio.audio.mixAssist.apply')}</Text>
                       </Pressable>
                     </View>
                   ))
                 )}
                 {suggestions.length > 1 ? (
-                  <Pressable onPress={applyAll} style={[styles.wide, applied.size === suggestions.length && { opacity: 0.4 }]} disabled={applied.size === suggestions.length}>
+                  <Pressable onPress={applyAll} style={[styles.wide, allApplied && { opacity: 0.4 }]} disabled={allApplied}>
                     <Text style={styles.wideText}>{t('studio.audio.mixAssist.applyAll', { count: suggestions.length })}</Text>
                   </Pressable>
                 ) : null}

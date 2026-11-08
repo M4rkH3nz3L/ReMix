@@ -65,6 +65,7 @@ import { exportOfflineWav, measureStretchLatency } from '@/lib/offlineMixClient'
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
+import { useProgressStore } from '@/store/progressStore';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { currentSpeechWords } from '@/components/studio/audio/SpeechEditBar';
@@ -3531,6 +3532,194 @@ async function smokeLongCodec(log: Log) {
   }
 }
 
+/** ↩️🤖 AI-műveletek visszavonása + hiba utáni helyreállítás: minden AI-lépés EGY visszavonás (pontosan az eredeti), újra = az eredmény; a hang a végén mintára az eredeti; megszakítás, hiányzó fájl, zárolt sáv. */
+async function smokeAiUndo(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  let seed = 5;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  // beszéd: nagy dinamika, dübörgés, zaj (a mixjavaslatnak); a „hang” sávon csendek (a csendkeresésnek)
+  const voice = Float32Array.from({ length: 13 * SR }, (_, i) => {
+    const t = i / SR;
+    const lvl = Math.floor(t / 1.3) % 2 === 0 ? 0.4 : 0.04;
+    const v = t % 1.3 < 1 ? lvl * (0.6 * Math.sin(2 * Math.PI * 150 * t) + 0.3 * Math.sin(2 * Math.PI * 450 * t)) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 4 * t)) : 0;
+    return v + 0.2 * Math.sin(2 * Math.PI * 35 * t) + 0.01 * rnd();
+  });
+  const talk: [number, number][] = [[0, 1.5], [3, 4.5], [5.2, 8]];
+  const fxPcm = Float32Array.from({ length: 8 * SR }, (_, i) => {
+    const t = i / SR;
+    return talk.some(([a, b]) => t >= a && t < b) ? 0.3 * Math.sin(2 * Math.PI * 180 * t) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 4 * t)) : 0.001 * rnd();
+  });
+  const write = (name: string, x: Float32Array) => {
+    const f = new File(Paths.document, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, x], SR, () => 0.5));
+    return f.uri;
+  };
+  const vUri = write('smoke_aiu_voice.wav', voice);
+  const fUri = write('smoke_aiu_fx.wav', fxPcm);
+  const mUri = toneWav('smoke_aiu_music.wav', 13);
+  const id = 'prj_smoke_aiundo';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:aiundo', caught));
+  const base = createEmptyProject('smoke AI-visszavonás', '9:16', undefined, 'audio');
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', label: 'x', trimIn: 0, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', uri: vUri, start: 0, duration: 13, sourceDuration: 13, id: 'x', ...over });
+  const project: Project = {
+    ...base,
+    id,
+    bpm: 120,
+    tracks: base.tracks.map((t) =>
+      t.type === 'voiceover'
+        ? { ...t, clips: [ac({ id: 'v', label: 'beszéd' })] }
+        : t.type === 'music'
+          ? { ...t, clips: [ac({ id: 'm', label: 'zene', uri: mUri, volume: 0.5 })] }
+          : t.type === 'sfx'
+            ? { ...t, clips: [ac({ id: 'f', label: 'hang', uri: fUri, duration: 8, sourceDuration: 8, volume: 0.5 })] }
+            : t
+    ),
+  };
+  await saveProject(project);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  runDevAction('audio.fit');
+  const render = async (p: Project, name: string) => {
+    const { uri: out } = await exportOfflineWav(p, new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0).slice();
+    new File(out).delete();
+    return y;
+  };
+  const audioBefore = await render(st().project!, 'smoke_aiu_a.wav');
+  const snap = () => JSON.stringify(st().project);
+  const origin = snap();
+  /** egy AI-művelet: változtat, EGY history-lépés, a visszavonás = előtte, az újra = utána; a végén visszavonva */
+  const check = async (name: string, run: () => unknown) => {
+    const b = snap();
+    const d = st().past.length;
+    const n = await run();
+    await sleep(300);
+    const a = snap();
+    const steps = st().past.length - d;
+    const actor = st().events.at(-1)?.actor;
+    st().undo();
+    const u = snap() === b;
+    st().redo();
+    const r = snap() === a;
+    st().undo();
+    await sleep(200);
+    log(a !== b && steps === 1 && u && r, `${name}: egy lépés — a visszavonás pontosan az előtte, az újra pontosan az utána`, `${typeof n === 'number' ? `${n} parancs, ` : ''}${steps} lépés, szereplő ${actor}, vissza ${u ? '=' : '≠'}, újra ${r ? '=' : '≠'}`);
+    return a !== b && steps === 1 && u && r;
+  };
+
+  // 1) hang-asszisztens: négy lépés egy mondatból
+  runDevAction('audio.assistant');
+  await sleep(400);
+  devTypeAssistant('Tegyél zengést a beszédre, halkítsd a zenét 3 dB-lel, halkuljon a zene a beszéd alatt és masterelj Spotify-ra');
+  await sleep(400);
+  await check('hang-asszisztens (4 lépés)', () => runDevAction('assistant.apply'));
+  devTypeAssistant('');
+
+  // 2) mixjavaslat: mind; visszavonás után a javaslatok újra alkalmazhatók
+  runDevAction('audio.mixAssist');
+  let keys: string[] = [];
+  for (let i = 0; i < 160 && keys.length === 0; i++) {
+    await sleep(250);
+    keys = (runDevAction('mixAssist.suggestions') as string[]) ?? [];
+  }
+  await check(`mixjavaslat — mind (${keys.join(', ')})`, () => runDevAction('mixAssist.applyAll'));
+  await sleep(300);
+  const reAppliedKeys = (runDevAction('mixAssist.appliedKeys') as string[]) ?? [];
+  const again = runDevAction('mixAssist.applyAll') as number;
+  log(keys.length > 0 && reAppliedKeys.length === 0 && again > 0, 'visszavonás után a javaslat nem marad „✓”, újra alkalmazható', `alkalmazottnak jelölt: ${reAppliedKeys.length}, újra: ${again} parancs`);
+  st().undo();
+  await sleep(300);
+
+  // 3) mastering-segéd: alkalmazás + mérés; visszavonás után a mérés-eredmény sem látszik
+  runDevAction('mixAssist.targetSpotify');
+  await sleep(200);
+  await check('mastering-segéd (Spotify)', () => runDevAction('mixAssist.applyMaster'));
+  await sleep(400);
+  log(runDevAction('mixAssist.verifiedShown') === false, 'visszavont master: a „cél elérve” mérés nem látszik tovább', '');
+
+  // 4) megszakítás: az elemzés közben — a projekt változatlan, nem marad futó feladat, utána újra megy
+  const b4 = snap();
+  const pending = runDevAction('mixAssist.reanalyze') as Promise<unknown>;
+  let cancelled = false;
+  for (let i = 0; i < 100 && !cancelled; i++) {
+    await sleep(20);
+    const task = useProgressStore.getState().tasks.find((x) => x.cancel);
+    if (task) {
+      task.cancel!();
+      cancelled = true;
+    }
+  }
+  const res = await pending;
+  await sleep(300);
+  log(cancelled && res === null && snap() === b4 && useProgressStore.getState().tasks.length === 0, 'megszakított elemzés: a projekt változatlan, nem marad futó feladat', `megszakítva ${cancelled}, eredmény ${res === null ? 'nincs' : 'van'}, feladat ${useProgressStore.getState().tasks.length}`);
+  const back = (await runDevAction('mixAssist.reanalyze')) as unknown;
+  await sleep(400);
+  log(!!back && ((runDevAction('mixAssist.suggestions') as string[]) ?? []).length > 0, 'a megszakítás után az elemzés újra fut', '');
+  runDevAction('audio.mixAssistClose');
+  await sleep(400);
+
+  // 5) csendek kivágása a jóváhagyás után
+  st().selectClip('f');
+  const found = (await runDevAction('audio.silenceFind')) as number | null;
+  await check(`csendek kivágása (${found} csend)`, () => runDevAction('audio.silenceApply'));
+
+  // 6) ütemenkénti vágás
+  st().selectClip('m');
+  await check('vágás ütemenként', () => runDevAction('audio.beatSplitBars'));
+
+  // a hang a lépések és visszavonások után mintára az eredeti (a forrásfájlokhoz semmi nem nyúlt)
+  const audioAfter = await render(st().project!, 'smoke_aiu_b.wav');
+  let maxD = 0;
+  for (let i = 0; i < Math.min(audioBefore.length, audioAfter.length); i++) maxD = Math.max(maxD, Math.abs(audioBefore[i] - audioAfter[i]));
+  log(snap() === origin && audioBefore.length === audioAfter.length && maxD === 0, 'minden visszavonva: a projekt és a hang mintára az eredeti', `max eltérés ${maxD}, ${audioAfter.length} minta`);
+
+  // 7) hiányzó fájl: a csendkeresés és a beszédvágás nem indul, a projekt változatlan, nem marad futó feladat
+  const gone: AudioClip = ac({ id: 'gone', label: 'hiányzó', uri: `${Paths.document.uri}smoke_aiu_missing.wav`, start: 9, duration: 3, sourceDuration: 3 });
+  st().addClip('sfx', gone);
+  st().selectClip('gone');
+  const b7 = snap();
+  const sil = await runDevAction('audio.silenceFind');
+  const sp = await runDevAction('audio.speechStart');
+  await sleep(300);
+  log(sil === null && sp === null && snap() === b7 && useSilenceReview.getState().review === null && useProgressStore.getState().tasks.length === 0, 'hiányzó fájl: a csendkeresés és a beszédvágás hibát jelez, a projekt változatlan', `csend ${String(sil)}, beszéd ${String(sp)}`);
+  runDevAction('audio.mixAssist');
+  let fin: string[] = [];
+  for (let i = 0; i < 240 && fin.length === 0; i++) {
+    await sleep(250);
+    fin = (runDevAction('mixAssist.suggestions') as string[]) ?? [];
+  }
+  await sleep(300);
+  // a hiányzó klip kimarad, a többi sáv elemzése ugyanazt adja
+  log(snap() === b7 && useProgressStore.getState().tasks.length === 0 && fin.slice().sort().join() === keys.slice().sort().join(), 'hiányzó fájl a mixjavaslatban: kimarad, a többi sáv javaslatai ugyanazok, a projekt változatlan', `javaslatok: ${fin.join(', ') || '—'}`);
+  runDevAction('audio.mixAssistClose');
+  st().undo();
+  await sleep(300);
+
+  // 8) zárolt sáv: az asszisztens nem írja (a többi lépés igen), egy visszavonás
+  st().toggleTrackFlag('music', 'lock');
+  const music0 = JSON.stringify(st().project!.tracks.find((t) => t.type === 'music'));
+  devTypeAssistant('tegyél zengést a beszédre és halkuljon a zene a beszéd alatt');
+  await sleep(400);
+  const ok8 = await check('zárolt zene-sáv mellett az asszisztens', () => runDevAction('assistant.apply'));
+  st().redo();
+  const music1 = JSON.stringify(st().project!.tracks.find((t) => t.type === 'music'));
+  const vfx = (st().project!.tracks.find((t) => t.type === 'voiceover')!.clips[0] as AudioClip).audioFx?.reverb;
+  st().undo();
+  log(ok8 && music0 === music1 && !!vfx, 'zárolt sáv: a zene érintetlen, a beszéd zengést kap', `zengés ${vfx}`);
+  st().toggleTrackFlag('music', 'lock');
+  devTypeAssistant('');
+  log(snap() === origin, 'a próba végén a projekt pontosan az eredeti', '');
+  await sleep(800);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -5839,6 +6028,10 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'aiundo') {
+    await step(phase, () => smokeAiUndo(log));
     return;
   }
   if (phase === 'longcodec') {

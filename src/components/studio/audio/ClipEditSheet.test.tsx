@@ -51,12 +51,31 @@ describe('ClipEditSheet', () => {
     await act(async () => {
       view = create(<ClipEditSheet clip={clip} fps={30} onClose={onClose} />);
     });
-    const slider = view.root.findAll((n) => typeof n.props.onChange === 'function' && n.props.value === 1)[0];
-    await act(async () => slider.props.onChange(0.25));
+    // a hangerő-csúszka dB-ben (0 dB = 1); −12,04 dB = 0,25
+    const slider = view.root.findAll((n) => typeof n.props.onChange === 'function' && n.props.label === 'studio.audio.volume')[0];
+    expect(slider.props.value).toBe(0);
+    await act(async () => slider.props.onChange(20 * Math.log10(0.25)));
     await act(async () => frameClose());
     expect(onClose).toHaveBeenCalledTimes(1);
     const saved = useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip;
-    expect(saved.volume).toBe(0.25);
+    expect(saved.volume).toBeCloseTo(0.25, 9);
+  });
+
+  it('🔊 0 dB fölé is erősíthető (+6 dB = ×1,995), és a hangerő-állítás nem kerekíti el a késés-kompenzált vágást', async () => {
+    const p = createEmptyProject('t', '9:16', undefined, 'audio');
+    const precise = { ...clip, trimIn: 0.2731 };
+    useEditorStore.getState().loadProject({ ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [precise] } : t)) }, []);
+    let view!: ReactTestRenderer;
+    await act(async () => {
+      view = create(<ClipEditSheet clip={precise} fps={30} onClose={() => {}} />);
+    });
+    const slider = view.root.findAll((n) => typeof n.props.onChange === 'function' && n.props.label === 'studio.audio.volume')[0];
+    expect(slider.props.max).toBe(12);
+    await act(async () => slider.props.onChange(6));
+    await act(async () => frameClose());
+    const saved = useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip;
+    expect(saved.volume).toBeCloseTo(1.99526, 4);
+    expect(saved.trimIn).toBe(0.2731);
   });
 
   describe('PRO effektek (A48)', () => {

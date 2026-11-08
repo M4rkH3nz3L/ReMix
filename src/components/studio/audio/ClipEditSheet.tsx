@@ -21,6 +21,7 @@ import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
 import { selectTakeCommand } from '@/lib/punchRecord';
+import { CLIP_DB_MAX, CLIP_DB_MIN, CLIP_VOLUME_MAX, dbToVolume, formatDb, volumeToDb } from '@/lib/clipGain';
 import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
@@ -216,13 +217,14 @@ export function ClipEditSheet({
           }}
         />
 
+        {/* 🔊 klip-erősítés dB-ben: −∞ … +12 dB (0 dB-nél megáll) — a keverő a 0 dB fölötti erősítést is alkalmazza */}
         <Slider
           label={t('studio.audio.volume')}
-          value={volume}
-          min={0}
-          max={1}
-          onChange={setVolume}
-          format={(v) => `${Math.round(v * 100)}%`}
+          value={volumeToDb(volume)}
+          min={CLIP_DB_MIN}
+          max={CLIP_DB_MAX}
+          onChange={(db) => setVolume(dbToVolume(db))}
+          format={(db) => formatDb(dbToVolume(db))}
         />
         <Slider
           label={t('studio.audio.pan')}
@@ -257,7 +259,7 @@ export function ClipEditSheet({
           keyframes={clip.keyframes?.volume ?? []}
           duration={clip.duration}
           min={0}
-          max={1}
+          max={CLIP_VOLUME_MAX}
           fallback={clip.volume}
           playhead={clamp(playhead - clip.start, 0, clip.duration)}
           onChange={(next) =>
@@ -266,7 +268,7 @@ export function ClipEditSheet({
             })
           }
           onSeek={(tt) => useEditorStore.getState().setPlayhead(clip.start + tt)}
-          formatValue={(v) => `${Math.round(v * 100)}%`}
+          formatValue={formatDb}
         />
 
         {/* 🎚️ pásztázás-automáció (−1…1 görbe) — a render per-frame aeval-lal égeti be */}

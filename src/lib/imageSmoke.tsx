@@ -70,6 +70,7 @@ import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
+import { dbToVolume } from '@/lib/clipGain';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { currentSpeechWords } from '@/components/studio/audio/SpeechEditBar';
@@ -4335,6 +4336,51 @@ async function smokeGapEdit(log: Log) {
   router.back();
 }
 
+/** 🔊 T7 klip-erősítés 0 dB fölé: −20 dBFS jel +6 dB-lel → az export −14,0 dBFS, az élő motor −14 LUFS; a régi (0–1) hangerő változatlan. */
+async function smokeClipGain(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const a20 = Math.pow(10, -20 / 20);
+  const x = Float32Array.from({ length: 6 * SR }, (_, i) => a20 * Math.sin((2 * Math.PI * 1000 * i) / SR));
+  const f = new File(Paths.document, 'smoke_gain_ref.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_gain';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:gain', caught));
+  const base = createEmptyProject('smoke klip-erősítés', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'g', uri: f.uri, label: 'ref', start: 0, duration: 6, trimIn: 0, sourceDuration: 6, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const peakDb = async () => {
+    const { uri: out } = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_gain.wav'), undefined, undefined, 'float32');
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0);
+    new File(out).delete();
+    let m = 0;
+    for (let i = Math.round(0.1 * SR); i < y.length - Math.round(0.1 * SR); i++) m = Math.max(m, Math.abs(y[i]));
+    return 20 * Math.log10(m);
+  };
+  const old = await peakDb();
+  log(Math.abs(old - -26.02) <= 0.05, 'régi projekt (hangerő 0,5 = −6,02 dB): az export −26,02 dBFS, változatlan', `${old.toFixed(2)} dBFS`);
+  // a csúszka útja: dB → szorzó (ugyanaz a függvény), egy lépés
+  st().dispatch({ type: 'UPDATE_CLIP', clipId: 'g', patch: { volume: dbToVolume(6) } });
+  const boosted = await peakDb();
+  log(Math.abs(boosted - -14.0) <= 0.05, '+6 dB: az export −14,0 dBFS (−20 + 6)', `${boosted.toFixed(2)} dBFS, szorzó ${dbToVolume(6).toFixed(4)}`);
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  for (let i = 0; i < 40 && !previewEngine.isPlaying(); i++) await sleep(50);
+  await sleep(3800);
+  const r = previewEngine.loudness();
+  st().setPlaying(false);
+  log(!!r && Math.abs(r.shortTerm - -14) <= 0.1 && Math.abs(r.truePeak - -14) <= 0.1, 'az előnézet is erősít: élő short-term −14 ± 0,1 LUFS, true-peak −14 ± 0,1 dBTP', r ? `S ${r.shortTerm.toFixed(2)} LUFS, TP ${r.truePeak.toFixed(2)} dBTP` : 'null (a motor nem szólt)');
+  st().undo();
+  log((st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).volume === 0.5, 'egy visszavonás: 0,5', '');
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6651,6 +6697,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'clipgain') {
+    await step(phase, () => smokeClipGain(log));
     return;
   }
   if (phase === 'gapedit') {

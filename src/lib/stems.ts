@@ -14,6 +14,12 @@ import { logCaught } from '@/lib/logCaught';
  *
  * A worker Demucs nélkül 503-at ad (env-kapuzva) — a hívó ezt kezeli.
  */
+/**
+ * 🚫 Kiadásból elrejtve (döntés 2026-11-08): a Demucs-súlyok licence nem kereskedelmi (MUSDB18),
+ * és csak telefonos AI lehet — tiszta licencű, eszközön futó modellig a gomb nem látszik.
+ */
+export const STEM_SEPARATION_ENABLED = false;
+
 export interface Stem {
   name: string;
   url: string;

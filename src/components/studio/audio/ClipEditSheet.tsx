@@ -19,7 +19,7 @@ import type { EditorCommand } from '@/lib/commands';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
-import { separateStems } from '@/lib/stems';
+import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -488,20 +488,24 @@ export function ClipEditSheet({
         </Pressable>
         <Text style={styles.hint}>{t('studio.audio.sync.openHint', { sec: 30 })}</Text>
 
-        {/* 🎚️ AI stem-szeparáció (Pro) */}
-        <View style={styles.divider} />
-        <Pressable onPress={onSeparate} disabled={separating} style={styles.stemsBtn}>
-          <Ionicons
-            name={separating ? 'hourglass-outline' : 'git-branch-outline'}
-            size={16}
-            color={palette.accent}
-          />
-          <Text style={styles.stemsText}>{t('studio.audio.stems')}</Text>
-          <View style={styles.proTag}>
-            <Text style={styles.proTagText}>PRO</Text>
-          </View>
-        </Pressable>
-        <Text style={styles.hint}>{t('studio.audio.stemsHint')}</Text>
+        {/* 🎚️ AI stem-szeparáció (Pro) — kiadásból elrejtve, lásd STEM_SEPARATION_ENABLED */}
+        {STEM_SEPARATION_ENABLED ? (
+          <>
+            <View style={styles.divider} />
+            <Pressable onPress={onSeparate} disabled={separating} style={styles.stemsBtn}>
+              <Ionicons
+                name={separating ? 'hourglass-outline' : 'git-branch-outline'}
+                size={16}
+                color={palette.accent}
+              />
+              <Text style={styles.stemsText}>{t('studio.audio.stems')}</Text>
+              <View style={styles.proTag}>
+                <Text style={styles.proTagText}>PRO</Text>
+              </View>
+            </Pressable>
+            <Text style={styles.hint}>{t('studio.audio.stemsHint')}</Text>
+          </>
+        ) : null}
       </ScrollView>
     </AudioSheetFrame>
   );

@@ -56,6 +56,16 @@ class RemixRenderModule : Module() {
       mapOf("output" to (outMs?.div(1000.0) ?: -1.0), "input" to -1.0, "buffer" to (if (frames != null && rate != null && rate > 0) frames / rate else -1.0), "category" to "android")
     }
 
+    // 🎬→🎵 a videó hangsávja külön M4A-ba, átkódolás nélkül (MediaMuxer) — AAC hangsávnál; hangsáv
+    // nélkül / nem AAC-nál hiba (a hívó érthető üzenetet ad)
+    AsyncFunction("extractAudio") { uri: String, outputPath: String, promise: Promise ->
+      try {
+        promise.resolve(extractAudioTrack(toPath(uri), toPath(outputPath)))
+      } catch (e: Exception) {
+        promise.reject("ERR_EXTRACT_AUDIO", e.message ?: "hang kinyerése", e)
+      }
+    }
+
     AsyncFunction("decodeWindow") { uri: String, start: Double, duration: Double, outputPath: String, promise: Promise ->
       try {
         val r = WindowDecoder.decodeWindow(toPath(uri), start, duration, toPath(outputPath))
@@ -72,8 +82,44 @@ class RemixRenderModule : Module() {
     }
   }
 
+  private fun extractAudioTrack(src: String, out: String): Map<String, Any> {
+    val ex = android.media.MediaExtractor()
+    ex.setDataSource(src)
+    try {
+      var idx = -1
+      for (i in 0 until ex.trackCount) {
+        if (ex.getTrackFormat(i).getString(android.media.MediaFormat.KEY_MIME)?.startsWith("audio/") == true) { idx = i; break }
+      }
+      if (idx < 0) throw IllegalStateException("A forrás nem tartalmaz sávot: audio")
+      val fmt = ex.getTrackFormat(idx)
+      val mime = fmt.getString(android.media.MediaFormat.KEY_MIME) ?: ""
+      if (mime != "audio/mp4a-latm") throw IllegalStateException("A videó hangja nem AAC ($mime)")
+      val durUs = if (fmt.containsKey(android.media.MediaFormat.KEY_DURATION)) fmt.getLong(android.media.MediaFormat.KEY_DURATION) else 0L
+      ex.selectTrack(idx)
+      java.io.File(out).delete()
+      val mux = android.media.MediaMuxer(out, android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+      val t = mux.addTrack(fmt)
+      mux.start()
+      val buf = java.nio.ByteBuffer.allocate(1 shl 20)
+      val info = android.media.MediaCodec.BufferInfo()
+      while (true) {
+        val n = ex.readSampleData(buf, 0)
+        if (n < 0) break
+        info.set(0, n, ex.sampleTime, if (ex.sampleFlags and android.media.MediaExtractor.SAMPLE_FLAG_SYNC != 0) android.media.MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+        mux.writeSampleData(t, buf, info)
+        ex.advance()
+      }
+      mux.stop()
+      mux.release()
+      return mapOf("duration" to durUs / 1e6, "passthrough" to true)
+    } finally {
+      ex.release()
+    }
+  }
+
+  // a `file://` uri százalékkódolt (ékezetes / szóközös név) — a fájlrendszer a dekódolt útvonalat várja
   private fun toPath(uri: String): String =
-    if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
+    if (uri.startsWith("file://")) android.net.Uri.parse(uri).path ?: uri.removePrefix("file://") else uri
 
   private fun render(planJson: String, outputPath: String): String {
     val plan = JSONObject(planJson)

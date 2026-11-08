@@ -167,6 +167,50 @@ public class RemixRenderModule: Module {
       return ["output": s.outputLatency, "input": s.inputLatency, "buffer": s.ioBufferDuration, "category": s.category.rawValue, "route": route, "options": s.categoryOptions.rawValue]
     }
 
+    /// 🎬→🎵 a videó hangsávja külön M4A-ba: átkódolás nélkül (a minták változatlanok), ha a forrás
+    /// AAC; különben AAC-re kódolva. Hangsáv nélkül hiba (a hívó érthető üzenetet ad).
+    AsyncFunction("extractAudio") { (uri: String, outputPath: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let asset = AVURLAsset(url: self.fileURL(uri))
+        guard let track = asset.tracks(withMediaType: .audio).first else {
+          DispatchQueue.main.async { promise.reject(RenderError.noTracks("audio")) }
+          return
+        }
+        let out = URL(fileURLWithPath: outputPath)
+        try? FileManager.default.removeItem(at: out)
+        let comp = AVMutableComposition()
+        let range = CMTimeRange(start: .zero, duration: asset.duration)
+        guard let ct = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid),
+              (try? ct.insertTimeRange(range, of: track, at: .zero)) != nil else {
+          DispatchQueue.main.async { promise.reject(RenderError.exportFailed("hangsáv")) }
+          return
+        }
+        func run(_ preset: String, _ src: AVAsset, then fallback: (() -> Void)?) {
+          guard let ex = AVAssetExportSession(asset: src, presetName: preset) else {
+            if let fallback {
+              fallback()
+            } else {
+              DispatchQueue.main.async { promise.reject(RenderError.exportFailed(preset)) }
+            }
+            return
+          }
+          ex.outputURL = out
+          ex.outputFileType = .m4a
+          ex.exportAsynchronously {
+            if ex.status == .completed {
+              DispatchQueue.main.async { promise.resolve(["duration": CMTimeGetSeconds(asset.duration), "passthrough": preset == AVAssetExportPresetPassthrough]) }
+            } else if let fallback {
+              try? FileManager.default.removeItem(at: out)
+              fallback()
+            } else {
+              DispatchQueue.main.async { promise.reject(ex.error ?? RenderError.exportFailed(preset)) }
+            }
+          }
+        }
+        run(AVAssetExportPresetPassthrough, comp) { run(AVAssetExportPresetAppleM4A, asset, then: nil) }
+      }
+    }
+
     AsyncFunction("decodeWindow") { (uri: String, start: Double, duration: Double, outputPath: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         do {

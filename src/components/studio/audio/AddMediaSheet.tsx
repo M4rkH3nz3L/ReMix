@@ -16,6 +16,7 @@ import { loadStorageProviders, type StorageEntry, type StorageProvider } from '@
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, TrackType } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { canExtractAudio, extractVideoAudio, pickVideoForAudio } from '@/lib/videoAudioImport';
 
 /**
  * ➕ Hang hozzáadása a stúdióhoz — ESZKÖZRŐL importálva VAGY a szerver-könyvtárból
@@ -130,6 +131,33 @@ export function AddMediaSheet({
     }
   };
 
+  // 🎬→🎵 hang videóból: a választott videó hangsávja külön fájlba, klip a lejátszófejnél
+  const importVideoAudio = async (from: 'photos' | 'files') => {
+    setBusy(true);
+    try {
+      const picked = await pickVideoForAudio(from);
+      if (!picked) return;
+      const r = await extractVideoAudio(picked.uri, picked.name);
+      if (!r.ok) {
+        Alert.alert(t('studio.audio.fromVideo'), t(r.reason === 'noAudio' ? 'studio.audio.noAudioInVideo' : 'studio.audio.extractFailed'));
+        return;
+      }
+      addAudio(r.uri, r.name, r.duration);
+    } catch (caught) {
+      logCaught('components/studio/audio/AddMediaSheet.tsx:fromVideo', caught);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const onFromVideo = () => {
+    if (busy) return;
+    Alert.alert(t('studio.audio.fromVideo'), undefined, [
+      { text: t('studio.audio.fromPhotos'), onPress: () => void importVideoAudio('photos') },
+      { text: t('studio.audio.fromFiles'), onPress: () => void importVideoAudio('files') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const onPickLibrary = async (provider: StorageProvider, entry: StorageEntry) => {
     if (busy) {
       return;
@@ -171,6 +199,12 @@ export function AddMediaSheet({
             <Ionicons name="phone-portrait-outline" size={18} color={palette.accent} />
             <Text style={styles.importText}>{t('studio.audio.importDevice')}</Text>
           </Pressable>
+          {canExtractAudio() ? (
+            <Pressable onPress={onFromVideo} disabled={busy} style={[styles.importRow, { marginTop: 8 }]} testID="add-from-video">
+              <Ionicons name="film-outline" size={18} color={palette.accent} />
+              <Text style={styles.importText}>{t('studio.audio.fromVideo')}</Text>
+            </Pressable>
+          ) : null}
           {onTts ? (
             <Pressable onPress={onTts} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
               <Ionicons name="sparkles-outline" size={18} color={palette.accent2} />

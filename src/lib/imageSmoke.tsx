@@ -71,6 +71,7 @@ import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { dbToVolume } from '@/lib/clipGain';
+import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { currentSpeechWords } from '@/components/studio/audio/SpeechEditBar';
@@ -4381,6 +4382,76 @@ async function smokeClipGain(log: Log) {
   router.back();
 }
 
+/** 🎬→🎵 T8 hang videóból: a kinyert M4A = a videó hangja (eltolás 0, korreláció ≥ 0,99), a projekt-mappában; hangsáv nélkül érthető hiba, nincs maradék. */
+async function smokeFromVideo(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  log(canExtractAudio(), 'a build tud hangot kinyerni (natív)', '');
+  const SR = 44100;
+  const id = 'prj_smoke_fromvideo';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fromvideo', caught));
+  const base = createEmptyProject('smoke hang videóból', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(800);
+  const vid = await downloadToCache(`${smokeFileHost()}/vid_audio.mp4`, 'smoke_vid_audio.mp4');
+  const noa = await downloadToCache(`${smokeFileHost()}/vid_noaudio.mp4`, 'smoke_vid_noaudio.mp4');
+  if (!vid || !noa) {
+    log(false, 'a próbavideók letöltése', '-');
+    return;
+  }
+  const t0 = Date.now();
+  const r = await extractVideoAudio(vid, 'próba videó.mp4');
+  const ms = Date.now() - t0;
+  if (!r.ok) {
+    log(false, 'kinyerés', `${r.reason} ${r.message ?? ''}`);
+    return;
+  }
+  const inFolder = r.uri.startsWith(projectMediaDir().uri) && new File(r.uri).exists;
+  log(inFolder && r.uri.endsWith('.m4a') && Math.abs(r.duration - 6) <= 1 / 30, 'a videó hangja M4A-ként a projekt-mappában, a hossza a videóé (± 1 képkocka)', `${r.duration.toFixed(3)} s, ${((new File(r.uri).size ?? 0) / 1024).toFixed(0)} kB, ${ms} ms, ${r.uri.split('/').slice(-2).join('/')}`);
+  const api = (await loadAudioApi())!;
+  const ex = (await api.decodeAudioData(r.uri, SR)).getChannelData(0);
+  const orig = (await api.decodeAudioData(vid, SR)).getChannelData(0);
+  const ref = (i: number) => 0.4 * Math.sin(2 * Math.PI * (300 + 40 * (Math.floor((i / SR) * 10) % 25)) * (i / SR));
+  const best = (get: (i: number) => number) => {
+    const a = SR;
+    const n = SR;
+    let bl = 0;
+    let bv = -Infinity;
+    for (let lag = -2000; lag <= 2000; lag++) {
+      let xy = 0;
+      for (let j = a; j < a + n; j += 8) xy += ex[j + lag] * get(j);
+      if (xy > bv) {
+        bv = xy;
+        bl = lag;
+      }
+    }
+    let xy = 0;
+    let xx = 0;
+    let yy = 0;
+    for (let j = a; j < a + n; j++) {
+      const p = ex[j + bl];
+      const q = get(j);
+      xy += p * q;
+      xx += p * p;
+      yy += q * q;
+    }
+    return { lag: bl, rho: xy / Math.sqrt(xx * yy) };
+  };
+  const vsVideo = best((j) => orig[j] ?? 0);
+  log(vsVideo.lag === 0 && vsVideo.rho >= 0.99, 'a kinyert hang = a videó hangja (eltolás 0, korreláció ≥ 0,99)', `eltolás ${vsVideo.lag} minta, ρ ${vsVideo.rho.toFixed(4)}`);
+  const vsRef = best(ref);
+  log(null, 'a kinyert hang az ismert jelhez (az AAC kódolói késleltetésével együtt)', `eltolás ${vsRef.lag} minta, ρ ${vsRef.rho.toFixed(4)}`);
+  // hangsáv nélküli videó: érthető hiba, nincs maradék fájl, a projekt változatlan
+  const before = JSON.stringify(st().project);
+  const extracted = () => projectMediaDir().list().filter((x) => x.name.endsWith('_hang.m4a')).length;
+  const files0 = extracted();
+  const r2 = await extractVideoAudio(noa, 'néma.mp4');
+  log(!r2.ok && r2.reason === 'noAudio' && extracted() === files0 && JSON.stringify(st().project) === before, 'hangsáv nélküli videó: „nincs hangsáv” hiba, nincs maradék fájl, a projekt változatlan', `${r2.ok ? 'ok?!' : r2.reason}; kinyert fájlok ${files0} → ${extracted()}; projekt ${JSON.stringify(st().project) === before ? 'változatlan' : 'változott'}`);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6697,6 +6768,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'fromvideo') {
+    await step(phase, () => smokeFromVideo(log));
     return;
   }
   if (phase === 'clipgain') {

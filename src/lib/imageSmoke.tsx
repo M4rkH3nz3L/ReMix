@@ -69,6 +69,7 @@ import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
+import { selectTakeCommand } from '@/lib/punchRecord';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { currentSpeechWords } from '@/components/studio/audio/SpeechEditBar';
@@ -4118,6 +4119,105 @@ async function smokeBleed(log: Log) {
   router.back();
 }
 
+/** 🎙️🔁 T4 take-ek: 3 punch ugyanarra a helyre = 3 take (nem vágás), a 2. választva az export a 2. take hangja; egy undo; mentés után is megvan mind. */
+async function smokeTakes(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const perm = await getRecordingPermissionsAsync();
+  if (!perm.granted) {
+    log(false, 'mikrofon-engedély', `nincs megadva (${perm.status})`);
+    return;
+  }
+  const SR = 44100;
+  const id = 'prj_smoke_takes';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:takes', caught));
+  const base = createEmptyProject('smoke take-ek', '9:16', undefined, 'audio');
+  const bed: AudioClip = { kind: 'audio', id: 'bed', uri: toneWav('smoke_takes_bed.wav', 8), label: 'alap', start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 0.02, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [bed] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  const voice = () => (st().project!.tracks.find((t) => t.type === 'voiceover')!.clips as AudioClip[]);
+  const state = () => runDevAction('audio.recordState') as { active: boolean };
+  useRecordPrefs.getState().setCountIn(0);
+  useRecordPrefs.getState().setPunch(true);
+  st().setPlayhead(2);
+  st().setRangeIn();
+  st().setPlayhead(4);
+  st().setRangeOut();
+  const takes: string[] = [];
+  for (let k = 0; k < 3; k++) {
+    const before = voice()[0]?.uri;
+    const t0 = Date.now();
+    await runDevAction('audio.recordToggle');
+    for (let i = 0; i < 120 && (Date.now() - t0 < 1000 || state().active); i++) await sleep(100);
+    for (let i = 0; i < 100 && voice()[0]?.uri === before; i++) await sleep(100);
+    await sleep(300);
+    takes.push(voice()[0]?.uri ?? '');
+    const al = lastTakeAlign();
+    log(null, `${k + 1}. take igazítása`, al ? `${al.measured ? 'mért' : 'kalibráció'} ${(al.shift * 1000).toFixed(1)} ms, ρ ${al.rho?.toFixed(2) ?? '—'}` : '—');
+  }
+  const c = voice()[0];
+  log(voice().length === 1 && c?.takes?.length === 3 && c.activeTake === c.takes[2].id && c.uri === takes[2] && new Set(takes).size === 3, '3 punch ugyanarra a helyre: EGY klip 3 take-kel, az utolsó szól', `${voice().length} klip, ${c?.takes?.length ?? 0} take, aktív ${(c?.takes?.findIndex((x) => x.id === c?.activeTake) ?? -1) + 1}.`);
+  if (!c?.takes || c.takes.length !== 3) {
+    router.back();
+    return;
+  }
+  // a take-választó a klipszerkesztőben (képernyőkép)
+  st().selectClip(c.id);
+  runDevAction('audio.editClip');
+  await sleep(800);
+  log(true, 'FOTÓZHATÓ', 'a klipszerkesztő tetején a take-választó (3 take, előhallgatással)');
+  await sleep(2500);
+  // a 2. take választása (a lap útja: függő beállítás nélkül egy lépés)
+  const past0 = st().past.length;
+  st().dispatch(selectTakeCommand(voice()[0], c.takes[1].id)!);
+  const c2 = voice()[0];
+  log(st().past.length === past0 + 1 && c2.uri === takes[1] && c2.activeTake === c.takes[1].id && Math.abs(c2.start - c.takes[1].start) < 1e-9 && Math.abs((c2.trimIn ?? 0) - c.takes[1].trimIn) < 1e-9, 'a 2. take választva: a klip a 2. take hangja és helye, egy lépés', `trimIn ${c2.trimIn?.toFixed(3)} s`);
+  await sleep(600);
+  runDevAction('clipEdit.done');
+  await sleep(400);
+  // az export a választott take hangja: korreláció mindhárom take fájljával (a take-ek külön felvételek)
+  const voOnly = (p: Project): Project => ({ ...p, tracks: p.tracks.map((t) => (t.type === 'voiceover' ? t : { ...t, clips: [] })) });
+  const { uri: out } = await exportOfflineWav(voOnly(st().project!), new File(projectExportDir(), 'smoke_takes.wav'), undefined, undefined, 'float32');
+  const api = (await loadAudioApi())!;
+  const y = (await api.decodeAudioData(out, SR)).getChannelData(0);
+  new File(out).delete();
+  const corr = async (take: { uri: string; trimIn: number; start: number }) => {
+    const x = (await api.decodeAudioData(take.uri, SR)).getChannelData(0);
+    // a klip közepe (a mikro-fade-ek nélkül): export[start + j] ↔ take[trimIn + j]
+    const a = Math.round((c2.start + 0.1) * SR);
+    const n = Math.round(1.6 * SR);
+    const off = Math.round(take.trimIn * SR) - Math.round(take.start * SR);
+    let xy = 0;
+    let xx = 0;
+    let yy = 0;
+    for (let j = a; j < a + n; j++) {
+      const p = y[j] ?? 0;
+      const q = x[j + off] ?? 0;
+      xy += p * q;
+      xx += p * p;
+      yy += q * q;
+    }
+    return xy / Math.sqrt(Math.max(1e-30, xx * yy));
+  };
+  const rs: number[] = [];
+  for (const tk of c.takes) rs.push(await corr({ uri: tk.uri, trimIn: c2.trimIn ?? 0, start: c2.start }));
+  const distinct = Math.max(Math.abs(rs[0]), Math.abs(rs[2])) < 0.9;
+  log(rs[1] > 0.99 ? (distinct ? true : null) : false, 'az export a 2. take hangja (korreláció ≥ 0,99), a másik kettőé nem', `take 1/2/3: ${rs.map((r) => r.toFixed(3)).join(' / ')}${distinct ? '' : ' — a take-ek hangja itt nem különböztethető meg (azonos bemenet)'}`);
+  // egy visszavonás: az előző (3.) take
+  st().undo();
+  log(voice()[0].uri === takes[2] && voice()[0].activeTake === c.takes[2].id, 'egy visszavonás: az előző take szól újra', '');
+  st().redo();
+  // mentés + újratöltés a tárból
+  await saveProject(st().project!);
+  const re = await loadProject(id);
+  const rc = re?.tracks.find((t) => t.type === 'voiceover')?.clips[0] as AudioClip | undefined;
+  log(rc?.takes?.length === 3 && rc.activeTake === c.takes[1].id && rc.uri === takes[1] && rc.takes.every((x) => new File(x.uri).exists), 'mentés után újratöltve: mind a 3 take megvan (a fájlok is), a 2. szól', `${rc?.takes?.length ?? 0} take`);
+  useRecordPrefs.getState().setPunch(false);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6434,6 +6534,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'takes') {
+    await step(phase, () => smokeTakes(log));
     return;
   }
   if (phase === 'punch') {

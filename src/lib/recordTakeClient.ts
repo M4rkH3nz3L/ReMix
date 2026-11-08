@@ -186,6 +186,15 @@ export function lastTakeAlign(): TakeAlignInfo | null {
 async function decodeMono(uri: string): Promise<Float32Array | null> {
   const api = await loadAudioApi();
   if (!api) return null;
+  // a frissen a projekt-mappába másolt take néha egy pillanatig még nem látszik (mérve: 0–100 ms)
+  if (uri.startsWith('file:') && !new File(uri).exists) {
+    const f = new File(uri);
+    for (let waited = 0; !f.exists && waited < 2000; waited += 100) await new Promise((r) => setTimeout(r, 100));
+    if (!f.exists) {
+      logCaught('lib/recordTakeClient.ts:decodeMono', new Error(`hiányzó fájl: ${uri.split('/').slice(-2).join('/')}`));
+      return null;
+    }
+  }
   try {
     return (await api.decodeAudioData(uri, SR)).getChannelData(0).slice();
   } catch (caught) {

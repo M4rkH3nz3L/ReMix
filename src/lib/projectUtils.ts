@@ -563,6 +563,11 @@ export function cropClip(clip: Clip, from: number, to: number): Clip {
   if ('keyframes' in clip && clip.keyframes) {
     (out as { keyframes?: ClipKeyframes }).keyframes = cropKeyframes(clip.keyframes, a, b - a);
   }
+  // 🎙️ a take-ek az egész felvételi helyre vonatkoznak: a darab a mostani take hangja marad, választó nélkül
+  if (out.kind === 'audio' && (a > 0 || b < clip.duration) && out.takes) {
+    delete out.takes;
+    delete out.activeTake;
+  }
   // 🎚️ a fade a klip széléhez tartozik: a vágásnál nem halkulhat el a hang
   if (out.kind === 'audio') {
     if (a > 0) {

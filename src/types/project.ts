@@ -1135,6 +1135,19 @@ export interface AudioFx {
   harmony?: number;
 }
 
+/** 🎙️ egy felvett take (lásd `AudioClip.takes`) */
+export interface AudioTake {
+  id: string;
+  uri: string;
+  label: string;
+  start: number;
+  duration: number;
+  trimIn: number;
+  sourceDuration: number;
+  /** a felvétel ideje (ISO) */
+  at?: string;
+}
+
 export interface AudioClip extends ClipBase {
   kind: 'audio';
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
@@ -1163,6 +1176,14 @@ export interface AudioClip extends ClipBase {
    * a minta közepéről folytatódik, a hurok-ablak (`trimIn` … `trimIn + loopLength`) marad. Hiányzó = 0.
    */
   loopOffset?: number;
+  /**
+   * 🎙️🔁 take-ek: ugyanarra a helyre ismételt felvételek (punch-in). Az aktív take adatai a klip saját
+   * mezői (`uri`, `trimIn`, `sourceDuration`, `start`, `duration`) — az export és a lejátszás így
+   * változatlan; a lista mindet tartalmazza (az aktívat is). Hiányzó = egyetlen felvétel.
+   */
+  takes?: AudioTake[];
+  /** az aktív take azonosítója (a `takes`-ből) */
+  activeTake?: string;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */

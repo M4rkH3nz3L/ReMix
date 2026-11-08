@@ -3972,7 +3972,7 @@
       "master": "Master"
     },
     "audio": {
-      "rec": {"pause": "Pause", "resume": "Resume", "level": "Input level", "hot": "Too loud — lower it or move back", "paused": "Paused", "options": "Recording options", "countIn": "Count-in: {{v}}", "off": "off", "bars_one": "{{count}} bar", "bars_other": "{{count}} bars", "punch": "Punch-in (In–Out): {{v}}", "on": "on", "done": "Done", "countingIn": "Count-in…", "punchArmed": "Punch — starts at In", "noRange": "Set an In–Out range for punch-in (at least 0.2 s)."},
+      "rec": {"pause": "Pause", "resume": "Resume", "level": "Input level", "hot": "Too loud — lower it or move back", "paused": "Paused", "options": "Recording options", "countIn": "Count-in: {{v}}", "off": "off", "bars_one": "{{count}} bar", "bars_other": "{{count}} bars", "punch": "Punch-in (In–Out): {{v}}", "on": "on", "done": "Done", "countingIn": "Count-in…", "punchArmed": "Punch — starts at In", "noRange": "Set an In–Out range for punch-in (at least 0.2 s).", "takes": "Takes ({{count}})", "take": "Take {{n}}", "activeTake": "active"},
       "spectrum": "Spectrum",
       "panAutomation": "Pan automation",
       "fxPitch": "Pitch (semitones)",

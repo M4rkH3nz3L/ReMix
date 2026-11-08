@@ -1,6 +1,6 @@
 import { applyCommand, type EditorCommand } from '@/lib/commands';
 import { createEmptyProject } from '@/lib/projectUtils';
-import { beatSeconds, countInClicks, countInSeconds, punchCommands, punchWindow, recordingStartFrom, PUNCH_LEAD } from '@/lib/punchRecord';
+import { beatSeconds, countInClicks, countInSeconds, punchCommands, punchWindow, recordingStartFrom, selectTakeCommand, takeSlot, PUNCH_LEAD } from '@/lib/punchRecord';
 import type { AudioClip, Project } from '@/types/project';
 
 let n = 0;
@@ -86,5 +86,57 @@ describe('punchCommands', () => {
     expect(ids).not.toContain('inner');
     const empty = createEmptyProject('e', '9:16', undefined, 'audio');
     expect(run(empty, punchCommands(empty, 'voiceover', { uri: 'file:///t.m4a', seconds: 3, startAt: 0.7, label: 't' }, { in: 1, out: 3 }, makeId)).tracks.find((t) => t.type === 'voiceover')!.clips).toHaveLength(1);
+  });
+});
+
+describe('take-ek (T4)', () => {
+  const empty = () => createEmptyProject('t', '9:16', undefined, 'audio');
+  const run = (p: Project, cmds: EditorCommand[]) => cmds.reduce((acc, c) => applyCommand(acc, c) ?? acc, p);
+  const vo = (p: Project) => p.tracks.find((t) => t.type === 'voiceover')!.clips as AudioClip[];
+  const win = { in: 2, out: 4 };
+  const rec = (name: string, startAt: number) => ({ uri: `file:///${name}.m4a`, seconds: 2.5, startAt, label: name });
+
+  it('ugyanarra a helyre ismételt punch: nem vág, hanem új take — a régiek megmaradnak, az új szól', () => {
+    let p = run(empty(), punchCommands(empty(), 'voiceover', rec('t1', 1.7), win, makeId));
+    expect(takeSlot(p, 'voiceover', win)?.uri).toBe('file:///t1.m4a');
+    p = run(p, punchCommands(p, 'voiceover', rec('t2', 1.75), win, makeId));
+    p = run(p, punchCommands(p, 'voiceover', rec('t3', 1.72), win, makeId));
+    const clips = vo(p);
+    expect(clips).toHaveLength(1);
+    const c = clips[0];
+    expect(c.takes!.map((t) => t.uri.split('/').pop())).toEqual(['t1.m4a', 't2.m4a', 't3.m4a']);
+    expect(c.uri).toBe('file:///t3.m4a');
+    expect(c.activeTake).toBe(c.takes![2].id);
+    expect(c.start).toBe(2);
+    expect(c.duration).toBeCloseTo(2, 9);
+    expect(c.trimIn).toBeCloseTo(0.28, 9);
+    expect(c.takes![1].trimIn).toBeCloseTo(0.25, 9);
+  });
+  it('take választása: a klip a választott take hangja és helye (egy parancs); a már aktív újraválasztása nem lépés', () => {
+    let p = run(empty(), punchCommands(empty(), 'voiceover', rec('a', 1.7), win, makeId));
+    p = run(p, punchCommands(p, 'voiceover', rec('b', 1.8), win, makeId));
+    const c = vo(p)[0];
+    const first = c.takes![0];
+    const cmd = selectTakeCommand(c, first.id)!;
+    const q = run(p, [cmd]);
+    expect(vo(q)[0].uri).toBe('file:///a.m4a');
+    expect(vo(q)[0].trimIn).toBeCloseTo(0.3, 9);
+    expect(vo(q)[0].activeTake).toBe(first.id);
+    expect(vo(q)[0].takes).toHaveLength(2);
+    expect(selectTakeCommand(vo(q)[0], first.id)).toBeNull();
+    expect(selectTakeCommand(vo(q)[0], 'nincs')).toBeNull();
+  });
+  it('a take-es klip kettévágva: a darabok a mostani take hangjai, választó nélkül', () => {
+    let p = run(empty(), punchCommands(empty(), 'voiceover', rec('a', 1.7), win, makeId));
+    p = run(p, punchCommands(p, 'voiceover', rec('b', 1.8), win, makeId));
+    const q = run(p, [{ type: 'SPLIT_CLIP', clipId: vo(p)[0].id, time: 3 }]);
+    expect(vo(q)).toHaveLength(2);
+    expect(vo(q).every((c) => c.uri === 'file:///b.m4a' && !c.takes && !c.activeTake)).toBe(true);
+  });
+  it('más tartomány (nem ugyanaz a hely) → nem take, hanem vágás', () => {
+    let p = run(empty(), punchCommands(empty(), 'voiceover', rec('a', 1.7), win, makeId));
+    p = run(p, punchCommands(p, 'voiceover', rec('b', 2.7), { in: 3, out: 5 }, makeId));
+    expect(vo(p)).toHaveLength(2);
+    expect(vo(p).every((c) => !c.takes)).toBe(true);
   });
 });

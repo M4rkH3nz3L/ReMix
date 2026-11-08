@@ -2,7 +2,7 @@ import { DEFAULT_METER, secPerBeat, type Meter } from '@/lib/audioTransport';
 import type { EditorCommand } from '@/lib/commands';
 import { MIN_CLIP_DURATION } from '@/constants/editor';
 import { cropClip } from '@/lib/projectUtils';
-import type { Asset, AudioClip, Clip, Project, TrackType } from '@/types/project';
+import type { Asset, AudioClip, AudioTake, Clip, Project, TrackType } from '@/types/project';
 
 /**
  * 🎙️⏱️ Count-in és punch-in — tiszta mag (a felület és a füstteszt közös útja).
@@ -70,9 +70,32 @@ export function recordingStartFrom(samples: { playhead: number; recordedMs: numb
 
 /**
  * a punch parancsai (egy köteg = egy undo): a sáv In–Out közé eső része kivágva (a kilógó darabok
- * maradnak, a kettévágott klip jobb fele új azonosítót kap), és az új klip pontosan In-től.
+ * maradnak, a kettévágott klip jobb fele új azonosítót kap), és az új klip pontosan In-től. Ha ott
+ * már egy korábbi punch take-je ül (`takeSlot`), nem vág: új take lesz belőle, az lesz az aktív.
  * Ha a felvétel In után indult (a felvevő késett), a klip a tényleges kezdettől szól.
  */
+/** a klip, amely már ennek a punch-tartománynak egy take-je (ugyanott kezdődik — a felvevő késése miatt legfeljebb kicsit később — és Out-nál ér véget) */
+export function takeSlot(project: Project, trackType: TrackType, win: { in: number; out: number }): AudioClip | null {
+  const track = project.tracks.find((t) => t.type === trackType);
+  const c = track?.clips.find(
+    (x): x is AudioClip =>
+      x.kind === 'audio' && x.source === 'voiceover' && x.start >= win.in - 1e-6 && x.start <= win.in + 0.25 && Math.abs(x.start + x.duration - win.out) <= 0.01
+  );
+  return c ?? null;
+}
+
+/** a klip mostani (aktív) felvétele take-ként */
+export function takeOf(clip: AudioClip, id: string): AudioTake {
+  return { id, uri: clip.uri, label: clip.label, start: clip.start, duration: clip.duration, trimIn: clip.trimIn ?? 0, sourceDuration: clip.sourceDuration ?? clip.duration };
+}
+
+/** take választása: a klip mezői a take-éi (egy parancs = egy undo); ismeretlen take → null */
+export function selectTakeCommand(clip: AudioClip, takeId: string): EditorCommand | null {
+  const t = clip.takes?.find((x) => x.id === takeId);
+  if (!t || clip.activeTake === takeId) return null;
+  return { type: 'UPDATE_CLIP', clipId: clip.id, patch: { uri: t.uri, label: t.label, start: t.start, duration: t.duration, trimIn: t.trimIn, sourceDuration: t.sourceDuration, activeTake: t.id } };
+}
+
 export function punchCommands(
   project: Project,
   trackType: TrackType,
@@ -101,6 +124,21 @@ export function punchCommands(
       carved.push(win.in - s >= MIN_CLIP_DURATION ? ({ ...right, id: makeId('clip') } as Clip) : right);
     }
   }
+  const asset0: Asset = { id: makeId('ast'), kind: 'audio', uri: rec.uri, provider: 'local', name: rec.label, duration: rec.seconds };
+  // 🔁 ugyanarra a helyre ismételt punch: új take (a régiek megmaradnak, az új az aktív) — nem vág
+  const slot = takeSlot(project, trackType, win);
+  if (slot) {
+    const prior = slot.takes && slot.takes.length > 0 ? slot.takes : [takeOf(slot, slot.activeTake ?? makeId('take'))];
+    const take: AudioTake = { id: makeId('take'), uri: rec.uri, label: rec.label, start, duration, trimIn, sourceDuration: rec.seconds, at: new Date().toISOString() };
+    return [
+      { type: 'ADD_ASSET', asset: asset0 },
+      {
+        type: 'UPDATE_CLIP',
+        clipId: slot.id,
+        patch: { uri: take.uri, label: take.label, start, duration, trimIn, sourceDuration: rec.seconds, takes: [...prior, take], activeTake: take.id },
+      },
+    ];
+  }
   const clip: AudioClip = {
     kind: 'audio',
     id: makeId('clip'),
@@ -115,9 +153,8 @@ export function punchCommands(
     fadeOut: 0,
     source: 'voiceover',
   };
-  const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: rec.uri, provider: 'local', name: rec.label, duration: rec.seconds };
   return [
-    { type: 'ADD_ASSET', asset },
+    { type: 'ADD_ASSET', asset: asset0 },
     { type: 'REPLACE_TRACK_CLIPS', trackType, clips: [...carved, clip].sort((a, b) => a.start - b.start) },
   ];
 }

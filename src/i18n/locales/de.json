@@ -3977,7 +3977,7 @@
       "master": "Master"
     },
     "audio": {
-      "rec": {"pause": "Pause", "resume": "Fortsetzen", "level": "Eingangspegel", "hot": "Zu laut — leiser oder weiter weg", "paused": "Pausiert", "options": "Aufnahme-Optionen", "countIn": "Vorzähler: {{v}}", "off": "aus", "bars_one": "{{count}} Takt", "bars_other": "{{count}} Takte", "punch": "Punch-in (In–Out): {{v}}", "on": "an", "done": "Fertig", "countingIn": "Vorzähler…", "punchArmed": "Punch — startet bei In", "noRange": "Für Punch-in einen In–Out-Bereich setzen (mind. 0,2 s)."},
+      "rec": {"pause": "Pause", "resume": "Fortsetzen", "level": "Eingangspegel", "hot": "Zu laut — leiser oder weiter weg", "paused": "Pausiert", "options": "Aufnahme-Optionen", "countIn": "Vorzähler: {{v}}", "off": "aus", "bars_one": "{{count}} Takt", "bars_other": "{{count}} Takte", "punch": "Punch-in (In–Out): {{v}}", "on": "an", "done": "Fertig", "countingIn": "Vorzähler…", "punchArmed": "Punch — startet bei In", "noRange": "Für Punch-in einen In–Out-Bereich setzen (mind. 0,2 s).", "takes": "Takes ({{count}})", "take": "Take {{n}}", "activeTake": "aktiv"},
       "spectrum": "Spektrum",
       "panAutomation": "Panorama-Automation",
       "fxPitch": "Tonhöhe (Halbtöne)",

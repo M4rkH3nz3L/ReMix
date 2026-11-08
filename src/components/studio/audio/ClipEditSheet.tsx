@@ -20,6 +20,8 @@ import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
+import { selectTakeCommand } from '@/lib/punchRecord';
+import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -143,16 +145,28 @@ export function ClipEditSheet({
     autoDuck !== !!clip.autoDuck ||
     JSON.stringify(fx) !== JSON.stringify(clip.audioFx ?? {});
 
+  // a vágás csak akkor ül a rácsra, ha a felhasználó állította — a késés-kompenzált take (count-in,
+  // punch) pontos `trimIn`-je egy hangerő-állítástól nem csúszhat el
+  const geometryChanged = duration !== clip.duration || trimIn !== (clip.trimIn ?? 0);
+  // 🎙️🔁 take-választás: a függő (nem vágási) beállítások előbb mentődnek, aztán a take — a lap az
+  // új take adataival épül újra (a kulcsa az aktív take)
+  const pickTake = (takeId: string) => {
+    if (dirty) {
+      updateClip(clip.id, { volume, pan, fadeIn: Math.min(fadeIn, clip.duration), fadeOut: Math.min(fadeOut, clip.duration), voiceEnhance, deReverb, autoDuck, audioFx: fx } as Partial<AudioClip>);
+    }
+    const cmd = selectTakeCommand(clip, takeId);
+    if (cmd) useEditorStore.getState().dispatch(cmd);
+  };
+
   const onDone = () => {
     if (dirty) {
-      const snapped = snapToFrame(duration, fps);
+      const snapped = geometryChanged ? snapToFrame(duration, fps) : clip.duration;
       updateClip(clip.id, {
         volume,
         pan,
         fadeIn: Math.min(fadeIn, snapped),
         fadeOut: Math.min(fadeOut, snapped),
-        duration: Math.max(snapToFrame(0.1, fps), snapped),
-        trimIn: snapToFrame(trimIn, fps),
+        ...(geometryChanged ? { duration: Math.max(snapToFrame(0.1, fps), snapped), trimIn: snapToFrame(trimIn, fps) } : {}),
         sourceDuration,
         voiceEnhance,
         deReverb,
@@ -184,6 +198,7 @@ export function ClipEditSheet({
       </View>
 
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        <TakePicker clip={clip} onSelect={pickTake} />
         <RegionBar
           trimIn={trimIn}
           duration={duration}

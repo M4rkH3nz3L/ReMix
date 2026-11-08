@@ -3951,6 +3951,12 @@
     },
     "instrument": {"play": "Lejátszás", "stop": "Állj"},
     "audioTools": {
+      "cutMenu": "Vágás és illesztés",
+      "silenceInsert": "Csend beszúrása",
+      "silenceInsertAt": "{{sec}} s csend a lejátszófejnél ({{at}})",
+      "scopeTrack": "Csak ez a sáv",
+      "scopeAll": "Minden sáv",
+      "join": "Összeillesztés a következővel",
       "beatSplitTitle": "Vágás a rácson",
       "beatSplitBars": "Ütemenként",
       "beatSplitBeats": "Ütemrészenként",

@@ -3951,6 +3951,12 @@
     },
     "instrument": {"play": "Play", "stop": "Stop"},
     "audioTools": {
+      "cutMenu": "Cut and join",
+      "silenceInsert": "Insert silence",
+      "silenceInsertAt": "{{sec}} s of silence at the playhead ({{at}})",
+      "scopeTrack": "This track only",
+      "scopeAll": "All tracks",
+      "join": "Join with next",
       "beatSplitTitle": "Split on the grid",
       "beatSplitBars": "Every bar",
       "beatSplitBeats": "Every beat",

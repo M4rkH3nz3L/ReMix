@@ -83,7 +83,8 @@ function Tool({
 }) {
   const color = disabled ? palette.border : danger ? palette.danger : palette.textDim;
   return (
-    <Pressable style={styles.tool} onPress={onPress} onLongPress={onLongPress} disabled={disabled}>
+    // a hosszú nyomás a letiltott (kijelölés nélküli) gombon is él: pl. csend beszúrása minden sávba
+    <Pressable style={styles.tool} onPress={disabled ? undefined : onPress} onLongPress={onLongPress} disabled={disabled && !onLongPress}>
       <Ionicons name={icon} size={22} color={color} />
       {/* Dynamic Type: a sűrű eszköztáron a felirat egy sorban marad (zsugorodik), legfeljebb 1,3× */}
       <Text style={[styles.toolLabel, { color: disabled ? palette.border : palette.textDim }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3}>

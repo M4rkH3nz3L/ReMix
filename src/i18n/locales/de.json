@@ -3956,6 +3956,12 @@
     },
     "instrument": {"play": "Abspielen", "stop": "Stopp"},
     "audioTools": {
+      "cutMenu": "Schneiden und verbinden",
+      "silenceInsert": "Stille einfügen",
+      "silenceInsertAt": "{{sec}} s Stille am Abspielkopf ({{at}})",
+      "scopeTrack": "Nur diese Spur",
+      "scopeAll": "Alle Spuren",
+      "join": "Mit nächstem verbinden",
       "beatSplitTitle": "Am Raster teilen",
       "beatSplitBars": "Jeden Takt",
       "beatSplitBeats": "Jeden Schlag",

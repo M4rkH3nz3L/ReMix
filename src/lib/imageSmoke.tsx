@@ -4267,6 +4267,74 @@ async function smokeLiveLufs(log: Log) {
   router.back();
 }
 
+/** ⏸️➕✂️↩️ T6 csend beszúrása + összeillesztés: az export mintára (a beszúrás pontosan 1 s-mal tolja a folytatást; a vágás + összeillesztés = az eredeti, bitre). */
+async function smokeGapEdit(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // a beszéd: a frekvencia 0,1 s-onként ugrik (a tolás mintára ellenőrizhető)
+  const v = Float32Array.from({ length: 8 * SR }, (_, i) => 0.4 * Math.sin(2 * Math.PI * (220 + 30 * (Math.floor((i / SR) * 10) % 20)) * (i / SR)));
+  const f = new File(Paths.document, 'smoke_gap_voice.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([v, v], SR, () => 0.5));
+  const id = 'prj_smoke_gap';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:gap', caught));
+  const base = createEmptyProject('smoke csend + illesztés', '9:16', undefined, 'audio');
+  const ac = (over: Partial<AudioClip>): AudioClip => ({ kind: 'audio', id: 'v', uri: f.uri, label: 'beszéd', start: 0, duration: 4, trimIn: 0, sourceDuration: 8, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', ...over });
+  await saveProject({ ...base, id, markers: [{ id: 'mk', time: 3, label: 'jel' }], tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [ac({})] } : t.type === 'music' ? { ...t, clips: [ac({ id: 'mu', uri: toneWav('smoke_gap_bed.wav', 8), duration: 6, volume: 0.2 })] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const voOnly = (p: Project): Project => ({ ...p, tracks: p.tracks.map((t) => (t.type === 'voiceover' ? t : { ...t, clips: [] })) });
+  const render = async (p: Project, name: string) => {
+    const { uri: out } = await exportOfflineWav(voOnly(p), new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0).slice();
+    new File(out).delete();
+    return y;
+  };
+  const origin = JSON.stringify(st().project);
+  const A = await render(st().project!, 'smoke_gap_a.wav');
+  const maxDiff = (x: Float32Array, y: Float32Array, from: number, to: number, shift = 0) => {
+    let d = 0;
+    for (let i = from; i < to; i++) d = Math.max(d, Math.abs((x[i] ?? 0) - (y[i + shift] ?? 0)));
+    return d;
+  };
+  // 1) csend 1 s a 2. mp-nél, csak a beszéd-sávon
+  st().selectClip('v');
+  st().setPlayhead(2);
+  const n1 = runDevAction('audio.insertSilence1Track') as number;
+  const vClips = () => (st().project!.tracks.find((t) => t.type === 'voiceover')!.clips as AudioClip[]).slice().sort((a, b) => a.start - b.start);
+  log(n1 === 1 && vClips().length === 2 && vClips()[1].start === 3 && Math.abs((vClips()[1].trimIn ?? 0) - 2) < 1e-9, 'csend beszúrása (csak ez a sáv): a klip kettéválik, a jobb fele 1 s-mal később, a forrás folytatásával', vClips().map((c) => `${c.start}+${c.duration} (trimIn ${c.trimIn})`).join(' · '));
+  const B = await render(st().project!, 'smoke_gap_b.wav');
+  const seam = Math.round(0.012 * SR);
+  const before = maxDiff(A, B, 0, 2 * SR - seam);
+  const after = maxDiff(A, B, 2 * SR + seam, 4 * SR - seam, SR);
+  let gapPeak = 0;
+  for (let i = 2 * SR + seam; i < 3 * SR - seam; i++) gapPeak = Math.max(gapPeak, Math.abs(B[i]));
+  log(before === 0 && after === 0 && gapPeak === 0 && B.length - A.length === SR, 'a hang: előtte változatlan, a beszúrás néma, utána ugyanaz pontosan 44 100 mintával később (a varratok 10 ms-os mikro-fade-je nélkül)', `eltérés ${before} / ${after}, csend csúcsa ${gapPeak}, hossz +${B.length - A.length} minta`);
+  log(st().project!.markers?.[0]?.time === 3 && (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).duration === 6, 'csak ez a sáv: a zene és a jelölő a helyén', '');
+  st().undo();
+  log(JSON.stringify(st().project) === origin, 'egy visszavonás: pontosan az eredeti', '');
+  // 2) minden sáv
+  st().setPlayhead(2);
+  runDevAction('audio.insertSilence1All');
+  const mus = (st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[]).slice().sort((a, b) => a.start - b.start);
+  log(mus.length === 2 && mus[1].start === 3 && st().project!.markers?.[0]?.time === 4, 'minden sáv: a zene is kettéválik és tolódik, a jelölő 3 → 4 s', mus.map((c) => `${c.start}+${c.duration}`).join(' · '));
+  st().undo();
+  // 3) vágás → összeillesztés = az eredeti (bitre)
+  st().splitClipAt('v', 1.7);
+  st().selectClip('v');
+  const parts = vClips().length;
+  const n3 = runDevAction('audio.join') as number;
+  const C = await render(st().project!, 'smoke_gap_c.wav');
+  log(parts === 2 && n3 === 2 && vClips().length === 1 && vClips()[0].duration === 4 && maxDiff(A, C, 0, A.length) === 0 && A.length === C.length, 'vágás (1,7 s) → összeillesztés: egy klip, a hang bitre az eredeti', `${parts} → ${vClips().length} klip, eltérés ${maxDiff(A, C, 0, A.length)}`);
+  st().undo();
+  st().undo();
+  log(JSON.stringify(st().project) === origin, 'két visszavonás: pontosan az eredeti', '');
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6583,6 +6651,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'gapedit') {
+    await step(phase, () => smokeGapEdit(log));
     return;
   }
   if (phase === 'livelufs') {

@@ -91,6 +91,7 @@ import { downloadToCache, probeAudioDuration } from '@/lib/media';
 import { pauseVoiceRecording, prepareVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
 import { nextHot } from '@/lib/recordingMeter';
 import { punchCommands, punchWindow } from '@/lib/punchRecord';
+import { insertSilenceCommands, joinableNext, joinCommands, type GapScope } from '@/lib/gapEdit';
 import { alignCountInTake, alignPunchTake, PunchSession, runCountIn } from '@/lib/recordTakeClient';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
@@ -210,12 +211,16 @@ export function AudioStudioBody({
   const countInRef = useRef<{ trim: number | null; alive: boolean; bars: number; bpm: number | undefined; meter: Meter } | null>(null);
   const recActive = recorderState.isRecording || recPaused || recArmed;
   // 🧪 füstteszt: felvétel indítása/leállítása, szünet/folytatás, a felvételi sáv állapota (csak __DEV__)
+  const gapDevRef = useRef<{ insert: (len: number, scope: 'track' | 'all') => number; join: () => number }>({ insert: () => 0, join: () => 0 });
   const recDevRef = useRef<{ toggle: () => Promise<void>; pause: () => void; state: () => Record<string, unknown> }>({ toggle: async () => {}, pause: () => {}, state: () => ({}) });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.recordToggle', () => recDevRef.current.toggle()),
       registerDevAction('audio.recordPause', () => recDevRef.current.pause()),
       registerDevAction('audio.recordState', () => recDevRef.current.state()),
+      registerDevAction('audio.insertSilence1Track', () => gapDevRef.current.insert(1, 'track')),
+      registerDevAction('audio.insertSilence1All', () => gapDevRef.current.insert(1, 'all')),
+      registerDevAction('audio.join', () => gapDevRef.current.join()),
     ];
     return () => offs.forEach((off) => off());
   }, []);
@@ -359,6 +364,46 @@ export function AudioStudioBody({
     const cmds: EditorCommand[] = times.reverse().map((time) => ({ type: 'SPLIT_CLIP', clipId: clip.id, time }));
     return cmds.length > 0 ? st.applyBatch(cmds, 'user') : 0;
   };
+  // ⏸️➕ csend beszúrása a lejátszófejnél (egy undo); ✂️↩️ összeillesztés a következő darabbal
+  const insertSilenceAt = (len: number, scope: GapScope) => {
+    const st = useEditorStore.getState();
+    if (!st.project) return 0;
+    const sel = selectedAudioClip(st.project, st.selectedClipId);
+    const trackType = st.project.tracks.find((tr) => tr.clips.some((c) => c.id === sel?.id))?.type ?? 'voiceover';
+    const cmds = insertSilenceCommands(st.project, st.playhead, len, scope, trackType, st.lockedTracks, makeId);
+    return cmds.length > 0 ? st.applyBatch(cmds, 'user') : 0;
+  };
+  const joinSelected = () => {
+    const st = useEditorStore.getState();
+    const cmds = st.project && st.selectedClipId ? joinCommands(st.project, st.selectedClipId) : [];
+    return cmds.length > 0 ? st.applyBatch(cmds, 'user') : 0;
+  };
+  const askInsertSilence = () => {
+    const pickScope = (len: number) => {
+      const hasSel = !!selectedAudioClip(useEditorStore.getState().project, useEditorStore.getState().selectedClipId);
+      Alert.alert(t('studio.audioTools.silenceInsert'), t('studio.audioTools.silenceInsertAt', { sec: len, at: formatTime(useEditorStore.getState().playhead) }), [
+        ...(hasSel ? [{ text: t('studio.audioTools.scopeTrack'), onPress: () => insertSilenceAt(len, 'track') }] : []),
+        { text: t('studio.audioTools.scopeAll'), onPress: () => insertSilenceAt(len, 'all') },
+        { text: t('common.cancel'), style: 'cancel' as const },
+      ]);
+    };
+    Alert.alert(t('studio.audioTools.silenceInsert'), undefined, [
+      { text: '0,5 s', onPress: () => pickScope(0.5) },
+      { text: '1 s', onPress: () => pickScope(1) },
+      { text: '2 s', onPress: () => pickScope(2) },
+    ]);
+  };
+  // ✂️ hosszú nyomás a Vágáson: ütemrács, csend beszúrása, összeillesztés (ha a kijelölt klip illeszthető)
+  const askCutMenu = () => {
+    const st = useEditorStore.getState();
+    const canJoin = !!st.project && !!st.selectedClipId && !!joinableNext(st.project, st.selectedClipId);
+    Alert.alert(t('studio.audioTools.cutMenu'), undefined, [
+      { text: t('studio.audioTools.beatSplitTitle'), onPress: askBeatSplit },
+      { text: t('studio.audioTools.silenceInsert'), onPress: askInsertSilence },
+      canJoin ? { text: t('studio.audioTools.join'), onPress: () => void joinSelected() } : { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  };
+
   const askBeatSplit = () => {
     const run = (every: 'bar' | 'beat') => {
       if (beatSplitSelection(every) === 0) Alert.alert(t('studio.audioTools.beatSplitTitle'), t('studio.audioTools.beatSplitNone'));
@@ -615,6 +660,7 @@ export function AudioStudioBody({
     }
   };
 
+  gapDevRef.current = { insert: insertSilenceAt, join: joinSelected };
   recDevRef.current = {
     toggle: toggleRecord,
     pause: pauseResumeRecording,
@@ -1319,7 +1365,7 @@ export function AudioStudioBody({
           onRecord={toggleRecord}
           onRecordLongPress={recordOptions}
           onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}
-          onBeatSplit={() => selClip && askBeatSplit()}
+          onBeatSplit={askCutMenu}
           onEdit={() => selClip && setEditing(true)}
           onDelete={() => selClip && useEditorStore.getState().removeSelectedClips()}
           onMixer={() => setMixerOpen(true)}

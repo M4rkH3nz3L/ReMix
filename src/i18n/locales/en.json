@@ -3972,6 +3972,7 @@
       "master": "Master"
     },
     "audio": {
+      "rec": {"pause": "Pause", "resume": "Resume", "level": "Input level", "hot": "Too loud — lower it or move back", "paused": "Paused"},
       "spectrum": "Spectrum",
       "panAutomation": "Pan automation",
       "fxPitch": "Pitch (semitones)",

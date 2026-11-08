@@ -17,12 +17,18 @@ export interface RecorderStatusLike {
   durationMillis: number;
 }
 
-/** idle = nincs take · recording = felvesz · interrupted = szünetel, de van felvett része */
-export type RecordingPhase = 'idle' | 'recording' | 'interrupted';
+/**
+ * idle = nincs take · recording = felvesz · paused = a felhasználó szüneteltette (folytatható) ·
+ * interrupted = szünetel, de nem a felhasználó állította meg (a rendszer) — a take klip lesz
+ */
+export type RecordingPhase = 'idle' | 'recording' | 'paused' | 'interrupted';
 
-export function recordingPhase(status: RecorderStatusLike): RecordingPhase {
+export function recordingPhase(status: RecorderStatusLike, userPaused = false): RecordingPhase {
   if (status.isRecording) {
     return 'recording';
+  }
+  if (userPaused && status.durationMillis > 0) {
+    return 'paused';
   }
   // a leállítás után a felvevő nullázza a hosszt; az előkészített, de el nem indított is 0
   return status.canRecord && status.durationMillis > 0 ? 'interrupted' : 'idle';

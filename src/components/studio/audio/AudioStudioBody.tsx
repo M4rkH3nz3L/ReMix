@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
   AudioModule,
-  RecordingPresets,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
@@ -34,6 +33,7 @@ import { ClipMarkers, LaneMeter, MasterMeter } from '@/components/studio/audio/L
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
+import { RecordingStrip } from '@/components/studio/audio/body/RecordingStrip';
 import { palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
@@ -87,7 +87,8 @@ import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, TrackType } from '@/types/project';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
-import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
+import { pauseVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
+import { nextHot } from '@/lib/recordingMeter';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
@@ -192,8 +193,27 @@ export function AudioStudioBody({
   // 📏 A42: a vonalzó és a rács csak a látható ablakra (± egy képernyő) rajzolódik
   const [view, setView] = useState({ x: 0, w: 0 });
   const viewXRef = useRef(0);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
+  const recorder = useAudioRecorder(VOICE_RECORDING_OPTIONS);
+  const recorderState = useAudioRecorderState(recorder, 100);
+  // ⏸️ a felhasználói szünet (a felvevő ilyenkor nem „isRecording”, de a take él és folytatható)
+  const [recPaused, setRecPaused] = useState(false);
+  const recPausedRef = useRef(false);
+  recPausedRef.current = recPaused;
+  const recActive = recorderState.isRecording || recPaused;
+  // 🧪 füstteszt: felvétel indítása/leállítása, szünet/folytatás, a felvételi sáv állapota (csak __DEV__)
+  const recDevRef = useRef<{ toggle: () => Promise<void>; pause: () => void; state: () => Record<string, unknown> }>({ toggle: async () => {}, pause: () => {}, state: () => ({}) });
+  useEffect(() => {
+    const offs = [
+      registerDevAction('audio.recordToggle', () => recDevRef.current.toggle()),
+      registerDevAction('audio.recordPause', () => recDevRef.current.pause()),
+      registerDevAction('audio.recordState', () => recDevRef.current.state()),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+  // 🔴 „túl hangos”: egyszer bekapcsol, a take végéig marad
+  const recHotRef = useRef(false);
+  if (recorderState.isRecording) recHotRef.current = nextHot(recHotRef.current, recorderState.metering);
+  const recHot = recHotRef.current;
   const recordStartPlayhead = useRef(0);
   // 🔍 pinch-zoom: a mindig friss zoom-index + a csippentés kezdő-indexe (ref, hogy a
   // gesztus-callback ne stale state-et lásson)
@@ -202,8 +222,11 @@ export function AudioStudioBody({
   const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
 
   const finishRecordingRef = useRef<() => Promise<void>>(async () => {});
-  useFinishRecordingOnLeave(recorder, finishRecordingRef, () =>
-    Alert.alert(t('panels.audio.noSpaceTitle'), t('panels.audio.lowSpaceStopped'))
+  useFinishRecordingOnLeave(
+    recorder,
+    finishRecordingRef,
+    () => Alert.alert(t('panels.audio.noSpaceTitle'), t('panels.audio.lowSpaceStopped')),
+    recPausedRef
   );
 
   // 🔍 „illeszd” nagyítás: folytonos px/mp (null = a lépcsős nagyítás él)
@@ -466,6 +489,9 @@ export function AudioStudioBody({
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
   const finishRecording = async () => {
+    setRecPaused(false);
+    recPausedRef.current = false;
+    recHotRef.current = false;
     const { uri, seconds } = await stopVoiceRecording(recorder);
     if (uri) {
       const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, fps, t('panels.audio.voiceoverLabel'), makeId);
@@ -476,14 +502,15 @@ export function AudioStudioBody({
 
   // kilépéskor a futó felvétel klip lesz, nem vész el
   const exitStudio = () => {
-    const done = recordingPhase(recorder.getStatus()) !== 'idle' ? finishRecording() : Promise.resolve();
+    const done = recordingPhase(recorder.getStatus(), recPausedRef.current) !== 'idle' ? finishRecording() : Promise.resolve();
     void done
       .catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:exitStudio', caught); })
       .then(onExit);
   };
 
   const toggleRecord = async () => {
-    if (recorderState.isRecording) {
+    // a szüneteltetett take is fut: a gomb leállítja (nem indít újat, ami felülírná)
+    if (recActive) {
       await finishRecording();
       return;
     }
@@ -500,6 +527,24 @@ export function AudioStudioBody({
       logCaught('components/studio/audio/AudioStudioBody.tsx:toggleRecord', caught);
       Alert.alert(t('panels.audio.recordFailedTitle'), caught instanceof Error ? caught.message : String(caught));
     }
+  };
+
+  const pauseResumeRecording = () => {
+    if (recorderState.isRecording) {
+      pauseVoiceRecording(recorder);
+      recPausedRef.current = true;
+      setRecPaused(true);
+    } else if (recPaused) {
+      resumeVoiceRecording(recorder);
+      recPausedRef.current = false;
+      setRecPaused(false);
+    }
+  };
+
+  recDevRef.current = {
+    toggle: toggleRecord,
+    pause: pauseResumeRecording,
+    state: () => ({ active: recActive, recording: recorderState.isRecording, paused: recPaused, metering: recorderState.metering, hot: recHot, durationMillis: recorderState.durationMillis }),
   };
 
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>
@@ -1177,11 +1222,16 @@ export function AudioStudioBody({
       {/* 🔇 csendek jóváhagyása */}
       <SilenceReviewBar />
 
+      {/* 🎙️ felvételi sáv: szünet/folytatás, szintmérő, idő, „túl hangos” */}
+      {recActive ? (
+        <RecordingStrip paused={recPaused} meterDb={recorderState.metering} hot={recHot} durationMs={recorderState.durationMillis} onPauseResume={pauseResumeRecording} />
+      ) : null}
+
       {/* eszköz-sor — nyitott inline lapnál rejtve (a lap fejléce a kilépés; a transport marad) */}
       {inlineSheet && !docked ? null : (
         <AudioStudioToolbar
           hasSelection={!!selClip}
-          isRecording={recorderState.isRecording}
+          isRecording={recActive}
           onAdd={() => setAdding(true)}
           onRecord={toggleRecord}
           onSplit={() => selClip && useEditorStore.getState().splitClipAt(selClip.id, playhead)}

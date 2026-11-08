@@ -3977,6 +3977,7 @@
       "master": "Master"
     },
     "audio": {
+      "rec": {"pause": "Pause", "resume": "Fortsetzen", "level": "Eingangspegel", "hot": "Zu laut — leiser oder weiter weg", "paused": "Pausiert"},
       "spectrum": "Spektrum",
       "panAutomation": "Panorama-Automation",
       "fxPitch": "Tonhöhe (Halbtöne)",

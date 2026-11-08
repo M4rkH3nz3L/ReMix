@@ -1,4 +1,4 @@
-import { setAudioModeAsync, type AudioRecorder } from 'expo-audio';
+import { RecordingPresets, setAudioModeAsync, type AudioRecorder, type RecordingOptions } from 'expo-audio';
 import { t as tr } from 'i18next';
 
 import { canStartRecording, megabytes } from '@/lib/diskSpace';
@@ -20,6 +20,19 @@ export async function startVoiceRecording(recorder: AudioRecorder): Promise<void
   }
   await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
   await recorder.prepareToRecordAsync();
+  recorder.record();
+}
+
+/** a felvétel beállításai: jó minőség + szintmérés (a felvételi sáv mérőjéhez) */
+export const VOICE_RECORDING_OPTIONS: RecordingOptions = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+
+/** ⏸️ szünet: a felvett rész megmarad, a folytatás ugyanabba a fájlba ír */
+export function pauseVoiceRecording(recorder: AudioRecorder): void {
+  recorder.pause();
+}
+
+/** ▶️ folytatás a szünet után (ugyanaz a take) */
+export function resumeVoiceRecording(recorder: AudioRecorder): void {
   recorder.record();
 }
 

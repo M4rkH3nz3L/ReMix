@@ -21,13 +21,18 @@ const SPACE_EVERY = 4;
  * `isRecording` hamis lesz, a felvett rész megmarad) — ezt is lezárjuk klipnek, különben a take
  * a gomb szerint „nem fut”, és a következő felvétel felülírná.
  *
+ * ⏸️ A felhasználói szünet (`userPaused`) nem megszakítás: a take folytatható; háttérbe lépéskor
+ * és bezáráskor viszont az is klip lesz.
+ *
  * 💾 Fogyó tárhelynél (`mustStopRecording`) a take MAGÁTÓL lezárul, mielőtt a lemez betelne;
  * az `onLowSpace` a felhasználónak szól (a felvett rész megmaradt).
  */
 export function useFinishRecordingOnLeave(
   recorder: AudioRecorder,
   finish: MutableRefObject<() => Promise<void>>,
-  onLowSpace?: () => void
+  onLowSpace?: () => void,
+  /** ⏸️ a felhasználó szüneteltette — ez nem rendszer-megszakítás, nem zárjuk le */
+  userPaused?: MutableRefObject<boolean>
 ): void {
   const lowSpaceRef = useRef(onLowSpace);
   useEffect(() => {
@@ -55,7 +60,7 @@ export function useFinishRecordingOnLeave(
     let tick = 0;
     const timer = setInterval(() => {
       try {
-        const phase = recordingPhase(recorder.getStatus());
+        const phase = recordingPhase(recorder.getStatus(), userPaused?.current ?? false);
         if (phase === 'interrupted') {
           close('interrupted');
         } else if (phase === 'recording' && ++tick % SPACE_EVERY === 0 && !busy.current && mustStopRecording(freeDiskBytes())) {
@@ -70,7 +75,7 @@ export function useFinishRecordingOnLeave(
       sub.remove();
       clearInterval(timer);
     };
-  }, [recorder, finish]);
+  }, [recorder, finish, userPaused]);
 
   useLayoutEffect(
     () => () => {

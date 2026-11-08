@@ -3762,6 +3762,141 @@ async function smokeLongWave(log: Log) {
   }
 }
 
+/** ⚡ T1 a valós menetben: a Hang Stúdió megnyitása (hidegen), majd export — a leghosszabb képkocka-szünet mindkettőben. */
+async function smokeExportGap(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // a forrás megmarad a futások között (a hullámforma lemez-cache-e a módosítás idejéhez kötött)
+  const keep = new File(Paths.document, 'smoke_xgap_keep.wav');
+  const uri = keep.exists ? keep.uri : toneWav('smoke_xgap_keep.wav', 60);
+  const id = 'prj_smoke_xgap';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:xgap', caught));
+  const base = createEmptyProject('smoke export-akadás', '1:1', undefined, 'audio');
+  const mk = (cid: string, start: number): AudioClip => ({ kind: 'audio', id: cid, uri, label: cid, start, duration: 40, trimIn: 0, sourceDuration: 60, volume: 0.5, fadeIn: 1, fadeOut: 1, source: 'imported' });
+  const project: Project = { ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('a', 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('b', 10)] } : tr.type === 'voiceover' ? { ...tr, clips: [mk('c', 20)] } : tr)) };
+  await saveProject(project);
+  // a hullámforma a lemez-cache-ből jöjjön (mint egy már megnyitott projektnél) — az első futás
+  // kiszámolja (és betölti a modult), ezért a mérés csak lemez-cache találatkor érvényes
+  const wf = new File(Paths.cache, `${waveformCacheKey(uri, new File(uri).size ?? 0, new File(uri).modificationTime ?? 0)}.json`);
+  const cold = wf.exists;
+  if (!cold) await getWaveform(uri, { userInitiated: true });
+  const watch = () => {
+    let gap = 0;
+    let at = 0;
+    let last = Date.now();
+    const t0 = last;
+    let on = true;
+    const tick = () => {
+      const now = Date.now();
+      if (now - last > gap) {
+        gap = now - last;
+        at = last - t0;
+      }
+      last = now;
+      if (on) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => {
+      on = false;
+      return { gap, at };
+    };
+  };
+  // a megnyitás utáni 8 s: minden > 30 ms-os képkocka-szünet időbélyeggel
+  const gaps: string[] = [];
+  let lastF = Date.now();
+  const tOpen = lastF;
+  let onF = true;
+  const tickF = () => {
+    const now = Date.now();
+    if (now - lastF > 30) gaps.push(`${now - lastF} ms @${lastF - tOpen}`);
+    lastF = now;
+    if (onF) requestAnimationFrame(tickF);
+  };
+  requestAnimationFrame(tickF);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(100);
+  await sleep(8000);
+  onF = false;
+  log(null, 'megnyitás utáni 8 s (> 30 ms-os szünetek)', gaps.join(' · ') || '—');
+  // ellenpróba: 3 s üresjárat (nincs képkocka-kérés) után munka NÉLKÜL indított figyelő
+  await sleep(3000);
+  const idle = watch();
+  await sleep(300);
+  const idleRes = idle();
+  log(null, 'ellenpróba: munka nélkül, üresjárat után', `leghosszabb szünet ${idleRes.gap} ms @${idleRes.at} ms`);
+  await sleep(3000);
+  // a megnyitott stúdió már betöltötte a hang-modult (a lejátszó-motor) — az export nem fizeti meg
+  const tl = Date.now();
+  await loadAudioApi();
+  log(cold ? Date.now() - tl < 10 : null, 'a hang-modul a megnyitott stúdióban már betöltve (az export nem tölti be hidegen)', `${Date.now() - tl} ms${cold ? '' : ' — első futás: a hullámforma számolása töltötte be, nem mérvadó'}`);
+  const stopExport = watch();
+  await sleep(80);
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_xgap.wav'));
+  const ms = Date.now() - t0;
+  const exp = stopExport();
+  new File(out).delete();
+  log(exp.gap <= 50, 'T1 export a megnyitott stúdióból: a felület nem akad (leghosszabb képkocka-szünet ≤ 50 ms)', `${exp.gap} ms @${exp.at} ms, export ${ms} ms`);
+  router.back();
+}
+
+/** ⏸️🎙️ T2 felvétel szünettel: 1 s felvétel → 1 s szünet → 1 s felvétel = EGY klip (~2 s), a szintmérő él, a szünet nem zárja le. */
+async function smokeRecPause(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const perm = await getRecordingPermissionsAsync();
+  if (!perm.granted) {
+    log(false, 'mikrofon-engedély', `nincs megadva (${perm.status})`);
+    return;
+  }
+  const id = 'prj_smoke_recpause';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:recpause', caught));
+  const base = createEmptyProject('smoke felvétel-szünet', '9:16', undefined, 'audio');
+  const bed: AudioClip = { kind: 'audio', id: 'bed', uri: toneWav('smoke_recpause_bed.wav', 8), label: 'alap', start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 0.3, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [bed] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  st().setPlayhead(1);
+  await sleep(200);
+  const voice = () => (st().project!.tracks.find((t) => t.type === 'voiceover')?.clips ?? []) as AudioClip[];
+  const state = () => runDevAction('audio.recordState') as { active: boolean; recording: boolean; paused: boolean; metering?: number; hot: boolean; durationMillis: number };
+  const pastBefore = st().past.length;
+  await runDevAction('audio.recordToggle');
+  const meters: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    await sleep(100);
+    const m = state().metering;
+    if (typeof m === 'number') meters.push(m);
+  }
+  log(state().recording && meters.length > 0 && meters.some((m) => m > -160), 'felvétel közben a szintmérő él (dBFS)', `${meters.map((m) => m.toFixed(0)).join(' ')}`);
+  const loud = meters.some((m) => m >= -3);
+  log(state().hot === loud, `„túl hangos” jelzés pontosan a −3 dBFS fölötti szintnél (${loud ? 'itt bekapcsol' : 'itt nincs'})`, `jelzés ${state().hot}, legnagyobb ${Math.max(...meters).toFixed(1)} dBFS`);
+  log(true, 'FOTÓZHATÓ', 'a felvételi sáv: szünet-gomb, idő, szintmérő');
+  await sleep(2500);
+  runDevAction('audio.recordPause');
+  await sleep(200);
+  const p0 = state();
+  await sleep(1500);
+  const p1 = state();
+  log(p0.paused && !p0.recording && p0.active && Math.abs(p1.durationMillis - p0.durationMillis) < 150 && voice().length === 0, 'szünet: a take él (nem zárul le magától), az idő áll', `${p0.durationMillis} → ${p1.durationMillis} ms, klip ${voice().length}`);
+  runDevAction('audio.recordPause');
+  await sleep(1000);
+  const recorded = state().durationMillis;
+  await runDevAction('audio.recordToggle');
+  await sleep(800);
+  const v = voice();
+  const c = v[0];
+  const fileDur = c ? await probeAudioDuration(c.uri) : 0;
+  // felvett idő: ~1,1 s (a mérő-minták) + 2,5 s (kép) a szünet előtt, ~1 s utána
+  log(v.length === 1 && !!c && Math.abs(c.duration - recorded / 1000) < 0.25 && Math.abs(fileDur - c.duration) < 0.25, 'szünet után folytatva: EGY klip, a hossza a felvett idő (a szünet nélkül), a fájl is', `${v.length} klip, klip ${c?.duration.toFixed(2)} s, felvett ${(recorded / 1000).toFixed(2)} s, fájl ${fileDur.toFixed(2)} s`);
+  log(!!c && c.start === 1 && !state().active, 'a klip a felvétel kezdeténél (1 s), a felvételi sáv eltűnt', `start ${c?.start}`);
+  log(st().past.length === pastBefore + 1, 'egy history-lépés', `${st().past.length - pastBefore}`);
+  st().undo();
+  log(voice().length === 0, 'egy visszavonás: a klip vissza', '');
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -4949,6 +5084,8 @@ async function smokeOfflineSpeed(log: Log) {
   const base = createEmptyProject('smoke offline hosszú', '1:1', undefined, 'audio');
   const mk = (id: string, start: number): AudioClip => ({ kind: 'audio', id, uri, label: id, start, duration: 40, trimIn: 0, sourceDuration: 60, volume: 0.5, fadeIn: 1, fadeOut: 1, source: 'imported' });
   const project: Project = { ...base, tracks: base.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [mk('a', 0)] } : tr.type === 'sfx' ? { ...tr, clips: [mk('b', 10)] } : tr.type === 'voiceover' ? { ...tr, clips: [mk('c', 20)] } : tr)) };
+  // a mérés kétszer: az első futás a hang-modul első betöltését is tartalmazza (hidegindítás)
+  for (const run of ['első (hideg)', 'második (meleg)']) {
   // T2: a felület folyékonysága export közben — a leghosszabb szünet két képkocka között
   let frameGap = 0;
   let lastFrame = Date.now();
@@ -4977,9 +5114,11 @@ async function smokeOfflineSpeed(log: Log) {
   });
   const ms = Date.now() - started;
   watching = false;
-  log(frameGap <= 100, 'T2 a felület export közben is folyékony (leghosszabb képkocka-szünet)', `${frameGap} ms — ${gapPhase} után`);
+  // a hideg futás a hang-modul első betöltését is méri (a Hang Stúdióban ez a megnyitáskor megtörténik — `exportgap`)
+  log(run.startsWith('első') ? null : frameGap <= 50, `T2 a felület export közben is folyékony (leghosszabb képkocka-szünet) — ${run}`, `${frameGap} ms — ${gapPhase} után`);
   log(ms < 30000, 'A26 egy perc keverés a telefonon', `${ms} ms (${(ms / 60).toFixed(0)} ms / mp hang) · ${phases.join(' · ')}`);
   new File(out).delete();
+  }
   new File(uri).delete();
 }
 
@@ -6070,6 +6209,14 @@ export async function runImageSmoke(
   }
   if (phase === 'offline') {
     await step('offline', () => smokeOfflineExport(log));
+    return;
+  }
+  if (phase === 'recpause') {
+    await step(phase, () => smokeRecPause(log));
+    return;
+  }
+  if (phase === 'exportgap') {
+    await step(phase, () => smokeExportGap(log));
     return;
   }
   if (phase === 'longwave') {

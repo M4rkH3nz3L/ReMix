@@ -1,8 +1,8 @@
 import { setAudioModeAsync } from 'expo-audio';
 
-import { startVoiceRecording, stopVoiceRecording, voiceoverClip } from '@/lib/voiceRecording';
+import { pauseVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
 
-jest.mock('expo-audio', () => ({ setAudioModeAsync: jest.fn(async () => {}) }));
+jest.mock('expo-audio', () => ({ setAudioModeAsync: jest.fn(async () => {}), RecordingPresets: { HIGH_QUALITY: { extension: '.m4a', sampleRate: 44100 } } }));
 jest.mock('@/lib/media', () => ({ persistToLibrary: (uri: string) => uri.replace('cache', 'project') }));
 
 const recorder = (over: Record<string, unknown> = {}) => {
@@ -43,5 +43,19 @@ describe('voiceRecording (A43)', () => {
     const { clip, asset } = voiceoverClip('file:///p/rec.m4a', 2.34, 1.01, 30, 'Hang', () => 'id1');
     expect(clip).toMatchObject({ start: 1, duration: 2.34, trimIn: 0, sourceDuration: 2.34, source: 'voiceover', uri: 'file:///p/rec.m4a' });
     expect(asset).toMatchObject({ kind: 'audio', uri: 'file:///p/rec.m4a', duration: 2.34 });
+  });
+});
+
+describe('szünet / folytatás + szintmérés (T2)', () => {
+  it('a felvétel szintmérővel indul, a jó minőségű beállítások megmaradnak', () => {
+    expect(VOICE_RECORDING_OPTIONS).toEqual(expect.objectContaining({ isMeteringEnabled: true, extension: '.m4a', sampleRate: 44100 }));
+  });
+  it('a szünet a felvevőt állítja meg, a folytatás ugyanazt a take-et folytatja (nem készít elő újat)', () => {
+    const r = recorder({ pause: jest.fn() });
+    pauseVoiceRecording(r);
+    expect((r as unknown as { pause: jest.Mock }).pause).toHaveBeenCalledTimes(1);
+    resumeVoiceRecording(r);
+    expect(r.record).toHaveBeenCalledTimes(1);
+    expect(r.prepareToRecordAsync).not.toHaveBeenCalled();
   });
 });

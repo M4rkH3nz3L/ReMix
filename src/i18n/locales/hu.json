@@ -3972,6 +3972,7 @@
       "master": "Master"
     },
     "audio": {
+      "rec": {"pause": "Szünet", "resume": "Folytatás", "level": "Bemeneti szint", "hot": "Túl hangos — vedd lejjebb vagy távolodj", "paused": "Szünetel"},
       "spectrum": "Spektrum",
       "panAutomation": "Pásztázás-automáció",
       "fxPitch": "Hangmagasság (félhang)",

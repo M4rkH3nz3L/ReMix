@@ -1,6 +1,12 @@
 import { detectSystemPause, INITIAL_STALL, recordingPhase, SYSTEM_PAUSE_MS, type PlayerSample, type StallState } from './interruption';
 
 describe('recordingPhase', () => {
+  it('a felhasználói szünet nem megszakítás (folytatható), a rendszer-szünet igen', () => {
+    expect(recordingPhase({ canRecord: true, isRecording: false, durationMillis: 1200 }, true)).toBe('paused');
+    expect(recordingPhase({ canRecord: true, isRecording: false, durationMillis: 1200 }, false)).toBe('interrupted');
+    expect(recordingPhase({ canRecord: true, isRecording: true, durationMillis: 1200 }, true)).toBe('recording');
+    expect(recordingPhase({ canRecord: true, isRecording: false, durationMillis: 0 }, true)).toBe('idle');
+  });
   it('felvétel közben recording', () => {
     expect(recordingPhase({ canRecord: true, isRecording: true, durationMillis: 1200 })).toBe('recording');
   });

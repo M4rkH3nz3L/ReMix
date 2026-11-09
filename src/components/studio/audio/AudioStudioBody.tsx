@@ -219,6 +219,7 @@ export function AudioStudioBody({
       registerDevAction('audio.recordToggle', () => recDevRef.current.toggle()),
       registerDevAction('audio.recordPause', () => recDevRef.current.pause()),
       registerDevAction('audio.recordState', () => recDevRef.current.state()),
+      registerDevAction('audio.master', () => setMastering(true)),
       registerDevAction('audio.insertSilence1Track', () => gapDevRef.current.insert(1, 'track')),
       registerDevAction('audio.insertSilence1All', () => gapDevRef.current.insert(1, 'all')),
       registerDevAction('audio.join', () => gapDevRef.current.join()),

@@ -246,7 +246,42 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
             active={!!m.multiband}
             onPress={() => setField({ multiband: !m.multiband })}
           />
+          {/* 🗜️ master-kompresszor (a multiband után) */}
+          <Chip
+            label={t('studio.master.compressor')}
+            active={!!m.compressor}
+            onPress={() => setField({ compressor: m.compressor ? undefined : { threshold: -18, ratio: 3 } })}
+          />
         </View>
+        {m.compressor ? (
+          <View testID="master-compressor">
+            <Slider
+              label={t('studio.master.compThreshold')}
+              value={m.compressor.threshold}
+              min={-40}
+              max={0}
+              onChange={(v) => setField({ compressor: { ...m.compressor!, threshold: Math.round(v) } })}
+              format={(v) => `${Math.round(v)} dB`}
+            />
+            <Slider
+              label={t('studio.master.compRatio')}
+              value={m.compressor.ratio}
+              min={1}
+              max={10}
+              onChange={(v) => setField({ compressor: { ...m.compressor!, ratio: Math.round(v * 2) / 2 } })}
+              format={(v) => `${(Math.round(v * 2) / 2).toFixed(1)}:1`}
+            />
+          </View>
+        ) : null}
+        {/* 🔥 szaturáció (lágy telítés — felharmonikusok, „melegség”) */}
+        <Slider
+          label={t('studio.master.saturation')}
+          value={m.saturation ?? 0}
+          min={0}
+          max={1}
+          onChange={(v) => setField({ saturation: v < 0.02 ? undefined : Math.round(v * 100) / 100 })}
+          format={(v) => `${Math.round(v * 100)}%`}
+        />
 
         {/* 🎚️ sidechain-duck TRIGGER: melyik sáv hangja alatt halkuljanak az autoDuck-klipek */}
         <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.duckTrigger', { defaultValue: 'Auto-duck trigger' })}</Text>

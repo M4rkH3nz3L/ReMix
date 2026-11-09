@@ -194,11 +194,29 @@ const COMP = 'acompressor=threshold=-18dB:ratio=2:attack=20:release=250:makeup=1
  * multiband kompresszió. A hívó (render.js) fűzi hozzá a loudnorm+alimiter-t
  * (mérő- ill. alkalmazó-menetben). Filter_complex-részlet (`;`-vel tagolva).
  */
+/** 🗜️🔥 a master-kompresszor + szaturáció szűrői (a kliens `buildMasterChain` tükre); '' ha egyik sincs */
+function masterDynamics(master) {
+  const parts = [];
+  if (master.compressor) {
+    const t = Math.max(-40, Math.min(0, master.compressor.threshold));
+    const r = Math.max(1, Math.min(20, master.compressor.ratio));
+    parts.push(`acompressor=threshold=${t}dB:ratio=${r}:attack=10:release=150`);
+  }
+  const a = Math.max(0, Math.min(1, master.saturation || 0));
+  if (a > 0) {
+    const k = Math.round((1 + 7 * a) * 1000) / 1000;
+    parts.push(`aeval=exprs='tanh(${k}*val(0))/tanh(${k})|tanh(${k}*val(1))/tanh(${k})':channel_layout=stereo`);
+  }
+  return parts.join(',');
+}
+
 function masterGraph(master, out = 'mst') {
   const eq = masterEq(master.eq);
   const eqNode = eq ? `[0:a]${eq}[meq]` : `[0:a]anull[meq]`;
+  const dyn = masterDynamics(master);
+  const tail = dyn ? `${dyn}` : 'anull';
   if (!master.multiband) {
-    return `${eqNode};[meq]anull[${out}]`;
+    return `${eqNode};[meq]${tail}[${out}]`;
   }
   // 3 sáv: mély (<250 Hz) · közép (250–4000) · magas (>4000), sávonként kompresszor
   return (
@@ -207,7 +225,7 @@ function masterGraph(master, out = 'mst') {
     `[b1]lowpass=f=250,${COMP}[c1];` +
     `[b2]highpass=f=250,lowpass=f=4000,${COMP}[c2];` +
     `[b3]highpass=f=4000,${COMP}[c3];` +
-    `[c1][c2][c3]amix=inputs=3:normalize=0[${out}]`
+    `[c1][c2][c3]amix=inputs=3:normalize=0` + (dyn ? `,${dyn}` : '') + `[${out}]`
   );
 }
 
@@ -219,6 +237,7 @@ module.exports = {
   audioFxChain,
   panFilter,
   masterGraph,
+  masterDynamics,
   masterEq,
   masterLra,
   dbToLinear,

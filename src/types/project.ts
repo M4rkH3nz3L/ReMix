@@ -1715,6 +1715,10 @@ export interface AudioMaster {
   eq?: { low: number; mid: number; high: number };
   /** multiband kompresszor (mcompand) — a keverék dinamikájának faragása */
   multiband?: boolean;
+  /** 🗜️ master-kompresszor (küszöb dBFS, arány) — a multiband után, a hangosság-illesztés előtt */
+  compressor?: { threshold: number; ratio: number };
+  /** 🔥 szaturáció (0–1): lágy telítés, `tanh(k·x)/tanh(k)`, k = 1 + 7·mérték — felharmonikusok, „melegség” */
+  saturation?: number;
   /** 🎚️ sidechain-duck TRIGGER sáv: az `autoDuck` klipek EZ a sáv hangja alatt halkulnak
    *  (hiányzó = a voiceover/beszéd — a mai viselkedés). Pl. 'sfx' → a zene a hangeffektek alatt duckol. */
   duckTrigger?: TrackType;

@@ -78,6 +78,7 @@ import { selectTakeCommand } from '@/lib/punchRecord';
 import { dbToVolume } from '@/lib/clipGain';
 import { tempoMatchPatch } from '@/lib/tempoMatch';
 import { moveStage } from '@/lib/fxOrder';
+import { masterPreset } from '@/lib/audioMaster';
 import { previewLocalUri } from '@/lib/previewRemoteCache';
 import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
@@ -4901,6 +4902,77 @@ async function smokeFxOrder(log: Log) {
   router.back();
 }
 
+/** 🗜️🔥 R4 master-kompresszor + szaturáció: a hangos/halk különbség csökken, megjelenik a 3. felharmonikus; az élő előnézet = az export. */
+async function smokeMasterDyn(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // 1 kHz, 1 s-onként váltva −6 / −26 dBFS (20 dB különbség)
+  const x = Float32Array.from({ length: 8 * SR }, (_, i) => (Math.floor(i / SR) % 2 === 0 ? 0.5 : 0.05) * Math.sin((2 * Math.PI * 1000 * i) / SR));
+  const f = new File(Paths.document, 'smoke_masterdyn.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_masterdyn';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:masterdyn', caught));
+  const base = createEmptyProject('smoke master-dinamika', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'k', uri: f.uri, label: 'jel', start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const render = async (name: string) => {
+    const { uri: out } = await exportOfflineWav(st().project!, new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0).slice();
+    new File(out).delete();
+    return y;
+  };
+  const rmsDb = (y: Float32Array, a: number, b: number) => {
+    let e = 0;
+    for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) e += y[i] * y[i];
+    return 10 * Math.log10(e / ((b - a) * SR) + 1e-20);
+  };
+  // a hangos (2. s) és a halk (3. s) rész különbsége (a beállás után)
+  const spread = (y: Float32Array) => rmsDb(y, 2.3, 2.9) - rmsDb(y, 3.3, 3.9);
+  const goertzel = (y: Float32Array, hz: number, a: number, n: number) => {
+    const w = (2 * Math.PI * hz) / SR;
+    const cw = 2 * Math.cos(w);
+    let s1 = 0;
+    let s2 = 0;
+    for (let i = a; i < a + n; i++) {
+      const s0 = y[i] + cw * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    return Math.sqrt(s1 * s1 + s2 * s2 - cw * s1 * s2);
+  };
+  const h3 = (y: Float32Array) => 20 * Math.log10(goertzel(y, 3000, Math.round(2.3 * SR), 22050) / Math.max(1e-12, goertzel(y, 1000, Math.round(2.3 * SR), 22050)));
+  const master = { ...masterPreset('youtube'), target: 'custom' as const };
+  st().dispatch({ type: 'SET_AUDIO_MASTER', audioMaster: master });
+  const plain = await render('smoke_md_a.wav');
+  st().dispatch({ type: 'SET_AUDIO_MASTER', audioMaster: { ...master, compressor: { threshold: -24, ratio: 4 }, saturation: 0.6 } });
+  const dyn = await render('smoke_md_b.wav');
+  log(spread(plain) > 19 && spread(dyn) < spread(plain) - 6, 'master-kompresszor: a hangos/halk különbség érezhetően csökken', `${spread(plain).toFixed(1)} → ${spread(dyn).toFixed(1)} dB`);
+  log(h3(plain) < -60 && h3(dyn) > -40, 'szaturáció: megjelenik a 3. felharmonikus (3 kHz)', `${h3(plain).toFixed(1)} → ${h3(dyn).toFixed(1)} dB (az alaphanghoz)`);
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  for (let i = 0; i < 40 && !previewEngine.isPlaying(); i++) await sleep(50);
+  await sleep(4000);
+  const live = previewEngine.loudness();
+  const pos = st().playhead;
+  st().setPlaying(false);
+  const end = Math.round(pos * SR);
+  const meter = new LiveLoudness(SR);
+  meter.push(0, dyn.subarray(0, end), dyn.subarray(0, end));
+  const ref = meter.readAt(end).shortTerm;
+  log(!!live && Math.abs(live.shortTerm - ref) <= 0.5, 'az élő előnézet a kompresszorral és a szaturációval szól: = az export (± 0,5 LU)', live ? `élő ${live.shortTerm.toFixed(2)} vs export ${ref.toFixed(2)} LUFS` : 'null');
+  runDevAction('audio.master');
+  await sleep(800);
+  log(true, 'FOTÓZHATÓ', 'a master-lapon a kompresszor (küszöb, arány) és a szaturáció');
+  await sleep(2500);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7217,6 +7289,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'masterdyn') {
+    await step(phase, () => smokeMasterDyn(log));
     return;
   }
   if (phase === 'fxorder') {

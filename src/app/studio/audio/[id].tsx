@@ -40,6 +40,8 @@ import { withCancellableProgress } from '@/store/progressStore';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
 import { registerDevAction } from '@/lib/devActions';
+import { myMembership } from '@/lib/collab';
+import { useLiveCollab } from '@/hooks/useLiveCollab';
 
 /**
  * 🎧 HANG STÚDIÓ képernyő (`kind: 'audio'` projekt). Vékony burkoló: betölti a
@@ -67,6 +69,18 @@ export default function AudioStudioScreen() {
   useEffect(() => registerDevAction('audio.closeCheck', () => setCheckResult(null)), []);
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
   const { saveFailed, missing, relinking, relink, exit } = useStudioSession(id, loading);
+
+  // 👥 ÉLŐ collab a közvetlenül megnyitott hang-projekten is (eddig csak a videóból nyitott hang volt közös)
+  const [collabOwner, setCollabOwner] = useState<string | null>(null);
+  const projectId = project?.id;
+  useEffect(() => {
+    if (projectId === id) {
+      myMembership(id)
+        .then((m) => setCollabOwner(m?.ownerId ?? null))
+        .catch((caught) => { logCaught('app/studio/audio/[id].tsx:membership', caught); });
+    }
+  }, [projectId, id]);
+  useLiveCollab(id, collabOwner);
 
   // 🔊 néma-kapcsolónál is szóljon a lejátszás (mint a videó-editorban); a
   // felvétel ideiglenesen record-módra vált, de a ClipEditSheet/stúdió vissza is állítja

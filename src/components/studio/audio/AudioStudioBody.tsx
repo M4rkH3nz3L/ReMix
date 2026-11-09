@@ -34,6 +34,7 @@ import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
 import { AudioStudioToolbar } from '@/components/studio/audio/body/AudioStudioToolbar';
 import { RecordingStrip } from '@/components/studio/audio/body/RecordingStrip';
+import { CollabPresence } from '@/components/editor/CollabPresence';
 import { MIN_CLIP_DURATION, palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
 import { layoutBudget, type Detent } from '@/lib/panelLayout';
@@ -1026,6 +1027,8 @@ export function AudioStudioBody({
             )}
           </Pressable>
         ) : null}
+        {/* 👥 a közös szerkesztés résztvevői (megosztott projektnél) */}
+        <CollabPresence />
         {mode === 'scoped' ? (
           <Pressable onPress={exitStudio} hitSlop={10} style={styles.exportBtn}>
             <Ionicons name="checkmark" size={16} color="#fff" />

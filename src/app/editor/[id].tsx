@@ -67,7 +67,7 @@ import type { MissingMedia } from '@/lib/videdFile';
 import { classifyMissingMedia, mediaRemoteMap, restoreMissingMedia } from '@/lib/mediaSync';
 import type { Project } from '@/types/project';
 import { useChat } from '@/store/chatStore';
-import { useCollabLive } from '@/store/collabLiveStore';
+import { useLiveCollab } from '@/hooks/useLiveCollab';
 import {
   selectPanelVisible,
   selectSurfaceTier,
@@ -126,33 +126,8 @@ export default function EditorScreen() {
     }
   }, [project?.id, id]);
 
-  // 👥 ÉLŐ collab: megosztott projektnél realtime csatorna (presence + parancs-szinkron).
-  // A start() belül ellenőrzi a tagságot — nem megosztott projektnél no-op.
-  useEffect(() => {
-    const owner = collab?.ownerId;
-    if (!owner || project?.id !== id) {
-      return;
-    }
-    void useCollabLive.getState().start(id);
-    // 👥 a saját lejátszófej broadcastja a többieknek (throttle ~150 ms — a playhead
-    // ~60×/mp változik, de a kurzornak elég a ritkább frissítés)
-    let last = 0;
-    const unsubCursor = useEditorStore.subscribe((s, prev) => {
-      if (s.playhead === prev.playhead) {
-        return;
-      }
-      const now = Date.now();
-      if (now - last < 150) {
-        return;
-      }
-      last = now;
-      useCollabLive.getState().sendCursor(s.playhead);
-    });
-    return () => {
-      unsubCursor();
-      useCollabLive.getState().stop();
-    };
-  }, [collab?.ownerId, id, project?.id]);
+  // 👥 ÉLŐ collab: megosztott projektnél realtime csatorna (presence + parancs-szinkron) — közös hook
+  useLiveCollab(id, collab?.ownerId);
 
   // 📲 átviteli tár: ha van hiányzó média, megnézzük, vár-e ránk csomag (B eszköz)
   useEffect(() => {

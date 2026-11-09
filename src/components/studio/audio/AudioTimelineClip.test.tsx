@@ -1,7 +1,7 @@
 /** 🖐️ Hang-klip: hosszú nyomás menüt ad, a „Több kijelölése” után a koppintás hozzáad, a törlés egy undo. */
 import { act, create } from 'react-test-renderer';
 import { Alert } from 'react-native';
-import { State } from 'react-native-gesture-handler';
+import { PointerType, State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { AudioTimelineClip } from '@/components/studio/audio/AudioTimelineClip';
@@ -124,3 +124,68 @@ describe('zárolt sáv a Hang Stúdióban (A47)', () => {
   });
 });
 
+
+describe('✏️ Apple Pencil: a toll a frame-rácsra, az ujj az ütemre illeszt (vágás, mozgatás, trim)', () => {
+  // ütemrács 0,5 s (120 BPM), 30 fps → frame 1/30 s; 41 px @ 60 px/s = 0,6833 s
+  const beat = (sec: number) => Math.round(sec * 2) / 2;
+  let mounted: ReturnType<typeof create> | null = null;
+  const mountSnap = (id: string, start: number, editMode: 'select' | 'cut' | 'move', selected = false) => {
+    act(() => {
+      mounted = create(<AudioTimelineClip clip={clip(id, start)} pxPerSec={60} laneColor="#fff" laneH={60} laneType="music" laneTypes={['music']} selected={selected} snap={beat} editMode={editMode} />);
+    });
+  };
+  const clipsNow = () => (useEditorStore.getState().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[]).slice().sort((a, b) => a.start - b.start);
+  beforeEach(() => {
+    useEditorStore.getState().loadProject(make(), []);
+  });
+  afterEach(() => {
+    act(() => mounted?.unmount());
+    mounted = null;
+  });
+
+  for (const [who, pointerType, expectAt] of [
+    ['ujj', PointerType.TOUCH, 3.5],
+    // 3,6833 s → a 30 fps-es rácson 111/30 = 3,7 s (az ütemrács 3,5-öt adna)
+    ['toll', PointerType.STYLUS, 111 / 30],
+  ] as const) {
+    it(`mozgatás (${who}): ${expectAt.toFixed(4)} s`, async () => {
+      mountSnap('b', 3, 'move');
+      await act(async () => {
+        fireGestureHandler(getByGestureTestId('audio-clip-move-b') as never, [
+          { state: State.BEGAN, translationX: 0, translationY: 0, pointerType },
+          { state: State.ACTIVE, translationX: 0, translationY: 0, pointerType },
+          { state: State.ACTIVE, translationX: 41, translationY: 0, pointerType },
+          { state: State.END, translationX: 41, translationY: 0, pointerType },
+        ]);
+      });
+      expect(clipsNow().find((c) => c.id === 'b')!.start).toBeCloseTo(expectAt, 9);
+    });
+    it(`vágás-mód koppintás (${who}): a vágás ${expectAt.toFixed(4)} s-nál`, async () => {
+      mountSnap('b', 3, 'cut');
+      await act(async () => {
+        fireGestureHandler(getByGestureTestId('audio-clip-tap-b') as never, [
+          { state: State.BEGAN, x: 41, pointerType },
+          { state: State.ACTIVE, x: 41, pointerType },
+          { state: State.END, x: 41, pointerType },
+        ]);
+      });
+      const parts = clipsNow().filter((c) => c.start >= 3 && c.start < 5);
+      expect(parts).toHaveLength(2);
+      expect(parts[1].start).toBeCloseTo(expectAt, 9);
+    });
+    it(`jobb trim (${who}): a vége ${(expectAt + 2).toFixed(4)} s`, async () => {
+      // a trim-fogantyúk a kijelölt klipen vannak
+      mountSnap('b', 3, 'select', true);
+      await act(async () => {
+        fireGestureHandler(getByGestureTestId('audio-clip-trimR-b') as never, [
+          { state: State.BEGAN, translationX: 0, pointerType },
+          { state: State.ACTIVE, translationX: 0, pointerType },
+          { state: State.ACTIVE, translationX: 41, pointerType },
+          { state: State.END, translationX: 41, pointerType },
+        ]);
+      });
+      const b = clipsNow().find((c) => c.id === 'b')!;
+      expect(b.start + b.duration).toBeCloseTo(expectAt + 2, 9);
+    });
+  }
+});

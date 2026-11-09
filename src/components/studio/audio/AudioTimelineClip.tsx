@@ -210,6 +210,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
   // a trim-fogantyúk SAJÁT pan-je (nincs long-press → azonnal aktiválódik a szélen,
   // és NEM mozgatja az egész klipet). A hitSlop a kényelmes érintésért.
   const trimLeftPan = Gesture.Pan()
+    .withTestId(`audio-clip-trimL-${clip.id}`)
     .enabled(!locked)
     .hitSlop({ left: 10, top: 6, bottom: 6 })
     .onUpdate((e) => {
@@ -220,6 +221,7 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     });
 
   const trimRightPan = Gesture.Pan()
+    .withTestId(`audio-clip-trimR-${clip.id}`)
     .enabled(!locked)
     .hitSlop({ right: 10, top: 6, bottom: 6 })
     .onUpdate((e) => {

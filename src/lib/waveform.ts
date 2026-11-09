@@ -3,6 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { logCaught } from '@/lib/logCaught';
 import { canSegment, isLongSource, LongSource } from '@/lib/longSource';
+import { fetchPreviewSource } from '@/lib/previewRemoteCache';
 
 /**
  * Hang-hullámforma az idővonalhoz ÉS a Hang Stúdióhoz. A csúcsokat AZ ESZKÖZÖN
@@ -246,6 +247,16 @@ export function getWaveform(uri: string, opts: { userInitiated?: boolean } = {})
       if (data === null) {
         memory.delete(uri);
       }
+    });
+    return pending;
+  }
+  // 🌐 távoli (http) forrás: a hullámforma az előnézeti cache helyi másolatából (a fájl-API a
+  // http uri-t nem nyitja meg — eddig minden alkalommal hibát naplózott, és nem volt hullámforma)
+  if (/^https?:\/\//i.test(uri)) {
+    pending = fetchPreviewSource(uri).then((local) => (local ? getWaveform(local, opts) : null));
+    remember(uri, pending);
+    pending.then((data) => {
+      if (data === null) memory.delete(uri);
     });
     return pending;
   }

@@ -20,6 +20,7 @@ import { ensureVoiceProxy, getVoiceProxySync, needsVoiceProxy } from '@/lib/voic
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Clip, Project, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { fetchPreviewSource, remoteUris, withLocalSources } from '@/lib/previewRemoteCache';
 import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
@@ -67,6 +68,21 @@ export function AudioLayer() {
     const mix = mixForExport(fxBypass ? withoutProcessing(project) : project, audible, masterVolume);
     return mix ? offlineMixPlan(mix) : null;
   }, [project, masterVolume, muted, solo, fxBypass]);
+  // 🌐 a távoli forrású klipek: letöltés a cache-be, utána a motor játssza (a +dB, effekt, master is)
+  const remote = useMemo(() => remoteUris(plan), [plan]);
+  const [localOf, setLocalOf] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    for (const u of remote) {
+      void fetchPreviewSource(u).then((l) => {
+        if (alive && l) setLocalOf((m) => (m[u] === l ? m : { ...m, [u]: l }));
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [remote]);
+  const enginePlan = useMemo(() => withLocalSources(plan, localOf), [plan, localOf]);
   const [engineOk, setEngineOk] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -80,8 +96,8 @@ export function AudioLayer() {
   if (!isFocused) {
     return null;
   }
-  if (engineOk && !previewEngine.forceFallback && engineCanPlay(plan)) {
-    return <MixEngineLayer plan={plan} />;
+  if (engineOk && !previewEngine.forceFallback && engineCanPlay(enginePlan)) {
+    return <MixEngineLayer plan={enginePlan} />;
   }
   return (
     <>

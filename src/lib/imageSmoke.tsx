@@ -70,12 +70,14 @@ import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { useAuth } from '@/store/authStore';
 import { useCollabLive } from '@/store/collabLiveStore';
-import { ensureShared, inviteMember, pullSharedProject, respondToInvite } from '@/lib/collab';
+import { ensureShared, inviteMember, pullSharedProject, removeMember, respondToInvite } from '@/lib/collab';
+import { deleteCloudProject } from '@/lib/cloudSync';
 import { canUseCloud } from '@/lib/backend';
 import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { dbToVolume } from '@/lib/clipGain';
 import { tempoMatchPatch } from '@/lib/tempoMatch';
+import { previewLocalUri } from '@/lib/previewRemoteCache';
 import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
 import { useSpeechEdit } from '@/store/speechEditStore';
@@ -137,7 +139,6 @@ import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
 import { flushProjectSave, useProjectAutosave } from '@/hooks/useProjectAutosave';
-import { deleteCloudProject } from '@/lib/cloudSync';
 import { rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
@@ -4662,6 +4663,71 @@ async function smokeCollabMember(log: Log) {
   router.back();
 }
 
+/** 🧹 a T10 tesztadatának törlése az app saját útján (tulaj: tagságok + felhős projekt + helyi; tag: helyi másolat) */
+async function smokeCollabCleanup(log: Log) {
+  const me = useAuth.getState().user;
+  if (!me || !supabase) {
+    log(false, 'fiók', 'nincs');
+    return;
+  }
+  const { data: rows } = await supabase.from('project_members').select('owner_id,member_id,role').eq('project_id', COLLAB_PID);
+  const mine = (rows ?? []).filter((r) => r.owner_id === me.id);
+  if (mine.length > 0) {
+    for (const r of mine.filter((x) => x.member_id !== me.id)) await removeMember(me.id, COLLAB_PID, r.member_id as string);
+    await removeMember(me.id, COLLAB_PID, me.id);
+  }
+  // a felhős példány (a saját sor) mindig — egy félbeszakadt takarítás után is
+  const cloud = await deleteCloudProject(COLLAB_PID).catch((caught) => { logCaught('lib/imageSmoke.tsx:cleanup', caught); return false; });
+  log(null, 'felhős példány törlése', String(cloud));
+  await deleteProject(COLLAB_PID).catch((caught) => logCaught('lib/imageSmoke.tsx:cleanup', caught));
+  const { data: left } = await supabase.from('project_members').select('member_id').eq('project_id', COLLAB_PID);
+  log(mine.length === 0 || (left ?? []).length === 0, `${me.email}: a tesztprojekt tagságai és a helyi példány törölve`, `maradt tagság-sor (látható): ${(left ?? []).length}`);
+}
+
+/** 🌐🔊 R1: távoli (http) forrású klip +6 dB-lel — a motor átveszi (letöltve a cache-be), az élő mérés −14 LUFS (a tartalék lejátszó nem erősítene). */
+async function smokeRemoteGain(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const url = `${smokeFileHost()}/gain_ref12.wav`;
+  const id = 'prj_smoke_remotegain';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:remotegain', caught));
+  const base = createEmptyProject('smoke távoli klip', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'r', uri: url, label: 'távoli', start: 0, duration: 12, trimIn: 0, sourceDuration: 12, volume: dbToVolume(6), fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  const t0 = Date.now();
+  for (let i = 0; i < 100 && !previewLocalUri(url); i++) await sleep(100);
+  log(!!previewLocalUri(url), 'a távoli forrás letöltve az előnézeti cache-be (nem a projekt-mappába)', `${Date.now() - t0} ms`);
+  // a lejátszás AZONNAL a megnyitás után (a motor még indulhat) — a tartalék → motor átváltás nem állíthatja le
+  const stops: string[] = [];
+  const origSet = st().setPlaying;
+  useEditorStore.setState({
+    setPlaying: (p: boolean) => {
+      if (!p) stops.push((new Error().stack ?? '').split('\n').slice(1, 6).map((l) => l.trim().replace(/\(.*\)/, '')).join(' < '));
+      origSet(p);
+    },
+  });
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  for (let i = 0; i < 60 && !previewEngine.isPlaying(); i++) await sleep(50);
+  const onEngine = previewEngine.isPlaying();
+  const probe: string[] = [];
+  for (let i = 0; i < 19; i++) {
+    await sleep(200);
+    if (i % 4 === 0) probe.push(`${(st().playhead).toFixed(2)}:${st().isPlaying ? 'P' : '-'}${previewEngine.isPlaying() ? 'E' : '-'}`);
+  }
+  const r = previewEngine.loudness();
+  log(null, 'állapot lejátszás közben (lejátszófej:transzport/motor)', probe.join(' '));
+  log(null, 'ki állította le', stops.slice(0, 2).join(' || ') || '—');
+  useEditorStore.setState({ setPlaying: origSet });
+  st().setPlaying(false);
+  const wf = await getWaveform(url, { userInitiated: true });
+  log(!!wf && wf.peaks.length >= 12 * 64 - 2, 'a távoli klipnek is van hullámformája (a helyi másolatból)', `${wf?.peaks.length ?? 0} csúcs`);
+  log(onEngine && !!r && Math.abs(r.shortTerm - -14) <= 0.1, 'a távoli klipet a motor játssza, a +6 dB hallható: −20 dBFS → élő −14 ± 0,1 LUFS', r ? `S ${r.shortTerm.toFixed(2)} LUFS, TP ${r.truePeak.toFixed(2)} dBTP` : `motor ${onEngine}`);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -6978,6 +7044,14 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'remotegain') {
+    await step(phase, () => smokeRemoteGain(log));
+    return;
+  }
+  if (phase === 'collabcleanup') {
+    await step(phase, () => smokeCollabCleanup(log));
     return;
   }
   if (phase === 'collabowner') {

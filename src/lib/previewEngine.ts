@@ -34,6 +34,8 @@ const START_LEAD_SEC = 0.08;
 /** szerkesztéskor csak az ennél később induló szeletek cserélődnek (a közelebbiek már a natív
  * szálé — mérve: 50 ms-os határnál egy újrakevert szelet 5 ms-ot késett, ami kattanás) */
 const EDIT_LEAD_SEC = 0.1;
+/** az indulás utáni türelmi idő: ezalatt a nem-futó hangkontextus átmeneti (újraindítjuk), utána megszakítás */
+const STARTUP_GRACE_MS = 2000;
 const FILL_MS = 40;
 
 interface Scheduled {
@@ -80,6 +82,8 @@ class PreviewEngine {
   /** 🎛️ a klip-effektek folytonos állapota (ugrásnál a `mixRange` bejáratja) */
   private fxState = new Map<string, FxState>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** a mostani lejátszás indulásának ideje (az indulás körüli átmeneti átállás türelmi ideje) */
+  private playStartedAt = 0;
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
   private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [] as number[], startMs: 0 };
@@ -257,7 +261,8 @@ class PreviewEngine {
     }
   }
 
-  async play(fromSec: number): Promise<void> {
+  /** `fresh`: valódi indítás (nem ugrás futás közben) — csak ez indítja újra az induláskori türelmi időt */
+  async play(fromSec: number, fresh = true): Promise<void> {
     if (!(await this.available())) {
       return;
     }
@@ -277,6 +282,7 @@ class PreviewEngine {
       return; // közben újabb indítás vagy szünet jött
     }
     this.stats.startMs = Date.now() - t0;
+    if (fresh) this.playStartedAt = Date.now();
     this.playing = true;
     this.startCtx = this.ctx.currentTime + START_LEAD_SEC;
     this.nextSample = this.startSample;
@@ -299,7 +305,7 @@ class PreviewEngine {
   /** ugrás futás közben: a teljes ütemezés újraindul az új helyről */
   seek(sec: number): void {
     if (this.playing) {
-      void this.play(sec);
+      void this.play(sec, false);
     } else {
       this.startSample = Math.round(sec * SR);
     }
@@ -358,8 +364,15 @@ class PreviewEngine {
     if (!this.playing || !ctx) {
       return;
     }
-    // 📞 hívás / Siri: az iOS felfüggeszti a hangmotort (az óra áll) — a transzport is megáll
+    // 📞 hívás / Siri: az iOS felfüggeszti a hangmotort (az óra áll) — a transzport is megáll. Az
+    // INDULÁS körüli első 2 s-ban viszont a munkamenet átmeneti átállása (a stúdió megnyitásakor a
+    // hang-mód beállítása) is egy pillanatra nem-futó állapotot ad: ott újraindítjuk, nem állítjuk meg
+    // (mérve: e nélkül a megnyitás utáni lejátszás 0,5–2 s után magától leállt). Később azonnal megáll.
     if (ctx.state !== 'running') {
+      if (Date.now() - this.playStartedAt < STARTUP_GRACE_MS) {
+        void ctx.resume().catch((caught) => { logCaught('lib/previewEngine.ts:resume', caught); });
+        return;
+      }
       this.pause();
       this.onInterrupted?.();
       return;
